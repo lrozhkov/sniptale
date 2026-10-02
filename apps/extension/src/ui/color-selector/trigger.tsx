@@ -1,4 +1,5 @@
-import { ChevronDown, Palette } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { getColorAlpha } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
 import {
   COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
@@ -12,26 +13,9 @@ import {
   hexToHsl,
   hexToRgb,
   resolvePickerColor,
+  normalizeColorSelectorValue,
 } from '@sniptale/ui/color-selector/helpers';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
-
-const ROOT_CLASS_NAME = cx(
-  'relative flex w-full min-w-0 max-w-full items-center gap-2 overflow-hidden px-2',
-  COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
-  COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME
-);
-
-const PICKER_ACTION_CLASS_NAME = [
-  'inline-flex h-full min-w-0 flex-1 items-center justify-end gap-2 rounded-[7px]',
-  'bg-transparent px-0 transition',
-  'focus-visible:outline-none focus-visible:ring-0',
-  'text-[var(--sniptale-color-text-primary)] hover:text-[var(--sniptale-color-text-primary)]',
-].join(' ');
-
-const PALETTE_BUTTON_CLASS_NAME = [
-  'inline-flex h-full w-5 shrink-0 items-center justify-center rounded-[7px] bg-transparent',
-  'focus-visible:outline-none focus-visible:ring-0',
-].join(' ');
 
 function buildTriggerDisplayValue(value: string, formatMode: ColorSelectorFormatMode) {
   if (value.trim().toLowerCase() === COLOR_SELECTOR_TRANSPARENT) {
@@ -56,97 +40,100 @@ function buildTriggerDisplayValue(value: string, formatMode: ColorSelectorFormat
   return resolvedColor.toUpperCase();
 }
 
-function PickerTriggerButton(props: {
-  disabled: boolean;
-  formatMode: ColorSelectorFormatMode;
+function ColorValue(props: {
   value: string;
-  onOpenPicker: () => void;
-  variant?: 'value' | 'swatch';
-}) {
-  const isTransparent = props.value.trim().toLowerCase() === COLOR_SELECTOR_TRANSPARENT;
-  const previewColor = resolvePickerColor(props.value);
-  const swatchColor = isTransparent ? 'transparent' : previewColor;
-  const displayValue = buildTriggerDisplayValue(props.value, props.formatMode);
-  const valueClassName = isTransparent
-    ? 'truncate text-[12px] font-semibold italic text-[var(--sniptale-color-text-primary)]'
-    : [
-        'truncate text-[12px] font-semibold text-[var(--sniptale-color-text-primary)]',
-        props.formatMode === 'hex' ? 'uppercase' : '',
-      ].join(' ');
-
-  return (
-    <button
-      type="button"
-      disabled={props.disabled}
-      aria-label={translate('shared.ui.colorSelectorChooseColor')}
-      title={displayValue}
-      onClick={props.onOpenPicker}
-      className={cx(PICKER_ACTION_CLASS_NAME, props.variant === 'swatch' && '!justify-start')}
-      data-ui="shared.ui.color-selector.picker-trigger"
-    >
-      <span
-        aria-hidden="true"
-        className={[
-          'inline-flex h-4 w-4 shrink-0 rounded-[6px] border',
-          'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_90%,transparent)]',
-          'bg-[color:var(--sniptale-color-surface-panel)]',
-          'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-surface-panel)_52%,transparent)]',
-        ].join(' ')}
-        style={{
-          backgroundColor: '#fff',
-          backgroundImage: [
-            `linear-gradient(${swatchColor}, ${swatchColor})`,
-            'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
-          ].join(', '),
-          backgroundSize: '100% 100%, 8px 8px',
-        }}
-      />
-      <span
-        className={cx(
-          valueClassName,
-          props.variant === 'swatch' && '!whitespace-normal !overflow-visible break-words text-left'
-        )}
-      >
-        {displayValue}
-      </span>
-    </button>
-  );
-}
-
-function PaletteButton(props: {
+  displayValue: string;
+  label: string;
   disabled: boolean;
-  expanded: boolean;
-  title: string;
-  onClick: () => void;
-  variant?: 'value' | 'swatch';
+  allowAlpha: boolean;
+  allowTransparent: boolean;
+  onCommit: (value: string) => void;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(props.value);
+  const [invalid, setInvalid] = useState(false);
+  const completed = useRef(false);
+  useEffect(() => {
+    setEditing(false);
+    setInvalid(false);
+  }, [props.value, props.disabled]);
+  const focusInput = useCallback((input: HTMLInputElement | null) => {
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }, []);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const finish = (cancel: boolean, restoreFocus: boolean) => {
+    if (completed.current) return;
+    const normalized = normalizeColorSelectorValue(draft);
+    const valid =
+      normalized !== null &&
+      (props.allowTransparent || normalized !== COLOR_SELECTOR_TRANSPARENT) &&
+      (props.allowAlpha ||
+        normalized === COLOR_SELECTOR_TRANSPARENT ||
+        getColorAlpha(normalized) === 1);
+    if (!cancel && !valid) {
+      setInvalid(true);
+      return;
+    }
+    completed.current = true;
+    setEditing(false);
+    setInvalid(false);
+    if (!cancel && normalized && normalized !== props.value) props.onCommit(normalized);
+    if (restoreFocus) queueMicrotask(() => buttonRef.current?.focus({ preventScroll: true }));
+  };
+  if (editing)
+    return (
+      <span className="flex h-8 min-w-0 flex-1 flex-col justify-center">
+        <input
+          ref={focusInput}
+          aria-label={props.label}
+          aria-invalid={invalid || undefined}
+          title={invalid ? translate('shared.ui.colorSelectorInvalid') : props.label}
+          disabled={props.disabled}
+          spellCheck={false}
+          className="h-4! min-h-0! w-full min-w-0 bg-transparent p-0! text-right text-xs leading-4! outline-none"
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setInvalid(false);
+          }}
+          onBlur={() => finish(false, false)}
+          onKeyDown={(event) => {
+            event.stopPropagation();
+            if (event.key === 'Enter' || event.key === 'Escape') {
+              event.preventDefault();
+              finish(event.key === 'Escape', true);
+            }
+          }}
+        />
+        {invalid ? (
+          <span role="alert" className="block truncate text-right text-[10px] leading-3">
+            {translate('shared.ui.colorSelectorInvalid')}
+          </span>
+        ) : null}
+      </span>
+    );
   return (
     <button
+      ref={buttonRef}
       type="button"
       disabled={props.disabled}
-      aria-label={props.title}
-      title={props.title}
-      aria-expanded={props.expanded}
-      onClick={props.onClick}
-      className={PALETTE_BUTTON_CLASS_NAME}
-      data-ui="shared.ui.color-selector.palette-trigger"
+      aria-label={props.label}
+      title={props.displayValue}
+      data-ui="shared.ui.color-selector.value-trigger"
+      className={[
+        'h-full min-w-0 flex-1 truncate rounded-[7px] bg-transparent text-right text-[12px] font-semibold',
+        'focus-visible:outline focus-visible:outline-1',
+      ].join(' ')}
+      onClick={() => {
+        completed.current = false;
+        setDraft(props.value);
+        setEditing(true);
+      }}
     >
-      {props.variant === 'swatch' ? (
-        <Palette
-          size={16}
-          aria-hidden="true"
-          className="text-[var(--sniptale-color-text-secondary)]"
-        />
-      ) : (
-        <ChevronDown
-          size={15}
-          strokeWidth={2.2}
-          className={[
-            'shrink-0 text-[var(--sniptale-color-text-muted-strong)] opacity-75 transition-transform',
-            props.expanded ? 'rotate-180' : '',
-          ].join(' ')}
-        />
-      )}
+      {props.displayValue}
     </button>
   );
 }
@@ -155,19 +142,23 @@ export function ColorSelectorTrigger(props: {
   active?: boolean;
   variant?: 'value' | 'swatch';
   disabled?: boolean;
-  expanded: boolean;
   formatMode: ColorSelectorFormatMode;
   label: string;
-  showPaletteButton?: boolean;
-  title: string;
   value: string;
+  allowAlpha?: boolean;
+  allowTransparent?: boolean;
+  onCommit: (value: string) => void;
   onOpenPicker: () => void;
-  onToggleExpanded: () => void;
 }) {
+  const displayValue = buildTriggerDisplayValue(props.value, props.formatMode);
+  const swatchColor =
+    props.value === COLOR_SELECTOR_TRANSPARENT ? 'transparent' : resolvePickerColor(props.value);
   return (
     <div
       className={cx(
-        ROOT_CLASS_NAME,
+        'relative flex w-full min-w-0 max-w-full items-center gap-2 px-2',
+        COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
+        COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME,
         props.variant === 'swatch' && '!gap-1 !px-0',
         props.active && COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME,
         props.disabled && 'cursor-not-allowed opacity-55'
@@ -177,24 +168,41 @@ export function ColorSelectorTrigger(props: {
       data-variant={props.variant ?? 'value'}
       style={resolveCompactInspectorInteractiveControlStyle(undefined)}
     >
-      <PickerTriggerButton
-        variant={props.variant ?? 'value'}
-        disabled={props.disabled === true}
-        formatMode={props.formatMode}
-        value={props.value}
-        onOpenPicker={props.onOpenPicker}
-      />
-      {props.showPaletteButton === false ? null : (
-        <PaletteButton
-          variant={props.variant ?? 'value'}
-          disabled={props.disabled === true}
-          expanded={props.expanded}
-          title={
-            props.variant === 'swatch' ? translate('shared.ui.colorSelectorPalette') : props.title
-          }
-          onClick={props.onToggleExpanded}
+      <button
+        type="button"
+        disabled={props.disabled}
+        aria-label={translate('shared.ui.colorSelectorChooseColor')}
+        title={displayValue}
+        onClick={props.onOpenPicker}
+        className={[
+          'inline-flex h-full w-6 shrink-0 items-center justify-center rounded-[7px] bg-transparent',
+          'focus-visible:outline focus-visible:outline-1',
+        ].join(' ')}
+        data-ui="shared.ui.color-selector.picker-trigger"
+      >
+        <span
+          aria-hidden="true"
+          className="h-4 w-4 rounded-[6px] border border-[var(--sniptale-color-border-soft)]"
+          style={{
+            backgroundColor: '#fff',
+            backgroundImage: [
+              `linear-gradient(${swatchColor}, ${swatchColor})`,
+              'conic-gradient(#d1d5db 25%, #fff 0 50%, #d1d5db 0 75%, #fff 0)',
+            ].join(', '),
+            backgroundSize: '100% 100%, 8px 8px',
+          }}
         />
-      )}
+      </button>
+      <ColorValue
+        key={String(props.active === true)}
+        value={props.value}
+        displayValue={displayValue}
+        label={props.label}
+        disabled={props.disabled === true || props.active === true}
+        allowAlpha={props.allowAlpha !== false}
+        allowTransparent={props.allowTransparent !== false}
+        onCommit={props.onCommit}
+      />
     </div>
   );
 }

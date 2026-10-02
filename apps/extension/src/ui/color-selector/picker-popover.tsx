@@ -1,3 +1,5 @@
+import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
+import { translate } from '../../platform/i18n';
 import { PickerFooter } from './picker-sections';
 import type { ColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { ColorEditorPanel } from './editor-panel';
@@ -19,6 +21,7 @@ type ColorSelectorPickerPopoverProps = {
   eyedropper: ReturnType<typeof useEyedropper>;
   formatMode: ColorSelectorFormatMode;
   palette?: readonly string[];
+  recentColors?: readonly string[];
   title?: string;
   onApply: () => void;
   onCancel: () => void;
@@ -39,9 +42,24 @@ export function ColorSelectorPickerPopover(props: ColorSelectorPickerPopoverProp
               showLabel={false}
               selectedColor={props.color}
               title={props.title ?? ''}
-              onSelect={props.onColorChange}
+              onSelect={(color) =>
+                props.onColorChange(
+                  props.color === 'transparent' || (getColorAlpha(color) ?? 1) < 1
+                    ? color
+                    : (replaceColorChannels(props.color, color) ?? color)
+                )
+              }
             />
           </div>
+        ) : null}
+        {props.recentColors?.length ? (
+          <ColorSelectorSwatchSection
+            colors={props.recentColors}
+            label={translate('shared.ui.colorSelectorRecentColors')}
+            selectedColor={props.color}
+            title={props.title ?? ''}
+            onSelect={props.onColorChange}
+          />
         ) : null}
         <ColorEditorPanel {...props} />
         <PickerFooter onApply={props.onApply} onCancel={props.onCancel} />

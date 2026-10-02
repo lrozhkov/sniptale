@@ -158,18 +158,8 @@ it('restores focus to the trigger after Escape inside a Shadow DOM picker', asyn
   expect(shadowRoot.activeElement).toBe(trigger);
   expect(onChange).not.toHaveBeenCalled();
 
-  const paletteTrigger = shadowRoot.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.color-selector.palette-trigger"]'
-  );
-  paletteTrigger?.focus();
-  await act(async () => paletteTrigger?.click());
-  expect(shadowRoot.querySelector('[data-ui="shared.ui.color-selector.expanded"]')).not.toBeNull();
-  await act(async () => {
-    paletteTrigger?.dispatchEvent(
-      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
-    );
-  });
-  expect(shadowRoot.querySelector('[data-ui="shared.ui.color-selector.expanded"]')).toBeNull();
-  expect(shadowRoot.activeElement).toBe(paletteTrigger);
+  expect(
+    shadowRoot.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+  ).toBeNull();
   host.remove();
 });

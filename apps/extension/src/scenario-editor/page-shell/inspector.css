@@ -645,7 +645,7 @@
 /* Textual values share typography; selection is neutral and editing keeps the accent. */
 .guide-inspector-panel [data-ui='shared.ui.compact-select'] > button,
 .guide-inspector-panel [data-ui='shared.ui.surface-style-selector.trigger'] > span:last-of-type,
-.guide-inspector-panel [data-ui='shared.ui.color-selector.picker-trigger'] > span:last-of-type,
+.guide-inspector-panel [data-ui='shared.ui.color-selector.value-trigger'],
 .guide-inspector-panel [data-ui='shared.ui.compact-inspector.numeric-value-field'] > input,
 .guide-inspector-panel .guide-inspector-choice [role='group'] button {
   font: 500 12px / 1.5 var(--sniptale-font-sans);

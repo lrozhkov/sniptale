@@ -1,6 +1,7 @@
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
+import { applyHarnessBootstrap, EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
 const check = expect.configure({ soft: true, timeout: 1000 });
 
@@ -55,9 +56,10 @@ for (const theme of ['light', 'dark'] as const) {
       await check(colorTrigger).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       const picker = accent.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
       const palette = accent.locator('[data-ui="shared.ui.color-selector.palette-trigger"]');
-      await check(palette.locator('svg.lucide-palette')).toHaveCount(1);
-      await check(picker.locator('span:last-child')).toBeVisible();
-      check((await picker.locator('span:last-child').boundingBox())!.width).toBeGreaterThan(20);
+      await check(palette).toHaveCount(0);
+      const value = accent.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
+      await check(value).toBeVisible();
+      check((await value.boundingBox())!.width).toBeGreaterThan(20);
       const labelColor = await accent
         .locator('[data-ui="shared.ui.compact-inspector.color-field"] > span')
         .evaluate((node) => getComputedStyle(node).color);
@@ -75,14 +77,14 @@ for (const theme of ['light', 'dark'] as const) {
       await popup.getByRole('button', { name: 'HEX', exact: true }).click();
       await page.keyboard.press('Escape');
       await expect(picker).toBeFocused();
-      await expect(picker).toContainText('RGB(');
+      await expect(value).toContainText('RGB(');
       const divider = page.locator('.guide-panel-divider-right');
       await divider.focus();
       await page.keyboard.press('Home');
       for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
       await expect(divider).toHaveAttribute('aria-valuenow', '260');
       await checkInspectorLabels(panel);
-      const valueGeometry = await picker.locator('span:last-child').evaluate((node) => ({
+      const valueGeometry = await value.evaluate((node) => ({
         width: node.clientWidth,
         content: node.scrollWidth,
         height: node.getBoundingClientRect().height,
@@ -91,7 +93,7 @@ for (const theme of ['light', 'dark'] as const) {
       check(valueGeometry.content).toBeLessThanOrEqual(valueGeometry.width + 1);
       check(valueGeometry.height).toBeGreaterThan(1);
       await info.attach(`color-value-narrow-${locale}-${theme}`, {
-        body: await panel.screenshot(),
+        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
         contentType: 'image/png',
       });
       await divider.focus();
@@ -155,7 +157,7 @@ for (const theme of ['light', 'dark'] as const) {
         '0px'
       );
       await info.attach(`headings-${locale}-${theme}`, {
-        body: await panel.screenshot(),
+        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
         contentType: 'image/png',
       });
       await panel
@@ -180,7 +182,7 @@ for (const theme of ['light', 'dark'] as const) {
       );
       await textColor.scrollIntoViewIfNeeded();
       await info.attach(`hotspot-fields-${locale}-${theme}`, {
-        body: await panel.screenshot(),
+        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
         contentType: 'image/png',
       });
       await page
@@ -308,11 +310,11 @@ for (const theme of ['light', 'dark'] as const) {
     const panel = page.locator('#guide-inspector-panel');
     await panel.getByRole('button', { name: 'Show all settings', exact: true }).click();
     const trigger = panel.locator(
-      '.guide-style-accent [data-ui="shared.ui.color-selector.palette-trigger"]'
+      '.guide-style-accent [data-ui="shared.ui.color-selector.picker-trigger"]'
     );
     await trigger.scrollIntoViewIfNeeded();
     await trigger.click();
-    const layer = page.locator('[data-ui="shared.ui.color-selector.expanded-layer"]');
+    const layer = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
     await expect(layer).toBeVisible();
     const scroll = panel.locator('.guide-panel-scroll');
     const previous = await trigger.boundingBox();
@@ -335,5 +337,99 @@ for (const theme of ['light', 'dark'] as const) {
       node.scrollTop = 0;
     });
     await expect(layer).toBeHidden();
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const locale of ['ru', 'en'] as const) {
+    test(`color value editing in ${locale} ${theme}`, async ({ page, hostOrigin }, info) => {
+      await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+      const panel = page.locator('#guide-inspector-panel');
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', {
+          name: locale === 'ru' ? 'Оформление' : 'Appearance',
+          exact: true,
+        })
+        .click();
+      const field = panel.locator('.guide-style-accent');
+      const swatch = field.locator('[data-ui="shared.ui.color-selector.picker-trigger"]');
+      const value = field.locator('[data-ui="shared.ui.color-selector.value-trigger"]');
+      await expect(
+        field.locator('[data-ui="shared.ui.color-selector.palette-trigger"]')
+      ).toHaveCount(0);
+      const before = await field.boundingBox();
+      await value.click();
+      const input = field.getByRole('textbox');
+      await expect(input).toBeFocused();
+      expect(await field.boundingBox()).toEqual(before);
+      await input.fill('#abcdef');
+      await input.press('Enter');
+      await expect(value).toHaveText('#ABCDEF');
+      await expect(value).toBeFocused();
+      expect(await field.boundingBox()).toEqual(before);
+      await value.click();
+      await input.fill('invalid');
+      await input.press('Enter');
+      await expect(input).toHaveAttribute('aria-invalid', 'true');
+      await expect(field.getByRole('alert')).toBeVisible();
+      expect(await field.boundingBox()).toEqual(before);
+      await input.press('Escape');
+      await expect(value).toHaveText('#ABCDEF');
+      await swatch.click();
+      const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+      await expect(picker).toBeVisible();
+      const cancel = picker.getByRole('button', {
+        name: locale === 'ru' ? 'Отмена' : 'Cancel',
+        exact: true,
+      });
+      const apply = picker.getByRole('button', {
+        name: locale === 'ru' ? 'Применить' : 'Apply',
+        exact: true,
+      });
+      expect((await cancel.boundingBox())!.height).toBeLessThanOrEqual(28);
+      expect((await apply.boundingBox())!.height).toBeLessThanOrEqual(28);
+      expect(await field.boundingBox()).toEqual(before);
+      await page.screenshot({ path: info.outputPath('color-picker.png') });
+      await picker.getByRole('textbox', { name: 'HEX', exact: true }).fill('#123456');
+      await cancel.click();
+      await expect(value).toHaveText('#ABCDEF');
+      await expect(swatch).toBeFocused();
+      const divider = page.locator('.guide-panel-divider-right');
+      await divider.focus();
+      await page.keyboard.press('Home');
+      const bounds = await field.boundingBox();
+      const valueBounds = await value.boundingBox();
+      expect(valueBounds!.width).toBeGreaterThan(20);
+      expect(valueBounds!.x + valueBounds!.width).toBeLessThanOrEqual(bounds!.x + bounds!.width);
+      await info.attach(`backlog6-${locale}-${theme}`, {
+        body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
+        contentType: 'image/png',
+      });
+    });
+  }
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`drawing color value editing in ${theme}`, async ({ page, hostOrigin }, info) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await applyHarnessBootstrap(page, { storage: { 'sniptale-theme-preference': theme } });
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}?theme=${theme}`);
+    await expect(page.locator('[data-ui="editor.page.root"]')).toBeVisible();
+    await page.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+    const options = page.locator('[data-ui="editor.drawing.options"]');
+    const swatch = options.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').first();
+    await expect(swatch.locator('span')).toBeVisible();
+    expect((await swatch.locator('span').boundingBox())!.width).toBe(16);
+    await expect(
+      options.locator('[data-ui="shared.ui.color-selector.value-trigger"]').first()
+    ).toBeHidden();
+    await swatch.click();
+    const picker = page.locator('[data-ui="shared.ui.color-selector.picker-layer"]');
+    await expect(picker).toBeVisible();
+    await expect(picker.getByRole('textbox', { name: 'HEX', exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath('drawing-color-picker.png') });
+    await page.keyboard.press('Escape');
+    await expect(swatch).toBeFocused();
   });
 }

@@ -29,7 +29,7 @@ export interface CompactColorSelectorProps {
   pickerOnly?: boolean;
   recentColors?: readonly string[];
   title: string;
-  /** Swatch presentation shows the formatted value beside the swatch with explicit palette access. */
+  /** Swatch presentation shows the editable formatted value beside the picker swatch. */
   triggerVariant?: 'value' | 'swatch';
   value: string;
 }

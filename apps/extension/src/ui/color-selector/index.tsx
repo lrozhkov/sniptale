@@ -1,11 +1,10 @@
-import { type CSSProperties, useEffect, useId } from 'react';
+import { useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppLocale } from '../../platform/i18n';
 import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { ColorSelectorExpandedPanel } from './expanded';
 import {
   ColorSelectorFloatingLayer,
   useColorSelectorLayerStyle,
@@ -18,290 +17,99 @@ import { FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE } from '@sniptale/ui/floating-i
 
 export type { CompactColorSelectorProps } from '@sniptale/ui/color-selector/types';
 
-function ColorSelectorHeader(props: {
-  active: boolean;
-  disabled: boolean;
-  expanded: boolean;
-  formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
-  label: string;
-  pickerOnly: boolean;
-  triggerVariant: NonNullable<CompactColorSelectorProps['triggerVariant']>;
-  title: string;
-  value: string;
-  onOpenPicker: () => void;
-  onToggleExpanded: () => void;
-}) {
-  return (
-    <ColorSelectorTrigger
-      variant={props.triggerVariant}
-      active={props.active}
-      disabled={props.disabled}
-      expanded={props.expanded}
-      formatMode={props.formatMode}
-      label={props.label}
-      showPaletteButton={!props.pickerOnly}
-      title={props.title}
-      value={props.value}
-      onToggleExpanded={props.onToggleExpanded}
-      onOpenPicker={props.onOpenPicker}
-    />
-  );
-}
-
-type ColorSelectorPanelsProps = {
-  allowAlpha: boolean;
-  allowTransparent: boolean;
-  cycleFormatMode: () => void;
-  draftColor: string;
-  expanded: boolean;
-  floatingBoundaryRef: CompactColorSelectorProps['floatingBoundaryRef'];
-  floatingOwnerId: string;
-  floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
-  formatMode: ReturnType<typeof useColorSelectorState>['formatMode'];
-  normalizedPalette: readonly string[];
-  paletteInPicker: boolean;
-  normalizedRecentColors: readonly string[];
-  pickerOpen: boolean;
-  title: string;
-  value: string;
-  onApply: () => void;
-  onCancel: () => void;
-  onColorChange: (color: string) => void;
-  onSelectTransparent: () => void;
-  onPaletteSelect: (color: string) => void;
-  onRecentSelect: (color: string) => void;
-  rootNode: HTMLDivElement | null;
+function PickerLayer(props: {
   state: ReturnType<typeof useColorSelectorState>;
-};
-
-function ColorSelectorExpandedLayer(
-  props: ColorSelectorPanelsProps & {
-    layerStyle: CSSProperties;
-    portalTheme: string | null;
-  }
-) {
-  if (!props.expanded) {
-    return null;
-  }
-
-  return (
-    <ColorSelectorFloatingLayer
-      layerRef={props.state.layerRef}
-      ownerId={props.floatingOwnerId}
-      portalTheme={props.portalTheme}
-      style={props.layerStyle}
-      ui="shared.ui.color-selector.expanded-layer"
-    >
-      <ColorSelectorExpandedPanel
-        palette={props.normalizedPalette}
-        recentColors={props.normalizedRecentColors}
-        title={props.title}
-        value={props.value}
-        onPaletteSelect={props.onPaletteSelect}
-        onRecentSelect={props.onRecentSelect}
-      />
-    </ColorSelectorFloatingLayer>
+  options: CompactColorSelectorProps;
+  ownerId: string;
+}) {
+  const { state, options } = props;
+  const rootNode = state.rootRef.current;
+  const portalTarget =
+    typeof document === 'undefined' ? null : resolveThemeSafePortalTarget(rootNode);
+  const portalTheme = useResolvedPortalTheme(rootNode);
+  const layerStyle = useColorSelectorLayerStyle(
+    rootNode,
+    state.pickerOpen,
+    options.floatingPlacement ?? 'auto',
+    options.floatingBoundaryRef?.current ?? null,
+    state.layerRef,
+    'picker'
   );
-}
-
-function ColorSelectorPickerLayer(
-  props: ColorSelectorPanelsProps & {
-    layerStyle: CSSProperties;
-    portalTheme: string | null;
-  }
-) {
-  if (!props.pickerOpen) {
-    return null;
-  }
-
-  return (
+  if (!state.pickerOpen || !portalTarget) return null;
+  const finish = (apply: boolean) => {
+    if (apply) state.handlePickerApply();
+    else state.handlePickerCancel();
+    state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
+  };
+  return createPortal(
     <ColorSelectorFloatingLayer
-      layerRef={props.state.layerRef}
-      ownerId={props.floatingOwnerId}
-      portalTheme={props.portalTheme}
-      style={props.layerStyle}
+      layerRef={state.layerRef}
+      ownerId={props.ownerId}
+      portalTheme={portalTheme}
+      style={layerStyle}
       ui="shared.ui.color-selector.picker-layer"
     >
       <ColorSelectorPickerPopover
-        allowAlpha={props.allowAlpha}
-        allowTransparent={props.allowTransparent}
-        color={props.draftColor}
-        formatMode={props.formatMode}
-        eyedropper={props.state.eyedropper}
-        palette={props.paletteInPicker ? props.normalizedPalette : []}
-        title={props.title}
-        onApply={props.onApply}
-        onCancel={props.onCancel}
-        onColorChange={props.onColorChange}
-        onCycleFormatMode={props.cycleFormatMode}
-        onSelectTransparent={props.onSelectTransparent}
+        allowAlpha={options.allowAlpha !== false}
+        allowTransparent={options.allowTransparent !== false}
+        color={state.draftColor}
+        formatMode={state.formatMode}
+        eyedropper={state.eyedropper}
+        palette={state.normalizedPalette}
+        recentColors={state.normalizedRecentColors}
+        title={options.title}
+        onApply={() => finish(true)}
+        onCancel={() => finish(false)}
+        onColorChange={state.handleDraftColorChange}
+        onCycleFormatMode={state.cycleFormatMode}
+        onSelectTransparent={state.handleSelectTransparent}
       />
-    </ColorSelectorFloatingLayer>
-  );
-}
-
-function ColorSelectorPanels(props: ColorSelectorPanelsProps) {
-  const open = props.expanded || props.pickerOpen;
-  const portalTarget =
-    typeof document === 'undefined' ? null : resolveThemeSafePortalTarget(props.rootNode);
-  const portalTheme = useResolvedPortalTheme(props.rootNode);
-  const layerStyle = useColorSelectorLayerStyle(
-    props.rootNode,
-    open,
-    props.floatingPlacement,
-    props.floatingBoundaryRef?.current ?? null,
-    props.state.layerRef,
-    props.pickerOpen ? 'picker' : 'palette'
-  );
-
-  if (!open || !portalTarget) {
-    return null;
-  }
-
-  return createPortal(
-    <>
-      <ColorSelectorExpandedLayer {...props} layerStyle={layerStyle} portalTheme={portalTheme} />
-      <ColorSelectorPickerLayer {...props} layerStyle={layerStyle} portalTheme={portalTheme} />
-    </>,
+    </ColorSelectorFloatingLayer>,
     portalTarget
   );
 }
 
-function ColorSelectorBody(props: {
-  allowAlpha: boolean;
-  allowTransparent: boolean;
-  className: string | undefined;
-  disabled: boolean;
-  floatingBoundaryRef: CompactColorSelectorProps['floatingBoundaryRef'];
-  floatingOwnerId: string;
-  floatingPlacement: NonNullable<CompactColorSelectorProps['floatingPlacement']>;
-  label: string;
-  paletteInPicker: boolean;
-  pickerOnly: boolean;
-  triggerVariant: NonNullable<CompactColorSelectorProps['triggerVariant']>;
-  state: ReturnType<typeof useColorSelectorState>;
-  title: string;
-}) {
-  return (
-    <div
-      ref={props.state.rootRef}
-      {...{ [FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE]: props.floatingOwnerId }}
-      data-ui="shared.ui.color-selector"
-      data-open={props.state.expanded || props.state.pickerOpen ? 'true' : 'false'}
-      className={
-        props.className
-          ? `relative w-full min-w-0 max-w-full ${props.className}`
-          : 'relative w-full min-w-0 max-w-full'
-      }
-    >
-      <ColorSelectorHeader
-        active={props.state.expanded || props.state.pickerOpen}
-        disabled={props.disabled}
-        expanded={props.state.expanded}
-        formatMode={props.state.formatMode}
-        label={props.label}
-        pickerOnly={props.pickerOnly}
-        triggerVariant={props.triggerVariant}
-        title={props.title}
-        value={props.state.draftColor}
-        onToggleExpanded={props.state.handleToggleExpanded}
-        onOpenPicker={props.state.handleOpenPicker}
-      />
-      <ColorSelectorPanels
-        allowAlpha={props.allowAlpha}
-        allowTransparent={props.allowTransparent}
-        cycleFormatMode={props.state.cycleFormatMode}
-        draftColor={props.state.draftColor}
-        expanded={props.state.expanded}
-        floatingBoundaryRef={props.floatingBoundaryRef}
-        floatingOwnerId={props.floatingOwnerId}
-        floatingPlacement={props.floatingPlacement}
-        formatMode={props.state.formatMode}
-        normalizedPalette={props.state.normalizedPalette}
-        paletteInPicker={props.paletteInPicker}
-        normalizedRecentColors={props.state.normalizedRecentColors}
-        pickerOpen={props.state.pickerOpen}
-        title={props.title}
-        value={props.state.draftColor}
-        onApply={() => {
-          props.state.handlePickerApply();
-          props.state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
-        }}
-        onCancel={() => {
-          props.state.handlePickerCancel();
-          props.state.rootRef.current?.querySelector('button')?.focus({ preventScroll: true });
-        }}
-        onColorChange={props.state.handleDraftColorChange}
-        onSelectTransparent={props.state.handleSelectTransparent}
-        onPaletteSelect={props.state.handlePaletteSelect}
-        onRecentSelect={props.state.handleRecentSelect}
-        rootNode={props.state.rootRef.current}
-        state={props.state}
-      />
-    </div>
-  );
-}
-
-export function CompactColorSelector({
-  allowAlpha = true,
-  allowTransparent = true,
-  className,
-  disabled = false,
-  floatingBoundaryRef,
-  floatingPlacement = 'auto',
-  label,
-  onChange,
-  onOpenChange,
-  onPreviewChange,
-  onPreviewReset,
-  palette = [],
-  paletteInPicker = false,
-  pickerOnly = false,
-  triggerVariant = 'value',
-  recentColors = [],
-  title,
-  value,
-}: CompactColorSelectorProps) {
+/** Color swatch opens a transactional picker; the value offers independent text editing. */
+export function CompactColorSelector(props: CompactColorSelectorProps) {
   useAppLocale();
   const floatingOwnerId = useId();
   const state = useColorSelectorState({
-    onChange,
-    onPreviewChange,
-    onPreviewReset,
-    palette,
-    recentColors,
-    value,
+    onChange: props.onChange,
+    onPreviewChange: props.onPreviewChange,
+    onPreviewReset: props.onPreviewReset,
+    palette: props.palette,
+    recentColors: props.recentColors,
+    value: props.value,
   });
-  const open = state.expanded || state.pickerOpen;
-  const { expanded, handlePickerCancel, handleToggleExpanded, pickerOpen } = state;
+  const { pickerOpen, handlePickerCancel } = state;
+  const { onOpenChange } = props;
   useEffect(() => {
-    if (!disabled) return;
-    if (pickerOpen) {
-      handlePickerCancel();
-      return;
-    }
-    if (expanded) handleToggleExpanded();
-  }, [disabled, expanded, handlePickerCancel, handleToggleExpanded, pickerOpen]);
-
+    if (props.disabled && pickerOpen) handlePickerCancel();
+  }, [props.disabled, pickerOpen, handlePickerCancel]);
   useEffect(() => {
-    onOpenChange?.(open);
-  }, [onOpenChange, open]);
-
+    onOpenChange?.(pickerOpen);
+  }, [onOpenChange, pickerOpen]);
   return (
-    <ColorSelectorBody
-      allowAlpha={allowAlpha}
-      allowTransparent={allowTransparent}
-      className={className}
-      disabled={disabled}
-      floatingBoundaryRef={floatingBoundaryRef}
-      floatingOwnerId={floatingOwnerId}
-      floatingPlacement={floatingPlacement}
-      label={label}
-      paletteInPicker={paletteInPicker}
-      pickerOnly={pickerOnly}
-      triggerVariant={triggerVariant}
-      state={state}
-      title={title}
-    />
+    <div
+      ref={state.rootRef}
+      {...{ [FLOATING_INTERACTION_OWNER_ID_ATTRIBUTE]: floatingOwnerId }}
+      data-ui="shared.ui.color-selector"
+      data-open={pickerOpen ? 'true' : 'false'}
+      className={`relative w-full min-w-0 max-w-full ${props.className ?? ''}`}
+    >
+      <ColorSelectorTrigger
+        variant={props.triggerVariant ?? 'value'}
+        active={pickerOpen}
+        disabled={props.disabled === true}
+        formatMode={state.formatMode}
+        label={props.label}
+        value={state.draftColor}
+        onCommit={state.handleRecentSelect}
+        onOpenPicker={state.handleOpenPicker}
+        allowAlpha={props.allowAlpha !== false}
+        allowTransparent={props.allowTransparent !== false}
+      />
+      <PickerLayer state={state} options={props} ownerId={floatingOwnerId} />
+    </div>
   );
 }

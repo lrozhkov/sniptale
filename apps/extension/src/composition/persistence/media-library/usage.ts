@@ -8,7 +8,7 @@ import {
 } from './dependencies';
 import { listScenarioProjectEntries } from '../scenario/projects';
 import { parseScenarioAssetEntry } from '../scenario/read-guards';
-import { listVideoProjectEntries } from '../projects';
+import { listVideoProjectEntries } from '../projects/queries';
 import {
   initDB,
   SCENARIO_ASSETS_STORE,

@@ -243,7 +243,7 @@
   button:focus-visible {
   outline: none;
 }
-.sniptale-inspector-surface [data-ui='shared.ui.color-selector.picker-trigger'] > span:last-child {
+.sniptale-inspector-surface [data-ui='shared.ui.color-selector.value-trigger'] {
   font-weight: 500;
 }
 .sniptale-inspector-surface [data-ui='shared.ui.compact-inspector.text-field'] > input {

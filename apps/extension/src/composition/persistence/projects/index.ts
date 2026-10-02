@@ -257,13 +257,7 @@ export async function listVideoProjectReadResults(): Promise<VideoProjectReadRes
   return verified;
 }
 
-export async function listVideoProjectEntries(): Promise<VideoProjectEntry[]> {
-  const db = await initDB();
-  return (await db.getAll(VIDEO_PROJECTS_STORE))
-    .map(parseVideoProjectEntry)
-    .filter((entry): entry is VideoProjectEntry => entry !== null)
-    .sort((left, right) => right.updatedAt - left.updatedAt);
-}
+export { listVideoProjectEntries } from './queries';
 
 export interface PreparedProjectAsset {
   id: string;

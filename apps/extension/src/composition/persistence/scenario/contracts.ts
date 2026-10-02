@@ -1,8 +1,8 @@
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
-import type { AssetRef } from '../assets';
-import type { PersistedEditorDocumentV3 } from '../document-assets';
+import type { AssetRef } from '../assets/contracts';
+import type { PersistedEditorDocumentV3 } from '../document-assets/contracts';
 
 export interface ScenarioSavedVersion {
   revision: number;

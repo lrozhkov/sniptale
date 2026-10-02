@@ -109,19 +109,12 @@ it('renders picker and palette content in floating layers under the trigger', ()
   expect(container!.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
   expect(document.body.querySelector('[data-ui="shared.ui.color-selector.picker"]')).not.toBeNull();
 
-  act(() => {
-    getButton('shared.ui.colorSelectorChooseColor')?.click();
-  });
-  act(() => {
-    getButton('Цвет')?.click();
-  });
-  const expandedLayer = document.body.querySelector(
-    '[data-ui="shared.ui.color-selector.expanded-layer"]'
-  ) as HTMLDivElement | null;
-  expect(expandedLayer?.className).toContain('fixed');
-  expect(expandedLayer?.dataset['floatingUiRoot']).toBe('true');
-  expect(expandedLayer?.style.width).toBe('224px');
-  expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
+  expect(
+    pickerLayer?.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')
+  ).not.toBeNull();
+  expect(
+    document.body.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+  ).toBeNull();
 });
 
 it('disables both color actions and closes an open layer when the field becomes linked', () => {

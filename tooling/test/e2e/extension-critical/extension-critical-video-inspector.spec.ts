@@ -103,8 +103,8 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(color).toHaveAttribute('data-variant', 'swatch');
       await color.scrollIntoViewIfNeeded();
       await expect(color).toContainText('#');
-      await color.locator('[data-ui="shared.ui.color-selector.palette-trigger"]').click();
-      const palette = page.locator('[data-ui="shared.ui.color-selector.expanded"]');
+      await color.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      const palette = page.locator('[data-ui="shared.ui.color-selector.picker"]');
       await expect(palette).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(palette).toHaveCount(0);

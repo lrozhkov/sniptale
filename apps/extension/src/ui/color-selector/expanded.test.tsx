@@ -1,7 +1,6 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
 
-import { ColorSelectorExpandedPanel } from './expanded';
 import { PickerHslFields, PickerRgbFields } from './picker-channel-fields';
 import { PickerManualColorField } from './picker-controls';
 
@@ -9,25 +8,6 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-
-it('renders recent and palette sections through the shared swatch section', () => {
-  const markup = renderToStaticMarkup(
-    <ColorSelectorExpandedPanel
-      palette={['#222222']}
-      recentColors={['#111111', '#111111']}
-      title="Color"
-      value="#111111"
-      onPaletteSelect={() => undefined}
-      onRecentSelect={() => undefined}
-    />
-  );
-
-  expect(markup).toContain('shared.ui.colorSelectorRecentColors');
-  expect(markup).toContain('shared.ui.colorSelectorPalette');
-  expect(markup).toContain('Color: #111111');
-  expect(markup).toContain('Color: #222222');
-  expect(markup).toContain('data-ui="shared.ui.color-selector.expanded"');
-});
 
 it('renders manual picker mode labels without legacy letter spacing', () => {
   const markup = renderToStaticMarkup(

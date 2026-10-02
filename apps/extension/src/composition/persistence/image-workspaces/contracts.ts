@@ -1,6 +1,6 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
-import type { PersistedEditorDocumentV3 } from '../document-assets';
-import type { AssetRef } from '../assets';
+import type { PersistedEditorDocumentV3 } from '../document-assets/contracts';
+import type { AssetRef } from '../assets/contracts';
 
 /** Authoritative editable document for an image aggregate. */
 export interface ImageWorkspaceEntry {

@@ -117,11 +117,21 @@ export function PickerManualColorField(props: {
 
 export function PickerFooter(props: { onApply: () => void; onCancel: () => void }) {
   return (
-    <div className="grid grid-cols-2 gap-2 pt-2">
-      <ProductActionButton compact tone="secondary" onClick={props.onCancel} className="w-full">
+    <div className="flex justify-end gap-2 pt-2">
+      <ProductActionButton
+        compact
+        tone="secondary"
+        onClick={props.onCancel}
+        className="h-7! min-h-7! rounded-[var(--sniptale-radius-sm)]! px-3! text-xs!"
+      >
         {translate('shared.ui.colorSelectorCancel')}
       </ProductActionButton>
-      <ProductActionButton compact tone="primary" onClick={props.onApply} className="w-full">
+      <ProductActionButton
+        compact
+        tone="primary"
+        onClick={props.onApply}
+        className="h-7! min-h-7! rounded-[var(--sniptale-radius-sm)]! px-3! text-xs!"
+      >
         {translate('shared.ui.colorSelectorApply')}
       </ProductActionButton>
     </div>

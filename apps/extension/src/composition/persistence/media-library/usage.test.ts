@@ -19,8 +19,8 @@ vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: mocks.initDB,
 }));
-vi.mock('../projects', async (original) => ({
-  ...(await original<typeof import('../projects')>()),
+vi.mock('../projects/queries', async (original) => ({
+  ...(await original<typeof import('../projects/queries')>()),
   listVideoProjectEntries: mocks.videos,
 }));
 vi.mock('../scenario/projects', async (original) => ({

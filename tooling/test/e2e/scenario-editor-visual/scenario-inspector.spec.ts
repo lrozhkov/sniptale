@@ -524,8 +524,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
             .getBoundingClientRect().right
       );
       expect.soft(colorSpacing).toBe(8);
-      await accent.locator('[data-ui="shared.ui.color-selector.palette-trigger"]').click();
-      const palette = page.locator('[data-ui="shared.ui.color-selector.expanded"]');
+      await accent.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
+      const palette = page.locator('[data-ui="shared.ui.color-selector.picker"]');
       expect.soft(await palette.locator('button').count()).toBeGreaterThanOrEqual(8);
       await page.keyboard.press('Escape');
       await info.attach(`guide-colors-${locale}-${theme}`, {
