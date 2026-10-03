@@ -18,6 +18,7 @@ import {
   updateEditorDrawingShapeDraft,
 } from '../../drawing/object/vector';
 import type { EditorControllerEventBindings } from './types';
+import { requestEditorFreehandPreview } from './runtime.render';
 import {
   getEditorFreeCanvasBounds,
   normalizeEditorCropSelection,
@@ -168,7 +169,11 @@ function applyDrawingPreview(
     return;
   }
   if (updateVectorPreview(object, drawing) || updateShapePreview(object, drawing)) {
-    canvas.requestRenderAll();
+    if (drawing.kind === 'pencil' || drawing.kind === 'marker') {
+      requestEditorFreehandPreview(bindings);
+    } else {
+      canvas.requestRenderAll();
+    }
     return;
   }
   replaceDraft(bindings, canvas, object, drawing);

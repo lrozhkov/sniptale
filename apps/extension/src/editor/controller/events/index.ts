@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric';
+import { cancelEditorFreehandPreview } from './runtime.render';
 import { createEditorDrawingEventHandlers } from './drawing';
 import { createPanEventHandlers } from './pan';
 import { createRuntimeEventHandlers } from './runtime';
@@ -77,6 +78,7 @@ export function detachEditorControllerEventHandlers(options: {
   viewportResizeObserver: ResizeObserver | null;
 }): void {
   const { canvas, viewportElement, handlers, viewportResizeObserver } = options;
+  cancelEditorFreehandPreview(canvas);
   canvas.off('selection:created', handlers.handleSelectionChange);
   canvas.off('selection:updated', handlers.handleSelectionChange);
   canvas.off('selection:cleared', handlers.handleSelectionChange);

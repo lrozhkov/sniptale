@@ -1,5 +1,7 @@
-import { FabricObject, Point } from 'fabric';
-import { beforeEach, expect, it, vi } from 'vitest';
+// @vitest-environment jsdom
+
+import { Canvas, FabricObject, Point, Rect } from 'fabric';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createFabricCanvasFixture,
   createTypedTestFixture,
@@ -22,7 +24,13 @@ vi.mock('../../drawing/preview', () => ({
   renderEditorFreehandPreview: mocks.renderPreview,
 }));
 
-import { createAfterRenderHandler } from './runtime.render';
+import {
+  cancelEditorFreehandPreview,
+  createAfterRenderHandler,
+  requestEditorFreehandPreview,
+} from './runtime.render';
+import { createBeforeRenderHandler } from './runtime.canvas';
+import type { DrawSession } from '../core/types';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -185,3 +193,114 @@ it.each([
   expect(mocks.readDrawing).not.toHaveBeenCalled();
   expect(mocks.renderPreview).not.toHaveBeenCalled();
 });
+
+function createPreviewLifecycle() {
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation((frame) => {
+    frames.delete(frame);
+  });
+  const canvas = new Canvas(document.createElement('canvas'), { renderOnAddRemove: false });
+  const object = new Rect({ visible: false });
+  canvas.add(object);
+  let session: DrawSession | null = {
+    object,
+    objectId: 'draft',
+    pointerId: 1,
+    tool: 'pencil',
+    start: new Point(),
+  };
+  let currentCanvas: Canvas | null = canvas;
+  const bindings = { getCanvas: () => currentCanvas, getDrawSession: () => session };
+  canvas.on('before:render', createBeforeRenderHandler(bindings));
+  canvas.on('after:render', createAfterRenderHandler(bindings));
+  mocks.readDrawing.mockReturnValue({ kind: 'pencil', id: 'draft' });
+  mocks.renderPreview.mockReturnValue(true);
+  const flush = () => {
+    const callbacks = [...frames.values()];
+    frames.clear();
+    callbacks.forEach((callback) => callback(0));
+  };
+  return {
+    canvas,
+    object,
+    bindings,
+    frames,
+    flush,
+    end: () => {
+      session = null;
+    },
+    replace: () => {
+      session = session ? { ...session } : null;
+    },
+    detachCanvas: () => {
+      currentCanvas = null;
+    },
+  };
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+it('coalesces top frames without rendering committed objects and clears each translucent preview', () => {
+  const fixture = createPreviewLifecycle();
+  const { canvas, bindings, flush } = fixture;
+  const committed = new Rect();
+  canvas.add(committed);
+  const render = vi.spyOn(committed, 'render');
+  const clear = vi.spyOn(canvas, 'clearContext');
+  for (let i = 0; i < 8; i++) requestEditorFreehandPreview(bindings);
+  expect(fixture.frames.size).toBe(1);
+  flush();
+  expect(render).not.toHaveBeenCalled();
+  expect(mocks.renderPreview).toHaveBeenCalledOnce();
+  expect(clear).toHaveBeenCalledExactlyOnceWith(canvas.contextTop);
+  expect(canvas.contextTopDirty).toBe(true);
+  requestEditorFreehandPreview(bindings);
+  flush();
+  expect(clear).toHaveBeenCalledTimes(2);
+  expect(mocks.renderPreview).toHaveBeenCalledTimes(2);
+  fixture.end();
+  canvas.renderAll();
+  expect(canvas.contextTopDirty).toBe(false);
+  expect(mocks.renderPreview).toHaveBeenCalledTimes(2);
+  expect(render).toHaveBeenCalledOnce();
+  canvas.destroy();
+});
+
+it.each(['before', 'after'])(
+  'refreshes a live preview with the scene %s a queued top frame',
+  (order) => {
+    const { canvas, bindings, frames, flush } = createPreviewLifecycle();
+    const transform = vi.spyOn(canvas.contextTop, 'transform');
+    requestEditorFreehandPreview(bindings);
+    if (order === 'after') flush();
+    const previous = mocks.renderPreview.mock.calls.length;
+    canvas.viewportTransform = [2, 0, 0, 2, 13, 27];
+    canvas.renderAll();
+    expect(transform).toHaveBeenLastCalledWith(2, 0, 0, 2, 13, 27);
+    expect(mocks.renderPreview).toHaveBeenCalledTimes(previous + 1);
+    expect(frames.size).toBe(0);
+    flush();
+    expect(mocks.renderPreview).toHaveBeenCalledTimes(previous + 1);
+    canvas.destroy();
+  }
+);
+
+it.each(['end', 'replace', 'detachCanvas', 'cancel', 'dispose', 'visible'] as const)(
+  'does not paint queued previews after %s',
+  (transition) => {
+    const fixture = createPreviewLifecycle();
+    requestEditorFreehandPreview(fixture.bindings);
+    if (transition === 'cancel') cancelEditorFreehandPreview(fixture.canvas);
+    else if (transition === 'dispose') fixture.canvas.disposed = true;
+    else if (transition === 'visible') fixture.object.visible = true;
+    else fixture[transition]();
+    fixture.flush();
+    expect(mocks.renderPreview).not.toHaveBeenCalled();
+    fixture.canvas.destroy();
+  }
+);

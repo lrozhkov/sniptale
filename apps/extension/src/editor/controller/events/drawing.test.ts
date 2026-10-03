@@ -103,6 +103,7 @@ function createCanvas() {
     getZoom: vi.fn(() => 1),
     remove: vi.fn(),
     requestRenderAll: vi.fn(),
+    renderTop: vi.fn(),
     setCursor: vi.fn(),
     setActiveObject: vi.fn(),
     skipTargetFind: false,
@@ -558,7 +559,7 @@ describe('drawing pointer continuity', () => {
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
     expect(mocks.stageDrawing).toHaveBeenCalledOnce();
-    expect(requestFrame).not.toHaveBeenCalled();
+    expect(requestFrame).toHaveBeenCalledOnce();
   });
 
   it('cancels queued drawing work and the Fabric transform on pointer cancellation', () => {
@@ -728,4 +729,21 @@ describe('drawing selection interactions', () => {
     expect(mocks.createDrawing).not.toHaveBeenCalled();
     expect(shape.bindings.startDrawSession).not.toHaveBeenCalled();
   });
+});
+
+it.each(['pencil', 'marker'])('does not repaint the committed scene on %s moves', (kind) => {
+  resetDrawingMocks();
+  const path = createBindings(kind);
+  path.bindings.setDrawSession({
+    object: new FabricObject({ visible: false }),
+    pointerId: null,
+    start: { x: 0, y: 0 },
+    tool: kind,
+  });
+  mocks.readDrawing.mockReturnValue({ id: 'live-stroke', kind, samples: [] });
+  for (let i = 0; i < 8; i++) {
+    path.handlers.handleMouseMove(pointerEvent({ point: { x: i, y: i } }) as never);
+  }
+  expect(mocks.stageDrawing).toHaveBeenCalledTimes(8);
+  expect(path.canvas.requestRenderAll).not.toHaveBeenCalled();
 });
