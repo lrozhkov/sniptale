@@ -74,3 +74,46 @@ it('drops stale availability when the inspected project or committed revision ch
   expect(host.querySelectorAll('a')).toHaveLength(0);
   act(() => root.unmount());
 });
+
+it('keeps export and source navigation icons distinct across available and unavailable inspector states', async () => {
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  io.snapshot.mockResolvedValue({ project: {} });
+  const entry = {
+    id: 'export',
+    projectId: 'p',
+    filename: 'guide.html',
+    format: 'html' as const,
+    size: 4,
+    createdAt: 1,
+  };
+  await act(async () =>
+    root.render(<ScenarioViewingActions projectId="p" layout="inspector" exportEntry={entry} />)
+  );
+  expect(host.querySelector('button:disabled .lucide-file-text')).not.toBeNull();
+  expect(host.querySelector('a .lucide-arrow-up-right')).not.toBeNull();
+  await act(async () =>
+    root.render(
+      <ScenarioViewingActions
+        projectId="p"
+        layout="inspector"
+        availability="unavailable"
+        exportEntry={{ ...entry, html: { mode: 'guide', assetId: 'html' } }}
+      />
+    )
+  );
+  expect(host.querySelectorAll('a')).toHaveLength(1);
+  expect(host.querySelector('a .lucide-file-text')).not.toBeNull();
+  expect(host.querySelector('.lucide-arrow-up-right')).toBeNull();
+  await act(async () =>
+    root.render(
+      <ScenarioViewingActions
+        projectId="p"
+        availability="unavailable"
+        exportEntry={{ ...entry, html: { mode: 'guide', assetId: 'html' } }}
+      />
+    )
+  );
+  expect(host.querySelector('svg')).toBeNull();
+  act(() => root.unmount());
+});

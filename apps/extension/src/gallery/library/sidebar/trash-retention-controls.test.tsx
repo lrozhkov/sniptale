@@ -41,6 +41,9 @@ afterEach(() => {
 it('shows loading and unavailable states without presenting defaults as saved', () => {
   const props = createProps();
   render({ ...props, status: 'loading', policy: null });
+  expect(container.querySelector('h3')?.textContent).toBe(
+    translate('gallery.app.trashRetentionTitle')
+  );
   expect(container.textContent).toContain(translate('gallery.app.trashRetentionLoading'));
   expect(container.querySelector('[role="switch"]')).toBeNull();
 

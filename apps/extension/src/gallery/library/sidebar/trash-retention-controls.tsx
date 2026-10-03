@@ -76,6 +76,9 @@ export function TrashRetentionControls(props: GalleryTrashRetentionProps) {
       aria-label={translate('gallery.app.trashRetentionTitle')}
       className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
     >
+      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.app.trashRetentionTitle')}
+      </h3>
       {props.status === 'loading' ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('gallery.app.trashRetentionLoading')}

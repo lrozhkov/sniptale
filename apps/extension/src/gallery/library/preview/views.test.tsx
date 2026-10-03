@@ -456,7 +456,7 @@ it('renders image-only actions conditionally', () => {
   expect(imageMarkup).toContain('gallery.preview.actions');
   expect(imageMarkup).toContain('gallery.preview.fileActions');
   expect(imageMarkup).not.toContain('gallery.preview.changeActions');
-  expect(editedImageMarkup).toContain('gallery.preview.changeActions');
+  expect(editedImageMarkup).not.toContain('gallery.preview.changeActions');
   expect(imageMarkup).not.toContain('grid-cols-2');
   expect(imageMarkup).toContain('border-none');
   expect(imageMarkup).toContain('h-10 min-h-10');

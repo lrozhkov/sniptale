@@ -8,7 +8,7 @@ import {
 import {
   ArrowUpRight,
   Clapperboard,
-  Film,
+  CopyPlus,
   Copy,
   Check,
   Download,
@@ -16,14 +16,13 @@ import {
   Images,
   Plus,
   RotateCcw,
-  Save,
   Tag,
   Trash2,
   Undo2,
   X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Children, useEffect, useRef, useState, type ReactNode } from 'react';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import { isGalleryMediaItem, isGalleryScenarioExportItem, isGalleryScenarioItem } from '../items';
 import { GalleryTagInput } from '../tags/input';
@@ -74,6 +73,10 @@ const previewDangerActionButtonClassName = [
   'w-full !justify-start !rounded-[8px] !px-3 text-left',
   getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' }),
 ].join(' ');
+
+const previewSectionLabelClassName =
+  'mb-2 text-xs font-semibold uppercase tracking-[0.12em] ' +
+  'text-[var(--sniptale-color-text-muted-strong)]';
 
 const previewActionGroupLabelClassName =
   'mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-[0.1em] ' +
@@ -150,7 +153,9 @@ function PreviewActionButton(props: {
 function PreviewActionGroup(props: { children: ReactNode; label: string }) {
   return (
     <div>
-      <div className={previewActionGroupLabelClassName}>{props.label}</div>
+      {Children.toArray(props.children).length > 1 ? (
+        <div className={previewActionGroupLabelClassName}>{props.label}</div>
+      ) : null}
       <div className="space-y-1">{props.children}</div>
     </div>
   );
@@ -307,7 +312,7 @@ export function PreviewProjectUsage({
   if (!mediaId) return null;
   return (
     <section aria-label={translate('gallery.preview.usedInProjects')}>
-      <div className={previewActionGroupLabelClassName}>
+      <div className={previewSectionLabelClassName}>
         {translate('gallery.preview.usedInProjects')}
       </div>
       {status === 'loading' ? <div>{translate('gallery.preview.projectsLoading')}</div> : null}
@@ -469,7 +474,7 @@ function PreviewRestoreAction(
       data-ui="gallery.preview.actions"
       aria-labelledby="preview-actions-heading"
     >
-      <div id="preview-actions-heading" className={previewActionGroupLabelClassName}>
+      <div id="preview-actions-heading" className={previewSectionLabelClassName}>
         {translate('gallery.preview.actions')}
       </div>
       <div className="space-y-2">
@@ -508,24 +513,27 @@ function PreviewRestoreAction(
   );
 }
 
+function getPreviewPrimaryActionLabel(item: PreviewPanelProps['item']) {
+  if (isGalleryMediaItem(item)) {
+    if (item.source.kind === 'recording') return 'gallery.videoReview.openVideoEditor';
+    if (item.kind === 'web-archive') return 'gallery.preview.openSnapshot';
+    if (
+      item.recordingGroupView?.projectId !== null &&
+      item.recordingGroupView?.projectId !== undefined
+    ) {
+      return 'gallery.preview.openRecordingGroup';
+    }
+    if (isImageKind(item.kind)) return 'gallery.preview.openInEditor';
+  }
+  return canOpenGalleryProject(item) ? 'gallery.preview.openInEditor' : null;
+}
+
 function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => void }) {
   const { item, onEdit, onReview } = props;
-  const canCopy = isGalleryMediaItem(item) && isImageKind(item.kind);
-  const canOpenWebSnapshot = isGalleryMediaItem(item) && item.kind === 'web-archive';
-  const canOpenRecordingGroup =
-    isGalleryMediaItem(item) &&
-    item.recordingGroupView?.projectId !== null &&
-    item.recordingGroupView?.projectId !== undefined;
-  const canOpenVideo = isGalleryMediaItem(item) && item.source.kind === 'recording';
-  const canOpenPrimaryAction =
-    canOpenGalleryProject(item) ||
-    canCopy ||
-    canOpenWebSnapshot ||
-    canOpenRecordingGroup ||
-    canOpenVideo;
+  const primaryLabel = getPreviewPrimaryActionLabel(item);
   return (
     <>
-      {onReview || canOpenPrimaryAction ? (
+      {onReview || primaryLabel ? (
         <div className="space-y-1">
           {onReview ? (
             <button
@@ -538,22 +546,10 @@ function PreviewPrimaryActions(props: PreviewPanelProps & { onReview?: () => voi
               {translate('gallery.videoReview.enter')}
             </button>
           ) : null}
-          {canOpenPrimaryAction ? (
+          {primaryLabel ? (
             <button type="button" onClick={onEdit} className={previewActionButtonClassName}>
-              {canOpenVideo ? (
-                <Film className="h-4 w-4 shrink-0" aria-hidden="true" />
-              ) : (
-                <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-              )}
-              {translate(
-                canOpenVideo
-                  ? 'gallery.videoReview.openVideoEditor'
-                  : canOpenWebSnapshot
-                    ? 'gallery.preview.openSnapshot'
-                    : canOpenRecordingGroup
-                      ? 'gallery.preview.openRecordingGroup'
-                      : 'gallery.preview.openInEditor'
-              )}
+              <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              {translate(primaryLabel)}
             </button>
           ) : null}
         </div>
@@ -607,11 +603,21 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
     (canEditMetadata && props.hasChanges && Boolean(onResetChanges)) ||
     (hasEditedImageContent && Boolean(props.onRestoreOriginal));
 
+  const showActionsHeading = Boolean(
+    getPreviewPrimaryActionLabel(item) ||
+    props.onReview ||
+    hasChangeActions ||
+    isGalleryScenarioItem(item) ||
+    isGalleryScenarioExportItem(item)
+  );
+
   return (
-    <section key={item.id} aria-labelledby="preview-actions-heading">
-      <div id="preview-actions-heading" className={previewActionGroupLabelClassName}>
-        {translate('gallery.preview.actions')}
-      </div>
+    <section key={item.id} aria-label={translate('gallery.preview.actions')}>
+      {showActionsHeading ? (
+        <div id="preview-actions-heading" className={previewSectionLabelClassName}>
+          {translate('gallery.preview.actions')}
+        </div>
+      ) : null}
       <div className="space-y-3">
         <PreviewPrimaryActions {...props} />
         {hasFileActions ? (
@@ -654,7 +660,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
             ) : null}
             {canUseImageAggregateActions && props.onSaveCopy ? (
               <PreviewActionButton
-                icon={Save}
+                icon={CopyPlus}
                 onClick={() => props.onSaveCopy?.()}
                 success={translate('gallery.preview.copySaved')}
               >

@@ -1,3 +1,4 @@
+import { RotateCw } from 'lucide-react';
 import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { translate } from '../../../platform/i18n';
@@ -107,6 +108,7 @@ export function PreviewSourceField({
               className={getControlSecondaryButtonClassName({ density: 'compact' })}
               onClick={metadata.retry}
             >
+              <RotateCw className="h-4 w-4 shrink-0" aria-hidden="true" />
               {translate('gallery.preview.retrySource')}
             </button>
           </div>

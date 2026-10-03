@@ -552,3 +552,47 @@ it('resets promotion feedback when the inspector switches to another draft', asy
   expect(container.querySelector('[role="alert"]')).toBeNull();
   act(() => root.unmount());
 });
+
+it('omits redundant headings for one file action and distinguishes save-copy from promotion', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const props = createProps();
+  await act(async () =>
+    root.render(<PreviewActions {...props} item={createMediaItem({ kind: 'audio' })} />)
+  );
+  expect(container.textContent).not.toContain('gallery.preview.fileActions');
+  expect(container.querySelector('#preview-actions-heading')).toBeNull();
+  expect(container.textContent).toContain('gallery.preview.download');
+  expect(container.textContent).toContain('common.actions.delete');
+  await act(async () => root.render(<PreviewActions {...props} onSaveCopy={vi.fn()} />));
+  expect(container.querySelector('#preview-actions-heading')?.className).toContain('text-xs');
+  const copy = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'gallery.preview.saveCopy'
+  );
+  expect(copy?.querySelector('.lucide-copy-plus')).not.toBeNull();
+  expect(container.textContent).toContain('gallery.preview.fileActions');
+  act(() => root.unmount());
+});
+
+it('uses the same navigation icon for image, recording and project editors', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const props = createProps();
+  const items = [
+    createMediaItem(),
+    createVideoProjectItem(),
+    createMediaItem({ source: { kind: 'recording', recordingId: 'r' }, kind: 'video' }),
+  ];
+  for (const item of items) {
+    await act(async () => root.render(<PreviewActions {...props} item={item} />));
+    const open = [...container.querySelectorAll('button')].find((button) =>
+      ['gallery.preview.openInEditor', 'gallery.videoReview.openVideoEditor'].includes(
+        button.textContent ?? ''
+      )
+    );
+    expect(open?.querySelector('.lucide-arrow-up-right')).not.toBeNull();
+    await act(async () => open?.click());
+  }
+  expect(props.onEdit).toHaveBeenCalledTimes(3);
+  act(() => root.unmount());
+});

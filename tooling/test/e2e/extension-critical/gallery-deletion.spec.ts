@@ -162,6 +162,16 @@ for (const [locale, theme] of [
       Math.abs((await remove.boundingBox())!.width - (await lifecycle.boundingBox())!.width)
     ).toBeLessThanOrEqual(1);
     await page.screenshot({ animations: 'disabled', path: info.outputPath(`draft-${locale}.png`) });
+    const headingStyles = await preview
+      .locator('#preview-actions-heading, h3, label[for]')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const style = getComputedStyle(node);
+          return `${style.fontSize}:${style.fontWeight}:${style.letterSpacing}`;
+        })
+      );
+    expect(headingStyles.length).toBeGreaterThanOrEqual(3);
+    expect(new Set(headingStyles).size).toBe(1);
     await save.click();
     await expect(save).toHaveCount(0);
     await page
@@ -190,6 +200,39 @@ for (const [locale, theme] of [
       .click();
     await expect(preview).toHaveCount(0);
     await page.locator('[data-ui="gallery.sidebar.footer"] button').click();
+    const selection = page.locator('[data-ui="gallery.trash.selection"]');
+    const restoreSelected = selection.getByRole('button', {
+      name: label('gallery.app.restoreTrash'),
+      exact: true,
+    });
+    await expect(restoreSelected).toBeDisabled();
+    await selection
+      .getByRole('button', { name: label('gallery.app.trashSelectAll'), exact: true })
+      .click();
+    await expect(restoreSelected).toBeEnabled();
+    await expect(
+      selection.getByRole('button', { name: label('gallery.app.permanentDelete'), exact: true })
+    ).toBeEnabled();
+    const retention = page.locator('[data-ui="gallery.trash.retention"]');
+    await expect(
+      retention.getByRole('heading', {
+        name: label('gallery.app.trashRetentionTitle'),
+        exact: true,
+      })
+    ).toBeVisible();
+    const selectionBox = (await selection.boundingBox())!;
+    expect(selectionBox.y + selectionBox.height).toBeLessThanOrEqual(
+      (await retention.boundingBox())!.y
+    );
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath(`trash-sidebar-${locale}.png`),
+    });
+    await selection
+      .getByRole('button', { name: label('gallery.app.trashDeselectAll'), exact: true })
+      .click();
+    await expect(restoreSelected).toBeDisabled();
+
     await page
       .locator(`[data-gallery-keyboard-id="${assetId}"]`)
       .getByRole('button', { name: 'deletion-draft.png', exact: true })

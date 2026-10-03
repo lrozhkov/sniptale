@@ -1,4 +1,4 @@
-import { BookOpen, MousePointerClick } from 'lucide-react';
+import { ArrowUpRight, BookOpen, FileText, MousePointerClick } from 'lucide-react';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { useEffect, useState } from 'react';
 import { readScenarioViewingSnapshot } from '../../../composition/persistence/scenario/projects/viewing';
@@ -21,12 +21,14 @@ function SavedExportLinks({
   projectId,
   sourceAvailable,
   className,
+  showIcons,
   t,
 }: {
   entry: ScenarioExportEntry;
   projectId: string;
   sourceAvailable: boolean;
   className: string;
+  showIcons: boolean;
   t: ReturnType<typeof createTranslator>;
 }) {
   return (
@@ -39,11 +41,13 @@ function SavedExportLinks({
             target="_blank"
             rel="noopener noreferrer"
           >
+            {showIcons ? <FileText className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
             {t('gallery.preview.openExport')}
           </a>
         ) : (
           <>
             <button type="button" className={className} disabled>
+              {showIcons ? <FileText className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
               {t('gallery.preview.openExport')}
             </button>
             <p role="status" className="px-3 text-xs">
@@ -58,6 +62,7 @@ function SavedExportLinks({
           target="_blank"
           rel="noopener noreferrer"
         >
+          {showIcons ? <ArrowUpRight className="h-4 w-4 shrink-0" aria-hidden="true" /> : null}
           {t('gallery.preview.openCurrentProject')}
         </a>
       )}
@@ -116,6 +121,7 @@ export function ScenarioViewingActions({
           entry={exportEntry}
           projectId={projectId}
           t={t}
+          showIcons={layout === 'inspector'}
           sourceAvailable={
             availability === 'available' && result?.key === key && result.status === 'ready'
           }

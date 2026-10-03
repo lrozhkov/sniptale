@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Library, RotateCcw, Trash2, X } from 'lucide-react';
+import { Library, ListChecks, RotateCcw, Trash2, X } from 'lucide-react';
 import { formatNumber, getCurrentLocale, translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import {
@@ -192,7 +192,8 @@ function GallerySidebarFooter(
 function GalleryTrashControls(props: GallerySidebarProps) {
   const trashRetention = useTrashRetentionPolicy();
   return (
-    <section className="flex flex-col gap-3 pb-6" aria-label={translate('gallery.app.trashTitle')}>
+    <section className="flex flex-col gap-4 pb-3" aria-label={translate('gallery.app.trashTitle')}>
+      <h2 className="text-sm font-semibold">{translate('gallery.app.trashTitle')}</h2>
       <div
         data-ui="gallery.trash.summary"
         role="status"
@@ -204,64 +205,77 @@ function GalleryTrashControls(props: GallerySidebarProps) {
           translate('gallery.app.trashCountLoading')
         )}
       </div>
-      <div className="flex items-center gap-2">
-        <p className="text-sm" role="status">
-          {translate('gallery.app.selectedPrefix')}{' '}
-          {formatNumber(props.selectedCount ?? 0, undefined, getCurrentLocale())}
-        </p>
-        {props.selectedCount ? (
+      <div
+        data-ui="gallery.trash.selection"
+        className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
+      >
+        <div className="flex items-center gap-2">
+          <p className="text-sm" role="status">
+            {translate('gallery.app.selectedPrefix')}{' '}
+            {formatNumber(props.selectedCount ?? 0, undefined, getCurrentLocale())}
+          </p>
+          {props.selectedCount ? (
+            <button
+              type="button"
+              aria-label={translate('gallery.app.trashDeselectAll')}
+              title={translate('gallery.app.trashDeselectAll')}
+              disabled={props.busy}
+              className={getControlIconButtonClassName({ density: 'compact' })}
+              onClick={props.onClearSelection}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+        <div className="flex flex-col gap-2">
           <button
             type="button"
-            aria-label={translate('gallery.app.trashDeselectAll')}
-            title={translate('gallery.app.trashDeselectAll')}
-            disabled={props.busy}
-            className={getControlIconButtonClassName({ density: 'compact' })}
-            onClick={props.onClearSelection}
+            disabled={
+              props.busy ||
+              !props.filteredItemCount ||
+              (props.selectedCount ?? 0) >= props.filteredItemCount
+            }
+            className={`${getControlSecondaryButtonClassName({ density: 'compact' })} w-full !justify-start`}
+            onClick={props.onSelectAll}
           >
-            <X className="h-4 w-4" aria-hidden="true" />
+            <ListChecks className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {translate('gallery.app.trashSelectAll')}
           </button>
-        ) : null}
-      </div>
-      <div className="flex flex-col gap-2">
-        <button
-          type="button"
-          disabled={
-            props.busy ||
-            !props.filteredItemCount ||
-            (props.selectedCount ?? 0) >= props.filteredItemCount
-          }
-          className={getControlSecondaryButtonClassName({ density: 'compact' })}
-          onClick={props.onSelectAll}
-        >
-          {translate('gallery.app.trashSelectAll')}
-        </button>
-        <button
-          type="button"
-          disabled={props.busy || !props.selectedCount}
-          className={getControlSecondaryButtonClassName({ density: 'compact' })}
-          onClick={props.onRestoreTrash}
-        >
-          <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          {translate('gallery.app.restoreTrash')}
-        </button>
+          <button
+            type="button"
+            disabled={props.busy || !props.selectedCount}
+            className={`${getControlSecondaryButtonClassName({ density: 'compact' })} w-full !justify-start`}
+            onClick={props.onRestoreTrash}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            {translate('gallery.app.restoreTrash')}
+          </button>
+        </div>
+        <div className="border-t border-[var(--sniptale-color-border-soft)] pt-2">
+          <button
+            type="button"
+            disabled={props.busy || !props.selectedCount}
+            className={`${getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
+            w-full !justify-start`}
+            onClick={(event) =>
+              props.onDeleteTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
+            }
+          >
+            <Trash2 className="h-4 w-4" aria-hidden="true" />
+            {translate('gallery.app.permanentDelete')}
+          </button>
+        </div>
       </div>
       <TrashRetentionControls {...trashRetention} />
-      <div className="mt-3 flex flex-col gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <button
-          type="button"
-          disabled={props.busy || !props.selectedCount}
-          className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
-          onClick={(event) =>
-            props.onDeleteTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
-          }
-        >
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
-          {translate('gallery.app.permanentDelete')}
-        </button>
+      <div
+        data-ui="gallery.trash.empty"
+        className="border-t border-[var(--sniptale-color-border-soft)] pt-3"
+      >
         <button
           type="button"
           disabled={props.busy || !props.trashSummary?.count}
-          className={getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
+          className={`${getControlSecondaryButtonClassName({ density: 'compact', tone: 'danger' })}
+            w-full !justify-start`}
           onClick={(event) =>
             props.onEmptyTrash?.({ anchor: event.currentTarget, keyboard: event.detail === 0 })
           }

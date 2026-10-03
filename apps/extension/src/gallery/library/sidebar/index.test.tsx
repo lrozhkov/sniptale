@@ -169,7 +169,7 @@ it('offers trash navigation and replaces library filters with recoverable action
     summary.compareDocumentPosition(retention) & Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   expect(
-    retention.compareDocumentPosition(button('gallery.app.permanentDelete')) &
+    button('gallery.app.permanentDelete').compareDocumentPosition(retention) &
       Node.DOCUMENT_POSITION_FOLLOWING
   ).toBeTruthy();
   act(() => button('gallery.app.restoreTrash').click());
@@ -332,4 +332,21 @@ it('does not show incomplete facets before the first library snapshot', () => {
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
   act(() => root?.render(<GallerySidebar {...props} countsKnown />));
   expect(container?.querySelector('[data-ui="test.facet-filters"]')).not.toBeNull();
+});
+
+it('groups selection recovery and deletion before cleanup settings and whole-trash actions', () => {
+  act(() => root?.render(<GallerySidebar {...createProps()} trashMode selectedCount={1} />));
+  const selection = container!.querySelector('[data-ui="gallery.trash.selection"]')!;
+  expect(selection).not.toBeNull();
+  expect(selection.textContent).toContain(translate('gallery.app.restoreTrash'));
+  expect(selection.textContent).toContain(translate('gallery.app.permanentDelete'));
+  expect(selection.textContent).not.toContain(translate('gallery.app.emptyTrash'));
+  const retention = container!.querySelector('[data-ui="gallery.trash.retention"]')!;
+  expect(
+    selection.compareDocumentPosition(retention) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(retention.querySelector('h3')?.textContent).toBe(
+    translate('gallery.app.trashRetentionTitle')
+  );
+  expect(container!.querySelector('h2')?.textContent).toBe(translate('gallery.app.trashTitle'));
 });

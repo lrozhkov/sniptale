@@ -84,6 +84,7 @@ it('ignores stale recording details, distinguishes missing metadata and retries 
   await act(async () => finish(telemetry()));
   expect(container.textContent).toContain('gallery.preview.sourceUnavailable');
   expect(container.textContent).not.toContain('gallery.preview.captureWindow');
+  expect(container.querySelector('button .lucide-rotate-cw')).not.toBeNull();
   await act(async () => container.querySelector('button')?.click());
   expect(container.textContent).toContain('gallery.preview.captureWindow');
   await act(async () =>
