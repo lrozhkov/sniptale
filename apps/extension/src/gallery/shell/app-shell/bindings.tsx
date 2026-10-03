@@ -148,7 +148,6 @@ function buildGalleryPreviewHandlers(
         type: MessageType.PROMOTE_AGGREGATE_TO_LIBRARY,
       });
       if (!response.success) throw new Error(response.error ?? 'Could not save to the library.');
-      controller.actions.preview.setPreview((previous) => ({ ...previous, item: null, url: null }));
       await controller.actions.storage.refresh();
     },
     onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) =>

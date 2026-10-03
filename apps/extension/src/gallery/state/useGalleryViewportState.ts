@@ -8,7 +8,7 @@ function getViewportContentWidth(viewport: HTMLDivElement) {
   return Math.max(0, viewport.clientWidth - paddingLeft - paddingRight);
 }
 
-export function useGalleryViewportState() {
+export function useGalleryViewportState(viewportMounted = true) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(720);
   const [gridWidth, setGridWidth] = useState(1200);
@@ -23,7 +23,7 @@ export function useGalleryViewportState() {
 
   useEffect(() => {
     const viewport = gridViewportRef.current;
-    if (!viewport) {
+    if (!viewportMounted || !viewport) {
       return undefined;
     }
 
@@ -42,7 +42,7 @@ export function useGalleryViewportState() {
       observer.disconnect();
       viewport.removeEventListener('scroll', updateMeasurements);
     };
-  }, []);
+  }, [viewportMounted]);
 
   return {
     gridViewportRef,

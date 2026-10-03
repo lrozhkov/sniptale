@@ -24,7 +24,7 @@ let attachedViewport: HTMLDivElement | null = null;
 function HookProbe(props: {
   measurements?: { clientHeight: number; clientWidth: number; scrollTop: number };
 }) {
-  latestValue = useGalleryViewportState();
+  latestValue = useGalleryViewportState(Boolean(props.measurements));
   const measurements = props.measurements;
 
   return measurements ? (
@@ -141,4 +141,23 @@ it('reads viewport measurements, subscribes to scroll and resize, and cleans up 
 
   expect(resizeObserver?.disconnect).toHaveBeenCalledTimes(1);
   root = null;
+});
+
+it('measures and observes a viewport mounted after the loading screen', () => {
+  act(() => root?.render(<HookProbe />));
+  act(() =>
+    root?.render(
+      <HookProbe measurements={{ clientHeight: 980, clientWidth: 2100, scrollTop: 0 }} />
+    )
+  );
+  expect(latestValue?.gridWidth).toBe(2100);
+  expect(latestValue?.viewportHeight).toBe(980);
+  expect(resizeObserver?.observe).toHaveBeenCalledWith(attachedViewport);
+  act(() => {
+    if (attachedViewport) {
+      attachedViewport.scrollTop = 1800;
+      attachedViewport.dispatchEvent(new Event('scroll'));
+    }
+  });
+  expect(latestValue?.scrollTop).toBe(1800);
 });

@@ -275,7 +275,9 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
     setPreview: preview.actions.setPreview,
     setSelectedIds: filters.actions.setSelectedIds,
   });
-  const viewport = useGalleryViewportState();
+  const viewport = useGalleryViewportState(
+    storage.state.hasLoadedLibrarySnapshot || !storage.state.isLoading
+  );
   const derived = useGalleryDerivedState({
     filters,
     library: storage.library,

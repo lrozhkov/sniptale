@@ -1,3 +1,4 @@
+import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { test, expect } from '../support/extension-fixture';
 
 for (const theme of ['light', 'dark'] as const) {
@@ -100,4 +101,64 @@ test('gallery cold and repeated startup show loading before the complete shell',
     await expect(page.locator('[data-ui="gallery.loading"]')).toHaveCount(0);
     if (attempt === 0) await page.reload();
   }
+});
+
+test('gallery measures its late-mounted grid and scrolls beyond the first virtual rows', async ({
+  page,
+  extensionId,
+}, testInfo) => {
+  await page.setViewportSize({ width: 2557, height: 1301 });
+  const url = `chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`;
+  await page.goto(url);
+  await expect(page.locator('[data-ui="gallery.sidebar.shell"]')).toBeVisible();
+  await page.evaluate(async (fixture) => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(fixture.databaseName);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const tx = db.transaction(['recordings', 'media_library'], 'readwrite');
+    const done = new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error);
+    });
+    for (let index = 0; index < 160; index += 1) {
+      const id = `grid-proof-${index}`;
+      tx.objectStore('recordings').put({ ...fixture.records.recordings[0], id });
+      tx.objectStore('media_library').put({
+        ...fixture.records.media_library[0],
+        id: `recording:${id}`,
+        filename: `${id}.webm`,
+        createdAt: 1000 + index,
+        source: { kind: 'recording', recordingId: id },
+      });
+    }
+    await done;
+    db.close();
+  }, betaV1Fixture);
+  await page.reload();
+  const surface = page.locator('[data-ui="gallery.content.surface"]');
+  const cards = surface.locator('[data-gallery-keyboard-id]');
+  await expect(cards.first()).toBeVisible();
+  const rightGap = () =>
+    surface.evaluate((element) => {
+      const cards = Array.from(element.querySelectorAll('[data-gallery-keyboard-id]'));
+      const right = Math.max(...cards.map((card) => card.getBoundingClientRect().right));
+      return element.getBoundingClientRect().right - right;
+    });
+  await expect.poll(rightGap).toBeLessThan(40);
+  const firstId = await cards.first().getAttribute('data-gallery-keyboard-id');
+  await surface.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect.poll(() => cards.first().getAttribute('data-gallery-keyboard-id')).not.toBe(firstId);
+  await expect(cards.last()).toBeInViewport();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(rightGap).toBeLessThan(40);
+  await surface.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.locator('[data-ui="gallery.sidebar.toggle"]').click();
+  await expect.poll(rightGap).toBeLessThan(40);
+  await page.screenshot({ path: testInfo.outputPath('gallery-grid-after-loading.png') });
 });

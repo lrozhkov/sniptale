@@ -131,11 +131,19 @@ async function verifyCompactSidebar(page: Page, locale: 'ru' | 'en') {
   expect(activeFolder).toBeTruthy();
   await sidebar.getByText(savedLabel, { exact: true }).click();
   await expect(saved).not.toBeChecked();
+  const footer = sidebar.locator('[data-ui="gallery.sidebar.footer"]');
+  const footerBefore = (await footer.boundingBox())!;
+  const sidebarBefore = (await sidebar.boundingBox())!;
+  const toggleBefore = (await toggle.boundingBox())!;
+  expect(toggleBefore.y).toBeGreaterThanOrEqual(footerBefore.y);
   await toggle.click();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
   await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(56);
   await expect(saved).toBeHidden();
-  await expect(sidebar.locator('[data-ui="gallery.sidebar.footer"]')).toBeHidden();
+  await expect(footer).toBeVisible();
+  expect((await footer.boundingBox())!.height).toBe(footerBefore.height);
+  expect((await sidebar.boundingBox())!.height).toBe(sidebarBefore.height);
+  expect((await footer.boundingBox())!.y).toBe(footerBefore.y);
   const rows = sidebar.locator('[data-gallery-folder] > button');
   const boxes = await rows.evaluateAll((buttons) =>
     buttons.map((button) => {
@@ -239,6 +247,9 @@ for (const [locale, theme] of [
     expect(new Set(headingStyles).size).toBe(1);
     await save.click();
     await expect(save).toHaveCount(0);
+    await expect(preview).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(preview).toBeHidden();
     const sidebarToggle = await verifyCompactSidebar(page, locale);
     await page.screenshot({
       animations: 'disabled',
@@ -272,7 +283,9 @@ for (const [locale, theme] of [
       .getByRole('menuitem', { name: label('gallery.app.moveToTrash'), exact: true })
       .click();
     await expect(preview).toHaveCount(0);
-    await page.locator('[data-ui="gallery.sidebar.footer"] button').click();
+    await page
+      .locator('[data-ui="gallery.sidebar.footer"] button:not([data-ui="gallery.sidebar.toggle"])')
+      .click();
     const selection = page.locator('[data-ui="gallery.trash.selection"]');
     const restoreSelected = selection.getByRole('button', {
       name: label('gallery.app.restoreTrash'),

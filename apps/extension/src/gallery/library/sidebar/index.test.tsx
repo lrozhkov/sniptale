@@ -360,6 +360,7 @@ it('collapses presentation without mutating folder, filters or saved-view contex
   act(() => root?.render(<GallerySidebar {...props} />));
   const toggle = container!.querySelector<HTMLButtonElement>('[data-ui="gallery.sidebar.toggle"]')!;
   expect(toggle).not.toBeNull();
+  expect(toggle.closest('[data-ui="gallery.sidebar.footer"]')).not.toBeNull();
   act(() => toggle.click());
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(container!.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).toContain(

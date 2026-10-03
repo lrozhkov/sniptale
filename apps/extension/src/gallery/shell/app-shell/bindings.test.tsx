@@ -399,3 +399,13 @@ it('forwards presentation acknowledgements to the resource owner without rewriti
   layoutProps.onPreviewPresented(presentation);
   expect(acknowledgePresented).toHaveBeenCalledExactlyOnceWith(presentation);
 });
+
+it('keeps the active preview open when saving it to the library', async () => {
+  const { controller, layoutProps } = renderBindings();
+  const item = createMediaItem({ id: 'media-promoted' });
+  layoutProps.onPreviewOpen(item);
+  sendRuntimeMessageMock.mockResolvedValue({ result: 'promoted', success: true });
+  await act(async () => layoutProps.onPreviewPromote(item));
+  expect(controller.state.preview.session.item?.id).toBe(item.id);
+  expect(controller.actions.storage.refresh).toHaveBeenCalledOnce();
+});

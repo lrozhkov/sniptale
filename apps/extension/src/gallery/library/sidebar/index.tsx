@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import {
   Library,
   ListChecks,
@@ -108,26 +108,6 @@ export function GallerySidebar(props: GallerySidebarProps) {
       dataUi="gallery.sidebar.shell"
     >
       <InspectorShellPanel dataUi="gallery.sidebar.panel" className={gallerySidebarPanelClassName}>
-        {!props.trashMode ? (
-          <div className="flex shrink-0 justify-end p-1.5">
-            <button
-              type="button"
-              data-ui="gallery.sidebar.toggle"
-              aria-label={toggleLabel}
-              title={toggleLabel}
-              aria-expanded={!compact}
-              aria-controls={contentId}
-              className={getControlIconButtonClassName()}
-              onClick={() => setCollapsed((value) => !value)}
-            >
-              {compact ? (
-                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
-              )}
-            </button>
-          </div>
-        ) : null}
         <div
           id={contentId}
           data-ui="gallery.sidebar.scroll"
@@ -144,9 +124,30 @@ export function GallerySidebar(props: GallerySidebarProps) {
             </>
           )}
         </div>
-        <div hidden={compact} className="shrink-0">
-          <GallerySidebarFooter {...props} />
-        </div>
+        <GallerySidebarFooter
+          {...props}
+          compact={compact}
+          toggle={
+            !props.trashMode ? (
+              <button
+                type="button"
+                data-ui="gallery.sidebar.toggle"
+                aria-label={toggleLabel}
+                title={toggleLabel}
+                aria-expanded={!compact}
+                aria-controls={contentId}
+                className={`${getControlIconButtonClassName()} !h-10 shrink-0`}
+                onClick={() => setCollapsed((value) => !value)}
+              >
+                {compact ? (
+                  <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+                )}
+              </button>
+            ) : null
+          }
+        />
       </InspectorShellPanel>
     </InspectorShellFrame>
   );
@@ -172,53 +173,58 @@ function GallerySidebarFooter(
   props: Pick<
     GallerySidebarProps,
     'busy' | 'trashMode' | 'countsKnown' | 'trashSummary' | 'onTrashModeChange'
-  >
+  > & { compact?: boolean; toggle?: ReactNode }
 ) {
   const sizeDescriptionId = useId();
   const { countLabel, compactCount } = getTrashCountPresentation(props);
   return (
     <div
       data-ui="gallery.sidebar.footer"
-      className="flex shrink-0 border-t border-[var(--sniptale-color-border-soft)] p-2.5"
+      className="flex shrink-0 items-center gap-2 border-t border-[var(--sniptale-color-border-soft)] p-2.5"
     >
-      <button
-        type="button"
-        disabled={props.busy}
-        aria-describedby={props.trashMode ? undefined : sizeDescriptionId}
-        className={trashButtonClassName}
-        aria-label={
-          props.trashMode
-            ? translate('gallery.app.returnToLibrary')
-            : `${translate('gallery.app.trashTitle')}: ${countLabel}`
-        }
-        onClick={() => props.onTrashModeChange?.(!props.trashMode)}
-      >
-        <span className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-sm font-semibold">
-          {props.trashMode ? (
-            <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
-          ) : (
-            <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-          )}
-          <span className="truncate">
-            {translate(props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle')}
+      <div hidden={props.compact} className="min-w-0 flex-1">
+        <button
+          type="button"
+          disabled={props.busy}
+          aria-describedby={props.trashMode ? undefined : sizeDescriptionId}
+          className={trashButtonClassName}
+          aria-label={
+            props.trashMode
+              ? translate('gallery.app.returnToLibrary')
+              : `${translate('gallery.app.trashTitle')}: ${countLabel}`
+          }
+          onClick={() => props.onTrashModeChange?.(!props.trashMode)}
+        >
+          <span className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap text-sm font-semibold">
+            {props.trashMode ? (
+              <Library className="h-4 w-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
+            )}
+            <span className="truncate">
+              {translate(
+                props.trashMode ? 'gallery.app.returnToLibrary' : 'gallery.app.trashTitle'
+              )}
+            </span>
           </span>
-        </span>
-        {!props.trashMode ? (
-          <>
-            <span
-              data-ui="gallery.trash.footerCount"
-              title={countLabel}
-              aria-hidden="true"
-              className="max-w-24 shrink-0 truncate rounded-full border
+          {!props.trashMode ? (
+            <>
+              <span
+                data-ui="gallery.trash.footerCount"
+                title={countLabel}
+                aria-hidden="true"
+                className="max-w-24 shrink-0 truncate rounded-full border
                     border-[var(--sniptale-color-border-soft)] px-2 py-0.5
                     text-[11px] font-semibold tabular-nums
                     text-[var(--sniptale-color-text-secondary)]"
-            >
-              {compactCount}
-            </span>
-          </>
-        ) : null}
-      </button>
+              >
+                {compactCount}
+              </span>
+            </>
+          ) : null}
+        </button>
+      </div>
+      {props.toggle}
       <span id={sizeDescriptionId} data-ui="gallery.trash.footerSummary" className="sr-only">
         {translate('gallery.app.trashSizeExplanation')}
         {props.countsKnown ? (
