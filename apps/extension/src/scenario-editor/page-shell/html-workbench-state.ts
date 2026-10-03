@@ -6,7 +6,7 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { htmlImageRasterKey, resolveHtmlImageSettings } from './html-image-settings';
-import { prepareHtmlImage } from './runtime/html-images';
+import { MissingGuideHtmlImageError, prepareHtmlImage } from './runtime/html-images';
 import { exportGuideHtml, measureGuideHtml } from './runtime/html-export';
 
 /** One disposable owner cancels obsolete measurements and file jobs on content change or exit. */
@@ -36,9 +36,10 @@ export function useHtmlExportJob(
     revision: string;
     result: Awaited<ReturnType<typeof measureGuideHtml>>;
   } | null>(null);
-  const [status, setStatus] = useState<'idle' | 'pending' | 'saved' | 'history-failed' | 'failed'>(
-    'idle'
-  );
+  const [status, setStatus] = useState<
+    'idle' | 'pending' | 'saved' | 'history-failed' | 'failed' | 'measure-failed' | 'missing-image'
+  >('idle');
+  const [missingBlockId, setMissingBlockId] = useState<string | null>(null);
   const job = useRef<AbortController | null>(null);
   useEffect(() => {
     setStatus('idle');
@@ -51,6 +52,7 @@ export function useHtmlExportJob(
     if (job.current) return;
     const controller = new AbortController();
     job.current = controller;
+    setMissingBlockId(null);
     setStatus('pending');
     const args = {
       project,
@@ -71,19 +73,26 @@ export function useHtmlExportJob(
         }
       }
     } catch (error) {
-      if (job.current === controller)
+      if (job.current === controller) {
+        if (error instanceof MissingGuideHtmlImageError) setMissingBlockId(error.blockId);
         setStatus(
           controller.signal.aborted ||
             (error instanceof DOMException && error.name === 'AbortError')
             ? 'idle'
-            : 'failed'
+            : error instanceof MissingGuideHtmlImageError
+              ? 'missing-image'
+              : save
+                ? 'failed'
+                : 'measure-failed'
         );
+      }
     } finally {
       if (job.current === controller) job.current = null;
     }
   };
   return {
     status,
+    missingBlockId,
     measurement: measurement?.revision === revision ? measurement.result : null,
     run,
     cancel: () => job.current?.abort(),

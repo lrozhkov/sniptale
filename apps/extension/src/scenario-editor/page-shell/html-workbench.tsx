@@ -129,19 +129,7 @@ export function GuideHtmlWorkbench({
           {feedback}
         </>
       }
-      status={
-        job.status === 'idle' ? undefined : (
-          <p
-            role="status"
-            className="guide-export-status"
-            data-tone={
-              job.status === 'failed' || job.status === 'history-failed' ? 'error' : undefined
-            }
-          >
-            {t(exportStatusMessages[job.status])}
-          </p>
-        )
-      }
+      status={<GuideHtmlStatus job={job} entries={entries} t={t} />}
       actions={
         <>
           <ProductActionButton
@@ -346,11 +334,41 @@ function GuideHtmlSettings({
   );
 }
 
+/** Export feedback identifies the failed phase and the affected image occurrence. */
+function GuideHtmlStatus({
+  job,
+  entries,
+  t,
+}: {
+  job: ReturnType<typeof useHtmlExportJob>;
+  entries: ReturnType<typeof guideHtmlImages>;
+  t: Translate;
+}) {
+  return job.status === 'idle' ? null : (
+    <p
+      role="status"
+      className="guide-export-status"
+      data-tone={
+        ['failed', 'history-failed', 'measure-failed', 'missing-image'].includes(job.status)
+          ? 'error'
+          : undefined
+      }
+    >
+      {t(exportStatusMessages[job.status]).replace(
+        '{number}',
+        String(entries.findIndex((entry) => entry.block.id === job.missingBlockId) + 1)
+      )}
+    </p>
+  );
+}
+
 const exportStatusMessages = {
   pending: 'scenario.editor.guideHtmlPreparing',
   saved: 'scenario.editor.guideHtmlSaved',
   'history-failed': 'scenario.editor.guideHtmlHistoryFailed',
   failed: 'scenario.editor.guideHtmlFailed',
+  'measure-failed': 'scenario.editor.htmlMeasureFailed',
+  'missing-image': 'scenario.editor.htmlMissingImage',
 } as const;
 
 /** Preview controls affect inspection scale, independently of export preparation. */

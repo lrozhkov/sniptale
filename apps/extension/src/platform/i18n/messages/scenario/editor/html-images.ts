@@ -1,5 +1,13 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorHtmlImageMessages = defineMessageSource({
+  htmlMeasureFailed: {
+    ru: 'Не удалось рассчитать размер HTML. Повторите попытку.',
+    en: 'Could not calculate HTML size. Try again.',
+  },
+  htmlMissingImage: {
+    ru: 'Изображение №{number} недоступно. Замените или удалите его в руководстве и повторите экспорт.',
+    en: 'Image #{number} is unavailable. Replace or remove it in the guide, then export again.',
+  },
   htmlImages: { ru: 'Изображения в HTML', en: 'HTML images' },
   htmlExportTitle: { ru: 'Экспорт HTML', en: 'Export HTML' },
   htmlImageSettings: { ru: 'Настройки изображений', en: 'Image settings' },

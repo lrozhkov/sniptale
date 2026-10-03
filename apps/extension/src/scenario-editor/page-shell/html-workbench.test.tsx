@@ -14,7 +14,11 @@ vi.mock('./runtime/html-export', () => ({
   measureGuideHtml: io.measure,
   exportGuideHtml: io.save,
 }));
-vi.mock('./runtime/html-images', () => ({ prepareHtmlImage: io.preview }));
+vi.mock('./runtime/html-images', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./runtime/html-images')>()),
+  prepareHtmlImage: io.preview,
+}));
+import { MissingGuideHtmlImageError } from './runtime/html-images';
 import { GuideHtmlWorkbench } from './html-workbench';
 afterEach(() => vi.unstubAllGlobals());
 it('rejects duplicate jobs, retains measurement through autosave acknowledgement and invalidates edits', async () => {
@@ -115,7 +119,7 @@ it('reports failed jobs, supports retry and distinguishes committed history fail
       )
     );
     await act(async () => button('Calculate size').click());
-    expect(host.textContent).toContain('Could not save HTML');
+    expect(host.textContent).toContain('Could not calculate HTML size');
     await act(async () => button('Calculate size').click());
     await act(async () => button('Save HTML').click());
     expect(host.textContent).toContain('Could not save HTML');
@@ -351,6 +355,52 @@ it('groups document and image settings and returns the current reading choice', 
       host.querySelector<HTMLButtonElement>('button[title="Back to export"]')!.click()
     );
     expect(close).toHaveBeenCalledWith(expect.objectContaining({ mode: 'steps' }));
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+it('identifies the unavailable occurrence and recovers after replacing it', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const project = createGuideProject('Guide');
+  const step = createGuideStep('Step');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'missing',
+      assetId: 'lost',
+      width: 100,
+      height: 50,
+      source: { kind: 'import', filename: 'lost.png' },
+    }),
+  ];
+  project.items = [step];
+  io.measure
+    .mockReset()
+    .mockRejectedValueOnce(new MissingGuideHtmlImageError('missing'))
+    .mockResolvedValueOnce({ size: 100, rasters: [], blocks: new Map() });
+  io.preview.mockResolvedValue(null);
+  try {
+    await act(async () =>
+      root.render(
+        <GuideHtmlWorkbench
+          project={project}
+          images={{ lost: null }}
+          onChange={() => {}}
+          onClose={() => {}}
+          t={createTranslator('en')}
+        />
+      )
+    );
+    const calculate = host.querySelector<HTMLButtonElement>('button[title="Calculate size"]')!;
+    await act(async () => calculate.click());
+    expect(host.textContent).toContain('Image #1 is unavailable');
+    expect(host.textContent).not.toContain('Could not save HTML');
+    await act(async () => calculate.click());
+    expect(host.textContent).not.toContain('Image #1 is unavailable');
   } finally {
     await act(async () => root.unmount());
     host.remove();

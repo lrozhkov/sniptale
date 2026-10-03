@@ -162,3 +162,42 @@ it('cancels pending preparation when leaving and restores reader focus and item'
     await s.close();
   }
 });
+
+it('keeps step grouping disposable and retains it when reopening print', async () => {
+  const s = setup();
+  const original = structuredClone(s.project);
+  const onClose = vi.fn();
+  try {
+    await act(async () =>
+      s.root.render(
+        <GuidePrint project={s.project} images={{ asset: 'blob:image' }} t={t} onClose={onClose} />
+      )
+    );
+    const toggle = () =>
+      s.host.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Keep steps together"]')!;
+    await act(async () => toggle().click());
+    expect(s.host.querySelector('main')?.dataset['keepSteps']).toBe('true');
+    await act(async () => button(s.host, 'Each step on a new page').click());
+    expect(toggle()).toBeNull();
+    await act(async () => button(s.host, 'Back to export').click());
+    expect(onClose).toHaveBeenCalledWith(
+      expect.objectContaining({ keepStepsTogether: true, pagination: 'step' })
+    );
+    await act(async () => s.root.render(null));
+    await act(async () =>
+      s.root.render(
+        <GuidePrint
+          project={s.project}
+          initialSettings={{ ...s.project.print, keepStepsTogether: true }}
+          images={{ asset: 'blob:image' }}
+          t={t}
+          onClose={onClose}
+        />
+      )
+    );
+    expect(toggle().getAttribute('aria-checked')).toBe('true');
+    expect(s.project).toEqual(original);
+  } finally {
+    await s.close();
+  }
+});

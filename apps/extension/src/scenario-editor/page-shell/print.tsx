@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { ArrowLeft, Printer } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -8,6 +9,8 @@ import type { Translate } from '../../platform/i18n';
 import { GuideReadDocument } from './reader-document';
 import './print.css';
 import './export-workspace.css';
+
+type GuidePrintSettings = GuideProject['print'] & { keepStepsTogether?: boolean };
 
 /** Output settings and browser print readiness are disposable, never project mutations. */
 export function GuidePrint({
@@ -18,12 +21,12 @@ export function GuidePrint({
   t,
 }: {
   project: GuideProject;
-  initialSettings?: GuideProject['print'] | undefined;
+  initialSettings?: GuidePrintSettings | undefined;
   images: Record<string, string | null>;
-  onClose: (settings: GuideProject['print']) => void;
+  onClose: (settings: GuidePrintSettings) => void;
   t: Translate;
 }) {
-  const [settings, setSettings] = useState(initialSettings);
+  const [settings, setSettings] = useState<GuidePrintSettings>(initialSettings);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const documentRef = useRef<HTMLDivElement>(null);
@@ -77,6 +80,7 @@ export function GuidePrint({
       className="guide-print"
       style={pageStyle}
       data-pagination={settings.pagination}
+      data-keep-steps={settings.keepStepsTogether || undefined}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -108,39 +112,7 @@ export function GuidePrint({
           {t('scenario.editor.guidePrintAction')}
         </ProductActionButton>
       </header>
-      <fieldset className="guide-print-settings guide-export-controls" disabled={pending}>
-        <legend className="sr-only">{t('scenario.editor.guidePrintSettings')}</legend>
-        <SegmentedSwitch
-          density="compact"
-          ariaLabel={t('scenario.editor.guidePrintPaper')}
-          activeId={settings.pageSize}
-          options={[
-            { id: 'a4', label: 'A4' },
-            { id: 'letter', label: t('scenario.editor.guidePrintLetter') },
-          ]}
-          onChange={(pageSize) => setSettings((current) => ({ ...current, pageSize }))}
-        />
-        <SegmentedSwitch
-          density="compact"
-          ariaLabel={t('scenario.editor.guidePrintOrientation')}
-          activeId={settings.orientation}
-          options={[
-            { id: 'portrait', label: t('scenario.editor.guidePrintPortrait') },
-            { id: 'landscape', label: t('scenario.editor.guidePrintLandscape') },
-          ]}
-          onChange={(orientation) => setSettings((current) => ({ ...current, orientation }))}
-        />
-        <SegmentedSwitch
-          density="compact"
-          ariaLabel={t('scenario.editor.guidePrintPagination')}
-          activeId={settings.pagination}
-          options={[
-            { id: 'flow', label: t('scenario.editor.guideReaderFlow') },
-            { id: 'step', label: t('scenario.editor.guidePrintStep') },
-          ]}
-          onChange={(pagination) => setSettings((current) => ({ ...current, pagination }))}
-        />
-      </fieldset>
+      <PrintSettingsControls settings={settings} onChange={setSettings} pending={pending} t={t} />
       <p className="guide-print-status" role="status">
         {t(
           missing || failed
@@ -159,10 +131,72 @@ export function GuidePrint({
   );
 }
 
+/** Print options change only the disposable output settings, independently of readiness. */
+function PrintSettingsControls({
+  settings,
+  onChange,
+  pending,
+  t,
+}: {
+  settings: GuidePrintSettings;
+  onChange: (settings: GuidePrintSettings) => void;
+  pending: boolean;
+  t: Translate;
+}) {
+  return (
+    <fieldset className="guide-print-settings guide-export-controls" disabled={pending}>
+      <legend className="sr-only">{t('scenario.editor.guidePrintSettings')}</legend>
+      <SegmentedSwitch
+        density="compact"
+        ariaLabel={t('scenario.editor.guidePrintPaper')}
+        activeId={settings.pageSize}
+        options={[
+          { id: 'a4', label: 'A4' },
+          { id: 'letter', label: t('scenario.editor.guidePrintLetter') },
+        ]}
+        onChange={(pageSize) => onChange({ ...settings, pageSize })}
+      />
+      <SegmentedSwitch
+        density="compact"
+        ariaLabel={t('scenario.editor.guidePrintOrientation')}
+        activeId={settings.orientation}
+        options={[
+          { id: 'portrait', label: t('scenario.editor.guidePrintPortrait') },
+          { id: 'landscape', label: t('scenario.editor.guidePrintLandscape') },
+        ]}
+        onChange={(orientation) => onChange({ ...settings, orientation })}
+      />
+      <SegmentedSwitch
+        density="compact"
+        ariaLabel={t('scenario.editor.guidePrintPagination')}
+        activeId={settings.pagination}
+        options={[
+          { id: 'flow', label: t('scenario.editor.guideReaderFlow') },
+          { id: 'step', label: t('scenario.editor.guidePrintStep') },
+        ]}
+        onChange={(pagination) => onChange({ ...settings, pagination })}
+      />
+      {settings.pagination === 'flow' && (
+        <label className="guide-print-keep-steps">
+          <ProductToggle
+            size="sm"
+            checked={settings.keepStepsTogether ?? false}
+            aria-label={t('scenario.editor.guidePrintKeepSteps')}
+            onClick={() =>
+              onChange({ ...settings, keepStepsTogether: !settings.keepStepsTogether })
+            }
+          />
+          <span>{t('scenario.editor.guidePrintKeepSteps')}</span>
+        </label>
+      )}
+    </fieldset>
+  );
+}
+
 /** Restores the reader command after closing the temporary print surface. */
 export function useGuidePrintMode() {
   const [active, setActive] = useState(false);
-  const [settings, setSettings] = useState<GuideProject['print']>();
+  const [settings, setSettings] = useState<GuidePrintSettings>();
   const trigger = useRef<HTMLButtonElement>(null);
   const restore = useRef(false);
   useEffect(() => {
@@ -176,7 +210,7 @@ export function useGuidePrintMode() {
     settings,
     trigger,
     open: () => setActive(true),
-    close: (next: GuideProject['print']) => {
+    close: (next: GuidePrintSettings) => {
       setSettings(next);
       restore.current = true;
       setActive(false);

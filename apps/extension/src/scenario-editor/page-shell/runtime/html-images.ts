@@ -25,6 +25,14 @@ export interface HtmlRaster {
   mime: string;
 }
 
+/** Missing media is recoverable by replacing/removing its occurrence, never by omitting pixels. */
+export class MissingGuideHtmlImageError extends Error {
+  constructor(readonly blockId: string) {
+    super('Missing export image.');
+    this.name = 'MissingGuideHtmlImageError';
+  }
+}
+
 /** Sequential native rendering retains at most one source and output bitmap. */
 export async function prepareHtmlImage(
   block: GuideImageBlock,
@@ -32,9 +40,14 @@ export async function prepareHtmlImage(
   signal: AbortSignal,
   readAsset = getScenarioAssetBlob
 ) {
-  const source = await readAsset(block.assetId);
+  const source = await readAsset(block.assetId).catch((error: unknown) => {
+    signal.throwIfAborted();
+    if (error instanceof DOMException && error.name === 'NotFoundError')
+      throw new MissingGuideHtmlImageError(block.id);
+    throw error;
+  });
   signal.throwIfAborted();
-  if (!source) throw new Error('Missing export image.');
+  if (!source) throw new MissingGuideHtmlImageError(block.id);
   await assertImportableProjectImage(source);
   const blob =
     settings.content === 'frame' ? await renderGuideImageFrame(source, block, signal) : source;

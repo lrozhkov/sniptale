@@ -111,3 +111,33 @@ it('releases a bitmap returned after cancellation without encoding', async () =>
   expect(io.close).toHaveBeenCalledOnce();
   expect(io.encode).not.toHaveBeenCalled();
 });
+
+it.each(['absent', 'not-found'] as const)(
+  'identifies %s media without decoding an incomplete export',
+  async (failure) => {
+    if (failure === 'absent') io.asset.mockResolvedValue(undefined);
+    else io.asset.mockRejectedValue(new DOMException('File not found', 'NotFoundError'));
+    await expect(
+      prepareHtmlImage(image(), DEFAULT_HTML_IMAGES, new AbortController().signal)
+    ).rejects.toMatchObject({ name: 'MissingGuideHtmlImageError', blockId: 'a' });
+    expect(io.bitmap).not.toHaveBeenCalled();
+  }
+);
+it('does not read removed image blocks or replacement slots', async () => {
+  const project = createGuideProject('Guide');
+  const step = createGuideStep('Step');
+  step.blocks = [
+    {
+      kind: 'image-slot',
+      id: 'a',
+      frame: { width: 400, height: 200 },
+      fit: 'contain',
+      alt: '',
+      caption: '',
+    },
+  ];
+  project.items = [step];
+  io.asset.mockRejectedValue(new DOMException('File not found', 'NotFoundError'));
+  expect((await measureHtmlImages(project, new AbortController().signal)).rasters).toEqual([]);
+  expect(io.asset).not.toHaveBeenCalled();
+});

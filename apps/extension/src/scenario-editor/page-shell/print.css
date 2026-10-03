@@ -107,6 +107,9 @@
   .guide-print[data-pagination='step'] .guide-read-document > :not(:first-child) {
     break-before: page;
   }
+  .guide-print[data-pagination='flow'][data-keep-steps='true'] .guide-read-document > article {
+    break-inside: avoid-page;
+  }
   .guide-print .guide-block {
     break-inside: auto;
   }
@@ -128,4 +131,11 @@
   padding: 8px 12px;
   color: var(--sniptale-color-text-primary);
   white-space: normal;
+}
+
+.guide-print-keep-steps {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
 }
