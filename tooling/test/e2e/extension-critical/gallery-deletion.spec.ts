@@ -119,6 +119,71 @@ async function createDraft(
   return assetId;
 }
 
+async function verifyCompactSidebar(page: Page, locale: 'ru' | 'en') {
+  const sidebar = page.locator('[data-ui="gallery.sidebar.shell"]');
+  const toggle = sidebar.locator('[data-ui="gallery.sidebar.toggle"]');
+  const savedLabel = translate('gallery.app.scopeLibrary', locale);
+  const saved = sidebar.getByRole('checkbox', { name: savedLabel });
+  await expect(saved).toBeChecked();
+  const activeFolder = await sidebar
+    .locator('[data-gallery-folder]:has(> button[aria-pressed="true"])')
+    .getAttribute('data-gallery-folder');
+  expect(activeFolder).toBeTruthy();
+  await sidebar.getByText(savedLabel, { exact: true }).click();
+  await expect(saved).not.toBeChecked();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(56);
+  await expect(saved).toBeHidden();
+  await expect(sidebar.locator('[data-ui="gallery.sidebar.footer"]')).toBeHidden();
+  const rows = sidebar.locator('[data-gallery-folder] > button');
+  const boxes = await rows.evaluateAll((buttons) =>
+    buttons.map((button) => {
+      const box = button.getBoundingClientRect();
+      return {
+        x: box.x,
+        width: box.width,
+        height: box.height,
+        name: button.getAttribute('aria-label'),
+        title: button.getAttribute('title'),
+      };
+    })
+  );
+  expect(boxes.length).toBeGreaterThanOrEqual(1);
+  for (const box of boxes) {
+    expect(box.x).toBe(boxes[0]!.x);
+    expect(box.width).toBeGreaterThanOrEqual(36);
+    expect(box.height).toBe(40);
+    expect(box.name).toBeTruthy();
+    expect(box.title).toBe(box.name);
+  }
+  await toggle.focus();
+  await page.keyboard.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(saved).not.toBeChecked();
+  await expect(sidebar.locator(`[data-gallery-folder="${activeFolder}"] > button`)).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  await sidebar.getByText(savedLabel, { exact: true }).click();
+  await expect(saved).toBeChecked();
+  await toggle.click();
+  const screenshot = sidebar.locator('[data-gallery-folder="screenshot"] > button');
+  await screenshot.focus();
+  await page.keyboard.press('Enter');
+  await expect(screenshot).toHaveAttribute('aria-pressed', 'true');
+  await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(56);
+  const sidebarLeft = (await sidebar.boundingBox())!.x;
+  const contentLeft = await page
+    .locator('[data-ui="gallery.page.root"]')
+    .evaluate(
+      (node) =>
+        node.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(node).paddingLeft)
+    );
+  expect(sidebarLeft).toBeGreaterThanOrEqual(contentLeft);
+  return toggle;
+}
+
 for (const [locale, theme] of [
   ['ru', 'light'],
   ['en', 'dark'],
@@ -174,6 +239,14 @@ for (const [locale, theme] of [
     expect(new Set(headingStyles).size).toBe(1);
     await save.click();
     await expect(save).toHaveCount(0);
+    const sidebarToggle = await verifyCompactSidebar(page, locale);
+    await page.screenshot({
+      animations: 'disabled',
+      path: info.outputPath(`compact-${locale}.png`),
+    });
+    await sidebarToggle.click();
+    await expect(sidebarToggle).toHaveAttribute('aria-expanded', 'true');
+
     await page
       .locator(`[data-gallery-keyboard-id="${assetId}"]`)
       .getByRole('button', { name: 'deletion-draft.png', exact: true })

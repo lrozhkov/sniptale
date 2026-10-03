@@ -21,7 +21,10 @@ type FolderListProps = Pick<
   | 'savedViews'
   | 'savedViewsLoadFailed'
   | 'savedViewsLoaded'
->;
+> & {
+  /** Icon-only presentation; selection and filter authority stay with the caller. */
+  compact?: boolean;
+};
 
 const activeFolderClassName = [
   'border-transparent',
@@ -43,7 +46,7 @@ function GalleryFolderRow(
   }
 ) {
   const Icon = getGalleryFolderIcon(props.folder);
-  const active = props.folderFilter === props.folder && !props.activeSavedView;
+  const active = props.folderFilter === props.folder && (props.compact || !props.activeSavedView);
 
   return (
     <div
@@ -55,9 +58,12 @@ function GalleryFolderRow(
         ref={props.buttonRef}
         type="button"
         aria-pressed={active}
+        aria-label={props.compact ? FOLDER_LABELS[props.folder] : undefined}
+        title={props.compact ? FOLDER_LABELS[props.folder] : undefined}
         onClick={() => props.onFolderFilterChange(props.folder)}
         className={[
-          'flex h-9 w-full items-center justify-between rounded-[8px] border px-2.5 text-left transition-colors',
+          'flex w-full items-center rounded-[8px] border text-left transition-colors',
+          props.compact ? 'h-10 justify-center' : 'h-9 justify-between px-2.5',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset',
           'focus-visible:ring-[var(--sniptale-color-text-primary)]',
           active ? activeFolderClassName : inactiveFolderClassName,
@@ -65,9 +71,9 @@ function GalleryFolderRow(
       >
         <span className="inline-flex min-w-0 items-center gap-2 text-sm font-medium">
           <Icon className="h-4 w-4" aria-hidden="true" />
-          <span className="truncate">{FOLDER_LABELS[props.folder]}</span>
+          {!props.compact ? <span className="truncate">{FOLDER_LABELS[props.folder]}</span> : null}
         </span>
-        {props.countsKnown ? (
+        {props.compact ? null : props.countsKnown ? (
           <span
             className="rounded-full border border-[var(--sniptale-color-border-soft)]
               bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,transparent)]
@@ -83,7 +89,7 @@ function GalleryFolderRow(
           />
         )}
       </button>
-      {props.countsKnown && props.savedViewsLoaded ? (
+      {!props.compact && props.countsKnown && props.savedViewsLoaded ? (
         <GallerySavedViewRows
           activeSavedView={props.activeSavedView ?? null}
           folder={props.folder}
@@ -117,7 +123,7 @@ export function GalleryFolderList(props: FolderListProps) {
   const allButtonRef = useRef<HTMLButtonElement>(null);
   const folders = props.countsKnown
     ? getRenderedGalleryFolders({
-        activeSavedView: Boolean(props.activeSavedView),
+        activeSavedView: Boolean(props.activeSavedView) && !props.compact,
         counts: props.counts,
         focusedFolder,
         folderFilter: props.folderFilter,
@@ -174,19 +180,19 @@ export function GalleryFolderList(props: FolderListProps) {
       {renderRow('all')}
       {props.countsKnown ? (
         <>
-          {projects.length > 0 ? (
+          {!props.compact && projects.length > 0 ? (
             <div className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.preview.projectsHeading')}
             </div>
           ) : null}
           {projects.map(renderRow)}
-          {materials.length > 0 ? (
+          {!props.compact && materials.length > 0 ? (
             <div className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
               {translate('gallery.preview.materialsHeading')}
             </div>
           ) : null}
           {materials.map(renderRow)}
-          {hiddenSavedViewFolders.length > 0 ? (
+          {!props.compact && hiddenSavedViewFolders.length > 0 ? (
             <section data-ui="gallery.sidebar.hiddenSavedViews">
               <h3 className="px-2.5 pt-3 text-xs font-semibold text-[var(--sniptale-color-text-muted)]">
                 {translate('gallery.app.savedViewsHeading')}
@@ -214,9 +220,9 @@ export function GalleryFolderList(props: FolderListProps) {
           ) : null}
         </>
       ) : (
-        <GalleryFolderPlaceholders />
+        !props.compact && <GalleryFolderPlaceholders />
       )}
-      {props.savedViewsLoadFailed ? (
+      {!props.compact && props.savedViewsLoadFailed ? (
         <p className="px-2 py-1 text-xs text-[var(--sniptale-color-danger)]">
           {translate('gallery.app.savedViewLoadFailed')}
         </p>

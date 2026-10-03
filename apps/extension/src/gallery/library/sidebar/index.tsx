@@ -1,5 +1,13 @@
-import { useId } from 'react';
-import { Library, ListChecks, RotateCcw, Trash2, X } from 'lucide-react';
+import { useId, useState } from 'react';
+import {
+  Library,
+  ListChecks,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RotateCcw,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { formatNumber, getCurrentLocale, translate } from '../../../platform/i18n';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import {
@@ -86,27 +94,59 @@ function GalleryTrashSummaryText({
 }
 
 export function GallerySidebar(props: GallerySidebarProps) {
+  const [collapsed, setCollapsed] = useState(false);
+  const compact = collapsed && !props.trashMode;
+  const contentId = useId();
+  const toggleLabel = translate(
+    compact ? 'gallery.app.sidebarExpand' : 'gallery.app.sidebarCollapse'
+  );
   return (
     <InspectorShellFrame
+      collapsed={compact}
       expandedWidthClassName={INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS}
       className="overflow-hidden border-r-0 bg-transparent"
       dataUi="gallery.sidebar.shell"
     >
       <InspectorShellPanel dataUi="gallery.sidebar.panel" className={gallerySidebarPanelClassName}>
+        {!props.trashMode ? (
+          <div className="flex shrink-0 justify-end p-1.5">
+            <button
+              type="button"
+              data-ui="gallery.sidebar.toggle"
+              aria-label={toggleLabel}
+              title={toggleLabel}
+              aria-expanded={!compact}
+              aria-controls={contentId}
+              className={getControlIconButtonClassName()}
+              onClick={() => setCollapsed((value) => !value)}
+            >
+              {compact ? (
+                <PanelLeftOpen className="h-4 w-4" aria-hidden="true" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" aria-hidden="true" />
+              )}
+            </button>
+          </div>
+        ) : null}
         <div
+          id={contentId}
           data-ui="gallery.sidebar.scroll"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${compact ? 'p-1.5' : 'p-3'}`}
         >
           {props.trashMode ? (
             <GalleryTrashControls {...props} />
           ) : (
             <>
-              <GalleryFolderList {...props} />
-              {props.countsKnown ? <GalleryFacetFilters {...props} /> : null}
+              <GalleryFolderList {...props} compact={compact} />
+              <div hidden={compact}>
+                {props.countsKnown ? <GalleryFacetFilters {...props} /> : null}
+              </div>
             </>
           )}
         </div>
-        <GallerySidebarFooter {...props} />
+        <div hidden={compact} className="shrink-0">
+          <GallerySidebarFooter {...props} />
+        </div>
       </InspectorShellPanel>
     </InspectorShellFrame>
   );

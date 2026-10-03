@@ -179,7 +179,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onDismiss={props.onActiveImportDismiss}
         />
       ) : null}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-clip">
         <GalleryHeader
           searchNavigation={{
             inputRef: searchRef,

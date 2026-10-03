@@ -22,6 +22,7 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 function renderList(props: {
+  compact?: boolean;
   counts?: GalleryFolderCounts;
   countsKnown?: boolean;
   countsLoading?: boolean;
@@ -33,6 +34,7 @@ function renderList(props: {
   act(() =>
     root?.render(
       <GalleryFolderList
+        compact={props.compact ?? false}
         counts={props.counts ?? EMPTY_COUNTS}
         countsKnown={props.countsKnown ?? true}
         countsLoading={props.countsLoading ?? false}
@@ -185,4 +187,100 @@ it('falls back from an emptied active category and recovers focus from saved-vie
   act(() => root?.render(<Probe counts={{ ...EMPTY_COUNTS, all: 1, screenshot: 1 }} />));
   expect(container?.textContent).toContain('Saved capture view');
   expect(container?.querySelector('[data-ui="gallery.sidebar.hiddenSavedViews"]')).toBeNull();
+});
+
+it('keeps all available compact folders named, selectable and current without extra rows', () => {
+  const onFolderFilterChange = vi.fn();
+  act(() =>
+    root?.render(
+      <GalleryFolderList
+        compact
+        counts={{
+          all: 8,
+          screenshot: 1,
+          recording: 1,
+          audio: 1,
+          scenario: 1,
+          export: 1,
+          'video-project': 1,
+          'web-snapshot': 1,
+        }}
+        countsKnown
+        folderFilter="screenshot"
+        savedViewsLoaded
+        onFolderFilterChange={onFolderFilterChange}
+      />
+    )
+  );
+  const buttons = [
+    ...container!.querySelectorAll<HTMLButtonElement>('[data-gallery-folder] > button'),
+  ];
+  expect(buttons).toHaveLength(8);
+  for (const button of buttons) {
+    expect(button.getAttribute('aria-label')).toBeTruthy();
+    expect(button.title).toBe(button.getAttribute('aria-label'));
+    expect(button.querySelector('span.truncate')).toBeNull();
+    expect(button.querySelector('svg')).not.toBeNull();
+  }
+  const screenshot = container!.querySelector<HTMLButtonElement>(
+    '[data-gallery-folder="screenshot"] > button'
+  )!;
+  expect(screenshot.getAttribute('aria-pressed')).toBe('true');
+  act(() => screenshot.click());
+  expect(onFolderFilterChange).toHaveBeenCalledWith('screenshot');
+  expect(container!.textContent).not.toContain(translate('gallery.preview.projectsHeading'));
+});
+
+it('keeps an empty saved-view parent current when compact and restores its row on expansion', () => {
+  const onFolderFilterChange = vi.fn();
+  const view = {
+    id: 'empty-view',
+    name: 'Empty saved view',
+    createdAt: 1,
+    updatedAt: 1,
+    folderFilter: 'screenshot' as const,
+    filters: {
+      activeTags: ['keep'],
+      scope: 'temporary' as const,
+      facetFilters: {
+        created: [],
+        updated: [],
+        duration: [],
+        format: [],
+        resolution: [],
+        size: [],
+        source: [],
+      },
+    },
+  };
+  const props = {
+    counts: EMPTY_COUNTS,
+    countsKnown: true,
+    folderFilter: 'screenshot' as const,
+    activeSavedView: view,
+    savedViews: [view],
+    savedViewsLoaded: true,
+    onFolderFilterChange,
+  };
+  act(() => root?.render(<GalleryFolderList {...props} compact />));
+  const current = container!.querySelector('[data-gallery-folder="screenshot"] > button');
+  expect(current?.getAttribute('aria-pressed')).toBe('true');
+  expect(container!.textContent).not.toContain(view.name);
+  act(() => root?.render(<GalleryFolderList {...props} />));
+  expect(container!.textContent).toContain(view.name);
+  expect(onFolderFilterChange).not.toHaveBeenCalled();
+});
+
+it('restores compact keyboard focus to All when a category disappears', () => {
+  renderList({ compact: true, counts: { ...EMPTY_COUNTS, all: 1, screenshot: 1 } });
+  const screenshot = container!.querySelector<HTMLButtonElement>(
+    '[data-gallery-folder="screenshot"] > button'
+  )!;
+  act(() => screenshot.focus());
+  expect(document.activeElement).toBe(screenshot);
+  renderList({ compact: true, counts: EMPTY_COUNTS });
+  expect(document.activeElement).toBe(
+    container!.querySelector('[data-gallery-folder="all"] > button')
+  );
+  expect(container!.querySelector('[data-gallery-folder="screenshot"]')).toBeNull();
 });

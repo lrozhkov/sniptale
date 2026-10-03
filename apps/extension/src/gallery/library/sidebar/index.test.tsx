@@ -350,3 +350,46 @@ it('groups selection recovery and deletion before cleanup settings and whole-tra
   );
   expect(container!.querySelector('h2')?.textContent).toBe(translate('gallery.app.trashTitle'));
 });
+
+it('collapses presentation without mutating folder, filters or saved-view context', () => {
+  const props = {
+    ...createProps(),
+    folderFilter: 'screenshot' as const,
+    scope: 'temporary' as const,
+  };
+  act(() => root?.render(<GallerySidebar {...props} />));
+  const toggle = container!.querySelector<HTMLButtonElement>('[data-ui="gallery.sidebar.toggle"]')!;
+  expect(toggle).not.toBeNull();
+  act(() => toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(container!.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).toContain(
+    'w-14'
+  );
+  expect(
+    container!.querySelector<HTMLElement>('[data-ui="test.facet-filters"]')?.parentElement?.hidden
+  ).toBe(true);
+  expect(sectionMocks.folderList).toHaveBeenLastCalledWith(
+    expect.objectContaining({ compact: true, folderFilter: 'screenshot' })
+  );
+  act(() => toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(
+    container!.querySelector<HTMLElement>('[data-ui="test.facet-filters"]')?.parentElement?.hidden
+  ).toBe(false);
+  expect(sectionMocks.facetFilters).toHaveBeenLastCalledWith(
+    expect.objectContaining({ scope: 'temporary', activeTags: ['alpha'] })
+  );
+  expect(props.onFolderFilterChange).not.toHaveBeenCalled();
+  expect(props.onScopeChange).not.toHaveBeenCalled();
+  expect(props.onResetFilters).not.toHaveBeenCalled();
+  act(() => toggle.click());
+  act(() => root?.render(<GallerySidebar {...props} trashMode />));
+  expect(container!.querySelector('[data-ui="gallery.sidebar.toggle"]')).toBeNull();
+  expect(container!.querySelector('[data-ui="gallery.sidebar.shell"]')?.className).not.toContain(
+    'w-14'
+  );
+  act(() => root?.render(<GallerySidebar {...props} />));
+  expect(
+    container!.querySelector('[data-ui="gallery.sidebar.toggle"]')?.getAttribute('aria-expanded')
+  ).toBe('false');
+});
