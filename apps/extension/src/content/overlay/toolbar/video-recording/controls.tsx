@@ -223,6 +223,8 @@ function MediaControls(props: {
 export function ToolbarVideoRecordingControls(props: {
   compactMenus?: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement?: boolean;
+  onFreePlacementChange?: ((value: boolean) => void) | undefined;
   onCollapse(): void;
   onCompactMenusChange(compact: boolean): void;
   onDisplayModeChange(displayMode: ContentToolbarDisplayMode): void;
@@ -253,6 +255,8 @@ export function ToolbarVideoRecordingControls(props: {
           onCompactMenusChange={props.onCompactMenusChange}
           onDisableScreenshotMode={() => undefined}
           onDisplayModeChange={props.onDisplayModeChange}
+          freePlacement={props.freePlacement ?? true}
+          onFreePlacementChange={props.onFreePlacementChange}
           onPinToTabChange={() => undefined}
           pinToTab
           pinToTabAvailable

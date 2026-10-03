@@ -1,5 +1,7 @@
-import React from 'react';
-import { Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
+import React, { useLayoutEffect, useState } from 'react';
+import { Move, Columns2, PanelBottomClose, Pin, PinOff, Rows3, X } from 'lucide-react';
+import { isBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
+import { PopoverCheckIcon } from '../../icons/icons';
 import { translate } from '../../../../platform/i18n';
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import {
@@ -40,10 +42,14 @@ function ToolbarSettingsItem(props: {
   onSelect: (event: React.MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
   selected?: boolean;
+  checked?: boolean;
 }) {
   const itemProps = {
     onMouseDown: props.onSelect,
-    onClick: stopMenuEvent,
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (event.detail === 0 && !isBridgedMouseEvent(event.nativeEvent)) props.onSelect(event);
+      else stopMenuEvent(event);
+    },
     ...(props.disabled === undefined ? {} : { disabled: props.disabled }),
     ...(props.selected === undefined ? {} : { selected: props.selected }),
   };
@@ -52,6 +58,7 @@ function ToolbarSettingsItem(props: {
     <ProductToolbarMenuItem {...itemProps}>
       {props.icon}
       <ProductToolbarMenuItemCopy hint={props.hint} label={props.label} />
+      {props.checked ? <PopoverCheckIcon /> : null}
     </ProductToolbarMenuItem>
   );
 }
@@ -239,8 +246,10 @@ function renderDisableScreenshotModeItem(props: {
   });
 }
 
-function ToolbarSettingsDropdownContent(props: ToolbarSettingsDropdownProps) {
-  const placement = getToolbarMenuPosition(props.triggerRef.current, 340);
+function ToolbarSettingsDropdownContent(
+  props: ToolbarSettingsDropdownProps & { placement: 'up' | 'down' }
+) {
+  const placement = props.placement;
   const menuPlacement = resolveToolbarMenuPlacement(props.displayMode, placement);
   const menuProps = {
     compact: props.compactMenus,
@@ -252,11 +261,26 @@ function ToolbarSettingsDropdownContent(props: ToolbarSettingsDropdownProps) {
 
   return (
     <ProductToolbarMenu {...menuProps}>
-      {renderDisplayModeItems({
-        displayMode: props.displayMode,
-        onClose: props.onClose,
-        onDisplayModeChange: props.onDisplayModeChange,
-      })}
+      {props.onFreePlacementChange ? (
+        <ToolbarSettingsItem
+          icon={<Move aria-hidden className="sniptale-popover-icon" />}
+          checked={props.freePlacement ?? false}
+          label={translate('content.toolbar.panelFreePlacement')}
+          hint={translate('content.toolbar.panelFreePlacementHint')}
+          selected={props.freePlacement ?? false}
+          onSelect={(event) => {
+            stopMenuEvent(event);
+            props.onFreePlacementChange?.(!props.freePlacement);
+          }}
+        />
+      ) : null}
+      {props.freePlacement !== false
+        ? renderDisplayModeItems({
+            displayMode: props.displayMode,
+            onClose: props.onClose,
+            onDisplayModeChange: props.onDisplayModeChange,
+          })
+        : null}
       {renderToolbarSettingsUtilityItems(props)}
     </ProductToolbarMenu>
   );
@@ -265,6 +289,8 @@ function ToolbarSettingsDropdownContent(props: ToolbarSettingsDropdownProps) {
 type ToolbarSettingsDropdownProps = {
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement?: boolean;
+  onFreePlacementChange?: ((value: boolean) => void) | undefined;
   menuRef: React.RefObject<HTMLDivElement | null>;
   menuStyle?: React.CSSProperties;
   onClose: () => void;
@@ -288,12 +314,29 @@ type ToolbarSettingsDropdownProps = {
 };
 
 export function ToolbarSettingsDropdown(props: ToolbarSettingsDropdownProps) {
-  const placement = getToolbarMenuPosition(props.triggerRef.current, 340);
+  const [menuSize, setMenuSize] = useState({ width: 280, height: 340 });
+  useLayoutEffect(() => {
+    const surface = props.menuRef.current?.firstElementChild;
+    if (!(surface instanceof HTMLElement)) return;
+    const measure = () => {
+      const width = surface.offsetWidth;
+      const height = surface.offsetHeight;
+      if (!width || !height) return;
+      setMenuSize((previous) =>
+        previous.width === width && previous.height === height ? previous : { width, height }
+      );
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(surface);
+    return () => observer?.disconnect();
+  }, [props.menuRef, props.freePlacement, props.compactMenus]);
+  const placement = getToolbarMenuPosition(props.triggerRef.current, menuSize.height);
   const menuStyle = resolveToolbarFloatingMenuStyle({
     anchorEl: props.triggerRef.current,
     displayMode: props.displayMode,
-    menuHeight: 340,
-    menuWidth: 280,
+    menuHeight: menuSize.height,
+    menuWidth: menuSize.width,
     placement,
     preferredAlign: 'end',
     ...(props.viewportRightInset === undefined
@@ -306,7 +349,11 @@ export function ToolbarSettingsDropdown(props: ToolbarSettingsDropdownProps) {
 
   return (
     <div ref={props.menuRef as React.Ref<HTMLDivElement>}>
-      <ToolbarSettingsDropdownContent {...props} menuStyle={menuStyle} />
+      <ToolbarSettingsDropdownContent
+        {...props}
+        placement={placement}
+        menuStyle={{ ...menuStyle, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
+      />
     </div>
   );
 }

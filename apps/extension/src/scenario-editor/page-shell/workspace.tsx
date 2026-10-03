@@ -25,6 +25,7 @@ type WorkspaceProps = {
   onUploadFile: (file: File, signal: AbortSignal) => Promise<boolean>;
   disabled: boolean;
   onSelect: (id: string) => void;
+  onClearSelection?: () => void;
   onAddStep: () => void;
   onOperate?: (operation: GuideStructureOperation) => void;
   itemActions: ReactNode;
@@ -46,6 +47,12 @@ export function GuideWorkspace(props: WorkspaceProps) {
     >
       <div
         className="guide-document-scroll"
+        onMouseDown={(event) => {
+          if (event.button !== 0 || !(event.target instanceof HTMLElement)) return;
+          if (!event.target.matches('.guide-document-scroll, .guide-document')) return;
+          props.onClearSelection?.();
+          event.currentTarget.focus({ preventScroll: true });
+        }}
         tabIndex={0}
         aria-label={t('scenario.editor.guideDocument')}
       >

@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react';
 import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './inspector-actions';
 import { useGuideResourceRequest } from './resource-drawer';
 import { GuideHtmlImageFields } from './html-image-fields';
@@ -34,6 +35,7 @@ export function GuideImageControls({
   disabled,
   onChange,
   onClose,
+  onEscape,
   onEdit,
   stepId,
   t,
@@ -45,6 +47,7 @@ export function GuideImageControls({
   disabled: boolean;
   onChange: (block: GuideImageBlock, group?: string | null) => void;
   onClose: () => void;
+  onEscape?: () => void;
   onEdit?: () => void;
   stepId?: string;
   t: Translate;
@@ -62,16 +65,12 @@ export function GuideImageControls({
   return (
     <div
       className="guide-image-inspector"
-      onKeyDown={(event) => {
-        if (event.defaultPrevented) return;
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          event.stopPropagation();
-          onClose();
-        }
-      }}
+      onKeyDown={(event) => handleInspectorEscape(event, onEscape ?? onClose)}
     >
-      <ScenarioInspectorBackButton label={t('scenario.editor.guideImageDone')} onBack={onClose} />
+      <ScenarioInspectorBackButton
+        label={t('scenario.editor.guideStepSettings')}
+        onBack={onClose}
+      />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
         {onEdit && (
@@ -344,4 +343,11 @@ function ImageActionContext({ source, t }: { source: GuideImageBlock['source']; 
       )}
     </GuideInspectorGroup>
   );
+}
+
+function handleInspectorEscape(event: KeyboardEvent<HTMLDivElement>, close: () => void) {
+  if (event.defaultPrevented || event.key !== 'Escape') return;
+  event.preventDefault();
+  event.stopPropagation();
+  close();
 }

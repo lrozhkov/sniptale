@@ -111,12 +111,13 @@ function startPointerReorder(
     window.removeEventListener('pointermove', move);
     window.removeEventListener('pointerup', finish);
     window.removeEventListener('pointercancel', cancel);
-    window.removeEventListener('keydown', key);
+    window.removeEventListener('keydown', key, true);
     window.removeEventListener('blur', cancel);
     handle.removeEventListener('lostpointercapture', cancel);
     clearMarker();
     if (preview) {
       handle.blur();
+      block.focus({ preventScroll: true });
       block.dataset['reorderResting'] = 'true';
     }
     preview?.element.remove();
@@ -197,7 +198,7 @@ function startPointerReorder(
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', cancel);
-  window.addEventListener('keydown', key);
+  window.addEventListener('keydown', key, true);
   window.addEventListener('blur', cancel);
   handle.addEventListener('lostpointercapture', cancel);
   return cancel;

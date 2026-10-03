@@ -33,7 +33,12 @@ vi.mock('../controls/secondary', () => ({
 function renderToolbarShell(
   positionReady: boolean,
   activeMenuType: string | null = null,
-  uiScale = 1
+  uiScale = 1,
+  docking?: {
+    isDragging: boolean;
+    freePlacement: boolean;
+    dockPreview: 'top' | 'bottom' | 'left' | 'right' | null;
+  }
 ) {
   useContentUiScaleMock.mockReturnValue(uiScale);
   return renderToStaticMarkup(
@@ -44,6 +49,7 @@ function renderToolbarShell(
           derivedState: {
             toolbarRef: { current: null },
             isDragging: false,
+            ...docking,
             displayMode: 'horizontal',
             position: { x: 24, y: 12 },
             positionReady,
@@ -218,3 +224,30 @@ describe('ToolbarShellContent', () => {
     expect(markup).toContain('data-menu-open="true"');
   });
 });
+
+it.each(['top', 'bottom', 'left', 'right', null] as const)(
+  'shows four pointer-transparent guides and the %s preview during docking',
+  (dockPreview) => {
+    const markup = renderToolbarShell(true, null, 0.5, {
+      isDragging: true,
+      freePlacement: false,
+      dockPreview,
+    });
+    const dom = new DOMParser().parseFromString(markup, 'text/html');
+    const guides = dom.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-guides"]')!;
+    expect(guides.style.pointerEvents).toBe('none');
+    expect(guides.children).toHaveLength(4);
+    expect(guides.querySelectorAll('[data-active="true"]')).toHaveLength(dockPreview ? 1 : 0);
+    expect(
+      guides.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-zone.top"]')?.style.height
+    ).toBe('32px');
+    expect(
+      renderToolbarShell(true, null, 1, {
+        isDragging: true,
+        freePlacement: true,
+        dockPreview: null,
+      })
+    ).not.toContain('content.toolbar.dock-guides');
+    expect(renderToolbarShell(true)).not.toContain('content.toolbar.dock-guides');
+  }
+);

@@ -48,6 +48,7 @@ export interface ContextMenuSettings {
 }
 
 export type ContentToolbarDisplayMode = 'horizontal' | 'vertical';
+export type ContentToolbarDockEdge = 'top' | 'bottom' | 'left' | 'right';
 
 export interface ContentToolbarPosition {
   x: number;
@@ -55,6 +56,9 @@ export interface ContentToolbarPosition {
 }
 
 export interface ContentToolbarPreferences {
+  /** Legacy absence uses docking at the top edge. */
+  freePlacement?: boolean;
+  dockEdge?: ContentToolbarDockEdge;
   displayMode: ContentToolbarDisplayMode;
   compactMenus: boolean;
   position: ContentToolbarPosition | null;

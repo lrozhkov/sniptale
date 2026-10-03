@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import { ToolbarSettingsDropdown } from './settings-content';
 
 const createTrustedContentActionIntentSource = vi.hoisted(() =>
@@ -58,6 +59,8 @@ function createMenuRef() {
 }
 
 function renderSettingsDropdown(params?: {
+  freePlacement?: boolean;
+  onFreePlacementChange?: (value: boolean) => void;
   onDisableScreenshotMode?: (activationEvent?: Event) => void;
   pinToTab?: boolean;
   pinToTabAvailable?: boolean;
@@ -73,6 +76,8 @@ function renderSettingsDropdown(params?: {
     root?.render(
       <ToolbarSettingsDropdown
         compactMenus={true}
+        {...(params?.freePlacement === undefined ? {} : { freePlacement: params.freePlacement })}
+        onFreePlacementChange={params?.onFreePlacementChange}
         displayMode="vertical"
         menuRef={createMenuRef()}
         onClose={() => undefined}
@@ -229,4 +234,51 @@ describe('ToolbarSettingsDropdown', () => {
 
     expect(onPinToTabChange).not.toHaveBeenCalled();
   });
+});
+
+it('shows manual orientation only in free placement and toggles with pointer and keyboard activation', () => {
+  const onFreePlacementChange = vi.fn();
+  renderSettingsDropdown({ freePlacement: false, onFreePlacementChange });
+  expect(container?.textContent).not.toContain('content.toolbar.panelHorizontal');
+  const toggle = [...container!.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('content.toolbar.panelFreePlacement')
+  )!;
+  act(() => toggle.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+  expect(onFreePlacementChange).toHaveBeenLastCalledWith(true);
+  renderSettingsDropdown({ freePlacement: true, onFreePlacementChange });
+  expect(container?.textContent).toContain('content.toolbar.panelHorizontal');
+  expect(container?.textContent).toContain('content.toolbar.panelVertical');
+  const selected = [...container!.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('content.toolbar.panelFreePlacement')
+  )!;
+  expect(selected.classList.contains('sniptale-popover-item-selected')).toBe(true);
+  expect(selected.firstElementChild?.classList.contains('lucide-move')).toBe(true);
+  expect(selected.lastElementChild?.classList.contains('sniptale-popover-check')).toBe(true);
+  act(() => selected.click());
+  expect(onFreePlacementChange).toHaveBeenLastCalledWith(false);
+});
+
+it('repositions the settings menu using its measured height near a viewport edge', () => {
+  vi.stubGlobal('innerHeight', 640);
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(610);
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(280);
+  renderSettingsDropdown({ freePlacement: true, onFreePlacementChange: vi.fn() });
+  const menu = container?.querySelector<HTMLElement>('.sniptale-popover-menu');
+  expect(menu?.style.top).toBe('-22px');
+  expect(menu?.style.overflowY).toBe('auto');
+  vi.unstubAllGlobals();
+});
+
+it('activates once for a bridged pointer gesture and still accepts keyboard clicks', () => {
+  const onFreePlacementChange = vi.fn();
+  renderSettingsDropdown({ freePlacement: false, onFreePlacementChange });
+  const button = findButton('content.toolbar.panelFreePlacement')!;
+  act(() => {
+    const source = new MouseEvent('mousedown', { button: 0, buttons: 1 });
+    button.dispatchEvent(createBridgedMouseEvent('mousedown', source));
+    button.dispatchEvent(createBridgedMouseEvent('click', source));
+  });
+  expect(onFreePlacementChange).toHaveBeenCalledTimes(1);
+  act(() => button.click());
+  expect(onFreePlacementChange).toHaveBeenCalledTimes(2);
 });

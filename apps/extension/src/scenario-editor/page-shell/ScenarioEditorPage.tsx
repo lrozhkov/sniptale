@@ -164,7 +164,6 @@ export function ScenarioEditorPage() {
           operate={operate}
           imageEditor={imageEditor}
           focusRequest={focusRequest}
-          selectItem={selectItem}
           t={t}
         />
       )}
@@ -186,7 +185,6 @@ function GuideDocumentWorkspace({
   operate,
   imageEditor,
   focusRequest,
-  selectItem,
   t,
 }: {
   state: ReturnType<typeof useGuidePageState>;
@@ -201,7 +199,6 @@ function GuideDocumentWorkspace({
   operate: ReturnType<typeof useGuideNavigation>['operate'];
   imageEditor: ReturnType<typeof useGuideImageEditorMode>;
   focusRequest: ReturnType<typeof useGuideNavigation>['focusRequest'];
-  selectItem: ReturnType<typeof useGuideNavigation>['selectItem'];
   t: Translate;
 }) {
   return (
@@ -226,6 +223,7 @@ function GuideDocumentWorkspace({
           project={project}
           selectedId={state.selectedId}
           disabled={disabled}
+          onClearSelection={framing.clear}
           onSelect={framing.selectStep}
           onOperate={operate}
           onAddStep={() => operate({ kind: 'add-step' })}
@@ -254,6 +252,8 @@ function GuideDocumentWorkspace({
           t={t}
         >
           <GuideDocument
+            selectedBlockId={framing.target?.block.id ?? null}
+            onClearSelection={framing.clear}
             framedImageId={framing.imageId}
             onSelectBlock={framing.selectBlock}
             onFrameImage={framing.select}
@@ -268,7 +268,6 @@ function GuideDocumentWorkspace({
             images={state.images}
             disabled={disabled}
             onChange={state.update}
-            onSelect={(id) => selectItem(id, false)}
             onOperate={operate}
             t={t}
           />
@@ -318,7 +317,10 @@ function ScenarioHeader({
             prepareAiProject: state.flushLatest,
           }
         : {})}
-      onAppearance={() => panels.openRight('document')}
+      onAppearance={() => {
+        if (!tourMode) framing.clear();
+        panels.openRight('document');
+      }}
       appearanceActive={panels.rightOpen && panels.rightScope === 'document'}
       onPreview={reader.open}
       previewRef={reader.trigger}
@@ -456,6 +458,7 @@ function GuideContextualInspector({
       disabled={disabled}
       onChange={framing.change}
       onClose={framing.close}
+      onEscape={framing.imageId ? framing.finishFraming : framing.close}
       t={t}
     />
   ) : framing.target ? (
@@ -485,52 +488,78 @@ function GuideContextualInspector({
 function useGuideBlockSelection(
   state: Pick<ReturnType<typeof useGuidePageState>, 'project' | 'selectedId' | 'update'>,
   panels: Pick<ReturnType<typeof useGuidePanels>, 'rightOpen' | 'toggleRight' | 'selectRightScope'>,
-  selectItem: (id: string, requestFocus?: boolean) => void
+  selectItem: (id: string | null, requestFocus?: boolean) => void
 ) {
   const [selection, setSelection] = useState<{ itemId: string; blockId: string } | null>(null);
-  const item = state.project?.items.find((entry) => entry.id === selection?.itemId);
+  const [framedId, setFramedId] = useState<string | null>(null);
+  const item = state.project?.items.find(
+    (entry) =>
+      entry.kind === 'step' && entry.blocks.some((block) => block.id === selection?.blockId)
+  );
   const block =
     item?.kind === 'step' ? item.blocks.find((entry) => entry.id === selection?.blockId) : null;
   const target =
     item?.kind === 'step' && block && state.selectedId === item.id ? { item, block } : null;
   const targetValid = target !== null;
   useEffect(() => {
-    if (selection && !targetValid) setSelection(null);
-  }, [selection, targetValid]);
+    if (selection && item && item.id !== selection.itemId) {
+      setSelection({ itemId: item.id, blockId: selection.blockId });
+      selectItem(item.id, false);
+      const moved = [...document.querySelectorAll<HTMLElement>('.guide-block[data-block-id]')].find(
+        (element) => element.dataset['blockId'] === selection.blockId
+      );
+      moved?.focus({ preventScroll: true });
+    }
+  }, [item, selection, selectItem]);
+  useEffect(() => {
+    if (selection && !targetValid && (!item || item.id === selection.itemId)) {
+      setSelection(null);
+      setFramedId(null);
+    }
+  }, [selection, targetValid, item]);
   const close = () => {
     setSelection(null);
-    const element = [...document.querySelectorAll<HTMLElement>('[data-block-id]')].find(
-      (entry) => entry.dataset['blockId'] === selection?.blockId
-    );
-    const trigger =
-      target?.block.kind === 'image'
-        ? element?.querySelector<HTMLElement>('[data-frame-image]')
-        : element?.closest('article')?.querySelector<HTMLElement>('.guide-step-title');
-    trigger?.focus({ preventScroll: true });
+    setFramedId(null);
+    const parent = document.getElementById(state.selectedId ?? '');
+    parent?.focus({ preventScroll: true });
+  };
+  const finishFraming = () => {
+    setFramedId(null);
+  };
+  const clear = () => {
+    setSelection(null);
+    setFramedId(null);
+    selectItem(null, false);
+    panels.selectRightScope('document');
   };
   return {
     target,
-    imageId: target?.block.kind === 'image' ? target.block.id : null,
+    imageId: target?.block.kind === 'image' && framedId === target.block.id ? framedId : null,
+    clear,
+    finishFraming,
     close,
     selectStep: (itemId: string) => {
       panels.selectRightScope('selection');
       setSelection(null);
+      setFramedId(null);
       selectItem(itemId);
     },
     selectBlock: (itemId: string, blockId: string | null) => {
       panels.selectRightScope('selection');
       selectItem(itemId, false);
+      if (blockId !== selection?.blockId) setFramedId(null);
       setSelection(blockId ? { itemId, blockId } : null);
       if (blockId && !panels.rightOpen && window.innerWidth >= 1200) panels.toggleRight();
     },
     select: (itemId: string, blockId: string, editing: boolean) => {
       if (!editing) {
-        close();
+        finishFraming();
         return;
       }
       panels.selectRightScope('selection');
       selectItem(itemId, false);
       setSelection({ itemId, blockId });
+      setFramedId(blockId);
       if (!panels.rightOpen) panels.toggleRight();
     },
     change: (next: NonNullable<typeof target>['block'], group?: string | null) => {
@@ -563,7 +592,7 @@ function useGuideNavigation(
   >
 ) {
   const [focusRequest, setFocusRequest] = useState<GuideFocusRequest>({ sequence: 0 });
-  const selectItem = (id: string, requestFocus = true) => {
+  const selectItem = (id: string | null, requestFocus = true) => {
     state.selectItem(id);
     setFocusRequest((current) => ({
       sequence: current.sequence + 1,

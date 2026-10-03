@@ -31,14 +31,23 @@ let latestDragState: DragState | null = null;
 let root: Root | null = null;
 let addEventListenerSpy: ReturnType<typeof vi.spyOn> | null = null;
 
-function DragHarness(props: { currentViewport: { width: number; height: number } | null }) {
+function DragHarness(props: {
+  currentViewport: { width: number; height: number } | null;
+  fullToolbar?: boolean;
+}) {
   const state = useToolbarDragPosition(props.currentViewport);
 
   useEffect(() => {
     latestDragState = state;
   });
 
-  return <div ref={state.toolbarRef} />;
+  return (
+    <div ref={state.toolbarRef} data-display-mode={state.displayMode}>
+      {props.fullToolbar
+        ? Array.from({ length: 20 }, (_, index) => <button key={index} className="sniptale-btn" />)
+        : null}
+    </div>
+  );
 }
 
 async function renderElement(element: React.ReactElement) {
@@ -93,7 +102,7 @@ function createDeferredSettings() {
 function expectCenteredToolbarPosition() {
   expect(getDragState().position).toEqual({
     x: (window.innerWidth - 120) / 2,
-    y: 5,
+    y: 8,
   });
 }
 
@@ -101,6 +110,8 @@ async function expectClampedToolbarPreferences() {
   storageMocks.loadSettings.mockResolvedValue({
     contentToolbar: {
       compactMenus: true,
+      freePlacement: true,
+      dockEdge: 'top',
       displayMode: 'vertical',
       position: { x: 9999, y: 9999 },
     },
@@ -140,6 +151,8 @@ async function dragToolbarToViewportEdge() {
 
   act(() => {
     window.dispatchEvent(new MouseEvent('pointerup'));
+  });
+  act(() => {
     vi.advanceTimersByTime(160);
   });
   await flushAsyncState();
@@ -152,6 +165,7 @@ async function expectToolbarDragPersistence() {
   expectCenteredToolbarPosition();
   act(() => {
     getDragState().setCompactMenus(true);
+    getDragState().setFreePlacement(true);
   });
   await dragToolbarToViewportEdge();
 
@@ -159,6 +173,8 @@ async function expectToolbarDragPersistence() {
   expect(storageMocks.patchSettings).toHaveBeenCalledWith({
     contentToolbar: {
       compactMenus: true,
+      freePlacement: true,
+      dockEdge: 'top',
       displayMode: 'vertical',
       position: {
         x: 0,
@@ -270,4 +286,113 @@ describe('toolbar drag position hook', () => {
     'keeps the toolbar position hidden behind readiness until preferences resolve',
     expectPositionReadinessDuringPreferenceLoad
   );
+});
+
+it('previews every edge, persists only a completed dock, and restores it on viewport resize', async () => {
+  await renderElement(<DragHarness currentViewport={null} />);
+  act(() => vi.advanceTimersByTime(160));
+  storageMocks.patchSettings.mockClear();
+  act(() => getDragState().handleMouseDown({ clientX: 500, clientY: 20, preventDefault: vi.fn() }));
+  for (const [edge, x, y] of [
+    ['left', 10, 300],
+    ['bottom', 500, 760],
+    ['right', 1010, 300],
+    ['top', 500, 10],
+    ['left', 10, 300],
+  ] as const) {
+    act(() => window.dispatchEvent(new MouseEvent('pointermove', { clientX: x, clientY: y })));
+    expect(getDragState().dockPreview).toBe(edge);
+    expect(getDragState().displayMode).toBe('horizontal');
+    act(() => vi.advanceTimersByTime(200));
+    expect(storageMocks.patchSettings).not.toHaveBeenCalled();
+  }
+  act(() => window.dispatchEvent(new MouseEvent('pointerup')));
+  act(() => vi.advanceTimersByTime(160));
+  expect(storageMocks.patchSettings).toHaveBeenCalledWith({
+    contentToolbar: expect.objectContaining({
+      freePlacement: false,
+      dockEdge: 'left',
+      displayMode: 'vertical',
+    }),
+  });
+  expect(getDragState().position).toEqual({ x: 8, y: (window.innerHeight - 32) / 2 });
+  vi.stubGlobal('innerHeight', 1000);
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(getDragState().position.y).toBe(484);
+});
+
+it.each(['pointercancel', 'blur', 'Escape', 'outside'])(
+  'restores the committed dock after %s',
+  async (reason) => {
+    await renderElement(<DragHarness currentViewport={null} />);
+    act(() =>
+      getDragState().handleMouseDown({ clientX: 500, clientY: 20, preventDefault: vi.fn() })
+    );
+    act(() => window.dispatchEvent(new MouseEvent('pointermove', { clientX: 10, clientY: 300 })));
+    expect(getDragState().displayMode).toBe('horizontal');
+    act(() => {
+      if (reason === 'outside') {
+        window.dispatchEvent(new MouseEvent('pointermove', { clientX: 500, clientY: 300 }));
+        window.dispatchEvent(new MouseEvent('pointerup'));
+      } else if (reason === 'Escape')
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      else window.dispatchEvent(new Event(reason));
+    });
+    expect(getDragState().isDragging).toBe(false);
+    expect(getDragState().dockPreview).toBeNull();
+    expect(getDragState().displayMode).toBe('horizontal');
+    expectCenteredToolbarPosition();
+  }
+);
+
+it('restores a saved dock and keeps its orientation when free placement is enabled', async () => {
+  storageMocks.loadSettings.mockResolvedValue({
+    contentToolbar: {
+      freePlacement: false,
+      dockEdge: 'right',
+      displayMode: 'horizontal',
+      position: { x: 40, y: 50 },
+    },
+  });
+  await renderElement(<DragHarness currentViewport={null} />);
+  expect(getDragState().displayMode).toBe('vertical');
+  expect(getDragState().position.x).toBe(window.innerWidth - 120 - 8);
+  act(() => getDragState().setFreePlacement(true));
+  expect(getDragState().displayMode).toBe('vertical');
+  act(() => getDragState().setDisplayMode('horizontal'));
+  expect(getDragState().displayMode).toBe('horizontal');
+  act(() => getDragState().setFreePlacement(false));
+  expect(getDragState().displayMode).toBe('vertical');
+});
+
+it('fits vertical controls and restores normal density when height returns', async () => {
+  storageMocks.loadSettings.mockResolvedValue({ contentToolbar: { dockEdge: 'left' } });
+  vi.stubGlobal('innerHeight', 720);
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    get() {
+      return (
+        (Number.parseFloat(this.style.getPropertyValue('--sniptale-toolbar-button-size')) || 36) *
+          20 +
+        100
+      );
+    },
+  });
+  const originalGetComputedStyle = window.getComputedStyle;
+  vi.spyOn(window, 'getComputedStyle').mockImplementation((element) => {
+    const style = originalGetComputedStyle(element);
+    vi.spyOn(style, 'getPropertyValue').mockReturnValue('36px');
+    return style;
+  });
+  await renderElement(<DragHarness currentViewport={null} fullToolbar />);
+  const toolbar = getDragState().toolbarRef.current!;
+  expect(toolbar.offsetHeight).toBeLessThanOrEqual(704);
+  expect(
+    Number.parseFloat(toolbar.style.getPropertyValue('--sniptale-toolbar-button-size'))
+  ).toBeGreaterThanOrEqual(24);
+  expect(getDragState().position.y).toBeGreaterThanOrEqual(8);
+  vi.stubGlobal('innerHeight', 1000);
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(toolbar.style.getPropertyValue('--sniptale-toolbar-button-size')).toBe('');
+  expect(getDragState().position.y).toBe(90);
 });

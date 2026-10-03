@@ -119,6 +119,9 @@ function createToolbarPrimaryViewModel(
       setAction: vi.fn(),
     },
     derivedState: {
+      freePlacement: false,
+      dockPreview: null,
+      setFreePlacement: vi.fn(),
       compactMenus: false,
       currentViewport: null,
       displayMode: 'horizontal',

@@ -136,6 +136,33 @@ async function editField(selector: string, value: string) {
 async function settleAutosave() {
   await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
 }
+it('selects an image by pointer without entering framing or changing the document', async () => {
+  const project = createGuideProject('Images', 'guide', 100);
+  const step = createGuideStep('Image step', 'images');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'one',
+      assetId: 'asset',
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: 'one.png' },
+    }),
+  ];
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  await render();
+  const block = container.querySelector<HTMLElement>('[data-block-id="one"]')!;
+  await act(async () =>
+    block
+      .querySelector('figure')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+  );
+  expect(container.querySelector('#guide-inspector-panel .guide-image-controls')).not.toBeNull();
+  expect(block.getAttribute('data-selected')).toBe('true');
+  expect(block.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
+  expect(io.save).not.toHaveBeenCalled();
+});
+
 it('moves framing into one contextual inspector and keeps it bound through canonical edits', async () => {
   const project = createGuideProject('Images', 'guide', 100);
   const step = createGuideStep('Image step', 'images');
@@ -186,8 +213,15 @@ it('moves framing into one contextual inspector and keeps it bound through canon
       .querySelector('.guide-image-description input')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
+  expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
+  expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
+  await act(async () =>
+    inspector
+      .querySelector('.guide-image-description input')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
   expect(inspector.querySelector('.guide-image-controls')).toBeNull();
-  expect(document.activeElement).toBe(second.querySelector('[data-frame-image]'));
+  expect(document.activeElement).toBe(container.querySelector('article#images'));
   await click('Frame and image', second);
   const other = container.querySelector<HTMLElement>('article#other')!;
   await act(async () => other.focus());
@@ -229,7 +263,7 @@ it('selects text and note settings from focus, preserves edits and returns to st
   );
   await click('Step settings', inspector);
   expect(inspector.textContent).toContain('Step layout');
-  expect(document.activeElement).toBe(container.querySelector('.guide-step-title'));
+  expect(document.activeElement).toBe(container.querySelector('article#blocks'));
   await act(async () => text.focus());
   const outline = container.querySelector<HTMLAnchorElement>('.guide-outline a')!;
   await act(async () => outline.click());
@@ -508,4 +542,103 @@ it('uses the project name in the tab and distinguishes reader preview', async ()
   expect(document.title).toBe('Renamed guide · Просмотр');
   await click('Back to editing');
   expect(document.title).toBe('Renamed guide');
+});
+
+it.each(['text', 'heading', 'note', 'image-slot'] as const)(
+  'selects %s without editing and returns through step to document appearance',
+  async (kind) => {
+    const project = createGuideProject('Selection', 'guide', 100);
+    const step = createGuideStep('Step', 'step');
+    step.blocks =
+      kind === 'text'
+        ? [{ id: 'block', kind, paragraphs: [] }]
+        : kind === 'heading'
+          ? [{ id: 'block', kind, text: 'Heading' }]
+          : kind === 'note'
+            ? [{ id: 'block', kind, tone: 'info', paragraphs: [] }]
+            : [
+                {
+                  id: 'block',
+                  kind,
+                  alt: '',
+                  caption: '',
+                  frame: { width: 960, height: 540 },
+                  fit: 'contain',
+                },
+              ];
+    project.items = [step];
+    io.load.mockResolvedValue(project);
+    await render();
+    const block = container.querySelector<HTMLElement>('[data-block-id="block"]')!;
+    await act(async () =>
+      block.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    );
+    expect(block.getAttribute('data-selected')).toBe('true');
+    expect(document.activeElement).toBe(block);
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('false');
+    await act(async () =>
+      block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('true');
+    await act(async () =>
+      container
+        .querySelector('article')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('false');
+    expect(container.querySelector('#guide-inspector-panel')?.textContent).toContain(
+      'Entire guide'
+    );
+    expect(io.save).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps the moved block selected and focused across steps and undo', async () => {
+  const project = createGuideProject('Transfer', 'guide', 100);
+  const source = createGuideStep('Source', 'source');
+  source.blocks = [{ id: 'moving', kind: 'text', paragraphs: [] }];
+  project.items = [source, createGuideStep('Destination', 'destination')];
+  io.load.mockResolvedValue(project);
+  await render();
+  const pane = container.querySelector('.guide-document-scroll')!;
+  vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 500, 600));
+  for (const [index, article] of [...container.querySelectorAll('article')].entries()) {
+    const rect = new DOMRect(0, index * 200, 100, 100);
+    vi.spyOn(article, 'getBoundingClientRect').mockReturnValue(rect);
+    vi.spyOn(article.querySelector('.guide-step-blocks')!, 'getBoundingClientRect').mockReturnValue(
+      rect
+    );
+  }
+  const block = container.querySelector<HTMLElement>('[data-block-id="moving"]')!;
+  vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100));
+  const grip = block.querySelector('button.guide-block-grip')!;
+  Object.assign(grip, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  for (const [type, x, y] of [
+    ['pointerdown', 10, 10],
+    ['pointermove', 50, 250],
+    ['pointerup', 50, 250],
+  ] as const) {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: x,
+      clientY: y,
+    });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () => (type === 'pointerdown' ? grip : window).dispatchEvent(event));
+  }
+  const moved = container.querySelector<HTMLElement>('[data-block-id="moving"]')!;
+  expect(moved.closest('article')?.id).toBe('destination');
+  expect(moved.getAttribute('data-selected')).toBe('true');
+  expect(document.activeElement).toBe(moved);
+  await click('Undo');
+  const restored = container.querySelector<HTMLElement>('[data-block-id="moving"]')!;
+  expect(restored.closest('article')?.id).toBe('source');
+  expect(restored.getAttribute('data-selected')).toBe('true');
+  expect(document.activeElement).toBe(restored);
 });

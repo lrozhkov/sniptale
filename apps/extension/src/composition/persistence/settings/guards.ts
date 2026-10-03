@@ -111,6 +111,18 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
     return INVALID_FIELD;
   }
 
+  const freePlacement = value['freePlacement'];
+  const dockEdge = value['dockEdge'];
+  if (freePlacement !== undefined && !isBoolean(freePlacement)) return INVALID_FIELD;
+  if (
+    dockEdge !== undefined &&
+    dockEdge !== 'top' &&
+    dockEdge !== 'bottom' &&
+    dockEdge !== 'left' &&
+    dockEdge !== 'right'
+  )
+    return INVALID_FIELD;
+
   const position = value['position'];
   if (position !== undefined && position !== null) {
     if (!isRecord(position) || !isNumber(position['x']) || !isNumber(position['y'])) {
@@ -127,6 +139,8 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
         };
 
   return {
+    ...(freePlacement === undefined ? {} : { freePlacement }),
+    ...(dockEdge === undefined ? {} : { dockEdge }),
     displayMode: displayMode ?? 'horizontal',
     compactMenus: isBoolean(value['compactMenus']) ? value['compactMenus'] : false,
     position: parsedPosition,

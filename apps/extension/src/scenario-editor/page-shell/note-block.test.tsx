@@ -28,11 +28,12 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(disabled = false) {
+async function render(disabled = false, selected = true) {
   await act(async () =>
     root.render(
       <GuideNoteBlock
         block={block}
+        {...{ selected }}
         disabled={disabled}
         onChange={change}
         t={createTranslator('en')}
@@ -99,4 +100,15 @@ it('restores focus on Escape and closes the menu when editing becomes disabled',
   await act(async () => trigger.click());
   expect(document.querySelector('.guide-action-menu')).toBeNull();
   expect(host.querySelector('textarea')?.disabled).toBe(true);
+});
+
+it('keeps an informational symbol without an unselected tone command', async () => {
+  await render(false, false);
+  expect(host.querySelector('.guide-note-callout svg')).not.toBeNull();
+  expect(host.querySelector('.guide-note-callout .guide-action-menu-anchor')).toBeNull();
+  await render(false, true);
+  await act(async () => host.querySelector('button')!.click());
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+  await render(false, false);
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
 });

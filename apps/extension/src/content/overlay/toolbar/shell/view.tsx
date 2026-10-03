@@ -1,4 +1,5 @@
 import React from 'react';
+import { ToolbarDockingGuides } from './docking-guides';
 import { ContentToolbarDragHandle, ContentToolbarShell } from '@sniptale/ui/content-toolbar';
 import { ToolbarPrimaryControls } from '../controls/primary';
 import { ToolbarSecondaryControls } from '../controls/secondary';
@@ -47,6 +48,9 @@ export function ToolbarShellContent(props: {
 
   return (
     <>
+      {derivedState.isDragging && !derivedState.freePlacement ? (
+        <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
+      ) : null}
       {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
       <div
         className="sniptale-toolbar-positioner"

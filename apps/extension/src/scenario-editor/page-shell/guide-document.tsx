@@ -3,7 +3,8 @@ import { GuideVoiceField } from './voice-field';
 import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
-import { Fragment, useEffect, useRef } from 'react';
+import { guideDocumentSelection, useGuideSelectionInput } from './document-selection';
+import { Fragment, useEffect, useId, useRef } from 'react';
 import { GuideDocumentInsert } from './document-insert';
 import { GuideStepActions } from './step-actions';
 import type {
@@ -42,6 +43,8 @@ type GuideImageUploadHandler = (
 type GuideDocumentProps = {
   project: GuideProject;
   selectedId: string | null;
+  selectedBlockId?: string | null;
+  onClearSelection?: () => void;
   focusRequest: GuideFocusRequest;
   images: Record<string, string | null>;
   disabled: boolean;
@@ -51,7 +54,6 @@ type GuideDocumentProps = {
   onUploadImage: GuideImageUploadHandler;
   framedImageId: string | null;
   onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
-  onSelect: (id: string) => void;
   onSelectBlock: (itemId: string, blockId: string | null) => void;
   t: Translate;
 };
@@ -60,11 +62,12 @@ type GuideDocumentProps = {
 export function GuideDocument({
   project,
   selectedId,
+  selectedBlockId = null,
+  onClearSelection,
   focusRequest,
   images,
   disabled,
   onChange,
-  onSelect,
   onSelectBlock,
   onOperate,
   onEditImage,
@@ -74,13 +77,30 @@ export function GuideDocument({
   t,
 }: GuideDocumentProps) {
   const content = useRef<HTMLDivElement>(null);
+  const instructions = useId();
+  useGuideSelectionInput(content);
+  const selection = guideDocumentSelection({
+    selectedId,
+    selectedBlockId,
+    select: onSelectBlock,
+    clear: () => onClearSelection?.(),
+  });
   useEffect(
     () => focusGuideTarget(content.current, selectedId, focusRequest),
     [selectedId, focusRequest]
   );
   const numbers = resolveGuideNumbering(project.items);
   return (
-    <div ref={content} className="guide-document" style={guideDocumentStyle(project.style)}>
+    <div
+      ref={content}
+      className="guide-document"
+      tabIndex={-1}
+      style={guideDocumentStyle(project.style)}
+      {...selection}
+    >
+      <span id={instructions} className="sr-only">
+        {t('scenario.editor.guideSelectionHelp')}
+      </span>
       {project.items.map((item) => {
         if (item.kind === 'section')
           return (
@@ -91,28 +111,16 @@ export function GuideDocument({
                 onOperate={onOperate}
                 t={t}
               />
-              <section
-                key={item.id}
-                id={item.id}
-                tabIndex={-1}
-                data-selected={selectedId === item.id}
-                onFocusCapture={() => onSelectBlock(item.id, null)}
-              >
-                <GuideSectionContent
-                  project={project}
-                  item={item}
-                  disabled={disabled}
-                  onChange={onChange}
-                  t={t}
-                />
-                <GuideStepActions
-                  project={project}
-                  itemId={item.id}
-                  disabled={disabled}
-                  onOperate={onOperate}
-                  t={t}
-                />
-              </section>
+              <GuideSectionContent
+                project={project}
+                item={item}
+                selected={selectedId === item.id}
+                instructions={instructions}
+                disabled={disabled}
+                onChange={onChange}
+                onOperate={onOperate}
+                t={t}
+              />
             </Fragment>
           );
         const number = numbers.get(item.id)?.label;
@@ -133,19 +141,12 @@ export function GuideDocument({
               data-number-style={appearance.numberStyle}
               style={guideDocumentStyle(appearance)}
               id={item.id}
-              tabIndex={-1}
-              data-selected={selectedId === item.id}
-              onFocusCapture={(event) => {
-                if (selectedId !== item.id) onSelect(item.id);
-                const field = event.target;
-                if (!(field instanceof HTMLElement)) return;
-                if (!(field instanceof HTMLTextAreaElement) && !field.closest('.guide-image-slot'))
-                  return;
-                const block = field.closest<HTMLElement>('[data-block-id]');
-                if (!block) onSelectBlock(item.id, null);
-                else if (block.dataset['kind'] !== 'image')
-                  onSelectBlock(item.id, block.dataset['blockId'] ?? null);
-              }}
+              tabIndex={0}
+              role="group"
+              aria-label={item.title || t('scenario.editor.guideStepTitle')}
+              aria-describedby={instructions}
+              aria-current={selectedId === item.id && !selectedBlockId ? true : undefined}
+              data-selected={selectedId === item.id && !selectedBlockId}
             >
               <header>
                 {number != null && <span>{number}</span>}
@@ -179,6 +180,8 @@ export function GuideDocument({
                 onOperate={onOperate}
                 onEditImage={onEditImage}
                 onUploadImage={onUploadImage}
+                selectedBlockId={selectedId === item.id ? selectedBlockId : null}
+                instructions={instructions}
                 framedImageId={framedImageId}
                 onFrameImage={onFrameImage}
                 t={t}
@@ -235,16 +238,30 @@ function GuideSectionContent({
   item,
   disabled,
   onChange,
+  onOperate,
+  selected,
+  instructions,
   t,
 }: {
   project: GuideProject;
   item: GuideSection;
+  selected: boolean;
+  instructions: string;
+  onOperate: (operation: GuideStructureOperation) => void;
   disabled: boolean;
   onChange: (project: GuideProject, group?: string | null) => void;
   t: Translate;
 }) {
   return (
-    <>
+    <section
+      id={item.id}
+      tabIndex={0}
+      role="group"
+      aria-label={item.title || t('scenario.editor.guideSectionTitle')}
+      aria-describedby={instructions}
+      aria-current={selected ? true : undefined}
+      data-selected={selected}
+    >
       <h2 aria-label={item.title || t('scenario.editor.guideSectionTitle')}>
         <GuideVoiceField
           className="guide-section-title"
@@ -288,9 +305,32 @@ function GuideSectionContent({
           )
         }
       />
-    </>
+      <GuideStepActions
+        project={project}
+        itemId={item.id}
+        disabled={disabled}
+        onOperate={onOperate}
+        t={t}
+      />
+    </section>
   );
 }
+
+type GuideStepBodyProps = {
+  project: GuideProject;
+  item: GuideStep;
+  selectedBlockId: string | null;
+  instructions: string;
+  images: Record<string, string | null>;
+  disabled: boolean;
+  onChange: (project: GuideProject, group?: string | null) => void;
+  onOperate: (operation: GuideStructureOperation) => void;
+  onEditImage: (itemId: string, blockId: string) => void;
+  onUploadImage: GuideImageUploadHandler;
+  framedImageId: string | null;
+  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+  t: Translate;
+};
 
 function GuideStepBody({
   project,
@@ -303,20 +343,10 @@ function GuideStepBody({
   onUploadImage,
   framedImageId,
   onFrameImage,
+  selectedBlockId,
+  instructions,
   t,
-}: {
-  project: GuideProject;
-  item: GuideStep;
-  images: Record<string, string | null>;
-  disabled: boolean;
-  onChange: (project: GuideProject, group?: string | null) => void;
-  onOperate: (operation: GuideStructureOperation) => void;
-  onEditImage: (itemId: string, blockId: string) => void;
-  onUploadImage: GuideImageUploadHandler;
-  framedImageId: string | null;
-  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
-  t: Translate;
-}) {
+}: GuideStepBodyProps) {
   const changeBlock = (block: GuideBlock, group: string | null = `block:${block.id}`) =>
     onChange(
       {
@@ -345,6 +375,8 @@ function GuideStepBody({
             <GuideBlockLayout
               key={block.id}
               block={block}
+              selected={selectedBlockId === block.id}
+              describedBy={instructions}
               layout={item.layout}
               disabled={disabled}
               onHeight={
@@ -396,7 +428,13 @@ function GuideStepBody({
                   t={t}
                 />
               ) : block.kind === 'note' ? (
-                <GuideNoteBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
+                <GuideNoteBlock
+                  selected={selectedBlockId === block.id}
+                  block={block}
+                  disabled={disabled}
+                  onChange={changeBlock}
+                  t={t}
+                />
               ) : (
                 <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
               )}

@@ -13,24 +13,38 @@ import type { Translate } from '../../platform/i18n';
 import { useGuideLayoutAssistance } from './layout-assistance';
 import { useGuideBlockResize } from './block-resize';
 
-/** Ordered blocks resize in flow; minimum height reserves space without clipping prose. */
-export function GuideBlockLayout({
-  block,
-  layout,
-  disabled,
-  onWidth,
-  onHeight,
-  t,
-  children,
-}: {
+const blockLabels = {
+  image: 'scenario.editor.guideImageBlock',
+  'image-slot': 'scenario.editor.guideImageBlock',
+  heading: 'scenario.editor.guideHeading',
+  note: 'scenario.editor.guideNoteText',
+  text: 'scenario.editor.body',
+} as const;
+
+type GuideBlockLayoutProps = {
   block: GuideBlock;
+  selected?: boolean;
+  describedBy?: string;
   layout: GuideStep['layout'];
   disabled: boolean;
   onWidth: (width: GuideBlockWidth) => void;
   onHeight?: ((height: number) => void) | undefined;
   t: Translate;
   children: ReactNode;
-}) {
+};
+
+/** Ordered blocks resize in flow; minimum height reserves space without clipping prose. */
+export function GuideBlockLayout({
+  block,
+  selected = false,
+  describedBy,
+  layout,
+  disabled,
+  onWidth,
+  onHeight,
+  t,
+  children,
+}: GuideBlockLayoutProps) {
   const width = resolveGuideBlockWidth(layout, block);
   const height = 'minHeight' in block ? (block.minHeight ?? 0) : 0;
   const { snap } = useGuideLayoutAssistance();
@@ -57,6 +71,12 @@ export function GuideBlockLayout({
     <div
       ref={size.element}
       className="guide-block"
+      tabIndex={0}
+      role="group"
+      aria-label={t(blockLabels[block.kind])}
+      aria-describedby={describedBy}
+      aria-current={selected ? true : undefined}
+      data-selected={selected}
       data-block-id={block.id}
       data-kind={block.kind}
       data-width={visible}

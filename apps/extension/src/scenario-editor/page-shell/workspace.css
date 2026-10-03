@@ -941,12 +941,8 @@
 }
 /* Insertion actions overlay the boundary; command contrast belongs to application chrome. */
 .guide-action-menu--insert {
-  --guide-insert-surface: rgb(from var(--sniptale-color-surface-panel) r g b / 1);
-  --guide-insert-hover: color-mix(
-    in srgb,
-    var(--guide-insert-surface) 90%,
-    var(--sniptale-color-text-primary) 10%
-  );
+  --guide-insert-surface: rgb(from var(--guide-paper) r g b / 0.94);
+  --guide-insert-hover: color-mix(in srgb, var(--guide-insert-surface) 90%, var(--guide-ink) 10%);
 }
 .guide-action-menu--insert .guide-insert-actions {
   position: relative;
@@ -967,24 +963,24 @@
 .guide-action-menu--insert .guide-insert-actions > button {
   position: relative;
   flex: none;
-  width: 2rem;
-  height: 2rem;
-  min-width: 2rem;
-  min-height: 2rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
   margin: 0;
   padding: 0;
   display: grid;
   place-items: center;
-  border: 0;
-  border-radius: var(--sniptale-radius-md);
+  border: 1px solid color-mix(in srgb, var(--guide-ink) 18%, transparent);
+  border-radius: var(--sniptale-radius-sm);
   background: var(--guide-insert-surface) !important;
-  color: var(--sniptale-color-text-primary);
+  color: var(--guide-ink) !important;
   box-shadow: var(--sniptale-shadow-sm);
 }
 .guide-action-menu--insert .guide-insert-actions > button:is(:hover, :focus-visible),
 .guide-action-menu--insert .guide-insert-actions > button[aria-pressed='true'] {
   background: var(--guide-insert-hover) !important;
-  color: var(--sniptale-color-text-primary-strong);
+  color: var(--guide-ink) !important;
 }
 .guide-action-menu--insert .guide-insert-actions > button:focus-visible {
   outline: 2px solid var(--sniptale-color-accent);
@@ -992,6 +988,10 @@
 }
 .guide-action-menu--insert .guide-insert-actions > button:disabled {
   opacity: 0.4;
+}
+.guide-action-menu--insert .guide-insert-actions > button > svg {
+  width: 14px;
+  height: 14px;
 }
 .guide-insert-tooltip {
   position: absolute;
@@ -1005,7 +1005,7 @@
   border-radius: var(--sniptale-radius-sm);
   text-align: center;
   font: 0.75rem/1.2 var(--sniptale-font-sans);
-  color: var(--sniptale-color-text-primary);
+  color: var(--guide-ink);
   background: var(--guide-insert-surface);
   box-shadow: var(--sniptale-shadow-sm);
   pointer-events: none;
@@ -2027,6 +2027,7 @@ html[data-guide-height-resizing] * {
   :is(
     .guide-item-actions .guide-action-menu-anchor > button,
     .guide-block-actions .guide-action-menu-anchor > button,
+    .guide-note-type .guide-action-menu-anchor > button,
     .guide-block-grip,
     .guide-block-width,
     .guide-block-height,
@@ -2051,6 +2052,7 @@ html[data-guide-height-resizing] * {
   :is(
     .guide-item-actions .guide-action-menu-anchor > button,
     .guide-block-actions .guide-action-menu-anchor > button,
+    .guide-note-type .guide-action-menu-anchor > button,
     .guide-block-grip,
     .guide-block-width,
     .guide-block-height,
@@ -2292,4 +2294,73 @@ html[data-guide-height-resizing] * {
 }
 .guide-insert-actions:has(> button:hover) > button:not(:hover) > .guide-insert-tooltip {
   display: none;
+}
+
+/* Selection owns structural chrome; hover and text focus cannot reveal other objects. */
+.guide-page .guide-document :is(article, section, .guide-block) {
+  --guide-selection-symbol: visible;
+  --guide-selection-visibility: hidden;
+  --guide-selection-opacity: 0;
+  --guide-selection-events: none;
+}
+.guide-page
+  .guide-document
+  :is(article, section, .guide-block)[data-selected='true']:not(
+    :has(.guide-voice-field:focus-within)
+  ) {
+  --guide-selection-symbol: hidden;
+  --guide-selection-visibility: visible;
+  --guide-selection-opacity: 1;
+  --guide-selection-events: auto;
+}
+.guide-page .guide-document :is(article, section, .guide-block)[data-selected='true'] {
+  outline: none;
+  box-shadow: 0 0 12px 3px var(--sniptale-color-accent-soft-strong);
+}
+.guide-page
+  .guide-document[data-selection-input='keyboard']
+  :is(article, section, .guide-block):focus-visible {
+  outline: 2px solid var(--guide-ink);
+  outline-offset: 4px;
+}
+.guide-page
+  .guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-block-actions,
+    .guide-item-actions,
+    .guide-image-tools,
+    .guide-note-type .guide-action-menu-anchor
+  ) {
+  visibility: var(--guide-selection-visibility);
+  opacity: var(--guide-selection-opacity);
+  pointer-events: var(--guide-selection-events);
+}
+.guide-page .guide-document .guide-voice-field > .guide-voice-control {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-page
+  .guide-document
+  .guide-voice-field:is(:focus-within, [data-voice-visible])
+  > .guide-voice-control {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.guide-note-type {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.guide-note-type > * {
+  grid-area: 1 / 1;
+}
+.guide-note-type-symbol {
+  visibility: var(--guide-selection-symbol, visible);
 }

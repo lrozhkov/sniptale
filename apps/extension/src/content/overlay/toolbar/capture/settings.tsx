@@ -19,6 +19,8 @@ type ToolbarSettingsMenuProps = {
   showPinItem?: boolean;
   showHideItem?: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement?: boolean;
+  onFreePlacementChange?: ((value: boolean) => void) | undefined;
   toolbarMenuState: ToolbarMenuState;
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
@@ -95,6 +97,8 @@ function renderToolbarSettingsDropdown(args: {
       onClose={() => args.props.toolbarMenuState.closeMenu('settings')}
       onCompactMenusChange={args.props.onCompactMenusChange}
       onDisplayModeChange={args.props.onDisplayModeChange}
+      freePlacement={args.props.freePlacement ?? true}
+      onFreePlacementChange={args.props.onFreePlacementChange}
       onDisableScreenshotMode={args.props.onDisableScreenshotMode}
       onHide={args.props.onClose}
       onPinToTabChange={args.props.onPinToTabChange}

@@ -92,6 +92,8 @@ export interface ToolbarCaptureActionsProps {
   captureAction: CaptureActionType;
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement?: boolean;
+  onFreePlacementChange?: ((value: boolean) => void) | undefined;
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;

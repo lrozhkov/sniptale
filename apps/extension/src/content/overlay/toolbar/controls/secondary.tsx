@@ -80,6 +80,8 @@ function createUtilityButtonsProps(args: {
     toolbarMenuState: args.viewModel.toolbarMenuState,
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
+    freePlacement: args.viewModel.derivedState.freePlacement,
+    onFreePlacementChange: args.viewModel.derivedState.setFreePlacement,
     sidebarVisible: args.toolbarProps.scenario?.sidebarVisible ?? false,
     ...(args.toolbarProps.autoBlur === undefined ? {} : { autoBlur: args.toolbarProps.autoBlur }),
     ...(args.toolbarProps.futureFrameStyle === undefined ||
@@ -118,6 +120,8 @@ function createCaptureActionProps(args: {
     captureAction: args.viewModel.capture.action,
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
+    freePlacement: args.viewModel.derivedState.freePlacement,
+    onFreePlacementChange: args.viewModel.derivedState.setFreePlacement,
     pinToTab: args.toolbarProps.pinToTab ?? false,
     pinToTabAvailable: args.toolbarProps.pinToTabAvailable ?? false,
     pinToTabLocked: args.toolbarProps.pinToTabLocked ?? false,
@@ -184,6 +188,8 @@ export function ToolbarSecondaryControls(props: {
       <ToolbarVideoRecordingControls
         compactMenus={viewModel.derivedState.compactMenus}
         displayMode={viewModel.derivedState.displayMode}
+        freePlacement={viewModel.derivedState.freePlacement}
+        onFreePlacementChange={viewModel.derivedState.setFreePlacement}
         onCollapse={toolbarProps.onHide}
         onCompactMenusChange={viewModel.derivedState.setCompactMenus}
         onDisplayModeChange={viewModel.derivedState.setDisplayMode}

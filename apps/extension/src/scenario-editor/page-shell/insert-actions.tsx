@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { Plus } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -114,6 +122,13 @@ export function GuideInsertActions({
   const ui = useInsertDisclosure(disabled, width);
   const id = useId();
   const theme = useResolvedPortalTheme(ui.anchor.current);
+  const paper = ui.anchor.current ? getComputedStyle(ui.anchor.current) : null;
+  const menuStyle: CSSProperties = {
+    ...ui.style,
+    '--guide-paper':
+      paper?.getPropertyValue('--guide-paper') || 'var(--sniptale-color-surface-panel)',
+    '--guide-ink': paper?.getPropertyValue('--guide-ink') || 'var(--sniptale-color-text-primary)',
+  } as CSSProperties;
   return (
     <div
       ref={ui.anchor}
@@ -160,7 +175,7 @@ export function GuideInsertActions({
             id={id}
             data-theme={theme ?? undefined}
             className="sniptale-ai-modal-root guide-action-menu guide-action-menu--insert"
-            style={ui.style}
+            style={menuStyle}
             onMouseEnter={ui.hover.cancel}
             onMouseLeave={ui.hover.leave}
             onKeyDown={(event) => {

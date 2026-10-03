@@ -654,6 +654,10 @@ it('routes block and item tools through reversible order-preserving mutations', 
   ]);
   await click('Duplicate item');
   expect(container.querySelectorAll('article')).toHaveLength(3);
+  await act(async () => {
+    const selected = container.querySelector<HTMLElement>('.guide-block[data-selected="true"]');
+    selected?.closest('article')?.focus();
+  });
   await click('Remove item');
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await click('Undo');

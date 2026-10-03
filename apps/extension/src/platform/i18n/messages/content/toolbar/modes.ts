@@ -317,6 +317,14 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Настройки панели',
     en: 'Toolbar settings',
   },
+  panelFreePlacement: {
+    ru: 'Свободное размещение панели',
+    en: 'Free toolbar placement',
+  },
+  panelFreePlacementHint: {
+    ru: 'Перемещать панель свободно и выбирать её ориентацию вручную',
+    en: 'Move the toolbar freely and choose its orientation manually',
+  },
   panelHorizontal: {
     ru: 'Горизонтальный вид',
     en: 'Horizontal view',

@@ -129,6 +129,8 @@ export function ToolbarCaptureActionGroup(
           onClose={captureProps.onClose}
           onDisableScreenshotMode={captureProps.onDisableScreenshotMode}
           onDisplayModeChange={captureProps.onDisplayModeChange}
+          freePlacement={captureProps.freePlacement ?? true}
+          onFreePlacementChange={captureProps.onFreePlacementChange}
           onPinToTabChange={captureProps.onPinToTabChange}
         />
       </ContentToolbarGroup>
