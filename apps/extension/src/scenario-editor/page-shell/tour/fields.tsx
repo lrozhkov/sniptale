@@ -155,6 +155,7 @@ export function TourTextPresentation({
           )
         }
       />
+      <TourHintStyle value={effective} disabled={disabled} onChange={onChange} t={t} />
       {value && (
         <>
           <span>{t('scenario.editor.tourTextAlignment')}</span>
@@ -197,7 +198,6 @@ export function TourTextPresentation({
           )}
         </>
       )}
-      <TourHintStyle value={effective} disabled={disabled} onChange={onChange} t={t} />
     </div>
   );
 }

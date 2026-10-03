@@ -12,6 +12,24 @@ import {
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createTranslator } from '../../../platform/i18n';
 import { TourInspector } from './inspector';
+import { getSystemSurfaceStylePresets } from '../../../features/highlighter/surface-style/system-presets';
+vi.mock(
+  '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',
+  () => ({
+    useSurfaceStylePresetCatalog: () => ({
+      actions: {},
+      presets: getSystemSurfaceStylePresets().map((preset) => ({
+        ...preset,
+        name: preset.id,
+        enabled: true,
+        customized: false,
+        favorite: false,
+        isDefault: false,
+        order: 0,
+      })),
+    }),
+  })
+);
 import type { TourSelection } from './selection';
 let root: Root;
 let host: HTMLDivElement;
@@ -551,40 +569,40 @@ it('edits navigation composition independently from its text and links', async (
   expect(host.querySelector('[aria-label="Main text"]')).not.toBeNull();
 });
 
-it('creates a local explanation style override from inherited settings', async () => {
-  await click('Hotspot');
-  await fill('Explanation width', '280');
-  await fill('Inner padding', '16');
-  await fill('Corner radius', '20');
-  expect(current().hotspots[0]?.appearance?.surface).toMatchObject({
-    width: 280,
-    padding: 16,
-    radius: 20,
-  });
-  await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.surface-style-selector"] button')!
-      .click()
-  );
-  const css = host.querySelector<HTMLTextAreaElement>(
-    '[data-ui="shared.ui.surface-style-selector"] textarea'
-  )!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-      css,
-      'box-shadow: 0 2px 8px #000000;'
+for (const kind of ['Hotspot', 'Slide explanation']) {
+  it(`selects a visual ${kind} style directly while preserving numeric settings`, async () => {
+    await click(kind);
+    await fill('Explanation width', '280');
+    await fill('Inner padding', '16');
+    await fill('Corner radius', '20');
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="shared.ui.surface-style-selector"] button')!
+        .click()
     );
-    css.dispatchEvent(new Event('input', { bubbles: true }));
+    const selector = host.querySelector('[data-ui="shared.ui.surface-style-selector"]')!;
+    const mode = [...selector.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      /^(Surface|Поверхность)$/.test(button.textContent?.trim() ?? '')
+    );
+    if (mode) await act(async () => mode.click());
+    expect(selector.querySelector('textarea')).toBeNull();
+    expect(
+      [...selector.querySelectorAll('button')].some((button) =>
+        /^(Apply|Применить|Duplicate|Дублировать|Copy|Копировать)$/.test(
+          button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
+        )
+      )
+    ).toBe(false);
+    await click('system-surface-soft-elevated');
+    const expected = getSystemSurfaceStylePresets().find(
+      (preset) => preset.id === 'system-surface-soft-elevated'
+    )!.style;
+    const appearance =
+      kind === 'Hotspot' ? current().hotspots[0]!.appearance : current().annotations[0]!.appearance;
+    expect(appearance?.surface).toMatchObject({ ...expected, width: 280, padding: 16, radius: 20 });
+    expect(project.tour!.style.textAppearance.surface).toBeUndefined();
   });
-  const apply = [
-    ...host.querySelectorAll<HTMLButtonElement>(
-      '[data-ui="shared.ui.surface-style-selector"] button'
-    ),
-  ].find((n) => /^(Apply|Применить)$/.test(n.textContent?.trim() ?? ''))!;
-  await act(async () => apply.click());
-  expect(current().hotspots[0]?.appearance?.surface?.surfaceCss).toContain('box-shadow');
-  expect(project.tour!.style.textAppearance.surface).toBeUndefined();
-});
+}
 
 it('shows one section heading in sections mode and moves object actions into it', async () => {
   presentation = 'sections';
