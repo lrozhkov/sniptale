@@ -136,6 +136,7 @@ function useDrawingOptionsLayout(args: {
     menuHeight,
     menuWidth,
     placement,
+    preferredTop: args.hasSelection ? -16 : 0,
   });
   const fallback: CSSProperties =
     args.displayMode === 'vertical'
@@ -212,17 +213,16 @@ function DrawingOptionsPair(props: {
       />
     </ProductToolbarMenu>
   );
-  const vertical = props.displayMode === 'vertical';
   return (
     <div
       data-ui="content.toolbar.drawing-options.pair"
       className={[
         'absolute flex max-w-[calc(100vw-16px)] items-start gap-2 overflow-x-auto',
-        vertical ? 'flex-col' : 'flex-row',
+        props.displayMode === 'vertical' ? 'flex-col' : 'flex-row',
       ].join(' ')}
       style={props.layout.style}
     >
-      {vertical ? [actions, options] : [options, actions]}
+      {[options, actions]}
     </div>
   );
 }

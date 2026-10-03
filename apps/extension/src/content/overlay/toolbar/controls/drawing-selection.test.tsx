@@ -199,14 +199,15 @@ it('shows shared shape properties and changes both selected shapes in one commit
 });
 
 it.each([
-  ['vertical', 20, true],
-  ['vertical', 950, true],
+  ['vertical', 20, false],
+  ['vertical', 950, false],
   ['horizontal', 20, false],
 ] as const)(
   'keeps selected actions adjacent to the %s toolbar at x=%s',
   (mode, x, actionsFirst) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     vi.stubGlobal('innerWidth', 1024);
+    vi.stubGlobal('innerHeight', 1200);
     vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
       new DOMRect(x, 100, 36, 36)
     );
@@ -227,6 +228,7 @@ it.each([
     expect(pair?.children[0]?.contains(action)).toBe(actionsFirst);
     expect(pair?.children[1]?.contains(action)).toBe(!actionsFirst);
     if (mode === 'vertical') {
+      expect((pair as HTMLElement).style.top).toBe('-16px');
       vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
         new DOMRect(x === 20 ? 950 : 20, 100, 36, 36)
       );

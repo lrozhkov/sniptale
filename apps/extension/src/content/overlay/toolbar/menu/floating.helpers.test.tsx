@@ -181,3 +181,25 @@ it('retains onClose as the shared Escape fallback', () => {
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(onClose).toHaveBeenCalledOnce();
 });
+
+it.each([
+  [100, 300, -16],
+  [10, 300, -2],
+  [600, 300, -140],
+])('clamps the preferred vertical offset at anchor y=%s', (y, menuHeight, expectedTop) => {
+  vi.stubGlobal('innerWidth', 1024);
+  vi.stubGlobal('innerHeight', 768);
+  const anchor = document.createElement('button');
+  document.body.append(anchor);
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(new DOMRect(20, y, 36, 36));
+  expect(
+    resolveToolbarFloatingMenuStyle({
+      anchorEl: anchor,
+      displayMode: 'vertical',
+      menuHeight,
+      menuWidth: 190,
+      placement: 'down',
+      preferredTop: -16,
+    })
+  ).toMatchObject({ top: expectedTop });
+});

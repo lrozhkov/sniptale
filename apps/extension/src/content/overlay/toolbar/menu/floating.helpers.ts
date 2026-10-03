@@ -55,6 +55,8 @@ export function resolveToolbarFloatingMenuStyle(params: {
   menuWidth: number;
   placement: 'up' | 'down';
   preferredAlign?: 'start' | 'end';
+  /** Preferred vertical-mode offset in content UI pixels, clamped to the viewport. */
+  preferredTop?: number;
   viewportRightInset?: number;
 }): CSSProperties | null {
   const {
@@ -64,6 +66,7 @@ export function resolveToolbarFloatingMenuStyle(params: {
     menuWidth,
     placement,
     preferredAlign = 'start',
+    preferredTop = 0,
     viewportRightInset = 0,
   } = params;
 
@@ -88,6 +91,7 @@ export function resolveToolbarFloatingMenuStyle(params: {
       anchorRect,
       menuHeight,
       menuWidth,
+      preferredTop,
       viewportRightInset,
       viewport,
     });
@@ -136,6 +140,7 @@ function resolveHorizontalToolbarFloatingMenuStyle(args: {
 }
 
 function resolveVerticalToolbarFloatingMenuStyle(args: {
+  preferredTop: number;
   anchorRect: { x: number; y: number; width: number; height: number };
   menuHeight: number;
   menuWidth: number;
@@ -151,7 +156,8 @@ function resolveVerticalToolbarFloatingMenuStyle(args: {
   const top = resolveVerticalToolbarFloatingMenuTop(
     args.anchorRect,
     args.menuHeight,
-    args.viewport.height
+    args.viewport.height,
+    args.preferredTop
   );
 
   if (spaceRight >= args.menuWidth || spaceRight >= spaceLeft) {
@@ -171,12 +177,13 @@ function resolveVerticalToolbarFloatingMenuStyle(args: {
 function resolveVerticalToolbarFloatingMenuTop(
   anchorRect: { y: number },
   menuHeight: number,
-  viewportHeight: number
+  viewportHeight: number,
+  preferredTop: number
 ): number {
   const minTop = TOOLBAR_MENU_VIEWPORT_MARGIN_PX - anchorRect.y;
   const maxTop = viewportHeight - TOOLBAR_MENU_VIEWPORT_MARGIN_PX - anchorRect.y - menuHeight;
 
-  return clampValue(0, minTop, maxTop);
+  return clampValue(preferredTop, minTop, maxTop);
 }
 
 function bindToolbarFloatingMenuDismissalHandlers(handlers: {
