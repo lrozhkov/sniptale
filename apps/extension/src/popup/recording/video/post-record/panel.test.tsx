@@ -67,6 +67,7 @@ function clickButton(label: string) {
 }
 
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'confirm',
@@ -85,6 +86,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
@@ -144,11 +146,9 @@ it('opens the saved recording directly in the gallery', async () => {
 it('closes after deleting confirmed saved outputs', async () => {
   const { onAcknowledge } = await renderPanel();
 
-  await act(async () => {
-    clickButton('popup.video.postRecordDelete');
-  });
+  await confirmDelete();
 
-  expect(window.confirm).toHaveBeenCalledWith('popup.video.postRecordDeleteConfirm');
+  expect(window.confirm).not.toHaveBeenCalled();
   expect(onAcknowledge).toHaveBeenCalled();
   expect(deleteVideoPostRecordResultMock).toHaveBeenCalledWith(RESULT);
 });
@@ -157,9 +157,7 @@ it('keeps the panel open and reports an error when deletion fails', async () => 
   const { onAcknowledge } = await renderPanel();
   deleteVideoPostRecordResultMock.mockRejectedValueOnce(new Error('delete failed'));
 
-  await act(async () => {
-    clickButton('popup.video.postRecordDelete');
-  });
+  await confirmDelete();
 
   expect(onAcknowledge).not.toHaveBeenCalled();
   expect(container?.textContent).toContain('popup.video.postRecordActionError');
@@ -169,9 +167,7 @@ it('keeps deleted-media authority visible when the acknowledgement write fails',
   const onAcknowledge = vi.fn().mockRejectedValueOnce(new Error('session write failed'));
   await renderPanel(onAcknowledge);
 
-  await act(async () => {
-    clickButton('popup.video.postRecordDelete');
-  });
+  await confirmDelete();
 
   expect(deleteVideoPostRecordResultMock).toHaveBeenCalledWith(RESULT);
   expect(onAcknowledge).toHaveBeenCalledOnce();
@@ -179,14 +175,44 @@ it('keeps deleted-media authority visible when the acknowledgement write fails',
   expect(container?.textContent).toContain('popup.video.postRecordActionError');
 });
 
-it('does not delete when the destructive action is cancelled', async () => {
-  vi.mocked(window.confirm).mockReturnValueOnce(false);
+it('requires a delayed second click and cancels confirmation on Escape', async () => {
   await renderPanel();
-
   await act(async () => {
     clickButton('popup.video.postRecordDelete');
+    clickButton('popup.video.postRecordDelete');
   });
+  expect(window.confirm).not.toHaveBeenCalled();
+  expect(deleteVideoPostRecordResultMock).not.toHaveBeenCalled();
+  await act(async () => vi.advanceTimersByTime(200));
+  const button = findButton('popup.video.postRecordDeleteConfirm');
+  await act(async () =>
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(findButton('popup.video.postRecordDelete')).toBe(button);
+  expect(deleteVideoPostRecordResultMock).not.toHaveBeenCalled();
+});
 
+it('cancels confirmation when focus leaves or the recording changes', async () => {
+  const { onAcknowledge } = await renderPanel();
+  const button = findButton('popup.video.postRecordDelete');
+  await act(async () => {
+    button.focus();
+    button.click();
+  });
+  await act(async () => vi.advanceTimersByTime(200));
+  await act(async () => findButton('popup.video.postRecordClose').focus());
+  expect(findButton('popup.video.postRecordDelete')).toBe(button);
+  await act(async () => button.click());
+  await act(async () => vi.advanceTimersByTime(200));
+  await act(async () =>
+    root?.render(
+      <VideoPostRecordPanel
+        result={{ ...RESULT, recordingId: 'recording-2' }}
+        onAcknowledge={onAcknowledge}
+      />
+    )
+  );
+  expect(findButton('popup.video.postRecordDelete')).toBeDefined();
   expect(deleteVideoPostRecordResultMock).not.toHaveBeenCalled();
 });
 
@@ -200,3 +226,9 @@ it('opens the primary recording directly in quick edit and acknowledges only suc
   expect(openLatestRecordingInGalleryMock).toHaveBeenLastCalledWith('recording-1', true);
   expect(onAcknowledge).toHaveBeenCalledOnce();
 });
+
+async function confirmDelete() {
+  await act(async () => clickButton('popup.video.postRecordDelete'));
+  await act(async () => vi.advanceTimersByTime(200));
+  await act(async () => clickButton('popup.video.postRecordDeleteConfirm'));
+}

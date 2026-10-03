@@ -112,8 +112,8 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     en: 'Available in your library.',
   },
   postRecordOpenGallery: {
-    ru: 'Открыть в библиотеке',
-    en: 'Open in library',
+    ru: 'Библиотека',
+    en: 'Library',
   },
   postRecordQuickEdit: { ru: 'Быстрое редактирование', en: 'Quick edit' },
   postRecordOpenEditor: {
@@ -133,8 +133,8 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     en: 'Delete',
   },
   postRecordDeleteConfirm: {
-    ru: 'Удалить эту запись? Это действие нельзя отменить.',
-    en: 'Delete this recording? This cannot be undone.',
+    ru: 'Нажмите ещё раз для удаления',
+    en: 'Click again to delete',
   },
   postRecordActionError: {
     ru: 'Не удалось выполнить действие. Попробуйте ещё раз.',

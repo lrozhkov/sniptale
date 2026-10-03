@@ -1,5 +1,6 @@
-import { Download, Film, Clapperboard, Library, Trash2, X } from 'lucide-react';
+import { Download, Film, Clapperboard, Library, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { PostRecordDeleteButton } from './delete-button';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../../../platform/i18n/popup';
 import {
@@ -14,14 +15,12 @@ function PostRecordActionButton({
   disabled,
   label,
   onClick,
-  tone = 'default',
   prominent = false,
 }: {
   icon: typeof Library;
   disabled: boolean;
   label: string;
   onClick: () => void;
-  tone?: 'danger' | 'default';
   prominent?: boolean;
 }) {
   return (
@@ -29,23 +28,18 @@ function PostRecordActionButton({
       type="button"
       disabled={disabled}
       className={[
-        'group flex min-w-0 items-center justify-center rounded-xl text-xs font-medium',
+        'group flex min-w-0 items-center justify-center rounded-md text-xs font-medium',
         'transition-colors motion-reduce:transition-none',
         'disabled:cursor-not-allowed disabled:opacity-50',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
         prominent
           ? [
-              'min-h-28 flex-col gap-3 border border-[var(--sniptale-color-border-soft)]',
-              'bg-[var(--sniptale-color-surface-panel)] px-3 py-4',
+              'min-h-28 flex-col gap-3',
+              'bg-[var(--sniptale-color-surface-input)] px-3 py-4',
               'hover:bg-[var(--sniptale-color-surface-hover)]',
             ].join(' ')
           : 'min-h-10 flex-row gap-2 px-2 py-2',
-        tone === 'danger'
-          ? [
-              'text-[var(--sniptale-color-text-muted-strong)]',
-              'hover:bg-[var(--sniptale-color-danger-soft)] hover:text-[var(--sniptale-color-danger)]',
-            ].join(' ')
-          : 'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
+        'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
       ].join(' ')}
       title={label}
       onClick={onClick}
@@ -55,14 +49,17 @@ function PostRecordActionButton({
         className={
           prominent
             ? [
-                'h-6 w-6 shrink-0 text-[var(--sniptale-color-text-secondary)] transition-colors',
-                'group-hover:text-[var(--sniptale-color-accent)]',
-                'group-focus-visible:text-[var(--sniptale-color-accent)]',
+                'h-6 w-6 shrink-0 text-[var(--sniptale-color-accent)]',
+                'transition-transform duration-180 ease-out motion-reduce:transition-none',
+                'group-hover:scale-110 group-disabled:scale-100',
+                'group-focus-visible:scale-110',
               ].join(' ')
             : 'h-4 w-4 shrink-0'
         }
       />
-      <span className="text-balance leading-relaxed">{label}</span>
+      <span className={prominent ? 'text-balance leading-relaxed' : 'whitespace-nowrap leading-5'}>
+        {label}
+      </span>
     </button>
   );
 }
@@ -144,10 +141,6 @@ function createPostRecordDeleteHandler(args: {
   runDecision: (action: () => Promise<void>) => void;
 }) {
   return () => {
-    if (!window.confirm(translate('popup.video.postRecordDeleteConfirm'))) {
-      return;
-    }
-
     args.runDecision(async () => {
       await deleteVideoPostRecordResult(args.result);
     });
@@ -206,13 +199,11 @@ function PostRecordActionGrid({
           label={translate('popup.video.postRecordClose')}
           onClick={() => runDecision(() => Promise.resolve())}
         />
-        <div className="flex justify-center border-t border-[var(--sniptale-color-border-soft)] pt-2">
-          <PostRecordActionButton
+        <div className="border-t border-[var(--sniptale-color-border-soft)] pt-2">
+          <PostRecordDeleteButton
+            key={JSON.stringify([result.recordingId, result.primaryRecordingId, result.projectId])}
             disabled={isBusy}
-            icon={Trash2}
-            label={translate('popup.video.postRecordDelete')}
-            tone="danger"
-            onClick={onDelete}
+            onDelete={onDelete}
           />
         </div>
       </div>
