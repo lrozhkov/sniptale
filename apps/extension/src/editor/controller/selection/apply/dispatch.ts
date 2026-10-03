@@ -7,6 +7,8 @@ import {
 } from '../../../drawing/object/metadata';
 import { refreshEditorDrawingBlurObject } from '../../../drawing/object/blur';
 import { replaceEditorDrawingFabricGeometry } from '../../../drawing/object/vector';
+import { parseScenarioBlurMetadata } from '../../../document/scenario-blur-metadata';
+import { updateBlurObject } from '../../../objects/annotation/blur/object';
 import { applyStepSettings } from './annotation';
 import { applyImageLayerSettings } from './image';
 
@@ -101,7 +103,15 @@ export function applySelectionToolSettingsToObjects(
     case 'blur':
       objects.forEach((object) => {
         const drawing = readEditorDrawingObject(object);
-        if (drawing?.kind !== 'blur') return;
+        if (drawing?.kind !== 'blur') {
+          const scenarioBlur = parseScenarioBlurMetadata(object.sniptaleScenarioBlurJson);
+          if (scenarioBlur) {
+            updateBlurObject(object, {
+              settings: { ...scenarioBlur.settings, amount: selectionToolSettings.blur.amount },
+            });
+          }
+          return;
+        }
         writeEditorDrawingObject(object, { ...drawing, amount: selectionToolSettings.blur.amount });
         refreshEditorDrawingBlurObject(object);
       });

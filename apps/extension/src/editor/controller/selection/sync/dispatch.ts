@@ -1,6 +1,7 @@
 import type { FabricObject } from 'fabric';
 import type { EditorObjectType } from '../../../../features/editor/document/types';
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import { parseScenarioBlurMetadata } from '../../../document/scenario-blur-metadata';
 import { useEditorStore } from '../../../state/useEditorStore';
 import { syncRichShapeSelectionSettings } from '../rich-shape-sync';
 import { syncImageSelectionSettings } from '../sync-image';
@@ -8,7 +9,15 @@ import { syncStepSelectionSettings } from '../sync-step';
 
 function syncDrawingSelection(object: FabricObject): void {
   const drawing = readEditorDrawingObject(object);
-  if (!drawing) return;
+  if (!drawing) {
+    const scenarioBlur = parseScenarioBlurMetadata(object.sniptaleScenarioBlurJson);
+    if (scenarioBlur) {
+      useEditorStore.getState().updateSelectionDrawingToolSettings('blur', {
+        amount: scenarioBlur.settings.amount,
+      });
+    }
+    return;
+  }
   const store = useEditorStore.getState();
   if (drawing.kind === 'blur') {
     store.updateSelectionDrawingToolSettings('blur', { amount: drawing.amount ?? 10 });

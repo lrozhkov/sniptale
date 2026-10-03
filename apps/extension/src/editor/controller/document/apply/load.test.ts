@@ -311,3 +311,37 @@ it.each([undefined, 3])(
     expect(image.objectCaching).toBe(false);
   }
 );
+
+it('loads a captured scenario document through the actual Fabric receiver and preserves its source', async () => {
+  const { createScenarioCaptureEditorDocument } =
+    await import('../../../../features/scenario/capture-step/editor-document');
+  const document = createScenarioCaptureEditorDocument({
+    dataUrl: 'data:image/png;base64,doc',
+    sourceWidth: 320,
+    sourceHeight: 180,
+    overlays: [
+      { id: 'frame', kind: 'focus-rect', rect: { x: 10, y: 20, width: 80, height: 40 } },
+      { id: 'click', kind: 'click-ring', point: { x: 30, y: 40 } },
+    ],
+  });
+  const original = JSON.stringify(document);
+  const canvas = new EditorCanvas(window.document.createElement('canvas'), {
+    renderOnAddRemove: false,
+  });
+  try {
+    await loadPreparedDocumentOnCanvas({
+      canvas,
+      prepared: prepareAppliedDocument(document),
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: async () => undefined,
+      zoomLevel: 1,
+    });
+    expect(canvas.getObjects().map((object) => object.sniptaleType)).toEqual([
+      'frame-annotation',
+      'shape',
+    ]);
+    expect(JSON.stringify(document)).toBe(original);
+  } finally {
+    canvas.destroy();
+  }
+});

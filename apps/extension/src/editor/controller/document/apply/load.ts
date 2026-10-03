@@ -14,15 +14,16 @@ import { normalizeFrameAnnotationsInCanvasJson } from '../../../frame-annotation
 import { assertValidEditorDrawingCanvasJson } from '../../../document/import-boundary';
 import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/canonicalize';
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import { normalizeScenarioAnnotationsInCanvasJson } from '../../../document/scenario-annotation-import';
 import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
 ): Promise<SourceState | null> {
   const canvasJson = normalizeFrameAnnotationsInCanvasJson(
-    options.prepared.normalizedDocument.canvasJson
+    normalizeScenarioAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson)
   );
-  assertValidEditorDrawingCanvasJson(options.prepared.normalizedDocument.canvasJson);
+  assertValidEditorDrawingCanvasJson(canvasJson);
   await options.canvas.loadFromJSON(canvasJson);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,

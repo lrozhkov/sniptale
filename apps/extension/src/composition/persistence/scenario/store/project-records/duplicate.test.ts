@@ -297,6 +297,17 @@ it('fails cleanly when image preparation hits quota before any publication', asy
 
 it('saves a selected template step with independently owned media and resolved appearance', async () => {
   const { saveScenarioStepTemplate } = await import('./templates');
+  const original = await io.document('source-document');
+  if (!original) throw new Error('Expected annotation fixture.');
+  const annotatedDocument = createScenarioCaptureEditorDocument({
+    dataUrl: 'data:image/png;base64,aW1hZ2U=',
+    sourceWidth: 100,
+    sourceHeight: 80,
+    overlays: [
+      { id: 'capture-frame', kind: 'focus-rect', rect: { x: 1, y: 2, width: 30, height: 20 } },
+    ],
+  });
+  io.document.mockResolvedValue({ ...original, document: annotatedDocument });
   const source = sourceProject();
   const selected = source.items[1];
   if (selected?.kind !== 'step') throw new Error('Expected step fixture.');
@@ -315,7 +326,9 @@ it('saves a selected template step with independently owned media and resolved a
       storageClass: 'library',
       children: expect.objectContaining({
         assetPuts: [expect.objectContaining({ projectId: template.id })],
-        editorDocumentPuts: [expect.objectContaining({ projectId: template.id })],
+        editorDocumentPuts: [
+          expect.objectContaining({ projectId: template.id, document: annotatedDocument }),
+        ],
       }),
     })
   );

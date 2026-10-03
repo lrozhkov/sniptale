@@ -1,3 +1,4 @@
+import { isValidScenarioBlurCanvasObject } from './scenario-blur-metadata';
 // policyStateIds: [] - parser sets and resource ceilings are immutable document import policy,
 // not mutable authority or capability state.
 import type { DrawingObject } from '../../features/drawing/public';
@@ -187,6 +188,10 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
     )
   ) {
     throw new Error('Removed editor drawing object');
+  }
+  if (value['sniptaleScenarioBlurJson'] !== undefined) {
+    if (!isValidScenarioBlurCanvasObject(value)) throw new Error('Invalid scenario blur metadata');
+    return;
   }
   const serializedMetadata = value['sniptaleDrawingJson'];
   if (!DRAWING_TYPES.has(String(objectType)) && serializedMetadata === undefined) return;

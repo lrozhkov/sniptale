@@ -1,3 +1,4 @@
+import { normalizeScenarioAnnotationsInCanvasJson } from '../scenario-annotation-import';
 import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
@@ -191,8 +192,9 @@ function assertSafeCanvasJson(canvasJson: string): void {
     throwInvalidSession();
   }
   try {
-    assertValidFrameAnnotationsInCanvasJson(canvasJson);
-    assertValidEditorDrawingCanvasJson(canvasJson);
+    const normalized = normalizeScenarioAnnotationsInCanvasJson(canvasJson);
+    assertValidFrameAnnotationsInCanvasJson(normalized);
+    assertValidEditorDrawingCanvasJson(normalized);
   } catch {
     throwInvalidSession();
   }
