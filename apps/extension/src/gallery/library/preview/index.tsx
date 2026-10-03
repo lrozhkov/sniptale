@@ -20,7 +20,7 @@ import {
   PreviewProjectUsage,
   PreviewTagEditor,
 } from './sidebar-sections';
-import { formatDate, getGalleryItemKindLabel } from '../ui';
+import { FOLDER_LABELS, formatDate, getGalleryFolderIcon, getGalleryItemFolder } from '../ui';
 
 function isMetadataEditable(item: PreviewPanelProps['item']) {
   return (
@@ -51,12 +51,15 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
 
 function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>) {
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
+  const folder = getGalleryItemFolder(props.item.kind);
+  const CategoryIcon = getGalleryFolderIcon(folder);
 
   return (
     <div className="shrink-0" data-ui="gallery.preview.inspectorHeader">
       <div className="min-w-0">
-        <h2 className="flex min-h-9 items-center pr-20 text-base font-semibold">
-          {getGalleryItemKindLabel(props.item.kind)}
+        <h2 className="flex min-h-9 items-center gap-2 pr-20 text-base font-semibold">
+          <CategoryIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
+          {FOLDER_LABELS[folder]}
         </h2>
         <div className="mt-1 text-sm text-[var(--sniptale-color-text-muted)]">
           {formatDate(props.item.createdAt)}

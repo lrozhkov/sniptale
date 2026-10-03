@@ -12,9 +12,8 @@ import {
 import { PreviewPanel } from './index';
 import type { PreviewPanelProps } from './types';
 
-const { formatDateMock, getGalleryItemKindLabelMock, translateMock } = vi.hoisted(() => ({
+const { formatDateMock, translateMock } = vi.hoisted(() => ({
   formatDateMock: vi.fn(() => '31 Mar 2026'),
-  getGalleryItemKindLabelMock: vi.fn(() => 'Screenshot'),
   translateMock: vi.fn((key: string) => key),
 }));
 
@@ -26,7 +25,6 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
   formatDate: formatDateMock,
-  getGalleryItemKindLabel: getGalleryItemKindLabelMock,
 }));
 
 vi.mock('../../video-review', () => ({
@@ -164,7 +162,7 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
   render(props);
 
   expect(container?.textContent).not.toContain('gallery.preview.inspector');
-  expect(container?.textContent).toContain('Screenshot');
+  expect(container?.textContent).toContain('gallery.preview.folderScreenshot');
   expect(container?.textContent).toContain('31 Mar 2026');
   expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
 
@@ -228,6 +226,24 @@ it('renders unsafe source urls as inert text instead of links', () => {
 
   expect(container?.textContent).toContain('javascript:alert(1)');
   expect(container?.querySelector('a[href]')).toBeNull();
+});
+
+it.each([
+  [createMediaItem({ kind: 'screenshot' }), 'folderScreenshot', 'image'],
+  [createMediaItem({ kind: 'image' }), 'folderScreenshot', 'image'],
+  [createMediaItem({ kind: 'recording' }), 'folderRecording', 'video'],
+  [createMediaItem({ kind: 'video' }), 'folderRecording', 'video'],
+  [createMediaItem({ kind: 'export' }), 'folderRecording', 'video'],
+  [createMediaItem({ kind: 'audio' }), 'kindAudio', 'audio-lines'],
+  [createMediaItem({ kind: 'web-archive' }), 'folderWebSnapshot', 'archive'],
+  [createScenarioItem(), 'folderScenario', 'book-open'],
+  [createScenarioExportItem(), 'folderExport', 'file-text'],
+  [createVideoProjectItem(), 'folderVideoProject', 'clapperboard'],
+] as const)('shows the sidebar category and icon for %j', (item, label, icon) => {
+  render(createProps({ item }));
+  const heading = container?.querySelector('[data-ui="gallery.preview.inspectorHeader"] h2');
+  expect(heading?.textContent).toBe(`gallery.preview.${label}`);
+  expect(heading?.querySelector(`svg.lucide-${icon}[aria-hidden="true"]`)).not.toBeNull();
 });
 
 it('places draft saving beside the deletion date in the inspector header', () => {

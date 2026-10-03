@@ -12,6 +12,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
+import { FOLDER_FILTER_KIND_MAP, SIDEBAR_FOLDERS } from '../constants';
 import type { RecordingGroupMemberRole } from '../../../features/media-hub/recording-groups';
 import { type GalleryItem, type GalleryItemKind } from '../items';
 import { createMediaThumbFallbackItem } from './fallback-items';
@@ -28,14 +29,30 @@ const GALLERY_THUMB_FALLBACK_SURFACE_CLASS_NAME = [
 ].join('');
 
 export const FOLDER_LABELS: Record<FolderFilter, string> = {
-  all: translate('gallery.preview.folderAll'),
-  audio: translate('gallery.preview.kindAudio'),
-  screenshot: translate('gallery.preview.folderScreenshot'),
-  recording: translate('gallery.preview.folderRecording'),
-  export: translate('gallery.preview.folderExport'),
-  'web-snapshot': translate('gallery.preview.folderWebSnapshot'),
-  scenario: translate('gallery.preview.folderScenario'),
-  'video-project': translate('gallery.preview.folderVideoProject'),
+  get all() {
+    return translate('gallery.preview.folderAll');
+  },
+  get audio() {
+    return translate('gallery.preview.kindAudio');
+  },
+  get screenshot() {
+    return translate('gallery.preview.folderScreenshot');
+  },
+  get recording() {
+    return translate('gallery.preview.folderRecording');
+  },
+  get export() {
+    return translate('gallery.preview.folderExport');
+  },
+  get 'web-snapshot'() {
+    return translate('gallery.preview.folderWebSnapshot');
+  },
+  get scenario() {
+    return translate('gallery.preview.folderScenario');
+  },
+  get 'video-project'() {
+    return translate('gallery.preview.folderVideoProject');
+  },
 };
 
 export function getGalleryFolderIcon(folder: FolderFilter) {
@@ -56,6 +73,17 @@ export function getGalleryFolderIcon(folder: FolderFilter) {
   }
 
   return getKindIcon(folder);
+}
+
+/** Resolves the item's category independently of the currently selected library filter. */
+export function getGalleryItemFolder(kind: GalleryItemKind): FolderFilter {
+  return (
+    SIDEBAR_FOLDERS.find((folder) => {
+      if (folder === 'all') return false;
+      if (folder === 'scenario') return kind === 'scenario';
+      return FOLDER_FILTER_KIND_MAP[folder].includes(kind);
+    }) ?? 'all'
+  );
 }
 
 export function getGalleryItemKindLabel(kind: GalleryItemKind): string {

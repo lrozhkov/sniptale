@@ -8,6 +8,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  translateMock,
   formatDateTimeMock,
   getAggregatePresentationMock,
   getCurrentLocaleMock,
@@ -15,6 +16,7 @@ const {
   getGalleryProjectCoverMock,
   revokeObjectURLMock,
 } = vi.hoisted(() => ({
+  translateMock: vi.fn((key: string) => key),
   formatDateTimeMock: vi.fn(() => 'Jan 01, 2024, 12:30 PM'),
   getAggregatePresentationMock: vi.fn(),
   getCurrentLocaleMock: vi.fn(() => 'en'),
@@ -46,7 +48,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   formatDateTime: formatDateTimeMock,
   getCurrentLocale: getCurrentLocaleMock,
-  translate: (key: string) => key,
+  translate: translateMock,
 }));
 
 import {
@@ -124,6 +126,17 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+});
+
+it('reads category labels in the current locale after preferences hydrate', () => {
+  expect(FOLDER_LABELS.screenshot).toBe('gallery.preview.folderScreenshot');
+  translateMock.mockImplementation((key) => `hydrated:${key}`);
+  try {
+    expect(FOLDER_LABELS.screenshot).toBe('hydrated:gallery.preview.folderScreenshot');
+    expect(FOLDER_LABELS.recording).toBe('hydrated:gallery.preview.folderRecording');
+  } finally {
+    translateMock.mockImplementation((key) => key);
+  }
 });
 
 async function verifyGalleryHelpersAndLoadedThumb() {

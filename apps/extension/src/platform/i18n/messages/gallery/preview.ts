@@ -70,12 +70,12 @@ export const galleryPreviewMessages = defineMessageSource({
     en: 'All materials',
   },
   folderScreenshot: {
-    ru: 'Скриншоты',
-    en: 'Screenshots',
+    ru: 'Изображения',
+    en: 'Images',
   },
   folderRecording: {
-    ru: 'Видео и записи',
-    en: 'Videos and recordings',
+    ru: 'Видео',
+    en: 'Videos',
   },
   folderExport: {
     ru: 'Руководства и туры',
