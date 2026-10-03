@@ -1,12 +1,13 @@
 import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getMediaAssetBlob,
   getMediaLibraryEntry,
-  getMediaThumbnail,
   listMediaLibrary,
 } from '../../../composition/persistence/media-library';
 import { translate } from '../../../platform/i18n';
+import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
+import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 import { buildEditorUrl } from '../../../platform/navigation/extension-pages/editor';
 import {
   EditorStart,
@@ -38,7 +39,22 @@ async function listStartImages(): Promise<EditorStartSourceItem[]> {
 }
 
 async function readThumbnail(id: string): Promise<Blob | undefined> {
-  return (await getMediaThumbnail(id))?.blob;
+  const entry = await getMediaLibraryEntry(id);
+  if (!entry || entry.lifecycle?.trashedAt !== undefined) return undefined;
+  const revision = entry.workspaceRevision ?? 0;
+  const presentation = await getAggregatePresentation({ kind: 'image', id });
+  const blob =
+    presentation?.presentationRevision === revision
+      ? (presentation.previewBlob ?? presentation.thumbnailBlob)
+      : revision === 0
+        ? await getMediaAssetBlob(id)
+        : undefined;
+  const latest = await getMediaLibraryEntry(id);
+  return latest &&
+    latest.lifecycle?.trashedAt === undefined &&
+    (latest.workspaceRevision ?? 0) === revision
+    ? blob
+    : undefined;
 }
 
 async function createBlankImage(): Promise<File> {
@@ -63,6 +79,13 @@ export function ImageEditorStart(props: {
   runOpen: (action: () => Promise<void>) => Promise<void>;
 }) {
   const { items, status, refresh } = useEditorStartItems(listStartImages, readThumbnail);
+  useEffect(
+    () =>
+      subscribeToMediaHubEvents((event) => {
+        if (event.type === 'library-changed') void refresh();
+      }),
+    [refresh]
+  );
   const input = useRef<HTMLInputElement>(null);
   const pendingRef = useRef(false);
   const [pending, setPending] = useState(false);

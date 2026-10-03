@@ -150,6 +150,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/media-hub-backup`
 - `apps/extension/src/workflows/page-package`
 - `apps/extension/src/workflows/page-preparation`
+- `apps/extension/src/workflows/project-covers`
 - `apps/extension/src/workflows/scenario-capture-edit`
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/video`

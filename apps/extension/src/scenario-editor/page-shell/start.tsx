@@ -1,7 +1,18 @@
+import { getRecording } from '../../composition/persistence/recordings';
+import {
+  getScenarioAsset,
+  getScenarioProjectEntry,
+} from '../../composition/persistence/scenario/projects';
+import { createProjectCoverService } from '../../workflows/project-covers';
+import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
+import { getVideoProject, getProjectAsset } from '../../composition/persistence/projects';
 import { ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
-import { useRef, useState } from 'react';
-import { getMediaThumbnail } from '../../composition/persistence/media-library';
-import { listScenarioProjectSummaries } from '../../composition/persistence/scenario/store/public';
+import { useEffect, useRef, useState } from 'react';
+import { getMediaAssetBlob } from '../../composition/persistence/media-library';
+import {
+  listScenarioProjectSummaries,
+  getScenarioAssetBlob,
+} from '../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../platform/i18n';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import {
@@ -10,6 +21,16 @@ import {
   useEditorStartItems,
 } from '../../ui/editor-start';
 import type { useGuidePageState } from './runtime/use-state';
+
+const covers = createProjectCoverService({
+  getVideoProject,
+  getProjectAsset,
+  getMediaAssetBlob,
+  getRecording,
+  getScenarioAsset,
+  getScenarioProjectEntry,
+  getScenarioAssetBlob,
+});
 
 async function listStartProjects(): Promise<EditorStartSourceItem[]> {
   const projects = await listScenarioProjectSummaries();
@@ -20,20 +41,27 @@ async function listStartProjects(): Promise<EditorStartSourceItem[]> {
       title: item.name,
       detail: new Date(item.updatedAt).toLocaleDateString(),
       updatedAt: item.updatedAt,
-      thumbnailId: `scenario:${item.id}`,
+      loadThumbnail: (signal: AbortSignal) =>
+        covers.getCover(
+          { kind: 'scenario', id: item.id, workspaceRevision: item.workspaceRevision ?? 0 },
+          signal
+        ),
       unavailable: item.availability !== 'available',
     }));
-}
-
-async function readThumbnail(id: string): Promise<Blob | undefined> {
-  return (await getMediaThumbnail(id))?.blob;
 }
 
 export function ScenarioEditorStart(props: {
   state: ReturnType<typeof useGuidePageState>;
   t: Translate;
 }) {
-  const { items, status, refresh } = useEditorStartItems(listStartProjects, readThumbnail);
+  const { items, status, refresh } = useEditorStartItems(listStartProjects);
+  useEffect(
+    () =>
+      subscribeToMediaHubEvents((event) => {
+        if (event.type === 'library-changed') void refresh();
+      }),
+    [refresh]
+  );
   const [pending, setPending] = useState(false);
   const pendingRef = useRef(false);
   const [error, setError] = useState<string | null>(null);

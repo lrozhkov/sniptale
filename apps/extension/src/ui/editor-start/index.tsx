@@ -2,6 +2,7 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FolderOpen, Plus, Search } from 'lucide-react';
 import { useState, type DragEvent, type ReactNode } from 'react';
 import type { EditorStartItem } from './use-items';
+import { EditorStartThumbnail } from './thumbnail';
 export { useEditorStartItems, sortEditorStartItems } from './use-items';
 export type { EditorStartItem, EditorStartSourceItem } from './use-items';
 
@@ -96,15 +97,7 @@ function EditorStartCard(props: { item: EditorStartItem; start: EditorStartProps
       title={item.title}
       data-ui="editor.start.project"
     >
-      <span className="grid aspect-video place-items-center overflow-hidden bg-[var(--sniptale-color-surface-canvas)]">
-        {item.thumbnailUrl ? (
-          <img src={item.thumbnailUrl} alt="" className="h-full w-full object-contain" />
-        ) : (
-          <span className="text-[var(--sniptale-color-text-muted)]" aria-hidden="true">
-            {start.icon}
-          </span>
-        )}
-      </span>
+      <EditorStartThumbnail item={item} fallback={start.icon} />
       <span className="block px-4 py-3">
         <span className="line-clamp-2 min-h-10 break-words text-sm font-medium leading-5">
           {item.title}

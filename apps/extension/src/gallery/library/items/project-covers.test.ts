@@ -33,7 +33,8 @@ vi.mock('../../../composition/persistence/scenario/store/public', () => ({
   getScenarioAssetBlob: io.getScenarioAssetBlob,
 }));
 
-import { getGalleryProjectCover, getVideoCoverCandidates } from './project-covers';
+import { getGalleryProjectCover } from './project-covers';
+import { getVideoCoverCandidates } from '../../../workflows/project-covers';
 
 function projectWithClips() {
   const project = createEmptyVideoProject('Cover');
@@ -175,12 +176,12 @@ it('coalesces concurrent reads and tries the next source when the first is missi
     getGalleryProjectCover(item),
   ]);
   expect(first).toBe(second);
-  expect(io.getVideoProject).toHaveBeenCalledTimes(1);
+  expect(io.getVideoProject).toHaveBeenCalledTimes(2);
   expect(io.getMediaAssetBlob.mock.calls.map(([id]) => id)).toEqual(['used', 'later']);
   expect(drawImage).toHaveBeenCalledOnce();
   expect(revoke).toHaveBeenCalledWith('blob:cover-source');
   expect(await getGalleryProjectCover(item)).toBe(first);
-  expect(io.getVideoProject).toHaveBeenCalledTimes(1);
+  expect(io.getVideoProject).toHaveBeenCalledTimes(3);
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });

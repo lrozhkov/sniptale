@@ -3,7 +3,12 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { EditorStart, sortEditorStartItems, type EditorStartItem } from './index';
+import {
+  EditorStart,
+  useEditorStartItems,
+  sortEditorStartItems,
+  type EditorStartItem,
+} from './index';
 
 const labels = {
   title: 'Editor',
@@ -125,4 +130,39 @@ it('retains full project names and blocks unavailable cards and pending actions'
   }
   expect(actions.onCreate).not.toHaveBeenCalled();
   expect(actions.onOpen).not.toHaveBeenCalled();
+});
+
+it('loads a project preview after browsing beyond the six recent cards', async () => {
+  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:seventh'), revokeObjectURL: vi.fn() });
+  const list = vi.fn(async () =>
+    Array.from({ length: 7 }, (_, index) => ({
+      id: String(index),
+      title: `Project ${index}`,
+      detail: '',
+      updatedAt: 7 - index,
+      thumbnailId: String(index),
+    }))
+  );
+  const thumbnail = vi.fn(async () => new Blob(['preview']));
+  function Projects() {
+    const state = useEditorStartItems(list, thumbnail);
+    return (
+      <EditorStart
+        {...labels}
+        {...state}
+        browseOnOpen
+        onCreate={vi.fn()}
+        onOpen={vi.fn()}
+        onSelect={vi.fn()}
+        onRetry={vi.fn()}
+      />
+    );
+  }
+  await act(async () => root.render(<Projects />));
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('button:nth-of-type(2)')?.click()
+  );
+  const cards = container.querySelectorAll('[data-ui="editor.start.project"]');
+  expect(cards).toHaveLength(7);
+  expect(cards[6]?.querySelector('img')).not.toBeNull();
 });

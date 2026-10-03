@@ -7,13 +7,18 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   thumbnail: vi.fn(),
+  cover: vi.fn(),
   create: vi.fn(),
   open: vi.fn(),
   gallery: vi.fn(),
 }));
-vi.mock('../../../composition/persistence/projects', () => ({ listVideoProjects: mocks.list }));
+vi.mock('../../../composition/persistence/projects', () => ({
+  listVideoProjects: mocks.list,
+  getVideoProject: vi.fn(),
+  getProjectAsset: vi.fn(),
+}));
 vi.mock('../../../composition/persistence/media-library', () => ({
-  getMediaThumbnail: mocks.thumbnail,
+  getMediaAssetBlob: vi.fn(),
 }));
 vi.mock('../../../platform/navigation/extension-pages', () => ({ openGalleryPage: mocks.gallery }));
 vi.mock('../../runtime/controller/composition/hooks', () => ({
@@ -23,6 +28,17 @@ vi.mock('../../runtime/commands/project-transition', () => ({
   useProjectTransitionPending: () => false,
 }));
 vi.mock('../../../platform/i18n', () => ({ translate: (key: string) => key }));
+vi.mock('../../../composition/persistence/scenario/store/public', () => ({
+  getScenarioAssetBlob: vi.fn(),
+}));
+vi.mock('../../../composition/persistence/recordings', () => ({ getRecording: vi.fn() }));
+vi.mock('../../../composition/persistence/scenario/projects', () => ({
+  getScenarioAsset: vi.fn(),
+  getScenarioProjectEntry: vi.fn(),
+}));
+vi.mock('../../../workflows/project-covers', () => ({
+  createProjectCoverService: () => ({ getCover: mocks.cover }),
+}));
 import { VideoEditorStart } from './start';
 
 let container: HTMLDivElement;
@@ -37,6 +53,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.list.mockReset().mockResolvedValue([]);
   mocks.thumbnail.mockReset().mockResolvedValue(undefined);
+  mocks.cover.mockReset().mockResolvedValue(undefined);
   mocks.create.mockReset().mockResolvedValue(undefined);
   mocks.open.mockReset().mockResolvedValue(undefined);
   mocks.gallery.mockReset();
@@ -78,4 +95,23 @@ it('keeps actions available when the list or create command fails', async () => 
       ?.click()
   );
   expect(mocks.gallery).toHaveBeenCalledOnce();
+});
+
+it('captures the saved project revision for its visible-card cover request', async () => {
+  mocks.list.mockResolvedValue([
+    {
+      id: 'current',
+      name: 'Current',
+      updatedAt: 10,
+      workspaceRevision: 4,
+      availability: 'available',
+      width: 640,
+      height: 360,
+    },
+  ]);
+  await render();
+  expect(mocks.cover).toHaveBeenCalledWith(
+    { kind: 'video-project', id: 'current', workspaceRevision: 4 },
+    expect.any(AbortSignal)
+  );
 });

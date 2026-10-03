@@ -7,6 +7,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   thumbnail: vi.fn(),
+  presentation: vi.fn(),
+  subscribe: vi.fn<typeof import('../../../features/media-hub/events').subscribeToMediaHubEvents>(
+    () => vi.fn()
+  ),
   entry: vi.fn(),
   blob: vi.fn(),
   openFile: vi.fn(),
@@ -17,6 +21,12 @@ vi.mock('../../../composition/persistence/media-library', () => ({
   getMediaThumbnail: mocks.thumbnail,
   getMediaLibraryEntry: mocks.entry,
   getMediaAssetBlob: mocks.blob,
+}));
+vi.mock('../../../composition/persistence/aggregate-presentations', () => ({
+  getAggregatePresentation: mocks.presentation,
+}));
+vi.mock('../../../features/media-hub/events', () => ({
+  subscribeToMediaHubEvents: mocks.subscribe,
 }));
 vi.mock('../../workflows/open-local-image-draft', () => ({
   openLocalImageAsEditorDraft: mocks.openFile,
@@ -44,6 +54,9 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.list.mockReset().mockResolvedValue([]);
   mocks.thumbnail.mockReset().mockResolvedValue(undefined);
+  mocks.presentation.mockReset().mockResolvedValue(undefined);
+  mocks.subscribe.mockClear();
+  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
   mocks.entry.mockReset().mockResolvedValue(undefined);
   mocks.blob.mockReset().mockResolvedValue(undefined);
   mocks.openFile.mockReset().mockResolvedValue(undefined);
@@ -133,4 +146,80 @@ it('reports PNG encoding failure without opening a draft', async () => {
   await act(async () => actions()[0]?.click());
   expect(container.textContent).toContain('shared.editorStart.createFailed');
   expect(mocks.openFile).not.toHaveBeenCalled();
+});
+
+function recentImage(workspaceRevision = 2) {
+  const entry = {
+    id: 'image',
+    kind: 'image',
+    filename: 'Edited.png',
+    updatedAt: 4,
+    width: 1280,
+    height: 720,
+    workspaceRevision,
+    lifecycle: { storageClass: 'library' },
+  };
+  mocks.list.mockResolvedValue([entry]);
+  mocks.entry.mockResolvedValue(entry);
+}
+
+it('uses the current full-resolution presentation rather than an obsolete acquisition thumbnail', async () => {
+  recentImage();
+  const current = new Blob(['current composition']);
+  const old = new Blob(['old source']);
+  mocks.thumbnail.mockResolvedValue({ blob: old });
+  mocks.presentation.mockResolvedValue({
+    presentationRevision: 2,
+    previewBlob: current,
+    thumbnailBlob: old,
+  });
+  await render();
+  expect(vi.mocked(URL.createObjectURL).mock.calls[0]?.[0]).toBe(current);
+});
+
+it('uses source pixels only for an original-only image and never for a stale edited presentation', async () => {
+  recentImage(0);
+  const original = new Blob(['original']);
+  mocks.blob.mockResolvedValue(original);
+  await render();
+  expect(vi.mocked(URL.createObjectURL).mock.calls[0]?.[0]).toBe(original);
+  recentImage(3);
+  mocks.presentation.mockResolvedValue({ presentationRevision: 2, thumbnailBlob: original });
+  vi.mocked(URL.createObjectURL).mockClear();
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+  expect(container.querySelector('section img')).toBeNull();
+});
+
+it('rejects a preview when the root revision changes during its read', async () => {
+  recentImage(2);
+  mocks.presentation.mockResolvedValue({
+    presentationRevision: 2,
+    thumbnailBlob: new Blob(['old']),
+  });
+  mocks.entry
+    .mockResolvedValueOnce({ workspaceRevision: 2 })
+    .mockResolvedValue({ workspaceRevision: 3 });
+  await render();
+  expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it('refreshes a mounted card after a current presentation commits and unsubscribes on unmount', async () => {
+  recentImage(2);
+  await render();
+  const next = new Blob(['new']);
+  mocks.presentation.mockResolvedValue({
+    presentationRevision: 2,
+    previewBlob: next,
+    thumbnailBlob: next,
+  });
+  const listener = vi.mocked(mocks.subscribe).mock.calls[0]?.[0];
+  await act(async () =>
+    listener?.({ type: 'library-changed', reason: 'update', assetIds: ['image'], timestamp: 1 })
+  );
+  expect(vi.mocked(URL.createObjectURL).mock.calls[0]?.[0]).toBe(next);
+  const unsubscribe = mocks.subscribe.mock.results[0]?.value;
+  act(() => root.unmount());
+  root = createRoot(container);
+  expect(unsubscribe).toHaveBeenCalledOnce();
 });

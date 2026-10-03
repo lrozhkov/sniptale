@@ -41,7 +41,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('loads sorted items and releases thumbnail URLs after refresh and unmount', async () => {
+it('loads sorted cards without waiting for preview I/O and refreshes the list', async () => {
   const list = vi
     .fn()
     .mockResolvedValueOnce([item('a', 1), item('b', 2)])
@@ -49,26 +49,24 @@ it('loads sorted items and releases thumbnail URLs after refresh and unmount', a
   await render(list);
   expect(last.items.map((entry) => entry.id)).toEqual(['b', 'a']);
   expect(last.status).toBe('ready');
-  expect(thumbnail).toHaveBeenCalledTimes(2);
+  expect(thumbnail).not.toHaveBeenCalled();
+  const controller = new AbortController();
+  await last.items[1]?.loadThumbnail?.(controller.signal);
+  expect(thumbnail).toHaveBeenCalledWith('a', controller.signal);
   await act(async () => last.refresh());
   expect(last.items.map((entry) => entry.id)).toEqual(['c']);
-  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
-  act(() => root.unmount());
-  root = createRoot(container);
-  expect(URL.revokeObjectURL).toHaveBeenCalledTimes(3);
 });
 
-it('keeps list error recoverable and uses a fallback when thumbnails fail', async () => {
+it('keeps list errors recoverable without coupling readiness to a thumbnail', async () => {
   const list = vi
     .fn()
     .mockRejectedValueOnce(new Error('storage'))
     .mockResolvedValueOnce([item('available')]);
   await render(list);
   expect(last.status).toBe('error');
-  thumbnail.mockRejectedValueOnce(new Error('missing thumbnail'));
   await act(async () => last.refresh());
   expect(last.status).toBe('ready');
-  expect(last.items[0]?.thumbnailUrl).toBeNull();
+  expect(last.items[0]?.loadThumbnail).toBeDefined();
 });
 
 it('discards an older list response after focus starts a newer read', async () => {

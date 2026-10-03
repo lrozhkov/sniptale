@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { renderImage, renderVideo } from './project-cover-rendering';
+import { renderImage, renderVideo } from './rendering';
 
 afterEach(() => {
   vi.restoreAllMocks();

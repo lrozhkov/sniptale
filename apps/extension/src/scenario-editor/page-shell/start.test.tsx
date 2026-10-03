@@ -4,14 +4,32 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), thumbnail: vi.fn(), gallery: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  list: vi.fn(),
+  thumbnail: vi.fn(),
+  cover: vi.fn(),
+  gallery: vi.fn(),
+}));
 vi.mock('../../composition/persistence/scenario/store/public', () => ({
   listScenarioProjectSummaries: mocks.list,
+  getScenarioAssetBlob: vi.fn(),
 }));
 vi.mock('../../composition/persistence/media-library', () => ({
-  getMediaThumbnail: mocks.thumbnail,
+  getMediaAssetBlob: vi.fn(),
 }));
 vi.mock('../../platform/navigation/extension-pages', () => ({ openGalleryPage: mocks.gallery }));
+vi.mock('../../composition/persistence/projects', () => ({
+  getVideoProject: vi.fn(),
+  getProjectAsset: vi.fn(),
+}));
+vi.mock('../../composition/persistence/recordings', () => ({ getRecording: vi.fn() }));
+vi.mock('../../composition/persistence/scenario/projects', () => ({
+  getScenarioAsset: vi.fn(),
+  getScenarioProjectEntry: vi.fn(),
+}));
+vi.mock('../../workflows/project-covers', () => ({
+  createProjectCoverService: () => ({ getCover: mocks.cover }),
+}));
 import { ScenarioEditorStart } from './start';
 
 let container: HTMLDivElement;
@@ -36,6 +54,7 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.list.mockReset().mockResolvedValue([]);
   mocks.thumbnail.mockReset().mockResolvedValue(undefined);
+  mocks.cover.mockReset().mockResolvedValue(undefined);
   mocks.gallery.mockReset();
   create.mockReset().mockResolvedValue(true);
   openExisting.mockReset().mockResolvedValue(undefined);
@@ -82,4 +101,23 @@ it('opens Gallery if the project list fails and reports a failed create', async 
   expect(container.textContent).toContain('shared.editorStart.createFailed');
   await act(async () => actions()[1]?.click());
   expect(mocks.gallery).toHaveBeenCalledOnce();
+});
+
+it('captures the saved project revision for its visible-card cover request', async () => {
+  mocks.list.mockResolvedValue([
+    {
+      id: 'current',
+      name: 'Current',
+      updatedAt: 10,
+      workspaceRevision: 4,
+      availability: 'available',
+      width: 640,
+      height: 360,
+    },
+  ]);
+  await render();
+  expect(mocks.cover).toHaveBeenCalledWith(
+    { kind: 'scenario', id: 'current', workspaceRevision: 4 },
+    expect.any(AbortSignal)
+  );
 });

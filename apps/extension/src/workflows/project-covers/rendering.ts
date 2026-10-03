@@ -1,4 +1,4 @@
-import type { ScenarioPreviewStep } from '../../../features/scenario/contracts/types/project';
+import type { ScenarioPreviewStep } from '../../features/scenario/contracts/types/project';
 
 const WIDTH = 640;
 const HEIGHT = 360;
@@ -9,7 +9,7 @@ function createCanvas() {
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
   const context = canvas.getContext('2d');
-  if (!context) throw new Error('Gallery cover canvas unavailable');
+  if (!context) throw new Error('Project cover canvas unavailable');
   context.fillStyle = '#0f172a';
   context.fillRect(0, 0, WIDTH, HEIGHT);
   return { canvas, context };
@@ -23,11 +23,11 @@ function toWebp(canvas: HTMLCanvasElement, signal: AbortSignal): Promise<Blob> {
     };
     const abort = () => {
       cleanup();
-      reject(new Error('Gallery cover encoding cancelled'));
+      reject(new Error('Project cover encoding cancelled'));
     };
     const timer = window.setTimeout(() => {
       cleanup();
-      reject(new Error('Gallery cover encoding timed out'));
+      reject(new Error('Project cover encoding timed out'));
     }, DECODE_TIMEOUT_MS);
     signal.addEventListener('abort', abort, { once: true });
     if (signal.aborted) {
@@ -38,7 +38,7 @@ function toWebp(canvas: HTMLCanvasElement, signal: AbortSignal): Promise<Blob> {
       (blob) => {
         cleanup();
         if (blob) resolve(blob);
-        else reject(new Error('Gallery cover encoding failed'));
+        else reject(new Error('Project cover encoding failed'));
       },
       'image/webp',
       0.88

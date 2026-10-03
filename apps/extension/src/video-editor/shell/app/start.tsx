@@ -1,7 +1,19 @@
+import { getRecording } from '../../../composition/persistence/recordings';
+import {
+  getScenarioAsset,
+  getScenarioProjectEntry,
+} from '../../../composition/persistence/scenario/projects';
+import { createProjectCoverService } from '../../../workflows/project-covers';
+import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
+import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/public';
 import { Clapperboard } from 'lucide-react';
-import { useRef, useState } from 'react';
-import { getMediaThumbnail } from '../../../composition/persistence/media-library';
-import { listVideoProjects } from '../../../composition/persistence/projects';
+import { useEffect, useRef, useState } from 'react';
+import { getMediaAssetBlob } from '../../../composition/persistence/media-library';
+import {
+  listVideoProjects,
+  getVideoProject,
+  getProjectAsset,
+} from '../../../composition/persistence/projects';
 import { translate } from '../../../platform/i18n';
 import { openGalleryPage } from '../../../platform/navigation/extension-pages';
 import {
@@ -12,6 +24,16 @@ import {
 import { useVideoEditorStartActions } from '../../runtime/controller/composition/hooks';
 import { useProjectTransitionPending } from '../../runtime/commands/project-transition';
 
+const covers = createProjectCoverService({
+  getVideoProject,
+  getProjectAsset,
+  getMediaAssetBlob,
+  getRecording,
+  getScenarioAsset,
+  getScenarioProjectEntry,
+  getScenarioAssetBlob,
+});
+
 async function listStartProjects(): Promise<EditorStartSourceItem[]> {
   const projects = await listVideoProjects();
   return projects
@@ -21,16 +43,23 @@ async function listStartProjects(): Promise<EditorStartSourceItem[]> {
       title: item.name,
       detail: `${item.width} × ${item.height}`,
       updatedAt: item.updatedAt,
-      thumbnailId: item.thumbnailId,
+      loadThumbnail: (signal: AbortSignal) =>
+        covers.getCover(
+          { kind: 'video-project', id: item.id, workspaceRevision: item.workspaceRevision ?? 0 },
+          signal
+        ),
     }));
 }
 
-async function readThumbnail(id: string): Promise<Blob | undefined> {
-  return (await getMediaThumbnail(id))?.blob;
-}
-
 export function VideoEditorStart() {
-  const { items, status, refresh } = useEditorStartItems(listStartProjects, readThumbnail);
+  const { items, status, refresh } = useEditorStartItems(listStartProjects);
+  useEffect(
+    () =>
+      subscribeToMediaHubEvents((event) => {
+        if (event.type === 'library-changed') void refresh();
+      }),
+    [refresh]
+  );
   const { onCreate, onOpen } = useVideoEditorStartActions();
   const transitionPending = useProjectTransitionPending();
   const [actionPending, setActionPending] = useState(false);

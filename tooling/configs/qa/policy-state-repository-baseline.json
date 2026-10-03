@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 312,
-  "findingDigest": "sha256:70a5a5db1df4561656edbb8d8199ff12b88bdc60b049b470dacfbbeaf487812e",
+  "findingCount": 311,
+  "findingDigest": "sha256:f5dce58e95e8dbb0f850894d59d5c825e1d11c94f23a42a7cd58623a9215ac8b",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -71,13 +71,6 @@
       "id": "noise.policy-state-descriptor.editor.inspector.layers.helpers",
       "owner": "apps/extension/src/editor/inspector/layers/helpers.ts",
       "reason": "The set is the inspector projection of supported drawing object kinds. Pure layer-selection predicates cannot authorize privileged runtime operations.",
-      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
-      "classification": "tool-noise"
-    },
-    {
-      "id": "noise.policy-state-descriptor.gallery.library.items.project-covers",
-      "owner": "apps/extension/src/gallery/library/items/project-covers.ts",
-      "reason": "The maps and queue cache disposable rendered cover blobs and bound decoder concurrency. They never publish workspaces or write durable assets; all source reads stay with their persistence owners.",
       "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
       "classification": "tool-noise"
     },
@@ -1464,12 +1457,6 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
-      "file": "apps/extension/src/gallery/library/items/project-covers.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name, top-level-map-or-set.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.gallery.library.items.project-covers"
     },
     {
       "file": "apps/extension/src/gallery/library/sidebar/disclosure-preferences.ts",
