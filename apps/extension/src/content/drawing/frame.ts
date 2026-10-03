@@ -79,6 +79,7 @@ type DrawingSnapshotSource = {
   objects: readonly DrawingObject[];
   root: PageScrollRoot;
   getObjectOpacity?: (objectId: string) => number;
+  getObjectAnchor?: (object: DrawingObject) => Element | null;
 };
 
 // Disposable render bindings; the drawing session remains the document authority.
@@ -97,7 +98,41 @@ export function registerDrawingSnapshotSource(
 /** Render committed ink across the scene, including content outside the current viewport. */
 export function captureDrawingFrame(canvas: HTMLCanvasElement): HTMLCanvasElement | null {
   const source = snapshotSources.get(canvas)?.();
-  if (!source) return null;
+  return source ? captureDrawingSource(canvas, source) : null;
+}
+
+/** Separate committed objects retain independent page anchors in static exports. */
+export function captureDrawingObjects(canvas: HTMLCanvasElement) {
+  const source = snapshotSources.get(canvas)?.();
+  if (!source?.getObjectAnchor) return null;
+  const areas = source.objects.map((object) => {
+    if (object.kind === 'text' || object.kind === 'blur') return 0;
+    const bounds = getDrawingSelectionBounds([object]);
+    const padding = Math.max(2, 'width' in object ? object.width : 0);
+    return bounds
+      ? Math.ceil(bounds.width + 2 * padding) * Math.ceil(bounds.height + 2 * padding)
+      : 1;
+  });
+  const area = areas.reduce((sum, value) => sum + value, 0);
+  return source.objects.map((object, index) => ({
+    object,
+    anchor: source.getObjectAnchor?.(object) ?? null,
+    canvas:
+      object.kind === 'text' || object.kind === 'blur'
+        ? null
+        : captureDrawingSource(
+            canvas,
+            { ...source, objects: [object] },
+            (16_777_216 * areas[index]!) / Math.max(1, area)
+          ),
+  }));
+}
+
+function captureDrawingSource(
+  canvas: HTMLCanvasElement,
+  source: DrawingSnapshotSource,
+  pixelBudget = 16_777_216
+): HTMLCanvasElement {
   const objects = source.objects.filter(
     (object) => object.kind !== 'text' && object.kind !== 'blur'
   );
@@ -120,7 +155,7 @@ export function captureDrawingFrame(canvas: HTMLCanvasElement): HTMLCanvasElemen
     Math.max(1, canvas.ownerDocument.defaultView?.devicePixelRatio ?? 1),
     8192 / width,
     8192 / height,
-    Math.sqrt(16_777_216 / (width * height))
+    Math.sqrt(pixelBudget / (width * height))
   );
   snapshot.width = Math.max(1, Math.floor(width * ratio));
   snapshot.height = Math.max(1, Math.floor(height * ratio));

@@ -238,3 +238,143 @@ describe('drawing session', () => {
     expect(session.getSnapshot().document.objects).toEqual([]);
   });
 });
+
+it('projects reads and previews without changing canonical history or publishing layout commits', () => {
+  const initial = {
+    id: 'layout',
+    kind: 'blur' as const,
+    bounds: { x: 10, y: 20, width: 30, height: 40 },
+  };
+  let shift = 0;
+  const capture = vi.fn();
+  const resolve = vi.fn((object: typeof initial) =>
+    shift === 0 ? object : { ...object, bounds: { ...object.bounds, x: object.bounds.x + shift } }
+  );
+  const commits: DrawingDocumentCommit[] = [];
+  const session = createDrawingSession({
+    initialDocument: { version: 1, objects: [initial] },
+    objectProjection: {
+      capture,
+      resolve: (object) => (object.kind === 'blur' ? resolve(object) : object),
+    },
+    onDocumentCommit: (commit) => {
+      commits.push(commit);
+      return true;
+    },
+  });
+  expect(capture).toHaveBeenCalledWith(initial);
+  expect(session.getSnapshot().document.objects[0]).toBe(initial);
+  shift = 100;
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 110 } });
+  expect(commits).toHaveLength(0);
+  const preview = { ...initial, bounds: { ...initial.bounds, x: 50 } };
+  session.previewObjects([preview]);
+  expect(capture).toHaveBeenCalledWith(preview, initial);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 150 } });
+  session.clearObjectPreview();
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 110 } });
+  session.replaceObject(preview);
+  expect(commits[0]?.before.objects[0]).toBe(initial);
+  expect(commits[0]?.after.objects[0]).toBe(preview);
+  commits[0]!.replay(commits[0]!.before);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 110 } });
+});
+
+it('duplicates projected objects and ignores empty selection without committing layout changes', () => {
+  const object = {
+    id: 'source',
+    kind: 'blur' as const,
+    bounds: { x: 10, y: 20, width: 30, height: 40 },
+  };
+  const commits: DrawingDocumentCommit[] = [];
+  const session = createDrawingSession({
+    initialDocument: { version: 1, objects: [object] },
+    objectProjection: {
+      capture: () => undefined,
+      resolve: (candidate) =>
+        candidate === object ? { ...object, bounds: { ...object.bounds, x: 110 } } : candidate,
+    },
+    onDocumentCommit: (commit) => {
+      commits.push(commit);
+      return true;
+    },
+  });
+  session.duplicateSelected();
+  expect(commits).toHaveLength(0);
+  session.select(object.id);
+  session.duplicateSelected();
+  expect(session.getSnapshot().document.objects[1]).toMatchObject({ bounds: { x: 122, y: 32 } });
+  expect(commits[0]?.before.objects).toEqual([object]);
+});
+
+it('discards projected previews on rejected edits, cancellation and replay', () => {
+  const original = {
+    id: 'preview',
+    kind: 'blur' as const,
+    bounds: { x: 10, y: 20, width: 30, height: 40 },
+  };
+  const sibling = { ...original, id: 'sibling' };
+  let commit: DrawingDocumentCommit | undefined;
+  let outcome: 'accept' | 'reject' | 'throw' = 'accept';
+  const session = createDrawingSession({
+    objectProjection: { capture: () => undefined, resolve: (object) => object },
+    onDocumentCommit: (next) => {
+      commit = next;
+      if (outcome === 'throw') throw new Error('rejected');
+      return outcome === 'accept';
+    },
+  });
+  session.commitObject(original);
+  session.commitObject(sibling);
+  const preview = { ...original, bounds: { ...original.bounds, x: 70 } };
+  session.previewObjects([]);
+  session.previewObjects([original]);
+  expect(session.getSnapshot().document.objects[0]).toBe(original);
+  session.previewObjects([preview]);
+  expect(session.getSnapshot().document.objects).toEqual([preview, sibling]);
+  outcome = 'reject';
+  session.replaceObject(preview);
+  expect(session.getSnapshot().document.objects).toEqual([original, sibling]);
+  session.previewObjects([preview]);
+  outcome = 'throw';
+  expect(() => session.replaceObject(preview)).toThrow('rejected');
+  expect(session.getSnapshot().document.objects).toEqual([original, sibling]);
+  session.previewObjects([preview]);
+  expect(commit!.replay(commit!.before)).toBe(true);
+  expect(session.getSnapshot().document.objects).toEqual([original, sibling]);
+  session.dispose();
+  session.previewObjects([preview]);
+  expect(session.getSnapshot().document.objects).toEqual([]);
+});
+
+it('keeps projected object positions while changing selection and stacking order', () => {
+  const objects = ['a', 'b', 'c'].map((id, index) => ({
+    id,
+    kind: 'blur' as const,
+    bounds: { x: index * 20, y: 0, width: 10, height: 10 },
+  }));
+  const session = createDrawingSession({
+    initialDocument: { version: 1, objects },
+    objectProjection: {
+      capture: () => undefined,
+      resolve: (object) =>
+        object.kind === 'blur' ? { ...object, bounds: { ...object.bounds, y: 100 } } : object,
+    },
+    onDocumentCommit: () => true,
+  });
+  const order = () => session.getSnapshot().document.objects.map((object) => object.id);
+  session.toggleSelection('missing');
+  session.toggleSelection('b');
+  session.moveSelected('forward');
+  expect(order()).toEqual(['a', 'c', 'b']);
+  session.moveSelected('backward');
+  expect(order()).toEqual(['a', 'b', 'c']);
+  session.moveSelected('front');
+  expect(order()).toEqual(['a', 'c', 'b']);
+  session.moveSelected('back');
+  expect(order()).toEqual(['b', 'a', 'c']);
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ bounds: { x: 20, y: 100 } });
+  session.toggleSelection('b');
+  session.moveSelected('front');
+  expect(order()).toEqual(['b', 'a', 'c']);
+});

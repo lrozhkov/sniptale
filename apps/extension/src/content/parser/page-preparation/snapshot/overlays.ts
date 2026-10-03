@@ -2,7 +2,8 @@ import { CONTENT_OVERLAY_ROOT_ID } from '@sniptale/ui/branding';
 import { resolveContentShadowRoot } from '../../../platform/dom-host';
 import { capturePreparedSnapshotLiveState } from './live-state';
 import type { PreparedSnapshotWarning } from './types';
-import { captureDrawingFrame } from '../../../drawing/frame';
+import type { VirtualDomOriginalElementResolver } from '../../dom-tree-parser/traversal';
+import { prepareDrawingOverlayNodes } from './drawing-overlays';
 
 const STATIC_OVERLAY_SELECTORS = [
   '.sniptale-frames-container',
@@ -86,7 +87,11 @@ function appendStaticOverlayStyle(snapshot: Document): void {
   snapshot.head.appendChild(style);
 }
 
-function cloneStaticOverlayNode(source: Element, snapshot: Document) {
+function cloneStaticOverlayNode(
+  source: Element,
+  snapshot: Document,
+  resolveOriginalElement: VirtualDomOriginalElementResolver
+) {
   const clone = snapshot.importNode(source, true);
   const sources = [source, ...source.querySelectorAll('*')];
   const targets = [clone, ...clone.querySelectorAll('*')];
@@ -94,15 +99,7 @@ function cloneStaticOverlayNode(source: Element, snapshot: Document) {
   for (const [index, target] of targets.entries()) {
     const original = sources[index];
     if (!original) continue;
-    const drawing = original.matches('canvas.sniptale-drawing-canvas')
-      ? captureDrawingFrame(original as HTMLCanvasElement)
-      : null;
-    if (drawing) {
-      target.setAttribute('width', String(drawing.width));
-      target.setAttribute('height', String(drawing.height));
-      target.setAttribute('style', drawing.style.cssText);
-    }
-    originals.set(target, drawing ?? original);
+    originals.set(target, original);
     const view = original.ownerDocument.defaultView;
     if (view && target instanceof HTMLElement) {
       const computed = view.getComputedStyle(original);
@@ -111,6 +108,13 @@ function cloneStaticOverlayNode(source: Element, snapshot: Document) {
       }
     }
   }
+  const anchored = prepareDrawingOverlayNodes({
+    source,
+    clone,
+    snapshot,
+    originals,
+    resolveOriginalElement,
+  });
   for (const transient of clone.querySelectorAll(TRANSIENT_OVERLAY_SELECTORS.join(','))) {
     transient.remove();
   }
@@ -118,10 +122,14 @@ function cloneStaticOverlayNode(source: Element, snapshot: Document) {
     clone,
     (element) => originals.get(element) ?? null
   ).materialize(clone);
-  return { clone, warnings };
+  return { clone, warnings, anchored };
 }
 
-function cloneStaticOverlayNodes(sourceRoot: HTMLElement, snapshot: Document) {
+function cloneStaticOverlayNodes(
+  sourceRoot: HTMLElement,
+  snapshot: Document,
+  resolveOriginalElement: VirtualDomOriginalElementResolver
+) {
   const sources = Array.from(sourceRoot.children).filter((child) =>
     child.matches(STATIC_OVERLAY_SELECTORS.join(','))
   );
@@ -130,7 +138,7 @@ function cloneStaticOverlayNodes(sourceRoot: HTMLElement, snapshot: Document) {
     '[data-ui="content.drawing.surface"]'
   );
   sources.push(...Array.from(drawingSurfaces ?? []));
-  return sources.map((source) => cloneStaticOverlayNode(source, snapshot));
+  return sources.map((source) => cloneStaticOverlayNode(source, snapshot, resolveOriginalElement));
 }
 
 function createStaticOverlayLayer(
@@ -139,7 +147,6 @@ function createStaticOverlayLayer(
   overlayNodes: Node[]
 ): HTMLElement {
   const sourceWindow = sourceDocument.defaultView;
-  const viewportWidth = sourceWindow?.innerWidth ?? sourceDocument.documentElement.clientWidth;
   const viewportHeight = sourceWindow?.innerHeight ?? sourceDocument.documentElement.clientHeight;
   const layer = snapshot.createElement('div');
   layer.setAttribute(STATIC_OVERLAY_LAYER_ATTRIBUTE, 'true');
@@ -150,7 +157,10 @@ function createStaticOverlayLayer(
     position: 'absolute',
     top: `${sourceWindow?.scrollY ?? 0}px`,
     transform: 'translateZ(0px)',
-    width: `${viewportWidth}px`,
+    width: '100%',
+    maxWidth: '100%',
+    overflowX: 'clip',
+    overflowY: 'visible',
     zIndex: '2147483647',
   });
   layer.append(...overlayNodes);
@@ -159,14 +169,15 @@ function createStaticOverlayLayer(
 
 export function appendStaticPagePreparationOverlays(
   snapshot: Document,
-  sourceDocument: Document = document
+  sourceDocument: Document = document,
+  resolveOriginalElement: VirtualDomOriginalElementResolver = () => null
 ): PreparedSnapshotWarning[] {
   const overlayRoot = resolveShadowOverlayRoot();
   if (!overlayRoot) {
     return [];
   }
 
-  const overlayNodes = cloneStaticOverlayNodes(overlayRoot, snapshot);
+  const overlayNodes = cloneStaticOverlayNodes(overlayRoot, snapshot, resolveOriginalElement);
   if (overlayNodes.length === 0) {
     return [];
   }
@@ -179,5 +190,6 @@ export function appendStaticPagePreparationOverlays(
       overlayNodes.map((node) => node.clone)
     )
   );
+  snapshot.body.append(...overlayNodes.flatMap((node) => node.anchored));
   return overlayNodes.flatMap((node) => node.warnings);
 }

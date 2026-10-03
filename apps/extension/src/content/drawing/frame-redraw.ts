@@ -39,6 +39,7 @@ export function useDrawingFrameRedraw(args: {
     return registerDrawingSnapshotSource(canvas, () => ({
       objects: controller.session.getSnapshot().document.objects,
       root: controller.getScrollRoot(),
+      ...(controller.getObjectAnchor ? { getObjectAnchor: controller.getObjectAnchor } : {}),
       ...(args.getObjectOpacity ? { getObjectOpacity: args.getObjectOpacity } : {}),
     }));
   }, [canvasRef, controller, args.getObjectOpacity]);
@@ -105,11 +106,13 @@ export function useDrawingFrameRedraw(args: {
       schedule();
       setViewportRevision((value) => value + 1);
     };
+    const unsubscribeLayout = controller.subscribeLayoutChanges?.(viewportChanged);
     target.addEventListener('scroll', viewportChanged, { passive: true });
     window.addEventListener('resize', viewportChanged);
     window.visualViewport?.addEventListener('resize', viewportChanged);
     window.visualViewport?.addEventListener('scroll', viewportChanged, { passive: true });
     return () => {
+      unsubscribeLayout?.();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
       pendingRef.current = false;

@@ -3,6 +3,7 @@ import {
   type DrawingDocumentV1,
   type DrawingDocumentCommit,
   type DrawingSession,
+  type DrawingObjectProjection,
 } from '../../features/drawing/public';
 import { pagePreparationHistory } from '../parser/page-preparation/history';
 import type { PagePreparationHistoryDomEffect } from '../parser/page-preparation/history/types';
@@ -31,7 +32,8 @@ function createDrawingHistoryEffect(
 }
 
 export function createPagePreparationDrawingSession(
-  history: DrawingHistoryCommitPort = pagePreparationHistory
+  history: DrawingHistoryCommitPort = pagePreparationHistory,
+  layout?: { projection: DrawingObjectProjection; dispose(): void }
 ): DrawingSession {
   let session: DrawingSession | null = null;
   let replayLatestDocument: DrawingDocumentCommit['replay'] | null = null;
@@ -39,6 +41,7 @@ export function createPagePreparationDrawingSession(
     replayLatestDocument?.(EMPTY_DRAWING_DOCUMENT);
   });
   session = createDrawingSession({
+    ...(layout ? { objectProjection: layout.projection } : {}),
     onDocumentCommit(commit) {
       if (!session) return false;
       const previousReplay = replayLatestDocument;
@@ -53,7 +56,10 @@ export function createPagePreparationDrawingSession(
       if (!accepted) replayLatestDocument = previousReplay;
       return accepted;
     },
-    onDispose: unsubscribeFromClear,
+    onDispose() {
+      unsubscribeFromClear();
+      layout?.dispose();
+    },
   });
   return session;
 }

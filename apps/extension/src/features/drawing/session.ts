@@ -48,7 +48,14 @@ export interface DrawingSession {
 
 const EMPTY_DOCUMENT: DrawingDocumentV1 = { version: 1, objects: [] };
 
+/** Optional runtime layout projection; canonical versions remain owned by the document/history. */
+export interface DrawingObjectProjection {
+  capture(object: DrawingObject, previous?: DrawingObject): void;
+  resolve(object: DrawingObject): DrawingObject;
+}
+
 type DrawingSessionOptions = {
+  objectProjection?: DrawingObjectProjection;
   initialDocument?: DrawingDocumentV1;
   defaults?: DrawingToolDefaults;
   onDocumentCommit: (commit: DrawingDocumentCommit) => boolean;
@@ -90,6 +97,7 @@ class DrawingSessionOwner implements DrawingSession {
 
   constructor(private readonly options: DrawingSessionOptions) {
     this.document = options.initialDocument ?? EMPTY_DOCUMENT;
+    this.document.objects.forEach((object) => options.objectProjection?.capture(object));
     this.defaults = options.defaults ?? createDefaultDrawingToolDefaults();
   }
 
@@ -118,10 +126,18 @@ class DrawingSessionOwner implements DrawingSession {
     return true;
   };
 
+  private captureObjects(objects: readonly DrawingObject[]) {
+    const projection = this.options.objectProjection;
+    if (!projection) return;
+    const previous = new Map(this.document.objects.map((object) => [object.id, object]));
+    for (const object of objects) projection.capture(object, previous.get(object.id));
+  }
+
   private commitDocument(next: DrawingDocumentV1, nextSelectedIds = this.selectedObjectIds) {
     if (next === this.document || this.disposed || this.commitInProgress) return;
     const hadPreview = this.previewDocument !== null;
     this.previewDocument = null;
+    this.captureObjects(next.objects);
     const before = this.document;
     const beforeSelectedIds = this.selectedObjectIds;
     const revisionBeforeCommit = this.revision;
@@ -153,8 +169,14 @@ class DrawingSessionOwner implements DrawingSession {
   }
 
   getSnapshot(): DrawingSessionSnapshot {
+    const source = this.previewDocument ?? this.document;
+    const objects = this.options.objectProjection
+      ? source.objects.map((object) => this.options.objectProjection!.resolve(object))
+      : source.objects;
     return {
-      document: this.previewDocument ?? this.document,
+      document: objects.every((object, index) => object === source.objects[index])
+        ? source
+        : { version: 1, objects },
       activeTool: this.activeTool,
       selectedObjectIds: this.selectedObjectIds,
       selectedObjectId: this.selectedObjectIds.at(-1) ?? null,
@@ -237,6 +259,7 @@ class DrawingSessionOwner implements DrawingSession {
 
   previewObjects(replacements: readonly DrawingObject[]) {
     if (this.disposed || replacements.length === 0) return;
+    this.captureObjects(replacements);
     const byId = new Map(replacements.map((object) => [object.id, object]));
     const objects = this.document.objects.map((object) => byId.get(object.id) ?? object);
     if (objects.every((object, index) => object === this.document.objects[index])) return;
@@ -257,8 +280,8 @@ class DrawingSessionOwner implements DrawingSession {
   duplicateSelected() {
     if (this.selectedObjectIds.length === 0) return;
     const selected = new Set(this.selectedObjectIds);
-    const copies = this.document.objects
-      .filter((object) => selected.has(object.id))
+    const copies = this.getSnapshot()
+      .document.objects.filter((object) => selected.has(object.id))
       .map((object) => ({
         ...translateDrawingObject(object, { x: 12, y: 12 }),
         id: createDrawingId(),

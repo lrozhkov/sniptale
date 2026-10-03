@@ -252,7 +252,11 @@ export async function buildPreparedSnapshotDocument(
     materializePreparedSnapshotIframeStyles(snapshot, virtualDomSnapshot.resolveOriginalElement);
     const liveStateWarnings = liveState.materialize(virtualDomSnapshot.root);
     shadowStyleMarks.materialize(snapshot);
-    const overlayWarnings = appendStaticPagePreparationOverlays(snapshot, rootDocument);
+    const overlayWarnings = appendStaticPagePreparationOverlays(
+      snapshot,
+      rootDocument,
+      virtualDomSnapshot.resolveOriginalElement
+    );
     await yieldPreparedSnapshot(options.abortSignal);
 
     const warnings = [

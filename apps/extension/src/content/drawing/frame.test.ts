@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it, vi } from 'vitest';
-import { captureDrawingFrame, registerDrawingSnapshotSource } from './frame';
+import { captureDrawingFrame, captureDrawingObjects, registerDrawingSnapshotSource } from './frame';
 import { renderDrawingObject } from './render';
 
 vi.mock('./render', () => ({ renderDrawingObject: vi.fn() }));
@@ -206,4 +206,26 @@ it('reads the current scene and never falls back to stale pixels after clearing 
   expect(snapshot.width).toBe(1);
   expect(snapshot.height).toBe(1);
   expect(snapshot.style.display).toBe('none');
+});
+
+it('does not spend the ink raster budget on independently rendered text or blur', () => {
+  const canvas = document.createElement('canvas');
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+  } as unknown as CanvasRenderingContext2D);
+  const unregister = registerDrawingSnapshotSource(canvas, () => ({
+    objects: [
+      original,
+      { id: 'large-blur', kind: 'blur', bounds: { x: 0, y: 0, width: 100000, height: 100000 } },
+    ],
+    root: { kind: 'viewport', element: null },
+    getObjectAnchor: () => null,
+  }));
+  try {
+    const frames = captureDrawingObjects(canvas);
+    expect(frames?.[0]?.canvas?.width).toBeGreaterThanOrEqual(48);
+    expect(frames?.[1]?.canvas).toBeNull();
+  } finally {
+    unregister();
+  }
 });

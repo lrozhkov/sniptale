@@ -35,6 +35,7 @@ export function DrawingBlurLayer(props: {
     return (
       <div
         key={object.id}
+        data-sniptale-drawing-object-id={object.id}
         style={{
           position: 'fixed',
           pointerEvents: 'none',
@@ -103,6 +104,7 @@ function DrawingTextObject(props: {
   return (
     <div
       data-ui="content.drawing.text-object"
+      data-sniptale-drawing-object-id={object.id}
       style={{
         ...(props.clip
           ? { clipPath: `inset(${clipTop}px ${clipRight}px ${clipBottom}px ${clipLeft}px)` }

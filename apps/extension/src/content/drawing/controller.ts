@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_DRAWING_COLORS,
   type DrawingSession,
+  type DrawingObject,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import { resolvePageScrollRoot, type PageScrollRoot } from '../platform/page-scroll';
 import { createPagePreparationDrawingSession } from './history';
 import { synchronizeContentDrawingPreferences } from './preferences';
+import { createDrawingLayout } from './layout';
 
 export { synchronizeContentDrawingPreferences } from './preferences';
 
@@ -15,6 +17,8 @@ export interface ContentDrawingController {
   getPalette(): readonly string[];
   applyPalette(colors: readonly string[]): void;
   getScrollRoot(): PageScrollRoot;
+  getObjectAnchor?(object: DrawingObject): Element | null;
+  subscribeLayoutChanges?(listener: () => void): () => void;
   prepareActivation(): boolean;
   registerInteractionFinalizer(finalizer: (() => void) | null): void;
   finalizeInteraction(): void;
@@ -24,9 +28,9 @@ export interface ContentDrawingController {
 }
 
 export function useDrawingSessionSnapshot(session: DrawingSession): DrawingSessionSnapshot {
-  const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
+  const [, setSnapshot] = useState(() => session.getSnapshot());
   useEffect(() => session.subscribe(() => setSnapshot(session.getSnapshot())), [session]);
-  return snapshot;
+  return session.getSnapshot();
 }
 
 export function useContentDrawingController(): ContentDrawingController {
@@ -44,15 +48,21 @@ export function useContentDrawingController(): ContentDrawingController {
 }
 
 export function createContentDrawingController(
-  session: DrawingSession = createPagePreparationDrawingSession()
+  suppliedSession?: DrawingSession
 ): ContentDrawingController {
   let root: PageScrollRoot = { kind: 'viewport', element: null };
+  const layout = suppliedSession ? null : createDrawingLayout(() => root);
+  const session =
+    suppliedSession ?? createPagePreparationDrawingSession(undefined, layout ?? undefined);
   let palette: readonly string[] = [...DEFAULT_DRAWING_COLORS];
   let finalizer: (() => void) | null = null;
   let pendingTextChange = false;
   const pendingTextListeners = new Set<() => void>();
   return {
     session,
+    ...(layout
+      ? { getObjectAnchor: layout.getAnchor, subscribeLayoutChanges: layout.subscribe }
+      : {}),
     getPalette: () => palette,
     applyPalette(colors) {
       palette = [...colors];
