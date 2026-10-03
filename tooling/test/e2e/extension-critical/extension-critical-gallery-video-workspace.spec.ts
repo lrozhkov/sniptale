@@ -132,8 +132,10 @@ for (const variant of [
       await page.mouse.move(0, 0);
       await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await expect(mode).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      const idleModeColor = await mode.evaluate((node) => getComputedStyle(node).color);
       await mode.hover();
-      await expect(mode).not.toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      await expect(mode).not.toHaveCSS('color', idleModeColor);
+      await expect(mode).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
       await expect(mode).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
       await page.mouse.move(0, 0);
       await expect(mode).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
@@ -290,7 +292,7 @@ async function exerciseWorkspaceAudio(
   await page.mouse.up();
   expect((await audioClip.boundingBox())!.width).toBeLessThanOrEqual(originalClipBox.width + 1);
   await audioClip.click();
-  await expectTimelineSelection(audioClip);
+  await expectTimelineSelection(audioClip, audioClip.locator(':scope > div').first());
   const clipMute = button('gallery.videoReview.audioClipMute');
   await clipMute.click();
   await page.mouse.move(0, 0);

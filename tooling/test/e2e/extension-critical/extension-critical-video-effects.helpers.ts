@@ -1,4 +1,5 @@
 import { basename } from 'node:path';
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 import {
@@ -23,7 +24,6 @@ import {
 import {
   applyHarnessBootstrap,
   E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
-  VIDEO_EDITOR_EFFECT_IMPORT_LABEL,
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
@@ -65,6 +65,11 @@ export async function openEffectVideoEditorHarness(
   await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}${projectQuery}`, {
     waitUntil: 'domcontentloaded',
   });
+  if (!project) {
+    await page
+      .getByRole('button', { name: translate('videoEditor.app.newProjectAction'), exact: true })
+      .click();
+  }
 }
 
 export function createTransitionE2eProject(): VideoProject {
@@ -108,14 +113,22 @@ export async function importAndApplyEffect(
   await importEffectFile(page, args);
 
   const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
-  const addButton = documentLabel.getByRole('button');
+  await documentLabel.hover();
+  const applyKey =
+    args.fixturePath === EFFECT_V1_STANDALONE_FIXTURE
+      ? 'videoEditor.effectsLibrary.applyToScene'
+      : args.fixturePath === EFFECT_V1_TRANSITION_FIXTURE
+        ? 'videoEditor.effectsLibrary.applyToTransition'
+        : 'videoEditor.effectsLibrary.applyToClip';
+  const addButton = documentLabel.getByRole('button', { name: translate(applyKey), exact: true });
   await expect(addButton).toBeEnabled();
   await addButton.click();
+  await page.locator('[data-ui="video-editor.materials.close"]').click();
 }
 
 export async function importEffectFile(
   page: Page,
-  args: { documentId: string; fixturePath: string }
+  args: { documentId: string; fixturePath: string; locale?: 'ru' | 'en' }
 ): Promise<void> {
   const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
   if (!(await dock.isVisible())) {
@@ -124,7 +137,7 @@ export async function importEffectFile(
     await page.locator('[data-ui="video-editor.library-tab.effects"]').click();
   }
   const importControl = dock.getByRole('button', {
-    name: VIDEO_EDITOR_EFFECT_IMPORT_LABEL,
+    name: translate('videoEditor.effectsLibrary.importPack', args.locale ?? 'ru'),
     exact: true,
   });
   await expect(importControl).toBeEnabled();
@@ -132,6 +145,13 @@ export async function importEffectFile(
   await importControl.click();
   await (await chooserPromise).setFiles(args.fixturePath);
 
+  const section =
+    args.fixturePath === EFFECT_V1_STANDALONE_FIXTURE
+      ? 'annotations'
+      : args.fixturePath === EFFECT_V1_TRANSITION_FIXTURE
+        ? 'transitions'
+        : 'effects';
+  await page.locator(`[data-ui="video-editor.library-tab.${section}"]`).click();
   const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
   await expect(documentLabel).toBeVisible();
 }

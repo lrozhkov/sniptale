@@ -174,13 +174,13 @@ export async function clickReviewExport(
 }
 
 /** Verifies selected timeline content retains a thin border and a visible surface. */
-export async function expectTimelineSelection(item: Locator) {
+export async function expectTimelineSelection(item: Locator, paint: Locator = item) {
   await expect(item).toHaveAttribute('aria-pressed', 'true');
-  await expect(item).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(item).toHaveCSS('border-top-width', '1px');
+  await expect(paint).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(paint).toHaveCSS('border-top-width', '1px');
   await expect
     .poll(() =>
-      item.evaluate((node) => {
+      paint.evaluate((node) => {
         const style = getComputedStyle(node);
         return style.borderTopColor === style.color;
       })

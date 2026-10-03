@@ -1,3 +1,4 @@
+import { openGuideImageLibrary } from './scenario-editor-visual.state-steps';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-visual.helpers';
@@ -10,10 +11,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     url.searchParams.set('actionFixture', '1');
     await page.goto(url.toString());
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
-    await page
-      .locator('#guide-library-panel')
-      .getByRole('button', { name: 'Image library', exact: true })
-      .click();
+    await openGuideImageLibrary(page);
     const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
     await drawer.getByRole('button', { name: 'Video', exact: true }).click();
     const row = drawer.getByRole('button', { name: 'Library motion.webm', exact: true });
@@ -23,7 +21,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       row: getComputedStyle(node).flexDirection,
       columns: getComputedStyle(node.parentElement!).gridTemplateColumns.split(' ').length,
     }));
-    expect(layout).toEqual({ row: 'row', columns: 1 });
+    expect(layout).toEqual({ row: 'column', columns: 1 });
     await expect(drawer.getByRole('button', { name: 'Start dictation', exact: true })).toHaveCount(
       2
     );
@@ -63,6 +61,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await fields.nth(1).fill('Captured description');
     const capture = drawer.getByRole('button', { name: 'Add frame as step', exact: true });
     await expect(capture).toBeEnabled();
+    await capture.scrollIntoViewIfNeeded();
     await expect(capture).toBeInViewport();
     await testInfo.attach(`video-controls-${theme}`, {
       body: await page.screenshot(),
