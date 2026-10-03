@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createMediaItem } from '../actions/test-support/index';
-import { translate } from '../../../platform/i18n';
+import { translate, getCurrentLocale, setLocalePreference } from '../../../platform/i18n';
 import { GRID_GAP } from '../constants';
 import { createGridMetricsFixture } from '../test-support/items';
 
@@ -14,6 +14,8 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: (size: number) => `size:${size}`,
 }));
 
+const thumbRenders = vi.hoisted(() => vi.fn());
+
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
   MediaThumb: (props: {
@@ -21,15 +23,18 @@ vi.mock('../ui', async (importOriginal) => ({
     deferUntilVisible?: boolean;
     fit?: string;
     item?: { id: string };
-  }) => (
-    <div
-      data-fit={props.fit ?? 'cover'}
-      data-deferred={String(props.deferUntilVisible ?? false)}
-      data-ui="test.thumb"
-    >
-      {props.item?.id ?? props.assetId}
-    </div>
-  ),
+  }) => {
+    thumbRenders(props.item?.id);
+    return (
+      <div
+        data-fit={props.fit ?? 'cover'}
+        data-deferred={String(props.deferUntilVisible ?? false)}
+        data-ui="test.thumb"
+      >
+        {props.item?.id ?? props.assetId}
+      </div>
+    );
+  },
   formatDate: (timestamp: number) => `date:${timestamp}`,
   getKindIcon: () => (props: { className?: string }) => <svg data-ui="test.icon" {...props} />,
 }));
@@ -657,4 +662,58 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   expect(container?.querySelector('[role="rowgroup"]')?.className).toContain(
     'border-[var(--sniptale-color-border-accent-strong)]'
   );
+});
+
+it('skips unchanged cards on parent renders but uses the latest action and selection', () => {
+  const items = [createMediaItem({ id: 'memo', filename: 'memo.png' })];
+  const onPreviewOpen = vi.fn();
+  const onToggleSelection = vi.fn();
+  const props = {
+    filteredItems: items,
+    visibleItems: items,
+    gridWidth: 800,
+    gridMetrics: metrics(items, 800, 'compact-grid', 2),
+    viewMode: 'compact-grid' as const,
+    selectedIds: new Set<string>(),
+    onPreviewOpen,
+    onToggleSelection,
+  };
+  act(() => root?.render(<GalleryGridCanvas {...props} />));
+  const renders = thumbRenders.mock.calls.length;
+  const latestPreview = vi.fn();
+  act(() => root?.render(<GalleryGridCanvas {...props} onPreviewOpen={latestPreview} />));
+  expect(thumbRenders).toHaveBeenCalledTimes(renders);
+  act(() => container?.querySelector<HTMLButtonElement>('button[aria-label="memo.png"]')?.click());
+  expect(latestPreview).toHaveBeenCalledWith(items[0]);
+  expect(onPreviewOpen).not.toHaveBeenCalled();
+  act(() => root?.render(<GalleryGridCanvas {...props} selectedIds={new Set(['memo'])} />));
+  expect(container?.querySelector('[aria-pressed="true"]')).not.toBeNull();
+});
+
+it('updates memoized card labels when the application locale changes', async () => {
+  const original = getCurrentLocale();
+  const items = [createMediaItem({ id: 'locale', filename: 'locale.png' })];
+  act(() =>
+    root?.render(
+      <GalleryGridCanvas
+        filteredItems={items}
+        visibleItems={items}
+        gridWidth={800}
+        gridMetrics={metrics(items, 800, 'compact-grid', 2)}
+        viewMode="compact-grid"
+        selectedIds={new Set()}
+        onPreviewOpen={vi.fn()}
+        onToggleSelection={vi.fn()}
+      />
+    )
+  );
+  const previous = container?.querySelector('[aria-pressed]')?.getAttribute('aria-label');
+  try {
+    await act(async () => setLocalePreference(original === 'ru' ? 'en' : 'ru'));
+    const current = container?.querySelector('[aria-pressed]')?.getAttribute('aria-label');
+    expect(current).toBe(translate('gallery.app.selectItem'));
+    expect(current).not.toBe(previous);
+  } finally {
+    await act(async () => setLocalePreference(original));
+  }
 });

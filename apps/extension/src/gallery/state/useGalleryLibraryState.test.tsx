@@ -517,3 +517,37 @@ it.each(['reject', 'empty'] as const)(
     expect(values.at(-1)?.trashUsage).toEqual(expected);
   }
 );
+
+it('coalesces focus and visibility notifications and reloads once after changes during a read', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  const initial = loadGalleryLibrarySnapshotMock.mock.calls.length;
+  const pending = createSnapshotDeferred([createMediaItem({ id: 'before-change' })]);
+  loadGalleryLibrarySnapshotMock.mockReturnValueOnce(pending.promise);
+  act(() => {
+    window.dispatchEvent(new Event('focus'));
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await flushLibraryState();
+  expect(loadGalleryLibrarySnapshotMock).toHaveBeenCalledTimes(initial + 1);
+  act(() => {
+    window.dispatchEvent(new Event('focus'));
+    window.dispatchEvent(new Event('focus'));
+  });
+  await flushLibraryState();
+  expect(loadGalleryLibrarySnapshotMock).toHaveBeenCalledTimes(initial + 1);
+  const latest = createSnapshotDeferred([createMediaItem({ id: 'after-change' })]);
+  loadGalleryLibrarySnapshotMock.mockReturnValueOnce(latest.promise);
+  await act(async () => pending.resolve());
+  await flushLibraryState();
+  expect(loadGalleryLibrarySnapshotMock).toHaveBeenCalledTimes(initial + 2);
+  expect(values.at(-1)?.items[0]?.id).toBe('asset-1');
+  await act(async () => latest.resolve());
+  await flushLibraryState();
+  expect(values.at(-1)?.items[0]?.id).toBe('after-change');
+});

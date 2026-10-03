@@ -33,14 +33,24 @@ export function useGalleryViewportState(viewportMounted = true) {
       setScrollTop(viewport.scrollTop);
     };
 
+    let scrollFrame: number | null = null;
+    const updateScroll = () => {
+      if (scrollFrame !== null) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = null;
+        setScrollTop(viewport.scrollTop);
+      });
+    };
+
     updateMeasurements();
     const observer = new ResizeObserver(updateMeasurements);
     observer.observe(viewport);
-    viewport.addEventListener('scroll', updateMeasurements, { passive: true });
+    viewport.addEventListener('scroll', updateScroll, { passive: true });
 
     return () => {
       observer.disconnect();
-      viewport.removeEventListener('scroll', updateMeasurements);
+      viewport.removeEventListener('scroll', updateScroll);
+      if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
     };
   }, [viewportMounted]);
 

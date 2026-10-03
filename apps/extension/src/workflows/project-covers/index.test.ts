@@ -128,3 +128,39 @@ it('uses a tour image when the scenario has no guide image blocks', async () => 
   expect(sources.getScenarioAssetBlob).toHaveBeenCalledWith('tour-image');
   expect(render.image).toHaveBeenCalledWith(source, expect.any(AbortSignal), undefined);
 });
+
+it('retains a revisited small cover beyond 24 entries without decoding again', async () => {
+  const { sources, request } = fixture();
+  const service = createProjectCoverService(sources);
+  const first = await service.getCover(request);
+  for (let i = 0; i < 40; i += 1) await service.getCover({ ...request, id: `cover-${i}` });
+  const decodes = render.image.mock.calls.length;
+  expect(await service.getCover(request)).toBe(first);
+  expect(render.image).toHaveBeenCalledTimes(decodes);
+});
+
+it('evicts least recently used covers within the byte budget and never retains an oversized cover', async () => {
+  const { sources, request } = fixture();
+  const service = createProjectCoverService(sources);
+  render.image.mockResolvedValue(new Blob([new Uint8Array(9 * 1024 * 1024)]));
+  await service.getCover(request);
+  await service.getCover({ ...request, id: 'second' });
+  await service.getCover(request);
+  expect(render.image).toHaveBeenCalledTimes(3);
+  render.image.mockResolvedValue(new Blob([new Uint8Array(17 * 1024 * 1024)]));
+  await service.getCover({ ...request, id: 'oversized' });
+  await service.getCover({ ...request, id: 'oversized' });
+  expect(render.image).toHaveBeenCalledTimes(5);
+});
+
+it('bounds even tiny covers by entry count and refreshes recency on hits', async () => {
+  const { sources, request } = fixture();
+  const service = createProjectCoverService(sources);
+  for (let i = 0; i < 256; i += 1) await service.getCover({ ...request, id: `small-${i}` });
+  await service.getCover({ ...request, id: 'small-0' });
+  await service.getCover({ ...request, id: 'small-256' });
+  await service.getCover({ ...request, id: 'small-0' });
+  expect(render.image).toHaveBeenCalledTimes(257);
+  await service.getCover({ ...request, id: 'small-1' });
+  expect(render.image).toHaveBeenCalledTimes(258);
+});

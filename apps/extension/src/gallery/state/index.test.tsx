@@ -35,6 +35,8 @@ vi.mock('./selectors', () => ({
   getGalleryCounts: getGalleryCountsMock,
   getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: getGalleryGridMetricsMock,
+  createGalleryGridMetrics: (geometry: object) => (viewport: object) =>
+    getGalleryGridMetricsMock({ ...geometry, ...viewport }),
 }));
 vi.mock('./useGalleryFilterState', () => ({
   useGalleryFilterState: useGalleryFilterStateMock,

@@ -27,7 +27,8 @@ export interface ProjectCoverSources {
 }
 const MAX_ACTIVE = 3;
 const MAX_PENDING = 24;
-const MAX_RETAINED_COVERS = 24;
+const MAX_RETAINED_COVERS = 256;
+const MAX_RETAINED_BYTES = 16 * 1024 * 1024;
 type CoverRequest = {
   controller: AbortController;
   promise: Promise<Blob | undefined>;
@@ -39,6 +40,7 @@ interface CoverState {
   retained: Map<string, Blob>;
   waiting: Array<{ admit: () => void; discard: () => void }>;
   active: number;
+  retainedBytes: number;
 }
 
 async function withSlot(
@@ -268,9 +270,19 @@ function requestCover(
       if (!blob || controller.signal.aborted || !(await isCurrentCover(sources, item)))
         return undefined;
       if (!controller.signal.aborted) {
-        state.retained.set(key, blob);
-        if (state.retained.size > MAX_RETAINED_COVERS)
-          state.retained.delete(state.retained.keys().next().value!);
+        if (blob.size <= MAX_RETAINED_BYTES) {
+          state.retainedBytes -= state.retained.get(key)?.size ?? 0;
+          state.retained.set(key, blob);
+          state.retainedBytes += blob.size;
+          while (
+            state.retained.size > MAX_RETAINED_COVERS ||
+            state.retainedBytes > MAX_RETAINED_BYTES
+          ) {
+            const oldest = state.retained.keys().next().value!;
+            state.retainedBytes -= state.retained.get(oldest)!.size;
+            state.retained.delete(oldest);
+          }
+        }
       }
       return controller.signal.aborted ? undefined : blob;
     })
@@ -285,7 +297,13 @@ function requestCover(
 
 /** Page-owned disposable cover cache; sources retain all persistence authority. */
 export function createProjectCoverService(sources: ProjectCoverSources) {
-  const state: CoverState = { inFlight: new Map(), retained: new Map(), waiting: [], active: 0 };
+  const state: CoverState = {
+    inFlight: new Map(),
+    retained: new Map(),
+    waiting: [],
+    active: 0,
+    retainedBytes: 0,
+  };
   return {
     getCover: (request: ProjectCoverRequest, signal?: AbortSignal) =>
       requestCover(state, sources, request, signal),

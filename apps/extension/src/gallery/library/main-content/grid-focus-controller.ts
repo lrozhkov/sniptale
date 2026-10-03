@@ -30,6 +30,7 @@ export class GalleryGridFocusController {
   readonly active: { current: Position };
   private pending: string | null = null;
   private ownsFocus = false;
+  private pointerFocus = false;
   private origin: Position | null = null;
   private previous: { order: string; context: string; previewOpen: boolean };
   constructor(
@@ -163,24 +164,28 @@ export class GalleryGridFocusController {
     this.pending = null;
     this.origin = null;
   }
-  private focusWithin(target: HTMLElement, grid: HTMLElement) {
+  private focusWithin(target: HTMLElement, grid: HTMLElement, fromPointer: boolean) {
     this.ownsFocus = true;
     const id = materialId(target);
     if (id) {
       const unit = this.options.units.find((unit) => unit.id === id);
       if (unit) this.setActive(unit);
-    } else if (target === grid && this.active.current.id) this.focusUnit(this.active.current.id);
+    } else if (target === grid && !fromPointer && this.active.current.id)
+      this.focusUnit(this.active.current.id);
   }
   private readonly onFocus = (event: FocusEvent) => {
     const target = event.target;
     const grid = this.options.gridRef.current;
     if (!(target instanceof HTMLElement) || !grid) return;
-    if (grid.contains(target)) this.focusWithin(target, grid);
+    const fromPointer = this.pointerFocus;
+    this.pointerFocus = false;
+    if (grid.contains(target)) this.focusWithin(target, grid, fromPointer);
     else if (!target.closest(layerSelector)) this.cancel();
     else if (!this.options.previewOpen) this.pending = null;
   };
   private readonly onPointer = (event: PointerEvent) => {
     this.pending = null;
+    this.pointerFocus = true;
     const target = event.target;
     if (
       target instanceof HTMLElement &&
@@ -189,12 +194,21 @@ export class GalleryGridFocusController {
     )
       this.cancel();
   };
+  private readonly clearPointerFocus = () => {
+    this.pointerFocus = false;
+  };
   listen() {
     document.addEventListener('focusin', this.onFocus);
     document.addEventListener('pointerdown', this.onPointer, true);
+    document.addEventListener('pointerup', this.clearPointerFocus, true);
+    document.addEventListener('pointercancel', this.clearPointerFocus, true);
+    document.addEventListener('keydown', this.clearPointerFocus, true);
     return () => {
       document.removeEventListener('focusin', this.onFocus);
       document.removeEventListener('pointerdown', this.onPointer, true);
+      document.removeEventListener('pointerup', this.clearPointerFocus, true);
+      document.removeEventListener('pointercancel', this.clearPointerFocus, true);
+      document.removeEventListener('keydown', this.clearPointerFocus, true);
     };
   }
 }

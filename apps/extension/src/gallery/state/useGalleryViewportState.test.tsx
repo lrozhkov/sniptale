@@ -52,6 +52,11 @@ function HookProbe(props: {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) =>
+    window.setTimeout(() => callback(0), 16)
+  );
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => window.clearTimeout(id));
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const registerResizeObserver = (callback: ResizeObserverCallback): ResizeObserverMock => {
     const observer = new ResizeObserverMock(callback);
@@ -84,6 +89,7 @@ afterEach(() => {
   container = null;
   attachedViewport = null;
   resizeObserver = null;
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -124,6 +130,7 @@ it('reads viewport measurements, subscribes to scroll and resize, and cleans up 
   });
   act(() => {
     viewport.dispatchEvent(new Event('scroll'));
+    vi.advanceTimersByTime(16);
   });
   expect(latestValue.scrollTop).toBe(260);
 
@@ -157,7 +164,46 @@ it('measures and observes a viewport mounted after the loading screen', () => {
     if (attachedViewport) {
       attachedViewport.scrollTop = 1800;
       attachedViewport.dispatchEvent(new Event('scroll'));
+      vi.advanceTimersByTime(16);
     }
   });
   expect(latestValue?.scrollTop).toBe(1800);
+});
+
+it('coalesces scroll positions per frame without reading layout and cancels pending work', () => {
+  const frames = new Map<number, FrameRequestCallback>();
+  let nextFrame = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++nextFrame, callback);
+    return nextFrame;
+  });
+  const cancel = vi.fn((id: number) => frames.delete(id));
+  vi.stubGlobal('cancelAnimationFrame', cancel);
+  act(() =>
+    root?.render(<HookProbe measurements={{ clientHeight: 640, clientWidth: 920, scrollTop: 0 }} />)
+  );
+  const style = vi.spyOn(window, 'getComputedStyle');
+  const viewport = attachedViewport!;
+  const width = vi.fn(() => 920);
+  Object.defineProperty(viewport, 'clientWidth', { configurable: true, get: width });
+  act(() => {
+    viewport.scrollTop = 100;
+    viewport.dispatchEvent(new Event('scroll'));
+    viewport.scrollTop = 250;
+    viewport.dispatchEvent(new Event('scroll'));
+  });
+  expect(style).not.toHaveBeenCalled();
+  expect(width).not.toHaveBeenCalled();
+  expect(frames.size).toBe(1);
+  act(() => {
+    for (const callback of frames.values()) callback(0);
+    frames.clear();
+  });
+  expect(latestValue?.scrollTop).toBe(250);
+  act(() => viewport.dispatchEvent(new Event('scroll')));
+  act(() => root?.unmount());
+  root = null;
+  expect(cancel).toHaveBeenCalled();
+  expect(frames.size).toBe(0);
+  style.mockRestore();
 });

@@ -271,30 +271,51 @@ function areGalleryItemsUiEquivalent(left: GalleryItem, right: GalleryItem | und
 function useGalleryLibrarySubscriptions({
   onBanner,
   refresh,
+  refreshEpochRef,
 }: {
   onBanner: (message: string) => void;
   refresh: () => Promise<void>;
+  refreshEpochRef: React.MutableRefObject<number>;
 }) {
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
+    let disposed = false;
+    let pending = false;
+    let running = false;
+    const drain = async () => {
+      if (disposed || running) return;
+      running = true;
+      try {
+        while (pending && !disposed) {
+          pending = false;
+          await refresh();
+        }
+      } finally {
+        running = false;
+      }
+    };
+    const scheduleRefresh = () => {
+      if (disposed) return Promise.resolve();
+      pending = true;
+      // A queued change already invalidates the snapshot currently being read.
+      refreshEpochRef.current += 1;
+      return Promise.resolve().then(drain);
+    };
+    void scheduleRefresh();
     const reconcile = () => {
-      if (document.visibilityState === 'visible') void refresh();
+      if (document.visibilityState === 'visible') void scheduleRefresh();
     };
     window.addEventListener('focus', reconcile);
     document.addEventListener('visibilitychange', reconcile);
+    const unsubscribe = subscribeToMediaHubEvents(
+      createMediaHubEventHandler(onBanner, scheduleRefresh)
+    );
     return () => {
+      disposed = true;
+      unsubscribe();
       window.removeEventListener('focus', reconcile);
       document.removeEventListener('visibilitychange', reconcile);
     };
-  }, [refresh]);
-
-  useEffect(
-    () => subscribeToMediaHubEvents(createMediaHubEventHandler(onBanner, refresh)),
-    [onBanner, refresh]
-  );
+  }, [onBanner, refresh, refreshEpochRef]);
 }
 
 function beginGalleryRefreshEpoch(args: Pick<GalleryRefreshActionArgs, 'refreshEpochRef'>) {
@@ -457,7 +478,7 @@ export function useGalleryLibraryState({
     storageInfoRef,
   });
 
-  useGalleryLibrarySubscriptions({ onBanner, refresh });
+  useGalleryLibrarySubscriptions({ onBanner, refresh, refreshEpochRef });
 
   return {
     hasLoadedLibrarySnapshot,

@@ -13,11 +13,12 @@ function getDraftDatePresentation(items: GalleryItem[]) {
   const expiresAt = expirationDates.length > 0 ? Math.min(...expirationDates) : undefined;
   const createdAt = formatDate(drafts[0]!.createdAt);
 
+  const dateLabel = expiresAt === undefined ? createdAt : formatDate(expiresAt);
   return {
-    dateLabel: expiresAt === undefined ? createdAt : formatDate(expiresAt),
+    dateLabel,
     hint:
       expiresAt !== undefined
-        ? `${translate('gallery.app.draftExpires')} ${formatDate(expiresAt)}`
+        ? `${translate('gallery.app.draftExpires')} ${dateLabel}`
         : [
             `${translate('gallery.app.createdLabel')} ${createdAt}`,
             translate('gallery.app.draftNoExpiration'),

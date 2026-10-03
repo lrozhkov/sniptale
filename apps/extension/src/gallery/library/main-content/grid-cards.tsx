@@ -17,9 +17,10 @@ import {
   isGalleryPreviewUnavailable,
 } from './grid-card-details';
 import type { GalleryMainContentProps } from './types';
-import { translate } from '../../../platform/i18n';
+import { translate, useAppLocale } from '../../../platform/i18n';
 import { Image as ImageIcon } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { memo, useMemo, type CSSProperties } from 'react';
+import { useCardActions } from './use-card-actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { getGallerySelectionButtonClassName } from './selection-button-style';
 import { GalleryGridCardDate } from './grid-card-date';
@@ -209,119 +210,129 @@ function GalleryListKindCell({ item }: { item: GalleryItem }) {
   );
 }
 
-function GalleryGridCard(props: GalleryGridCardProps) {
-  const isList = props.viewMode === 'list';
+const GalleryGridCard = memo(
+  function GalleryGridCard(props: GalleryGridCardProps) {
+    useAppLocale();
+    const isList = props.viewMode === 'list';
 
-  return (
-    <article
-      style={
-        isList
-          ? { ...GALLERY_LIST_LAYOUT_STYLE, ...props.style }
-          : props.style
-            ? { position: 'absolute', ...props.style }
-            : undefined
-      }
-      className={cx(
-        getGalleryGridCardClassName(props.selected, props.viewMode),
-        props.navigation && galleryMaterialFocusClassName
-      )}
-      role={isList ? 'row' : 'group'}
-      data-gallery-keyboard-id={props.item.id}
-      tabIndex={
-        props.navigation ? (props.navigation.activeId === props.item.id ? 0 : -1) : undefined
-      }
-      aria-label={props.item.filename}
-      data-ui={isList ? 'gallery.list.row' : undefined}
-      data-selected={isList ? props.selected : undefined}
-    >
-      {isList ? (
-        <>
-          <div className="flex items-center justify-center" role="cell">
-            {isGallerySelectableItem(props.item) ? (
-              <button
-                type="button"
-                aria-label={translate('gallery.app.selectItem')}
-                aria-pressed={props.selected}
-                onClick={(event) =>
-                  props.onToggleSelection(props.item.id, {
-                    shiftKey: event.shiftKey,
-                  })
-                }
-                className={getGallerySelectionButtonClassName(props.selected, true)}
-              >
-                {props.selected ? '✓' : ''}
-              </button>
-            ) : (
-              <div className="h-8 w-8 shrink-0" />
-            )}
-          </div>
-          <GalleryListKindCell item={props.item} />
-          <GalleryGridCardMedia
-            item={props.item}
-            onPreviewOpen={props.onPreviewOpen}
-            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-            previewRecoveryAllowed={props.previewRecoveryAllowed}
-            onToggleSelection={props.onToggleSelection}
-            selected={props.selected}
-            viewMode={props.viewMode}
-          />
-          <GalleryListDetails
-            item={props.item}
-            onPreviewOpen={props.onPreviewOpen}
-            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-            previewUnavailable={isGalleryPreviewUnavailable(props.item)}
-            {...(isGalleryPreviewUnavailable(props.item) &&
-            props.previewRecoveryAllowed &&
-            props.onProjectOpen
-              ? { onRetryPreview: () => props.onProjectOpen?.(props.item) }
-              : {})}
-          />
-        </>
-      ) : (
-        <>
-          <GalleryGridCardMedia
-            item={props.item}
-            onPreviewOpen={props.onPreviewOpen}
-            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-            previewRecoveryAllowed={props.previewRecoveryAllowed}
-            onToggleSelection={props.onToggleSelection}
-            selected={props.selected}
-            viewMode={props.viewMode}
-          />
-          {props.item.type !== 'scenario' && props.item.type !== 'video-project' ? (
-            <GalleryGridDetails
-              compact={props.viewMode === 'compact-grid'}
+    return (
+      <article
+        style={
+          isList
+            ? { ...GALLERY_LIST_LAYOUT_STYLE, ...props.style }
+            : props.style
+              ? { position: 'absolute', ...props.style }
+              : undefined
+        }
+        className={cx(
+          getGalleryGridCardClassName(props.selected, props.viewMode),
+          props.navigation && galleryMaterialFocusClassName
+        )}
+        role={isList ? 'row' : 'group'}
+        data-gallery-keyboard-id={props.item.id}
+        tabIndex={
+          props.navigation ? (props.navigation.activeId === props.item.id ? 0 : -1) : undefined
+        }
+        aria-label={props.item.filename}
+        data-ui={isList ? 'gallery.list.row' : undefined}
+        data-selected={isList ? props.selected : undefined}
+      >
+        {isList ? (
+          <>
+            <div className="flex items-center justify-center" role="cell">
+              {isGallerySelectableItem(props.item) ? (
+                <button
+                  type="button"
+                  aria-label={translate('gallery.app.selectItem')}
+                  aria-pressed={props.selected}
+                  onClick={(event) =>
+                    props.onToggleSelection(props.item.id, {
+                      shiftKey: event.shiftKey,
+                    })
+                  }
+                  className={getGallerySelectionButtonClassName(props.selected, true)}
+                >
+                  {props.selected ? '✓' : ''}
+                </button>
+              ) : (
+                <div className="h-8 w-8 shrink-0" />
+              )}
+            </div>
+            <GalleryListKindCell item={props.item} />
+            <GalleryGridCardMedia
               item={props.item}
               onPreviewOpen={props.onPreviewOpen}
+              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+              previewRecoveryAllowed={props.previewRecoveryAllowed}
+              onToggleSelection={props.onToggleSelection}
+              selected={props.selected}
+              viewMode={props.viewMode}
             />
-          ) : null}
-        </>
-      )}
-      {!isList ? (
-        <GalleryProjectDetails
-          item={props.item}
-          viewMode={props.viewMode}
-          onPreviewOpen={props.onPreviewOpen}
-          {...(props.onProjectOpen ? { onOpen: props.onProjectOpen } : {})}
-        />
-      ) : null}
-    </article>
-  );
-}
-
-function getRecordingGroupItems(items: GalleryItem[], representative: GalleryItem) {
-  if (!isGalleryMediaItem(representative) || !representative.recordingGroupView) {
-    return [];
-  }
-  const groupId = representative.recordingGroupView.groupId;
-
-  return items
-    .filter(isGalleryMediaItem)
-    .filter((item) => item.recordingGroupView?.groupId === groupId)
-    .sort(
-      (left, right) =>
-        (left.recordingGroupView?.order ?? 0) - (right.recordingGroupView?.order ?? 0)
+            <GalleryListDetails
+              item={props.item}
+              onPreviewOpen={props.onPreviewOpen}
+              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+              previewUnavailable={isGalleryPreviewUnavailable(props.item)}
+              {...(isGalleryPreviewUnavailable(props.item) &&
+              props.previewRecoveryAllowed &&
+              props.onProjectOpen
+                ? { onRetryPreview: () => props.onProjectOpen?.(props.item) }
+                : {})}
+            />
+          </>
+        ) : (
+          <>
+            <GalleryGridCardMedia
+              item={props.item}
+              onPreviewOpen={props.onPreviewOpen}
+              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+              previewRecoveryAllowed={props.previewRecoveryAllowed}
+              onToggleSelection={props.onToggleSelection}
+              selected={props.selected}
+              viewMode={props.viewMode}
+            />
+            {props.item.type !== 'scenario' && props.item.type !== 'video-project' ? (
+              <GalleryGridDetails
+                compact={props.viewMode === 'compact-grid'}
+                item={props.item}
+                onPreviewOpen={props.onPreviewOpen}
+              />
+            ) : null}
+          </>
+        )}
+        {!isList ? (
+          <GalleryProjectDetails
+            item={props.item}
+            viewMode={props.viewMode}
+            onPreviewOpen={props.onPreviewOpen}
+            {...(props.onProjectOpen ? { onOpen: props.onProjectOpen } : {})}
+          />
+        ) : null}
+      </article>
     );
+  },
+  (left, right) =>
+    left.item === right.item &&
+    left.selected === right.selected &&
+    left.viewMode === right.viewMode &&
+    left.previewRecoveryAllowed === right.previewRecoveryAllowed &&
+    left.onPreviewOpen === right.onPreviewOpen &&
+    left.onProjectOpen === right.onProjectOpen &&
+    left.onToggleSelection === right.onToggleSelection &&
+    Boolean(left.navigation) === Boolean(right.navigation) &&
+    (left.navigation?.activeId === left.item.id) ===
+      (right.navigation?.activeId === right.item.id) &&
+    sameCardStyle(left.style, right.style)
+);
+
+function sameCardStyle(left: GalleryGridCardProps['style'], right: GalleryGridCardProps['style']) {
+  return (
+    Boolean(left) === Boolean(right) &&
+    left?.height === right?.height &&
+    left?.width === right?.width &&
+    left?.top === right?.top &&
+    left?.left === right?.left
+  );
 }
 
 function GalleryRecordingGroupDetails(props: {
@@ -389,7 +400,7 @@ function GalleryRecordingGroupDetails(props: {
   );
 }
 
-function GalleryRecordingGroupGridCard(props: {
+type GalleryRecordingGroupGridCardProps = {
   representativeId: string;
   navigation?: GalleryCardNavigation;
   items: GalleryItem[];
@@ -399,108 +410,125 @@ function GalleryRecordingGroupGridCard(props: {
   selectedIds: Set<string>;
   style: GalleryGridCardProps['style'];
   viewMode: GalleryGridCardProps['viewMode'];
-}) {
-  const selectableItems = props.items.filter(isGallerySelectableItem);
-  const allSelected =
-    selectableItems.length > 0 && selectableItems.every((item) => props.selectedIds.has(item.id));
-  const firstItem = props.items[0];
-  if (!firstItem) return null;
+};
 
-  return (
-    <article
-      style={props.style ? { position: 'absolute', ...props.style } : undefined}
-      data-ui="gallery.recording-group.card"
-      data-gallery-keyboard-id={props.representativeId}
-      tabIndex={
-        props.navigation
-          ? props.navigation.activeId === props.representativeId
-            ? 0
-            : -1
-          : undefined
-      }
-      role="group"
-      aria-label={`${translate('gallery.preview.multiTrackRecording')}: ${firstItem.filename}`}
-      className={cx(
-        'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)]',
-        props.navigation && galleryMaterialFocusClassName,
-        'border shadow-sm transition',
-        allSelected
-          ? 'border-[var(--sniptale-color-border-accent-strong)]'
-          : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]',
-        'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
-        'color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent))]'
-      )}
-    >
-      <div
-        className="relative grid min-h-0 w-full flex-1 overflow-hidden
-          bg-[var(--sniptale-color-surface-canvas)]"
-        data-ui="gallery.grid.thumbnail-viewport"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(3, Math.max(1, props.items.length))}, minmax(0, 1fr))`,
-        }}
+const GalleryRecordingGroupGridCard = memo(
+  function GalleryRecordingGroupGridCard(props: GalleryRecordingGroupGridCardProps) {
+    useAppLocale();
+    const selectableItems = props.items.filter(isGallerySelectableItem);
+    const allSelected =
+      selectableItems.length > 0 && selectableItems.every((item) => props.selectedIds.has(item.id));
+    const firstItem = props.items[0];
+    if (!firstItem) return null;
+
+    return (
+      <article
+        style={props.style ? { position: 'absolute', ...props.style } : undefined}
+        data-ui="gallery.recording-group.card"
+        data-gallery-keyboard-id={props.representativeId}
+        tabIndex={
+          props.navigation
+            ? props.navigation.activeId === props.representativeId
+              ? 0
+              : -1
+            : undefined
+        }
+        role="group"
+        aria-label={`${translate('gallery.preview.multiTrackRecording')}: ${firstItem.filename}`}
+        className={cx(
+          'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)]',
+          props.navigation && galleryMaterialFocusClassName,
+          'border shadow-sm transition',
+          allSelected
+            ? 'border-[var(--sniptale-color-border-accent-strong)]'
+            : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]',
+          'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
+          'color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent))]'
+        )}
       >
-        {props.items.map((item) => {
-          const role = isGalleryMediaItem(item)
-            ? getRecordingGroupRoleLabel(item.recordingGroupView?.role ?? 'display')
-            : getGalleryItemKindLabel(item.kind);
-          const sourceLabel = isGalleryMediaItem(item)
-            ? item.recordingGroupView?.sourceLabel
-            : null;
+        <div
+          className="relative grid min-h-0 w-full flex-1 overflow-hidden
+          bg-[var(--sniptale-color-surface-canvas)]"
+          data-ui="gallery.grid.thumbnail-viewport"
+          style={{
+            gridTemplateColumns: `repeat(${Math.min(3, Math.max(1, props.items.length))}, minmax(0, 1fr))`,
+          }}
+        >
+          {props.items.map((item) => {
+            const role = isGalleryMediaItem(item)
+              ? getRecordingGroupRoleLabel(item.recordingGroupView?.role ?? 'display')
+              : getGalleryItemKindLabel(item.kind);
+            const sourceLabel = isGalleryMediaItem(item)
+              ? item.recordingGroupView?.sourceLabel
+              : null;
 
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => props.onPreviewOpen(item)}
-              aria-label={`${role}: ${sourceLabel ?? item.filename}`}
-              className="relative min-h-0 min-w-0 cursor-pointer overflow-hidden border-r
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => props.onPreviewOpen(item)}
+                aria-label={`${role}: ${sourceLabel ?? item.filename}`}
+                className="relative min-h-0 min-w-0 cursor-pointer overflow-hidden border-r
                 border-[var(--sniptale-color-border-soft)] last:border-r-0"
-            >
-              <MediaThumb item={item} fit="contain" />
-              <span
-                className="absolute inset-x-1.5 bottom-1.5 rounded-[6px]
+              >
+                <MediaThumb item={item} fit="contain" />
+                <span
+                  className="absolute inset-x-1.5 bottom-1.5 rounded-[6px]
                   bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_82%,transparent)]
                   px-2 py-1 text-left text-[10px] leading-tight text-[var(--sniptale-color-text-primary)]"
-              >
-                <span className="block truncate font-semibold">{role}</span>
-                {sourceLabel ? (
-                  <span className="mt-0.5 block truncate text-[var(--sniptale-color-text-muted)]">
-                    {sourceLabel}
-                  </span>
-                ) : null}
-              </span>
+                >
+                  <span className="block truncate font-semibold">{role}</span>
+                  {sourceLabel ? (
+                    <span className="mt-0.5 block truncate text-[var(--sniptale-color-text-muted)]">
+                      {sourceLabel}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            );
+          })}
+          <div className="absolute left-3 top-3 z-10">
+            <button
+              type="button"
+              aria-label={translate('gallery.app.selectRecordingGroup')}
+              aria-pressed={allSelected}
+              onClick={(event) => {
+                selectableItems.forEach((item) => {
+                  if (event.shiftKey || allSelected || !props.selectedIds.has(item.id)) {
+                    if (event.shiftKey) props.onToggleSelection(item.id, { shiftKey: true });
+                    else props.onToggleSelection(item.id);
+                  }
+                });
+              }}
+              className={getGallerySelectionButtonClassName(allSelected)}
+            >
+              {allSelected ? '✓' : ''}
             </button>
-          );
-        })}
-        <div className="absolute left-3 top-3 z-10">
-          <button
-            type="button"
-            aria-label={translate('gallery.app.selectRecordingGroup')}
-            aria-pressed={allSelected}
-            onClick={(event) => {
-              selectableItems.forEach((item) => {
-                if (event.shiftKey || allSelected || !props.selectedIds.has(item.id)) {
-                  if (event.shiftKey) props.onToggleSelection(item.id, { shiftKey: true });
-                  else props.onToggleSelection(item.id);
-                }
-              });
-            }}
-            className={getGallerySelectionButtonClassName(allSelected)}
-          >
-            {allSelected ? '✓' : ''}
-          </button>
+          </div>
         </div>
-      </div>
-      <GalleryRecordingGroupDetails
-        items={props.items}
-        {...(props.onRecordingGroupOpen
-          ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
-          : {})}
-        viewMode={props.viewMode}
-      />
-    </article>
-  );
-}
+        <GalleryRecordingGroupDetails
+          items={props.items}
+          {...(props.onRecordingGroupOpen
+            ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
+            : {})}
+          viewMode={props.viewMode}
+        />
+      </article>
+    );
+  },
+  (left, right) =>
+    left.items === right.items &&
+    left.representativeId === right.representativeId &&
+    left.selectedIds === right.selectedIds &&
+    left.viewMode === right.viewMode &&
+    left.onPreviewOpen === right.onPreviewOpen &&
+    left.onRecordingGroupOpen === right.onRecordingGroupOpen &&
+    left.onToggleSelection === right.onToggleSelection &&
+    Boolean(left.navigation) === Boolean(right.navigation) &&
+    (left.navigation?.activeId === left.representativeId) ===
+      (right.navigation?.activeId === right.representativeId) &&
+    sameCardStyle(left.style, right.style)
+);
 
 export function GalleryMediaList(
   props: Pick<
@@ -514,7 +542,8 @@ export function GalleryMediaList(
     | 'selectedIds'
   > & { navigation?: GalleryCardNavigation }
 ) {
-  const units = buildGalleryListUnits(props.filteredItems);
+  const actions = useCardActions(props);
+  const units = useMemo(() => buildGalleryListUnits(props.filteredItems), [props.filteredItems]);
 
   return (
     <div className="min-w-[1120px]" role="table">
@@ -563,9 +592,9 @@ export function GalleryMediaList(
               key={unit.item.id}
               item={unit.item}
               {...(props.navigation ? { navigation: props.navigation } : {})}
-              onPreviewOpen={props.onPreviewOpen}
-              {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-              onToggleSelection={props.onToggleSelection}
+              onPreviewOpen={actions.onPreviewOpen}
+              {...(actions.onProjectOpen ? { onProjectOpen: actions.onProjectOpen } : {})}
+              onToggleSelection={actions.onToggleSelection}
               selected={props.selectedIds.has(unit.item.id)}
               previewRecoveryAllowed={!props.trashMode}
               viewMode="list"
@@ -629,9 +658,9 @@ export function GalleryMediaList(
                 key={item.id}
                 item={item}
                 {...(props.navigation ? { navigation: props.navigation } : {})}
-                onPreviewOpen={props.onPreviewOpen}
-                {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
-                onToggleSelection={props.onToggleSelection}
+                onPreviewOpen={actions.onPreviewOpen}
+                {...(actions.onProjectOpen ? { onProjectOpen: actions.onProjectOpen } : {})}
+                onToggleSelection={actions.onToggleSelection}
                 selected={props.selectedIds.has(item.id)}
                 previewRecoveryAllowed={!props.trashMode}
                 viewMode="list"
@@ -678,7 +707,18 @@ export function GalleryGridCanvas(
     | 'visibleItems'
   > & { navigation?: GalleryCardNavigation }
 ) {
-  const { gridMetrics, gridWidth, onPreviewOpen, onToggleSelection, selectedIds, viewMode } = props;
+  const { gridMetrics, gridWidth, selectedIds, viewMode } = props;
+  const { onPreviewOpen, onToggleSelection, onProjectOpen, onRecordingGroupOpen } =
+    useCardActions(props);
+  const groups = useMemo(
+    () =>
+      new Map(
+        buildGalleryListUnits(props.filteredItems).flatMap((unit) =>
+          unit.kind === 'recording-group' ? [[unit.groupId, unit.items] as const] : []
+        )
+      ),
+    [props.filteredItems]
+  );
   const cardWidth = getGalleryGridCardWidth(gridWidth, gridMetrics.columnCount);
   const gridMode = viewMode === 'large-grid' ? 'large-grid' : 'compact-grid';
 
@@ -691,7 +731,10 @@ export function GalleryGridCanvas(
     >
       {props.visibleItems.map((item, index) => {
         const absoluteIndex = gridMetrics.startRow * gridMetrics.columnCount + index;
-        const groupItems = getRecordingGroupItems(props.filteredItems, item);
+        const groupItems =
+          isGalleryMediaItem(item) && item.recordingGroupView
+            ? groups.get(item.recordingGroupView.groupId)
+            : undefined;
         const style = resolveGalleryGridCardStyle({
           absoluteIndex,
           cardHeight: getGalleryGridCardHeight(gridMode, cardWidth),
@@ -700,7 +743,7 @@ export function GalleryGridCanvas(
           rowTops: gridMetrics.rowTops,
         });
 
-        if (groupItems.length > 0) {
+        if (groupItems && groupItems.length > 0) {
           return (
             <GalleryRecordingGroupGridCard
               key={`recording-group:${isGalleryMediaItem(item) ? item.recordingGroupView?.groupId : item.id}`}
@@ -708,8 +751,8 @@ export function GalleryGridCanvas(
               representativeId={item.id}
               {...(props.navigation ? { navigation: props.navigation } : {})}
               onPreviewOpen={onPreviewOpen}
-              {...(!props.trashMode && props.onRecordingGroupOpen
-                ? { onRecordingGroupOpen: props.onRecordingGroupOpen }
+              {...(!props.trashMode && onRecordingGroupOpen
+                ? { onRecordingGroupOpen: onRecordingGroupOpen }
                 : {})}
               onToggleSelection={onToggleSelection}
               selectedIds={selectedIds}
@@ -725,7 +768,7 @@ export function GalleryGridCanvas(
             item={item}
             {...(props.navigation ? { navigation: props.navigation } : {})}
             onPreviewOpen={onPreviewOpen}
-            {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
+            {...(onProjectOpen ? { onProjectOpen: onProjectOpen } : {})}
             onToggleSelection={onToggleSelection}
             selected={selectedIds.has(item.id)}
             previewRecoveryAllowed={!props.trashMode}

@@ -10,6 +10,7 @@ const selectorMocks = vi.hoisted(() => ({
   getFilteredGalleryItems: vi.fn(),
   getGalleryCounts: vi.fn(),
   getGalleryGridMetrics: vi.fn(),
+  createGalleryGridMetrics: vi.fn(),
 }));
 
 vi.mock('./selectors', () => ({
@@ -21,6 +22,7 @@ vi.mock('./selectors', () => ({
   getGalleryCounts: selectorMocks.getGalleryCounts,
   getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: selectorMocks.getGalleryGridMetrics,
+  createGalleryGridMetrics: selectorMocks.createGalleryGridMetrics,
 }));
 
 import { useGalleryDerivedState } from './derived';
@@ -154,6 +156,10 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   latestValue = null;
+  selectorMocks.createGalleryGridMetrics.mockImplementation(
+    (geometry) => (viewport: object) =>
+      selectorMocks.getGalleryGridMetrics({ ...geometry, ...viewport })
+  );
   selectorMocks.getActiveStorageBarClass.mockReturnValue('storage-normal');
   selectorMocks.getAllGalleryTags.mockReturnValue(['alpha']);
   selectorMocks.getFilteredGalleryItems.mockReturnValue([item]);
@@ -370,4 +376,17 @@ it('shows result actions only for committed Library result contexts', () => {
     expect(renderState(context)).toBe(true);
     expect(renderState({ ...context, trashMode: true })).toBe(false);
   }
+});
+
+it('prepares grid geometry only when items, width or mode change', () => {
+  const props = createProbeProps('healthy');
+  act(() => root?.render(<HookProbe {...props} />));
+  act(() =>
+    root?.render(<HookProbe {...props} viewport={{ ...props.viewport, scrollTop: 220 }} />)
+  );
+  expect(selectorMocks.createGalleryGridMetrics).toHaveBeenCalledTimes(1);
+  act(() =>
+    root?.render(<HookProbe {...props} viewport={{ ...props.viewport, gridWidth: 640 }} />)
+  );
+  expect(selectorMocks.createGalleryGridMetrics).toHaveBeenCalledTimes(2);
 });

@@ -5,7 +5,7 @@ import {
   getFilteredGalleryItems,
   getGalleryFacets,
   getGalleryCounts,
-  getGalleryGridMetrics,
+  createGalleryGridMetrics,
 } from './selectors';
 import type { GalleryAppState } from './types';
 import type { GalleryViewMode } from './types';
@@ -85,22 +85,6 @@ function getDerivedFilteredGalleryItems(args: {
     search: args.search,
     scope: args.scope,
     sortMode: args.sortMode,
-  });
-}
-
-function getDerivedGalleryGridMetrics(args: {
-  filteredItems: ReturnType<typeof getFilteredGalleryItems>;
-  gridWidth: GalleryViewportState['gridWidth'];
-  scrollTop: GalleryViewportState['scrollTop'];
-  viewMode: GalleryViewMode;
-  viewportHeight: GalleryViewportState['viewportHeight'];
-}) {
-  return getGalleryGridMetrics({
-    filteredItems: args.filteredItems,
-    gridWidth: args.gridWidth,
-    scrollTop: args.scrollTop,
-    viewMode: args.viewMode,
-    viewportHeight: args.viewportHeight,
   });
 }
 
@@ -222,23 +206,19 @@ export function useGalleryDerivedState(props: {
     items: library.items,
     selectedIds: filters.state.selectedIds,
   });
-  const gridMetrics = useMemo(
+  const selectGridMetrics = useMemo(
     () =>
-      getDerivedGalleryGridMetrics({
+      createGalleryGridMetrics({
         filteredItems: filterState.filteredItems,
         gridWidth: viewport.gridWidth,
-        scrollTop: viewport.scrollTop,
         viewMode,
-        viewportHeight: viewport.viewportHeight,
       }),
-    [
-      filterState.filteredItems,
-      viewMode,
-      viewport.gridWidth,
-      viewport.scrollTop,
-      viewport.viewportHeight,
-    ]
+    [filterState.filteredItems, viewMode, viewport.gridWidth]
   );
+  const gridMetrics = selectGridMetrics({
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.viewportHeight,
+  });
 
   return {
     activeStorageBarClass: getGalleryStoragePressureClass(library.storageInfo),

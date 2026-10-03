@@ -384,19 +384,32 @@ export function getGalleryGridMetrics(args: {
   viewMode: GalleryViewMode;
   viewportHeight: number;
 }): GalleryGridMetrics & { visibleItems: GalleryItem[] } {
+  return createGalleryGridMetrics(args)(args);
+}
+
+/** Prepares immutable layout once; scrolling only selects a window of that layout. */
+export function createGalleryGridMetrics(args: {
+  filteredItems: GalleryItem[];
+  gridWidth: number;
+  viewMode: GalleryViewMode;
+}): (viewport: {
+  scrollTop: number;
+  viewportHeight: number;
+}) => GalleryGridMetrics & { visibleItems: GalleryItem[] } {
   const displayItems =
     args.viewMode === 'list'
       ? args.filteredItems
       : collapseGalleryRecordingGroups(args.filteredItems);
 
   if (args.viewMode === 'list') {
-    return {
+    const metrics = {
       columnCount: 1,
       rowTops: [0],
       startRow: 0,
       totalRows: displayItems.length,
       visibleItems: displayItems,
     };
+    return () => metrics;
   }
 
   const cardMinWidth = GRID_CARD_MIN_WIDTH_BY_MODE[args.viewMode];
@@ -412,21 +425,30 @@ export function getGalleryGridMetrics(args: {
   });
   const totalRows = Math.ceil(displayItems.length / columnCount);
   const totalHeight = rowTops[totalRows] ?? 0;
-  const scrollTop = Math.min(
-    Math.max(0, args.scrollTop),
-    Math.max(0, totalHeight - args.viewportHeight)
-  );
-  const firstVisibleRow = Math.max(0, findFirstRowAfter(rowTops, scrollTop) - 1);
-  const lastVisibleRow = findFirstRowAfter(rowTops, scrollTop + Math.max(1, args.viewportHeight));
-  const startRow = Math.max(0, Math.min(firstVisibleRow, totalRows - 1) - GRID_OVERSCAN_ROWS);
-  const endRow = Math.min(totalRows, lastVisibleRow + GRID_OVERSCAN_ROWS);
-
-  return {
-    columnCount,
-    rowTops,
-    startRow,
-    totalRows,
-    visibleItems: displayItems.slice(startRow * columnCount, endRow * columnCount),
+  let previous: (GalleryGridMetrics & { visibleItems: GalleryItem[] }) | undefined;
+  let previousEnd = -1;
+  return (viewport) => {
+    const scrollTop = Math.min(
+      Math.max(0, viewport.scrollTop),
+      Math.max(0, totalHeight - viewport.viewportHeight)
+    );
+    const firstVisibleRow = Math.max(0, findFirstRowAfter(rowTops, scrollTop) - 1);
+    const lastVisibleRow = findFirstRowAfter(
+      rowTops,
+      scrollTop + Math.max(1, viewport.viewportHeight)
+    );
+    const startRow = Math.max(0, Math.min(firstVisibleRow, totalRows - 1) - GRID_OVERSCAN_ROWS);
+    const endRow = Math.min(totalRows, lastVisibleRow + GRID_OVERSCAN_ROWS);
+    if (previous?.startRow === startRow && previousEnd === endRow) return previous;
+    previousEnd = endRow;
+    previous = {
+      columnCount,
+      rowTops,
+      startRow,
+      totalRows,
+      visibleItems: displayItems.slice(startRow * columnCount, endRow * columnCount),
+    };
+    return previous;
   };
 }
 

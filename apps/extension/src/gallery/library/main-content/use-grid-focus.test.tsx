@@ -207,3 +207,42 @@ it('preserves the preview opener through pointer selection in a portaled menu or
     }
   }
 });
+
+it('preserves manual scroll when a background pointer press focuses the viewport', () => {
+  render({ visible: ['b', 'c'] });
+  grid().scrollTop = 200;
+  act(() => {
+    grid().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    grid().focus();
+  });
+  expect(grid().scrollTop).toBe(200);
+  expect(document.activeElement).toBe(grid());
+  render({ visible: ['a', 'b', 'c'] });
+  expect(grid().scrollTop).toBe(200);
+  expect(document.activeElement).toBe(grid());
+});
+
+it('still restores the active material when entering the viewport with the keyboard', () => {
+  render({ visible: ['b', 'c'] });
+  grid().scrollTop = 200;
+  act(() => grid().focus());
+  expect(grid().scrollTop).toBe(0);
+  render();
+  expect(document.activeElement).toBe(card('a'));
+});
+
+it.each(['pointerup', 'pointercancel', 'keydown'])(
+  'does not retain pointer focus suppression after %s',
+  (eventType) => {
+    render({ visible: ['b', 'c'] });
+    grid().scrollTop = 200;
+    act(() => {
+      grid().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      document.dispatchEvent(new Event(eventType, { bubbles: true }));
+      grid().focus();
+    });
+    expect(grid().scrollTop).toBe(0);
+    render();
+    expect(document.activeElement).toBe(card('a'));
+  }
+);
