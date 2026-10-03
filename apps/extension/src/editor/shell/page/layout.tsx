@@ -79,7 +79,13 @@ export function EditorPageLayout(props: {
       className={EDITOR_PAGE_ROOT_CLASS_NAME}
       onContextMenuCapture={handleEditorPageContextMenuCapture}
     >
-      <div className="absolute inset-0 min-h-0 min-w-0" data-ui="editor.canvas.layer">
+      <div
+        className={`absolute inset-0 min-h-0 min-w-0 ${
+          !props.hasImage && props.startPage ? 'invisible pointer-events-none' : ''
+        }`}
+        aria-hidden={!props.hasImage && Boolean(props.startPage)}
+        data-ui="editor.canvas.layer"
+      >
         <CanvasWrapper hasImage={props.hasImage} />
       </div>
       <div

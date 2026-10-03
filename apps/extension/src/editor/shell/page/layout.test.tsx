@@ -215,3 +215,28 @@ it('blocks context menus outside the canonical canvas surface', async () => {
   expect(canvasSurfaceEvent.defaultPrevented).toBe(false);
   expect(emptyDropzoneEvent.defaultPrevented).toBe(false);
 });
+
+for (const openStatus of ['idle', 'loading', 'error', 'missing'] as const) {
+  it(`hides competing empty canvas in standalone ${openStatus} while keeping its controller mounted`, async () => {
+    await act(async () => {
+      root?.render(
+        <EditorPageLayout
+          commandPaletteOpen={false}
+          hasImage={false}
+          openStatus={openStatus}
+          onCloseCommandPalette={vi.fn()}
+          onRecoverOriginal={vi.fn(async () => undefined)}
+          startPage={<div>Current start</div>}
+        />
+      );
+    });
+    const layer = container?.querySelector('[data-ui="editor.canvas.layer"]');
+    expect(layer?.getAttribute('aria-hidden')).toBe('true');
+    expect(layer?.classList.contains('invisible')).toBe(true);
+    expect(layer?.querySelector('[data-ui="editor.canvas-wrapper"]')).not.toBeNull();
+    await renderLayout(true);
+    expect(
+      container?.querySelector('[data-ui="editor.canvas.layer"]')?.getAttribute('aria-hidden')
+    ).toBe('false');
+  });
+}
