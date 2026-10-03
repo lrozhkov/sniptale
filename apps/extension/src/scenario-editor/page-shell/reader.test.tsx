@@ -1,3 +1,4 @@
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -209,10 +210,10 @@ it('keeps export activation available during a pending autosave', async () => {
         'Edited guide'
       );
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      await vi.advanceTimersByTimeAsync(400);
+      await vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS);
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400);
+      await vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS);
     });
     expect(io.save).toHaveBeenCalledOnce();
     const exportButton = host.querySelector<HTMLButtonElement>('button[aria-label="Export"]')!;

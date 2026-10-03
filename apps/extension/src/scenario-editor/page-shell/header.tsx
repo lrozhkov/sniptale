@@ -18,6 +18,7 @@ type GuidePageHeaderProps = {
   panelControls?: ReactNode;
   aiSelection?: { stepId: string | null; blockId: string | null };
   onAiOpen?: () => void;
+  prepareAiProject?: () => Promise<GuideProject | null>;
   onAppearance: () => void;
   appearanceActive?: boolean;
   leftControls?: ReactNode;
@@ -50,6 +51,7 @@ export function GuidePageHeader({
   panelControls,
   aiSelection,
   onAiOpen,
+  prepareAiProject,
   onAppearance,
   appearanceActive = false,
   leftControls,
@@ -103,14 +105,15 @@ export function GuidePageHeader({
         {feedback}
         <div className="guide-header-actions">
           {contextControls}
-          {aiSelection && onAiOpen && (
+          {aiSelection && onAiOpen && prepareAiProject && (
             <GuideAiEntry
               images={images}
               project={project}
               selectedStepId={aiSelection.stepId}
               selectedBlockId={aiSelection.blockId}
               status={status}
-              disabled={commandsDisabled}
+              disabled={disabled}
+              prepareProject={prepareAiProject}
               onOpen={onAiOpen}
               onChange={onChange}
               onReload={onReload}

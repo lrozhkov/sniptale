@@ -50,10 +50,15 @@ function button(text: string) {
   if (!match) throw new Error(`Missing button: ${text}`);
   return match;
 }
-async function open(guide = project, selectedBlockId: string | null = null) {
+async function open(
+  guide = project,
+  selectedBlockId: string | null = null,
+  prepareProject = async () => guide
+) {
   await act(async () =>
     root.render(
       <GuideAiAssistant
+        prepareProject={prepareProject}
         project={guide}
         selectedStepId="step"
         selectedBlockId={selectedBlockId}
@@ -245,6 +250,7 @@ it('enables committed entry states and sends visible image frames only after exp
     act(async () =>
       root.render(
         <GuideAiEntry
+          prepareProject={async () => withImage}
           project={withImage}
           status={status}
           selectedStepId="step"
@@ -258,6 +264,10 @@ it('enables committed entry states and sends visible image frames only after exp
       )
     );
   await render('dirty');
+  expect(button('AI assistance').disabled).toBe(false);
+  await render('saving');
+  expect(button('AI assistance').disabled).toBe(false);
+  await render('conflict');
   expect(button('AI assistance').disabled).toBe(true);
   await render('ready');
   expect(button('AI assistance').disabled).toBe(false);
@@ -388,4 +398,74 @@ it('keeps selected-only filtering reversible and freezes the picker during a req
   await act(async () => button('Stop waiting').click());
   await act(async () => finish({ baseRevision: 1, changes: [] }));
   expect(document.body.textContent).not.toContain('Choose changes to apply');
+});
+
+it('waits for the current committed draft and accepts its own timestamp acknowledgement', async () => {
+  const { name, ...rest } = project;
+  const committed = { name, ...rest, updatedAt: project.updatedAt + 1 };
+  let release!: () => void;
+  const prepare = vi.fn(
+    () =>
+      new Promise<typeof project>((resolve) => {
+        release = () => resolve(committed);
+      })
+  );
+  await open(project, null, prepare);
+  await act(async () => {
+    button('Get suggestions').click();
+    button('Get suggestions').click();
+  });
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(io.request).not.toHaveBeenCalled();
+  await act(async () => release());
+  expect(io.request).toHaveBeenCalledWith(expect.objectContaining({ project: committed }));
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+  await act(async () => button('Apply selected').click());
+  expect(change).toHaveBeenCalledOnce();
+  expect(change.mock.calls[0]![0].updatedAt).toBe(committed.updatedAt);
+});
+
+it('cancels during save preparation without dispatching a late AI request', async () => {
+  let release!: () => void;
+  await open(
+    project,
+    null,
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(project);
+      })
+  );
+  await act(async () => button('Get suggestions').click());
+  await act(async () => button('Stop waiting').click());
+  await act(async () => release());
+  expect(io.request).not.toHaveBeenCalled();
+  expect(document.querySelector('textarea')).not.toBeNull();
+});
+
+it('retains the instruction and does not dispatch when saving the current draft fails', async () => {
+  await open(project, null, async () => {
+    throw new Error('Save failed');
+  });
+  const instruction = document.querySelector('textarea')!.value;
+  await act(async () => button('Get suggestions').click());
+  expect(io.request).not.toHaveBeenCalled();
+  expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  expect(document.querySelector('textarea')!.value).toBe(instruction);
+});
+
+it('rejects a late proposal when actual draft content changed during the request', async () => {
+  let release!: () => void;
+  io.request.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(proposal);
+      })
+  );
+  await open();
+  await act(async () => button('Get suggestions').click());
+  await open({ ...project, name: 'Newer draft' });
+  await act(async () => release());
+  expect(document.querySelector('[role="alert"]')?.textContent).toContain('changed');
+  expect(change).not.toHaveBeenCalled();
+  expect(document.body.textContent).not.toContain('After title');
 });

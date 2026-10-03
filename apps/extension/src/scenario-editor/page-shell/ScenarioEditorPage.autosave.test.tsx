@@ -8,7 +8,13 @@ import {
   createGuideStep,
   createTourDocument,
 } from '../../features/scenario/project/factories';
-const io = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn() }));
+const io = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn(), request: vi.fn() }));
+vi.mock('./runtime/ai-request', () => ({
+  loadGuideAiConfiguration: async () => ({ providers: [], models: [], defaultModelId: 'model' }),
+  requestGuideAiProposal: io.request,
+  verifyGuideAiBasis: async () => 1,
+  GuideAiStaleError: class extends Error {},
+}));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
@@ -32,11 +38,13 @@ vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   useAppLocale: () => 'en',
 }));
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import { clickGuideControl } from './test-support/guide-controls';
 let root: Root;
 let host: HTMLDivElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   host = document.createElement('div');
@@ -47,6 +55,8 @@ beforeEach(() => {
   project.tour = createTourDocument();
   io.load.mockResolvedValue(project);
   io.save.mockReset();
+  io.request.mockReset();
+  io.request.mockResolvedValue({ baseRevision: 3, changes: [] });
   io.save.mockImplementation(async (value) => ({ ...value, updatedAt: 101 }));
 });
 it('keeps the information note control mounted and enabled through autosave', async () => {
@@ -106,6 +116,7 @@ it.each(['stacked', 'side-by-side', 'comparison', 'text'] as const)(
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function autosave(enabled: boolean) {
@@ -119,7 +130,7 @@ async function autosave(enabled: boolean) {
   );
 }
 async function settle() {
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
 }
 it('keeps autosave paused across guide/tour switching and saves latest edits on resume', async () => {
   await act(async () => root.render(<ScenarioEditorPage />));
@@ -147,4 +158,114 @@ it('keeps autosave paused across guide/tour switching and saves latest edits on 
   expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Paused tour title' }), {
     baseUpdatedAt: 100,
   });
+});
+
+async function changeProjectName(name: string, selector = 'input[aria-label="Scenario"]') {
+  const field = host.querySelector<HTMLInputElement | HTMLTextAreaElement>(selector)!;
+  await act(async () => {
+    const prototype =
+      field instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, name);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+it('opens AI during a pending autosave and sends the latest draft once using the acknowledged revision', async () => {
+  let release!: () => void;
+  io.save.mockImplementationOnce(
+    (source) =>
+      new Promise((resolve) => {
+        release = () => resolve({ ...source, updatedAt: 101 });
+      })
+  );
+  io.save.mockImplementation(async (source) => ({ ...source, updatedAt: 102 }));
+  await act(async () => root.render(<ScenarioEditorPage />));
+  await changeProjectName('Earlier draft');
+  await settle();
+  await changeProjectName('Latest draft');
+  const ai = host.querySelector<HTMLButtonElement>('[title="AI assistance"]')!;
+  expect(ai.disabled).toBe(false);
+  await act(async () => ai.click());
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  const send = [...document.querySelectorAll('button')].find(
+    (node) => node.textContent === 'Get suggestions'
+  )!;
+  await act(async () => {
+    send.click();
+    send.click();
+  });
+  expect(io.request).not.toHaveBeenCalled();
+  await act(async () => release());
+  expect(io.save).toHaveBeenCalledTimes(2);
+  expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ name: 'Latest draft' }), {
+    baseUpdatedAt: 101,
+  });
+  expect(io.request).toHaveBeenCalledOnce();
+  expect(io.request).toHaveBeenCalledWith(
+    expect.objectContaining({
+      project: expect.objectContaining({ name: 'Latest draft', updatedAt: 102 }),
+    })
+  );
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+});
+
+it('flushes a field boundary immediately while keeping continuous input coalesced', async () => {
+  await act(async () => root.render(<ScenarioEditorPage />));
+  await changeProjectName('Completed field');
+  expect(io.save).not.toHaveBeenCalled();
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Scenario"]')!;
+  await act(async () => field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(io.save).toHaveBeenCalledOnce();
+  expect(io.save).toHaveBeenCalledWith(expect.objectContaining({ name: 'Completed field' }), {
+    baseUpdatedAt: 100,
+  });
+});
+
+it('keeps typing available during autosave and uses the acknowledged revision for newer content', async () => {
+  let finish: (() => void) | undefined;
+  io.save.mockImplementationOnce(
+    (project) =>
+      new Promise((resolve) => {
+        finish = () => resolve({ ...project, updatedAt: 101 });
+      })
+  );
+  await act(async () => root.render(<ScenarioEditorPage />));
+  await changeProjectName('First draft', 'article#step .guide-step-title');
+  await settle();
+  expect(host.querySelector('.guide-page-feedback')?.getAttribute('data-quiet')).toBe('true');
+  expect(io.save).toHaveBeenCalledTimes(1);
+  expect(host.querySelector('article .guide-step-title')).toHaveProperty('disabled', false);
+  await changeProjectName('More recent draft', 'article#step .guide-step-title');
+  await act(async () => finish?.());
+  expect(host.querySelector('article .guide-step-title')).toHaveProperty(
+    'value',
+    'More recent draft'
+  );
+  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
+  await settle();
+  expect(io.save).toHaveBeenCalledTimes(2);
+  expect(io.save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
+    { baseUpdatedAt: 101 }
+  );
+  await clickGuideControl('Undo', host);
+  expect(host.querySelector('article .guide-step-title')).toHaveProperty('value', 'Step');
+});
+
+it('protects a closing page until its latest edit is durable and does not autosave acknowledgments', async () => {
+  await act(async () => root.render(<ScenarioEditorPage />));
+  expect([...host.querySelectorAll('button')].some((button) => button.textContent === 'Save')).toBe(
+    false
+  );
+  await changeProjectName('Last edit', 'article#step .guide-step-title');
+  const pendingClose = new Event('beforeunload', { cancelable: true });
+  await act(async () => window.dispatchEvent(pendingClose));
+  expect(pendingClose.defaultPrevented).toBe(true);
+  await settle();
+  const savedClose = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(savedClose);
+  expect(savedClose.defaultPrevented).toBe(false);
+  expect(io.save).toHaveBeenCalledTimes(1);
 });

@@ -63,6 +63,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import type { GuideLibraryBrowser } from './library-browser';
 import { clickGuideControl, openGuideInsertionMenu } from './test-support/guide-controls';
@@ -70,6 +71,7 @@ import { clickGuideControl, openGuideInsertionMenu } from './test-support/guide-
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   io.previous.mockReturnValue([]);
   io.list.mockResolvedValue([]);
@@ -94,6 +96,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function render() {
@@ -105,7 +108,7 @@ async function click(label: string, scope: ParentNode = container) {
 
 async function settleAutosave() {
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS);
   });
 }
 
@@ -683,56 +686,6 @@ it('accepts image import as one undoable publication and saves undo against its 
   );
   await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { baseUpdatedAt: 105 });
-});
-
-it('keeps typing available during autosave and uses the acknowledged revision for newer content', async () => {
-  let finish: (() => void) | undefined;
-  io.save.mockImplementationOnce(
-    (project) =>
-      new Promise((resolve) => {
-        finish = () => resolve({ ...project, updatedAt: 101 });
-      })
-  );
-  await render();
-  await editField('article#first .guide-step-title', 'First draft');
-  await settleAutosave();
-  expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-quiet')).toBe('true');
-  expect(io.save).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty('disabled', false);
-  await editField('article#first .guide-step-title', 'More recent draft');
-  await act(async () => finish?.());
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
-    'value',
-    'More recent draft'
-  );
-  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledTimes(2);
-  expect(io.save).toHaveBeenLastCalledWith(
-    expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
-    { baseUpdatedAt: 101 }
-  );
-  await click('Undo');
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
-    'value',
-    'First step'
-  );
-});
-
-it('protects a closing page until its latest edit is durable and does not autosave acknowledgments', async () => {
-  await render();
-  expect(
-    [...container.querySelectorAll('button')].some((button) => button.textContent === 'Save')
-  ).toBe(false);
-  await editField('article#first .guide-step-title', 'Last edit');
-  const pendingClose = new Event('beforeunload', { cancelable: true });
-  await act(async () => window.dispatchEvent(pendingClose));
-  expect(pendingClose.defaultPrevented).toBe(true);
-  await settleAutosave();
-  const savedClose = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(savedClose);
-  expect(savedClose.defaultPrevented).toBe(false);
-  expect(io.save).toHaveBeenCalledTimes(1);
 });
 
 it('settles autosave without writing when undo then redo returns to the durable snapshot', async () => {

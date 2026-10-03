@@ -130,7 +130,7 @@ export function useGuidePageState() {
       openProject,
       () => setStatus('failed')
     );
-  const { save } = useGuideAutosave({
+  const autosave = useGuideAutosave({
     project,
     enabled: autosaveEnabled,
     dirty: status === 'dirty',
@@ -197,7 +197,7 @@ export function useGuidePageState() {
     openExisting: (id: string) =>
       openExistingScenarioProject(id, enterResourceSession, openProject),
     ...editing,
-    save,
+    ...autosave,
     duplicate,
     remove,
     reload: load,

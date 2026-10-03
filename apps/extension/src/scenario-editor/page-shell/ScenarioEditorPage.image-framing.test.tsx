@@ -79,11 +79,13 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   io.previous.mockReturnValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -107,6 +109,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function render() {
@@ -131,7 +134,7 @@ async function editField(selector: string, value: string) {
   });
 }
 async function settleAutosave() {
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 900)));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
 }
 it('moves framing into one contextual inspector and keeps it bound through canonical edits', async () => {
   const project = createGuideProject('Images', 'guide', 100);

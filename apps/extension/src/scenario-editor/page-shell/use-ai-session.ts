@@ -1,3 +1,4 @@
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { useEffect, useRef, useState } from 'react';
 import type { GuideProject, GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { applyGuideAiProposal, type GuideAiScope } from '../../features/scenario/project/public';
@@ -21,13 +22,14 @@ type GuideAiSessionInput = {
   selectedStepId: string | null;
   selectedBlockId: string | null;
   onChange: (project: GuideProject) => void;
+  prepareProject: () => Promise<GuideProject | null>;
   onClose: () => void;
   t: Translate;
 };
 
 /** Owns one disposable AI request and its explicitly accepted proposal. */
 export function useGuideAiSession(input: GuideAiSessionInput) {
-  const { project, selectedStepId, selectedBlockId, onChange, onClose, t } = input;
+  const { project, selectedStepId, selectedBlockId, onChange, prepareProject, onClose, t } = input;
   const latest = useRef(project);
   latest.current = project;
   const job = useRef<AbortController | null>(null);
@@ -59,13 +61,17 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     job.current = controller;
     setPending(true);
     setFailure(null);
-    const basis = apply && proposal ? proposal.project : project;
     try {
+      const basis = apply && proposal ? proposal.project : await prepareProject();
+      if (!basis) throw new Error('Latest scenario edits could not be saved');
+      controller.signal.throwIfAborted();
+      if (job.current !== controller) return;
       if (apply && proposal) {
         await verifyGuideAiBasis(basis, controller.signal, proposal.baseRevision);
         controller.signal.throwIfAborted();
         if (job.current !== controller) return;
-        if (latest.current !== basis) throw new GuideAiStaleError();
+        if (guideAiContentIdentity(latest.current) !== guideAiContentIdentity(basis))
+          throw new GuideAiStaleError();
         const next = applyGuideAiProposal(
           basis,
           proposal.scope,
@@ -86,7 +92,8 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
           signal: controller.signal,
         });
         if (job.current !== controller) return;
-        if (latest.current !== basis) throw new GuideAiStaleError();
+        if (guideAiContentIdentity(latest.current) !== guideAiContentIdentity(basis))
+          throw new GuideAiStaleError();
         const changes = result.changes.filter((change) => change.before !== change.after);
         setProposal({ ...result, changes, project: basis, scope });
         setAccepted(new Set(changes.map((_, index) => index)));
@@ -139,6 +146,12 @@ export function useGuideAiSession(input: GuideAiSessionInput) {
     writeInstruction: (value: string) => setInstruction(value),
     chooseImages: (value: boolean) => setIncludeImages(value),
   };
+}
+
+function guideAiContentIdentity(project: GuideProject): string {
+  const parsed = parseGuideProject(project);
+  if (parsed.status !== 'ok') throw new GuideAiStaleError();
+  return JSON.stringify({ ...parsed.project, updatedAt: 0 });
 }
 
 function useAiConfiguration() {

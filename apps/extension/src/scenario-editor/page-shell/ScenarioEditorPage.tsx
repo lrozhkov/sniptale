@@ -112,7 +112,22 @@ export function ScenarioEditorPage() {
   return (
     <main
       className="guide-page"
-      onBlurCapture={state.sealEdit}
+      onBlurCapture={(event) => {
+        state.sealEdit();
+        const field = event.target;
+        if (
+          !(field instanceof HTMLTextAreaElement) &&
+          !(field instanceof HTMLInputElement && ['text', 'number', 'search'].includes(field.type))
+        )
+          return;
+        // Commands that acquire the mutation gate consume the draft themselves.
+        if (
+          event.relatedTarget instanceof Element &&
+          event.relatedTarget.closest('button,[role="button"]')
+        )
+          return;
+        state.flushEdits();
+      }}
       onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
     >
       {tourMode && (
@@ -296,6 +311,7 @@ function ScenarioHeader({
         ? {
             aiSelection: { stepId: selectedStepId, blockId: framing.target?.block.id ?? null },
             onAiOpen: state.sealEdit,
+            prepareAiProject: state.flushLatest,
           }
         : {})}
       onAppearance={() => panels.openRight('document')}
