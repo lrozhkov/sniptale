@@ -480,11 +480,23 @@ it('keeps promotion and independent Delete available for temporary scenario expo
     ...createScenarioExportItem(),
     lifecycle: { savedAt: null, storageClass: 'temporary' as const, updatedAt: 1 },
   };
-  await act(async () => root.render(<PreviewActions {...createProps(onPromote)} item={item} />));
+  await act(async () =>
+    root.render(
+      <>
+        <PreviewPromotionAction {...createProps(onPromote)} item={item} />
+        <PreviewActions {...createProps(onPromote)} item={item} />
+      </>
+    )
+  );
   const save = Array.from(container.querySelectorAll('button')).find(
     (button) => button.textContent === 'gallery.preview.saveToLibrary'
   );
   expect(save).toBeDefined();
+  expect(
+    container
+      .querySelector('[data-ui="gallery.preview.lifecycle-actions"]')
+      ?.querySelectorAll('button')
+  ).toHaveLength(1);
   expect(container.textContent).toContain('common.actions.delete');
   await act(async () => save?.click());
   expect(onPromote).toHaveBeenCalledOnce();
@@ -520,4 +532,23 @@ it('offers draft reset for HTML filenames while export tags remain read-only', a
   expect(onResetChanges).toHaveBeenCalledOnce();
   expect(container.querySelector('input')).toBeNull();
   await act(async () => root.unmount());
+});
+
+it('resets promotion feedback when the inspector switches to another draft', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const props = createProps(
+    vi.fn(async () => {
+      throw new Error('write failed');
+    })
+  );
+  await act(async () => root.render(<PreviewPromotionAction {...props} />));
+  await act(async () => container.querySelector('button')?.click());
+  expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () =>
+    root.render(<PreviewPromotionAction {...props} item={{ ...props.item, id: 'next-draft' }} />)
+  );
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  act(() => root.unmount());
 });

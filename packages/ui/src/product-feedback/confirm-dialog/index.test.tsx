@@ -295,3 +295,39 @@ it('restores focus inside a ShadowRoot and traps reverse keyboard navigation', (
   expect(shadow.activeElement).toBe(trigger);
   host.remove();
 });
+
+it('can disable confirmation while cancellation and Escape remain available', () => {
+  renderDialog();
+  const onConfirm = vi.fn();
+  const onCancel = vi.fn();
+  act(() =>
+    root?.render(
+      <ProductConfirmDialog
+        title="Delete"
+        message="Checking"
+        confirmText="Confirm"
+        cancelText="Cancel"
+        confirmDisabled
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    )
+  );
+  const confirm = container?.querySelector<HTMLButtonElement>(
+    '.sniptale-confirm-actions button:last-child'
+  );
+  const cancel = container?.querySelector<HTMLButtonElement>(
+    '.sniptale-confirm-actions button:first-child'
+  );
+  expect(confirm?.disabled).toBe(true);
+  expect(cancel?.disabled).toBe(false);
+  act(() => confirm?.click());
+  expect(onConfirm).not.toHaveBeenCalled();
+  act(() => cancel?.click());
+  expect(onCancel).toHaveBeenCalledOnce();
+  act(() => {
+    cancel?.focus();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+  });
+  expect(onCancel).toHaveBeenCalledTimes(2);
+});

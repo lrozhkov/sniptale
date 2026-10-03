@@ -230,7 +230,7 @@ it('renders unsafe source urls as inert text instead of links', () => {
   expect(container?.querySelector('a[href]')).toBeNull();
 });
 
-it('shows the draft deletion date below the creation date in the inspector header', () => {
+it('places draft saving beside the deletion date in the inspector header', () => {
   const baseProps = createProps();
 
   render(
@@ -246,6 +246,11 @@ it('shows the draft deletion date below the creation date in the inspector heade
   expect(formatDateMock).toHaveBeenCalledWith(1);
   expect(formatDateMock).toHaveBeenCalledWith(99);
   expect(container?.textContent).toContain('gallery.app.draftExpires 31 Mar 2026');
+  expect(
+    container?.querySelector(
+      '[data-ui="gallery.preview.inspectorHeader"] [data-ui="preview.promotion"]'
+    )
+  ).not.toBeNull();
 });
 
 it('uses project name as the source fallback and keeps non-HTML exports read-only', () => {

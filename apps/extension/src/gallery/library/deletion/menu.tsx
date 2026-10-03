@@ -1,6 +1,7 @@
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
 import { useId } from 'react';
-import { Trash2, X } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { ContentPopoverAdapter } from '@sniptale/ui/content-popover-adapter';
 import { translate } from '../../../platform/i18n';
 import type { GalleryDeletionRequest } from './types';
@@ -17,7 +18,27 @@ export function GalleryDeletionMenu({
 }) {
   const warningId = useId();
   const menu = useDeletionMenu(request, contextKey, onClose);
-  const itemLayout = 'w-full !justify-start gap-2 !whitespace-normal text-left';
+  if (!request.moveToTrash) {
+    return (
+      <div
+        onKeyDownCapture={(event) => {
+          if (event.repeat && ['Enter', ' ', 'Delete'].includes(event.key)) event.preventDefault();
+        }}
+      >
+        <ProductConfirmDialog
+          title={translate('gallery.app.permanentDelete')}
+          message={menu.prepared?.warning ?? translate('gallery.app.deleteChecking')}
+          confirmText={translate('gallery.app.permanentDelete')}
+          cancelText={translate('common.actions.cancel')}
+          confirmDisabled={!menu.prepared || menu.pending}
+          isLoading={menu.committing}
+          onCancel={menu.dismiss}
+          onConfirm={menu.activatePermanent}
+        />
+      </div>
+    );
+  }
+  const itemLayout = 'w-full !justify-start gap-2 !whitespace-normal !min-h-9 text-left';
   return (
     <ContentPopoverAdapter
       isOpen
@@ -25,8 +46,10 @@ export function GalleryDeletionMenu({
       popoverRef={menu.surfaceRef}
       style={menu.style}
       dataUi="gallery.deletion.menu"
+      className="!rounded-[10px] !bg-[var(--sniptale-color-surface-canvas)]
+        !bg-[linear-gradient(var(--sniptale-color-surface-panel),var(--sniptale-color-surface-panel))]"
     >
-      <div role="menu" aria-label={translate('common.actions.delete')}>
+      <div role="menu" className="space-y-1 p-1" aria-label={translate('common.actions.delete')}>
         {request.moveToTrash ? (
           <button
             type="button"
@@ -39,6 +62,10 @@ export function GalleryDeletionMenu({
             {translate('gallery.app.moveToTrash')}
           </button>
         ) : null}
+        <div
+          role="separator"
+          className="my-1 border-t border-[var(--sniptale-color-border-soft)]"
+        />
         <button
           type="button"
           role="menuitem"
@@ -49,7 +76,7 @@ export function GalleryDeletionMenu({
             if (event.detail <= 1) void menu.activatePermanent();
           }}
         >
-          <X aria-hidden="true" className="h-4 w-4" />
+          <Trash2 aria-hidden="true" className="h-4 w-4" />
           {translate(
             menu.prepared ? 'gallery.app.confirmPermanentDelete' : 'gallery.app.permanentDelete'
           )}

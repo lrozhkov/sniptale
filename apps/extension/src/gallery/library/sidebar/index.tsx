@@ -256,7 +256,7 @@ function GalleryTrashControls(props: GallerySidebarProps) {
           }
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
-          {translate('common.actions.delete')}
+          {translate('gallery.app.permanentDelete')}
         </button>
         <button
           type="button"

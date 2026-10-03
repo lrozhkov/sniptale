@@ -15,7 +15,7 @@ export function useDeletionMenu(
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const [prepared, setPrepared] = useState<GalleryPreparedDeletion | null>(null);
-  const [pending, setPending] = useState(false);
+  const [operation, setOperation] = useState<'prepare' | 'commit' | null>(null);
   const [style, setStyle] = useState<CSSProperties>({ position: 'fixed', width: 300 });
 
   const dismiss = useCallback(() => {
@@ -25,38 +25,65 @@ export function useDeletionMenu(
     if (focusInside && request.anchor?.isConnected) request.anchor.focus();
   }, [request]);
 
+  const prepare = useCallback(async () => {
+    if (pendingRef.current || !liveRef.current) return;
+    const generation = generationRef.current;
+    pendingRef.current = true;
+    setOperation('prepare');
+    try {
+      const result = await request.preparePermanent();
+      if (liveRef.current && generation === generationRef.current) {
+        setPrepared(result);
+        if (!result && !request.moveToTrash) dismiss();
+      }
+    } finally {
+      if (generation === generationRef.current) {
+        pendingRef.current = false;
+        if (liveRef.current) setOperation(null);
+      }
+    }
+  }, [request, dismiss]);
+
   useEffect(() => {
     if (request.contextKey !== contextKey) dismiss();
   }, [contextKey, request, dismiss]);
 
   useEffect(() => {
+    if (request.contextKey !== contextKey) return;
     liveRef.current = true;
     generationRef.current += 1;
     pendingRef.current = false;
     setPrepared(null);
-    setPending(false);
-    const surface = surfaceRef.current;
-    if (!surface) return;
-    const unbindPosition = bindDeletionMenuPosition(surface, request.anchor, setStyle);
-    const unbindInteraction = bindDeletionMenuInteractions(
-      surface,
-      request.anchor,
-      request.keyboard,
-      dismiss
-    );
+    setOperation(null);
+    let unbind = () => {};
+    if (!request.moveToTrash) {
+      void prepare();
+    } else if (surfaceRef.current) {
+      const surface = surfaceRef.current;
+      const unbindPosition = bindDeletionMenuPosition(surface, request.anchor, setStyle);
+      const unbindInteraction = bindDeletionMenuInteractions(
+        surface,
+        request.anchor,
+        request.keyboard,
+        dismiss
+      );
+      unbind = () => {
+        unbindPosition();
+        unbindInteraction();
+      };
+    }
     return () => {
       liveRef.current = false;
       generationRef.current += 1;
-      unbindPosition();
-      unbindInteraction();
+      unbind();
     };
-  }, [request, dismiss]);
+  }, [request, contextKey, dismiss, prepare]);
 
   const run = async (action: () => Promise<boolean>) => {
     if (pendingRef.current || !liveRef.current) return;
     const generation = generationRef.current;
     pendingRef.current = true;
-    setPending(true);
+    setOperation('commit');
     try {
       if (await action()) {
         if (liveRef.current && generation === generationRef.current) dismiss();
@@ -64,25 +91,22 @@ export function useDeletionMenu(
     } finally {
       if (generation === generationRef.current) {
         pendingRef.current = false;
-        if (liveRef.current) setPending(false);
+        if (liveRef.current) setOperation(null);
       }
     }
   };
   const activatePermanent = async () => {
     if (prepared) return run(prepared.confirm);
-    if (pendingRef.current || !liveRef.current) return;
-    const generation = generationRef.current;
-    pendingRef.current = true;
-    setPending(true);
-    try {
-      const result = await request.preparePermanent();
-      if (liveRef.current && generation === generationRef.current) setPrepared(result);
-    } finally {
-      if (generation === generationRef.current) {
-        pendingRef.current = false;
-        if (liveRef.current) setPending(false);
-      }
-    }
+    return prepare();
   };
-  return { surfaceRef, style, prepared, pending, run, activatePermanent };
+  return {
+    surfaceRef,
+    style,
+    prepared,
+    pending: operation !== null,
+    committing: operation === 'commit',
+    dismiss,
+    run,
+    activatePermanent,
+  };
 }

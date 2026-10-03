@@ -15,6 +15,7 @@ import { PreviewInspectorControls } from './inspector-controls';
 import { PreviewMedia } from './media';
 import {
   PreviewActions,
+  PreviewPromotionAction,
   PreviewMetadataCards,
   PreviewProjectUsage,
   PreviewTagEditor,
@@ -48,7 +49,7 @@ function UnavailableProjectNotice({ item }: Pick<PreviewPanelProps, 'item'>) {
   );
 }
 
-function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
+function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item' | 'onPromote' | 'trashMode'>) {
   const isDraft = props.item.lifecycle?.storageClass === 'temporary';
 
   return (
@@ -61,10 +62,16 @@ function PreviewPanelHeader(props: Pick<PreviewPanelProps, 'item'>) {
           {formatDate(props.item.createdAt)}
         </div>
         {isDraft ? (
-          <div className="mt-1 text-xs font-medium text-[var(--sniptale-color-warning)]">
-            {props.item.expiresAt
-              ? `${translate('gallery.app.draftExpires')} ${formatDate(props.item.expiresAt)}`
-              : translate('gallery.app.draftNoExpiration')}
+          <div
+            className="mt-1 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2
+              text-xs font-medium text-[var(--sniptale-color-warning)]"
+          >
+            <span className="whitespace-nowrap">
+              {props.item.expiresAt
+                ? `${translate('gallery.app.draftExpires')} ${formatDate(props.item.expiresAt)}`
+                : translate('gallery.app.draftNoExpiration')}
+            </span>
+            {!props.trashMode ? <PreviewPromotionAction {...props} /> : null}
           </div>
         ) : null}
       </div>

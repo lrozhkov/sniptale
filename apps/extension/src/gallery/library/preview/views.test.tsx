@@ -245,7 +245,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
   expect(videoMarkup).toContain('class="block h-full w-full bg-transparent object-contain"');
   expect(videoMarkup).toContain('gallery.preview.videoLoading');
   expect(audioMarkup).toContain('<audio');
-  expect(videoProjectMarkup).toContain('lucide-video');
+  expect(videoProjectMarkup).toContain('lucide-clapperboard');
   expect(videoProjectMarkup).toContain('data-ui="gallery.preview.project-thumbnail"');
   expect(videoProjectMarkup).toContain('max-h-[360px]');
   expect(videoProjectMarkup).not.toContain('gallery.preview.openInEditor');

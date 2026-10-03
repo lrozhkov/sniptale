@@ -86,15 +86,51 @@ it('requires a second explicit permanent activation and ignores the double-click
   expect(onClose).toHaveBeenCalledOnce();
 });
 
-it('offers only confirmed permanent deletion in Trash and preserves the menu after failure', async () => {
+it('opens one direct confirmation in Trash and preserves it after failed commit', async () => {
   request.moveToTrash = null;
   confirm.mockResolvedValue(false);
   await render();
-  expect(document.querySelectorAll('[role="menuitem"]')).toHaveLength(1);
-  expect(document.activeElement).toBe(button('gallery.app.permanentDelete'));
-  await click(button('gallery.app.permanentDelete'));
-  await click(button('gallery.app.confirmPermanentDelete'));
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  const dialog = document.querySelector('[role="alertdialog"]');
+  expect(dialog?.textContent).toContain('Cannot be undone');
+  expect(request.preparePermanent).toHaveBeenCalledOnce();
+  expect(confirm).not.toHaveBeenCalled();
+  const controls = [...(dialog?.querySelectorAll('button') ?? [])];
+  const cancel = controls.find(
+    (control) => control.textContent === translate('common.actions.cancel')
+  )!;
+  const permanent = controls.find(
+    (control) => control.textContent === translate('gallery.app.permanentDelete')
+  )!;
+  expect(document.activeElement).toBe(cancel);
+  await click(permanent);
+  expect(confirm).toHaveBeenCalledOnce();
   expect(onClose).not.toHaveBeenCalled();
+});
+
+it('allows cancelling a pending direct preparation and discards its late result', async () => {
+  request.moveToTrash = null;
+  const gate = Promise.withResolvers<Awaited<ReturnType<typeof request.preparePermanent>>>();
+  request.preparePermanent = vi.fn(() => gate.promise);
+  anchor.focus();
+  await render();
+  expect(request.preparePermanent).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="menu"]')).toBeNull();
+  const dialog = document.querySelector('[role="alertdialog"]')!;
+  const permanent = [...dialog.querySelectorAll('button')].find(
+    (control) => control.textContent === translate('gallery.app.permanentDelete')
+  )!;
+  expect(permanent.disabled).toBe(true);
+  await act(async () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+  gate.resolve({ warning: 'late', confirm });
+  await act(async () => {
+    await gate.promise;
+  });
+  expect(document.body.textContent).not.toContain('late');
+  expect(confirm).not.toHaveBeenCalled();
 });
 
 it('consumes Escape before the preview handler and discards a late preparation', async () => {
@@ -239,5 +275,55 @@ it('announces pending reference checking and resets confirmation on reopening', 
   await render();
   expect(document.querySelector('[role="status"]')).toBeNull();
   expect(button('gallery.app.permanentDelete').hasAttribute('aria-describedby')).toBe(false);
+  expect(confirm).not.toHaveBeenCalled();
+});
+
+it('exposes owner preparation failure by closing the direct confirmation without deleting', async () => {
+  request.moveToTrash = null;
+  request.preparePermanent = vi.fn(async () => null);
+  await render();
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(confirm).not.toHaveBeenCalled();
+});
+
+it('locks a direct commit against duplicate activation and rejects a late replaced preparation', async () => {
+  request.moveToTrash = null;
+  const gate = Promise.withResolvers<boolean>();
+  confirm.mockImplementation(() => gate.promise);
+  await render();
+  const control = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+  ].find((element) => element.textContent === translate('gallery.app.permanentDelete'))!;
+  await click(control);
+  await click(control);
+  expect(confirm).toHaveBeenCalledOnce();
+  expect(control.disabled).toBe(true);
+  gate.resolve(true);
+  await act(async () => {
+    await gate.promise;
+  });
+  expect(onClose).toHaveBeenCalledOnce();
+
+  const preparation = Promise.withResolvers<Awaited<ReturnType<typeof request.preparePermanent>>>();
+  request = { ...request, preparePermanent: vi.fn(() => preparation.promise) };
+  await render();
+  request = {
+    ...request,
+    preparePermanent: vi.fn(async () => ({ warning: 'new target', confirm })),
+  };
+  await render();
+  preparation.resolve({ warning: 'old target', confirm });
+  await act(async () => {
+    await preparation.promise;
+  });
+  expect(document.body.textContent).toContain('new target');
+  expect(document.body.textContent).not.toContain('old target');
+});
+
+it('does not start a direct preparation for an already stale selection context', async () => {
+  request.moveToTrash = null;
+  await render('other-selection');
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(request.preparePermanent).not.toHaveBeenCalled();
   expect(confirm).not.toHaveBeenCalled();
 });

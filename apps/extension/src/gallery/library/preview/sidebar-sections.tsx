@@ -1,7 +1,10 @@
 import { canOpenGalleryProject } from '../items/types';
 import { getGalleryProjectSummary } from '../ui/project-presentation';
 import { translate } from '../../../platform/i18n';
-import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
+import {
+  getControlIconButtonClassName,
+  getControlSecondaryButtonClassName,
+} from '@sniptale/ui/control-language';
 import {
   ArrowUpRight,
   Clapperboard,
@@ -581,7 +584,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
           }
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
-          {translate('common.actions.delete')}
+          {translate('gallery.app.permanentDelete')}
         </button>
       </>
     );
@@ -676,8 +679,7 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
         ) : null}
         <div
           data-ui="gallery.preview.lifecycle-actions"
-          className="grid auto-cols-fr grid-flow-col items-start gap-2
-            border-t border-[var(--sniptale-color-border-soft)] pt-2"
+          className="border-t border-[var(--sniptale-color-border-soft)] pt-2"
         >
           <button
             type="button"
@@ -691,7 +693,6 @@ export function PreviewActions(props: PreviewPanelProps & { onReview?: () => voi
             <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />
             {translate('common.actions.delete')}
           </button>
-          <PreviewPromotionAction {...props} />
         </div>
       </div>
     </section>
@@ -706,14 +707,11 @@ export function PreviewPromotionAction(
   }
 
   return (
-    <div className="min-w-0 text-xs">
-      <PromotionAction
-        className={`${previewActionButtonClassName}
-          !h-auto !min-h-9 !px-2 !py-2 !whitespace-normal !text-xs text-center
-          active:!translate-y-0 active:!bg-[var(--sniptale-color-surface-input)]`}
-        onPromote={props.onPromote}
-        visible
-      />
-    </div>
+    <PromotionAction
+      key={props.item.id}
+      className={`${getControlIconButtonClassName()} !h-7 !w-7 !rounded-[6px]`}
+      onPromote={props.onPromote}
+      visible
+    />
   );
 }
