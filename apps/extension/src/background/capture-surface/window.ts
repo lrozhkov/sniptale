@@ -46,12 +46,15 @@ async function waitForNormalWindow(
   lastBoundsChange: () => number,
   onNormalized?: (snapshot: WindowSnapshot) => Promise<void>
 ): Promise<WindowSnapshot> {
-  const deadline = Date.now() + 2000;
+  let deadline = Date.now() + 2000;
   let snapshot = await getWindowSnapshot(windowId);
   let recorded: WindowSnapshot | null = null;
   while (Date.now() < deadline) {
     if (snapshot.state === 'normal' && (!recorded || !windowSnapshotsEqual(snapshot, recorded))) {
+      const persistenceStarted = Date.now();
       await onNormalized?.(snapshot);
+      // Durable recovery bookkeeping must not consume the browser settling budget.
+      deadline += Date.now() - persistenceStarted;
       recorded = snapshot;
     }
     if (snapshot.state === 'normal' && recorded && Date.now() - lastBoundsChange() >= 250) {

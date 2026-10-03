@@ -195,6 +195,51 @@ describe('browser window transition and bounds retry', () => {
     }
   });
 
+  it.each(['maximized', 'fullscreen'] as const)(
+    'excludes journal persistence from the %s normalization deadline',
+    async (state) => {
+      vi.useFakeTimers();
+      try {
+        const expected = { ...prior, width: 1280, height: 720 };
+        let current = prior;
+        mocks.getWindow.mockImplementation(async () => ({ id: 3, ...current }));
+        mocks.updateWindow.mockImplementation(async (_id, update) => {
+          if (update.width !== undefined) current = expected;
+        });
+        const onNormalized = vi.fn(async () => {
+          await new Promise<void>((resolve) => setTimeout(resolve, 1990));
+          expect(mocks.updateWindow).toHaveBeenCalledTimes(1);
+          const listener = mocks.subscribeBoundsChanged.mock.calls.at(-1)?.[0];
+          listener?.({
+            ...current,
+            id: 3,
+            type: 'normal',
+            focused: true,
+            alwaysOnTop: false,
+            incognito: false,
+          });
+        });
+        const result = expect(
+          applyPreparedWindowSize(3, { ...prior, state }, expected, onNormalized)
+        ).resolves.toEqual(expected);
+        await Promise.all([result, vi.advanceTimersByTimeAsync(3000)]);
+        expect(onNormalized).toHaveBeenCalledOnce();
+        expect(mocks.updateWindow).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('does not apply requested bounds when normalized journal persistence fails', async () => {
+    mocks.getWindow.mockResolvedValue({ id: 3, ...prior });
+    const onNormalized = vi.fn().mockRejectedValue(new Error('journal unavailable'));
+    await expect(
+      applyPreparedWindowSize(3, maximized, { ...prior, width: 1280 }, onNormalized)
+    ).rejects.toMatchObject({ message: 'journal unavailable', observedSnapshot: prior });
+    expect(mocks.updateWindow).toHaveBeenCalledExactlyOnceWith(3, { state: 'normal' });
+  });
+
   it('retries a browser bounds update that resolved without changing size', async () => {
     vi.useFakeTimers();
     try {
