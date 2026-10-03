@@ -8,7 +8,9 @@ import type { ContentAppLayoutScenarioProps } from './types';
 const captureMocks = vi.hoisted(() => ({
   source: vi.fn<(event: Event) => { kind: 'trusted-content-event' } | null>(),
   error: vi.fn(),
+  toast: vi.fn(),
 }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: captureMocks.toast }));
 vi.mock('../../application/privileged-action-intent', () => ({
   createTrustedContentActionIntentSource: captureMocks.source,
 }));
@@ -60,6 +62,7 @@ function createScenarioController() {
     captureAction: 'scenario' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),
+    finishRecording: vi.fn(async () => undefined),
     handleScreenshotModeDisabled: vi.fn(async () => undefined),
     moveRecentStep: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => undefined),
@@ -91,6 +94,7 @@ function createScenarioProps() {
       applyCaptureAction: controller.applyCaptureAction,
       createProject: controller.createProject,
       deleteRecentStep: controller.deleteRecentStep,
+      finishRecording: controller.finishRecording,
       handleScreenshotModeDisabled: controller.handleScreenshotModeDisabled,
       moveRecentStep: controller.moveRecentStep,
       openEditor: controller.openEditor,
@@ -230,11 +234,42 @@ describe('ContentScenarioRecorderSidebar finish flow', () => {
 
     expect(props.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
     expect(props.setPinToTab).toHaveBeenCalledWith(false);
-    expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledTimes(1);
-    expect(props.scenario.actions.openEditor).toHaveBeenCalledWith();
+    expect(props.scenario.actions.finishRecording).toHaveBeenCalledTimes(1);
+    expect(props.scenario.actions.openEditor).not.toHaveBeenCalled();
 
     await verifySidebarHideStates(props);
     await verifyDeferredHighlightRestore(props);
+  });
+
+  it('blocks repeated finish while pending and keeps the panel usable after failure', async () => {
+    const props = createProps();
+    let reject!: (reason: Error) => void;
+    props.scenario.actions.finishRecording.mockImplementationOnce(
+      () =>
+        new Promise((_, fail) => {
+          reject = fail;
+        })
+    );
+    await renderSidebar(props);
+    await act(async () => {
+      await clickRenderedSidebarButton();
+      await clickRenderedSidebarButton();
+    });
+    expect(props.scenario.actions.finishRecording).toHaveBeenCalledOnce();
+    expect(scenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ finishBusy: true, captureBusy: true })
+    );
+    expect(props.modeController.handleToggleScreenshotMode).not.toHaveBeenCalled();
+    await act(async () => {
+      reject(new Error('Open failed'));
+    });
+    expect(captureMocks.toast).toHaveBeenCalledWith(expect.any(String), 'error');
+    expect(props.setPinToTab).not.toHaveBeenCalled();
+    await act(async () => {
+      await clickRenderedSidebarButton();
+    });
+    expect(props.scenario.actions.finishRecording).toHaveBeenCalledTimes(2);
+    expect(props.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
   });
 
   it('keeps the panel pinned when finishing a scenario with automatic blur active', async () => {
@@ -246,7 +281,7 @@ describe('ContentScenarioRecorderSidebar finish flow', () => {
 
     expect(props.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
     expect(props.setPinToTab).not.toHaveBeenCalled();
-    expect(props.scenario.actions.openEditor).toHaveBeenCalledWith();
+    expect(props.scenario.actions.openEditor).not.toHaveBeenCalled();
   });
 });
 

@@ -112,7 +112,7 @@ function buildScenarioToolbarProps(args: {
 
 function createFinishScenarioHandler(args: {
   onDisableScreenshotMode: () => void;
-  scenarioActions: Pick<ContentAppScenarioActions, 'handleScreenshotModeDisabled' | 'openEditor'>;
+  scenarioActions: Pick<ContentAppScenarioActions, 'finishRecording'>;
 }) {
   return () =>
     finishScenarioRecorder({

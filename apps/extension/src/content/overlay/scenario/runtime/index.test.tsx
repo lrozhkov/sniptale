@@ -8,7 +8,9 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 import { installContentRuntimeMessagingMock } from '../../../application/runtime-services/services.test-support';
 
 const { sendRuntimeMessageMock } = vi.hoisted(() => ({
-  sendRuntimeMessageMock: vi.fn(async () => ({ success: true })),
+  sendRuntimeMessageMock: vi.fn<(message: unknown) => Promise<{ success: boolean }>>(async () => ({
+    success: true,
+  })),
 }));
 
 vi.mock('../../../../platform/runtime-messaging', async (importOriginal) => ({
@@ -95,5 +97,35 @@ describe('useScenarioControllerRuntime', () => {
       projectId: 'project-1',
       stepId: 'step-1',
     });
+  });
+  it('shares one pending finish across rerenders and allows retry after rejection', async () => {
+    let runtime: ReturnType<typeof useScenarioControllerRuntime> | null = null;
+    const onReady = (value: ReturnType<typeof useScenarioControllerRuntime>) => {
+      runtime = value;
+    };
+    await renderHarness(onReady);
+    let release!: (value: { success: boolean }) => void;
+    sendRuntimeMessageMock.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    const first = runtime!.controllerActions.finishRecording();
+    const rejected = expect(first).rejects.toThrow();
+    await renderHarness(onReady);
+    expect(runtime!.controllerActions.finishRecording()).toBe(first);
+    release({ success: false });
+    await rejected;
+    await runtime!.controllerActions.finishRecording();
+    expect(
+      sendRuntimeMessageMock.mock.calls.filter(
+        ([message]) =>
+          typeof message === 'object' &&
+          message !== null &&
+          'type' in message &&
+          message.type === MessageType.SCENARIO_OPEN_EDITOR
+      )
+    ).toHaveLength(1);
   });
 });

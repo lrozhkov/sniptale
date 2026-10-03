@@ -91,8 +91,8 @@ export function ScenarioRecorderSidebar(
     onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
     onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
     captureBusy: boolean;
+    finishBusy: boolean;
     onMoveStep: (stepId: string, toIndex: number) => void;
-    onOpenEditor: (stepId?: string | null) => void;
     onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
     pendingProjectSelection: boolean;
     projectName: string | null;
@@ -124,7 +124,6 @@ export function ScenarioRecorderSidebar(
         highlightedStepId={highlightedStepId}
         onDeleteStep={sidebarState.openDeleteStep}
         onInspectStep={sidebarState.openInspectedStep}
-        onOpenEditor={() => props.onOpenEditor()}
         onPreviewOpen={sidebarState.openPreviewStep}
         onProjectMenuToggle={() => sidebarState.setProjectMenuOpen((open) => !open)}
         onProjectMenuClose={sidebarState.closeProjectMenu}

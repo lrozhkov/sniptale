@@ -9,6 +9,7 @@ function createScenarioController(): PreparationSurfaceControllers['scenarioCont
     createProject: vi.fn(),
     deleteRecentStep: vi.fn(),
     ensureCaptureReady: vi.fn(),
+    finishRecording: vi.fn(),
     handleScreenshotModeDisabled: vi.fn(),
     moveRecentStep: vi.fn(),
     openEditor: vi.fn(),
@@ -52,6 +53,7 @@ it('projects real scenario layout props for the viewer sidebar gate', () => {
       sidebarVisible: true,
     })
   );
+  expect(scenario.actions.finishRecording).toBe(controller.finishRecording);
   expect(scenario.actions.applyCaptureAction).toBe(controller.applyCaptureAction);
   expect(scenario.actions.setSidebarVisible).toBe(controller.setSidebarVisible);
 });

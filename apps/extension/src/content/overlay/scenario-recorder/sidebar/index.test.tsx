@@ -90,7 +90,7 @@ async function renderSidebar(
         onCaptureVisible={vi.fn(async () => undefined)}
         captureBusy={false}
         onMoveStep={vi.fn()}
-        onOpenEditor={vi.fn()}
+        finishBusy={false}
         onSidebarHeaderMouseDown={vi.fn()}
         projectName="Scenario"
         position={position}

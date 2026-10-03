@@ -211,8 +211,8 @@ async function verifiesScenarioFinishUsesExplicitScreenshotExit() {
 
   expect(props.toolbar.modeController.handleToggleScreenshotMode).toHaveBeenCalledWith(false);
   expect(props.toolbar.setPinToTab).toHaveBeenCalledWith(false);
-  expect(props.scenario.actions.handleScreenshotModeDisabled).toHaveBeenCalledOnce();
-  expect(props.scenario.actions.openEditor).toHaveBeenCalledOnce();
+  expect(props.scenario.actions.finishRecording).toHaveBeenCalledOnce();
+  expect(props.scenario.actions.openEditor).not.toHaveBeenCalled();
 }
 
 async function verifiesVideoModeActivationKeepsToolbarVisible() {

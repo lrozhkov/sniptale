@@ -72,30 +72,18 @@ it('treats highlighter, quick edit, and ai-pick as by-click blockers', () => {
   ).toBe(true);
 });
 
-it('finishes the recorder by disabling screenshot mode before opening the scenario editor', async () => {
+it('closes screenshot mode only after finishing and opening the editor', async () => {
   const events: string[] = [];
-  const handleScreenshotModeDisabled = vi.fn(async () => {
-    events.push('scenario-disabled');
+  const finishRecording = vi.fn(async () => {
+    events.push('finished');
   });
-  const openEditor = vi.fn(async () => {
-    events.push('editor-opened');
-  });
-  const handleToggleScreenshotMode = vi.fn((enabled: boolean) => {
-    events.push(`toggle:${String(enabled)}`);
-  });
-
   await finishScenarioRecorder({
-    onDisableScreenshotMode: () => handleToggleScreenshotMode(false),
-    scenarioController: {
-      handleScreenshotModeDisabled,
-      openEditor,
+    onDisableScreenshotMode: () => {
+      events.push('closed');
     },
+    scenarioController: { finishRecording },
   });
-
-  expect(handleToggleScreenshotMode).toHaveBeenCalledWith(false);
-  expect(handleScreenshotModeDisabled).toHaveBeenCalledTimes(1);
-  expect(openEditor).toHaveBeenCalledWith();
-  expect(events).toEqual(['toggle:false', 'scenario-disabled', 'editor-opened']);
+  expect(events).toEqual(['finished', 'closed']);
 });
 
 it('restores by-click after blocker modes are cleared only when it was auto-forced to manual', () => {
@@ -122,4 +110,20 @@ it('restores by-click after blocker modes are cleared only when it was auto-forc
       restoreState: { restoreByClickAfterUnblock: false },
     })
   ).toBeNull();
+});
+
+it('keeps screenshot mode available when finishing fails', async () => {
+  const onDisableScreenshotMode = vi.fn();
+  const failure = new Error('Cannot finish');
+  await expect(
+    finishScenarioRecorder({
+      onDisableScreenshotMode,
+      scenarioController: {
+        finishRecording: vi.fn(async () => {
+          throw failure;
+        }),
+      },
+    })
+  ).rejects.toThrow(failure);
+  expect(onDisableScreenshotMode).not.toHaveBeenCalled();
 });

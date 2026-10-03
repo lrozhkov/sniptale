@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/types/base';
 import type {
   ScenarioRecorderSurfaceState,
@@ -51,7 +51,9 @@ export function useScenarioControllerRuntime(args: {
     applyScenarioResponse: args.applyScenarioResponse,
     buildCapturePayload,
   });
+  const finishPendingRef = useRef<Promise<void> | null>(null);
   const controllerActions = createScenarioControllerActions({
+    finishPendingRef,
     applyScenarioResponse: args.applyScenarioResponse,
     currentSurfaceRef: args.currentSurfaceRef,
     navigationLockEnabled: args.navigationLockEnabled,

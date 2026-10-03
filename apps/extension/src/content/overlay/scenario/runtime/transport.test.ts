@@ -172,4 +172,9 @@ describe('scenario-controller-runtime.transport', () => {
   });
 
   it('opens the scenario editor through the same transport owner', expectOpenEditorTransport);
+
+  it('rejects an unsuccessful editor response so finishing can recover', async () => {
+    sendRuntimeMessageMock.mockResolvedValueOnce({ success: false });
+    await expect(openScenarioEditor({ projectId: 'project-1' })).rejects.toThrow();
+  });
 });

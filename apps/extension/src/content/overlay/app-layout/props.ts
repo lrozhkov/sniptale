@@ -31,6 +31,7 @@ function createScenarioLayoutSection(
       applyCaptureAction: viewModel.scenarioController.applyCaptureAction,
       createProject: viewModel.scenarioController.createProject,
       deleteRecentStep: viewModel.scenarioController.deleteRecentStep,
+      finishRecording: viewModel.scenarioController.finishRecording,
       handleScreenshotModeDisabled: viewModel.scenarioController.handleScreenshotModeDisabled,
       moveRecentStep: viewModel.scenarioController.moveRecentStep,
       openEditor: viewModel.scenarioController.openEditor,

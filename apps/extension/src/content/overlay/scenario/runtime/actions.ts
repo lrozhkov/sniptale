@@ -1,3 +1,4 @@
+import { finishScenarioRecording } from '../mutation/finish';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/types/base';
 import type {
@@ -129,6 +130,7 @@ async function applyRecentStepMutation(args: {
 }
 
 export function createScenarioControllerActions(args: {
+  finishPendingRef: { current: Promise<void> | null };
   applyScenarioResponse: (response: ScenarioControllerResponse) => void;
   currentSurfaceRef: { current: ScenarioRecorderSurfaceState };
   navigationLockEnabled: boolean;
@@ -139,6 +141,19 @@ export function createScenarioControllerActions(args: {
   setOptimisticCaptureMode: (captureMode: ScenarioCaptureMode | null) => void;
 }) {
   return {
+    finishRecording: () => {
+      if (!args.finishPendingRef.current) {
+        args.finishPendingRef.current = finishScenarioRecording({
+          applyScenarioResponse: args.applyScenarioResponse,
+          currentSession: args.sessionRef.current,
+          currentSurface: args.currentSurfaceRef.current,
+          refreshSession: args.refreshSession,
+        }).finally(() => {
+          args.finishPendingRef.current = null;
+        });
+      }
+      return args.finishPendingRef.current;
+    },
     ...createScenarioControllerModeActions(args),
     ...createScenarioControllerProjectActions(args),
     ...createScenarioControllerStepActions(args),

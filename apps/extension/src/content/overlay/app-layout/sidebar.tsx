@@ -1,3 +1,4 @@
+import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { FileStack } from 'lucide-react';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { translate } from '../../../platform/i18n';
@@ -47,6 +48,33 @@ function useSidebarCapture(args: ContentScenarioRecorderSidebarArgs) {
   return { busy, captureVisible };
 }
 
+function useSidebarFinish(args: ContentScenarioRecorderSidebarArgs, captureBusy: boolean) {
+  const pending = useRef(false);
+  const [busy, setBusy] = useState(false);
+  async function finish() {
+    if (pending.current || captureBusy || args.captureSuspended) return;
+    pending.current = true;
+    setBusy(true);
+    try {
+      await finishScenarioRecorder({
+        onDisableScreenshotMode: () =>
+          exitScreenshotModeFromUserAction({
+            modeController: args.modeController,
+            setPinToTab: args.setPinToTab,
+            keepPinnedForAutoBlur: args.keepPinnedForAutoBlur,
+          }),
+        scenarioController: args.scenario.actions,
+      });
+    } catch {
+      showToast(translate('scenario.content.finishError'), 'error');
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
+  }
+  return { busy, finish };
+}
+
 export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSidebarArgs) {
   const { forcedHighlightStepId, forcedHighlightVersion } = useDeferredSidebarHighlight(args);
   const [countdownCapturePending, setCountdownCapturePending] = useState(false);
@@ -56,6 +84,7 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
   }, [args.captureSuspended, args.isToolbarVisible]);
   const captureSuspended = args.captureSuspended === true || countdownCapturePending;
   const capture = useSidebarCapture({ ...args, captureSuspended });
+  const finish = useSidebarFinish({ ...args, captureSuspended }, capture.busy);
   const isHidden = !shouldRenderContentScenarioRecorderSidebar(args) || captureSuspended;
   const focusTarget = useRef<'panel' | 'restore' | null>(null);
   const restoreButton = useRef<HTMLButtonElement>(null);
@@ -103,7 +132,7 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
   return (
     <ScenarioRecorderSidebar
       onCaptureVisible={capture.captureVisible}
-      captureBusy={capture.busy}
+      captureBusy={capture.busy || finish.busy}
       onCollapse={(event) => {
         if (event.detail === 0) focusTarget.current = 'restore';
         args.scenario.actions.setSidebarVisible(false);
@@ -112,19 +141,9 @@ export function ContentScenarioRecorderSidebar(args: ContentScenarioRecorderSide
       forcedHighlightStepId={forcedHighlightStepId}
       forcedHighlightVersion={forcedHighlightVersion}
       onDeleteStep={(stepId) => void args.scenario.actions.deleteRecentStep(stepId)}
-      onFinish={() =>
-        void finishScenarioRecorder({
-          onDisableScreenshotMode: () =>
-            exitScreenshotModeFromUserAction({
-              modeController: args.modeController,
-              setPinToTab: args.setPinToTab,
-              keepPinnedForAutoBlur: args.keepPinnedForAutoBlur,
-            }),
-          scenarioController: args.scenario.actions,
-        })
-      }
+      onFinish={() => void finish.finish()}
+      finishBusy={finish.busy}
       onMoveStep={(stepId, toIndex) => void args.scenario.actions.moveRecentStep(stepId, toIndex)}
-      onOpenEditor={(stepId) => void args.scenario.actions.openEditor(stepId)}
       onSidebarHeaderMouseDown={sidebarPosition.handleHeaderMouseDown}
       captureMode={args.scenario.state.scenarioCaptureMode}
       byClickDisabled={args.byClickDisabled}

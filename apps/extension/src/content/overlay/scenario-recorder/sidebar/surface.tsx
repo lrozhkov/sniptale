@@ -1,3 +1,5 @@
+import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { AppWindow } from 'lucide-react';
 import type { MouseEvent, MouseEventHandler, RefObject } from 'react';
 import { translate } from '../../../../platform/i18n';
@@ -45,12 +47,12 @@ function ScenarioRecorderStepList(props: ScenarioRecorderSidebarStepListProps) {
 
 function ScenarioRecorderSidebarFooter(props: {
   onFinish: () => void;
-  onOpenEditor: () => void;
   onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
   captureBusy: boolean;
+  finishBusy: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-2">
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
       <button
         type="button"
         onClick={(event) => void props.onCaptureVisible(event)}
@@ -59,37 +61,20 @@ function ScenarioRecorderSidebarFooter(props: {
         data-ui="content.scenario.sidebar.capture-visible"
         aria-label={translate('content.toolbar.visibleArea')}
         title={translate('content.toolbar.visibleArea')}
-        className="flex h-9 w-9 items-center justify-center rounded-lg border-0 bg-[var(--sniptale-color-surface-hover)]
-          text-[var(--sniptale-color-text-primary)] disabled:opacity-50 focus-visible:outline-2
-          focus-visible:outline-[var(--sniptale-color-border-accent-strong)]"
+        className={getControlIconButtonClassName({ density: 'compact' })}
       >
         <AppWindow aria-hidden="true" size={18} />
       </button>
-      <button
-        type="button"
+      <ProductActionButton
+        tone="primary"
         disabled={props.captureBusy}
-        onClick={props.onOpenEditor}
-        data-ui="content.scenario.sidebar.open-editor"
-        className="inline-flex min-w-0 w-full items-center justify-center overflow-hidden rounded-[14px]
-        border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_82%,transparent)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_54%,transparent)]
-        px-2 py-2 text-xs font-semibold text-[var(--sniptale-color-text-primary)] transition
-        hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-strong)_72%,transparent)]
-        hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_84%,transparent)]"
-      >
-        {translate('scenario.content.openEditorCta')}
-      </button>
-      <button
-        type="button"
-        disabled={props.captureBusy}
+        aria-busy={props.finishBusy}
         onClick={props.onFinish}
         data-ui="content.scenario.sidebar.finish"
-        className="rounded-[14px] border border-[var(--sniptale-color-border-soft)] px-3 py-2
-        text-sm font-semibold text-[var(--sniptale-color-text-primary)]
-        hover:bg-[var(--sniptale-color-surface-hover)]"
+        className="min-w-0 w-full"
       >
-        {translate('scenario.content.finish')}
-      </button>
+        {translate(props.finishBusy ? 'scenario.content.finishing' : 'scenario.content.finish')}
+      </ProductActionButton>
     </div>
   );
 }
@@ -153,11 +138,11 @@ export function ScenarioRecorderSidebarSurface(
     onDeleteStep: (stepId: string) => void;
     onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
     onMoveStep: (stepId: string, toIndex: number) => void;
-    onOpenEditor: () => void;
     onFinish: () => void;
     onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
     onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
     captureBusy: boolean;
+    finishBusy: boolean;
     onPreviewOpen: (step: ScenarioRecorderSidebarStep) => void;
     onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
     onProjectMenuToggle: () => void;
@@ -178,36 +163,38 @@ export function ScenarioRecorderSidebarSurface(
       style={getScenarioRecorderSidebarSurfaceStyle(props.position, props.uiScale ?? 1)}
       className={getScenarioRecorderSidebarSurfaceClassName(props.dragging)}
     >
-      <ScenarioRecorderSidebarHeader
-        dragging={props.dragging}
-        onCollapse={props.onCollapse}
-        onMouseDown={props.onSidebarHeaderMouseDown}
-        onProjectMenuToggle={props.onProjectMenuToggle}
-        projectMenuOpen={props.projectMenuOpen}
-        projectName={props.projectName}
-      />
+      <fieldset disabled={props.finishBusy} className="contents">
+        <ScenarioRecorderSidebarHeader
+          dragging={props.dragging}
+          onCollapse={props.onCollapse}
+          onMouseDown={props.onSidebarHeaderMouseDown}
+          onProjectMenuToggle={props.onProjectMenuToggle}
+          projectMenuOpen={props.projectMenuOpen}
+          projectName={props.projectName}
+        />
 
-      {props.projectMenuOpen ? (
-        <ScenarioSidebarProjectPicker {...props} onClose={props.onProjectMenuClose} />
-      ) : null}
-      <ScenarioSidebarCaptureMode {...props} />
+        {props.projectMenuOpen ? (
+          <ScenarioSidebarProjectPicker {...props} onClose={props.onProjectMenuClose} />
+        ) : null}
+        <ScenarioSidebarCaptureMode {...props} />
 
-      <ScenarioRecorderSidebarRecentSteps
-        highlightedStepId={props.highlightedStepId}
-        onDeleteStep={props.onDeleteStep}
-        onInspectStep={props.onInspectStep}
-        onMoveStep={props.onMoveStep}
-        onPreviewOpen={props.onPreviewOpen}
-        recentSteps={props.recentSteps}
-        stepsContainerRef={props.stepsContainerRef}
-      />
+        <ScenarioRecorderSidebarRecentSteps
+          highlightedStepId={props.highlightedStepId}
+          onDeleteStep={props.onDeleteStep}
+          onInspectStep={props.onInspectStep}
+          onMoveStep={props.onMoveStep}
+          onPreviewOpen={props.onPreviewOpen}
+          recentSteps={props.recentSteps}
+          stepsContainerRef={props.stepsContainerRef}
+        />
 
-      <ScenarioRecorderSidebarFooter
-        onFinish={props.onFinish}
-        onOpenEditor={props.onOpenEditor}
-        onCaptureVisible={props.onCaptureVisible}
-        captureBusy={props.captureBusy}
-      />
+        <ScenarioRecorderSidebarFooter
+          onFinish={props.onFinish}
+          onCaptureVisible={props.onCaptureVisible}
+          captureBusy={props.captureBusy}
+          finishBusy={props.finishBusy}
+        />
+      </fieldset>
     </aside>
   );
 }

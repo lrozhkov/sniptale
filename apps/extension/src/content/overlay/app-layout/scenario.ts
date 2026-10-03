@@ -13,8 +13,7 @@ type ScenarioByClickRestoreState = {
 type FinishScenarioRecorderArgs = {
   onDisableScreenshotMode: () => void;
   scenarioController: {
-    handleScreenshotModeDisabled: () => Promise<void>;
-    openEditor: (stepId?: string | null) => Promise<void>;
+    finishRecording: () => Promise<void>;
   };
 };
 
@@ -60,7 +59,6 @@ export function exitScreenshotModeFromUserAction(args: UserScreenshotModeExitArg
 }
 
 export async function finishScenarioRecorder(args: FinishScenarioRecorderArgs) {
+  await args.scenarioController.finishRecording();
   args.onDisableScreenshotMode();
-  await args.scenarioController.handleScreenshotModeDisabled();
-  await args.scenarioController.openEditor();
 }

@@ -45,6 +45,7 @@ export type ContentAppScenarioActions = {
   applyCaptureAction: (actionType: CaptureActionType) => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteRecentStep: (stepId: string) => Promise<void>;
+  finishRecording: () => Promise<void>;
   handleScreenshotModeDisabled: () => Promise<void>;
   moveRecentStep: (stepId: string, toIndex: number) => Promise<void>;
   openEditor: (stepId?: string | null) => Promise<void>;

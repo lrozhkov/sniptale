@@ -74,13 +74,14 @@ export const scenarioContentMessages = defineMessageSource({
     ru: 'Редактор сценариев',
     en: 'Scenario editor',
   },
-  openEditorCta: {
-    ru: 'Перейти в редактор сценария',
-    en: 'Open scenario editor',
-  },
   finish: {
-    ru: 'Завершить',
-    en: 'Finish',
+    ru: 'Завершить и редактировать',
+    en: 'Finish and edit',
+  },
+  finishing: { ru: 'Завершение…', en: 'Finishing…' },
+  finishError: {
+    ru: 'Не удалось завершить запись и открыть редактор. Сохранённые шаги доступны в проекте.',
+    en: 'Could not finish recording and open the editor. Saved steps remain in the project.',
   },
   openStepInEditor: {
     ru: 'Открыть шаг в редакторе',
