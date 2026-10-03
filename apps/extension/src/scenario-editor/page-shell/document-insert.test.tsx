@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { translate } from '../../platform/i18n';
-import { GuideDocumentInsert, GuideInsertionAvailability } from './document-insert';
+import { GuideDocumentInsert, GuideInsertScope } from './document-insert';
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
@@ -27,12 +27,14 @@ it('offers step and section operations from one visible insertion trigger', asyn
   const onOperate = vi.fn();
   await act(async () =>
     root.render(
-      <GuideDocumentInsert
-        target={{ kind: 'item', beforeItemId: 'next' }}
-        disabled={false}
-        onOperate={onOperate}
-        t={(key) => translate(key, 'en')}
-      />
+      <GuideInsertScope value={false} breaks={['block-2', 'next']}>
+        <GuideDocumentInsert
+          target={{ kind: 'item', beforeItemId: 'next' }}
+          disabled={false}
+          onOperate={onOperate}
+          t={(key) => translate(key, 'en')}
+        />
+      </GuideInsertScope>
     )
   );
   const trigger = container.querySelector<HTMLButtonElement>('.guide-insertion-chrome button')!;
@@ -53,13 +55,15 @@ it('places row-start inside the block insert menu and toggles the targeted block
   const render = async (rowStart: boolean) =>
     act(async () =>
       root.render(
-        <GuideDocumentInsert
-          target={{ kind: 'block', itemId: 'step-1', beforeBlockId: 'block-2' }}
-          rowStart={rowStart}
-          disabled={false}
-          onOperate={onOperate}
-          t={(key) => translate(key, 'en')}
-        />
+        <GuideInsertScope value={false} breaks={['block-2', 'next']}>
+          <GuideDocumentInsert
+            target={{ kind: 'block', itemId: 'step-1', beforeBlockId: 'block-2' }}
+            rowStart={rowStart}
+            disabled={false}
+            onOperate={onOperate}
+            t={(key) => translate(key, 'en')}
+          />
+        </GuideInsertScope>
       )
     );
   await render(false);
@@ -96,13 +100,19 @@ it('inserts before the selected block and omits row-start at the end', async () 
   const render = async (beforeBlockId?: string) =>
     act(async () =>
       root.render(
-        <GuideDocumentInsert
-          target={{ kind: 'block', itemId: 'step-1', ...(beforeBlockId ? { beforeBlockId } : {}) }}
-          {...(beforeBlockId ? { rowStart: false } : {})}
-          disabled={false}
-          onOperate={onOperate}
-          t={(key) => translate(key, 'en')}
-        />
+        <GuideInsertScope value={false} breaks={['block-2', 'next']}>
+          <GuideDocumentInsert
+            target={{
+              kind: 'block',
+              itemId: 'step-1',
+              ...(beforeBlockId ? { beforeBlockId } : {}),
+            }}
+            {...(beforeBlockId ? { rowStart: false } : {})}
+            disabled={false}
+            onOperate={onOperate}
+            t={(key) => translate(key, 'en')}
+          />
+        </GuideInsertScope>
       )
     );
   await render('block-2');
@@ -128,13 +138,15 @@ it('opens the extended anchor with keyboard support and disabled gating', async 
   const render = async (disabled: boolean) =>
     act(async () =>
       root.render(
-        <GuideDocumentInsert
-          target={{ kind: 'block', itemId: 'step', beforeBlockId: 'next' }}
-          rowStart={false}
-          disabled={disabled}
-          onOperate={onOperate}
-          t={(key) => translate(key, 'en')}
-        />
+        <GuideInsertScope value={false} breaks={['block-2', 'next']}>
+          <GuideDocumentInsert
+            target={{ kind: 'block', itemId: 'step', beforeBlockId: 'next' }}
+            rowStart={false}
+            disabled={disabled}
+            onOperate={onOperate}
+            t={(key) => translate(key, 'en')}
+          />
+        </GuideInsertScope>
       )
     );
   await render(false);
@@ -180,14 +192,14 @@ it('disables insertion and closes an open menu while a block is selected', async
   const onOperate = vi.fn();
   const draw = (blocked: boolean) =>
     root.render(
-      <GuideInsertionAvailability value={blocked}>
+      <GuideInsertScope value={blocked}>
         <GuideDocumentInsert
           target={{ kind: 'item', beforeItemId: 'first' }}
           disabled={false}
           onOperate={onOperate}
           t={(key) => translate(key, 'en')}
         />
-      </GuideInsertionAvailability>
+      </GuideInsertScope>
     );
   await act(async () => draw(false));
   const trigger = container.querySelector<HTMLButtonElement>('button')!;
@@ -203,4 +215,21 @@ it('disables insertion and closes an open menu while a block is selected', async
   expect(trigger.disabled).toBe(false);
   await act(async () => trigger.click());
   expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+});
+
+it('uses dots for block insertion and omits a row command without a meaningful move', async () => {
+  await act(async () =>
+    root.render(
+      <GuideDocumentInsert
+        target={{ kind: 'block', itemId: 'step', beforeBlockId: 'solo' }}
+        rowStart={false}
+        disabled={false}
+        onOperate={vi.fn()}
+        t={(key) => translate(key, 'en')}
+      />
+    )
+  );
+  expect(container.querySelector('svg.lucide-ellipsis')).not.toBeNull();
+  await act(async () => container.querySelector<HTMLButtonElement>('button')!.click());
+  expect(document.querySelector('.guide-action-menu button[aria-pressed]')).toBeNull();
 });

@@ -108,13 +108,15 @@ function useInsertDisclosure(disabled: boolean, width: number) {
   return { open, anchor, row, trigger, hover: boundaryHover, style, enterRow, close, setOpen };
 }
 
-/** Owns the plus-to-icon-row interaction at one stable document insertion boundary. */
+/** Owns the trigger-to-icon-row interaction at one stable document insertion boundary. */
 export function GuideInsertActions({
   label,
+  icon,
   items,
   disabled,
 }: {
   label: string;
+  icon?: ReactNode;
   items: InsertAction[];
   disabled: boolean;
 }) {
@@ -166,7 +168,7 @@ export function GuideInsertActions({
           ui.enterRow();
         }}
       >
-        <Plus size={16} aria-hidden="true" />
+        {icon ?? <Plus size={16} aria-hidden="true" />}
       </ContentToolbarButton>
       {ui.open &&
         createPortal(

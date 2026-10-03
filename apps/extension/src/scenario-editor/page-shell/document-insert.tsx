@@ -1,11 +1,35 @@
-import { createContext, useContext } from 'react';
-import { FileText, Heading, Image, ListPlus, MessageSquare, CornerDownLeft } from 'lucide-react';
+import { createContext, useContext, type ReactNode } from 'react';
+import {
+  FileText,
+  Heading,
+  Image,
+  ListPlus,
+  MessageSquare,
+  CornerDownLeft,
+  Ellipsis,
+} from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideInsertActions } from './insert-actions';
 
-const InsertionBlocked = createContext(false);
-export const GuideInsertionAvailability = InsertionBlocked.Provider;
+const InsertionAvailability = createContext<{ blocked: boolean; breaks: readonly string[] }>({
+  blocked: false,
+  breaks: [],
+});
+/** Editor selection and measured rows jointly determine available insertion commands. */
+export function GuideInsertScope({
+  value,
+  breaks = [],
+  children,
+}: {
+  value: boolean;
+  breaks?: readonly string[];
+  children: ReactNode;
+}) {
+  return (
+    <InsertionAvailability value={{ blocked: value, breaks }}>{children}</InsertionAvailability>
+  );
+}
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
@@ -27,7 +51,7 @@ export function GuideDocumentInsert({
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
 }) {
-  const blocked = useContext(InsertionBlocked);
+  const { blocked, breaks } = useContext(InsertionAvailability);
   const before = target.kind === 'item' ? target.beforeItemId : target.beforeBlockId;
   const items =
     target.kind === 'item'
@@ -83,7 +107,10 @@ export function GuideDocumentInsert({
             }),
         }));
   const rowStartItem =
-    target.kind === 'block' && target.beforeBlockId && rowStart !== undefined
+    target.kind === 'block' &&
+    target.beforeBlockId &&
+    rowStart !== undefined &&
+    breaks.includes(target.beforeBlockId)
       ? {
           label: t(
             rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
@@ -110,6 +137,7 @@ export function GuideDocumentInsert({
     >
       <div className="guide-insertion-chrome">
         <GuideInsertActions
+          icon={target.kind === 'block' ? <Ellipsis size={16} aria-hidden="true" /> : undefined}
           label={t(
             target.kind === 'item'
               ? 'scenario.editor.guideInsertItem'

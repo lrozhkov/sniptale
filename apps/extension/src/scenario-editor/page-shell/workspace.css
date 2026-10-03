@@ -2489,3 +2489,15 @@ html[data-guide-height-resizing] * {
   ) !important;
   color: var(--sniptale-color-text-primary) !important;
 }
+
+/* Editor insertion menus need breathing room; document/export spacing stays unchanged. */
+.guide-page .guide-document > :is(article, section) {
+  margin-bottom: 2.5rem;
+}
+.guide-page .guide-document > .guide-insertion-item:not(:first-of-type) {
+  --guide-insert-hit-height: 2rem;
+}
+.guide-page .guide-document > .guide-insertion-item:not(:first-of-type) > .guide-insertion-chrome,
+.guide-page .guide-document > .guide-insertion-item:not(:first-of-type)::before {
+  top: -2.25rem;
+}

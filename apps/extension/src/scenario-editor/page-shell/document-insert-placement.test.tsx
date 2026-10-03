@@ -11,9 +11,9 @@ const disconnect = vi.fn();
 const bounds = new Map<string, DOMRect>();
 function Surface({ ids = ['a', 'b', 'c'] }: { ids?: string[] }) {
   const ref = useRef<HTMLDivElement>(null);
-  useGuideInsertPlacement(ref);
+  const movable = useGuideInsertPlacement(ref);
   return (
-    <div ref={ref}>
+    <div ref={ref} data-movable={JSON.stringify(movable)}>
       <div className="guide-step-blocks">
         <div className="guide-block-row" style={{ rowGap: '24px' }}>
           {ids.map((id, index) => (
@@ -105,4 +105,40 @@ it('repositions wrapping rows and newly inserted blocks and disconnects on unmou
   await act(async () => root.render(null));
   expect(disconnect).toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it('offers a row break only after a preceding block in the actual wrapped row', async () => {
+  await act(async () => root.render(<Surface />));
+  await flush();
+  expect(JSON.parse(host.firstElementChild!.getAttribute('data-movable')!)).toEqual(['b', 'c']);
+  bounds.set('c', new DOMRect(100, 284, 200, 120));
+  resize();
+  await flush();
+  expect(JSON.parse(host.firstElementChild!.getAttribute('data-movable')!)).toEqual(['b']);
+});
+
+it('offers removing an explicit break only when the preceding row has room', async () => {
+  function SplitSurface() {
+    const ref = useRef<HTMLDivElement>(null);
+    const movable = useGuideInsertPlacement(ref);
+    return (
+      <div ref={ref} data-movable={JSON.stringify(movable)}>
+        <div className="guide-step-blocks">
+          {['a', 'b'].map((id) => (
+            <div key={id} className="guide-block-row" style={{ columnGap: '40px' }}>
+              <div className="guide-block" data-block-id={id} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  bounds.set('b', new DOMRect(100, 284, 200, 80));
+  await act(async () => root.render(<SplitSurface />));
+  await flush();
+  expect(JSON.parse(host.firstElementChild!.getAttribute('data-movable')!)).toEqual(['b']);
+  bounds.set('a', new DOMRect(100, 100, 680, 160));
+  resize();
+  await flush();
+  expect(JSON.parse(host.firstElementChild!.getAttribute('data-movable')!)).toEqual([]);
 });

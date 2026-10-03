@@ -1,18 +1,27 @@
-import { useLayoutEffect, type RefObject } from 'react';
+import { useLayoutEffect, useState, type RefObject } from 'react';
 
 type MeasuredBlock = { element: HTMLElement; rect: DOMRect };
 
 /** One editor observer keeps insertion targets aligned with actual wrapped rows. */
-export function useGuideInsertPlacement(ref: RefObject<HTMLDivElement | null>): void {
+export function useGuideInsertPlacement(ref: RefObject<HTMLDivElement | null>): readonly string[] {
+  const [movable, setMovable] = useState<readonly string[]>([]);
   useLayoutEffect(() => {
     const root = ref.current;
     if (!root) return;
     let frame: number | null = null;
+    const measure = () => {
+      const next = placeInsertions(root);
+      setMovable((previous) =>
+        previous.length === next.length && previous.every((id, index) => id === next[index])
+          ? previous
+          : next
+      );
+    };
     const schedule = () => {
       if (frame !== null) return;
       frame = requestAnimationFrame(() => {
         frame = null;
-        placeInsertions(root);
+        measure();
       });
     };
     const resize = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
@@ -29,16 +38,19 @@ export function useGuideInsertPlacement(ref: RefObject<HTMLDivElement | null>): 
     });
     observe();
     mutation.observe(root, { childList: true, subtree: true });
-    placeInsertions(root);
+    measure();
     return () => {
       resize?.disconnect();
       mutation.disconnect();
       if (frame !== null) cancelAnimationFrame(frame);
     };
   }, [ref]);
+  return movable;
 }
 
-function placeInsertions(root: HTMLElement): void {
+function placeInsertions(root: HTMLElement): string[] {
+  const movable: string[] = [];
+  let previous: { segment: HTMLElement; row: MeasuredBlock[] } | null = null;
   for (const segment of root.querySelectorAll<HTMLElement>('.guide-block-row')) {
     const rows: MeasuredBlock[][] = [];
     for (const element of segment.querySelectorAll<HTMLElement>(':scope > .guide-block')) {
@@ -49,8 +61,29 @@ function placeInsertions(root: HTMLElement): void {
       else rows.push([{ element, rect }]);
     }
     const gap = parseFloat(getComputedStyle(segment).rowGap) || 0;
-    for (const row of rows) placeRow(row, gap);
+    for (const row of rows) {
+      placeRow(row, gap);
+      for (const block of row.slice(1)) {
+        const id = block.element.dataset['blockId'];
+        if (id) movable.push(id);
+      }
+    }
+    const first = rows[0]?.[0];
+    if (first && previous?.segment.parentElement === segment.parentElement) {
+      const right = Math.max(...previous.row.map(({ rect }) => rect.right));
+      const columnGap = parseFloat(getComputedStyle(segment).columnGap) || 0;
+      if (
+        right + columnGap + first.rect.width <=
+        previous.segment.getBoundingClientRect().right + 1
+      ) {
+        const id = first.element.dataset['blockId'];
+        if (id) movable.push(id);
+      }
+    }
+    const last = rows.at(-1);
+    previous = last ? { segment, row: last } : null;
   }
+  return movable;
 }
 
 function placeRow(row: MeasuredBlock[], gap: number): void {

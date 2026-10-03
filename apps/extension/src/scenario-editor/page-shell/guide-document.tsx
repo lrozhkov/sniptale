@@ -6,7 +6,7 @@ import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
 import { guideDocumentSelection, useGuideSelectionInput } from './document-selection';
 import { Fragment, useEffect, useId, useRef, useState } from 'react';
-import { GuideDocumentInsert, GuideInsertionAvailability } from './document-insert';
+import { GuideDocumentInsert, GuideInsertScope } from './document-insert';
 import { GuideStepActions } from './step-actions';
 import type {
   GuideBlock,
@@ -81,7 +81,7 @@ export function GuideDocument({
   const instructions = useId();
   const [textEditing, setTextEditing] = useState(false);
   useGuideSelectionInput(content);
-  useGuideInsertPlacement(content);
+  const breaks = useGuideInsertPlacement(content);
   const selection = guideDocumentSelection({
     selectedId,
     selectedBlockId,
@@ -94,7 +94,7 @@ export function GuideDocument({
   );
   const numbers = resolveGuideNumbering(project.items);
   return (
-    <GuideInsertionAvailability value={!!selectedBlockId || textEditing || !!framedImageId}>
+    <GuideInsertScope breaks={breaks} value={!!(selectedBlockId || textEditing || framedImageId)}>
       <div
         ref={content}
         className="guide-document"
@@ -207,7 +207,7 @@ export function GuideDocument({
           />
         )}
       </div>
-    </GuideInsertionAvailability>
+    </GuideInsertScope>
   );
 }
 
