@@ -153,3 +153,22 @@ it('animates manual camera only after its delay, through the same entrance clock
   f.motion.frame(1200);
   expect(plane.style.transform).toBe('');
 });
+
+it('reprojects outgoing pixels and travelling points without resetting elapsed motion', () => {
+  const f = fixture();
+  f.prepare();
+  f.motion.ready();
+  f.motion.frame(100);
+  f.scene.innerHTML =
+    '<div class="tour-image-plane"></div><button class="tour-hotspot" style="left:214px;top:90px">1</button>';
+  f.motion.reflow({ stageWidth: 320, stageHeight: 180 });
+  expect(f.previous!.pixels.style.opacity).toBe('0.5');
+  expect(f.previous!.pixels.style.transform).toBe('scale(0.5)');
+  expect(f.previous!.pixels.style.width).toBe('640px');
+  expect(f.previous!.pixels.inert).toBe(true);
+  f.motion.frame(350);
+  expect(f.root.querySelector<HTMLElement>('.tour-motion-hotspot')!.style.left).toBe('132px');
+  f.motion.frame(500);
+  expect(f.root.querySelector('.tour-motion-previous')).toBeNull();
+  expect(f.scene.inert).toBe(false);
+});

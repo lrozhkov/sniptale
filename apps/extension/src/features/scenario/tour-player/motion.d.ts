@@ -17,6 +17,7 @@ export function createTourMotion(
   ): void;
   ready(): void;
   frame(elapsed: number): void;
+  reflow(viewport: { stageWidth: number; stageHeight: number }): void;
   cancel(options?: { preserveMediaGate?: boolean }): void;
   fail(): void;
 };

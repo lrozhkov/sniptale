@@ -412,3 +412,58 @@ it('does not turn pending image URLs into relative undefined requests', async ()
   player.select('navigation');
   expect(root.querySelector('img.tour-navigation-image')!.getAttribute('src')).toBeNull();
 });
+
+it.each(['loading', 'running'] as const)(
+  'keeps camera entrance through %s viewport layout',
+  async (phase) => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const tick = playbackFrames();
+    const pending: { onload: (() => void) | null; onerror: (() => void) | null; src: string }[] =
+      [];
+    vi.stubGlobal(
+      'Image',
+      class {
+        src = '';
+        onload = null;
+        onerror = null;
+        constructor() {
+          pending.push(this);
+        }
+      }
+    );
+    const tour = previewTour();
+    tour.playback.autoplay = false;
+    const slide = imageSlide('first');
+    slide.camera = {
+      mode: 'manual',
+      center: { x: 0.5, y: 0.5 },
+      zoom: 2,
+      delayMs: 0,
+      durationMs: 1000,
+    };
+    tour.slides = [slide];
+    const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+    if (phase === 'running') {
+      pending.at(-1)!.onload!();
+      await tick(0);
+      await tick(250);
+    }
+    const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
+    Object.defineProperty(viewport, 'clientWidth', { value: 500, configurable: true });
+    window.dispatchEvent(new Event('resize'));
+    if (phase === 'loading') {
+      expect(root.querySelector<HTMLElement>('[data-tour-scene]')!.inert).toBe(true);
+      pending.at(-1)!.onload!();
+      await tick(0);
+      await tick(250);
+    }
+    const plane = root.querySelector<HTMLElement>('.tour-image-plane')!;
+    expect(plane.style.transform).toContain('scale(0.578125)');
+    await tick(250);
+    expect(plane.style.transform).toContain('scale(0.75)');
+    await tick(500);
+    expect(plane.style.transform).toBe('');
+    expect(root.querySelector<HTMLElement>('[data-tour-stage]')!.dataset['motion']).toBe('settled');
+    expect(root.dataset['slideId']).toBe('first');
+  }
+);

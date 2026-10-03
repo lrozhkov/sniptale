@@ -597,7 +597,7 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   expect(root.dataset['slideId']).toBe('third');
   expect(play.textContent).toBe('Play');
 });
-it('seeks a stable paused entrance frame and cancels transient geometry on actual resize', async () => {
+it('keeps a paused entrance at its clock position through actual resize', async () => {
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   const tick = playbackFrames();
   const { player, root } = await mount();
@@ -617,9 +617,13 @@ it('seeks a stable paused entrance frame and cancels transient geometry on actua
   const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
   Object.defineProperty(viewport, 'clientWidth', { value: 500, configurable: true });
   window.dispatchEvent(new Event('resize'));
-  expect(scene.inert).toBe(false);
-  expect(scene.style.opacity).toBe('');
-  expect(root.querySelector('.tour-motion-previous')).toBeNull();
+  expect(scene.inert).toBe(true);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('1');
+  await tick(1000);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('1');
+  seek.value = '50';
+  seek.dispatchEvent(new Event('input', { bubbles: true }));
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
   player.select('second');
   player.select('third');
   await tick(0);

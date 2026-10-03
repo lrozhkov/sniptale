@@ -172,13 +172,13 @@ async function expectChromeBelowFrame(page: Page) {
   expect(await page.locator('header').count()).toBe(0);
   const controls = await Promise.all(
     [
-      '[data-tour-contents]',
       '[data-tour-play]',
       '.tour-time',
       '[data-tour-seek]',
       '[data-tour-previous]',
       '[data-tour-counter]',
       '[data-tour-next]',
+      '[data-tour-contents]',
     ].map(async (selector) => ({ selector, box: await page.locator(selector).boundingBox() }))
   );
   for (const { selector, box } of controls) {

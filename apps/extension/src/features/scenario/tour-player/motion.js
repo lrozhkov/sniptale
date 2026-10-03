@@ -10,6 +10,20 @@ export function createTourMotion(root, signal) {
   const stage = root.querySelector('[data-tour-stage]');
   const hint = root.querySelector('[data-tour-hint]');
   let current = null;
+  function frame(elapsed) {
+    if (!current?.ready || signal.aborted) return;
+    current.elapsed = elapsed;
+    if (elapsed >= current.phases.total) {
+      settleMotion(current, scene, hint, stage);
+      return;
+    }
+    scene.inert = true;
+    hint.inert = true;
+    hint.style.visibility = 'hidden';
+    if (current.previous) stage.append(current.previous.pixels);
+    stage.dataset.motion = 'running';
+    applyMotionFrame(current, scene, stage, elapsed);
+  }
   function cancel({ preserveMediaGate = false } = {}) {
     const gate =
       preserveMediaGate && ['loading', 'error'].includes(stage.dataset.motion)
@@ -59,18 +73,30 @@ export function createTourMotion(root, signal) {
       if (current) current.ready = true;
       else cancel();
     },
-    frame(elapsed) {
-      if (!current?.ready || signal.aborted) return;
-      if (elapsed >= current.phases.total) {
-        settleMotion(current, scene, hint, stage);
-        return;
-      }
+    frame,
+    reflow(viewport) {
+      if (signal.aborted) return;
+      if (!current) return cancel({ preserveMediaGate: true });
+      const { ready, elapsed, previous, context } = current;
+      settleMotion(current, scene, hint, stage);
+      resizeSnapshot(previous, current.viewport, viewport);
+      current = prepareMotion(
+        scene,
+        previous,
+        context.slide,
+        context.tour,
+        viewport,
+        context.reducedMotion
+      );
+      current.ready = ready;
+      current.elapsed = elapsed;
+      if (ready) return frame(elapsed);
       scene.inert = true;
       hint.inert = true;
       hint.style.visibility = 'hidden';
-      if (current.previous) stage.append(current.previous.pixels);
-      stage.dataset.motion = 'running';
-      applyMotionFrame(current, scene, stage, elapsed);
+      scene.style.opacity = '0';
+      if (previous) stage.append(previous.pixels);
+      stage.dataset.motion = 'loading';
     },
     fail() {
       cancel();
@@ -107,6 +133,8 @@ function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
     marker.setAttribute('aria-hidden', 'true');
   }
   return {
+    context: { slide, tour, reducedMotion },
+    elapsed: 0,
     previous,
     phases,
     kind: tour.transition.kind,
@@ -120,6 +148,18 @@ function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
     image,
   };
 }
+/** Frozen outgoing pixels retain their geometry while the live scene is rebuilt. */
+function resizeSnapshot(previous, from, to) {
+  if (!previous) return;
+  const scale = previous.scale ?? 1;
+  previous.pixels.style.width = `${from.stageWidth / scale}px`;
+  previous.pixels.style.height = `${from.stageHeight / scale}px`;
+  previous.pixels.style.transformOrigin = 'top left';
+  const ratio = to.stageWidth / from.stageWidth;
+  previous.scale = scale * ratio;
+  previous.pixels.style.transform = `scale(${previous.scale})`;
+  if (previous.point) previous.point = { x: previous.point.x * ratio, y: previous.point.y * ratio };
+}
 function applyMotionFrame(state, scene, stage, elapsed) {
   const switching = state.phases.switchMs ? bounded(elapsed / state.phases.switchMs) : 1;
   const travelling =
@@ -132,8 +172,10 @@ function applyMotionFrame(state, scene, stage, elapsed) {
   if (state.previous) state.previous.pixels.style.opacity = String(1 - switching);
   if (state.kind === 'slide') {
     scene.style.transform = `translateX(${(1 - switching) * state.viewport.stageWidth * 0.08}px)`;
-    if (state.previous)
-      state.previous.pixels.style.transform = `translateX(${-switching * state.viewport.stageWidth * 0.08}px)`;
+    if (state.previous) {
+      const offset = -switching * state.viewport.stageWidth * 0.08;
+      state.previous.pixels.style.transform = `translateX(${offset}px) scale(${state.previous.scale ?? 1})`;
+    }
   }
   let box = state.final;
   if (state.plane && state.base && state.final) {

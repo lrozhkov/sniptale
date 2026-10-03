@@ -467,11 +467,11 @@ it('lays out one content frame above one bottom toolbar that owns every control'
   expect(main.firstElementChild).toBe(viewport);
   expect(viewport.compareDocumentPosition(toolbar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   const ordered = [
-    '[data-tour-contents]',
     '[data-tour-play]',
     '[data-tour-seek]',
     '[data-tour-previous]',
     '[data-tour-next]',
+    '[data-tour-contents]',
   ];
   const nodes = ordered.map((selector) => document.querySelector(selector)!);
   for (const node of nodes) expect(toolbar.contains(node)).toBe(true);

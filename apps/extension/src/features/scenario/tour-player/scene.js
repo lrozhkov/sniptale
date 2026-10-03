@@ -132,7 +132,6 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
     )
       return;
     lastFontSize = fontSize;
-    motion?.cancel({ preserveMediaGate: true });
     stageWidth = nextWidth;
     stageHeight = nextHeight;
     root.style.setProperty('--tour-frame-width', `${stageWidth}px`);
@@ -141,6 +140,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
     stage.style.width = `${stageWidth}px`;
     stage.style.height = `${stageHeight}px`;
     render();
+    motion?.reflow({ stageWidth, stageHeight });
   }
   applySceneStyle(root, stage, tour);
   return {

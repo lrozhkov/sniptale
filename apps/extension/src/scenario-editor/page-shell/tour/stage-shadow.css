@@ -16,16 +16,6 @@
 :host(:not([data-view='preview'])) .tour-toolbar {
   display: none;
 }
-:host([data-view='edit'][data-authoring-navigation='true']) .tour-toolbar {
-  display: flex;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  color: var(--sniptale-color-text-primary);
-}
-:host([data-view='edit']) .tour-playback {
-  display: none;
-}
 :host([data-view='edit'][data-authoring-navigation='true']) .tour-hint-text {
   overflow-y: auto;
   overscroll-behavior: contain;
