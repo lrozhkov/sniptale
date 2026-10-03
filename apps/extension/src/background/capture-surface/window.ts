@@ -1,8 +1,11 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { browserDisplays } from '@sniptale/platform/browser/displays';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import type { CaptureSurfaceSnapshot } from '../storage/capture-surface/contracts';
 import { clampWindowPosition, doesSizeFit, selectDisplayForWindow } from './display-geometry';
 import { CaptureSurfaceMutationError } from './types';
+
+const logger = createLogger({ namespace: 'CaptureSurfaceWindow' });
 
 type WindowSnapshot = Extract<CaptureSurfaceSnapshot, { type: 'window' }>;
 
@@ -63,6 +66,11 @@ async function waitForNormalWindow(
     await new Promise<void>((resolve) => setTimeout(resolve, 50));
     snapshot = await getWindowSnapshot(windowId);
   }
+  logger.warn('Window verification failed', {
+    phase: 'normalization',
+    observed: snapshot,
+    quietForMs: Date.now() - lastBoundsChange(),
+  });
   throw new CaptureSurfaceMutationError('verification-failed', snapshot);
 }
 
@@ -91,6 +99,13 @@ async function waitForAppliedWindowSize(
       return null;
     }
   }
+  logger.warn('Window verification failed', {
+    phase: 'requested-size',
+    expected,
+    reported,
+    observed: applied,
+    quietForMs: Date.now() - lastBoundsChange(),
+  });
   throw new CaptureSurfaceMutationError('verification-failed', applied);
 }
 

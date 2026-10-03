@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  warn: vi.fn(),
   displayInfo: vi.fn(),
   getWindow: vi.fn(),
   updateWindow: vi.fn(),
   subscribeBoundsChanged: vi.fn((_listener: (window: chrome.windows.Window) => void) => vi.fn()),
+}));
+
+vi.mock('@sniptale/platform/observability/logger', () => ({
+  createLogger: () => ({ warn: mocks.warn }),
 }));
 
 vi.mock('@sniptale/platform/browser/displays', () => ({
@@ -67,6 +72,7 @@ describe('browser window sizing and normalization', () => {
 
     await expect(applyPreparedWindowSize(3, prior, expected)).resolves.toEqual(expected);
 
+    expect(mocks.warn).not.toHaveBeenCalled();
     expect(mocks.updateWindow).toHaveBeenCalledOnce();
     expect(mocks.updateWindow).toHaveBeenCalledWith(3, {
       left: expected.left,
@@ -231,6 +237,25 @@ describe('browser window transition and bounds retry', () => {
     }
   );
 
+  it('reports only window geometry when normalization never completes', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.getWindow.mockResolvedValue({ id: 3, ...maximized, title: 'private title', tabs: [] });
+      const result = expect(
+        applyPreparedWindowSize(3, maximized, { ...prior, width: 1280 })
+      ).rejects.toMatchObject({ message: 'verification-failed' });
+      await Promise.all([result, vi.advanceTimersByTimeAsync(2100)]);
+      expect(mocks.warn).toHaveBeenCalledExactlyOnceWith('Window verification failed', {
+        phase: 'normalization',
+        observed: maximized,
+        quietForMs: 2000,
+      });
+      expect(mocks.updateWindow).toHaveBeenCalledExactlyOnceWith(3, { state: 'normal' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('does not apply requested bounds when normalized journal persistence fails', async () => {
     mocks.getWindow.mockResolvedValue({ id: 3, ...prior });
     const onNormalized = vi.fn().mockRejectedValue(new Error('journal unavailable'));
@@ -272,6 +297,13 @@ describe('browser window transition and bounds retry', () => {
       await vi.advanceTimersByTimeAsync(3500);
       await failure;
       expect(mocks.updateWindow).toHaveBeenCalledTimes(2);
+      expect(mocks.warn).toHaveBeenCalledExactlyOnceWith('Window verification failed', {
+        phase: 'requested-size',
+        expected,
+        reported: null,
+        observed: prior,
+        quietForMs: 2000,
+      });
     } finally {
       vi.useRealTimers();
     }
