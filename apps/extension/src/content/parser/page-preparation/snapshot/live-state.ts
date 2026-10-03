@@ -157,7 +157,7 @@ function appendScrollStateStyle(snapshotRoot: ParentNode, rules: string[]): void
 }
 
 export function capturePreparedSnapshotLiveState(
-  virtualRoot: HTMLElement,
+  virtualRoot: ParentNode,
   resolveOriginalElement: VirtualDomOriginalElementResolver
 ): PreparedSnapshotLiveState {
   const sources: PreparedSnapshotLiveStateSource[] = collectSnapshotElements(virtualRoot).map(

@@ -1,4 +1,11 @@
-import { expect, it } from 'vitest';
+// @vitest-environment jsdom
+
+import { afterEach, expect, it, vi } from 'vitest';
+import { captureDrawingFrame, registerDrawingSnapshotSource } from './frame';
+import { renderDrawingObject } from './render';
+
+vi.mock('./render', () => ({ renderDrawingObject: vi.fn() }));
+afterEach(() => vi.restoreAllMocks());
 import type { DrawingObject } from '../../features/drawing/public';
 import type { PointerDraft } from './interaction';
 import { resolveDrawingFrameRenderables } from './frame-renderables';
@@ -108,4 +115,95 @@ it.each(['move', 'resize'] as const)('projects a live blur %s draft into the DOM
         };
 
   expect(resolveDrawingFrameRenderables([committed], draft)).toEqual([{ object: live }]);
+});
+
+it('projects committed ink beyond the viewport while excluding DOM text and blur', () => {
+  const context = { setTransform: vi.fn() };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(context as never);
+  const canvas = document.createElement('canvas');
+  const distant = { ...original, id: 'distant', bounds: { ...original.bounds, y: 2000 } };
+  const unregister = registerDrawingSnapshotSource(canvas, () => ({
+    objects: [original, distant, untouched],
+    root: { kind: 'viewport', element: null },
+  }));
+
+  const snapshot = captureDrawingFrame(canvas)!;
+
+  expect(snapshot.height).toBeGreaterThan(2000);
+  expect(snapshot.style.top).toBe('16px');
+  expect(renderDrawingObject).toHaveBeenCalledWith(
+    context,
+    distant,
+    { x: 6, y: 16 },
+    { opacity: 1 }
+  );
+  expect(canvas.width).toBe(300);
+  unregister();
+  expect(captureDrawingFrame(canvas)).toBeNull();
+});
+
+it('bounds raster allocation for a large scene while retaining its CSS extent', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+  } as never);
+  const canvas = document.createElement('canvas');
+  const huge = { ...original, bounds: { x: 0, y: 0, width: 100000, height: 100000 } };
+  registerDrawingSnapshotSource(canvas, () => ({
+    objects: [huge],
+    root: { kind: 'viewport', element: null },
+  }));
+
+  const snapshot = captureDrawingFrame(canvas)!;
+
+  expect(snapshot.width * snapshot.height).toBeLessThanOrEqual(16_777_216);
+  expect(snapshot.style.width).toBe('100008px');
+});
+
+it('fails explicitly when the snapshot renderer cannot allocate a context', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const canvas = document.createElement('canvas');
+  registerDrawingSnapshotSource(canvas, () => ({
+    objects: [original],
+    root: { kind: 'viewport', element: null },
+  }));
+  expect(() => captureDrawingFrame(canvas)).toThrow('Drawing snapshot canvas is unavailable');
+});
+
+it('keeps element-scroll clipping and a replacement binding after stale cleanup', () => {
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    setTransform: vi.fn(),
+  } as never);
+  const canvas = document.createElement('canvas');
+  const root = document.createElement('div');
+  root.getBoundingClientRect = () => new DOMRect(100, 200, 80, 60);
+  const staleCleanup = registerDrawingSnapshotSource(canvas, () => ({
+    objects: [],
+    root: { kind: 'viewport', element: null },
+  }));
+  registerDrawingSnapshotSource(canvas, () => ({
+    objects: [original],
+    root: { kind: 'element', element: root },
+  }));
+  staleCleanup();
+
+  const snapshot = captureDrawingFrame(canvas)!;
+
+  expect(snapshot.style.left).toBe('106px');
+  expect(snapshot.style.top).toBe('216px');
+  expect(snapshot.style.clipPath).toBe('inset(0px 0px 0px 0px)');
+});
+
+it('reads the current scene and never falls back to stale pixels after clearing it', () => {
+  const canvas = document.createElement('canvas');
+  registerDrawingSnapshotSource(canvas, () => ({
+    objects: [],
+    root: { kind: 'viewport', element: null },
+  }));
+
+  const snapshot = captureDrawingFrame(canvas)!;
+
+  expect(snapshot).not.toBe(canvas);
+  expect(snapshot.width).toBe(1);
+  expect(snapshot.height).toBe(1);
+  expect(snapshot.style.display).toBe('none');
 });

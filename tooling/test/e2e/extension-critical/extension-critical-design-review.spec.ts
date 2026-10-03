@@ -1,4 +1,5 @@
 import { expect, test } from '../support/extension-fixture';
+import { saveWebSnapshotThroughPopup } from '../security/support';
 
 import { openDesignReview } from './extension-critical-page-toolbar.helpers';
 
@@ -357,6 +358,154 @@ test('content block editing switches on one click and preserves committed text',
       'true'
     );
   }
+  await popup.close();
+  await page.close();
+});
+
+test('web copy retains authored text drawings and frames after Library reopen', async ({
+  context,
+  extensionId,
+  hostOrigin,
+}, testInfo) => {
+  const { page, popup } = await openDesignReview(context, extensionId, hostOrigin);
+  const switchMode = async (mode: string) => {
+    await page.locator('[data-ui="content.toolbar.mode-selector-button"]').click();
+    await page.locator(`[data-ui="content.toolbar.mode-option.${mode}"]`).click();
+  };
+  await page.evaluate(() => {
+    document.body.style.minHeight = '1800px';
+  });
+  await switchMode('highlighter');
+  const target = (await page.locator('#measurement-target').boundingBox())!;
+  await page.mouse.click(target.x + target.width / 2, target.y + target.height / 2);
+  await expect(page.locator('.sniptale-frame-container')).toHaveCount(1);
+  const frameTrigger = page.locator('.sniptale-frame-toolbar-trigger');
+  await expect
+    .poll(
+      async () => {
+        await page.mouse.move(target.x - 3, target.y + 10);
+        return frameTrigger.isVisible();
+      },
+      { intervals: [150], timeout: 3000 }
+    )
+    .toBe(true);
+  await frameTrigger.click();
+  await page
+    .getByRole('button', { name: /^(Add comment|Добавить комментарий)$/u })
+    .first()
+    .click();
+  const comment = page.locator('.sniptale-callout [contenteditable="true"]').last();
+  await comment.fill('Retained frame comment');
+  await comment.press('Escape');
+  await switchMode('drawing');
+  await page.locator('[data-ui="content.toolbar.drawing.pencil"]').click();
+  await page.mouse.move(580, 330);
+  await page.mouse.down();
+  await page.mouse.move(750, 410, { steps: 10 });
+  await page.mouse.up();
+  await page.evaluate(() => window.scrollTo(0, 800));
+  await page.mouse.move(590, 350);
+  await page.mouse.down();
+  await page.mouse.move(770, 430, { steps: 10 });
+  await page.mouse.up();
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.locator('[data-ui="content.toolbar.drawing.text"]').click();
+  await page.mouse.click(580, 450);
+  await page.locator('[data-ui="content.drawing.text-input"]').fill('Retained drawing note');
+  await switchMode('quick-edit');
+  const heading = page.locator('h1').first();
+  const headingBounds = (await heading.boundingBox())!;
+  await page.mouse.click(headingBounds.x + 40, headingBounds.y + headingBounds.height / 2);
+  await expect(heading).toHaveAttribute('contenteditable', 'true');
+  await heading.fill('Retained edited heading');
+  await switchMode('cursor');
+  const drawingFont = await page
+    .locator('[data-ui="content.drawing.text-object"] span')
+    .last()
+    .evaluate((node) => getComputedStyle(node).fontFamily);
+  const tabId = await popup.evaluate(async (url) => {
+    const tabs = await chrome.tabs.query({});
+    return tabs.find((tab) => tab.url === url)?.id;
+  }, page.url());
+  expect(typeof tabId).toBe('number');
+  const saved = (await saveWebSnapshotThroughPopup({
+    popup,
+    tabId: tabId!,
+    requestId: 'backlog6-annotations',
+  })) as { success: boolean; assetId: string };
+  expect(saved.success).toBe(true);
+  const viewer = await context.newPage();
+  await viewer.goto(
+    `chrome-extension://${extensionId}/apps/extension/src/web-snapshot-viewer/index.html?snapshotId=${saved.assetId}`
+  );
+  const snapshot = viewer.frameLocator('iframe').first();
+  await expect(snapshot.locator('body')).toContainText('Retained edited heading');
+  await expect(snapshot.locator('body')).toContainText('Retained drawing note');
+  await expect(snapshot.locator('[data-ui="content.drawing.text-object"] span').last()).toHaveCSS(
+    'font-family',
+    drawingFont
+  );
+  await expect(snapshot.locator('.sniptale-frame-container')).toHaveCount(1);
+  await expect(snapshot.locator('body')).toContainText('Retained frame comment');
+  await expect(snapshot.locator('.sniptale-drawing-canvas')).toHaveAttribute(
+    'data-sniptale-canvas-rasterized',
+    'true'
+  );
+  await expect(snapshot.locator('.sniptale-drawing-canvas')).not.toHaveCSS(
+    'background-image',
+    'none'
+  );
+  const retainedDrawingHeight = await snapshot
+    .locator('.sniptale-drawing-canvas')
+    .evaluate((node) => node.getBoundingClientRect().height);
+  expect(retainedDrawingHeight).toBeGreaterThan(900);
+  await viewer.screenshot({ path: testInfo.outputPath('library-annotations.png') });
+  const downloadPromise = viewer.waitForEvent('download');
+  await viewer.getByRole('button', { name: /^(Download HTML|Скачать HTML)$/u }).click();
+  const download = await downloadPromise;
+  const htmlPath = testInfo.outputPath('annotations.html');
+  await download.saveAs(htmlPath);
+  const standalone = await context.newPage();
+  await standalone.goto(`file://${htmlPath}`);
+  await expect(standalone.locator('body')).toContainText('Retained edited heading');
+  await expect(standalone.locator('body')).toContainText('Retained drawing note');
+  await expect(standalone.locator('body')).toContainText('Retained frame comment');
+  await expect(standalone.locator('.sniptale-frame-container')).toHaveCount(1);
+  await expect(standalone.locator('.sniptale-drawing-canvas')).not.toHaveCSS(
+    'background-image',
+    'none'
+  );
+  await expect(
+    standalone.locator(
+      '[data-ui="shared.ui.content-toolbar"], .sniptale-resize-handle, script, [onclick]'
+    )
+  ).toHaveCount(0);
+  const hasOffscreenInk = await standalone
+    .locator('.sniptale-drawing-canvas')
+    .evaluate(async (node) => {
+      const background = getComputedStyle(node).backgroundImage;
+      const image = new Image();
+      image.src = background.slice(5, -2);
+      await image.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext('2d')!;
+      context.drawImage(image, 0, 0);
+      const top = Math.floor(canvas.height / 2);
+      const pixels = context.getImageData(0, top, canvas.width, canvas.height - top).data;
+      return pixels.some((value, index) => index % 4 === 3 && value > 0);
+    });
+  expect(hasOffscreenInk).toBe(true);
+  await standalone.screenshot({
+    path: testInfo.outputPath('standalone-annotations.png'),
+    fullPage: true,
+  });
+  await standalone.close();
+  await expect(
+    snapshot.locator('[data-ui="shared.ui.content-toolbar"], .sniptale-resize-handle')
+  ).toHaveCount(0);
+  await viewer.close();
   await popup.close();
   await page.close();
 });

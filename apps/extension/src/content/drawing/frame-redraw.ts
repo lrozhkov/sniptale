@@ -3,7 +3,7 @@ import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { DrawingObject } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import type { PointerDraft } from './interaction';
-import { drawDrawingFrame } from './frame';
+import { drawDrawingFrame, registerDrawingSnapshotSource } from './frame';
 
 export function useDrawingFrameRedraw(args: {
   active: boolean;
@@ -33,6 +33,16 @@ export function useDrawingFrameRedraw(args: {
     showSelectionChrome,
     setViewportRevision,
   } = args;
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    return registerDrawingSnapshotSource(canvas, () => ({
+      objects: controller.session.getSnapshot().document.objects,
+      root: controller.getScrollRoot(),
+      ...(args.getObjectOpacity ? { getObjectOpacity: args.getObjectOpacity } : {}),
+    }));
+  }, [canvasRef, controller, args.getObjectOpacity]);
+
   const redraw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
