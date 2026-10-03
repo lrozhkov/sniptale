@@ -155,7 +155,7 @@ for (const theme of ['light', 'dark'] as const) {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.getByRole('button', { name: 'К просмотру сценария', exact: true }).click();
+    await page.getByRole('button', { name: 'Вернуться к экспорту', exact: true }).click();
     await expect(page.locator('.guide-html-export button').first()).toBeFocused();
   });
 }

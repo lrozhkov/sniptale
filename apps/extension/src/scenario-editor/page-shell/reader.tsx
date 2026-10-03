@@ -56,12 +56,23 @@ export function GuideReader({
         images={images}
         onChange={onChange}
         feedback={feedback}
-        onClose={html.close}
+        onClose={(reading) => {
+          setOptions(reading);
+          html.close();
+        }}
         t={t}
       />
     );
   if (print.active)
-    return <GuidePrint project={project} images={images} onClose={print.close} t={t} />;
+    return (
+      <GuidePrint
+        project={project}
+        initialSettings={print.settings}
+        images={images}
+        onClose={print.close}
+        t={t}
+      />
+    );
   return (
     <GuideExportWorkspace
       preferenceScope="guide-reader"
@@ -132,7 +143,8 @@ export function GuideReader({
         </>
       }
       actions={
-        <>
+        <fieldset className="guide-export-formats">
+          <legend>{t('scenario.editor.guideExportFormat')}</legend>
           <GuideHtmlExport project={project} t={t} onOpenHtml={html.open} htmlRef={html.trigger} />
           <ContentToolbarButton
             className="guide-labeled-action"
@@ -143,7 +155,7 @@ export function GuideReader({
             <Printer size={16} aria-hidden="true" />
             <span>{t('scenario.editor.guidePrintAction')}</span>
           </ContentToolbarButton>
-        </>
+        </fieldset>
       }
     />
   );

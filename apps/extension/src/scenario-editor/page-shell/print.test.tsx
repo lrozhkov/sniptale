@@ -148,12 +148,16 @@ it('cancels pending preparation when leaving and restores reader focus and item'
     await act(async () => button(s.host, 'Step by step').click());
     await act(async () => button(s.host, 'Print / PDF').click());
     expect(s.host.querySelectorAll('article')).toHaveLength(2);
+    await act(async () => button(s.host, 'Letter').click());
+    await act(async () => button(s.host, 'Landscape').click());
     await act(async () => button(s.host, 'Print / PDF').click());
     await act(async () => button(s.host, 'Back to export').click());
     await act(async () => resolve?.());
     expect(print).not.toHaveBeenCalled();
     expect(s.host.querySelector('article')?.id).toBe('last');
     expect(document.activeElement).toBe(button(s.host, 'Print / PDF'));
+    await act(async () => button(s.host, 'Print / PDF').click());
+    expect(s.host.querySelector('style')?.textContent).toContain('letter landscape');
   } finally {
     await s.close();
   }

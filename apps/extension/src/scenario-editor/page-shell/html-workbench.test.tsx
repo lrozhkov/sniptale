@@ -317,3 +317,42 @@ it('inherits reading mode, forwards output options and invalidates a measured fi
     host.remove();
   }
 });
+
+it('groups document and image settings and returns the current reading choice', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const close = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <GuideHtmlWorkbench
+          project={createGuideProject('Guide')}
+          images={{}}
+          onChange={() => {}}
+          onClose={close}
+          t={createTranslator('en')}
+        />
+      )
+    );
+    expect(host.querySelector('h1')?.textContent).toBe('Export HTML');
+    expect(
+      [...host.querySelectorAll('.guide-export-inspector .guide-inspector-group')].map((node) =>
+        node.getAttribute('aria-label')
+      )
+    ).toEqual(['Reading mode', 'Image settings', 'HTML images']);
+    expect(host.querySelector('.guide-export-stage .guide-html-preview-toolbar')).not.toBeNull();
+    const steps = [...host.querySelectorAll('button')].find(
+      (node) => node.textContent === 'Step by step'
+    )!;
+    await act(async () => steps.click());
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('button[title="Back to export"]')!.click()
+    );
+    expect(close).toHaveBeenCalledWith(expect.objectContaining({ mode: 'steps' }));
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});

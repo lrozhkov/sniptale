@@ -224,3 +224,28 @@
   > button:not(:hover):not(:focus-visible):not([aria-expanded='true']) {
   border-color: transparent;
 }
+
+.guide-export-formats {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.guide-export-formats > legend {
+  margin: 0;
+  padding: 0 0 8px;
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+}
+.guide-reader .guide-export-formats > button,
+.guide-reader .guide-export-formats .guide-html-export > button,
+:is(.guide-reader, .guide-html-workbench) .guide-export-heading .guide-labeled-action {
+  min-height: 40px;
+  height: auto;
+  justify-content: flex-start;
+  padding: 8px 12px;
+  white-space: normal;
+  color: var(--sniptale-color-text-primary);
+}

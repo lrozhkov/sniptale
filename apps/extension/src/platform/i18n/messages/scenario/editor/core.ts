@@ -210,6 +210,7 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Здесь показан непрерывный документ. Нажмите «Печать / PDF», чтобы проверить разбиение на страницы в окне печати, затем выберите принтер или «Сохранить как PDF».',
     en: 'This view shows a continuous document. Choose “Print / PDF” to check page breaks in the print dialog, then select a printer or “Save as PDF”.',
   },
+  guideExportFormat: { ru: 'Формат экспорта', en: 'Export format' },
   guideReaderOpen: { ru: 'Экспорт', en: 'Export' },
   guideReaderBack: { ru: 'Вернуться к редактированию', en: 'Back to editing' },
   guideNavigationPosition: { ru: 'Навигация по шагам', en: 'Step navigation' },

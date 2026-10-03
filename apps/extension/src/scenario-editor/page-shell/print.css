@@ -121,3 +121,11 @@
     widows: 3;
   }
 }
+
+.guide-print-header .guide-labeled-action {
+  min-height: 40px;
+  height: auto;
+  padding: 8px 12px;
+  color: var(--sniptale-color-text-primary);
+  white-space: normal;
+}

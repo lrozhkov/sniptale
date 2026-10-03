@@ -11,7 +11,6 @@ import {
   RotateCcw,
   SlidersHorizontal,
   X,
-  ZoomIn,
 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -42,7 +41,7 @@ export function GuideHtmlWorkbench({
   project: GuideProject;
   images: Record<string, string | null>;
   onChange: (project: GuideProject) => void;
-  onClose: () => void;
+  onClose: (reading: GuideReadingOptions) => void;
   feedback?: ReactNode;
   initialReading?: GuideReadingOptions;
   t: Translate;
@@ -61,29 +60,32 @@ export function GuideHtmlWorkbench({
     <GuideExportWorkspace
       preferenceScope="guide-html"
       className="guide-html-workbench"
-      title={t('scenario.editor.htmlImages')}
+      title={t('scenario.editor.htmlExportTitle')}
       backLabel={t('scenario.editor.htmlBack')}
       headingMeta={
         job.measurement ? <output>{formatBytes(job.measurement.size)}</output> : undefined
       }
       stageLabel={t('scenario.editor.htmlPreview')}
-      onClose={onClose}
+      onClose={() => onClose(reading)}
       stage={
-        <div className="guide-html-preview-image" data-zoom={zoom}>
-          {preview ? (
-            <img src={preview.url} alt={block?.alt ?? ''} />
-          ) : (
-            <p role="status">
-              {t(
-                !block
-                  ? 'scenario.editor.htmlEmpty'
-                  : failed
-                    ? 'scenario.editor.htmlPreviewFailed'
-                    : 'scenario.editor.htmlPreviewLoading'
-              )}
-            </p>
-          )}
-        </div>
+        <>
+          <div className="guide-html-preview-image" data-zoom={zoom}>
+            {preview ? (
+              <img src={preview.url} alt={block?.alt ?? ''} />
+            ) : (
+              <p role="status">
+                {t(
+                  !block
+                    ? 'scenario.editor.htmlEmpty'
+                    : failed
+                      ? 'scenario.editor.htmlPreviewFailed'
+                      : 'scenario.editor.htmlPreviewLoading'
+                )}
+              </p>
+            )}
+          </div>
+          <GuideHtmlPreviewSettings zoom={zoom} onZoom={setZoom} preview={preview} t={t} />
+        </>
       }
       inspector={
         <>
@@ -94,11 +96,21 @@ export function GuideHtmlWorkbench({
           >
             <GuideReadingControls value={reading} onChange={setReading} disabled={busy} t={t} />
           </GuideInspectorGroup>
+          <GuideHtmlSettings
+            project={project}
+            selected={selected}
+            scope={scope}
+            onScope={setScope}
+            job={job}
+            onChange={onChange}
+            t={t}
+          />
           <GuideInspectorGroup
             id="htmlImages"
             icon={Images}
             title={t('scenario.editor.htmlImages')}
           >
+            <p className="guide-html-hint">{t('scenario.editor.htmlSelectionHint')}</p>
             <GuideHtmlImageList
               project={project}
               images={images}
@@ -113,16 +125,6 @@ export function GuideHtmlWorkbench({
               t={t}
             />
           </GuideInspectorGroup>
-          <GuideHtmlPreviewSettings zoom={zoom} onZoom={setZoom} preview={preview} t={t} />
-          <GuideHtmlSettings
-            project={project}
-            selected={selected}
-            scope={scope}
-            onScope={setScope}
-            job={job}
-            onChange={onChange}
-            t={t}
-          />
           <p className="guide-html-hint">{t('scenario.editor.htmlMeasureHint')}</p>
           {feedback}
         </>
@@ -292,11 +294,14 @@ function GuideHtmlSettings({
     );
   const busy = job.status === 'pending';
   const common = scope === 'common';
-  const title = t(common ? 'scenario.editor.htmlCommon' : 'scenario.editor.htmlSelected');
   const resetTitle = t(common ? 'scenario.editor.htmlResetAll' : 'scenario.editor.htmlReset');
   const unavailable = busy || (!common && !chosen.length);
   return (
-    <GuideInspectorGroup id="html-workbench" icon={SlidersHorizontal} title={title}>
+    <GuideInspectorGroup
+      id="html-workbench"
+      icon={SlidersHorizontal}
+      title={t('scenario.editor.htmlImageSettings')}
+    >
       <SegmentedSwitch
         density="compact"
         ariaLabel={t('scenario.editor.htmlImages')}
@@ -361,7 +366,7 @@ function GuideHtmlPreviewSettings({
   t: Translate;
 }) {
   return (
-    <GuideInspectorGroup id="htmlPreview" icon={ZoomIn} title={t('scenario.editor.htmlPreview')}>
+    <div className="guide-html-preview-toolbar guide-export-controls">
       <SegmentedSwitch
         density="compact"
         ariaLabel={t('scenario.editor.htmlPreview')}
@@ -377,6 +382,6 @@ function GuideHtmlPreviewSettings({
           {`${preview.width} × ${preview.height} · ${formatBytes(preview.size)}`}
         </p>
       )}
-    </GuideInspectorGroup>
+    </div>
   );
 }

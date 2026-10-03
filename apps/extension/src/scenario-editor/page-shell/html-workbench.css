@@ -134,3 +134,18 @@
     display: none;
   }
 }
+
+.guide-html-preview-toolbar {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-html-preview-toolbar > [role='group'] {
+  width: auto;
+  min-width: 160px;
+}

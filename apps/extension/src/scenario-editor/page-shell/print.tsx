@@ -12,16 +12,18 @@ import './export-workspace.css';
 /** Output settings and browser print readiness are disposable, never project mutations. */
 export function GuidePrint({
   project,
+  initialSettings = project.print,
   images,
   onClose,
   t,
 }: {
   project: GuideProject;
+  initialSettings?: GuideProject['print'] | undefined;
   images: Record<string, string | null>;
-  onClose: () => void;
+  onClose: (settings: GuideProject['print']) => void;
   t: Translate;
 }) {
-  const [settings, setSettings] = useState(project.print);
+  const [settings, setSettings] = useState(initialSettings);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   const documentRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,7 @@ export function GuidePrint({
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
-          onClose();
+          onClose(settings);
         } else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'p') {
           event.preventDefault();
           void print();
@@ -91,15 +93,14 @@ export function GuidePrint({
           ref={back}
           className="guide-labeled-action"
           title={t('scenario.editor.guidePrintBack')}
-          onClick={onClose}
+          onClick={() => onClose(settings)}
         >
           <ArrowLeft size={16} aria-hidden="true" />
           <span>{t('scenario.editor.guidePrintBack')}</span>
         </ContentToolbarButton>
         <h1>{project.name}</h1>
         <ProductActionButton
-          tone="primary"
-          compact
+          tone="secondary"
           disabled={pending || loading || missing}
           onClick={() => void print()}
         >
@@ -161,6 +162,7 @@ export function GuidePrint({
 /** Restores the reader command after closing the temporary print surface. */
 export function useGuidePrintMode() {
   const [active, setActive] = useState(false);
+  const [settings, setSettings] = useState<GuideProject['print']>();
   const trigger = useRef<HTMLButtonElement>(null);
   const restore = useRef(false);
   useEffect(() => {
@@ -171,9 +173,11 @@ export function useGuidePrintMode() {
   }, [active]);
   return {
     active,
+    settings,
     trigger,
     open: () => setActive(true),
-    close: () => {
+    close: (next: GuideProject['print']) => {
+      setSettings(next);
       restore.current = true;
       setActive(false);
     },

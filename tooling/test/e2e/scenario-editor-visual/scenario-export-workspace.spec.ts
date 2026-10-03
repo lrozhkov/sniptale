@@ -2,6 +2,26 @@ import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { createPageIssueCollector, openVisualHarness } from './scenario-editor-visual.helpers';
 
+test('guide HTML reading settings survive return and repeated export', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1024, height: 640 });
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+  await page.getByRole('button', { name: 'Step by step', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+});
+
 test('guide export opens the shared reader workspace on the first click', async ({
   page,
   hostOrigin,
@@ -202,7 +222,7 @@ test('tour preview paints the selected slide in the browser', async ({
   await expect(stage.locator('[data-tour-counter]')).toHaveText('2 / 2');
   await stage.locator('[data-tour-contents]').click();
   await expect(stage.locator('[data-tour-navigation]')).toBeVisible();
-  await stage.locator('[data-tour-navigation] button').first().click();
+  await stage.locator('.tour-contents-list button').first().click();
   await expect(stage.locator('[data-tour-counter]')).toHaveText('1 / 2');
   await stage.locator('[data-tour-next]').click();
   await expect.poll(painted).toBe(true);
@@ -287,4 +307,85 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(inspector).toBeVisible();
     });
   }
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`guide export groups output settings and keeps actions reachable in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const ru = locale === 'ru';
+    const words = ru
+      ? {
+          export: 'Экспорт',
+          format: 'Формат экспорта',
+          html: 'Сохранить автономный HTML',
+          print: 'Печать / PDF',
+          back: 'Вернуться к экспорту',
+          title: 'Экспорт HTML',
+          settings: 'Настройки изображений',
+          preview: 'Сохранённое изображение',
+          landscape: 'Альбомная',
+        }
+      : {
+          export: 'Export',
+          format: 'Export format',
+          html: 'Save standalone HTML',
+          print: 'Print / PDF',
+          back: 'Back to export',
+          title: 'Export HTML',
+          settings: 'Image settings',
+          preview: 'Saved image preview',
+          landscape: 'Landscape',
+        };
+    await openVisualHarness(page, hostOrigin, ru ? 'light' : 'dark', locale, {
+      width: 1024,
+      height: 640,
+    });
+    await page.getByRole('button', { name: words.export, exact: true }).click();
+    const formats = page.getByRole('group', { name: words.format, exact: true });
+    await expect(formats).toBeInViewport();
+    const print = formats.getByRole('button', { name: words.print, exact: true });
+    expect((await print.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    await page.getByRole('button', { name: words.html, exact: true }).click();
+    await expect(page.getByRole('heading', { name: words.title, exact: true })).toBeVisible();
+    const inspector = page.locator('.guide-export-inspector');
+    await expect(inspector.locator('.guide-inspector-group').nth(1)).toHaveAttribute(
+      'aria-label',
+      words.settings
+    );
+    const preview = page
+      .locator('.guide-export-stage')
+      .getByRole('group', { name: words.preview, exact: true })
+      .first();
+    await expect(preview).toBeInViewport();
+    await preview.getByRole('button', { name: '100%', exact: true }).click();
+    await expect(page.locator('.guide-html-preview-image')).toHaveAttribute('data-zoom', 'full');
+    const back = page.getByRole('button', { name: words.back, exact: true });
+    expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    await info.attach(`html-composition-${locale}`, {
+      body: await page.screenshot({ path: `.tmp/backlog6-w22-html-${locale}.png` }),
+      contentType: 'image/png',
+    });
+    await back.click();
+    await expect(page.getByRole('button', { name: words.html, exact: true })).toBeFocused();
+    await print.click();
+    const paper = page.locator('.guide-print');
+    await paper.getByRole('button', { name: words.landscape, exact: true }).click();
+    const action = paper.getByRole('button', { name: words.print, exact: true });
+    const returnButton = paper.getByRole('button', { name: words.back, exact: true });
+    expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    expect((await returnButton.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    await expect(action).toBeInViewport();
+    await info.attach(`print-composition-${locale}`, {
+      body: await page.screenshot({ path: `.tmp/backlog6-w22-print-${locale}.png` }),
+      contentType: 'image/png',
+    });
+    await returnButton.click();
+    await print.click();
+    await expect(paper.getByRole('button', { name: words.landscape, exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
 }
