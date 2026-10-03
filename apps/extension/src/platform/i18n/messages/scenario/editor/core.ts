@@ -207,8 +207,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     en: 'Images could not be prepared. Return to editing and check them.',
   },
   guidePrintHint: {
-    ru: 'В окне печати выберите принтер или «Сохранить как PDF».',
-    en: 'Choose a printer or “Save as PDF” in the print dialog.',
+    ru: 'Здесь показан непрерывный документ. Нажмите «Печать / PDF», чтобы проверить разбиение на страницы в окне печати, затем выберите принтер или «Сохранить как PDF».',
+    en: 'This view shows a continuous document. Choose “Print / PDF” to check page breaks in the print dialog, then select a printer or “Save as PDF”.',
   },
   guideReaderOpen: { ru: 'Экспорт', en: 'Export' },
   guideReaderBack: { ru: 'Вернуться к редактированию', en: 'Back to editing' },
