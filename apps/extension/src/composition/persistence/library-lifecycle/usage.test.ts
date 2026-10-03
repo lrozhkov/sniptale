@@ -596,3 +596,23 @@ it('includes a 1.5 MB image and 2 MB retained resource once alongside workspace 
     trashBytes: retained,
   });
 });
+
+it('does not start obsolete storage reads when cancelled before admission', async () => {
+  const controller = new AbortController();
+  controller.abort();
+  await expect(getLibraryStorageUsage({ signal: controller.signal })).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  expect(mocks.listMediaLibrary).not.toHaveBeenCalled();
+});
+
+it('stops accounting after cancellation during the initial read', async () => {
+  const controller = new AbortController();
+  mocks.listMediaLibrary.mockImplementation(async () => {
+    controller.abort();
+    return [];
+  });
+  await expect(getLibraryStorageUsage({ signal: controller.signal })).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+});

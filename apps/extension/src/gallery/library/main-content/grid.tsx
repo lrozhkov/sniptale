@@ -1,3 +1,4 @@
+import { GalleryThumbnailProvider } from '../ui/thumbnail-provider';
 import { useGalleryGridKeyboard } from './use-grid-keyboard';
 import type { GalleryCardNavigation } from './keyboard-navigation';
 import type { Ref } from 'react';
@@ -95,9 +96,9 @@ export function GalleryGrid(
     ...props,
     keyboardEnabled: props.keyboardEnabled && !props.isLoading,
   });
-  const activeMaterialRendered =
-    props.viewMode === 'list' ||
-    props.visibleItems.some((item) => item.id === keyboard.navigation.activeId);
+  const activeMaterialRendered = props.visibleItems.some(
+    (item) => item.id === keyboard.navigation.activeId
+  );
   return (
     <div
       onKeyDown={keyboard.onKeyDown}
@@ -113,11 +114,13 @@ export function GalleryGrid(
         props.viewMode === 'list' ? 'p-0' : 'p-4',
       ].join(' ')}
     >
-      {renderGalleryGridContent({
-        ...props,
-        navigation: keyboard.navigation,
-        onToggleSelection: keyboard.onPointerToggle,
-      })}
+      <GalleryThumbnailProvider snapshot={props.filteredItems}>
+        {renderGalleryGridContent({
+          ...props,
+          navigation: keyboard.navigation,
+          onToggleSelection: keyboard.onPointerToggle,
+        })}
+      </GalleryThumbnailProvider>
     </div>
   );
 }

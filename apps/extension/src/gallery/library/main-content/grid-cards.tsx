@@ -1,5 +1,10 @@
 import type { GalleryCardNavigation } from './keyboard-navigation';
-import { buildGalleryListUnits } from './recording-units';
+import {
+  buildGalleryListUnits,
+  buildGalleryListLayout,
+  GALLERY_LIST_HEADER_HEIGHT,
+  GALLERY_LIST_ROW_HEIGHT,
+} from './recording-units';
 import { GalleryProjectDetails } from '../ui/project-presentation';
 import { GRID_GAP } from '../constants';
 import { getGalleryGridCardHeight, getGalleryGridCardWidth } from '../grid-layout';
@@ -18,8 +23,8 @@ import {
 } from './grid-card-details';
 import type { GalleryMainContentProps } from './types';
 import { translate, useAppLocale } from '../../../platform/i18n';
-import { Image as ImageIcon } from 'lucide-react';
-import { memo, useMemo, type CSSProperties } from 'react';
+import { GalleryListHeader, GALLERY_LIST_LAYOUT_STYLE } from './list-header';
+import { memo, useMemo } from 'react';
 import { useCardActions } from './use-card-actions';
 import { formatBytes, formatCompactBytes } from '../../../platform/i18n/format-bytes';
 import { getGallerySelectionButtonClassName } from './selection-button-style';
@@ -28,11 +33,6 @@ import { GalleryGridCardDate } from './grid-card-date';
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
-
-const GALLERY_LIST_LAYOUT_STYLE = {
-  gridTemplateColumns:
-    '32px 32px 128px minmax(160px, 1.35fr) 132px minmax(220px, 2fr) minmax(100px, 1fr) 88px',
-} satisfies CSSProperties;
 
 const GALLERY_LIST_ROW_CLASS_NAME = [
   'grid min-w-[1120px] items-center gap-3 px-3 py-2.5',
@@ -59,6 +59,7 @@ type GalleryGridCardProps = {
   previewRecoveryAllowed: boolean;
   onToggleSelection: GalleryMainContentProps['onToggleSelection'];
   selected: boolean;
+  rowIndex?: number | undefined;
   style?: { height?: string; left?: string; top?: string; width?: string };
   viewMode: GalleryMainContentProps['viewMode'];
 };
@@ -72,7 +73,7 @@ function getGalleryGridCardClassName(
     viewMode === 'list'
       ? GALLERY_LIST_ROW_CLASS_NAME
       : [
-          'flex flex-col',
+          'flex flex-col [contain:layout_paint]',
           'rounded-[var(--sniptale-radius-lg)] border',
           'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent),',
           'color-mix(in_srgb,var(--sniptale-color-surface-canvas)_84%,transparent))]',
@@ -229,6 +230,7 @@ const GalleryGridCard = memo(
           props.navigation && galleryMaterialFocusClassName
         )}
         role={isList ? 'row' : 'group'}
+        aria-rowindex={props.rowIndex}
         data-gallery-keyboard-id={props.item.id}
         tabIndex={
           props.navigation ? (props.navigation.activeId === props.item.id ? 0 : -1) : undefined
@@ -313,6 +315,7 @@ const GalleryGridCard = memo(
   },
   (left, right) =>
     left.item === right.item &&
+    left.rowIndex === right.rowIndex &&
     left.selected === right.selected &&
     left.viewMode === right.viewMode &&
     left.previewRecoveryAllowed === right.previewRecoveryAllowed &&
@@ -436,7 +439,7 @@ const GalleryRecordingGroupGridCard = memo(
         role="group"
         aria-label={`${translate('gallery.preview.multiTrackRecording')}: ${firstItem.filename}`}
         className={cx(
-          'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)]',
+          'group flex flex-col overflow-hidden rounded-[var(--sniptale-radius-lg)] [contain:layout_paint]',
           props.navigation && galleryMaterialFocusClassName,
           'border shadow-sm transition',
           allSelected
@@ -540,135 +543,143 @@ export function GalleryMediaList(
     | 'onProjectOpen'
     | 'onToggleSelection'
     | 'selectedIds'
-  > & { navigation?: GalleryCardNavigation }
+  > &
+    Partial<Pick<GalleryMainContentProps, 'visibleItems'>> & { navigation?: GalleryCardNavigation }
 ) {
   const actions = useCardActions(props);
-  const units = useMemo(() => buildGalleryListUnits(props.filteredItems), [props.filteredItems]);
+  const layout = useMemo(() => buildGalleryListLayout(props.filteredItems), [props.filteredItems]);
+  const visible = new Set((props.visibleItems ?? layout.rows).map((item) => item.id));
+  const unitIndexes = new Set(
+    (props.visibleItems ?? layout.rows).map((item) => layout.unitByItem.get(item.id))
+  );
+  const units = [...unitIndexes].flatMap((index) =>
+    index === undefined ? [] : [layout.positionedUnits[index]!]
+  );
 
   return (
-    <div className="min-w-[1120px]" role="table">
+    <div className="min-w-[1120px]" role="table" aria-rowcount={layout.rowCount}>
+      <GalleryListHeader />
       <div
-        data-ui="gallery.list.header"
-        style={GALLERY_LIST_LAYOUT_STYLE}
-        className={cx(
-          'sticky top-0 z-10 grid h-12 items-center gap-3 px-3',
-          'border-b border-[var(--sniptale-color-border-strong)]',
-          'bg-[var(--sniptale-color-surface-muted)]',
-          'text-[11px] font-semibold uppercase tracking-[0.06em]',
-          'text-[var(--sniptale-color-text-secondary)]'
-        )}
-        role="row"
+        style={{ position: 'relative', height: layout.totalHeight - GALLERY_LIST_HEADER_HEIGHT }}
       >
-        <span className="min-w-0" role="columnheader">
-          <span className="sr-only">{translate('gallery.app.listColumnSelection')}</span>
-        </span>
-        <span className="min-w-0 truncate text-center leading-tight" role="columnheader">
-          {translate('gallery.app.listColumnType')}
-        </span>
-        <span className="flex min-w-0 items-center justify-center" role="columnheader">
-          <ImageIcon className="h-4 w-4" aria-hidden="true" />
-          <span className="sr-only">{translate('gallery.app.listColumnPreview')}</span>
-        </span>
-        <span className="min-w-0 truncate" role="columnheader">
-          {translate('gallery.app.listColumnSource')}
-        </span>
-        <span className="min-w-0 truncate" role="columnheader">
-          {translate('gallery.app.listColumnCreated')}
-        </span>
-        <span className="min-w-0 truncate" role="columnheader">
-          {translate('gallery.app.listColumnName')}
-        </span>
-        <span className="min-w-0 truncate" role="columnheader">
-          {translate('gallery.app.listColumnTags')}
-        </span>
-        <span className="min-w-0 truncate text-right" role="columnheader">
-          {translate('gallery.app.listColumnSize')}
-        </span>
-      </div>
-      {units.map((unit) => {
-        if (unit.kind === 'item') {
-          return (
-            <GalleryGridCard
-              key={unit.item.id}
-              item={unit.item}
-              {...(props.navigation ? { navigation: props.navigation } : {})}
-              onPreviewOpen={actions.onPreviewOpen}
-              {...(actions.onProjectOpen ? { onProjectOpen: actions.onProjectOpen } : {})}
-              onToggleSelection={actions.onToggleSelection}
-              selected={props.selectedIds.has(unit.item.id)}
-              previewRecoveryAllowed={!props.trashMode}
-              viewMode="list"
-            />
+        {units.map(({ unit, top, height, headerIndex }) => {
+          if (unit.kind === 'item') {
+            return (
+              <div
+                key={unit.item.id}
+                style={{
+                  position: 'absolute',
+                  top: top - GALLERY_LIST_HEADER_HEIGHT,
+                  width: '100%',
+                }}
+              >
+                <GalleryGridCard
+                  style={{ height: `${GALLERY_LIST_ROW_HEIGHT}px` }}
+                  rowIndex={layout.rowIndices.get(unit.item.id)}
+                  item={unit.item}
+                  {...(props.navigation ? { navigation: props.navigation } : {})}
+                  onPreviewOpen={actions.onPreviewOpen}
+                  {...(actions.onProjectOpen ? { onProjectOpen: actions.onProjectOpen } : {})}
+                  onToggleSelection={actions.onToggleSelection}
+                  selected={props.selectedIds.has(unit.item.id)}
+                  previewRecoveryAllowed={!props.trashMode}
+                  viewMode="list"
+                />
+              </div>
+            );
+          }
+          const visibleMembers = unit.items.filter((item) => visible.has(item.id));
+          const firstVisible = unit.items.indexOf(visibleMembers[0]!);
+          const editorItem = unit.items.find(
+            (item) => isGalleryMediaItem(item) && Boolean(item.recordingGroupView?.projectId)
           );
-        }
-        const editorItem = unit.items.find(
-          (item) => isGalleryMediaItem(item) && Boolean(item.recordingGroupView?.projectId)
-        );
-        const projectName = unit.items.find(isGalleryMediaItem)?.recordingGroupView?.projectName;
-        const selectableItems = unit.items.filter(isGallerySelectableItem);
-        const allSelected =
-          selectableItems.length > 0 &&
-          selectableItems.every((item) => props.selectedIds.has(item.id));
+          const projectName = unit.items.find(isGalleryMediaItem)?.recordingGroupView?.projectName;
+          const selectableItems = unit.items.filter(isGallerySelectableItem);
+          const allSelected =
+            selectableItems.length > 0 &&
+            selectableItems.every((item) => props.selectedIds.has(item.id));
 
-        return (
-          <div
-            key={unit.groupId}
-            className={cx(
-              'my-2 overflow-hidden rounded-[8px] border',
-              'bg-[var(--sniptale-color-surface-panel)]',
-              allSelected
-                ? 'border-[var(--sniptale-color-border-accent-strong)]'
-                : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
-            )}
-            role="rowgroup"
-          >
+          return (
             <div
-              style={GALLERY_LIST_LAYOUT_STYLE}
-              className={cx('grid min-w-[1120px] items-center gap-3 px-3 py-2')}
-              role="row"
+              key={unit.groupId}
+              style={{
+                position: 'absolute',
+                top: top - GALLERY_LIST_HEADER_HEIGHT + 8,
+                height: height - 16,
+                width: '100%',
+              }}
+              className={cx(
+                'overflow-hidden rounded-[8px] border',
+                'bg-[var(--sniptale-color-surface-panel)]',
+                allSelected
+                  ? 'border-[var(--sniptale-color-border-accent-strong)]'
+                  : 'border-[var(--sniptale-color-border-soft)] hover:border-[var(--sniptale-color-border-strong)]'
+              )}
+              role="rowgroup"
             >
               <div
-                className="col-span-full flex items-center justify-between gap-3 text-xs"
-                role="cell"
+                style={GALLERY_LIST_LAYOUT_STYLE}
+                className={cx('grid h-8 min-w-[1120px] items-center gap-3 px-3 py-2')}
+                aria-rowindex={headerIndex}
+                role="row"
               >
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="truncate font-semibold text-[var(--sniptale-color-text-primary)]">
-                    {projectName ?? translate('gallery.preview.multiTrackRecording')}
-                  </span>
-                  <span className="shrink-0 text-[var(--sniptale-color-text-muted)]">
-                    {translate('gallery.preview.multiTrackRecording')} ·{' '}
-                    {translate('gallery.preview.recordingGroup')} {unit.memberCount}
-                  </span>
-                </div>
-                {!props.trashMode && props.onRecordingGroupOpen && editorItem ? (
-                  <button
-                    type="button"
-                    className="shrink-0 font-semibold text-[var(--sniptale-color-accent-emphasis)]
+                <div
+                  className="col-span-full flex items-center justify-between gap-3 text-xs"
+                  role="cell"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate font-semibold text-[var(--sniptale-color-text-primary)]">
+                      {projectName ?? translate('gallery.preview.multiTrackRecording')}
+                    </span>
+                    <span className="shrink-0 text-[var(--sniptale-color-text-muted)]">
+                      {translate('gallery.preview.multiTrackRecording')} ·{' '}
+                      {translate('gallery.preview.recordingGroup')} {unit.memberCount}
+                    </span>
+                  </div>
+                  {!props.trashMode && props.onRecordingGroupOpen && editorItem ? (
+                    <button
+                      type="button"
+                      className="shrink-0 font-semibold text-[var(--sniptale-color-accent-emphasis)]
                       hover:underline focus-visible:outline-none focus-visible:ring-2
                       focus-visible:ring-[var(--sniptale-color-focus-ring)]"
-                    onClick={() => props.onRecordingGroupOpen?.(editorItem)}
-                  >
-                    {translate('gallery.preview.openRecordingGroupShort')}
-                  </button>
-                ) : null}
+                      onClick={() => props.onRecordingGroupOpen?.(editorItem)}
+                    >
+                      {translate('gallery.preview.openRecordingGroupShort')}
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </div>
-            {unit.items.map((item) => (
-              <GalleryGridCard
-                key={item.id}
-                item={item}
-                {...(props.navigation ? { navigation: props.navigation } : {})}
-                onPreviewOpen={actions.onPreviewOpen}
-                {...(actions.onProjectOpen ? { onProjectOpen: actions.onProjectOpen } : {})}
-                onToggleSelection={actions.onToggleSelection}
-                selected={props.selectedIds.has(item.id)}
-                previewRecoveryAllowed={!props.trashMode}
-                viewMode="list"
+              <div
+                aria-hidden="true"
+                style={{ height: Math.max(0, firstVisible) * GALLERY_LIST_ROW_HEIGHT }}
               />
-            ))}
-          </div>
-        );
-      })}
+              {visibleMembers.map((item) => (
+                <GalleryGridCard
+                  style={{ height: `${GALLERY_LIST_ROW_HEIGHT}px` }}
+                  key={item.id}
+                  rowIndex={layout.rowIndices.get(item.id)}
+                  item={item}
+                  {...(props.navigation ? { navigation: props.navigation } : {})}
+                  onPreviewOpen={actions.onPreviewOpen}
+                  {...(actions.onProjectOpen ? { onProjectOpen: actions.onProjectOpen } : {})}
+                  onToggleSelection={actions.onToggleSelection}
+                  selected={props.selectedIds.has(item.id)}
+                  previewRecoveryAllowed={!props.trashMode}
+                  viewMode="list"
+                />
+              ))}
+              <div
+                aria-hidden="true"
+                style={{
+                  height:
+                    Math.max(0, unit.items.length - firstVisible - visibleMembers.length) *
+                    GALLERY_LIST_ROW_HEIGHT,
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -64,6 +64,7 @@ export interface GalleryFacetDefinition {
 export interface GalleryGridMetrics {
   columnCount: number;
   rowTops: number[];
+  rowBottoms?: number[];
   startRow: number;
   totalRows: number;
 }

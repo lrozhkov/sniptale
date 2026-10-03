@@ -1,3 +1,4 @@
+import { useMediaThumbUrl } from './thumbnail-provider';
 import {
   Archive,
   AudioLines,
@@ -12,7 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
 import type { RecordingGroupMemberRole } from '../../../features/media-hub/recording-groups';
-import { ensureGalleryItemThumbnail, type GalleryItem, type GalleryItemKind } from '../items';
+import { type GalleryItem, type GalleryItemKind } from '../items';
 import { createMediaThumbFallbackItem } from './fallback-items';
 import { formatDurationLabel } from '../../../composition/audio-recording/format';
 
@@ -124,50 +125,6 @@ export function isVideoKind(kind: GalleryItemKind): boolean {
   return kind === 'recording' || kind === 'export' || kind === 'video' || kind === 'video-project';
 }
 
-function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => void) {
-  let disposed = false;
-  let objectUrl: string | null = null;
-  const controller = new AbortController();
-
-  ensureGalleryItemThumbnail(item, controller.signal)
-    .then((thumb) => {
-      if (disposed) {
-        return;
-      }
-      if (!thumb) {
-        setThumbUrl(null);
-        return;
-      }
-
-      objectUrl = URL.createObjectURL(thumb.blob);
-      setThumbUrl(objectUrl);
-    })
-    .catch(() => {
-      if (disposed) {
-        return;
-      }
-      setThumbUrl(null);
-    });
-
-  return () => {
-    disposed = true;
-    controller.abort();
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
-}
-
-function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
-  if (item.type === 'video-project') {
-    return `${item.id}:${item.hasThumbnail}:${item.presentationRevision ?? ''}:${item.workspaceRevision ?? ''}`;
-  }
-  if (item.type === 'scenario' || item.type === 'scenario-export') {
-    return `${item.id}:${item.hasThumbnail}:${item.project.updatedAt}:${item.workspaceRevision ?? ''}`;
-  }
-  return `${item.id}:${item.hasThumbnail}:${item.entityId ?? item.id}`;
-}
-
 type MediaThumbProps = {
   assetId?: string;
   deferUntilVisible?: boolean;
@@ -201,21 +158,12 @@ function useResolvedMediaThumbItem(props: MediaThumbProps): GalleryItem {
 
 export function MediaThumb(props: MediaThumbProps) {
   const item = useResolvedMediaThumbItem(props);
-  const itemRef = useRef(item);
-  itemRef.current = item;
-  const thumbnailIdentity = getGalleryItemThumbnailIdentity(item);
   const deferUntilVisible =
     props.deferUntilVisible === true && (item.type === 'scenario' || item.type === 'video-project');
   const visibilityRoot = useRef<HTMLDivElement>(null);
   const [visibility, setVisibility] = useState({ visible: false, epoch: 0 });
   const visible = !deferUntilVisible || visibility.visible;
   const epoch = deferUntilVisible ? visibility.epoch : 0;
-  const [thumb, setThumb] = useState<{
-    epoch: number;
-    identity: string;
-    url: string | null;
-  } | null>(null);
-
   useEffect(() => {
     if (!deferUntilVisible) return;
     const root = visibilityRoot.current;
@@ -239,15 +187,7 @@ export function MediaThumb(props: MediaThumbProps) {
     return () => observer.disconnect();
   }, [deferUntilVisible]);
 
-  useEffect(() => {
-    if (!visible) return;
-    return loadThumbUrl(itemRef.current, (url) =>
-      setThumb({ epoch, identity: thumbnailIdentity, url })
-    );
-  }, [thumbnailIdentity, visible, epoch]);
-
-  const thumbUrl =
-    visible && thumb?.identity === thumbnailIdentity && thumb.epoch === epoch ? thumb.url : null;
+  const thumbUrl = useMediaThumbUrl(item, visible, epoch);
   const content = thumbUrl ? (
     <img
       src={thumbUrl}

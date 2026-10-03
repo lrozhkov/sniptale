@@ -27,8 +27,17 @@ type StorageClass = 'temporary' | 'library';
 
 /** Existing callers recover image publications; read-only callers can suppress recovery. */
 export async function getLibraryStorageUsage(
-  options: { recoverImageWorkspaces?: boolean } = {}
+  options: { recoverImageWorkspaces?: boolean; signal?: AbortSignal } = {}
 ): Promise<LibraryStorageUsage> {
+  options.signal?.throwIfAborted();
+  let turnStarted = performance.now();
+  const yieldIfNeeded = async () => {
+    options.signal?.throwIfAborted();
+    if (performance.now() - turnStarted < 8) return;
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    options.signal?.throwIfAborted();
+    turnStarted = performance.now();
+  };
   const [media, videoProjects, scenarioProjects, imageWorkspaces, presentations, assetAuthority] =
     await Promise.all([
       listMediaLibrary(),
@@ -55,7 +64,8 @@ export async function getLibraryStorageUsage(
     else usage.libraryBytes += safeSize;
     if (trashed) usage.trashBytes += safeSize;
   };
-  const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).byteLength;
+  const encoder = new TextEncoder();
+  const jsonBytes = (value: unknown) => encoder.encode(JSON.stringify(value)).byteLength;
   const addPhysicalAsset = (assetId: string, storageClass: StorageClass, trashed: boolean) => {
     const size = assetAuthority.refsById.get(assetId)?.size ?? 0;
     if (trashed && !countedTrashAssetIds.has(assetId)) {
@@ -71,6 +81,7 @@ export async function getLibraryStorageUsage(
   const scenarioById = new Map(scenarioProjects.map((entry) => [entry.id, entry]));
 
   for (const entry of media) {
+    await yieldIfNeeded();
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
     const trashed = entry.lifecycle?.trashedAt !== undefined;
     if (!entry.source) addBytes(entry.size, storageClass, trashed);
@@ -86,6 +97,7 @@ export async function getLibraryStorageUsage(
     }
   }
   for (const workspace of imageWorkspaces) {
+    await yieldIfNeeded();
     const parent = mediaById.get(workspace.aggregateId);
     if (parent) {
       const storageClass = parent.lifecycle?.storageClass ?? 'library';
@@ -97,6 +109,7 @@ export async function getLibraryStorageUsage(
     }
   }
   for (const entry of videoProjects) {
+    await yieldIfNeeded();
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
     const trashed = entry.lifecycle?.trashedAt !== undefined;
     addBytes(jsonBytes(entry.project), storageClass, trashed);
@@ -106,6 +119,7 @@ export async function getLibraryStorageUsage(
     }
   }
   for (const entry of scenarioProjects) {
+    await yieldIfNeeded();
     const storageClass = entry.lifecycle?.storageClass ?? 'library';
     const trashed = entry.lifecycle?.trashedAt !== undefined;
     addBytes(jsonBytes(entry.project), storageClass, trashed);
@@ -119,6 +133,7 @@ export async function getLibraryStorageUsage(
       addPhysicalAsset(asset.assetId, storageClass, trashed);
     }
     for (const stepDocument of stepDocuments) {
+      await yieldIfNeeded();
       addBytes(jsonBytes(stepDocument), storageClass, trashed);
       for (const assetId of new Set(stepDocument.document.assets.map((asset) => asset.assetId))) {
         addPhysicalAsset(assetId, storageClass, trashed);
@@ -133,6 +148,7 @@ export async function getLibraryStorageUsage(
     }
   }
   for (const presentation of presentations) {
+    await yieldIfNeeded();
     const root = resolvePresentationRoot(presentation, {
       mediaById,
       scenarioById,
@@ -144,6 +160,7 @@ export async function getLibraryStorageUsage(
     addBytes(presentation.thumbnailBlob.size, storageClass, trashed);
     if (presentation.previewBlob) addBytes(presentation.previewBlob.size, storageClass, trashed);
   }
+  options.signal?.throwIfAborted();
   return usage;
 }
 

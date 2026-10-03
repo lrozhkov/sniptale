@@ -717,3 +717,41 @@ it('updates memoized card labels when the application locale changes', async () 
     await act(async () => setLocalePreference(original));
   }
 });
+
+it('mounts only visible list rows, including a window inside a large recording group', () => {
+  const items = Array.from({ length: 500 }, (_, index) =>
+    createMediaItem({
+      id: `member-${index}`,
+      kind: 'recording',
+      recordingGroupView: {
+        groupId: 'large-group',
+        sourceLabel: 'Display',
+        role: 'display',
+        order: index,
+        memberCount: 500,
+        projectId: null,
+      },
+    })
+  );
+  act(() =>
+    root?.render(
+      <GalleryMediaList
+        filteredItems={items}
+        visibleItems={items.slice(240, 260)}
+        onPreviewOpen={vi.fn()}
+        onToggleSelection={vi.fn()}
+        selectedIds={new Set()}
+      />
+    )
+  );
+  expect(container?.querySelectorAll('[data-ui="gallery.list.row"]')).toHaveLength(20);
+  expect(container?.querySelector('[role="table"]')?.getAttribute('aria-rowcount')).toBe('502');
+  expect(
+    container
+      ?.querySelector('[data-gallery-keyboard-id="member-240"]')
+      ?.getAttribute('aria-rowindex')
+  ).toBe('243');
+  expect(container?.querySelectorAll('*').length).toBeLessThan(1000);
+  expect(container?.querySelector('[data-gallery-keyboard-id="member-240"]')).not.toBeNull();
+  expect(container?.querySelector('[data-gallery-keyboard-id="member-0"]')).toBeNull();
+});

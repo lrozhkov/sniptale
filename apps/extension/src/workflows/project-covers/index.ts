@@ -26,7 +26,6 @@ export interface ProjectCoverSources {
   getScenarioAssetBlob: typeof getScenarioAssetBlob;
 }
 const MAX_ACTIVE = 3;
-const MAX_PENDING = 24;
 const MAX_RETAINED_COVERS = 256;
 const MAX_RETAINED_BYTES = 16 * 1024 * 1024;
 type CoverRequest = {
@@ -66,7 +65,6 @@ async function withSlot(
           resolve(false);
         },
       };
-      if (state.waiting.length >= MAX_PENDING) state.waiting.shift()?.discard();
       state.waiting.push(entry);
       signal.addEventListener('abort', cancel, { once: true });
       if (signal.aborted) cancel();
@@ -77,8 +75,9 @@ async function withSlot(
     if (signal.aborted) return undefined;
     return await work();
   } finally {
-    // Reserve the released slot for the newest visible request before another caller arrives.
-    const next = state.waiting.pop();
+    // Live consumers bound the queue; cancellation removes requests that leave the viewport.
+    // FIFO prevents starvation when a large viewport keeps more than 27 covers visible.
+    const next = state.waiting.shift();
     if (next) next.admit();
     else state.active -= 1;
   }

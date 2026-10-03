@@ -50,7 +50,8 @@ export function useGalleryGridKeyboard(props: KeyboardProps) {
     base: ReadonlySet<string>;
     applied: ReadonlySet<string>;
   } | null>(null);
-  const rangeContext = props.navigationContext + '\0' + orderedIds.join('\0');
+  const orderKey = useMemo(() => orderedIds.join('\0'), [orderedIds]);
+  const rangeContext = props.navigationContext + '\0' + orderKey;
   useEffect(() => {
     range.current = null;
   }, [rangeContext, props.keyboardEnabled]);

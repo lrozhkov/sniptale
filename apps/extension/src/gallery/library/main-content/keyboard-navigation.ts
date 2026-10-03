@@ -114,6 +114,6 @@ export function getGalleryGridUnitBounds(
   const row = Math.floor(index / metrics.columnCount);
   return {
     top: (metrics.rowTops[row] ?? 0) + padding,
-    bottom: (metrics.rowTops[row + 1] ?? 0) + padding,
+    bottom: (metrics.rowBottoms?.[row] ?? metrics.rowTops[row + 1] ?? 0) + padding,
   };
 }

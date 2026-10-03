@@ -277,12 +277,20 @@ it('updates advisory Trash size after the item snapshot and ignores stale byte r
   await flushLibraryState();
   expect(values.at(-1)?.items).toEqual([trashed]);
   expect(values.at(-1)?.trashUsage).toEqual({ status: 'loading' });
-  expect(getLibraryStorageUsageMock).toHaveBeenCalledWith({ recoverImageWorkspaces: false });
+  await vi.waitFor(() =>
+    expect(getLibraryStorageUsageMock).toHaveBeenCalledWith({
+      recoverImageWorkspaces: false,
+      signal: expect.any(AbortSignal),
+    })
+  );
 
   getLibraryStorageUsageMock.mockResolvedValueOnce({ trashBytes: 42 });
   await act(async () => values.at(-1)?.refresh());
   await flushLibraryState();
-  expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 42 });
+  await vi.waitFor(async () => {
+    await flushLibraryState();
+    expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 42 });
+  });
 
   await act(async () => resolveOld({ trashBytes: 99 }));
   expect(values.at(-1)?.trashUsage).toEqual({ status: 'ready', bytes: 42 });
@@ -300,7 +308,10 @@ it('updates advisory Trash size after the item snapshot and ignores stale byte r
   await act(async () => values.at(-1)?.refresh());
   await flushLibraryState();
   expect(values.at(-1)?.items).toEqual([trashed]);
-  expect(values.at(-1)?.trashUsage).toEqual({ status: 'unavailable' });
+  await vi.waitFor(async () => {
+    await flushLibraryState();
+    expect(values.at(-1)?.trashUsage).toEqual({ status: 'unavailable' });
+  });
 });
 
 it('keeps gallery items stable when a background refresh returns an equivalent snapshot', async () => {
@@ -500,6 +511,7 @@ it.each(['reject', 'empty'] as const)(
       onSelectionRefresh: vi.fn(),
     });
     await flushLibraryState();
+    await vi.waitFor(() => expect(getLibraryStorageUsageMock).toHaveBeenCalledOnce());
     if (outcome === 'empty')
       loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
         estimate: { usage: 0, quota: 20 },
@@ -509,7 +521,10 @@ it.each(['reject', 'empty'] as const)(
     await act(async () => values.at(-1)?.refresh());
     await flushLibraryState();
     const expected = { status: 'ready', bytes: outcome === 'empty' ? 0 : 42 };
-    expect(values.at(-1)?.trashUsage).toEqual(expected);
+    await vi.waitFor(async () => {
+      await flushLibraryState();
+      expect(values.at(-1)?.trashUsage).toEqual(expected);
+    });
     await act(async () => {
       if (outcome === 'empty') resolveOld({ trashBytes: 99 });
       else rejectOld(new Error('stale read failed'));

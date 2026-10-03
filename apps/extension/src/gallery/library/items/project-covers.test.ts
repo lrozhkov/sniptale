@@ -331,7 +331,7 @@ it('bounds concurrent project reads and releases a slot after completion', async
   await expect(Promise.all(results)).resolves.toEqual([undefined, undefined, undefined, undefined]);
 });
 
-it('bounds pending work during rapid viewport churn and starts the newest cover next', async () => {
+it('serves every live viewport request in arrival order without dropping older visible covers', async () => {
   const held: Array<
     (value: {
       status: 'ready';
@@ -356,11 +356,12 @@ it('bounds pending work during rapid viewport churn and starts the newest cover 
   expect(io.getVideoProject).toHaveBeenCalledTimes(3);
   held[0]?.({ status: 'ready', project: empty, workspaceRevision: 5 });
   await vi.waitFor(() => expect(io.getVideoProject.mock.calls.length).toBeGreaterThanOrEqual(4));
-  expect(io.getVideoProject.mock.calls[3]?.[0]).toBe('churn-project-39');
+  const nextProject = io.getVideoProject.mock.calls[3]?.[0];
   held[1]?.({ status: 'ready', project: empty, workspaceRevision: 5 });
   held[2]?.({ status: 'ready', project: empty, workspaceRevision: 5 });
   await expect(Promise.all(requests)).resolves.toHaveLength(40);
-  expect(io.getVideoProject).toHaveBeenCalledTimes(27);
+  expect(nextProject).toBe('churn-project-3');
+  expect(io.getVideoProject).toHaveBeenCalledTimes(40);
 });
 
 it('removes a hidden queued request without cancelling another subscriber', async () => {

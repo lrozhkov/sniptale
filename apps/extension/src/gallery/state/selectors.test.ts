@@ -778,3 +778,17 @@ it('builds File Type only from real files and filters independently of legacy pr
     }).map((item) => item.id)
   ).toEqual([items[2]!.id]);
 });
+
+it('bounds list rendering by the viewport while keeping offscreen geometry for keyboard navigation', () => {
+  const items = Array.from({ length: 2000 }, (_, index) => createItem({ id: `list-${index}` }));
+  const metrics = getGalleryGridMetrics({
+    filteredItems: items,
+    gridWidth: 3840,
+    scrollTop: 9400,
+    viewMode: 'list',
+    viewportHeight: 2000,
+  });
+  expect(metrics.visibleItems.length).toBeLessThan(35);
+  expect(metrics.startRow).toBeGreaterThan(90);
+  expect(metrics.rowTops).toHaveLength(2001);
+});

@@ -1,3 +1,4 @@
+import { buildGalleryListLayout } from '../library/main-content/recording-units';
 import { compareStrings, translate } from '../../platform/i18n';
 import { formatBytes } from '../../platform/i18n/format-bytes';
 import type { ScenarioProjectSummary } from '../../features/scenario/contracts/types/project';
@@ -396,33 +397,20 @@ export function createGalleryGridMetrics(args: {
   scrollTop: number;
   viewportHeight: number;
 }) => GalleryGridMetrics & { visibleItems: GalleryItem[] } {
-  const displayItems =
-    args.viewMode === 'list'
-      ? args.filteredItems
-      : collapseGalleryRecordingGroups(args.filteredItems);
-
-  if (args.viewMode === 'list') {
-    const metrics = {
-      columnCount: 1,
-      rowTops: [0],
-      startRow: 0,
-      totalRows: displayItems.length,
-      visibleItems: displayItems,
-    };
-    return () => metrics;
-  }
-
-  const cardMinWidth = GRID_CARD_MIN_WIDTH_BY_MODE[args.viewMode];
-  const columnCount = Math.max(
-    1,
-    Math.floor((args.gridWidth + GRID_GAP) / (cardMinWidth + GRID_GAP))
-  );
-  const { rowTops } = getGalleryGridLayout({
-    columnCount,
-    gridWidth: args.gridWidth,
-    items: displayItems,
-    viewMode: args.viewMode,
-  });
+  const listLayout = args.viewMode === 'list' ? buildGalleryListLayout(args.filteredItems) : null;
+  const displayItems = listLayout?.rows ?? collapseGalleryRecordingGroups(args.filteredItems);
+  const cardMinWidth = args.viewMode === 'list' ? 1 : GRID_CARD_MIN_WIDTH_BY_MODE[args.viewMode];
+  const columnCount = listLayout
+    ? 1
+    : Math.max(1, Math.floor((args.gridWidth + GRID_GAP) / (cardMinWidth + GRID_GAP)));
+  const rowTops =
+    listLayout?.rowTops ??
+    getGalleryGridLayout({
+      columnCount,
+      gridWidth: args.gridWidth,
+      items: displayItems,
+      viewMode: args.viewMode === 'list' ? 'compact-grid' : args.viewMode,
+    }).rowTops;
   const totalRows = Math.ceil(displayItems.length / columnCount);
   const totalHeight = rowTops[totalRows] ?? 0;
   let previous: (GalleryGridMetrics & { visibleItems: GalleryItem[] }) | undefined;
@@ -444,6 +432,7 @@ export function createGalleryGridMetrics(args: {
     previous = {
       columnCount,
       rowTops,
+      ...(listLayout ? { rowBottoms: listLayout.rowBottoms } : {}),
       startRow,
       totalRows,
       visibleItems: displayItems.slice(startRow * columnCount, endRow * columnCount),

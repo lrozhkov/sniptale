@@ -164,3 +164,42 @@ it('bounds even tiny covers by entry count and refreshes recency on hits', async
   await service.getCover({ ...request, id: 'small-1' });
   expect(render.image).toHaveBeenCalledTimes(258);
 });
+
+it('serves every live request on a large viewport without exceeding three active renders', async () => {
+  const { sources, request } = fixture();
+  let active = 0;
+  let peak = 0;
+  render.image.mockImplementation(async () => {
+    active += 1;
+    peak = Math.max(peak, active);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    active -= 1;
+    return new Blob(['cover']);
+  });
+  const service = createProjectCoverService(sources);
+  const results = await Promise.all(
+    Array.from({ length: 120 }, (_, index) =>
+      service.getCover({ ...request, id: `visible-${index}` })
+    )
+  );
+  expect(results.filter(Boolean)).toHaveLength(120);
+  expect(peak).toBeLessThanOrEqual(3);
+});
+
+it('removes cancelled queued consumers while serving the remaining viewport', async () => {
+  const { sources, request } = fixture();
+  render.image.mockImplementation(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    return new Blob(['cover']);
+  });
+  const service = createProjectCoverService(sources);
+  const controllers = Array.from({ length: 60 }, () => new AbortController());
+  const pending = controllers.map((controller, index) =>
+    service.getCover({ ...request, id: `queued-${index}` }, controller.signal)
+  );
+  controllers.slice(3, 40).forEach((controller) => controller.abort());
+  const results = await Promise.all(pending);
+  expect(results.slice(3, 40).every((value) => value === undefined)).toBe(true);
+  expect(results.filter(Boolean)).toHaveLength(23);
+  expect(render.image).toHaveBeenCalledTimes(23);
+});

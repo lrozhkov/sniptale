@@ -44,8 +44,16 @@ export class GalleryGridFocusController {
       previewOpen: options.previewOpen,
     };
   }
+  private indexedUnits: GalleryKeyboardUnit[] | undefined;
+  private orderKey = '';
+  private indexes = new Map<string, number>();
   private order() {
-    return this.options.units.map((unit) => unit.id).join('\0');
+    if (this.indexedUnits !== this.options.units) {
+      this.indexedUnits = this.options.units;
+      this.indexes = new Map(this.options.units.map((unit, index) => [unit.id, index]));
+      this.orderKey = this.options.units.map((unit) => unit.id).join('\0');
+    }
+    return this.orderKey;
   }
   private material(id: string) {
     return Array.from(
@@ -54,22 +62,22 @@ export class GalleryGridFocusController {
   }
   private resolve(position: Position) {
     return (
-      this.options.units.find(
-        (unit) => unit.id === position.id || unit.selectableIds.includes(position.id ?? '')
-      ) ?? this.options.units[Math.min(position.index, Math.max(0, this.options.units.length - 1))]
+      this.options.units[this.indexes.get(position.id ?? '') ?? -1] ??
+      this.options.units.find((unit) => unit.selectableIds.includes(position.id ?? '')) ??
+      this.options.units[Math.min(position.index, Math.max(0, this.options.units.length - 1))]
     );
   }
   private setActive(unit: GalleryKeyboardUnit | undefined) {
     this.active.current = {
       id: unit?.id ?? null,
-      index: unit ? this.options.units.indexOf(unit) : 0,
+      index: unit ? (this.indexes.get(unit.id) ?? 0) : 0,
     };
     this.publish(this.active.current.id);
   }
   private ensureVisible(id: string, element?: HTMLElement) {
-    const { gridRef, units, metrics, viewMode } = this.options;
+    const { gridRef, metrics, viewMode } = this.options;
     const grid = gridRef.current;
-    const index = units.findIndex((unit) => unit.id === id);
+    const index = this.indexes.get(id) ?? -1;
     if (!grid || index < 0) return;
     const padding = Number.parseFloat(getComputedStyle(grid).paddingTop) || 0;
     const bounds =
