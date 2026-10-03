@@ -96,3 +96,33 @@ it('sorts equal timestamps by stable id without mutating the source', () => {
   expect(sortEditorStartItems(source).map((item) => item.id)).toEqual(['c', 'a', 'b']);
   expect(source[0]?.id).toBe('b');
 });
+
+it('retains full project names and blocks unavailable cards and pending actions', () => {
+  const name = 'A detailed project name that remains available beyond its two visual lines';
+  const actions = render([{ id: 'missing', title: name, detail: '', unavailable: true }]);
+  const card = container.querySelector<HTMLButtonElement>('[data-ui="editor.start.project"]');
+  expect(card?.title).toBe(name);
+  expect(card?.disabled).toBe(true);
+  act(() => card?.click());
+  expect(actions.onSelect).not.toHaveBeenCalled();
+  act(() =>
+    root.render(
+      <EditorStart
+        {...labels}
+        items={[]}
+        status="ready"
+        pending
+        onCreate={actions.onCreate}
+        onOpen={actions.onOpen}
+        onSelect={actions.onSelect}
+        onRetry={actions.onRetry}
+      />
+    )
+  );
+  for (const button of container.querySelectorAll<HTMLButtonElement>('button')) {
+    expect(button.disabled).toBe(true);
+    act(() => button.click());
+  }
+  expect(actions.onCreate).not.toHaveBeenCalled();
+  expect(actions.onOpen).not.toHaveBeenCalled();
+});

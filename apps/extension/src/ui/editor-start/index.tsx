@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FolderOpen, Plus, Search } from 'lucide-react';
 import { useState, type DragEvent, type ReactNode } from 'react';
 import type { EditorStartItem } from './use-items';
@@ -35,25 +36,18 @@ const rootClassName = [
   'bg-[var(--sniptale-color-surface-canvas)] px-10 py-10',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
+const headerClassName = [
+  'flex flex-wrap items-center gap-x-8 gap-y-5 pb-6',
+  'border-b border-[var(--sniptale-color-border-soft)]',
+].join(' ');
 const focusClassName = [
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
   'focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
-const primaryButtonClassName = [
-  'inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--sniptale-color-accent)]',
-  'px-5 font-medium text-white hover:brightness-110 disabled:opacity-50',
-  focusClassName,
-].join(' ');
-const secondaryButtonClassName = [
-  'inline-flex h-11 items-center gap-2 rounded-xl border border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)] px-5 font-medium',
-  'hover:bg-[var(--sniptale-color-surface-hover)] disabled:opacity-50',
-  focusClassName,
-].join(' ');
 const cardClassName = [
   'group min-w-0 overflow-hidden rounded-xl border border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)] text-left',
-  'hover:border-[var(--sniptale-color-accent)] disabled:opacity-50',
+  'hover:bg-[var(--sniptale-color-surface-hover)] disabled:opacity-50',
   focusClassName,
 ].join(' ');
 const searchClassName = [
@@ -66,32 +60,27 @@ const emptyClassName = [
   'p-8 text-sm text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 const iconClassName = [
-  'grid size-14 shrink-0 place-items-center rounded-2xl',
-  'bg-[var(--sniptale-color-accent-soft)]',
-  'text-[var(--sniptale-color-accent-emphasis)]',
+  'grid size-12 shrink-0 place-items-center rounded-xl',
+  'border border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
+  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 function EditorStartActions(props: EditorStartProps & { onBrowse: () => void }) {
   return (
-    <div className="mt-8 flex gap-3">
-      <button
-        type="button"
-        disabled={props.pending}
-        onClick={props.onCreate}
-        className={primaryButtonClassName}
-      >
+    <div className="flex shrink-0 flex-wrap items-center gap-2" data-ui="editor.start.actions">
+      <ProductActionButton compact disabled={props.pending} onClick={props.onCreate}>
         <Plus size={18} aria-hidden="true" />
         {props.createLabel}
-      </button>
-      <button
-        type="button"
+      </ProductActionButton>
+      <ProductActionButton
+        compact
+        tone="secondary"
         disabled={props.pending}
         onClick={props.browseOnOpen ? props.onBrowse : props.onOpen}
-        className={secondaryButtonClassName}
       >
         <FolderOpen size={18} aria-hidden="true" />
         {props.openLabel}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }
@@ -104,8 +93,10 @@ function EditorStartCard(props: { item: EditorStartItem; start: EditorStartProps
       disabled={start.pending || item.unavailable}
       onClick={() => start.onSelect(item.id)}
       className={cardClassName}
+      title={item.title}
+      data-ui="editor.start.project"
     >
-      <span className="grid h-36 place-items-center overflow-hidden bg-[var(--sniptale-color-surface-canvas)]">
+      <span className="grid aspect-video place-items-center overflow-hidden bg-[var(--sniptale-color-surface-canvas)]">
         {item.thumbnailUrl ? (
           <img src={item.thumbnailUrl} alt="" className="h-full w-full object-contain" />
         ) : (
@@ -115,7 +106,9 @@ function EditorStartCard(props: { item: EditorStartItem; start: EditorStartProps
         )}
       </span>
       <span className="block px-4 py-3">
-        <span className="block truncate text-sm font-medium">{item.title}</span>
+        <span className="line-clamp-2 min-h-10 break-words text-sm font-medium leading-5">
+          {item.title}
+        </span>
         <span className="mt-1 block truncate text-xs text-[var(--sniptale-color-text-secondary)]">
           {item.unavailable ? start.unavailableLabel : item.detail}
         </span>
@@ -133,7 +126,7 @@ function EditorStartRecent(
   }
 ) {
   return (
-    <section aria-label={props.recentLabel} className="mt-12">
+    <section aria-label={props.recentLabel} className="mt-8">
       <div className="mb-5 flex items-center justify-between gap-4">
         <h2 className="text-lg font-semibold">{props.recentLabel}</h2>
         {props.browse ? (
@@ -210,18 +203,20 @@ export function EditorStart(props: EditorStartProps) {
       className={rootClassName}
     >
       <div className="mx-auto max-w-[1080px]">
-        <header className="flex items-start gap-4 border-b border-[var(--sniptale-color-border-soft)] pb-8">
-          <span className={iconClassName} aria-hidden="true">
-            {props.icon}
-          </span>
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">{props.title}</h1>
-            <p className="mt-2 text-sm text-[var(--sniptale-color-text-secondary)]">
-              {props.description}
-            </p>
+        <header className={headerClassName}>
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <span className={iconClassName} aria-hidden="true">
+              {props.icon}
+            </span>
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight">{props.title}</h1>
+              <p className="mt-2 text-sm text-[var(--sniptale-color-text-secondary)]">
+                {props.description}
+              </p>
+            </div>
           </div>
+          <EditorStartActions {...props} onBrowse={() => setBrowse(true)} />
         </header>
-        <EditorStartActions {...props} onBrowse={() => setBrowse(true)} />
         {props.actionError ? (
           <div role="alert" className="mt-4 text-sm text-[var(--sniptale-color-text-danger)]">
             <p>{props.actionError}</p>

@@ -1,4 +1,4 @@
-import { BookOpen } from 'lucide-react';
+import { ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 import { useRef, useState } from 'react';
 import { getMediaThumbnail } from '../../composition/persistence/media-library';
 import { listScenarioProjectSummaries } from '../../composition/persistence/scenario/store/public';
@@ -76,7 +76,7 @@ export function ScenarioEditorStart(props: {
       status={props.state.status === 'loading' ? 'loading' : status}
       actionError={error ?? loadError}
       pending={pending || props.state.status === 'loading' || props.state.status === 'saving'}
-      icon={<BookOpen size={28} />}
+      icon={<ScenarioEditorIcon className="size-6" />}
       browseOnOpen={status !== 'error'}
       onCreate={() =>
         void run(

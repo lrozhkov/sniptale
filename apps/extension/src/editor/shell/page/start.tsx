@@ -1,4 +1,4 @@
-import { ImagePlus } from 'lucide-react';
+import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
 import { useRef, useState } from 'react';
 import {
   getMediaAssetBlob,
@@ -120,7 +120,7 @@ export function ImageEditorStart(props: {
         status={status}
         actionError={actionError}
         pending={pending}
-        icon={<ImagePlus size={28} />}
+        icon={<ImageEditorIcon className="size-6" />}
         onCreate={() =>
           void run(
             async () => openFile(await createBlankImage()),
