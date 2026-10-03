@@ -1,3 +1,4 @@
+import { useGuideInsertPlacement } from './document-insert-placement';
 import { GuideBlockRows } from './block-rows';
 import { GuideVoiceField } from './voice-field';
 import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
@@ -80,6 +81,7 @@ export function GuideDocument({
   const instructions = useId();
   const [textEditing, setTextEditing] = useState(false);
   useGuideSelectionInput(content);
+  useGuideInsertPlacement(content);
   const selection = guideDocumentSelection({
     selectedId,
     selectedBlockId,
