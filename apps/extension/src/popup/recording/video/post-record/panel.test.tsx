@@ -89,10 +89,12 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('renders post-record actions as a single column and runs one explicit decision', async () => {
+it('groups editing actions and runs one explicit decision', async () => {
   await renderPanel();
 
-  expect(container?.querySelector('[data-busy="false"]')?.className).toContain('grid-cols-1');
+  const buttons = Array.from(container?.querySelectorAll('button') ?? []);
+  expect(buttons[0]?.parentElement).toBe(buttons[1]?.parentElement);
+  expect(buttons[2]?.parentElement).not.toBe(buttons[0]?.parentElement);
   expect(Array.from(container?.querySelectorAll('button') ?? [])[0]?.textContent).toBe(
     'popup.video.postRecordQuickEdit'
   );

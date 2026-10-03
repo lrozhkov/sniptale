@@ -15,30 +15,54 @@ function PostRecordActionButton({
   label,
   onClick,
   tone = 'default',
+  prominent = false,
 }: {
   icon: typeof Library;
   disabled: boolean;
   label: string;
   onClick: () => void;
   tone?: 'danger' | 'default';
+  prominent?: boolean;
 }) {
   return (
     <button
       type="button"
       disabled={disabled}
       className={[
-        'inline-flex h-9 items-center justify-center gap-2 rounded-[10px] px-3',
-        'text-xs font-semibold transition-colors',
-        'disabled:cursor-not-allowed disabled:opacity-60',
+        'group flex min-w-0 items-center justify-center rounded-xl text-xs font-medium',
+        'transition-colors motion-reduce:transition-none',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        prominent
+          ? [
+              'min-h-28 flex-col gap-3 border border-[var(--sniptale-color-border-soft)]',
+              'bg-[var(--sniptale-color-surface-panel)] px-3 py-4',
+              'hover:bg-[var(--sniptale-color-surface-hover)]',
+            ].join(' ')
+          : 'min-h-10 flex-row gap-2 px-2 py-2',
         tone === 'danger'
-          ? 'text-[var(--sniptale-color-danger)] hover:bg-[var(--sniptale-color-danger-soft)]'
+          ? [
+              'text-[var(--sniptale-color-text-muted-strong)]',
+              'hover:bg-[var(--sniptale-color-danger-soft)] hover:text-[var(--sniptale-color-danger)]',
+            ].join(' ')
           : 'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
       ].join(' ')}
       title={label}
       onClick={onClick}
     >
-      <Icon className="h-4 w-4" />
-      <span className="truncate">{label}</span>
+      <Icon
+        aria-hidden="true"
+        className={
+          prominent
+            ? [
+                'h-6 w-6 shrink-0 text-[var(--sniptale-color-text-secondary)] transition-colors',
+                'group-hover:text-[var(--sniptale-color-accent)]',
+                'group-focus-visible:text-[var(--sniptale-color-accent)]',
+              ].join(' ')
+            : 'h-4 w-4 shrink-0'
+        }
+      />
+      <span className="text-balance leading-relaxed">{label}</span>
     </button>
   );
 }
@@ -62,13 +86,8 @@ export function VideoPostRecordPanel({
   const handleDelete = createPostRecordDeleteHandler({ result, runDecision });
 
   return (
-    <div
-      className={[
-        'flex min-h-0 flex-1 flex-col justify-center gap-4 rounded-[14px] border p-4',
-        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
-      ].join(' ')}
-    >
-      <div className="text-center">
+    <div className={['flex min-h-0 flex-1 flex-col gap-5 px-2 pb-1 pt-5'].join(' ')}>
+      <div className="px-2 text-center">
         <div className="text-base font-semibold text-[var(--sniptale-color-text-primary)]">
           {translate('popup.video.postRecordTitle')}
         </div>
@@ -147,49 +166,56 @@ function PostRecordActionGrid({
   runDecision: (action: () => Promise<void>) => void;
 }) {
   return (
-    <div
-      className="grid grid-cols-1 gap-2 opacity-100 data-[busy=true]:pointer-events-none data-[busy=true]:opacity-60"
-      data-busy={isBusy}
-    >
-      <PostRecordActionButton
-        disabled={isBusy}
-        icon={Clapperboard}
-        label={translate('popup.video.postRecordQuickEdit')}
-        onClick={() =>
-          runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId, true))
-        }
-      />
-      <PostRecordActionButton
-        disabled={isBusy}
-        icon={Film}
-        label={translate('popup.video.postRecordOpenEditor')}
-        onClick={() => runDecision(() => openSavedRecordingInVideoEditor(result))}
-      />
-      <PostRecordActionButton
-        disabled={isBusy}
-        icon={Library}
-        label={translate('popup.video.postRecordOpenGallery')}
-        onClick={() => runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId))}
-      />
-      <PostRecordActionButton
-        disabled={isBusy}
-        icon={Download}
-        label={translate('popup.video.postRecordDownload')}
-        onClick={() => runDecision(() => downloadSavedRecordingTracks(result.recordingId))}
-      />
-      <PostRecordActionButton
-        disabled={isBusy}
-        icon={X}
-        label={translate('popup.video.postRecordClose')}
-        onClick={() => runDecision(() => Promise.resolve())}
-      />
-      <PostRecordActionButton
-        disabled={isBusy}
-        icon={Trash2}
-        label={translate('popup.video.postRecordDelete')}
-        tone="danger"
-        onClick={onDelete}
-      />
+    <div className="flex flex-1 flex-col gap-3" data-busy={isBusy}>
+      <div className="grid grid-cols-2 gap-2">
+        <PostRecordActionButton
+          prominent
+          disabled={isBusy}
+          icon={Clapperboard}
+          label={translate('popup.video.postRecordQuickEdit')}
+          onClick={() =>
+            runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId, true))
+          }
+        />
+        <PostRecordActionButton
+          disabled={isBusy}
+          prominent
+          icon={Film}
+          label={translate('popup.video.postRecordOpenEditor')}
+          onClick={() => runDecision(() => openSavedRecordingInVideoEditor(result))}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <PostRecordActionButton
+          disabled={isBusy}
+          icon={Library}
+          label={translate('popup.video.postRecordOpenGallery')}
+          onClick={() => runDecision(() => openLatestRecordingInGallery(result.primaryRecordingId))}
+        />
+        <PostRecordActionButton
+          disabled={isBusy}
+          icon={Download}
+          label={translate('popup.video.postRecordDownload')}
+          onClick={() => runDecision(() => downloadSavedRecordingTracks(result.recordingId))}
+        />
+      </div>
+      <div className="mt-auto flex flex-col gap-2 pt-4">
+        <PostRecordActionButton
+          disabled={isBusy}
+          icon={X}
+          label={translate('popup.video.postRecordClose')}
+          onClick={() => runDecision(() => Promise.resolve())}
+        />
+        <div className="flex justify-center border-t border-[var(--sniptale-color-border-soft)] pt-2">
+          <PostRecordActionButton
+            disabled={isBusy}
+            icon={Trash2}
+            label={translate('popup.video.postRecordDelete')}
+            tone="danger"
+            onClick={onDelete}
+          />
+        </div>
+      </div>
     </div>
   );
 }

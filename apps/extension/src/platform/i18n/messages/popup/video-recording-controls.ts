@@ -108,8 +108,8 @@ export const popupVideoRecordingControlMessages = defineMessageSource({
     en: 'Recording saved',
   },
   postRecordDescription: {
-    ru: 'Запись доступна в библиотеке. Можно открыть её в видеоредакторе, скачать или удалить.',
-    en: 'The recording is available in the library. You can open it in the video editor, download, or delete it.',
+    ru: 'Доступна в вашей библиотеке.',
+    en: 'Available in your library.',
   },
   postRecordOpenGallery: {
     ru: 'Открыть в библиотеке',
