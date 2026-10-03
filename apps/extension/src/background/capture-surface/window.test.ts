@@ -390,6 +390,51 @@ describe('browser window transition and bounds retry', () => {
 });
 
 describe('browser window restoration', () => {
+  it('waits for normal bounds to settle before restoring maximized state', async () => {
+    vi.useFakeTimers();
+    try {
+      let current: Omit<typeof prior, 'state'> & { state: 'normal' | 'maximized' } = {
+        ...prior,
+        width: 1280,
+        height: 720,
+      };
+      let resizing = false;
+      mocks.getWindow.mockImplementation(async () => ({ id: 3, ...current }));
+      mocks.updateWindow.mockImplementation(async (_id, update) => {
+        if (update.width !== undefined) {
+          resizing = true;
+          setTimeout(() => {
+            current = { ...prior };
+            resizing = false;
+          }, 150);
+        }
+        if (update.state === 'maximized' && !resizing) current = maximized;
+        return { id: 3, ...current };
+      });
+      const result = expect(restoreWindowSnapshot(3, maximized)).resolves.toBeUndefined();
+      await Promise.all([result, vi.advanceTimersByTimeAsync(3000)]);
+      expect(current.state).toBe('maximized');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not maximize while restoration bounds keep changing', async () => {
+    vi.useFakeTimers();
+    try {
+      let left = prior.left;
+      mocks.getWindow.mockImplementation(async () => ({ id: 3, ...prior, left: left++ }));
+      const result = expect(restoreWindowSnapshot(3, maximized)).rejects.toThrow(
+        'restore-impossible'
+      );
+      await Promise.all([result, vi.advanceTimersByTimeAsync(2100)]);
+      expect(mocks.updateWindow).toHaveBeenCalledTimes(2);
+      expect(mocks.updateWindow).not.toHaveBeenCalledWith(3, { state: 'maximized' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('restores exact bounds before restoring the prior maximized state', async () => {
     mocks.getWindow.mockResolvedValue({ id: 3, ...maximized });
 
@@ -425,7 +470,7 @@ describe('browser window restoration', () => {
       const failure = expect(restoreWindowSnapshot(3, maximized)).rejects.toThrow(
         'restore-impossible'
       );
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(3000);
       await failure;
     } finally {
       vi.useRealTimers();
@@ -439,7 +484,7 @@ describe('browser window restoration', () => {
       const failure = expect(restoreWindowSnapshot(3, maximized)).rejects.toThrow(
         'restore-impossible'
       );
-      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(3000);
       await failure;
     } finally {
       vi.useRealTimers();

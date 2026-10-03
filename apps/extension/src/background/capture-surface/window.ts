@@ -214,6 +214,25 @@ export async function applyPreparedWindowSize(
   }
 }
 
+async function waitForRestorationBoundsToSettle(
+  windowId: number,
+  lastBoundsChange: () => number
+): Promise<void> {
+  const deadline = Date.now() + 2000;
+  let observed = await getWindowSnapshot(windowId);
+  let stableSince = Date.now();
+  while (Date.now() < deadline) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    const current = await getWindowSnapshot(windowId);
+    if (!windowSnapshotsEqual(current, observed)) {
+      observed = current;
+      stableSince = Date.now();
+    }
+    if (Date.now() - Math.max(stableSince, lastBoundsChange()) >= 250) return;
+  }
+  throw new Error('restore-impossible');
+}
+
 export async function restoreWindowSnapshot(windowId: number, snapshot: WindowSnapshot) {
   let lastBoundsChange = Date.now();
   const unsubscribe = browserWindows.subscribeBoundsChanged((window) => {
@@ -228,6 +247,8 @@ export async function restoreWindowSnapshot(windowId: number, snapshot: WindowSn
       height: snapshot.height,
     });
     if (snapshot.state !== 'normal') {
+      // A late bounds transition can overwrite an immediately requested maximization.
+      await waitForRestorationBoundsToSettle(windowId, () => lastBoundsChange);
       await browserWindows.update(windowId, { state: snapshot.state });
     }
     // Native window transitions can emit bounds changes after update() resolves.
