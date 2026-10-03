@@ -68,17 +68,34 @@ function resolveContentRuntimeHost(originalRoot: HTMLElement): Element | null {
   );
 }
 
+function isEmptyInjectedUi(host: Element): boolean {
+  if (!host.matches('reclyp-ui[data-wxt-shadow-root]') || host.childNodes.length > 0) return false;
+  if (!(host instanceof HTMLElement) || host.style.width !== '0px' || host.style.height !== '0px')
+    return false;
+  const shadow = host.shadowRoot;
+  const root = shadow?.getElementById('reclyp-root');
+  if (!shadow || !root || root.childNodes.length > 0 || root.parentNode !== shadow) return false;
+  return Array.from(shadow.childNodes).every(
+    (node) =>
+      node === root ||
+      node instanceof HTMLStyleElement ||
+      (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim())
+  );
+}
+
 function removeContentRuntimeHost(
   virtualRoot: HTMLElement,
   originalRoot: HTMLElement,
   resolveOriginalElement: VirtualDomOriginalElementResolver
 ): void {
   const contentHost = resolveContentRuntimeHost(originalRoot);
-  if (!contentHost) return;
   for (const element of [virtualRoot, ...virtualRoot.querySelectorAll('*')]) {
-    if (resolveOriginalElement(element) === contentHost) {
+    const original = resolveOriginalElement(element);
+    if (
+      (contentHost && original === contentHost) ||
+      (original instanceof Element && isEmptyInjectedUi(original))
+    ) {
       element.remove();
-      return;
     }
   }
 }

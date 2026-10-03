@@ -3,6 +3,7 @@ import { isAccessibleDocumentRuntimeStyle } from '../../../platform/frame';
 import { sanitizePreparedSnapshotCapturedCssText } from './style-assets';
 
 const SHADOW_STYLE_HOST_ATTRIBUTE = 'data-sniptale-shadow-style-host';
+const SHADOW_SHEET_ATTRIBUTE = 'data-sniptale-shadow-sheet';
 const SHADOW_BOUNDARY_ATTRIBUTE = 'data-sniptale-shadow-boundary';
 
 interface MarkedShadowStyleHost {
@@ -10,6 +11,7 @@ interface MarkedShadowStyleHost {
   id: string;
   previousMarker: string | null;
   shadowRoot: ShadowRoot;
+  owners: { source: Element; id: string; previous: string | null }[];
 }
 
 function readStyleSheetRules(sheet: CSSStyleSheet, documentBaseUrl: string): string | null {
@@ -99,13 +101,15 @@ function readAuthoredInlineStyleRules(owner: Element): AuthoredInlineStyleRules 
 function readLosslessInlineStyleSheet(
   sheet: CSSStyleSheet,
   owner: Element | undefined,
-  documentBaseUrl: string
+  documentBaseUrl: string,
+  requireExact = false
 ): string | null {
   if (!owner || owner.tagName.toLowerCase() !== 'style') return null;
   const authoredCssText = owner.textContent?.trim() ?? '';
   const authoredRuleSet = readAuthoredInlineStyleRules(owner);
   if (!authoredCssText || !authoredRuleSet) return null;
   const { comparison, rules: authoredRules } = authoredRuleSet;
+  if (requireExact && comparison !== 'exact') return null;
   try {
     const liveRules = Array.from(sheet.cssRules, (rule) => rule.cssText);
     const rulesMatch =
@@ -156,13 +160,14 @@ function appendMaterializedStyle(
   cssText: string,
   fallbackOwner: Element | undefined,
   target: Element = snapshot.head
-): void {
+): HTMLStyleElement | undefined {
   if (!cssText) return;
   const style = snapshot.createElement('style');
   style.setAttribute('data-sniptale-captured-stylesheet', 'true');
   const media = (sheet.media?.mediaText || fallbackOwner?.getAttribute('media') || '').trim();
   style.textContent = media ? `@media ${media} {\n${cssText}\n}` : cssText;
   target.appendChild(style);
+  return style;
 }
 
 function appendRestrictedStylesheetLink(
@@ -266,13 +271,25 @@ export function markPreparedSnapshotShadowStyles(sourceDocument: Document): {
       const previousMarker = host.getAttribute(SHADOW_STYLE_HOST_ATTRIBUTE);
       const id = `sniptale-shadow-style-${index + 1}`;
       host.setAttribute(SHADOW_STYLE_HOST_ATTRIBUTE, id);
-      return [{ host, id, previousMarker, shadowRoot }];
+      const owners = Array.from(shadowRoot.querySelectorAll('style, link[rel~="stylesheet"]')).map(
+        (source, sheetIndex) => {
+          const sheetId = `${id}-${sheetIndex}`;
+          const previous = source.getAttribute(SHADOW_SHEET_ATTRIBUTE);
+          source.setAttribute(SHADOW_SHEET_ATTRIBUTE, sheetId);
+          return { source, id: sheetId, previous };
+        }
+      );
+      return [{ host, id, previousMarker, shadowRoot, owners }];
     }
   );
 
   return {
     cleanup() {
       for (const item of marked) {
+        for (const owner of item.owners) {
+          if (owner.previous === null) owner.source.removeAttribute(SHADOW_SHEET_ATTRIBUTE);
+          else owner.source.setAttribute(SHADOW_SHEET_ATTRIBUTE, owner.previous);
+        }
         if (item.previousMarker === null) item.host.removeAttribute(SHADOW_STYLE_HOST_ATTRIBUTE);
         else item.host.setAttribute(SHADOW_STYLE_HOST_ATTRIBUTE, item.previousMarker);
       }
@@ -303,12 +320,27 @@ export function markPreparedSnapshotShadowStyles(sourceDocument: Document): {
           item.shadowRoot.querySelectorAll('style, link[rel~="stylesheet"]')
         );
         for (const sheet of Array.from(item.shadowRoot.styleSheets ?? [])) {
-          if (sheet.disabled) continue;
           const owner = resolveSourceStylesheetOwner(sheet, sourceOwners);
-          if (isAccessibleDocumentRuntimeStyle(owner)) continue;
-          const cssText = readStyleSheetRules(sheet, sourceDocument.baseURI);
-          if (cssText !== null)
-            appendMaterializedStyle(snapshot, sheet, cssText, undefined, target);
+          const marker = item.owners.find((entry) => entry.source === owner);
+          const clone = marker
+            ? target.querySelector(`[${SHADOW_SHEET_ATTRIBUTE}="${marker.id}"]`)
+            : null;
+          if (sheet.disabled || isAccessibleDocumentRuntimeStyle(owner)) {
+            clone?.remove();
+            continue;
+          }
+          const cssText =
+            readLosslessInlineStyleSheet(sheet, owner, sourceDocument.baseURI, true) ??
+            readStyleSheetRules(sheet, sourceDocument.baseURI);
+          if (cssText === null) continue;
+          const materialized = appendMaterializedStyle(snapshot, sheet, cssText, owner, target);
+          if (clone && materialized) clone.replaceWith(materialized);
+          else if (clone && !cssText) clone.remove();
+        }
+        for (const owner of item.owners) {
+          target
+            .querySelector(`[${SHADOW_SHEET_ATTRIBUTE}="${owner.id}"]`)
+            ?.removeAttribute(SHADOW_SHEET_ATTRIBUTE);
         }
         for (const sheet of item.shadowRoot.adoptedStyleSheets ?? []) {
           if (sheet.disabled) continue;
