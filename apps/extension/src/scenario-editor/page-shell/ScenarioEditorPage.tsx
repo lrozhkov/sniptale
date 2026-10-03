@@ -232,6 +232,10 @@ function GuideDocumentWorkspace({
           inspectedBlockKind={framing.target?.block.kind}
           itemActions={
             <GuideContextualInspector
+              onEditImage={(itemId, blockId) => {
+                state.sealEdit();
+                imageEditor.open(itemId, blockId);
+              }}
               onSaveTemplate={state.saveTemplate}
               onApplyTemplate={(stepId, templateId, mode) =>
                 state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
@@ -397,6 +401,7 @@ function handleGuideHistoryShortcut(
 
 /** Routes the right inspector to current image framing or the selected step's appearance. */
 function GuideContextualInspector({
+  onEditImage,
   onSaveTemplate,
   onApplyTemplate,
   scope,
@@ -409,6 +414,7 @@ function GuideContextualInspector({
   onChange,
   t,
 }: {
+  onEditImage: (itemId: string, blockId: string) => void;
   presentation: 'all' | 'sections';
   project: GuideProject;
   selectedId: string | null;
@@ -440,6 +446,10 @@ function GuideContextualInspector({
     return <p className="guide-inspector-hint">{t('scenario.editor.guideSelectForSettings')}</p>;
   return framing.target?.block.kind === 'image' ? (
     <GuideImageControls
+      stepId={framing.target.item.id}
+      onEdit={() => {
+        if (framing.target) onEditImage(framing.target.item.id, framing.target.block.id);
+      }}
       block={framing.target.block}
       htmlDefaults={project.htmlExport}
       url={images[framing.target.block.assetId]}

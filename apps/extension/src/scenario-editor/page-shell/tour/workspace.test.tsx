@@ -375,6 +375,12 @@ it('shows object narration without slide narration in the selected-object drill-
   await click('Slide objects', host.querySelector('#guide-inspector-panel')!);
   await click('Go first');
   const inspector = host.querySelector('#guide-inspector-panel')!;
+  expect(inspector.textContent).not.toContain('Object narration');
+  await click('Narration', inspector);
+  expect(inspector.querySelector('[aria-label="Narration"]')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  await click('Show all settings', inspector);
   expect(inspector.textContent).toContain('Object narration');
   expect(inspector.textContent).not.toContain('Slide narration');
   expect([...inspector.querySelectorAll('button')].some((b) => b.textContent === 'Record')).toBe(
@@ -391,16 +397,28 @@ it('uses the header presentation switch and keeps grouped objects switchable wit
   await click('Show settings sections', panel());
   expect(panel().textContent).not.toContain('Slide narration');
   await click('Playback', panel());
-  expect(panel().textContent).toContain('Slide narration');
+  expect(panel().textContent).not.toContain('Slide narration');
+  await click('Narration', panel());
+  expect(
+    [...panel().querySelectorAll('button')].some((button) => button.textContent === 'Record')
+  ).toBe(true);
   await click('Slide objects', panel());
   await click('Hotspot', panel());
   expect(panel().querySelector('nav')).not.toBeNull();
   expect(panel().querySelector('[title="Show all settings"]')).not.toBeNull();
   await click('Show all settings', panel());
   expect(panel().querySelector('nav')).toBeNull();
+  expect(panel().textContent).toContain('Object narration');
+  expect(panel().textContent).not.toContain('Slide narration');
   await click('Show settings sections', panel());
   expect(panel().querySelector('nav')).not.toBeNull();
-  expect(panel().textContent).toContain('Object narration');
+  await click('Narration', panel());
+  expect(panel().querySelector('[aria-label="Narration"]')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  expect(
+    [...panel().querySelectorAll('button')].some((button) => button.textContent === 'Record')
+  ).toBe(true);
   expect(panel().textContent).not.toContain('Slide narration');
   await click('Back to slide settings', panel());
   expect(panel().querySelector('[aria-label="Slide objects"]')?.getAttribute('aria-pressed')).toBe(

@@ -26,7 +26,8 @@
   padding-block: 12px;
   border-top: 1px solid var(--sniptale-color-border-soft);
 }
-.guide-inspector-section > .guide-inspector-group:first-child {
+.guide-inspector-section > .guide-inspector-group:first-child,
+.guide-default-appearance .guide-style-fields > .guide-inspector-group:first-child {
   padding-top: 0;
   border-top: none;
 }
@@ -491,7 +492,7 @@
   padding: 12px 6px;
 }
 .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] > div {
-  padding: 12px;
+  padding: 0 12px 12px;
 }
 .guide-inspector-panel .sniptale-input,
 .guide-inspector-panel .sniptale-textarea {

@@ -6,7 +6,8 @@ import type {
   TourRect,
   TourDocument,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { Crosshair, MessageSquare, ScanLine } from 'lucide-react';
+import { Crosshair, MessageSquare, ScanLine, Palette, MousePointer2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { GuideInspectorGroup } from '../inspector';
 import { TourActionField, TourPointFields, TourTextField, TourTextPresentation } from './fields';
@@ -16,6 +17,7 @@ import type { Translate } from '../../../platform/i18n';
 type SettingsProps<T> = {
   value: T;
   presentation?: 'all' | 'sections';
+  narration?: ReactNode;
   tour: TourDocument;
   disabled: boolean;
   onChange: (value: T) => boolean;
@@ -25,12 +27,13 @@ type SettingsProps<T> = {
 export function TourHotspotSettings({
   value,
   presentation = 'all',
+  narration,
   tour,
   disabled,
   onChange,
   t,
 }: SettingsProps<TourHotspot>) {
-  const renderSections = useTourInspectorSections(presentation, t);
+  const renderSections = useTourInspectorSections(presentation, t, narration);
   return renderSections('hotspot', [
     {
       id: 'content',
@@ -85,15 +88,11 @@ export function TourHotspotSettings({
     },
     {
       id: 'appearance',
-      icon: MessageSquare,
+      icon: Palette,
       label: t('scenario.editor.appearance'),
       categorized: true,
       content: (
-        <GuideInspectorGroup
-          id="appearance"
-          icon={MessageSquare}
-          title={t('scenario.editor.appearance')}
-        >
+        <GuideInspectorGroup id="appearance" icon={Palette} title={t('scenario.editor.appearance')}>
           <label className="guide-number-toggle">
             <ProductToggle
               size="sm"
@@ -117,11 +116,15 @@ export function TourHotspotSettings({
     },
     {
       id: 'action',
-      icon: Crosshair,
+      icon: MousePointer2,
       label: t('scenario.editor.tourAction'),
       categorized: true,
       content: (
-        <GuideInspectorGroup id="action" icon={Crosshair} title={t('scenario.editor.tourAction')}>
+        <GuideInspectorGroup
+          id="action"
+          icon={MousePointer2}
+          title={t('scenario.editor.tourAction')}
+        >
           <TourActionField
             value={value.action}
             tour={tour}

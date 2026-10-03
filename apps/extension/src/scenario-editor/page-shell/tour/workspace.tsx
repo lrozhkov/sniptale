@@ -2,15 +2,13 @@ import { getTourAudioResources } from '../../../features/scenario/project/public
 import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
 import { useState } from 'react';
-import {
-  getTourSlideObjects,
-  type TourSlide,
-} from '@sniptale/runtime-contracts/scenario/types/tour';
+import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { X, Settings2, List, PanelLeft, SquarePen } from 'lucide-react';
+import { X, Settings2, List, PanelLeft, SquarePen, Image } from 'lucide-react';
 import { ScenarioWorkspaceFrame } from '../workspace';
-import { GuideResourceDrawer } from '../resource-drawer';
+import { GuideResourceDrawer, useGuideResourceRequest } from '../resource-drawer';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourViewControls, useTourViewMode } from './view-controls';
 import { TourInspector } from './inspector';
 import { TourImageDropZone } from './image-drop';
@@ -115,6 +113,8 @@ export function TourWorkspace(props: TourWorkspaceProps) {
 }
 
 function TourSettingsPanel({
+  images,
+  onEditImage,
   project,
   panels,
   disabled,
@@ -124,6 +124,9 @@ function TourSettingsPanel({
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
+  const requestResource = useGuideResourceRequest();
+  const slide = state.slide;
+  const image = slide?.kind === 'image' ? slide.image : slide?.background.image;
   const inspectorTitle =
     panels.rightScope === 'document'
       ? t('scenario.editor.tourSettings')
@@ -134,16 +137,7 @@ function TourSettingsPanel({
             state.selection?.kind === 'slide' ? state.selection.objectId : null,
             t
           );
-  const selectedObjectId = state.selection?.kind === 'slide' ? state.selection.objectId : null;
-  const selectedObject =
-    state.slide?.kind === 'image' && state.selection?.kind === 'slide'
-      ? getTourSlideObjects(state.slide).find((entry) => entry.object.id === selectedObjectId)
-      : undefined;
-  const grouped =
-    panels.rightScope === 'document' ||
-    (state.selection?.kind === 'slide' && !state.selection.objectId) ||
-    selectedObject?.type === 'hotspot' ||
-    selectedObject?.type === 'mask';
+  const grouped = panels.rightScope === 'document' || state.selection?.kind === 'slide';
   return (
     <FloatingChromePanel
       role="complementary"
@@ -185,6 +179,36 @@ function TourSettingsPanel({
       <div className="guide-panel-scroll">
         {project.tour && (
           <TourInspector
+            imageActions={
+              slide &&
+              image && (
+                <>
+                  {onEditImage && (
+                    <ScenarioInspectorActionButton
+                      data-inspector-edit-image={slide.id}
+                      disabled={disabled || !images[image.assetId]}
+                      onClick={() => onEditImage(slide.id)}
+                    >
+                      <SquarePen size={16} aria-hidden="true" />
+                      {t('scenario.editor.guideEditImage')}
+                    </ScenarioInspectorActionButton>
+                  )}
+                  <ScenarioInspectorActionButton
+                    disabled={importDisabled || !requestResource}
+                    aria-controls="guide-resource-drawer"
+                    onClick={() =>
+                      requestResource?.({
+                        kind: slide.kind === 'image' ? 'tour-image' : 'tour-background',
+                        slideId: slide.id,
+                      })
+                    }
+                  >
+                    <Image size={16} aria-hidden="true" />
+                    {t('scenario.editor.guideReplaceImage')}
+                  </ScenarioInspectorActionButton>
+                </>
+              )
+            }
             presentation={panels.presentation}
             tour={project.tour}
             slide={state.slide}

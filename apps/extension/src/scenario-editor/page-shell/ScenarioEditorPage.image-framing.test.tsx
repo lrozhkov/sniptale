@@ -244,6 +244,44 @@ it('selects text and note settings from focus, preserves edits and returns to st
   expect(inspector.textContent).toContain('Step layout');
 });
 
+for (const selector of ['.guide-image-slot', '.guide-image-slot button']) {
+  it(`selects the empty image slot from ${selector} focus without changing the previous block`, async () => {
+    const project = createGuideProject('Slots', 'guide', 100);
+    const step = createGuideStep('Step', 'slots');
+    step.blocks = [
+      { kind: 'text', id: 'text', paragraphs: [] },
+      {
+        kind: 'image-slot',
+        id: 'slot',
+        frame: { width: 960, height: 540 },
+        fit: 'contain',
+        alt: '',
+        caption: '',
+      },
+    ];
+    project.items = [step];
+    io.load.mockResolvedValue(project);
+    await render();
+    await act(async () =>
+      container.querySelector<HTMLTextAreaElement>('[data-block-id="text"] textarea')!.focus()
+    );
+    await act(async () => container.querySelector<HTMLElement>(selector)!.focus());
+    const inspector = container.querySelector('#guide-inspector-panel')!;
+    await click('Half width', inspector);
+    expect(container.querySelector('[data-block-id="slot"]')?.getAttribute('data-width')).toBe(
+      '50'
+    );
+    expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe(
+      '100'
+    );
+    expect(inspector.querySelector('.guide-image-controls')).toBeNull();
+    await click('Undo');
+    expect(container.querySelector('[data-block-id="slot"]')?.getAttribute('data-width')).toBe(
+      '100'
+    );
+  });
+}
+
 it('opens the selected tour image and restores its selection and focus after Apply', async () => {
   const project = createGuideProject('Tour', 'guide', 100);
   const first = createTourImageSlide('first');

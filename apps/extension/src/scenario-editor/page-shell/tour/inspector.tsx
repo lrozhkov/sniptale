@@ -27,6 +27,7 @@ import {
   Layers,
   LayoutPanelTop,
   List,
+  MousePointer2,
 } from 'lucide-react';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -42,6 +43,7 @@ import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
 
 type InspectorProps = {
+  imageActions?: ReactNode;
   presentation?: 'all' | 'sections';
   narration?: ReactNode;
   tour: TourDocument;
@@ -131,6 +133,58 @@ function TourSlideCategories({
       ];
 }
 
+function TourDocumentCategories({
+  tour,
+  disabled,
+  onChangeTour,
+  t,
+}: Pick<InspectorProps, 'tour' | 'disabled' | 'onChangeTour' | 't'>) {
+  const documentSettings = { tour, disabled, onChange: onChangeTour, t };
+  return [
+    {
+      id: 'appearance',
+      icon: Palette,
+      label: t('scenario.editor.appearance'),
+      categorized: true,
+      content: <TourDocumentSettings {...documentSettings} section="appearance" />,
+    },
+    {
+      id: 'hotspots',
+      icon: Crosshair,
+      label: t('scenario.editor.tourHotspot'),
+      categorized: true,
+      content: <TourDocumentSettings {...documentSettings} section="hotspots" />,
+    },
+    {
+      id: 'masks',
+      icon: ScanLine,
+      label: t('scenario.editor.tourMask'),
+      content: <TourMaskDefaultSettings {...documentSettings} />,
+    },
+    {
+      id: 'explanations',
+      icon: MessageSquare,
+      label: t('scenario.editor.tourAnnotation'),
+      categorized: true,
+      content: <TourDocumentSettings {...documentSettings} section="explanations" />,
+    },
+    {
+      id: 'playback',
+      icon: Play,
+      label: t('scenario.editor.tourPlayback'),
+      categorized: true,
+      content: <TourPlaybackSettings {...documentSettings} />,
+    },
+    {
+      id: 'transitions',
+      icon: Layers,
+      label: t('scenario.editor.tourTransitions'),
+      categorized: true,
+      content: <TourTransitionSettings {...documentSettings} />,
+    },
+  ];
+}
+
 /** The inspector edits exactly one scope: whole tour, end screen, slide or selected object. */
 export function TourInspector(props: InspectorProps) {
   return (
@@ -142,7 +196,11 @@ export function TourInspector(props: InspectorProps) {
 
 function TourInspectorContent(props: InspectorProps) {
   const { tour, slide, selection, disabled, t, onSelectObject } = props;
-  const renderSections = useTourInspectorSections(props.presentation ?? 'all', t);
+  const renderSections = useTourInspectorSections(
+    props.presentation ?? 'all',
+    t,
+    props.scope === 'selection' && selection?.kind === 'slide' ? props.narration : null
+  );
   const list = useRef<HTMLDivElement>(null);
   const previousObject = useRef<string | null>(null);
   const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
@@ -155,51 +213,7 @@ function TourInspectorContent(props: InspectorProps) {
     }
     previousObject.current = selectedObject;
   }, [selectedObject, props.scope]);
-  const documentSettings = { tour, disabled, onChange: props.onChangeTour, t };
-  if (props.scope === 'document')
-    return renderSections('document', [
-      {
-        id: 'appearance',
-        icon: Palette,
-        label: t('scenario.editor.appearance'),
-        categorized: true,
-        content: <TourDocumentSettings {...documentSettings} section="appearance" />,
-      },
-      {
-        id: 'hotspots',
-        icon: Crosshair,
-        label: t('scenario.editor.tourHotspot'),
-        categorized: true,
-        content: <TourDocumentSettings {...documentSettings} section="hotspots" />,
-      },
-      {
-        id: 'masks',
-        icon: ScanLine,
-        label: t('scenario.editor.tourMask'),
-        content: <TourMaskDefaultSettings {...documentSettings} />,
-      },
-      {
-        id: 'explanations',
-        icon: MessageSquare,
-        label: t('scenario.editor.tourAnnotation'),
-        categorized: true,
-        content: <TourDocumentSettings {...documentSettings} section="explanations" />,
-      },
-      {
-        id: 'playback',
-        icon: Play,
-        label: t('scenario.editor.tourPlayback'),
-        categorized: true,
-        content: <TourPlaybackSettings {...documentSettings} />,
-      },
-      {
-        id: 'transitions',
-        icon: Layers,
-        label: t('scenario.editor.tourTransitions'),
-        categorized: true,
-        content: <TourTransitionSettings {...documentSettings} />,
-      },
-    ]);
+  if (props.scope === 'document') return renderSections('document', TourDocumentCategories(props));
   if (selection?.kind === 'end')
     return (
       <InspectorCategorizedContent>
@@ -224,6 +238,7 @@ function TourInspectorContent(props: InspectorProps) {
       />
     ) : (
       <TourImageSettings
+        narration={props.narration}
         presentation={props.presentation ?? 'all'}
         key={JSON.stringify([slide.id, objectId])}
         section={section}
@@ -243,8 +258,21 @@ function TourInspectorContent(props: InspectorProps) {
           label={t('scenario.editor.tourBackToSlide')}
           onBack={() => onSelectObject(null)}
         />
-        {settings('object')}
-        {props.narration}
+        {slide.kind === 'navigation' || slide.annotations.some((entry) => entry.id === objectId)
+          ? renderSections(slide.kind === 'navigation' ? 'navigation-button' : 'annotation', [
+              {
+                id: 'content',
+                icon: slide.kind === 'navigation' ? MousePointer2 : MessageSquare,
+                label: t(
+                  slide.kind === 'navigation'
+                    ? 'scenario.editor.tourButton'
+                    : 'scenario.editor.textLabel'
+                ),
+                categorized: true,
+                content: settings('object'),
+              },
+            ])
+          : settings('object')}
       </>
     );
   return (
@@ -256,11 +284,20 @@ function TourInspectorContent(props: InspectorProps) {
           t,
           onChangeSlide: props.onChangeSlide,
           onSelectObject,
-        }).map((section) => ({ ...section, content: settings(section.id) })),
+        }).map((section) => ({
+          ...section,
+          content: (
+            <>
+              {section.id === 'content' && props.imageActions}
+              {settings(section.id)}
+            </>
+          ),
+        })),
         {
           id: 'playback',
           icon: Play,
           label: t('scenario.editor.tourPlayback'),
+          categorized: true,
           content: (
             <>
               <TourTimingSettings
@@ -270,7 +307,6 @@ function TourInspectorContent(props: InspectorProps) {
                 onChange={props.onChangeSlide}
                 t={t}
               />
-              {props.narration}
             </>
           ),
         },
@@ -280,6 +316,7 @@ function TourInspectorContent(props: InspectorProps) {
 }
 
 type ImageSettingsProps = {
+  narration?: ReactNode;
   presentation: 'all' | 'sections';
   section: string;
   slide: TourImageSlide;
@@ -367,6 +404,7 @@ function TourImageSettings(props: ImageSettingsProps) {
 }
 
 function TourImageObjectSettings({
+  narration,
   presentation,
   slide,
   tour,
@@ -384,6 +422,7 @@ function TourImageObjectSettings({
       <>
         {hotspot && (
           <TourHotspotSettings
+            narration={narration}
             presentation={presentation}
             value={hotspot}
             tour={tour}
@@ -415,6 +454,7 @@ function TourImageObjectSettings({
         )}
         {mask && (
           <TourMaskSettings
+            narration={narration}
             presentation={presentation}
             defaults={tour.style.maskDefaults}
             value={mask}

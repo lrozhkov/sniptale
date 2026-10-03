@@ -11,6 +11,7 @@ import {
 } from '@sniptale/ui/categorized-inspector';
 import { InspectorCategorizedContent } from '../inspector';
 import type { Translate } from '../../../platform/i18n';
+import { Mic } from 'lucide-react';
 
 type SettingsSection = CategorizedInspectorSection<string> & {
   content: ReactNode;
@@ -20,9 +21,24 @@ type SettingsSection = CategorizedInspectorSection<string> & {
 };
 
 /** Disposable category selection survives object drill-down and the All/Sections switch. */
-export function useTourInspectorSections(presentation: 'all' | 'sections', t: Translate) {
+export function useTourInspectorSections(
+  presentation: 'all' | 'sections',
+  t: Translate,
+  narration?: ReactNode
+) {
   const [active, setActive] = useState<Record<string, string>>({});
   return (context: string, sections: SettingsSection[]) => {
+    if (narration)
+      sections = [
+        ...sections,
+        {
+          id: 'narration',
+          icon: Mic,
+          label: t('scenario.editor.tourNarration'),
+          categorized: true,
+          content: narration,
+        },
+      ];
     if (presentation === 'all')
       return sections.map(({ id, content }) => (
         <div key={id} className="guide-inspector-section">

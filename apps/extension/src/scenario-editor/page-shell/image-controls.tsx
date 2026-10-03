@@ -1,9 +1,19 @@
-import { ScenarioInspectorBackButton } from './inspector-actions';
+import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './inspector-actions';
+import { useGuideResourceRequest } from './resource-drawer';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
+import {
+  MousePointer2,
+  Focus,
+  Maximize2,
+  RotateCcw,
+  ScanLine,
+  Text,
+  Pencil,
+  Image,
+} from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useImageDimensions } from './image-dimensions';
@@ -24,6 +34,8 @@ export function GuideImageControls({
   disabled,
   onChange,
   onClose,
+  onEdit,
+  stepId,
   t,
   url,
 }: {
@@ -33,9 +45,12 @@ export function GuideImageControls({
   disabled: boolean;
   onChange: (block: GuideImageBlock, group?: string | null) => void;
   onClose: () => void;
+  onEdit?: () => void;
+  stepId?: string;
   t: Translate;
 }) {
   const dimensions = useImageDimensions(url);
+  const requestResource = useGuideResourceRequest();
   const { cropBounds } = useGuideImageBounds(block);
   const geometryDisabled = disabled || (cropBounds && !dimensions);
   const constrain = (next: GuideImageBlock) =>
@@ -59,6 +74,26 @@ export function GuideImageControls({
       <ScenarioInspectorBackButton label={t('scenario.editor.guideImageDone')} onBack={onClose} />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
+        {onEdit && (
+          <ScenarioInspectorActionButton
+            data-inspector-edit-image={block.id}
+            disabled={disabled || !url}
+            onClick={onEdit}
+          >
+            <Pencil size={16} aria-hidden="true" />
+            {t('scenario.editor.guideEditImage')}
+          </ScenarioInspectorActionButton>
+        )}
+        {stepId && (
+          <ScenarioInspectorActionButton
+            disabled={disabled || !requestResource}
+            aria-controls="guide-resource-drawer"
+            onClick={() => requestResource?.({ kind: 'replace-image', stepId, blockId: block.id })}
+          >
+            <Image size={16} aria-hidden="true" />
+            {t('scenario.editor.guideReplaceImage')}
+          </ScenarioInspectorActionButton>
+        )}
         <GuideInspectorGroup
           id="framing"
           icon={ScanLine}

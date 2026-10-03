@@ -214,7 +214,8 @@ it('renders exactly one heading per section in both presentations and keeps nest
   const subgroupHeadings = [...host.querySelectorAll('.guide-inspector-group-heading')].map(
     (node) => node.textContent?.trim()
   );
-  expect(subgroupHeadings).toEqual([expect.stringContaining('Timing and autoplay')]);
+  expect(subgroupHeadings).toEqual([]);
+  expect(host.textContent).toContain('Playback');
 });
 
 it('remembers document disclosure groups independently after leaving document settings', async () => {
@@ -287,4 +288,82 @@ it('keeps effect defaults independent and restores inherited mask appearance', a
   await fill('Blur radius', '20');
   expect(current().masks[0]!.inheritStyle).toBe(false);
   expect(project.tour!.style.maskDefaults?.blur.radius).toBe(32);
+});
+
+for (const objectId of [null, 'voice-point']) {
+  it(`gives ${objectId ? 'object' : 'slide'} narration its own selectable section`, async () => {
+    if (objectId)
+      current().hotspots = [
+        {
+          id: objectId,
+          point: { x: 0.5, y: 0.5 },
+          targetRect: null,
+          label: 'Voice point',
+          text: '',
+          action: { kind: 'none' },
+          appearance: null,
+          pulse: false,
+        },
+      ];
+    selected = { kind: 'slide', slideId: 'image', objectId };
+    presentation = 'sections';
+    draw();
+    const narration = host.querySelector<HTMLButtonElement>('button[aria-label="Narration"]');
+    expect(narration).not.toBeNull();
+    expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
+    await act(async () => narration!.click());
+    expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
+  });
+}
+
+for (const kind of ['Slide explanation', 'Highlight', 'Add button'] as const) {
+  it(`keeps ${kind} narration isolated and preserves it through presentation switches`, async () => {
+    if (kind === 'Add button') {
+      selected = { kind: 'slide', slideId: 'nav', objectId: null };
+      draw();
+    }
+    await click(kind);
+    presentation = 'sections';
+    draw();
+    const before = JSON.stringify(project);
+    expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
+    await click('Narration');
+    expect(host.querySelectorAll('[data-testid="narration-slot"]')).toHaveLength(1);
+    presentation = 'all';
+    draw();
+    expect(host.querySelectorAll('[data-testid="narration-slot"]')).toHaveLength(1);
+    presentation = 'sections';
+    draw();
+    expect(host.querySelector('button[aria-label="Narration"]')?.getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+    expect(JSON.stringify(project)).toBe(before);
+  });
+}
+
+it('shows only selection guidance when no slide is selected', () => {
+  selected = null;
+  presentation = 'sections';
+  draw();
+  expect(host.textContent).toContain(
+    createTranslator('en')('scenario.editor.guideSelectForSettings')
+  );
+  expect(host.querySelector('nav, input, textarea, [data-testid="narration-slot"]')).toBeNull();
+});
+
+it('keeps legacy redaction controls distinct while grouping its narration', async () => {
+  await click('Highlight');
+  current().masks[0]!.kind = 'redact';
+  presentation = 'sections';
+  draw();
+  expect(host.textContent).toContain('Redact area');
+  await click('Appearance');
+  expect(host.querySelector('[aria-label="Use tour style"]')).toBeNull();
+  expect(host.querySelector('input[aria-label="Opacity"]')).toBeNull();
+  await click('Narration');
+  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
+  expect(current().masks[0]!.kind).toBe('redact');
+  await click('Effect type');
+  await choose('Highlight', 'Blur');
+  expect(current().masks[0]!.kind).toBe('blur');
 });

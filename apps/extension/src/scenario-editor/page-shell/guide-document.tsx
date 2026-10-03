@@ -138,7 +138,9 @@ export function GuideDocument({
               onFocusCapture={(event) => {
                 if (selectedId !== item.id) onSelect(item.id);
                 const field = event.target;
-                if (!(field instanceof HTMLTextAreaElement)) return;
+                if (!(field instanceof HTMLElement)) return;
+                if (!(field instanceof HTMLTextAreaElement) && !field.closest('.guide-image-slot'))
+                  return;
                 const block = field.closest<HTMLElement>('[data-block-id]');
                 if (!block) onSelectBlock(item.id, null);
                 else if (block.dataset['kind'] !== 'image')

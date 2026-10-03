@@ -1,6 +1,7 @@
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-visual.helpers';
+import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
   test(`scenario inspector shares color and section patterns in ${theme}`, async ({
@@ -68,6 +69,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       .getByRole('button', { name: 'Оформление', exact: true })
       .click();
     await expect(panel.locator('h2')).toHaveText('Весь сценарий');
+    await expect(
+      panel.locator('.guide-default-appearance .guide-inspector-group').first()
+    ).toHaveCSS('border-top-width', '0px');
     await expect(
       panel.getByRole('button', { name: 'Показать все настройки', exact: true })
     ).toHaveCount(0);
@@ -181,6 +185,11 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await tourPanel
         .getByRole('button', { name: locale === 'ru' ? 'Точка действия' : 'Hotspot', exact: true })
         .click();
+      await tourPanel
+        .getByRole('navigation')
+        .getByRole('button', { name: locale === 'ru' ? 'Положение' : 'Position', exact: true })
+        .click();
+      await tourPanel.locator('.tour-coordinate-disclosure summary').click();
       await expect(
         tourPanel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').first()
       ).toBeVisible();
@@ -198,6 +207,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
             .map((el) => ({ text: el.textContent, label: el.getAttribute('aria-label') }))
         )
       ).toEqual([]);
+      await tourPanel
+        .getByRole('navigation')
+        .getByRole('button', { name: appearance, exact: true })
+        .click();
       const surface = tourPanel.locator('[data-ui="shared.ui.surface-style-selector"]');
       expect(
         await surface
@@ -210,7 +223,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       ).toEqual([]);
       await surface.locator('[data-ui="shared.ui.surface-style-selector.trigger"]').click();
       await expect(surface.getByRole('dialog')).toBeVisible();
-      await surface.locator('[data-ui="surface-style.cancel"]').click();
+      await page.keyboard.press('Escape');
       await expect(surface.getByRole('dialog')).toHaveCount(0);
       await expect(
         surface.locator('[data-ui="shared.ui.surface-style-selector.trigger"]')
@@ -548,7 +561,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       ].join(', ');
       for (const section of [
         ru ? 'Воспроизведение' : 'Playback',
-        ru ? 'Пояснения' : 'Explanations',
+        ru ? 'Пояснение к слайду' : 'Slide explanation',
       ]) {
         await panel
           .getByRole('navigation')
@@ -689,4 +702,356 @@ for (const locale of ['ru', 'en'] as const) {
       });
     });
   }
+}
+
+for (const [locale, theme] of [
+  ['ru', 'light'],
+  ['en', 'dark'],
+] as const) {
+  test(`inspector image actions return to their origin in ${locale} ${theme}`, async ({
+    page,
+    extensionId,
+  }, info) => {
+    const ru = locale === 'ru';
+    page.setDefaultTimeout(10_000);
+    await page.goto(`chrome-extension://${extensionId}/apps/extension/src/gallery/index.html`);
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const value: unknown = (await chrome.storage.local.get('sniptale-locale-preference'))[
+            'sniptale-locale-preference'
+          ];
+          return value === 'ru' || value === 'en';
+        })
+      )
+      .toBe(true);
+    await page.evaluate(
+      async ({ locale, theme }) => {
+        localStorage.setItem('sniptale-locale-preference', locale);
+        await chrome.storage.local.set({
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': theme,
+        });
+      },
+      { locale, theme }
+    );
+    await openVisualHarness(
+      page,
+      `chrome-extension://${extensionId}`,
+      theme,
+      locale,
+      { width: 1280, height: 720 },
+      'compare',
+      { tourFixture: '1' }
+    );
+    const panel = page.locator('#guide-inspector-panel');
+    const figure = page.locator('article#compare figure').first();
+    await figure.hover();
+    await figure
+      .getByRole('button', { name: ru ? 'Рамка и изображение' : 'Frame and image', exact: true })
+      .click();
+    for (const representation of ['guide', 'tour']) {
+      if (representation === 'tour') {
+        await page
+          .getByRole('button', { name: ru ? 'Интерактивный тур' : 'Interactive tour', exact: true })
+          .click();
+      }
+      const edit = panel.getByRole('button', {
+        name: ru ? 'Редактировать изображение' : 'Edit image',
+        exact: true,
+      });
+      const replace = panel.getByRole('button', {
+        name: ru ? 'Заменить изображение' : 'Replace image',
+        exact: true,
+      });
+      await expect(edit).toBeEnabled();
+      await expect(replace).toBeEnabled();
+      await replace.click();
+      await expect(page.locator('#guide-resource-drawer')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('#guide-resource-drawer')).toHaveCount(0);
+      await expect(replace).toBeFocused();
+      await edit.focus();
+      await page.keyboard.press('Enter');
+      const child = page.frameLocator('.guide-image-editor iframe');
+      await expect(
+        child.locator('[data-ui="editor.floating.document-bar.apply-scenario-button"]')
+      ).toBeEnabled();
+      await child
+        .getByRole('button', {
+          name: ru ? 'Назад без применения' : 'Back without applying',
+          exact: true,
+        })
+        .click();
+      await expect(page.locator('.guide-image-editor')).toHaveCount(0);
+      await expect(edit).toBeFocused();
+      await edit.click();
+      await child.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+      const canvas = child.locator('canvas.upper-canvas');
+      await expect(canvas).toBeVisible();
+      const bounds = await canvas.boundingBox();
+      if (!bounds) throw new Error('Missing image editor canvas');
+      await page.mouse.move(bounds.x + bounds.width * 0.35, bounds.y + bounds.height * 0.4);
+      await page.mouse.down();
+      await page.mouse.move(bounds.x + bounds.width * 0.55, bounds.y + bounds.height * 0.5, {
+        steps: 5,
+      });
+      await page.mouse.up();
+      await child.locator('[data-ui="editor.floating.document-bar.apply-scenario-button"]').click();
+      await expect(page.locator('.guide-image-editor')).toHaveCount(0);
+      await expect(edit).toBeFocused();
+      await info.attach(`${representation}-inspector-actions-${locale}-${theme}`, {
+        body: await page.screenshot({
+          path: `.tmp/backlog6-w16-visual/${representation}-actions-${locale}-${theme}.png`,
+        }),
+        contentType: 'image/png',
+      });
+    }
+  });
+}
+
+for (const [locale, theme] of [
+  ['ru', 'light'],
+  ['en', 'dark'],
+] as const) {
+  test(`tour inspector element matrix in ${locale} ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      theme,
+      locale,
+      { width: 1280, height: 720 },
+      'compare',
+      { tourFixture: '1' }
+    );
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    const category = (name: string) =>
+      panel.getByRole('navigation').getByRole('button', { name, exact: true });
+    const visit = async (expected: number, label: string) => {
+      const buttons = panel.getByRole('navigation').getByRole('button');
+      await expect(buttons).toHaveCount(expected);
+      for (let index = 0; index < expected; index++) {
+        const button = buttons.nth(index);
+        const pressed = await button.getAttribute('aria-pressed');
+        await button.hover();
+        await expect(button).toHaveAttribute('aria-pressed', pressed!);
+        await button.focus();
+        await page.keyboard.press('Enter');
+        await expect(button).toHaveAttribute('aria-pressed', 'true');
+        expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+        await expect(panel.locator('.guide-inspector-disclosure')).toHaveCount(0);
+        if (
+          label === 'image-slide' &&
+          (await button.getAttribute('aria-label')) === t('scenario.editor.tourObjects')
+        ) {
+          const geometry = await panel.evaluate((node) => {
+            const heading = node
+              .querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!
+              .getBoundingClientRect();
+            const actions = [...node.querySelectorAll('.tour-object-actions button')].map((entry) =>
+              entry.getBoundingClientRect()
+            );
+            return {
+              top: actions[0]!.top - heading.bottom,
+              heights: actions.map((entry) => entry.height),
+              gaps: actions.slice(1).map((entry, index) => entry.top - actions[index]!.bottom),
+            };
+          });
+          expect(geometry.top).toBeGreaterThanOrEqual(8);
+          expect(geometry.heights.every((height) => height >= 32)).toBe(true);
+          expect(geometry.gaps.every((gap) => gap >= 8)).toBe(true);
+          await page.screenshot({
+            path: `.tmp/backlog6-w16-visual/slide-object-actions-${locale}-${theme}.png`,
+          });
+        }
+      }
+      await category(t('scenario.editor.tourNarration')).click();
+      await expect(panel.locator('.tour-audio-acquisition')).toBeVisible();
+      await panel
+        .getByRole('button', { name: t('scenario.editor.inspectorShowAll'), exact: true })
+        .click();
+      await expect(panel.getByRole('navigation')).toHaveCount(0);
+      await panel
+        .getByRole('button', { name: t('scenario.editor.inspectorShowSections'), exact: true })
+        .click();
+      await expect(category(t('scenario.editor.tourNarration'))).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      await info.attach(`${label}-${locale}-${theme}`, {
+        body: await page.screenshot({
+          path: `.tmp/backlog6-w16-visual/${label}-${locale}-${theme}.png`,
+        }),
+        contentType: 'image/png',
+      });
+    };
+    await visit(5, 'image-slide');
+    await panel
+      .locator('.tour-audio-acquisition input[type="file"]')
+      .setInputFiles('tooling/test/e2e/fixtures/review-voice-speech.wav');
+    await expect(panel).toContainText('review-voice-speech.wav');
+    for (const [key, count] of [
+      ['tourHotspot', 6],
+      ['tourAnnotation', 2],
+      ['tourMask', 3],
+    ] as const) {
+      await category(t('scenario.editor.tourObjects')).click();
+      if (key === 'tourHotspot') {
+        await panel.getByRole('button', { name: t(`scenario.editor.${key}`), exact: true }).click();
+      } else {
+        await panel.locator('.tour-object-add button').click();
+        await page
+          .getByRole('group', { name: t('scenario.editor.tourAddObject'), exact: true })
+          .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true })
+          .click();
+      }
+      await visit(count, key);
+      if (key === 'tourHotspot') {
+        await expect(panel).not.toContainText('review-voice-speech.wav');
+        await panel
+          .locator('.tour-audio-acquisition input[type="file"]')
+          .setInputFiles('tooling/test/e2e/fixtures/review-voice-speech.wav');
+        await expect(panel).toContainText('review-voice-speech.wav');
+      }
+      if (key === 'tourMask') {
+        await category(t('scenario.editor.tourEffectType')).click();
+        for (const effect of ['tourSpotlight', 'tourBlur', 'tourHighlight'] as const) {
+          await panel
+            .getByRole('button', { name: t('scenario.editor.tourMask'), exact: true })
+            .click();
+          await page
+            .getByRole('option', { name: t(`scenario.editor.${effect}`), exact: true })
+            .click();
+          await category(t('scenario.editor.appearance')).click();
+          await expect(
+            panel.getByRole('switch', {
+              name: t('scenario.editor.tourUseCentralStyle'),
+              exact: true,
+            })
+          ).toBeVisible();
+          await category(t('scenario.editor.tourEffectType')).click();
+        }
+      }
+      await panel
+        .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
+        .click();
+    }
+    await page
+      .locator('#guide-library-panel')
+      .getByRole('button', { name: t('scenario.editor.tourAddNavigation'), exact: true })
+      .click();
+    await visit(5, 'navigation-slide');
+    await category(t('scenario.editor.tourContentsLinks')).click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourAddButton'), exact: true })
+      .click();
+    await visit(2, 'navigation-button');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page
+      .locator('#guide-library-panel')
+      .getByRole('button', { name: t('scenario.editor.tourEnd'), exact: true })
+      .click();
+    await expect(panel.getByRole('navigation')).toHaveCount(0);
+    await expect(panel.locator('input,textarea').first()).toBeVisible();
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+      .click();
+    const defaults = panel.getByRole('navigation').getByRole('button');
+    await expect(defaults).toHaveCount(6);
+    for (let index = 0; index < 6; index++) {
+      await defaults.nth(index).click();
+      await expect(defaults.nth(index)).toHaveAttribute('aria-pressed', 'true');
+      expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+      await page.screenshot({
+        path: `.tmp/backlog6-w16-visual/tour-default-${index}-${locale}-${theme}.png`,
+      });
+    }
+    await expect(page.getByRole('status').first()).toHaveText(t('scenario.editor.guideSaved'));
+    await page.reload();
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    await page.locator('.tour-slide-select').first().click();
+    await category(t('scenario.editor.tourNarration')).click();
+    await expect(panel.locator('.tour-audio-binding')).toContainText('review-voice-speech.wav');
+    await category(t('scenario.editor.tourObjects')).click();
+    await panel.locator('[data-inspector-object]').first().click();
+    await category(t('scenario.editor.tourNarration')).click();
+    await expect(panel.locator('.tour-audio-binding')).toContainText('review-voice-speech.wav');
+  });
+}
+
+for (const [locale, theme] of [
+  ['ru', 'light'],
+  ['en', 'dark'],
+] as const) {
+  test(`guide inspector element matrix in ${locale} ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    const panel = page.locator('#guide-inspector-panel');
+    const step = page.locator('article#compare');
+    await step.locator('.guide-block[data-kind="text"] textarea').first().focus();
+    const checkPlacement = async (kind: string) => {
+      const block = step.locator(`.guide-block[data-kind="${kind}"]`).last();
+      await expect(panel.locator('.guide-block-inspector')).toBeVisible();
+      await panel
+        .getByRole('button', { name: t('scenario.editor.guideHalfWidth'), exact: true })
+        .click();
+      await expect(block).toHaveAttribute('data-width', '50');
+      await expect(
+        panel.getByRole('button', { name: t('scenario.editor.guideEditImage'), exact: true })
+      ).toHaveCount(0);
+      expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+      await info.attach(`${kind}-${locale}-${theme}`, {
+        body: await page.screenshot({
+          path: `.tmp/backlog6-w16-visual/${kind}-${locale}-${theme}.png`,
+        }),
+        contentType: 'image/png',
+      });
+    };
+    await checkPlacement('text');
+    for (const [kind, key] of [
+      ['heading', 'guideAddHeading'],
+      ['note', 'guideAddNote'],
+      ['image-slot', 'guideAddImage'],
+    ] as const) {
+      const add = step
+        .locator('.guide-insertion-block')
+        .last()
+        .getByRole('button', { name: t('scenario.editor.guideAddBlock'), exact: true });
+      await add.focus();
+      await page.keyboard.press('Enter');
+      await page.getByRole('button', { name: t(`scenario.editor.${key}`), exact: true }).click();
+      if (kind !== 'image-slot') {
+        await step
+          .locator(`.guide-block[data-kind="${kind}"]`)
+          .last()
+          .locator('input,textarea')
+          .first()
+          .fill(`${kind} ${'A long readable title '.repeat(4)}`);
+      } else await step.locator('.guide-image-slot').last().focus();
+      await checkPlacement(kind);
+    }
+    const section = page.locator('.guide-section-title').first();
+    await section.fill('Long section title '.repeat(8));
+    await expect(
+      panel.getByRole('region', { name: t('scenario.editor.guideNumbering'), exact: true })
+    ).toBeVisible();
+    await expect(panel.getByRole('navigation')).toHaveCount(0);
+    expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await info.attach(`section-${locale}-${theme}`, {
+      body: await page.screenshot({
+        path: `.tmp/backlog6-w16-visual/section-${locale}-${theme}.png`,
+      }),
+      contentType: 'image/png',
+    });
+  });
 }

@@ -1,6 +1,6 @@
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { useTourInspectorSections } from './settings-sections';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { createSolidPaint, getRepresentativeColor, type Paint } from '@sniptale/foundation/paint';
 import {
   resolveTourMask,
@@ -9,7 +9,7 @@ import {
   type TourDocument,
   type TourMask,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { ScanLine } from 'lucide-react';
+import { ScanLine, Palette } from 'lucide-react';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
 import { TourInspectorNumericRow } from './numeric-row';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
@@ -21,6 +21,7 @@ export function TourMaskSettings({
   value: authored,
   defaults,
   presentation = 'all',
+  narration,
   central = false,
   title,
   disabled,
@@ -30,6 +31,7 @@ export function TourMaskSettings({
   value: TourMask;
   defaults?: TourMaskDefaults | undefined;
   presentation?: 'all' | 'sections';
+  narration?: ReactNode;
   central?: boolean;
   title?: string;
   disabled: boolean;
@@ -37,7 +39,7 @@ export function TourMaskSettings({
   t: Translate;
 }) {
   const value = resolveTourMask(authored, defaults);
-  const renderSections = useTourInspectorSections(presentation, t);
+  const renderSections = useTourInspectorSections(presentation, t, narration);
   const controls = maskEffectControls(value);
   const changeStyle = (next: TourMask) => onChange({ ...next, inheritStyle: false });
   const [preview, setPreview] = useState<{ id: string; kind: string; amount: number } | null>(null);
@@ -48,7 +50,7 @@ export function TourMaskSettings({
   const appearance = (
     <GuideInspectorGroup
       id={central ? `default-${value.kind}` : 'mask-appearance'}
-      icon={ScanLine}
+      icon={central ? ScanLine : Palette}
       title={title ?? t('scenario.editor.appearance')}
     >
       {!central && value.kind !== 'redact' && (
@@ -135,7 +137,7 @@ export function TourMaskSettings({
     },
     {
       id: 'appearance',
-      icon: ScanLine,
+      icon: Palette,
       label: t('scenario.editor.appearance'),
       categorized: true,
       content: appearance,

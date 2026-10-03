@@ -6,6 +6,8 @@ import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageControls } from './image-controls';
 import { GuideLayoutAssistance, useGuideImageBounds } from './layout-assistance';
+const requestResource = vi.hoisted(() => vi.fn());
+vi.mock('./resource-drawer', () => ({ useGuideResourceRequest: () => requestResource }));
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -15,6 +17,7 @@ const block = createGuideImageBlock({
 });
 const change = vi.fn();
 const close = vi.fn();
+const edit = vi.fn();
 let host: HTMLDivElement;
 let root: Root;
 let decoded: HTMLImageElement[];
@@ -45,6 +48,8 @@ async function render(url: string | null = 'blob:image', disabled = false, image
   await act(async () =>
     root.render(
       <GuideImageControls
+        stepId="step"
+        onEdit={edit}
         block={image}
         url={url}
         disabled={disabled}
@@ -248,4 +253,32 @@ it('shows saved click and keyboard provenance without inventing missing geometry
   });
   expect(host.textContent).toContain('Keystroke');
   expect(host.textContent).not.toContain('Point:');
+});
+
+it('makes editing and replacing the selected image available from its inspector', async () => {
+  await render();
+  const buttons = [...host.querySelectorAll('button')].map(
+    (button) => button.getAttribute('aria-label') ?? button.textContent?.trim()
+  );
+  expect(buttons).toContain('Edit image');
+  expect(buttons).toContain('Replace image');
+  await click('Edit image');
+  expect(edit).toHaveBeenCalledOnce();
+  await click('Replace image');
+  expect(requestResource).toHaveBeenCalledWith({
+    kind: 'replace-image',
+    stepId: 'step',
+    blockId: block.id,
+  });
+});
+
+it('does not edit an unavailable or disabled image', async () => {
+  await render(null);
+  await click('Edit image');
+  expect(edit).not.toHaveBeenCalled();
+  await render('blob:image', true);
+  await click('Edit image');
+  expect(edit).not.toHaveBeenCalled();
+  await click('Replace image');
+  expect(requestResource).not.toHaveBeenCalled();
 });

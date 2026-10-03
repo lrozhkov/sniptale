@@ -18,7 +18,7 @@ vi.mock('../../platform/navigation/extension-pages', () => ({
 vi.mock('../../workflows/scenario-capture-edit/tour-source', () => ({
   prepareTourImageEditorPayload: io.prepare,
 }));
-import { GuideImageEditor, TourImageEditor } from './image-editor';
+import { GuideImageEditor, TourImageEditor, useGuideImageEditorMode } from './image-editor';
 let root: Root;
 let host: HTMLDivElement;
 const target = {
@@ -72,6 +72,45 @@ async function render() {
       />
     )
   );
+}
+
+for (const representation of ['guide', 'tour'] as const) {
+  it(`restores the ${representation} inspector entry after the editing workspace remounts`, async () => {
+    function Harness() {
+      const mode = useGuideImageEditorMode({ asset: 'blob:image' });
+      if (mode.selection || mode.tourSlideId)
+        return (
+          <button onClick={representation === 'guide' ? mode.close : mode.closeTour}>Return</button>
+        );
+      const open = () =>
+        representation === 'guide' ? mode.open('step', 'image') : mode.openTour('slide');
+      return (
+        <>
+          <div data-block-id="image">
+            <button data-edit-image onClick={open}>
+              Canvas
+            </button>
+          </div>
+          <button data-tour-edit-image="slide" onClick={open}>
+            Header
+          </button>
+          <button
+            data-inspector-edit-image={representation === 'guide' ? 'image' : 'slide'}
+            onClick={open}
+          >
+            Inspector
+          </button>
+        </>
+      );
+    }
+    await act(async () => root.render(<Harness />));
+    const inspector = host.querySelector<HTMLButtonElement>('[data-inspector-edit-image]')!;
+    inspector.focus();
+    await act(async () => inspector.click());
+    expect(inspector.isConnected).toBe(false);
+    await act(async () => host.querySelector('button')!.click());
+    expect(document.activeElement).toBe(host.querySelector('[data-inspector-edit-image]'));
+  });
 }
 function frame() {
   const element = host.querySelector('iframe');
