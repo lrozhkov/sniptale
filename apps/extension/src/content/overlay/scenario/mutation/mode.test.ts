@@ -10,6 +10,9 @@ const transportMocks = vi.hoisted(() => ({
   updateScenarioSurfaceStateMock: vi.fn(),
 }));
 
+const feedbackMocks = vi.hoisted(() => ({ showToast: vi.fn() }));
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => feedbackMocks);
+
 const helperMocks = vi.hoisted(() => ({
   restoreNavigationLockStateMock: vi.fn(),
 }));
@@ -74,6 +77,7 @@ describe('scenario-controller-mode-actions', () => {
       harness.setNavigationLockEnabled
     );
     expect(harness.applyScenarioResponse).not.toHaveBeenCalled();
+    expect(feedbackMocks.showToast).toHaveBeenCalledExactlyOnceWith(expect.any(String), 'error');
   });
 
   it(
@@ -115,6 +119,7 @@ async function expectCaptureModeOptimismAndRollback() {
   );
   expect(harness.setOptimisticCaptureMode).toHaveBeenCalledWith('by-click');
   expect(harness.applyScenarioResponse).toHaveBeenCalledTimes(1);
+  expect(feedbackMocks.showToast).not.toHaveBeenCalled();
 
   transportMocks.setScenarioCaptureModeMock.mockResolvedValueOnce({
     success: false,
@@ -124,6 +129,7 @@ async function expectCaptureModeOptimismAndRollback() {
   await applyCaptureModeHarness(harness, 'manual', false, false);
 
   expect(harness.setOptimisticCaptureMode).toHaveBeenLastCalledWith(null);
+  expect(feedbackMocks.showToast).toHaveBeenCalledExactlyOnceWith(expect.any(String), 'error');
 
   transportMocks.setScenarioCaptureModeMock.mockResolvedValueOnce({
     success: false,
@@ -136,6 +142,7 @@ async function expectCaptureModeOptimismAndRollback() {
     true,
     harness.setNavigationLockEnabled
   );
+  expect(feedbackMocks.showToast).toHaveBeenCalledTimes(2);
 }
 
 function createCaptureModeHarness() {

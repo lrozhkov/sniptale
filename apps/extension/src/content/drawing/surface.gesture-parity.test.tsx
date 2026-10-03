@@ -8,7 +8,10 @@ import { drawDrawingFrame } from './frame';
 import { createRecordingDrawingOwner } from '../overlay/toolbar/video-recording/drawing-session';
 import { createPagePreparationDrawingSession } from './history';
 
-vi.mock('./frame', () => ({ drawDrawingFrame: vi.fn() }));
+vi.mock('./frame', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./frame')>()),
+  drawDrawingFrame: vi.fn(),
+}));
 vi.mock('../platform/dom-host', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../platform/dom-host')>()),
   toggleContentHostClass: vi.fn(),

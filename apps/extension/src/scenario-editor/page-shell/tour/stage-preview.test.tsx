@@ -125,15 +125,16 @@ it('keeps preview interactive: pointer and keyboard hints, pagination, Escape an
   const hotspot = shadow().querySelector<HTMLElement>('.tour-hotspot')!;
   expect(hotspot.tagName).toBe('BUTTON');
   expect(shadow().querySelector('a[href]')).toBeNull();
+  // The counter spans both hints, the empty second slide, and the enabled end screen.
   const hint = () => shadow().querySelector<HTMLElement>('[data-tour-hint]')!;
   act(() => hotspot.focus());
   expect(hint().hidden).toBe(false);
-  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 2');
+  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 4');
   act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click());
-  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('2 / 2');
+  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('2 / 4');
   expect(hint().querySelector('[data-tour-hint-text]')!.textContent).toBe('Second page');
   act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click());
-  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 2');
+  expect(hint().querySelector('[data-tour-hint-point-count]')!.textContent).toContain('1 / 4');
   act(() =>
     hotspot.dispatchEvent(
       new KeyboardEvent('keydown', {

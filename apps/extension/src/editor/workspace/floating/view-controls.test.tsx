@@ -151,7 +151,7 @@ it('opens combined workspace and grid settings and the map below the top-right t
     '[data-ui="editor.floating.view-controls.popover.workspace"]'
   );
   expect(
-    workspacePopover?.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+    workspacePopover?.querySelector('[data-ui="shared.ui.color-selector.picker-trigger"]')
   ).not.toBeNull();
   expect(workspacePopover?.querySelector('.sniptale-glass-color-palette')).toBeNull();
 

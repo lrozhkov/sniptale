@@ -66,6 +66,8 @@ it('renders the compact color row as one left label and one right value field', 
   expect(container!.querySelectorAll('[data-ui="shared.ui.color-selector.trigger"]')).toHaveLength(
     1
   );
-  expect(pickerTrigger?.className).toContain('justify-end');
-  expect(paletteTrigger?.className).toContain('w-5');
+  expect(pickerTrigger?.tagName).toBe('BUTTON');
+  expect(trigger?.contains(pickerTrigger)).toBe(true);
+  expect(trigger?.querySelectorAll('button')).toHaveLength(2);
+  expect(paletteTrigger).toBeNull();
 });

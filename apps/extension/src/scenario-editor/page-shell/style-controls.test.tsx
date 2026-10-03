@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
-import { createTranslator } from '../../platform/i18n';
+import { createTranslator, translate } from '../../platform/i18n';
 import { GuideStyleFields } from './style-controls';
 
 it('emits only each edited style property so other defaults remain inherited', async () => {
@@ -23,15 +23,21 @@ it('emits only each edited style property so other defaults remain inherited', a
         />
       )
     );
-    const paletteTrigger = host.querySelector<HTMLButtonElement>(
-      '[data-ui="shared.ui.color-selector.palette-trigger"]'
+    const pickerTrigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.color-selector.picker-trigger"]'
     )!;
-    await act(async () => paletteTrigger.click());
-    const palette = document.querySelector('[data-ui="shared.ui.color-selector.expanded"]')!;
+    await act(async () => pickerTrigger.click());
+    const palette = document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')!;
     const colors = palette.querySelectorAll<HTMLButtonElement>('button');
     expect(colors.length).toBeGreaterThanOrEqual(8);
     await act(async () => colors[0]!.click());
-    expect(change.mock.lastCall?.[0]).toHaveProperty('accentColor');
+    expect(change).not.toHaveBeenCalled();
+    const picker = document.querySelector('[data-ui="shared.ui.color-selector.picker"]')!;
+    const apply = [...picker.querySelectorAll('button')].find(
+      (button) => button.textContent === translate('shared.ui.colorSelectorApply')
+    )!;
+    await act(async () => apply.click());
+    expect(Object.keys(change.mock.lastCall?.[0] ?? {})).toEqual(['accentColor']);
     const cases = [
       ['Warm', { theme: 'warm' }],
       ['Serif', { font: 'serif' }],

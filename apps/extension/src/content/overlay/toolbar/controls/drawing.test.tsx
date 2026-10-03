@@ -709,6 +709,17 @@ it('keeps Drawing options inside right and bottom viewport edges under page zoom
       };
     }
   );
+  // jsdom has no layout; provide the dimensions read by the real menu measurement effect.
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('sniptale-drawing-options-menu') ? 190 : 0;
+    }
+  );
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('sniptale-drawing-options-menu') ? 170 : 0;
+    }
+  );
   const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
     session,
