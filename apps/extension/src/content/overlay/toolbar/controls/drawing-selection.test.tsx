@@ -17,7 +17,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderSelectionToolbar(session: ReturnType<typeof createDrawingSession>) {
+function renderSelectionToolbar(
+  session: ReturnType<typeof createDrawingSession>,
+  displayMode: 'horizontal' | 'vertical' = 'horizontal'
+) {
   const controller: ContentDrawingController = {
     session,
     applyPalette: vi.fn(),
@@ -31,7 +34,7 @@ function renderSelectionToolbar(session: ReturnType<typeof createDrawingSession>
   document.body.append(host);
   const root = createRoot(host);
   act(() =>
-    root.render(<ToolbarDrawingControls controller={controller} displayMode="horizontal" />)
+    root.render(<ToolbarDrawingControls controller={controller} displayMode={displayMode} />)
   );
   return { host, root };
 }
@@ -194,3 +197,43 @@ it('shows shared shape properties and changes both selected shapes in one commit
   ]);
   act(() => root.unmount());
 });
+
+it.each([
+  ['vertical', 20, true],
+  ['vertical', 950, true],
+  ['horizontal', 20, false],
+] as const)(
+  'keeps selected actions adjacent to the %s toolbar at x=%s',
+  (mode, x, actionsFirst) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('innerWidth', 1024);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+      new DOMRect(x, 100, 36, 36)
+    );
+    const session = createDrawingSession({ onDocumentCommit: () => true });
+    session.commitObject({
+      id: 'selected',
+      kind: 'blur',
+      bounds: { x: 0, y: 0, width: 40, height: 40 },
+    });
+    session.setActiveTool('select');
+    session.select('selected');
+    const { host, root } = renderSelectionToolbar(session, mode);
+    act(() => window.dispatchEvent(new Event('resize')));
+    const pair = host.querySelector('[data-ui="content.toolbar.drawing-options.pair"]');
+    const action = host.querySelector('[data-ui="drawing.selection.actions.delete"]');
+    expect(pair?.children).toHaveLength(2);
+    expect(pair?.classList.contains('flex-col')).toBe(mode === 'vertical');
+    expect(pair?.children[0]?.contains(action)).toBe(actionsFirst);
+    expect(pair?.children[1]?.contains(action)).toBe(!actionsFirst);
+    if (mode === 'vertical') {
+      vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue(
+        new DOMRect(x === 20 ? 950 : 20, 100, 36, 36)
+      );
+      act(() => window.dispatchEvent(new Event('resize')));
+      expect(pair?.children[0]?.contains(action)).toBe(actionsFirst);
+      expect(host.querySelector('[data-ui="drawing.selection.actions.delete"]')).toBe(action);
+    }
+    act(() => root.unmount());
+  }
+);

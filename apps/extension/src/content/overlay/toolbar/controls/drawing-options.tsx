@@ -121,10 +121,12 @@ function useDrawingOptionsLayout(args: {
     };
   }, [args.displayMode, args.hasSelection, args.panelRef, args.tool]);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
-  const menuHeight = measured?.height ?? dimensions.height;
+  const menuHeight =
+    measured?.height ??
+    dimensions.height + (args.hasSelection && args.displayMode === 'vertical' ? 294 : 0);
   const menuWidth = Math.min(
     measured?.width ??
-      dimensions.width + (args.hasSelection ? (args.displayMode === 'vertical' ? 52 : 294) : 0),
+      dimensions.width + (args.hasSelection && args.displayMode === 'horizontal' ? 294 : 0),
     Math.max(0, window.innerWidth - 16)
   );
   const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
@@ -171,45 +173,56 @@ function DrawingOptionsPair(props: {
   totalCount: number;
   tool: DrawingQuickOptionsTool;
 }) {
+  const options = (
+    <ProductToolbarMenu
+      key="options"
+      compact
+      variant="drawing"
+      className="sniptale-drawing-options-popover"
+      style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+    >
+      <div
+        ref={props.panelRef}
+        role="group"
+        aria-label={translate('content.toolbar.drawingOptions')}
+        data-ui={`content.toolbar.drawing-options.${props.tool}`}
+        className={getDrawingOptionsLayoutClass(props.displayMode)}
+      >
+        {props.children}
+      </div>
+    </ProductToolbarMenu>
+  );
+  const actions = (
+    <ProductToolbarMenu
+      key="actions"
+      compact
+      variant="drawing"
+      className="sniptale-drawing-options-popover"
+      style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+    >
+      <DrawingSelectionActions
+        vertical={props.displayMode === 'vertical'}
+        canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
+        canDuplicate={props.selectedCount > 0}
+        canDelete={props.selectedCount > 0}
+        onMove={(direction) => props.controller.session.moveSelected(direction)}
+        onDuplicate={() => props.controller.session.duplicateSelected()}
+        onDelete={() => props.controller.session.deleteSelected()}
+        onDeselect={() => props.controller.session.select(null)}
+      />
+    </ProductToolbarMenu>
+  );
+  const vertical = props.displayMode === 'vertical';
   return (
     <div
       data-ui="content.toolbar.drawing-options.pair"
-      className="absolute flex max-w-[calc(100vw-16px)] items-start gap-2 overflow-x-auto"
+      className={[
+        'absolute flex max-w-[calc(100vw-16px)] items-start gap-2 overflow-x-auto',
+        vertical ? 'flex-col' : 'flex-row',
+      ].join(' ')}
       style={props.layout.style}
     >
-      <ProductToolbarMenu
-        compact
-        variant="drawing"
-        className="sniptale-drawing-options-popover"
-        style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
-      >
-        <div
-          ref={props.panelRef}
-          role="group"
-          aria-label={translate('content.toolbar.drawingOptions')}
-          data-ui={`content.toolbar.drawing-options.${props.tool}`}
-          className={getDrawingOptionsLayoutClass(props.displayMode)}
-        >
-          {props.children}
-        </div>
-      </ProductToolbarMenu>
-      <ProductToolbarMenu
-        compact
-        variant="drawing"
-        className="sniptale-drawing-options-popover"
-        style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
-      >
-        <DrawingSelectionActions
-          vertical={props.displayMode === 'vertical'}
-          canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
-          canDuplicate={props.selectedCount > 0}
-          canDelete={props.selectedCount > 0}
-          onMove={(direction) => props.controller.session.moveSelected(direction)}
-          onDuplicate={() => props.controller.session.duplicateSelected()}
-          onDelete={() => props.controller.session.deleteSelected()}
-          onDeselect={() => props.controller.session.select(null)}
-        />
-      </ProductToolbarMenu>
+      {vertical ? [actions, options] : [options, actions]}
     </div>
   );
 }
