@@ -67,32 +67,3 @@
 .tour-controls [data-tour-contents] {
   margin-inline-start: auto;
 }
-.tour-hint[data-compact='true'] {
-  grid-template-columns: minmax(0, 1fr) auto auto;
-}
-.tour-hint[data-compact='true'] [data-tour-hint-point-count] {
-  display: none;
-}
-.tour-hint[data-compact='true'] .tour-hint-text {
-  align-self: start;
-  grid-column: 1;
-  grid-row: 1;
-  min-width: 0;
-}
-.tour-hint[data-compact='true'] .tour-caption-title {
-  grid-column: 2;
-  justify-content: center;
-  min-width: 28px;
-}
-.tour-hint[data-compact='true'] .tour-hint-controls,
-.tour-hint[data-compact='true'] .tour-caption-title {
-  align-self: start;
-}
-.tour-hint[data-compact='true'][data-collapsed='true'] .tour-hint-text {
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-.tour-hint[data-compact='true'] .tour-caption-title[hidden] {
-  display: none;
-}

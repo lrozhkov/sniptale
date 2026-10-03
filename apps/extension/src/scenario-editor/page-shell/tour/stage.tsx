@@ -207,6 +207,7 @@ function TourStageScaffold({
             </button>
           </div>
         </aside>
+        <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
       </div>
       <footer className="tour-toolbar">
         <div className="tour-feedback">
@@ -234,7 +235,6 @@ function TourStageScaffold({
           </button>
         </div>
       </footer>
-      <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
     </div>
   );
 }

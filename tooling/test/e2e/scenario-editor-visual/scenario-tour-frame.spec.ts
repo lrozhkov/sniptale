@@ -253,3 +253,146 @@ for (const [locale, theme] of [
     expect(contents!.x).toBeGreaterThan(next!.x);
   });
 }
+
+async function inspectSharedCaption(player: Locator, copy: string) {
+  const hint = player.locator('[data-tour-hint]');
+  const body = hint.locator('[data-tour-hint-text]');
+  const toggle = hint.locator('[data-tour-hint-toggle]');
+  await expect(hint).toBeVisible();
+  await expect(hint).not.toHaveAttribute('inert', '');
+  await expect(hint).toHaveAttribute('data-collapsed', 'true');
+  await expect(hint.locator('[data-tour-hint-title]')).toBeVisible();
+  await expect(body).toHaveText(copy);
+  await expect(hint).toHaveCSS('border-top-left-radius', '0px');
+  const collapsedHeight = (await hint.boundingBox())!.height;
+  await body.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect
+    .poll(async () => (await hint.boundingBox())!.height)
+    .toBeGreaterThan(collapsedHeight + 10);
+  const viewport = await player.locator('.tour-viewport').boundingBox();
+  const expanded = await hint.boundingBox();
+  expect(expanded!.y).toBeGreaterThanOrEqual(viewport!.y - 1);
+  expect(expanded!.y + expanded!.height).toBeLessThanOrEqual(viewport!.y + viewport!.height + 1);
+  await expect
+    .poll(() =>
+      body.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+        return node.scrollTop;
+      })
+    )
+    .toBeGreaterThan(0);
+  await expect(body).toHaveText(copy);
+  await toggle.focus();
+  await toggle.press('Enter');
+  await expect(hint).toHaveAttribute('data-collapsed', 'true');
+  await expect(toggle).toBeFocused();
+  return hint.evaluate((node) => {
+    const style = getComputedStyle(node);
+    const text = getComputedStyle(node.querySelector('[data-tour-hint-text]')!);
+    return {
+      background: style.backgroundColor,
+      color: style.color,
+      radius: style.borderRadius,
+      padding: style.padding,
+      shadow: style.boxShadow,
+      font: text.fontSize,
+    };
+  });
+}
+
+for (const [locale, theme] of [
+  ['en', 'light'],
+  ['ru', 'dark'],
+] as const) {
+  test(`shared tour caption and drawer remain inside the frame ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      theme,
+      locale,
+      { width: 1280, height: 720 },
+      'compare',
+      { tourFixture: '1' }
+    );
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: t('scenario.editor.tourObjects'), exact: true })
+      .click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourAnnotation'), exact: true })
+      .click();
+    const field = panel.getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true });
+    const short = locale === 'ru' ? 'Короткое пояснение' : 'Short explanation';
+    await field.fill(short);
+    const host = page.locator('.tour-stage-host');
+    await expect(host.locator('[data-tour-hint-text]')).toHaveText(short);
+    await expect(host.locator('[data-tour-hint-toggle]')).toBeHidden();
+    const copy = (
+      locale === 'ru'
+        ? 'Подробное пояснение шага сохраняет весь текст и легко раскрывается. '
+        : 'A detailed explanation keeps its full text and opens predictably. '
+    )
+      .repeat(18)
+      .trim();
+    await field.fill(copy);
+    await field.blur();
+    const selector = panel.locator('[data-ui="shared.ui.surface-style-selector"]');
+    await selector.locator('button').first().click();
+    const styles = selector.getByRole('dialog');
+    await styles
+      .getByRole('button', { name: t('content.callout.surfaceStyle.surface'), exact: true })
+      .click();
+    await styles
+      .getByRole('button', {
+        name: t('content.callout.surfaceStyle.system.softElevated'),
+        exact: true,
+      })
+      .click();
+    await page.keyboard.press('Escape');
+    await expect(styles).toBeHidden();
+    const editing = await inspectSharedCaption(host, copy);
+    expect(editing.shadow).not.toBe('none');
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    expect(await inspectSharedCaption(host, copy)).toEqual(editing);
+    const drawerBounds = async (player: Locator) => {
+      const trigger = player.locator('[data-tour-contents]');
+      await trigger.click();
+      const drawer = await player.locator('[data-tour-navigation]').boundingBox();
+      const viewport = await player.locator('.tour-viewport').boundingBox();
+      expect(drawer!.y).toBeCloseTo(viewport!.y, 0);
+      expect(drawer!.height).toBeCloseTo(viewport!.height, 0);
+      expect(drawer!.x + drawer!.width).toBeCloseTo(viewport!.x + viewport!.width, 0);
+      await page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+    };
+    await drawerBounds(host);
+    await expect(page.locator('[data-ui="autosave-control"] button').first()).toHaveAccessibleName(
+      new RegExp(t('common.states.saved'))
+    );
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    const exported = page
+      .frameLocator('.tour-export-frame iframe')
+      .frameLocator('iframe')
+      .locator('#tour-player');
+    expect(await inspectSharedCaption(exported, copy)).toEqual(editing);
+    await drawerBounds(exported);
+    await info.attach(`shared-caption-${locale}`, {
+      body: await page.screenshot({ path: `.tmp/backlog6-w18-caption-${locale}.png` }),
+      contentType: 'image/png',
+    });
+  });
+}

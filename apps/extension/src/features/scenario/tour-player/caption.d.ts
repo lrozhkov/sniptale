@@ -11,8 +11,7 @@ export function createTourCaption(
   text: HTMLElement,
   labels: Pick<TourPlayerLabels, 'expand' | 'collapse' | 'details'>,
   redraw: () => void,
-  signal: AbortSignal,
-  compact?: boolean
+  signal: AbortSignal
 ): {
   reset(): void;
   prepare(

@@ -118,18 +118,28 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
   act(() => root.render(<TourStage {...props} selection={selection} />));
   const toggle = shadow().querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
-  expect(toggle.hidden).toBe(false);
-  act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click());
-  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(10));
-  act(() => toggle.click());
-  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(true);
+  const body = shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!;
+  const hint = shadow().querySelector<HTMLElement>('[data-tour-hint]')!;
+  Object.defineProperty(body, 'scrollHeight', { get: () => 80 });
   act(() =>
     root.render(<TourStage {...props} selection={selection} tour={structuredClone(props.tour)} />)
   );
-  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(true);
-  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(10));
+  expect(toggle.hidden).toBe(false);
+  expect(hint.dataset['collapsed']).toBe('true');
+  expect(body.textContent).toBe('A'.repeat(170));
+  expect(body.style.maxHeight).toBe('24px');
+  act(() => body.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(Number.parseFloat(body.style.maxHeight)).toBeGreaterThan(24);
   act(() => toggle.click());
-  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(false);
+  act(() =>
+    root.render(<TourStage {...props} selection={selection} tour={structuredClone(props.tour)} />)
+  );
+  expect(hint.dataset['collapsed']).toBe('true');
+  expect(body.hidden).toBe(false);
+  expect(body.textContent).toBe('A'.repeat(170));
+  act(() => toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
 });
 
 it('resizes a selected mask on canvas with live geometry, one commit and Escape rollback', () => {

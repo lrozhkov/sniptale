@@ -160,6 +160,8 @@ ${escape(labels.previous)}</button>
 <button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">${escape(labels.next)}</button>
 </div>
 </aside>
+<dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
+</dialog>
 </div>
 <footer class="tour-toolbar">
 <div class="tour-feedback">
@@ -195,8 +197,6 @@ ${escape(labels.previous)}</button>
 </button>
 </div>
 </footer>
-<dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
-</dialog>
 </main>
 <script id="tour-data" type="application/json">${json.slice(0, -1)},"assets":[`,
     `]}</script>

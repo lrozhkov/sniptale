@@ -1,3 +1,4 @@
+import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { test, expect, type Page } from '@playwright/test';
 import { build } from 'esbuild';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -94,7 +95,7 @@ const tour = {
 };
 
 /** Bundles the real document module the same way the vite plugin does, then builds the artifact. */
-async function buildPlayerHtml(): Promise<string> {
+async function buildPlayerHtml(documentTour: TourDocument = tour): Promise<string> {
   const script = (
     await build({
       absWorkingDir: repo,
@@ -150,7 +151,7 @@ async function buildPlayerHtml(): Promise<string> {
     }): Promise<string>;
   };
   return module.buildTourPlayerHtml({
-    tour,
+    tour: documentTour,
     title: 'Demo tour',
     labels,
     assets: [{ id: 'image', mime: 'image/png', base64: png }],
@@ -242,7 +243,7 @@ test.describe('standalone tour player chrome', () => {
       await expectChromeBelowFrame(page);
       await page.locator('[data-tour-contents]').click();
       const dialog = await page.locator('[data-tour-navigation]').boundingBox();
-      const player = await page.locator('#tour-player').boundingBox();
+      const player = await page.locator('.tour-viewport').boundingBox();
       if (!dialog || !player) throw new Error('Missing drawer geometry');
       expect(dialog.y).toBeCloseTo(player.y, 0);
       expect(dialog.height).toBeCloseTo(player.height, 0);
@@ -266,9 +267,18 @@ test.describe('standalone tour player chrome', () => {
     });
     await page.setViewportSize({ width: 320, height: 280 });
     const drawer = page.locator('[data-tour-navigation]');
-    const box = await drawer.boundingBox();
-    expect(box?.height).toBe(280);
-    expect(box!.x + box!.width).toBeCloseTo(320, 0);
+    await expect
+      .poll(() =>
+        drawer.evaluate((node) => {
+          const box = node.getBoundingClientRect();
+          const viewport = node.closest('.tour-viewport')!.getBoundingClientRect();
+          return Math.max(
+            Math.abs(box.height - viewport.height),
+            Math.abs(box.right - viewport.right)
+          );
+        })
+      )
+      .toBeLessThan(0.5);
     await drawer.locator('.tour-contents-list').evaluate((list) => {
       list.scrollTop = list.scrollHeight;
     });
@@ -290,4 +300,62 @@ test.describe('standalone tour player chrome', () => {
     );
     await page.screenshot({ path: path.join(proofDir, 'tour-player-caption.png') });
   });
+});
+
+test('tour caption area and compact chrome respect the player work area', async ({ page }) => {
+  const check = expect.configure({ soft: true, timeout: 500 });
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const captionTour: TourDocument = {
+    ...tour,
+    slides: [
+      {
+        ...slide('caption', 'Caption'),
+        hotspots: [],
+        annotations: [
+          {
+            id: 'note',
+            text: 'A long explanation with enough detail to span several lines. '.repeat(12),
+            anchor: null,
+            appearance: null,
+          },
+        ],
+      },
+    ],
+  };
+  await page.setContent(await buildPlayerHtml(captionTour));
+  const hint = page.locator('[data-tour-hint]');
+  await expect(hint).toBeVisible();
+  await check(hint).toHaveCSS('border-top-left-radius', '0px');
+  await check(hint).toHaveCSS('border-top-right-radius', '0px');
+  await check(hint).toHaveAttribute('data-collapsed', 'true');
+  await expect(hint.locator('[data-tour-hint-title]')).toBeVisible();
+  const body = hint.locator('[data-tour-hint-text]');
+  await expect(body).toHaveCSS('transition-duration', '0.18s');
+  await body.click();
+  await expect(hint).toHaveAttribute('data-collapsed', 'false');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(body).toHaveCSS('transition-duration', '0s');
+  await hint.locator('[data-tour-hint-toggle]').click();
+  await expect(hint).toHaveAttribute('data-collapsed', 'true');
+  await body.click();
+  await expect(hint).toHaveAttribute('data-collapsed', 'false');
+  const toolbar = page.locator('.tour-toolbar');
+  await page.mouse.move(0, 0);
+  for (const button of await toolbar.locator('button').all()) {
+    await check(button).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await check(button).toHaveCSS('border-top-width', '0px');
+  }
+  const play = toolbar.locator('[data-tour-play]');
+  await play.hover();
+  await expect(play).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await page.keyboard.press('Tab');
+  await play.focus();
+  await expect(play).toHaveCSS('outline-style', 'solid');
+  await expect(play).toHaveCSS('outline-width', '2px');
+  await page.locator('[data-tour-contents]').click();
+  const drawer = await page.locator('[data-tour-navigation]').boundingBox();
+  const viewport = await page.locator('.tour-viewport').boundingBox();
+  check(drawer!.y).toBeGreaterThanOrEqual(viewport!.y - 0.5);
+  check(drawer!.y + drawer!.height).toBeLessThanOrEqual(viewport!.y + viewport!.height + 0.5);
+  await page.screenshot({ path: path.join(proofDir, 'caption-work-area.png') });
 });

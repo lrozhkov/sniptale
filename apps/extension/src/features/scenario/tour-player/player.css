@@ -836,3 +836,27 @@ a:focus-visible {
 .tour-scene[data-resizing] * {
   cursor: inherit !important;
 }
+
+.tour-controls .tour-button {
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 0;
+  background: transparent;
+}
+.tour-controls .tour-button:hover:not(:disabled) {
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.tour-hint[data-presentation^='caption-'] .tour-hint-text {
+  transition: max-height 180ms ease;
+  overscroll-behavior: contain;
+}
+.tour-hint[data-caption-long='true'][data-collapsed='true'] {
+  cursor: pointer;
+}
+.tour-hint[data-caption-long='true'][data-collapsed='true'] .tour-hint-text {
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tour-hint .tour-caption-title[hidden] {
+  display: none;
+}

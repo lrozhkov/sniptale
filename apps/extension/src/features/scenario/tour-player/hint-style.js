@@ -29,7 +29,7 @@ export function sizeTourHint({ hint, hintText, surface, appearance, stageWidth, 
     hint.style.borderRadius =
       appearance.presentation === 'caption-top'
         ? `0 0 ${surface.radius}px ${surface.radius}px`
-        : `${surface.radius}px ${surface.radius}px 0 0`;
+        : '0 0 0 0';
   const header = hint.querySelector('.tour-hint-header');
   const controls = hint.querySelector('.tour-hint-controls');
   const chromeHeight = caption

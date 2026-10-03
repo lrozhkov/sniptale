@@ -61,7 +61,7 @@ export function createTourHints(
   let hints = [];
   let dismissed = false;
   let restoringFocus = false;
-  const caption = createTourCaption(hint, hintText, labels, paginate, signal, Boolean(navigation));
+  const caption = createTourCaption(hint, hintText, labels, paginate, signal);
   let geometry = { stageWidth: 640, stageHeight: 360, imageBox: null };
   function paginate() {
     const { stageWidth, stageHeight } = geometry;
@@ -89,7 +89,10 @@ export function createTourHints(
     const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
     hint.style.textAlign = appearance.alignment;
     sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
-    pages = navigation ? [copy.text] : measureHintPages(hintText, copy.text);
+    pages =
+      navigation || appearance.presentation !== 'callout'
+        ? [copy.text]
+        : measureHintPages(hintText, copy.text);
     textPage = Math.min(textPage, pages.length - 1);
     hintText.textContent = pages[textPage];
     updateTourHintNavigation(hint, {
@@ -107,7 +110,9 @@ export function createTourHints(
     hintText.hidden = hintText.hidden || copy.hideBody;
     const position = positionHint({ hint, viewport, geometry, current, appearance });
     hint.style.left = `${position.left}px`;
-    hint.style.top = `${position.top}px`;
+    const bottomCaption = appearance.presentation === 'caption-bottom';
+    hint.style.top = bottomCaption ? 'auto' : `${position.top}px`;
+    hint.style.bottom = bottomCaption ? `${position.bottom}px` : '';
   }
   function changeHint(direction) {
     if (navigation) {
@@ -200,6 +205,7 @@ function positionHint({ hint, viewport, geometry, current, appearance }) {
   if (appearance.presentation !== 'callout')
     return {
       left: offsetX,
+      bottom: offsetY,
       top:
         offsetY +
         (appearance.presentation === 'caption-top'

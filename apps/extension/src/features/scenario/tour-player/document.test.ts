@@ -383,21 +383,30 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
     const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
     const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    Object.defineProperty(body, 'scrollHeight', {
+      get: () => ((body.textContent?.length ?? 0) > 80 ? 80 : 20),
+    });
+    body.style.lineHeight = '20px';
+    doc.getElementById('tour-player')!.style.fontSize = '15px';
+    const resize = doc.createEvent('Event');
+    resize.initEvent('resize', false, false);
+    dom.window.dispatchEvent(resize);
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(toggle.textContent).toContain('Details');
+    expect(body.textContent).toBe('A'.repeat(170));
+    expect(body.hidden).toBe(false);
     expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 2');
-    next.click();
-    expect(body.textContent).toBe('A'.repeat(10));
+    body.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(body.textContent).toBe('A'.repeat(170));
+    expect(Number.parseFloat(body.style.maxHeight)).toBeGreaterThan(20);
     toggle.click();
-    expect(body.hidden).toBe(true);
     expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
-    toggle.click();
     expect(body.hidden).toBe(false);
-    expect(body.textContent).toBe('A'.repeat(10));
-    toggle.click();
+    expect(body.style.maxHeight).toBe('20px');
     next.click();
-    expect(body.hidden).toBe(false);
-    expect(toggle.textContent).toContain('Details');
+    expect(body.textContent).toBe('Second body');
+    expect(toggle.hidden).toBe(true);
     expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 2');
     expect(doc.querySelector<HTMLElement>('[data-tour-hint-count]')!.hidden).toBe(true);
     dom.close();
@@ -426,7 +435,9 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     dom.window.dispatchEvent(resize);
     expect(hint.style.width).toBe('608px');
     expect(hint.style.left).toBe('0px');
-    expect(Number.parseFloat(hint.style.top)).toBe(presentation === 'caption-top' ? 139 : 361);
+    expect(
+      Number.parseFloat(presentation === 'caption-top' ? hint.style.top : hint.style.bottom)
+    ).toBe(139);
     dom.close();
   }
 );
@@ -487,7 +498,7 @@ it('lays out one content frame above one bottom toolbar that owns every control'
   dom.close();
 });
 
-it('uses a neutral disclosure heading for slide explanations', async () => {
+it('keeps short slide explanations readable without a disclosure', async () => {
   const text = 'Slide explanation body';
   const args = fixture();
   args.tour.style.textAppearance.presentation = 'caption-bottom';
@@ -501,10 +512,11 @@ it('uses a neutral disclosure heading for slide explanations', async () => {
   const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
   expect(toggle.textContent?.trim()).toBe('Details');
   expect(body.textContent).toBe(text);
-  expect(toggle.getAttribute('aria-label')).toBe('Collapse explanation: Details');
+  expect(toggle.hidden).toBe(true);
+  expect(body.hidden).toBe(false);
   toggle.click();
-  expect(body.hidden).toBe(true);
-  expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: Details');
+  expect(body.hidden).toBe(false);
+  expect(body.textContent).toBe(text);
   dom.close();
 });
 
