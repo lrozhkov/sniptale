@@ -69,7 +69,12 @@ const iconClassName = [
 function EditorStartActions(props: EditorStartProps & { onBrowse: () => void }) {
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2" data-ui="editor.start.actions">
-      <ProductActionButton compact disabled={props.pending} onClick={props.onCreate}>
+      <ProductActionButton
+        compact
+        tone="secondary"
+        disabled={props.pending}
+        onClick={props.onCreate}
+      >
         <Plus size={18} aria-hidden="true" />
         {props.createLabel}
       </ProductActionButton>
