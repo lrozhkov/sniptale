@@ -1,4 +1,4 @@
-import type { DragEvent, KeyboardEvent, RefObject } from 'react';
+import type { KeyboardEvent, RefObject } from 'react';
 import {
   Camera,
   ChevronDown,
@@ -32,10 +32,6 @@ type RowActions = {
   select(key: string): void;
   toggleExpanded(id: string): void;
   keyDown(event: KeyboardEvent<HTMLDivElement>, key: string, node: ContextMenuTreeNode): void;
-  dragStart(event: DragEvent<HTMLSpanElement>, key: string): void;
-  dragEnd(): void;
-  dragOver(event: DragEvent<HTMLDivElement>, key: string, node: ContextMenuTreeNode): void;
-  drop(event: DragEvent<HTMLDivElement>): void;
   edit(key: string, value: string): void;
   editValue(value: string): void;
   commitRename(): void;
@@ -48,8 +44,7 @@ export const treeIconButton = [
   'text-[var(--sniptale-color-text-muted)]',
   'hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)]',
-  'focus-visible:outline-none focus-visible:ring-2',
-  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+  'focus-visible:outline-none',
   'disabled:cursor-not-allowed disabled:opacity-40',
 ].join(' ');
 
@@ -69,14 +64,13 @@ function CommandIcon({ command }: { command: string }) {
 
 function rowClass(selected: boolean, dropEdge?: DropEdge): string {
   return [
-    'relative min-w-0 rounded-md border pr-1 transition-colors',
-    'focus-visible:outline-none focus-visible:ring-2',
-    'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+    'context-menu-tree-row relative min-w-0 rounded-md border pr-1 transition-colors',
+    'focus-visible:outline-none',
     selected
       ? 'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)]'
       : 'border-transparent hover:bg-[var(--sniptale-color-surface-hover)]',
     'pl-1',
-    dropEdge === 'inside' ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
+    dropEdge === 'inside' ? 'ring-1 ring-inset ring-[var(--sniptale-color-accent)]' : '',
   ].join(' ');
 }
 
@@ -108,12 +102,14 @@ export function ContextMenuTreeRow(props: {
       tabIndex={props.selected || props.first ? 0 : -1}
       onFocus={() => actions.select(key)}
       onClick={(event) => {
-        if ((event.target as HTMLElement).closest('button,input,[draggable]')) return;
+        if (
+          event.target instanceof Element &&
+          event.target.closest('button,input,[data-context-menu-source]')
+        )
+          return;
         actions.select(key);
       }}
       onKeyDown={(event) => actions.keyDown(event, key, node)}
-      onDragOver={(event) => actions.dragOver(event, key, node)}
-      onDrop={actions.drop}
       className={rowClass(props.selected, props.dropEdge)}
       style={{ marginInlineStart: `${(level - 1) * 18}px` }}
     >
@@ -122,7 +118,7 @@ export function ContextMenuTreeRow(props: {
           aria-hidden="true"
           data-drop-edge={props.dropEdge}
           data-drop-target={props.dropTargetKey}
-          className={`pointer-events-none absolute right-0 z-10 h-0.5 bg-[var(--sniptale-color-accent)] ${
+          className={`pointer-events-none absolute right-0 z-10 h-px bg-[var(--sniptale-color-accent)] ${
             props.dropEdge === 'before' ? '-top-px' : '-bottom-px'
           }`}
           style={{ insetInlineStart: -(props.dropIndent ?? 0) }}
@@ -132,7 +128,7 @@ export function ContextMenuTreeRow(props: {
         {node.type === 'section' ? (
           <button
             type="button"
-            className={treeIconButton}
+            className={`${treeIconButton} context-menu-quiet-icon`}
             aria-label={`${t(
               props.expanded
                 ? 'settings.appearance.contextMenuCollapse'
@@ -146,11 +142,10 @@ export function ContextMenuTreeRow(props: {
           <span aria-hidden="true" className="inline-block size-8" />
         )}
         <span
-          draggable
-          onDragStart={(event) => actions.dragStart(event, key)}
-          onDragEnd={actions.dragEnd}
+          draggable={false}
+          data-context-menu-source="tree"
           className={[
-            'flex size-7 shrink-0 cursor-grab items-center justify-center',
+            'flex size-7 shrink-0 touch-none cursor-grab items-center justify-center',
             'text-[var(--sniptale-color-text-muted)] active:cursor-grabbing',
           ].join(' ')}
           aria-label={t('settings.appearance.contextMenuDrag')}
@@ -223,7 +218,7 @@ function RowControls(props: {
     <div className="flex shrink-0 items-center justify-end">
       <button
         type="button"
-        className={treeIconButton}
+        className={`${treeIconButton} context-menu-quiet-icon context-menu-remove`}
         aria-label={`${t(
           node.type === 'section'
             ? 'settings.appearance.contextMenuRemoveSection'

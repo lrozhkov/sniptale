@@ -202,13 +202,17 @@ export function reactivateContextMenuCommand(
   return next;
 }
 
-export function removeContextMenuNode(tree: ContextMenuTree, key: string): ContextMenuTree {
+export function removeContextMenuNode(
+  tree: ContextMenuTree,
+  key: string,
+  options = { preserveChildren: true }
+): ContextMenuTree {
   const source = contextMenuNodePosition(tree, key);
   if (!source) return tree;
   const next = structuredClone(tree);
   const items = getItems(next, source.parentId)!;
   const [removed] = items.splice(source.index, 1);
-  if (removed?.type === 'section') {
+  if (removed?.type === 'section' && options.preserveChildren) {
     const flatten = (children: ContextMenuTreeNode[], enabled: boolean): ContextMenuCommandNode[] =>
       children.flatMap((child) =>
         child.type === 'command'

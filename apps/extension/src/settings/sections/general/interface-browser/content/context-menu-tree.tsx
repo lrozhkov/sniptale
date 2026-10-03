@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Folder } from 'lucide-react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Plus } from 'lucide-react';
+import { settingsAddButtonClassName } from '../../../../section-surface';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import type { AppLocale } from '../../../../../platform/i18n';
 import { translate } from '../../../../../platform/i18n';
@@ -12,7 +13,7 @@ import { CONTEXT_MENU_MAX_SECTIONS } from '../../../../../contracts/settings/con
 import type { ContextMenuCatalogItem } from './context-menu-catalog';
 import { contextMenuCommandLabel } from './context-menu-catalog';
 import { ContextMenuTreeRow, treeIconButton } from './context-menu-tree-row';
-import { useContextMenuTreeDrop } from './context-menu-tree-drop';
+import type { ContextMenuDropTarget } from './context-menu-tree-drop';
 import {
   createSectionAtSelection,
   createTreeReorder,
@@ -33,6 +34,7 @@ import {
 
 type TreeViewProps = {
   tree: ContextMenuTree;
+  drop?: ContextMenuDropTarget | null;
   catalog: readonly ContextMenuCatalogItem[];
   locale: AppLocale;
   selectedKey: string | null;
@@ -145,17 +147,7 @@ function useTreeFocus(props: TreeViewProps, editingKey: string | undefined) {
 
 /** Owns keyboard, pointer and editing transactions for one disposable tree draft. */
 function useContextMenuTree(props: TreeViewProps) {
-  const {
-    tree,
-    catalog,
-    locale,
-    selectedKey,
-    onSelect,
-    onChange,
-    expanded,
-    onExpanded,
-    onAnnounce,
-  } = props;
+  const { tree, locale, selectedKey, onSelect, onChange, expanded, onExpanded, onAnnounce } = props;
   const [editing, setEditing] = useState<{ key: string; value: string; isNew: boolean } | null>(
     null
   );
@@ -178,15 +170,6 @@ function useContextMenuTree(props: TreeViewProps) {
     if (nextKey) select(nextKey);
     else onSelect(null);
   };
-  const drag = useContextMenuTreeDrop({
-    tree,
-    catalog,
-    locale,
-    expanded,
-    onExpanded,
-    onAnnounce,
-    apply,
-  });
   const toggleExpanded = (id: string) => {
     const result = toggleTreeSection(tree, id, expanded, selectedKey);
     if (result.focusKey) select(result.focusKey);
@@ -244,10 +227,6 @@ function useContextMenuTree(props: TreeViewProps) {
     select: onSelect,
     toggleExpanded,
     keyDown,
-    dragStart: drag.dragStart,
-    dragEnd: drag.dragEnd,
-    dragOver: drag.dragOver,
-    drop: drag.dropOnRow,
     edit: (key: string, value: string) => setEditing({ key, value, isNew: false }),
     editValue: (value: string) => setEditing((current) => current && { ...current, value }),
     commitRename,
@@ -267,10 +246,6 @@ function useContextMenuTree(props: TreeViewProps) {
     rootRef,
     inputRef,
     rows,
-    drop: drag.drop,
-    rootDragOver: drag.rootDragOver,
-    rootDrop: drag.dropOnRow,
-    rootDragLeave: drag.rootDragLeave,
     editing,
     addSection,
     rowActions,
@@ -284,15 +259,12 @@ function useContextMenuTree(props: TreeViewProps) {
 }
 
 export function ContextMenuTreeView(props: TreeViewProps) {
-  const { tree, catalog, locale, selectedKey, expanded } = props;
+  const instructionsId = useId();
+  const { tree, catalog, locale, selectedKey, expanded, drop } = props;
   const {
     rootRef,
     inputRef,
     rows,
-    drop,
-    rootDragOver,
-    rootDrop,
-    rootDragLeave,
     editing,
     addSection,
     rowActions,
@@ -331,25 +303,27 @@ export function ContextMenuTreeView(props: TreeViewProps) {
         ) : null}
         <button
           type="button"
-          className={`${treeIconButton} w-auto gap-1 px-2`}
+          className={`${settingsAddButtonClassName} !w-auto gap-1.5`}
           onClick={addSection}
           disabled={countContextMenuSections(tree.nodes) >= CONTEXT_MENU_MAX_SECTIONS}
         >
-          <Folder size={15} />
+          <Plus className="h-3.5 w-3.5" aria-hidden="true" />
           {t('settings.appearance.contextMenuCreateSection')}
         </button>
       </div>
+      <span id={instructionsId} className="sr-only">
+        {t('settings.appearance.contextMenuMoveHelp')}
+      </span>
       <div
         ref={rootRef}
         role="tree"
         aria-label={t('settings.appearance.contextMenuTree')}
-        title={t('settings.appearance.contextMenuMoveHelp')}
-        onDragOver={rootDragOver}
-        onDrop={rootDrop}
-        onDragLeave={rootDragLeave}
+        aria-describedby={instructionsId}
+        data-context-menu-tree
+        data-context-menu-scroll
         className={[
           'min-h-0 flex-1 overflow-auto p-2',
-          drop?.rowKey === 'root' ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
+          drop?.rowKey === 'root' ? 'ring-1 ring-inset ring-[var(--sniptale-color-accent)]' : '',
         ].join(' ')}
       >
         {rows.length === 0 ? (

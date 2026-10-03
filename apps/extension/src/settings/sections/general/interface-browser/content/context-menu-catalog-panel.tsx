@@ -11,6 +11,7 @@ import type { ContextMenuCatalogItem } from './context-menu-catalog';
 
 type CatalogPanelProps = {
   tree: ContextMenuTree;
+  dropActive?: boolean;
   catalog: readonly ContextMenuCatalogItem[];
   locale: AppLocale;
   selectedKey: string | null;
@@ -62,7 +63,10 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
   };
   return (
     <section
-      className="flex h-[min(28rem,55vh)] min-h-48 min-w-0 flex-col"
+      data-context-menu-catalog
+      tabIndex={-1}
+      data-drop-active={props.dropActive || undefined}
+      className="context-menu-catalog flex h-[min(28rem,55vh)] min-h-48 min-w-0 flex-col"
       aria-label={t('settings.appearance.contextMenuCatalog')}
     >
       <h3
@@ -73,7 +77,7 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
       >
         {t('settings.appearance.contextMenuCatalog')}
       </h3>
-      <div className="min-h-0 flex-1 overflow-y-auto p-2">
+      <div data-context-menu-scroll className="min-h-0 flex-1 overflow-y-auto p-2">
         {unused.length === 0 ? (
           <p className="text-sm text-[var(--sniptale-color-text-muted)]">
             {t('settings.appearance.contextMenuEmptyCatalog')}
@@ -83,16 +87,13 @@ export function ContextMenuCatalogPanel(props: CatalogPanelProps) {
           <button
             key={item.command}
             type="button"
-            draggable
-            className="block h-10 w-full truncate rounded-md px-3 text-left text-sm
+            data-context-menu-source="catalog"
+            data-command-key={`command:${item.command}`}
+            className="touch-pan-y cursor-grab block h-10 w-full truncate rounded-md px-3 text-left text-sm
               hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none
-              focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]"
+"
             title={item.label}
             aria-label={`${t('settings.appearance.contextMenuAddCommand')}: ${item.label}`}
-            onDragStart={(event) => {
-              event.dataTransfer.effectAllowed = 'move';
-              event.dataTransfer.setData('text/plain', `command:${item.command}`);
-            }}
             onClick={() => add(item.command)}
           >
             {item.label}

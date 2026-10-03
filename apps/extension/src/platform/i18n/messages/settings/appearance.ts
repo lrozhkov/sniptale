@@ -274,7 +274,7 @@ export const settingsAppearanceMessages = defineMessageSource({
   contextMenuBefore: { ru: 'Перед выбранным', en: 'Before selected' },
   contextMenuAfter: { ru: 'После выбранного', en: 'After selected' },
   contextMenuInsideSelected: { ru: 'В выбранный раздел', en: 'Inside selected section' },
-  contextMenuCreateSection: { ru: 'Создать раздел здесь', en: 'Create section here' },
+  contextMenuCreateSection: { ru: 'Добавить', en: 'Add' },
   contextMenuEmptyCatalog: { ru: 'Команды не найдены', en: 'No commands found' },
   contextMenuRetrySave: { ru: 'Повторить сохранение', en: 'Retry saving' },
   contextMenuEmptyTree: {
@@ -301,6 +301,9 @@ export const settingsAppearanceMessages = defineMessageSource({
   },
   contextMenuNoPreview: { ru: 'Включённых команд пока нет', en: 'No enabled commands yet' },
   contextMenuDrag: { ru: 'Перетащить пункт', en: 'Drag item' },
+  contextMenuReturned: { ru: 'Пункт убран из меню', en: 'Item removed from the menu' },
+  contextMenuUndoReturn: { ru: 'Отменить', en: 'Undo' },
+  contextMenuReturnUndone: { ru: 'Пункт возвращён в меню', en: 'Item restored to the menu' },
   contextMenuMoved: { ru: 'Пункт перемещён', en: 'Item moved' },
   contextMenuDestination: { ru: 'Раздел для новой команды', en: 'Section for new command' },
   contextMenuPosition: { ru: 'Позиция новой команды', en: 'New command position' },

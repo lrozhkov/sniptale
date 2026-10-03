@@ -227,3 +227,13 @@ describe('context menu tree mutations', () => {
     ]);
   });
 });
+
+it('removes an entire branch for catalog return without mutating the snapshot used by Undo', () => {
+  const original = structuredClone(tree);
+  const next = removeContextMenuNode(tree, 'section:tools', { preserveChildren: false });
+  expect(next.nodes.some((node) => node.type === 'section' && node.id === 'tools')).toBe(false);
+  expect(JSON.stringify(next)).not.toContain('sniptale.video.');
+  expect(next.nodes).toHaveLength(2);
+  expect(tree).toEqual(original);
+  expect(parseContextMenuTree(next)).not.toBeNull();
+});

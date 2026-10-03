@@ -1,5 +1,8 @@
+import './context-menu-editor.css';
+import { useContextMenuTreeDrop } from './context-menu-tree-drop';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  type ContextMenuTree,
   createRecommendedContextMenuTree,
   parseContextMenuTree,
   resolveContextMenuTree,
@@ -9,14 +12,14 @@ import type { AppearanceSectionState } from './types';
 import { buildContextMenuCatalog } from './context-menu-catalog';
 import { ContextMenuCatalogPanel } from './context-menu-catalog-panel';
 import { ContextMenuTreeView } from './context-menu-tree';
-import { findContextMenuNode } from './context-menu-tree-model';
+import { findContextMenuNode, removeContextMenuNode } from './context-menu-tree-model';
 import { useContextMenuDraftPersistence } from './use-context-menu-draft-persistence';
 
 const buttonClass = [
   'inline-flex min-h-9 cursor-pointer items-center justify-center rounded-lg',
   'border border-[var(--sniptale-color-border-soft)] px-3 py-1.5 text-sm',
   'hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline-none',
-  'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+  'focus-visible:ring-2 ',
   'disabled:cursor-not-allowed disabled:opacity-45',
 ].join(' ');
 
@@ -100,7 +103,60 @@ function useContextMenuDraft(state: ContextMenuEditorState) {
   };
 }
 
+function useContextMenuTransfers(
+  draft: ReturnType<typeof useContextMenuDraft>,
+  locale: ContextMenuEditorState['locale']
+) {
+  const { tree, catalog, expanded, setTree, setExpanded, setSelectedKey, setAnnouncement } = draft;
+  const [focusRequest, setFocusRequest] = useState<{ key: string } | null>(null);
+  const [removed, setRemoved] = useState<{
+    before: ContextMenuTree;
+    after: string;
+    key: string;
+    expanded: Set<string>;
+  } | null>(null);
+  const drag = useContextMenuTreeDrop({
+    tree,
+    catalog,
+    locale: locale,
+    expanded,
+    onExpanded: setExpanded,
+    onAnnounce: setAnnouncement,
+    apply: (next, key) => {
+      setTree(next);
+      setSelectedKey(key);
+      setFocusRequest({ key });
+    },
+    remove: (key) => {
+      if (!tree) return;
+      const next = removeContextMenuNode(tree, key, { preserveChildren: false });
+      if (next === tree) return;
+      setRemoved({ before: tree, after: JSON.stringify(next), key, expanded: new Set(expanded) });
+      setTree(next);
+      setSelectedKey(null);
+      setAnnouncement(translate('settings.appearance.contextMenuReturned', locale));
+    },
+  });
+  const undoRemoval = () => {
+    if (!removed || JSON.stringify(tree) !== removed.after) return;
+    setTree(removed.before);
+    setExpanded(removed.expanded);
+    setSelectedKey(removed.key);
+    setFocusRequest({ key: removed.key });
+    setRemoved(null);
+    setAnnouncement(translate('settings.appearance.contextMenuReturnUndone', locale));
+  };
+  return {
+    drag,
+    focusRequest,
+    setFocusRequest,
+    undoRemoval,
+    canUndo: !!removed && JSON.stringify(tree) === removed.after,
+  };
+}
+
 export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; visible?: boolean }) {
+  const draft = useContextMenuDraft(state);
   const {
     tree,
     setTree,
@@ -114,8 +170,11 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
     catalog,
     restore,
     save,
-  } = useContextMenuDraft(state);
-  const [focusRequest, setFocusRequest] = useState<{ key: string } | null>(null);
+  } = draft;
+  const { drag, focusRequest, setFocusRequest, undoRemoval, canUndo } = useContextMenuTransfers(
+    draft,
+    state.locale
+  );
   const t = (key: Parameters<typeof translate>[0]) => translate(key, state.locale);
   if (
     state.contextMenuCatalogStatus !== 'ready' ||
@@ -147,18 +206,20 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
     );
   }
   return (
-    <div className="min-w-0 space-y-3 pb-2 text-[var(--sniptale-color-text-primary)]">
-      <p className="max-w-[65rem] text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-        {t('settings.appearance.contextMenuEditorHelp')}{' '}
-        {t('settings.appearance.contextMenuMoveHelp')}
-      </p>
+    <div
+      className="context-menu-editor min-w-0 space-y-3 pb-2 text-[var(--sniptale-color-text-primary)]"
+      aria-busy={status === 'editing' || status === 'saving'}
+    >
       <div
+        ref={drag.rootRef}
         className={[
-          'grid min-w-0 overflow-hidden rounded-xl border border-[var(--sniptale-color-border-soft)]',
+          'context-menu-workspace grid min-w-0 overflow-hidden rounded-xl border',
+          'border-[var(--sniptale-color-border-soft)]',
           'lg:grid-cols-[minmax(0,1.6fr)_minmax(15rem,0.9fr)]',
         ].join(' ')}
       >
         <ContextMenuTreeView
+          drop={drag.drop}
           tree={tree}
           catalog={catalog}
           locale={state.locale}
@@ -172,6 +233,7 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
         />
         <div className="min-w-0 border-t border-[var(--sniptale-color-border-soft)] lg:border-l lg:border-t-0">
           <ContextMenuCatalogPanel
+            dropActive={drag.catalogTarget}
             tree={tree}
             catalog={catalog}
             locale={state.locale}
@@ -187,6 +249,14 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
           />
         </div>
       </div>
+      {canUndo ? (
+        <div className="flex items-center gap-3 text-sm" role="status">
+          <span>{t('settings.appearance.contextMenuReturned')}</span>
+          <button type="button" className={buttonClass} onClick={undoRemoval}>
+            {t('settings.appearance.contextMenuUndoReturn')}
+          </button>
+        </div>
+      ) : null}
       <div aria-live="polite" className="sr-only">
         {announcement}
       </div>
@@ -195,20 +265,9 @@ export function ContextMenuEditor({ state }: { state: ContextMenuEditorState; vi
           {t('settings.appearance.contextMenuInvalidName')}
         </p>
       ) : null}
-      {status !== 'ready' ? (
-        <p
-          role={status === 'failed' ? 'alert' : 'status'}
-          className="text-sm text-[var(--sniptale-color-text-muted)]"
-        >
-          {t(
-            status === 'failed'
-              ? 'settings.appearance.contextMenuSaveFailed'
-              : status === 'saving'
-                ? 'settings.appearance.contextMenuSaving'
-                : status === 'saved'
-                  ? 'settings.appearance.contextMenuSaved'
-                  : 'settings.appearance.contextMenuUnsaved'
-          )}
+      {status === 'failed' ? (
+        <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
+          {t('settings.appearance.contextMenuSaveFailed')}
         </p>
       ) : null}
       <div className="flex flex-wrap gap-2">

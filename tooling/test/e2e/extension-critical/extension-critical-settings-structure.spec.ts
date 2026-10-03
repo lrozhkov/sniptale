@@ -138,6 +138,23 @@ for (const locale of ['en', 'ru'] as const) {
         await chrome.storage.local.set({ 'sniptale-theme-preference': value });
       }, theme);
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+      const restore = page.getByRole('button', {
+        name: t('settings.appearance.contextMenuRestore'),
+        exact: true,
+      });
+      await restore.focus();
+      await page.keyboard.press('Shift+Tab');
+      const restingBackground = await restore.evaluate(
+        (element) => getComputedStyle(element).backgroundColor
+      );
+      await page.keyboard.press('Tab');
+      await expect(restore).toBeFocused();
+      expect(
+        await restore.evaluate((element) => getComputedStyle(element).backgroundColor)
+      ).not.toBe(restingBackground);
+      expect(await restore.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe(
+        'none'
+      );
       await firstRow.click();
       await expect(firstRow).toHaveAttribute('aria-selected', 'true');
       const selection = await firstRow.evaluate((element) => {
@@ -170,9 +187,8 @@ for (const locale of ['en', 'ru'] as const) {
         return keys.indexOf('command:sniptale.export.start') === keys.indexOf('section:a') - 1;
       })
       .toBe(true);
-    await expect(
-      page.getByRole('status').filter({ hasText: t('settings.appearance.contextMenuSaved') })
-    ).toBeVisible();
+    await expect(page.locator('.context-menu-editor')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.reload();
     await expect(tree.locator('[data-tree-key="command:sniptale.export.start"]')).toBeVisible();
     await expect
@@ -207,11 +223,8 @@ for (const locale of ['en', 'ru'] as const) {
         return keys.indexOf('section:long-20') === keys.indexOf('section:long-18') - 1;
       })
       .toBe(true);
-    await expect(
-      page.getByRole('status').filter({
-        hasText: t('settings.appearance.contextMenuSaved'),
-      })
-    ).toBeVisible();
+    await expect(page.locator('.context-menu-editor')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByRole('alert')).toHaveCount(0);
     await page.reload();
     await expect
       .poll(async () => {
@@ -238,12 +251,11 @@ for (const locale of ['en', 'ru'] as const) {
     await expect(tree).toContainText(t('settings.appearance.contextMenuEmptyTree'));
     await addExport.dragTo(tree, { targetPosition: { x: 100, y: 80 } });
     await expect(tree.getByRole('treeitem')).toHaveCount(1);
+    await firstAvailable.click();
+    await expect(tree.getByRole('treeitem')).toHaveCount(2);
     await expect(tree.locator('[data-tree-key="command:sniptale.export.start"]')).toBeVisible();
-    await expect(
-      page.getByRole('status').filter({
-        hasText: t('settings.appearance.contextMenuSaved'),
-      })
-    ).toBeVisible();
+    await expect(page.locator('.context-menu-editor')).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByRole('alert')).toHaveCount(0);
   });
 }
 test('Start Screen offers every supported target and restores HTML on the next popup launch', async ({

@@ -74,7 +74,7 @@ async function moveDown(key: string) {
 }
 
 it('automatically saves a valid edited tree and exposes a committed result', async () => {
-  await click('Create section here');
+  await click('Add');
   const name = container.querySelector<HTMLInputElement>('input[aria-label="Section name"]')!;
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
@@ -85,7 +85,8 @@ it('automatically saves a valid edited tree and exposes a committed result', asy
   expect(update).not.toHaveBeenCalled();
   await settleDebounce();
   expect(update).toHaveBeenCalledWith({ layout: expect.objectContaining({ version: 2 }) });
-  expect(container.textContent).toContain('Menu saved');
+  expect(container.querySelector('.context-menu-editor')?.getAttribute('aria-busy')).toBe('false');
+  expect(container.querySelector('[role="status"]')).toBeNull();
   expect(container.textContent).not.toContain('Save menu');
 });
 
@@ -174,7 +175,8 @@ it('serializes a newer edit after an in-flight write and keeps latest order', as
   expect(update.mock.calls[0]?.[0].layout.nodes).not.toEqual(
     update.mock.calls[1]?.[0].layout.nodes
   );
-  expect(container.textContent).toContain('Menu saved');
+  expect(container.querySelector('.context-menu-editor')?.getAttribute('aria-busy')).toBe('false');
+  expect(container.querySelector('[role="status"]')).toBeNull();
 });
 
 it('waits for stored settings and gives catalog insertion focus to the new tree item', async () => {
@@ -289,4 +291,87 @@ it('does not auto-save or flush a draft refused during privacy erasure', async (
   expect(update).not.toHaveBeenCalled();
   expect(window.localStorage.getItem(CONTEXT_MENU_PENDING_DRAFT_KEY)).toBeNull();
   root = createRoot(container);
+});
+
+it('previews the full tree row during pointer drag and cancels without saving', async () => {
+  const row = container.querySelector<HTMLElement>(
+    '[data-tree-key="section:recommended-screenshots"]'
+  )!;
+  const grip = row.querySelector('[aria-label="Drag item"]')!;
+  await act(async () => {
+    grip.dispatchEvent(
+      Object.assign(
+        new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 50, clientY: 50 }),
+        { pointerId: 1, isPrimary: true }
+      )
+    );
+    window.dispatchEvent(
+      Object.assign(new MouseEvent('pointermove', { bubbles: true, clientX: 80, clientY: 80 }), {
+        pointerId: 1,
+      })
+    );
+  });
+  const preview = container.querySelector('.context-menu-drag-preview');
+  expect(preview?.textContent).toContain('Screenshots');
+  expect(preview?.querySelector('svg')).not.toBeNull();
+  await act(async () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(container.querySelector('.context-menu-drag-preview')).toBeNull();
+  await settleDebounce();
+  expect(update).not.toHaveBeenCalled();
+});
+
+it('returns an entire section to the catalog and Undo restores the saved hierarchy exactly', async () => {
+  await click('Expand: Screenshots');
+  const originalKeys = [...container.querySelectorAll('[data-tree-key]')].map((node) =>
+    node.getAttribute('data-tree-key')
+  );
+  const section = container.querySelector<HTMLElement>(
+    '[data-tree-key="section:recommended-screenshots"]'
+  )!;
+  const catalog = container.querySelector<HTMLElement>('[data-context-menu-catalog]')!;
+  Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: () => catalog });
+  const pointer = (target: EventTarget, type: string, x: number) =>
+    target.dispatchEvent(
+      Object.assign(
+        new MouseEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          button: 0,
+          clientX: x,
+          clientY: 60,
+        }),
+        { pointerId: 1, isPrimary: true }
+      )
+    );
+  try {
+    await act(async () => {
+      pointer(section.querySelector('[data-context-menu-source]')!, 'pointerdown', 20);
+      pointer(window, 'pointermove', 400);
+      pointer(window, 'pointerup', 400);
+    });
+    expect(container.querySelector('[data-tree-key="section:recommended-screenshots"]')).toBeNull();
+    expect(document.activeElement).toBe(catalog);
+    await settleDebounce();
+    const removedTree = update.mock.calls.at(-1)![0].layout;
+    expect(JSON.stringify(removedTree)).not.toContain('recommended-screenshots');
+    expect(catalog.querySelectorAll('[data-context-menu-source]').length).toBeGreaterThan(0);
+    await click('Undo');
+    expect(
+      [...container.querySelectorAll('[data-tree-key]')].map((node) =>
+        node.getAttribute('data-tree-key')
+      )
+    ).toEqual(originalKeys);
+    expect(document.activeElement?.getAttribute('data-tree-key')).toBe(
+      'section:recommended-screenshots'
+    );
+    await settleDebounce();
+    expect(update.mock.calls.at(-1)![0].layout.nodes[0]).toMatchObject({
+      id: 'recommended-screenshots',
+      children: expect.any(Array),
+    });
+  } finally {
+    Reflect.deleteProperty(document, 'elementFromPoint');
+  }
 });

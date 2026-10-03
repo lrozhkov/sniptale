@@ -1,22 +1,38 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type {
   ContextMenuTree,
   ContextMenuTreeNode,
 } from '../../../../../contracts/settings/context-menu-layout';
 import { translate, type AppLocale } from '../../../../../platform/i18n';
 import type { ContextMenuCatalogItem } from './context-menu-catalog';
+import { bindContextMenuPointerDrag } from './context-menu-pointer-drag';
 import {
   addContextMenuCommand,
   contextMenuNodePosition,
   findContextMenuNode,
+  isContextMenuCommandActive,
+  isContextMenuDescendant,
   moveContextMenuNode,
 } from './context-menu-tree-model';
 
-type DropTarget = {
+/** Accepted placement shared by pointer targeting and the tree's insertion indicator. */
+export type ContextMenuDropTarget = {
   parentId: string | null;
   index: number;
   rowKey: string;
   edge: 'before' | 'after' | 'inside';
+};
+type Source = { key: string; origin: 'tree' | 'catalog' };
+type Target = ContextMenuDropTarget | 'catalog' | null;
+type DropProps = {
+  tree: ContextMenuTree | null;
+  catalog: readonly ContextMenuCatalogItem[];
+  locale: AppLocale;
+  expanded: ReadonlySet<string>;
+  onExpanded(next: Set<string>): void;
+  onAnnounce(message: string): void;
+  apply(next: ContextMenuTree, focusKey: string): void;
+  remove(key: string): void;
 };
 
 function rowTarget(
@@ -26,7 +42,7 @@ function rowTarget(
   rect: DOMRect,
   x: number,
   y: number
-): DropTarget | null {
+): ContextMenuDropTarget | null {
   const position = contextMenuNodePosition(tree, rowKey);
   if (!position) return null;
   const middle = y >= rect.top + rect.height * 0.25 && y <= rect.bottom - rect.height * 0.25;
@@ -42,155 +58,125 @@ function rowTarget(
       };
 }
 
-function useTreeDragCancellation(dragEnd: () => void, clearExpandTimer: () => void) {
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') dragEnd();
-    };
-    // Catalog drags can end outside the tree, where its internal handles receive no dragend.
-    window.addEventListener('dragend', dragEnd, true);
-    window.addEventListener('keydown', cancel, true);
-    return () => {
-      window.removeEventListener('dragend', dragEnd, true);
-      window.removeEventListener('keydown', cancel, true);
-      clearExpandTimer();
-    };
-  }, [clearExpandTimer, dragEnd]);
+function resolveTarget(
+  tree: ContextMenuTree,
+  source: Source,
+  hit: Element | null,
+  x: number,
+  y: number
+): Target {
+  if (hit?.closest('[data-context-menu-catalog]'))
+    return source.origin === 'tree' ? 'catalog' : null;
+  if (!hit?.closest('[data-context-menu-tree]')) return null;
+  const row = hit.closest<HTMLElement>('[data-tree-key]');
+  const key = row?.dataset['treeKey'];
+  const node = key ? findContextMenuNode(tree, key) : null;
+  const target =
+    row && key && node
+      ? rowTarget(tree, key, node, row.getBoundingClientRect(), x, y)
+      : { parentId: null, index: tree.nodes.length, rowKey: 'root', edge: 'inside' as const };
+  if (!target || source.origin === 'catalog') return target;
+  const moving = findContextMenuNode(tree, source.key);
+  if (!moving) return null;
+  if (
+    moving.type === 'section' &&
+    target.parentId &&
+    (target.parentId === moving.id ||
+      isContextMenuDescendant(tree, `section:${target.parentId}`, moving.id))
+  )
+    return null;
+  const position = contextMenuNodePosition(tree, source.key);
+  if (
+    position?.parentId === target.parentId &&
+    (target.index === position.index || target.index === position.index + 1)
+  )
+    return null;
+  return target;
 }
 
-/** One disposable native drag session owns the indicator, expansion timer and tree commit. */
-export function useContextMenuTreeDrop(props: {
-  tree: ContextMenuTree;
-  catalog: readonly ContextMenuCatalogItem[];
-  locale: AppLocale;
-  expanded: ReadonlySet<string>;
-  onExpanded(next: Set<string>): void;
-  onAnnounce(message: string): void;
-  apply(next: ContextMenuTree, focusKey: string): void;
-}) {
-  const { tree, catalog, locale, expanded, onExpanded, onAnnounce, apply } = props;
-  const dragKey = useRef<string | null>(null);
-  const latestTarget = useRef<DropTarget | null>(null);
-  const expandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const expandingSection = useRef<string | null>(null);
-  const [drop, setDrop] = useState<DropTarget | null>(null);
-  const clearExpandTimer = useCallback(() => {
-    if (expandTimer.current) clearTimeout(expandTimer.current);
-    expandTimer.current = null;
-    expandingSection.current = null;
-  }, []);
-  const setTarget = (target: DropTarget | null) => {
-    latestTarget.current = target;
-    setDrop(target);
-  };
-  const dragEnd = useCallback(() => {
-    dragKey.current = null;
-    latestTarget.current = null;
-    setDrop(null);
-    clearExpandTimer();
-  }, [clearExpandTimer]);
-  useTreeDragCancellation(dragEnd, clearExpandTimer);
-  const dragOver = (
-    event: DragEvent<HTMLDivElement>,
-    rowKey: string,
-    node: ContextMenuTreeNode
-  ) => {
-    if (!dragKey.current && !event.dataTransfer.types.includes('text/plain')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const target = rowTarget(
-      tree,
-      rowKey,
-      node,
-      event.currentTarget.getBoundingClientRect(),
-      event.clientX,
-      event.clientY
-    );
-    const valid =
-      target && (!dragKey.current || moveContextMenuNode(tree, dragKey.current, target) !== tree);
-    event.dataTransfer.dropEffect = valid ? 'move' : 'none';
-    setTarget(valid ? target : null);
-    const section = valid && target.edge === 'inside' && node.type === 'section' ? node.id : null;
-    if (section !== expandingSection.current) clearExpandTimer();
-    if (section && !expanded.has(section) && !expandTimer.current) {
-      expandingSection.current = section;
-      expandTimer.current = setTimeout(() => {
-        onExpanded(new Set([...expanded, section]));
-        clearExpandTimer();
-      }, 450);
-    }
-  };
-  const dropOnRow = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    let target = latestTarget.current;
-    if (!target) {
-      dragEnd();
-      return;
-    }
-    const rowKey = event.currentTarget.dataset['treeKey'];
-    const node = rowKey ? findContextMenuNode(tree, rowKey) : null;
-    if (node && rowKey && typeof event.clientX === 'number' && typeof event.clientY === 'number') {
-      target = rowTarget(
-        tree,
-        rowKey,
-        node,
-        event.currentTarget.getBoundingClientRect(),
-        event.clientX,
-        event.clientY
-      );
-    } else if (target?.rowKey !== (rowKey ?? 'root')) target = null;
-    const payload = event.dataTransfer.getData('text/plain');
-    const command = payload.startsWith('command:') ? payload.slice('command:'.length) : null;
-    if (
-      target &&
-      (dragKey.current ||
-        (command && catalog.some((item) => item.command === command && item.available)))
-    ) {
-      const next = dragKey.current
-        ? moveContextMenuNode(tree, dragKey.current, target)
-        : command
-          ? addContextMenuCommand(tree, command, target)
-          : tree;
-      if (next !== tree) {
-        if (target.parentId) onExpanded(new Set([...expanded, target.parentId]));
-        apply(next, dragKey.current ?? payload);
-        onAnnounce(translate('settings.appearance.contextMenuMoved', locale));
-      }
-    }
-    dragEnd();
-  };
+function acceptedSource(props: DropProps, source: Source) {
+  if (!props.tree) return false;
+  if (source.origin === 'tree') return !!findContextMenuNode(props.tree, source.key);
+  const command = source.key.slice('command:'.length);
+  return (
+    source.key.startsWith('command:') &&
+    props.catalog.some((item) => item.command === command && item.available) &&
+    !isContextMenuCommandActive(props.tree, command)
+  );
+}
+
+/** Owns a workspace drag target and delayed expansion; commit uses the current draft owner. */
+export function useContextMenuTreeDrop(props: DropProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const current = useRef(props);
+  current.current = props;
+  const [target, setTarget] = useState<Target>(null);
+  // Saving can replace the draft object without changing a gesture's source or destinations.
+  const treeIdentity = props.tree ? JSON.stringify(props.tree) : null;
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root || !current.current.tree) return;
+    let latest: Target = null;
+    let expanding: string | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const clearTimer = () => {
+      clearTimeout(timer);
+      timer = undefined;
+      expanding = null;
+    };
+    const set = (next: Target) => {
+      if (JSON.stringify(latest) === JSON.stringify(next)) return;
+      latest = next;
+      setTarget(next);
+    };
+    const cleanup = bindContextMenuPointerDrag(root, {
+      accept: (source) => acceptedSource(current.current, source),
+      move: (source, hit, x, y) => {
+        const state = current.current;
+        const next = state.tree ? resolveTarget(state.tree, source, hit, x, y) : null;
+        set(next);
+        const section = next && next !== 'catalog' && next.edge === 'inside' ? next.parentId : null;
+        if (section !== expanding) clearTimer();
+        if (section && !state.expanded.has(section) && !timer) {
+          expanding = section;
+          timer = setTimeout(() => {
+            current.current.onExpanded(new Set([...current.current.expanded, section]));
+            clearTimer();
+          }, 450);
+        }
+      },
+      commit: (source) => {
+        const state = current.current;
+        if (!state.tree || !latest || !acceptedSource(state, source)) return;
+        if (latest === 'catalog') {
+          root
+            .querySelector<HTMLElement>('[data-context-menu-catalog]')
+            ?.focus({ preventScroll: true });
+          state.remove(source.key);
+          return;
+        }
+        const next =
+          source.origin === 'tree'
+            ? moveContextMenuNode(state.tree, source.key, latest)
+            : addContextMenuCommand(state.tree, source.key.slice('command:'.length), latest);
+        if (next === state.tree) return;
+        if (latest.parentId) state.onExpanded(new Set([...state.expanded, latest.parentId]));
+        state.apply(next, source.key);
+        state.onAnnounce(translate('settings.appearance.contextMenuMoved', state.locale));
+      },
+      end: () => {
+        set(null);
+        clearTimer();
+      },
+    });
+    return () => {
+      cleanup();
+      clearTimer();
+    };
+  }, [treeIdentity]);
   return {
-    drop,
-    dragEnd,
-    dragOver,
-    dropOnRow,
-    dragStart: (event: DragEvent<HTMLSpanElement>, key: string) => {
-      dragKey.current = key;
-      event.dataTransfer.effectAllowed = 'move';
-      event.dataTransfer.setData('text/plain', key);
-    },
-    rootDragOver: (event: DragEvent<HTMLDivElement>) => {
-      if (event.target instanceof Element && event.target.closest('[role="treeitem"]')) return;
-      if (!dragKey.current && !event.dataTransfer.types.includes('text/plain')) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-      clearExpandTimer();
-      setTarget({ parentId: null, index: tree.nodes.length, rowKey: 'root', edge: 'inside' });
-    },
-    rootDragLeave: (event: DragEvent<HTMLDivElement>) => {
-      if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
-        return;
-      const rect = event.currentTarget.getBoundingClientRect();
-      if (
-        event.clientX >= rect.left &&
-        event.clientX < rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY < rect.bottom
-      )
-        return;
-      setTarget(null);
-      clearExpandTimer();
-    },
+    rootRef,
+    drop: target === 'catalog' ? null : target,
+    catalogTarget: target === 'catalog',
   };
 }
