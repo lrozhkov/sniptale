@@ -74,3 +74,23 @@ it('updates surface state and returns a cloned result', async () => {
   expect(core.ensureHydrated).toHaveBeenCalledTimes(1);
   expect(core.persistSessions).toHaveBeenCalledTimes(1);
 });
+
+it('updates toolbar visibility without overwriting the current capture action or mode', async () => {
+  const core = createCore();
+  const surface = {
+    captureAction: 'scenario' as const,
+    screenshotMode: true,
+    toolbarVisible: true,
+  };
+  vi.mocked(core.getMutableSurface).mockReturnValue(surface);
+  const result = await createScenarioSessionServiceSurfaceMutationApi(core).updateSurfaceState(7, {
+    toolbarVisible: false,
+  });
+  expect(result).toEqual({
+    captureAction: 'scenario',
+    screenshotMode: true,
+    toolbarVisible: false,
+  });
+  expect(result).not.toBe(surface);
+  expect(core.persistSessions).toHaveBeenCalledOnce();
+});

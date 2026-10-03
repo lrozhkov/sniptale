@@ -25,11 +25,11 @@ export async function handleScenarioSetCaptureMode(
 export async function handleScenarioSetSidebarVisible(
   args: ScenarioRouteContext & { message: ScenarioSetSidebarVisibleMessage }
 ) {
-  await args.scenarioSessionService.setSidebarVisible(
+  const session = await args.scenarioSessionService.setSidebarVisible(
     args.resolvedTabId,
     args.message.sidebarVisible
   );
-  return buildScenarioPayloadResponse(args);
+  return { success: true, session };
 }
 
 export async function handleScenarioUpdateSurfaceState(

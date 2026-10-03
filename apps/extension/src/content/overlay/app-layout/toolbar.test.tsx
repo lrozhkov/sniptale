@@ -280,6 +280,22 @@ async function verifiesCollapsedVideoModeUsesCanonicalShowButtonSurface() {
 
 describe('ContentToolbarShell', () => {
   useContentToolbarShellTestScope();
+  it.each([false, true])(
+    'keeps scenario pin state explicit when all-sites availability is %s',
+    async (available) => {
+      const props = createProps();
+      props.toolbar.captureAction = 'scenario';
+      props.toolbar.modes.screenshotMode = true;
+      props.toolbar.pinToTab = false;
+      props.toolbar.pinToTabAvailable = available;
+      await renderShell(props);
+      expect(toolbarMock.mock.calls.at(-1)?.[0]).toMatchObject({
+        pinToTab: false,
+        pinToTabLocked: false,
+        pinToTabAvailable: available,
+      });
+    }
+  );
   it(
     'forces manual mode when by-click capture is blocked and restores it after blockers clear',
     verifiesByClickModeSync

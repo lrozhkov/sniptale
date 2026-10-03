@@ -71,5 +71,27 @@ it('routes simple session mutations through the session service', async () => {
     captureAction: 'scenario',
   });
   expect(scenarioSessionService.setRememberProjectSelection).toHaveBeenCalledWith(11, false);
-  expect(buildScenarioPayloadResponseMock).toHaveBeenCalledTimes(5);
+  expect(buildScenarioPayloadResponseMock).toHaveBeenCalledTimes(4);
+});
+
+it('returns only the changed sidebar session without replaying unrelated toolbar state', async () => {
+  const scenarioSessionService = createScenarioSessionServiceStub();
+  const session = {
+    captureMode: 'manual' as const,
+    enabled: true,
+    pendingProjectSelection: false,
+    projectId: 'project-1',
+    projectName: 'Project 1',
+    rememberProjectSelection: true,
+    sidebarVisible: false,
+  };
+  vi.mocked(scenarioSessionService.setSidebarVisible).mockResolvedValue(session);
+  await expect(
+    handleScenarioSetSidebarVisible({
+      resolvedTabId: 11,
+      scenarioSessionService,
+      message: { type: MessageType.SCENARIO_SET_SIDEBAR_VISIBLE, sidebarVisible: false },
+    })
+  ).resolves.toEqual({ success: true, session });
+  expect(buildScenarioPayloadResponseMock).not.toHaveBeenCalled();
 });

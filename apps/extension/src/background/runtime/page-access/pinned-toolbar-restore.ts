@@ -11,10 +11,15 @@ import {
 } from '../../page-access/service';
 import { beginPinnedToolbarRestoreOperation } from '../../page-access/pinned-toolbar-operation';
 import { waitForContentToolbarReady } from '../../page-access/readiness';
+import { readScenarioRestoreState } from './scenario-restore';
 
 type PinnedToolbarRestoreState = Pick<
   BackgroundRuntimeMessageDeps,
-  'screenshotModeState' | 'viewportOwnerState' | 'viewportState' | 'webSnapshotViewerPorts'
+  | 'scenarioSessionService'
+  | 'screenshotModeState'
+  | 'viewportOwnerState'
+  | 'viewportState'
+  | 'webSnapshotViewerPorts'
 >;
 
 export async function restorePinnedToolbarAfterNavigation(
@@ -48,7 +53,10 @@ export async function restorePinnedToolbarAfterNavigation(
       return false;
     }
 
-    const toolbarVisible = await readPinToTabToolbarVisibilitySessionStorageState(tabId);
+    const scenario = await readScenarioRestoreState(tabId, runtimeState);
+    const toolbarVisible = scenario.shouldRestore
+      ? scenario.surface.toolbarVisible
+      : await readPinToTabToolbarVisibilitySessionStorageState(tabId);
     if (!operation.isCurrent()) {
       return false;
     }

@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createScenarioSessionServiceStub } from '../../../../../../tooling/test/support/scenario-session-service.stub';
 
 const restoreMocks = vi.hoisted(() => ({
   enableScreenshotModeGuarded: vi.fn(),
@@ -51,7 +52,23 @@ function createDeferred<T>() {
 }
 
 function createRestoreState() {
+  const scenarioSessionService = createScenarioSessionServiceStub();
+  vi.mocked(scenarioSessionService.getSession).mockResolvedValue({
+    captureMode: 'manual',
+    enabled: false,
+    pendingProjectSelection: false,
+    projectId: null,
+    projectName: null,
+    rememberProjectSelection: false,
+    sidebarVisible: true,
+  });
+  vi.mocked(scenarioSessionService.getSurface).mockResolvedValue({
+    captureAction: 'download_default',
+    screenshotMode: false,
+    toolbarVisible: false,
+  });
   return {
+    scenarioSessionService,
     screenshotModeState: new Map<number, boolean>(),
     viewportOwnerState: new Map<number, 'capture-surface' | 'viewer'>(),
     viewportState: new Map<
@@ -61,6 +78,24 @@ function createRestoreState() {
     webSnapshotViewerPorts: new Map(),
   };
 }
+
+it('uses the scenario visibility authority when the navigation-complete callback restores a pin', async () => {
+  const state = createRestoreState();
+  vi.mocked(state.scenarioSessionService.getSurface).mockResolvedValue({
+    captureAction: 'scenario',
+    screenshotMode: true,
+    toolbarVisible: false,
+  });
+  await expect(restorePinnedToolbarAfterNavigation(7, state)).resolves.toBe(true);
+  expect(restoreMocks.enableScreenshotModeGuarded).toHaveBeenCalledWith(
+    7,
+    state.screenshotModeState,
+    state.viewportState,
+    state.viewportOwnerState,
+    state.webSnapshotViewerPorts,
+    expect.objectContaining({ toolbarVisible: false })
+  );
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

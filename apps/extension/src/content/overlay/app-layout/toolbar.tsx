@@ -234,11 +234,7 @@ function renderToolbarShell(args: {
         onToggleVideoRecordingMode={handleToggleVideoRecordingMode}
         pinToTab={Boolean(args.toolbar.pinToTab || modes.videoRecordingMode)}
         pinToTabAvailable={args.toolbar.pinToTabAvailable}
-        pinToTabLocked={
-          autoBlur.autoApplyEnabled ||
-          modes.videoRecordingMode ||
-          (args.toolbar.captureAction === 'scenario' && modes.screenshotMode)
-        }
+        pinToTabLocked={Boolean(autoBlur.autoApplyEnabled || modes.videoRecordingMode)}
         onCaptureActionChange={args.toolbar.setCaptureAction}
         onDisableAiPickMode={args.toolbar.aiController.handleDisableAiPickMode}
         onToggleDesignReviewPanel={args.designReview.panel.toggle}

@@ -7,7 +7,7 @@ export function createScenarioSessionServiceSurfaceMutationApi(core: ScenarioSes
   return {
     async updateSurfaceState(
       tabId: number,
-      surfaceState: ScenarioRecorderSurfaceState
+      surfaceState: Partial<ScenarioRecorderSurfaceState>
     ): Promise<ScenarioRecorderSurfaceState> {
       return runPersistedMutation({
         cloneResult: (surface) => ({ ...surface }),
