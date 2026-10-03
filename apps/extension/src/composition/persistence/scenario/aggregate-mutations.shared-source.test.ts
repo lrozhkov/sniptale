@@ -179,21 +179,110 @@ it('clears an interrupted mixed journal on startup after its shared source was d
 });
 
 it('keeps a rendered Library import project-private through aggregate publication and replay', async () => {
+  const source = createGuideProject('Source');
+  await commitScenarioAggregateMutation(source, {
+    children: { assetPuts: [createAsset(source.id, 'original')] },
+  });
   const project = createGuideProject('Imported');
   const asset = {
     ...createAsset(project.id, 'rendered-import'),
-    galleryAssetId: 'library-original',
+    galleryAssetId: 'scenario-asset:original',
   };
   await commitScenarioAggregateMutation(project, { children: { assetPuts: [asset] } });
-  expect(getStore('media_library').size).toBe(0);
+  expect([...getStore('media_library').keys()]).toEqual(['scenario-asset:original']);
   expect(getStore('scenario_assets').get(asset.id)).toMatchObject({
     assetId: asset.assetId,
-    galleryAssetId: 'library-original',
+    galleryAssetId: 'scenario-asset:original',
   });
   expect(getStore('asset_refs').has(asset.assetId)).toBe(true);
   expect(
     getStore('asset_owners').get(JSON.stringify(['scenario-asset', asset.id, 'body']))
   ).toMatchObject({ assetId: asset.assetId });
   await recoverScenarioAssetPublications();
-  expect(getStore('media_library').size).toBe(0);
+  expect([...getStore('media_library').keys()]).toEqual(['scenario-asset:original']);
+});
+
+it('aborts the whole import when a frozen Library origin is purged after preparation', async () => {
+  const source = createGuideProject('Source');
+  const original = createAsset(source.id, 'original');
+  await commitScenarioAggregateMutation(source, { children: { assetPuts: [original] } });
+  const project = createGuideProject('Destination');
+  const staged = createAsset(project.id, 'staged');
+  const frozen = {
+    ...createAsset(project.id, 'frozen'),
+    galleryAssetId: 'scenario-asset:original',
+  };
+  const assets = await import('../assets');
+  vi.mocked(assets.publishReadyJournalWithRetry).mockImplementationOnce(
+    async (journal, publish) => {
+      getStore('media_library').delete('scenario-asset:original');
+      await publish(journal);
+    }
+  );
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [staged, frozen] },
+    })
+  ).rejects.toThrow('Scenario Library source is unavailable');
+  expect(getStore('scenario_projects').has(project.id)).toBe(false);
+  expect(getStore('scenario_assets').has(staged.id)).toBe(false);
+  expect(getStore('scenario_assets').has(frozen.id)).toBe(false);
+  expect(getStore('asset_refs').has(frozen.assetId)).toBe(false);
+  expect(db.transaction.mock.results.at(-1)?.value.abort).toHaveBeenCalledOnce();
+  expect(assets.cancelAssetPublication).toHaveBeenCalled();
+});
+
+it('allows unchanged legacy frozen origins but refuses a new missing origin atomically', async () => {
+  const source = createGuideProject('Source');
+  await commitScenarioAggregateMutation(source, {
+    children: { assetPuts: [createAsset(source.id, 'original')] },
+  });
+  const project = createGuideProject('Destination');
+  const frozen = {
+    ...createAsset(project.id, 'frozen'),
+    galleryAssetId: 'scenario-asset:original',
+  };
+  await commitScenarioAggregateMutation(project, { children: { assetPuts: [frozen] } });
+  getStore('media_library').delete('scenario-asset:original');
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [{ ...frozen, width: 20 }] },
+    })
+  ).resolves.toBeDefined();
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      children: { assetPuts: [{ ...frozen, galleryAssetId: 'missing-other' }] },
+    })
+  ).rejects.toThrow('Scenario Library source is unavailable');
+  expect(getStore('scenario_assets').get(frozen.id)).toMatchObject({
+    galleryAssetId: frozen.galleryAssetId,
+    width: 20,
+  });
+});
+
+it('cancels an interrupted frozen-origin journal after its Library source disappears', async () => {
+  const source = createGuideProject('Source');
+  await commitScenarioAggregateMutation(source, {
+    children: { assetPuts: [createAsset(source.id, 'original')] },
+  });
+  const project = createGuideProject('Destination');
+  const frozen = {
+    ...createAsset(project.id, 'frozen'),
+    galleryAssetId: 'scenario-asset:original',
+  };
+  const assets = await import('../assets');
+  vi.mocked(assets.publishReadyJournalWithRetry).mockRejectedValueOnce(new Error('context closed'));
+  await expect(
+    commitScenarioAggregateMutation(project, { children: { assetPuts: [frozen] } })
+  ).rejects.toThrow('context closed');
+  const args = vi.mocked(assets.createAssetPublicationJournal).mock.calls.at(-1)![0];
+  const journal = { ...args, createdAt: 1, journalId: 'interrupted' };
+  getStore('media_library').delete('scenario-asset:original');
+  vi.mocked(assets.recoverStandaloneAssetPublications).mockImplementationOnce(async (adapters) => {
+    await runWithDurableAssetLifecycleLock((permit) => adapters[0]!.publish(journal, permit));
+    return 1;
+  });
+  await expect(recoverScenarioAssetPublications()).resolves.toBe(1);
+  expect(getStore('scenario_assets').has(frozen.id)).toBe(false);
+  expect(assets.cancelAssetPublication).toHaveBeenCalledWith(journal, expect.anything());
 });

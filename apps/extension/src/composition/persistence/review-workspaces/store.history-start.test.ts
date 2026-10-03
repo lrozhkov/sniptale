@@ -9,6 +9,10 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
   VIDEO_WORKSPACES_STORE: 'video_workspaces',
   VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
 }));
+vi.mock('../assets/opfs-store', async (original) => ({
+  ...(await original<typeof import('../assets/opfs-store')>()),
+  listReadyJournals: vi.fn(async () => []),
+}));
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: async (operation: (db: unknown) => Promise<unknown>) =>
     operation(await harness.database()),

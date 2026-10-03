@@ -1,3 +1,8 @@
+import { parseProjectAssetPayload } from './asset-publication-payload';
+export type {
+  ProjectAssetPublicationOptions,
+  ProjectAssetPublicationPayload,
+} from './asset-publication-payload';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertMediaSourceReplaceable } from './source-admission';
@@ -43,19 +48,6 @@ export const PROJECT_ASSET_OWNER_KIND = 'project-asset';
 export const PROJECT_EXPORT_OWNER_KIND = 'project-export';
 export const PROJECT_MEDIA_ASSET_ROLE = 'body';
 
-export interface ProjectAssetPublicationOptions {
-  /** False keeps a frozen project representation out of the Library catalogue. */
-  publishToLibrary?: boolean;
-  originMediaId?: string;
-}
-
-interface ProjectAssetPublicationPayload extends ProjectAssetPublicationOptions {
-  entry: StoredProjectAssetEntry;
-  filename: string;
-  expectedAssetId?: string | null;
-  requiredReview?: { aggregateId: string; clipId: string };
-}
-
 interface ProjectExportPublicationPayload {
   expectedAssetId?: string | null;
   entry: StoredProjectExportEntry;
@@ -63,46 +55,6 @@ interface ProjectExportPublicationPayload {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function parseProjectAssetPayload(value: unknown): ProjectAssetPublicationPayload | null {
-  if (!isRecord(value) || typeof value['filename'] !== 'string') return null;
-  if (value['publishToLibrary'] !== undefined && typeof value['publishToLibrary'] !== 'boolean')
-    return null;
-  if (
-    value['expectedAssetId'] !== undefined &&
-    value['expectedAssetId'] !== null &&
-    typeof value['expectedAssetId'] !== 'string'
-  )
-    return null;
-  const entry = parseProjectAssetEntry(value['entry']);
-  if (!entry) return null;
-  const required = value['requiredReview'];
-  if (
-    required !== undefined &&
-    (!isRecord(required) ||
-      typeof required['aggregateId'] !== 'string' ||
-      typeof required['clipId'] !== 'string')
-  )
-    return null;
-  return {
-    entry,
-    filename: value['filename'],
-    ...(typeof value['expectedAssetId'] === 'string' || value['expectedAssetId'] === null
-      ? { expectedAssetId: value['expectedAssetId'] }
-      : {}),
-    ...(typeof value['publishToLibrary'] === 'boolean'
-      ? { publishToLibrary: value['publishToLibrary'] }
-      : {}),
-    ...(required
-      ? {
-          requiredReview: {
-            aggregateId: required['aggregateId'] as string,
-            clipId: required['clipId'] as string,
-          },
-        }
-      : {}),
-  };
 }
 
 function parseProjectExportPayload(value: unknown): ProjectExportPublicationPayload | null {
@@ -342,4 +294,4 @@ export function recoverProjectMediaPublications(): Promise<number> {
   ]);
 }
 
-export type { ProjectAssetPublicationPayload, ProjectExportPublicationPayload };
+export type { ProjectExportPublicationPayload };

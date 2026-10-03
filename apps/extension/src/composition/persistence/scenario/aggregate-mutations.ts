@@ -26,6 +26,7 @@ import { promoteLibraryLifecycle, type LibraryStorageClass } from '../library-li
 import { areScenarioProjectsEqual } from './aggregate-comparison';
 import { isRecord } from '../infrastructure/indexed-db/read-primitives';
 import {
+  assertNewScenarioGallerySource,
   assertBorrowedScenarioAsset,
   assertBorrowedScenarioAssetSource,
   publishScenarioAssetToLibrary,
@@ -431,6 +432,7 @@ export async function applyScenarioAssetMutations(
     ) {
       throw new Error(`Scenario asset ${asset.id} publication metadata does not match its object.`);
     }
+    await assertNewScenarioGallerySource(tx, asset, existingAsset);
     if (existingAsset && existingAsset.assetId !== asset.assetId) {
       await ownerStore.delete!([SCENARIO_ASSET_OWNER_KIND, asset.id, SCENARIO_ASSET_ROLE]);
       if ((await ownerStore.index!('assetId').count(existingAsset.assetId)) === 0) {

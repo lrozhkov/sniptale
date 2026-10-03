@@ -11,13 +11,29 @@ import { commitScenarioAggregateMutation } from './aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
 import { completePhysicalDeleteOperation } from '../assets';
 import { pruneScenarioResources } from './retention';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { createMediaLibraryEntry } from '../projects/index.test-support';
+
+async function commitLegacyFrozenChild(
+  project: GuideProject,
+  child: Omit<ReturnType<typeof createAsset>, 'galleryAssetId'> & { galleryAssetId: string | null }
+) {
+  if (child.galleryAssetId)
+    getStore('media_library').set(
+      child.galleryAssetId,
+      createMediaLibraryEntry({ id: child.galleryAssetId, source: { kind: 'screenshot' } })
+    );
+  await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+  // Cleanup fixtures intentionally retain the legacy graph with a missing logical origin.
+  if (child.galleryAssetId) getStore('media_library').delete(child.galleryAssetId);
+}
 
 it('retains an external montage snapshot when its scenario is replaced from an archive', async () => {
   const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
   const { putScenarioProjectBackupRestore } = await import('./backup-restore');
   const project = createGuideProject('Archive replacement');
   const child = { ...createAsset(project.id), galleryAssetId: 'origin' };
-  await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+  await commitLegacyFrozenChild(project, child);
   const video = createVideoProjectEntryWithMediaClip();
   video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
   getStore('video_projects').set(video.id, video);
@@ -79,7 +95,7 @@ function getStoreNames() {
 it('retains an invalid scenario source record together with its byte owner on parent removal', async () => {
   const project = createGuideProject('Retain source evidence');
   const child = { ...createAsset(project.id), galleryAssetId: 'origin' };
-  await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+  await commitLegacyFrozenChild(project, child);
   getStore('scenario_assets').set(child.id, { ...child, mimeType: 123 });
   const before = structuredClone(getStore('asset_owners'));
   await expect(deleteScenarioAggregate(project.id)).rejects.toThrow();
@@ -95,7 +111,7 @@ it.each(['child-delete', 'prune', 'child-replace'] as const)(
     const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
     const project = createGuideProject('Scenario resource lifetime');
     const child = { ...createAsset(project.id), galleryAssetId: 'origin' };
-    await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+    await commitLegacyFrozenChild(project, child);
     const video = createVideoProjectEntryWithMediaClip();
     video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
     getStore('video_projects').set(video.id, video);
@@ -297,7 +313,7 @@ it.each([true, false])(
     const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
     const project = createGuideProject('Scenario snapshot owner');
     const child = { ...createAsset(project.id), galleryAssetId: 'original-image' };
-    await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+    await commitLegacyFrozenChild(project, child);
     if (published) {
       const { createMediaLibraryEntry } = await import('../projects/index.test-support');
       getStore('media_library').set(
@@ -331,7 +347,7 @@ it('aborts scenario deletion when a related montage cannot be safely rehomed', a
   const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
   const project = createGuideProject('Retain on invalid montage');
   const child = createAsset(project.id);
-  await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+  await commitLegacyFrozenChild(project, child);
   const video = createVideoProjectEntryWithMediaClip();
   video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
   getStore('video_projects').set(video.id, {
@@ -352,7 +368,7 @@ it.each(['missing-bytes', 'invalid-library', 'unknown-video'] as const)(
     const { createVideoProjectEntryWithMediaClip } = await import('../projects/index.test-support');
     const project = createGuideProject('Retained scenario');
     const child = { ...createAsset(project.id), galleryAssetId: 'origin' };
-    await commitScenarioAggregateMutation(project, { children: { assetPuts: [child] } });
+    await commitLegacyFrozenChild(project, child);
     const video = createVideoProjectEntryWithMediaClip();
     video.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: child.id };
     getStore('video_projects').set(

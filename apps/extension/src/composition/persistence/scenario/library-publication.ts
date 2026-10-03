@@ -30,6 +30,19 @@ export class UnavailableBorrowedScenarioSourceError extends Error {
   }
 }
 
+/** A newly linked frozen representation must retain a valid logical Library origin. */
+export async function assertNewScenarioGallerySource(
+  tx: ScenarioLibraryTransaction,
+  asset: ScenarioAssetEntry,
+  previous: ScenarioAssetEntry | null
+): Promise<void> {
+  const mediaId = asset.galleryAssetId;
+  if (!mediaId || asset.borrowedMediaId || previous?.galleryAssetId === mediaId) return;
+  const media = parseMediaLibraryEntry(await tx.objectStore(MEDIA_LIBRARY_STORE).get(mediaId));
+  if (!media || media.id !== mediaId)
+    throw new UnavailableBorrowedScenarioSourceError('Scenario Library source is unavailable.');
+}
+
 export function scenarioLibraryMediaId(assetId: string): string {
   return `scenario-asset:${assetId}`;
 }

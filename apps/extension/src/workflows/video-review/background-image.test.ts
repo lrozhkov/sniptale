@@ -4,6 +4,8 @@ import { importReviewBackgroundImage } from './background-image';
 const asset = vi.hoisted(() => ({
   prepare: vi.fn(),
   publish: vi.fn(),
+  protect: vi.fn(),
+  cancel: vi.fn(),
   discard: vi.fn(),
   changed: vi.fn(),
 }));
@@ -17,7 +19,13 @@ beforeEach(() => {
     'createImageBitmap',
     vi.fn(async () => ({ width: 1920, height: 1080, close }))
   );
-  asset.prepare.mockResolvedValue({ id: 'image', publish: asset.publish, discard: asset.discard });
+  asset.prepare.mockResolvedValue({
+    id: 'image',
+    publish: asset.publish,
+    protect: asset.protect,
+    cancel: asset.cancel,
+    discard: asset.discard,
+  });
 });
 afterEach(() => {
   vi.resetAllMocks();
@@ -28,11 +36,12 @@ const file = () => new File(['image'], 'background.png', { type: 'image/png' });
 it('publishes only after attaching the durable background reference', async () => {
   const attach = vi.fn(async () => {
     expect(asset.publish).not.toHaveBeenCalled();
+    expect(asset.protect).toHaveBeenCalledOnce();
   });
   await importReviewBackgroundImage({ file: file(), signal: new AbortController().signal, attach });
   expect(attach).toHaveBeenCalledWith('project-asset:image');
   expect(asset.publish).toHaveBeenCalledOnce();
-  expect(asset.discard).not.toHaveBeenCalled();
+  expect(asset.cancel).not.toHaveBeenCalled();
   expect(close).toHaveBeenCalledOnce();
 });
 it('rejects unsupported and oversized images before staging', async () => {
@@ -60,8 +69,8 @@ it('discards staged bytes when attaching fails, but retains a referenced asset a
       },
     })
   ).rejects.toThrow('write');
-  expect(asset.discard).toHaveBeenCalledOnce();
-  asset.discard.mockClear();
+  expect(asset.cancel).toHaveBeenCalledOnce();
+  asset.cancel.mockClear();
   asset.publish.mockRejectedValueOnce(new Error('publish'));
   await expect(
     importReviewBackgroundImage({
@@ -70,18 +79,24 @@ it('discards staged bytes when attaching fails, but retains a referenced asset a
       attach: vi.fn(),
     })
   ).rejects.toThrow('publish');
-  expect(asset.discard).not.toHaveBeenCalled();
+  expect(asset.cancel).not.toHaveBeenCalled();
 });
 it('cancels after staging without attaching or publishing', async () => {
   const controller = new AbortController();
   asset.prepare.mockImplementationOnce(async () => {
     controller.abort();
-    return { id: 'image', publish: asset.publish, discard: asset.discard };
+    return {
+      id: 'image',
+      publish: asset.publish,
+      protect: asset.protect,
+      cancel: asset.cancel,
+      discard: asset.discard,
+    };
   });
   const attach = vi.fn();
   await expect(
     importReviewBackgroundImage({ file: file(), signal: controller.signal, attach })
   ).rejects.toThrow();
   expect(attach).not.toHaveBeenCalled();
-  expect(asset.discard).toHaveBeenCalledOnce();
+  expect(asset.cancel).toHaveBeenCalledOnce();
 });
