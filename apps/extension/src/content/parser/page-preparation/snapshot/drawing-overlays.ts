@@ -5,14 +5,12 @@ import type { VirtualDomOriginalElementResolver } from '../../dom-tree-parser/tr
 function applyDrawingAnchor(
   snapshot: Document,
   node: HTMLElement,
-  anchor: Element,
+  anchor: HTMLElement | SVGElement,
   original: Element
 ): void {
   const name = `--sniptale-ink-${crypto.randomUUID()}`;
   const token = name.slice(2);
-  const previous =
-    anchor instanceof HTMLElement ? anchor.style.getPropertyValue('anchor-name') : '';
-  if (!(anchor instanceof HTMLElement)) return;
+  const previous = anchor.style.getPropertyValue('anchor-name');
   const sourceNames =
     previous ||
     original.ownerDocument.defaultView
@@ -113,7 +111,7 @@ export function prepareDrawingOverlayNodes(args: {
       cloneCanvas.before(node);
     }
     const target = entry.anchor ? targets.get(entry.anchor) : null;
-    if (target instanceof HTMLElement && entry.anchor) {
+    if ((target instanceof HTMLElement || target instanceof SVGElement) && entry.anchor) {
       const wrapper = wrapAnchoredDrawing(args.snapshot, node, entry.object);
       applyDrawingAnchor(args.snapshot, wrapper, target, entry.anchor);
       floating.push(wrapper);

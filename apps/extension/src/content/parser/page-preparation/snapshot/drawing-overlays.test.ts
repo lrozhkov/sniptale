@@ -82,10 +82,14 @@ it('reports unreadable drawing pixels without publishing an executable fallback'
   expect(result.html).not.toContain('<script');
 });
 
-it.each([true, false])(
-  'exports independent ink with anchor availability %s and a bounded static layer',
-  async (hasAnchor) => {
-    const target = document.createElement('p');
+it.each(['html', 'svg', 'missing'])(
+  'exports independent ink with %s anchors and a bounded static layer',
+  async (anchorKind) => {
+    const hasAnchor = anchorKind !== 'missing';
+    const target =
+      anchorKind === 'svg'
+        ? document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+        : document.createElement('p');
     target.textContent = 'Anchor paragraph';
     document.body.append(target);
     vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(300, 100, 400, 80));
