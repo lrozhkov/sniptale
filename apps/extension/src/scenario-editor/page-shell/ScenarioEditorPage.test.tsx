@@ -502,12 +502,12 @@ async function editField(selector: string, value: string) {
 
 it('composes multiple blocks and retains undo and redo after autosave', async () => {
   await render();
-  const article = container.querySelector('article#first');
+  const article = container.querySelector<HTMLElement>('article#first');
   if (!article) throw new Error('Missing step');
-  await click('Text', article);
-  await click('Text', article);
-  await click('Heading', article);
-  await click('Note', article);
+  for (const kind of ['Text', 'Text', 'Heading', 'Note']) {
+    await act(async () => article.focus());
+    await click(kind, article);
+  }
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
   await settleAutosave();
   await click('Undo');
@@ -558,6 +558,7 @@ it('supports optional numbering and editable sections with structural undo', asy
   expect(
     container.querySelector('article#first header > span:not(.guide-voice-field)')?.textContent
   ).toBe('1');
+  await act(async () => container.querySelector<HTMLElement>('article#first')!.focus());
   await click('Add section');
   await editField('.guide-section-title', 'A section');
   expect(container.querySelector('section h2')?.getAttribute('aria-label')).toBe('A section');

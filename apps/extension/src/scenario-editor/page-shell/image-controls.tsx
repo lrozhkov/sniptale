@@ -1,3 +1,4 @@
+import { GuideBlockPlacement } from './block-inspector';
 import type { KeyboardEvent } from 'react';
 import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './inspector-actions';
 import { useGuideResourceRequest } from './resource-drawer';
@@ -13,7 +14,7 @@ import {
   ScanLine,
   Text,
   Pencil,
-  Image,
+  ImageUp,
 } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
@@ -31,6 +32,7 @@ import { changeGuideImageGeometry, constrainGuideImage } from './image-geometry'
 /** Framing fields belong to the selected image in the existing right inspector. */
 export function GuideImageControls({
   block,
+  layout = 'stacked',
   htmlDefaults,
   disabled,
   onChange,
@@ -42,6 +44,7 @@ export function GuideImageControls({
   url,
 }: {
   block: GuideImageBlock;
+  layout?: import('@sniptale/runtime-contracts/scenario/types/guide').GuideStep['layout'];
   htmlDefaults?: GuideHtmlImageSettings | undefined;
   url: string | null | undefined;
   disabled: boolean;
@@ -53,7 +56,6 @@ export function GuideImageControls({
   t: Translate;
 }) {
   const dimensions = useImageDimensions(url);
-  const requestResource = useGuideResourceRequest();
   const { cropBounds } = useGuideImageBounds(block);
   const geometryDisabled = disabled || (cropBounds && !dimensions);
   const constrain = (next: GuideImageBlock) =>
@@ -73,26 +75,21 @@ export function GuideImageControls({
       />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
-        {onEdit && (
-          <ScenarioInspectorActionButton
-            data-inspector-edit-image={block.id}
-            disabled={disabled || !url}
-            onClick={onEdit}
-          >
-            <Pencil size={16} aria-hidden="true" />
-            {t('scenario.editor.guideEditImage')}
-          </ScenarioInspectorActionButton>
-        )}
-        {stepId && (
-          <ScenarioInspectorActionButton
-            disabled={disabled || !requestResource}
-            aria-controls="guide-resource-drawer"
-            onClick={() => requestResource?.({ kind: 'replace-image', stepId, blockId: block.id })}
-          >
-            <Image size={16} aria-hidden="true" />
-            {t('scenario.editor.guideReplaceImage')}
-          </ScenarioInspectorActionButton>
-        )}
+        <GuideBlockPlacement
+          item={{ layout }}
+          block={block}
+          disabled={disabled}
+          onChange={onChange}
+          t={t}
+        />
+        <GuideImageActions
+          block={block}
+          stepId={stepId}
+          url={url}
+          disabled={disabled}
+          onEdit={onEdit}
+          t={t}
+        />
         <GuideInspectorGroup
           id="framing"
           icon={ScanLine}
@@ -350,4 +347,47 @@ function handleInspectorEscape(event: KeyboardEvent<HTMLDivElement>, close: () =
   event.preventDefault();
   event.stopPropagation();
   close();
+}
+
+/** Image acquisition actions keep drawer navigation separate from geometry editing. */
+function GuideImageActions({
+  block,
+  stepId,
+  url,
+  disabled,
+  onEdit,
+  t,
+}: {
+  block: GuideImageBlock;
+  stepId: string | undefined;
+  url: string | null | undefined;
+  disabled: boolean;
+  onEdit: (() => void) | undefined;
+  t: Translate;
+}) {
+  const requestResource = useGuideResourceRequest();
+  return (
+    <>
+      {onEdit && (
+        <ScenarioInspectorActionButton
+          data-inspector-edit-image={block.id}
+          disabled={disabled || !url}
+          onClick={onEdit}
+        >
+          <Pencil size={16} aria-hidden="true" />
+          {t('scenario.editor.guideEditImage')}
+        </ScenarioInspectorActionButton>
+      )}
+      {stepId && (
+        <ScenarioInspectorActionButton
+          disabled={disabled || !requestResource}
+          aria-controls="guide-resource-drawer"
+          onClick={() => requestResource?.({ kind: 'replace-image', stepId, blockId: block.id })}
+        >
+          <ImageUp size={16} aria-hidden="true" />
+          {t('scenario.editor.guideReplaceImage')}
+        </ScenarioInspectorActionButton>
+      )}
+    </>
+  );
 }

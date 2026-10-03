@@ -154,7 +154,7 @@
 .guide-inspector-panel .guide-image-controls .guide-inspector-number input {
   width: 0;
 }
-.guide-inspector-panel .guide-image-controls label {
+.guide-inspector-panel .guide-image-controls label:not(.guide-html-switch) {
   display: grid;
   gap: 5px;
   font-size: 12px;

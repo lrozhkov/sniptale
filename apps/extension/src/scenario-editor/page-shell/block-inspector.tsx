@@ -40,44 +40,6 @@ export function GuideBlockInspector({
   onClose: () => void;
   t: Translate;
 }) {
-  const width = resolveGuideBlockWidth(item.layout, block);
-  const presets: Array<{
-    value: string;
-    width: GuideBlockWidth;
-    percent: number;
-    label: string;
-    icon: React.ReactNode;
-  }> = [
-    {
-      value: 'full',
-      width: 'full',
-      percent: 100,
-      label: t('scenario.editor.guideFullWidth'),
-      icon: <span aria-label={t('scenario.editor.guideFullWidth')}>1:1</span>,
-    },
-    {
-      value: 'half',
-      width: 'half',
-      percent: 50,
-      label: t('scenario.editor.guideHalfWidth'),
-      icon: <span aria-label={t('scenario.editor.guideHalfWidth')}>1:2</span>,
-    },
-    {
-      value: 'third',
-      width: 33,
-      percent: 33,
-      label: t('scenario.editor.guideThirdWidth'),
-      icon: <span aria-label={t('scenario.editor.guideThirdWidth')}>1:3</span>,
-    },
-    {
-      value: 'quarter',
-      width: 25,
-      percent: 25,
-      label: t('scenario.editor.guideQuarterWidth'),
-      icon: <span aria-label={t('scenario.editor.guideQuarterWidth')}>1:4</span>,
-    },
-  ];
-  const selected = presets.find((preset) => preset.percent === width)?.value ?? 'custom';
   return (
     <div className="guide-block-inspector">
       <ScenarioInspectorBackButton
@@ -85,53 +47,13 @@ export function GuideBlockInspector({
         onBack={onClose}
       />
       <fieldset className="guide-style-fields" disabled={disabled}>
-        <GuideInspectorGroup
-          id="placement"
-          icon={Columns2}
-          title={`${t('scenario.editor.guidePlacementGroup')} · ${width}%`}
-        >
-          <CompactSegmentedSelector
-            columns={4}
-            ariaLabel={t('scenario.editor.guideBlockWidth')}
-            value={selected}
-            options={presets}
-            onChange={(next) => {
-              const preset = presets.find((option) => option.value === next);
-              if (preset) onChange({ ...block, width: preset.width }, null);
-            }}
-          />
-          <label className="guide-html-switch">
-            <span>{t('scenario.editor.guideRowStart')}</span>
-            <ProductToggle
-              size="sm"
-              checked={block.rowStart ?? false}
-              disabled={disabled}
-              aria-label={t('scenario.editor.guideRowStart')}
-              onClick={() => onChange({ ...block, rowStart: !block.rowStart }, null)}
-            />
-          </label>
-          {(block.kind === 'text' || block.kind === 'heading' || block.kind === 'note') && (
-            <>
-              <GuideInspectorNumber
-                label={t('scenario.editor.guideBlockHeight')}
-                value={block.minHeight ?? 0}
-                min={0}
-                max={GUIDE_LIMITS.maxDimension}
-                disabled={disabled}
-                onChange={(minHeight) => onChange({ ...block, minHeight }, null)}
-              />
-              <ProductActionButton
-                compact
-                tone="secondary"
-                disabled={!block.minHeight}
-                onClick={() => onChange({ ...block, minHeight: 0 }, null)}
-              >
-                <RotateCcw size={15} aria-hidden="true" />
-                {t('scenario.editor.guideAutoHeight')}
-              </ProductActionButton>
-            </>
-          )}
-        </GuideInspectorGroup>
+        <GuideBlockPlacement
+          item={item}
+          block={block}
+          disabled={disabled}
+          onChange={onChange}
+          t={t}
+        />
         {block.kind === 'note' && (
           <GuideInspectorGroup
             id="noteType"
@@ -230,6 +152,109 @@ function GuideTextSettings({
           {t('scenario.editor.guideTextReset')}
         </ProductActionButton>
       </div>
+    </GuideInspectorGroup>
+  );
+}
+
+/** Shared placement fields publish the same block metadata for text and images. */
+export function GuideBlockPlacement<T extends GuideBlock>({
+  item,
+  block,
+  disabled,
+  onChange,
+  t,
+}: {
+  item: Pick<GuideStep, 'layout'>;
+  block: T;
+  disabled: boolean;
+  onChange: (block: T, group?: string | null) => void;
+  t: Translate;
+}) {
+  const width = resolveGuideBlockWidth(item.layout, block);
+  const presets: Array<{
+    value: string;
+    width: GuideBlockWidth;
+    percent: number;
+    label: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      value: 'full',
+      width: 'full',
+      percent: 100,
+      label: t('scenario.editor.guideFullWidth'),
+      icon: <span aria-label={t('scenario.editor.guideFullWidth')}>1:1</span>,
+    },
+    {
+      value: 'half',
+      width: 'half',
+      percent: 50,
+      label: t('scenario.editor.guideHalfWidth'),
+      icon: <span aria-label={t('scenario.editor.guideHalfWidth')}>1:2</span>,
+    },
+    {
+      value: 'third',
+      width: 33,
+      percent: 33,
+      label: t('scenario.editor.guideThirdWidth'),
+      icon: <span aria-label={t('scenario.editor.guideThirdWidth')}>1:3</span>,
+    },
+    {
+      value: 'quarter',
+      width: 25,
+      percent: 25,
+      label: t('scenario.editor.guideQuarterWidth'),
+      icon: <span aria-label={t('scenario.editor.guideQuarterWidth')}>1:4</span>,
+    },
+  ];
+  const selected = presets.find((preset) => preset.percent === width)?.value ?? 'custom';
+  return (
+    <GuideInspectorGroup
+      id="placement"
+      icon={Columns2}
+      title={`${t('scenario.editor.guidePlacementGroup')} · ${width}%`}
+    >
+      <CompactSegmentedSelector
+        columns={4}
+        ariaLabel={t('scenario.editor.guideBlockWidth')}
+        value={selected}
+        options={presets}
+        onChange={(next) => {
+          const preset = presets.find((option) => option.value === next);
+          if (preset) onChange({ ...block, width: preset.width }, null);
+        }}
+      />
+      <label className="guide-html-switch">
+        <span>{t('scenario.editor.guideRowStart')}</span>
+        <ProductToggle
+          size="sm"
+          checked={block.rowStart ?? false}
+          disabled={disabled}
+          aria-label={t('scenario.editor.guideRowStart')}
+          onClick={() => onChange({ ...block, rowStart: !block.rowStart }, null)}
+        />
+      </label>
+      {(block.kind === 'text' || block.kind === 'heading' || block.kind === 'note') && (
+        <>
+          <GuideInspectorNumber
+            label={t('scenario.editor.guideBlockHeight')}
+            value={block.minHeight ?? 0}
+            min={0}
+            max={GUIDE_LIMITS.maxDimension}
+            disabled={disabled}
+            onChange={(minHeight) => onChange({ ...block, minHeight }, null)}
+          />
+          <ProductActionButton
+            compact
+            tone="secondary"
+            disabled={!block.minHeight}
+            onClick={() => onChange({ ...block, minHeight: 0 }, null)}
+          >
+            <RotateCcw size={15} aria-hidden="true" />
+            {t('scenario.editor.guideAutoHeight')}
+          </ProductActionButton>
+        </>
+      )}
     </GuideInspectorGroup>
   );
 }

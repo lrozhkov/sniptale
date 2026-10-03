@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { GuideImageResources } from './resources';
 import { createPortal } from 'react-dom';
-import { Image, X } from 'lucide-react';
+import { Image, ImageUp, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import {
@@ -126,7 +126,8 @@ export function GuideResourceTrigger({
     'aria-controls': 'guide-resource-drawer',
     onClick: () => request?.(target ?? { kind: 'steps' }),
   };
-  const icon = <Image size={16} aria-hidden="true" />;
+  const Icon = target?.kind === 'replace-image' ? ImageUp : Image;
+  const icon = <Icon size={16} aria-hidden="true" />;
   return label ? (
     <ProductActionButton {...buttonProps} tone="secondary" compact>
       {icon}

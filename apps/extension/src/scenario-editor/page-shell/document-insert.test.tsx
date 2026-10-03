@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { translate } from '../../platform/i18n';
-import { GuideDocumentInsert } from './document-insert';
+import { GuideDocumentInsert, GuideInsertionAvailability } from './document-insert';
 let container: HTMLDivElement;
 let root: Root;
 beforeEach(() => {
@@ -174,4 +174,33 @@ it('opens the extended anchor with keyboard support and disabled gating', async 
   });
   expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
   expect(onOperate).toHaveBeenCalledOnce();
+});
+
+it('disables insertion and closes an open menu while a block is selected', async () => {
+  const onOperate = vi.fn();
+  const draw = (blocked: boolean) =>
+    root.render(
+      <GuideInsertionAvailability value={blocked}>
+        <GuideDocumentInsert
+          target={{ kind: 'item', beforeItemId: 'first' }}
+          disabled={false}
+          onOperate={onOperate}
+          t={(key) => translate(key, 'en')}
+        />
+      </GuideInsertionAvailability>
+    );
+  await act(async () => draw(false));
+  const trigger = container.querySelector<HTMLButtonElement>('button')!;
+  await act(async () => trigger.click());
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+  await act(async () => draw(true));
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  expect(trigger.disabled).toBe(true);
+  expect(container.querySelector('.guide-insertion')?.hasAttribute('inert')).toBe(true);
+  await act(async () => trigger.click());
+  expect(onOperate).not.toHaveBeenCalled();
+  await act(async () => draw(false));
+  expect(trigger.disabled).toBe(false);
+  await act(async () => trigger.click());
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
 });

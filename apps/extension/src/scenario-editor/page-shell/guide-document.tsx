@@ -4,8 +4,8 @@ import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
 import { guideDocumentSelection, useGuideSelectionInput } from './document-selection';
-import { Fragment, useEffect, useId, useRef } from 'react';
-import { GuideDocumentInsert } from './document-insert';
+import { Fragment, useEffect, useId, useRef, useState } from 'react';
+import { GuideDocumentInsert, GuideInsertionAvailability } from './document-insert';
 import { GuideStepActions } from './step-actions';
 import type {
   GuideBlock,
@@ -78,6 +78,7 @@ export function GuideDocument({
 }: GuideDocumentProps) {
   const content = useRef<HTMLDivElement>(null);
   const instructions = useId();
+  const [textEditing, setTextEditing] = useState(false);
   useGuideSelectionInput(content);
   const selection = guideDocumentSelection({
     selectedId,
@@ -91,122 +92,120 @@ export function GuideDocument({
   );
   const numbers = resolveGuideNumbering(project.items);
   return (
-    <div
-      ref={content}
-      className="guide-document"
-      tabIndex={-1}
-      style={guideDocumentStyle(project.style)}
-      {...selection}
-    >
-      <span id={instructions} className="sr-only">
-        {t('scenario.editor.guideSelectionHelp')}
-      </span>
-      {project.items.map((item) => {
-        if (item.kind === 'section')
+    <GuideInsertionAvailability value={!!selectedBlockId || textEditing || !!framedImageId}>
+      <div
+        ref={content}
+        className="guide-document"
+        tabIndex={-1}
+        style={guideDocumentStyle(project.style)}
+        {...selection}
+        onFocusCapture={(event) => {
+          selection.onFocusCapture(event);
+          setTextEditing(event.target.matches('textarea'));
+        }}
+        onBlurCapture={(event) => {
+          setTextEditing(
+            event.relatedTarget instanceof Element &&
+              event.currentTarget.contains(event.relatedTarget) &&
+              event.relatedTarget.matches('textarea')
+          );
+        }}
+      >
+        <span id={instructions} className="sr-only">
+          {t('scenario.editor.guideSelectionHelp')}
+        </span>
+        {project.items.map((item) => {
+          if (item.kind === 'section')
+            return (
+              <Fragment key={item.id}>
+                <GuideDocumentInsert
+                  target={{ kind: 'item', beforeItemId: item.id }}
+                  disabled={disabled}
+                  onOperate={onOperate}
+                  t={t}
+                />
+                <GuideSectionContent
+                  project={project}
+                  item={item}
+                  selected={selectedId === item.id}
+                  instructions={instructions}
+                  disabled={disabled}
+                  onChange={onChange}
+                  onOperate={onOperate}
+                  t={t}
+                />
+              </Fragment>
+            );
+          const number = numbers.get(item.id)?.label;
+          const appearance = resolveGuideStyle(project.style, item.styleOverrides);
           return (
             <Fragment key={item.id}>
-              <GuideDocumentInsert
-                target={{ kind: 'item', beforeItemId: item.id }}
-                disabled={disabled}
-                onOperate={onOperate}
-                t={t}
-              />
-              <GuideSectionContent
-                project={project}
-                item={item}
-                selected={selectedId === item.id}
-                instructions={instructions}
-                disabled={disabled}
-                onChange={onChange}
-                onOperate={onOperate}
-                t={t}
-              />
+              {project.purpose !== 'step-template' && (
+                <GuideDocumentInsert
+                  target={{ kind: 'item', beforeItemId: item.id }}
+                  disabled={disabled}
+                  onOperate={onOperate}
+                  t={t}
+                />
+              )}
+              <article
+                key={item.id}
+                data-layout={item.layout}
+                data-number-style={appearance.numberStyle}
+                style={guideDocumentStyle(appearance)}
+                id={item.id}
+                tabIndex={0}
+                role="group"
+                aria-label={item.title || t('scenario.editor.guideStepTitle')}
+                aria-describedby={instructions}
+                aria-current={selectedId === item.id && !selectedBlockId ? true : undefined}
+                data-selected={selectedId === item.id && !selectedBlockId}
+              >
+                <GuideStepHeader
+                  project={project}
+                  item={item}
+                  number={number}
+                  disabled={disabled}
+                  onChange={onChange}
+                  t={t}
+                />
+                <GuideStepBody
+                  project={project}
+                  item={item}
+                  images={images}
+                  disabled={disabled}
+                  onChange={onChange}
+                  onOperate={onOperate}
+                  onEditImage={onEditImage}
+                  onUploadImage={onUploadImage}
+                  selectedBlockId={selectedId === item.id ? selectedBlockId : null}
+                  instructions={instructions}
+                  framedImageId={framedImageId}
+                  onFrameImage={onFrameImage}
+                  t={t}
+                />
+                <GuideStepActions
+                  project={project}
+                  itemId={item.id}
+                  disabled={disabled}
+                  onOperate={onOperate}
+                  t={t}
+                />
+              </article>
             </Fragment>
           );
-        const number = numbers.get(item.id)?.label;
-        const appearance = resolveGuideStyle(project.style, item.styleOverrides);
-        return (
-          <Fragment key={item.id}>
-            {project.purpose !== 'step-template' && (
-              <GuideDocumentInsert
-                target={{ kind: 'item', beforeItemId: item.id }}
-                disabled={disabled}
-                onOperate={onOperate}
-                t={t}
-              />
-            )}
-            <article
-              key={item.id}
-              data-layout={item.layout}
-              data-number-style={appearance.numberStyle}
-              style={guideDocumentStyle(appearance)}
-              id={item.id}
-              tabIndex={0}
-              role="group"
-              aria-label={item.title || t('scenario.editor.guideStepTitle')}
-              aria-describedby={instructions}
-              aria-current={selectedId === item.id && !selectedBlockId ? true : undefined}
-              data-selected={selectedId === item.id && !selectedBlockId}
-            >
-              <header>
-                {number != null && <span>{number}</span>}
-                <GuideVoiceField
-                  className="guide-step-title"
-                  rows={1}
-                  aria-label={t('scenario.editor.guideStepTitle')}
-                  placeholder={t('scenario.editor.guideStepTitle')}
-                  maxLength={GUIDE_LIMITS.maxLabelLength}
-                  value={item.title}
-                  disabled={disabled}
-                  onValueChange={(value) =>
-                    onChange(
-                      {
-                        ...project,
-                        items: project.items.map((entry) =>
-                          entry.id === item.id ? { ...item, title: value } : entry
-                        ),
-                      },
-                      `step-title:${item.id}`
-                    )
-                  }
-                />
-              </header>
-              <GuideStepBody
-                project={project}
-                item={item}
-                images={images}
-                disabled={disabled}
-                onChange={onChange}
-                onOperate={onOperate}
-                onEditImage={onEditImage}
-                onUploadImage={onUploadImage}
-                selectedBlockId={selectedId === item.id ? selectedBlockId : null}
-                instructions={instructions}
-                framedImageId={framedImageId}
-                onFrameImage={onFrameImage}
-                t={t}
-              />
-              <GuideStepActions
-                project={project}
-                itemId={item.id}
-                disabled={disabled}
-                onOperate={onOperate}
-                t={t}
-              />
-            </article>
-          </Fragment>
-        );
-      })}
-      {project.items.length > 0 && project.purpose !== 'step-template' && (
-        <GuideDocumentInsert
-          target={{ kind: 'item' }}
-          end
-          disabled={disabled}
-          onOperate={onOperate}
-          t={t}
-        />
-      )}
-    </div>
+        })}
+        {project.items.length > 0 && project.purpose !== 'step-template' && (
+          <GuideDocumentInsert
+            target={{ kind: 'item' }}
+            end
+            disabled={disabled}
+            onOperate={onOperate}
+            t={t}
+          />
+        )}
+      </div>
+    </GuideInsertionAvailability>
   );
 }
 
@@ -510,5 +509,48 @@ function GuideTextBlock({
         .join('\n')}
       onValueChange={(value) => onChange({ ...block, paragraphs: createGuideParagraphs(value) })}
     />
+  );
+}
+
+/** Step heading owns its editable title and displayed numbering within the document. */
+function GuideStepHeader({
+  project,
+  item,
+  number,
+  disabled,
+  onChange,
+  t,
+}: {
+  project: GuideProject;
+  item: GuideStep;
+  number: string | null | undefined;
+  disabled: boolean;
+  onChange: GuideDocumentProps['onChange'];
+  t: Translate;
+}) {
+  return (
+    <header>
+      {number != null && <span>{number}</span>}
+      <GuideVoiceField
+        className="guide-step-title"
+        rows={1}
+        aria-label={t('scenario.editor.guideStepTitle')}
+        placeholder={t('scenario.editor.guideStepTitle')}
+        maxLength={GUIDE_LIMITS.maxLabelLength}
+        value={item.title}
+        disabled={disabled}
+        onValueChange={(value) =>
+          onChange(
+            {
+              ...project,
+              items: project.items.map((entry) =>
+                entry.id === item.id ? { ...item, title: value } : entry
+              ),
+            },
+            `step-title:${item.id}`
+          )
+        }
+      />
+    </header>
   );
 }

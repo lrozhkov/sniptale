@@ -58,18 +58,14 @@ export function guideDocumentSelection(params: {
         field.focus({ preventScroll: true });
         return;
       }
-      if (event.key !== 'Escape') return;
+      const field = current.value.matches(FIELD);
+      const finishText =
+        field && (event.key === 'Escape' || (event.key === 'Enter' && !event.shiftKey));
+      if (!finishText) return;
       event.preventDefault();
       event.stopPropagation();
-      if (current.value.closest('.guide-voice-field')) {
-        current.element.focus({ preventScroll: true });
-      } else if (current.block) {
-        params.select(current.item.id, null);
-        current.item.focus({ preventScroll: true });
-      } else {
-        params.clear();
-        event.currentTarget.focus({ preventScroll: true });
-      }
+      event.currentTarget.dataset['selectionInput'] = 'pointer';
+      current.element.focus({ preventScroll: true });
     },
   };
 }
@@ -82,8 +78,8 @@ export function useGuideSelectionInput(ref: RefObject<HTMLDivElement | null>) {
     const pointer = () => {
       root.dataset['selectionInput'] = 'pointer';
     };
-    const keyboard = () => {
-      root.dataset['selectionInput'] = 'keyboard';
+    const keyboard = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Tab') root.dataset['selectionInput'] = 'keyboard';
     };
     const owner = root.ownerDocument;
     pointer();

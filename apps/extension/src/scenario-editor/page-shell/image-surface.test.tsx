@@ -89,6 +89,7 @@ async function pointer(element: Element, type: string, x: number, y: number) {
 it('commits one normalized pan only on pointer release and keeps annotation identity', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -106,6 +107,7 @@ it('commits one normalized pan only on pointer release and keeps annotation iden
 it('cancels a draft on Escape and restores trigger focus without undo work', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -119,6 +121,7 @@ it('cancels a draft on Escape and restores trigger focus without undo work', asy
 it('cancels on pointercancel and when saving disables an active gesture', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 20, 30);
@@ -133,6 +136,7 @@ it('cancels on pointercancel and when saving disables an active gesture', async 
 it('resizes through the corner and provides arrow key equivalents', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   frame();
   const resize = host.querySelector('.guide-image-resize');
   if (!resize) throw new Error('Missing handle');
@@ -152,6 +156,7 @@ it('resizes through the corner and provides arrow key equivalents', async () => 
 it('leaves ordinary wheel scrolling alone and batches explicit modifier zoom', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   vi.useFakeTimers();
   const normal = new WheelEvent('wheel', { deltaY: 40, bubbles: true, cancelable: true });
@@ -173,6 +178,7 @@ it('leaves ordinary wheel scrolling alone and batches explicit modifier zoom', a
 it('keeps pointer preview across equivalent canonical rerenders and preserves concurrent caption edits', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -191,6 +197,7 @@ it('keeps pointer preview across equivalent canonical rerenders and preserves co
 it('keeps pending wheel zoom across canonical rerenders without reverting newer text', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   vi.useFakeTimers();
   await act(async () =>
@@ -215,6 +222,7 @@ it('keeps pending wheel zoom across canonical rerenders without reverting newer 
 it('commits pending zoom before an immediate pan without snapping back or a delayed extra commit', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   vi.useFakeTimers();
   await act(async () =>
@@ -243,6 +251,7 @@ it('commits pending zoom before an immediate pan without snapping back or a dela
 it('cancels active geometry on image replacement and cancels pending wheel on unmount', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -267,6 +276,7 @@ it('cancels active geometry on image replacement and cancels pending wheel on un
 it('does not record a pointer move that returns to its original position', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -278,7 +288,6 @@ it('does not record a pointer move that returns to its original position', async
 it('crop magnet prevents blank edges for pan and keyboard while disabling restores free movement', async () => {
   await render();
   await click('Frame and image');
-  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 400, -300);
@@ -296,25 +305,24 @@ it('crop magnet prevents blank edges for pan and keyboard while disabling restor
   expect(change.mock.calls[0]?.[0].contentTransform).toEqual({ x: 0, y: 0, scale: 1 });
 });
 
-it('scopes the pressed state to the current image and reapplies bounds after switching back', async () => {
+it('defaults new images to bounded framing and retains the current image opt-out', async () => {
   await render(false, { ...block, frame: { width: 400, height: 400 } });
   await click('Frame and image');
-  await click('Keep image inside frame');
   const button = host.querySelector<HTMLButtonElement>('[aria-label="Keep image inside frame"]')!;
   expect(button.getAttribute('aria-pressed')).toBe('true');
-  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(4 / 3);
+  await click('Keep image inside frame');
+  expect(button.getAttribute('aria-pressed')).toBe('false');
   await render(false, { ...block, id: 'other', assetId: 'other-asset' });
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  await render(false, block);
   expect(button.getAttribute('aria-pressed')).toBe('false');
   await click('Keep image inside frame');
   expect(button.getAttribute('aria-pressed')).toBe('true');
-  await click('Keep image inside frame');
-  expect(button.getAttribute('aria-pressed')).toBe('false');
 });
 
 it('holds image geometry while bounds are enabled and dimensions are loading', async () => {
   await render();
   await click('Frame and image');
-  await click('Keep image inside frame');
   decoded.value = null;
   await render();
   const element = frame();
@@ -328,7 +336,6 @@ it('holds image geometry while bounds are enabled and dimensions are loading', a
 it('commits a constrained extreme resize with the fit shown in preview', async () => {
   await render();
   await click('Frame and image');
-  await click('Keep image inside frame');
   frame();
   const resize = host.querySelector('.guide-image-resize')!;
   await pointer(resize, 'pointerdown', 0, 0);

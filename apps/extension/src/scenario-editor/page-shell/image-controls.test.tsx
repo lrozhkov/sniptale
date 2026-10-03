@@ -62,13 +62,15 @@ async function render(url: string | null = 'blob:image', disabled = false, image
 }
 async function click(name: string) {
   const button = [...host.querySelectorAll('button')].find(
-    (node) => (node.getAttribute('aria-label') ?? node.textContent) === name
+    (node) =>
+      (node.getAttribute('aria-label') ?? node.getAttribute('title') ?? node.textContent) === name
   );
   if (!button) throw new Error(`Missing ${name}`);
   await act(async () => button.click());
 }
 it('changes fit and resets the frame from the decoded image dimensions', async () => {
   await render();
+  await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   await click('Fill');
   expect(change.mock.calls[0]?.[0].fit).toBe('cover');
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
@@ -281,4 +283,12 @@ it('does not edit an unavailable or disabled image', async () => {
   expect(edit).not.toHaveBeenCalled();
   await click('Replace image');
   expect(requestResource).not.toHaveBeenCalled();
+});
+
+it('offers image block placement and preserves image metadata', async () => {
+  await render();
+  await click('Half width');
+  expect(change.mock.calls.at(-1)).toEqual([{ ...block, width: 'half' }, null]);
+  await click('Start a new row');
+  expect(change.mock.calls.at(-1)).toEqual([{ ...block, rowStart: true }, null]);
 });

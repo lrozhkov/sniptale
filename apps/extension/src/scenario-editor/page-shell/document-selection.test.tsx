@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { guideDocumentSelection, useGuideSelectionInput } from './document-selection';
 
-it('selects content first, preserves commands and climbs one level per Escape', async () => {
+it('selects content first, preserves commands and finishes text entry without changing selection', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -70,19 +70,32 @@ it('selects content first, preserves commands and climbs one level per Escape', 
     expect(first.defaultPrevented).toBe(false);
     await key(text, 'Enter');
     expect(document.activeElement).toBe(field);
+    for (const extra of [{ shiftKey: true }, { isComposing: true }]) {
+      const newline = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+        ...extra,
+      });
+      await act(async () => field.dispatchEvent(newline));
+      expect(newline.defaultPrevented).toBe(false);
+      expect(document.activeElement).toBe(field);
+    }
+    await key(field, 'Enter');
+    expect(document.activeElement).toBe(text);
+    await key(text, 'Enter');
+    expect(document.activeElement).toBe(field);
     await key(field, 'Escape');
     expect(document.activeElement).toBe(text);
     expect(selectedBlockId).toBe('text');
     await key(text, 'Escape');
-    expect(selectedBlockId).toBeNull();
-    expect(document.activeElement).toBe(host.querySelector('article'));
-    await key(host.querySelector('article')!, 'Escape');
-    expect(clear).toHaveBeenCalledOnce();
-    expect(selectedId).toBeNull();
+    expect(selectedBlockId).toBe('text');
+    expect(document.activeElement).toBe(text);
+    expect(clear).not.toHaveBeenCalled();
     const command = mouse();
     await act(async () => host.querySelector('button')!.dispatchEvent(command));
     expect(command.defaultPrevented).toBe(false);
-    expect(selectedId).toBeNull();
+    expect(selectedId).toBe('step');
     await act(async () => host.querySelector('svg path')!.dispatchEvent(mouse()));
     expect(selectedBlockId).toBe('image');
     expect(document.activeElement).toBe(host.querySelector('[data-block-id="image"]'));
@@ -109,6 +122,7 @@ it('distinguishes pointer selection from keyboard focus and removes modality lis
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));
   expect(surface.getAttribute('data-selection-input')).toBe('keyboard');
   document.dispatchEvent(new Event('pointerdown'));
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   expect(surface.getAttribute('data-selection-input')).toBe('pointer');
   act(() => root.unmount());
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab' }));

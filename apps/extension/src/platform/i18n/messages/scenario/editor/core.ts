@@ -22,8 +22,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideDescriptionGroup: { ru: 'Описание', en: 'Description' },
   guideImageBlock: { en: 'Image block', ru: 'Блок изображения' },
   guideSelectionHelp: {
-    en: 'Click to select. Click selected text or press Enter to edit. Escape returns to the parent; from a step it selects the document.',
-    ru: 'Клик выбирает объект. Клик по выбранному тексту или Enter включает редактирование. Escape возвращает к родителю, из шага — к документу.',
+    en: 'Click to select. Click selected text or press Enter to edit. Enter or Escape finishes editing. Shift+Enter adds a line break.',
+    ru: 'Клик выбирает объект. Клик по выбранному тексту или Enter включает редактирование. Enter или Escape завершает ввод. Shift+Enter переносит строку.',
   },
   guideSelectForSettings: {
     ru: 'Выберите шаг или элемент на холсте.',

@@ -6,17 +6,17 @@ import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types
 
 const Assistance = createContext({
   snap: true,
-  boundedImage: null as string | null,
+  unboundedImage: null as string | null,
   setSnap: (_value: boolean) => {},
-  setBoundedImage: (_value: string | null) => {},
+  setUnboundedImage: (_value: string | null) => {},
 });
 
 /** Disposable editor preferences; accepted geometry remains in project history. */
 export function GuideLayoutAssistance({ children }: { children: ReactNode }) {
   const [snap, setSnap] = useState(true);
-  const [boundedImage, setBoundedImage] = useState<string | null>(null);
+  const [unboundedImage, setUnboundedImage] = useState<string | null>(null);
   return (
-    <Assistance.Provider value={{ snap, setSnap, boundedImage, setBoundedImage }}>
+    <Assistance.Provider value={{ snap, setSnap, unboundedImage, setUnboundedImage }}>
       {children}
     </Assistance.Provider>
   );
@@ -26,11 +26,11 @@ export const useGuideLayoutAssistance = () => useContext(Assistance);
 
 /** Bounds are an editing preference for one asset and block, never a stored image property. */
 export function useGuideImageBounds(block: Pick<GuideImageBlock, 'id' | 'assetId'>) {
-  const { boundedImage, setBoundedImage } = useGuideLayoutAssistance();
+  const { unboundedImage, setUnboundedImage } = useGuideLayoutAssistance();
   const key = `${block.id}:${block.assetId}`;
   return {
-    cropBounds: boundedImage === key,
-    setCropBounds: (enabled: boolean) => setBoundedImage(enabled ? key : null),
+    cropBounds: unboundedImage !== key,
+    setCropBounds: (enabled: boolean) => setUnboundedImage(enabled ? null : key),
   };
 }
 

@@ -1,7 +1,11 @@
+import { createContext, useContext } from 'react';
 import { FileText, Heading, Image, ListPlus, MessageSquare, CornerDownLeft } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideInsertActions } from './insert-actions';
+
+const InsertionBlocked = createContext(false);
+export const GuideInsertionAvailability = InsertionBlocked.Provider;
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
@@ -23,6 +27,7 @@ export function GuideDocumentInsert({
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
 }) {
+  const blocked = useContext(InsertionBlocked);
   const before = target.kind === 'item' ? target.beforeItemId : target.beforeBlockId;
   const items =
     target.kind === 'item'
@@ -98,6 +103,9 @@ export function GuideDocumentInsert({
     <div
       className={`guide-insertion guide-insertion-${target.kind}`}
       data-end={end}
+      data-blocked={blocked || undefined}
+      inert={blocked}
+      aria-hidden={blocked || undefined}
       data-insert-before={before ?? 'end'}
     >
       <div className="guide-insertion-chrome">
@@ -108,7 +116,7 @@ export function GuideDocumentInsert({
               : 'scenario.editor.guideAddBlock'
           )}
           items={rowStartItem ? [...items, rowStartItem] : items}
-          disabled={disabled}
+          disabled={disabled || blocked}
         />
       </div>
     </div>

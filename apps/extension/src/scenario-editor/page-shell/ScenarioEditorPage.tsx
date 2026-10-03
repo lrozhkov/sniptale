@@ -448,6 +448,7 @@ function GuideContextualInspector({
     return <p className="guide-inspector-hint">{t('scenario.editor.guideSelectForSettings')}</p>;
   return framing.target?.block.kind === 'image' ? (
     <GuideImageControls
+      layout={framing.target.item.layout}
       stepId={framing.target.item.id}
       onEdit={() => {
         if (framing.target) onEditImage(framing.target.item.id, framing.target.block.id);
