@@ -228,7 +228,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
   expect((await add.boundingBox())!.width).toBeLessThanOrEqual(32);
   await expect(add).toHaveText('');
   await add.click();
-  for (const label of ['Точка действия', 'Пояснение', 'Выделение']) {
+  for (const label of ['Точка действия', 'Пояснение к слайду', 'Выделение']) {
     await expect
       .soft(
         page.locator('.guide-action-menu').getByRole('button', { name: label, exact: true }),
@@ -327,12 +327,13 @@ for (const theme of ['light', 'dark'] as const) {
       expect(insertion.hit).toBe(true);
       const step = page.locator('article#compare');
       for (const name of ['Подзаголовок', 'Примечание']) {
-        const add = step
-          .locator('.guide-insertion-block')
-          .last()
-          .getByRole('button', { name, exact: true });
-        await add.focus();
-        await add.click();
+        const trigger = step.locator('.guide-insertion-block').last().locator('button');
+        await trigger.focus();
+        await page.keyboard.press('ArrowDown');
+        await page
+          .locator('.guide-action-menu--insert')
+          .getByRole('button', { name, exact: true })
+          .click();
       }
       const blocks = page.locator('.guide-document article .guide-block');
       for (const block of await blocks.all()) {

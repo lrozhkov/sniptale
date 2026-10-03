@@ -7,13 +7,13 @@ import { createProjectCoverService } from '../../workflows/project-covers';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import { getVideoProject, getProjectAsset } from '../../composition/persistence/projects';
 import { ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getMediaAssetBlob } from '../../composition/persistence/media-library';
 import {
   listScenarioProjectSummaries,
   getScenarioAssetBlob,
 } from '../../composition/persistence/scenario/store/public';
-import type { Translate } from '../../platform/i18n';
+import { formatDateTime, useAppLocale, type AppLocale, type Translate } from '../../platform/i18n';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import {
   EditorStart,
@@ -32,14 +32,14 @@ const covers = createProjectCoverService({
   getScenarioAssetBlob,
 });
 
-async function listStartProjects(): Promise<EditorStartSourceItem[]> {
+async function listStartProjects(locale: AppLocale): Promise<EditorStartSourceItem[]> {
   const projects = await listScenarioProjectSummaries();
   return projects
     .filter((item) => item.lifecycle?.trashedAt === undefined)
     .map((item) => ({
       id: item.id,
       title: item.name,
-      detail: new Date(item.updatedAt).toLocaleDateString(),
+      detail: formatDateTime(item.updatedAt, undefined, locale),
       updatedAt: item.updatedAt,
       loadThumbnail: (signal: AbortSignal) =>
         covers.getCover(
@@ -54,7 +54,9 @@ export function ScenarioEditorStart(props: {
   state: ReturnType<typeof useGuidePageState>;
   t: Translate;
 }) {
-  const { items, status, refresh } = useEditorStartItems(listStartProjects);
+  const locale = useAppLocale();
+  const listProjects = useCallback(() => listStartProjects(locale), [locale]);
+  const { items, status, refresh } = useEditorStartItems(listProjects);
   useEffect(
     () =>
       subscribeToMediaHubEvents((event) => {

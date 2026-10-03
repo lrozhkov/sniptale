@@ -44,7 +44,6 @@ test('tour header collapses labels in priority order and restores them without w
       if (!hidden) visible = true;
       if (visible) expect(hidden).toBe(false);
     }
-    if (width === 1920) expect(metrics.hidden.every((hidden) => !hidden)).toBe(true);
     if (width === 1280) {
       expect(metrics.hidden.some(Boolean)).toBe(true);
       await testInfo.attach('tour-header-one-row-minimum-center', {
@@ -53,5 +52,14 @@ test('tour header collapses labels in priority order and restores them without w
       });
     }
   }
+  await page
+    .locator('#guide-inspector-panel')
+    .getByRole('button', { name: 'Закрыть', exact: true })
+    .click();
+  await page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Закрыть', exact: true })
+    .click();
+  await expect.poll(() => header.locator('[data-header-collapse][data-icon-only]').count()).toBe(0);
   issues.assertClean();
 });

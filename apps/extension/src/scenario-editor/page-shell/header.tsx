@@ -180,6 +180,7 @@ function useHeaderFit() {
     const header = ref.current;
     if (!header) return;
     const fit = () => {
+      header.removeAttribute('data-wrapped');
       const buttons = [...header.querySelectorAll<HTMLElement>('[data-header-collapse]')].sort(
         (a, b) => Number(a.dataset['headerCollapse']) - Number(b.dataset['headerCollapse'])
       );
@@ -188,6 +189,7 @@ function useHeaderFit() {
         if (header.scrollWidth <= header.clientWidth) break;
         button.setAttribute('data-icon-only', 'true');
       }
+      if (header.scrollWidth > header.clientWidth) header.setAttribute('data-wrapped', 'true');
     };
     fit();
     const observer = globalThis.ResizeObserver ? new ResizeObserver(fit) : null;

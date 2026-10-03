@@ -9,6 +9,9 @@
 .guide-video-preview > [data-ui='library-media-player'] {
   min-height: 180px;
 }
+.guide-video-preview [data-ui='library-media-viewport'] {
+  min-height: 160px;
+}
 .guide-video-field {
   display: grid;
   gap: 4px;

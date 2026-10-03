@@ -27,6 +27,7 @@ vi.mock('../../composition/persistence/scenario/store/project-records/assets', (
   getScenarioAssetBlob: vi.fn(),
 }));
 vi.mock('../../composition/persistence/scenario/store/public', () => ({
+  getScenarioAssetBlob: vi.fn(),
   createScenarioProjectRecord: vi.fn(),
   duplicateScenarioProjectRecord: vi.fn(),
   deleteScenarioProjectRecord: vi.fn(),

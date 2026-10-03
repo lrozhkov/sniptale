@@ -71,11 +71,22 @@ for (const theme of ['light', 'dark'] as const) {
         .first()
         .locator('.tour-contents-actions button:not(:disabled)')
         .first();
-      const idleColor = await iconAction.evaluate((node) => getComputedStyle(node).color);
+      const colors = await iconAction.evaluate((node) => {
+        const probe = document.createElement('span');
+        node.append(probe);
+        probe.style.color = 'var(--sniptale-color-text-secondary)';
+        const idle = getComputedStyle(probe).color;
+        probe.style.color = 'var(--sniptale-color-text-primary-strong)';
+        const hover = getComputedStyle(probe).color;
+        probe.remove();
+        return { idle, hover };
+      });
+      await main.hover();
+      await expect(iconAction).toHaveCSS('color', colors.idle);
       await iconAction.hover();
       await expect.soft(iconAction).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
       await expect.soft(iconAction).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await expect.soft(iconAction).not.toHaveCSS('color', idleColor);
+      await expect.soft(iconAction).toHaveCSS('color', colors.hover);
       await info.attach(`contents-hover-${locale}-${theme}`, {
         body: await panel.screenshot(),
         contentType: 'image/png',

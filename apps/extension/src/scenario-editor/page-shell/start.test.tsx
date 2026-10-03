@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   thumbnail: vi.fn(),
   cover: vi.fn(),
   gallery: vi.fn(),
+  locale: 'en' as 'en' | 'ru',
+}));
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
+  useAppLocale: () => mocks.locale,
 }));
 vi.mock('../../composition/persistence/scenario/store/public', () => ({
   listScenarioProjectSummaries: mocks.list,
@@ -51,6 +56,7 @@ function actions() {
   return [...container.querySelectorAll<HTMLButtonElement>('[data-ui="editor.start"] button')];
 }
 beforeEach(() => {
+  mocks.locale = 'en';
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.list.mockReset().mockResolvedValue([]);
   mocks.thumbnail.mockReset().mockResolvedValue(undefined);
@@ -62,6 +68,24 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
+});
+
+it('formats recent project dates in the selected locale and updates after a locale change', async () => {
+  mocks.list.mockResolvedValue([
+    {
+      id: 'dated',
+      name: 'Dated project',
+      updatedAt: new Date(2026, 8, 23, 12).getTime(),
+      availability: 'available',
+    },
+  ]);
+  mocks.locale = 'ru';
+  await render();
+  expect(container.textContent).toContain('23.09.2026');
+  mocks.locale = 'en';
+  await render();
+  expect(container.textContent).toContain('9/23/2026');
+  expect(container.textContent).not.toContain('23.09.2026');
 });
 afterEach(() => {
   act(() => root.unmount());

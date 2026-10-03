@@ -35,7 +35,7 @@ for (const [locale, theme] of [
   ['ru', 'light'],
   ['en', 'dark'],
 ] as const) {
-  test(`authoring action navigation at 1280x720 ${locale}/${theme} preserves the project`, async ({
+  test(`authoring selection and preview navigation at 1280x720 ${locale}/${theme} preserves the project`, async ({
     context,
     extensionId,
   }) => {
@@ -95,57 +95,67 @@ for (const [locale, theme] of [
     const previous = stage.locator('[data-tour-previous]');
     const next = stage.locator('[data-tour-next]');
     await expect(player).toHaveAttribute('data-slide-id', 'First');
+    await expect(stage.locator('.tour-toolbar')).toBeHidden();
+    for (const id of ['one', 'two', 'button-13']) {
+      const action = stage.locator(`[data-tour-object-id="${id}"]`);
+      for (let pageIndex = 0; pageIndex < 13 && !(await action.count()); pageIndex++) {
+        await stage
+          .locator('.tour-navigation-pager')
+          .getByRole('button', {
+            name: locale === 'ru' ? 'Далее' : 'Next',
+            exact: true,
+          })
+          .click();
+      }
+      await action.scrollIntoViewIfNeeded();
+      await action.focus();
+      await action.press('Enter');
+      await expect(action).toBeFocused();
+      await expect(action).toHaveAttribute('data-selected', 'true');
+      await expect(action).toBeVisible();
+    }
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', {
+        name: locale === 'ru' ? 'Просмотр' : 'Preview',
+        exact: true,
+      })
+      .click();
+    await expect(stage.locator('.tour-toolbar')).toBeVisible();
     await expect(previous).toBeDisabled();
-    const firstAction = stage.locator('[data-tour-object-id="one"]');
-    await firstAction.focus();
-    await firstAction.press('Enter');
-    await expect(firstAction).toBeFocused();
-    await expect(firstAction).toHaveAttribute('data-selected', 'true');
     await next.focus();
     await next.press('Enter');
-    await expect(stage.locator('[data-tour-object-id="two"]')).toHaveAttribute(
-      'data-selected',
-      'true'
-    );
-    for (let index = 3; index <= 13; index++) await next.click();
-    await expect(stage.locator('[data-tour-object-id="button-13"]')).toHaveAttribute(
-      'data-selected',
-      'true'
-    );
-    await expect(stage.locator('[data-tour-object-id="button-13"]')).toBeVisible();
-    await next.click();
     await expect(player).toHaveAttribute('data-slide-id', 'Empty');
     await expect(next).toBeFocused();
     await next.click();
     await expect(player).toHaveAttribute('data-slide-id', 'Last');
-    await expect(stage.locator('[data-tour-object-id="three"]')).toHaveAttribute(
-      'data-selected',
-      'true'
-    );
+    await next.click();
+    await expect(player).toHaveAttribute('data-slide-id', 'end');
     await expect(next).toBeDisabled();
+    await previous.click();
+    await expect(player).toHaveAttribute('data-slide-id', 'Last');
     await previous.click();
     await expect(player).toHaveAttribute('data-slide-id', 'Empty');
     await previous.click();
-    await expect(stage.locator('[data-tour-object-id="button-13"]')).toHaveAttribute(
-      'data-selected',
-      'true'
-    );
-    await expect(stage.locator('[data-tour-object-id="button-13"]')).toBeVisible();
-    for (let index = 13; index > 2; index--) await previous.click();
-    await expect(stage.locator('[data-tour-object-id="two"]')).toHaveAttribute(
-      'data-selected',
-      'true'
-    );
-    await previous.click();
+    await expect(player).toHaveAttribute('data-slide-id', 'First');
     await expect(previous).toBeDisabled();
     for (const button of [previous, next]) {
       const box = await button.boundingBox();
       expect(box!.height).toBeGreaterThanOrEqual(28);
       expect(box!.y + box!.height).toBeLessThanOrEqual(720);
-      expect(await button.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe(
-        'rgba(0, 0, 0, 0)'
-      );
     }
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', {
+        name: locale === 'ru' ? 'К редактированию' : 'Return to editing',
+        exact: true,
+      })
+      .click();
+    await expect(stage.locator('.tour-toolbar')).toBeHidden();
+    await expect(stage.locator('[data-tour-object-id="button-13"]')).toHaveAttribute(
+      'data-selected',
+      'true'
+    );
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
     );

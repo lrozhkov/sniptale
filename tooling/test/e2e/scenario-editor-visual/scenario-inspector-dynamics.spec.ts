@@ -199,9 +199,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         await tabs.evaluate((node) => getComputedStyle(node, '::after').transitionDuration)
       ).toBe('0.28s');
       const active = tabs.locator('[aria-pressed="true"]');
-      expect(await active.locator('svg').evaluate((node) => getComputedStyle(node).color)).toBe(
-        await active.evaluate((node) => getComputedStyle(node).color)
-      );
+      await expect
+        .poll(() =>
+          active.evaluate(
+            (node) =>
+              getComputedStyle(node.querySelector('svg')!).color === getComputedStyle(node).color
+          )
+        )
+        .toBe(true);
       await expect(library.locator('.guide-resource-footer')).toHaveCount(0);
       const images = library.locator('.guide-image-resources');
       const previewButton = images

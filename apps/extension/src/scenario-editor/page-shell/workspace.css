@@ -69,9 +69,9 @@
 .guide-page-header .sniptale-glass-toolbar-button,
 .guide-page-header .sniptale-glass-toolbar-button span {
   font-family: var(--sniptale-font-sans);
-  font-size: 0.75rem;
+  font-size: 13px;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 20px;
 }
 .guide-page-identity {
   flex-shrink: 0;
@@ -111,6 +111,16 @@
   flex-shrink: 0;
   gap: 0.25rem;
   margin-left: auto;
+}
+.guide-page-header[data-wrapped='true'] {
+  flex-wrap: wrap;
+  padding-block: 0.25rem;
+}
+.guide-page-header[data-wrapped='true'] .guide-header-actions {
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-end;
 }
 .guide-page-header button[data-icon-only='true'] {
   width: 2rem;
@@ -2161,7 +2171,13 @@ html[data-guide-height-resizing] * {
 .guide-page
   .sniptale-glass-toolbar-button:not(.guide-section-tab):not(.sniptale-btn-utility):not(
     :disabled
-  ):not([data-active='true']):not(.sniptale-btn-danger) {
+  ):not([data-active='true']):not(.sniptale-btn-danger):not(
+    :where(
+      .tour-contents-actions > button,
+      .tour-object-item-actions > button,
+      .guide-resource-actions > button
+    )
+  ) {
   color: var(--sniptale-color-text-primary);
 }
 .guide-page .sniptale-btn-danger:not(:disabled) {

@@ -12,6 +12,8 @@ import {
   SCENARIO_VISUAL_VIEWPORTS,
 } from './scenario-editor-visual.helpers';
 import {
+  insertGuideBlock,
+  openGuideImageLibrary,
   verifyImageImport,
   verifySavedVersionHistory,
   verifyResourceRetention,
@@ -323,11 +325,7 @@ test('resources open in a wide drawer and return focus to their inspector', asyn
 }, testInfo) => {
   await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
-  const trigger = page
-    .locator('#guide-library-panel')
-    .getByRole('button', { name: 'Image library', exact: true });
-  await expect(trigger).toBeVisible();
-  await trigger.click();
+  const trigger = await openGuideImageLibrary(page);
   const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
   await expect(drawer).toBeVisible();
   expect((await drawer.boundingBox())?.width).toBeGreaterThan(900);
@@ -386,7 +384,9 @@ test('workspace has three aligned surface headers and restores panels by section
   await expect(center.getByRole('button', { name: 'Outline', exact: true })).toBeVisible();
   await center.getByRole('button', { name: 'Resources', exact: true }).click();
   await expect(
-    page.locator('#guide-library-panel').getByRole('button', { name: 'Image library', exact: true })
+    page.locator(
+      '#guide-library-panel .guide-image-upload-compact .guide-action-menu-anchor > button'
+    )
   ).toBeVisible();
   await expect(center.getByRole('button', { name: 'Resources', exact: true })).toHaveCount(0);
   await page
@@ -469,11 +469,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     };
     const step = page.locator('article#compare');
     const count = await step.locator('.guide-block').count();
-    const add = step
-      .locator('.guide-insertion-block[data-end="true"]')
-      .getByRole('button', { name: 'Image', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Image');
     const slot = step.locator('[data-kind="image-slot"]');
     await expect(slot.getByRole('button', { name: 'Upload image', exact: true })).toBeFocused();
     const id = await slot.getAttribute('data-block-id');
@@ -564,11 +560,7 @@ test('image drops append, replace and fill slots with one Undo per gesture', asy
   );
   await undo.click();
   await expect(image.locator('img')).toHaveAttribute('src', original!);
-  const add = step
-    .locator('.guide-insertion-block[data-end="true"]')
-    .getByRole('button', { name: 'Image', exact: true });
-  await add.focus();
-  await add.click();
+  await insertGuideBlock(page, step, 'Image');
   const slot = step.locator('[data-kind="image-slot"]');
   const slotId = await slot.getAttribute('data-block-id');
   await resource.dragTo(slot.getByRole('button', { name: 'Upload image', exact: true }));
@@ -610,11 +602,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
     const step = page.locator('article#compare');
     const count = await step.locator('.guide-block').count();
-    const add = step
-      .locator('.guide-insertion-block[data-end="true"]')
-      .getByRole('button', { name: 'Image', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Image');
     const slot = step.locator('[data-kind="image-slot"]');
     const id = await slot.getAttribute('data-block-id');
     const trigger = slot.getByRole('button', { name: 'Image library', exact: true });
@@ -674,9 +662,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   }, testInfo) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1440, height: 1000 });
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
-    const trigger = page
-      .locator('.guide-library-panel')
-      .getByRole('button', { name: 'Image library', exact: true });
+    const trigger = page.locator(
+      '#guide-library-panel .guide-image-upload-compact .guide-action-menu-anchor > button'
+    );
     const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
     const card = drawer.getByRole('button', { name: 'Library screenshot.png', exact: true });
     const dragToDocument = async (target: Locator) => {
@@ -688,7 +676,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const empty = page.locator('article#text-only');
     const initial = await empty.locator('.guide-block').count();
     await empty.scrollIntoViewIfNeeded();
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(empty.locator('.guide-step-title'));
     await expect(drawer).toHaveCount(0);
     await expect(empty.locator('.guide-block')).toHaveCount(initial + 1);
@@ -700,21 +688,17 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const existing = step.locator('[data-block-id="before"]');
     const caption = await existing.locator('figcaption').textContent();
     await existing.scrollIntoViewIfNeeded();
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(existing.locator('img'));
     await expect(drawer).toHaveCount(0);
     await expect(step.locator('.guide-block')).toHaveCount(count);
     await expect(existing.locator('figcaption')).toHaveText(caption ?? '');
     await expect(page.getByRole('status').first()).toHaveText('Saved');
     await undo.click();
-    const add = step
-      .locator('.guide-insertion-block[data-end="true"]')
-      .getByRole('button', { name: 'Image', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Image');
     const slot = step.locator('[data-kind="image-slot"]');
     await slot.scrollIntoViewIfNeeded();
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(slot);
     await expect(drawer).toHaveCount(0);
     await expect(slot).toHaveCount(0);
@@ -723,7 +707,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(slot).toHaveCount(1);
     await undo.click();
     await expect(step.locator('.guide-block')).toHaveCount(count);
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await card.hover();
     const point = await card.boundingBox();
     if (!point) throw new Error('Missing library card');
@@ -742,7 +726,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(drawer).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(step.locator('.guide-block')).toHaveCount(count);
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(page.locator('.guide-page-header'));
     await expect(drawer).toHaveCount(0);
     await expect(step.locator('.guide-block')).toHaveCount(count);
@@ -898,12 +882,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       'text-only'
     );
     const step = page.locator('article#text-only');
-    const add = step
-      .locator('.guide-insertion-block')
-      .last()
-      .getByRole('button', { name: 'Note', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Note');
     const block = step
       .locator('.guide-block')
       .filter({ has: page.locator('.guide-note-callout') })
@@ -979,11 +958,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       ['Heading', 'heading'],
       ['Note', 'note'],
     ] as const) {
-      const add = step
-        .locator('.guide-insertion-block[data-end="true"]')
-        .getByRole('button', { name: command, exact: true });
-      await add.focus();
-      await add.click();
+      await insertGuideBlock(page, step, command);
       const block = step.locator(`.guide-block[data-kind="${kind}"]`).last();
       const field = block.getByRole('textbox').first();
       await field.fill(`Visible ${kind} content`);
@@ -1014,7 +989,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       ).toBeLessThan(1);
       expect(widthBox.width).toBe(widthBox.height);
       expect(await widthControl.evaluate((node) => getComputedStyle(node).borderRadius)).toBe(
-        '50%'
+        await grip.evaluate((node) => getComputedStyle(node).borderRadius)
       );
       await page.mouse.move((box.x + box.width + widthBox.x) / 2, widthBox.y + widthBox.height / 2);
       expect(await widthControl.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
@@ -1099,10 +1074,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     url.searchParams.set('videoFixture', '1');
     await page.goto(url.toString());
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
-    await page
-      .locator('#guide-library-panel')
-      .getByRole('button', { name: 'Image library', exact: true })
-      .click();
+    await openGuideImageLibrary(page);
     const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
     await expect(drawer.locator('input[type="file"]')).toHaveCount(0);
     await expect(
@@ -1110,15 +1082,15 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toHaveCount(0);
     await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
     await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
-    const widths = await drawer.evaluate((node) => ({
-      grid: node.querySelector('.guide-library-content')!.getBoundingClientRect().width,
-      preview: node.querySelector('.guide-library-preview')!.getBoundingClientRect().width,
-      columns: getComputedStyle(
-        node.querySelector('.guide-library-grid')!
-      ).gridTemplateColumns.split(' ').length,
-    }));
-    expect(widths.preview).toBeGreaterThan(widths.grid);
-    expect(widths.columns).toBe(3);
+    const list = drawer.locator('[data-ui="library-materials-list"]');
+    await expect(list).toHaveAttribute('data-layout', 'strip');
+    const preview = drawer.locator('[data-ui="library-material-preview"]');
+    const listBounds = await list.boundingBox();
+    const previewBounds = await preview.boundingBox();
+    expect(listBounds && previewBounds && previewBounds.y >= listBounds.y + listBounds.height).toBe(
+      true
+    );
+    expect(previewBounds?.height).toBeGreaterThan(listBounds?.height ?? 0);
     await drawer.getByRole('button', { name: 'Video', exact: true }).click();
     await drawer.getByRole('button', { name: 'Library motion.webm', exact: true }).click();
     const video = drawer.locator('video');
@@ -1183,6 +1155,7 @@ test('shared library navigation stays aligned in the built video editor', async 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/video-editor/index.html`);
   await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'en' }));
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.locator('[data-ui="video-editor.materials.library"]')).toBeVisible();
   await expectLibraryDrawerPlacement(page);
   await page.locator('[data-ui="video-editor.materials.library"]').click();
