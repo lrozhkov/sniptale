@@ -2319,6 +2319,11 @@ html[data-guide-height-resizing] * {
   box-shadow: 0 0 12px 3px var(--sniptale-color-accent-soft-strong);
 }
 .guide-page
+  .guide-document[data-selection-input='pointer']
+  :is(article, section, .guide-block):focus-visible {
+  outline: none;
+}
+.guide-page
   .guide-document[data-selection-input='keyboard']
   :is(article, section, .guide-block):focus-visible {
   outline: 2px solid var(--guide-ink);

@@ -50,6 +50,18 @@ export function guideDocumentSelection(params: {
       if (event.defaultPrevented || event.nativeEvent.isComposing) return;
       const current = target(event.currentTarget, event.target);
       if (!current) return;
+      if (
+        event.key === 'Escape' &&
+        params.selectedBlockId &&
+        params.selectedId === current.item.id
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.currentTarget.dataset['selectionInput'] = 'pointer';
+        params.select(current.item.id, null);
+        current.item.focus({ preventScroll: true });
+        return;
+      }
       if ((event.key === 'Enter' || event.key === 'F2') && event.target === current.element) {
         const field = current.element.querySelector<HTMLElement>('textarea, [data-image-upload]');
         if (!field) return;

@@ -545,7 +545,7 @@ it('uses the project name in the tab and distinguishes reader preview', async ()
 });
 
 it.each(['text', 'heading', 'note', 'image-slot'] as const)(
-  'selects %s without editing and returns through step to document appearance',
+  'clears selected %s on Escape and keeps step settings on repeated Escape',
   async (kind) => {
     const project = createGuideProject('Selection', 'guide', 100);
     const step = createGuideStep('Step', 'step');
@@ -585,8 +585,13 @@ it.each(['text', 'heading', 'note', 'image-slot'] as const)(
         .querySelector('article')!
         .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     );
-    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('false');
-    expect(container.querySelector('#guide-inspector-panel')?.textContent).toContain(
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('true');
+    expect(block.getAttribute('data-selected')).toBe('false');
+    expect(document.activeElement).toBe(container.querySelector('article'));
+    expect(container.querySelector('.guide-document')?.getAttribute('data-selection-input')).toBe(
+      'pointer'
+    );
+    expect(container.querySelector('#guide-inspector-panel')?.textContent).not.toContain(
       'Entire guide'
     );
     expect(io.save).not.toHaveBeenCalled();

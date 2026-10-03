@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { guideDocumentSelection, useGuideSelectionInput } from './document-selection';
 
-it('selects content first, preserves commands and finishes text entry without changing selection', async () => {
+it('selects content first, finishes Enter in place and returns Escape to step settings', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -86,11 +86,15 @@ it('selects content first, preserves commands and finishes text entry without ch
     await key(text, 'Enter');
     expect(document.activeElement).toBe(field);
     await key(field, 'Escape');
-    expect(document.activeElement).toBe(text);
-    expect(selectedBlockId).toBe('text');
-    await key(text, 'Escape');
-    expect(selectedBlockId).toBe('text');
-    expect(document.activeElement).toBe(text);
+    const step = host.querySelector('article')!;
+    expect(document.activeElement).toBe(step);
+    expect(selectedBlockId).toBeNull();
+    expect(field.value).toBe('Hello world');
+    expect(host.firstElementChild?.getAttribute('data-selection-input')).toBe('pointer');
+    await key(step, 'Escape');
+    expect(selectedId).toBe('step');
+    expect(selectedBlockId).toBeNull();
+    expect(document.activeElement).toBe(step);
     expect(clear).not.toHaveBeenCalled();
     const command = mouse();
     await act(async () => host.querySelector('button')!.dispatchEvent(command));
@@ -98,7 +102,21 @@ it('selects content first, preserves commands and finishes text entry without ch
     expect(selectedId).toBe('step');
     await act(async () => host.querySelector('svg path')!.dispatchEvent(mouse()));
     expect(selectedBlockId).toBe('image');
-    expect(document.activeElement).toBe(host.querySelector('[data-block-id="image"]'));
+    const image = host.querySelector<HTMLElement>('[data-block-id="image"]')!;
+    expect(document.activeElement).toBe(image);
+    const handled = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    handled.preventDefault();
+    await act(async () => image.dispatchEvent(handled));
+    expect(selectedBlockId).toBe('image');
+    await key(image, 'Escape');
+    expect(selectedId).toBe('step');
+    expect(selectedBlockId).toBeNull();
+    expect(document.activeElement).toBe(step);
+    expect(clear).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     host.remove();
