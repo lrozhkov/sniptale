@@ -1,3 +1,4 @@
+import { GuideImageFramingProvider, useGuideImageFramingSession } from './image-framing-session';
 import { TourHtmlExport } from './tour/export';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { BookOpen, MousePointerClick } from 'lucide-react';
@@ -202,78 +203,80 @@ function GuideDocumentWorkspace({
   t: Translate;
 }) {
   return (
-    <GuideResourceDrawer
-      t={t}
-      disabled={importDisabled}
-      selectedStepId={selectedStepId}
-      onImport={imports.resources}
-    >
-      <GuideImageDropZone
+    <GuideImageFramingProvider value={framing.session}>
+      <GuideResourceDrawer
         t={t}
-        project={project}
         disabled={importDisabled}
-        onPlace={operate}
-        onImport={imports.drop}
+        selectedStepId={selectedStepId}
+        onImport={imports.resources}
       >
-        <GuideWorkspace
-          onUploadFile={imports.uploadStep}
-          header={header}
-          images={state.images}
-          panels={panels}
+        <GuideImageDropZone
+          t={t}
           project={project}
-          selectedId={state.selectedId}
-          disabled={disabled}
-          onClearSelection={framing.clear}
-          onSelect={framing.selectStep}
-          onOperate={operate}
-          onAddStep={() => operate({ kind: 'add-step' })}
-          inspectedBlockKind={framing.target?.block.kind}
-          itemActions={
-            <GuideContextualInspector
+          disabled={importDisabled}
+          onPlace={operate}
+          onImport={imports.drop}
+        >
+          <GuideWorkspace
+            onUploadFile={imports.uploadStep}
+            header={header}
+            images={state.images}
+            panels={panels}
+            project={project}
+            selectedId={state.selectedId}
+            disabled={disabled}
+            onClearSelection={framing.clear}
+            onSelect={framing.selectStep}
+            onOperate={operate}
+            onAddStep={() => operate({ kind: 'add-step' })}
+            inspectedBlockKind={framing.target?.block.kind}
+            itemActions={
+              <GuideContextualInspector
+                onEditImage={(itemId, blockId) => {
+                  state.sealEdit();
+                  imageEditor.open(itemId, blockId);
+                }}
+                onSaveTemplate={state.saveTemplate}
+                onApplyTemplate={(stepId, templateId, mode) =>
+                  state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
+                }
+                presentation={panels.presentation}
+                scope={panels.rightScope}
+                project={project}
+                selectedId={state.selectedId}
+                framing={framing}
+                images={state.images}
+                disabled={disabled}
+                onChange={state.update}
+                t={t}
+              />
+            }
+            t={t}
+          >
+            <GuideDocument
+              selectedBlockId={framing.target?.block.id ?? null}
+              onClearSelection={framing.clear}
+              framedImageId={framing.imageId}
+              onSelectBlock={framing.selectBlock}
+              onFrameImage={framing.select}
+              onUploadImage={imports.upload}
               onEditImage={(itemId, blockId) => {
                 state.sealEdit();
                 imageEditor.open(itemId, blockId);
               }}
-              onSaveTemplate={state.saveTemplate}
-              onApplyTemplate={(stepId, templateId, mode) =>
-                state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
-              }
-              presentation={panels.presentation}
-              scope={panels.rightScope}
+              focusRequest={focusRequest}
               project={project}
               selectedId={state.selectedId}
-              framing={framing}
               images={state.images}
               disabled={disabled}
               onChange={state.update}
+              onOperate={operate}
               t={t}
             />
-          }
-          t={t}
-        >
-          <GuideDocument
-            selectedBlockId={framing.target?.block.id ?? null}
-            onClearSelection={framing.clear}
-            framedImageId={framing.imageId}
-            onSelectBlock={framing.selectBlock}
-            onFrameImage={framing.select}
-            onUploadImage={imports.upload}
-            onEditImage={(itemId, blockId) => {
-              state.sealEdit();
-              imageEditor.open(itemId, blockId);
-            }}
-            focusRequest={focusRequest}
-            project={project}
-            selectedId={state.selectedId}
-            images={state.images}
-            disabled={disabled}
-            onChange={state.update}
-            onOperate={operate}
-            t={t}
-          />
-        </GuideWorkspace>
-      </GuideImageDropZone>
-    </GuideResourceDrawer>
+          </GuideWorkspace>
+        </GuideImageDropZone>
+      </GuideResourceDrawer>
+    </GuideImageFramingProvider>
   );
 }
 
@@ -492,7 +495,9 @@ function useGuideBlockSelection(
   selectItem: (id: string | null, requestFocus?: boolean) => void
 ) {
   const [selection, setSelection] = useState<{ itemId: string; blockId: string } | null>(null);
-  const [framedId, setFramedId] = useState<string | null>(null);
+  const imageFraming = useGuideImageFramingSession(state.project, state.update);
+  const framedId = imageFraming.session?.block.id ?? null;
+  const cancelFraming = imageFraming.cancel;
   const item = state.project?.items.find(
     (entry) =>
       entry.kind === 'step' && entry.blocks.some((block) => block.id === selection?.blockId)
@@ -515,26 +520,27 @@ function useGuideBlockSelection(
   useEffect(() => {
     if (selection && !targetValid && (!item || item.id === selection.itemId)) {
       setSelection(null);
-      setFramedId(null);
+      cancelFraming();
     }
-  }, [selection, targetValid, item]);
+  }, [selection, targetValid, item, cancelFraming]);
   const close = () => {
     setSelection(null);
-    setFramedId(null);
+    cancelFraming();
     const parent = document.getElementById(state.selectedId ?? '');
     parent?.focus({ preventScroll: true });
   };
   const finishFraming = () => {
-    setFramedId(null);
+    cancelFraming();
   };
   const clear = () => {
     setSelection(null);
-    setFramedId(null);
+    cancelFraming();
     selectItem(null, false);
     panels.selectRightScope('document');
   };
   return {
     target,
+    session: imageFraming.session,
     imageId: target?.block.kind === 'image' && framedId === target.block.id ? framedId : null,
     clear,
     finishFraming,
@@ -542,25 +548,28 @@ function useGuideBlockSelection(
     selectStep: (itemId: string) => {
       panels.selectRightScope('selection');
       setSelection(null);
-      setFramedId(null);
+      cancelFraming();
       selectItem(itemId);
     },
     selectBlock: (itemId: string, blockId: string | null) => {
       panels.selectRightScope('selection');
       selectItem(itemId, false);
-      if (blockId !== selection?.blockId) setFramedId(null);
+      if (blockId !== selection?.blockId) cancelFraming();
       setSelection(blockId ? { itemId, blockId } : null);
       if (blockId && !panels.rightOpen && window.innerWidth >= 1200) panels.toggleRight();
     },
     select: (itemId: string, blockId: string, editing: boolean) => {
       if (!editing) {
-        finishFraming();
+        imageFraming.commit();
         return;
       }
       panels.selectRightScope('selection');
       selectItem(itemId, false);
       setSelection({ itemId, blockId });
-      setFramedId(blockId);
+      const step = state.project?.items.find((item) => item.id === itemId);
+      const image =
+        step?.kind === 'step' ? step.blocks.find((block) => block.id === blockId) : null;
+      if (image?.kind === 'image') imageFraming.begin(itemId, image);
       if (!panels.rightOpen) panels.toggleRight();
     },
     change: (next: NonNullable<typeof target>['block'], group?: string | null) => {

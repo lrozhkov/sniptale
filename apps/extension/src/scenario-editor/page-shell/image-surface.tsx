@@ -1,9 +1,8 @@
+import { GuideImageSurfaceTools } from './image-surface-tools';
+import { useGuideImageFraming } from './image-framing-session';
 import { useImageDimensions } from './image-dimensions';
 import { useGuideImageBounds } from './layout-assistance';
-import { GuideResourceTrigger } from './resource-drawer';
-import { Check, Crop, Pencil, Magnet } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   useCallback,
   useEffect,
@@ -29,6 +28,8 @@ type ImageProps = {
   disabled: boolean;
   t: Translate;
   onEdit?: () => void;
+  onCancel?: (() => void) | undefined;
+  onPreview?: ((block: GuideImageBlock) => void) | undefined;
   editing: boolean;
   onEditingChange: (editing: boolean) => void;
   libraryTarget?: { stepId: string; blockId: string };
@@ -184,7 +185,21 @@ function useImageGesture(
 
 /** Inline image framing keeps annotation/resource identity and commits only accepted geometry. */
 export function GuideImageSurface(props: ImageProps) {
-  const { block, url, disabled, editing, onEditingChange, t } = props;
+  const framing = useGuideImageFraming();
+  const session = framing?.block.id === props.block.id ? framing : null;
+  return (
+    <GuideImageSurfaceView
+      {...props}
+      block={session?.block ?? props.block}
+      onChange={session?.change ?? props.onChange}
+      onCancel={session?.cancel ?? props.onCancel}
+      onPreview={session?.preview}
+    />
+  );
+}
+
+function GuideImageSurfaceView(props: ImageProps) {
+  const { block, url, disabled, editing, onEditingChange, onPreview } = props;
   const trigger = useRef<HTMLButtonElement>(null);
   const dimensions = useImageDimensions(editing ? url : undefined);
   const { cropBounds, setCropBounds } = useGuideImageBounds(block);
@@ -195,75 +210,31 @@ export function GuideImageSurface(props: ImageProps) {
   );
   const interaction = { ...props, disabled: disabled || !url || (cropBounds && !dimensions) };
   const gesture = useImageGesture(interaction, editing, constrain, cropBounds);
-  const close = () => {
-    gesture.finish(false);
-    onEditingChange(false);
+  useEffect(() => {
+    onPreview?.(gesture.shown);
+  }, [onPreview, gesture.shown]);
+  const close = (commit: boolean) => {
+    gesture.finish(commit);
+    if (!commit && props.onCancel) props.onCancel();
+    else onEditingChange(false);
     trigger.current?.focus();
   };
   const tools = (
-    <div
-      className="guide-image-tools"
-      onPointerDown={(event) => event.stopPropagation()}
-      onKeyDown={(event) => {
-        if (event.key !== 'Escape') event.stopPropagation();
+    <GuideImageSurfaceTools
+      {...props}
+      trigger={trigger}
+      bounds={cropBounds}
+      boundsDisabled={disabled || !dimensions}
+      close={close}
+      toggleBounds={() => {
+        gesture.finish(false);
+        setCropBounds(!cropBounds);
+        if (!cropBounds && dimensions) {
+          const next = constrainGuideImage(block, dimensions);
+          if (!hasSameGuideImageGestureBase(block, next)) props.onChange(next, null);
+        }
       }}
-    >
-      {editing && (
-        <ContentToolbarButton
-          title={t('scenario.editor.guideCropBounds')}
-          aria-label={t('scenario.editor.guideCropBounds')}
-          aria-pressed={cropBounds}
-          disabled={disabled || !dimensions}
-          onClick={() => {
-            gesture.finish(false);
-            setCropBounds(!cropBounds);
-            if (!cropBounds && dimensions) {
-              const next = constrainGuideImage(block, dimensions);
-              if (!hasSameGuideImageGestureBase(block, next)) props.onChange(next, null);
-            }
-          }}
-        >
-          <Magnet size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      )}
-
-      {props.libraryTarget && (
-        <GuideResourceTrigger
-          t={t}
-          disabled={disabled}
-          target={{ kind: 'replace-image', ...props.libraryTarget }}
-          title={t('scenario.editor.guideReplaceImage')}
-        />
-      )}
-      {props.onEdit && (
-        <ContentToolbarButton
-          type="button"
-          title={t('scenario.editor.guideEditImage')}
-          aria-label={t('scenario.editor.guideEditImage')}
-          data-edit-image
-          disabled={disabled || !url}
-          onClick={props.onEdit}
-        >
-          <Pencil size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      )}
-      <ContentToolbarButton
-        ref={trigger}
-        data-frame-image
-        type="button"
-        disabled={disabled || !url}
-        title={t(
-          editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame'
-        )}
-        aria-label={t(
-          editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame'
-        )}
-        aria-expanded={editing}
-        onClick={() => (editing ? close() : onEditingChange(true))}
-      >
-        {editing ? <Check size={16} aria-hidden="true" /> : <Crop size={16} aria-hidden="true" />}
-      </ContentToolbarButton>
-    </div>
+    />
   );
   return (
     <figure
@@ -273,7 +244,7 @@ export function GuideImageSurface(props: ImageProps) {
         if (event.key === 'Escape' && editing) {
           event.preventDefault();
           event.stopPropagation();
-          close();
+          close(false);
         }
       }}
     >

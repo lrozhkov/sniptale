@@ -260,8 +260,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideEditImageFrame: { ru: 'Рамка и изображение', en: 'Frame and image' },
   guideImageDone: { ru: 'Готово', en: 'Done' },
   guideImageGestureHint: {
-    ru: 'Перетаскивайте изображение или угол рамки. Стрелки — перемещение; Ctrl + колесо — масштаб. Escape отменяет текущий жест.',
-    en: 'Drag the image or frame corner. Arrow keys move; Ctrl + wheel zooms. Escape cancels the current gesture.',
+    ru: 'Ctrl + колесо — масштаб. «Готово» применяет изменения, Escape отменяет кадрирование.',
+    en: 'Drag to move; Ctrl + wheel to zoom. Done applies changes; Escape cancels framing.',
   },
   guideImageFit: { ru: 'Размещение изображения', en: 'Image fitting' },
   guideImageContain: { ru: 'Вписать', en: 'Fit' },

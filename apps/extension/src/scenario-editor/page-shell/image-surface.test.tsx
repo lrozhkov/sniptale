@@ -369,3 +369,25 @@ it('keeps the image toolbar inside the viewport and isolates it from pan and arr
   expect(host.querySelector('.guide-image-surface')?.getAttribute('data-editing')).toBe('false');
   expect(document.activeElement).toBe(host.querySelector('[data-frame-image]'));
 });
+
+it('includes a pending wheel draft when Done is clicked before its idle timer', async () => {
+  vi.useFakeTimers();
+  await render();
+  await click('Frame and image');
+  await act(async () =>
+    frame().dispatchEvent(
+      new WheelEvent('wheel', {
+        ctrlKey: true,
+        deltaY: -100,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(change).not.toHaveBeenCalled();
+  await click('Done');
+  expect(change).toHaveBeenCalledTimes(1);
+  expect(change.mock.calls[0]?.[0].contentTransform.scale).toBeGreaterThan(1);
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(change).toHaveBeenCalledTimes(1);
+});

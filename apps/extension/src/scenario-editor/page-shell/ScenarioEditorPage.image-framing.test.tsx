@@ -23,6 +23,7 @@ const io = vi.hoisted(() => ({
   tourEdit: vi.fn(),
   narration: vi.fn(),
 }));
+vi.mock('./image-dimensions', () => ({ useImageDimensions: () => ({ width: 800, height: 600 }) }));
 vi.mock('../../workflows/scenario-capture-edit/tour-edits', () => ({
   applyTourImageEdit: io.tourEdit,
 }));
@@ -163,7 +164,7 @@ it('selects an image by pointer without entering framing or changing the documen
   expect(io.save).not.toHaveBeenCalled();
 });
 
-it('moves framing into one contextual inspector and keeps it bound through canonical edits', async () => {
+it('keeps one framing draft bound to its inspector and discards it on selection change', async () => {
   const project = createGuideProject('Images', 'guide', 100);
   const step = createGuideStep('Image step', 'images');
   step.blocks = ['one', 'two'].map((id) =>
@@ -193,24 +194,23 @@ it('moves framing into one contextual inspector and keeps it bound through canon
   expect(inspector.hasAttribute('hidden')).toBe(false);
   expect(first.querySelector('.guide-image-controls')).toBeNull();
   expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
-  await editField('#guide-inspector-panel .guide-image-description input', 'Current caption');
-  expect(first.querySelector('figcaption')?.textContent).toBe('Current caption');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  expect(first.querySelector('img')?.style.scale).toBe('2');
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await settleAutosave();
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await click('Frame and image', second);
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
-  expect(inspector.querySelector<HTMLInputElement>('.guide-image-description input')?.value).toBe(
-    ''
-  );
+  expect(first.querySelector('img')?.style.scale).toBe('1');
+  expect(second.querySelector('img')?.style.scale).toBe('1');
   await click('Close', inspector);
   expect(inspector.hasAttribute('hidden')).toBe(true);
   await click('Inspector');
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await act(async () =>
     inspector
-      .querySelector('.guide-image-description input')
+      .querySelector('.guide-image-overview-map')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
   expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
@@ -646,4 +646,49 @@ it('keeps the moved block selected and focused across steps and undo', async () 
   expect(restored.closest('article')?.id).toBe('source');
   expect(restored.getAttribute('data-selected')).toBe('true');
   expect(document.activeElement).toBe(restored);
+});
+
+it('keeps a framing session out of autosave and commits all geometry once on Done', async () => {
+  const project = createGuideProject('Framing', 'guide', 100);
+  const step = createGuideStep('Image', 'images');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'one',
+      assetId: 'asset',
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: 'one.png' },
+    }),
+  ];
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:guide-image');
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  await render();
+  const image = container.querySelector('[data-block-id="one"]')!;
+  await click('Frame and image', image);
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '300');
+  await settleAutosave();
+  expect(io.save).not.toHaveBeenCalled();
+  expect(image.querySelector('img')?.style.scale).toBe('3');
+  await click('Done', image);
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledTimes(1);
+  await click('Undo');
+  expect(image.querySelector('img')?.style.scale).toBe('1');
+  await settleAutosave();
+  io.save.mockClear();
+  await click('Frame and image', image);
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  await click('Cancel', image);
+  await settleAutosave();
+  expect(image.querySelector('img')?.style.scale).toBe('1');
+  expect(io.save).not.toHaveBeenCalled();
 });

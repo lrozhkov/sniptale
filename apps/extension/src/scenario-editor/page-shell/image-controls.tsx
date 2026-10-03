@@ -1,5 +1,7 @@
+import { useGuideImageFraming } from './image-framing-session';
+import { GuideImageOverview } from './image-overview';
 import { GuideBlockPlacement } from './block-inspector';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './inspector-actions';
 import { useGuideResourceRequest } from './resource-drawer';
 import { GuideHtmlImageFields } from './html-image-fields';
@@ -30,8 +32,22 @@ import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
 import { changeGuideImageGeometry, constrainGuideImage } from './image-geometry';
 
 /** Framing fields belong to the selected image in the existing right inspector. */
-export function GuideImageControls({
+export function GuideImageControls(props: Parameters<typeof GuideImageControlsView>[0]) {
+  const framing = useGuideImageFraming();
+  const session = framing?.block.id === props.block.id ? framing : null;
+  return (
+    <GuideImageControlsView
+      {...props}
+      block={session?.display ?? props.block}
+      onChange={session?.change ?? props.onChange}
+      framing={!!session}
+    />
+  );
+}
+
+function GuideImageControlsView({
   block,
+  framing = false,
   layout = 'stacked',
   htmlDefaults,
   disabled,
@@ -44,6 +60,7 @@ export function GuideImageControls({
   url,
 }: {
   block: GuideImageBlock;
+  framing?: boolean;
   layout?: import('@sniptale/runtime-contracts/scenario/types/guide').GuideStep['layout'];
   htmlDefaults?: GuideHtmlImageSettings | undefined;
   url: string | null | undefined;
@@ -75,101 +92,154 @@ export function GuideImageControls({
       />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
-        <GuideBlockPlacement
-          item={{ layout }}
-          block={block}
-          disabled={disabled}
-          onChange={onChange}
-          t={t}
-        />
-        <GuideImageActions
-          block={block}
-          stepId={stepId}
-          url={url}
-          disabled={disabled}
-          onEdit={onEdit}
-          t={t}
-        />
-        <GuideInspectorGroup
-          id="framing"
-          icon={ScanLine}
-          title={t('scenario.editor.guideFramingGroup')}
-        >
-          <p>{t('scenario.editor.guideImageGestureHint')}</p>
-          <fieldset className="contents" disabled={geometryDisabled}>
-            <SegmentedSwitch
-              activeId={block.fit}
-              ariaLabel={t('scenario.editor.guideImageFit')}
-              options={[
-                { id: 'contain', label: t('scenario.editor.guideImageContain') },
-                { id: 'cover', label: t('scenario.editor.guideImageCover') },
-              ]}
-              onChange={(fit) => geometry({ kind: 'fit', fit })}
+        {!framing && (
+          <>
+            <GuideBlockPlacement
+              item={{ layout }}
+              block={block}
+              disabled={disabled}
+              onChange={onChange}
+              t={t}
             />
-          </fieldset>
-          <GuideImageRangeField
-            label={t('scenario.editor.guideImageZoom')}
-            min={10}
-            max={10000}
-            sliderMax={400}
-            step={10}
-            disabled={geometryDisabled}
-            value={Math.round(block.contentTransform.scale * 100)}
-            onChange={(value) =>
-              geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
-            }
-          />
-          {(['width', 'height'] as const).map((dimension) => (
-            <GuideImageRangeField
-              key={dimension}
-              label={t(
-                dimension === 'width'
-                  ? 'scenario.editor.guideImageWidth'
-                  : 'scenario.editor.guideImageHeight'
-              )}
-              min={1}
-              max={GUIDE_LIMITS.maxDimension}
-              sliderMax={2000}
-              disabled={geometryDisabled}
-              value={Math.round(block.frame[dimension])}
-              onChange={(value) =>
-                geometry(
-                  { kind: 'frame', ...block.frame, [dimension]: value },
-                  `image-${dimension}:${block.id}`
-                )
-              }
+            <GuideImageActions
+              block={block}
+              stepId={stepId}
+              url={url}
+              disabled={disabled}
+              onEdit={onEdit}
+              t={t}
             />
-          ))}
-          <div className="guide-image-reset-actions">
-            <ContentToolbarButton
-              title={t('scenario.editor.guideImageCenter')}
-              disabled={geometryDisabled}
-              onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
-            >
-              <Focus size={16} aria-hidden="true" />
-            </ContentToolbarButton>
-            <ContentToolbarButton
-              title={t('scenario.editor.guideImageReset')}
-              disabled={geometryDisabled || !dimensions}
-              onClick={() => {
-                if (dimensions) geometry({ kind: 'reset', ...dimensions });
-              }}
-            >
-              <RotateCcw size={16} aria-hidden="true" />
-            </ContentToolbarButton>
-          </div>
-        </GuideInspectorGroup>
-        <GuideImageDescriptionFields block={block} disabled={disabled} onChange={onChange} t={t} />
-        <ImageActionContext source={block.source} t={t} />
-        <ImageHtmlSettings
+          </>
+        )}
+        <GuideImageGeometryFields
+          overview={
+            framing && (
+              <GuideImageOverview
+                block={block}
+                url={url}
+                dimensions={dimensions}
+                disabled={geometryDisabled}
+                onChange={(next) => onChange(constrain(next), null)}
+                t={t}
+              />
+            )
+          }
           block={block}
-          htmlDefaults={htmlDefaults}
-          disabled={disabled}
-          onChange={onChange}
+          geometryDisabled={geometryDisabled}
+          dimensions={dimensions}
+          geometry={geometry}
           t={t}
         />
+        {!framing && (
+          <>
+            <GuideImageDescriptionFields
+              block={block}
+              disabled={disabled}
+              onChange={onChange}
+              t={t}
+            />
+            <ImageActionContext source={block.source} t={t} />
+            <ImageHtmlSettings
+              block={block}
+              htmlDefaults={htmlDefaults}
+              disabled={disabled}
+              onChange={onChange}
+              t={t}
+            />
+          </>
+        )}
       </fieldset>
     </div>
+  );
+}
+
+/** Geometry settings work against either the active draft or the selected saved image. */
+function GuideImageGeometryFields({
+  overview,
+  block,
+  geometryDisabled,
+  dimensions,
+  geometry,
+  t,
+}: {
+  overview: ReactNode;
+  block: GuideImageBlock;
+  geometryDisabled: boolean;
+  dimensions: { width: number; height: number } | null;
+  geometry: (change: Parameters<typeof changeGuideImageGeometry>[1], group?: string | null) => void;
+  t: Translate;
+}) {
+  return (
+    <GuideInspectorGroup
+      id="framing"
+      icon={ScanLine}
+      title={t('scenario.editor.guideFramingGroup')}
+    >
+      <p>{t('scenario.editor.guideImageGestureHint')}</p>
+      <fieldset className="contents" disabled={geometryDisabled}>
+        <SegmentedSwitch
+          activeId={block.fit}
+          ariaLabel={t('scenario.editor.guideImageFit')}
+          options={[
+            { id: 'contain', label: t('scenario.editor.guideImageContain') },
+            { id: 'cover', label: t('scenario.editor.guideImageCover') },
+          ]}
+          onChange={(fit) => geometry({ kind: 'fit', fit })}
+        />
+      </fieldset>
+      {overview}
+      <GuideImageRangeField
+        label={t('scenario.editor.guideImageZoom')}
+        min={10}
+        max={10000}
+        sliderMax={400}
+        step={10}
+        disabled={geometryDisabled}
+        value={Math.round(block.contentTransform.scale * 100)}
+        onChange={(value) =>
+          geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
+        }
+      />
+      {(['width', 'height'] as const).map((dimension) => (
+        <GuideImageRangeField
+          key={dimension}
+          label={t(
+            dimension === 'width'
+              ? 'scenario.editor.guideImageWidth'
+              : 'scenario.editor.guideImageHeight'
+          )}
+          min={1}
+          max={GUIDE_LIMITS.maxDimension}
+          sliderMax={2000}
+          disabled={geometryDisabled}
+          value={Math.round(block.frame[dimension])}
+          onChange={(value) =>
+            geometry(
+              { kind: 'frame', ...block.frame, [dimension]: value },
+              `image-${dimension}:${block.id}`
+            )
+          }
+        />
+      ))}
+      <div className="guide-image-reset-actions">
+        <ContentToolbarButton
+          title={t('scenario.editor.guideImageCenter')}
+          disabled={geometryDisabled}
+          onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
+        >
+          <Focus size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+        <ContentToolbarButton
+          title={t('scenario.editor.guideImageReset')}
+          disabled={geometryDisabled || !dimensions}
+          onClick={() => {
+            if (dimensions) geometry({ kind: 'reset', ...dimensions });
+          }}
+        >
+          <RotateCcw size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+    </GuideInspectorGroup>
   );
 }
 
