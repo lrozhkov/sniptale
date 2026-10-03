@@ -519,31 +519,45 @@ it('composes multiple blocks and retains undo and redo after autosave', async ()
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
 });
 
-it('groups text edits and routes keyboard undo and redo to the same history', async () => {
-  await render();
-  await editField('article#first .guide-step-title', 'First change');
-  await editField('article#first .guide-step-title', 'Second change');
-  const field = container.querySelector('article#first .guide-step-title');
-  if (!(field instanceof HTMLTextAreaElement)) throw new Error('Missing field');
-  await act(async () =>
-    field.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
-    )
-  );
-  expect(field.value).toBe('First step');
-  await act(async () =>
-    field.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        key: 'z',
-        ctrlKey: true,
-        shiftKey: true,
-        bubbles: true,
-        cancelable: true,
-      })
-    )
-  );
-  expect(field.value).toBe('Second change');
-});
+it.each([
+  { key: 'z', code: '', modifier: 'ctrlKey' },
+  { key: 'я', code: 'KeyZ', modifier: 'ctrlKey' },
+  { key: 'я', code: 'KeyZ', modifier: 'metaKey' },
+])(
+  'routes $modifier undo/redo with $key to the same grouped history',
+  async ({ key, code, modifier }) => {
+    await render();
+    await editField('article#first .guide-step-title', 'First change');
+    await editField('article#first .guide-step-title', 'Second change');
+    const field = container.querySelector('article#first .guide-step-title');
+    if (!(field instanceof HTMLTextAreaElement)) throw new Error('Missing field');
+    await act(async () =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key,
+          code,
+          [modifier]: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    );
+    expect(field.value).toBe('First step');
+    await act(async () =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: key.toUpperCase(),
+          code,
+          [modifier]: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    );
+    expect(field.value).toBe('Second change');
+  }
+);
 
 it('supports optional numbering and editable sections with structural undo', async () => {
   await render();
@@ -751,8 +765,20 @@ it('inserts at a block boundary and focuses the new field before typing', async 
   await editField('.guide-block-heading', 'Inserted heading');
   await click('Undo');
   expect(heading?.value).toBe('');
-  await click('Undo');
+  await act(async () =>
+    heading?.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'я',
+        code: 'KeyZ',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  await act(async () => vi.advanceTimersByTimeAsync(20));
   expect(container.querySelectorAll('.guide-block')).toHaveLength(2);
+  expect(document.activeElement).toBe(container.querySelector('main'));
   await click('Redo');
   expect(container.querySelectorAll('.guide-block')).toHaveLength(3);
 });

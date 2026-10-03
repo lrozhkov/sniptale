@@ -113,6 +113,7 @@ export function ScenarioEditorPage() {
   return (
     <main
       className="guide-page"
+      tabIndex={-1}
       onBlurCapture={(event) => {
         state.sealEdit();
         const field = event.target;
@@ -393,15 +394,28 @@ function handleGuideHistoryShortcut(
   undo: () => void,
   redo: () => void
 ) {
-  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
+  const matchesUndo = event.code ? event.code === 'KeyZ' : event.key.toLowerCase() === 'z';
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || !matchesUndo) return;
   if (
     event.target instanceof Element &&
     event.target.closest('[role="dialog"], [role="alertdialog"]')
   )
     return;
   event.preventDefault();
+  const field = event.target;
+  const page = event.currentTarget;
   if (event.shiftKey) redo();
   else undo();
+  // Removing the focused block must not strand the next history shortcut on body.
+  requestAnimationFrame(() => {
+    if (
+      field instanceof Element &&
+      !field.isConnected &&
+      page.isConnected &&
+      page.ownerDocument.activeElement === page.ownerDocument.body
+    )
+      page.focus({ preventScroll: true });
+  });
 }
 
 /** Routes the right inspector to current image framing or the selected step's appearance. */
