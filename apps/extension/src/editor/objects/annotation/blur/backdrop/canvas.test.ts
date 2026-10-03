@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { extendBackdropCanvasEdges, renderBackdropCanvas, type MutableBlurCanvas } from './canvas';
 import { extendTransformedBackdropCanvasEdges } from './canvas/edges';
+import { setEditorEditingSurfaceDimensions } from '../../../../document/canvas-surface/editing-surface';
 
 function createMutableCanvas(): MutableBlurCanvas {
   return {
@@ -194,4 +195,38 @@ describe('blur backdrop canvas owner', () => {
     ]);
     expect(context.putImageData).toHaveBeenCalledWith(imageData, 0, 0);
   });
+});
+
+describe('blur sampling at the document edge inside an editing workspace', () => {
+  it.each([
+    ['bottom', { left: 20, top: 70 }, [0, 29, 40, 1, 0, 30, 40, 10]],
+    ['right', { left: 90, top: 20 }, [29, 0, 1, 40, 30, 0, 10, 40]],
+  ] as const)(
+    'extends the %s document edge rather than the padded workspace edge',
+    (_edge, origin, sample) => {
+      const canvas = createMutableCanvas();
+      canvas.setDimensions = vi.fn(function (size) {
+        canvas.width = Number(size.width);
+        canvas.height = Number(size.height);
+        return canvas;
+      });
+      canvas.setViewportTransform = vi.fn((transform) => {
+        canvas.viewportTransform = transform;
+      });
+      setEditorEditingSurfaceDimensions(canvas, { width: 120, height: 100 });
+      const workspaceSize = { width: canvas.width, height: canvas.height };
+      expect(workspaceSize.height).toBeGreaterThan(100);
+      const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+      const backdropCanvas = { height: 40, width: 40 } as HTMLCanvasElement;
+      renderBackdropCanvas({
+        backdropCanvas,
+        bounds: { ...origin, width: 20, height: 20, paddedWidth: 40, paddedHeight: 40 },
+        canvas,
+        context,
+        objectIndex: 2,
+      });
+      expect(context.drawImage).toHaveBeenCalledWith(backdropCanvas, ...sample);
+      expect({ width: canvas.width, height: canvas.height }).toEqual(workspaceSize);
+    }
+  );
 });

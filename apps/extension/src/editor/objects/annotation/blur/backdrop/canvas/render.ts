@@ -1,3 +1,4 @@
+import { getEditorEditingDocumentSize } from '../../../../../document/canvas-surface/editing-surface';
 import type { BlurBackdropBounds } from '../bounds';
 import { extendBackdropCanvasEdges, extendTransformedBackdropCanvasEdges } from './edges';
 import {
@@ -17,10 +18,11 @@ export function renderBackdropCanvas(options: {
 }): void {
   const previousState = resolveBackdropCaptureState(options.canvas);
   const outerSceneDimensions = activeSceneDimensions.get(options.canvas);
-  const sceneDimensions = outerSceneDimensions ?? {
-    height: previousState.height,
-    width: previousState.width,
-  };
+  const sceneDimensions = outerSceneDimensions ??
+    getEditorEditingDocumentSize(options.canvas) ?? {
+      height: previousState.height,
+      width: previousState.width,
+    };
   if (!outerSceneDimensions) {
     activeSceneDimensions.set(options.canvas, sceneDimensions);
   }
