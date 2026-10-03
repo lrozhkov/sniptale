@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { appendDrawingSample, appendDrawingSamples, buildDrawingStrokeOutline } from './freehand';
 import { createDefaultDrawingToolDefaults } from './model';
@@ -378,3 +379,44 @@ it('keeps projected object positions while changing selection and stacking order
   session.moveSelected('front');
   expect(order()).toEqual(['b', 'a', 'c']);
 });
+
+it('avoids repeated vector-length work across smoothing passes of a long stroke', () => {
+  const samples = Array.from({ length: 800 }, (_, i) => ({
+    x: i * 0.8,
+    y: Math.sin(i * 0.07) * 40 + Math.cos(i * 0.023) * 70,
+    t: i * 4,
+  }));
+  const hypot = vi.spyOn(Math, 'hypot');
+  try {
+    const outline = buildDrawingStrokeOutline(samples, 8, {
+      dynamicWidth: true,
+      smoothingLevel: 10,
+    });
+    expect(outline).toHaveLength(1754);
+    expect(hypot.mock.calls.length).toBeLessThan(samples.length * 30);
+  } finally {
+    hypot.mockRestore();
+  }
+});
+
+it.each([
+  [false, false, '1a0ef3625c99bd94fa70f33b8bf25d272e85d63ebf4ee8c8b0732451fe63bb78'],
+  [false, true, '99171b8b0b915ad1eed43772cd63d08828dc844862693ee37fefc6f1543d57f2'],
+  [true, false, '6b2e2a1a503130f229e4c6add8da0480fd4e00a9f03de3ceea60f502569db9d3'],
+  [true, true, 'b2faaba128ccf66492e5181ca0f3097a89808ddb396d9ecba55a59edcd66e58a'],
+] as const)(
+  'preserves baseline stroke geometry (preview=%s, dynamic=%s)',
+  (preview, dynamicWidth, digest) => {
+    const samples = Array.from({ length: 800 }, (_, i) => ({
+      x: i * 0.8,
+      y: Math.sin(i * 0.07) * 40 + Math.cos(i * 0.023) * 70,
+      t: i * 4,
+    }));
+    const outline = buildDrawingStrokeOutline(samples, 8, {
+      preview,
+      dynamicWidth,
+      smoothingLevel: 10,
+    });
+    expect(createHash('sha256').update(JSON.stringify(outline)).digest('hex')).toBe(digest);
+  }
+);

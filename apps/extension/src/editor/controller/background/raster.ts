@@ -93,7 +93,7 @@ export function rasterizeBlurredBackground(options: {
   outputContext.filter = 'none';
   void renderer.dispose();
 
-  return new FabricImage(output, {
+  const image = new FabricImage(output, {
     height: output.height,
     left: 0,
     originX: 'left',
@@ -104,4 +104,14 @@ export function rasterizeBlurredBackground(options: {
     top: 0,
     width: output.width,
   });
+  const getSrc = image.getSrc.bind(image);
+  let encoded: string | undefined;
+  // This owner never mutates the completed raster; changed backgrounds create a new image.
+  image.getSrc = (filtered) => {
+    const element = filtered ? image.getElement() : image._originalElement;
+    if (element !== output) return getSrc(filtered);
+    encoded ??= getSrc(filtered);
+    return encoded;
+  };
+  return image;
 }

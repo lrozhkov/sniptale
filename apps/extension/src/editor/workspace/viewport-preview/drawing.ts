@@ -62,7 +62,7 @@ function drawPreviewFrame(args: {
 
   const context = args.previewCanvas.getContext('2d');
   if (!context) {
-    return;
+    return false;
   }
 
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -71,7 +71,7 @@ function drawPreviewFrame(args: {
   // `hasImage` flips to true before Fabric finishes sizing the backing canvas.
   // Skip this frame until the source canvas becomes drawable instead of throwing.
   if (!hasDrawableCanvasSize(args.sourceCanvas)) {
-    return;
+    return false;
   }
 
   context.imageSmoothingEnabled = true;
@@ -83,7 +83,7 @@ function drawPreviewFrame(args: {
   if (documentSize && args.fabricCanvas) {
     const rendered = renderFabricPreviewSource(args.fabricCanvas, documentSize, content.width);
     context.drawImage(rendered, content.left, content.top, content.width, content.height);
-    return;
+    return true;
   }
   const surface = documentSize ? getEditorEditingSurfaceSize(documentSize) : null;
   const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
@@ -108,6 +108,7 @@ function drawPreviewFrame(args: {
     content.width,
     content.height
   );
+  return true;
 }
 
 export function startEditorViewportPreviewLoop(args: {
@@ -119,6 +120,23 @@ export function startEditorViewportPreviewLoop(args: {
 }) {
   let frameId = 0;
   let lastDrawAt = 0;
+  let dirty = true;
+  let stopped = false;
+  let fabricCanvas: Canvas | null | undefined;
+  let unsubscribe: (() => void) | undefined;
+  let pixelRatio = window.devicePixelRatio || 1;
+
+  const syncCanvas = () => {
+    const next = args.getCanvas?.();
+    if (next === fabricCanvas) return;
+    unsubscribe?.();
+    fabricCanvas = next;
+    dirty = true;
+    unsubscribe = next?.on('after:render', (event) => {
+      // Export/minimap rendering also fires this event, but does not change the live scene.
+      if (event.ctx === next.getContext()) dirty = true;
+    });
+  };
 
   const drawPreview = () => {
     const sourceCanvas = args.canvasRef.current;
@@ -129,10 +147,10 @@ export function startEditorViewportPreviewLoop(args: {
       args.previewSize.width <= 0 ||
       args.previewSize.height <= 0
     ) {
-      return;
+      return false;
     }
 
-    drawPreviewFrame({
+    return drawPreviewFrame({
       sourceCanvas,
       ...(args.getCanvas ? { fabricCanvas: args.getCanvas() } : {}),
       previewCanvas,
@@ -142,15 +160,25 @@ export function startEditorViewportPreviewLoop(args: {
   };
 
   const animate = (timestamp: number) => {
-    if (timestamp - lastDrawAt >= 1000 / PREVIEW_FPS) {
-      drawPreview();
+    if (stopped) return;
+    syncCanvas();
+    const nextPixelRatio = window.devicePixelRatio || 1;
+    if (nextPixelRatio !== pixelRatio) {
+      pixelRatio = nextPixelRatio;
+      dirty = true;
+    }
+    if ((!fabricCanvas || dirty) && timestamp - lastDrawAt >= 1000 / PREVIEW_FPS) {
+      dirty = !drawPreview();
       lastDrawAt = timestamp;
     }
     frameId = window.requestAnimationFrame(animate);
   };
 
+  syncCanvas();
   frameId = window.requestAnimationFrame(animate);
   return () => {
+    stopped = true;
+    unsubscribe?.();
     if (frameId !== 0) {
       window.cancelAnimationFrame(frameId);
     }

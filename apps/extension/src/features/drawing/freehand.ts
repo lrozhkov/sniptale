@@ -138,11 +138,12 @@ function resample(points: readonly DynamicStrokePoint[], step: number) {
 }
 
 function isSharp(previous: DrawingPoint, current: DrawingPoint, next: DrawingPoint) {
-  const incoming = { x: previous.x - current.x, y: previous.y - current.y };
-  const outgoing = { x: next.x - current.x, y: next.y - current.y };
-  const lengths = Math.hypot(incoming.x, incoming.y) * Math.hypot(outgoing.x, outgoing.y);
-  if (lengths <= 0) return false;
-  return incoming.x * outgoing.x + incoming.y * outgoing.y >= 0;
+  const incomingX = previous.x - current.x;
+  const incomingY = previous.y - current.y;
+  const outgoingX = next.x - current.x;
+  const outgoingY = next.y - current.y;
+  if ((incomingX === 0 && incomingY === 0) || (outgoingX === 0 && outgoingY === 0)) return false;
+  return incomingX * outgoingX + incomingY * outgoingY >= 0;
 }
 
 function curveTangent(

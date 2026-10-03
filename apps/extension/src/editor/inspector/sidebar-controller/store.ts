@@ -2,7 +2,16 @@ import { useShallow } from 'zustand/react/shallow';
 import { useEditorStore } from '../../state/useEditorStore';
 
 export function useEditorInspectorStoreSlice() {
-  return useEditorStore(
+  const viewport = useEditorStore(
+    useShallow((state) => ({
+      canvasWidth: state.viewport.canvasWidth,
+      canvasHeight: state.viewport.canvasHeight,
+      sourceWidth: state.viewport.sourceWidth,
+      sourceHeight: state.viewport.sourceHeight,
+      sourceName: state.viewport.sourceName,
+    }))
+  );
+  const store = useEditorStore(
     useShallow((state) => ({
       activeTool: state.activeTool,
       browserFrame: state.browserFrame,
@@ -30,10 +39,10 @@ export function useEditorInspectorStoreSlice() {
       updateImageSettings: state.updateImageSettings,
       updateWorkspace: state.updateWorkspace,
       updateWorkspaceDefaults: state.updateWorkspaceDefaults,
-      viewport: state.viewport,
       workspace: state.workspace,
     }))
   );
+  return { ...store, viewport };
 }
 
 export type EditorInspectorStoreSlice = ReturnType<typeof useEditorInspectorStoreSlice>;

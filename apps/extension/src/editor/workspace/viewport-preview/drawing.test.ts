@@ -53,7 +53,7 @@ it.each([
       previewCanvasRef: { current: previewCanvas },
       previewSize: { width: 196, height: 138 },
       documentSize,
-      getCanvas: () => ({ toCanvasElement }) as never,
+      getCanvas: () => ({ toCanvasElement, on: () => () => undefined }) as never,
     });
     callbacks[0]?.(1000);
     expect(context.drawImage).toHaveBeenCalledWith(rendered, ...rect);
@@ -198,7 +198,7 @@ it('renders offscreen image pixels from Fabric instead of the clipped live canva
     previewCanvasRef: { current: previewCanvas },
     previewSize: { width: 100, height: 80 },
     documentSize: { width: 100, height: 80 },
-    getCanvas: () => ({ toCanvasElement }) as never,
+    getCanvas: () => ({ toCanvasElement, on: () => () => undefined }) as never,
   });
   callbacks[0]?.(1000);
 
@@ -243,4 +243,74 @@ it('uses the virtual canvas document render for the preview', () => {
 
   expect(renderDocumentCanvas).toHaveBeenCalledWith(1);
   expect(context.drawImage).toHaveBeenCalledWith(rendered, 0, 0, 100, 80);
+});
+
+it('redraws only dirty main-canvas frames, including readiness, trailing updates and replacement', () => {
+  const { context, previewCanvas, sourceCanvas } = createPreviewContext();
+  const callbacks: FrameRequestCallback[] = [];
+  vi.stubGlobal(
+    'requestAnimationFrame',
+    vi.fn((callback: FrameRequestCallback) => {
+      callbacks.push(callback);
+      return callbacks.length;
+    })
+  );
+  const cancel = vi.fn();
+  vi.stubGlobal('cancelAnimationFrame', cancel);
+  const createCanvas = () => {
+    const main = {};
+    const listeners = new Set<(event: { ctx: unknown }) => void>();
+    return {
+      getContext: () => main,
+      on: vi.fn((_event, listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }),
+      toCanvasElement: vi.fn(() => document.createElement('canvas')),
+      fire: (ctx = main) => listeners.forEach((listener) => listener({ ctx })),
+      listeners,
+    };
+  };
+  let canvas = createCanvas();
+  const args = {
+    canvasRef: { current: sourceCanvas },
+    previewCanvasRef: { current: previewCanvas },
+    previewSize: { width: 100, height: 50 },
+    documentSize: { width: 640, height: 320 },
+    getCanvas: () => canvas as never,
+  };
+  sourceCanvas.width = 0;
+  const stop = startEditorViewportPreviewLoop(args);
+  callbacks.shift()?.(1000);
+  expect(context.drawImage).not.toHaveBeenCalled();
+  sourceCanvas.width = 640;
+  callbacks.shift()?.(1060);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  callbacks.shift()?.(1120);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  canvas.fire({});
+  callbacks.shift()?.(1180);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  canvas.fire();
+  callbacks.shift()?.(1200);
+  expect(context.drawImage).toHaveBeenCalledTimes(2);
+  canvas.fire();
+  callbacks.shift()?.(1210);
+  expect(context.drawImage).toHaveBeenCalledTimes(2);
+  callbacks.shift()?.(1260);
+  expect(context.drawImage).toHaveBeenCalledTimes(3);
+  const old = canvas;
+  canvas = createCanvas();
+  callbacks.shift()?.(1320);
+  expect(old.listeners.size).toBe(0);
+  expect(canvas.toCanvasElement).toHaveBeenCalledOnce();
+  stop();
+  expect(canvas.listeners.size).toBe(0);
+  expect(cancel).toHaveBeenCalled();
+  callbacks.length = 0;
+  const reopened = startEditorViewportPreviewLoop(args);
+  callbacks.shift()?.(1400);
+  expect(canvas.toCanvasElement).toHaveBeenCalledTimes(2);
+  reopened();
+  vi.unstubAllGlobals();
 });
