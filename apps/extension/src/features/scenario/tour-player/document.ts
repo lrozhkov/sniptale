@@ -146,7 +146,6 @@ async function buildTourPlayerShell(args: {
 </section>
 <aside class="tour-hint" data-tour-hint hidden>
 <div class="tour-hint-header">
-<span data-tour-hint-point-count hidden></span>
 <strong class="tour-hint-action-title" data-tour-hint-action-title hidden></strong>
 <button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true">
 <span data-tour-hint-title></span></button>
@@ -156,6 +155,7 @@ async function buildTourPlayerShell(args: {
 <div class="tour-hint-controls">
 <button class="tour-button" data-tour-hint-previous aria-label="${escape(labels.previous)}">
 ${escape(labels.previous)}</button>
+<span data-tour-hint-point-count hidden></span>
 <span data-tour-hint-count hidden></span>
 <button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">${escape(labels.next)}</button>
 </div>

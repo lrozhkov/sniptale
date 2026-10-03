@@ -1,3 +1,4 @@
+import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourScene } from './scene.js';
 import { createTourPlayback } from './playback.js';
 import { createTourChrome } from './chrome.js';
@@ -21,7 +22,16 @@ export function createTourPlayer(root, input, options = {}) {
   let ended = false;
   const history = [];
   const authoringNavigation = options.authoring?.navigation;
-  const view = createTourScene(root, input, act, lifetime.signal, options);
+  const view = createTourScene(root, input, act, lifetime.signal, options, {
+    canMove: (direction) =>
+      index + direction >= 0 &&
+      index + direction < tour.slides.length + Number(tour.endScreen.enabled),
+    move: (direction) => {
+      playback?.interact();
+      go(index + direction, true, direction);
+    },
+    position: (hintIndex) => explanationPosition(tour, index, hintIndex),
+  });
   const chrome = options.authoring ? null : createTourChrome(root, lifetime.signal);
   const playback = options.authoring
     ? null
@@ -35,20 +45,14 @@ export function createTourPlayer(root, input, options = {}) {
         chrome,
       });
   function act(action) {
-    if (options.authoring) return;
-    // Editor preview stays inside its document: URL actions never navigate or open tabs.
-    if (options.preview && action.kind === 'url') return;
+    // Editor preview never executes authored URL actions.
+    if (options.authoring || (options.preview && action.kind === 'url')) return;
     if (action.kind !== 'none') playback?.interact();
-    if (action.kind === 'next') go(index + 1);
-    else if (action.kind === 'previous') go(index - 1);
-    else if (action.kind === 'restart') {
-      history.length = 0;
-      go(0, false);
-    } else if (action.kind === 'end') go(tour.slides.length);
-    else if (action.kind === 'slide')
-      go(tour.slides.findIndex((slide) => slide.id === action.slideId));
+    if (action.kind === 'restart') history.length = 0;
+    const target = actionSlideIndex(action, tour.slides, index);
+    if (target !== null) go(target, action.kind !== 'restart');
   }
-  function go(target, recordHistory = true) {
+  function go(target, recordHistory = true, hintEdge = 0) {
     if (
       lifetime.signal.aborted ||
       target < 0 ||
@@ -62,13 +66,13 @@ export function createTourPlayer(root, input, options = {}) {
     }
     ended = target === tour.slides.length && tour.endScreen.enabled;
     index = Math.min(target, Math.max(0, tour.slides.length - 1));
-    render();
+    render(hintEdge);
   }
   function back() {
     const target = history.pop();
     navigationInput.manualGo(target ?? Math.max(0, index - 1), false);
   }
-  function render() {
+  function render(hintEdge = 0) {
     if (lifetime.signal.aborted) return;
     const slide = tour.slides[index];
     title.textContent = ended ? tour.endScreen.title : (slide?.title ?? '');
@@ -79,7 +83,7 @@ export function createTourPlayer(root, input, options = {}) {
     next.disabled =
       ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
     navigationInput.updateControls();
-    view.show(slide, ended);
+    view.show(slide, ended, hintEdge);
     playback?.show(tour, index, ended, input.assets);
     root.dataset.slideId = ended ? 'end' : (slide?.id ?? '');
   }
@@ -223,4 +227,35 @@ function mountTourNavigationInput(root, options, signal, actions) {
       query('next').disabled = !authoring.canMove(1);
     },
   };
+}
+
+/** Empty and navigation slides remain explicit stops in the authored sequence. */
+function explanationPosition(tour, slideIndex, hintIndex) {
+  const counts = tour.slides.map((slide) =>
+    slide.kind === 'image' && slide.image
+      ? Math.max(1, getTourSlideObjects(slide).filter((entry) => entry.type !== 'mask').length)
+      : 1
+  );
+  return {
+    index: counts.slice(0, slideIndex).reduce((sum, count) => sum + count, 0) + hintIndex,
+    count: counts.reduce((sum, count) => sum + count, Number(tour.endScreen.enabled)),
+  };
+}
+
+/** Resolves authored slide destinations without owning history or playback effects. */
+function actionSlideIndex(action, slides, index) {
+  switch (action.kind) {
+    case 'next':
+      return index + 1;
+    case 'previous':
+      return index - 1;
+    case 'restart':
+      return 0;
+    case 'end':
+      return slides.length;
+    case 'slide':
+      return slides.findIndex((slide) => slide.id === action.slideId);
+    default:
+      return null;
+  }
 }

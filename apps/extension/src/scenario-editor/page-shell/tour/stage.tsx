@@ -182,7 +182,6 @@ function TourStageScaffold({
         </section>
         <aside className="tour-hint" data-tour-hint hidden>
           <div className="tour-hint-header">
-            <span data-tour-hint-point-count hidden />
             <strong className="tour-hint-action-title" data-tour-hint-action-title hidden />
             <button
               className="tour-button tour-caption-title"
@@ -201,6 +200,7 @@ function TourStageScaffold({
             <button className="tour-button" data-tour-hint-previous aria-label={labels.previous}>
               {labels.previous}
             </button>
+            <span data-tour-hint-point-count hidden />
             <span data-tour-hint-count hidden />
             <button className="tour-button" data-tour-hint-next aria-label={labels.next}>
               {labels.next}

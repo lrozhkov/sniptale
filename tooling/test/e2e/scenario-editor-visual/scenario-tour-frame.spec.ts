@@ -272,6 +272,8 @@ async function inspectSharedCaption(player: Locator, copy: string) {
     .toBeGreaterThan(collapsedHeight + 10);
   const viewport = await player.locator('.tour-viewport').boundingBox();
   const expanded = await hint.boundingBox();
+  const controls = await hint.locator('.tour-hint-controls').boundingBox();
+  expect(controls!.y + controls!.height).toBeLessThanOrEqual(expanded!.y + expanded!.height + 1);
   expect(expanded!.y).toBeGreaterThanOrEqual(viewport!.y - 1);
   expect(expanded!.y + expanded!.height).toBeLessThanOrEqual(viewport!.y + viewport!.height + 1);
   await expect
@@ -392,6 +394,94 @@ for (const [locale, theme] of [
     await drawerBounds(exported);
     await info.attach(`shared-caption-${locale}`, {
       body: await page.screenshot({ path: `.tmp/backlog6-w18-caption-${locale}.png` }),
+      contentType: 'image/png',
+    });
+  });
+}
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`explanation navigation crosses slides in live and export ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      'light',
+      locale,
+      { width: 1280, height: 720 },
+      'compare',
+      { tourFixture: '1' }
+    );
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    const copies =
+      locale === 'ru' ? ['Первый шаг', 'Второй шаг'] : ['First explanation', 'Second explanation'];
+    for (const [index, copy] of copies.entries()) {
+      await page.locator('.tour-slide-select').nth(index).click();
+      await panel
+        .getByRole('navigation')
+        .getByRole('button', { name: t('scenario.editor.tourObjects'), exact: true })
+        .click();
+      await panel
+        .getByRole('button', { name: t('scenario.editor.tourAnnotation'), exact: true })
+        .click();
+      await panel
+        .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
+        .fill(copy);
+    }
+    await page.locator('.tour-slide-select').first().click();
+    await expect(page.locator('[data-ui="autosave-control"] button').first()).toHaveAccessibleName(
+      new RegExp(t('common.states.saved'))
+    );
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    const checkSequence = async (player: Locator) => {
+      const hint = player.locator('[data-tour-hint]');
+      const body = hint.locator('[data-tour-hint-text]');
+      const previous = hint.locator('[data-tour-hint-previous]');
+      const next = hint.locator('[data-tour-hint-next]');
+      const count = hint.locator('[data-tour-hint-point-count]');
+      await expect(hint).not.toHaveAttribute('inert', '');
+      await expect(body).toHaveText(copies[0]!);
+      await expect(previous).toBeDisabled();
+      await expect(next).toBeEnabled();
+      await expect(count).toHaveText('1 / 3');
+      const buttons = await hint.locator('.tour-hint-controls').boundingBox();
+      const position = await count.boundingBox();
+      const copyBox = await body.boundingBox();
+      expect(position!.y).toBeGreaterThanOrEqual(copyBox!.y + copyBox!.height);
+      expect(position!.y).toBeGreaterThanOrEqual(buttons!.y);
+      expect(position!.y + position!.height).toBeLessThanOrEqual(buttons!.y + buttons!.height);
+      await next.click();
+      await expect(body).toHaveText(copies[1]!);
+      await expect(hint).not.toHaveAttribute('inert', '');
+      await expect(count).toHaveText('2 / 3');
+      await previous.click();
+      await expect(body).toHaveText(copies[0]!);
+      await expect(hint).not.toHaveAttribute('inert', '');
+      await expect(previous).toBeDisabled();
+      await next.click();
+      await expect(body).toHaveText(copies[1]!);
+      await expect(hint).not.toHaveAttribute('inert', '');
+      await next.click();
+      await expect(player.locator('[data-tour-next]')).toBeDisabled();
+      await expect(hint).toBeHidden();
+    };
+    await checkSequence(page.locator('.tour-stage-host'));
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    await checkSequence(
+      page.frameLocator('.tour-export-frame iframe').frameLocator('iframe').locator('#tour-player')
+    );
+    await info.attach(`sequence-${locale}`, {
+      body: await page.screenshot(),
       contentType: 'image/png',
     });
   });

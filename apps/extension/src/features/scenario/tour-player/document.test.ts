@@ -301,7 +301,7 @@ it('uses a numberless hotspot and readable explanation controls without a compou
   expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('Back');
   expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('Next');
   expect(doc.querySelector('[data-tour-hint-count]')?.textContent).not.toContain('·');
-  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 1');
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 3');
   expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
   dom.close();
 });
@@ -318,12 +318,12 @@ it('shows each action name in the callout header and omits an empty description'
   });
   const dom = open(await buildTourPlayerHtml(args));
   const doc = dom.window.document;
-  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 2');
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('1 / 4');
   expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Continue');
   expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(false);
   expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('Explanation');
   doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
-  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('2 / 2');
+  expect(doc.querySelector('[data-tour-hint-point-count]')?.textContent).toBe('2 / 4');
   expect(doc.querySelector('[data-tour-hint-action-title]')?.textContent).toBe('Finish setup');
   expect(doc.querySelector<HTMLElement>('[data-tour-hint-text]')?.hidden).toBe(true);
   dom.close();
@@ -395,7 +395,7 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     expect(toggle.textContent).toContain('Details');
     expect(body.textContent).toBe('A'.repeat(170));
     expect(body.hidden).toBe(false);
-    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 2');
+    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 4');
     body.click();
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     expect(body.textContent).toBe('A'.repeat(170));
@@ -407,7 +407,7 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     next.click();
     expect(body.textContent).toBe('Second body');
     expect(toggle.hidden).toBe(true);
-    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 2');
+    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 4');
     expect(doc.querySelector<HTMLElement>('[data-tour-hint-count]')!.hidden).toBe(true);
     dom.close();
   }
@@ -650,4 +650,90 @@ it('renders independent inherited and local element styles in the standalone art
   expect(effects[0]!.style.backdropFilter).toBe('blur(30px)');
   expect(effects[1]!.style.backdropFilter).toBe('blur(7px)');
   dom.close();
+});
+
+it('traverses mixed explanations across slides in both directions with a controls-row position', async () => {
+  const args = fixture();
+  args.tour.endScreen.enabled = false;
+  const first = args.tour.slides[0]!;
+  const second = args.tour.slides[1]!;
+  if (first.kind !== 'image' || second.kind !== 'image') throw new Error('Expected images');
+  first.annotations = [{ id: 'note', text: 'First note', anchor: null, appearance: null }];
+  first.objectOrder = ['note', 'point'];
+  second.annotations = [{ id: 'last', text: 'Last note', anchor: null, appearance: null }];
+  const dom = open(await buildTourPlayerHtml(args));
+  try {
+    const doc = dom.window.document;
+    const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
+    const previous = doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!;
+    const body = doc.querySelector('[data-tour-hint-text]')!;
+    const counter = doc.querySelector('[data-tour-hint-point-count]')!;
+    expect(counter.parentElement?.className).toBe('tour-hint-controls');
+    expect(body.textContent).toBe('First note');
+    expect(counter.textContent).toBe('1 / 3');
+    expect(previous.disabled).toBe(true);
+    next.click();
+    expect(body.textContent).toBe('Explanation');
+    expect(counter.textContent).toBe('2 / 3');
+    expect(next.disabled).toBe(false);
+    next.click();
+    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('two');
+    expect(body.textContent).toBe('Last note');
+    expect(counter.textContent).toBe('3 / 3');
+    expect(next.disabled).toBe(true);
+    previous.click();
+    expect(body.textContent).toBe('Explanation');
+    expect(counter.textContent).toBe('2 / 3');
+    previous.click();
+    expect(body.textContent).toBe('First note');
+    expect(previous.disabled).toBe(true);
+  } finally {
+    dom.close();
+  }
+});
+
+it('returns to the last callout text page and keeps empty slides and ending reachable', async () => {
+  const args = fixture();
+  const first = args.tour.slides[0]!;
+  const second = args.tour.slides[1]!;
+  if (first.kind !== 'image' || second.kind !== 'image') throw new Error('Expected images');
+  first.hotspots[0]!.text = 'A'.repeat(170);
+  second.annotations = [{ id: 'last', text: 'Last note', anchor: null, appearance: null }];
+  const dom = open(await buildTourPlayerHtml(args));
+  try {
+    const doc = dom.window.document;
+    const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
+    const previous = doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!;
+    const body = doc.querySelector('[data-tour-hint-text]')!;
+    next.click();
+    expect(body.textContent).toBe('A'.repeat(10));
+    next.click();
+    expect(body.textContent).toBe('Last note');
+    previous.click();
+    expect(body.textContent).toBe('A'.repeat(10));
+    previous.click();
+    expect(body.textContent).toBe('A'.repeat(160));
+    next.click();
+    next.click();
+    next.click();
+    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('end');
+    doc.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
+    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('two');
+  } finally {
+    dom.close();
+  }
+  second.annotations = [];
+  const empty = open(await buildTourPlayerHtml(args));
+  try {
+    const doc = empty.window.document;
+    const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
+    next.click();
+    next.click();
+    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('two');
+    expect(doc.querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(true);
+    doc.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
+    expect(doc.getElementById('tour-player')?.dataset['slideId']).toBe('end');
+  } finally {
+    empty.close();
+  }
 });

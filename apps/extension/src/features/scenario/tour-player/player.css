@@ -675,7 +675,7 @@ a:focus-visible {
 }
 .tour-hint[data-presentation^='caption-'] {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   column-gap: 8px;
   row-gap: 8px;
   overflow: hidden;
@@ -686,16 +686,13 @@ a:focus-visible {
 .tour-hint[data-presentation^='caption-'] .tour-hint-header {
   display: contents;
 }
-.tour-hint[data-presentation^='caption-'] [data-tour-hint-point-count] {
-  grid-column: 1;
-  grid-row: 1;
-  align-self: center;
-  font-size: 11px;
+.tour-hint-controls [data-tour-hint-point-count] {
+  order: 0;
+  margin: 0;
   white-space: nowrap;
-  font-variant-numeric: tabular-nums;
 }
 .tour-hint[data-presentation^='caption-'] .tour-caption-title {
-  grid-column: 2;
+  grid-column: 1;
   grid-row: 1;
   display: flex;
   align-items: center;
@@ -728,8 +725,9 @@ a:focus-visible {
   margin-top: 4px;
 }
 .tour-hint[data-presentation^='caption-'] .tour-hint-controls {
-  grid-column: 3;
-  grid-row: 1;
+  grid-column: 1 / -1;
+  grid-row: 3;
+  justify-content: flex-end;
 }
 .tour-hint[data-presentation^='caption-'] .tour-hint-controls span {
   order: 0;
@@ -859,4 +857,11 @@ a:focus-visible {
 }
 .tour-hint .tour-caption-title[hidden] {
   display: none;
+}
+
+.tour-hint[data-presentation^='caption-'][data-caption-long='false'] .tour-hint-text {
+  grid-row: 1;
+}
+.tour-hint[data-presentation^='caption-'][data-caption-long='false'] .tour-hint-controls {
+  grid-row: 2;
 }

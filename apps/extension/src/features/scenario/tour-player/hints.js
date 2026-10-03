@@ -43,7 +43,7 @@ export function measureHintPages(hintText, fullText) {
 export function createTourHints(
   root,
   defaultStyle,
-  { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels, navigation }
+  { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels, navigation, boundary }
 ) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
@@ -101,6 +101,9 @@ export function createTourHints(
       page: textPage,
       pages: pages.length,
       pointLabel: labels.point,
+      position: boundary?.position(activeHint),
+      previousAvailable: boundary?.canMove(-1),
+      nextAvailable: boundary?.canMove(1),
     });
     if (navigation) {
       hintPrevious.disabled = !navigation.canMove(-1);
@@ -124,6 +127,9 @@ export function createTourHints(
     else if (activeHint + direction >= 0 && activeHint + direction < hints.length) {
       activeHint += direction;
       textPage = direction < 0 ? Number.MAX_SAFE_INTEGER : 0;
+    } else if (boundary?.canMove(direction)) {
+      boundary.move(direction);
+      return;
     }
     paginate();
   }
@@ -157,10 +163,10 @@ export function createTourHints(
       textPage = 0;
       dismissed = false;
     },
-    select(index) {
+    select(index, lastPage = false) {
       if (restoringFocus) return;
-      if (hints[index]?.id !== activeHintId || hint.dataset.presentation === 'callout')
-        textPage = 0;
+      if (lastPage || hints[index]?.id !== activeHintId || hint.dataset.presentation === 'callout')
+        textPage = lastPage ? Number.MAX_SAFE_INTEGER : 0;
       activeHint = index;
       dismissed = false;
       paginate();

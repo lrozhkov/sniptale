@@ -26,6 +26,9 @@ it('places the Slides control last in the editor footer', () => {
       )
     );
     const shadow = host.querySelector('.tour-stage-host')!.shadowRoot!;
+    expect(shadow.querySelector('[data-tour-hint-point-count]')!.parentElement?.className).toBe(
+      'tour-hint-controls'
+    );
     expect(
       shadow.querySelector('.tour-controls')!.lastElementChild?.hasAttribute('data-tour-contents')
     ).toBe(true);

@@ -25,13 +25,14 @@ function scenePolicy(root, options) {
 }
 
 /** Hint interaction wiring follows the mount policy; explanation order stays scene-owned. */
-function createSceneHints(root, input, policy, signal, getHints) {
+function createSceneHints(root, input, policy, signal, getHints, boundary) {
   const scene = root.querySelector('[data-tour-scene]');
   return createTourHints(root, input.tour.style, {
     signal,
     keyboardScope: policy.keyboardScope,
     hideVoice: policy.hideVoice,
     navigation: policy.authoring?.navigation,
+    boundary: policy.authoring ? null : boundary,
     onClose: () => {},
     labels: input.labels,
     focusTrigger: (activeIndex) => {
@@ -46,7 +47,7 @@ function createSceneHints(root, input, policy, signal, getHints) {
 }
 
 /** Owns current scene geometry and explanation state, independent from playback history. */
-export function createTourScene(root, input, onAction, signal, options = {}) {
+export function createTourScene(root, input, onAction, signal, options = {}, boundary) {
   const policy = scenePolicy(root, options);
   const { authoring } = policy;
   let { tour } = input;
@@ -67,7 +68,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
   let stageHeight = 360;
   let hints = [];
   const { element, actionButton } = sceneElements(root.ownerDocument, onAction, policy);
-  const hintController = createSceneHints(root, input, policy, signal, () => hints);
+  const hintController = createSceneHints(root, input, policy, signal, () => hints, boundary);
   const navigationController = createTourNavigation({
     root,
     labels,
@@ -165,7 +166,7 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
     motion,
     openContents: navigationController.openContents,
     closeContents: navigationController.closeContents,
-    show(slide, isEnd) {
+    show(slide, isEnd, hintEdge = 0) {
       if (signal.aborted) return;
       const previous = motion?.capture() ?? null;
       hintController.reset(current?.id === slide?.id && ended === isEnd);
@@ -173,6 +174,8 @@ export function createTourScene(root, input, onAction, signal, options = {}) {
       ended = isEnd;
       navigationController.reset();
       render();
+      if (hintEdge)
+        hintController.select(hintEdge < 0 ? Math.max(0, hints.length - 1) : 0, hintEdge < 0);
       motion?.prepare(
         previous,
         ended ? null : slide,
