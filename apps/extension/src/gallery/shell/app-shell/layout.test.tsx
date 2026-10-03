@@ -489,3 +489,25 @@ it('wires list keyboard commands and search exit through the existing shell hand
   grid.remove();
   input.remove();
 });
+
+it('presents one loading surface until the first snapshot, then preserves the shell on refresh or failure', () => {
+  const props = createLayoutProps();
+  props.state.storage.hasLoadedLibrarySnapshot = false;
+  props.state.storage.isLoading = true;
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(container?.querySelectorAll('[data-ui="gallery.loading"]')).toHaveLength(1);
+  expect(container?.querySelector('[data-ui="test.sidebar"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="test.main-content"]')).toBeNull();
+
+  props.state.storage.isLoading = false;
+  props.state.storage.banner = 'load failed';
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(container?.querySelector('[data-ui="gallery.loading"]')).toBeNull();
+  expect(mainContentPropsMock.mock.lastCall?.[0].banner).toBe('load failed');
+
+  props.state.storage.hasLoadedLibrarySnapshot = true;
+  props.state.storage.isLoading = true;
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(container?.querySelector('[data-ui="gallery.loading"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="test.sidebar"]')).not.toBeNull();
+});

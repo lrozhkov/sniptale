@@ -1,3 +1,4 @@
+import { GalleryLoadingPanel } from './loading';
 import { useRef, type Ref } from 'react';
 import { useGalleryLibraryShortcuts } from '../../library/keyboard/use-library-shortcuts';
 import { isGalleryListInteractionEnabled } from './list-interaction';
@@ -159,6 +160,9 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
     onSelectAll: props.onSelectAllFiltered,
     onClearSelection: props.onClearSelection,
   });
+  if (!props.state.storage.hasLoadedLibrarySnapshot && props.state.storage.isLoading) {
+    return <GalleryLoadingPanel />;
+  }
   return (
     <GalleryImportDropTarget
       disabled={props.state.storage.isBusy}

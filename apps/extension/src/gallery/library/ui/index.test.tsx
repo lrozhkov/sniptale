@@ -417,3 +417,10 @@ it('identifies audio thumbnails with the real name and known duration', async ()
   expect(preview.textContent).toContain('Another recording.webm');
   expect(preview.textContent).not.toContain('02:05');
 });
+
+it('matches guide and tour folders to document thumbnails and distinguishes editable video projects', () => {
+  expect(getGalleryFolderIcon('export')).toBe(getKindIcon('scenario-export'));
+  expect(getGalleryFolderIcon('video-project')).toBe(getKindIcon('video-project'));
+  expect(getGalleryFolderIcon('video-project')).not.toBe(getGalleryFolderIcon('recording'));
+  expect(getGalleryFolderIcon('scenario')).toBe(BookOpen);
+});

@@ -325,3 +325,11 @@ it.each([0, 6, 42, 1234567])(
     else expect(badge.textContent!.length).toBeLessThan(full.length);
   }
 );
+
+it('does not show incomplete facets before the first library snapshot', () => {
+  const props = createProps();
+  act(() => root?.render(<GallerySidebar {...props} countsKnown={false} />));
+  expect(container?.querySelector('[data-ui="test.facet-filters"]')).toBeNull();
+  act(() => root?.render(<GallerySidebar {...props} countsKnown />));
+  expect(container?.querySelector('[data-ui="test.facet-filters"]')).not.toBeNull();
+});

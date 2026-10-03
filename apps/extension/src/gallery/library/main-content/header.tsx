@@ -180,7 +180,8 @@ function GalleryStorageMenu(
       aria-label={translate('gallery.app.storageTools')}
       data-ui="gallery.header.storage-menu"
       className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-[10px] border
-        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
+        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
+        bg-[linear-gradient(var(--sniptale-color-surface-panel),var(--sniptale-color-surface-panel))]
         p-2 shadow-xl"
     >
       <GalleryStorageSummary {...props.presentation} />

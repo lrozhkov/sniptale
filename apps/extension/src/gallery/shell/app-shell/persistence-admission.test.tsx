@@ -45,6 +45,8 @@ it('holds the library behind checking and renders it only after ready admission'
     );
   });
   expect(container.textContent).toContain(translate('gallery.recovery.checkingTitle'));
+  expect(container.querySelectorAll('[data-ui="gallery.loading"]')).toHaveLength(1);
+  expect(container.querySelector('h1')?.textContent).toBe(translate('gallery.app.loading'));
   expect(container.textContent).not.toContain('library-ready');
 
   await act(async () => resolve({ databaseVersion: 1, status: 'ready' }));

@@ -2,6 +2,7 @@ import {
   Archive,
   AudioLines,
   BookOpen,
+  Clapperboard,
   FileText,
   Image as ImageIcon,
   Library,
@@ -43,6 +44,10 @@ export function getGalleryFolderIcon(folder: FolderFilter) {
 
   if (folder === 'scenario') {
     return BookOpen;
+  }
+
+  if (folder === 'export') {
+    return FileText;
   }
 
   if (folder === 'web-snapshot') {
@@ -95,8 +100,9 @@ export function getKindIcon(kind: GalleryItemKind) {
     case 'recording':
     case 'export':
     case 'video':
-    case 'video-project':
       return Video;
+    case 'video-project':
+      return Clapperboard;
     case 'audio':
       return AudioLines;
     case 'scenario':

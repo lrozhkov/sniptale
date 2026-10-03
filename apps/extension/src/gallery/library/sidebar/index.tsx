@@ -102,7 +102,7 @@ export function GallerySidebar(props: GallerySidebarProps) {
           ) : (
             <>
               <GalleryFolderList {...props} />
-              <GalleryFacetFilters {...props} />
+              {props.countsKnown ? <GalleryFacetFilters {...props} /> : null}
             </>
           )}
         </div>
