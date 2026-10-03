@@ -237,20 +237,77 @@ describe('browser window transition and bounds retry', () => {
     }
   );
 
-  it('reports only window geometry when normalization never completes', async () => {
+  it.each(['maximized', 'fullscreen'] as const)(
+    'applies normal state with bounds when the state-only %s update is ignored',
+    async (state) => {
+      vi.useFakeTimers();
+      try {
+        const initial = { ...prior, state };
+        const expected = { ...prior, width: 1280, height: 720 };
+        let current: typeof initial | typeof expected = initial;
+        mocks.getWindow.mockImplementation(async () => ({ id: 3, ...current }));
+        mocks.updateWindow.mockImplementation(async (_id, update) => {
+          if (update.state === 'normal' && update.width === expected.width) current = expected;
+          return { id: 3, ...current };
+        });
+        const onNormalized = vi.fn(async () => undefined);
+        const result = expect(
+          applyPreparedWindowSize(3, initial, expected, onNormalized)
+        ).resolves.toEqual(expected);
+        await Promise.all([result, vi.advanceTimersByTimeAsync(5000)]);
+        expect(mocks.updateWindow).toHaveBeenNthCalledWith(2, 3, {
+          state: 'normal',
+          left: expected.left,
+          top: expected.top,
+          width: expected.width,
+          height: expected.height,
+        });
+        expect(onNormalized).not.toHaveBeenCalled();
+        expect(mocks.warn).not.toHaveBeenCalled();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('does not retry normalization after external geometry changes', async () => {
     vi.useFakeTimers();
     try {
-      mocks.getWindow.mockResolvedValue({ id: 3, ...maximized, title: 'private title', tabs: [] });
+      const changed = { ...maximized, left: maximized.left + 100 };
+      mocks.getWindow.mockResolvedValue({ id: 3, ...changed, title: 'private title', tabs: [] });
       const result = expect(
         applyPreparedWindowSize(3, maximized, { ...prior, width: 1280 })
       ).rejects.toMatchObject({ message: 'verification-failed' });
       await Promise.all([result, vi.advanceTimersByTimeAsync(2100)]);
       expect(mocks.warn).toHaveBeenCalledExactlyOnceWith('Window verification failed', {
         phase: 'normalization',
-        observed: maximized,
+        observed: changed,
         quietForMs: 2000,
       });
       expect(mocks.updateWindow).toHaveBeenCalledExactlyOnceWith(3, { state: 'normal' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails after bounded attempts when combined normalization is also ignored', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.getWindow.mockResolvedValue({ id: 3, ...maximized });
+      const expected = { ...prior, width: 1280, height: 720 };
+      const result = expect(applyPreparedWindowSize(3, maximized, expected)).rejects.toMatchObject({
+        message: 'verification-failed',
+        observedSnapshot: maximized,
+      });
+      await Promise.all([result, vi.advanceTimersByTimeAsync(5000)]);
+      expect(mocks.updateWindow).toHaveBeenCalledTimes(3);
+      expect(mocks.warn).toHaveBeenCalledExactlyOnceWith('Window verification failed', {
+        phase: 'requested-size',
+        expected,
+        reported: null,
+        observed: maximized,
+        quietForMs: 2000,
+      });
     } finally {
       vi.useRealTimers();
     }

@@ -47,8 +47,9 @@ function windowSizeMatches(left: WindowSnapshot, right: WindowSnapshot): boolean
 async function waitForNormalWindow(
   windowId: number,
   lastBoundsChange: () => number,
+  prior: WindowSnapshot,
   onNormalized?: (snapshot: WindowSnapshot) => Promise<void>
-): Promise<WindowSnapshot> {
+): Promise<WindowSnapshot | null> {
   let deadline = Date.now() + 2000;
   let snapshot = await getWindowSnapshot(windowId);
   let recorded: WindowSnapshot | null = null;
@@ -65,6 +66,15 @@ async function waitForNormalWindow(
     }
     await new Promise<void>((resolve) => setTimeout(resolve, 50));
     snapshot = await getWindowSnapshot(windowId);
+  }
+  // A resolved state-only update can leave the native window unchanged.
+  // Only that exact, settled no-op permits a combined normal-state/bounds update.
+  if (
+    !recorded &&
+    windowSnapshotsEqual(snapshot, prior) &&
+    Date.now() - lastBoundsChange() >= 250
+  ) {
+    return null;
   }
   logger.warn('Window verification failed', {
     phase: 'normalization',
@@ -160,12 +170,21 @@ export async function applyPreparedWindowSize(
   });
   try {
     let baseline = prior;
+    let normalizeWithBounds = false;
     if (prior.state !== 'normal') {
       await browserWindows.update(windowId, { state: 'normal' });
-      baseline = await waitForNormalWindow(windowId, () => lastBoundsChange, onNormalized);
+      const normalized = await waitForNormalWindow(
+        windowId,
+        () => lastBoundsChange,
+        prior,
+        onNormalized
+      );
+      normalizeWithBounds = normalized === null;
+      baseline = normalized ?? prior;
     }
     for (let attempt = 0; attempt < 2; attempt++) {
       const updated = await browserWindows.update(windowId, {
+        ...(normalizeWithBounds ? { state: 'normal' as const } : {}),
         left: expected.left,
         top: expected.top,
         width: expected.width,
