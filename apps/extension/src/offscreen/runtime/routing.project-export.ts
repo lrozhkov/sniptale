@@ -1,3 +1,4 @@
+import { offscreenDataReadiness } from './data-readiness';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
 
@@ -30,8 +31,12 @@ export async function handleProjectExportRuntimeMessage(
       if (message.jobId !== message.input.jobId) {
         throw new Error('Project export input job mismatch');
       }
-      const project = await consumeProjectExportInput(message.input);
-      await startProjectExport(message.jobId, project, message.settings);
+      await startProjectExport(
+        message.jobId,
+        () => consumeProjectExportInput(message.input),
+        message.settings,
+        offscreenDataReadiness.ensureAssets
+      );
       return 'accepted';
     }
     case VideoMessageType.OFFSCREEN_CANCEL_PROJECT_EXPORT:

@@ -75,3 +75,34 @@ it('rejects activation when the pending gate is invalidated across an async barr
   expect(() => allowRecordingBegin(binding)).toThrow('Stale or mismatched');
   await expect(pending).rejects.toThrow('superseded while awaiting a fresh frame');
 });
+
+it('retains early BEGIN through preparation and rejects a stale binding', async () => {
+  const { reserveRecordingBegin } = await import('./gate');
+  const prepared = reserveRecordingBegin(binding, 15_000);
+  expect(() => allowRecordingBegin({ ...binding, generation: 0 })).toThrow('Stale');
+  allowRecordingBegin(binding);
+  await prepared;
+  await expect(waitForRecordingBegin(binding)).resolves.toBeUndefined();
+});
+
+it('does not reuse an early BEGIN after cancellation', async () => {
+  const { reserveRecordingBegin } = await import('./gate');
+  reserveRecordingBegin(binding, 15_000);
+  allowRecordingBegin(binding);
+  cancelRecordingBegin();
+  const next = { ...binding, generation: 2 };
+  const pending = waitForRecordingBegin(next);
+  expect(() => allowRecordingBegin(binding)).toThrow('Stale');
+  allowRecordingBegin(next);
+  await pending;
+});
+
+it('does not renew an expired reserved deadline when stream preparation finishes late', async () => {
+  vi.useFakeTimers();
+  const { reserveRecordingBegin } = await import('./gate');
+  const admission = reserveRecordingBegin(binding, 15_000);
+  const failed = expect(admission).rejects.toThrow('Timed out');
+  await vi.advanceTimersByTimeAsync(15_000);
+  await failed;
+  await expect(waitForRecordingBegin(binding)).rejects.toThrow('Timed out');
+});

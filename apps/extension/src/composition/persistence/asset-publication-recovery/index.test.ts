@@ -676,3 +676,12 @@ it('preserves a legacy compensation receipt with an invalid previous byte owner'
   });
   expect(harness.get('asset_owners', ['recording', 'other', 'body'])).toBeUndefined();
 });
+
+it('replays pending publications without discovering or collecting orphan objects', async () => {
+  const { recoverPendingAssetPublications } = await import('./index');
+  mocks.runMutation.mockImplementation(async (effect) => effect({ getAll: async () => [] }));
+  await recoverPendingAssetPublications();
+  expect(mocks.recoverStandalone).toHaveBeenCalled();
+  expect(mocks.objects).not.toHaveBeenCalled();
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});

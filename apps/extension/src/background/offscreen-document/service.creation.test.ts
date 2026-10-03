@@ -76,7 +76,7 @@ async function loadOffscreenManager(): Promise<OffscreenManagerModule> {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  randomUuidMock.mockReturnValue('startup-1');
+  randomUuidMock.mockReset().mockReturnValue('startup-1');
   vi.stubGlobal('crypto', { randomUUID: randomUuidMock });
   browserRuntimeGetURLMock.mockReturnValue(
     'chrome-extension://id/apps/extension/src/offscreen/offscreen.html'
@@ -168,7 +168,7 @@ it('recreates a reused context whose readiness probe reports bootstrap failure',
   });
 });
 
-it('rejects a readiness response with a mismatched challenge and recreates the context', async () => {
+it('preserves the context when a readiness response has a mismatched challenge', async () => {
   const manager = await loadOffscreenManager();
   browserRuntimeGetContextsMock.mockResolvedValue([
     {
@@ -184,10 +184,12 @@ it('rejects a readiness response with a mismatched challenge and recreates the c
     state: 'ready',
   });
 
-  await expect(manager.ensureOffscreenDocument('Replace stale response')).resolves.toBe(true);
+  await expect(manager.ensureOffscreenDocument('Replace stale response')).rejects.toThrow(
+    'unverified'
+  );
 
-  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCreateDocumentMock).not.toHaveBeenCalled();
 });
 
 it('keeps ordinary ready signals provisional until the challenge-bound probe validates', async () => {
@@ -217,13 +219,12 @@ it('keeps ordinary ready signals provisional until the challenge-bound probe val
     offscreenStartupId: 'startup-existing',
     state: 'ready',
   });
-  await expect(ensure).resolves.toBe(true);
-
-  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  await expect(ensure).rejects.toThrow('unverified');
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCreateDocumentMock).not.toHaveBeenCalled();
 });
 
-it('times out an unresolved readiness probe before closing and recreating the context', async () => {
+it('preserves the context after an unresolved readiness probe times out', async () => {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
   browserRuntimeGetContextsMock.mockResolvedValue([
@@ -235,33 +236,29 @@ it('times out an unresolved readiness probe before closing and recreating the co
   ]);
   sendRuntimeMessageMock.mockImplementationOnce(() => new Promise(() => undefined));
 
-  const ensure = manager.ensureOffscreenDocument('Replace timed-out context');
+  const ensure = manager.ensureOffscreenDocument('Probe context').catch((error: unknown) => error);
   await vi.waitFor(() => expect(sendRuntimeMessageMock).toHaveBeenCalledOnce());
   await vi.advanceTimersByTimeAsync(5000);
-  await expect(ensure).resolves.toBe(true);
-
-  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCloseDocumentMock.mock.invocationCallOrder[0]).toBeLessThan(
-    browserOffscreenCreateDocumentMock.mock.invocationCallOrder[0]!
+  await expect(ensure).resolves.toEqual(
+    expect.objectContaining({ message: 'Offscreen readiness probe timed out' })
   );
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
-    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-1',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
-    justification: 'Replace timed-out context',
-  });
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCreateDocumentMock).not.toHaveBeenCalled();
 });
 
-it('recreates an existing context whose startup identity cannot be resolved', async () => {
+it('preserves an existing context whose startup identity cannot be resolved', async () => {
   const manager = await loadOffscreenManager();
   browserRuntimeGetContextsMock.mockResolvedValue([
     { contextId: 'ctx-without-url' } as chrome.runtime.ExtensionContext,
   ]);
 
-  await expect(manager.ensureOffscreenDocument('Replace unbound context')).resolves.toBe(true);
+  await expect(manager.ensureOffscreenDocument('Replace unbound context')).rejects.toThrow(
+    'unverified'
+  );
 
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
-  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCreateDocumentMock).not.toHaveBeenCalled();
 });
 
 it('creates a new offscreen document when none exists yet', async () => {
@@ -401,7 +398,7 @@ it('shares a creation rejection and admits a new generation after it settles', a
   });
 });
 
-it('closes a timed-out startup before creating a replacement offscreen document', async () => {
+it('retains a live startup when one readiness waiter times out', async () => {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
   randomUuidMock.mockReturnValueOnce('startup-1').mockReturnValueOnce('startup-2');
@@ -414,24 +411,14 @@ it('closes a timed-out startup before creating a replacement offscreen document'
   const voiceRetry = manager.ensureOffscreenDocument('Retry voice');
   const exportRetry = manager.ensureOffscreenDocument('Retry export');
 
-  expect(voiceRetry).toBe(recordingRetry);
-  expect(exportRetry).toBe(recordingRetry);
   await expect(Promise.all([recordingRetry, voiceRetry, exportRetry])).resolves.toEqual([
-    true,
-    true,
-    true,
+    false,
+    false,
+    false,
   ]);
-
-  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledTimes(2);
-  expect(loggerWarnMock).toHaveBeenCalledWith('Closed failed offscreen document', {
-    reason: 'runtime failure',
-  });
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenLastCalledWith({
-    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
-    justification: 'Retry recording',
-  });
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  expect(manager.markOffscreenDocumentReady('startup-1')).toBe(true);
 });
 
 it('supports isolated service instances for owner-local readiness checks', async () => {
@@ -468,4 +455,20 @@ it('fails local data erasure close when the offscreen context remains active', a
   await expect(manager.closeOffscreenDocumentForPrivacyErasure()).rejects.toThrow(
     'remained active'
   );
+});
+
+it('privacy close cancels pending readiness and rejects late signals before a new generation', async () => {
+  const manager = await loadOffscreenManager();
+  randomUuidMock.mockReturnValueOnce('before-erasure').mockReturnValueOnce('after-erasure');
+  await manager.ensureOffscreenDocument();
+  const pending = manager.waitForOffscreenReady(null).catch((error: unknown) => error);
+  browserRuntimeGetContextsMock
+    .mockResolvedValueOnce([{ contextId: 'old' } as chrome.runtime.ExtensionContext])
+    .mockResolvedValueOnce([]);
+  await manager.closeOffscreenDocumentForPrivacyErasure();
+  expect(await pending).toBeInstanceOf(Error);
+  expect(manager.markOffscreenDocumentReady('before-erasure')).toBe(false);
+  await manager.ensureOffscreenDocument();
+  expect(manager.markOffscreenDocumentReady('before-erasure')).toBe(false);
+  expect(manager.markOffscreenDocumentReady('after-erasure')).toBe(true);
 });

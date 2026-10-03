@@ -8,10 +8,13 @@ const defaultProjectExportService = createLazyDefaultOwner(createProjectExportSe
 
 export async function startProjectExport(
   jobId: string,
-  project: VideoProject,
-  settings: VideoProjectExportSettings
+  project: VideoProject | (() => Promise<VideoProject>),
+  settings: VideoProjectExportSettings,
+  prepareData?: () => Promise<void>
 ): Promise<void> {
-  return defaultProjectExportService.getOwner().startProjectExport(jobId, project, settings);
+  return defaultProjectExportService
+    .getOwner()
+    .startProjectExport(jobId, project, settings, prepareData);
 }
 
 export function cancelProjectExport(jobId: string): Promise<void> {

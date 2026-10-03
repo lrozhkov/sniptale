@@ -697,3 +697,62 @@ it.each(['stable', 'late-change', 'no-frame', 'discard'] as const)(
     });
   }
 );
+
+it.each([1, 2])(
+  'cancels pending data admission for %s sources without late capture',
+  async (sourceCount) => {
+    let resolve!: () => void;
+    const data = new Promise<void>((done) => {
+      resolve = done;
+    });
+    const params = createStartParams();
+    params.settings.sourceCount = sourceCount;
+    const pending = startRecording(params, () => data);
+    if (sourceCount === 1) {
+      const { allowRecordingBegin } = await import('./start/gate');
+      allowRecordingBegin(sourceBinding);
+    }
+    await expect(stopRecording({ ...sourceBinding, generation: 0 })).rejects.toThrow('Stale');
+    await expect(stopRecording(sourceBinding, true)).resolves.toEqual({ result: 'stopped' });
+    await pending;
+    resolve();
+    await Promise.resolve();
+    expect(startRecordingImplMock).not.toHaveBeenCalled();
+    const { startMultiSourceRecording } = await import('./multi-source');
+    expect(startMultiSourceRecording).not.toHaveBeenCalled();
+  }
+);
+
+it.each([1, 2])(
+  'expires pending data admission for %s sources without late capture',
+  async (sourceCount) => {
+    vi.useFakeTimers();
+    try {
+      let resolve!: () => void;
+      const data = new Promise<void>((done) => {
+        resolve = done;
+      });
+      const params = createStartParams();
+      params.settings.sourceCount = sourceCount;
+      const pending = startRecording(params, () => data);
+      const failed = expect(pending).rejects.toThrow('timed out');
+      await vi.advanceTimersByTimeAsync(15_000);
+      await failed;
+      resolve();
+      await Promise.resolve();
+      expect(startRecordingImplMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+);
+
+it('releases a failed admission so a subsequent start can retry', async () => {
+  await expect(
+    startRecording(createStartParams(), async () => {
+      throw new Error('storage failed');
+    })
+  ).rejects.toThrow('storage failed');
+  await startRecording(createStartParams());
+  expect(startRecordingImplMock).toHaveBeenCalledOnce();
+});

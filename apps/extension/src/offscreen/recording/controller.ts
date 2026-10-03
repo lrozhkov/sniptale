@@ -1,3 +1,5 @@
+import { OFFSCREEN_RECORDING_START_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
+import { reserveRecordingBegin, cancelRecordingBegin } from './start/gate';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { recordingContext, type RecordingStopOutcome } from './context';
@@ -36,6 +38,11 @@ const STOP_RECORDING_TIMEOUT_MS = 10_000;
 let pendingRecordingStart: Promise<void> | null = null;
 let pendingRecordingStop: Promise<RecordingStopOutcome> | null = null;
 let activeRecordingBinding: RecordingSourceBinding | null = null;
+let pendingDataPreparation: {
+  binding: RecordingSourceBinding;
+  abort: AbortController;
+  cancelled: boolean;
+} | null = null;
 
 type StateMessage =
   | typeof VideoMessageType.OFFSCREEN_RECORDING_PAUSED
@@ -75,7 +82,10 @@ function notifyRecordingStoppedBestEffort(
   });
 }
 
-export function startRecording(params: Parameters<typeof startRecordingImpl>[0]): Promise<void> {
+export function startRecording(
+  params: Parameters<typeof startRecordingImpl>[0],
+  prepareData?: () => Promise<void>
+): Promise<void> {
   if (pendingRecordingStart || hasActiveRecordingSession()) {
     return Promise.reject(new Error(translate('background.runtime.recordingAlreadyRunning')));
   }
@@ -93,7 +103,7 @@ export function startRecording(params: Parameters<typeof startRecordingImpl>[0])
     streamInstanceId: params.streamInstanceId,
   };
   activeRecordingBinding = binding;
-  const work = startRecordingAfterPendingPublication(params, binding, previousBinding);
+  const work = startRecordingAfterPendingPublication(params, binding, previousBinding, prepareData);
   const tracked = work.finally(() => {
     if (pendingRecordingStart === tracked) {
       pendingRecordingStart = null;
@@ -107,10 +117,12 @@ export function startRecording(params: Parameters<typeof startRecordingImpl>[0])
 async function startRecordingAfterPendingPublication(
   params: Parameters<typeof startRecordingImpl>[0],
   binding: RecordingSourceBinding,
-  previousBinding: RecordingSourceBinding | null
+  previousBinding: RecordingSourceBinding | null,
+  prepareData?: () => Promise<void>
 ): Promise<void> {
   let previousBindingRetired = false;
   try {
+    if (prepareData && !(await prepareRecordingData(params, binding, prepareData))) return;
     if (previousBinding) {
       previousBindingRetired =
         await reconcilePendingPostRecordPublicationBeforeStart(previousBinding);
@@ -130,10 +142,51 @@ async function startRecordingAfterPendingPublication(
       activeRecordingBinding = null;
     }
   } catch (error) {
+    if (prepareData) cancelRecordingBegin();
     if (matchesActiveRecordingBinding(binding)) {
       activeRecordingBinding = previousBindingRetired ? null : previousBinding;
     }
     throw error;
+  }
+}
+
+async function prepareRecordingData(
+  params: Parameters<typeof startRecordingImpl>[0],
+  binding: RecordingSourceBinding,
+  prepareData: () => Promise<void>
+): Promise<boolean> {
+  const preparation = { binding, abort: new AbortController(), cancelled: false };
+  pendingDataPreparation = preparation;
+  const timeoutMs =
+    OFFSCREEN_RECORDING_START_TIMEOUT_MS +
+    Math.max(0, params.settings.countdownSeconds ?? 0) * 1000;
+  const timeout = setTimeout(
+    () => preparation.abort.abort(new Error('Recording data preparation timed out')),
+    timeoutMs
+  );
+  const aborted = new Promise<never>((_, reject) => {
+    preparation.abort.signal.addEventListener(
+      'abort',
+      () => reject(preparation.abort.signal.reason),
+      { once: true }
+    );
+  });
+  try {
+    if ((params.settings.sourceCount ?? 1) <= 1) {
+      const begin = reserveRecordingBegin(binding, timeoutMs);
+      void begin.catch((error) => preparation.abort.abort(error));
+    }
+    await Promise.race([prepareData(), aborted]);
+    return !preparation.cancelled && matchesActiveRecordingBinding(binding);
+  } catch (error) {
+    cancelRecordingBegin();
+    if (preparation.cancelled) return false;
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+    if (pendingDataPreparation === preparation) pendingDataPreparation = null;
+    if (preparation.cancelled && matchesActiveRecordingBinding(binding))
+      activeRecordingBinding = null;
   }
 }
 
@@ -325,6 +378,12 @@ export function stopRecording(
     assertActiveRecordingBinding(binding, { allowIdleStop: true });
   } catch (error) {
     return Promise.reject(error);
+  }
+  if (pendingDataPreparation && matchesActiveRecordingBinding(binding)) {
+    pendingDataPreparation.cancelled = true;
+    pendingDataPreparation.abort.abort(new Error('Recording preparation cancelled'));
+    cancelRecordingBegin();
+    return Promise.resolve({ result: 'stopped' });
   }
   if (pendingRecordingStop) {
     return pendingRecordingStop;

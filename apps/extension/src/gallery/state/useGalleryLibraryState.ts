@@ -1,3 +1,4 @@
+import { maintainLibraryAssets } from '../../workflows/media-hub/maintenance';
 import { loadSettings } from '../../composition/persistence/settings';
 import { cleanupLibraryTrash } from '../../workflows/media-hub/trash';
 import { getLibraryStorageUsage } from '../../composition/persistence/library-lifecycle';
@@ -397,6 +398,7 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
       storageInfoRef: args.storageInfoRef,
     });
     loadGalleryTrashUsage(args, nextItems, refreshEpoch, usageController.signal);
+    void maintainLibraryAssets(usageController.signal);
     args.onRefresh?.();
   } catch (error) {
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {

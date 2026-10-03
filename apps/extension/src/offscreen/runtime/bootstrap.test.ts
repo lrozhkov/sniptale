@@ -66,7 +66,7 @@ function resetOffscreenMocks() {
   offscreenMocks.logger.debug.mockReset();
   offscreenMocks.logger.error.mockReset();
   offscreenMocks.logger.warn.mockReset();
-  offscreenMocks.sendRuntimeMessage.mockReset();
+  offscreenMocks.sendRuntimeMessage.mockReset().mockResolvedValue(undefined);
   offscreenMocks.subscribeToDbTermination.mockReset();
   offscreenMocks.reconcileProjectExportJobs.mockReset();
   offscreenMocks.recoverAssetPublications.mockReset();
@@ -87,37 +87,6 @@ async function flushBootstrapTasks() {
   await Promise.resolve();
 }
 
-async function verifyTerminationReinitFlow() {
-  offscreenMocks.subscribeToDbTermination.mockReturnValue(() => undefined);
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await vi.waitFor(() => {
-    expect(offscreenMocks.subscribeToDbTermination).toHaveBeenCalledTimes(1);
-    expect(offscreenMocks.deleteAllFrameAnnotationRasterJobs).toHaveBeenCalledOnce();
-    expect(offscreenMocks.recoverAssetPublications).toHaveBeenCalledOnce();
-  });
-
-  expect(offscreenMocks.initDB).toHaveBeenCalledTimes(1);
-  expect(offscreenMocks.subscribeToDbTermination).toHaveBeenCalledTimes(1);
-  expect(offscreenMocks.recoverAssetPublications).toHaveBeenCalledOnce();
-  expect(offscreenMocks.deleteAllFrameAnnotationRasterJobs).toHaveBeenCalledOnce();
-
-  const handleTermination = offscreenMocks.subscribeToDbTermination.mock.calls[0]?.[0] as
-    | (() => void)
-    | undefined;
-  if (!handleTermination) {
-    throw new Error('Expected DB termination listener to be registered');
-  }
-
-  handleTermination();
-
-  expect(offscreenMocks.logger.warn).toHaveBeenCalledWith(
-    'DB connection terminated, reinitializing offscreen DB'
-  );
-  expect(offscreenMocks.initDB).toHaveBeenCalledTimes(2);
-}
-
 async function verifyReadyMessageIncludesStartupId() {
   const { bootstrapOffscreenDocument } = await import('./bootstrap');
   bootstrapOffscreenDocument();
@@ -131,55 +100,6 @@ async function verifyReadyMessageIncludesStartupId() {
   expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
     type: 'OFFSCREEN_READY',
     offscreenStartupId: 'startup-1',
-  });
-}
-
-async function verifyCompletionOutboxReplaysBeforeReady() {
-  offscreenMocks.reconcileRecordingCompletionOutbox.mockResolvedValueOnce(true);
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await vi.waitFor(() => {
-    expect(offscreenMocks.reconcileRecordingCompletionOutbox).toHaveBeenCalledOnce();
-    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-      type: 'OFFSCREEN_READY',
-      offscreenStartupId: 'startup-1',
-    });
-  });
-
-  expect(
-    offscreenMocks.reconcileRecordingCompletionOutbox.mock.invocationCallOrder[0]
-  ).toBeLessThan(offscreenMocks.sendRuntimeMessage.mock.invocationCallOrder[0]!);
-}
-
-async function verifyReadinessProbeWaitsForBootstrap() {
-  let resolveDb!: () => void;
-  offscreenMocks.initDB.mockImplementationOnce(
-    () =>
-      new Promise<void>((resolve) => {
-        resolveDb = resolve;
-      })
-  );
-  const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
-    await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  const probe = probeOffscreenRuntimeReadiness({
-    challenge: 'challenge-1',
-    offscreenStartupId: 'startup-1',
-  });
-  let settled = false;
-  void probe.finally(() => {
-    settled = true;
-  });
-
-  await flushBootstrapTasks();
-  expect(settled).toBe(false);
-
-  resolveDb();
-  await expect(probe).resolves.toEqual({
-    challenge: 'challenge-1',
-    offscreenStartupId: 'startup-1',
-    state: 'ready',
   });
 }
 
@@ -219,100 +139,6 @@ async function verifyPrivacyErasureBootstrapSkipsPersistenceInitialization() {
   });
 }
 
-async function verifyBootstrapFailureReporting() {
-  offscreenMocks.initDB.mockRejectedValueOnce(new Error('db unavailable'));
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
-
-  expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-    type: 'OFFSCREEN_ERROR',
-    error: 'db unavailable',
-    offscreenStartupId: 'startup-1',
-    phase: 'runtime',
-  });
-}
-
-async function verifyOrphanCleanupFailureBlocksReady() {
-  offscreenMocks.recoverAssetPublications.mockRejectedValueOnce(
-    new Error('staging cleanup unavailable')
-  );
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await vi.waitFor(() =>
-    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-      type: 'OFFSCREEN_ERROR',
-      error: 'staging cleanup unavailable',
-      offscreenStartupId: 'startup-1',
-      phase: 'runtime',
-    })
-  );
-
-  expect(offscreenMocks.reconcileProjectExportJobs).not.toHaveBeenCalled();
-}
-
-async function verifyCompletionReplayFailureBlocksReady() {
-  offscreenMocks.reconcileRecordingCompletionOutbox.mockRejectedValueOnce(
-    new Error('completion replay unavailable')
-  );
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await vi.waitFor(() =>
-    expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-      type: 'OFFSCREEN_ERROR',
-      error: 'completion replay unavailable',
-      offscreenStartupId: 'startup-1',
-      phase: 'runtime',
-    })
-  );
-  expect(offscreenMocks.sendRuntimeMessage).not.toHaveBeenCalledWith(
-    expect.objectContaining({ type: 'OFFSCREEN_READY' })
-  );
-}
-
-async function verifyBootstrapFailureNotificationFallback() {
-  offscreenMocks.initDB.mockRejectedValueOnce(new Error('db unavailable'));
-  offscreenMocks.sendRuntimeMessage.mockRejectedValueOnce(new Error('transport unavailable'));
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
-
-  expect(offscreenMocks.logger.error).toHaveBeenLastCalledWith(
-    'Failed to notify runtime about offscreen bootstrap failure',
-    expect.any(Error)
-  );
-}
-
-async function verifyTerminationReinitFailureReporting() {
-  offscreenMocks.subscribeToDbTermination.mockReturnValue(() => undefined);
-
-  const { bootstrapOffscreenDocument } = await import('./bootstrap');
-  bootstrapOffscreenDocument();
-  await flushBootstrapTasks();
-
-  offscreenMocks.initDB.mockRejectedValueOnce(new Error('db unavailable again'));
-  const handleTermination = offscreenMocks.subscribeToDbTermination.mock.calls[0]?.[0] as
-    | (() => void)
-    | undefined;
-  if (!handleTermination) {
-    throw new Error('Expected DB termination listener to be registered');
-  }
-
-  handleTermination();
-  await flushBootstrapTasks();
-
-  expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
-    type: 'OFFSCREEN_ERROR',
-    error: 'db unavailable again',
-    offscreenStartupId: 'startup-1',
-    phase: 'runtime',
-  });
-}
-
 describe('offscreen bootstrap', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -323,45 +149,69 @@ describe('offscreen bootstrap', () => {
     resetOffscreenMocks();
   });
 
-  it(
-    'subscribes to db termination and retries initialization after termination',
-    verifyTerminationReinitFlow
-  );
   it('sends OFFSCREEN_READY with the current startup id', verifyReadyMessageIncludesStartupId);
-  it(
-    'keeps a readiness probe pending until bootstrap completes',
-    verifyReadinessProbeWaitsForBootstrap
-  );
   it(
     'rejects a readiness probe for a stale startup identity',
     verifyReadinessProbeRejectsStaleStartupIdentity
   );
   it(
-    'replays a durable recording completion before OFFSCREEN_READY',
-    verifyCompletionOutboxReplaysBeforeReady
-  );
-  it(
     'keeps the privacy-erasure offscreen document free of persistence bootstrap writes',
     verifyPrivacyErasureBootstrapSkipsPersistenceInitialization
   );
-  it(
-    'reports bootstrap failures instead of sending OFFSCREEN_READY',
-    verifyBootstrapFailureReporting
+});
+
+it('announces transport readiness without opening or recovering storage', async () => {
+  vi.resetModules();
+  resetOffscreenMocks();
+  vi.stubGlobal('location', {
+    href: 'chrome-extension://id/offscreen.html?offscreenStartupId=current',
+  });
+  offscreenMocks.initDB.mockImplementation(() => new Promise(() => undefined));
+  const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
+    await import('./bootstrap');
+  bootstrapOffscreenDocument();
+  await flushBootstrapTasks();
+  expect(offscreenMocks.sendRuntimeMessage).toHaveBeenCalledWith({
+    type: 'OFFSCREEN_READY',
+    offscreenStartupId: 'current',
+  });
+  expect(offscreenMocks.initDB).not.toHaveBeenCalled();
+  expect(offscreenMocks.deleteAllFrameAnnotationRasterJobs).not.toHaveBeenCalled();
+  await expect(
+    probeOffscreenRuntimeReadiness({ challenge: 'probe', offscreenStartupId: 'current' })
+  ).resolves.toMatchObject({ state: 'ready' });
+});
+
+it.each(['chrome-extension://id/offscreen.html', 'invalid-url'])(
+  'refuses to announce a document without startup identity: %s',
+  async (href) => {
+    vi.resetModules();
+    resetOffscreenMocks();
+    vi.stubGlobal('location', { href });
+    const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
+      await import('./bootstrap');
+    bootstrapOffscreenDocument();
+    expect(offscreenMocks.sendRuntimeMessage).not.toHaveBeenCalled();
+    await expect(
+      probeOffscreenRuntimeReadiness({ challenge: 'x', offscreenStartupId: 'x' })
+    ).resolves.toMatchObject({ state: 'failed' });
+  }
+);
+it('keeps a probe usable when readiness notification fails', async () => {
+  vi.resetModules();
+  resetOffscreenMocks();
+  vi.stubGlobal('location', {
+    href: 'chrome-extension://id/offscreen.html?offscreenStartupId=current',
+  });
+  offscreenMocks.sendRuntimeMessage.mockRejectedValueOnce(new Error('transport'));
+  const { bootstrapOffscreenDocument, probeOffscreenRuntimeReadiness } =
+    await import('./bootstrap');
+  bootstrapOffscreenDocument();
+  await flushBootstrapTasks();
+  expect(offscreenMocks.logger.warn).toHaveBeenCalledWith(
+    'Failed to notify runtime about offscreen readiness'
   );
-  it(
-    'blocks readiness when orphan staging cannot be reconciled',
-    verifyOrphanCleanupFailureBlocksReady
-  );
-  it(
-    'blocks readiness when a durable recording completion cannot be replayed',
-    verifyCompletionReplayFailureBlocksReady
-  );
-  it(
-    'logs when bootstrap failure notifications cannot be delivered',
-    verifyBootstrapFailureNotificationFallback
-  );
-  it(
-    'reports reinitialization failures after DB termination',
-    verifyTerminationReinitFailureReporting
-  );
+  await expect(
+    probeOffscreenRuntimeReadiness({ challenge: 'x', offscreenStartupId: 'current' })
+  ).resolves.toMatchObject({ state: 'ready' });
 });

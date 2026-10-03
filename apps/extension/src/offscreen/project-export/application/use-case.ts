@@ -52,30 +52,62 @@ async function reconcileInterruptedProjectExportJob(
 async function startProjectExportWithState(
   state: ProjectExportServiceState,
   jobId: string,
-  project: VideoProject,
-  settings: VideoProjectExportSettings
+  input: VideoProject | (() => Promise<VideoProject>),
+  settings: VideoProjectExportSettings,
+  prepareData?: () => Promise<void>
 ): Promise<void> {
-  assertExportReadyVideoProject(project);
-  assertVideoProjectExportSettingsCompatibleWithProject(project, settings);
-  await reconcileInterruptedProjectExportJob(hasActiveProjectExportJob(state), jobId);
   const jobState = registerProjectExportJob(state, jobId);
-  if (!jobState) {
-    return;
-  }
-
+  if (!jobState) return;
+  const abort = new AbortController();
+  jobState.exportAbortController = abort;
+  let detached = false;
+  let rejectCancellation!: (reason: unknown) => void;
+  const cancelled = new Promise<never>((_, reject) => {
+    rejectCancellation = reject;
+  });
+  const onCancel = () => rejectCancellation(new Error('PROJECT_EXPORT_CANCELLED'));
+  abort.signal.addEventListener('abort', onCancel, { once: true });
+  const assertCurrent = () => {
+    if (jobState.cancelled || state.activeJobs.get(jobId) !== jobState)
+      throw new Error('PROJECT_EXPORT_CANCELLED');
+  };
   try {
-    await upsertProjectExportJobLedgerEntry({ jobId, projectId: project.id });
+    await Promise.race([prepareData?.() ?? Promise.resolve(), cancelled]);
+    assertCurrent();
+    const project = await Promise.race([
+      typeof input === 'function' ? input() : Promise.resolve(input),
+      cancelled,
+    ]);
+    assertCurrent();
+    assertExportReadyVideoProject(project);
+    assertVideoProjectExportSettingsCompatibleWithProject(project, settings);
+    await reconcileInterruptedProjectExportJob(false, jobId);
+    assertCurrent();
+    const existing = await loadActiveProjectExportJobLedgerEntry();
+    assertCurrent();
+    if (existing?.jobId === jobId && (existing.status !== 'running' || existing.cancelRequested))
+      return;
+    const admitted = await upsertProjectExportJobLedgerEntry({ jobId, projectId: project.id });
+    assertCurrent();
+    if (admitted.status !== 'running' || admitted.cancelRequested) return;
+    detached = true;
+    void runAcceptedProjectExportWithState(state, jobId, project, settings, jobState).catch(() =>
+      logger.error('Accepted project export detached lifecycle failed')
+    );
   } catch (error) {
-    releaseProjectExportJob(jobState);
-    releaseProjectExportJobRegistration(state, jobId);
-    throw error;
-  }
-
-  void runAcceptedProjectExportWithState(state, jobId, project, settings, jobState).catch(
-    (error: unknown) => {
-      logger.error('Accepted project export detached lifecycle failed', error);
+    if (jobState.cancelled) {
+      await sendProjectExportCancelled(jobId);
+      return;
     }
-  );
+    throw error;
+  } finally {
+    abort.signal.removeEventListener('abort', onCancel);
+    if (!detached) {
+      releaseProjectExportJob(jobState);
+      if (state.activeJobs.get(jobId) === jobState)
+        releaseProjectExportJobRegistration(state, jobId);
+    }
+  }
 }
 
 async function runAcceptedProjectExportWithState(
@@ -125,9 +157,10 @@ export function createProjectExportUseCaseService() {
   return {
     startProjectExport: (
       jobId: string,
-      project: VideoProject,
-      settings: VideoProjectExportSettings
-    ) => startProjectExportWithState(state, jobId, project, settings),
+      project: VideoProject | (() => Promise<VideoProject>),
+      settings: VideoProjectExportSettings,
+      prepareData?: () => Promise<void>
+    ) => startProjectExportWithState(state, jobId, project, settings, prepareData),
     cancelProjectExport: (jobId: string) => cancelProjectExportWithState(state, jobId),
     reconcileProjectExportJobs,
   };

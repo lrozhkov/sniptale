@@ -57,6 +57,12 @@ describe('offscreen entrypoint', () => {
     expect((document as { title: string }).title).toBe('background.runtime.offscreenDocumentTitle');
     expect(statusText.textContent).toBe('popup.labels.statusReady');
     expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
+    expect(registerOffscreenRuntimeMessageListenerMock.mock.invocationCallOrder[0]).toBeLessThan(
+      bootstrapOffscreenDocumentMock.mock.invocationCallOrder[0]!
+    );
+    expect(registerOffscreenVoiceInputMessageListenerMock.mock.invocationCallOrder[0]).toBeLessThan(
+      bootstrapOffscreenDocumentMock.mock.invocationCallOrder[0]!
+    );
     expect(registerOffscreenRuntimeMessageListenerMock).toHaveBeenCalledOnce();
     expect(registerOffscreenVoiceInputMessageListenerMock).toHaveBeenCalledOnce();
   });
@@ -79,6 +85,12 @@ describe('offscreen entrypoint', () => {
 
     expect(getCurrentLocaleMock).not.toHaveBeenCalled();
     expect(bootstrapOffscreenDocumentMock).toHaveBeenCalledOnce();
+    expect(registerOffscreenRuntimeMessageListenerMock.mock.invocationCallOrder[0]).toBeLessThan(
+      bootstrapOffscreenDocumentMock.mock.invocationCallOrder[0]!
+    );
+    expect(registerOffscreenVoiceInputMessageListenerMock.mock.invocationCallOrder[0]).toBeLessThan(
+      bootstrapOffscreenDocumentMock.mock.invocationCallOrder[0]!
+    );
     expect(registerOffscreenRuntimeMessageListenerMock).toHaveBeenCalledOnce();
     expect(registerOffscreenVoiceInputMessageListenerMock).toHaveBeenCalledOnce();
   });

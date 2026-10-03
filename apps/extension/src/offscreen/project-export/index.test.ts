@@ -53,7 +53,7 @@ describe('project-export-root-facade', () => {
     await getProjectExportCapabilities(settings);
     await reconcileProjectExportJobs();
 
-    expect(startProjectExportMock).toHaveBeenCalledWith('job-1', project, settings);
+    expect(startProjectExportMock).toHaveBeenCalledWith('job-1', project, settings, undefined);
     expect(cancelProjectExportMock).toHaveBeenCalledWith('job-1');
     expect(getProjectExportCapabilitiesMock).toHaveBeenCalledWith(settings);
     expect(reconcileProjectExportJobsMock).toHaveBeenCalledOnce();

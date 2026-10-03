@@ -272,6 +272,26 @@ export function runWithDurableAssetLifecycleLock<T>(
   );
 }
 
+/** Maintenance yields immediately to an existing or queued lifecycle operation. */
+export function tryRunWithDurableAssetLifecycleLock<T>(
+  operation: (permit: DurableAssetLifecyclePermit) => T | Promise<T>
+): Promise<T | null> {
+  return getPersistenceLockManager().request(
+    DURABLE_ASSET_LIFECYCLE_LOCK_NAME,
+    { mode: 'exclusive', ifAvailable: true },
+    async (lock) => {
+      if (lock === null) return null;
+      const permit: DurableAssetLifecyclePermit = { [durableAssetLifecyclePermitBrand]: true };
+      activeDurableAssetLifecyclePermits.add(permit);
+      try {
+        return await operation(permit);
+      } finally {
+        activeDurableAssetLifecyclePermits.delete(permit);
+      }
+    }
+  );
+}
+
 export function runWithDurableAssetOperation<T>(
   operation: (permit: DurableAssetOperationPermit) => T | Promise<T>
 ): Promise<T> {

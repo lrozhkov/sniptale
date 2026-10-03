@@ -479,9 +479,10 @@ async function recoverBackupRestoreOperations(
   }
 }
 
-export async function recoverAssetPublications(
-  permit?: DurableAssetOperationPermit,
-  transitionPermit?: PersistenceMutationTransitionPermit
+async function recoverPublications(
+  permit: DurableAssetOperationPermit | undefined,
+  transitionPermit: PersistenceMutationTransitionPermit | undefined,
+  collectOrphans: boolean
 ): Promise<number> {
   // Cold database admission reserves the exclusive transition gate; it must settle before
   // the durable operation and lifecycle locks are held or nested IndexedDB mutations would
@@ -502,7 +503,20 @@ export async function recoverAssetPublications(
       ],
       transitionPermit
     );
-    await collectOrphanAssetObjects();
+    if (collectOrphans) await collectOrphanAssetObjects();
     return recovered;
   });
+}
+
+/** Preserve the full maintenance behavior for existing explicit recovery consumers. */
+export async function recoverAssetPublications(
+  permit?: DurableAssetOperationPermit,
+  transitionPermit?: PersistenceMutationTransitionPermit
+): Promise<number> {
+  return recoverPublications(permit, transitionPermit, true);
+}
+
+/** Recover durable publication intents without a full orphan sweep on the interactive path. */
+export function recoverPendingAssetPublications(): Promise<number> {
+  return recoverPublications(undefined, undefined, false);
 }

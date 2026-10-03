@@ -1,5 +1,9 @@
+import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
+import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   deleteAssetObject,
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
   listAssetObjectIds,
   listReadyJournals,
   readyJournalClaimsAsset,
@@ -9,7 +13,10 @@ import {
   type AssetRef,
   type ArchiveRestoreSession,
 } from '../assets';
-import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import {
+  runWithDurableAssetLifecycleLock,
+  tryRunWithDurableAssetLifecycleLock,
+} from '../infrastructure/mutation-barrier';
 import { collectDurableAssetSnapshot } from '../assets/retention-authority';
 
 interface DurableAssetAuditReport {
@@ -117,4 +124,28 @@ async function isStillOrphanAssetObject(assetId: string): Promise<boolean> {
 
 function ownerKey(owner: AssetOwner): string {
   return `${owner.ownerKind}\u0000${owner.ownerId}\u0000${owner.role}`;
+}
+
+/** Candidate discovery is advisory; each deletion revalidates authority under the lifecycle lock. */
+export async function collectOrphanAssetObjectsDuringIdle(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  await initDB();
+  const report = await auditDurableAssets();
+  if (!report.authorityValid || signal.aborted) return;
+  // One finite pass per Gallery refresh. The next refresh can retry busy or remaining candidates.
+  for (const assetId of report.objectsWithoutAuthority.slice(0, 32)) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (signal.aborted) return;
+    await tryRunWithDurableAssetLifecycleLock(async (permit) => {
+      if (signal.aborted) return;
+      await runWithAssetObjectLockIfAvailable(assetId, async () => {
+        if (signal.aborted || !(await isStillOrphanAssetObject(assetId))) return;
+        if (signal.aborted) return;
+        const operation = buildPhysicalDeleteOperation([assetId]);
+        await runWithIndexedDbMutation((db) => db.put(ASSET_OPERATIONS_STORE, operation));
+        // Once durable intent commits, finish its physical step or leave the intent for replay.
+        await completePhysicalDeleteOperation(operation, permit);
+      });
+    });
+  }
 }
