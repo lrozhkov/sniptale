@@ -5,31 +5,33 @@ export function useGuideMenuHover(
   enabled: boolean,
   disabled: boolean,
   menuRef: RefObject<HTMLDivElement | null>,
-  setOpen: Dispatch<SetStateAction<boolean>>
+  setOpen: Dispatch<SetStateAction<boolean>>,
+  delayedOpen = false
 ) {
-  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancel = () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-    closeTimer.current = null;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
   };
   const enter = () => {
     if (!enabled || disabled) return;
     cancel();
-    setOpen(true);
+    if (delayedOpen) timer.current = setTimeout(() => setOpen(true), 180);
+    else setOpen(true);
   };
   const leave = () => {
     if (!enabled) return;
     cancel();
-    closeTimer.current = setTimeout(() => {
+    timer.current = setTimeout(() => {
       if (menuRef.current?.contains(document.activeElement)) return;
       setOpen(false);
     }, 180);
   };
   useEffect(
     () => () => {
-      if (closeTimer.current) clearTimeout(closeTimer.current);
+      if (timer.current) clearTimeout(timer.current);
     },
-    []
+    [enabled, disabled, delayedOpen]
   );
   return { enter, leave, cancel };
 }

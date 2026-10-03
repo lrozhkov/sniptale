@@ -53,7 +53,7 @@ function useInsertDisclosure(disabled: boolean, width: number) {
     document.addEventListener('mousemove', releaseHover, true);
     return () => document.removeEventListener('mousemove', releaseHover, true);
   }, [open]);
-  const hover = useGuideMenuHover(true, disabled, row, setOpen);
+  const hover = useGuideMenuHover(true, disabled, row, setOpen, true);
   useGlassSelectDismiss({ isOpen: open, setIsOpen: dismiss, containerRef: anchor, menuRef: row });
   const style = useGuideInsertLayout({
     open,
@@ -73,6 +73,7 @@ function useInsertDisclosure(disabled: boolean, width: number) {
   }, [disabled]);
   function enterRow() {
     if (disabled) return;
+    hover.cancel();
     if (open) row.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
     else {
       focus.current = 'row';

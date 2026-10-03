@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Image, LocateFixed, Maximize2, FileText } from 'lucide-react';
+import { Image, ArrowRight, Expand, FileText } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   resolveThemeSafePortalTarget,
@@ -109,12 +109,12 @@ export function GuideResources({
               disabled={!images[assetId]}
               onClick={() => setPreviewId(assetId)}
             >
-              <Maximize2 size={16} aria-hidden="true" />
+              <Expand size={16} aria-hidden="true" />
             </ContentToolbarButton>
             <GuideActionMenu
               tone="utility"
               label={t('scenario.editor.guideResourceUses').replace('{count}', String(uses.length))}
-              icon={<LocateFixed size={16} aria-hidden="true" />}
+              icon={<ArrowRight size={16} aria-hidden="true" />}
               disabled={disabled}
               items={uses.map((use, index) => ({
                 label: `${use.item.title || t('scenario.editor.untitledStep')} · ${index + 1}`,

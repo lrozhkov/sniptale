@@ -263,7 +263,7 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await expect(miniButton).toHaveCSS('background-color', buttonSurface);
   const insertion = page
     .locator('article#compare [data-insert-before="before"]')
-    .getByRole('button', { name: 'Heading', exact: true });
+    .locator('.guide-insert-anchor > button');
   await expect(insertion).toHaveCount(1);
   await insertion.focus();
   await expect(insertion.locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -271,7 +271,11 @@ test('document tools are contextual and leave image geometry unchanged', async (
     body: await page.screenshot(),
     contentType: 'image/png',
   });
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page
+    .locator('.guide-action-menu--insert')
+    .getByRole('button', { name: 'Heading', exact: true })
+    .click();
 
   const heading = page.locator('article#compare .guide-block-heading');
   await expect(heading).toBeFocused();
@@ -286,12 +290,17 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await expect(heading).toHaveCount(0);
   await page
     .locator('.guide-insertion-item[data-insert-before="compare"]')
-    .getByRole('button', { name: 'Add step', exact: true })
+    .locator('.guide-insert-anchor > button')
     .focus();
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page
+    .locator('.guide-action-menu--insert')
+    .getByRole('button', { name: 'Add step', exact: true })
+    .click();
 
-  const insertedTitle = page.locator('.guide-step-title:focus');
-  await expect(insertedTitle).toHaveCount(1);
+  const inserted = page.locator('article').first();
+  await expect(inserted.locator('.guide-description')).toBeFocused();
+  const insertedTitle = inserted.locator('.guide-step-title');
   await insertedTitle.fill('Inserted before the illustrated step');
   await expect(page.locator('article').first().locator('.guide-step-title')).toHaveValue(
     'Inserted before the illustrated step'

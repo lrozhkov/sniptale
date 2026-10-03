@@ -292,3 +292,124 @@ test('guide start, end and empty insertion rails leave text and neighboring poin
     await expect(trigger).toBeFocused();
   }
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  for (const paper of ['White', 'Warm', 'Graphite'] as const) {
+    test(`guide action chrome follows paper without opaque dots in ${theme}/${paper}`, async ({
+      page,
+      hostOrigin,
+    }, info) => {
+      await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 720 });
+      await page
+        .locator('.guide-page-header')
+        .getByRole('button', { name: 'Appearance', exact: true })
+        .click();
+      await page
+        .locator('#guide-inspector-panel')
+        .getByRole('group', { name: 'Paper theme', exact: true })
+        .getByRole('button', { name: paper, exact: true })
+        .click();
+      const tools = page.locator('article#compare .guide-image-tools').first();
+      const button = tools.locator('button').first();
+      await page.keyboard.press('Tab');
+      await button.focus();
+      await expect(tools).toHaveCSS('opacity', '1');
+      await expect(button).not.toHaveCSS('border-radius', '50%');
+      const result = await button.evaluate((node) => {
+        const css = getComputedStyle(node);
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const context = canvas.getContext('2d')!;
+        const pixel = (color: string, background?: string) => {
+          context.clearRect(0, 0, 1, 1);
+          if (background) {
+            context.fillStyle = background;
+            context.fillRect(0, 0, 1, 1);
+          }
+          context.fillStyle = color;
+          context.fillRect(0, 0, 1, 1);
+          return [...context.getImageData(0, 0, 1, 1).data];
+        };
+        const luminance = (color: number[]) =>
+          color
+            .slice(0, 3)
+            .map((channel) => {
+              const value = channel / 255;
+              return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+            })
+            .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index]!, 0);
+        const foreground = luminance(pixel(css.color));
+        return {
+          alpha: pixel(css.backgroundColor)[3],
+          contrast: ['#000000', '#ffffff'].map((backdrop) => {
+            const background = luminance(pixel(css.backgroundColor, backdrop));
+            return (
+              (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05)
+            );
+          }),
+          transform: css.transform,
+        };
+      });
+      expect(result.alpha).toBeLessThan(255);
+      expect(result.alpha).toBeGreaterThan(220);
+      expect(Math.min(...result.contrast)).toBeGreaterThanOrEqual(3);
+      expect(result.transform).toBe('none');
+      await expect(button).toHaveCSS('outline-style', 'solid');
+      const idle = await button.evaluate((node) => getComputedStyle(node).backgroundColor);
+      const ink = await button.evaluate((node) => getComputedStyle(node).color);
+      await button.hover();
+      await expect(button).not.toHaveCSS('background-color', idle);
+      await expect(button).toHaveCSS('color', ink);
+      await expect(button).toHaveCSS('transform', 'none');
+      const frame = tools.locator('[data-frame-image]');
+      await frame.click();
+      await expect(frame).toHaveAttribute('aria-expanded', 'true');
+      await expect(frame.locator('.lucide-check')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(frame).toHaveAttribute('aria-expanded', 'false');
+      await expect(frame).toBeFocused();
+      const enabledColor = await button.evaluate((node) => getComputedStyle(node).color);
+      await button.evaluate((node: HTMLButtonElement) => {
+        node.disabled = true;
+      });
+      await expect(button).not.toHaveCSS('color', enabledColor);
+      await expect(button).toHaveCSS('opacity', '1');
+      await button.evaluate((node: HTMLButtonElement) => {
+        node.disabled = false;
+      });
+      await info.attach(`paper-actions-${theme}-${paper}`, {
+        body: await page.screenshot({ path: `.tmp/backlog6-w20-${theme}-${paper}.png` }),
+        contentType: 'image/png',
+      });
+    });
+  }
+}
+
+test('guide insertion ignores quick pointer passes but keeps dwell and keyboard activation', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  const anchor = page.locator(
+    '.guide-insertion-item[data-insert-before="compare"] .guide-insert-anchor'
+  );
+  await anchor.scrollIntoViewIfNeeded();
+  await page.mouse.move(10, 10);
+  const box = (await anchor.boundingBox())!;
+  const menu = page.locator('.guide-action-menu--insert');
+  await page.clock.install();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.clock.runFor(100);
+  expect(await menu.count()).toBe(0);
+  await page.mouse.move(10, 10);
+  await page.clock.runFor(200);
+  expect(await menu.count()).toBe(0);
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.clock.runFor(180);
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toHaveCount(0);
+  await anchor.locator('button').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.locator('button').first()).toBeFocused();
+});

@@ -149,7 +149,11 @@ it('offers acquisition from plus menus and previews images outside the library p
   await act(async () => uploadButton.click());
   expect(pick).toHaveBeenCalledOnce();
   expect(document.querySelector('.guide-action-menu')).toBeNull();
+  const actions = host.querySelector('.tour-resource-list .guide-resource-actions')!;
+  expect(actions.querySelector('button:first-child .lucide-expand')).not.toBeNull();
+  expect(actions.querySelector('button:last-child .lucide-arrow-right')).not.toBeNull();
   await click('View image');
+  expect(select).not.toHaveBeenCalled();
   expect(host.querySelector('#tour-resource-preview')).toBeNull();
   expect(document.querySelector('#tour-resource-preview img')?.getAttribute('src')).toBe(
     'data:image/png;base64,aA=='

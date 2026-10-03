@@ -19,6 +19,7 @@ afterEach(() => {
   container.remove();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 it('keeps insertion actions in a horizontal icon row with focusable tooltips', async () => {
   await act(async () =>
@@ -34,7 +35,7 @@ it('keeps insertion actions in a horizontal icon row with focusable tooltips', a
     )
   );
   const trigger = container.querySelector<HTMLButtonElement>('button')!;
-  await act(async () => trigger.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  await act(async () => trigger.click());
   const menu = document.querySelector<HTMLElement>('.guide-action-menu')!;
   expect(menu.classList.contains('guide-action-menu--insert')).toBe(true);
   expect(menu.style.width).toBe('136px');
@@ -132,6 +133,7 @@ it('skips disabled insertion actions when the keyboard opens the row', async () 
 });
 
 it('keeps Escape closed when the stationary pointer reenters the revealed anchor', async () => {
+  vi.useFakeTimers();
   await act(async () =>
     root.render(
       <GuideInsertActions
@@ -144,11 +146,13 @@ it('keeps Escape closed when the stationary pointer reenters the revealed anchor
   const anchor = container.querySelector<HTMLElement>('.guide-insert-anchor')!;
   vi.spyOn(anchor, 'matches').mockImplementation((selector) => selector === ':hover');
   await act(async () => anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  await act(async () => vi.advanceTimersByTime(180));
   expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
   await act(async () =>
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
   await act(async () => anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  await act(async () => vi.advanceTimersByTime(180));
   expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
   await act(async () =>
     anchor.dispatchEvent(
@@ -160,10 +164,12 @@ it('keeps Escape closed when the stationary pointer reenters the revealed anchor
       new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body })
     )
   );
+  await act(async () => vi.advanceTimersByTime(180));
   expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
 });
 
 it('reopens after Escape over an outer action and leaving the removed row', async () => {
+  vi.useFakeTimers();
   await act(async () =>
     root.render(
       <GuideInsertActions
@@ -175,11 +181,13 @@ it('reopens after Escape over an outer action and leaving the removed row', asyn
   );
   const anchor = container.querySelector<HTMLElement>('.guide-insert-anchor')!;
   await act(async () => anchor.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+  await act(async () => vi.advanceTimersByTime(180));
   const menu = document.querySelector<HTMLElement>('.guide-action-menu--insert')!;
   vi.spyOn(menu, 'matches').mockImplementation((selector) => selector === ':hover');
   await act(async () =>
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
+  await act(async () => vi.advanceTimersByTime(180));
   expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
   await act(async () =>
     document.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, clientX: 10, clientY: 10 }))
@@ -189,5 +197,60 @@ it('reopens after Escape over an outer action and leaving the removed row', asyn
       new MouseEvent('mouseover', { bubbles: true, relatedTarget: document.body })
     )
   );
+  await act(async () => vi.advanceTimersByTime(180));
   expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
+});
+
+it('requires pointer dwell, cancels brief passes and keeps explicit activation immediate', () => {
+  vi.useFakeTimers();
+  try {
+    const render = (disabled = false) =>
+      act(() =>
+        root.render(
+          <GuideInsertActions
+            label="Insert"
+            disabled={disabled}
+            items={[{ label: 'Step', icon: null, onSelect: vi.fn() }]}
+          />
+        )
+      );
+    render();
+    const trigger = container.querySelector<HTMLButtonElement>('button')!;
+    const enter = () =>
+      act(() => trigger.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
+    const leave = () =>
+      act(() =>
+        trigger.dispatchEvent(
+          new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })
+        )
+      );
+    enter();
+    act(() => vi.advanceTimersByTime(100));
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    leave();
+    act(() => vi.advanceTimersByTime(200));
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    enter();
+    act(() => vi.advanceTimersByTime(180));
+    expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
+    leave();
+    act(() => vi.advanceTimersByTime(180));
+    enter();
+    render(true);
+    act(() => vi.advanceTimersByTime(200));
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    render();
+    act(() => trigger.click());
+    expect(document.querySelector('.guide-action-menu--insert')).not.toBeNull();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Step');
+    render(true);
+    render();
+    enter();
+    act(() => root.render(null));
+    act(() => vi.advanceTimersByTime(200));
+    expect(document.querySelector('.guide-action-menu--insert')).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
 });

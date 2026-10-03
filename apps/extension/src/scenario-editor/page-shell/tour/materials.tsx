@@ -67,6 +67,7 @@ export function TourResources({
             </button>
             <div className="guide-resource-actions">
               <ContentToolbarButton
+                tone="utility"
                 disabled={!images[id]}
                 title={t('scenario.editor.tourPreviewImage')}
                 onClick={() => {
@@ -74,9 +75,10 @@ export function TourResources({
                   if (src) setPreview({ src, title: slide.title });
                 }}
               >
-                <Expand size={15} />
+                <Expand size={16} aria-hidden="true" />
               </ContentToolbarButton>
               <ContentToolbarButton
+                tone="utility"
                 title={`${t('scenario.editor.tourUsed')}: ${ids.length}`}
                 onClick={() => {
                   const current =
@@ -85,7 +87,7 @@ export function TourResources({
                   if (next) onSelect(next);
                 }}
               >
-                <ArrowRight size={12} />
+                <ArrowRight size={16} aria-hidden="true" />
               </ContentToolbarButton>
             </div>
           </div>

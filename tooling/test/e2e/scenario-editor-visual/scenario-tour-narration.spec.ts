@@ -61,6 +61,7 @@ test('attached narration decodes and plays in editor and exact exported tour at 
   await library.locator('.tour-audio-resource').hover();
   await library.getByRole('button', { name: 'Attach to selection', exact: true }).click();
   await expect(library.getByRole('button', { name: 'Bindings: 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page
     .locator('.tour-header-controls')
     .getByRole('button', { name: 'Preview', exact: true })
@@ -88,8 +89,10 @@ test('attached narration decodes and plays in editor and exact exported tour at 
     .locator('#tour-player');
   await exported.locator('[data-tour-contents]').click();
   await exported.locator('.tour-contents-list button').filter({ hasText: title! }).click();
+  await expect(exported.locator('[data-tour-status]')).toBeHidden();
   await expect(exported.locator('[data-tour-play]')).toHaveAttribute('aria-pressed', 'false');
   await exported.locator('[data-tour-play]').click();
+  await expect(exported.locator('[data-tour-play]')).toHaveAttribute('aria-pressed', 'true');
   const exportedAudio = exported.locator('audio');
   await expect
     .poll(() => exportedAudio.evaluate((node: HTMLAudioElement) => node.currentTime))

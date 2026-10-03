@@ -613,3 +613,64 @@ for (const theme of ['light', 'dark'] as const) {
     expect(new Set(await tops()).size).toBe(1);
   });
 }
+
+for (const [locale, theme] of [
+  ['en', 'light'],
+  ['ru', 'dark'],
+] as const) {
+  test(`resource preview and usage stay distinct and quiet in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const ru = locale === 'ru';
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      theme,
+      locale,
+      { width: 1280, height: 720 },
+      'compare',
+      { tourFixture: '1' }
+    );
+    const library = page.locator('#guide-library-panel');
+    await library.getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true }).click();
+    const guideActions = library.locator('.guide-resource-actions').first();
+    const preview = guideActions.locator('button').first();
+    const uses = guideActions.locator('button').nth(1);
+    await expect(preview.locator('.lucide-expand')).toBeVisible();
+    await expect(uses.locator('.lucide-arrow-right')).toBeVisible();
+    await preview.hover();
+    await expect(preview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(preview).toHaveCSS('box-shadow', 'none');
+    await preview.click();
+    await expect(page.locator('#guide-resource-preview')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(preview).toBeFocused();
+    await uses.click();
+    await expect(uses).toHaveAttribute('aria-expanded', 'true');
+    await expect(uses).toHaveCSS('box-shadow', 'none');
+    await page.locator('.guide-action-menu').getByRole('button').first().click();
+    await expect(page.locator('#guide-resource-preview')).toHaveCount(0);
+    await expect(page.locator('article#compare .guide-image-frame').first()).toBeInViewport();
+    await page
+      .getByRole('button', { name: ru ? 'Интерактивный тур' : 'Interactive tour', exact: true })
+      .click();
+    await library.getByRole('button', { name: ru ? 'Ресурсы' : 'Resources', exact: true }).click();
+    const tourActions = library.locator('.guide-resource-actions').first();
+    const tourPreview = tourActions.locator('button').first();
+    const tourUses = tourActions.locator('button').nth(1);
+    await expect(tourPreview.locator('.lucide-expand')).toBeVisible();
+    await expect(tourUses.locator('.lucide-arrow-right')).toBeVisible();
+    await tourPreview.hover();
+    await expect(tourPreview).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(tourPreview).toHaveCSS('box-shadow', 'none');
+    expect((await tourPreview.boundingBox())!.width).toBe((await tourUses.boundingBox())!.width);
+    await tourPreview.click();
+    await expect(page.locator('#tour-resource-preview')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(tourPreview).toBeFocused();
+    await tourUses.click();
+    await expect(page.locator('#tour-resource-preview')).toHaveCount(0);
+    await expect(page.locator('.tour-stage-host [data-tour-scene] img').first()).toBeVisible();
+  });
+}

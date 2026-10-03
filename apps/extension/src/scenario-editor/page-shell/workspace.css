@@ -1812,9 +1812,6 @@ html[data-guide-width-resizing] * {
 }
 
 /* Contextual chrome fades in place; intent timing belongs to the central pointer owner. */
-.guide-center-panel {
-  --guide-tool-hover-surface: color-mix(in srgb, var(--guide-ink) 8%, var(--guide-paper));
-}
 .guide-center-panel
   :is(
     .guide-block-actions,
@@ -2014,7 +2011,7 @@ html[data-guide-height-resizing] * {
   transition: none;
 }
 
-/* Opaque editing chrome stays readable over every document palette and image. */
+/* Paper-derived editing chrome keeps image contrast without opaque theme-colored dots. */
 .guide-page
   .guide-document
   :is(
@@ -2026,14 +2023,17 @@ html[data-guide-height-resizing] * {
     .guide-image-tools > button,
     .guide-voice-control > button
   ) {
+  --guide-tool-surface: rgb(from var(--guide-paper) r g b / 0.94);
+  --guide-tool-border: color-mix(in srgb, var(--guide-ink) 18%, transparent);
+  --guide-tool-hover-surface: color-mix(in srgb, var(--guide-ink) 8%, var(--guide-paper));
   width: 1.5rem;
   height: 1.5rem;
   min-width: 1.5rem;
   min-height: 1.5rem;
-  border-radius: 50%;
-  border: 1px solid var(--sniptale-color-text-secondary);
-  color: var(--sniptale-color-text-primary) !important;
-  background: var(--sniptale-color-surface-canvas) !important;
+  border-radius: var(--sniptale-radius-sm);
+  border: 1px solid var(--guide-tool-border);
+  color: var(--guide-ink) !important;
+  background: var(--guide-tool-surface) !important;
   box-shadow: var(--sniptale-shadow-sm);
 }
 .guide-page
@@ -2047,18 +2047,14 @@ html[data-guide-height-resizing] * {
     .guide-image-tools > button,
     .guide-voice-control > button
   ):not(:hover):not(:active):not([aria-expanded='true']):not([aria-pressed='true']) {
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--guide-tool-surface) !important;
 }
 .guide-page
   .guide-document
   :is(.guide-item-actions, .guide-block-actions)
   .guide-action-menu-anchor
   > button[aria-expanded='true'] {
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-text-primary) 10%,
-    var(--sniptale-color-surface-canvas)
-  ) !important;
+  background: var(--guide-tool-hover-surface) !important;
 }
 .guide-page
   .guide-document
@@ -2067,7 +2063,7 @@ html[data-guide-height-resizing] * {
   background: color-mix(
     in srgb,
     var(--sniptale-color-accent) 15%,
-    var(--sniptale-color-surface-canvas)
+    var(--guide-tool-surface)
   ) !important;
 }
 .guide-page
@@ -2077,9 +2073,9 @@ html[data-guide-height-resizing] * {
     .guide-voice-field .guide-voice-control > button
   ):disabled {
   opacity: 1;
-  border-color: var(--sniptale-color-text-secondary);
-  color: var(--sniptale-color-text-secondary) !important;
-  background: var(--sniptale-color-surface-canvas) !important;
+  border-color: var(--guide-muted);
+  color: var(--guide-muted) !important;
+  background: var(--guide-tool-surface) !important;
 }
 
 .guide-page
@@ -2092,11 +2088,8 @@ html[data-guide-height-resizing] * {
     .guide-image-tools > button,
     .guide-voice-control > button
   ):hover:not(:disabled):not([aria-pressed='true']) {
-  background: color-mix(
-    in srgb,
-    var(--sniptale-color-text-primary) 10%,
-    var(--sniptale-color-surface-canvas)
-  ) !important;
+  background: var(--guide-tool-hover-surface) !important;
+  color: var(--guide-ink) !important;
 }
 
 .guide-page .guide-voice-control > button {
