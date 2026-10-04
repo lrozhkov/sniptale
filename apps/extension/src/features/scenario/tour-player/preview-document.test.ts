@@ -8,6 +8,7 @@ import retainedTourRuntime from './preview-document.retained-tour.fixture.txt?ra
 import retainedMarkerTourRuntime from './preview-document.retained-marker-tour.fixture.txt?raw';
 import retainedStageTourRuntime from './preview-document.retained-stage-tour.fixture.txt?raw';
 import retainedNavigationTourRuntime from './preview-document.retained-navigation-tour.fixture.txt?raw';
+import retainedFullViewTourRuntime from './preview-document.retained-full-view-tour.fixture.txt?raw';
 beforeEach(() => {
   vi.stubGlobal('Blob', NodeBlob);
   vi.stubGlobal('crypto', webcrypto);
@@ -334,6 +335,12 @@ it('admits the retained caption-aware guide runtime while rejecting archive-sele
 
 // Immutable captured Tour bundles; never regenerate from current code.
 it.each([
+  {
+    name: 'pre-highlight-animation',
+    runtime: retainedFullViewTourRuntime,
+    bytes: 133253,
+    hash: '3OvTIcJwTvV7uuNtL7CppFRivBKeMe8r4Qv8Pz4f+28=',
+  },
   {
     name: 'pre-full-view',
     runtime: retainedNavigationTourRuntime,

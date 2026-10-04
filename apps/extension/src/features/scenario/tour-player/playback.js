@@ -5,6 +5,7 @@ import {
   tourAutoplayDestination,
   tourLinearTimeline,
   tourEntranceTiming,
+  tourHighlightTiming,
 } from './timing.js';
 import { createTourTransport } from './transport.js';
 
@@ -24,6 +25,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   let ended = false;
   let duration = 0;
   let entrance = 0;
+  let exitStart = 0;
   let assets = input.assets;
   let timeline = null;
   let choice = false;
@@ -47,7 +49,13 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     hidden: () => root.ownerDocument.hidden,
     autoplay: tour.playback.autoplay,
     changed(elapsed, playing, state, mode, continuous) {
-      syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state });
+      syncPlaybackAudio(audio, {
+        audioState,
+        elapsed,
+        entrance,
+        playing: playing && elapsed < exitStart,
+        state,
+      });
       const view = playbackView(elapsed, state);
       update({ ...view, playing: continuous, mode });
       chrome?.update({ playing: continuous, state: view.state });
@@ -55,17 +63,13 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     complete: advance,
   });
   function advance() {
-    if (ended) {
-      session.pause();
-      return;
-    }
-    const target = nextUnvisitedDestination(tour, index, visited);
+    const target = ended ? tour.slides.length : nextUnvisitedDestination(tour, index, visited);
     if (target === null) {
       choice = true;
       session.pause();
       return;
     }
-    if (target === tour.slides.length && !tour.endScreen.enabled) {
+    if (ended || (target === tour.slides.length && !tour.endScreen.enabled)) {
       session.pause();
       return;
     }
@@ -94,7 +98,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     audioState = null;
     session.pause();
     const target = resolveTourSeek(timeline, index, value);
-    if (target.index !== index || ended) navigate(target.index);
+    if (target.index !== index || ended) navigate(target.index, false, true);
     session.seek(target.elapsed);
   }
 
@@ -109,7 +113,8 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     audio.show(ended ? null : slide, assets);
     timeline = tourLinearTimeline(tour, reduced());
     entrance = tourEntranceTiming(tour, ended ? null : slide, reduced()).total;
-    duration = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
+    exitStart = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
+    duration = exitStart + tourHighlightTiming(tour, ended ? null : slide, reduced()).exitMs;
     if (!slide) {
       session.clear();
       return;
@@ -120,6 +125,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     session.load({
       duration,
       entrance,
+      exitStart,
       source: assets.find((asset) => asset.id === image?.assetId)?.src,
       required: Boolean(image),
     });
@@ -132,19 +138,16 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     () => entrance,
     () => show(tour, index, ended, assets)
   );
-  const pause = () => {
-    audio.stop();
-    session.pause();
-  };
-  bindPlaybackLifetime(root, signal, pause);
-  bindNarrationActivation(root, signal, (id) => {
+  const pause = bindPlaybackLifetime(root, signal, session, audio, () => {
     audioState = null;
-    session.pause();
-    audio.activate(id);
   });
   return {
     show,
     pause,
+    depart(callbacks) {
+      audio.stop();
+      session.depart(callbacks);
+    },
     get mode() {
       return session.mode;
     },
@@ -164,7 +167,11 @@ function resolveTourSeek(timeline, index, value) {
   return { index: target, elapsed: value - timeline.offsets[target] };
 }
 
-function bindPlaybackLifetime(root, signal, pause) {
+function bindPlaybackLifetime(root, signal, session, audio, clearAudioState) {
+  const pause = () => {
+    audio.stop();
+    session.pause();
+  };
   root.ownerDocument.addEventListener(
     'visibilitychange',
     () => {
@@ -179,9 +186,6 @@ function bindPlaybackLifetime(root, signal, pause) {
     },
     { signal, capture: true }
   );
-}
-
-function bindNarrationActivation(root, signal, activate) {
   root.addEventListener(
     'click',
     (event) => {
@@ -190,10 +194,13 @@ function bindNarrationActivation(root, signal, activate) {
           ? event.target.closest('[data-tour-narration]')
           : null;
       if (!target) return;
-      activate(target.dataset.tourNarration);
+      clearAudioState();
+      session.pause();
+      audio.activate(target.dataset.tourNarration);
     },
     { signal }
   );
+  return pause;
 }
 
 /** Reduced-motion changes retain the hold position while rebuilding the entrance gate. */
@@ -204,6 +211,7 @@ function bindMotionPreference(preference, signal, session, motion, getEntrance, 
       if (signal.aborted) return;
       const holdElapsed = Math.max(0, session.elapsed - getEntrance());
       const resume = session.continuous;
+      session.pause();
       motion.cancel({ preserveMediaGate: true });
       reload();
       session.seek(getEntrance() + holdElapsed);

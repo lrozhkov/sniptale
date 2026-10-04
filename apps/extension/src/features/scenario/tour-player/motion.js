@@ -10,9 +10,14 @@ export function createTourMotion(root, signal, changed = () => {}) {
   const stage = root.querySelector('[data-tour-stage]');
   const hint = root.querySelector('[data-tour-hint]');
   let current = null;
+  let highlightPhase = { kind: 'settled', elapsed: 0, reduced: false };
+  const highlights = () => projectHighlightPhase(scene, highlightPhase);
   function frame(elapsed) {
     if (!current?.ready || signal.aborted) return;
     current.elapsed = elapsed;
+    if (highlightPhase.kind !== 'exit')
+      highlightPhase = { ...highlightPhase, kind: 'enter', elapsed };
+    highlights();
     if (elapsed >= current.phases.total) {
       const wasSettled = stage.dataset.motion === 'settled';
       settleMotion(current, scene, hint, stage);
@@ -28,13 +33,15 @@ export function createTourMotion(root, signal, changed = () => {}) {
     applyMotionFrame(current, scene, stage, elapsed);
     if (!wasRunning) changed();
   }
-  function cancel({ preserveMediaGate = false } = {}) {
+  function cancel({ preserveMediaGate = false, preserveHighlight = false } = {}) {
     const gate =
       preserveMediaGate && ['loading', 'error'].includes(stage.dataset.motion)
         ? stage.dataset.motion
         : null;
     if (current) settleMotion(current, scene, hint, stage);
     current = null;
+    if (!preserveHighlight) highlightPhase = { ...highlightPhase, kind: 'settled', elapsed: 0 };
+    highlights();
     scene.inert = false;
     hint.inert = false;
     hint.style.visibility = '';
@@ -50,7 +57,7 @@ export function createTourMotion(root, signal, changed = () => {}) {
   return {
     capture() {
       const travelling = current?.marker?.isConnected ? pointOf(current.marker) : null;
-      cancel();
+      cancel({ preserveHighlight: true });
       if (!root.dataset.slideId) return null;
       const points = scene.querySelectorAll('.tour-hotspot');
       const point = travelling ?? (points.length === 1 ? pointOf(points[0]) : null);
@@ -66,6 +73,8 @@ export function createTourMotion(root, signal, changed = () => {}) {
       cancel();
       if (signal.aborted) return;
       current = prepareMotion(scene, previous, slide, tour, viewport, reducedMotion);
+      highlightPhase = { kind: 'enter', elapsed: 0, reduced: reducedMotion };
+      highlights();
       current.ready = false;
       scene.inert = true;
       hint.inert = true;
@@ -80,9 +89,18 @@ export function createTourMotion(root, signal, changed = () => {}) {
       else cancel();
     },
     frame,
+    exit(elapsed) {
+      if (signal.aborted) return;
+      highlightPhase = { ...highlightPhase, kind: 'exit', elapsed };
+      highlights();
+    },
+    cancelExit() {
+      highlightPhase = { ...highlightPhase, kind: 'settled', elapsed: 0 };
+      highlights();
+    },
     reflow(viewport) {
       if (signal.aborted) return;
-      if (!current) return cancel({ preserveMediaGate: true });
+      if (!current) return cancel({ preserveMediaGate: true, preserveHighlight: true });
       const { ready, elapsed, previous, context } = current;
       settleMotion(current, scene, hint, stage);
       resizeSnapshot(previous, current.viewport, viewport);
@@ -115,6 +133,24 @@ export function createTourMotion(root, signal, changed = () => {}) {
     },
     cancel,
   };
+}
+
+/** Effect alpha multiplies immutable rendered base alpha, including baked-redaction zero. */
+function projectHighlightPhase(scene, phase) {
+  for (const effect of scene.querySelectorAll('[data-tour-highlight]')) {
+    const base = Number(effect.dataset.baseOpacity);
+    const duration = Number(phase.kind === 'exit' ? effect.dataset.exitMs : effect.dataset.enterMs);
+    const progress = duration > 0 ? ease(bounded(phase.elapsed / duration)) : 1;
+    const factor =
+      phase.reduced || phase.kind === 'settled'
+        ? 1
+        : phase.kind === 'exit'
+          ? duration > 0
+            ? 1 - progress
+            : 1
+          : progress;
+    effect.style.opacity = String(base * factor);
+  }
 }
 
 function pointOf(node) {

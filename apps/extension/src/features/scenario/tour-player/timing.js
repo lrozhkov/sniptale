@@ -1,3 +1,4 @@
+import { resolveTourHighlightAnimation } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourNarrationCues } from '../project/tour-resources';
 import { tourCameraEnabled } from './camera.js';
 /** Reading and narration use authored source data; returned duration is milliseconds. */
@@ -67,7 +68,9 @@ export function tourLinearTimeline(tour, reducedMotion = false) {
       return null;
     offsets.push(duration);
     duration +=
-      tourEntranceTiming(tour, slide, reducedMotion).total + tourSlideDuration(tour, slide);
+      tourEntranceTiming(tour, slide, reducedMotion).total +
+      tourSlideDuration(tour, slide) +
+      tourHighlightTiming(tour, slide, reducedMotion).exitMs;
   }
   return { offsets, duration };
 }
@@ -88,6 +91,24 @@ export function tourEntranceTiming(tour, slide, reducedMotion = false) {
     travelMs,
     cameraStartMs,
     cameraMs,
-    total: Math.max(switchMs + travelMs, cameraStartMs + cameraMs),
+    total: Math.max(
+      switchMs + travelMs,
+      cameraStartMs + cameraMs,
+      tourHighlightTiming(tour, slide, reducedMotion).enterMs
+    ),
   };
+}
+
+/** Concurrent highlight phases use the longest duration, independent of reading/narration hold. */
+export function tourHighlightTiming(tour, slide, reducedMotion = false) {
+  const result = { enterMs: 0, exitMs: 0 };
+  if (reducedMotion || slide?.kind !== 'image') return result;
+  for (const mask of slide.masks) {
+    const phases = resolveTourHighlightAnimation(mask, tour.style.maskDefaults);
+    if (phases.enter.kind === 'fade')
+      result.enterMs = Math.max(result.enterMs, phases.enter.durationMs);
+    if (phases.exit.kind === 'fade')
+      result.exitMs = Math.max(result.exitMs, phases.exit.durationMs);
+  }
+  return result;
 }

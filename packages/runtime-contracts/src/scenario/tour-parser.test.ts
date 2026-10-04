@@ -4,6 +4,8 @@ import { parseTourDocument, tourDocumentSchema } from './tour-parser';
 import {
   getTourSlideObjects,
   resolveTourMask,
+  resolveTourHighlightAnimation,
+  TOUR_HIGHLIGHT_ANIMATION_DEFAULTS,
   resolveTourMarkerAppearance,
   TOUR_MARKER_DEFAULTS,
   resolveTourTextAppearance,
@@ -734,4 +736,64 @@ describe('stage background boundary', () => {
     value.audioResources = [];
     expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
   });
+});
+
+it('resolves independent highlight phases without persisting defaults or animating other effects', () => {
+  const value = document();
+  const slide = imageSlide();
+  const mask = slide.masks[0]!;
+  mask.kind = 'highlight';
+  const defaults = (value.style.maskDefaults = structuredClone(TOUR_MASK_DEFAULTS));
+  const animation = {
+    enter: { kind: 'fade' as const, durationMs: 100 },
+    exit: { kind: 'none' as const, durationMs: 1000 },
+  };
+  expect(resolveTourHighlightAnimation(mask)).toEqual(TOUR_HIGHLIGHT_ANIMATION_DEFAULTS);
+  defaults.highlight.animation = animation;
+  expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(animation);
+  mask.highlightAnimation = structuredClone(TOUR_HIGHLIGHT_ANIMATION_DEFAULTS);
+  expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(mask.highlightAnimation);
+  const resolved = resolveTourHighlightAnimation(mask, defaults);
+  resolved.enter.durationMs = 700;
+  expect(mask.highlightAnimation.enter.durationMs).toBe(250);
+  mask.highlightAnimation = null;
+  expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(animation);
+  for (const kind of ['spotlight', 'blur', 'redact'] as const) {
+    mask.kind = kind;
+    mask.highlightAnimation = animation;
+    expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(
+      TOUR_HIGHLIGHT_ANIMATION_DEFAULTS
+    );
+  }
+  value.slides[0] = slide;
+  expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+});
+it('strictly admits complete bounded global and local highlight phase pairs', () => {
+  const phase = { kind: 'fade', durationMs: 100 };
+  const value = document();
+  value.style.maskDefaults = structuredClone(TOUR_MASK_DEFAULTS);
+  const slide = imageSlide();
+  value.slides[0] = slide;
+  for (const animation of [
+    null,
+    {},
+    { enter: phase },
+    { enter: phase, exit: phase, extra: true },
+    { enter: { ...phase, extra: true }, exit: phase },
+    ...[99, 1001, NaN, Infinity].map((durationMs) => ({
+      enter: { ...phase, durationMs },
+      exit: phase,
+    })),
+    { enter: { ...phase, kind: 'zoom' }, exit: phase },
+  ]) {
+    Reflect.set(value.style.maskDefaults.highlight, 'animation', animation);
+    expect(parseTourDocument(value).status).toBe('invalid');
+    Reflect.deleteProperty(value.style.maskDefaults.highlight, 'animation');
+    expect(
+      parseTourDocument({
+        ...value,
+        slides: [{ ...slide, masks: [{ ...slide.masks[0], highlightAnimation: animation }] }],
+      }).status
+    ).toBe(animation === null ? 'ok' : 'invalid');
+  }
 });

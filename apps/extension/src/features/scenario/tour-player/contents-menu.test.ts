@@ -187,3 +187,170 @@ it('omits disabled end and skips retained end history when the feature is disabl
   player.selectEnd();
   expect(root.dataset['slideId']).toBe('first');
 });
+
+function departureFrames() {
+  let now = 0;
+  let id = 0;
+  const frames = new Map<number, FrameRequestCallback>();
+  vi.stubGlobal('matchMedia', () => ({ matches: false }));
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    frames.set(++id, callback);
+    return id;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (key: number) => frames.delete(key));
+  return async (delta: number) => {
+    now += delta;
+    const queued = [...frames.values()];
+    frames.clear();
+    queued.forEach((callback) => callback(now));
+    await Promise.resolve();
+    await Promise.resolve();
+  };
+}
+async function animatedTour() {
+  const tick = departureFrames();
+  const h = await mount();
+  h.tour.transition = { kind: 'none', durationMs: 0, hotspotTravelMs: 0 };
+  h.tour.slides = ['first', 'second', 'third'].map((id) => ({
+    ...createTourImageSlide(id),
+    masks: [
+      {
+        id: `mask-${id}`,
+        kind: 'highlight' as const,
+        color: '#ff0000',
+        opacity: 0.5,
+        rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+        highlightAnimation: {
+          enter: { kind: 'none' as const, durationMs: 250 },
+          exit: { kind: 'fade' as const, durationMs: 300 },
+        },
+      },
+    ],
+  }));
+  h.player.update({ tour: h.tour, labels, assets: [] });
+  await tick(0);
+  return {
+    ...h,
+    tick,
+    click: (name: string) =>
+      h.root.querySelector<HTMLButtonElement>(`[data-tour-${name}]`)!.click(),
+  };
+}
+it('projects consecutive Space destinations during exit and records only the actual departing slide', async () => {
+  const h = await animatedTour();
+  const space = () =>
+    h.root.dispatchEvent(
+      new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+    );
+  space();
+  expect(h.root.dataset['slideId']).toBe('first');
+  await h.tick(100);
+  space();
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('third');
+  h.click('previous');
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('first');
+});
+it('keeps history intact when a pending Previous is cancelled by visibility', async () => {
+  const h = await animatedTour();
+  h.click('next');
+  await h.tick(300);
+  h.click('next');
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('third');
+  h.click('previous');
+  await h.tick(100);
+  const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  document.dispatchEvent(new Event('visibilitychange'));
+  await h.tick(1000);
+  expect(h.root.dataset['slideId']).toBe('third');
+  hidden.mockReturnValue(false);
+  h.click('previous');
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('second');
+});
+it('lets Contents replace a pending target and cancels departure on document update', async () => {
+  const h = await animatedTour();
+  h.click('next');
+  await h.tick(100);
+  h.click('contents');
+  h.root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')[2]!.click();
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('third');
+  h.click('previous');
+  await h.tick(100);
+  h.player.update({ tour: h.tour, labels, assets: [] });
+  await h.tick(1000);
+  expect(h.root.dataset['slideId']).toBe('third');
+});
+it('cancels pending exit before full-view reflow and restores alpha without changing manual mode', async () => {
+  vi.stubGlobal(
+    'Image',
+    class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        queueMicrotask(() => this.onload?.());
+      }
+      decode() {
+        return Promise.resolve();
+      }
+    }
+  );
+  const h = await animatedTour();
+  const first = h.tour.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image slide');
+  first.image = {
+    assetId: 'image',
+    width: 400,
+    height: 200,
+    alt: '',
+    galleryAssetId: null,
+    editDocumentId: null,
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  first.camera = { mode: 'manual', zoom: 3, center: { x: 0.5, y: 0.5 } };
+  const assets = [{ id: 'image', src: 'data:image/png;base64,AA==' }];
+  h.player.update({ tour: h.tour, labels, assets });
+  await h.tick(0);
+  await h.tick(0);
+  const effect = () => h.root.querySelector<HTMLElement>('.tour-mask-effect')!;
+  const base = Number(effect().style.opacity);
+  expect(base).toBe(0.5);
+  h.click('next');
+  await h.tick(150);
+  expect(Number(effect().style.opacity)).toBeLessThan(base);
+  const fullView = h.root.querySelector<HTMLButtonElement>('[data-tour-full-view]')!;
+  expect(fullView.disabled).toBe(false);
+  fullView.click();
+  expect(fullView.getAttribute('aria-pressed')).toBe('true');
+  expect(Number(effect().style.opacity)).toBe(base);
+  await h.tick(1000);
+  expect(h.root.dataset['slideId']).toBe('first');
+  h.root.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true }));
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('second');
+});
+it('seeks across slides immediately while retaining the actual source in Back history', async () => {
+  const h = await animatedTour();
+  const seek = h.root.querySelector<HTMLInputElement>('[data-tour-seek]')!;
+  seek.value = seek.max;
+  seek.dispatchEvent(new Event('input', { bubbles: true }));
+  expect(h.root.dataset['slideId']).toBe('third');
+  await h.tick(0);
+  h.click('previous');
+  await h.tick(300);
+  expect(h.root.dataset['slideId']).toBe('first');
+});
+it('selects the current Contents row without replacing its rendered scene or replaying entry', async () => {
+  const h = await animatedTour();
+  const frame = h.root.querySelector('[data-tour-scene]')!.firstChild;
+  h.click('contents');
+  h.root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')[0]!.click();
+  await h.tick(1000);
+  expect(h.root.dataset['slideId']).toBe('first');
+  expect(h.root.querySelector('[data-tour-scene]')!.firstChild).toBe(frame);
+  expect(h.root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.disabled).toBe(true);
+});

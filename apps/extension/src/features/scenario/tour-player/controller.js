@@ -18,14 +18,18 @@ export function createTourPlayer(root, input, options = {}) {
   );
   let ended = false;
   const history = [];
+  const { go, manualGo, projectedIndex, canMove } = createTourNavigation({
+    signal: lifetime.signal,
+    current: () => (ended ? tour.slides.length : index),
+    limit: () => tour.slides.length - Number(!tour.endScreen.enabled),
+    playback: () => playback,
+    commit,
+  });
   const authoringNavigation = options.authoring?.navigation;
   const view = createTourScene(root, input, act, lifetime.signal, options, {
-    canMove: (direction) =>
-      index + direction >= 0 &&
-      index + direction < tour.slides.length + Number(tour.endScreen.enabled),
+    canMove,
     move: (direction) => {
-      playback?.interact();
-      go(index + direction, true, direction);
+      manualGo(projectedIndex() + direction, true, direction);
     },
     fullView: () => {
       playback?.interact();
@@ -39,28 +43,22 @@ export function createTourPlayer(root, input, options = {}) {
     : createTourPlayback(root, input, {
         signal: lifetime.signal,
         motion: view.motion,
-        navigate: (target, restart = false) => {
-          if (restart) history.length = 0;
-          go(target, !restart);
+        navigate: (target, restart = false, immediate = false) => {
+          if (immediate) commit(target);
+          else go(target, !restart, 0, restart ? 0 : null);
         },
         chrome,
       });
   function act(action) {
     // Editor preview never executes authored URL actions.
     if (options.authoring || (options.preview && action.kind === 'url')) return;
-    if (action.kind !== 'none') playback?.interact();
-    if (action.kind === 'restart') history.length = 0;
-    const target = actionSlideIndex(action, tour.slides, index);
-    if (target !== null) go(target, action.kind !== 'restart');
+    const target = actionSlideIndex(action, tour.slides, projectedIndex());
+    if (target !== null)
+      manualGo(target, action.kind !== 'restart', 0, action.kind === 'restart' ? 0 : null);
+    else if (action.kind !== 'none') playback?.interact();
   }
-  function go(target, recordHistory = true, hintEdge = 0) {
-    if (
-      lifetime.signal.aborted ||
-      target < 0 ||
-      target > tour.slides.length ||
-      (target === tour.slides.length && !tour.endScreen.enabled)
-    )
-      return;
+  function commit(target, recordHistory = true, hintEdge = 0, historyLength = null) {
+    if (historyLength !== null) history.length = historyLength;
     if (recordHistory && (target !== index || ended)) {
       history.push(ended ? 'end' : index);
       if (history.length > 1000) history.shift();
@@ -70,7 +68,8 @@ export function createTourPlayer(root, input, options = {}) {
     render(hintEdge);
   }
   function back() {
-    navigationInput.manualGo(previousTourTarget(history, tour, index), false);
+    const previous = previousTourTarget(history, tour, index);
+    manualGo(previous.target, false, 0, previous.length);
   }
   function render(hintEdge = 0) {
     if (lifetime.signal.aborted) return;
@@ -82,18 +81,20 @@ export function createTourPlayer(root, input, options = {}) {
     root.dataset.slideId = ended ? 'end' : (slide?.id ?? '');
   }
   const navigationInput = mountTourNavigationInput(root, options, lifetime.signal, {
-    move: go,
+    move: manualGo,
     back,
-    index: () => index,
+    index: projectedIndex,
     slides: () => tour.slides,
-    interact: () => playback?.interact(),
     space: (next) => {
       if (playback?.mode === 'manual') next();
       else playback?.pause();
     },
     openContents: (select) => {
       playback?.pause();
-      view.openContents(tour.slides, ended ? 'end' : index, select, tour.endScreen);
+      const choose = (target) => {
+        if (target !== (ended ? tour.slides.length : index)) select(target);
+      };
+      view.openContents(tour.slides, ended ? 'end' : index, choose, tour.endScreen);
     },
   });
   observeViewport(root, view.resize, lifetime.signal);
@@ -102,6 +103,7 @@ export function createTourPlayer(root, input, options = {}) {
   return {
     update(nextInput) {
       if (lifetime.signal.aborted) return;
+      playback?.pause();
       const previousId = tour.slides[index]?.id;
       input = nextInput;
       tour = nextInput.tour;
@@ -142,11 +144,50 @@ export function createTourPlayer(root, input, options = {}) {
   };
 }
 
+/** One admitted destination owns commit; cancellation never consumes history. */
+function createTourNavigation({ signal, current, limit, playback, commit }) {
+  let pending = null;
+  const accepts = (target) => !signal.aborted && target >= 0 && target <= limit();
+  const projectedIndex = () => pending?.target ?? current();
+  function go(target, recordHistory = true, hintEdge = 0, historyLength = null) {
+    if (!accepts(target)) return;
+    const request = { target };
+    pending = request;
+    const complete = () => {
+      if (pending !== request || signal.aborted) return;
+      pending = null;
+      commit(target, recordHistory, hintEdge, historyLength);
+    };
+    if (playback())
+      playback().depart({
+        complete,
+        cancel: () => {
+          if (pending === request) pending = null;
+        },
+      });
+    else complete();
+  }
+  return {
+    go,
+    projectedIndex,
+    canMove: (direction) => accepts(projectedIndex() + direction),
+    manualGo(target, recordHistory = true, hintEdge = 0, historyLength = null) {
+      if (!accepts(target)) return;
+      playback()?.interact();
+      go(target, recordHistory, hintEdge, historyLength);
+    },
+  };
+}
+
 /** Resolve transient end history against the current document after live updates. */
 function previousTourTarget(history, tour, index) {
-  let target = history.pop();
-  while (target === 'end' && !tour.endScreen.enabled) target = history.pop();
-  return target === 'end' ? tour.slides.length : (target ?? Math.max(0, index - 1));
+  let length = history.length;
+  let target = history[--length];
+  while (target === 'end' && !tour.endScreen.enabled) target = history[--length];
+  return {
+    target: target === 'end' ? tour.slides.length : (target ?? Math.max(0, index - 1)),
+    length: Math.max(0, length),
+  };
 }
 
 /** Binds navigation DOM once; selection and history remain controller-owned. */
@@ -259,7 +300,6 @@ function mountTourNavigationInput(root, options, signal, actions) {
       if (slide) authoring.selectSlide(slide.id);
       return;
     }
-    actions.interact();
     actions.move(target, recordHistory);
   }
   query('previous').addEventListener(

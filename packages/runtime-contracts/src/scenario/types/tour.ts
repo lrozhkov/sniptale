@@ -121,8 +121,20 @@ export interface TourAnnotation {
   appearance: TourTextAppearance | null;
 }
 
+/** Independent highlight entry/exit phases; None retains its dormant duration. */
+export interface TourHighlightAnimation {
+  enter: { kind: 'none' | 'fade'; durationMs: number };
+  exit: { kind: 'none' | 'fade'; durationMs: number };
+}
+export const TOUR_HIGHLIGHT_ANIMATION_DEFAULTS: TourHighlightAnimation = {
+  enter: { kind: 'none', durationMs: 250 },
+  exit: { kind: 'none', durationMs: 250 },
+};
+
 /** Spotlight is presentation; redact requires irreversible raster preparation at export. */
 export interface TourMask {
+  /** Absent/null inherits animation independently from color and opacity. */
+  highlightAnimation?: TourHighlightAnimation | null | undefined;
   /** Absent preserves legacy local styling; true resolves central effect defaults. */
   inheritStyle?: boolean | undefined;
   narration?: TourObjectNarration | null | undefined;
@@ -141,7 +153,7 @@ export interface TourMask {
 
 /** Central defaults are separate for effects with distinct visual semantics. */
 export interface TourMaskDefaults {
-  highlight: { paint: Paint; opacity: number };
+  highlight: { paint: Paint; opacity: number; animation?: TourHighlightAnimation | undefined };
   spotlight: { color: string; opacity: number };
   blur: { radius: number };
 }
@@ -150,6 +162,20 @@ export const TOUR_MASK_DEFAULTS: TourMaskDefaults = {
   spotlight: { color: '#111827', opacity: 0.6 },
   blur: { radius: 12 },
 };
+
+/** Resolves detached visual phases; inactive effect kinds retain dormant authored settings. */
+export function resolveTourHighlightAnimation(
+  mask: Pick<TourMask, 'kind' | 'highlightAnimation'>,
+  defaults: TourMaskDefaults = TOUR_MASK_DEFAULTS
+): TourHighlightAnimation {
+  const value =
+    mask.kind === 'highlight'
+      ? (mask.highlightAnimation ??
+        defaults.highlight.animation ??
+        TOUR_HIGHLIGHT_ANIMATION_DEFAULTS)
+      : TOUR_HIGHLIGHT_ANIMATION_DEFAULTS;
+  return { enter: { ...value.enter }, exit: { ...value.exit } };
+}
 
 /** Resolve without mutating authored objects, including legacy local masks and redactions. */
 export function resolveTourMask(mask: TourMask, defaults = TOUR_MASK_DEFAULTS): TourMask {

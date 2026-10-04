@@ -608,3 +608,39 @@ it('applies stage gradient and solid paint while clearing only the stage image b
   expect(project.tour!.stage.paint?.kind).toBe('solid');
   expect(current()).toEqual(before);
 });
+
+it('inherits highlight animation independently and preserves it through appearance edits', async () => {
+  await click('Highlight');
+  const mask = current().masks[0]!;
+  await click('Use tour style');
+  scope = 'document';
+  draw();
+  await choose('Entry', 'Fade');
+  await fill('Entry duration', '0.6');
+  await choose('Exit', 'Fade');
+  await fill('Exit duration', '0.4');
+  const animation = structuredClone(project.tour!.style.maskDefaults!.highlight.animation);
+  await fill('Opacity', '45');
+  expect(project.tour!.style.maskDefaults!.highlight.animation).toEqual(animation);
+  scope = 'selection';
+  draw();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Entry duration"]')?.value).toBe(
+    '0.6'
+  );
+  await choose('Entry', 'None');
+  expect(current().masks[0]!.inheritStyle).toBe(false);
+  expect(current().masks[0]!.color).toBe(mask.color);
+  expect(current().masks[0]!.highlightAnimation?.enter.kind).toBe('none');
+  expect(project.tour!.style.maskDefaults!.highlight.animation).toEqual(animation);
+  await click('Use tour animation');
+  expect(current().masks[0]!.highlightAnimation).toBeNull();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Entry duration"]')?.value).toBe(
+    '0.6'
+  );
+  await choose('Highlight', 'Blur');
+  expect(host.querySelector('[aria-label="Entry"]')).toBeNull();
+  await choose('Highlight', 'Highlight');
+  disabled = true;
+  draw();
+  expect(host.querySelector<HTMLButtonElement>('[aria-label="Entry"]')?.disabled).toBe(true);
+});

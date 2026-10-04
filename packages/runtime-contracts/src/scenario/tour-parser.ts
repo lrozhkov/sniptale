@@ -16,6 +16,13 @@ const text = z.string().max(TOUR_LIMITS.maxTextLength);
 const fraction = z.number().finite().min(0).max(1);
 const color = z.string().regex(/^#[a-fA-F0-9]{6}$/);
 const duration = z.number().finite().positive().max(TOUR_LIMITS.maxDurationSeconds);
+const highlightPhase = z
+  .object({
+    kind: z.enum(['none', 'fade']),
+    durationMs: z.number().finite().min(100).max(1000),
+  })
+  .strict();
+const highlightAnimation = z.object({ enter: highlightPhase, exit: highlightPhase }).strict();
 const point = z.object({ x: fraction, y: fraction }).strict();
 const rect = point
   .extend({ width: fraction.gt(0), height: fraction.gt(0) })
@@ -137,6 +144,7 @@ export const tourObjectSchemas = {
       rect,
       kind: z.enum(['spotlight', 'highlight', 'blur', 'redact']),
       inheritStyle: z.boolean().optional(),
+      highlightAnimation: highlightAnimation.nullable().optional(),
       paint: tourPaintSchema.optional(),
       spotlightColor: color.optional(),
       spotlightOpacity: fraction.optional(),
@@ -232,7 +240,13 @@ export const tourDocumentSchema = z
         markerAppearance: markerAppearance.optional(),
         maskDefaults: z
           .object({
-            highlight: z.object({ paint: tourPaintSchema, opacity: fraction }).strict(),
+            highlight: z
+              .object({
+                paint: tourPaintSchema,
+                opacity: fraction,
+                animation: highlightAnimation.optional(),
+              })
+              .strict(),
             spotlight: z.object({ color, opacity: fraction }).strict(),
             blur: z.object({ radius: z.number().finite().min(1).max(80) }).strict(),
           })

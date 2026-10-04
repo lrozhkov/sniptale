@@ -9,6 +9,7 @@ import { bindTourObjectDrag } from './authoring.js';
 import {
   getTourSlideObjects,
   resolveTourMask,
+  resolveTourHighlightAnimation,
   resolveTourMarkerAppearance,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 
@@ -66,6 +67,7 @@ export function renderTourImage(
         labels,
         authoring,
         signal,
+        animation: resolveTourHighlightAnimation(mask, maskDefaults),
       })
     );
   const explanations = getTourSlideObjects(slide).flatMap((entry) =>

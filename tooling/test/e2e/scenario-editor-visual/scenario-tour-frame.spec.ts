@@ -1633,3 +1633,211 @@ for (const [locale, theme, viewport, camera] of [
     }
   });
 }
+
+for (const [locale, theme, viewport] of [
+  ['ru', 'light', { width: 1280, height: 560 }],
+  ['en', 'dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`tour highlight phases inherit and play in live fullscreen and offline ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await openVisualHarness(page, hostOrigin, theme, locale, viewport, 'compare', {
+      tourFixture: '1',
+    });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    const category = (key: 'tourObjects' | 'tourMask' | 'appearance') =>
+      panel
+        .getByRole('navigation')
+        .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true });
+    const choose = async (label: string, option: string) => {
+      await panel.getByRole('button', { name: label, exact: true }).click();
+      await page.getByRole('option', { name: option, exact: true }).click();
+    };
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+      .click();
+    await category('tourMask').click();
+    for (const [phase, duration] of [
+      ['tourHighlightEnter', 'tourHighlightEnterDuration'],
+      ['tourHighlightExit', 'tourHighlightExitDuration'],
+    ] as const) {
+      await choose(t(`scenario.editor.${phase}`), t('scenario.editor.tourAnimationFade'));
+      const field = panel.getByRole('textbox', {
+        name: t(`scenario.editor.${duration}`),
+        exact: true,
+      });
+      await field.fill('0.6');
+      await field.press('Enter');
+    }
+    await page.locator('.tour-slide-select').first().click();
+    await category('tourObjects').click();
+    await panel.getByRole('button', { name: t('scenario.editor.tourMask'), exact: true }).click();
+    await expect(page.locator('.tour-stage-host .tour-mask-highlight')).toHaveCount(1);
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
+      .click();
+    await category('tourObjects').click();
+    await panel.locator('.tour-object-add button').click();
+    await page
+      .getByRole('group', { name: t('scenario.editor.tourAddObject'), exact: true })
+      .getByRole('button', { name: t('scenario.editor.tourMask'), exact: true })
+      .click();
+    await expect(page.locator('.tour-stage-host .tour-mask-highlight')).toHaveCount(2);
+    await category('appearance').click();
+    await choose(t('scenario.editor.tourHighlightEnter'), t('scenario.editor.tourAnimationNone'));
+    await choose(t('scenario.editor.tourHighlightExit'), t('scenario.editor.tourAnimationNone'));
+    await expect(
+      panel.getByRole('switch', { name: t('scenario.editor.tourUseTourAnimation'), exact: true })
+    ).not.toBeChecked();
+    await expect(
+      panel.getByRole('switch', { name: t('scenario.editor.tourUseCentralStyle'), exact: true })
+    ).toBeChecked();
+    await info.attach(`highlight-controls-${locale}`, {
+      body: await page.screenshot({
+        fullPage: false,
+        path: info.outputPath(`highlight-controls-${locale}.png`),
+      }),
+      contentType: 'image/png',
+    });
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    const check = async (player: Locator, surface: string, automatic = false) => {
+      await player.locator('[data-tour-manual]').click();
+      const direct = async (index: number) => {
+        await player.locator('[data-tour-contents]').click();
+        await player.locator('.tour-contents-list button').nth(index).click();
+      };
+      await direct(1);
+      await expect(player).toHaveAttribute('data-slide-id', 'tour-after');
+      await player.evaluate((root) => {
+        const samples: { slide: string; opacity: number[] }[] = [];
+        Reflect.set(window, 'highlightSamples', samples);
+        const sample = () => {
+          if (!root.isConnected || Reflect.get(window, 'highlightSamples') !== samples) return;
+          samples.push({
+            slide: (root as HTMLElement).dataset['slideId'] ?? '',
+            opacity: [...root.querySelectorAll('.tour-mask-highlight .tour-mask-effect')].map(
+              (node) => Number(getComputedStyle(node).opacity)
+            ),
+          });
+          if (samples.length > 1200) samples.shift();
+          requestAnimationFrame(sample);
+        };
+        requestAnimationFrame(sample);
+      });
+      await direct(0);
+      const effect = player.locator('.tour-mask-highlight .tour-mask-effect');
+      await expect(effect).toHaveCount(2);
+      const samples = () =>
+        page.evaluate(
+          () => Reflect.get(window, 'highlightSamples') as { slide: string; opacity: number[] }[]
+        );
+      await expect
+        .poll(async () =>
+          (await samples()).some(
+            (sample) =>
+              sample.slide === 'tour-before' &&
+              sample.opacity[0]! > 0 &&
+              sample.opacity[0]! < 0.29 &&
+              sample.opacity[1] === 0.3
+          )
+        )
+        .toBe(true);
+      await expect(effect.first()).toHaveCSS('opacity', '0.3');
+      await expect(effect.nth(1)).toHaveCSS('opacity', '0.3');
+      await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+      await info.attach(`highlight-settled-${surface}-${locale}`, {
+        body: await page.screenshot({
+          fullPage: false,
+          path: info.outputPath(`highlight-settled-${surface}-${locale}.png`),
+        }),
+        contentType: 'image/png',
+      });
+      await page.evaluate(() =>
+        Reflect.set(
+          window,
+          'highlightExitStart',
+          (Reflect.get(window, 'highlightSamples') as unknown[]).length
+        )
+      );
+      if (automatic) await player.locator('[data-tour-play]').click();
+      else await player.locator('[data-tour-next]').click();
+      await expect(player).toHaveAttribute('data-slide-id', 'tour-after', { timeout: 12000 });
+      const start = await page.evaluate(() => Number(Reflect.get(window, 'highlightExitStart')));
+      expect(
+        (await samples())
+          .slice(start)
+          .some(
+            (sample) =>
+              sample.slide === 'tour-before' &&
+              sample.opacity[0]! > 0 &&
+              sample.opacity[0]! < 0.29 &&
+              sample.opacity[1] === 0.3
+          )
+      ).toBe(true);
+      await player.locator('[data-tour-manual]').click();
+      await direct(0);
+      await expect(effect.first()).toHaveCSS('opacity', '0.3');
+    };
+    const player = page.locator('.tour-stage-host #tour-player');
+    await check(player, 'normal', true);
+    await player.evaluate((root) => root.requestFullscreen());
+    await check(player, 'fullscreen');
+    await page.evaluate(() => document.exitFullscreen());
+    await page.evaluate(() => {
+      const chunks: Uint8Array[] = [];
+      Object.defineProperty(window, 'showSaveFilePicker', {
+        configurable: true,
+        value: async () => ({
+          createWritable: async () =>
+            new WritableStream<Uint8Array>({
+              write(chunk) {
+                chunks.push(chunk);
+              },
+            }),
+        }),
+      });
+      Object.defineProperty(window, 'savedHighlightTour', {
+        configurable: true,
+        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+      });
+    });
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedHighlightTour'))))
+      .toContain('<!doctype html>');
+    const output = info.outputPath('highlight-tour.html');
+    await writeFile(
+      output,
+      await page.evaluate(() => String(Reflect.get(window, 'savedHighlightTour')))
+    );
+    await page.context().setOffline(true);
+    try {
+      await page.goto(pathToFileURL(output).href);
+      const offline = page.locator('#tour-player');
+      await check(offline, 'offline');
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await offline.locator('[data-tour-next]').click();
+      await expect(offline).toHaveAttribute('data-slide-id', 'tour-after');
+      await offline.locator('[data-tour-previous]').click();
+      await expect(offline.locator('.tour-mask-highlight .tour-mask-effect').first()).toHaveCSS(
+        'opacity',
+        '0.3'
+      );
+    } finally {
+      await page.context().setOffline(false);
+    }
+  });
+}

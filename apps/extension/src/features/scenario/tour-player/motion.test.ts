@@ -172,3 +172,65 @@ it('reprojects outgoing pixels and travelling points without resetting elapsed m
   expect(f.root.querySelector('.tour-motion-previous')).toBeNull();
   expect(f.scene.inert).toBe(false);
 });
+
+it('projects highlight phases with exact base alpha through reflow, cancellation and outgoing capture', () => {
+  const f = fixture();
+  const masks = () => [...f.scene.querySelectorAll<HTMLElement>('[data-tour-highlight]')];
+  const markup =
+    '<div data-tour-highlight data-base-opacity="0.6" data-enter-ms="400" data-exit-ms="200"></div>' +
+    '<div data-tour-highlight data-base-opacity="0" data-enter-ms="400" data-exit-ms="200"></div>';
+  f.scene.insertAdjacentHTML('beforeend', markup);
+  f.prepare();
+  f.motion.ready();
+  f.motion.frame(200);
+  expect(masks().map((node) => Number(node.style.opacity))).toEqual([0.3, 0]);
+  f.motion.exit(100);
+  expect(masks().map((node) => Number(node.style.opacity))).toEqual([0.3, 0]);
+  masks().forEach((node) => node.remove());
+  f.scene.insertAdjacentHTML('beforeend', markup);
+  f.motion.reflow({ stageWidth: 320, stageHeight: 180 });
+  expect(masks().map((node) => Number(node.style.opacity))).toEqual([0.3, 0]);
+  f.motion.cancelExit();
+  expect(masks().map((node) => Number(node.style.opacity))).toEqual([0.6, 0]);
+  f.motion.exit(200);
+  const snapshot = f.motion.capture()!;
+  expect(
+    [...snapshot.pixels.querySelectorAll<HTMLElement>('[data-tour-highlight]')].map((node) =>
+      Number(node.style.opacity)
+    )
+  ).toEqual([0, 0]);
+  f.motion.cancel();
+  expect(masks().map((node) => Number(node.style.opacity))).toEqual([0.6, 0]);
+});
+
+it('keeps independent highlight durations and no-effect masks stable in reduced motion', () => {
+  const f = fixture();
+  f.scene.insertAdjacentHTML(
+    'beforeend',
+    '<div data-tour-highlight data-base-opacity="0.8" data-enter-ms="200" data-exit-ms="400"></div>' +
+      '<div data-tour-highlight data-base-opacity="0.4" data-enter-ms="0" data-exit-ms="0"></div>' +
+      '<div class="tour-mask-redact"><div class="tour-mask-effect" style="opacity:1"></div></div>'
+  );
+  const effects = () =>
+    [...f.scene.querySelectorAll<HTMLElement>('[data-tour-highlight]')].map((node) =>
+      Number(node.style.opacity)
+    );
+  f.prepare();
+  f.motion.ready();
+  f.motion.frame(100);
+  expect(effects()).toEqual([0.4, 0.4]);
+  f.motion.exit(200);
+  expect(effects()).toEqual([0.4, 0.4]);
+  expect(
+    f.scene.querySelector<HTMLElement>('.tour-mask-redact .tour-mask-effect')!.style.opacity
+  ).toBe('1');
+  f.prepare(true);
+  f.motion.ready();
+  f.motion.frame(0);
+  f.motion.exit(100);
+  expect(effects()).toEqual([0.8, 0.4]);
+  f.motion.cancel();
+  f.scene.querySelector<HTMLElement>('[data-tour-highlight]')!.style.opacity = '0.8';
+  f.motion.reflow({ stageWidth: 320, stageHeight: 180 });
+  expect(effects()).toEqual([0.8, 0.4]);
+});

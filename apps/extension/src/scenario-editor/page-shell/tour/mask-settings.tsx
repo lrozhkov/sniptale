@@ -4,6 +4,8 @@ import { useState, type ReactNode } from 'react';
 import { createSolidPaint, getRepresentativeColor, type Paint } from '@sniptale/foundation/paint';
 import {
   resolveTourMask,
+  resolveTourHighlightAnimation,
+  type TourHighlightAnimation,
   TOUR_MASK_DEFAULTS,
   type TourMaskDefaults,
   type TourDocument,
@@ -101,6 +103,16 @@ export function TourMaskSettings({
           }}
         />
       )}
+      {value.kind === 'highlight' && (
+        <TourHighlightAnimationFields
+          value={resolveTourHighlightAnimation(authored, defaults)}
+          inherited={!central && authored.highlightAnimation == null}
+          central={central}
+          disabled={disabled}
+          t={t}
+          onChange={(highlightAnimation) => onChange({ ...authored, highlightAnimation })}
+        />
+      )}
     </GuideInspectorGroup>
   );
   if (central) return appearance;
@@ -189,7 +201,12 @@ export function TourMaskDefaultSettings({
           style: {
             ...tour.style,
             maskDefaults: {
-              highlight: { paint: value.paint ?? defaults.highlight.paint, opacity: value.opacity },
+              highlight: {
+                ...defaults.highlight,
+                paint: value.paint ?? defaults.highlight.paint,
+                opacity: value.opacity,
+                ...(value.highlightAnimation ? { animation: value.highlightAnimation } : {}),
+              },
               spotlight: {
                 color: value.spotlightColor ?? defaults.spotlight.color,
                 opacity: value.spotlightOpacity ?? defaults.spotlight.opacity,
@@ -246,4 +263,87 @@ function maskEffectControls(value: TourMask) {
                 : { ...value, opacity: amount / 100 },
           },
   };
+}
+
+/** Animation inheritance is independent from the mask's paint and opacity inheritance. */
+function TourHighlightAnimationFields({
+  value,
+  inherited,
+  central,
+  disabled,
+  onChange,
+  t,
+}: {
+  value: TourHighlightAnimation;
+  inherited: boolean;
+  central: boolean;
+  disabled: boolean;
+  onChange: (value: TourHighlightAnimation | null) => boolean;
+  t: Translate;
+}) {
+  return (
+    <>
+      {!central && (
+        <label className="guide-number-toggle">
+          <ProductToggle
+            size="sm"
+            disabled={disabled}
+            aria-label={t('scenario.editor.tourUseTourAnimation')}
+            checked={inherited}
+            onClick={() => onChange(inherited ? value : null)}
+          />
+          {t('scenario.editor.tourUseTourAnimation')}
+        </label>
+      )}
+      {(['enter', 'exit'] as const).map((phase) => (
+        <div key={phase}>
+          <div className="tour-text-field">
+            <span>
+              {t(
+                phase === 'enter'
+                  ? 'scenario.editor.tourHighlightEnter'
+                  : 'scenario.editor.tourHighlightExit'
+              )}
+            </span>
+            <CompactSelect
+              aria-label={t(
+                phase === 'enter'
+                  ? 'scenario.editor.tourHighlightEnter'
+                  : 'scenario.editor.tourHighlightExit'
+              )}
+              disabled={disabled}
+              value={value[phase].kind}
+              options={[
+                { value: 'none', label: t('scenario.editor.tourAnimationNone') },
+                { value: 'fade', label: t('scenario.editor.tourAnimationFade') },
+              ]}
+              onChange={(kind) => onChange({ ...value, [phase]: { ...value[phase], kind } })}
+            />
+          </div>
+          {value[phase].kind === 'fade' && (
+            <TourInspectorNumericRow
+              label={t(
+                phase === 'enter'
+                  ? 'scenario.editor.tourHighlightEnterDuration'
+                  : 'scenario.editor.tourHighlightExitDuration'
+              )}
+              value={value[phase].durationMs / 1000}
+              unit="s"
+              min={0.1}
+              max={1}
+              step={0.05}
+              precision={2}
+              disabled={disabled}
+              onChange={(duration) =>
+                onChange({
+                  ...value,
+                  [phase]: { ...value[phase], durationMs: Math.round(duration * 1000) },
+                })
+              }
+            />
+          )}
+        </div>
+      ))}
+    </>
+  );
 }

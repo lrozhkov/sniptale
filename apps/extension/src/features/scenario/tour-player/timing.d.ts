@@ -11,3 +11,9 @@ export function tourEntranceTiming(
   slide: TourSlide | null,
   reducedMotion?: boolean
 ): { switchMs: number; travelMs: number; total: number };
+
+export function tourHighlightTiming(
+  tour: TourDocument,
+  slide: TourSlide | null,
+  reducedMotion?: boolean
+): { enterMs: number; exitMs: number };
