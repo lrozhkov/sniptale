@@ -1438,3 +1438,198 @@ for (const [locale, theme, viewport] of [
     }
   });
 }
+
+for (const [locale, theme, viewport, camera] of [
+  ['ru', 'light', { width: 1280, height: 560 }, 'tourCameraManual'],
+  ['en', 'dark', { width: 1920, height: 900 }, 'tourCameraAuto'],
+] as const) {
+  test(`tour full view and technical end work in live fullscreen and offline ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openVisualHarness(page, hostOrigin, theme, locale, viewport, 'compare', {
+      tourFixture: '1',
+    });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    const category = (key: 'tourObjects' | 'tourCamera') =>
+      panel
+        .getByRole('navigation')
+        .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true });
+    const portrait = await page.evaluateHandle(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 320;
+      canvas.height = 480;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#2563eb';
+      context.fillRect(0, 0, 320, 480);
+      context.fillStyle = '#22c55e';
+      context.fillRect(0, 0, 320, 80);
+      context.fillStyle = '#f97316';
+      context.fillRect(0, 400, 320, 80);
+      const bytes = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (c) =>
+        c.charCodeAt(0)
+      );
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([bytes], 'full-view-portrait.png', { type: 'image/png' }));
+      return transfer;
+    });
+    await page.locator('.tour-canvas').dispatchEvent('drop', { dataTransfer: portrait });
+    await expect
+      .poll(() =>
+        page
+          .locator('.tour-stage-host .tour-image')
+          .evaluate((image: HTMLImageElement) => image.naturalHeight)
+      )
+      .toBe(480);
+    await panel.getByRole('button', { name: t('scenario.editor.tourFit'), exact: true }).click();
+    await page.getByRole('option', { name: t('scenario.editor.tourCover'), exact: true }).click();
+    await category('tourObjects').click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
+      .click();
+    await category('tourCamera').click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourCameraMode'), exact: true })
+      .click();
+    await page.getByRole('option', { name: t(`scenario.editor.${camera}`), exact: true }).click();
+    const zoom = panel.getByRole('textbox', {
+      name: t('scenario.editor.tourCameraZoom'),
+      exact: true,
+    });
+    await zoom.fill('200');
+    await zoom.press('Enter');
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    const inspect = (player: Locator) =>
+      player.evaluate((root) => {
+        const image = root.querySelector<HTMLImageElement>('.tour-image')!;
+        const marker = root.querySelector<HTMLElement>('.tour-hotspot')!;
+        const bounds = image.getBoundingClientRect();
+        const stage = root.querySelector('[data-tour-stage]')!.getBoundingClientRect();
+        const x = parseFloat(marker.style.left),
+          y = parseFloat(marker.style.top);
+        return {
+          width: bounds.width / stage.width,
+          height: bounds.height / stage.height,
+          point: [
+            (x - parseFloat(image.style.left)) / parseFloat(image.style.width),
+            (y - parseFloat(image.style.top)) / parseFloat(image.style.height),
+          ],
+          source: [image.naturalWidth, image.naturalHeight],
+        };
+      });
+    const check = async (player: Locator, surface: string) => {
+      const full = player.locator('[data-tour-full-view]');
+      const contents = player.locator('[data-tour-contents]');
+      const first = async () => {
+        await contents.click();
+        await player.locator('.tour-contents-list button').first().click();
+        await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+      };
+      await first();
+      const authored = await inspect(player);
+      expect(authored.height).toBeGreaterThan(1);
+      await expect(full).toHaveAccessibleName(t('scenario.editor.tourFullView'));
+      await player.locator('[data-tour-play]').click();
+      await full.click();
+      await expect(full).toHaveAttribute('aria-pressed', 'true');
+      await expect(full).toHaveAccessibleName(t('scenario.editor.tourAuthoredView'));
+      await expect(player.locator('[data-tour-play]')).toHaveAccessibleName(
+        t('scenario.editor.tourPlay')
+      );
+      await expect(player).toHaveAttribute('data-tour-mode', 'playback');
+      const fitted = await inspect(player);
+      expect(fitted.width).toBeLessThanOrEqual(1.01);
+      expect(fitted.height).toBeLessThanOrEqual(1.01);
+      expect(fitted.source).toEqual([320, 480]);
+      fitted.point.forEach((value, index) => expect(value).toBeCloseTo(authored.point[index]!, 3));
+      await info.attach(`full-view-${surface}-${locale}`, {
+        body: await page.screenshot({
+          fullPage: false,
+          path: info.outputPath(`full-view-${surface}-${locale}.png`),
+        }),
+        contentType: 'image/png',
+      });
+      await full.click();
+      const restored = await inspect(player);
+      expect(restored.width).toBeCloseTo(authored.width, 2);
+      expect(restored.height).toBeCloseTo(authored.height, 2);
+      await contents.click();
+      const end = player
+        .locator('.tour-contents-list')
+        .getByRole('button', { name: t('scenario.editor.tourEnd'), exact: true });
+      await end.click();
+      await expect(player).toHaveAttribute('data-slide-id', 'end');
+      await expect(contents).toBeFocused();
+      await expect(full).toBeHidden();
+      await player.locator('[data-tour-stage]').click({ position: { x: 4, y: 4 } });
+      await page.keyboard.press('Space');
+      await expect(player).toHaveAttribute('data-slide-id', 'end');
+      await contents.click();
+      await expect(end).toHaveAttribute('aria-current', 'step');
+      await page.keyboard.press('Escape');
+      await player.locator('[data-tour-previous]').click();
+      await expect(player).toHaveAttribute('data-slide-id', 'tour-before');
+      await expect(full).toHaveAttribute('aria-pressed', 'false');
+      await contents.click();
+      await end.click();
+      await player
+        .getByRole('button', { name: t('scenario.editor.tourRestart'), exact: true })
+        .click();
+      await expect(player).toHaveAttribute('data-slide-id', 'tour-before');
+      await expect(full).toHaveAttribute('aria-pressed', 'false');
+    };
+    const player = page.locator('.tour-stage-host #tour-player');
+    await check(player, 'normal');
+    await player.evaluate((root) => root.requestFullscreen());
+    await check(player, 'fullscreen');
+    await page.evaluate(() => document.exitFullscreen());
+    await page.evaluate(() => {
+      const chunks: Uint8Array[] = [];
+      Object.defineProperty(window, 'showSaveFilePicker', {
+        configurable: true,
+        value: async () => ({
+          createWritable: async () =>
+            new WritableStream<Uint8Array>({
+              write(chunk) {
+                chunks.push(chunk);
+              },
+            }),
+        }),
+      });
+      Object.defineProperty(window, 'savedFullViewTour', {
+        configurable: true,
+        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+      });
+    });
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedFullViewTour'))))
+      .toContain('<!doctype html>');
+    const output = info.outputPath('full-view-tour.html');
+    await writeFile(
+      output,
+      await page.evaluate(() => String(Reflect.get(window, 'savedFullViewTour')))
+    );
+    await page.context().setOffline(true);
+    try {
+      await page.goto(pathToFileURL(output).href);
+      await check(page.locator('#tour-player'), 'offline');
+    } finally {
+      await page.context().setOffline(false);
+    }
+  });
+}

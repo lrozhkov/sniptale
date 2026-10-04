@@ -5,7 +5,7 @@ const ease = (value) => value * value * (3 - 2 * value);
 const between = (from, to, progress) => from + (to - from) * progress;
 
 /** Visual snapshots only. The playback clock supplies every frame and owns elapsed time. */
-export function createTourMotion(root, signal) {
+export function createTourMotion(root, signal, changed = () => {}) {
   const scene = root.querySelector('[data-tour-scene]');
   const stage = root.querySelector('[data-tour-stage]');
   const hint = root.querySelector('[data-tour-hint]');
@@ -14,15 +14,19 @@ export function createTourMotion(root, signal) {
     if (!current?.ready || signal.aborted) return;
     current.elapsed = elapsed;
     if (elapsed >= current.phases.total) {
+      const wasSettled = stage.dataset.motion === 'settled';
       settleMotion(current, scene, hint, stage);
+      if (!wasSettled) changed();
       return;
     }
     scene.inert = true;
     hint.inert = true;
     hint.style.visibility = 'hidden';
     if (current.previous) stage.append(current.previous.pixels);
+    const wasRunning = stage.dataset.motion === 'running';
     stage.dataset.motion = 'running';
     applyMotionFrame(current, scene, stage, elapsed);
+    if (!wasRunning) changed();
   }
   function cancel({ preserveMediaGate = false } = {}) {
     const gate =
@@ -40,6 +44,7 @@ export function createTourMotion(root, signal) {
       hint.inert = true;
       hint.style.visibility = 'hidden';
     }
+    changed();
   }
   signal.addEventListener('abort', cancel, { once: true });
   return {
@@ -68,6 +73,7 @@ export function createTourMotion(root, signal) {
       scene.style.opacity = '0';
       if (previous) stage.append(previous.pixels);
       stage.dataset.motion = 'loading';
+      changed();
     },
     ready() {
       if (current) current.ready = true;
@@ -97,6 +103,7 @@ export function createTourMotion(root, signal) {
       scene.style.opacity = '0';
       if (previous) stage.append(previous.pixels);
       stage.dataset.motion = 'loading';
+      changed();
     },
     fail() {
       cancel();
@@ -104,6 +111,7 @@ export function createTourMotion(root, signal) {
       hint.inert = true;
       hint.style.visibility = 'hidden';
       stage.dataset.motion = 'error';
+      changed();
     },
     cancel,
   };

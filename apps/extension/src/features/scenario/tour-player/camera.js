@@ -85,3 +85,12 @@ export function tourCameraEnabled(slide, autoZoom) {
     (slide.camera.mode === 'auto' || (slide.camera.mode === 'inherit' && autoZoom))
   );
 }
+
+/** Viewer-only full-source projection; authored fit and camera stay untouched. */
+export function resolveTourFullViewCamera(slide, viewport) {
+  return resolveTourCamera(
+    { ...slide, fit: 'contain', camera: { ...slide.camera, mode: 'off' } },
+    viewport,
+    false
+  );
+}

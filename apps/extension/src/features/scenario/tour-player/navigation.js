@@ -39,7 +39,7 @@ export function createTourNavigation({
     return rendered;
   }
 
-  function openContents(slides, index, onSelect) {
+  function openContents(slides, index, onSelect, endScreen) {
     const navigation = root.querySelector('[data-tour-navigation]');
     const trigger = root.querySelector('[data-tour-contents]');
     if (navigation.open) {
@@ -49,15 +49,22 @@ export function createTourNavigation({
     navigation.replaceChildren();
     const list = element('div', 'tour-contents-list');
     let current = null;
-    slides.forEach((slide, number) => {
-      const button = actionButton(`${number + 1}. ${slide.title}`, { kind: 'none' }, 'tour-button');
-      button.title = slide.title;
-      if (number === index) {
+    const entries = slides.map((slide, number) => ({
+      key: number,
+      label: `${number + 1}. ${slide.title}`,
+      title: slide.title,
+    }));
+    if (endScreen?.enabled)
+      entries.push({ key: 'end', label: labels.end ?? labels.finished, title: endScreen.title });
+    entries.forEach((entry) => {
+      const button = actionButton(entry.label, { kind: 'none' }, 'tour-button');
+      button.title = entry.title;
+      if (entry.key === index) {
         button.setAttribute('aria-current', 'step');
         current = button;
       }
       button.addEventListener('click', () => {
-        onSelect(number);
+        onSelect(entry.key === 'end' ? slides.length : entry.key);
         closeContents(true);
       });
       list.append(button);

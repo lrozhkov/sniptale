@@ -59,7 +59,12 @@ it.each(['ru', 'en'] as const)(
       )!;
     expect(button('htmlSave').disabled).toBe(true);
     await act(async () => button('tourHtmlPrepare').click());
-    expect(io.prepare.mock.calls[0]![0].labels.manual).toBe(t('scenario.editor.tourManual'));
+    expect(io.prepare.mock.calls[0]![0].labels).toMatchObject({
+      manual: t('scenario.editor.tourManual'),
+      fullView: locale === 'ru' ? 'Слайд целиком' : 'Full slide',
+      authoredView: locale === 'ru' ? 'Авторский вид' : 'Authored view',
+      end: t('scenario.editor.tourEnd'),
+    });
     const frame = host.querySelector('iframe')!;
     expect(frame.getAttribute('src')).toContain('/tour-preview-sandbox/index.html#');
     const post = vi.spyOn(frame.contentWindow!, 'postMessage');

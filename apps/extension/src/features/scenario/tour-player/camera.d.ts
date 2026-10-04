@@ -19,4 +19,8 @@ export function resolveTourEditingCamera(
   slide: TourImageSlide,
   viewport: { stageWidth: number; stageHeight: number }
 ): TourImageProjection | null;
+export function resolveTourFullViewCamera(
+  slide: TourImageSlide,
+  viewport: { stageWidth: number; stageHeight: number }
+): TourImageProjection | null;
 export function tourCameraEnabled(slide: TourImageSlide | null, autoZoom: boolean): boolean;

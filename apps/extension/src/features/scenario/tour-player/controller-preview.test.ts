@@ -444,6 +444,7 @@ it.each(['loading', 'running'] as const)(
     };
     tour.slides = [slide];
     const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+    expect(root.querySelector<HTMLButtonElement>('[data-tour-full-view]')!.disabled).toBe(true);
     if (phase === 'running') {
       pending.at(-1)!.onload!();
       await tick(0);
@@ -458,6 +459,7 @@ it.each(['loading', 'running'] as const)(
       await tick(0);
       await tick(250);
     }
+    expect(root.querySelector<HTMLButtonElement>('[data-tour-full-view]')!.disabled).toBe(false);
     const plane = root.querySelector<HTMLElement>('.tour-image-plane')!;
     expect(plane.style.transform).toContain('scale(0.578125)');
     await tick(250);
@@ -688,4 +690,77 @@ it('preserves consumed keys, contents dialog and ARIA control focus', async () =
   root.dispatchEvent(key);
   expect(key.defaultPrevented).toBe(false);
   expect(root.dataset['slideId']).toBe('first');
+});
+
+it('keeps temporary full-source projection aligned through playback, resize and explicit restore', async () => {
+  instantImages();
+  const tick = playbackFrames();
+  const tour = previewTour();
+  const slide = imageSlide('first');
+  slide.fit = 'cover';
+  slide.image!.height = 200;
+  slide.camera = { mode: 'manual', zoom: 3, center: { x: 0.5, y: 0.5 } };
+  tour.slides = [slide, imageSlide('second')];
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.25, y: 0.75 },
+      targetRect: null,
+      label: 'Point',
+      text: 'Hint',
+      action: { kind: 'none' },
+      appearance: null,
+      pulse: false,
+    },
+  ];
+  slide.masks = [
+    {
+      id: 'mask',
+      rect: { x: 0.1, y: 0.2, width: 0.3, height: 0.4 },
+      kind: 'highlight',
+      color: '#ff0000',
+      opacity: 0.5,
+    },
+  ];
+  const before = JSON.stringify(tour);
+  const { root, player } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+  await settleMedia();
+  await tick(0);
+  const button = root.querySelector<HTMLButtonElement>('[data-tour-full-view]')!;
+  expect(button).not.toBeNull();
+  expect(button.disabled).toBe(false);
+  const image = () => root.querySelector<HTMLElement>('.tour-image')!;
+  const authoredWidth = image().style.width;
+  button.click();
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(root.dataset['tourMode']).toBe('playback');
+  const fullWidth = parseFloat(image().style.width);
+  const fullHeight = parseFloat(image().style.height);
+  const stage = root.querySelector<HTMLElement>('[data-tour-stage]')!;
+  expect(fullWidth).toBeLessThanOrEqual(parseFloat(stage.style.width));
+  expect(fullHeight).toBeLessThanOrEqual(parseFloat(stage.style.height));
+  const marker = root.querySelector<HTMLElement>('.tour-hotspot')!;
+  const mask = root.querySelector<HTMLElement>('.tour-mask')!;
+  expect(parseFloat(marker.style.left)).toBeCloseTo(
+    parseFloat(image().style.left) + fullWidth * 0.25
+  );
+  expect(parseFloat(marker.style.top)).toBeCloseTo(
+    parseFloat(image().style.top) + fullHeight * 0.75
+  );
+  expect(parseFloat(mask.style.width)).toBeCloseTo(fullWidth * 0.3);
+  await tick(100000);
+  expect(root.dataset['slideId']).toBe('first');
+  expect(parseFloat(image().style.width)).toBe(fullWidth);
+  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
+  await tick(1);
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  globalThis.dispatchEvent(new Event('resize'));
+  expect(parseFloat(image().style.width)).toBe(fullWidth);
+  button.click();
+  expect(image().style.width).toBe(authoredWidth);
+  button.click();
+  player.select('second');
+  player.select('first');
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  expect(JSON.stringify(tour)).toBe(before);
 });

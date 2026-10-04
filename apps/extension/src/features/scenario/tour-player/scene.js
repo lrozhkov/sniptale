@@ -1,4 +1,5 @@
 import { serializePaintToCss } from '@sniptale/foundation/paint';
+import { resolveTourCamera, resolveTourFullViewCamera } from './camera.js';
 import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
@@ -58,16 +59,29 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
   const viewport = query('viewport');
   const stage = query('stage');
   const scene = query('scene');
-  const motion = authoring ? null : createTourMotion(root, signal);
+
   const reducedMotion = () =>
     Boolean(globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   let current = null;
   let ended = false;
+  let fullView = false;
   let selectedObjectId = null;
   let lastFontSize = '';
   let stageWidth = 640;
   let stageHeight = 360;
   let hints = [];
+  const updateFullView = createFullViewControl(root, labels, signal, authoring, () =>
+    boundary?.fullView?.()
+  );
+  const refreshFullView = () =>
+    updateFullView({
+      slide: ended ? null : current,
+      viewport: { stageWidth, stageHeight },
+      autoZoom: tour.playback.autoZoom,
+      fullView,
+      state: stage.dataset.motion,
+    });
+  const motion = authoring ? null : createTourMotion(root, signal, refreshFullView);
   const { element, actionButton } = sceneElements(root.ownerDocument, onAction, policy);
   const hintController = createSceneHints(root, input, policy, signal, () => hints, boundary);
   const navigationController = createTourNavigation({
@@ -82,72 +96,47 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
 
   function render() {
     if (signal.aborted) return;
-    const focused = root.getRootNode().activeElement;
-    scene.replaceChildren();
-    let imageBox = null;
-    hints = [];
-    const slide = ended ? endSlide(tour, labels) : current;
-    if (slide?.kind === 'image') {
-      imageBox = renderTourImage(
-        slide,
-        { stageWidth, stageHeight },
-        {
-          scene,
-          element,
-          labels,
-          media,
-          actionButton,
-          hintController,
-          onAction,
-          authoring,
-          signal,
-          autoZoom: tour.playback.autoZoom,
-          maskDefaults: tour.style.maskDefaults,
-          style: tour.style,
-        }
-      );
-      hints = slide.image ? slideExplanations(slide) : [];
-    } else if (slide) {
-      const rendered = navigationController.render(
-        slide,
-        stageWidth,
-        stageHeight,
-        selectedObjectId
-      );
-      scene.append(rendered.panel);
-      hints = rendered.hints;
-    } else scene.append(element('p', 'tour-empty', labels.empty));
-    hintController.show(hints, { stageWidth, stageHeight, imageBox });
-    markTourSelection(scene, selectedObjectId, focused);
+    hints = renderSceneContent(
+      ended ? endSlide(tour, labels) : current,
+      { stageWidth, stageHeight },
+      {
+        scene,
+        element,
+        labels,
+        media,
+        actionButton,
+        hintController,
+        onAction,
+        authoring,
+        signal,
+        autoZoom: tour.playback.autoZoom,
+        maskDefaults: tour.style.maskDefaults,
+        style: tour.style,
+        fullView,
+      },
+      navigationController,
+      selectedObjectId
+    );
+    refreshFullView();
   }
   function resize() {
     if (signal.aborted) return;
-    const {
-      width: nextWidth,
-      height: nextHeight,
-      fontSize,
-    } = measureScene(root, viewport, tour.stage.aspect);
-    if (
-      nextWidth === stageWidth &&
-      nextHeight === stageHeight &&
-      fontSize === lastFontSize &&
-      stage.style.width
-    )
-      return;
-    lastFontSize = fontSize;
-    stageWidth = nextWidth;
-    stageHeight = nextHeight;
-    root.style.setProperty('--tour-frame-width', `${stageWidth}px`);
-    viewport.style.width = `${stageWidth}px`;
-    viewport.style.height = `${stageHeight}px`;
-    stage.style.width = `${stageWidth}px`;
-    stage.style.height = `${stageHeight}px`;
+    const next = resizeTourViewport(root, viewport, stage, tour.stage.aspect, {
+      width: stageWidth,
+      height: stageHeight,
+      fontSize: lastFontSize,
+    });
+    if (!next) return;
+    lastFontSize = next.fontSize;
+    stageWidth = next.width;
+    stageHeight = next.height;
     render();
     motion?.reflow({ stageWidth, stageHeight });
   }
   applySceneStyle(root, stage, tour, media);
   return {
     update(next) {
+      fullView = false;
       tour = next.tour;
       media.clear();
       for (const asset of next.assets) media.set(asset.id, asset.src);
@@ -158,11 +147,19 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
       selectedObjectId = id;
       if (authoring && current?.kind === 'navigation') render();
       markTourSelection(scene, selectedObjectId);
-      const hintIndex =
-        current?.kind === 'image'
-          ? slideExplanations(current).findIndex((item) => item.id === id)
-          : -1;
-      if (hintIndex >= 0) hintController.select(hintIndex);
+      selectObjectHint(current, id, hintController);
+    },
+    toggleFullView() {
+      if (
+        authoring ||
+        ended ||
+        current?.kind !== 'image' ||
+        ['loading', 'error'].includes(stage.dataset.motion)
+      )
+        return;
+      motion?.cancel({ preserveMediaGate: true });
+      fullView = !fullView;
+      render();
     },
     resize,
     motion,
@@ -171,6 +168,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
     show(slide, isEnd, hintEdge = 0) {
       if (signal.aborted) return;
       const previous = motion?.capture() ?? null;
+      fullView = false;
       hintController.reset(current?.id === slide?.id && ended === isEnd);
       current = slide;
       ended = isEnd;
@@ -186,6 +184,99 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
         reducedMotion()
       );
     },
+  };
+}
+
+/** Selection uses the same authored explanation order as scene rendering. */
+function selectObjectHint(slide, id, hints) {
+  const index =
+    slide?.kind === 'image' ? slideExplanations(slide).findIndex((item) => item.id === id) : -1;
+  if (index >= 0) hints.select(index);
+}
+
+/** Stable viewport projection only; scene state and motion remain with the caller. */
+function resizeTourViewport(root, viewport, stage, aspect, previous) {
+  const next = measureScene(root, viewport, aspect);
+  if (
+    next.width === previous.width &&
+    next.height === previous.height &&
+    next.fontSize === previous.fontSize &&
+    stage.style.width
+  )
+    return null;
+  root.style.setProperty('--tour-frame-width', `${next.width}px`);
+  viewport.style.width = stage.style.width = `${next.width}px`;
+  viewport.style.height = stage.style.height = `${next.height}px`;
+  return next;
+}
+
+/** Image and navigation renderers share the scene owner and return its hint projection. */
+function renderSceneContent(slide, viewport, context, navigation, selectedObjectId) {
+  const { scene, hintController } = context;
+  const focused = scene.getRootNode().activeElement;
+  scene.replaceChildren();
+  const rendered = renderSceneBody(slide, viewport, context, navigation, selectedObjectId);
+  hintController.show(rendered.hints, { ...viewport, imageBox: rendered.imageBox });
+  markTourSelection(scene, selectedObjectId, focused);
+  return rendered.hints;
+}
+
+function renderSceneBody(slide, viewport, context, navigation, selectedObjectId) {
+  if (slide?.kind === 'image')
+    return {
+      imageBox: renderTourImage(slide, viewport, context),
+      hints: slide.image ? slideExplanations(slide) : [],
+    };
+  if (slide) {
+    const rendered = navigation.render(
+      slide,
+      viewport.stageWidth,
+      viewport.stageHeight,
+      selectedObjectId
+    );
+    context.scene.append(rendered.panel);
+    return { imageBox: null, hints: rendered.hints };
+  }
+  context.scene.append(context.element('p', 'tour-empty', context.labels.empty));
+  return { imageBox: null, hints: [] };
+}
+
+/** Disposable button projects scene-owned full view; it never owns camera or playback state. */
+function createFullViewControl(root, labels, signal, authoring, toggle) {
+  if (authoring) return () => {};
+  const button = root.ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'tour-button tour-icon-button';
+  button.dataset.tourFullView = '';
+  const svg = root.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '2');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = root.ownerDocument.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 8h8v8H8z');
+  svg.append(path);
+  button.append(svg);
+  button.addEventListener('click', toggle, { signal });
+  root.querySelector('.tour-controls').append(button);
+  signal.addEventListener('abort', () => button.remove(), { once: true });
+  return ({ slide, viewport, autoZoom, fullView, state }) => {
+    const authored = slide?.kind === 'image' ? resolveTourCamera(slide, viewport, autoZoom) : null;
+    const full = authored ? resolveTourFullViewCamera(slide, viewport) : null;
+    button.hidden =
+      !authored ||
+      !full ||
+      ['x', 'y', 'width', 'height'].every((key) => Math.abs(authored[key] - full[key]) < 0.01);
+    button.disabled = ['loading', 'error'].includes(state);
+    button.setAttribute('aria-pressed', String(fullView));
+    const label = fullView
+      ? (labels.authoredView ?? 'Authored view')
+      : (labels.fullView ?? 'Full slide');
+    button.setAttribute('aria-label', label);
+    button.title = label;
   };
 }
 

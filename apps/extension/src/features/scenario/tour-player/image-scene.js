@@ -1,5 +1,9 @@
 import { renderTourCameraFrame } from './camera-frame.js';
-import { resolveTourCamera, resolveTourEditingCamera } from './camera.js';
+import {
+  resolveTourCamera,
+  resolveTourEditingCamera,
+  resolveTourFullViewCamera,
+} from './camera.js';
 import { renderTourMask } from './image-mask.js';
 import { bindTourObjectDrag } from './authoring.js';
 import {
@@ -29,6 +33,7 @@ export function renderTourImage(
     autoZoom,
     maskDefaults,
     style,
+    fullView = false,
   }
 ) {
   if (!slide.image) {
@@ -37,7 +42,9 @@ export function renderTourImage(
   }
   const imageBox = authoring
     ? resolveTourEditingCamera(slide, { stageWidth, stageHeight })
-    : resolveTourCamera(slide, { stageWidth, stageHeight }, autoZoom);
+    : fullView
+      ? resolveTourFullViewCamera(slide, { stageWidth, stageHeight })
+      : resolveTourCamera(slide, { stageWidth, stageHeight }, autoZoom);
   if (!imageBox) return null;
   const plane = element('div', 'tour-image-plane');
   scene.append(plane);

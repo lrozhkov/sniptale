@@ -893,7 +893,8 @@ a:focus-visible {
   grid-row: 2;
 }
 
-.tour-controls [data-tour-manual][aria-pressed='true'] {
+.tour-controls [data-tour-manual][aria-pressed='true'],
+.tour-controls [data-tour-full-view][aria-pressed='true'] {
   background: color-mix(in srgb, currentColor 16%, transparent);
   box-shadow: inset 0 0 0 1px currentColor;
 }

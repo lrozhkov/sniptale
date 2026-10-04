@@ -480,6 +480,7 @@ it('gates playback on decoded current media, ignores stale loads and permits ret
   pending.at(-1)!.onerror!();
   await tick(0);
   expect(play.textContent).toBe('Retry');
+  expect(root.querySelector<HTMLButtonElement>('[data-tour-full-view]')!.disabled).toBe(true);
   Object.defineProperty(viewport, 'clientWidth', { value: 400, configurable: true });
   window.dispatchEvent(new Event('resize'));
   expect(root.querySelector<HTMLElement>('[data-tour-hint]')!.inert).toBe(true);

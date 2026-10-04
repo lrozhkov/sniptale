@@ -27,6 +27,10 @@ export function createTourPlayer(root, input, options = {}) {
       playback?.interact();
       go(index + direction, true, direction);
     },
+    fullView: () => {
+      playback?.interact();
+      view.toggleFullView();
+    },
     position: (hintIndex) => explanationPosition(tour, index, hintIndex),
   });
   const chrome = options.authoring ? null : createTourChrome(root, lifetime.signal);
@@ -58,7 +62,7 @@ export function createTourPlayer(root, input, options = {}) {
     )
       return;
     if (recordHistory && (target !== index || ended)) {
-      history.push(index);
+      history.push(ended ? 'end' : index);
       if (history.length > 1000) history.shift();
     }
     ended = target === tour.slides.length && tour.endScreen.enabled;
@@ -66,8 +70,7 @@ export function createTourPlayer(root, input, options = {}) {
     render(hintEdge);
   }
   function back() {
-    const target = history.pop();
-    navigationInput.manualGo(target ?? Math.max(0, index - 1), false);
+    navigationInput.manualGo(previousTourTarget(history, tour, index), false);
   }
   function render(hintEdge = 0) {
     if (lifetime.signal.aborted) return;
@@ -90,7 +93,7 @@ export function createTourPlayer(root, input, options = {}) {
     },
     openContents: (select) => {
       playback?.pause();
-      view.openContents(tour.slides, index, select);
+      view.openContents(tour.slides, ended ? 'end' : index, select, tour.endScreen);
     },
   });
   observeViewport(root, view.resize, lifetime.signal);
@@ -137,6 +140,13 @@ export function createTourPlayer(root, input, options = {}) {
       scene.replaceChildren();
     },
   };
+}
+
+/** Resolve transient end history against the current document after live updates. */
+function previousTourTarget(history, tour, index) {
+  let target = history.pop();
+  while (target === 'end' && !tour.endScreen.enabled) target = history.pop();
+  return target === 'end' ? tour.slides.length : (target ?? Math.max(0, index - 1));
 }
 
 /** Binds navigation DOM once; selection and history remain controller-owned. */

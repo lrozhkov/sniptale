@@ -13,6 +13,7 @@ const labels = {
   close: 'Close',
   restart: 'Restart',
   finished: 'Finished',
+  end: 'End of tour',
   empty: 'Empty',
   point: 'Point',
   details: 'Details',
@@ -37,8 +38,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-async function mount() {
+async function mount(endEnabled = true) {
   const tour = createTourDocument('tour');
+  tour.endScreen.enabled = endEnabled;
   tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
   tour.slides[0]!.title = 'First';
   tour.slides[1]!.title = 'Second';
@@ -48,7 +50,7 @@ async function mount() {
   if (!root) throw new Error('Missing player fixture');
   document.body.append(root);
   const player = createTourPlayer(root, { tour, labels, assets: [] });
-  const value = { player, root };
+  const value = { player, root, tour };
   mounted.push(value);
   return value;
 }
@@ -63,9 +65,9 @@ it('opens the slide drawer and selects or dismisses it predictably', async () =>
   expect(navigation.open).toBe(true);
   expect(trigger.getAttribute('aria-expanded')).toBe('true');
   const items = [...navigation.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')];
-  expect(items).toHaveLength(2);
+  expect(items).toHaveLength(3);
   expect(items[0]!.getAttribute('aria-current')).toBe('step');
-  expect(items.map((item) => item.textContent)).toEqual(['1. First', '2. Second']);
+  expect(items.map((item) => item.textContent)).toEqual(['1. First', '2. Second', 'End of tour']);
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
   expect(navigation.open).toBe(false);
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
@@ -138,4 +140,50 @@ it('releases drawer listeners when disposed while open', async () => {
   document.dispatchEvent(escape);
   expect(escape.defaultPrevented).toBe(false);
   expect(root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!.open).toBe(false);
+});
+
+it('selects the technical end and preserves its history identity across slide count updates', async () => {
+  const { root, player, tour } = await mount();
+  const trigger = root.querySelector<HTMLButtonElement>('[data-tour-contents]')!;
+  const select = (index: number) => {
+    trigger.click();
+    root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')[index]!.click();
+  };
+  select(2);
+  expect(root.dataset['slideId']).toBe('end');
+  expect(document.activeElement).toBe(trigger);
+  trigger.click();
+  const rows = root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button');
+  expect([...rows].filter((row) => row.hasAttribute('aria-current'))).toEqual([rows[2]]);
+  expect(document.activeElement).toBe(rows[2]);
+  rows[0]!.click();
+  const expanded = { ...tour, slides: [...tour.slides, createTourImageSlide('third')] };
+  player.update({ tour: expanded, labels, assets: [] });
+  root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
+  expect(root.dataset['slideId']).toBe('end');
+  root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
+  expect(root.dataset['slideId']).toBe('first');
+});
+
+it('omits disabled end and skips retained end history when the feature is disabled', async () => {
+  const { root, player, tour } = await mount();
+  const trigger = root.querySelector<HTMLButtonElement>('[data-tour-contents]')!;
+  const select = (index: number) => {
+    trigger.click();
+    root.querySelectorAll<HTMLButtonElement>('.tour-contents-list button')[index]!.click();
+  };
+  select(2);
+  select(1);
+  player.update({
+    tour: { ...tour, endScreen: { ...tour.endScreen, enabled: false } },
+    labels,
+    assets: [],
+  });
+  trigger.click();
+  expect(root.querySelectorAll('.tour-contents-list button')).toHaveLength(2);
+  trigger.click();
+  root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
+  expect(root.dataset['slideId']).toBe('first');
+  player.selectEnd();
+  expect(root.dataset['slideId']).toBe('first');
 });
