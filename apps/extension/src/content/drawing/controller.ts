@@ -6,7 +6,7 @@ import {
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import { resolvePageScrollRoot, type PageScrollRoot } from '../platform/page-scroll';
-import { createPagePreparationDrawingSession } from './history';
+import { createPagePreparationDrawingSession, type DrawingHistoryCommitPort } from './history';
 import { synchronizeContentDrawingPreferences } from './preferences';
 import { createDrawingLayout } from './layout';
 
@@ -33,8 +33,10 @@ export function useDrawingSessionSnapshot(session: DrawingSession): DrawingSessi
   return session.getSnapshot();
 }
 
-export function useContentDrawingController(): ContentDrawingController {
-  const controller = useMemo(() => createContentDrawingController(), []);
+export function useContentDrawingController(
+  history: DrawingHistoryCommitPort
+): ContentDrawingController {
+  const controller = useMemo(() => createContentDrawingController(history), [history]);
 
   useEffect(() => {
     const unsubscribe = synchronizeContentDrawingPreferences(controller);
@@ -48,12 +50,15 @@ export function useContentDrawingController(): ContentDrawingController {
 }
 
 export function createContentDrawingController(
-  suppliedSession?: DrawingSession
+  source: DrawingSession | DrawingHistoryCommitPort
 ): ContentDrawingController {
   let root: PageScrollRoot = { kind: 'viewport', element: null };
-  const layout = suppliedSession ? null : createDrawingLayout(() => root);
+  const history = 'commitEntry' in source ? source : null;
+  const layout = history ? createDrawingLayout(() => root) : null;
   const session =
-    suppliedSession ?? createPagePreparationDrawingSession(undefined, layout ?? undefined);
+    'commitEntry' in source
+      ? createPagePreparationDrawingSession(source, layout ?? undefined)
+      : source;
   let palette: readonly string[] = [...DEFAULT_DRAWING_COLORS];
   let finalizer: (() => void) | null = null;
   let pendingTextChange = false;

@@ -2573,7 +2573,7 @@ for (const variant of [
   { locale: 'ru' as const, theme: 'light' as const },
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
-  test(`quick editor preserves authored focus geometry while dragging across Cut at HD in ${variant.locale}/${variant.theme}`, async ({
+  test(`focus retains authored geometry while dragging across Cut at HD in ${variant.locale}/${variant.theme}`, async ({
     page,
   }, testInfo) => {
     const host = await startHostServer();

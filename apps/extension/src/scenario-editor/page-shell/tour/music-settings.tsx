@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { FolderOpen, Music2, Unlink } from 'lucide-react';
+import { Music2, Unlink } from 'lucide-react';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import {
   createTourBackgroundMusic,
@@ -10,7 +9,6 @@ import type { importScenarioNarration } from '../../../composition/persistence/s
 import type { Translate } from '../../../platform/i18n';
 import { GuideInspectorGroup } from '../inspector';
 import { ScenarioInspectorActionButton } from '../inspector-actions';
-import { TourAudioPicker } from './audio-materials';
 import { TourNarrationAcquisition } from './narration-acquisition';
 import { TourInspectorNumericRow } from './numeric-row';
 
@@ -32,7 +30,6 @@ export function TourMusicSettings({
   ) => Promise<boolean>;
   t: Translate;
 }) {
-  const [choosing, setChoosing] = useState(false);
   const music = tour.backgroundMusic ?? null;
   const resources = getTourAudioResources(tour);
   const resource = resources.find((entry) => entry.assetId === music?.assetId);
@@ -67,28 +64,15 @@ export function TourMusicSettings({
         disabled={importDisabled}
         onImport={onImport}
         t={t}
-      >
-        <ScenarioInspectorActionButton
-          disabled={disabled || !resources.length}
-          aria-expanded={choosing}
-          onClick={() => setChoosing(!choosing)}
-        >
-          <FolderOpen size={15} />
-          {t('scenario.editor.tourAudioChoose')}
-        </ScenarioInspectorActionButton>
-      </TourNarrationAcquisition>
-      {choosing && (
-        <TourAudioPicker
-          resources={resources}
-          disabled={disabled}
-          t={t}
-          onChoose={(entry) => {
+        catalog={{
+          resources,
+          disabled,
+          onChoose: (entry) => {
             const identity = { assetId: entry.assetId, duration: entry.duration };
-            if (change(music ? { ...music, ...identity } : createTourBackgroundMusic(identity)))
-              setChoosing(false);
-          }}
-        />
-      )}
+            return change(music ? { ...music, ...identity } : createTourBackgroundMusic(identity));
+          },
+        }}
+      />
       {music && (
         <>
           <TourInspectorNumericRow

@@ -183,6 +183,19 @@ async function initializeFrameAnnotationRasterLease(id: string): Promise<void> {
   assertPreparationIsCurrent(id);
   await waitForOffscreenReady(30_000);
   assertPreparationIsCurrent(id);
+  const response = await getBackgroundRuntimeMessaging().sendRuntimeMessage(
+    attachOffscreenCommandCapability({
+      type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+      operation: 'prepare',
+      leaseId: id,
+    })
+  );
+  assertPreparationIsCurrent(id);
+  if (!response.success)
+    throw new Error(response.error ?? 'Frame annotation data admission failed');
+  if (response.result !== 'prepared' || response.leaseId !== id) {
+    throw new Error('Frame annotation data admission lease mismatch');
+  }
 }
 
 function assertPreparationIsCurrent(id: string): void {

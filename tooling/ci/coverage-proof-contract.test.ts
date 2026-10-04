@@ -29,7 +29,7 @@ it('keeps coverage scope, reuse authority, transport, reports, and release admis
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
   expect(canonicalProof).not.toContain('select-coverage-proof.mjs restore-latest-release');
   expect(canonicalProof).toContain('container.mjs proof');
-  expect(provenance).toContain('Download exact admitted release coverage');
+  expect(provenance).toContain('Download coverage');
   expect(provenance).toContain('verify-main-proof.mjs release');
   expect(provenance).toContain(
     'coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329'

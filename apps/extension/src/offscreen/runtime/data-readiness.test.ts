@@ -68,3 +68,27 @@ it('rejects stale completion after termination without clearing a replacement fl
   await f.service.ensureAssets();
   expect(f.admit).toHaveBeenCalledTimes(2);
 });
+
+it('requires completed admission without queuing cold or terminated connections', async () => {
+  const f = fixture();
+  expect(() => f.service.requireAdmission()).toThrow('Offscreen data is not admitted');
+  expect(f.admit).not.toHaveBeenCalled();
+  let complete!: () => void;
+  f.admit.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      })
+  );
+  const pending = f.service.ensureAdmission();
+  expect(() => f.service.requireAdmission()).toThrow('Offscreen data is not admitted');
+  complete();
+  await pending;
+  expect(() => f.service.requireAdmission()).not.toThrow();
+  f.terminate();
+  expect(() => f.service.requireAdmission()).toThrow('Offscreen data is not admitted');
+  expect(f.admit).toHaveBeenCalledOnce();
+  await f.service.ensureAdmission();
+  expect(() => f.service.requireAdmission()).not.toThrow();
+  expect(f.recover).not.toHaveBeenCalled();
+});

@@ -166,7 +166,13 @@ test('short quarter blocks retain separate controls at HD with compact spacing',
     const controls = nodes
       .flatMap((node) => [
         ...node.querySelectorAll<HTMLElement>(
-          '.guide-block-grip, .guide-block-width, .guide-block-height, .guide-block-actions button, .guide-voice-control button'
+          [
+            '.guide-block-grip',
+            '.guide-block-width',
+            '.guide-block-height',
+            '.guide-block-actions button',
+            '.guide-voice-control button',
+          ].join(', ')
         ),
       ])
       .filter((node) => getComputedStyle(node).display !== 'none');

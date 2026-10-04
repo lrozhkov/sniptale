@@ -62,7 +62,10 @@ import { SETTINGS_TRANSFER_MAX_BYTES } from '../../../../settings-transfer';
 import { isSettingsTransferResponse } from './settings-transfer-response-guard';
 import { isFullPageCaptureGeometry } from '../../../../full-page-capture';
 import type { RuntimeContentActionRequestByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/content-action';
-import type { RuntimeFrameAnnotationRasterRequestByType } from '../../runtime-message/frame-annotation-raster.types';
+import type {
+  RuntimeFrameAnnotationRasterRequestByType,
+  RuntimeFrameAnnotationRasterResponseByType,
+} from '../../runtime-message/frame-annotation-raster.types';
 
 type OpenEditorWithImageMessage =
   RuntimeContentActionRequestByType[typeof MessageType.OPEN_EDITOR_WITH_IMAGE] & {
@@ -332,6 +335,10 @@ function isFrameAnnotationRasterResponse(
   );
 }
 
+const isOffscreenRasterResponseEnvelope = createRuntimeResponseGuard<
+  RuntimeFrameAnnotationRasterResponseByType[typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]
+>({ optional: { result: isString, leaseId: isFrameAnnotationRasterLeaseId } });
+
 export const runtimeActionCoreMessageContracts = {
   [MessageType.SETTINGS_TRANSFER]: {
     parseRequest: createGuardParser('runtime SETTINGS_TRANSFER message', isSettingsTransferMessage),
@@ -376,14 +383,30 @@ export const runtimeActionCoreMessageContracts = {
   [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_FRAME_ANNOTATION_RASTERIZE message',
-      createMessageGuard({
-        type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
-        required: { capabilityToken: isString, reference: isFrameAnnotationRasterReference },
-      })
+      (
+        value
+      ): value is RuntimeFrameAnnotationRasterRequestByType[typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE] =>
+        isRecord(value) &&
+        value['type'] === MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE &&
+        isString(value['capabilityToken']) &&
+        ((value['operation'] === 'prepare' &&
+          isFrameAnnotationRasterLeaseId(value['leaseId']) &&
+          !('reference' in value)) ||
+          (!('operation' in value) &&
+            !('leaseId' in value) &&
+            isFrameAnnotationRasterReference(value['reference'])))
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_FRAME_ANNOTATION_RASTERIZE response',
-      isFrameAnnotationRasterResponse
+      (
+        value
+      ): value is RuntimeFrameAnnotationRasterResponseByType[typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE] =>
+        isOffscreenRasterResponseEnvelope(value) &&
+        (value.success !== true ||
+          (value.result === 'applied' && !('leaseId' in value)) ||
+          (value.result === 'prepared' &&
+            'leaseId' in value &&
+            isFrameAnnotationRasterLeaseId(value.leaseId)))
     ),
   },
   [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: {

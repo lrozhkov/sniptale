@@ -97,6 +97,19 @@ function buildReadinessResponse(result: unknown): OffscreenCommandSuccessRespons
   };
 }
 
+function buildRasterResponse(result: unknown): OffscreenCommandSuccessResponse {
+  if (result === 'applied') return { result, success: true };
+  if (
+    !isRecordWithExactKeys(result, ['result', 'leaseId']) ||
+    result['result'] !== 'prepared' ||
+    typeof result['leaseId'] !== 'string' ||
+    result['leaseId'].length === 0 ||
+    result['leaseId'].length > 128
+  )
+    return invalidCompletion(MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE);
+  return { result: 'prepared', leaseId: result['leaseId'], success: true };
+}
+
 function buildCameraAnswerResponse(result: unknown): OffscreenCommandSuccessResponse {
   const type = VideoMessageType.OFFSCREEN_VIDEO_RECORDING_CAMERA_OFFER;
   if (
@@ -219,8 +232,7 @@ export function buildOffscreenCommandResponse(
     case MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME:
       return buildAcceptedScalarResponse(type, result);
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE:
-      if (result !== 'applied') return invalidCompletion(type);
-      return { result, success: true };
+      return buildRasterResponse(result);
     case MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD:
       if (result !== 'copied') return invalidCompletion(type);
       return { result, success: true };

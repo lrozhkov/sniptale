@@ -23,7 +23,7 @@ it('keeps verified unit proof transport subordinate to the canonical QA owner', 
     },
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
-  expect(workflow).toContain('Restore verified reusable proof inputs');
+  expect(workflow).toContain('Restore verified inputs');
   expect(workflow).not.toContain('select-unit-proof.mjs');
   expect(workflow).not.toContain('SNIPTALE_UNIT_PROOF_PATH');
   expect(container).toContain("'SNIPTALE_UNIT_PROOF_AUTHORITY=external-only'");

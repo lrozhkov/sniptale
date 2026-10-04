@@ -1,11 +1,11 @@
-name: Release provenance finalize
-run-name: Release provenance Finalize Gate
+name: Prepare release
+run-name: Prepare release
 
 on:
   workflow_dispatch:
     inputs:
       proof_run_id:
-        description: Canonical release proof run to finalize without repeating QA
+        description: Release check run to finalize without repeating tests
         required: true
         type: string
 
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   finalize:
-    name: Release provenance Finalize Gate
+    name: Prepare release
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 25
@@ -32,14 +32,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { fetch-depth: 0, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Install exact finalizer dependencies
+      - name: Install dependencies
         run: |
           npm ci --ignore-scripts --prefix tooling/configs/ci/npm
           node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
           export PATH="$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin:$PATH"
           echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
           npm ci --ignore-scripts
-      - name: Admit the canonical proof and classify intervening controls
+      - name: Verify source results
         id: source
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,12 +51,12 @@ jobs:
           jq -e '
             .head_branch == "main" and .event == "workflow_dispatch" and
             .status == "completed" and .path == ".github/workflows/provenance.yml" and
-            .display_title == "Release provenance Gate"
+            .display_title == "Release checks"
           ' <<<"$run" >/dev/null
           jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROOF_RUN_ID}/jobs?filter=all&per_page=100")
           jq -s -e '
-            ([.[].jobs[] | select(.name == "canonical-proof / Release provenance Gate" and .conclusion == "success")] | length >= 1) and
-            ([.[].jobs[] | select(.name == "Release provenance Gate" and .conclusion == "success")] | length >= 1)
+            ([.[].jobs[] | select(.name == "Checks / Release result" and .conclusion == "success")] | length >= 1) and
+            ([.[].jobs[] | select(.name == "Release result" and .conclusion == "success")] | length >= 1)
           ' <<<"$jobs" >/dev/null
           classification=$(node tooling/ci/post-proof-classifier.mjs "$source_sha" "$GITHUB_SHA")
           test "$(jq -er .classification <<<"$classification")" = post-proof-only
@@ -64,7 +64,7 @@ jobs:
           echo "source-sha=$source_sha" >> "$GITHUB_OUTPUT"
           echo "source-tree=$source_tree" >> "$GITHUB_OUTPUT"
           echo "classification=$classification" >> "$GITHUB_OUTPUT"
-      - name: Download exact canonical proof and image receipts
+      - name: Download results and image receipts
         id: artifacts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,15 +81,15 @@ jobs:
           echo "producer-attempt=$proof_attempt" >> "$GITHUB_OUTPUT"
           gh run download "$PROOF_RUN_ID" --name "$proof_name" --dir build/release-proof
           gh run download "$PROOF_RUN_ID" --name "$image_name" --dir build/image-use
-      - name: Check out the exact canonical proof source
+      - name: Check out verified source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.source.outputs.source-sha }}
           path: proof-source
           persist-credentials: false
-      - name: Install exact proof preparation dependencies
+      - name: Install preparation dependencies
         run: npm ci --ignore-scripts --prefix proof-source
-      - name: Verify proof, prepare assets, and bind cached image receipts
+      - name: Prepare release assets
         id: images
         env:
           PROOF_RUN_ID: ${{ inputs.proof_run_id }}
@@ -109,7 +109,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Publish and verify exact immutable image aliases without rebuilding
+      - name: Publish verified image aliases
         env:
           SOURCE_SHA: ${{ steps.source.outputs.source-sha }}
           QA_DIGEST: ${{ steps.images.outputs.qa }}
@@ -138,7 +138,7 @@ jobs:
             expected=${binding#*|}
             test "$(node tooling/ci/immutable-image-tag.mjs "$image" "$expected")" = exact
           done
-      - name: Attest the exact validated release subject inventory
+      - name: Attest release assets
         id: release-attestation
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
@@ -148,7 +148,7 @@ jobs:
             build/release-proof/release-assets/provenance.json
             build/release-proof/release-assets/sbom.cdx.json
             build/release-proof/release-assets/sniptale_*.zip
-      - name: Attest the admitted immutable QA image
+      - name: Attest build image
         id: qa-attestation
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
@@ -156,7 +156,7 @@ jobs:
           subject-name: ghcr.io/lrozhkov/sniptale-qa
           subject-digest: ${{ steps.images.outputs.qa }}
           push-to-registry: true
-      - name: Attest the admitted immutable controller image
+      - name: Attest controller image
         id: controller-attestation
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
         with:
@@ -164,7 +164,7 @@ jobs:
           subject-name: ghcr.io/lrozhkov/sniptale-controller
           subject-digest: ${{ steps.images.outputs.controller }}
           push-to-registry: true
-      - name: Seal finalizer admission and attestation identities
+      - name: Seal release admission
         env:
           CLASSIFICATION: ${{ steps.source.outputs.classification }}
           SOURCE_SHA: ${{ steps.source.outputs.source-sha }}

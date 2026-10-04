@@ -10,6 +10,7 @@ import {
 } from './canonicalize';
 import {
   readEditorDrawingObject,
+  stageEditorDrawingObject,
   isEditorDrawingSelection,
   syncEditorDrawingTextObject,
   synchronizeEditorDrawingObjectFromFabric,
@@ -253,4 +254,15 @@ describe('editor drawing metadata authority', () => {
       start: { x: 34, y: 44 },
     });
   });
+});
+
+it('replaces staged preview metadata when committing through the document serializer', () => {
+  const object = createEditorDrawingFabricObject(shape, 1);
+  const preview = { ...shape, color: '#00ff00' };
+  stageEditorDrawingObject(object, preview);
+  expect(readEditorDrawingObject(object)).toEqual(preview);
+  const committed = { ...shape, color: '#0000ff' };
+  writeEditorDrawingObject(object, committed);
+  expect(readEditorDrawingObject(object)).toEqual(committed);
+  expect(JSON.parse(object.sniptaleDrawingJson!)).toEqual({ version: 1, object: committed });
 });

@@ -1,9 +1,11 @@
-import { Rect, type FabricObject } from 'fabric';
+import { Ellipse, Rect, type FabricObject } from 'fabric';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
 import { parseScenarioBlurMetadata } from './scenario-blur-metadata';
 import { parseFrameAnnotationSnapshot } from '../../features/highlighter/frame-annotation/parser';
 import { createFrameAnnotationProxy } from '../frame-annotation/proxy';
-import { createEditorDrawingFabricObject } from '../drawing/object/vector';
+import type { DrawingObject } from '../../features/drawing/public';
+import { serializeEditorDrawingMetadata } from './import-boundary';
+import { createObjectLabel } from './model';
 import { CUSTOM_JSON_PROPS } from './model/custom-json-props';
 
 const SCENARIO_KINDS = new Set([
@@ -206,17 +208,31 @@ function convertObject(value: Record<string, unknown>, ordering: number): unknow
       size(value['ry']) * 2 !== height
     )
       invalid();
-    object = createEditorDrawingFabricObject(
-      {
-        id,
-        kind: 'ellipse',
-        bounds: { x: x - width / 2, y: y - height / 2, width, height },
-        color: color(value['stroke']),
-        fillColor: color(value['fill']),
-        width: size(value['strokeWidth']),
-      },
-      ordering + 1
-    );
+    const drawing: Extract<DrawingObject, { kind: 'ellipse' }> = {
+      id,
+      kind: 'ellipse',
+      bounds: { x: x - width / 2, y: y - height / 2, width, height },
+      color: color(value['stroke']),
+      fillColor: color(value['fill']),
+      width: size(value['strokeWidth']),
+    };
+    object = new Ellipse({
+      fill: drawing.fillColor ?? 'transparent',
+      left: drawing.bounds.x + drawing.bounds.width / 2,
+      originX: 'center',
+      originY: 'center',
+      rx: drawing.bounds.width / 2,
+      ry: drawing.bounds.height / 2,
+      stroke: drawing.color,
+      strokeUniform: true,
+      strokeWidth: drawing.width,
+      top: drawing.bounds.y + drawing.bounds.height / 2,
+    });
+    object.sniptaleId = id;
+    object.sniptaleType = 'shape';
+    object.sniptaleRole = 'annotation';
+    object.sniptaleLabel = createObjectLabel('shape', ordering + 1);
+    object.sniptaleDrawingJson = serializeEditorDrawingMetadata(drawing);
   } else {
     const blur = kind === 'scenario-blur-rect';
     if (value['sniptaleType'] !== (blur ? 'blur' : 'rectangle')) invalid();

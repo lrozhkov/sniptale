@@ -87,6 +87,7 @@ function getStoreNames() {
     'media_library',
     'project_assets',
     'video_projects',
+    'recordings',
     'aggregate_presentations',
     'thumbnails',
   ];

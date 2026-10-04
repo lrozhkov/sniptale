@@ -1,5 +1,5 @@
-import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 // @vitest-environment jsdom
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

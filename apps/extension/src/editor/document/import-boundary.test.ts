@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { DrawingObject } from '../../features/drawing/public';
-import { assertValidEditorDrawingCanvasJson, parseEditorDrawingMetadata } from './import-boundary';
+import {
+  assertValidEditorDrawingCanvasJson,
+  parseEditorDrawingMetadata,
+  serializeEditorDrawingMetadata,
+} from './import-boundary';
 
 const objects: readonly DrawingObject[] = [
   { id: 'p', kind: 'pencil', color: '#111', width: 4, samples: [{ x: 1, y: 2, t: 3 }] },
@@ -191,4 +195,12 @@ describe('editor drawing import boundary', () => {
       assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: [nested(41)] }))
     ).toThrow('Invalid editor canvas object tree');
   });
+});
+
+it('round trips every admitted drawing kind through the document metadata serializer', () => {
+  for (const object of objects) {
+    const serialized = serializeEditorDrawingMetadata(object);
+    expect(JSON.parse(serialized)).toEqual({ version: 1, object });
+    expect(parseEditorDrawingMetadata(serialized)).toEqual(object);
+  }
 });

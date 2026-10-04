@@ -124,7 +124,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       width: 1280,
       height: 900,
     });
-    await verifyImageEditorRoundtrip(page, testInfo);
+    await verifyImageEditorRoundtrip(page, testInfo, () =>
+      page.evaluate(() => chrome.downloads.search({}))
+    );
     issues.assertClean();
   });
 }

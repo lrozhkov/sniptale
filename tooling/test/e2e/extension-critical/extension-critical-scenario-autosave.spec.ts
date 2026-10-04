@@ -35,8 +35,12 @@ test('coalesces typing, keeps AI available, and retains the last edit through a 
     });
     db.close();
   }, project);
-  const url = `chrome-extension://${extensionId}/apps/extension/src/scenario-editor/index.html?projectId=autosave-proof`;
-  await page.goto(url);
+  const url = new URL(
+    '/apps/extension/src/scenario-editor/index.html',
+    `chrome-extension://${extensionId}`
+  );
+  url.searchParams.set('projectId', 'autosave-proof');
+  await page.goto(url.toString());
   const name = page.getByRole('textbox', { name: 'Scenario', exact: true });
   await expect(name).toHaveValue('Autosave proof');
   const readSaved = () =>

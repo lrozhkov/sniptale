@@ -192,13 +192,13 @@ it('keeps color layers pointer-interactive and anchored to owning scroll parents
     '[data-ui="shared.ui.color-selector.picker-layer"]'
   )!;
   expect(pickerLayer.style.pointerEvents).toBe('auto');
-  expect(pickerLayer.style.top).toBe('78px');
+  expect(pickerLayer.style.top).toBe('76px');
 
   anchorTop = 110;
   act(() => {
     scroller.dispatchEvent(new Event('scroll'));
   });
-  expect(pickerLayer.style.top).toBe('156px');
+  expect(pickerLayer.style.top).toBe('154px');
 });
 
 it('places a side picker outside its owning panel boundary', () => {
@@ -253,7 +253,7 @@ it('places a side picker outside its owning panel boundary', () => {
   const pickerLayer = document.body.querySelector<HTMLElement>(
     '[data-ui="shared.ui.color-selector.picker-layer"]'
   )!;
-  expect(pickerLayer.style.left).toBe('310px');
+  expect(pickerLayer.style.left).toBe('308px');
   expect(pickerLayer.style.top).toBe('160px');
   expect(pickerLayer.style.transform).toBe('');
 });

@@ -10,13 +10,9 @@ import {
   buildTourPlayerBlob,
   type TourPlayerLabels,
 } from '../../../features/scenario/tour-player/public';
-import {
-  getScenarioAssetBlob,
-  saveScenarioExportRecord,
-} from '../../../composition/persistence/scenario/store/public';
-import { createDirectFileSink } from '../../../composition/archive-transfer';
+import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/public';
+import { saveScenarioHtmlExport } from './html-export';
 import { prepareTourRaster, type TourHtmlImageOptions } from './tour-html-images';
-import { createScenarioHtmlCapture } from '../../../composition/persistence/scenario/export-artifacts';
 
 /** A detached artifact is the only input to both preview and save. */
 export interface PreparedTourHtml {
@@ -108,50 +104,28 @@ export async function saveTourHtml(
   signal: AbortSignal
 ): Promise<'saved' | 'history-failed'> {
   signal.throwIfAborted();
-  const sink = await createDirectFileSink({
+  return saveScenarioHtmlExport({
+    projectId: artifact.projectId,
     filename: artifact.filename,
-    extension: '.html',
-    mimeType: 'text/html',
-    description: 'HTML',
-  });
-  const capture = await createScenarioHtmlCapture();
-  try {
-    const writer = sink.writable.getWriter();
-    try {
-      for (let offset = 0; offset < artifact.blob.size; offset += 96 * 1024) {
-        signal.throwIfAborted();
-        const bytes = new Uint8Array(
-          await artifact.blob.slice(offset, offset + 96 * 1024).arrayBuffer()
-        );
-        await writer.write(bytes);
-        await capture.append(bytes);
+    mode: 'tour',
+    signal,
+    write: async (sink, retain) => {
+      const writer = sink.writable.getWriter();
+      try {
+        for (let offset = 0; offset < artifact.blob.size; offset += 96 * 1024) {
+          signal.throwIfAborted();
+          const bytes = new Uint8Array(
+            await artifact.blob.slice(offset, offset + 96 * 1024).arrayBuffer()
+          );
+          await writer.write(bytes);
+          await retain(bytes);
+        }
+      } finally {
+        writer.releaseLock();
       }
-    } finally {
-      writer.releaseLock();
-    }
-    signal.throwIfAborted();
-    await sink.close();
-  } catch (error) {
-    try {
-      await sink.abort(error);
-    } finally {
-      await capture.abort();
-    }
-    throw error;
-  }
-  try {
-    const { ref } = await capture.finalize();
-    await saveScenarioExportRecord({
-      projectId: artifact.projectId,
-      filename: artifact.filename,
-      format: 'html',
-      size: artifact.blob.size,
-      html: { mode: 'tour', ref },
-    });
-    return 'saved';
-  } catch {
-    return 'history-failed';
-  }
+      return artifact.blob.size;
+    },
+  });
 }
 
 /** References and shared-source privacy are resolved together before reading media. */

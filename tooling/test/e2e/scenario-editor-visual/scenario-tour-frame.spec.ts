@@ -456,7 +456,7 @@ for (const [locale, theme] of [
     };
     await drawerBounds(host);
     await expect(page.locator('[data-ui="autosave-control"] button').first()).toHaveAccessibleName(
-      new RegExp(t('common.states.saved'))
+      `${t('editor.documentActions.autosaveTitle')}: ${t('common.states.saved')}`
     );
     await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
     await page
@@ -510,7 +510,7 @@ for (const locale of ['en', 'ru'] as const) {
     }
     await page.locator('.tour-slide-select').first().click();
     await expect(page.locator('[data-ui="autosave-control"] button').first()).toHaveAccessibleName(
-      new RegExp(t('common.states.saved'))
+      `${t('editor.documentActions.autosaveTitle')}: ${t('common.states.saved')}`
     );
     await page
       .locator('.tour-header-controls')

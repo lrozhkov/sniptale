@@ -40,60 +40,6 @@
       }
     },
     {
-      "id": "033ac7aa0eb8f34bc66be6c1d054ae4d825366fb3cb191d8910243eb92561791",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
-      "reason": "Discriminated navigation/image tour settings forward the same slide identity and callbacks into different typed inspectors. Image additionally receives presentation; shared props are branch binding and neither leaf should depend on the other slide kind.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
-        "start": 215,
-        "end": 225
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
-        "start": 228,
-        "end": 238
-      }
-    },
-    {
-      "id": "03aa33ab2c08d06dbec0bfa12423c58b9a4fa3b02ad1602193b88465b140c18d",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/library-preview/viewport.tsx <-> apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-      "reason": "Pointer-capture cleanup uses the same DOM protocol, but library panning is enabled by its viewport whereas video panning ends on fullscreen or zoom exit and resets scroll in a layout effect. Sharing these lifetimes would combine unrelated view state.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
-        "start": 160,
-        "end": 169
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
-        "start": 181,
-        "end": 191
-      }
-    },
-    {
-      "id": "053032706c71ef82c6d3fe7bd6b2acf108451b569798a732acb6e6ecfe7dceac",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Repeated guide control selector lists target base motion versus focus-visible outline. Merging those rules would apply a keyboard ring outside its focus state; the match is selectors only.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1890,
-        "end": 1901
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1923,
-        "end": 1934
-      }
-    },
-    {
       "id": "07e9c86fb0e10c170f1ed23c5a5cfa9c5ef51bbe3a08aee21737a45c34503970",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/selection/frame-settings-popover",
@@ -109,42 +55,6 @@
         "path": "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
         "start": 230,
         "end": 235
-      }
-    },
-    {
-      "id": "08982f54512b3087114bc583bcddd9af5e175d436c9208dcf16a9c6e685e3df4",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "The same guide contextual controls receive base border/color/shadow and a separate non-hover/non-active/non-expanded/non-pressed transparent background. The repeated selectors preserve state-specific cascade, with different declaration sets.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 2026,
-        "end": 2035
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 2040,
-        "end": 2049
-      }
-    },
-    {
-      "id": "0c769481ce0946551d80b7501609a2df35f21e7d65babad137c0160b876fc91d",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/controls.tsx <-> apps/extension/src/video-editor/workspace/sidebar/selection/shared/details.tsx",
-      "reason": "Review and full-editor disclosure adapters use native details onToggle and separate preference state. Their data-ui roots, body classes and section context differ; shared heading/icon primitives already supply the common presentation.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/controls.tsx",
-        "start": 183,
-        "end": 191
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/shared/details.tsx",
-        "start": 20,
-        "end": 28
       }
     },
     {
@@ -202,6 +112,24 @@
       }
     },
     {
+      "id": "1259020c9fccaae996b5965ced92a1e8babd8bfaf5d0d2202bd8cbb572490e2b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/controls.tsx <-> apps/extension/src/video-editor/workspace/sidebar/selection/shared/details.tsx",
+      "reason": "Native details adapters already use useInspectorDisclosure; review and video retain separate preference identities, data-ui roots and body geometry.",
+      "removalCondition": "Remove when the exact pair disappears or both hosts share one disclosure presentation contract.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/controls.tsx",
+        "start": 184,
+        "end": 192
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/shared/details.tsx",
+        "start": 20,
+        "end": 28
+      }
+    },
+    {
       "id": "130ebb220c1232afe302c19832789595355343d67b885081a50d1a2dfaa02215",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence/projects/asset-publication.ts <-> apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
@@ -238,39 +166,21 @@
       }
     },
     {
-      "id": "14fc5d36403e5cfa73aaef00d1e9f19b54524c11f7213a2be1c26768bfb17098",
+      "id": "1550bb833f2ff7773c66a675a4832993698092fc3601942a0679692736f75b4c",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Repeated guide control selector lists target base motion versus descendant svg dimensions. Their declaration targets differ; combining them would change which element gets sizing and transition properties.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "apps/extension/src/composition/library-preview/viewport.tsx <-> apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
+      "reason": "Library pointerdown and video capture-phase pointerdown differ in propagation and admission; matching scroll arithmetic does not merge their view lifetimes.",
+      "removalCondition": "Remove when the exact pair disappears or one pan owner explicitly owns both admission and cleanup policies.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1890,
-        "end": 1901
+        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
+        "start": 182,
+        "end": 200
       },
       "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1936,
-        "end": 1947
-      }
-    },
-    {
-      "id": "166f212150af086ffbb9407d20d71c8ed704f17d2db71380623b3a9cd7c5d87c",
-      "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/toolbar/legacy-actions.css",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
-        "start": 167,
-        "end": 172
-      },
-      "secondFile": {
-        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
-        "start": 82,
-        "end": 87
+        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
+        "start": 214,
+        "end": 232
       }
     },
     {
@@ -292,75 +202,39 @@
       }
     },
     {
-      "id": "18cb252c89fe625f8b9d57f571c84cab50516c3b90c6d09377604e849a96cbec",
+      "id": "1917c30360faa44d877715820468450a8598610166d43a145002ca4560274b0b",
       "classification": "tool-noise",
-      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar",
-      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
-      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "owner": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
+      "reason": "Orphan cleanup proves parent absence and opens a child-graph transaction; root cleanup also recovers HTML publications and detaches the complete graph. Matching abort/settle/postcommit deletion is protocol boilerplate, not one destructive authority.",
+      "removalCondition": "Remove when the exact pair disappears or the cleanup operations legitimately share one atomic transaction contract.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "packages/ui/src/styles/content-popover/index.css",
-        "start": 47,
-        "end": 57
+        "path": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
+        "start": 123,
+        "end": 137
       },
       "secondFile": {
-        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
-        "start": 108,
-        "end": 114
+        "path": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
+        "start": 99,
+        "end": 113
       }
     },
     {
-      "id": "1a2b4cb39f2e57ea8758b64a229dd1ed93355ae9267b02649d4d5dfe34e03452",
+      "id": "1a8db46787df4d2a9bd069f51bc9732310c066d503be16f4283cc97bd4af72f5",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/inspector.css",
-      "reason": "A label/select field pair and a static-title disclosure containing one selector use the same responsive grid declarations under different :has structures. Their child placement rules differ; the repeated CSS layout is a scoped projection, not one reusable operation.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts <-> apps/extension/src/features/web-snapshot/sanitize-css.ts",
+      "reason": "Authored CSS splitting trims and omits empty rules for CSSOM comparison; hostile stylesheet sanitization preserves slices before per-rule admission. Matching scanner setup does not merge those contracts.",
+      "removalCondition": "Remove when the exact pair disappears or an independently specified lexical primitive safely serves both contracts.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
-        "start": 1008,
-        "end": 1014
+        "path": "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts",
+        "start": 29,
+        "end": 36
       },
       "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
-        "start": 1039,
-        "end": 1045
-      }
-    },
-    {
-      "id": "1b544131dac010637f070356b4b900d5de1afb39b540db06a67dded0f11bd91f",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/controller/instance/types/actions.ts <-> apps/extension/src/editor/controller/magnet/manager.ts",
-      "reason": "The controller action capability and optional magnet-manager port independently specify resize inputs. The controller supports a grid fallback even when snapResizeRect is absent; importing an implementation-facing manager contract into the capability would conflate that optional dependency.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/editor/controller/instance/types/actions.ts",
-        "start": 130,
-        "end": 135
-      },
-      "secondFile": {
-        "path": "apps/extension/src/editor/controller/magnet/manager.ts",
-        "start": 17,
-        "end": 22
-      }
-    },
-    {
-      "id": "1cafb34079722fae369107c3f36b17d156cc4406552ba0ef62e83906e0cf6546",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/tour/workspace.tsx <-> apps/extension/src/scenario-editor/page-shell/workspace.tsx",
-      "reason": "Tour and guide inspector headers bind ContentToolbarButton to their panel controllers. Guide adds aria-controls and aria-expanded for its own panel. Matching presentation icons and close button remain local control bindings into different workspaces.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/tour/workspace.tsx",
-        "start": 201,
-        "end": 211
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.tsx",
-        "start": 299,
-        "end": 309
+        "path": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
+        "start": 483,
+        "end": 490
       }
     },
     {
@@ -436,24 +310,6 @@
       }
     },
     {
-      "id": "2297319af75ea5087d44bfdbc78b73e8424391a7d0e6fcc3f234be3f26b4c323",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/review/cuts.ts <-> apps/extension/src/features/video/review/fragment.ts",
-      "reason": "Cut/speed range creation rejects same-kind overlap and creates an edit; fragment selection validates raw bounds and clips existing edits into a selection. nearestReviewBoundary is already shared; common snapping syntax must not erase different admissibility and history results.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/features/video/review/cuts.ts",
-        "start": 77,
-        "end": 89
-      },
-      "secondFile": {
-        "path": "apps/extension/src/features/video/review/fragment.ts",
-        "start": 25,
-        "end": 37
-      }
-    },
-    {
       "id": "22c3c1b594effa6037773fab8dab78a010895b640786cbef95652a1cad9c40e5",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/editor-resources",
@@ -490,6 +346,24 @@
       }
     },
     {
+      "id": "25112a4704bcdec27d0c43be8f23d67e115a8c9a8ccd83af0927123dcd175c9f",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/review/advanced/validation.ts",
+      "reason": "Content loading rejects ui while complete state loading requires ui and validates recoveryV1; zoom/background/audio parsing is already shared.",
+      "removalCondition": "Remove when the exact pair disappears or the accepted persisted projections become the same schema.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
+        "start": 334,
+        "end": 339
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
+        "start": 374,
+        "end": 379
+      }
+    },
+    {
       "id": "25e9765d69c1f7cfd65a1a62a61275d8664b046e551ffbfd1b89b3f7e9f06e27",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass/popover-controls.css",
@@ -523,24 +397,6 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
         "start": 136,
         "end": 149
-      }
-    },
-    {
-      "id": "26894b4d37dbf642a42b73065776232aab829c5cf5d2a5bd8160ad30c58be9bd",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/shell/page/start.tsx <-> apps/extension/src/video-editor/shell/app/start.tsx",
-      "reason": "Both entrypoints already render shared EditorStart. Image creates/opens files and its aggregate sessions; video creates projects and opens gallery/project ids. The matching translated labels and item/status props are the intended shared component consumer contract.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/editor/shell/page/start.tsx",
-        "start": 112,
-        "end": 123
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/shell/app/start.tsx",
-        "start": 61,
-        "end": 72
       }
     },
     {
@@ -595,42 +451,6 @@
         "path": "apps/extension/src/video-editor/workspace/sidebar/panel-content/selection-panel.tsx",
         "start": 77,
         "end": 84
-      }
-    },
-    {
-      "id": "29caf515b19c584a5b8c7ed08e3eebc053357e02809a1f1e466f3bcd5bd756c0",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "List and grid branches already use GalleryGridCardMedia. List adds kind/details cells; grid adds its own detail projection and project controls. Repeated props bind the same media primitive inside two intentional DOM layouts.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 258,
-        "end": 268
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 281,
-        "end": 291
-      }
-    },
-    {
-      "id": "2a5371b8bd99c6b0dab2a01a812abb488fa669fdeb2bb7fef86011c5f68bdc77",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "Repeated guide control selector lists target base transition/transform versus hover:not-disabled:not-pressed background/border/color. Distinct pseudo-state declarations must remain separate CSS rules.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1890,
-        "end": 1901
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 1904,
-        "end": 1915
       }
     },
     {
@@ -706,39 +526,39 @@
       }
     },
     {
-      "id": "3352b6538a0ea8d362bc58edbb92e95e3a2ed71a8cdf129bd7c73798ed12d729",
+      "id": "33723fe2dce03604796de8548c084f90af8c33a27d9a5795901a2856dd5e24e2",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/content/parser/page-preparation/snapshot <-> apps/extension/src/features/web-snapshot",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "owner": "apps/extension/src/features/video/review/advanced/zoom.ts",
+      "reason": "Move preserves region length and requested missing-id position; trim preserves the opposite edge and minimum length with zero missing-id fallback. Similar neighbor lookup does not duplicate the full edit operation.",
+      "removalCondition": "Remove when the exact pair disappears or an actual shared region-window contract replaces the parallel policies.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts",
-        "start": 27,
-        "end": 34
+        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
+        "start": 221,
+        "end": 228
       },
       "secondFile": {
-        "path": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
-        "start": 483,
-        "end": 490
+        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
+        "start": 244,
+        "end": 250
       }
     },
     {
-      "id": "359ebaa9399179d18c022e842dddc1d0f433b347dae14775623ea14856692f2e",
+      "id": "3532c88ff5ca62e2f01b942e92601a079b40fd05119d4f6fefedb129e5ea89d6",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/workspace/floating/document-autosave-status.tsx <-> apps/extension/src/gallery/video-review/timeline-chrome.tsx",
-      "reason": "Both sessions already render the shared autosave popover. Image status distinguishes presentation retry errors, while review binds reload/conflict and workspace errors; matching label props preserve independent autosave services and error lifetimes.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "apps/extension/src/features/video/review/cuts.ts <-> apps/extension/src/features/video/review/fragment.ts",
+      "reason": "Cut/speed creation rejects same-kind overlap and requires boundaries; fragment selection validates raw bounds, clips edits and may allow unsnapped missing boundaries. nearestReviewBoundary already supplies shared snapping.",
+      "removalCondition": "Remove when the exact pair disappears or cut and fragment admissibility/results become one operation.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/editor/workspace/floating/document-autosave-status.tsx",
-        "start": 66,
-        "end": 78
+        "path": "apps/extension/src/features/video/review/cuts.ts",
+        "start": 78,
+        "end": 90
       },
       "secondFile": {
-        "path": "apps/extension/src/gallery/video-review/timeline-chrome.tsx",
-        "start": 302,
-        "end": 314
+        "path": "apps/extension/src/features/video/review/fragment.ts",
+        "start": 25,
+        "end": 37
       }
     },
     {
@@ -757,24 +577,6 @@
         "path": "apps/extension/src/video-editor/project/history/index.ts",
         "start": 210,
         "end": 220
-      }
-    },
-    {
-      "id": "37395632faa78e7986a3d1e97001b4dd143adeea926caeeb6404ea98fb41c690",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/video-review/inspector.css <-> apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-      "reason": "Only a closing declaration/comment and utility-layer prefix match: review overrides row-action buttons while compact inspector styles target select/color controls. Merging those scoped CSS selectors would broaden override reach.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/video-review/inspector.css",
-        "start": 76,
-        "end": 81
-      },
-      "secondFile": {
-        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
-        "start": 182,
-        "end": 187
       }
     },
     {
@@ -832,21 +634,21 @@
       }
     },
     {
-      "id": "3b11014f670deaca4baa693c6aa9ba1a8c15ccfc4b3fb5bba905d154b59bd75e",
+      "id": "3db31af0283de30d93210164261040db9d49ceae94c385e232ef0be5de115d6f",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
-      "reason": "Mutation and deletion explicitly expose stores from different readwrite transactions: mutation includes recordingStore, deletion includes aggregatePresentationStore. The repeated objectStore projections describe those authority sets rather than duplicate a transaction.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Repeated control selectors bind base transition and conditional hover states with different declarations; the old selector spans are preserved.",
+      "removalCondition": "Remove when the exact pair disappears or these states acquire one semantic rule.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
-        "start": 35,
-        "end": 42
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1866,
+        "end": 1877
       },
       "secondFile": {
-        "path": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
-        "start": 65,
-        "end": 72
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1880,
+        "end": 1891
       }
     },
     {
@@ -940,6 +742,24 @@
       }
     },
     {
+      "id": "4524502da46e7f938ed7c4edd587a85649e79fa5731a5840782c9af80a91d21c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Shared input surface and later document-theme override retain separate cascade positions; matching declarations are preserved at their existing specificity.",
+      "removalCondition": "Remove when the exact pair disappears or one scoped input rule replaces both cascade responsibilities.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 415,
+        "end": 420
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 848,
+        "end": 852
+      }
+    },
+    {
       "id": "46fd17bda10290c2e17088641aa0aec87bdd1cf0cff6f4652f38391fe1476773",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/grouped/inspector.css <-> apps/extension/src/video-editor/workspace/sidebar/selection/inspector.css",
@@ -1012,6 +832,24 @@
       }
     },
     {
+      "id": "4a4df4bb4effc7b8b65a8d5c5fa544de919910604192b5a07bc3233e3a219851",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/print.tsx <-> apps/extension/src/scenario-editor/page-shell/reader.tsx",
+      "reason": "Print retains output settings and closes with settings; Reader seals editing before open. Shared focus restoration syntax belongs to separate mounted-mode lifetimes and targets.",
+      "removalCondition": "Remove when the exact pair disappears or one mode lifecycle owner replaces both activation policies.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/print.tsx",
+        "start": 199,
+        "end": 209
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/reader.tsx",
+        "start": 147,
+        "end": 157
+      }
+    },
+    {
       "id": "4acc9c9d86f7f39c176c342ac1e9fb7efa4f847b66a600c2d51ba3ed7c1a0e9d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
@@ -1027,6 +865,24 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
         "start": 456,
         "end": 472
+      }
+    },
+    {
+      "id": "4b461aa437b864c92a90509fbd32a96dac21af82d8f30dd35bd97e85c4793695",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/controller/instance/types/actions.ts <-> apps/extension/src/editor/controller/magnet/manager.ts",
+      "reason": "Required controller resize capability and optional magnet-manager port have independent contracts; controller grid fallback remains valid without magnet resize.",
+      "removalCondition": "Remove when the exact pair disappears or a neutral resize contract is legitimately introduced without coupling capability to implementation.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/controller/instance/types/actions.ts",
+        "start": 130,
+        "end": 135
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/controller/magnet/manager.ts",
+        "start": 17,
+        "end": 22
       }
     },
     {
@@ -1063,24 +919,6 @@
         "path": "packages/ui/src/styles/content-popover/index.css",
         "start": 231,
         "end": 241
-      }
-    },
-    {
-      "id": "5277b9d4038b8e2aaf31395e3dcdba6a0deace53b12748e209976e3062f7542a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
-      "firstFile": {
-        "path": "apps/extension/src/background/frame-annotation-raster/route.ts",
-        "start": 235,
-        "end": 243
-      },
-      "secondFile": {
-        "path": "apps/extension/src/composition/frame-annotation-raster-client/orchestrator.ts",
-        "start": 118,
-        "end": 126
       }
     },
     {
@@ -1300,24 +1138,6 @@
       }
     },
     {
-      "id": "5f01abd102f37dc3ac4e7de7f162783d9074c28b25a3f197c0eb103ccf9c0cf8",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-      "reason": "The same guide field selectors occur at different cascade positions with different declarations: base shared surface tokens versus later document-theme border/paper colors. The detector matches selector syntax, not an equivalent rule to merge.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 376,
-        "end": 381
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
-        "start": 837,
-        "end": 841
-      }
-    },
-    {
       "id": "5f3fe67731e0552eb97792d333e109cecbeb4a3624b654ab05b3b48aa6d076e3",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/grouped/inspector.css <-> apps/extension/src/video-editor/workspace/sidebar/selection/grouped-inspector/panel.css",
@@ -1354,21 +1174,39 @@
       }
     },
     {
-      "id": "60ce376043e2ed4c008ec182390a5030c64e50ee28f84565360616251ea72768",
+      "id": "609ea9f2949f9d13ad90b8b48fe651a375202ba0f1a764aed224e329204121e1",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/review/advanced",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
+      "owner": "apps/extension/src/scenario-editor/page-shell/inspector.css",
+      "reason": "Responsive grid declarations are unchanged, but surrounding :has targets distinguish field pairs from static-heading single-select disclosures and retain different child placement.",
+      "removalCondition": "Remove when the exact pair disappears or the DOM contracts and placement become one responsive layout owner.",
+      "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
-        "start": 178,
-        "end": 185
+        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
+        "start": 1021,
+        "end": 1027
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/zoom.ts",
-        "start": 201,
-        "end": 207
+        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
+        "start": 1052,
+        "end": 1058
+      }
+    },
+    {
+      "id": "62c69fce5aa7752431f19a05e9dbeefe6c1f86a9d61e8640725b27471a5f7f0c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx <-> apps/extension/src/scenario-editor/page-shell/note-block.tsx",
+      "reason": "Both already use GuideVoiceField and paragraph construction; note and body keep different labels, classes and typed mutations.",
+      "removalCondition": "Remove when the exact pair disappears or note/body editing becomes one actual typed control contract.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 500,
+        "end": 506
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/note-block.tsx",
+        "start": 68,
+        "end": 74
       }
     },
     {
@@ -1444,6 +1282,24 @@
       }
     },
     {
+      "id": "65e6612764de8a169c0365dc8b685e5f990fdea5f4742ea129b89d2df75cbe3f",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/tour/workspace.tsx <-> apps/extension/src/scenario-editor/page-shell/workspace.tsx",
+      "reason": "Guide and Tour already use ContentToolbarButton; the presentation/close bindings serve distinct grouping admission and header contracts.",
+      "removalCondition": "Remove when the exact pair disappears or a common header authority owns both grouping and close behavior.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/workspace.tsx",
+        "start": 164,
+        "end": 174
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.tsx",
+        "start": 308,
+        "end": 318
+      }
+    },
+    {
       "id": "660e1a945e63ab4b664b39bd49b02c060d60cff88cebe6904db87a7138c35511",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover/index.css",
@@ -1477,42 +1333,6 @@
         "path": "apps/extension/src/features/editor/document/rich-shape/catalog/geometry/decorative.ts",
         "start": 26,
         "end": 38
-      }
-    },
-    {
-      "id": "66b9312b990df57cadb05b3cab88b6e78f72863c93fc71abef3f841aa900443f",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/composition/audio-recording/dialog/index.tsx <-> apps/extension/src/video-editor/recording/audio-modal/index.tsx",
-      "reason": "Escape/close props bind the existing shared recording-session controller in two modal presentations: generic dialog and timeline backdrop. Sizing, anchoring and body are intentionally host-local; another modal facade would only forward those props.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/composition/audio-recording/dialog/index.tsx",
-        "start": 84,
-        "end": 95
-      },
-      "secondFile": {
-        "path": "apps/extension/src/video-editor/recording/audio-modal/index.tsx",
-        "start": 86,
-        "end": 97
-      }
-    },
-    {
-      "id": "66c260575315146d1d74fbf273c477bd9006d05de839db667016a75a5a01d5c2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/content/overlay/toolbar/capture/settings-content.tsx",
-      "reason": "Utility items declare a narrow input subset, while ToolbarSettingsDropdown additionally owns display mode and menu/trigger placement refs. Matching callback fields are structural port declarations; the child must not depend on the whole dropdown contract.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/content/overlay/toolbar/capture/settings-content.tsx",
-        "start": 134,
-        "end": 147
-      },
-      "secondFile": {
-        "path": "apps/extension/src/content/overlay/toolbar/capture/settings-content.tsx",
-        "start": 272,
-        "end": 285
       }
     },
     {
@@ -1570,21 +1390,21 @@
       }
     },
     {
-      "id": "6a1aad7c4462a9501646debd6144b656438413437e7de5091af432973e4a2861",
+      "id": "68cd88fdc636ae5b080533bdf6e7b48428b2fa0e713a9fb670de86c17083241a",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx <-> apps/extension/src/scenario-editor/page-shell/note-block.tsx",
-      "reason": "Body and note textareas already share paragraph creation, appearance and textarea control. Their block types, classes, placeholders and containing markup differ; the text projection is declarative binding into separately typed block updates.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "apps/extension/src/scenario-editor/page-shell/inspector.css",
+      "reason": "Guide shared segmented-row and Tour native composition groups expose different DOM contracts; pressed/focus declarations coincide without sharing interaction authority.",
+      "removalCondition": "Remove when the exact pair disappears or the two surfaces adopt one semantic control owner.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 466,
-        "end": 472
+        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
+        "start": 941,
+        "end": 950
       },
       "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/note-block.tsx",
-        "start": 61,
-        "end": 67
+        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
+        "start": 973,
+        "end": 980
       }
     },
     {
@@ -1603,6 +1423,24 @@
         "path": "apps/extension/src/features/highlighter/frame-annotation/parser.ts",
         "start": 115,
         "end": 121
+      }
+    },
+    {
+      "id": "6ad13d1f2a402e43377c8e58d0f66894a497b2313cc98facdb81f121604ae53d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/audio-recording/dialog/index.tsx <-> apps/extension/src/video-editor/recording/audio-modal/index.tsx",
+      "reason": "Generic and timeline recording dialogs bind the same existing session/focus owners, but maintain different backdrop, anchoring, sizing, duration and playback composition. Another modal facade would only forward glue.",
+      "removalCondition": "Remove when the exact pair disappears or one complete presentation contract replaces both hosts.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/audio-recording/dialog/index.tsx",
+        "start": 85,
+        "end": 96
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/recording/audio-modal/index.tsx",
+        "start": 86,
+        "end": 97
       }
     },
     {
@@ -1678,6 +1516,60 @@
       }
     },
     {
+      "id": "7372a1862282ddd4d99a4fc7dbdf5b402585d27ba0d239582d18aaffa2f33f8a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/shell/page/start.tsx <-> apps/extension/src/video-editor/shell/app/start.tsx",
+      "reason": "Both entrypoints already use EditorStart and useEditorStartItems; image file creation and video project creation/loading remain separate. Shared translated props are the intended consumer contract.",
+      "removalCondition": "Remove when the exact pair disappears or a common start-session owner replaces the separate source actions.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/shell/page/start.tsx",
+        "start": 135,
+        "end": 146
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/shell/app/start.tsx",
+        "start": 90,
+        "end": 101
+      }
+    },
+    {
+      "id": "73c083127e216da9556089ebf623b7066e88cedd6841a8e111cbdc3739511863",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+      "reason": "Step and section title updates target the same item identity pattern but preserve different type labels and history groups. Matching expression excludes those important binding distinctions.",
+      "removalCondition": "Remove when the exact pair disappears or title kinds acquire one history/mutation contract.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 264,
+        "end": 275
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 533,
+        "end": 544
+      }
+    },
+    {
+      "id": "7634c5a1ab163c31b7f9b9dfb887a67208db1c8248561a68096f9c0a21fd3f18",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/video-review/inspector.css <-> apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+      "reason": "Exact lexical overlap is a trailing transparent background declaration, comment and utility-layer prefix. Review row-action buttons and shared select/color layout selectors implement unrelated rules.",
+      "removalCondition": "Remove when the exact lexical pair disappears; reconsider only if those selectors acquire a genuinely common style responsibility.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/video-review/inspector.css",
+        "start": 76,
+        "end": 81
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/compact-inspector-controls/inspector-surface.css",
+        "start": 183,
+        "end": 188
+      }
+    },
+    {
       "id": "76d71fdadf0aa201bbe0f61b636b341bd84fc75e31976c1f26c396d94b8f7602",
       "classification": "tool-noise",
       "owner": "tooling/web-snapshot-smoke/runtime",
@@ -1750,6 +1642,24 @@
       }
     },
     {
+      "id": "7e4c4a3018c6df105eff972cf0e92559bf51e006ef083abb17a3e09214980c1a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/overlay/toolbar/capture/settings-content.tsx",
+      "reason": "Utility-items props are a narrow port; dropdown adds display mode, placement and menu/trigger refs. Repeated structural callbacks do not duplicate runtime behavior.",
+      "removalCondition": "Remove when the exact pair disappears or the narrow and complete props contracts become identical.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/capture/settings-content.tsx",
+        "start": 141,
+        "end": 154
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/capture/settings-content.tsx",
+        "start": 298,
+        "end": 311
+      }
+    },
+    {
       "id": "7f3e43228bbd0ae78c12c2eabbe8c3dd1cc7a6223fca1f65257e69b691e7de92",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/frame-annotation-controls",
@@ -1804,6 +1714,24 @@
       }
     },
     {
+      "id": "82239476b40dbdb54d513238265ac4ee1948d73f44ba145062aab3d402a6e114",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Current page-scoped paper-derived controls repeat selectors across base geometry/surface and non-hover/non-active/non-expanded/non-pressed overrides; changed tokens require fresh exact review but state/cascade separation remains.",
+      "removalCondition": "Remove when the exact pair disappears or one semantic state rule replaces those separate cascade responsibilities.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 2011,
+        "end": 2022
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 2036,
+        "end": 2047
+      }
+    },
+    {
       "id": "82eea7261ee4368b5f612a8b9384719d83b57356677ddde4270258009ec5645c",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/compact/inspector/browser-frame-details.tsx <-> apps/extension/src/editor/inspector/environment/browser-frame.tsx",
@@ -1855,6 +1783,24 @@
         "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
         "start": 88,
         "end": 95
+      }
+    },
+    {
+      "id": "85de3566caf9097aa246a868c93363766c5d7149925e0af503bc74d4e8006ec5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
+      "reason": "Navigation and image inspectors receive discriminated slide bindings; image additionally receives narration/presentation. Shared union props would weaken branch narrowing. Old repeated spans are byte-identical.",
+      "removalCondition": "Remove when the exact pair disappears or both slide kinds intentionally acquire one typed inspector contract.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
+        "start": 257,
+        "end": 267
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/tour/inspector.tsx",
+        "start": 271,
+        "end": 281
       }
     },
     {
@@ -1966,6 +1912,24 @@
       }
     },
     {
+      "id": "89e2edfe27f4721574656e52e5c04ab91223741a9db5e0ef1da13fb952a6c4a4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/frame-annotation-raster/route.ts <-> apps/extension/src/composition/frame-annotation-raster-client/orchestrator.ts",
+      "reason": "Background lease preparation/commit and client dispatch retain separate timeout and cleanup authorities across runtime boundaries; the tiny Promise race and error projection do not justify cross-runtime lifecycle coupling.",
+      "removalCondition": "Remove when the exact pair disappears or an independently required neutral timeout contract replaces both adapters.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/background/frame-annotation-raster/route.ts",
+        "start": 247,
+        "end": 256
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-raster-client/orchestrator.ts",
+        "start": 133,
+        "end": 142
+      }
+    },
+    {
       "id": "8b591fe6edbc7b1760ef4e0fb86577af0cfd0055a7958cf40154e7c4e030424b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
@@ -1999,6 +1963,24 @@
         "path": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
         "start": 402,
         "end": 407
+      }
+    },
+    {
+      "id": "8c96cf76eedd348bf31b05bff29318850525d76522ffef7e717f280c1d63363a",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover/index.css <-> packages/ui/src/styles/toolbar/legacy-actions.css",
+      "reason": "Popover active controls and toolbar lock active state share theme token values but keep separate selectors/base borders; lock declares border width/style while popover adjusts its existing control border.",
+      "removalCondition": "Remove when the exact pair disappears or both scopes adopt one semantic state style owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 47,
+        "end": 57
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 99,
+        "end": 105
       }
     },
     {
@@ -2038,6 +2020,24 @@
       }
     },
     {
+      "id": "929ac0b85c14ba62e48f191bfa0e68bf66310f3fd38b206dfdc85d04d5f26b34",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
+      "reason": "Loaded visible folders and hidden/pinned folder sections already render GallerySavedViewRows with matching callback props but different containment gates.",
+      "removalCondition": "Remove when the exact pair disappears or one containment owner replaces both insertion sites.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
+        "start": 207,
+        "end": 216
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
+        "start": 95,
+        "end": 100
+      }
+    },
+    {
       "id": "929dfd5e208fff568e681c9d12e39ae4e75fb245a5497f317004d3091f74601d",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
@@ -2071,24 +2071,6 @@
         "path": "apps/extension/src/editor/drawing/object/controls/chrome.ts",
         "start": 53,
         "end": 69
-      }
-    },
-    {
-      "id": "93afd8123c4622d122c9d1ef06ab27f312e9a33c7ab22f705fb2c85f663cd1a2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/print.tsx <-> apps/extension/src/scenario-editor/page-shell/reader.tsx",
-      "reason": "Print and reader modes each restore focus to their own remounted trigger. Reader additionally calls beforeOpen to finish editing; print owns a temporary print surface. Matching focus restoration belongs to separate mode lifetimes and must not combine their activation policy.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/print.tsx",
-        "start": 162,
-        "end": 175
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/reader.tsx",
-        "start": 153,
-        "end": 166
       }
     },
     {
@@ -2290,6 +2272,24 @@
       }
     },
     {
+      "id": "9c6eab84e6e6057bae17be2f0c0054b27ad7dd7ecca4f134dba1656201dae525",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/controller/instance/helpers/viewport.ts <-> apps/extension/src/editor/controller/instance/types/actions.ts",
+      "reason": "The public resize capability and implementing viewport helper describe a structural port; helper additionally owns workspace grid fallback. Making capability depend on implementation reverses the boundary.",
+      "removalCondition": "Remove when the exact pair disappears or a neutral shared type is required independently of clone suppression.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
+        "start": 58,
+        "end": 64
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/controller/instance/types/actions.ts",
+        "start": 130,
+        "end": 135
+      }
+    },
+    {
       "id": "9cab0b82a006fe804bd2ca38a30572e9e63b4d9290fdc7fb505462bb14d670a1",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/content-popover/index.css",
@@ -2377,6 +2377,24 @@
         "path": "apps/extension/src/ui/highlighter-preset-editor/step-badge/index.tsx",
         "start": 260,
         "end": 277
+      }
+    },
+    {
+      "id": "a3bf37df0e70d88927492150c043bf273cba5de7567809d71d1a94119b3823d4",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts <-> apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+      "reason": "Scenario and video inventory adapters share descriptor output fields but differ in root metadata, privacy/history traversals and recording/telemetry counts; common result shape is not common traversal authority.",
+      "removalCondition": "Remove when the exact pair disappears or one evidenced root traversal replaces both adapters.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
+        "start": 272,
+        "end": 278
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 354,
+        "end": 360
       }
     },
     {
@@ -2542,6 +2560,24 @@
       }
     },
     {
+      "id": "ab929064d0c19b824e82011414d8085348a065334762166ed1f9690bfa961f89",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Repeated selector family binds base control motion versus descendant SVG geometry; preserved spans do not imply identical target/declaration ownership.",
+      "removalCondition": "Remove when the exact pair disappears or the motion and SVG rules become one semantic style operation.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1866,
+        "end": 1877
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1920,
+        "end": 1931
+      }
+    },
+    {
       "id": "aba4c8b91a70db3f553ff9bcbe7b17d4fdcaa1fb63e99da87549d13b51f968a1",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections",
@@ -2557,6 +2593,24 @@
         "path": "apps/extension/src/settings/sections/styles/annotations/borders/helpers.ts",
         "start": 25,
         "end": 38
+      }
+    },
+    {
+      "id": "abb3c1389f0693b8dcdd22cac2d8cda6152f83c0a98fedf6d37341c39c69b138",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+      "reason": "Base transitions and focus-visible rules repeat selectors; focus color changed to semantic accent, but the current clone is selector syntax rather than a shared state rule.",
+      "removalCondition": "Remove when the exact pair disappears or base and focus states are replaced by one evidenced rule.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1866,
+        "end": 1877
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/workspace.css",
+        "start": 1907,
+        "end": 1918
       }
     },
     {
@@ -2650,24 +2704,6 @@
       }
     },
     {
-      "id": "b24b204fddcfbd321bb2d83a33e0e7edbfd18e2487cd149614e9bdb630ad835a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-      "reason": "Folder row and pinned-folder section already render GallerySavedViewRows. One is gated by loaded counts and the other resides in a pinned section; matching callback props bind the shared rows at different containment points.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-        "start": 201,
-        "end": 210
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/sidebar/folder-list.tsx",
-        "start": 89,
-        "end": 94
-      }
-    },
-    {
       "id": "b3862e22d5b9369aea6c22cbf9d56f9007f1e0ee73ec732253685892228b040b",
       "classification": "tool-noise",
       "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
@@ -2719,24 +2755,6 @@
         "path": "packages/ui/src/styles/product-form-controls/range.css",
         "start": 157,
         "end": 172
-      }
-    },
-    {
-      "id": "b4f5abebc0dc056ae4c5950f515d803d667ada0e9605cf5b5f47cc048fad0b5d",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts <-> apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-      "reason": "Scenario and video roots return different metadata paths/rootKind and summary counts. Repeated objectCount/totalBytes/load fields implement the portable root descriptor contract; merging root collectors would combine unrelated asset/reference traversal.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
-        "start": 230,
-        "end": 236
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-        "start": 329,
-        "end": 335
       }
     },
     {
@@ -2884,6 +2902,24 @@
       }
     },
     {
+      "id": "c352e5b293e66d55e7d3a60b23bf523f5ca22c5277add7c4575cdddcaec2deae",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "List and grid already reuse GalleryGridCardMedia; kind/details cells and grid project controls have distinct DOM layouts. Matching props bind the shared media primitive.",
+      "removalCondition": "Remove when the exact pair disappears or both layouts intentionally share one complete card body.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 263,
+        "end": 273
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 286,
+        "end": 296
+      }
+    },
+    {
       "id": "c3de2c23868d0e8e2635adf2028b234211e2b1a8137838009af4aab344f29113",
       "classification": "tool-noise",
       "owner": "apps/extension/src/editor/inspector/grouped/inspector.css <-> apps/extension/src/video-editor/workspace/sidebar/selection/inspector.css",
@@ -2917,24 +2953,6 @@
         "path": "apps/extension/src/scenario-editor/page-shell/step-actions.tsx",
         "start": 34,
         "end": 42
-      }
-    },
-    {
-      "id": "c4f3fcdf6bb94ca78b8aa8895c53abde9b59f417cadd8338a8f1bbbff423a98c",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/inspector.css",
-      "reason": "Guide block segmented rows and tour-layout native groups use separate selector contracts for pressed and focus states. Matching visual token declarations do not duplicate interaction state; joining selectors would couple independent control DOM.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
-        "start": 928,
-        "end": 937
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/inspector.css",
-        "start": 960,
-        "end": 967
       }
     },
     {
@@ -2989,6 +3007,24 @@
         "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
         "start": 40,
         "end": 63
+      }
+    },
+    {
+      "id": "c8fe35f26b08dd1df51ca4fd20ae36a97a64c4071374a1a7e1548ec8727d89e0",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/workspace/floating/document-autosave-status.tsx <-> apps/extension/src/gallery/video-review/timeline-chrome.tsx",
+      "reason": "Image and review both use AutosaveControl; conflict-copy/reload and review confirmation/error overrides have separate service and error lifetimes. Shared labels do not justify merging those sessions.",
+      "removalCondition": "Remove when the exact pair disappears or autosave actions and error lifecycle gain one shared owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/workspace/floating/document-autosave-status.tsx",
+        "start": 54,
+        "end": 67
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/video-review/timeline-chrome.tsx",
+        "start": 304,
+        "end": 317
       }
     },
     {
@@ -3136,6 +3172,24 @@
       }
     },
     {
+      "id": "cbe82a5d949e99c242944df913f7f43b8db528c4a40b27b19ad9bf4a5090fa57",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
+      "reason": "Mutation includes recording/scenario stores; deletion excludes them and exposes aggregate-presentation. Common objectStore fields are explicit capability inventories, not a duplicated mutation algorithm.",
+      "removalCondition": "Remove when the exact pair disappears or both operations legitimately require the same transaction capability.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
+        "start": 44,
+        "end": 51
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/projects/mutation-stores.ts",
+        "start": 80,
+        "end": 87
+      }
+    },
+    {
       "id": "cda58e96d82511f013e73202bebb74fd5b1f7a47cad175d3edae112643c8199d",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/persistence",
@@ -3169,24 +3223,6 @@
         "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
         "start": 347,
         "end": 359
-      }
-    },
-    {
-      "id": "d15d1d97960e534f1957204bf3aa60457aaf43580bfc5443588842538ceceea2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 307,
-        "end": 315
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 45,
-        "end": 53
       }
     },
     {
@@ -3244,21 +3280,21 @@
       }
     },
     {
-      "id": "d523ce2b83e7ab5a58135d0eb5e1762009d3ad763cbc161b79bfc5d9ff38ab41",
+      "id": "d6fb3d09434bfd1db27ae01990cdf95a4a65174bad5005445bfd139d8f6d2729",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/editor/controller/instance/helpers/viewport.ts <-> apps/extension/src/editor/controller/instance/types/actions.ts",
-      "reason": "Controller resize capability and its implementing viewport helper describe the same structural input at a typed method boundary. The helper adds workspace grid snapping; turning the public capability into a dependency on the implementation would reverse the port direction.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "apps/extension/src/composition/persistence/projects/asset-publication.ts <-> apps/extension/src/composition/persistence/recordings/asset-publication.ts",
+      "reason": "Project publication writes one asset/export; recording publication batches assets and owns a replay-sensitive completion outbox. Project swallows postcommit physical-delete failure while recording propagates it; shared transaction-tail syntax must not erase that distinction.",
+      "removalCondition": "Remove when the exact pair disappears or both outbox and postcommit failure contracts become one publication operation.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
-        "start": 58,
-        "end": 64
+        "path": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
+        "start": 178,
+        "end": 193
       },
       "secondFile": {
-        "path": "apps/extension/src/editor/controller/instance/types/actions.ts",
-        "start": 130,
-        "end": 135
+        "path": "apps/extension/src/composition/persistence/recordings/asset-publication.ts",
+        "start": 199,
+        "end": 214
       }
     },
     {
@@ -3316,24 +3352,6 @@
       }
     },
     {
-      "id": "dbfb9034aef4273718bda6bb9d96bde1bab0bde1265f73a38ea162e80ad1977a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell",
-      "reason": "The exact repetition is declarative shape or parallel owner-specific control flow; extraction would couple independently evolving contracts or add indirection without removing runtime behavior.",
-      "removalCondition": "Remove when one semantic owner can replace both endpoints without cross-owner coupling or configuration branching, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-21",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 154,
-        "end": 165
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
-        "start": 251,
-        "end": 262
-      }
-    },
-    {
       "id": "dc4c4676fdbed71d9c743d74111462ca7cc5cca84418632990a869075f180a41",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
@@ -3388,21 +3406,39 @@
       }
     },
     {
-      "id": "e069fce6386ff1b4d717967cf5621565bb67d99e9178b24fe26c91ac655f6b1e",
+      "id": "df3eb459126c3ceec94d985fd25f550373efbf0f5591a80a16312ba88e00c87d",
       "classification": "tool-noise",
-      "owner": "apps/extension/src/features/video/review/advanced/validation.ts",
-      "reason": "Content-only quick-edit loading explicitly rejects ui, while full advanced state requires parsed ui and validates recoveryV1. Both already share zoom/background/audio parsers; matching field reads preserve separate accepted schema projections.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
+      "owner": "packages/ui/src/styles/toolbar/legacy-actions.css",
+      "reason": "Toggle and lock share active-hover token declarations but have distinct base borders, disabled behavior and active transforms. Existing state-family selectors remain local.",
+      "removalCondition": "Remove when the exact pair disappears or toggle/lock states acquire one semantic style contract.",
       "reviewBy": "2027-09-01",
       "firstFile": {
-        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
-        "start": 332,
-        "end": 337
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 114,
+        "end": 125
       },
       "secondFile": {
-        "path": "apps/extension/src/features/video/review/advanced/validation.ts",
-        "start": 372,
-        "end": 377
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 58,
+        "end": 69
+      }
+    },
+    {
+      "id": "e14374db1b57476211c13d9780d6cc8be1fc8628e48584d812e1e3c70fcc6c26",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/library-preview/viewport.tsx <-> apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
+      "reason": "Video pan stops on fullscreen or zoom exit and resets scroll in layout effect; library pan uses its viewport-enabled lifetime. Shared pointer-capture protocol must not merge those state authorities.",
+      "removalCondition": "Remove when the exact pair disappears or one owner explicitly unifies both enable/reset lifecycles.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/library-preview/viewport.tsx",
+        "start": 160,
+        "end": 169
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/preview/stage/canvas/fullscreen.tsx",
+        "start": 182,
+        "end": 192
       }
     },
     {
@@ -3421,24 +3457,6 @@
         "path": "apps/extension/src/features/highlighter/step-badge-presets/catalog.ts",
         "start": 290,
         "end": 298
-      }
-    },
-    {
-      "id": "e3adc0781402ca696c60a81039b8bdcabf5a2228322394a1b6634d0c917ed9f2",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-      "reason": "Flat list units and expanded group units already render GalleryGridCard with the same selection/recovery props. Their keys come from different unit shapes and group expansion owns containment; another card facade would only re-forward the existing component contract.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 564,
-        "end": 569
-      },
-      "secondFile": {
-        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
-        "start": 630,
-        "end": 635
       }
     },
     {
@@ -3550,6 +3568,24 @@
       }
     },
     {
+      "id": "ecdb307f0d001b786b552f54c25a296058206ac75fd86c73ea93c35f0feb20ad",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+      "reason": "Guide document and typed step-body props share callback signatures while retaining parent/child responsibilities, selection and instructions; the matching declarations are not duplicate effects.",
+      "removalCondition": "Remove when the exact pair disappears or one actual props contract replaces both boundary declarations.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 317,
+        "end": 325
+      },
+      "secondFile": {
+        "path": "apps/extension/src/scenario-editor/page-shell/guide-document.tsx",
+        "start": 50,
+        "end": 58
+      }
+    },
+    {
       "id": "ed28807382aceecce3a0bc66a06174c48c92bbe9e42af1dc0b80646555acaee1",
       "classification": "tool-noise",
       "owner": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
@@ -3601,24 +3637,6 @@
         "path": "packages/ui/src/styles/toolbar-shell/button.css",
         "start": 99,
         "end": 110
-      }
-    },
-    {
-      "id": "f2e4686e612159aca5721d467b8bd48e4c599dd7de46d1208b90674f761ac669",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts <-> apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-      "reason": "Scenario and video inventory read thumbnails under different aggregate keys, then use shared encodePortableThumbnail and buildPortableAggregatePresentation. Their metadata/privacy and object collection remain root-specific; the match is adapter calls into existing shared encoders.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
-        "start": 187,
-        "end": 202
-      },
-      "secondFile": {
-        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
-        "start": 293,
-        "end": 308
       }
     },
     {
@@ -3745,6 +3763,42 @@
         "path": "apps/extension/src/video-editor/project/state/insertion/material-actions.ts",
         "start": 50,
         "end": 57
+      }
+    },
+    {
+      "id": "fb45eb5243b04375873c2cab1f2fe59d229c7f9477578953545abe2e509c5807",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+      "reason": "Flat virtualized units and expanded recording-group members already reuse GalleryGridCard; keys, offsets, group controls and containment differ. Another wrapper would merely forward the same card props.",
+      "removalCondition": "Remove when the exact pair disappears or one rendering authority replaces both virtualized insertion contexts.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 579,
+        "end": 584
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/library/main-content/grid-cards.tsx",
+        "start": 661,
+        "end": 666
+      }
+    },
+    {
+      "id": "fd0fe2cfccef2a4fa5ac80051523f21638d733a598591726eec460f90825cdf9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts <-> apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+      "reason": "Scenario and video thumbnail keys and aggregate kinds differ while both use encodePortableThumbnail/buildPortableAggregatePresentation; collector insertion order preserves archive identity and root privacy remains local.",
+      "removalCondition": "Remove when the exact pair disappears or thumbnail identity and inventory ordering become one semantic owner.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
+        "start": 229,
+        "end": 244
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 318,
+        "end": 333
       }
     },
     {

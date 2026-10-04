@@ -733,3 +733,37 @@ it('requires activation proof and operation binding for runtime-token requests',
     })
   ).toThrow();
 });
+
+it('admits only unambiguous offscreen raster preparation and correlated completion', () => {
+  const prepare = {
+    type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+    capabilityToken: 'capability',
+    operation: 'prepare',
+    leaseId: 'lease-1',
+  };
+  expect(offscreenFrameAnnotationRasterContract.parseRequest(prepare)).toMatchObject(prepare);
+  for (const invalid of [
+    { ...prepare, leaseId: '' },
+    { ...prepare, leaseId: 'x'.repeat(129) },
+    { ...prepare, capabilityToken: undefined },
+    { ...prepare, operation: 'other' },
+    { ...prepare, reference: { inputSha256: 'a'.repeat(64), jobId: 'lease-1', revision: 1 } },
+  ])
+    expect(() => offscreenFrameAnnotationRasterContract.parseRequest(invalid)).toThrow();
+  expect(
+    offscreenFrameAnnotationRasterContract.parseResponse({
+      success: true,
+      result: 'prepared',
+      leaseId: 'lease-1',
+    })
+  ).toMatchObject({ result: 'prepared', leaseId: 'lease-1' });
+  for (const leaseId of [undefined, '', 'x'.repeat(129)]) {
+    expect(() =>
+      offscreenFrameAnnotationRasterContract.parseResponse({
+        success: true,
+        result: 'prepared',
+        leaseId,
+      })
+    ).toThrow();
+  }
+});

@@ -202,16 +202,7 @@ export async function preparePersistedEditorDocument(
       document: {
         version: 3,
         sourceImage,
-        sourceName: document.sourceName,
-        ...(document.displayName === undefined ? {} : { displayName: document.displayName }),
-        sourceWidth: document.sourceWidth,
-        sourceHeight: document.sourceHeight,
-        canvasWidth: document.canvasWidth,
-        canvasHeight: document.canvasHeight,
-        sourceLeft: document.sourceLeft,
-        sourceTop: document.sourceTop,
-        sourceDisplayWidth: document.sourceDisplayWidth,
-        sourceDisplayHeight: document.sourceDisplayHeight,
+        ...projectEditorImageMetadata(document),
         frame: { ...frame, backgroundImage },
         ...(browserFrame ? { browserFrame } : {}),
         canvasJson: JSON.stringify(canvas),
@@ -318,6 +309,36 @@ export async function hydratePersistedEditorDocument(args: {
   };
 }
 
+/** Shared scalar metadata only; binary fields and version admission stay at each codec boundary. */
+function projectEditorImageMetadata(
+  document: Pick<
+    EditorDocument,
+    | 'sourceName'
+    | 'displayName'
+    | 'sourceWidth'
+    | 'sourceHeight'
+    | 'canvasWidth'
+    | 'canvasHeight'
+    | 'sourceLeft'
+    | 'sourceTop'
+    | 'sourceDisplayWidth'
+    | 'sourceDisplayHeight'
+  >
+) {
+  return {
+    sourceName: document.sourceName,
+    ...(document.displayName === undefined ? {} : { displayName: document.displayName }),
+    sourceWidth: document.sourceWidth,
+    sourceHeight: document.sourceHeight,
+    canvasWidth: document.canvasWidth,
+    canvasHeight: document.canvasHeight,
+    sourceLeft: document.sourceLeft,
+    sourceTop: document.sourceTop,
+    sourceDisplayWidth: document.sourceDisplayWidth,
+    sourceDisplayHeight: document.sourceDisplayHeight,
+  };
+}
+
 function projectEditorDocumentV2(
   document: PersistedEditorDocumentV3,
   hydrated: {
@@ -331,16 +352,7 @@ function projectEditorDocumentV2(
   return {
     version: 2,
     sourceImageData: hydrated.sourceImageData,
-    sourceName: document.sourceName,
-    ...(document.displayName === undefined ? {} : { displayName: document.displayName }),
-    sourceWidth: document.sourceWidth,
-    sourceHeight: document.sourceHeight,
-    canvasWidth: document.canvasWidth,
-    canvasHeight: document.canvasHeight,
-    sourceLeft: document.sourceLeft,
-    sourceTop: document.sourceTop,
-    sourceDisplayWidth: document.sourceDisplayWidth,
-    sourceDisplayHeight: document.sourceDisplayHeight,
+    ...projectEditorImageMetadata(document),
     frame: { ...hydrated.frame, backgroundImageData: hydrated.backgroundImageData },
     ...(hydrated.browserFrame ? { browserFrame: hydrated.browserFrame } : {}),
     canvasJson: hydrated.canvasJson,

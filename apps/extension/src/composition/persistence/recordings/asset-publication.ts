@@ -1,7 +1,7 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
-import { assertMediaSourceReplaceable } from '../projects/source-admission';
+import { assertStandaloneMediaSourceReplaceable } from '../projects/source-admission';
 import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -157,14 +157,7 @@ export async function publishRecordingAssetJournal(
         if (replay) continue;
         if (previous && previous.assetId !== entry.assetId) {
           const target = buildRecordingMediaEntry(previous);
-          if ((await tx.objectStore(VIDEO_WORKSPACES_STORE).get(target.id)) !== undefined)
-            throw new MediaAssetDeletionBlockedError('source-unavailable');
-          await assertMediaSourceReplaceable(target, {
-            assets: tx.objectStore(PROJECT_ASSETS_STORE),
-            projects: tx.objectStore(VIDEO_PROJECTS_STORE),
-            scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
-            videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
-          });
+          await assertStandaloneMediaSourceReplaceable(target, tx);
           await ownerStore.delete(ownerKey(entry.id));
           if ((await ownerStore.index('assetId').count(previous.assetId)) === 0) {
             await tx.objectStore(ASSET_REFS_STORE).delete(previous.assetId);

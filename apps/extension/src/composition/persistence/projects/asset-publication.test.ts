@@ -556,3 +556,34 @@ it.each(['voiceover', 'music', 'recovery'] as const)(
     ]);
   }
 );
+
+it('rejects a retained own review before standalone export replacement writes', async () => {
+  const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+  const transaction = createTransaction(writes, Promise.resolve(), {
+    ...exportEntry,
+    assetId: 'asset-old',
+  });
+  const objectStore = transaction.objectStore;
+  const review = { aggregateId: `export:${exportEntry.id}` };
+  transaction.objectStore = (name) => {
+    const store = objectStore(name);
+    if (name === 'video_workspaces') {
+      store.get.mockResolvedValue(review);
+      store.getAll.mockResolvedValue([review]);
+    }
+    return store;
+  };
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  await expect(
+    publishProjectExportJournal(
+      createJournal(PROJECT_EXPORT_PUBLICATION_DOMAIN, {
+        entry: exportEntry,
+        expectedAssetId: 'asset-old',
+      })
+    )
+  ).rejects.toThrow();
+  expect(writes).toEqual([]);
+  expect(mocks.completeDelete).not.toHaveBeenCalled();
+});

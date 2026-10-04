@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,17 +23,31 @@ function writePackage(directory: string, name: string, version: string) {
 function runtimeFixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-npm-runtime-'));
   roots.push(root);
-  const dependencies = { npm: '11.19.1', 'brace-expansion': '5.0.12', undici: '6.28.1' };
+  const dependencies = {
+    npm: '11.19.1',
+    'brace-expansion': '5.0.12',
+    undici: '6.28.1',
+    'http-cache-semantics': '4.3.0',
+  };
   const packages: Record<string, unknown> = { '': { dependencies } };
   for (const [name, version] of Object.entries(dependencies)) {
     writePackage(path.join(root, 'node_modules', name), name, version);
     packages[`node_modules/${name}`] = { version };
   }
   const npmRoot = path.join(root, 'node_modules/npm');
-  for (const name of ['minimatch', 'node-gyp', 'unrelated'])
+  for (const name of ['minimatch', 'node-gyp', 'make-fetch-happen', 'unrelated'])
     writePackage(path.join(npmRoot, 'node_modules', name), name, '1.0.0');
   writePackage(path.join(npmRoot, 'node_modules/brace-expansion'), 'brace-expansion', '5.0.9');
   writePackage(path.join(npmRoot, 'node_modules/undici'), 'undici', '6.28.0');
+  writePackage(
+    path.join(npmRoot, 'node_modules/http-cache-semantics'),
+    'http-cache-semantics',
+    '4.2.0'
+  );
+  fs.copyFileSync(
+    'tooling/ci/fixtures/http-cache-semantics-4.3.0.fixture.txt',
+    path.join(root, 'node_modules/http-cache-semantics/index.js')
+  );
   const bytes = JSON.stringify({ lockfileVersion: 3, packages });
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ dependencies }));
   fs.writeFileSync(path.join(root, 'package-lock.json'), bytes);
@@ -128,3 +143,49 @@ it.each(['missing', 'redirected'])(
     expect(fs.existsSync(path.join(npmRoot, 'node_modules/unrelated'))).toBe(true);
   }
 );
+
+it('patches the exact published cache source and resolves it from the actual npm consumer', () => {
+  const { root, npmRoot, lock } = runtimeFixture();
+  const source = path.join(root, 'node_modules/http-cache-semantics/index.js');
+  expect(crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex')).toBe(
+    'ede1cc404a492fa348eb9d97a3007a0d72aa717bd22cd86a56bd0824c19729ca'
+  );
+  normalizeNpmRuntime(root, lock);
+  const consumer = createRequire(path.join(npmRoot, 'node_modules/make-fetch-happen/index.js'));
+  expect(consumer.resolve('http-cache-semantics')).toBe(source);
+  const CachePolicy = consumer('http-cache-semantics');
+  for (const shared of [true, false]) {
+    for (const [headers, prohibited] of [
+      [{ 'set-cookie': 'session=secret', 'cache-control': 'max-age=3600' }, true],
+      [{ 'cache-control': 'max-age=0, proxy-revalidate' }, true],
+      [{ 'cache-control': 'no-cache' }, true],
+      [{ 'set-cookie': 'session=secret', 'cache-control': 'public,max-age=3600' }, false],
+      [{ 'set-cookie': 'session=secret', 'cache-control': 'immutable,max-age=3600' }, false],
+      [{ 'cache-control': 'max-age=0' }, false],
+    ] as const) {
+      const request = {
+        url: 'https://example.test/private',
+        method: 'GET',
+        headers: { host: 'example.test' },
+      };
+      const policy = new CachePolicy(request, { status: 200, headers }, { shared });
+      expect(
+        policy.satisfiesWithoutRevalidation({
+          ...request,
+          headers: { ...request.headers, 'cache-control': 'max-stale=999999' },
+        })
+      ).toBe(!(shared && prohibited));
+    }
+  }
+  const patched = fs.readFileSync(source);
+  normalizeNpmRuntime(root, lock);
+  expect(fs.readFileSync(source)).toEqual(patched);
+  fs.appendFileSync(source, '\n// tampered');
+  expect(() => validateNpmRuntime(root, lock)).toThrow('source drift');
+});
+it('rejects unknown cache bytes before deleting any bundled dependency', () => {
+  const { root, npmRoot, lock } = runtimeFixture();
+  fs.appendFileSync(path.join(root, 'node_modules/http-cache-semantics/index.js'), ' ');
+  expect(() => normalizeNpmRuntime(root, lock)).toThrow('source drift');
+  expect(fs.existsSync(path.join(npmRoot, 'node_modules/brace-expansion'))).toBe(true);
+});

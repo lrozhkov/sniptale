@@ -1,5 +1,6 @@
-import { BookOpen } from 'lucide-react';
 // @vitest-environment jsdom
+
+import { BookOpen } from 'lucide-react';
 
 import { act } from 'react';
 import { createVideoProjectItem } from '../test-support/items';

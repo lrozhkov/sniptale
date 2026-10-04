@@ -138,8 +138,9 @@ function expectToolbarSizeContract(): void {
   expect(contentToolbarSource).toContain("'sniptale-glass-toolbar'");
   expect(contentToolbarSource).toContain("'sniptale-glass-toolbar-divider'");
   expect(contentToolbarSource).toContain("'sniptale-glass-toolbar-button'");
-  expect(contentToolbarSource).toContain(
-    "selected && tone !== 'utility' && 'sniptale-glass-toolbar-button--active'"
+  expect(contentToolbarSource.replace(/\s+/g, ' ')).toContain(
+    "selected && tone !== 'utility' && tone !== 'outline' && tone !== 'close' && " +
+      "'sniptale-glass-toolbar-button--active'"
   );
   expect(contentToolbarSource).toContain("tone === 'close' && 'sniptale-btn-close'");
   expect(contentToolbarSource).not.toContain('sniptale-btn-sm sniptale-btn-close');

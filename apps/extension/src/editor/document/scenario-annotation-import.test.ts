@@ -11,6 +11,7 @@ import { applySelectionToolSettingsToObjects } from '../controller/selection/app
 import { syncSelectionToolSettingsFromObject } from '../controller/selection/sync/dispatch';
 import { useEditorStore } from '../state/useEditorStore';
 import { getBlurSettings } from '../objects/annotation/blur/object';
+import { createEditorDrawingFabricObject } from '../drawing/object/vector';
 
 function documentFor(overlays: ScenarioOverlay[]) {
   return buildScenarioEditorCanvasDocument({
@@ -213,4 +214,50 @@ it.each([
       JSON.stringify({ objects: [{ ...normalized.objects[0], ...patch }] })
     )
   ).toThrow('Invalid scenario blur metadata');
+});
+
+it.each([
+  { left: 32, top: 48, width: 24, height: 24, strokeWidth: 3 },
+  { left: 32.125, top: -48.375, width: 23.75, height: 19.125, strokeWidth: 2.625 },
+  { left: 0, top: 0, width: 0, height: 0, strokeWidth: 0 },
+])('preserves complete canonical point serialization for %j', (geometry) => {
+  for (const overlay of [ring, cursor]) {
+    for (const label of [undefined, 'Retained point']) {
+      const source = documentFor([overlay]);
+      source.objects[0] = {
+        ...source.objects[0],
+        ...geometry,
+        rx: geometry.width / 2,
+        ry: geometry.height / 2,
+        fill: '#123456',
+        stroke: '#abcdef',
+        sniptaleLocked: true,
+        visible: false,
+      };
+      if (label === undefined) delete source.objects[0]['sniptaleLabel'];
+      else source.objects[0]['sniptaleLabel'] = label;
+      const expected = createEditorDrawingFabricObject(
+        {
+          id: overlay.id,
+          kind: 'ellipse',
+          bounds: {
+            x: geometry.left - geometry.width / 2,
+            y: geometry.top - geometry.height / 2,
+            width: geometry.width,
+            height: geometry.height,
+          },
+          color: '#abcdef',
+          fillColor: '#123456',
+          width: geometry.strokeWidth,
+        },
+        1
+      );
+      if (label !== undefined) expected.sniptaleLabel = label;
+      expected.sniptaleLocked = true;
+      expected.visible = false;
+      const normalized = normalizeScenarioAnnotationsInCanvasJson(JSON.stringify(source));
+      expect(JSON.parse(normalized).objects).toEqual([expected.toObject([...CUSTOM_JSON_PROPS])]);
+      expect(() => assertValidEditorDrawingCanvasJson(normalized)).not.toThrow();
+    }
+  }
 });

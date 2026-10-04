@@ -9,9 +9,7 @@ import { createContentDrawingController } from './controller';
 import { createDrawingLayout } from './layout';
 import { createDrawingSession, type DrawingDocumentCommit } from '../../features/drawing/public';
 
-vi.mock('../parser/page-preparation/history', () => ({
-  pagePreparationHistory: { commitEntry: () => true, subscribeToClear: () => () => undefined },
-}));
+const history = { commitEntry: () => true, subscribeToClear: () => () => undefined };
 
 const controllers: ReturnType<typeof createContentDrawingController>[] = [];
 afterEach(() => {
@@ -32,7 +30,7 @@ function fixture() {
     configurable: true,
     value: () => [target, document.body],
   });
-  const controller = createContentDrawingController();
+  const controller = createContentDrawingController(history);
   controllers.push(controller);
   controller.session.commitObject({
     id: 'ink',

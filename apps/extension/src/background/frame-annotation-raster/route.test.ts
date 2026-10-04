@@ -33,6 +33,12 @@ import { routeFrameAnnotationRasterMessage } from './route';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.send.mockReset().mockImplementation(async (...args: unknown[]) => {
+    const message = args[0] as { operation?: string; leaseId?: string };
+    return message.operation === 'prepare'
+      ? { success: true, result: 'prepared', leaseId: message.leaseId }
+      : { success: true, result: 'applied' };
+  });
   mocks.ensure.mockResolvedValue(undefined);
   mocks.wait.mockResolvedValue(undefined);
 });
@@ -52,6 +58,7 @@ async function prepareLease(): Promise<string> {
   const response = sendResponse.mock.calls[0]?.[0] as { success: boolean; result: string };
   expect(response.success).toBe(true);
   expect(response.result).toBe(leaseId);
+  mocks.send.mockClear();
   return response.result;
 }
 
@@ -531,4 +538,95 @@ it('releases the erasure exclusion when render setup or cancellation cleanup fai
   const erasure = reserveMediaErasureExclusion();
   await expect(erasure.waitForActiveMutations()).resolves.toBeUndefined();
   erasure.release();
+});
+
+it('waits for correlated offscreen data admission before admitting the client lease', async () => {
+  let admit!: (response: { success: boolean; result: string; leaseId: string }) => void;
+  mocks.send.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        admit = resolve;
+      })
+  );
+  const response = vi.fn();
+  routeFrameAnnotationRasterMessage(
+    {
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'prepare',
+      leaseId: 'data-admission',
+    },
+    response
+  );
+  try {
+    await vi.waitFor(() =>
+      expect(mocks.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+          operation: 'prepare',
+          leaseId: 'data-admission',
+          capabilityToken: expect.any(String),
+        })
+      )
+    );
+    expect(response).not.toHaveBeenCalled();
+    admit({ success: true, result: 'prepared', leaseId: 'data-admission' });
+    await vi.waitFor(() =>
+      expect(response).toHaveBeenCalledWith({ success: true, result: 'data-admission' })
+    );
+  } finally {
+    await cancelLease('data-admission');
+  }
+});
+
+it.each([
+  { success: false, error: 'admission refused' },
+  { success: true, result: 'prepared', leaseId: 'stale-lease' },
+])('rejects failed or stale offscreen admission: %j', async (completion) => {
+  mocks.send.mockResolvedValueOnce(completion);
+  const response = vi.fn();
+  routeFrameAnnotationRasterMessage(
+    {
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'prepare',
+      leaseId: 'failed-admission',
+    },
+    response
+  );
+  await vi.waitFor(() =>
+    expect(response).toHaveBeenCalledWith({ success: false, error: expect.any(String) })
+  );
+  expect(await confirmLease('failed-admission')).toMatchObject({ success: false });
+  const retry = await prepareLease();
+  await cancelLease(retry);
+});
+
+it('does not revive a cancelled lease when delayed data admission succeeds', async () => {
+  let admit!: (response: { success: boolean; result: string; leaseId: string }) => void;
+  mocks.send.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        admit = resolve;
+      })
+  );
+  const response = vi.fn();
+  routeFrameAnnotationRasterMessage(
+    {
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'prepare',
+      leaseId: 'cancelled-admission',
+    },
+    response
+  );
+  await vi.waitFor(() => expect(mocks.send).toHaveBeenCalledOnce());
+  await cancelLease('cancelled-admission');
+  admit({ success: true, result: 'prepared', leaseId: 'cancelled-admission' });
+  await vi.waitFor(() =>
+    expect(response).toHaveBeenCalledWith({
+      success: false,
+      error: 'Frame annotation raster preparation was cancelled',
+    })
+  );
+  expect(await confirmLease('cancelled-admission')).toMatchObject({ success: false });
+  const retry = await prepareLease();
+  await cancelLease(retry);
 });

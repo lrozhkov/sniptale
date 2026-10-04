@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewZoomEditor } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { reconcileReviewFocus, projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type {
   QuickEditZoomRegion,
@@ -481,3 +482,67 @@ it.each(
   });
   expect(original.enter.duration).toBe(4);
 });
+
+it.each([
+  [{ scale: 3 }, { transform: { scale: 3 } }],
+  [{ centerX: 0.7 }, { transform: { centerX: 0.7 } }],
+  [{ centerY: 0.2 }, { transform: { centerY: 0.2 } }],
+  [{ enter: { type: 'ease-in-out' as const, duration: 0.7 } }, { enter: { duration: 0.7 } }],
+  [{ exit: { type: 'ease-in-out' as const, duration: 0.6 } }, { exit: { duration: 0.6 } }],
+])(
+  'commits property %j beside a cut-hidden region without changing source intent',
+  (patch, expected) => {
+    const cut = {
+      id: 'cut',
+      kind: 'cut' as const,
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+    };
+    const retained = reconcileReviewFocus({
+      regions: [region('hidden', 2, 4), region('visible', 6, 8)],
+      duration: 10,
+      before: [],
+      after: [cut],
+      edit: cut,
+      preserveUnderCuts: true,
+    });
+    const timeMap = buildReviewTimeMap(10, [cut]);
+    expect(retained.map(({ start, end }) => ({ start, end }))).toEqual([
+      { start: 2, end: 4 },
+      { start: 2, end: 4 },
+    ]);
+    expect(projectReviewFocus(retained, timeMap).map(({ id }) => id)).toEqual(['visible']);
+    let zoom = { enabled: true, regions: retained };
+    let editor!: ReturnType<typeof useReviewZoomEditor>;
+    function Harness() {
+      editor = useReviewZoomEditor({
+        zoom,
+        timelineDuration: 6,
+        timeMap,
+        setZoom: (update) => {
+          zoom = update(zoom);
+        },
+      });
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    act(() => editor.change('visible', patch));
+    expect(zoom.regions[1]).toMatchObject(expected);
+    expect(zoom.regions[0]).toEqual(retained[0]);
+    expect(zoom.regions.map(({ sourceAnchor, dormant }) => ({ sourceAnchor, dormant }))).toEqual(
+      retained.map(({ sourceAnchor, dormant }) => ({ sourceAnchor, dormant }))
+    );
+    const restored = reconcileReviewFocus({
+      regions: zoom.regions,
+      duration: 10,
+      before: [cut],
+      after: [],
+      edit: null,
+      preserveUnderCuts: true,
+    });
+    expect(restored[1]).toMatchObject({ ...expected, start: 6, end: 8 });
+    expect(restored[0]).toMatchObject({ start: 2, end: 4 });
+  }
+);

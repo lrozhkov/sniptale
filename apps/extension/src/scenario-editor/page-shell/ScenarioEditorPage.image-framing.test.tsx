@@ -430,11 +430,16 @@ it('imports narration from the mounted tour inspector through the source-bound p
   io.narration.mockResolvedValue({ ...project, updatedAt: 101 });
   await render();
   await click('Interactive tour');
-  await act(async () => container.querySelector<HTMLButtonElement>('.tour-slide-select')?.click());
-  await click('Inspector');
-  const showAll = container.querySelector<HTMLButtonElement>('button[title="Show all settings"]');
-  if (showAll) await act(async () => showAll.click());
-  const input = container.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
+  const selectedSlide = container.querySelector<HTMLButtonElement>('.tour-slide-select');
+  expect(selectedSlide).not.toBeNull();
+  await act(async () => selectedSlide!.click());
+  const inspector = container.querySelector<HTMLElement>('#guide-inspector-panel');
+  expect(inspector).not.toBeNull();
+  expect(inspector!.hidden).toBe(false);
+  const showAll = inspector!.querySelector<HTMLButtonElement>('button[title="Show all settings"]');
+  expect(showAll).not.toBeNull();
+  await act(async () => showAll!.click());
+  const input = inspector!.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
   expect(input).not.toBeNull();
   const blob = new File(['voice'], 'narration.wav', { type: 'audio/wav' });
   Object.defineProperty(input, 'files', { value: [blob] });
@@ -708,4 +713,67 @@ it('keeps a framing session out of autosave and commits all geometry once on Don
   await settleAutosave();
   expect(image.querySelector('img')?.style.scale).toBe('1');
   expect(io.save).not.toHaveBeenCalled();
+});
+
+it('detaches old media URLs before revocation across undo, redo and a delayed asset read', async () => {
+  const project = createGuideProject('Images', 'guide', 100);
+  const step = createGuideStep('Images', 'images');
+  const blocks = ['edited', 'original'].map((assetId, index) =>
+    createGuideImageBlock({
+      id: `image-${index}`,
+      assetId,
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: `${assetId}.png` },
+    })
+  );
+  step.blocks = blocks;
+  project.items = [step];
+  const previous = {
+    ...project,
+    updatedAt: 90,
+    items: [{ ...step, blocks: blocks.map((block) => ({ ...block, assetId: 'original' })) }],
+  };
+  io.load.mockResolvedValue(project);
+  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
+  const blob = new Blob(['image'], { type: 'image/png' });
+  io.asset.mockResolvedValue(blob);
+  const sources = () =>
+    [...container.querySelectorAll('article img')].map((image) => image.getAttribute('src'));
+  const attachedAtRevocation: string[] = [];
+  let sequence = 0;
+  const createUrl = vi.fn(() => `blob:media-${++sequence}`);
+  const revokeUrl = vi.fn((url: string) => {
+    if (sources().includes(url)) attachedAtRevocation.push(url);
+  });
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = createUrl;
+      static revokeObjectURL = revokeUrl;
+    }
+  );
+  await render();
+  expect(sources()).toHaveLength(2);
+  let finishStale!: (blob: Blob) => void;
+  io.asset.mockImplementationOnce(
+    () =>
+      new Promise<Blob>((resolve) => {
+        finishStale = resolve;
+      })
+  );
+  await click('Undo');
+  expect(container.querySelectorAll('article img')).toHaveLength(0);
+  await click('Redo');
+  const restoredSources = sources();
+  expect(restoredSources).toHaveLength(2);
+  const allocated = createUrl.mock.calls.length;
+  await act(async () => finishStale(blob));
+  expect(createUrl).toHaveBeenCalledTimes(allocated);
+  expect(sources()).toEqual(restoredSources);
+  await act(async () => root.render(null));
+  expect(attachedAtRevocation).toEqual([]);
+  expect(revokeUrl.mock.calls.map(([url]) => url).sort()).toEqual(
+    createUrl.mock.results.map((result) => result.value).sort()
+  );
 });

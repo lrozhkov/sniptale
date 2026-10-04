@@ -507,7 +507,7 @@ for (const { locale, theme } of [
   { locale: 'en', theme: 'light' },
   { locale: 'ru', theme: 'dark' },
 ]) {
-  test(`saved guide and tour keep exact native bytes after source changes and catalogue rename at 1280 ${locale}`, async ({
+  test(`saved guide and tour retain native bytes after source edits and catalogue rename at HD ${locale}`, async ({
     context,
     extensionId,
   }) => {

@@ -14,6 +14,41 @@ import {
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
 
+import {
+  PROJECT_ASSETS_STORE,
+  VIDEO_PROJECTS_STORE,
+  SCENARIO_ASSETS_STORE,
+  VIDEO_WORKSPACES_STORE,
+} from '../infrastructure/indexed-db/core';
+
+interface StandaloneSourceTransaction {
+  objectStore(
+    name:
+      | typeof PROJECT_ASSETS_STORE
+      | typeof VIDEO_PROJECTS_STORE
+      | typeof SCENARIO_ASSETS_STORE
+      | typeof VIDEO_WORKSPACES_STORE
+  ): {
+    get(key: string): Promise<unknown>;
+    getAll(): Promise<unknown[]>;
+  };
+}
+
+/** Standalone publication cannot replace even its own retained review's source bytes. */
+export async function assertStandaloneMediaSourceReplaceable(
+  source: MediaDependencyTarget,
+  tx: StandaloneSourceTransaction
+): Promise<void> {
+  if ((await tx.objectStore(VIDEO_WORKSPACES_STORE).get(source.id)) !== undefined)
+    throw new MediaAssetDeletionBlockedError('source-unavailable');
+  await assertMediaSourceReplaceable(source, {
+    assets: tx.objectStore(PROJECT_ASSETS_STORE),
+    projects: tx.objectStore(VIDEO_PROJECTS_STORE),
+    scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
+    videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+  });
+}
+
 interface SourceConsumerStores {
   assets: { getAll(): Promise<unknown[]> };
   projects: { getAll(): Promise<unknown[]> };

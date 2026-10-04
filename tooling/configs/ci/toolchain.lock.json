@@ -4,7 +4,7 @@
   "node": {
     "version": "24.18.0",
     "npmVersion": "11.19.1",
-    "npmLockSha256": "402e4813aa804030b9059b933d08e242832425f3400785f5a9e96fc66ee3f08c",
+    "npmLockSha256": "6bb959f89366ba722b8e0d7ec2cf31e7556cce84d0a7738381b7a8f5e7b74e15",
     "image": "node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d",
     "baseDebianSnapshot": "20260829T000000Z"
   },

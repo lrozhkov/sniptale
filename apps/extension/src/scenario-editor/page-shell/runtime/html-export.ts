@@ -48,8 +48,31 @@ export async function exportGuideHtml(args: {
     title: args.project.name,
     extension: 'html',
   });
-  const sink = await createDirectFileSink({
+  return saveScenarioHtmlExport({
+    projectId: args.project.id,
     filename,
+    mode: 'guide',
+    signal: args.signal,
+    write: async (sink, retain) => {
+      args.signal.throwIfAborted();
+      const { buildGuideHtml } = await import('../html-document');
+      const media = await measureHtmlImages(args.project, args.signal);
+      const document = await buildGuideHtml(args.project, args.t, args.theme, media, args.reading);
+      return writeGuideHtml(sink, document, args.signal, undefined, retain);
+    },
+  });
+}
+
+/** Native HTML commit precedes immutable capture publication and advisory export history. */
+export async function saveScenarioHtmlExport(args: {
+  projectId: string;
+  filename: string;
+  mode: 'guide' | 'tour';
+  signal: AbortSignal;
+  write: (sink: ExportSink, retain: (chunk: Uint8Array) => Promise<void>) => Promise<number>;
+}): Promise<'saved' | 'history-failed'> {
+  const sink = await createDirectFileSink({
+    filename: args.filename,
     extension: '.html',
     mimeType: 'text/html',
     description: 'HTML',
@@ -57,11 +80,7 @@ export async function exportGuideHtml(args: {
   const capture = await createScenarioHtmlCapture();
   let size = 0;
   try {
-    args.signal.throwIfAborted();
-    const { buildGuideHtml } = await import('../html-document');
-    const media = await measureHtmlImages(args.project, args.signal);
-    const document = await buildGuideHtml(args.project, args.t, args.theme, media, args.reading);
-    size = await writeGuideHtml(sink, document, args.signal, undefined, capture.append);
+    size = await args.write(sink, capture.append);
     args.signal.throwIfAborted();
     await sink.close();
   } catch (error) {
@@ -75,11 +94,11 @@ export async function exportGuideHtml(args: {
   try {
     const { ref } = await capture.finalize();
     await saveScenarioExportRecord({
-      projectId: args.project.id,
-      filename,
+      projectId: args.projectId,
+      filename: args.filename,
       format: 'html',
       size,
-      html: { mode: 'guide', ref },
+      html: { mode: args.mode, ref },
     });
     return 'saved';
   } catch {

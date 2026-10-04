@@ -1,10 +1,10 @@
-name: Canonical proof
+name: Checks
 
 on:
   workflow_call:
     inputs:
       gate:
-        description: Exact canonical proof mode
+        description: Check mode
         required: true
         type: string
       force_rebuild:
@@ -18,7 +18,7 @@ on:
         default: ''
         type: string
       release_diagnostic:
-        description: Allow the release QA graph on a branch without publishing release outputs
+        description: Allow release checks on a branch without publication
         required: false
         default: false
         type: boolean
@@ -52,6 +52,7 @@ env:
 
 jobs:
   fast-classifier:
+    name: Check scope
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.pull_request.draft == false &&
@@ -83,10 +84,10 @@ jobs:
           }
       - uses: ./trusted-control/.github/actions/setup-locked-node
         with: { repository-root: trusted-control }
-      - name: Classify every fast-gate input with trusted base controls
+      - name: Check changed inputs
         id: classify
         run: node trusted-control/tooling/ci/classify-fast-gate.mjs trusted-control candidate "$BASE_SHA" "$CANDIDATE_SHA"
-      - name: Report candidate QA control disposition
+      - name: Report check scope
         env:
           CONTROLS_CHANGED: ${{ steps.classify.outputs.controls-changed }}
           CANDIDATE_CONTROL_DIGEST: ${{ steps.classify.outputs.candidate-control-digest }}
@@ -102,7 +103,7 @@ jobs:
             echo "Candidate control digest: $CANDIDATE_CONTROL_DIGEST"
             echo "Trusted control digest: $TRUSTED_CONTROL_DIGEST"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Install locked npm
+      - name: Install pinned npm
         if: steps.classify.outputs.reuse == 'true'
         run: |
           npm ci --ignore-scripts --prefix candidate/tooling/configs/ci/npm
@@ -114,14 +115,14 @@ jobs:
           path: candidate/.tmp/npm-cache
           key: npm-${{ runner.os }}-${{ runner.arch }}-node-24.18.0-toolchain-${{ hashFiles('candidate/tooling/configs/ci/toolchain.lock.json') }}-lock-${{ hashFiles('candidate/package-lock.json') }}
           restore-keys: npm-${{ runner.os }}-${{ runner.arch }}-node-24.18.0-toolchain-${{ hashFiles('candidate/tooling/configs/ci/toolchain.lock.json') }}-
-      - name: Restore the exact successful base proof
+      - name: Restore previous results
         id: source
         if: steps.classify.outputs.reuse == 'true'
         continue-on-error: true
         working-directory: candidate
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: node ../trusted-control/tooling/ci/restore-fast-proof.mjs "$BASE_SHA" "$RUNNER_TEMP/base-fast-proof"
-      - name: Install exact candidate dependencies for non-gate validators
+      - name: Install dependencies
         id: install
         if: steps.source.outcome == 'success'
         continue-on-error: true
@@ -129,13 +130,13 @@ jobs:
         env:
           npm_config_cache: ${{ github.workspace }}/candidate/.tmp/npm-cache
         run: npm ci --ignore-scripts
-      - name: Derive a candidate-bound proof without Selectel
+      - name: Bind results to this commit
         id: derive
         if: steps.install.outcome == 'success'
         continue-on-error: true
         working-directory: candidate
         run: node tooling/ci/derive-fast-proof.mjs "$RUNNER_TEMP/base-fast-proof" "build/ci-artifacts/proof-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" "$BASE_SHA"
-      - name: Publish docs-only admission decision
+      - name: Report documentation-only changes
         id: admission
         if: always()
         env:
@@ -157,6 +158,7 @@ jobs:
           retention-days: 14
 
   qa-image:
+    name: Build environment
     needs: fast-classifier
     if: >-
       always() &&
@@ -198,7 +200,7 @@ jobs:
           }
       - uses: ./trusted-control/.github/actions/setup-locked-node
         with: { repository-root: trusted-control }
-      - name: Bind candidate and trusted QA control digests
+      - name: Bind control digests
         id: controls
         run: |
           result=$(node trusted-control/tooling/ci/check-control-authority.mjs trusted-control candidate)
@@ -213,7 +215,7 @@ jobs:
             username: '${{ github.actor }}',
             password: '${{ secrets.GITHUB_TOKEN }}',
           }
-      - name: Derive the complete candidate QA image cache identity
+      - name: Resolve build image identity
         id: cache
         env:
           SNIPTALE_POLICY_ROOT: trusted-control
@@ -221,10 +223,10 @@ jobs:
           SNIPTALE_FORCE_REBUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild || false }}
           SNIPTALE_FORCE_REBUILD_REASON: ${{ inputs.force_rebuild_reason || '' }}
         run: node trusted-control/tooling/ci/candidate-image-cache.mjs derive candidate "$RUNNER_TEMP/candidate-image/plan.json"
-      - name: Resolve and verify the content-addressed candidate QA image
+      - name: Verify cached build image
         id: cache-lookup
         run: node trusted-control/tooling/ci/candidate-image-cache.mjs lookup candidate "${{ steps.cache.outputs.plan }}"
-      - name: Derive the complete trusted controller image cache identity
+      - name: Resolve controller image identity
         id: controller-cache
         env:
           SNIPTALE_POLICY_ROOT: trusted-control
@@ -232,10 +234,10 @@ jobs:
           SNIPTALE_FORCE_REBUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_rebuild || false }}
           SNIPTALE_FORCE_REBUILD_REASON: ${{ inputs.force_rebuild_reason || '' }}
         run: node trusted-control/tooling/ci/candidate-image-cache.mjs derive trusted-control "$RUNNER_TEMP/controller-image/plan.json"
-      - name: Resolve and verify the content-addressed controller image
+      - name: Verify cached controller image
         id: controller-cache-lookup
         run: node trusted-control/tooling/ci/candidate-image-cache.mjs lookup trusted-control "${{ steps.controller-cache.outputs.plan }}"
-      - name: Build exact candidate QA image
+      - name: Build test environment
         id: build
         if: steps.cache-lookup.outputs['qa-build'] == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
@@ -255,7 +257,7 @@ jobs:
           provenance: mode=max
           cache-from: type=gha,scope=sniptale-qa
           cache-to: ${{ github.event_name != 'pull_request_target' && env.QA_CACHE_EXPORT || '' }}
-      - name: Build exact candidate controller image
+      - name: Build controller
         id: build-controller
         if: steps.controller-cache-lookup.outputs['controller-build'] == 'true'
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
@@ -275,7 +277,7 @@ jobs:
           provenance: mode=max
           cache-from: type=gha,scope=sniptale-controller
           cache-to: ${{ github.event_name != 'pull_request_target' && env.CONTROLLER_CACHE_EXPORT || '' }}
-      - name: Bind exact image references
+      - name: Record image references
         id: reference
         env:
           QA_DIGEST: ${{ steps.build.outputs.digest || steps.cache-lookup.outputs['qa-digest'] }}
@@ -285,12 +287,12 @@ jobs:
           printf '%s\n' "$CONTROLLER_DIGEST" | grep -Eq '^sha256:[a-f0-9]{64}$'
           echo "reference=ghcr.io/lrozhkov/sniptale-qa@$QA_DIGEST" >> "$GITHUB_OUTPUT"
           echo "controller-reference=ghcr.io/lrozhkov/sniptale-controller@$CONTROLLER_DIGEST" >> "$GITHUB_OUTPUT"
-      - name: Verify immutable candidate binding and record seven-day liveness
+      - name: Verify build image lease
         env:
           SNIPTALE_IMAGE_DIGEST: ${{ steps.build.outputs.digest || steps.cache-lookup.outputs['qa-digest'] }}
           SNIPTALE_IMAGE_TAG: ${{ steps.cache-lookup.outputs['qa-tag'] }}
         run: node trusted-control/tooling/ci/candidate-image-cache.mjs verify-receipt candidate "${{ steps.cache.outputs.plan }}"
-      - name: Verify immutable controller binding and record seven-day liveness
+      - name: Verify controller image lease
         env:
           SNIPTALE_IMAGE_DIGEST: ${{ steps.build-controller.outputs.digest || steps.controller-cache-lookup.outputs['controller-digest'] }}
           SNIPTALE_IMAGE_TAG: ${{ steps.controller-cache-lookup.outputs['controller-tag'] }}
@@ -305,6 +307,7 @@ jobs:
           retention-days: 9
 
   provision:
+    name: Start runner
     needs: qa-image
     if: ${{ !cancelled() && needs.qa-image.result == 'success' }}
     runs-on: ubuntu-24.04
@@ -327,7 +330,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
-      - name: Provision first available disposable runner
+      - name: Start disposable runner
         env:
           CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
           SELECTEL_QA_PROFILES: ${{ vars.SELECTEL_QA_PROFILES }}
@@ -367,7 +370,7 @@ jobs:
             --env SNIPTALE_QA_IMAGE --env SNIPTALE_PROOF_LANE \
             --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT --env GITHUB_WORKFLOW \
             "$CONTROLLER_IMAGE" provision
-      - name: Export sanitized selected profile
+      - name: Report runner profile
         id: record
         if: always()
         run: |
@@ -399,6 +402,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
   canonical-qa:
+    name: Tests and build
     needs: [qa-image, provision]
     if: >-
       !cancelled() &&
@@ -431,7 +435,7 @@ jobs:
           path: candidate/.tmp/npm-cache
           key: npm-${{ runner.os }}-${{ runner.arch }}-node-24.18.0-toolchain-${{ hashFiles('candidate/tooling/configs/ci/toolchain.lock.json') }}-lock-${{ hashFiles('candidate/package-lock.json') }}
           restore-keys: npm-${{ runner.os }}-${{ runner.arch }}-node-24.18.0-toolchain-${{ hashFiles('candidate/tooling/configs/ci/toolchain.lock.json') }}-
-      - name: Restore verified reusable proof inputs
+      - name: Restore verified inputs
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
           source_sha="${BASE_SHA:-$TRUSTED_CONTROL_SHA}"
@@ -454,7 +458,7 @@ jobs:
               echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
             fi
           fi
-      - name: Run exact canonical commit gate
+      - name: Run checks
         timeout-minutes: 225
         working-directory: candidate
         env:
@@ -484,7 +488,7 @@ jobs:
             export SNIPTALE_FAST_PROOF_PATH="$PWD/$fast_root"
           fi
           node ../trusted-control/tooling/ci/container.mjs "$PROOF_LANE"
-      - name: Upload admitted Fast proof used by Release provenance
+      - name: Upload prior check results
         if: success() && env.PROOF_LANE == 'release'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -493,7 +497,7 @@ jobs:
           if-no-files-found: error
           include-hidden-files: true
           retention-days: 30
-      - name: Upload canonical proof before cleanup
+      - name: Upload results
         id: canonical-proof
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
@@ -503,7 +507,7 @@ jobs:
           if-no-files-found: warn
           include-hidden-files: true
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
-      - name: Upload incremental failure evidence when proof sealing did not complete
+      - name: Upload failure details
         if: failure() || cancelled()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -519,7 +523,7 @@ jobs:
         with:
           path: candidate/.tmp/npm-cache
           key: npm-${{ runner.os }}-${{ runner.arch }}-node-24.18.0-toolchain-${{ hashFiles('candidate/tooling/configs/ci/toolchain.lock.json') }}-lock-${{ hashFiles('candidate/package-lock.json') }}
-      - name: Publish proof location and selected resources
+      - name: Report results and resources
         if: always()
         env:
           ARTIFACT_NAME: ${{ env.PROOF_KIND }}-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -562,6 +566,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   advisory-artifacts:
+    name: Additional reports
     needs: canonical-qa
     if: >-
       always() &&
@@ -590,17 +595,17 @@ jobs:
           }
       - uses: ./trusted-control/.github/actions/setup-locked-node
         with: { repository-root: trusted-control }
-      - name: Install exact candidate dependencies
+      - name: Install dependencies
         working-directory: candidate
         run: npm ci --ignore-scripts
-      - name: Install locked mutation toolchain
+      - name: Install mutation tools
         if: env.PROOF_LANE == 'release'
         working-directory: candidate
         run: npm ci --ignore-scripts --prefix tooling/test/mutation
-      - name: Collect report-only advisory evidence
+      - name: Collect additional reports
         working-directory: candidate
         run: node tooling/ci/advisory-artifacts.mjs "$PROOF_LANE"
-      - name: Upload report-only advisory evidence
+      - name: Upload additional reports
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
@@ -613,6 +618,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
   infrastructure-smoke:
+    name: Runner health
     needs: [qa-image, provision]
     if: >-
       !cancelled() &&
@@ -626,7 +632,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Verify immutable QA image, locked tools, Chromium, and metadata isolation
+      - name: Verify runner environment
         run: node tooling/ci/infrastructure-smoke.mjs '${{ needs.qa-image.outputs.reference }}'
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
         if: always()
@@ -637,6 +643,7 @@ jobs:
           retention-days: 30
 
   trusted-admission:
+    name: Verify results
     needs: [fast-classifier, qa-image, provision, canonical-qa]
     if: >-
       always() &&
@@ -666,7 +673,7 @@ jobs:
           }
       - uses: ./trusted-control/.github/actions/setup-locked-node
         with: { repository-root: trusted-control }
-      - name: Resolve the exact available proof producer attempt
+      - name: Resolve result producer
         id: proof-artifact
         working-directory: trusted-control
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
@@ -678,7 +685,7 @@ jobs:
         with:
           name: ${{ steps.proof-artifact.outputs.name }}
           path: candidate-proof
-      - name: Admit candidate evidence with trusted-base policy
+      - name: Verify results against trusted policy
         id: admit
         working-directory: trusted-control
         env:
@@ -706,6 +713,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
   cleanup:
+    name: Clean up runner
     needs: [qa-image, provision, canonical-qa, infrastructure-smoke]
     if: always() && needs.qa-image.result == 'success' && needs.provision.result != 'skipped'
     runs-on: ubuntu-24.04
@@ -722,7 +730,7 @@ jobs:
             name: 'selectel-provision-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}',
             path: controller,
           }
-      - name: Restore the early provision receipt independently of artifact transport
+      - name: Restore runner receipt
         id: receipt
         env:
           PROVISION_RECEIPT_B64: ${{ needs.provision.outputs.receipt_b64 }}
@@ -735,7 +743,7 @@ jobs:
               echo 'recovery=true' >> "$GITHUB_OUTPUT"
             fi
           fi
-      - name: Delete VM, volume, port, and JIT registration
+      - name: Delete runner resources
         env:
           CONTROLLER_IMAGE: ${{ needs.qa-image.outputs.controller-reference }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
@@ -757,7 +765,7 @@ jobs:
             --env SELECTEL_OS_APPLICATION_CREDENTIAL_ID --env SELECTEL_OS_APPLICATION_CREDENTIAL_SECRET \
             --env RUNNER_CONTROLLER_TOKEN --env GITHUB_RUN_ID --env GITHUB_RUN_ATTEMPT \
             "$CONTROLLER_IMAGE" "$command" /workspace/controller/provision.json
-      - name: Report cleanup status
+      - name: Report cleanup
         if: always()
         run: |
           status=$(jq -r '.cleanup.status // .status // "unknown"' controller/provision.json 2>/dev/null || echo unknown)
@@ -776,6 +784,7 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request_target' && 14 || 30 }}
 
   security-results:
+    name: Security reports
     needs: [canonical-qa, trusted-admission]
     if: >-
       !inputs.release_diagnostic &&
@@ -796,7 +805,7 @@ jobs:
         with: { ref: '${{ env.CANDIDATE_SHA }}', path: candidate, persist-credentials: false }
       - uses: ./trusted-control/.github/actions/setup-locked-node
         with: { repository-root: trusted-control }
-      - name: Resolve the exact available proof producer attempt
+      - name: Resolve result producer
         id: proof-artifact
         working-directory: trusted-control
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
@@ -844,7 +853,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ env.TRUSTED_CONTROL_SHA }}', persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Admit one exact trusted GitHub job graph
+      - name: Verify required results
         env:
           SNIPTALE_ADMISSION_RESULT: ${{ needs.trusted-admission.result }}
           SNIPTALE_CANONICAL_RESULT: ${{ needs.canonical-qa.result }}
@@ -857,7 +866,7 @@ jobs:
         run: node tooling/ci/admit-gate-graph.mjs
 
   fast-gate:
-    name: Fast PR Gate
+    name: Pull request result
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
     if: always() && github.event_name == 'workflow_dispatch' && inputs.gate == 'fast'
     runs-on: ubuntu-24.04
@@ -877,7 +886,7 @@ jobs:
         run: node tooling/ci/admit-gate-graph.mjs
 
   release-provenance-gate:
-    name: Release provenance Gate
+    name: Release result
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
     if: >-
       always() &&
@@ -901,7 +910,7 @@ jobs:
         run: node tooling/ci/admit-gate-graph.mjs
 
   release-diagnostic-gate:
-    name: Release diagnostic Gate
+    name: Diagnostic result
     needs: [fast-classifier, qa-image, provision, canonical-qa, trusted-admission, cleanup]
     if: >-
       always() &&
@@ -925,12 +934,12 @@ jobs:
         run: node tooling/ci/admit-gate-graph.mjs
 
   infrastructure-smoke-gate:
-    name: Selectel infrastructure smoke
+    name: Runner result
     needs: [qa-image, provision, infrastructure-smoke, cleanup]
     if: always() && github.event_name == 'workflow_dispatch' && inputs.gate == 'selectel-smoke'
     runs-on: ubuntu-24.04
     steps:
-      - name: Require successful provisioning, smoke checks, and complete cleanup
+      - name: Verify runner cleanup
         env:
           IMAGE_RESULT: ${{ needs.qa-image.result }}
           PROVISION_RESULT: ${{ needs.provision.result }}

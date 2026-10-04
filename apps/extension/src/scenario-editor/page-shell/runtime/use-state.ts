@@ -252,7 +252,10 @@ function createGuideProjectCommands({
 
 /** Owns image and attached audio URLs; the existing images map is the player media input. */
 function useGuideMedia(project: GuideProject | null) {
-  const [images, setImages] = useState<Record<string, string | null>>({});
+  const [media, setMedia] = useState<{
+    identity: string | null;
+    images: Record<string, string | null>;
+  }>({ identity: null, images: {} });
   const projectId = project?.id ?? null;
   const assetKey = JSON.stringify([
     ...new Set([
@@ -270,10 +273,17 @@ function useGuideMedia(project: GuideProject | null) {
       ) ?? []),
     ]),
   ]);
+  const identity = JSON.stringify([projectId, assetKey]);
   useEffect(() => {
     let active = true;
     const urls: string[] = [];
-    setImages({});
+    setMedia({ identity, images: {} });
+    const publish = (id: string, url: string | null) =>
+      setMedia((current) =>
+        current.identity === identity
+          ? { identity, images: { ...current.images, [id]: url } }
+          : current
+      );
     const parsedIds: unknown = JSON.parse(assetKey);
     const ids = Array.isArray(parsedIds)
       ? parsedIds.filter((id): id is string => typeof id === 'string')
@@ -283,20 +293,20 @@ function useGuideMedia(project: GuideProject | null) {
         const blob = await getScenarioAssetBlob(id).catch(() => undefined);
         if (!active) return;
         if (!blob) {
-          setImages((current) => ({ ...current, [id]: null }));
+          publish(id, null);
           return;
         }
         const url = URL.createObjectURL(blob);
         urls.push(url);
-        setImages((current) => ({ ...current, [id]: url }));
+        publish(id, url);
       })
     );
     return () => {
       active = false;
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [assetKey, projectId]);
-  return images;
+  }, [assetKey, identity]);
+  return media.identity === identity ? media.images : {};
 }
 
 /** Keeps item selection addressable when structural edits or undo remove the focused item. */

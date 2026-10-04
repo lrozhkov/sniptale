@@ -197,3 +197,19 @@ describe('offscreen command response serialization', () => {
     ).toThrow(`Invalid ${VideoMessageType.OFFSCREEN_STOP_RECORDING} completion`);
   });
 });
+
+it('preserves only a bounded correlated raster preparation completion', () => {
+  const type = MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE;
+  expect(buildOffscreenCommandResponse(type, { result: 'prepared', leaseId: 'lease-1' })).toEqual({
+    success: true,
+    result: 'prepared',
+    leaseId: 'lease-1',
+  });
+  for (const invalid of [
+    { result: 'prepared' },
+    { result: 'prepared', leaseId: '' },
+    { result: 'prepared', leaseId: 'x'.repeat(129) },
+    { result: 'prepared', leaseId: 'lease-1', extra: true },
+  ])
+    expect(() => buildOffscreenCommandResponse(type, invalid)).toThrow();
+});

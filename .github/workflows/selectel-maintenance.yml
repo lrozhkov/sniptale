@@ -1,4 +1,4 @@
-name: Selectel maintenance
+name: Runner maintenance
 
 on:
   schedule:
@@ -31,6 +31,7 @@ concurrency:
 
 jobs:
   candidate-image-sweeper:
+    name: Clean up images
     if: github.event_name == 'schedule' || inputs.operation == 'sweep'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -41,10 +42,10 @@ jobs:
         with: { ref: '${{ github.sha }}', persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
       - uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
-      - name: Authenticate the bounded GHCR maintenance owner
+      - name: Authenticate image cleanup
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: echo "$GH_TOKEN" | docker login ghcr.io --username '${{ github.actor }}' --password-stdin
-      - name: Delete only candidate images idle for seven days
+      - name: Delete expired images
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: node tooling/ci/candidate-image-maintenance.mjs apply
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
@@ -56,6 +57,7 @@ jobs:
           retention-days: 30
 
   scheduled-sweeper:
+    name: Clean up resources
     if: github.event_name == 'schedule' || inputs.operation == 'sweep'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -64,9 +66,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
-      - name: Build the controller from the exact scheduled main commit
+      - name: Build controller
         run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .
-      - name: Delete expired managed Selectel resources
+      - name: Delete expired runner resources
         env:
           CONTROLLER_IMAGE: sniptale-controller:${{ github.sha }}
           SELECTEL_OS_AUTH_URL: ${{ vars.SELECTEL_OS_AUTH_URL }}
@@ -101,6 +103,7 @@ jobs:
           retention-days: 30
 
   selectel-recovery:
+    name: Recover runner
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.operation == 'recover'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -109,9 +112,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
-      - name: Build the controller from the exact dispatched main commit
+      - name: Build controller
         run: docker build --file tooling/ci/selectel/Dockerfile.controller --tag sniptale-controller:${GITHUB_SHA} .
-      - name: Recover one exact Selectel run attempt without provisioning
+      - name: Recover selected runner
         env:
           CONTROLLER_IMAGE: sniptale-controller:${{ github.sha }}
           RECOVERY_RUN_ID: ${{ inputs.recovery_run_id }}
@@ -141,6 +144,7 @@ jobs:
           retention-days: 30
 
   dependency-freshness:
+    name: Dependency updates
     if: github.event_name == 'workflow_dispatch' && inputs.operation == 'dependency-freshness'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -150,7 +154,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Generate the read-only dependency refresh plan
+      - name: Report dependency updates
         run: node tooling/ci/dependency-freshness.mjs > build/dependency-freshness.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v6.0.0
         with:

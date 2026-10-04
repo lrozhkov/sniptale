@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const readiness = vi.hoisted(() => ({
   ensureAdmission: vi.fn().mockResolvedValue(undefined),
+  requireAdmission: vi.fn(),
   ensureAssets: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('./data-readiness', () => ({
@@ -194,7 +195,8 @@ it('routes camera and desktop utilities even while data admission is stalled', a
   );
   const raster = handleOffscreenRuntimeMessage({
     capabilityToken: 'capability-1',
-    reference: { inputSha256: 'sha256-1', jobId: 'job-1', revision: 1 },
+    operation: 'prepare',
+    leaseId: 'lease-1',
     type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
   });
   expect(mocks.rasterize).not.toHaveBeenCalled();
@@ -280,7 +282,10 @@ it('routes camera and desktop utilities even while data admission is stalled', a
   expect(mocks.disposeDesktopMedia).toHaveBeenCalledOnce();
   expect(mocks.rasterize).not.toHaveBeenCalled();
   admit();
-  await expect(raster).resolves.toBe('applied');
+  await expect(raster).resolves.toEqual({ result: 'prepared', leaseId: 'lease-1' });
+  expect(mocks.acquireRasterInput).not.toHaveBeenCalled();
+  expect(mocks.cleanupRasterJobs).not.toHaveBeenCalled();
+  expect(readiness.ensureAssets).not.toHaveBeenCalled();
 });
 
 it('routes frame raster, settings update, and project export commands', async () => {
@@ -364,4 +369,21 @@ it('opens recording only after the correlated begin authority is accepted', asyn
     throw new Error('stale binding');
   });
   await expect(handleOffscreenRuntimeMessage(message)).rejects.toThrow('stale binding');
+});
+
+it('refuses a terminated data connection without waiting or touching staged input', async () => {
+  readiness.requireAdmission.mockImplementationOnce(() => {
+    throw new Error('Offscreen data is not admitted');
+  });
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+      capabilityToken: 'capability-1',
+      reference: { inputSha256: 'a'.repeat(64), jobId: 'job-1', revision: 1 },
+    })
+  ).rejects.toThrow('Offscreen data is not admitted');
+  expect(readiness.ensureAdmission).not.toHaveBeenCalled();
+  expect(mocks.acquireRasterInput).not.toHaveBeenCalled();
+  expect(mocks.deleteRasterJob).not.toHaveBeenCalled();
+  expect(mocks.cleanupRasterJobs).not.toHaveBeenCalled();
 });

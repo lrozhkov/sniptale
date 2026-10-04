@@ -201,6 +201,7 @@ export async function handleOffscreenRuntimeMessage(
   | { challenge: string; offscreenStartupId: string; state: 'failed' | 'ready' }
   | { leaseId: string; result: 'leased'; url: string }
   | { result: 'confirmed' | 'released' | 'stale' }
+  | { result: 'prepared'; leaseId: string }
   | 'accepted'
   | 'applied'
   | 'copied'
@@ -234,8 +235,13 @@ export async function handleOffscreenRuntimeMessage(
       handlePageStoragePrivacyErasure(message, sendResponse);
       return;
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE: {
-      try {
+      if (message.operation === 'prepare') {
         await offscreenDataReadiness.ensureAdmission();
+        return { result: 'prepared', leaseId: message.leaseId };
+      }
+      // The caller now holds a shared transition; cold admission would wait on that caller.
+      offscreenDataReadiness.requireAdmission();
+      try {
         await cleanupFrameAnnotationRasterJobs();
         const input = await acquireFrameAnnotationRasterInput(message.reference);
         const result = await new FrameAnnotationRasterizer().rasterize(input);

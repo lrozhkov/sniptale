@@ -114,6 +114,7 @@ vi.mock('../../video-recording/session/controller', () => ({
 }));
 
 import { useContentAppControllers } from '.';
+import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -355,7 +356,7 @@ async function expectScreenshotQuickEditDisableResetsDocumentMode() {
 async function expectDrawingModeWiring() {
   const modeState = await renderHarness();
 
-  expect(mocks.useContentDrawingController).toHaveBeenCalledOnce();
+  expect(mocks.useContentDrawingController).toHaveBeenCalledExactlyOnceWith(pagePreparationHistory);
   expect(mocks.useDrawingModeIntegration).toHaveBeenCalledWith({
     baseModeController: { kind: 'mode-controller' },
     controller: mocks.drawingController,

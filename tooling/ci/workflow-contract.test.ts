@@ -131,7 +131,7 @@ describe('split workflow topology', () => {
       }
     ).workflow_dispatch.inputs.diagnostic;
     expect(diagnosticInput).toEqual({
-      description: 'Run the release QA graph on this branch without publication or attestation',
+      description: 'Run release checks on this branch without publication or attestation',
       required: false,
       default: false,
       type: 'boolean',
@@ -169,19 +169,14 @@ describe('release workflow topology', () => {
     expect(publication).toContain('sniptale-qa:sha-${SOURCE_SHA}');
     expect(publication).toContain('sniptale-controller:sha-${SOURCE_SHA}');
     expect(publication.match(/immutable-image-tag\.mjs/gu)).toHaveLength(2);
-    const releaseSubjects = steps.find(
-      (step) => step.name === 'Attest the exact validated release subject inventory'
-    );
+    const releaseSubjects = steps.find((step) => step.name === 'Attest release assets');
     expect(releaseSubjects?.with).toMatchObject({
       'create-storage-record': false,
     });
     expect(String(releaseSubjects?.with?.['subject-path'])).toContain(
       'build/release-proof/release-assets/sniptale_*.zip'
     );
-    for (const name of [
-      'Attest the admitted immutable QA image',
-      'Attest the admitted immutable controller image',
-    ]) {
+    for (const name of ['Attest build image', 'Attest controller image']) {
       expect(steps.find((step) => step.name === name)?.with).toMatchObject({
         'create-storage-record': false,
         'push-to-registry': true,
@@ -228,7 +223,7 @@ describe('release workflow topology', () => {
       uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
     });
     const controlCheckout = release.jobs.admission.steps?.find(
-      (step) => step.name === 'Check out release control'
+      (step) => step.name === 'Check out release controls'
     );
     expect(controlCheckout?.with?.path).toBe('build/release-control');
     const admission = (release.jobs.admission.steps ?? []).map((step) => step.run ?? '').join('\n');
@@ -254,14 +249,14 @@ describe('release workflow topology', () => {
       'cp build/release-finalized/attestations.json build/release-deployment/attestations.json'
     );
     const provenanceAdmission = release.jobs.admission.steps?.find(
-      (step) => step.name === 'Admit exact provenance source'
+      (step) => step.name === 'Verify release source'
     );
     expect(provenanceAdmission?.env?.RELEASE_POLICY_READ_TOKEN).toBe(
       '${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}'
     );
     expect(provenanceAdmission?.run).toContain('GH_TOKEN="$RELEASE_POLICY_READ_TOKEN"');
-    expect(admission).toContain('.display_title == "Release pipeline diagnostic"');
-    expect(admission).toContain('.name == "Release pipeline diagnostic Gate"');
+    expect(admission).toContain('.display_title == "Release diagnostics"');
+    expect(admission).toContain('.name == "Diagnostic result"');
     expect(admission).toContain('prepare-release-assets.mjs');
     expect(admission).toContain('sniptale-branch-diagnostic-release-admission');
     expect(admission).toContain('deferred-to-main');
@@ -521,4 +516,30 @@ it('completes every dedicated npm installation before publishing or using its CL
     }
   }
   expect(installations).toBe(4);
+});
+
+it('keeps readable pipeline labels aligned with exact release admission checks', () => {
+  for (const path of WORKFLOW_PATHS) {
+    const workflow = readWorkflow(path);
+    expect(readSource(path).split('\n')[0]).not.toMatch(/canonical|\bQA\b/iu);
+    for (const job of Object.values(workflow.jobs)) {
+      expect(job.name).toBeTruthy();
+      expect(job.name).not.toMatch(/canonical|\bQA\b/iu);
+      for (const step of job.steps ?? []) {
+        if (step.name) expect(step.name).not.toMatch(/canonical|\bQA\b/iu);
+      }
+    }
+  }
+  const provenance = readWorkflow(PROVENANCE);
+  const nested = `${provenance.jobs['canonical-proof'].name} / ${readWorkflow(CANONICAL).jobs['release-provenance-gate'].name}`;
+  expect(nested).toBe('Checks / Release result');
+  for (const path of [RELEASE, FINALIZE]) {
+    expect(readSource(path)).toContain(`.name == "${nested}"`);
+    expect(readSource(path)).toContain('.display_title == "Release checks"');
+  }
+  expect(readSource(FINALIZE)).toContain(
+    `.name == "${provenance.jobs['release-provenance-gate'].name}"`
+  );
+  expect(readSource(RELEASE)).toContain(`.name == "${readWorkflow(FINALIZE).jobs.finalize.name}"`);
+  expect(readSource(RELEASE)).toContain('.display_title == "Prepare release"');
 });

@@ -158,60 +158,55 @@ function useDrawingOptionsLayout(args: {
   };
 }
 
-function getDrawingOptionsLayoutClass(displayMode: 'horizontal' | 'vertical'): string {
-  return displayMode === 'vertical'
-    ? 'flex flex-col items-center gap-2'
-    : 'flex flex-row items-center gap-2';
+type DrawingOptionsBodyProps = {
+  children: ReactNode;
+  displayMode: 'horizontal' | 'vertical';
+  panelRef: RefObject<HTMLDivElement | null>;
+  tool: DrawingQuickOptionsTool;
+};
+
+function DrawingOptionsBody(props: DrawingOptionsBodyProps) {
+  return (
+    <div
+      ref={props.panelRef}
+      role="group"
+      aria-label={translate('content.toolbar.drawingOptions')}
+      data-ui={`content.toolbar.drawing-options.${props.tool}`}
+      className={
+        props.displayMode === 'vertical'
+          ? 'flex flex-col items-center gap-2'
+          : 'flex flex-row items-center gap-2'
+      }
+    >
+      {props.children}
+    </div>
+  );
 }
 
-function DrawingOptionsPair(props: {
-  children: ReactNode;
-  controller: ContentDrawingController;
-  displayMode: 'horizontal' | 'vertical';
-  layout: ReturnType<typeof useDrawingOptionsLayout>;
-  panelRef: RefObject<HTMLDivElement | null>;
-  selectedCount: number;
-  totalCount: number;
-  tool: DrawingQuickOptionsTool;
-}) {
+function DrawingOptionsPair(
+  props: DrawingOptionsBodyProps & {
+    controller: ContentDrawingController;
+    layout: ReturnType<typeof useDrawingOptionsLayout>;
+    selectedCount: number;
+    totalCount: number;
+  }
+) {
   const options = (
-    <ProductToolbarMenu
-      key="options"
-      compact
-      variant="drawing"
-      className="sniptale-drawing-options-popover"
-      style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
-    >
-      <div
-        ref={props.panelRef}
-        role="group"
-        aria-label={translate('content.toolbar.drawingOptions')}
-        data-ui={`content.toolbar.drawing-options.${props.tool}`}
-        className={getDrawingOptionsLayoutClass(props.displayMode)}
-      >
-        {props.children}
-      </div>
-    </ProductToolbarMenu>
+    <DrawingOptionsBody panelRef={props.panelRef} tool={props.tool} displayMode={props.displayMode}>
+      {props.children}
+    </DrawingOptionsBody>
   );
   const actions = (
-    <ProductToolbarMenu
-      key="actions"
-      compact
-      variant="drawing"
-      className="sniptale-drawing-options-popover"
-      style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
-    >
-      <DrawingSelectionActions
-        vertical={props.displayMode === 'vertical'}
-        canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
-        canDuplicate={props.selectedCount > 0}
-        canDelete={props.selectedCount > 0}
-        onMove={(direction) => props.controller.session.moveSelected(direction)}
-        onDuplicate={() => props.controller.session.duplicateSelected()}
-        onDelete={() => props.controller.session.deleteSelected()}
-        onDeselect={() => props.controller.session.select(null)}
-      />
-    </ProductToolbarMenu>
+    <DrawingSelectionActions
+      vertical={props.displayMode === 'vertical'}
+      canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
+      canDuplicate={props.selectedCount > 0}
+      canDelete={props.selectedCount > 0}
+      onMove={(direction) => props.controller.session.moveSelected(direction)}
+      onDuplicate={() => props.controller.session.duplicateSelected()}
+      onDelete={() => props.controller.session.deleteSelected()}
+      onDeselect={() => props.controller.session.select(null)}
+    />
   );
   return (
     <div
@@ -222,7 +217,17 @@ function DrawingOptionsPair(props: {
       ].join(' ')}
       style={props.layout.style}
     >
-      {[options, actions]}
+      {Object.entries({ options, actions }).map(([key, content]) => (
+        <ProductToolbarMenu
+          key={key}
+          compact
+          variant="drawing"
+          className="sniptale-drawing-options-popover"
+          style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+        >
+          {content}
+        </ProductToolbarMenu>
+      ))}
     </div>
   );
 }
@@ -231,10 +236,7 @@ function resolveSelectedQuickObject(
   object: DrawingObject | undefined,
   tool: ConfigurableDrawingQuickOptionsTool
 ): SelectedQuickDrawingObject {
-  if (tool === 'pencil' && object?.kind === 'pencil') return object;
-  if (tool === 'marker' && object?.kind === 'marker') return object;
-  if (tool === 'arrow' && object?.kind === 'arrow') return object;
-  if (tool === 'text' && object?.kind === 'text') return object;
+  if (object?.kind === tool) return object;
   if (
     tool === 'shape' &&
     (object?.kind === 'rectangle' ||
@@ -635,16 +637,14 @@ function DrawingNonTextToolOptions(props: {
   );
 }
 
-function DrawingOptionsSurface(props: {
-  children: ReactNode;
-  controller: ContentDrawingController;
-  displayMode: 'horizontal' | 'vertical';
-  layout: ReturnType<typeof useDrawingOptionsLayout>;
-  panelRef: RefObject<HTMLDivElement | null>;
-  selected: boolean;
-  snapshot: DrawingSessionSnapshot;
-  tool: DrawingQuickOptionsTool;
-}) {
+function DrawingOptionsSurface(
+  props: DrawingOptionsBodyProps & {
+    controller: ContentDrawingController;
+    layout: ReturnType<typeof useDrawingOptionsLayout>;
+    selected: boolean;
+    snapshot: DrawingSessionSnapshot;
+  }
+) {
   if (props.selected) {
     return (
       <DrawingOptionsPair
@@ -668,15 +668,13 @@ function DrawingOptionsSurface(props: {
       placement={props.layout.placement}
       style={props.layout.style}
     >
-      <div
-        ref={props.panelRef}
-        role="group"
-        aria-label={translate('content.toolbar.drawingOptions')}
-        data-ui={`content.toolbar.drawing-options.${props.tool}`}
-        className={getDrawingOptionsLayoutClass(props.displayMode)}
+      <DrawingOptionsBody
+        panelRef={props.panelRef}
+        tool={props.tool}
+        displayMode={props.displayMode}
       >
         {props.children}
-      </div>
+      </DrawingOptionsBody>
     </ProductToolbarMenu>
   );
 }

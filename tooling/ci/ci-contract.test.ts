@@ -195,11 +195,15 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   expect(npmPackage.dependencies.npm).toBe(lock.node.npmVersion);
   expect(npmPackage.dependencies['brace-expansion']).toBe('5.0.12');
   expect(npmPackage.dependencies.undici).toBe('6.28.1');
+  expect(npmPackage.dependencies['http-cache-semantics']).toBe('4.3.0');
   const canonicalNpmLock = JSON.parse(npmLock.toString());
   expect(canonicalNpmLock.packages).not.toHaveProperty(
     'node_modules/npm/node_modules/brace-expansion'
   );
   expect(canonicalNpmLock.packages).not.toHaveProperty('node_modules/npm/node_modules/undici');
+  expect(canonicalNpmLock.packages).not.toHaveProperty(
+    'node_modules/npm/node_modules/http-cache-semantics'
+  );
   expect(dockerfile.indexOf('node /opt/sniptale-ci/npm-runtime.mjs')).toBeGreaterThan(
     dockerfile.indexOf('npm ci --ignore-scripts --prefix /opt/sniptale-npm')
   );

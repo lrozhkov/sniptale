@@ -269,7 +269,7 @@ it('drives Drawing undo and redo through the existing toolbar history controls',
   };
   pagePreparationHistory.clear();
   pagePreparationHistory.registerBridge(bridge);
-  const session = createPagePreparationDrawingSession();
+  const session = createPagePreparationDrawingSession(pagePreparationHistory);
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);

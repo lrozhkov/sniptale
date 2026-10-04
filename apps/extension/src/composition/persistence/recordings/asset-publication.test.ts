@@ -292,3 +292,32 @@ it('does not republish metadata or recreate a consumed completion on an exact re
   );
   expect(writes).toEqual([]);
 });
+
+it('rejects a retained own review before recording replacement or outbox writes', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const transaction = createTransaction(writes, Promise.resolve());
+  const objectStore = transaction.objectStore;
+  const review = { aggregateId: buildRecordingMediaEntry(previous).id };
+  transaction.objectStore = (name) => {
+    const store = objectStore(name);
+    if (name === 'video_workspaces') {
+      store.get.mockResolvedValue(review);
+      store.getAll.mockResolvedValue([review]);
+    }
+    return store;
+  };
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  await expect(
+    publishRecordingAssetJournal(
+      journal({
+        primaryRecordingId: entry.id,
+        projectId: null,
+        recordingId: 'session-1',
+      })
+    )
+  ).rejects.toThrow();
+  expect(writes).toEqual([]);
+  expect(mocks.completeDelete).not.toHaveBeenCalled();
+});

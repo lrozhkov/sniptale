@@ -48,6 +48,9 @@ function applyZoomChange(
 ): ZoomState {
   const originalRegion = zoom.regions.find((region) => region.id === id);
   if (!originalRegion) return zoom;
+  // Property edits keep an active source placement; cut-hidden result caches are not neighbors.
+  if (!originalRegion.dormant && patch.start === undefined && patch.end === undefined)
+    return { ...zoom, regions: updateQuickEditZoomRegion(zoom.regions, id, patch) };
   let regions = zoom.regions;
   if (patch.start !== undefined) {
     const start = patch.start;

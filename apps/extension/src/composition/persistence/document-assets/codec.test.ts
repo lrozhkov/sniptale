@@ -381,3 +381,53 @@ it.each(['Схема.png', 'data: diagram', 'blob: sketch'])(
     hydrated.release();
   }
 );
+
+it.each([undefined, 'Displayed caption'])(
+  'preserves image metadata across codec boundaries with caption %s',
+  async (displayName) => {
+    const document = createEditorDocumentFixture();
+    if (displayName !== undefined) document.displayName = displayName;
+    else delete document.displayName;
+    Object.assign(document, {
+      sourceName: 'source.png',
+      sourceWidth: 1200,
+      sourceHeight: 800,
+      canvasWidth: 900,
+      canvasHeight: 600,
+      sourceLeft: 12,
+      sourceTop: 24,
+      sourceDisplayWidth: 450,
+      sourceDisplayHeight: 300,
+    });
+    const metadata = {
+      sourceName: document.sourceName,
+      sourceWidth: 1200,
+      sourceHeight: 800,
+      canvasWidth: 900,
+      canvasHeight: 600,
+      sourceLeft: 12,
+      sourceTop: 24,
+      sourceDisplayWidth: 450,
+      sourceDisplayHeight: 300,
+    };
+    const prepared = await preparePersistedEditorDocument(document);
+    mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+    const hydrated = await hydratePersistedEditorDocument({
+      document: prepared.document,
+      refs: prepared.refs,
+    });
+    const legacy = await materializePersistedEditorDocumentForLegacyTransfer({
+      document: prepared.document,
+      refs: prepared.refs,
+    });
+    for (const result of [prepared.document, hydrated.document, legacy]) {
+      expect(result).toMatchObject(metadata);
+      expect(Object.hasOwn(result, 'displayName')).toBe(displayName !== undefined);
+      expect(result.displayName).toBe(displayName);
+    }
+    expect(prepared.document.version).toBe(3);
+    expect(hydrated.document.version).toBe(2);
+    expect(legacy.version).toBe(2);
+    hydrated.release();
+  }
+);

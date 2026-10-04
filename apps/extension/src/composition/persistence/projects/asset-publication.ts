@@ -5,7 +5,7 @@ export type {
 } from './asset-publication-payload';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
-import { assertMediaSourceReplaceable } from './source-admission';
+import { assertStandaloneMediaSourceReplaceable } from './source-admission';
 import {
   VIDEO_PROJECTS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -147,14 +147,7 @@ async function publishProjectMediaAsset(args: {
           'projectId' in previous
             ? buildProjectExportMediaEntry(previous)
             : buildProjectAssetMediaEntry(previous);
-        if ((await tx.objectStore(VIDEO_WORKSPACES_STORE).get(target.id)) !== undefined)
-          throw new MediaAssetDeletionBlockedError('source-unavailable');
-        await assertMediaSourceReplaceable(target, {
-          assets: tx.objectStore(PROJECT_ASSETS_STORE),
-          projects: tx.objectStore(VIDEO_PROJECTS_STORE),
-          scenarioAssets: tx.objectStore(SCENARIO_ASSETS_STORE),
-          videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
-        });
+        await assertStandaloneMediaSourceReplaceable(target, tx);
         await ownerStore.delete(ownerKey(args.ownerKind, args.entry.id));
         if ((await ownerStore.index('assetId').count(previous.assetId)) === 0) {
           await tx.objectStore(ASSET_REFS_STORE).delete(previous.assetId);

@@ -16,9 +16,11 @@ type Dependencies = {
 export function createOffscreenDataReadiness(deps: Dependencies) {
   let generation = 0;
   let admission: Promise<void> | null = null;
+  let admitted = false;
   let recovery: Promise<void> | null = null;
   const unsubscribe = deps.subscribeTermination(() => {
     generation += 1;
+    admitted = false;
     admission = null;
     recovery = null;
   });
@@ -31,6 +33,7 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
     try {
       await operation();
       if (current !== generation) throw new Error('Offscreen data connection changed');
+      if (phase === 'admission') admitted = true;
       logger.debug('Data readiness completed', {
         phase,
         durationMs: Math.round(performance.now() - start),
@@ -65,7 +68,10 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
     }
     return recovery;
   }
-  return { ensureAdmission, ensureAssets, dispose: unsubscribe };
+  function requireAdmission(): void {
+    if (!admitted) throw new Error('Offscreen data is not admitted');
+  }
+  return { ensureAdmission, requireAdmission, ensureAssets, dispose: unsubscribe };
 }
 
 export const offscreenDataReadiness = createOffscreenDataReadiness({

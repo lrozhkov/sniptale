@@ -387,12 +387,18 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   expect((await frame.boundingBox())?.width).toBeLessThanOrEqual(500);
 }
 
-export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo): Promise<void> {
-  const launch = page.locator('[data-edit-image]').first();
+export async function verifyImageEditorRoundtrip(
+  page: Page,
+  testInfo: TestInfo,
+  readDownloads: () => Promise<chrome.downloads.DownloadItem[]>
+): Promise<void> {
+  const figure = page.locator('article#compare figure.guide-image-surface').first();
+  const launch = figure.locator('[data-edit-image]');
   const title = page.locator('article#compare > header .guide-step-title');
   await title.fill('Unsaved title retained through annotations');
   const originalImage = await page.locator('.guide-image-frame img').first().getAttribute('src');
-  await page.locator('article#compare figure').first().hover();
+  await figure.click();
+  await expect(launch).toBeVisible();
   await launch.click();
   const child = page.frameLocator('.guide-image-editor iframe');
   const apply = child.locator('[data-ui="editor.floating.document-bar.apply-scenario-button"]');
@@ -400,15 +406,10 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await expect(apply).toBeEnabled();
   await expect(page.locator('.guide-image-editor > header')).toHaveCount(0);
   await expect(page.locator('.guide-image-editor iframe')).toHaveJSProperty('clientHeight', 900);
-  const previousDownloads = await page.evaluate(async () =>
-    (await chrome.downloads.search({})).map((download) => download.id)
-  );
+  const previousDownloads = (await readDownloads()).map((download) => download.id);
   await child.locator('[data-ui="editor.floating.document-bar.save-button"]').click();
-  const savedDownloads = () =>
-    page.evaluate(async (previousIds) => {
-      const downloads = await chrome.downloads.search({});
-      return downloads.filter((download) => !previousIds.includes(download.id));
-    }, previousDownloads);
+  const savedDownloads = async () =>
+    (await readDownloads()).filter((download) => !previousDownloads.includes(download.id));
   await expect
     .poll(async () =>
       (await savedDownloads()).some(
@@ -455,7 +456,8 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
     'src',
     originalImage ?? ''
   );
-  await page.locator('article#compare figure').first().hover();
+  await figure.click();
+  await expect(launch).toBeVisible();
   await launch.click();
   await expect(apply).toBeVisible();
   await expect(apply).toBeEnabled();
@@ -491,7 +493,8 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.reload();
   await expect(title).toHaveValue('Unsaved title retained through annotations');
-  await page.locator('article#compare figure').first().hover();
+  await figure.click();
+  await expect(launch).toBeVisible();
   await launch.click();
   await expect(apply).toBeVisible();
   await expect(apply).toBeEnabled();
@@ -501,7 +504,8 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   expect(reopened.annotations).toBe(firstPublication.annotations);
   expect(reopened.frameAnnotations).toBe(firstPublication.frameAnnotations);
   expect(reopened.standaloneWorkspaces).toBe(0);
-  await page.locator('article#compare figure').first().hover();
+  await figure.click();
+  await expect(launch).toBeVisible();
   await launch.click();
   await expect(apply).toBeVisible();
   await expect(apply).toBeEnabled();

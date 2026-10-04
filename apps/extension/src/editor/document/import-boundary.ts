@@ -162,6 +162,11 @@ function expectedObjectType(kind: unknown): string {
   return SHAPE_KINDS.has(String(kind)) ? 'shape' : String(kind);
 }
 
+/** Serialize typed drawing state using the same version admitted at the document boundary. */
+export function serializeEditorDrawingMetadata(object: DrawingObject): string {
+  return JSON.stringify({ version: 1, object });
+}
+
 export function parseEditorDrawingMetadata(value: unknown): DrawingObject | null {
   let metadata: unknown = value;
   if (typeof value === 'string') {

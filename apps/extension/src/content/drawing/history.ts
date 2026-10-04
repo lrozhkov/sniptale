@@ -5,20 +5,25 @@ import {
   type DrawingSession,
   type DrawingObjectProjection,
 } from '../../features/drawing/public';
-import { pagePreparationHistory } from '../parser/page-preparation/history';
-import type { PagePreparationHistoryDomEffect } from '../parser/page-preparation/history/types';
-
-type DrawingHistoryCommitPort = Pick<
-  typeof pagePreparationHistory,
-  'commitEntry' | 'subscribeToClear'
->;
+/** Drawing supplies reversible effects to the page's existing history owner. */
+export interface DrawingHistoryCommitPort {
+  commitEntry(entry: {
+    scope: 'drawing';
+    domEffect: {
+      hasChanges: boolean;
+      hasCurrentChanges: () => boolean;
+      apply(direction: 'undo' | 'redo'): { failures: string[]; success: boolean };
+    };
+  }): boolean;
+  subscribeToClear(listener: () => void): () => void;
+}
 
 const EMPTY_DRAWING_DOCUMENT: DrawingDocumentV1 = { version: 1, objects: [] };
 
 function createDrawingHistoryEffect(
   commit: DrawingDocumentCommit,
   hasCurrentChanges: () => boolean
-): PagePreparationHistoryDomEffect {
+): Parameters<DrawingHistoryCommitPort['commitEntry']>[0]['domEffect'] {
   return {
     hasChanges: true,
     hasCurrentChanges,
@@ -32,7 +37,7 @@ function createDrawingHistoryEffect(
 }
 
 export function createPagePreparationDrawingSession(
-  history: DrawingHistoryCommitPort = pagePreparationHistory,
+  history: DrawingHistoryCommitPort,
   layout?: { projection: DrawingObjectProjection; dispose(): void }
 ): DrawingSession {
   let session: DrawingSession | null = null;

@@ -118,10 +118,9 @@ for (const variant of [
         await picker
           .getByRole('button', { name: label('shared.ui.colorSelectorApply'), exact: true })
           .click();
-        await expect(colorTrigger).toHaveAttribute(
-          'title',
-          new RegExp(WORKSPACE_BACKGROUND_PALETTE[index]!.slice(1), 'i')
-        );
+        await expect
+          .poll(async () => (await colorTrigger.getAttribute('title'))?.toLowerCase())
+          .toContain(WORKSPACE_BACKGROUND_PALETTE[index]!.slice(1).toLowerCase());
       }
       await colorTrigger.click();
       await picker

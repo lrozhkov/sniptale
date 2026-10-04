@@ -791,11 +791,8 @@ for (const theme of ['light', 'dark'] as const) {
     const picker = page.locator('[data-ui="content.toolbar.future-callout-popover"]');
     await expect(editable).toBeVisible();
     for (const name of ['Редакционная цитата', 'Неоновый терминал']) {
-      await picker
-        .getByRole('button', { name: new RegExp(name) })
-        .first()
-        .click();
-      await expect(picker.getByRole('button', { name: new RegExp(name) }).first()).toHaveClass(
+      await picker.getByRole('button', { name, exact: false }).first().click();
+      await expect(picker.getByRole('button', { name, exact: false }).first()).toHaveClass(
         /sniptale-glass-preset-item--active/
       );
       await expect(editable).toBeVisible();

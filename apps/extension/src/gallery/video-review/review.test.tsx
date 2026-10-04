@@ -426,15 +426,21 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     );
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
+    // Advanced mode may commit its enabled-only state before the later Add gesture.
+    await act(async () =>
+      vi.waitFor(() => {
+        expect(advancedContentAt(fixture.snapshot).zoom.enabled).toBe(true);
+        expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(0);
+      })
+    );
     await click('zoomAdd');
     await act(async () =>
-      vi.waitFor(
-        () => expect(advancedContentAt(fixture.snapshot, 0).zoom.regions).toHaveLength(1),
-        { timeout: 3000 }
-      )
+      vi.waitFor(() => expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(1), {
+        timeout: 3000,
+      })
     );
-    expect(advancedContentAt(fixture.snapshot, 0).zoom.enabled).toBe(true);
-    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions[0]).toMatchObject({
+    expect(advancedContentAt(fixture.snapshot).zoom.enabled).toBe(true);
+    expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
       start: 0,
       end: 2,
       transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
@@ -451,8 +457,7 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     });
     await act(async () =>
       vi.waitFor(
-        () =>
-          expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2),
+        () => expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2),
         { timeout: 3000 }
       )
     );

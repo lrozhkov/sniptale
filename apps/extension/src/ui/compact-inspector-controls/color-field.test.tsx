@@ -56,7 +56,7 @@ it('renders the compact color row as one left label and one right value field', 
   expect(selectorRoot?.className).toContain('max-w-[58%]');
   expect(selectorRoot?.className).toContain('shrink-0');
   expect(selectorRoot?.className).toContain("[&_[data-ui='shared.ui.color-selector.trigger']]:h-8");
-  expect(trigger?.className).toContain('gap-2');
+  expect(trigger?.className).toContain('gap-1');
   expect(selectorRoot?.className).toContain(
     "[&_[data-ui='shared.ui.color-selector.trigger']]:px-0"
   );
