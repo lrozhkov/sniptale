@@ -30,7 +30,7 @@ export function createTourPlayer(root, input, options = {}) {
     canMove,
     refreshNarration: () => playback?.refreshAudioControls(),
     move: (direction) => {
-      manualGo(projectedIndex() + direction, true, direction);
+      manualGo(projectedIndex() + direction, true, direction, null, { gesture: true });
     },
     fullView: () => {
       playback?.interact();
@@ -45,20 +45,16 @@ export function createTourPlayer(root, input, options = {}) {
         signal: lifetime.signal,
         motion: view.motion,
         navigate: (target, restart = false, immediate = false) => {
-          if (immediate) commit(target);
-          else go(target, !restart, 0, restart ? 0 : null);
+          if (immediate) commit(target, true, 0, null, false);
+          else go(target, !restart, 0, restart ? 0 : null, restart);
         },
         chrome,
       });
   function act(action) {
-    // Editor preview never executes authored URL actions.
-    if (options.authoring || (options.preview && action.kind === 'url')) return;
-    const target = actionSlideIndex(action, tour.slides, projectedIndex());
-    if (target !== null)
-      manualGo(target, action.kind !== 'restart', 0, action.kind === 'restart' ? 0 : null);
-    else if (action.kind !== 'none') playback?.interact();
+    dispatchTourAction(action, options, tour.slides, projectedIndex(), manualGo, playback);
   }
-  function commit(target, recordHistory = true, hintEdge = 0, historyLength = null) {
+  function commit(target, recordHistory, hintEdge, historyLength, restart) {
+    if (restart) playback?.restartVisit();
     if (historyLength !== null) history.length = historyLength;
     if (recordHistory && (target !== index || ended)) {
       history.push(ended ? 'end' : index);
@@ -70,7 +66,7 @@ export function createTourPlayer(root, input, options = {}) {
   }
   function back() {
     const previous = previousTourTarget(history, tour, index);
-    manualGo(previous.target, false, 0, previous.length);
+    manualGo(previous.target, false, 0, previous.length, { gesture: true });
   }
   function render(hintEdge = 0) {
     if (lifetime.signal.aborted) return;
@@ -91,7 +87,7 @@ export function createTourPlayer(root, input, options = {}) {
       else playback?.pause();
     },
     openContents: (select) => {
-      playback?.pause();
+      playback?.interact();
       const choose = (target) => {
         if (target !== (ended ? tour.slides.length : index)) select(target);
       };
@@ -104,7 +100,7 @@ export function createTourPlayer(root, input, options = {}) {
   return {
     update(nextInput) {
       if (lifetime.signal.aborted) return;
-      playback?.pause();
+      playback?.interact();
       const previousId = tour.slides[index]?.id;
       input = nextInput;
       tour = nextInput.tour;
@@ -126,14 +122,14 @@ export function createTourPlayer(root, input, options = {}) {
       if (options.authoring) {
         ended = true;
         render();
-      } else navigationInput.manualGo(tour.slides.length, false);
+      } else manualGo(tour.slides.length, false);
     },
     select(slideId) {
       if (lifetime.signal.aborted) return;
       const target = tour.slides.findIndex((slide) => slide.id === slideId);
       if (target >= 0 && (target !== index || ended)) {
         if (authoringNavigation) go(target, false);
-        else navigationInput.manualGo(target, false);
+        else manualGo(target, false);
       }
     },
     dispose() {
@@ -145,19 +141,30 @@ export function createTourPlayer(root, input, options = {}) {
   };
 }
 
+/** Authored actions carry an explicit restart command; history length is never a visit signal. */
+function dispatchTourAction(action, options, slides, index, manualGo, playback) {
+  if (options.authoring || (options.preview && action.kind === 'url')) return;
+  const target = actionSlideIndex(action, slides, index);
+  const restart = action.kind === 'restart';
+  if (target !== null)
+    manualGo(target, !restart, 0, restart ? 0 : null, { gesture: true, restart });
+  else if (action.kind === 'url') playback?.pause();
+  else playback?.interact('point');
+}
+
 /** One admitted destination owns commit; cancellation never consumes history. */
 function createTourNavigation({ signal, current, limit, playback, commit }) {
   let pending = null;
   const accepts = (target) => !signal.aborted && target >= 0 && target <= limit();
   const projectedIndex = () => pending?.target ?? current();
-  function go(target, recordHistory = true, hintEdge = 0, historyLength = null) {
+  function go(target, recordHistory = true, hintEdge = 0, historyLength = null, restart = false) {
     if (!accepts(target)) return;
     const request = { target };
     pending = request;
     const complete = () => {
       if (pending !== request || signal.aborted) return;
       pending = null;
-      commit(target, recordHistory, hintEdge, historyLength);
+      commit(target, recordHistory, hintEdge, historyLength, restart);
     };
     if (playback())
       playback().depart({
@@ -172,10 +179,10 @@ function createTourNavigation({ signal, current, limit, playback, commit }) {
     go,
     projectedIndex,
     canMove: (direction) => accepts(projectedIndex() + direction),
-    manualGo(target, recordHistory = true, hintEdge = 0, historyLength = null) {
+    manualGo(target, recordHistory = true, hintEdge = 0, historyLength = null, command = null) {
       if (!accepts(target)) return;
-      playback()?.interact();
-      go(target, recordHistory, hintEdge, historyLength);
+      playback()?.interact(command?.gesture ? 'navigation' : undefined);
+      go(target, recordHistory, hintEdge, historyLength, Boolean(command?.restart));
     },
   };
 }
@@ -301,7 +308,7 @@ function mountTourNavigationInput(root, options, signal, actions) {
       if (slide) authoring.selectSlide(slide.id);
       return;
     }
-    actions.move(target, recordHistory);
+    actions.move(target, recordHistory, 0, null, { gesture: true });
   }
   query('previous').addEventListener(
     'click',

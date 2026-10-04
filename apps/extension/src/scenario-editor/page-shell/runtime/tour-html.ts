@@ -171,6 +171,11 @@ function collectTourMedia(tour: TourDocument) {
       roles.set(narration.assetId, 'audio');
     }
   }
+  if (tour.backgroundMusic) {
+    const id = tour.backgroundMusic.assetId;
+    if (roles.get(id) === 'image') throw new Error('Conflicting media');
+    roles.set(id, 'audio');
+  }
   return { redactions, roles };
 }
 

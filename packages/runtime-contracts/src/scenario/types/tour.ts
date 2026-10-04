@@ -330,8 +330,30 @@ export interface TourNavigationSlide {
 }
 export type TourSlide = TourImageSlide | TourNavigationSlide;
 
+/** One continuous authored music binding, independent from narration and viewer mute. */
+export interface TourBackgroundMusic {
+  assetId: string;
+  duration: number;
+  volume: number;
+  loop: boolean;
+  ducking: { enabled: boolean; level: number };
+}
+/** Initializes author settings only for a deliberate first attachment. */
+export function createTourBackgroundMusic(
+  source: Pick<TourBackgroundMusic, 'assetId' | 'duration'>
+): TourBackgroundMusic {
+  return {
+    assetId: source.assetId,
+    duration: source.duration,
+    volume: 0.3,
+    loop: true,
+    ducking: { enabled: true, level: 0.25 },
+  };
+}
+
 /** Separate interactive document, sharing only media provenance with a reference guide. */
 export interface TourDocument {
+  backgroundMusic?: TourBackgroundMusic | null | undefined;
   audioResources?: TourAudioResource[] | undefined;
   version: 1;
   id: string;

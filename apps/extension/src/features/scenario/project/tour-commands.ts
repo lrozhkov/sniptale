@@ -120,6 +120,7 @@ function removeAudioResource(tour: TourDocument, assetId: string): void {
   if (!resources.some((resource) => resource.assetId === assetId))
     throw new Error('Tour audio resource is unavailable.');
   tour.audioResources = resources.filter((resource) => resource.assetId !== assetId);
+  if (tour.backgroundMusic?.assetId === assetId) tour.backgroundMusic = null;
   for (const target of tour.slides.flatMap(getTourNarrationTargets)) {
     if (target.narration?.assetId === assetId) target.narration = null;
   }

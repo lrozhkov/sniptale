@@ -193,6 +193,13 @@ it('deduplicates slide and object narration and leaves detached audio unloaded',
       },
     ];
     next.tour.audioResources = [{ assetId: 'unused', duration: 2, name: 'Unused' }];
+    next.tour.backgroundMusic = {
+      assetId: 'audio',
+      duration: 2,
+      volume: 0.3,
+      loop: true,
+      ducking: { enabled: true, level: 0.25 },
+    };
     return next;
   });
   await act(async () => {
@@ -233,4 +240,62 @@ it('releases and reacquires the same media IDs when opening another project', as
   expect(urls.revoke).toHaveBeenCalledWith('blob:voice-1');
   expect(io.read).toHaveBeenCalledTimes(2);
   expect(state.images['audio']).toBe('blob:voice-2');
+});
+
+it('loads music-only URLs and releases them when the binding is undone', async () => {
+  const urls = mediaURLs();
+  io.read.mockResolvedValue(new Blob(['music'], { type: 'audio/wav' }));
+  io.attach.mockImplementation(async ({ project }) => {
+    const next = structuredClone(project);
+    next.updatedAt = 2;
+    next.tour.backgroundMusic = {
+      assetId: 'music',
+      duration: 2,
+      volume: 0.3,
+      loop: true,
+      ducking: { enabled: true, level: 0.25 },
+    };
+    return next;
+  });
+  await act(async () => {
+    await state.commitChange(command());
+  });
+  expect(io.read.mock.calls).toEqual([['music']]);
+  expect(state.images['music']).toBe('blob:voice-1');
+  await act(async () => state.undo());
+  expect(urls.revoke).toHaveBeenCalledWith('blob:voice-1');
+  expect(state.images['music']).toBeUndefined();
+});
+
+it('discards late music bytes after undo without creating a stale object URL', async () => {
+  const urls = mediaURLs();
+  let finish!: (blob: Blob) => void;
+  io.read.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  io.attach.mockImplementation(async ({ project }) => ({
+    ...project,
+    updatedAt: 2,
+    tour: {
+      ...project.tour,
+      backgroundMusic: {
+        assetId: 'music',
+        duration: 2,
+        volume: 0.3,
+        loop: true,
+        ducking: { enabled: true, level: 0.25 },
+      },
+    },
+  }));
+  await act(async () => {
+    await state.commitChange(command());
+  });
+  expect(io.read).toHaveBeenCalledWith('music');
+  await act(async () => state.undo());
+  await act(async () => finish(new Blob(['late'], { type: 'audio/wav' })));
+  expect(urls.create).not.toHaveBeenCalled();
+  expect(state.images['music']).toBeUndefined();
 });

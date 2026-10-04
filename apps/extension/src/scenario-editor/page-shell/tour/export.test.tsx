@@ -60,6 +60,13 @@ it.each(['ru', 'en'] as const)(
     expect(button('htmlSave').disabled).toBe(true);
     await act(async () => button('tourHtmlPrepare').click());
     expect(io.prepare.mock.calls[0]![0].labels).toMatchObject({
+      musicMute: locale === 'ru' ? 'Выключить музыку' : 'Mute music',
+      musicUnmute: locale === 'ru' ? 'Включить музыку' : 'Unmute music',
+      musicRetry: locale === 'ru' ? 'Повторить музыку' : 'Retry music',
+      musicBlocked:
+        locale === 'ru' ? 'Воспроизведение музыки заблокировано.' : 'Music playback was blocked.',
+      musicError:
+        locale === 'ru' ? 'Не удалось воспроизвести музыку.' : 'Music could not be played.',
       narrationReplay: locale === 'ru' ? 'Повторить озвучку' : 'Replay narration',
       narrationPause: locale === 'ru' ? 'Приостановить озвучку' : 'Pause narration',
       narrationResume: locale === 'ru' ? 'Продолжить озвучку' : 'Resume narration',

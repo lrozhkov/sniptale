@@ -1,3 +1,4 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import {
   applyGuideStructureOperation,
@@ -105,6 +106,7 @@ function fixture() {
     timing: slide.timing,
   };
   tour.slides = [slide, navigation];
+  tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'audio-remove', duration: 2 });
   tour.stage.image = structuredClone(slide.image);
   tour.stage.imageFit = 'contain';
   tour.audioResources = [
@@ -129,6 +131,7 @@ it('removes selected image and audio references from current and saved history',
   expect(next.workspaceRevision).toBe(entry.workspaceRevision + 1);
   expect(next.history?.[0]?.savedAt).toBe(entry.history?.[0]?.savedAt);
   for (const project of [next.project, ...(next.history ?? []).map((version) => version.project)]) {
+    expect(project.tour?.backgroundMusic).toBeNull();
     expect(project.tour?.stage.image).toBeNull();
     expect(project.tour?.stage.imageFit).toBe('contain');
     const refs = getScenarioResourceReferences(project);

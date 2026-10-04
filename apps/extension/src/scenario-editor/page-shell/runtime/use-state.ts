@@ -250,7 +250,7 @@ function createGuideProjectCommands({
   return { create, duplicate, saveTemplate, remove };
 }
 
-/** Owns image and attached narration URLs; the existing images map is the player media input. */
+/** Owns image and attached audio URLs; the existing images map is the player media input. */
 function useGuideMedia(project: GuideProject | null) {
   const [images, setImages] = useState<Record<string, string | null>>({});
   const projectId = project?.id ?? null;
@@ -262,6 +262,7 @@ function useGuideMedia(project: GuideProject | null) {
           : []
       ) ?? []),
       ...(project?.tour ? getTourImages(project.tour).map((image) => image.assetId) : []),
+      ...(project?.tour?.backgroundMusic ? [project.tour.backgroundMusic.assetId] : []),
       ...(project?.tour?.slides.flatMap((slide) =>
         getTourNarrationTargets(slide).flatMap((target) =>
           target.narration ? [target.narration.assetId] : []

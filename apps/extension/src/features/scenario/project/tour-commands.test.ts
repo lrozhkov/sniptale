@@ -1,3 +1,4 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import { createGuideProject, createTourDocument, createTourImageSlide } from './factories';
 import {
@@ -407,4 +408,22 @@ it('keeps a reusable material after unlink and clears every attachment on materi
   expect(() =>
     applyTourCommands(original, [{ kind: 'remove-audio-resource', assetId: 'missing' }], resources)
   ).toThrow('unavailable');
+});
+
+it('keeps detached music on unbind but clears binding on explicit resource removal', () => {
+  const value = project();
+  value.tour!.backgroundMusic = createTourBackgroundMusic({ assetId: 'audio', duration: 5 });
+  const unbound = applyTourCommands(
+    value,
+    [{ kind: 'replace-tour', tour: { ...value.tour!, backgroundMusic: null } }],
+    resources
+  );
+  expect(unbound.tour!.audioResources?.some((entry) => entry.assetId === 'audio')).toBe(true);
+  const removed = applyTourCommands(
+    value,
+    [{ kind: 'remove-audio-resource', assetId: 'audio' }],
+    resources
+  );
+  expect(removed.tour!.backgroundMusic).toBeNull();
+  expect(value.tour!.backgroundMusic?.assetId).toBe('audio');
 });

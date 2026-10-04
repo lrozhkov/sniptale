@@ -13,9 +13,28 @@ const FACES = {
   next: { fill: 'none', d: 'm9 18 6-6-6-6' },
 };
 
+// Lucide Play, Pause, RotateCcw and X geometry matches the surrounding editor controls.
+const NARRATION_FACES = {
+  play: {
+    fill: 'none',
+    d: 'M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z',
+  },
+  pause: {
+    fill: 'none',
+    shapes: [
+      ['rect', { x: '14', y: '3', width: '5', height: '18', rx: '1' }],
+      ['rect', { x: '5', y: '3', width: '5', height: '18', rx: '1' }],
+    ],
+  },
+  replay: { fill: 'none', d: 'M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5' },
+  close: { fill: 'none', d: 'M18 6 6 18m0-12 12 12' },
+};
+
 /** Disposable transport DOM; elapsed time and navigation remain owned by the player. */
 export function createTourTransport(root, labels, signal, onToggle, onSeek, onManual) {
   const document = root.ownerDocument;
+  const close = root.querySelector('[data-tour-hint-close]');
+  close?.replaceChildren(createIcon(document, NARRATION_FACES.close));
   for (const name of ['contents', 'previous', 'next']) {
     const control = root.querySelector(`[data-tour-${name}]`);
     if (!control) continue;
@@ -114,10 +133,14 @@ function createIcon(document, face) {
   if (face.fill === 'none') {
     svg.setAttribute('stroke', 'currentColor');
     svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
   }
-  const path = document.createElementNS(SVG, 'path');
-  path.setAttribute('d', face.d);
-  svg.append(path);
+  for (const [tag, attributes] of face.shapes ?? [['path', { d: face.d }]]) {
+    const shape = document.createElementNS(SVG, tag);
+    for (const [name, value] of Object.entries(attributes)) shape.setAttribute(name, value);
+    svg.append(shape);
+  }
   return svg;
 }
 function formatTime(milliseconds) {
@@ -132,7 +155,7 @@ export function createTourNarrationButton(document, label) {
   button.className = 'tour-button tour-icon-button';
   button.setAttribute('aria-label', label);
   button.title = label;
-  button.append(createIcon(document, FACES.play));
+  button.append(createIcon(document, NARRATION_FACES.play));
   return button;
 }
 
@@ -143,7 +166,7 @@ export function createTourNarrationControls(document, labels, id) {
   const toggle = createTourNarrationButton(document, labels.narrationReplay ?? labels.play);
   toggle.dataset.tourNarrationAction = 'replay';
   const replay = createTourNarrationButton(document, labels.narrationReplay ?? labels.retry);
-  replay.replaceChildren(createIcon(document, FACES.retry));
+  replay.replaceChildren(createIcon(document, NARRATION_FACES.replay));
   group.append(toggle, replay);
   setTourNarrationIdentity(group, id);
   return group;
@@ -207,7 +230,7 @@ export function projectTourAudioControls(root, labels, snapshot) {
     const face = pausable ? 'pause' : 'play';
     if (toggle.dataset.tourFace !== face) {
       toggle.dataset.tourFace = face;
-      toggle.replaceChildren(createIcon(root.ownerDocument, FACES[face]));
+      toggle.replaceChildren(createIcon(root.ownerDocument, NARRATION_FACES[face]));
     }
   }
   const volume = root.querySelector('[data-tour-volume]');
@@ -222,4 +245,65 @@ export function projectTourAudioControls(root, labels, snapshot) {
     mute.title = text;
     mute.setAttribute('aria-pressed', String(snapshot.muted));
   }
+}
+
+/** Music uses one channel-local command group alongside the existing master controls. */
+export function createTourMusicControls(root, labels, signal) {
+  const document = root.ownerDocument;
+  const group = document.createElement('span');
+  group.className = 'tour-music-controls';
+  group.dataset.tourMusicControls = '';
+  group.hidden = true;
+  const mute = createTourNarrationButton(document, labels.musicMute ?? 'Mute music');
+  mute.dataset.tourMusicMute = '';
+  mute.replaceChildren(
+    createIcon(document, {
+      fill: 'none',
+      d: 'M9 18V5l12-2v13M9 8l12-2M9 18a3 3 0 1 1-3-3c2 0 3 1 3 3Zm12-2a3 3 0 1 1-3-3c2 0 3 1 3 3Z',
+    })
+  );
+  const retry = createTourNarrationButton(document, labels.musicRetry ?? 'Retry music');
+  retry.dataset.tourMusicRetry = '';
+  retry.replaceChildren(createIcon(document, FACES.retry));
+  retry.hidden = true;
+  group.append(mute, retry);
+  const feedback = document.createElement('span');
+  feedback.className = 'tour-playback-status';
+  feedback.dataset.tourMusicStatus = '';
+  feedback.setAttribute('role', 'status');
+  feedback.hidden = true;
+  root.querySelector('[data-tour-audio-controls]').append(group);
+  root.querySelector('.tour-feedback').append(feedback);
+  signal.addEventListener(
+    'abort',
+    () => {
+      group.remove();
+      feedback.remove();
+    },
+    { once: true }
+  );
+}
+
+/** The media snapshot is the sole authority for music availability, mute and failure feedback. */
+export function projectTourMusicControls(root, labels, snapshot) {
+  const group = root.querySelector('[data-tour-music-controls]');
+  if (!group) return;
+  group.hidden = !snapshot.available;
+  const mute = group.querySelector('[data-tour-music-mute]');
+  const label = snapshot.muted
+    ? (labels.musicUnmute ?? 'Unmute music')
+    : (labels.musicMute ?? 'Mute music');
+  mute.setAttribute('aria-label', label);
+  mute.title = label;
+  mute.setAttribute('aria-pressed', String(snapshot.muted));
+  const failed = snapshot.available && ['blocked', 'error'].includes(snapshot.status);
+  group.querySelector('[data-tour-music-retry]').hidden = !failed;
+  const feedback = root.querySelector('[data-tour-music-status]');
+  feedback.hidden = !failed;
+  feedback.textContent = failed
+    ? snapshot.status === 'blocked'
+      ? (labels.musicBlocked ?? 'Music playback was blocked.')
+      : (labels.musicError ?? 'Music could not be played.')
+    : '';
+  feedback.title = feedback.textContent;
 }

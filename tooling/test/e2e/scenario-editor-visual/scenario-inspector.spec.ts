@@ -1032,8 +1032,8 @@ for (const [locale, theme] of [
       .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
       .click();
     const defaults = panel.getByRole('navigation').getByRole('button');
-    await expect(defaults).toHaveCount(6);
-    for (let index = 0; index < 6; index++) {
+    await expect(defaults).toHaveCount(7);
+    for (let index = 0; index < 7; index++) {
       await defaults.nth(index).click();
       await expect(defaults.nth(index)).toHaveAttribute('aria-pressed', 'true');
       await expect

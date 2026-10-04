@@ -1,4 +1,5 @@
 import { getTourAudioResources } from '../../../features/scenario/project/public';
+import { TourMusicSettings } from './music-settings';
 import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
 import { useState } from 'react';
@@ -125,7 +126,6 @@ function TourSettingsPanel({
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
-  const requestResource = useGuideResourceRequest();
   const slide = state.slide;
   const image = slide?.kind === 'image' ? slide.image : slide?.background.image;
   const inspectorTitle =
@@ -191,31 +191,14 @@ function TourSettingsPanel({
             imageActions={
               slide &&
               image && (
-                <>
-                  {onEditImage && (
-                    <ScenarioInspectorActionButton
-                      data-inspector-edit-image={slide.id}
-                      disabled={disabled || !images[image.assetId]}
-                      onClick={() => onEditImage(slide.id)}
-                    >
-                      <SquarePen size={16} aria-hidden="true" />
-                      {t('scenario.editor.guideEditImage')}
-                    </ScenarioInspectorActionButton>
-                  )}
-                  <ScenarioInspectorActionButton
-                    disabled={importDisabled || !requestResource}
-                    aria-controls="guide-resource-drawer"
-                    onClick={() =>
-                      requestResource?.({
-                        kind: slide.kind === 'image' ? 'tour-image' : 'tour-background',
-                        slideId: slide.id,
-                      })
-                    }
-                  >
-                    <Image size={16} aria-hidden="true" />
-                    {t('scenario.editor.guideReplaceImage')}
-                  </ScenarioInspectorActionButton>
-                </>
+                <TourSelectedImageActions
+                  slide={slide}
+                  images={images}
+                  onEditImage={onEditImage}
+                  disabled={disabled}
+                  importDisabled={importDisabled}
+                  t={t}
+                />
               )
             }
             presentation={panels.presentation}
@@ -227,6 +210,19 @@ function TourSettingsPanel({
             t={t}
             onChangeTour={state.changeTour}
             onChangeSlide={state.changeSlide}
+            music={
+              onImportNarration && (
+                <TourMusicSettings
+                  key={project.id}
+                  tour={project.tour}
+                  disabled={disabled}
+                  importDisabled={importDisabled}
+                  onChange={state.changeTour}
+                  onImport={onImportNarration}
+                  t={t}
+                />
+              )
+            }
             narration={
               panels.rightOpen &&
               panels.rightScope === 'selection' &&
@@ -251,6 +247,53 @@ function TourSettingsPanel({
         )}
       </div>
     </FloatingChromePanel>
+  );
+}
+
+/** Selected image commands keep target and resource availability separate from panel presentation. */
+function TourSelectedImageActions({
+  slide,
+  images,
+  onEditImage,
+  disabled,
+  importDisabled,
+  t,
+}: {
+  slide: TourSlide;
+  images: SelectedTourProps['images'];
+  onEditImage: SelectedTourProps['onEditImage'];
+  disabled: boolean;
+  importDisabled: boolean;
+  t: Translate;
+}) {
+  const requestResource = useGuideResourceRequest();
+  const image = slide.kind === 'image' ? slide.image : slide.background.image;
+  return (
+    <>
+      {onEditImage && (
+        <ScenarioInspectorActionButton
+          data-inspector-edit-image={slide.id}
+          disabled={disabled || !image || !images[image.assetId]}
+          onClick={() => onEditImage(slide.id)}
+        >
+          <SquarePen size={16} aria-hidden="true" />
+          {t('scenario.editor.guideEditImage')}
+        </ScenarioInspectorActionButton>
+      )}
+      <ScenarioInspectorActionButton
+        disabled={importDisabled || !requestResource}
+        aria-controls="guide-resource-drawer"
+        onClick={() =>
+          requestResource?.({
+            kind: slide.kind === 'image' ? 'tour-image' : 'tour-background',
+            slideId: slide.id,
+          })
+        }
+      >
+        <Image size={16} aria-hidden="true" />
+        {t('scenario.editor.guideReplaceImage')}
+      </ScenarioInspectorActionButton>
+    </>
   );
 }
 

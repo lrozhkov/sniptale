@@ -7,11 +7,15 @@ import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { TourNarrationRecording } from './narration-recording';
 
 type ImportInput = Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>;
-type NarrationDestination = Pick<ImportInput, 'slideId' | 'objectId' | 'expectedNarration'>;
+type NarrationDestination = Pick<
+  ImportInput,
+  'slideId' | 'objectId' | 'expectedNarration' | 'destination'
+>;
 
 /** Shared acquisition UI captures one immutable destination; persistence stays with the page. */
 export function TourNarrationAcquisition({
   menu = false,
+  uploadOnly = false,
   destination,
   disabled,
   onImport,
@@ -19,6 +23,7 @@ export function TourNarrationAcquisition({
   children,
 }: {
   menu?: boolean;
+  uploadOnly?: boolean;
   destination: NarrationDestination;
   disabled: boolean;
   onImport: (input: ImportInput) => Promise<boolean>;
@@ -62,11 +67,15 @@ export function TourNarrationAcquisition({
             icon={<Plus size={16} aria-hidden="true" />}
             disabled={disabled || pending}
             items={[
-              {
-                label: t('scenario.editor.tourRecord'),
-                icon: <Mic size={15} />,
-                onSelect: () => setRecording(structuredClone(destination)),
-              },
+              ...(!uploadOnly
+                ? [
+                    {
+                      label: t('scenario.editor.tourRecord'),
+                      icon: <Mic size={15} />,
+                      onSelect: () => setRecording(structuredClone(destination)),
+                    },
+                  ]
+                : []),
               {
                 label: t('scenario.editor.tourAudioUpload'),
                 icon: <Upload size={15} />,
@@ -76,13 +85,15 @@ export function TourNarrationAcquisition({
           />
         ) : (
           <>
-            <ScenarioInspectorActionButton
-              disabled={disabled || pending}
-              onClick={() => setRecording(structuredClone(destination))}
-            >
-              <Mic size={15} />
-              {t('scenario.editor.tourRecord')}
-            </ScenarioInspectorActionButton>
+            {!uploadOnly && (
+              <ScenarioInspectorActionButton
+                disabled={disabled || pending}
+                onClick={() => setRecording(structuredClone(destination))}
+              >
+                <Mic size={15} />
+                {t('scenario.editor.tourRecord')}
+              </ScenarioInspectorActionButton>
+            )}
             <ScenarioInspectorActionButton
               disabled={disabled || pending}
               onClick={() => input.current?.click()}

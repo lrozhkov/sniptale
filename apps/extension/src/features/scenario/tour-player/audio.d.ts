@@ -27,3 +27,31 @@ export function createTourAudio(
   setMuted(value: boolean): void;
   stop(): void;
 };
+
+/** Optional continuous music channel; master values remain owned by the narration audio owner. */
+export function createTourMusic(
+  root: HTMLElement,
+  signal: AbortSignal,
+  getAudioSnapshot: () => Pick<TourAudioSnapshot, 'volume' | 'muted' | 'audible'>,
+  changed?: (snapshot: TourMusicSnapshot) => void
+): {
+  readonly snapshot: TourMusicSnapshot;
+  configure(
+    binding:
+      | import('@sniptale/runtime-contracts/scenario/types/tour').TourBackgroundMusic
+      | null
+      | undefined,
+    assets: { id: string; src: string }[]
+  ): void;
+  play(): Promise<void>;
+  pause(): void;
+  finish(): void;
+  refreshMix(): void;
+  setMuted(value: boolean): void;
+};
+interface TourMusicSnapshot {
+  available: boolean;
+  status: TourAudioSnapshot['status'];
+  muted: boolean;
+  exhausted: boolean;
+}

@@ -4,6 +4,11 @@ import type { Translate } from '../../../platform/i18n';
 /** One translated vocabulary for authoring and exported playback. */
 export function tourPlayerLabels(t: Translate): TourPlayerLabels {
   return {
+    musicMute: t('scenario.editor.tourMusicMute'),
+    musicUnmute: t('scenario.editor.tourMusicUnmute'),
+    musicRetry: t('scenario.editor.tourMusicRetry'),
+    musicBlocked: t('scenario.editor.tourMusicBlocked'),
+    musicError: t('scenario.editor.tourMusicError'),
     audioBlocked: t('scenario.editor.tourHtmlAudioBlocked'),
     audioError: t('scenario.editor.tourAudioFailed'),
     narrationReplay: t('scenario.editor.tourNarrationReplay'),

@@ -5,6 +5,11 @@ import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-par
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 export interface TourPlayerLabels {
+  musicMute?: string;
+  musicUnmute?: string;
+  musicRetry?: string;
+  musicBlocked?: string;
+  musicError?: string;
   audioBlocked?: string;
   audioError?: string;
   narrationReplay?: string;
@@ -91,6 +96,11 @@ function selectAssets<T extends { id: string; mime: string }>(
     }
     if (slide.kind === 'image' && slide.masks.some((mask) => mask.kind === 'redact'))
       throw new Error('Tour redaction must be rasterized before export.');
+  }
+  if (tour.backgroundMusic) {
+    const id = tour.backgroundMusic.assetId;
+    if (required.get(id) === 'image') throw new Error('Conflicting tour media roles.');
+    required.set(id, 'audio');
   }
   const seen = new Set<string>();
   const assets = inputAssets.flatMap((asset) => {

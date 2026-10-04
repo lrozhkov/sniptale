@@ -216,6 +216,17 @@ const navigationSlide = z
 export const tourDocumentSchema = z
   .object({
     version: z.literal(1),
+    backgroundMusic: z
+      .object({
+        assetId: id,
+        duration,
+        volume: fraction,
+        loop: z.boolean(),
+        ducking: z.object({ enabled: z.boolean(), level: fraction }).strict(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     audioResources: z
       .array(z.object({ assetId: id, duration, name: label }).strict())
       .max(TOUR_LIMITS.maxAudioResources)
@@ -306,6 +317,11 @@ function validReferences(document: TourDocument): boolean {
   for (const resource of document.audioResources ?? []) {
     if (audio.has(resource.assetId)) return false;
     audio.set(resource.assetId, resource.duration);
+  }
+  const music = document.backgroundMusic;
+  if (music) {
+    if (audio.has(music.assetId) && audio.get(music.assetId) !== music.duration) return false;
+    audio.set(music.assetId, music.duration);
   }
   for (const slide of document.slides) {
     const objects =

@@ -182,7 +182,7 @@ it('locally pauses and resumes entry narration without moving clock, slide or pl
   h.button('[data-tour-narration-replay="entry"]').click();
   await h.tick();
   expect(h.media.currentTime).toBe(2);
-  expect(h.root.querySelectorAll('audio')).toHaveLength(1);
+  expect(h.root.querySelectorAll('audio:not([data-tour-music])')).toHaveLength(1);
 });
 it('composes viewer volume and mute without restarting narration or changing authored gain', async () => {
   const h = await mount();

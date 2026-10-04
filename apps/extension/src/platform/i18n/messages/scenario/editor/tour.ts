@@ -395,4 +395,17 @@ export const scenarioTourMessages = {
   tourVolume: { ru: 'Громкость', en: 'Volume' },
   tourMute: { ru: 'Выключить звук', en: 'Mute' },
   tourUnmute: { ru: 'Включить звук', en: 'Unmute' },
+  tourMusic: { ru: 'Музыка', en: 'Music' },
+  tourMusicMute: { ru: 'Выключить музыку', en: 'Mute music' },
+  tourMusicUnmute: { ru: 'Включить музыку', en: 'Unmute music' },
+  tourMusicRetry: { ru: 'Повторить музыку', en: 'Retry music' },
+  tourMusicBlocked: {
+    ru: 'Воспроизведение музыки заблокировано.',
+    en: 'Music playback was blocked.',
+  },
+  tourMusicError: { ru: 'Не удалось воспроизвести музыку.', en: 'Music could not be played.' },
+  tourMusicRemove: { ru: 'Убрать музыку', en: 'Remove music' },
+  tourMusicLoop: { ru: 'Повторять', en: 'Loop' },
+  tourMusicDucking: { ru: 'Приглушать при озвучке', en: 'Lower during narration' },
+  tourMusicLevel: { ru: 'Громкость при озвучке', en: 'Volume during narration' },
 } as const;

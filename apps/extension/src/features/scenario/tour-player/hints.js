@@ -188,7 +188,7 @@ function updateTourVoice(voice, current, hideVoice, boundary) {
 
 function createTourVoiceButton(close, labels, signal) {
   const voice = createTourNarrationControls(close.ownerDocument, labels, '');
-  close.before(voice);
+  close.closest('.tour-hint').querySelector('.tour-hint-controls').prepend(voice);
   signal.addEventListener('abort', () => voice.remove(), { once: true });
   return voice;
 }

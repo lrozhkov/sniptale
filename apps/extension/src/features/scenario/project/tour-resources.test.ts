@@ -1,3 +1,4 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import {
   createGuideImageBlock,
@@ -249,4 +250,12 @@ it('includes the mutable stage occurrence and retains shared slide references in
   expect([...getScenarioResourceReferences(project).documents]).toEqual(['edit']);
   tour.stage.image = { ...image, assetId: 'stage-only' };
   expect(getScenarioResourceReferences(project).assets.has('stage-only')).toBe(true);
+});
+
+it('retains a music-only asset without materializing a resource catalog on read', () => {
+  const project = createGuideProject('Music');
+  project.tour = createTourDocument();
+  project.tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'music', duration: 4 });
+  expect([...getScenarioResourceReferences(project).assets]).toEqual(['music']);
+  expect(project.tour.audioResources).toBeUndefined();
 });

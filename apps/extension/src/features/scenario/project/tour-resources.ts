@@ -102,6 +102,13 @@ export function getTourAudioResources(tour: TourDocument): TourAudioResource[] {
           name: voice.assetId,
         });
     }
+  const music = tour.backgroundMusic;
+  if (music && !resources.has(music.assetId))
+    resources.set(music.assetId, {
+      assetId: music.assetId,
+      duration: music.duration,
+      name: music.assetId,
+    });
   return [...resources.values()];
 }
 

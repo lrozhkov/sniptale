@@ -12,6 +12,7 @@ import {
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createTranslator, translate } from '../../../platform/i18n';
 import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { TourMusicSettings } from './music-settings';
 import { TourInspector } from './inspector';
 import type { TourSelection } from './selection';
 const uploadStage = vi.fn<(file: File, signal: AbortSignal) => Promise<boolean>>();
@@ -75,6 +76,16 @@ function draw() {
         importDisabled={importDisabled}
         presentation={presentation}
         narration={<div data-testid="narration-slot" />}
+        music={
+          <TourMusicSettings
+            tour={project.tour!}
+            disabled={disabled}
+            importDisabled={importDisabled}
+            onChange={(tour) => accept({ kind: 'replace-tour', tour })}
+            onImport={vi.fn()}
+            t={createTranslator('en')}
+          />
+        }
         tour={project.tour!}
         slide={project.tour!.slides.find((s) => s.id === slideId) ?? null}
         selection={selected}
@@ -95,7 +106,7 @@ function accept(command: Parameters<typeof applyTourCommands>[1][number]) {
   try {
     project = applyTourCommands(project, [command], {
       images: getTourImages(project.tour!),
-      audio: [],
+      audio: project.tour!.audioResources ?? [],
     });
     draw();
     return true;
@@ -186,7 +197,7 @@ it('renders exactly one heading per section in both presentations and keeps nest
   scope = 'document';
   presentation = 'sections';
   draw();
-  for (const label of ['Appearance', 'Slide explanation', 'Playback', 'Transitions']) {
+  for (const label of ['Appearance', 'Slide explanation', 'Playback', 'Music', 'Transitions']) {
     await click(label);
     const heading = host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
     expect(heading.textContent).toContain(label);
@@ -198,7 +209,7 @@ it('renders exactly one heading per section in both presentations and keeps nest
   presentation = 'all';
   draw();
   const groups = [...host.querySelectorAll('.guide-inspector-group')];
-  expect(groups).toHaveLength(8);
+  expect(groups).toHaveLength(9);
   for (const group of groups)
     expect(group.querySelectorAll('.guide-inspector-group-heading')).toHaveLength(1);
   scope = 'selection';
@@ -643,4 +654,42 @@ it('inherits highlight animation independently and preserves it through appearan
   disabled = true;
   draw();
   expect(host.querySelector<HTMLButtonElement>('[aria-label="Entry"]')?.disabled).toBe(true);
+});
+
+it('edits one global music binding, preserves balances on replacement and removes only binding', async () => {
+  project.tour!.audioResources = [
+    { assetId: 'one', duration: 5, name: 'One.wav' },
+    { assetId: 'two', duration: 8, name: 'Two.wav' },
+  ];
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Music');
+  expect(host.textContent).not.toContain('Record');
+  await click('From resources');
+  await act(async () => host.querySelectorAll<HTMLButtonElement>('.tour-audio-name')[0]!.click());
+  expect(project.tour!.backgroundMusic).toEqual({
+    assetId: 'one',
+    duration: 5,
+    volume: 0.3,
+    loop: true,
+    ducking: { enabled: true, level: 0.25 },
+  });
+  await fill('Volume', '45');
+  await fill('Volume during narration', '15');
+  await click('Loop');
+  await click('Lower during narration');
+  expect(host.querySelector('input[aria-label="Volume during narration"]')).toBeNull();
+  await click('From resources');
+  await act(async () => host.querySelectorAll<HTMLButtonElement>('.tour-audio-name')[1]!.click());
+  expect(project.tour!.backgroundMusic).toEqual({
+    assetId: 'two',
+    duration: 8,
+    volume: 0.45,
+    loop: false,
+    ducking: { enabled: false, level: 0.15 },
+  });
+  await click('Remove music');
+  expect(project.tour!.backgroundMusic).toBeNull();
+  expect(project.tour!.audioResources).toHaveLength(2);
 });

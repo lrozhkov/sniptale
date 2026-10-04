@@ -1,4 +1,4 @@
-import { createTourAudio } from './audio.js';
+import { createTourAudio, createTourMusic } from './audio.js';
 import { createTourPlaybackSession } from './playback-session.js';
 import {
   tourSlideDuration,
@@ -11,6 +11,8 @@ import {
   createTourTransport,
   createTourVolumeControls,
   projectTourAudioControls,
+  createTourMusicControls,
+  projectTourMusicControls,
 } from './transport.js';
 import { getTourNarrationTargets } from '../project/tour-resources';
 
@@ -45,15 +47,11 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     state: audioState ?? (choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state),
   });
   let audioState = null;
-  const audio = createTourAudio(
-    root,
-    signal,
-    (state) => {
-      audioState = state;
-      session.pause();
-    },
-    (snapshot) => projectTourAudioControls(root, input.labels, snapshot)
-  );
+  const { audio, music, refresh } = createTourAudioChannels(root, input.labels, signal, (state) => {
+    audioState = state;
+    session.pause();
+  });
+  const visit = createTourVisit(music);
   const session = createTourPlaybackSession({
     signal,
     motion,
@@ -74,29 +72,25 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     complete: advance,
   });
   function advance() {
-    const target = ended ? tour.slides.length : nextUnvisitedDestination(tour, index, visited);
-    if (target === null) {
-      choice = true;
-      session.pause();
-      return;
-    }
-    if (ended || (target === tour.slides.length && !tour.endScreen.enabled)) {
-      session.pause();
-      return;
-    }
-    navigate(target);
+    const route = tourAutomaticRoute(tour, index, visited, ended);
+    choice = route.choice;
+    if (route.finished) visit.finish();
+    if (route.target === null) session.pause();
+    else navigate(route.target);
   }
   function toggle() {
     audio.stop();
     audioState = null;
     if (session.continuous) {
+      visit.pause();
       session.pause();
       return;
     }
     visited.clear();
     if (tour.slides[index]) visited.add(tour.slides[index].id);
     choice = false;
-    if (ended) navigate(0, true);
+    if (ended || visit.completed) navigate(0, true);
+    else visit.play();
     session.play();
   }
   function manual() {
@@ -122,15 +116,20 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     const slide = tour.slides[index];
     audioState = null;
     audio.show(ended ? null : slide, assets);
+    music.configure(tour.backgroundMusic ?? null, assets);
     timeline = tourLinearTimeline(tour, reduced());
     const spec = tourPlaybackSpec(tour, ended ? null : slide, assets, reduced());
     ({ entrance, exitStart, duration } = spec);
-    setVolumeAvailable(tourHasPlayableNarration(tour, assets));
+    setVolumeAvailable(Boolean(tour.backgroundMusic) || tourHasPlayableNarration(tour, assets));
     if (!slide) {
+      visit.finish();
       session.clear();
       return;
     }
-    if (ended) session.pause();
+    if (ended) {
+      visit.finish();
+      session.pause();
+    }
     visited.add(slide.id);
     session.load(spec);
   }
@@ -142,13 +141,14 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     () => entrance,
     () => show(tour, index, ended, assets)
   );
-  const pause = bindPlaybackLifetime(root, signal, session, audio, () => {
+  const pause = bindPlaybackLifetime(root, signal, session, audio, visit, () => {
     audioState = null;
   });
   return {
     show,
     pause,
-    refreshAudioControls: () => projectTourAudioControls(root, input.labels, audio.snapshot),
+    refreshAudioControls: refresh,
+    restartVisit: visit.restart,
     depart(callbacks) {
       audio.stop();
       session.depart(callbacks);
@@ -156,12 +156,86 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     get mode() {
       return session.mode;
     },
-    interact() {
+    interact(reason) {
       visited.clear();
-      pause();
+      audio.stop();
+      session.pause();
+      if (reason === 'navigation' || reason === 'point') visit.admit();
     },
   };
 }
+/** Narration and music share one viewer mix; snapshots stay inside their media owner. */
+function createTourAudioChannels(root, labels, signal, failed) {
+  const audio = createTourAudio(root, signal, failed, (snapshot) => {
+    projectTourAudioControls(root, labels, snapshot);
+    music.refreshMix();
+  });
+  createTourMusicControls(root, labels, signal);
+  const music = createTourMusic(
+    root,
+    signal,
+    () => audio.snapshot,
+    (snapshot) => projectTourMusicControls(root, labels, snapshot)
+  );
+  root.addEventListener(
+    'click',
+    (event) => {
+      const target =
+        event.target instanceof globalThis.Element
+          ? event.target.closest('[data-tour-music-mute]')
+          : null;
+      if (target) music.setMuted(!music.snapshot.muted);
+    },
+    { signal }
+  );
+  return {
+    audio,
+    music,
+    refresh() {
+      projectTourAudioControls(root, labels, audio.snapshot);
+      projectTourMusicControls(root, labels, music.snapshot);
+    },
+  };
+}
+
+/** A visit is admitted by viewer commands, independently of the progression clock and media state. */
+function createTourVisit(music) {
+  let phase = 'idle';
+  function finish() {
+    phase = 'completed';
+    music.finish();
+  }
+  function restart() {
+    music.finish();
+    phase = 'active';
+    music.play();
+  }
+  return {
+    finish,
+    restart,
+    admit() {
+      if (phase === 'paused') return;
+      if (phase === 'completed') music.finish();
+      phase = 'active';
+      music.play();
+    },
+    get completed() {
+      return phase === 'completed';
+    },
+    play() {
+      phase = 'active';
+      music.play();
+    },
+    pause() {
+      if (phase !== 'completed') phase = 'paused';
+      music.pause();
+    },
+    retry() {
+      if (phase === 'active') music.play();
+    },
+  };
+}
+
 /** Converts the shared scrub position to one slide-local clock position. */
 function resolveTourSeek(timeline, index, value) {
   if (!timeline) return { index, elapsed: value };
@@ -172,8 +246,9 @@ function resolveTourSeek(timeline, index, value) {
   return { index: target, elapsed: value - timeline.offsets[target] };
 }
 
-function bindPlaybackLifetime(root, signal, session, audio, clearAudioState) {
+function bindPlaybackLifetime(root, signal, session, audio, visit, clearAudioState) {
   const pause = () => {
+    visit.pause();
     audio.stop();
     session.pause();
   };
@@ -191,12 +266,23 @@ function bindPlaybackLifetime(root, signal, session, audio, clearAudioState) {
     },
     { signal, capture: true }
   );
-  bindLocalAudioCommands(root, signal, session, audio, clearAudioState);
+  root.addEventListener(
+    'click',
+    (event) => {
+      if (
+        event.target instanceof globalThis.Element &&
+        event.target.closest('[data-tour-music-retry]')
+      )
+        visit.retry();
+    },
+    { signal }
+  );
+  bindLocalAudioCommands(root, signal, session, audio, clearAudioState, visit);
   return pause;
 }
 
 /** Local audio detaches before pausing the timeline, whose change callback synchronizes immediately. */
-function bindLocalAudioCommands(root, signal, session, audio, clearAudioState) {
+function bindLocalAudioCommands(root, signal, session, audio, clearAudioState, visit) {
   root.addEventListener(
     'click',
     (event) => {
@@ -215,6 +301,7 @@ function bindLocalAudioCommands(root, signal, session, audio, clearAudioState) {
       const id = target.dataset.tourNarrationToggle ?? target.dataset.tourNarrationReplay;
       const sameCue = snapshot.objectId === id;
       const playing = snapshot.status === 'playing' || snapshot.status === 'loading';
+      visit.admit();
       clearAudioState();
       audio.pause();
       session.pause();
@@ -280,6 +367,13 @@ function bindMotionPreference(preference, signal, session, motion, getEntrance, 
     },
     { signal }
   );
+}
+
+/** A missing choice pauses progression; only physical completion ends the music visit. */
+function tourAutomaticRoute(tour, index, visited, ended) {
+  const target = ended ? tour.slides.length : nextUnvisitedDestination(tour, index, visited);
+  const finished = ended || (target === tour.slides.length && !tour.endScreen.enabled);
+  return { target: finished ? null : target, choice: target === null, finished };
 }
 
 /** Loop policy belongs to route selection, not the playback clock. */

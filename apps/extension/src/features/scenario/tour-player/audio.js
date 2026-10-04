@@ -300,3 +300,193 @@ function selectNarrationSource(audio, cue, assets, time, replaced) {
     audio.currentTime = time;
   return Boolean(audio.getAttribute('src'));
 }
+
+/** One optional music channel consumes the narration owner's master and actual audible projection. */
+export function createTourMusic(root, signal, getAudioSnapshot, changed = () => {}) {
+  const audio = root.ownerDocument.createElement('audio');
+  Object.assign(audio, { hidden: true, preload: 'auto' });
+  audio.dataset.tourMusic = '';
+  root.append(audio);
+  let binding = null;
+  let source = null;
+  let muted = false;
+  const snapshot = () => ({ available: Boolean(binding), muted, ...media.snapshot });
+  const emit = () => {
+    if (!signal.aborted) changed(snapshot());
+  };
+  const mix = createMusicGain(
+    audio,
+    getAudioSnapshot,
+    () => binding,
+    () => muted
+  );
+  const media = createMusicMedia(audio, signal, mix.prepare, emit);
+  function refreshMix() {
+    if (signal.aborted) return;
+    mix.refresh();
+    emit();
+  }
+  signal.addEventListener(
+    'abort',
+    () => {
+      media.reset(null, false);
+      audio.remove();
+      mix.dispose();
+    },
+    { once: true }
+  );
+  return {
+    get snapshot() {
+      return snapshot();
+    },
+    configure(nextBinding, assets) {
+      if (signal.aborted) return;
+      const nextSource = nextBinding
+        ? (assets.find((asset) => asset.id === nextBinding.assetId)?.src ?? null)
+        : null;
+      const replaced = binding?.assetId !== nextBinding?.assetId || source !== nextSource;
+      binding = nextBinding ?? null;
+      source = nextSource;
+      audio.loop = Boolean(binding?.loop);
+      if (replaced) media.reset(source, Boolean(binding));
+      refreshMix();
+    },
+    play: media.play,
+    pause: media.pause,
+    finish() {
+      if (!signal.aborted) media.reset(source, Boolean(binding));
+    },
+    refreshMix,
+    setMuted(value) {
+      if (signal.aborted) return;
+      muted = value === true;
+      refreshMix();
+    },
+  };
+}
+
+/** Music readiness and exhaustion are independent of scene changes and the progression clock. */
+function createMusicMedia(audio, signal, prepare, changed) {
+  let status = 'idle';
+  let exhausted = false;
+  let wanted = false;
+  let pending = false;
+  let generation = 0;
+  function pause(next = 'paused') {
+    generation++;
+    wanted = false;
+    pending = false;
+    status = exhausted ? 'ended' : next;
+    audio.pause();
+    changed();
+  }
+  async function play() {
+    if (signal.aborted || exhausted || pending || !audio.getAttribute('src')) return;
+    if (wanted && !audio.paused) return;
+    wanted = true;
+    pending = true;
+    status = 'loading';
+    const token = ++generation;
+    changed();
+    try {
+      await prepare();
+      if (signal.aborted || token !== generation) return;
+      await audio.play();
+      if (signal.aborted || token !== generation) {
+        if (signal.aborted || !wanted) audio.pause();
+        return;
+      }
+      status = audio.paused ? 'paused' : 'playing';
+      changed();
+    } catch (error) {
+      if (!signal.aborted && token === generation)
+        pause(error?.name === 'NotAllowedError' ? 'blocked' : 'error');
+    } finally {
+      if (token === generation) pending = false;
+    }
+  }
+  bindNarrationEvents(audio, signal, {
+    playing() {
+      if (wanted) {
+        status = 'playing';
+        changed();
+      }
+    },
+    waiting() {
+      if (wanted) {
+        status = 'loading';
+        changed();
+      }
+    },
+    pause() {
+      if (wanted && !pending && audio.paused) pause();
+    },
+    ended() {
+      if (!audio.loop && audio.ended && audio.getAttribute('src')) {
+        exhausted = true;
+        pause('ended');
+      }
+    },
+    error() {
+      if (audio.getAttribute('src')) pause('error');
+    },
+  });
+  return {
+    get snapshot() {
+      return { status, exhausted };
+    },
+    play,
+    pause,
+    reset(source, available) {
+      pause('idle');
+      exhausted = false;
+      if (source) audio.src = source;
+      else audio.removeAttribute('src');
+      audio.load();
+      audio.currentTime = 0;
+      status = source ? 'paused' : available ? 'error' : 'idle';
+      changed();
+    },
+  };
+}
+
+/** Only the duck envelope is smoothed; master and either mute apply immediately to the media. */
+function createMusicGain(audio, getMaster, getBinding, getMuted) {
+  let context = null,
+    source = null,
+    gain = null;
+  let target = 1;
+  function refresh() {
+    const binding = getBinding();
+    const master = getMaster();
+    audio.volume = (binding?.volume ?? 0) * master.volume * (master.muted || getMuted() ? 0 : 1);
+    const next = binding?.ducking.enabled && master.audible ? binding.ducking.level : 1;
+    if (!gain || next === target) return;
+    const now = context.currentTime;
+    gain.gain.cancelAndHoldAtTime(now);
+    gain.gain.linearRampToValueAtTime(next, now + (next < gain.gain.value ? 0.15 : 0.25));
+    target = next;
+  }
+  return {
+    refresh,
+    prepare() {
+      if (!context) {
+        context = new globalThis.AudioContext();
+        gain = context.createGain();
+        source = context.createMediaElementSource(audio);
+        source.connect(gain);
+        gain.connect(context.destination);
+        const binding = getBinding();
+        target = binding?.ducking.enabled && getMaster().audible ? binding.ducking.level : 1;
+        gain.gain.setValueAtTime(target, context.currentTime);
+      }
+      refresh();
+      return context.resume();
+    },
+    dispose() {
+      source?.disconnect();
+      gain?.disconnect();
+      void context?.close().catch(() => {});
+    },
+  };
+}

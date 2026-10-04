@@ -1,3 +1,4 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createGuideProject,
@@ -243,4 +244,94 @@ it('keeps an object entry trigger when replacing its recorded audio', async () =
   expect(result.tour!.slides[0]).toMatchObject({
     annotations: [{ narration: { trigger: 'enter' } }],
   });
+});
+
+it('atomically attaches and replaces music while preserving author settings and original content', async () => {
+  const args = input();
+  const expected = {
+    ...createTourBackgroundMusic({ assetId: 'old', duration: 7 }),
+    volume: 0.7,
+    loop: false,
+  };
+  args.project.tour!.backgroundMusic = expected;
+  const result = await importScenarioNarration({
+    ...args,
+    slideId: null,
+    destination: { kind: 'background-music', expected },
+  });
+  expect(result.tour!.backgroundMusic).toMatchObject({
+    duration: 4,
+    volume: 0.7,
+    loop: false,
+    ducking: expected.ducking,
+  });
+  expect(result.tour!.backgroundMusic!.assetId).not.toBe('old');
+  expect(result.tour!.slides).toEqual(args.project.tour!.slides);
+  expect(args.project.tour!.backgroundMusic).toEqual(expected);
+  expect(io.commit).toHaveBeenCalledOnce();
+  expect(io.commit.mock.calls[0]![1].children.assetPuts).toHaveLength(1);
+});
+it('rejects incompatible or stale full music destinations before decoding', async () => {
+  const args = input();
+  const expected = createTourBackgroundMusic({ assetId: 'old', duration: 7 });
+  args.project.tour!.backgroundMusic = expected;
+  await expect(
+    importScenarioNarration({ ...args, destination: { kind: 'background-music', expected } })
+  ).rejects.toThrow();
+  await expect(
+    importScenarioNarration({
+      ...args,
+      slideId: null,
+      destination: {
+        kind: 'background-music',
+        expected: { ...expected, ducking: { ...expected.ducking, level: 0.9 } },
+      },
+    })
+  ).rejects.toThrow();
+  expect(io.decode).not.toHaveBeenCalled();
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it.each(['before', 'decode', 'stage', 'commit'] as const)(
+  'keeps music unchanged on %s failure',
+  async (phase) => {
+    const args = input();
+    const cancel = new AbortController();
+    if (phase === 'before') cancel.abort();
+    if (phase === 'decode')
+      io.decode.mockImplementation(async () => {
+        cancel.abort();
+        return { duration: 4 };
+      });
+    if (phase === 'stage') {
+      const write = io.write.getMockImplementation()!;
+      io.write.mockImplementation(async (...values) => {
+        const result = await write(...values);
+        cancel.abort();
+        return result;
+      });
+    }
+    if (phase === 'commit') io.commit.mockRejectedValueOnce(new Error('conflict'));
+    await expect(
+      importScenarioNarration({
+        ...args,
+        slideId: null,
+        signal: cancel.signal,
+        destination: { kind: 'background-music', expected: null },
+      })
+    ).rejects.toThrow();
+    expect(args.project.tour!.backgroundMusic).toBeUndefined();
+    expect(io.discard).toHaveBeenCalledTimes(phase === 'stage' ? 1 : 0);
+    expect(io.commit).toHaveBeenCalledTimes(phase === 'commit' ? 1 : 0);
+  }
+);
+it('initializes music settings on first atomic attachment', async () => {
+  const result = await importScenarioNarration({
+    ...input(),
+    slideId: null,
+    destination: { kind: 'background-music', expected: null },
+  });
+  expect(result.tour!.backgroundMusic).toEqual(
+    createTourBackgroundMusic({ assetId: result.tour!.backgroundMusic!.assetId, duration: 4 })
+  );
 });

@@ -67,3 +67,38 @@ it('retains a failed resources upload for retry without assigning it to a select
   expect(onImport).toHaveBeenCalledTimes(2);
   expect(host.querySelector('[role=alert]')).toBeNull();
 });
+
+it('imports music with its captured binding and offers upload without recording', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  document.body.append(host);
+  root = createRoot(host);
+  const onImport = vi.fn().mockResolvedValue(true);
+  act(() =>
+    root.render(
+      <TourNarrationAcquisition
+        uploadOnly
+        destination={{
+          slideId: null,
+          objectId: null,
+          expectedNarration: null,
+          destination: { kind: 'background-music', expected: null },
+        }}
+        disabled={false}
+        onImport={onImport}
+        t={createTranslator('en')}
+      />
+    )
+  );
+  expect(
+    [...host.querySelectorAll('button')].some((button) => button.textContent === 'Record')
+  ).toBe(false);
+  const input = host.querySelector<HTMLInputElement>('input')!;
+  Object.defineProperty(input, 'files', {
+    value: [new File(['music'], 'Music.wav', { type: 'audio/wav' })],
+  });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(onImport).toHaveBeenCalledWith(
+    expect.objectContaining({ destination: { kind: 'background-music', expected: null } })
+  );
+  expect(draft.render).not.toHaveBeenCalled();
+});

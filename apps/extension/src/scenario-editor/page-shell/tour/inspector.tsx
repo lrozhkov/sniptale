@@ -28,6 +28,7 @@ import {
   LayoutPanelTop,
   List,
   MousePointer2,
+  Music2,
 } from 'lucide-react';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -48,6 +49,7 @@ type InspectorProps = {
   importDisabled?: boolean;
   presentation?: 'all' | 'sections';
   narration?: ReactNode;
+  music?: ReactNode;
   tour: TourDocument;
   slide: TourSlide | null;
   selection: TourSelection | null;
@@ -136,6 +138,7 @@ function TourSlideCategories({
 }
 
 function TourDocumentCategories({
+  music,
   tour,
   disabled,
   onChangeTour,
@@ -144,7 +147,7 @@ function TourDocumentCategories({
   t,
 }: Pick<
   InspectorProps,
-  'tour' | 'disabled' | 'onChangeTour' | 'onUploadStage' | 'importDisabled' | 't'
+  'tour' | 'disabled' | 'onChangeTour' | 'onUploadStage' | 'importDisabled' | 't' | 'music'
 >) {
   const documentSettings = {
     tour,
@@ -189,6 +192,17 @@ function TourDocumentCategories({
       categorized: true,
       content: <TourPlaybackSettings {...documentSettings} />,
     },
+    ...(music
+      ? [
+          {
+            id: 'music',
+            icon: Music2,
+            label: t('scenario.editor.tourMusic'),
+            categorized: true,
+            content: music,
+          },
+        ]
+      : []),
     {
       id: 'transitions',
       icon: Layers,

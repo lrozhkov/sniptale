@@ -108,12 +108,16 @@ a:focus-visible {
   gap: 10px;
 }
 .tour-narration-controls,
+.tour-music-controls,
 .tour-audio-controls {
   display: inline-flex;
   align-items: center;
   flex: none;
   gap: 4px;
 }
+.tour-music-controls[hidden],
+[data-tour-music-retry][hidden],
+[data-tour-music-status][hidden],
 .tour-narration-controls[hidden],
 .tour-audio-controls[hidden] {
   display: none;
@@ -678,6 +682,11 @@ a:focus-visible {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 .tour-hint [data-tour-hint-close] {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  display: grid;
+  place-items: center;
   opacity: 0.7;
   transition: opacity 100ms ease;
 }
@@ -921,4 +930,27 @@ a:focus-visible {
 .tour-controls [data-tour-full-view][aria-pressed='true'] {
   background: color-mix(in srgb, currentColor 16%, transparent);
   box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.tour-hint [data-tour-hint-close] svg {
+  width: 20px;
+  height: 20px;
+}
+.tour-hint .tour-hint-controls .tour-narration-controls,
+.tour-hint[data-presentation^='caption-'] .tour-hint-controls .tour-narration-controls {
+  order: -1;
+  margin-right: auto;
+  opacity: 1;
+  gap: 4px;
+}
+.tour-hint-controls .tour-narration-controls button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+}
+.tour-narration-controls svg {
+  width: 18px;
+  height: 18px;
 }

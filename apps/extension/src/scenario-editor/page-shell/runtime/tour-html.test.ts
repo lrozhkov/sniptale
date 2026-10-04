@@ -257,3 +257,47 @@ it('prepares a stage-only image through the shared raster authority and fails mi
   );
   await expect(prepareTourHtml(args)).rejects.toThrow('Missing tour media');
 });
+
+it('reads shared music and narration once, and includes music-only bindings', async () => {
+  const args = fixture();
+  args.project.tour!.backgroundMusic = {
+    assetId: 'audio',
+    duration: 4,
+    volume: 0.3,
+    loop: true,
+    ducking: { enabled: true, level: 0.25 },
+  };
+  await prepareTourHtml(args);
+  expect(io.asset.mock.calls.filter(([id]) => id === 'audio')).toHaveLength(1);
+  io.asset.mockClear();
+  for (const slide of args.project.tour!.slides) {
+    slide.narration = null;
+    if (slide.kind === 'image') for (const mask of slide.masks) delete mask.narration;
+  }
+  const result = await prepareTourHtml(args);
+  expect(io.asset).toHaveBeenCalledWith('audio');
+  expect(result.mediaCount).toBe(2);
+  expect(io.asset).not.toHaveBeenCalledWith('unused');
+});
+
+it('rejects missing music and aborts after a pending music read without publication', async () => {
+  const args = fixture();
+  args.project.tour!.backgroundMusic = {
+    assetId: 'music',
+    duration: 4,
+    volume: 0.3,
+    loop: true,
+    ducking: { enabled: true, level: 0.25 },
+  };
+  const read = io.asset.getMockImplementation()!;
+  io.asset.mockImplementation((id) => (id === 'music' ? undefined : read(id)));
+  await expect(prepareTourHtml(args)).rejects.toThrow('Missing tour media');
+  const controller = new AbortController();
+  io.asset.mockImplementation(async (id) => {
+    if (id === 'music') controller.abort();
+    return read(id);
+  });
+  await expect(prepareTourHtml({ ...args, signal: controller.signal })).rejects.toThrow();
+  expect(io.sink).not.toHaveBeenCalled();
+  expect(io.record).not.toHaveBeenCalled();
+});

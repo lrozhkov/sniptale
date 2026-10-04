@@ -125,6 +125,10 @@ export async function remapCopyReferences(
         image.editDocumentId = await children.copyDocument(image.editDocumentId);
     }
     project.tour.audioResources = getTourAudioResources(project.tour);
+    if (project.tour.backgroundMusic)
+      project.tour.backgroundMusic.assetId = await children.copyAsset(
+        project.tour.backgroundMusic.assetId
+      );
     for (const resource of project.tour.audioResources)
       resource.assetId = await children.copyAsset(resource.assetId);
     for (const slide of project.tour.slides)

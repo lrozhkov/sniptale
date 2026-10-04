@@ -1,5 +1,7 @@
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
 import type {
+  TourAudioResource,
+  TourBackgroundMusic,
   TourDocument,
   TourImage,
   TourNarration,
@@ -8,13 +10,19 @@ import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 /** Archive references name logical scenario children, never physical asset objects. */
 export function encodePortableTour(tour: TourDocument) {
-  const media = (value: TourImage | TourNarration | null) => {
+  const media = (
+    value: TourImage | TourNarration | TourBackgroundMusic | TourAudioResource | null
+  ) => {
     if (!value) return null;
     const { assetId, ...rest } = value;
     return { ...rest, scenarioAssetId: assetId };
   };
   return {
     ...tour,
+    ...(tour.audioResources === undefined
+      ? {}
+      : { audioResources: tour.audioResources.map(media) }),
+    ...(tour.backgroundMusic === undefined ? {} : { backgroundMusic: media(tour.backgroundMusic) }),
     stage: {
       ...tour.stage,
       ...(tour.stage.image === undefined ? {} : { image: media(tour.stage.image) }),
@@ -70,11 +78,29 @@ export function decodePortableTour(
         : null;
     return { ...rest, assetId, editDocumentId, galleryAssetId };
   };
+  // Pre-B31 v6 catalogs used assetId for logical children; other media never did.
+  const catalogMedia = (input: unknown) => {
+    if (record(input) && typeof input['assetId'] === 'string' && !('scenarioAssetId' in input)) {
+      const { assetId, ...rest } = input;
+      return media({ ...rest, scenarioAssetId: assetId }, false);
+    }
+    return media(input, false);
+  };
   if (!record(value['stage'])) throw new Error('Portable tour stage is invalid.');
   const stage = value['stage'];
+  const resources = value['audioResources'];
+  if (
+    resources !== undefined &&
+    (!Array.isArray(resources) || resources.length > TOUR_LIMITS.maxAudioResources)
+  )
+    throw new Error('Portable tour audio resources are invalid.');
   const slides: unknown[] = value['slides'];
   const decoded = {
     ...value,
+    ...(resources === undefined ? {} : { audioResources: resources.map(catalogMedia) }),
+    ...('backgroundMusic' in value
+      ? { backgroundMusic: media(value['backgroundMusic'], false) }
+      : {}),
     stage: { ...stage, ...('image' in stage ? { image: media(stage['image'], true) } : {}) },
     slides: slides.map((slide) => {
       if (!record(slide)) throw new Error('Portable tour slide is invalid.');
