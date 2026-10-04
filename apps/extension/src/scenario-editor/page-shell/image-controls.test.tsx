@@ -373,3 +373,34 @@ it('restricts active framing to its category without dropping the draft fields',
   expect(host.querySelector('[data-inspector-edit-image]')).toBeNull();
   expect(change).not.toHaveBeenCalled();
 });
+
+it('aligns only the caption in both presentations and disables alignment while busy', async () => {
+  for (const presentation of ['all', 'sections'] as const) {
+    await render('blob:image', false, block, false, presentation);
+    if (presentation === 'sections')
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('nav button[aria-label="Description"]')!.click()
+      );
+    const group = () => host.querySelector('[aria-label="Caption alignment"]')!;
+    expect(group().querySelector('button[title="Center"]')?.getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+    for (const [label, captionAlignment] of [
+      ['Start', 'start'],
+      ['Center', 'center'],
+      ['End', 'end'],
+    ] as const) {
+      await act(async () =>
+        group().querySelector<HTMLButtonElement>(`button[title="${label}"]`)!.click()
+      );
+      expect(change).toHaveBeenLastCalledWith({ ...block, captionAlignment }, null);
+    }
+    change.mockClear();
+    await render('blob:image', true, block, false, presentation);
+    for (const button of group().querySelectorAll<HTMLButtonElement>('button')) {
+      expect(button.matches(':disabled')).toBe(true);
+      await act(async () => button.click());
+    }
+    expect(change).not.toHaveBeenCalled();
+  }
+});

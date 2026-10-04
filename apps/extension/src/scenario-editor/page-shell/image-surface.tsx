@@ -249,7 +249,11 @@ function GuideImageSurfaceView(props: ImageProps) {
       }}
     >
       <GuideImageViewport {...interaction} gesture={gesture} constrain={constrain} tools={tools} />
-      {block.caption && <figcaption>{block.caption}</figcaption>}
+      {block.caption && (
+        <figcaption style={{ textAlign: block.captionAlignment ?? 'center' }}>
+          {block.caption}
+        </figcaption>
+      )}
     </figure>
   );
 }

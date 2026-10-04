@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import {
+  applyGuideStructureOperation,
   createGuideImageBlock,
   createGuideProject,
   createGuideStep,
@@ -166,3 +167,43 @@ it('keeps a valid entry and revision when none of the selected assets are refere
   expect(removeScenarioAssetReferences(entry, new Set(['absent']), 30)).toEqual(entry);
   expect(() => removeScenarioAssetReferences(entry, new Set(['image-remove']), -1)).toThrow();
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'retains caption alignment %s through reference removal, saved history and slot refill',
+  (captionAlignment) => {
+    const entry = fixture();
+    for (const project of [entry.project, ...(entry.history ?? []).map((item) => item.project)]) {
+      const step = project.items[0];
+      const block = step?.kind === 'step' ? step.blocks[0] : undefined;
+      if (block?.kind !== 'image') throw new Error('Expected image');
+      if (captionAlignment !== undefined) block.captionAlignment = captionAlignment;
+    }
+    const original = structuredClone(entry);
+    const removed = removeScenarioAssetReferences(entry, new Set(['image-remove']), 30);
+    for (const project of [
+      removed.project,
+      ...(removed.history ?? []).map((item) => item.project),
+    ]) {
+      const step = project.items[0];
+      if (step?.kind !== 'step') throw new Error('Expected step');
+      const slot = step.blocks[0];
+      if (slot?.kind !== 'image-slot') throw new Error('Expected slot');
+      expect(slot.captionAlignment).toBe(captionAlignment);
+      expect(Object.hasOwn(slot, 'captionAlignment')).toBe(captionAlignment !== undefined);
+      const refilled = applyGuideStructureOperation(project, {
+        kind: 'place-image',
+        sourceBlockId: 'keep-block',
+        itemId: step.id,
+        blockId: slot.id,
+      });
+      const item = refilled.items[0];
+      const image = item?.kind === 'step' ? item.blocks[0] : undefined;
+      if (image?.kind !== 'image') throw new Error('Expected refilled image');
+      expect(image.captionAlignment).toBe(captionAlignment);
+      expect(image.caption).toBe('Keep caption');
+      expect(Object.hasOwn(image, 'captionAlignment')).toBe(captionAlignment !== undefined);
+    }
+    expect(entry).toEqual(original);
+    expect(parseScenarioProjectEntry(removed)).not.toBeNull();
+  }
+);

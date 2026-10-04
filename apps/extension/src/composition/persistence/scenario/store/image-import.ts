@@ -147,6 +147,9 @@ export async function importScenarioImages(args: {
                 frame: replacement.frame,
                 fit: replacement.fit,
                 caption: replacement.caption,
+                ...(replacement.captionAlignment === undefined
+                  ? {}
+                  : { captionAlignment: replacement.captionAlignment }),
                 alt: replacement.alt,
               }
             : current

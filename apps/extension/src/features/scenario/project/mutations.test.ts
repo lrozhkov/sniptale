@@ -597,3 +597,39 @@ it('uses in-step ordering when transfer source and destination are the same', ()
   });
   expect(next.items[1]).toMatchObject({ blocks: [{ id: 'image' }, { id: 'text' }] });
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'keeps target caption alignment %s when filling a slot and replacing its image',
+  (captionAlignment) => {
+    const source = applyGuideStructureOperation(fixture(), {
+      kind: 'add-block',
+      itemId: 'second',
+      blockKind: 'image-slot',
+    });
+    const first = source.items[1];
+    const second = source.items[2];
+    if (first?.kind !== 'step' || second?.kind !== 'step') throw new Error('Missing steps');
+    const image = first.blocks[1];
+    const slot = second.blocks[1];
+    if (image?.kind !== 'image' || slot?.kind !== 'image-slot') throw new Error('Missing images');
+    image.captionAlignment = captionAlignment === 'end' ? 'start' : 'end';
+    if (captionAlignment !== undefined) slot.captionAlignment = captionAlignment;
+    const original = structuredClone(source);
+    let current = source;
+    for (let replacement = 0; replacement < 2; replacement++) {
+      current = applyGuideStructureOperation(current, {
+        kind: 'place-image',
+        sourceBlockId: image.id,
+        itemId: second.id,
+        blockId: slot.id,
+      });
+      const item = current.items[2];
+      const target = item?.kind === 'step' ? item.blocks[1] : undefined;
+      expect(target).toMatchObject({ kind: 'image', id: slot.id, frame: slot.frame });
+      if (target?.kind !== 'image') throw new Error('Expected target image');
+      expect(target.captionAlignment).toBe(captionAlignment);
+      expect(Object.hasOwn(target, 'captionAlignment')).toBe(captionAlignment !== undefined);
+    }
+    expect(source).toEqual(original);
+  }
+);

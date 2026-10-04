@@ -61,8 +61,9 @@ it('loads all visible images once, preserves framing, reports failures and relea
   });
   image.alt = 'Alternative';
   image.caption = 'Caption';
+  image.captionAlignment = 'end';
   image.contentTransform = { x: 0.2, y: -0.1, scale: 1.5 };
-  const second = { ...image, id: 'missing', assetId: 'missing' };
+  const second = { ...image, id: 'missing', assetId: 'missing', captionAlignment: undefined };
   getBlob
     .mockReset()
     .mockResolvedValueOnce(new Blob(['image']))
@@ -107,6 +108,9 @@ it('loads all visible images once, preserves framing, reports failures and relea
     expect(img.style.translate).toBe('20% -10%');
     expect(img.style.scale).toBe('1.5');
     expect(host.textContent).toContain('Caption');
+    expect(
+      [...host.querySelectorAll('figcaption')].map((caption) => caption.style.textAlign)
+    ).toEqual(['end', 'center', 'end']);
     expect(host.querySelectorAll('[role="status"]')).toHaveLength(2);
     await act(async () => root.unmount());
     expect(revoke).toHaveBeenCalledExactlyOnceWith('blob:local');

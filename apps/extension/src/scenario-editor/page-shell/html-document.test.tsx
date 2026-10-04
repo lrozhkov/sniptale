@@ -101,3 +101,49 @@ it('projects grouped step navigation without hiding content from script-free rea
     vi.unstubAllGlobals();
   }
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'exports caption alignment %s for the document and enlarged viewer',
+  async (captionAlignment) => {
+    vi.stubGlobal('crypto', webcrypto);
+    try {
+      const project = createGuideProject('Guide');
+      const step = createGuideStep('Step');
+      const block = {
+        ...createGuideImageBlock({
+          id: 'image',
+          assetId: 'asset',
+          width: 100,
+          height: 50,
+          source: { kind: 'import', filename: 'image.png' },
+        }),
+        caption: 'Caption',
+        captionAlignment,
+      };
+      step.blocks = [block];
+      project.items = [step];
+      const result = await buildGuideHtml(project, createTranslator('en'), 'light', {
+        rasters: [
+          {
+            block,
+            settings: { ...DEFAULT_HTML_IMAGES, viewer: true },
+            width: 100,
+            height: 50,
+            size: 10,
+            mime: 'image/png',
+          },
+        ],
+        blocks: new Map([['image', 0]]),
+      });
+      const doc = new DOMParser().parseFromString(result.html, 'text/html');
+      expect(doc.querySelector<HTMLElement>('article figcaption')?.style.textAlign).toBe(
+        captionAlignment ?? 'center'
+      );
+      expect(doc.querySelector('[data-guide-open]')?.getAttribute('data-caption-alignment')).toBe(
+        captionAlignment ?? 'center'
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);

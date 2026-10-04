@@ -21,6 +21,9 @@ function removeFromProject(project: GuideProject, assetIds: ReadonlySet<string>)
         fit: block.fit,
         alt: block.alt,
         caption: block.caption,
+        ...(block.captionAlignment === undefined
+          ? {}
+          : { captionAlignment: block.captionAlignment }),
         ...(block.width === undefined ? {} : { width: block.width }),
         ...(block.rowStart === undefined ? {} : { rowStart: block.rowStart }),
       };

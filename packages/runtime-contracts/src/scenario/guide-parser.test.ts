@@ -634,3 +634,50 @@ it('preserves bounded prose minimum heights and rejects invalid size metadata', 
     ).toBe('invalid');
   }
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'round-trips image and slot caption alignment %s without filling absent metadata',
+  (captionAlignment) => {
+    const block = image();
+    if (captionAlignment !== undefined) block.captionAlignment = captionAlignment;
+    const slot = {
+      kind: 'image-slot' as const,
+      id: 'slot',
+      frame: block.frame,
+      fit: block.fit,
+      alt: block.alt,
+      caption: block.caption,
+      ...(captionAlignment === undefined ? {} : { captionAlignment }),
+    };
+    const input = project([{ ...step(), blocks: [block, slot] }]);
+    const parsed = parseGuideProject(JSON.parse(JSON.stringify(input)));
+    expect(parsed).toEqual({ status: 'ok', project: input });
+    if (parsed.status !== 'ok') throw new Error('Expected parsed guide');
+    const item = parsed.project.items[0];
+    if (item?.kind !== 'step') throw new Error('Expected step');
+    for (const result of item.blocks)
+      expect(Object.hasOwn(result, 'captionAlignment')).toBe(captionAlignment !== undefined);
+  }
+);
+
+it.each(['left', 'right', 'justify', '', null, 1])(
+  'rejects invalid caption alignment %s for images and slots',
+  (captionAlignment) => {
+    const block = image();
+    const slot = {
+      kind: 'image-slot',
+      id: 'slot',
+      frame: block.frame,
+      fit: block.fit,
+      alt: block.alt,
+      caption: block.caption,
+    };
+    for (const candidate of [block, slot])
+      expect(
+        parseGuideProject({
+          ...project(),
+          items: [{ ...step(), blocks: [{ ...candidate, captionAlignment }] }],
+        }).status
+      ).toBe('invalid');
+  }
+);

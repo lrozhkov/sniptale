@@ -73,11 +73,13 @@ for (const [theme, locale] of [
   });
 }
 
-for (const [theme, locale] of [
-  ['light', 'en'],
-  ['dark', 'ru'],
+for (const [theme, locale, mode] of [
+  ['light', 'en', 'all'],
+  ['light', 'en', 'sections'],
+  ['dark', 'ru', 'all'],
+  ['dark', 'ru', 'sections'],
 ] as const) {
-  test(`image crop controls retain application surfaces in ${theme}`, async ({
+  test(`image crop controls retain application surfaces in ${theme} ${mode}`, async ({
     page,
     hostOrigin,
   }) => {
@@ -85,12 +87,17 @@ for (const [theme, locale] of [
     const image = page.locator('[data-block-id="before"]');
     await image.locator('img').click();
     const inspector = page.locator('.guide-image-inspector');
-    await page
-      .getByRole('button', {
-        name: locale === 'en' ? 'Show all settings' : 'Показать все настройки',
-        exact: true,
-      })
-      .click();
+    if (mode === 'all')
+      await page
+        .getByRole('button', {
+          name: locale === 'en' ? 'Show all settings' : 'Показать все настройки',
+          exact: true,
+        })
+        .click();
+    const selectSection = async (name: string) => {
+      if (mode === 'sections')
+        await inspector.locator('nav').getByRole('button', { name, exact: true }).click();
+    };
     const actions = inspector.locator('.guide-image-controls > button');
     await expect(actions).toHaveCount(2);
     expect(
@@ -119,9 +126,10 @@ for (const [theme, locale] of [
     }
     await actions.last().scrollIntoViewIfNeeded();
     await expect(actions.last()).toBeInViewport();
-    await page.screenshot({ path: `.tmp/backlog7/w11-image-actions-${theme}.png` });
+    await page.screenshot({ path: `.tmp/backlog7/b12-image-actions-${theme}-${mode}.png` });
     const zoom = inspector.locator('input[type="range"]').first();
     await expect(inspector.locator('.guide-image-overview-map')).toHaveCount(0);
+    await selectSection(locale === 'en' ? 'Framing' : 'Кадрирование');
     await inspector
       .getByRole('button', {
         name: locale === 'en' ? 'Frame and image' : 'Рамка и изображение',
@@ -177,17 +185,19 @@ for (const [theme, locale] of [
     await expect(bounds).toHaveAttribute('aria-pressed', 'true');
     await expect(bounds).toHaveCSS('color', colors.color);
     await expect(bounds).toHaveCSS('background-color', colors.selected);
-    await page.screenshot({ path: `.tmp/backlog7/w10-crop-${theme}.png` });
+    await page.screenshot({ path: `.tmp/backlog7/b12-crop-${theme}-${mode}.png` });
     await page.setViewportSize({ width: 1024, height: 640 });
     await expect(cancel).toBeInViewport();
-    await page.screenshot({ path: `.tmp/backlog7/w10-crop-${theme}-compact.png` });
+    await page.screenshot({ path: `.tmp/backlog7/b12-crop-${theme}-${mode}-compact.png` });
     await cancel.click();
+    await selectSection(locale === 'en' ? 'Placement' : 'Размещение');
     await inspector
       .getByRole('button', {
         name: locale === 'en' ? 'Quarter width' : 'На четверть ширины',
         exact: true,
       })
       .click();
+    await selectSection(locale === 'en' ? 'Framing' : 'Кадрирование');
     await inspector
       .getByRole('button', {
         name: locale === 'en' ? 'Frame and image' : 'Рамка и изображение',

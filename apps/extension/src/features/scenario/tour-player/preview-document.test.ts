@@ -10,8 +10,10 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-async function fixture(mode: 'guide' | 'tour') {
-  const script = "globalThis.document.body.dataset.ready = 'true';";
+async function fixture(
+  mode: 'guide' | 'tour',
+  script = "globalThis.document.body.dataset.ready = 'true';"
+) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(script));
   const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
   const policy =
@@ -69,4 +71,130 @@ it('rejects changed executable bytes, archive-selected hashes and weakened CSP',
   const large = new Blob(['x']);
   Object.defineProperty(large, 'size', { value: SCENARIO_PREVIEW_MAX_BYTES + 1 });
   expect(await admitSavedScenarioHtml(large, 'guide', f.hash)).toBe(false);
+});
+
+// Frozen bundled guide runtime from 110c14f9a, before caption alignment.
+const retainedGuideRuntime = `(() => {
+  const dialog = globalThis.document.querySelector('[data-guide-viewer]');
+  if (!(dialog instanceof globalThis.HTMLDialogElement) || typeof dialog.showModal !== 'function')
+    return;
+  const image = dialog.querySelector('img');
+  const caption = dialog.querySelector('figcaption');
+  const zoom = dialog.querySelector('[data-zoom]');
+  let trigger;
+  for (const button of globalThis.document.querySelectorAll('[data-guide-open]')) {
+    button.hidden = false;
+    button.addEventListener('click', () => {
+      const source = globalThis.document.getElementById(button.dataset.guideOpen);
+      if (!source) return;
+      image.src = source.getAttribute('href');
+      image.alt = button.dataset.alt;
+      caption.textContent = button.dataset.caption;
+      dialog.dataset.zoom = 'fit';
+      zoom.setAttribute('aria-pressed', 'false');
+      trigger = button;
+      dialog.showModal();
+    });
+  }
+  zoom.addEventListener('click', () => {
+    const full = dialog.dataset.zoom !== 'full';
+    dialog.dataset.zoom = full ? 'full' : 'fit';
+    zoom.setAttribute('aria-pressed', String(full));
+  });
+  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => {
+    image.removeAttribute('src');
+    trigger?.focus();
+  });
+})();
+
+(() => {
+  const root = globalThis.document.querySelector('.guide-reading-layout');
+  if (!root || root.dataset.readingMode !== 'steps') return;
+  const links = [...root.querySelectorAll('[data-guide-target]')];
+  const items = [...root.querySelectorAll('[data-guide-page]')];
+  const pager = globalThis.document.querySelector('[data-guide-pagination]');
+  if (!links.length || !pager) return;
+  const previous = pager.querySelector('[data-guide-previous]');
+  const next = pager.querySelector('[data-guide-next]');
+  const progress = pager.querySelector('[data-guide-progress]');
+  let index = 0;
+  const select = (id, focus) => {
+    const selected = links.findIndex((link) => link.dataset.guideTarget === id);
+    if (selected < 0) return;
+    index = selected;
+    for (const item of items) item.hidden = item.dataset.guidePage !== id;
+    for (const link of links) {
+      if (link.dataset.guideTarget === id) link.setAttribute('aria-current', 'step');
+      else link.removeAttribute('aria-current');
+    }
+    previous.disabled = index === 0;
+    next.disabled = index === links.length - 1;
+    progress.textContent = \`\${index + 1} / \${links.length}\`;
+    root.querySelector('.guide-html-content').scrollTop = 0;
+    if (focus) items.find((item) => !item.hidden)?.focus({ preventScroll: true });
+    links[index].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  };
+  const fromHash = () => {
+    try {
+      const id = decodeURIComponent(globalThis.location.hash.slice(1));
+      const item = items.find((item) => item.id === id);
+      return item?.dataset.guidePage;
+    } catch {
+      return undefined;
+    }
+  };
+  const go = (id) => {
+    select(id, true);
+    globalThis.location.hash = encodeURIComponent(id);
+  };
+  for (const link of links)
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      go(link.dataset.guideTarget);
+    });
+  const move = (delta) => {
+    const link = links[index + delta];
+    if (link) go(link.dataset.guideTarget);
+  };
+  previous.addEventListener('click', () => move(-1));
+  next.addEventListener('click', () => move(1));
+  globalThis.addEventListener('hashchange', () => select(fromHash(), false));
+  globalThis.document.addEventListener('keydown', (event) => {
+    if (
+      event.defaultPrevented ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      globalThis.document.querySelector('dialog[open]') ||
+      event.target.closest('input,textarea,select,[contenteditable]')
+    )
+      return;
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    move(event.key === 'ArrowLeft' ? -1 : 1);
+  });
+  select(fromHash() ?? links[0].dataset.guideTarget, false);
+  pager.hidden = false;
+})();
+`;
+
+it('keeps a retained guide export readable without rewriting or executing it', async () => {
+  const current = await fixture('guide');
+  const retained = await fixture('guide', retainedGuideRuntime);
+  expect(retained.hash).toBe('dzYMBa1Mh84duGVb11ECbGEj5Zso1ZXmoUwZj2Jp9fs=');
+  expect(await admitSavedScenarioHtml(retained.blob, 'guide', current.hash)).toBe(true);
+  expect(await retained.blob.text()).toBe(retained.html);
+  expect(document.querySelector('[data-guide-viewer]')).toBeNull();
+
+  for (const html of [
+    retained.html.replace('dialog.showModal();', 'globalThis.alert(1);'),
+    retained.html.replace("default-src 'none'", 'default-src *'),
+    retained.html.replace('</body>', '<script>alert(1)</script></body>'),
+  ])
+    expect(await admitSavedScenarioHtml(new Blob([html]), 'guide', current.hash)).toBe(false);
+  const unknown = await fixture('guide', retainedGuideRuntime + '\n// changed executable');
+  expect(await admitSavedScenarioHtml(unknown.blob, 'guide', current.hash)).toBe(false);
+  const wrongMode = await fixture('tour', retainedGuideRuntime);
+  expect(await admitSavedScenarioHtml(wrongMode.blob, 'tour', current.hash)).toBe(false);
 });

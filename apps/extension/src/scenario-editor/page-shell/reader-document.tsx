@@ -157,7 +157,11 @@ function GuideReadBlock({
             </p>
           )}
         </div>
-        {block.caption && <figcaption>{block.caption}</figcaption>}
+        {block.caption && (
+          <figcaption style={{ textAlign: block.captionAlignment ?? 'center' }}>
+            {block.caption}
+          </figcaption>
+        )}
       </figure>
     );
   if (block.kind === 'heading') return <h3 style={guideTextAppearance(block)}>{block.text}</h3>;

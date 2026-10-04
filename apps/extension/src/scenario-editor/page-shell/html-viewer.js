@@ -14,6 +14,8 @@
       image.src = source.getAttribute('href');
       image.alt = button.dataset.alt;
       caption.textContent = button.dataset.caption;
+      const alignment = button.dataset.captionAlignment;
+      caption.style.textAlign = alignment === 'start' || alignment === 'end' ? alignment : 'center';
       dialog.dataset.zoom = 'fit';
       zoom.setAttribute('aria-pressed', 'false');
       trigger = button;

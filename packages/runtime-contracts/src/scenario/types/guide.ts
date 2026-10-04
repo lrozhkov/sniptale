@@ -59,6 +59,8 @@ export interface GuideImageBlock extends GuideBlockComposition {
   editDocumentId: string | null;
   alt: string;
   caption: string;
+  /** Caption-only alignment; absence retains the centered legacy presentation. */
+  captionAlignment?: GuideTextStyle['alignment'] | undefined;
   source: GuideImageSource;
   frame: { width: number; height: number };
   fit: 'contain' | 'cover';
@@ -69,7 +71,7 @@ export interface GuideImageBlock extends GuideBlockComposition {
 /** Empty image space has layout and identity but owns no media until filled. */
 export interface GuideImageSlotBlock extends Pick<
   GuideImageBlock,
-  'id' | 'frame' | 'fit' | 'alt' | 'caption' | 'width' | 'rowStart'
+  'id' | 'frame' | 'fit' | 'alt' | 'caption' | 'captionAlignment' | 'width' | 'rowStart'
 > {
   kind: 'image-slot';
 }

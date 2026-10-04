@@ -10,6 +10,9 @@ import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
   Columns2,
   MousePointer2,
   Focus,
@@ -21,6 +24,7 @@ import {
   ImageUp,
 } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { CompactSegmentedSelector } from '../../ui/compact-inspector-controls/control-renderers';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useImageDimensions } from './image-dimensions';
 import { useGuideImageBounds } from './layout-assistance';
@@ -374,22 +378,63 @@ function GuideImageDescriptionFields({
             : 'scenario.editor.guideImageAlt'
         );
         return (
-          <label key={field} className="guide-image-description">
-            {label}
-            <ProductInput
-              aria-label={label}
-              value={block[field]}
-              maxLength={GUIDE_LIMITS.maxTextLength}
-              disabled={disabled}
-              onChange={(event) =>
-                onChange({ ...block, [field]: event.target.value }, `image-${field}:${block.id}`)
-              }
-            />
-            {field === 'alt' && <small>{t('scenario.editor.guideImageAltHint')}</small>}
-          </label>
+          <Fragment key={field}>
+            <label className="guide-image-description">
+              {label}
+              <ProductInput
+                aria-label={label}
+                value={block[field]}
+                maxLength={GUIDE_LIMITS.maxTextLength}
+                disabled={disabled}
+                onChange={(event) =>
+                  onChange({ ...block, [field]: event.target.value }, `image-${field}:${block.id}`)
+                }
+              />
+              {field === 'alt' && <small>{t('scenario.editor.guideImageAltHint')}</small>}
+            </label>
+            {field === 'caption' && (
+              <GuideImageCaptionAlignment
+                block={block}
+                disabled={disabled}
+                onChange={onChange}
+                t={t}
+              />
+            )}
+          </Fragment>
         );
       })}
     </GuideInspectorGroup>
+  );
+}
+
+function GuideImageCaptionAlignment({
+  block,
+  disabled,
+  onChange,
+  t,
+}: Pick<Parameters<typeof GuideImageControls>[0], 'block' | 'disabled' | 'onChange' | 't'>) {
+  return (
+    <>
+      <span>{t('scenario.editor.guideCaptionAlignment')}</span>
+      <CompactSegmentedSelector
+        columns={3}
+        ariaLabel={t('scenario.editor.guideCaptionAlignment')}
+        value={block.captionAlignment ?? 'center'}
+        options={(
+          [
+            ['start', AlignLeft, 'scenario.editor.guideTextStart'],
+            ['center', AlignCenter, 'scenario.editor.guideTextCenter'],
+            ['end', AlignRight, 'scenario.editor.guideTextEnd'],
+          ] as const
+        ).map(([value, Icon, label]) => ({
+          value,
+          disabled,
+          icon: <Icon size={15} aria-hidden="true" />,
+          label: t(label),
+        }))}
+        onChange={(captionAlignment) => onChange({ ...block, captionAlignment }, null)}
+      />
+    </>
   );
 }
 

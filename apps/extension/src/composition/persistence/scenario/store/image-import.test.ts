@@ -650,3 +650,96 @@ it('creates a tour hotspot from video action evidence and preserves its source c
   ).rejects.toThrow('text');
   expect(io.write).not.toHaveBeenCalled();
 });
+
+it.each(
+  (['image', 'image-slot'] as const).flatMap((kind) =>
+    (['file', 'library'] as const).flatMap((sourceKind) =>
+      ([undefined, 'start', 'center', 'end'] as const).map((captionAlignment) => ({
+        kind,
+        sourceKind,
+        captionAlignment,
+      }))
+    )
+  )
+)(
+  'preserves $kind caption alignment $captionAlignment on $sourceKind replacement',
+  async ({ kind, sourceKind, captionAlignment }) => {
+    const args = replacementInput();
+    const step = args.project.items[0];
+    if (step?.kind !== 'step') throw new Error('Missing step');
+    const target = step.blocks[1];
+    if (target?.kind !== 'image') throw new Error('Missing image');
+    if (captionAlignment !== undefined) target.captionAlignment = captionAlignment;
+    if (kind === 'image-slot')
+      step.blocks[1] = {
+        kind,
+        id: target.id,
+        frame: target.frame,
+        fit: target.fit,
+        alt: target.alt,
+        caption: target.caption,
+        width: target.width,
+        rowStart: target.rowStart,
+        ...(captionAlignment === undefined ? {} : { captionAlignment }),
+      };
+    if (sourceKind === 'library') {
+      io.entry.mockResolvedValue({
+        id: 'library',
+        kind: 'image',
+        source: { kind: 'screenshot' },
+        filename: 'Library.png',
+        originalFilename: 'Library.png',
+        createdAt: 1,
+        updatedAt: 1,
+        size: 9,
+        mimeType: 'image/png',
+        width: 120,
+        height: 80,
+        duration: null,
+        sourceUrl: null,
+        sourceTitle: null,
+        sourceFavicon: null,
+        tags: [],
+        workspaceRevision: 0,
+      });
+      io.presentation.mockResolvedValue({
+        aggregateId: 'library',
+        aggregateKind: 'image',
+        presentationRevision: 0,
+        previewBlob: png(),
+        thumbnailBlob: png(),
+        updatedAt: 1,
+      });
+    }
+    const original = structuredClone(args.project);
+    const result = await importScenarioImages({
+      ...args,
+      sources: sourceKind === 'library' ? [{ kind: 'library', mediaId: 'library' }] : args.sources,
+    });
+    const next = result.items[0];
+    if (next?.kind !== 'step') throw new Error('Missing result step');
+    const image = next.blocks[1];
+    if (image?.kind !== 'image') throw new Error('Missing replacement');
+    expect(image.captionAlignment).toBe(captionAlignment);
+    expect(Object.hasOwn(image, 'captionAlignment')).toBe(captionAlignment !== undefined);
+    expect(image).toMatchObject({
+      id: target.id,
+      caption: target.caption,
+      alt: target.alt,
+      frame: target.frame,
+      fit: target.fit,
+      width: target.width,
+      rowStart: target.rowStart,
+      contentTransform: { x: 0, y: 0, scale: 1 },
+      galleryAssetId: sourceKind === 'library' ? 'library' : null,
+      editDocumentId: null,
+    });
+    expect(image.assetId).not.toBe(target.assetId);
+    expect(next.blocks).toHaveLength(step.blocks.length);
+    expect(next.blocks[0]).toEqual(step.blocks[0]);
+    expect(next.blocks[2]).toEqual(step.blocks[2]);
+    expect(args.project).toEqual(original);
+    expect(io.commit).toHaveBeenCalledOnce();
+    expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts).toHaveLength(1);
+  }
+);

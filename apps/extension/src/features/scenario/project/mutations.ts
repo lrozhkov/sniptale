@@ -294,6 +294,7 @@ function placeImage(
     throw new Error('Guide image target is unavailable.');
   delete copy.width;
   delete copy.rowStart;
+  delete copy.captionAlignment;
   step.blocks[index] = {
     ...copy,
     id: target.id,
@@ -303,6 +304,7 @@ function placeImage(
     fit: target.fit,
     alt: target.alt,
     caption: target.caption,
+    ...(target.captionAlignment === undefined ? {} : { captionAlignment: target.captionAlignment }),
     contentTransform: { x: 0, y: 0, scale: 1 },
   };
 }

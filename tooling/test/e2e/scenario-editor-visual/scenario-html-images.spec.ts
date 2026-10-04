@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Page, type Locator } from '@playwright/test';
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { test } from '../support/extension-fixture';
@@ -158,4 +158,97 @@ for (const theme of ['light', 'dark'] as const) {
     await page.getByRole('button', { name: 'Вернуться к экспорту', exact: true }).click();
     await expect(page.locator('.guide-html-export button').first()).toBeFocused();
   });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`caption alignment persists through both inspector modes and export in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 800 });
+    const image = page.locator('[data-block-id="before"]');
+    const caption = image.locator('figcaption');
+    await image.locator('img').click();
+    const inspector = page.locator('.guide-image-inspector');
+    await inspector
+      .locator('nav')
+      .getByRole('button', { name: 'Description', exact: true })
+      .click();
+    const alignment = inspector.getByRole('group', { name: 'Caption alignment', exact: true });
+    await expect(caption).toHaveCSS('text-align', 'center');
+    const width = (await image.boundingBox())!.width;
+    for (const [label, value] of [
+      ['Start', 'start'],
+      ['Center', 'center'],
+      ['End', 'end'],
+    ] as const) {
+      await alignment.getByRole('button', { name: label, exact: true }).click();
+      await expectCaptionAlignment(caption, value);
+      expect((await image.boundingBox())!.width).toBeCloseTo(width, 1);
+    }
+    await page.getByRole('button', { name: 'Show all settings', exact: true }).click();
+    await expect(alignment.getByRole('button', { name: 'End', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await alignment.getByRole('button', { name: 'Start', exact: true }).click();
+    await page.locator('.guide-history-controls button').first().click();
+    await expect(caption).toHaveCSS('text-align', 'end');
+    await expect(page.locator('.guide-page-feedback')).toHaveAttribute('data-status', 'saved');
+    await page.reload();
+    await expect(caption).toHaveCSS('text-align', 'end');
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect(page.locator('.guide-reader figcaption').first()).toHaveCSS('text-align', 'end');
+    await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('.guide-print figcaption').first()).toHaveCSS('text-align', 'end');
+    await page.emulateMedia({ media: 'screen' });
+    await page.getByRole('button', { name: 'Back to export', exact: true }).click();
+    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+    await installSink(page);
+    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
+    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    const html = await page.evaluate(() => {
+      const value: unknown = Reflect.get(window, 'savedGuideHtml');
+      if (typeof value !== 'string') throw new Error('Missing exported HTML');
+      return value;
+    });
+    const file = testInfo.outputPath('caption-alignment.html');
+    await writeFile(file, html);
+    await page.context().setOffline(true);
+    await page.goto(pathToFileURL(file).href);
+    await expect(page.locator('article figcaption').first()).toHaveCSS('text-align', 'end');
+    const open = page.getByRole('button', { name: 'Open image', exact: true }).first();
+    await open.click();
+    await expectCaptionAlignment(page.locator('dialog figcaption'), 'end');
+    await page.screenshot({ path: `.tmp/backlog7/b12-caption-${theme}.png` });
+    await page.keyboard.press('Escape');
+    await open.evaluate((element) =>
+      element.setAttribute('data-caption-alignment', 'url(https://invalid.example/)')
+    );
+    await open.click();
+    await expect(page.locator('dialog figcaption')).toHaveCSS('text-align', 'center');
+    await page.context().setOffline(false);
+  });
+}
+
+async function expectCaptionAlignment(caption: Locator, alignment: 'start' | 'center' | 'end') {
+  await expect(caption).toHaveCSS('text-align', alignment);
+  const geometry = await caption.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const text = range.getBoundingClientRect();
+    const left = bounds.left + parseFloat(style.paddingLeft);
+    const right = bounds.right - parseFloat(style.paddingRight);
+    return {
+      start: text.left - left,
+      end: right - text.right,
+      center: (text.left + text.right - left - right) / 2,
+    };
+  });
+  expect(Math.abs(geometry[alignment])).toBeLessThan(1);
 }

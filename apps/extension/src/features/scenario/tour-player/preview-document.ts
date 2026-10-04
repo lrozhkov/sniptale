@@ -1,5 +1,8 @@
 import { SCENARIO_PREVIEW_MAX_BYTES } from './preview-contract';
 
+// Bundled guide runtime before caption alignment (110c14f9a); immutable saved exports retain it.
+const retainedGuideRuntimeHash = 'dzYMBa1Mh84duGVb11ECbGEj5Zso1ZXmoUwZj2Jp9fs=';
+
 /** Runs only in the opaque sandbox: inert admission precedes mounting the original saved Blob. */
 export async function admitSavedScenarioHtml(
   blob: Blob,
@@ -13,17 +16,21 @@ export async function admitSavedScenarioHtml(
   )
     return false;
   const document = new DOMParser().parseFromString(await blob.text(), 'text/html');
-  const expectedPolicy =
-    mode === 'guide'
-      ? `default-src 'none'; script-src 'sha256-${scriptHash}'; img-src data:; font-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`
-      : `default-src 'none'; script-src 'sha256-${scriptHash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
   const policies = [...document.querySelectorAll('meta[http-equiv]')];
   if (
     policies.length !== 1 ||
-    policies[0]?.getAttribute('http-equiv')?.toLowerCase() !== 'content-security-policy' ||
-    policies[0].getAttribute('content') !== expectedPolicy
+    policies[0]?.getAttribute('http-equiv')?.toLowerCase() !== 'content-security-policy'
   )
     return false;
+  const trustedHashes = mode === 'guide' ? [scriptHash, retainedGuideRuntimeHash] : [scriptHash];
+  const admittedHash = trustedHashes.find((hash) => {
+    const expectedPolicy =
+      mode === 'guide'
+        ? `default-src 'none'; script-src 'sha256-${hash}'; img-src data:; font-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'`
+        : `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
+    return policies[0]?.getAttribute('content') === expectedPolicy;
+  });
+  if (!admittedHash) return false;
   if (document.querySelector('base, iframe, frame, object, embed')) return false;
   for (const element of document.querySelectorAll('*')) {
     if (element.getAttributeNames().some((name) => /^on/iu.test(name))) return false;
@@ -46,5 +53,5 @@ export async function admitSavedScenarioHtml(
     'SHA-256',
     new TextEncoder().encode(executable[0]?.textContent ?? '')
   );
-  return btoa(String.fromCharCode(...new Uint8Array(digest))) === scriptHash;
+  return btoa(String.fromCharCode(...new Uint8Array(digest))) === admittedHash;
 }

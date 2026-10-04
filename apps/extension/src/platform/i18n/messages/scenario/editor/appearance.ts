@@ -33,6 +33,7 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   guideHeadingMedium: { ru: 'Средний', en: 'Medium' },
   guideTextNormal: { ru: 'Обычный', en: 'Normal' },
   guideTextLarge: { ru: 'Крупный', en: 'Large' },
+  guideCaptionAlignment: { ru: 'Выравнивание подписи', en: 'Caption alignment' },
   guideTextAlignment: { ru: 'Выравнивание', en: 'Text alignment' },
   guideTextStart: { ru: 'По началу', en: 'Start' },
   guideTextCenter: { ru: 'По центру', en: 'Center' },

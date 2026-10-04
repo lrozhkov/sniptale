@@ -203,12 +203,17 @@ function HtmlImage({
           data-guide-open={`guide-media-${index}`}
           data-alt={block.alt}
           data-caption={block.caption}
+          data-caption-alignment={block.captionAlignment ?? 'center'}
           aria-label={t('scenario.editor.htmlImageOpen')}
         >
           +
         </button>
       )}
-      {block.caption && <figcaption>{block.caption}</figcaption>}
+      {block.caption && (
+        <figcaption style={{ textAlign: block.captionAlignment ?? 'center' }}>
+          {block.caption}
+        </figcaption>
+      )}
     </figure>
   );
 }

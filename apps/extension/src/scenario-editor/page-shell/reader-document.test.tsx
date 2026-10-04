@@ -175,3 +175,29 @@ it('retains local boundaries even when their empty leading block is omitted from
   ]);
   expect(document.querySelectorAll('[data-block-id="empty"]')).toHaveLength(0);
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'projects caption alignment %s into reader and print content',
+  (captionAlignment) => {
+    const project = createGuideProject('Guide');
+    const step = createGuideStep('Step');
+    const image = createGuideImageBlock({
+      id: 'image',
+      assetId: 'asset',
+      width: 100,
+      height: 50,
+      source: { kind: 'import', filename: 'image.png' },
+    });
+    step.blocks = [{ ...image, caption: 'Caption', captionAlignment }];
+    project.items = [step];
+    const markup = renderToStaticMarkup(
+      <GuideReadDocument
+        project={project}
+        images={{ asset: 'blob:image' }}
+        t={createTranslator('en')}
+      />
+    );
+    const doc = new DOMParser().parseFromString(markup, 'text/html');
+    expect(doc.querySelector('figcaption')?.style.textAlign).toBe(captionAlignment ?? 'center');
+  }
+);

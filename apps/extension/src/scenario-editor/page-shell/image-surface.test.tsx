@@ -391,3 +391,12 @@ it('includes a pending wheel draft when Done is clicked before its idle timer', 
   await act(async () => vi.advanceTimersByTime(300));
   expect(change).toHaveBeenCalledTimes(1);
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'renders caption alignment %s without changing the image frame',
+  async (captionAlignment) => {
+    await render(false, { ...block, caption: 'Caption', captionAlignment });
+    expect(host.querySelector('figcaption')?.style.textAlign).toBe(captionAlignment ?? 'center');
+    expect(change).not.toHaveBeenCalled();
+  }
+);

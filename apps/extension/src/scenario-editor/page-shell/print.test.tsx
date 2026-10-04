@@ -201,3 +201,22 @@ it('keeps step grouping disposable and retains it when reopening print', async (
     await s.close();
   }
 });
+
+it('retains caption alignment in the print projection', async () => {
+  const s = setup();
+  const step = s.project.items[0];
+  if (step?.kind !== 'step' || step.blocks[0]?.kind !== 'image')
+    throw new Error('Missing image fixture');
+  step.blocks[0].caption = 'Caption';
+  step.blocks[0].captionAlignment = 'end';
+  try {
+    await act(async () =>
+      s.root.render(
+        <GuidePrint project={s.project} images={{ asset: 'blob:image' }} t={t} onClose={vi.fn()} />
+      )
+    );
+    expect(s.host.querySelector('figcaption')?.style.textAlign).toBe('end');
+  } finally {
+    await s.close();
+  }
+});
