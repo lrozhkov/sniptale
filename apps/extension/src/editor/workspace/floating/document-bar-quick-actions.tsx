@@ -1,7 +1,6 @@
 import { createOutputFilename } from '../../../workflows/file-naming';
 import { Check, ClipboardCopy, Download, ArrowLeft, FolderInput, Save, X } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeDivider } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
@@ -82,6 +81,7 @@ export function EditorFloatingDocumentQuickActions({
         />
       )}
       <DocumentImageQuickActions
+        embedded={!standalone}
         actionState={actionState}
         documentController={documentController}
         hasImage={hasImage}
@@ -176,11 +176,13 @@ function DocumentImageQuickActions(props: {
   actionState: ReturnType<typeof useQuickActionState>;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
+  embedded: boolean;
 }) {
-  const { actionState, documentController, hasImage } = props;
+  const { actionState, documentController, hasImage, embedded } = props;
   return (
     <>
       <ContentToolbarButton
+        tone={embedded ? 'outline' : 'default'}
         title={getDocumentRequiredTitle(translate('editor.documentActions.download'), hasImage)}
         disabled={!hasImage}
         className={QUICK_ACTION_BUTTON_CLASS_NAME}
@@ -190,6 +192,7 @@ function DocumentImageQuickActions(props: {
         <Download size={18} strokeWidth={2} />
       </ContentToolbarButton>
       <ContentToolbarButton
+        tone={embedded ? 'outline' : 'default'}
         title={getDocumentRequiredTitle(translate('editor.documentActions.downloadAs'), hasImage)}
         disabled={!hasImage}
         className={QUICK_ACTION_BUTTON_CLASS_NAME}
@@ -201,19 +204,25 @@ function DocumentImageQuickActions(props: {
         <Save size={18} strokeWidth={2} />
       </ContentToolbarButton>
       {actionState.canCopy ? (
-        <CopyPngQuickAction actionState={actionState} documentController={documentController} />
+        <CopyPngQuickAction
+          actionState={actionState}
+          documentController={documentController}
+          embedded={embedded}
+        />
       ) : null}
     </>
   );
 }
 
 function CopyPngQuickAction(props: {
+  embedded: boolean;
   actionState: ReturnType<typeof useQuickActionState>;
   documentController: EditorFloatingDocumentController;
 }) {
   const { copyStatus, runActionFeedback } = props.actionState;
   return (
     <ContentToolbarButton
+      tone={props.embedded ? 'outline' : 'default'}
       title={translate('editor.documentActions.copyPng')}
       active={copyStatus === 'saved'}
       className={COPY_FEEDBACK_BUTTON_CLASS_NAME}
@@ -248,19 +257,19 @@ function ScenarioQuickActions(props: {
   if (embed.mode !== 'scenario') return null;
   return (
     <>
-      <ProductActionButton
-        compact
-        tone="secondary"
+      <ContentToolbarButton
+        type="button"
+        tone="outline"
         disabled={pending || !embed.onClose}
         onClick={() => runDocumentBarAction('close-scenario-editor', () => embed.onClose?.())}
-        data-ui="editor.floating.document-bar.cancel-scenario-button"
+        dataUi="editor.floating.document-bar.cancel-scenario-button"
       >
         <ArrowLeft size={16} aria-hidden="true" />
         {translate('editor.documentActions.returnToScenario')}
-      </ProductActionButton>
-      <ProductActionButton
-        compact
-        tone="primary"
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        tone="outline"
         disabled={!hasImage || pending || !embed.onApply}
         aria-busy={pending}
         onClick={() => {
@@ -278,11 +287,11 @@ function ScenarioQuickActions(props: {
             }
           });
         }}
-        data-ui="editor.floating.document-bar.apply-scenario-button"
+        dataUi="editor.floating.document-bar.apply-scenario-button"
       >
         <Check size={16} aria-hidden="true" />
         {translate('editor.documentActions.applyToScenario')}
-      </ProductActionButton>
+      </ContentToolbarButton>
     </>
   );
 }

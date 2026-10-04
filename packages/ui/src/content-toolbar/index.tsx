@@ -110,7 +110,7 @@ export interface ContentToolbarButtonProps extends ButtonHTMLAttributes<HTMLButt
   children: ReactNode;
   active?: boolean;
   menuIndicator?: boolean;
-  tone?: 'default' | 'danger' | 'close' | 'utility';
+  tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline';
   size?: 'default' | 'compact';
   dataUi?: string;
 }
@@ -147,12 +147,16 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
         className={cx(
           'sniptale-glass-toolbar-button',
           'sniptale-btn',
-          selected && tone !== 'utility' && 'sniptale-glass-toolbar-button--active',
+          selected &&
+            tone !== 'utility' &&
+            tone !== 'outline' &&
+            'sniptale-glass-toolbar-button--active',
           tone === 'danger' && 'sniptale-glass-toolbar-button--danger',
           tone === 'danger' && 'sniptale-btn-danger',
           tone === 'close' && 'sniptale-btn-close',
           tone === 'default' && 'sniptale-toggle',
           tone === 'utility' && 'sniptale-btn-utility',
+          tone === 'outline' && 'sniptale-btn-outline',
           size === 'compact' && 'sniptale-btn-compact',
           className
         )}

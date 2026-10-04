@@ -746,10 +746,7 @@ for (const [locale, theme] of [
     );
     const panel = page.locator('#guide-inspector-panel');
     const figure = page.locator('article#compare figure').first();
-    await figure.hover();
-    await figure
-      .getByRole('button', { name: ru ? 'Рамка и изображение' : 'Frame and image', exact: true })
-      .click();
+    await figure.locator('img').click();
     for (const representation of ['guide', 'tour']) {
       if (representation === 'tour') {
         await page

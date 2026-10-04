@@ -192,3 +192,24 @@
   width: 16px;
   height: 16px;
 }
+
+.sniptale-btn.sniptale-btn-outline {
+  width: auto;
+  gap: 8px;
+  padding: 0 9px;
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-outline:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+  background: transparent;
+  border-color: var(--sniptale-color-border-strong);
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-outline:focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
