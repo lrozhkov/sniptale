@@ -118,7 +118,7 @@ function GuideWorkspaceLibrary(props: WorkspaceProps) {
           ))}
         </div>
         <ContentToolbarButton
-          tone="utility"
+          tone="close"
           size="compact"
           title={t('scenario.editor.close')}
           aria-controls="guide-library-panel"
@@ -311,7 +311,7 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
           </ContentToolbarButton>
         )}
         <ContentToolbarButton
-          tone="utility"
+          tone="close"
           size="compact"
           title={t('scenario.editor.close')}
           aria-controls="guide-inspector-panel"

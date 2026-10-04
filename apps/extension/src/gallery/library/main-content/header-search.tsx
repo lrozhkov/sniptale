@@ -77,10 +77,8 @@ export function GalleryHeaderSearchField(props: {
             props.onSearchCommit('');
             (props.searchNavigation?.inputRef ?? inputRef).current?.focus();
           }}
-          className="flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center
-            rounded-[6px] text-[var(--sniptale-color-text-muted)] transition-colors
-            hover:bg-[var(--sniptale-color-surface-hover)]
-            hover:text-[var(--sniptale-color-text-primary)]
+          className="sniptale-dismiss-button flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center
+            rounded-[6px]  transition-colors
             focus-visible:outline-none focus-visible:ring-2
             focus-visible:ring-[var(--sniptale-color-accent)]"
         >

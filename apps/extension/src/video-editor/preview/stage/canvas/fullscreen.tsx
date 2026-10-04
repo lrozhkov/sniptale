@@ -163,6 +163,7 @@ export function PreviewStageFullscreenTransport(props: PreviewStageFullscreenTra
       </div>
       {props.onClose ? (
         <ContentToolbarButton
+          tone="close"
           onClick={props.onClose}
           title={closeLabel}
           aria-label={closeLabel}

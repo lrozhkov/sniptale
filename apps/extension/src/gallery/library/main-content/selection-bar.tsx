@@ -147,7 +147,7 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
         aria-label={translate('gallery.app.clearSelection')}
         title={getGalleryShortcutTitle(translate('gallery.app.clearSelection'), 'Escape')}
         onClick={onClearSelection}
-        className={galleryClearSelectionClassName}
+        className={['sniptale-dismiss-button', galleryClearSelectionClassName].join(' ')}
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>

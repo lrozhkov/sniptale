@@ -153,12 +153,12 @@ export function DesignReviewPopover(props: {
       <button
         type="button"
         className={[
+          'sniptale-dismiss-button',
           'pointer-events-auto absolute -right-3 -top-3 z-50 inline-flex h-8 w-8',
           'cursor-pointer items-center justify-center',
-          'rounded-full border shadow-md backdrop-blur-[8px] text-[var(--sniptale-color-text-primary)]',
+          'rounded-full border',
           'border-[color:var(--sniptale-color-border-strong)]',
           'bg-[var(--sniptale-color-surface-panel)]',
-          'hover:brightness-95 active:brightness-90',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-strong)]',
         ].join(' ')}
         aria-label={translate('content.designReview.close')}

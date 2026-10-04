@@ -67,6 +67,7 @@ export function AnnotationTemplateQueryControls(props: {
         />
         {props.query ? (
           <button
+            className={'sniptale-dismiss-button'}
             aria-label={translate('highlighter.templateTags.clearSearch')}
             onClick={() => props.onQueryChange('')}
             type="button"

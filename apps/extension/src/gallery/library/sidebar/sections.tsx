@@ -174,10 +174,9 @@ function GalleryFacetSection(props: {
                   event.stopPropagation();
                   props.onClear?.();
                 }}
-                className="inline-flex h-5 w-5 items-center justify-center rounded-[5px]
-                  text-[var(--sniptale-color-text-muted)] transition-colors
-                  hover:bg-[var(--sniptale-color-surface-canvas)]
-                  hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
+                className="sniptale-dismiss-button inline-flex h-5 w-5 items-center justify-center rounded-[5px]
+                   transition-colors
+                   focus-visible:outline-none
                   focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
               >
                 <X className="h-3 w-3" aria-hidden="true" />
@@ -209,10 +208,10 @@ function GalleryFacetSection(props: {
                 onClick={() => setSearch('')}
                 aria-label={translate('gallery.app.facetClearSearch')}
                 title={translate('gallery.app.facetClearSearch')}
-                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px]
-                  text-[var(--sniptale-color-text-muted)] transition-colors
-                  hover:bg-[var(--sniptale-color-surface-canvas)]
-                  hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
+                className="sniptale-dismiss-button inline-flex h-5 w-5 shrink-0
+                  items-center justify-center rounded-[5px]
+                   transition-colors
+                   focus-visible:outline-none
                   focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-text-primary)]"
               >
                 <X className="h-3 w-3" aria-hidden="true" />

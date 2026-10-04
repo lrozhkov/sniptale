@@ -70,7 +70,7 @@ export function SettingsPopoverHeader(props: {
         {props.context === 'element' ? (
           <button
             aria-label={props.closeLabel}
-            className="sniptale-settings-popover-close"
+            className="sniptale-dismiss-button sniptale-settings-popover-close"
             onClick={props.onClose}
             title={props.closeLabel}
             type="button"

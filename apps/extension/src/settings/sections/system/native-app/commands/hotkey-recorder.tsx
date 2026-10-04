@@ -92,9 +92,10 @@ function HotkeyClearButton(props: {
     <button
       aria-label={translate('settings.nativeApp.shortcutClear')}
       className={[
+        'sniptale-dismiss-button',
         'absolute right-2 top-1/2 inline-flex h-7 w-7 translate-x-0 -translate-y-1/2',
-        'items-center justify-center rounded-md text-[var(--sniptale-color-text-muted)]',
-        'opacity-0 transition-opacity hover:text-[var(--sniptale-color-text-primary)]',
+        'items-center justify-center rounded-md',
+        'opacity-0 transition-opacity',
         props.value === ''
           ? 'pointer-events-none'
           : 'focus-visible:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100',

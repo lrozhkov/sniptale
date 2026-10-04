@@ -24,7 +24,11 @@ export function PreviewInspectorControls(
           )}
         </PreviewFloatingControl>
       ) : null}
-      <PreviewFloatingControl ariaLabel={translate('common.actions.close')} onClick={props.onClose}>
+      <PreviewFloatingControl
+        dismiss
+        ariaLabel={translate('common.actions.close')}
+        onClick={props.onClose}
+      >
         <X className="h-4 w-4" />
       </PreviewFloatingControl>
     </>

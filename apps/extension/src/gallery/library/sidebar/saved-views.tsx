@@ -215,8 +215,7 @@ export function GallerySavedViewActions(
               }}
               aria-label={translate('common.actions.cancel')}
               title={translate('common.actions.cancel')}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[7px]
-                text-[var(--sniptale-color-text-muted)] hover:bg-[var(--sniptale-color-surface-canvas)]"
+              className="sniptale-dismiss-button inline-flex h-8 w-8 items-center justify-center rounded-[7px]"
             >
               <X className="h-4 w-4" aria-hidden="true" />
             </button>

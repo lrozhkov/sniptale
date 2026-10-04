@@ -214,6 +214,7 @@ export function GuideResourceDialog({
           <strong>{title ?? props.t('scenario.editor.guideOpenImageLibrary')}</strong>
           {toolbarRef && <div className="guide-resource-header-actions" ref={toolbarRef} />}
           <ContentToolbarButton
+            tone="close"
             type="button"
             title={props.t('scenario.editor.close')}
             onClick={onClose}

@@ -56,7 +56,7 @@ export function VideoEditorEffectsLibraryDock(
               <EditorIconButton
                 title={translate('common.actions.close')}
                 aria-label={translate('common.actions.close')}
-                className="!h-6 !w-6 !min-w-6 shrink-0"
+                className="sniptale-dismiss-button !h-6 !w-6 !min-w-6 shrink-0"
                 onClick={() => setDismissedError(operationError)}
               >
                 <X size={14} aria-hidden="true" />

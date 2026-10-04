@@ -168,7 +168,7 @@ function TourSettingsPanel({
           </ContentToolbarButton>
         )}
         <ContentToolbarButton
-          tone="utility"
+          tone="close"
           size="compact"
           title={t('scenario.editor.close')}
           onClick={panels.toggleRight}

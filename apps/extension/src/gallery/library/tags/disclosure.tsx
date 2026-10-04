@@ -54,8 +54,11 @@ export function GalleryTagInputDisclosure(props: GalleryTagInputDisclosureProps)
         aria-label={translate('gallery.app.closeTagEditor')}
         title={translate('gallery.app.closeTagEditor')}
         onClick={() => setExpanded(false)}
-        className={`${getControlSecondaryButtonClassName({ density: 'compact' })}
-          !h-8 !min-h-8 !w-8 !min-w-8 !rounded-[8px] !p-0`}
+        className={[
+          'sniptale-dismiss-button',
+          `${getControlSecondaryButtonClassName({ density: 'compact' })}
+          !h-8 !min-h-8 !w-8 !min-w-8 !rounded-[8px] !p-0`,
+        ].join(' ')}
       >
         <X className="h-3.5 w-3.5" aria-hidden="true" />
       </button>

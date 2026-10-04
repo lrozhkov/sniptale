@@ -133,6 +133,7 @@ export function ReviewVoiceoverRecording(props: {
               </span>
             </span>
             <ContentToolbarButton
+              tone="close"
               className="!h-9 !w-9 !min-w-9 !px-0"
               disabled={isSaving}
               onClick={session.requestClose}

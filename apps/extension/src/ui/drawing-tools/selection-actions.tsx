@@ -22,9 +22,9 @@ function DrawingDeselectOption(props: { onClick: () => void }) {
       title={label}
       data-ui="content.toolbar.drawing-options.deselect"
       className={[
-        'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0 bg-transparent',
-        'text-[var(--sniptale-color-text-secondary)] transition-colors',
-        'hover:bg-[var(--sniptale-color-surface-hover)]',
+        'sniptale-dismiss-button',
+        'flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border-0',
+        'transition-colors',
         'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
       ].join(' ')}
       onClick={props.onClick}

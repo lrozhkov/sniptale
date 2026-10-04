@@ -178,6 +178,7 @@ export function FrameAnnotationToolbarActionButtons(props: {
         <Trash2 size={18} />
       </ProductGlassToolbarButton>
       <ProductGlassToolbarButton
+        className={'sniptale-dismiss-button'}
         onClick={props.onClose}
         onMouseDown={props.onMouseDown}
         title={labels.get('close')}

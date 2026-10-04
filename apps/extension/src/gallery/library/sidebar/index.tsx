@@ -266,7 +266,10 @@ function GalleryTrashControls(props: GallerySidebarProps) {
               aria-label={translate('gallery.app.trashDeselectAll')}
               title={translate('gallery.app.trashDeselectAll')}
               disabled={props.busy}
-              className={getControlIconButtonClassName({ density: 'compact' })}
+              className={[
+                'sniptale-dismiss-button',
+                getControlIconButtonClassName({ density: 'compact' }),
+              ].join(' ')}
               onClick={props.onClearSelection}
             >
               <X className="h-4 w-4" aria-hidden="true" />

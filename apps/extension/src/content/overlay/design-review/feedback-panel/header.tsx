@@ -24,7 +24,7 @@ export function FeedbackPanelHeader(props: {
       <span className="text-xs text-[var(--sniptale-color-text-dim)]">{props.count}</span>
       <button
         type="button"
-        className="ml-auto inline-flex h-8 w-8 items-center justify-center rounded-[8px]"
+        className="sniptale-dismiss-button ml-auto inline-flex h-8 w-8 items-center justify-center rounded-[8px]"
         aria-label={translate('content.designReview.panelClose')}
         title={translate('content.designReview.panelClose')}
         onClick={props.onClose}

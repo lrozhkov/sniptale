@@ -150,12 +150,13 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
           selected &&
             tone !== 'utility' &&
             tone !== 'outline' &&
+            tone !== 'close' &&
             'sniptale-glass-toolbar-button--active',
           tone === 'danger' && 'sniptale-glass-toolbar-button--danger',
           tone === 'danger' && 'sniptale-btn-danger',
           tone === 'close' && 'sniptale-btn-close',
           tone === 'default' && 'sniptale-toggle',
-          tone === 'utility' && 'sniptale-btn-utility',
+          (tone === 'utility' || tone === 'close') && 'sniptale-btn-utility',
           tone === 'outline' && 'sniptale-btn-outline',
           size === 'compact' && 'sniptale-btn-compact',
           className

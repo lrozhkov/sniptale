@@ -31,9 +31,9 @@ function HotkeyInputClearButton({ handleClear }: { handleClear: (event: MouseEve
       type="button"
       onClick={handleClear}
       className={[
+        'sniptale-dismiss-button',
         'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-        'text-[var(--sniptale-color-text-dim)] transition-colors',
-        'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
+        'transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
       title={translate('settings.hotkeyInput.clearTitle')}

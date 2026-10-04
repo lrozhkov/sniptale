@@ -50,9 +50,9 @@ function InlineCurtainPanelCloseButton({
       type="button"
       aria-label={ariaLabel}
       className={[
+        'sniptale-dismiss-button',
         'absolute right-2 top-2 inline-flex h-7 w-7 items-center justify-center rounded-[7px]',
-        'text-[var(--sniptale-color-text-secondary)] transition-colors',
-        'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
+        'transition-colors',
       ].join(' ')}
       onClick={onClick}
     >

@@ -124,7 +124,6 @@
 }
 
 .sniptale-btn-danger:hover:not(:disabled),
-.sniptale-btn-close:hover:not(:disabled),
 .sniptale-btn-exit:hover:not(:disabled) {
   border-color: color-mix(
     in srgb,
@@ -210,6 +209,24 @@
   box-shadow: none;
 }
 .sniptale-btn.sniptale-btn-outline:focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+
+/* Dismiss actions keep their appearance inside independently styled toolbars and panels. */
+.sniptale-dismiss-button,
+.sniptale-btn.sniptale-btn-close {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--sniptale-color-text-muted) !important;
+}
+.sniptale-dismiss-button:hover:not(:disabled),
+.sniptale-btn.sniptale-btn-close:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong) !important;
+}
+.sniptale-dismiss-button:focus-visible:not([data-focus-restoration='pointer']),
+.sniptale-btn.sniptale-btn-close:focus-visible:not([data-focus-restoration='pointer']) {
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 2px;
 }

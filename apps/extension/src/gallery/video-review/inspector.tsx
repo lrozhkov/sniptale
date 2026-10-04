@@ -370,7 +370,7 @@ function ReviewInspectorHeader(
 
       <ContentToolbarButton
         type="button"
-        tone="utility"
+        tone="close"
         size="compact"
         title={translate('common.actions.close')}
         disabled={props.busy}

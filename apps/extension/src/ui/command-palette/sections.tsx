@@ -34,9 +34,9 @@ export function CommandPaletteHeader(props: {
           onClick={props.onClose}
           title={translate('shared.ui.commandPaletteCloseTitle')}
           className={[
+            'sniptale-dismiss-button',
             'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-            'text-[var(--sniptale-color-text-muted)] transition-colors',
-            'hover:bg-[var(--sniptale-color-surface-hover)]',
+            'transition-colors',
             'hover:text-[var(--sniptale-color-text-primary)]',
           ].join(' ')}
         >

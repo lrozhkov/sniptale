@@ -118,11 +118,8 @@ function ScenarioPreviewSidebarHeader(props: {
       <button
         type="button"
         onClick={props.onClose}
-        className="rounded-full border border-[var(--sniptale-color-border-soft)]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_86%,transparent)]
-          p-2 text-[var(--sniptale-color-text-muted)] transition
-          hover:border-[var(--sniptale-color-border-strong)]
-          hover:text-[var(--sniptale-color-text-primary)]"
+        className="sniptale-dismiss-button rounded-full border
+          p-2  transition"
       >
         <X className="h-4 w-4" />
       </button>

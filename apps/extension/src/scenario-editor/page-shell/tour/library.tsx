@@ -88,7 +88,7 @@ export function TourLibraryPanel(
           ))}
         </div>
         <ContentToolbarButton
-          tone="utility"
+          tone="close"
           size="compact"
           title={t('scenario.editor.close')}
           onClick={panels.toggleLeft}

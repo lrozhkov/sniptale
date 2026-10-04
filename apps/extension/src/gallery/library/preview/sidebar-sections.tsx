@@ -415,10 +415,9 @@ export function PreviewTagEditor(props: {
             aria-label={translate('gallery.app.closeTagEditor')}
             title={translate('gallery.app.closeTagEditor')}
             onClick={() => setExpanded(false)}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-[6px]
-              text-[var(--sniptale-color-text-muted)] transition-colors
-              hover:bg-[var(--sniptale-color-surface-canvas)]
-              hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none
+            className="sniptale-dismiss-button inline-flex h-7 w-7 items-center justify-center rounded-[6px]
+               transition-colors
+               focus-visible:outline-none
               focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-accent-strong)]"
           >
             <X className="h-3.5 w-3.5" aria-hidden="true" />

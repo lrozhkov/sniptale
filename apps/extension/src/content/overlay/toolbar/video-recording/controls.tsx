@@ -82,6 +82,7 @@ function RecordingLifecycleControl(props: { recording: ToolbarVideoRecordingProp
     return (
       <>
         <ContentToolbarButton
+          tone="close"
           dataUi="content.toolbar.video-recording.cancel-start"
           title={translate('content.toolbar.videoRecordingCancelStart')}
           onClick={() => runToolbarAction(props.recording.onCancelStart)}

@@ -73,15 +73,6 @@
 /* ========================================
    Close Button
    ======================================== */
-.sniptale-btn-close {
-  color: var(--sniptale-text-muted);
-  margin-left: 4px;
-}
-
-.sniptale-btn-close:hover:not(:disabled) {
-  background: var(--sniptale-danger-bg);
-  color: var(--sniptale-danger-color);
-}
 
 /* ========================================
    Lock Button

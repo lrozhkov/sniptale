@@ -72,7 +72,7 @@ export function DataSelectionPreviewHeader({
             {filterQuery ? (
               <button
                 aria-label={translate('aiModal.clearSearchLabel')}
-                className="sniptale-ai-data-search-clear"
+                className="sniptale-dismiss-button sniptale-ai-data-search-clear"
                 disabled={isLoading}
                 onClick={() => setFilterQuery('')}
                 type="button"

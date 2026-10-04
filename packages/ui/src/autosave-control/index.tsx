@@ -199,6 +199,7 @@ function AutosavePopover({
             {failed ? props.labels.error : label}
           </h3>
           <ContentToolbarButton
+            tone="close"
             title={props.labels.close}
             onClick={close}
             className="!h-6 !w-6 !min-w-6 !px-0"

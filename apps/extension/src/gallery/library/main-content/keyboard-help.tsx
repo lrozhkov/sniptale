@@ -68,8 +68,7 @@ function GalleryKeyboardHelpDialog(props: { onClose(): void }) {
             aria-label={closeLabel}
             title={closeLabel}
             onClick={props.onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-[8px]
-              hover:bg-[var(--sniptale-color-surface-hover)]"
+            className="sniptale-dismiss-button flex h-8 w-8 items-center justify-center rounded-[8px]"
           >
             <X aria-hidden="true" className="h-4 w-4" />
           </button>

@@ -54,6 +54,7 @@ export function TimelineRecordingPanel(props: {
   );
   const closeButton = (
     <ContentToolbarButton
+      tone="close"
       title={translate('common.actions.close')}
       disabled={props.saving}
       onClick={props.onClose}

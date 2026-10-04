@@ -235,6 +235,7 @@ function MaterialsFilters(props: {
             }}
           />
           <ProductActionButton
+            className={'sniptale-dismiss-button'}
             compact
             tone="secondary"
             aria-label={translate('videoEditor.sidebar.materialsCloseSearch')}

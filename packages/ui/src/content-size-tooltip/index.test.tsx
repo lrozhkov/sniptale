@@ -147,7 +147,7 @@ describe('ContentSizeTooltip', () => {
     expect(style?.textContent).toContain(
       '.sniptale-selection-size-cancel-button:focus-visible svg'
     );
-    expect(style?.textContent).toContain('var(--sniptale-color-danger)');
+    expect(style?.textContent).toContain('var(--sniptale-color-text-primary-strong)');
     expect(style?.textContent).not.toContain(
       'background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent);'
     );

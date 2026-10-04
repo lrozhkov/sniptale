@@ -635,6 +635,15 @@ a:focus-visible {
 .tour-hint .tour-button:hover:not(:disabled) {
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
+.tour-hint [data-tour-hint-close] {
+  opacity: 0.7;
+  transition: opacity 100ms ease;
+}
+.tour-hint [data-tour-hint-close]:hover:not(:disabled),
+.tour-hint [data-tour-hint-close]:focus-visible {
+  background: transparent;
+  opacity: 1;
+}
 .tour-hint-header button {
   width: 24px;
   height: 24px;

@@ -127,6 +127,7 @@ export function EditorFloatingDocumentQuickActions({
         <>
           <FloatingChromeDivider vertical className={QUICK_ACTION_BUTTON_CLASS_NAME} />
           <ContentToolbarButton
+            tone="close"
             ref={closeButtonRef}
             title={translate('editor.documentActions.closeFile')}
             disabled={!hasImage}

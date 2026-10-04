@@ -124,7 +124,7 @@ it('renders the mock-aligned comment, action, element bar, and compact settings'
   expect(closeButton?.className).toContain('pointer-events-auto');
   expect(closeButton?.className).toContain('cursor-pointer');
   expect(closeButton?.className).toContain('z-50');
-  expect(closeButton?.className).toContain('hover:brightness-95');
+  expect(closeButton?.className).toContain('sniptale-dismiss-button');
   expect(closeButton?.className).not.toContain('hover:bg-[var(--sniptale-color-surface-input)]');
 });
 
