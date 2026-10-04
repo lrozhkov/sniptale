@@ -4,11 +4,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
+import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { GuideDefaultAppearance } from './default-appearance';
 let host: HTMLDivElement;
 let opener: HTMLButtonElement;
 let root: Root;
 const apply = vi.fn();
+const changeHtml = vi.fn();
 const style = createGuideProject('Guide').style;
 beforeEach(() => {
   vi.clearAllMocks();
@@ -30,6 +32,8 @@ async function render(disabled = false) {
     root.render(
       <GuideDefaultAppearance
         style={style}
+        htmlImages={DEFAULT_HTML_IMAGES}
+        onHtmlImagesChange={changeHtml}
         disabled={disabled}
         onApply={apply}
         t={createTranslator('en')}
@@ -65,4 +69,18 @@ it('renders document appearance inline without a modal or focus trap', async () 
   expect(host.textContent).not.toContain('Entire guide');
   expect(host.textContent).toContain('Paper theme');
   expect(document.activeElement).toBe(opener);
+});
+
+it('offers shared HTML defaults and edits them independently from appearance overrides', async () => {
+  await render();
+  expect(host.textContent).toContain('HTML images');
+  await act(async () => button('Click to view').click());
+  expect(changeHtml).toHaveBeenCalledExactlyOnceWith({ viewer: false });
+  expect(apply).not.toHaveBeenCalled();
+});
+it('disables HTML default edits with the document mutation gate', async () => {
+  await render(true);
+  expect(button('Click to view').disabled).toBe(true);
+  await act(async () => button('Click to view').click());
+  expect(changeHtml).not.toHaveBeenCalled();
 });

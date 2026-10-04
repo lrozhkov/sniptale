@@ -15,6 +15,7 @@ import { GuideBlockInspector } from './block-inspector';
 import { GuideReader, useGuideReaderMode } from './reader';
 import { GuideAppearance } from './appearance';
 import { GuideDefaultAppearance } from './default-appearance';
+import { getHtmlImagePreferences } from './html-image-settings';
 import { applyGuideDefaultStyle } from '../../features/scenario/project/public';
 import { GuidePageHeader, GuidePageFeedback } from './header';
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
@@ -473,6 +474,10 @@ function GuideContextualInspector({
     return (
       <GuideDefaultAppearance
         style={project.style}
+        htmlImages={getHtmlImagePreferences(project)}
+        onHtmlImagesChange={(patch) =>
+          onChange({ ...project, htmlExport: { ...getHtmlImagePreferences(project), ...patch } })
+        }
         disabled={disabled}
         t={t}
         onApply={(style, resetSteps) =>

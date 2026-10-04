@@ -141,3 +141,27 @@ it('does not read removed image blocks or replacement slots', async () => {
   expect((await measureHtmlImages(project, new AbortController().signal)).rasters).toEqual([]);
   expect(io.asset).not.toHaveBeenCalled();
 });
+it.each([false, true])(
+  'encodes frame quality at intrinsic crop dimensions with optimize=%s',
+  async (optimize) => {
+    const cropped = png();
+    io.crop.mockResolvedValue(cropped);
+    io.bitmap.mockResolvedValue({ width: 3000, height: 1500, close: io.close });
+    const encoded = new Blob(['ok'], { type: 'image/webp' });
+    io.encode.mockResolvedValue(encoded);
+    for (const maxEdge of [1280, 4096] as const) {
+      const result = await prepareHtmlImage(
+        image(),
+        { ...DEFAULT_HTML_IMAGES, content: 'frame', optimize, maxEdge, quality: 0.75 },
+        new AbortController().signal
+      );
+      expect(result).toMatchObject({ width: 3000, height: 1500 });
+      expect(result.blob).toBe(encoded);
+    }
+    expect(io.bitmap).toHaveBeenNthCalledWith(1, cropped);
+    expect(io.bitmap).toHaveBeenNthCalledWith(2, cropped);
+    expect(io.encode).toHaveBeenCalledTimes(2);
+    expect(io.encode).toHaveBeenLastCalledWith({ type: 'image/webp', quality: 0.75 });
+    expect(io.close).toHaveBeenCalledTimes(2);
+  }
+);

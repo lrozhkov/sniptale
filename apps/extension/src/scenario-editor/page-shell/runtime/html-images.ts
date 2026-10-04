@@ -55,17 +55,18 @@ export async function prepareHtmlImage(
   let canvas: OffscreenCanvas | undefined;
   try {
     signal.throwIfAborted();
-    const ratio = settings.optimize
-      ? Math.min(
-          1,
-          settings.maxEdge / Math.max(bitmap.width, bitmap.height),
-          Math.sqrt(16_000_000 / (bitmap.width * bitmap.height))
-        )
-      : 1;
+    const ratio =
+      settings.content === 'full' && settings.optimize
+        ? Math.min(
+            1,
+            settings.maxEdge / Math.max(bitmap.width, bitmap.height),
+            Math.sqrt(16_000_000 / (bitmap.width * bitmap.height))
+          )
+        : 1;
     const width = Math.max(1, Math.floor(bitmap.width * ratio));
     const height = Math.max(1, Math.floor(bitmap.height * ratio));
     let output = blob;
-    if (settings.optimize) {
+    if (settings.content === 'frame' || settings.optimize) {
       canvas = new OffscreenCanvas(width, height);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Image rendering unavailable.');

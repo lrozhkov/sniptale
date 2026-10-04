@@ -10,9 +10,12 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
   hostOrigin,
 }, testInfo) => {
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
-  const figure = page.locator('article#compare figure').first();
-  await figure.hover();
-  await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
+  const figure = page.locator('article#compare [data-block-id="before"]');
+  await figure.locator('img').click();
+  const framing = figure.getByRole('button', { name: 'Frame and image', exact: true });
+  await expect(framing).toBeVisible();
+  await framing.click();
+  await figure.getByRole('button', { name: 'Keep image inside frame', exact: true }).click();
   for (const [name, value] of [
     ['Frame width', '200'],
     ['Frame height', '200'],
@@ -27,10 +30,7 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
   await frame.focus();
   await frame.press('ArrowRight');
   await frame.press('ArrowRight');
-  await page
-    .locator('.guide-image-inspector')
-    .getByRole('button', { name: 'Done', exact: true })
-    .click();
+  await figure.getByRole('button', { name: 'Done', exact: true }).click();
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
   await page.getByRole('button', { name: 'Select all images', exact: true }).click();
@@ -39,9 +39,12 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
   await expect(
     page.locator('.guide-html-thumbnail small').filter({ hasText: 'Override' })
   ).toHaveCount(2);
-  await page.getByRole('switch', { name: 'Click to view', exact: true }).click();
-  await page.getByRole('button', { name: 'Select image 2', exact: true }).click();
-  await page.getByRole('switch', { name: 'Click to view', exact: true }).click();
+  await expect(page.getByRole('switch', { name: 'Click to view', exact: true })).toBeDisabled();
+  await expect(page.getByRole('switch', { name: 'Click to view', exact: true })).not.toBeChecked();
+  await page.getByRole('button', { name: 'Select image 1', exact: true }).click();
+  await page.getByRole('button', { name: 'Saved content', exact: true }).click();
+  await page.getByRole('option', { name: 'Full image', exact: true }).click();
+  await expect(page.getByRole('switch', { name: 'Click to view', exact: true })).toBeChecked();
   await testInfo.attach('html-overrides', {
     body: await page.screenshot(),
     contentType: 'image/png',
@@ -102,7 +105,7 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
     shifted: 255,
   });
   await page.getByRole('button', { name: 'Open image', exact: true }).click();
-  await expect(page.locator('dialog img')).toHaveJSProperty('naturalWidth', 200);
+  await expect(page.locator('dialog img')).toHaveJSProperty('naturalWidth', 960);
   await page.keyboard.press('Escape');
   const before = await page.locator('.guide-image-frame').first().screenshot();
   const cdp = await page.context().newCDPSession(page);

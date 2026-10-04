@@ -13,12 +13,21 @@ export const DEFAULT_HTML_IMAGES: Readonly<GuideHtmlImageSettings> = {
   viewer: true,
 };
 
-/** One policy resolver serves export, workbench and the selected-image inspector. */
-export function resolveHtmlImageSettings(
+/** Whole-object source preferences retain dormant full-image choices when fields are patched. */
+export function getHtmlImagePreferences(
   project: GuideProject,
   block?: GuideImageBlock
 ): GuideHtmlImageSettings {
   return block?.htmlExport ?? project.htmlExport ?? DEFAULT_HTML_IMAGES;
+}
+
+/** Frame exports cannot open a viewer; the retained optimization preference applies only to full images. */
+export function resolveHtmlImageSettings(
+  project: GuideProject,
+  block?: GuideImageBlock
+): GuideHtmlImageSettings {
+  const settings = getHtmlImagePreferences(project, block);
+  return settings.content === 'frame' ? { ...settings, viewer: false } : settings;
 }
 
 /** Each list entry denotes one occurrence; the same immutable raster can have different crops. */
@@ -32,7 +41,7 @@ export function guideHtmlImages(project: GuideProject) {
   );
 }
 
-/** Bulk patches preserve unedited effective fields; reset removes overrides instead of copying defaults. */
+/** Bulk patches preserve unedited source preferences; reset removes overrides instead of copying defaults. */
 export function changeHtmlImageSettings(
   project: GuideProject,
   selected: ReadonlySet<string>,
@@ -50,7 +59,7 @@ export function changeHtmlImageSettings(
               if (patch)
                 return {
                   ...block,
-                  htmlExport: { ...resolveHtmlImageSettings(project, block), ...patch },
+                  htmlExport: { ...getHtmlImagePreferences(project, block), ...patch },
                 };
               const { htmlExport, ...rest } = block;
               void htmlExport;
@@ -76,6 +85,10 @@ export function htmlImageRasterKey(block: GuideImageBlock, settings: GuideHtmlIm
           block.contentTransform.scale,
         ]
       : null,
-    settings.optimize ? [settings.maxEdge, settings.quality] : null,
+    settings.content === 'frame'
+      ? [settings.quality]
+      : settings.optimize
+        ? [settings.maxEdge, settings.quality]
+        : null,
   ]);
 }

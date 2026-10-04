@@ -24,6 +24,18 @@ export const scenarioEditorHtmlImageMessages = defineMessageSource({
     ru: 'WebP с потерями. Мелкий текст может стать менее чётким.',
     en: 'Lossy WebP. Small text may become less sharp.',
   },
+  htmlFrameOptimizeHint: {
+    ru: 'Фрагмент всегда преобразуется в изображение с выбранным качеством.',
+    en: 'The visible frame is always rendered with the selected quality.',
+  },
+  htmlFrameSizeHint: {
+    ru: 'Ограничение размера применяется только к полному изображению.',
+    en: 'The size limit applies only to full images.',
+  },
+  htmlFrameViewerHint: {
+    ru: 'Просмотр по нажатию доступен только для полного изображения.',
+    en: 'Click-to-view is available only for full images.',
+  },
   htmlMaxEdge: { ru: 'Максимальная сторона', en: 'Maximum edge' },
   htmlQuality: { ru: 'Качество WebP', en: 'WebP quality' },
   htmlViewer: { ru: 'Просмотр по нажатию', en: 'Click to view' },

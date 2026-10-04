@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageFramingProvider } from './image-framing-session';
+import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { GuideImageControls } from './image-controls';
 import { GuideLayoutAssistance, useGuideImageBounds } from './layout-assistance';
 const requestResource = vi.hoisted(() => vi.fn());
@@ -403,4 +405,24 @@ it('aligns only the caption in both presentations and disables alignment while b
     }
     expect(change).not.toHaveBeenCalled();
   }
+});
+
+it('retains independent HTML preferences through frame mode and restores inheritance explicitly', async () => {
+  const image: GuideImageBlock = {
+    ...block,
+    htmlExport: { ...DEFAULT_HTML_IMAGES, content: 'frame' },
+  };
+  await render('blob:image', false, image);
+  const viewer = host.querySelector<HTMLButtonElement>('[aria-label="Click to view"]')!;
+  expect(viewer.disabled).toBe(true);
+  expect(viewer.getAttribute('aria-checked')).toBe('false');
+  await click('Saved content');
+  const full = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (option) => option.textContent === 'Full image'
+  )!;
+  await act(async () => full.click());
+  expect(change).toHaveBeenLastCalledWith({ ...image, htmlExport: DEFAULT_HTML_IMAGES }, null);
+  await click('Guide defaults');
+  expect(change).toHaveBeenLastCalledWith({ ...image, htmlExport: undefined }, null);
+  expect(image.htmlExport?.viewer).toBe(true);
 });

@@ -19,6 +19,7 @@ vi.mock('./runtime/html-images', async (importOriginal) => ({
   prepareHtmlImage: io.preview,
 }));
 import { MissingGuideHtmlImageError } from './runtime/html-images';
+import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { GuideHtmlWorkbench } from './html-workbench';
 afterEach(() => vi.unstubAllGlobals());
 it('rejects duplicate jobs, retains measurement through autosave acknowledgement and invalidates edits', async () => {
@@ -403,6 +404,42 @@ it('identifies the unavailable occurrence and recovers after replacing it', asyn
     expect(host.textContent).not.toContain('Image #1 is unavailable');
   } finally {
     await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+it('preserves dormant frame viewer preferences when editing another common setting', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let project = createGuideProject('Guide');
+  project.htmlExport = { ...DEFAULT_HTML_IMAGES, content: 'frame', viewer: true };
+  const render = () =>
+    root.render(
+      <GuideHtmlWorkbench
+        project={project}
+        images={{}}
+        onChange={(next) => {
+          project = next;
+          render();
+        }}
+        onClose={() => {}}
+        t={createTranslator('en')}
+      />
+    );
+  try {
+    await act(async () => render());
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[aria-label="Saved content"]')!.click()
+    );
+    const full = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (option) => option.textContent === 'Full image'
+    )!;
+    await act(async () => full.click());
+    expect(project.htmlExport).toEqual({ ...DEFAULT_HTML_IMAGES, content: 'full', viewer: true });
+  } finally {
+    act(() => root.unmount());
     host.remove();
   }
 });

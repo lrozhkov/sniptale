@@ -7,6 +7,7 @@ import {
 import {
   changeHtmlImageSettings,
   DEFAULT_HTML_IMAGES,
+  getHtmlImagePreferences,
   htmlImageRasterKey,
   resolveHtmlImageSettings,
 } from './html-image-settings';
@@ -43,4 +44,49 @@ it('preserves independent overrides, bulk edits only selected occurrences and re
   expect(htmlImageRasterKey(a, resolveHtmlImageSettings(next, a))).not.toBe(
     htmlImageRasterKey(image, DEFAULT_HTML_IMAGES)
   );
+});
+it('suppresses legacy frame viewing without losing dormant full-image preferences on edits', () => {
+  const project = createGuideProject('Guide');
+  project.htmlExport = { ...DEFAULT_HTML_IMAGES, content: 'frame', maxEdge: 1280 };
+  const image = createGuideImageBlock({
+    id: 'a',
+    assetId: 'asset',
+    width: 400,
+    height: 200,
+    source: { kind: 'import', filename: 'image.png' },
+  });
+  const step = createGuideStep('Step');
+  step.blocks = [image];
+  project.items = [step];
+  expect(getHtmlImagePreferences(project, image)).toBe(project.htmlExport);
+  expect(resolveHtmlImageSettings(project, image).viewer).toBe(false);
+  const next = changeHtmlImageSettings(project, new Set(['a']), { quality: 0.75 });
+  const edited = next.items[0]?.kind === 'step' ? next.items[0].blocks[0] : null;
+  if (edited?.kind !== 'image') throw new Error('Missing image');
+  expect(edited.htmlExport).toEqual({ ...project.htmlExport, quality: 0.75 });
+  const restored = changeHtmlImageSettings(next, new Set(['a']), { content: 'full' });
+  const full = restored.items[0]?.kind === 'step' ? restored.items[0].blocks[0] : null;
+  if (full?.kind !== 'image') throw new Error('Missing image');
+  expect(resolveHtmlImageSettings(restored, full)).toEqual({
+    ...DEFAULT_HTML_IMAGES,
+    maxEdge: 1280,
+    quality: 0.75,
+  });
+  expect(project.htmlExport.viewer).toBe(true);
+});
+it('keys frame pixels by crop and quality regardless of dormant full-image options', () => {
+  const image = createGuideImageBlock({
+    id: 'a',
+    assetId: 'asset',
+    width: 400,
+    height: 200,
+    source: { kind: 'import', filename: 'image.png' },
+  });
+  const frame = { ...DEFAULT_HTML_IMAGES, content: 'frame' as const };
+  const key = htmlImageRasterKey(image, frame);
+  expect(
+    htmlImageRasterKey(image, { ...frame, maxEdge: 1280, optimize: true, viewer: false })
+  ).toBe(key);
+  expect(htmlImageRasterKey(image, { ...frame, quality: 0.95 })).not.toBe(key);
+  expect(htmlImageRasterKey({ ...image, frame: { width: 200, height: 200 } }, frame)).not.toBe(key);
 });

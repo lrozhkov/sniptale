@@ -214,3 +214,49 @@ it.each(['plain', 'badge'] as const)(
     }
   }
 );
+
+it('suppresses inherited and explicit legacy frame viewers while retaining full-image viewing', async () => {
+  vi.stubGlobal('crypto', webcrypto);
+  try {
+    const project = createGuideProject('Guide');
+    project.htmlExport = { ...DEFAULT_HTML_IMAGES, content: 'frame', viewer: true };
+    const image = createGuideImageBlock({
+      id: 'inherited',
+      assetId: 'asset',
+      width: 400,
+      height: 200,
+      source: { kind: 'import', filename: 'image.png' },
+    });
+    const step = createGuideStep('Step');
+    step.blocks = [
+      image,
+      { ...image, id: 'explicit', htmlExport: { ...project.htmlExport } },
+      { ...image, id: 'full', htmlExport: { ...DEFAULT_HTML_IMAGES } },
+      { ...image, id: 'full-no-viewer', htmlExport: { ...DEFAULT_HTML_IMAGES, viewer: false } },
+    ];
+    project.items = [step];
+    const saved = JSON.stringify(project);
+    const result = await buildGuideHtml(project, createTranslator('en'), 'light', {
+      rasters: [
+        {
+          block: image,
+          settings: DEFAULT_HTML_IMAGES,
+          width: 400,
+          height: 200,
+          size: 10,
+          mime: 'image/png',
+        },
+      ],
+      blocks: new Map(step.blocks.map((block) => [block.id, 0])),
+    });
+    const doc = new DOMParser().parseFromString(result.html, 'text/html');
+    for (const id of ['inherited', 'explicit', 'full-no-viewer']) {
+      expect(doc.querySelector(`[data-block-id="${id}"] [data-guide-open]`)).toBeNull();
+    }
+    expect(doc.querySelector('[data-block-id="full"] [data-guide-open]')).not.toBeNull();
+    expect(doc.querySelectorAll('[data-guide-open]')).toHaveLength(1);
+    expect(JSON.stringify(project)).toBe(saved);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

@@ -20,7 +20,7 @@ import type { Translate } from '../../platform/i18n';
 import {
   changeHtmlImageSettings,
   guideHtmlImages,
-  resolveHtmlImageSettings,
+  getHtmlImagePreferences,
 } from './html-image-settings';
 import { GuideHtmlImageFields } from './html-image-fields';
 import { GuideInspectorGroup } from './inspector';
@@ -270,7 +270,7 @@ function GuideHtmlSettings({
 }) {
   const entries = guideHtmlImages(project);
   const chosen = entries.filter((entry) => selected.has(entry.block.id));
-  const value = resolveHtmlImageSettings(
+  const value = getHtmlImagePreferences(
     project,
     scope === 'selected' ? chosen[0]?.block : undefined
   );
@@ -278,7 +278,7 @@ function GuideHtmlSettings({
     scope === 'selected' &&
     chosen.some(
       (entry) =>
-        JSON.stringify(resolveHtmlImageSettings(project, entry.block)) !== JSON.stringify(value)
+        JSON.stringify(getHtmlImagePreferences(project, entry.block)) !== JSON.stringify(value)
     );
   const busy = job.status === 'pending';
   const common = scope === 'common';
