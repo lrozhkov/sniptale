@@ -201,3 +201,65 @@ it.each([undefined, 'start', 'center', 'end'] as const)(
     expect(doc.querySelector('figcaption')?.style.textAlign).toBe(captionAlignment ?? 'center');
   }
 );
+
+it.each([
+  ['paper', '#b94719'],
+  ['warm', '#98541b'],
+  ['graphite', '#ffad70'],
+] as const)(
+  'resolves saved accents for linked plain numbers in the %s reader',
+  (theme, fallback) => {
+    const project = createGuideProject('Saved appearance');
+    project.style = { ...project.style, theme, numberStyle: 'plain', accentColor: '#2367ab' };
+    project.items = ['inherited', 'default', 'override'].map((id) => {
+      const step = createGuideStep(id, id);
+      step.styleOverrides =
+        id === 'inherited' ? {} : { accentColor: id === 'default' ? null : '#ab3267' };
+      step.blocks = [
+        {
+          kind: 'text',
+          id: `${id}-link`,
+          paragraphs: [
+            {
+              runs: [
+                {
+                  text: 'Read documentation',
+                  bold: false,
+                  italic: false,
+                  href: 'https://example.com/docs',
+                },
+              ],
+            },
+          ],
+        },
+      ];
+      return step;
+    });
+    const saved = JSON.stringify(project);
+    const loaded = JSON.parse(saved);
+    const markup = renderToStaticMarkup(
+      <GuideReadDocument project={loaded} images={{}} t={createTranslator('en')} />
+    );
+    const doc = new DOMParser().parseFromString(markup, 'text/html');
+    expect(
+      doc
+        .querySelector<HTMLElement>('.guide-read-document')!
+        .style.getPropertyValue('--guide-accent')
+    ).toBe('#2367ab');
+    const articles = [...doc.querySelectorAll('article')];
+    expect(articles.map((article) => article.style.getPropertyValue('--guide-accent'))).toEqual([
+      '#2367ab',
+      fallback,
+      '#ab3267',
+    ]);
+    articles.forEach((article, index) => {
+      expect(article.dataset['numberStyle']).toBe('plain');
+      expect(article.querySelector('header > span')?.textContent).toBe(String(index + 1));
+      const link = article.querySelector('a')!;
+      expect(link.textContent).toBe('Read documentation');
+      expect(link.getAttribute('href')).toBe('https://example.com/docs');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    });
+    expect(JSON.stringify(loaded)).toBe(saved);
+  }
+);

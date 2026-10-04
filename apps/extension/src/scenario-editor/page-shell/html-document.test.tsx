@@ -147,3 +147,70 @@ it.each([undefined, 'start', 'center', 'end'] as const)(
     }
   }
 );
+
+it.each(['plain', 'badge'] as const)(
+  'exports saved accent inheritance with %s numbering and links',
+  async (numberStyle) => {
+    vi.stubGlobal('crypto', webcrypto);
+    try {
+      const project = createGuideProject('Saved appearance');
+      project.style = { ...project.style, theme: 'warm', numberStyle, accentColor: '#2367ab' };
+      project.items = ['inherited', 'default', 'override'].map((id) => {
+        const step = createGuideStep(id, id);
+        step.styleOverrides =
+          id === 'inherited' ? {} : { accentColor: id === 'default' ? null : '#ab3267' };
+        step.blocks = [
+          {
+            kind: 'text',
+            id: `${id}-link`,
+            paragraphs: [
+              {
+                runs: [
+                  {
+                    text: 'Read documentation',
+                    bold: false,
+                    italic: false,
+                    href: 'https://example.com/docs',
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+        return step;
+      });
+      const saved = JSON.stringify(project);
+      const loaded = JSON.parse(saved);
+      const result = await buildGuideHtml(loaded, createTranslator('en'), 'dark', {
+        rasters: [],
+        blocks: new Map(),
+      });
+      const doc = new DOMParser().parseFromString(result.html, 'text/html');
+      expect(
+        doc
+          .querySelector<HTMLElement>('.guide-read-document')!
+          .style.getPropertyValue('--guide-accent')
+      ).toBe('#2367ab');
+      const articles = [...doc.querySelectorAll('article')];
+      expect(articles.map((article) => article.style.getPropertyValue('--guide-accent'))).toEqual([
+        '#2367ab',
+        '#98541b',
+        '#ab3267',
+      ]);
+      articles.forEach((article, index) => {
+        expect(article.dataset['numberStyle']).toBe(numberStyle);
+        expect(article.style.getPropertyValue('--guide-number-background')).toBe(
+          numberStyle === 'plain' ? 'transparent' : '#e3d8c5'
+        );
+        expect(article.querySelector('header > span')?.textContent).toBe(String(index + 1));
+        const link = article.querySelector('a')!;
+        expect(link.textContent).toBe('Read documentation');
+        expect(link.getAttribute('href')).toBe('https://example.com/docs');
+        expect(link.getAttribute('target')).toBe('_blank');
+      });
+      expect(JSON.stringify(loaded)).toBe(saved);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);

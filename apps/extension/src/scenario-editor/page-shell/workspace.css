@@ -1089,7 +1089,7 @@
   pointer-events: auto;
 }
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
-  outline: 2px solid var(--guide-accent);
+  outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 1px;
 }
 .guide-insertion {
@@ -2260,7 +2260,7 @@ html[data-guide-height-resizing] * {
   color: var(--guide-ink) !important;
 }
 .guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
-  outline-color: var(--guide-accent);
+  outline-color: var(--sniptale-color-accent);
 }
 .guide-insert-actions > button:first-child > .guide-insert-tooltip {
   left: 0;

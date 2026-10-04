@@ -123,13 +123,13 @@ export function GuideStyleFields({
           t={t}
           segmented
         />
-        <div className="guide-style-accent">
+        <div className="guide-style-accent" title={t('scenario.editor.appearanceAccentHint')}>
           <ColorField
             triggerVariant="swatch"
             floatingPlacement="side"
             layout="stacked"
-            label={t('scenario.editor.appearanceAccent')}
-            title={t('scenario.editor.appearanceAccent')}
+            label={t('scenario.editor.appearanceAccentElements')}
+            title={t('scenario.editor.appearanceAccentElements')}
             value={guideDocumentStyle(style)['--guide-accent']!}
             disabled={disabled}
             palette={DEFAULT_DRAWING_COLORS}

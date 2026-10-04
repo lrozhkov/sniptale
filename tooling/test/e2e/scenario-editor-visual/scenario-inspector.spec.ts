@@ -19,7 +19,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       .click();
     const accent = panel.locator('.guide-style-accent');
     await expect(accent.locator('input[type="color"]')).toHaveCount(0);
-    await expect(accent.getByText('Акцентный цвет', { exact: true })).toBeVisible();
+    await expect(accent.getByText('Номера и ссылки', { exact: true })).toBeVisible();
     await accent.locator('[data-ui="shared.ui.color-selector.picker-trigger"]').click();
     await expect(page.locator('[data-ui="shared.ui.color-selector.picker"]')).toBeVisible();
     await page.keyboard.press('Escape');

@@ -74,5 +74,10 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   appearancePlain: { ru: 'Текст', en: 'Plain' },
   appearanceBadge: { ru: 'Плашка', en: 'Badge' },
   appearanceAccent: { ru: 'Акцентный цвет', en: 'Accent color' },
+  appearanceAccentElements: { ru: 'Номера и ссылки', en: 'Numbers and links' },
+  appearanceAccentHint: {
+    ru: 'Цвет текстовых номеров шагов и ссылок при просмотре и экспорте. Номера на плашках сохраняют своё оформление.',
+    en: 'Colors plain step numbers and links in preview and export. Badge numbers keep their own appearance.',
+  },
   appearanceAccentReset: { ru: 'Цвет по умолчанию', en: 'Default accent' },
 });
