@@ -392,44 +392,14 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   },
   guideDuplicate: { ru: 'Создать копию', en: 'Duplicate project' },
   guideCopyName: { ru: '{name} — копия', en: '{name} — copy' },
-  guideCopyFailed: {
-    ru: 'Не удалось создать копию. Проверьте доступное место и повторите. Исходные правки остались в редакторе.',
-    en: 'Could not create a copy. Check available space and retry. Your original edits remain in the editor.',
-  },
   guideDelete: { ru: 'Удалить проект', en: 'Delete project' },
   guideDeleteMessage: {
     ru: 'Удалить этот проект и его изображения? Это действие нельзя отменить.',
     en: 'Delete this project and its images? This action cannot be undone.',
   },
-  guideDeleteFailed: {
-    ru: 'Не удалось удалить проект. Повторите попытку.',
-    en: 'Could not delete the project. Try again.',
-  },
-  guideReload: { ru: 'Перезагрузить проект', en: 'Reload project' },
-  guideReloadMessage: {
-    ru: 'Заменить текущие правки сохранённой версией? Несохранённые изменения будут потеряны. Чтобы оставить их, сначала создайте копию.',
-    en: 'Replace your current edits with the saved version? Unsaved changes will be lost. Duplicate the project first to keep them.',
-  },
   guideStepTitle: { ru: 'Заголовок шага', en: 'Step title' },
   guideInsertItem: { ru: 'Добавить шаг или раздел', en: 'Insert step or section' },
   guideAddStep: { ru: 'Добавить шаг', en: 'Add step' },
-  guideSaving: { ru: 'Сохранение…', en: 'Saving…' },
-  guideSaved: { ru: 'Сохранено', en: 'Saved' },
-  guideDirty: { ru: 'Есть несохранённые изменения', en: 'Unsaved changes' },
-  guideConflict: {
-    ru: 'Проект изменён в другой вкладке. Ваши правки сохранены в редакторе; запись остановлена, чтобы не перезаписать изменения.',
-    en: 'This project changed in another tab. Your edits remain in the editor; saving is stopped to avoid overwriting changes.',
-  },
-  guideFailed: {
-    ru: 'Не удалось сохранить. Изменения остались в редакторе. Повторите сохранение.',
-    en: 'Could not save. Your edits remain in the editor. Try saving again.',
-  },
-  guideUnavailable: {
-    ru: 'Этот сценарий недоступен в текущем редакторе. Вернитесь в библиотеку или повторите загрузку.',
-    en: 'This guide is unavailable in this editor. Return to the library or retry loading.',
-  },
-  guideMissing: { ru: 'Сценарий не найден.', en: 'Guide not found.' },
-  guideRetry: { ru: 'Повторить загрузку', en: 'Retry loading' },
   guideEmpty: {
     ru: 'Создайте инструкцию и добавьте первый шаг.',
     en: 'Create a guide and add its first step.',

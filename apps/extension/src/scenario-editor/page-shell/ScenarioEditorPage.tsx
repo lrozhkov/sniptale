@@ -16,8 +16,7 @@ import { GuideReader, useGuideReaderMode } from './reader';
 import { GuideAppearance } from './appearance';
 import { GuideDefaultAppearance } from './default-appearance';
 import { applyGuideDefaultStyle } from '../../features/scenario/project/public';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { GuidePageHeader } from './header';
+import { GuidePageHeader, GuidePageFeedback } from './header';
 import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
@@ -55,6 +54,8 @@ export function ScenarioEditorPage() {
       status={status}
       actionError={state.actionError}
       onRetry={project ? state.save : undefined}
+      onReload={project ? state.reload : undefined}
+      disabled={commandsDisabled}
       t={t}
     />
   );
@@ -706,71 +707,6 @@ function resolveOperationFocus(
     next.items.find((item) => item.id === selectedId) ??
     next.items[0];
   return { target, addedItem, addedBlock };
-}
-
-function GuidePageFeedback({
-  status,
-  onRetry,
-  actionError,
-  t,
-}: {
-  status: ReturnType<typeof useGuidePageState>['status'];
-  onRetry: (() => Promise<boolean>) | undefined;
-  actionError: ReturnType<typeof useGuidePageState>['actionError'];
-  t: Translate;
-}) {
-  const statusMessages = {
-    saving: t('scenario.editor.guideSaving'),
-    saved: t('scenario.editor.guideSaved'),
-    dirty: t('scenario.editor.guideDirty'),
-    failed: t('scenario.editor.guideFailed'),
-    conflict: t('scenario.editor.guideConflict'),
-    unavailable: t('scenario.editor.guideUnavailable'),
-    missing: t('scenario.editor.guideMissing'),
-    loading: t('scenario.editor.loading'),
-    empty: '',
-    ready: t('scenario.editor.guideSaved'),
-  };
-  return (
-    <div
-      className="guide-page-feedback"
-      data-status={status}
-      data-quiet={
-        !actionError &&
-        (status === 'saving' ||
-          status === 'saved' ||
-          status === 'ready' ||
-          status === 'dirty' ||
-          status === 'empty')
-      }
-    >
-      <p role="status" aria-live="polite">
-        {statusMessages[status]}
-      </p>
-      {status === 'failed' && onRetry && (
-        <ProductActionButton tone="secondary" compact type="button" onClick={() => void onRetry()}>
-          {t('common.actions.retry')}
-        </ProductActionButton>
-      )}
-      {actionError && (
-        <p role="alert">
-          {t(
-            actionError === 'template'
-              ? 'scenario.editor.templateFailed'
-              : actionError === 'copy'
-                ? 'scenario.editor.guideCopyFailed'
-                : actionError === 'edit'
-                  ? 'scenario.editor.guideImageApplyFailed'
-                  : actionError === 'import'
-                    ? 'scenario.editor.guideImportFailed'
-                    : actionError === 'structure'
-                      ? 'scenario.editor.guideOperationFailed'
-                      : 'scenario.editor.guideDeleteFailed'
-          )}
-        </p>
-      )}
-    </div>
-  );
 }
 
 /** Adapts library, drop and upload gestures to the existing single import transaction. */

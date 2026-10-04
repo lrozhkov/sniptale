@@ -6,6 +6,7 @@ import { scenarioEditorAppearanceMessages } from './appearance';
 import { defineMessageSource } from '../../source';
 import { scenarioEditorAiMessages } from './ai';
 import { scenarioEditorCoreMessages } from './core';
+import { scenarioEditorFeedbackMessages } from './feedback';
 import { scenarioEditorExportMessages } from './export';
 import { scenarioEditorImageStepMessages } from './image-step';
 import { scenarioEditorQuickEditMessages } from './quick-edit';
@@ -23,6 +24,7 @@ export const scenarioEditorMessages = defineMessageSource({
   ...scenarioEditorAppearanceMessages,
   ...scenarioEditorAiMessages,
   ...scenarioEditorCoreMessages,
+  ...scenarioEditorFeedbackMessages,
   ...scenarioEditorExportMessages,
   ...scenarioEditorImageStepMessages,
   ...scenarioEditorQuickEditMessages,

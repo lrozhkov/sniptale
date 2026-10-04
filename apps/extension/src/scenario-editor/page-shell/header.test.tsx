@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
-import { GuidePageHeader } from './header';
+import { GuidePageHeader, GuidePageFeedback } from './header';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -28,6 +28,7 @@ async function draw(
     appearanceActive?: boolean;
     contextControls?: ReactNode;
     representationControls?: ReactNode;
+    feedback?: ReactNode;
   } = {}
 ) {
   const autosave = vi.fn();
@@ -41,6 +42,7 @@ async function draw(
     root.render(
       <GuidePageHeader
         project={project}
+        feedback={options.feedback}
         autosaveEnabled
         onAutosaveChange={autosave}
         status="failed"
@@ -149,8 +151,70 @@ it('places autosave between history and menu and forwards the switch', async () 
     'guide-history-controls'
   );
   expect(anchor.querySelector<HTMLButtonElement>('button')?.getAttribute('aria-expanded')).toBe(
-    'true'
+    'false'
   );
+  await act(async () => anchor.querySelector<HTMLButtonElement>('button')!.click());
   await act(async () => document.querySelector<HTMLInputElement>('[role="switch"]')!.click());
   expect(autosave).toHaveBeenCalledWith(false);
 });
+
+it('keeps feedback outside the title and actions while exposing confirmed recovery', async () => {
+  const reload = vi.fn(async () => {});
+  const retry = vi.fn(async () => true);
+  await draw({
+    feedback: (
+      <GuidePageFeedback
+        status="failed"
+        actionError={null}
+        onRetry={retry}
+        onReload={reload}
+        disabled={false}
+        t={createTranslator('en')}
+      />
+    ),
+  });
+  const header = host.querySelector('.guide-page-header')!;
+  const feedback = host.querySelector('.guide-page-feedback')!;
+  expect(header.contains(feedback)).toBe(false);
+  expect(header.nextElementSibling).toBe(feedback);
+  expect(feedback.querySelectorAll('[role="alert"]')).toHaveLength(1);
+  expect(feedback.textContent).not.toContain('Saved');
+  const buttons = [...feedback.querySelectorAll<HTMLButtonElement>('button')];
+  await act(async () => buttons.find((button) => button.textContent === 'Retry')!.click());
+  expect(retry).toHaveBeenCalledOnce();
+  await act(async () => buttons.find((button) => button.textContent === 'Reload project')!.click());
+  expect(reload).not.toHaveBeenCalled();
+  const dialog = document.querySelector('[role="alertdialog"]')!;
+  expect(dialog.textContent).toContain('Unsaved changes will be lost');
+  await act(async () =>
+    [...dialog.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === 'Cancel')!
+      .click()
+  );
+  expect(reload).not.toHaveBeenCalled();
+});
+
+it.each(['saved', 'dirty'] as const)(
+  'distinguishes a failed operation from a %s document',
+  async (status) => {
+    const props = {
+      status,
+      actionError: 'copy' as const,
+      onRetry: undefined,
+      onReload: undefined,
+      disabled: false,
+      t: createTranslator('en'),
+    };
+    await act(async () => root.render(<GuidePageFeedback {...props} />));
+    expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    expect(host.textContent).toContain('Could not create a copy');
+    expect(host.textContent).toContain(
+      status === 'saved' ? 'The document is saved.' : 'Unsaved changes'
+    );
+    expect(host.querySelector('button')).toBeNull();
+    await act(async () => root.render(<GuidePageFeedback {...props} />));
+    expect(host.querySelectorAll('[role="alert"]')).toHaveLength(1);
+    await act(async () => root.render(<GuidePageFeedback {...props} actionError={null} />));
+    expect(host.querySelector('.guide-page-feedback')).toBeNull();
+  }
+);

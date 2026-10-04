@@ -1359,3 +1359,76 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     issues.assertClean();
   });
 }
+
+for (const [theme, locale] of [
+  ['light', 'en'],
+  ['dark', 'ru'],
+] as const) {
+  test(`save feedback preserves header geometry and recovers in ${theme} ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    const header = page.locator('.guide-page-header');
+    const title = header.locator('.guide-project-name input');
+    const feedback = page.locator('.guide-page-feedback');
+    const autosave = header.locator('[data-ui="autosave-control"] button');
+    const original = await header.boundingBox();
+    await page.evaluate(() => {
+      const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (...args) {
+        if (this.name === 'scenario_projects')
+          throw new DOMException('test quota', 'QuotaExceededError');
+        return put.apply(this, args);
+      };
+      window.addEventListener(
+        'b13-restore-store',
+        () => {
+          IDBObjectStore.prototype.put = put;
+        },
+        { once: true }
+      );
+    });
+    try {
+      await title.fill(locale === 'en' ? 'Recoverable guide edits' : 'Восстанавливаемые изменения');
+      await title.press('Tab');
+      await expect(feedback).toBeVisible();
+      await expect(feedback).toHaveAttribute('data-status', 'failed');
+      await expect(feedback.getByRole('alert')).toHaveCount(1);
+      await expect(header.locator('.guide-page-feedback')).toHaveCount(0);
+      await expect(autosave).toHaveAttribute('aria-expanded', 'false');
+      const failed = await header.boundingBox();
+      expect(failed?.y).toBe(original?.y);
+      expect(failed?.height).toBe(original?.height);
+      const retry = feedback.getByRole('button', {
+        name: locale === 'en' ? 'Retry' : 'Повторить',
+        exact: true,
+      });
+      await retry.click();
+      await expect(feedback).toHaveAttribute('data-status', 'failed');
+      await expect(feedback.getByRole('alert')).toHaveCount(1);
+      for (const width of [1280, 1920]) {
+        await page.setViewportSize({ width, height: width === 1920 ? 1080 : 720 });
+        const nameBox = await title.boundingBox();
+        const actions = await header.locator('.guide-header-actions').boundingBox();
+        expect(nameBox).not.toBeNull();
+        expect(actions).not.toBeNull();
+        expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(actions!.x + 1);
+        await expect(retry).toBeInViewport();
+        await page.screenshot({ path: `.tmp/backlog7/b13-feedback-${theme}-${width}.png` });
+      }
+    } finally {
+      await page.evaluate(() => window.dispatchEvent(new Event('b13-restore-store')));
+    }
+    await feedback
+      .getByRole('button', { name: locale === 'en' ? 'Retry' : 'Повторить', exact: true })
+      .click();
+    await expect(feedback).toHaveCount(0);
+    await expect(autosave).toHaveAttribute('aria-label', /Saved|Сохранено/u);
+    await page.reload();
+    await expect(title).toHaveValue(
+      locale === 'en' ? 'Recoverable guide edits' : 'Восстанавливаемые изменения'
+    );
+    await expect(feedback).toHaveCount(0);
+  });
+}

@@ -8,7 +8,12 @@ import {
   createGuideStep,
   createTourDocument,
 } from '../../features/scenario/project/factories';
-const io = vi.hoisted(() => ({ load: vi.fn(), save: vi.fn(), request: vi.fn() }));
+const io = vi.hoisted(() => ({
+  load: vi.fn(),
+  save: vi.fn(),
+  request: vi.fn(),
+  session: vi.fn(),
+}));
 vi.mock('./runtime/ai-request', () => ({
   loadGuideAiConfiguration: async () => ({ providers: [], models: [], defaultModelId: 'model' }),
   requestGuideAiProposal: io.request,
@@ -16,12 +21,14 @@ vi.mock('./runtime/ai-request', () => ({
   GuideAiStaleError: class extends Error {},
 }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
-const enterSession = async () => true;
+const enterSession = (projectId: string | null) => io.session(projectId);
 vi.mock('../../composition/persistence/scenario/history', () => ({
-  getScenarioSavedVersions: async () => ({
-    currentRevision: 1,
-    versions: [{ project: await io.load(), revision: 1, savedAt: 100 }],
-  }),
+  getScenarioSavedVersions: async () => {
+    const project = await io.load();
+    return project
+      ? { currentRevision: 1, versions: [{ project, revision: 1, savedAt: 100 }] }
+      : null;
+  },
 }));
 vi.mock('../../composition/persistence/scenario/store/project-records/assets', () => ({
   getScenarioAssetBlob: vi.fn(),
@@ -54,7 +61,10 @@ beforeEach(() => {
   const project = createGuideProject('Local guide', 'guide', 100);
   project.items.push(createGuideStep('Step', 'step'));
   project.tour = createTourDocument();
+  io.load.mockReset();
   io.load.mockResolvedValue(project);
+  io.session.mockReset();
+  io.session.mockResolvedValue(true);
   io.save.mockReset();
   io.request.mockReset();
   io.request.mockResolvedValue({ baseRevision: 3, changes: [] });
@@ -235,7 +245,7 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
   await act(async () => root.render(<ScenarioEditorPage />));
   await changeProjectName('First draft', 'article#step .guide-step-title');
   await settle();
-  expect(host.querySelector('.guide-page-feedback')?.getAttribute('data-quiet')).toBe('true');
+  expect(host.querySelector('.guide-page-feedback')).toBeNull();
   expect(io.save).toHaveBeenCalledTimes(1);
   expect(host.querySelector('article .guide-step-title')).toHaveProperty('disabled', false);
   await changeProjectName('More recent draft', 'article#step .guide-step-title');
@@ -270,3 +280,67 @@ it('protects a closing page until its latest edit is durable and does not autosa
   expect(savedClose.defaultPrevented).toBe(false);
   expect(io.save).toHaveBeenCalledTimes(1);
 });
+
+it.each(['failed', 'conflict'] as const)(
+  'protects a %s draft while confirmed reload is pending',
+  async (status) => {
+    const error = new Error('Save rejected');
+    if (status === 'conflict') error.name = 'StaleScenarioAggregateRevisionError';
+    io.save.mockRejectedValue(error);
+    await act(async () => root.render(<ScenarioEditorPage />));
+    await clickGuideControl('Add step', host);
+    await settle();
+    io.load.mockImplementationOnce(() => new Promise(() => {}));
+    await confirmRecoveryReload();
+    expect(host.querySelectorAll('article')).toHaveLength(2);
+    const closing = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(closing);
+    expect(closing.defaultPrevented).toBe(true);
+  }
+);
+
+it.each([
+  ['failed', 'rejected'],
+  ['conflict', 'rejected'],
+  ['failed', 'missing'],
+  ['conflict', 'missing'],
+  ['failed', 'refused'],
+  ['conflict', 'refused'],
+] as const)('retains a %s draft after a %s reload', async (status, outcome) => {
+  const error = new Error('Save rejected');
+  if (status === 'conflict') error.name = 'StaleScenarioAggregateRevisionError';
+  io.save.mockRejectedValue(error);
+  await act(async () => root.render(<ScenarioEditorPage />));
+  await clickGuideControl('Add step', host);
+  await settle();
+  if (outcome === 'rejected') io.load.mockRejectedValueOnce(new Error('Load rejected'));
+  else if (outcome === 'missing') io.load.mockResolvedValueOnce(null);
+  else io.session.mockResolvedValueOnce(false);
+  await confirmRecoveryReload();
+  expect(host.querySelectorAll('article')).toHaveLength(2);
+  expect(host.querySelector('.guide-page-feedback')?.getAttribute('data-status')).toBe(status);
+  const closing = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(closing);
+  expect(closing.defaultPrevented).toBe(true);
+  await settle();
+  expect(io.save).toHaveBeenCalledTimes(1);
+  await confirmRecoveryReload();
+  expect(host.querySelectorAll('article')).toHaveLength(1);
+  const recoveredClose = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(recoveredClose);
+  expect(recoveredClose.defaultPrevented).toBe(false);
+  expect(host.querySelector('.guide-page-feedback')).toBeNull();
+});
+
+async function confirmRecoveryReload() {
+  const recovery = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'Reload project'
+  );
+  if (!recovery) throw new Error('Missing reload recovery');
+  await act(async () => recovery.click());
+  const confirm = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button'),
+  ].find((button) => button.textContent === 'Reload project');
+  if (!confirm) throw new Error('Missing reload confirmation');
+  await act(async () => confirm.click());
+}

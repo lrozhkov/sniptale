@@ -128,7 +128,8 @@ it('saves the edited project title and added steps against the loaded revision',
     }),
     { baseUpdatedAt: 100 }
   );
-  expect(container.textContent).toContain('Saved');
+  expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
+  expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
 
 it('keeps recoverable edits after save failure and allows retry', async () => {
@@ -140,7 +141,8 @@ it('keeps recoverable edits after save failure and allows retry', async () => {
   expect(container.textContent).toContain('Your edits remain in the editor');
   await click('Retry');
   expect(io.save).toHaveBeenCalledTimes(2);
-  expect(container.textContent).toContain('Saved');
+  expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
+  expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
 
 it('does not create or overwrite an unavailable project', async () => {
@@ -388,10 +390,10 @@ it('confirms project deletion and clears the project route only after success', 
 
 it('confirms replacing failed edits with the persisted version', async () => {
   const clickRecoveryReload = async () => {
-    const button = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
-      (candidate) => candidate.textContent === 'Reload project'
-    );
-    if (!button) throw new Error('Missing autosave reload action');
+    const button = [
+      ...document.querySelectorAll<HTMLButtonElement>('.guide-page-feedback button'),
+    ].find((candidate) => candidate.textContent === 'Reload project');
+    if (!button) throw new Error('Missing feedback reload action');
     await act(async () => button.click());
   };
   io.save.mockRejectedValue(new Error('Storage failure'));
@@ -720,9 +722,7 @@ it('settles autosave without writing when undo then redo returns to the durable 
   expect(unchangedClose.defaultPrevented).toBe(false);
   await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-status')).toBe(
-    'saved'
-  );
+  expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
 
 it('opens stored revisions in ordinary undo and autosaves against the current revision', async () => {

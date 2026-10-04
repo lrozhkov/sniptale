@@ -102,7 +102,6 @@ export function GuidePageHeader({
             />
           </label>
         )}
-        {feedback}
         <div className="guide-header-actions">
           {contextControls}
           {aiSelection && onAiOpen && prepareAiProject && (
@@ -152,8 +151,6 @@ export function GuidePageHeader({
                 onRedo={onRedo}
                 enabled={autosaveEnabled}
                 onChange={onAutosaveChange}
-                onReload={onReload}
-                commandsDisabled={commandsDisabled}
                 status={status}
                 t={t}
               />
@@ -169,6 +166,7 @@ export function GuidePageHeader({
           {panelControls}
         </div>
       </header>
+      {feedback}
     </>
   );
 }
@@ -201,7 +199,10 @@ function useHeaderFit() {
 
 function guideAutosaveState(status: GuidePageHeaderProps['status']) {
   if (status === 'conflict' || status === 'saving' || status === 'dirty') return status;
-  return status === 'failed' ? 'error' : 'saved';
+  if (status === 'loading') return 'saving';
+  return status === 'failed' || status === 'unavailable' || status === 'missing'
+    ? 'error'
+    : 'saved';
 }
 
 function GuideHistoryAutosave(props: {
@@ -212,13 +213,25 @@ function GuideHistoryAutosave(props: {
   onRedo: () => void;
   enabled: boolean;
   onChange: ((enabled: boolean) => void) | undefined;
-  onReload: () => Promise<void>;
-  commandsDisabled: boolean;
   status: GuidePageHeaderProps['status'];
   t: Translate;
 }) {
   return (
     <>
+      {(props.status === 'ready' ||
+        props.status === 'saved' ||
+        props.status === 'dirty' ||
+        props.status === 'saving') && (
+        <span className="sr-only" role="status" aria-live="polite">
+          {props.t(
+            props.status === 'dirty'
+              ? 'scenario.editor.guideDirty'
+              : props.status === 'saving'
+                ? 'scenario.editor.guideSaving'
+                : 'scenario.editor.guideSaved'
+          )}
+        </span>
+      )}
       <div
         className="guide-history-controls"
         role="group"
@@ -252,8 +265,6 @@ function GuideHistoryAutosave(props: {
           <GuideAutosaveStatus
             enabled={props.enabled}
             onChange={props.onChange}
-            onReload={props.onReload}
-            disabled={props.commandsDisabled}
             status={props.status}
             t={props.t}
           />
@@ -266,60 +277,133 @@ function GuideHistoryAutosave(props: {
 function GuideAutosaveStatus(props: {
   enabled: boolean;
   onChange: (enabled: boolean) => void;
-  onReload: () => Promise<void>;
-  disabled: boolean;
   status: GuidePageHeaderProps['status'];
   t: Translate;
 }) {
-  const [confirmReload, setConfirmReload] = useState(false);
-  const failed = props.status === 'conflict' || props.status === 'failed';
   return (
-    <>
-      <AutosaveControl
-        enabled={props.enabled}
-        onChange={props.onChange}
-        state={guideAutosaveState(props.status)}
-        openOnError
-        actions={
-          failed ? (
+    <AutosaveControl
+      enabled={props.enabled}
+      onChange={props.onChange}
+      state={guideAutosaveState(props.status)}
+      labels={{
+        title: props.t('editor.documentActions.autosaveTitle'),
+        switch: props.t('editor.documentActions.autosaveSwitch'),
+        errorDescription: props.t('editor.documentActions.autosaveErrorDescription'),
+        on: props.t('editor.documentActions.autosaveOnDescription'),
+        off: props.t('editor.documentActions.autosaveOffDescription'),
+        paused: props.t('editor.documentActions.autosaveOffStatus'),
+        dirty: props.t('common.states.dirty'),
+        saving: props.t(
+          props.status === 'loading' ? 'scenario.editor.loading' : 'common.states.saving'
+        ),
+        saved: props.t('common.states.saved'),
+        error: props.t('editor.documentActions.saveErrorTitle'),
+        conflict: props.t('editor.documentActions.autosaveConflict'),
+        close: props.t('common.actions.close'),
+      }}
+    />
+  );
+}
+
+/** Presents operation impact and confirmed recovery without occupying the title/action row. */
+export function GuidePageFeedback({
+  status,
+  onRetry,
+  onReload,
+  disabled,
+  actionError,
+  t,
+}: {
+  status: GuidePageHeaderProps['status'];
+  onRetry: (() => Promise<boolean>) | undefined;
+  onReload: (() => Promise<void>) | undefined;
+  disabled: boolean;
+  actionError: ReturnType<typeof useGuidePageState>['actionError'];
+  t: Translate;
+}) {
+  const [confirmReload, setConfirmReload] = useState(false);
+  const failed = status === 'failed' || status === 'conflict';
+  if (!failed && !actionError) return null;
+  return (
+    <div className="guide-page-feedback" data-status={status}>
+      <GuideFeedbackMessage status={status} actionError={actionError} t={t} />
+      {(failed || actionError === 'reload') && (
+        <div className="guide-feedback-actions">
+          {status === 'failed' && onRetry && (
             <ProductActionButton
-              compact
               tone="secondary"
-              disabled={props.disabled}
+              compact
+              disabled={disabled}
+              onClick={() => void onRetry()}
+            >
+              {t('common.actions.retry')}
+            </ProductActionButton>
+          )}
+          {onReload && (
+            <ProductActionButton
+              tone="secondary"
+              compact
+              disabled={disabled}
               onClick={() => setConfirmReload(true)}
             >
-              {props.t('scenario.editor.guideReload')}
+              {t('scenario.editor.guideReload')}
             </ProductActionButton>
-          ) : null
-        }
-        labels={{
-          title: props.t('editor.documentActions.autosaveTitle'),
-          switch: props.t('editor.documentActions.autosaveSwitch'),
-          errorDescription: props.t('editor.documentActions.autosaveErrorDescription'),
-          on: props.t('editor.documentActions.autosaveOnDescription'),
-          off: props.t('editor.documentActions.autosaveOffDescription'),
-          paused: props.t('editor.documentActions.autosaveOffStatus'),
-          dirty: props.t('common.states.dirty'),
-          saving: props.t('common.states.saving'),
-          saved: props.t('common.states.saved'),
-          error: props.t('editor.documentActions.saveErrorTitle'),
-          conflict: props.t('editor.documentActions.autosaveConflict'),
-          close: props.t('common.actions.close'),
-        }}
-      />
+          )}
+        </div>
+      )}
       <ProductConfirmDialog
         isOpen={confirmReload}
-        isLoading={props.disabled}
-        title={props.t('scenario.editor.guideReload')}
-        message={props.t('scenario.editor.guideReloadMessage')}
-        confirmText={props.t('scenario.editor.guideReload')}
-        cancelText={props.t('common.actions.cancel')}
+        isLoading={disabled}
+        title={t('scenario.editor.guideReload')}
+        message={t('scenario.editor.guideReloadMessage')}
+        confirmText={t('scenario.editor.guideReload')}
+        cancelText={t('common.actions.cancel')}
         onCancel={() => setConfirmReload(false)}
         onConfirm={async () => {
-          await props.onReload();
+          await onReload?.();
           setConfirmReload(false);
         }}
       />
-    </>
+    </div>
+  );
+}
+
+function GuideFeedbackMessage({
+  status,
+  actionError,
+  t,
+}: {
+  status: GuidePageHeaderProps['status'];
+  actionError: ReturnType<typeof useGuidePageState>['actionError'];
+  t: Translate;
+}) {
+  const failed = status === 'failed' || status === 'conflict';
+  const actionMessages = {
+    template: 'scenario.editor.templateFailed',
+    copy: 'scenario.editor.guideCopyFailed',
+    edit: 'scenario.editor.guideImageApplyFailed',
+    import: 'scenario.editor.guideImportFailed',
+    structure: 'scenario.editor.guideOperationFailed',
+    delete: 'scenario.editor.guideDeleteFailed',
+    reload: 'scenario.editor.guideReloadFailed',
+  } as const;
+  const context =
+    status === 'saved' || status === 'ready'
+      ? 'scenario.editor.guideOperationDocumentSaved'
+      : status === 'saving'
+        ? 'scenario.editor.guideSaving'
+        : status === 'loading'
+          ? 'scenario.editor.loading'
+          : 'scenario.editor.guideDirty';
+  return (
+    <div className="guide-feedback-message" role="alert">
+      {failed && (
+        <p>
+          {t(status === 'failed' ? 'scenario.editor.guideFailed' : 'scenario.editor.guideConflict')}
+        </p>
+      )}
+      {actionError && <p>{t(actionMessages[actionError])}</p>}
+      {!failed && <p className="guide-feedback-context">{t(context)}</p>}
+    </div>
   );
 }
