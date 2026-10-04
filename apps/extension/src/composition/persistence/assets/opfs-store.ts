@@ -478,9 +478,11 @@ export async function listReadyJournals(
   const journals: AssetReadyJournal[] = [];
   for await (const [, handle] of ready.entries()) {
     if (handle.kind !== 'file') continue;
-    const parsed = parseAssetReadyJournal(
-      JSON.parse(await (await (handle as FileSystemFileHandle).getFile()).text()) as unknown
-    );
+    const file = await (handle as FileSystemFileHandle).getFile();
+    // A newly created handle remains empty until its writable stream commits on close.
+    // Page termination can leave that uncommitted handle behind; it owns no ready metadata.
+    if (file.size === 0) continue;
+    const parsed = parseAssetReadyJournal(JSON.parse(await file.text()) as unknown);
     if (parsed) journals.push(parsed);
   }
   return journals.sort((left, right) => left.createdAt - right.createdAt);
