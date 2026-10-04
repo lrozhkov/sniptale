@@ -641,3 +641,17 @@ it.each(['positive', 'negative', 'unavailable'] as const)(
     expect(harness.session.reload).toHaveBeenCalledTimes(result === 'positive' ? 1 : 0);
   }
 );
+
+it('shows the chosen cap in the ready transport instead of the full available interval', () => {
+  renderRecording(true);
+  const input = host.querySelector<HTMLInputElement>('input[type="number"]')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '3');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('00:03');
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.duration-limit"]')!.click()
+  );
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('00:07');
+});

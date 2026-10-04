@@ -57,11 +57,25 @@ it('lists microphones, refreshes device changes and removes its listener on clos
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
+  const onChange = vi.fn();
   try {
     await act(async () =>
-      root.render(<AudioRecordingDeviceSelect value="mic" onChange={() => {}} disabled={false} />)
+      root.render(<AudioRecordingDeviceSelect value="mic" onChange={onChange} disabled={false} />)
     );
     expect(host.textContent).toContain('Desk microphone');
+    const trigger = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!;
+    await act(async () => trigger.click());
+    const unnamed = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (option) => option.textContent?.includes('videoEditor.app.recordAudioDevice 2')
+    )!;
+    await act(async () => unnamed.click());
+    expect(onChange).toHaveBeenCalledExactlyOnceWith('unnamed');
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+    await act(async () =>
+      root.render(<AudioRecordingDeviceSelect value="mic" onChange={onChange} disabled />)
+    );
+    await act(async () => trigger.click());
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
     enumerateDevices.mockResolvedValue([]);
     await act(async () => events.dispatchEvent(new Event('devicechange')));
     expect(enumerateDevices).toHaveBeenCalledTimes(2);

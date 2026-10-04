@@ -76,3 +76,52 @@ it('exposes a labelled real playback switch without a play icon and respects dis
     vi.unstubAllGlobals();
   }
 });
+
+it('shows a compact fractional default without changing the exact capture interval', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let latest!: ReturnType<typeof useRecordingDurationLimit>;
+  function Harness({ maximum }: { maximum: number }) {
+    latest = useRecordingDurationLimit(maximum);
+    return <RecordingDurationLimit value={latest} maximum={maximum} disabled={false} />;
+  }
+  try {
+    act(() => root.render(<Harness maximum={12.013666666666667} />));
+    const input = host.querySelector<HTMLInputElement>('input')!;
+    expect(input.value).toBe('12.013');
+    expect(latest.seconds).toBe(12.013666666666667);
+    act(() => input.focus());
+    act(() => input.blur());
+    expect(latest.seconds).toBe(12.013666666666667);
+    act(() => latest.setEnabled(false));
+    act(() => latest.setEnabled(true));
+    expect(latest.seconds).toBe(12.013666666666667);
+    act(() => root.render(<Harness maximum={7.123456789} />));
+    expect(latest.seconds).toBe(7.123456789);
+    expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('7.123');
+    const editedInput = host.querySelector<HTMLInputElement>('input')!;
+    act(() => editedInput.focus());
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        editedInput,
+        '2.123456789'
+      );
+      editedInput.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(editedInput.value).toBe('2.123456789');
+    act(() => editedInput.blur());
+    expect(latest.seconds).toBe(2.123456789);
+    expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('2.123');
+    act(() => root.render(<Harness maximum={0.000123456789} />));
+    expect(latest.invalid).toBe(true);
+    act(() => root.render(<Harness key="tiny" maximum={0.000123456789} />));
+    expect(latest.seconds).toBe(0.000123456789);
+    expect(host.querySelector<HTMLInputElement>('input')!.value).toBe('0.000123');
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

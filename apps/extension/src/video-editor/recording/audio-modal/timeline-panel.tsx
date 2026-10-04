@@ -6,7 +6,10 @@ import { translate } from '../../../platform/i18n';
 import type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
 import { formatDurationLabel } from '../../../composition/audio-recording/format';
 import { renderAudioRecordingTrimPanel } from '../../../composition/audio-recording/dialog/trim';
-import { AudioRecordingDownloadButton } from '../../../composition/audio-recording/dialog/controls';
+import {
+  AudioRecordingDownloadButton,
+  RecordingSetup,
+} from '../../../composition/audio-recording/dialog/controls';
 import { RecordingLevelMeter } from '../../../composition/audio-recording/dialog/level-meter';
 
 /** Recording settings, transport and take actions remain in separate stable rows. */
@@ -71,16 +74,11 @@ export function TimelineRecordingPanel(props: {
       </header>
       {!trim && (
         <>
-          <div
-            className={[
-              'flex flex-wrap items-center gap-3 rounded-md border p-3',
-              'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
-            ].join(' ')}
-          >
-            <div className="w-44 min-w-0">{props.device}</div>
-            {props.playbackChoice}
-            <div className="ml-auto">{props.durationOptions}</div>
-          </div>
+          <RecordingSetup
+            device={props.device}
+            playback={props.playbackChoice}
+            duration={props.durationOptions}
+          />
           <TimelineRecordingTransport
             transport={transport}
             duration={props.duration}
@@ -128,9 +126,12 @@ function TimelineRecordingTransport(props: {
   const recording = props.transport.status === 'recording';
   const paused = props.transport.status === 'paused';
   return (
-    <div className="flex flex-wrap items-center gap-3" role="status">
+    <div
+      className="flex flex-wrap items-center gap-3 border-t border-[var(--sniptale-color-border-soft)] pt-3"
+      role="status"
+    >
       <span
-        className="whitespace-nowrap text-xs tabular-nums"
+        className="inline-flex items-baseline gap-1 whitespace-nowrap text-xs tabular-nums"
         data-ui="video-editor.audio-recording.limit"
       >
         {translate(
@@ -147,7 +148,7 @@ function TimelineRecordingTransport(props: {
                     (props.captureDuration ?? props.duration) - props.transport.elapsedSeconds
                   )
                 )
-              : props.duration
+              : (props.captureDuration ?? props.duration)
           )}
         </strong>
       </span>

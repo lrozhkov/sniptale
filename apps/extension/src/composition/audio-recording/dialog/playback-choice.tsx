@@ -10,7 +10,7 @@ export function RecordingPlaybackChoice(props: {
 }) {
   const labelId = useId();
   return (
-    <span className="inline-flex items-center gap-2 text-xs">
+    <span className="inline-flex min-h-10 items-center gap-2 self-start text-xs">
       <ProductToggle
         size="sm"
         checked={props.checked}

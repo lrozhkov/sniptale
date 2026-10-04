@@ -9,6 +9,7 @@ import { useAudioRecordingFocus } from '../../composition/audio-recording/dialog
 import {
   AudioRecordingDeviceSelect,
   AudioRecordingDownloadButton,
+  RecordingSetup,
 } from '../../composition/audio-recording/dialog/controls';
 import {
   RecordingDurationLimit,
@@ -109,7 +110,7 @@ export function ReviewVoiceoverRecording(props: {
       <ProductModal
         onKeyDown={(event) => {
           handleKeyDown(event);
-          if (event.key === 'Escape' && !session.confirmation.open) {
+          if (event.key === 'Escape' && !event.defaultPrevented && !session.confirmation.open) {
             event.preventDefault();
             session.requestClose();
           }
@@ -192,32 +193,29 @@ function VoiceoverCaptureOptions(props: {
 }) {
   const disabled = props.session.starting || props.capturing;
   return (
-    <div
-      className={[
-        'flex flex-wrap items-center gap-3 rounded-md border p-3',
-        'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]',
-      ].join(' ')}
-    >
-      <div className="w-44 min-w-0">
+    <RecordingSetup
+      device={
         <AudioRecordingDeviceSelect
           value={props.session.deviceId}
           onChange={props.session.setDeviceId}
           disabled={disabled || props.session.isSaving}
         />
-      </div>
-      <RecordingPlaybackChoice
-        checked={props.playVideo}
-        disabled={disabled || props.session.isSaving}
-        onChange={props.onPlayVideo}
-      />
-      <div className="ml-auto">
+      }
+      playback={
+        <RecordingPlaybackChoice
+          checked={props.playVideo}
+          disabled={disabled || props.session.isSaving}
+          onChange={props.onPlayVideo}
+        />
+      }
+      duration={
         <RecordingDurationLimit
           value={props.durationLimit}
           maximum={props.maximum}
           disabled={disabled || props.session.isSaving}
         />
-      </div>
-    </div>
+      }
+    />
   );
 }
 
@@ -230,14 +228,17 @@ function VoiceoverTransport(props: {
   const { transport } = props.session.controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
   return (
-    <div className="flex flex-wrap items-center gap-3 text-xs" role="status">
-      <span className="mr-auto tabular-nums">
+    <div
+      className="flex flex-wrap items-center gap-3 border-t border-[var(--sniptale-color-border-soft)] pt-3 text-xs"
+      role="status"
+    >
+      <span className="mr-auto inline-flex items-baseline gap-1 tabular-nums">
         {translate(
           capturing ? 'videoEditor.app.recordAudioRemaining' : 'videoEditor.app.recordAudioLimit'
         )}{' '}
         <strong>
           {formatDurationLabel(
-            capturing ? Math.max(0, props.limit - transport.elapsedSeconds) : props.remaining
+            capturing ? Math.max(0, props.limit - transport.elapsedSeconds) : props.limit
           )}
         </strong>
       </span>

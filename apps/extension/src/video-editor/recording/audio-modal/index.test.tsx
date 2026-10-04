@@ -201,7 +201,7 @@ it('normal recorder passes the numeric cap to capture while preserving its maxim
         onSave={vi.fn()}
         timeline={{
           startTime: 2,
-          duration: 20,
+          duration: 20.123456789,
           beforeStart: async () => undefined,
           onStop: vi.fn(),
         }}
@@ -209,9 +209,13 @@ it('normal recorder passes the numeric cap to capture while preserving its maxim
       />
     )
   );
-  expect(controller.captureDuration).toBe(20);
+  expect(controller.captureDuration).toBe(20.123456789);
   const input = host.querySelector<HTMLInputElement>('input[type="number"]')!;
-  expect(input.max).toBe('20');
+  expect(input.max).toBe('20.123456789');
+  expect(input.value).toBe('20.123');
+  act(() => input.focus());
+  act(() => input.blur());
+  expect(controller.captureDuration).toBe(20.123456789);
   const setValue = (value: string) =>
     act(() => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
@@ -221,7 +225,7 @@ it('normal recorder passes the numeric cap to capture while preserving its maxim
   expect(controller.captureDuration).toBe(8);
   expect(
     host.querySelector('[data-ui="video-editor.audio-recording.limit"]')?.textContent
-  ).toContain('00:20');
+  ).toContain('00:08');
   const start = [...host.querySelectorAll('button')].find((b) =>
     b.textContent?.includes('recordAudioStart')
   )!;
@@ -232,7 +236,7 @@ it('normal recorder passes the numeric cap to capture while preserving its maxim
     host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.duration-limit"]')!.click()
   );
   expect(start.disabled).toBe(false);
-  expect(controller.captureDuration).toBe(20);
+  expect(controller.captureDuration).toBe(20.123456789);
   act(() =>
     host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.play-video"]')!.click()
   );

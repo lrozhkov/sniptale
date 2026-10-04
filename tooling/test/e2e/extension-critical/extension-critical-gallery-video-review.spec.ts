@@ -2706,6 +2706,32 @@ for (const variant of [
         name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
       });
       await expect(numericLimit).toBeVisible();
+
+      expect(Number(await numericLimit.inputValue())).toBeGreaterThan(0);
+      expect((await numericLimit.inputValue()).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(3);
+      const exactMaximum = await numericLimit.getAttribute('max');
+      await numericLimit.focus();
+      await numericLimit.blur();
+      await expect(numericLimit).toHaveAttribute('max', exactMaximum!);
+      const microphone = strip.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioDevice', variant.locale),
+        exact: true,
+      });
+      await expect(microphone).toBeVisible();
+      const setup = strip.locator('[data-ui="audio-recording.setup"]');
+      const microphoneBox = (await microphone.boundingBox())!;
+      const setupBox = (await setup.boundingBox())!;
+      expect(microphoneBox.width).toBeGreaterThan(setupBox.width * 0.95);
+      expect((await numericLimit.boundingBox())!.y).toBeGreaterThan(
+        microphoneBox.y + microphoneBox.height
+      );
+      await microphone.click();
+      await expect(page.getByRole('listbox')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('listbox')).toHaveCount(0);
+      await expect(strip).toBeVisible();
+      await expect(microphone).toBeFocused();
+
       const startCapture = strip.getByRole('button', {
         name: translate('videoEditor.app.recordAudioStart', variant.locale),
         exact: true,
@@ -2726,6 +2752,28 @@ for (const variant of [
       const durationLimit = strip.getByRole('switch', {
         name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
       });
+
+      for (const failure of ['NotAllowedError', 'NotFoundError']) {
+        await page.evaluate((name) => {
+          Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
+            configurable: true,
+            value: async () => [],
+          });
+          navigator.mediaDevices.dispatchEvent(new Event('devicechange'));
+          Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+            configurable: true,
+            value: async () => {
+              throw new DOMException('Test microphone failure', name);
+            },
+          });
+        }, failure);
+        await startCapture.click();
+        await expect(strip.getByRole('alert')).toBeVisible();
+        await expect(startCapture).toBeEnabled();
+        await expect(numericLimit).toBeEnabled();
+        await expect(microphone).toBeEnabled();
+      }
+
       await durationLimit.uncheck();
       await expect(durationLimit).not.toBeChecked();
       await page.evaluate(() => {

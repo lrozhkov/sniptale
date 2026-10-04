@@ -84,7 +84,7 @@ function MaterialRecordingDialog({
       <ProductModal
         onKeyDown={(event) => {
           handleKeyDown(event);
-          if (event.key === 'Escape' && !session.confirmation.open) {
+          if (event.key === 'Escape' && !event.defaultPrevented && !session.confirmation.open) {
             event.preventDefault();
             event.stopPropagation();
             requestClose();
