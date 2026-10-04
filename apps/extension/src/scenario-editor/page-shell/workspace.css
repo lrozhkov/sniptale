@@ -2431,7 +2431,14 @@ html[data-guide-height-resizing] * {
   padding: 0;
   pointer-events: none;
 }
-.guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button {
+.guide-page .guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button {
+  --guide-tool-surface: var(--sniptale-color-surface-panel);
+  --guide-tool-border: var(--sniptale-color-border-soft);
+  --guide-tool-hover-surface: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 8%,
+    var(--sniptale-color-surface-panel)
+  );
   width: auto;
   min-width: 2rem;
   height: 2rem;
@@ -2443,6 +2450,18 @@ html[data-guide-height-resizing] * {
   color: var(--sniptale-color-text-primary) !important;
   font-size: 0.75rem;
   pointer-events: auto;
+}
+.guide-page
+  .guide-document
+  .guide-image-surface[data-editing='true']
+  .guide-image-tools
+  > button[aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 15%,
+    var(--sniptale-color-surface-panel)
+  ) !important;
 }
 .guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button:first-child {
   margin-inline-end: auto;
@@ -2464,7 +2483,11 @@ html[data-guide-height-resizing] * {
     inset: 0.25rem 0.25rem auto;
     gap: 0.125rem;
   }
-  .guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button {
+  .guide-page
+    .guide-document
+    .guide-image-surface[data-editing='true']
+    .guide-image-tools
+    > button {
     width: 1.5rem;
     min-width: 1.5rem;
     height: 1.5rem;

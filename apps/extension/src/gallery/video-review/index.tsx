@@ -413,6 +413,12 @@ function ReviewEditor({
       >
         <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
           <ReviewStageBinding
+            cutPreview={{
+              file: resource.file,
+              duration: state.source.duration,
+              edits: snapshot.document.edits,
+              time: state.timeline.sceneOutputTime,
+            }}
             backgroundPending={state.backgroundImport.pending}
             url={resource.url}
             source={state.source}

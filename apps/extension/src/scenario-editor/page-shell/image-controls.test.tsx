@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
+import { GuideImageFramingProvider } from './image-framing-session';
 import { GuideImageControls } from './image-controls';
 import { GuideLayoutAssistance, useGuideImageBounds } from './layout-assistance';
 const requestResource = vi.hoisted(() => vi.fn());
@@ -18,6 +19,7 @@ const block = createGuideImageBlock({
 const change = vi.fn();
 const close = vi.fn();
 const edit = vi.fn();
+const startFraming = vi.fn();
 let host: HTMLDivElement;
 let root: Root;
 let decoded: HTMLImageElement[];
@@ -44,19 +46,31 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(url: string | null = 'blob:image', disabled = false, image = block) {
+async function render(
+  url: string | null = 'blob:image',
+  disabled = false,
+  image = block,
+  framing = false
+) {
   await act(async () =>
     root.render(
-      <GuideImageControls
-        stepId="step"
-        onEdit={edit}
-        block={image}
-        url={url}
-        disabled={disabled}
-        onChange={change}
-        onClose={close}
-        t={createTranslator('en')}
-      />
+      <GuideImageFramingProvider
+        value={
+          framing ? { block: image, display: image, change, preview: change, cancel: close } : null
+        }
+      >
+        <GuideImageControls
+          onStartFraming={startFraming}
+          stepId="step"
+          onEdit={edit}
+          block={image}
+          url={url}
+          disabled={disabled}
+          onChange={change}
+          onClose={close}
+          t={createTranslator('en')}
+        />
+      </GuideImageFramingProvider>
     )
   );
 }
@@ -69,7 +83,7 @@ async function click(name: string) {
   await act(async () => button.click());
 }
 it('changes fit and resets the frame from the decoded image dimensions', async () => {
-  await render();
+  await render('blob:image', false, block, true);
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   await click('Fill');
   expect(change.mock.calls[0]?.[0].fit).toBe('cover');
@@ -97,8 +111,6 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
       field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     );
   };
-  await update('Zoom, %', '200');
-  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
   await update('Frame width', '500');
   expect(change.mock.calls.at(-1)?.[0].frame.width).toBe(500);
   await update('Frame height', '350');
@@ -112,7 +124,7 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
 });
 
 it('synchronizes visible sliders with zoom and frame values', async () => {
-  await render();
+  await render('blob:image', false, block, true);
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
   expect(ranges.map((range) => range.getAttribute('aria-label'))).toEqual([
     'Zoom, %',
@@ -152,7 +164,7 @@ it('keeps geometry disabled after a decode failure or while edits are locked', a
   await click('Reset frame and position');
   expect(change).not.toHaveBeenCalled();
   await render('blob:image', true);
-  await click('Center image');
+  await click('Reset frame and position');
   expect(change).not.toHaveBeenCalled();
 });
 
@@ -181,9 +193,9 @@ it('holds inspector geometry when bounds are on until the current image decodes'
     )
   );
   await click('Bounds on');
-  expect(host.querySelector<HTMLFieldSetElement>('.guide-image-controls fieldset')?.disabled).toBe(
-    true
-  );
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Frame width"]')?.matches(':disabled')
+  ).toBe(true);
   const caption = host.querySelector<HTMLInputElement>('.guide-image-description input')!;
   expect(caption.matches(':disabled')).toBe(false);
   const htmlToggle = host.querySelector<HTMLButtonElement>('.guide-html-switch button')!;
@@ -197,13 +209,13 @@ it('holds inspector geometry when bounds are on until the current image decodes'
   });
   expect(change.mock.calls.at(-1)?.[0].caption).toBe('Still editable');
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
-  expect(host.querySelector<HTMLFieldSetElement>('.guide-image-controls fieldset')?.disabled).toBe(
-    false
-  );
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Frame width"]')?.matches(':disabled')
+  ).toBe(false);
 });
 
 it('lets numeric Escape cancel the draft before inspector dismissal', async () => {
-  await render();
+  await render('blob:image', false, block, true);
   const field = host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')!;
   await act(async () => field.focus());
   await act(async () => {
@@ -291,4 +303,19 @@ it('offers image block placement and preserves image metadata', async () => {
   expect(change.mock.calls.at(-1)).toEqual([{ ...block, width: 'half' }, null]);
   await click('Start a new row');
   expect(change.mock.calls.at(-1)).toEqual([{ ...block, rowStart: true }, null]);
+});
+
+it('offers framing entry without exposing draft-only geometry outside the session', async () => {
+  await render();
+  expect(host.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Center image"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Image fit"]')).toBeNull();
+  expect(host.textContent).not.toContain('Ctrl');
+  await click('Frame and image');
+  expect(startFraming).toHaveBeenCalledOnce();
+  await render(null);
+  await click('Frame and image');
+  await render('blob:image', true);
+  await click('Frame and image');
+  expect(startFraming).toHaveBeenCalledOnce();
 });

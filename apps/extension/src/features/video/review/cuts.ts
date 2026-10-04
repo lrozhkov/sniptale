@@ -1,3 +1,4 @@
+import { buildReviewTimeMap } from './timeline';
 import { isReviewSpeedRate } from './speed';
 import type { ReviewAnchor, ReviewEdit } from './types';
 
@@ -116,4 +117,85 @@ export function reviewPlaybackTime(time: number, edits: readonly ReviewEdit[]): 
   for (const edit of [...edits].sort((left, right) => left.start - right.start))
     if (edit.kind === 'cut' && next >= edit.start && next < edit.end) next = edit.end;
   return next;
+}
+
+/** Effective result-time window plus the only source intervals allowed to supply its frames. */
+export interface ReviewCutTransitionPlan {
+  id: string;
+  type: 'dissolve' | 'fade-black';
+  seam: number;
+  before: number;
+  after: number;
+  left: { start: number; end: number };
+  right: { start: number; end: number };
+}
+
+/** Fits authored portions to retained islands without changing any timeline coordinate. */
+export function planReviewCutTransitions(
+  duration: number,
+  edits: readonly ReviewEdit[]
+): ReviewCutTransitionPlan[] {
+  const segments = buildReviewTimeMap(duration, edits);
+  const cuts = edits.filter((edit) => edit.kind === 'cut').sort((a, b) => a.start - b.start);
+  const retainedDuration = (start: number, end: number) =>
+    segments.reduce(
+      (sum, segment) =>
+        sum +
+        (segment.kind === 'cut'
+          ? 0
+          : Math.max(0, Math.min(end, segment.sourceEnd) - Math.max(start, segment.sourceStart)) /
+            segment.rate),
+      0
+    );
+  const plans: ReviewCutTransitionPlan[] = [];
+  for (const [index, cut] of cuts.entries()) {
+    if (!cut.transition) continue;
+    const left = { start: cuts[index - 1]?.end ?? 0, end: cut.start };
+    const right = { start: cut.end, end: cuts[index + 1]?.start ?? duration };
+    // Adjacent cuts have no independently visible seam; preserve intent only in the document.
+    if (left.start >= left.end || right.start >= right.end) continue;
+    const seam = segments.find((segment) => segment.sourceStart === cut.start)!.resultStart;
+    plans.push({
+      id: cut.id,
+      type: cut.transition.type,
+      seam,
+      left,
+      right,
+      before: Math.min(cut.transition.before, retainedDuration(left.start, left.end)),
+      after: Math.min(cut.transition.after, retainedDuration(right.start, right.end)),
+    });
+  }
+  for (let index = 1; index < plans.length; index++) {
+    const previous = plans[index - 1]!;
+    const current = plans[index]!;
+    if (previous.right.start !== current.left.start || previous.right.end !== current.left.end)
+      continue;
+    const available = current.seam - previous.seam;
+    const outgoing = cuts.find((cut) => cut.id === previous.id)!.transition!.after;
+    const incoming = cuts.find((cut) => cut.id === current.id)!.transition!.before;
+    const requested = outgoing + incoming;
+    if (requested > available) {
+      previous.after = (outgoing * available) / requested;
+      current.before = (incoming * available) / requested;
+    }
+  }
+  return plans;
+}
+
+/** Shared blend evaluation; outside a transition the native frame remains unchanged. */
+export function reviewCutTransitionAt(time: number, plans: readonly ReviewCutTransitionPlan[]) {
+  const plan = plans.find(
+    (item) => time >= item.seam - item.before && time < item.seam + item.after
+  );
+  if (!plan || plan.before + plan.after <= 0) return null;
+  const incoming = (time - plan.seam + plan.before) / (plan.before + plan.after);
+  const black =
+    time < plan.seam
+      ? plan.before > 0
+        ? 1 - (plan.seam - time) / plan.before
+        : 1
+      : plan.after > 0
+        ? 1 - (time - plan.seam) / plan.after
+        : 0;
+  return { plan, incoming, beforeSeam: time < plan.seam, black: Math.max(0, Math.min(1, black)) };
 }

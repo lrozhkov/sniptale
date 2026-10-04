@@ -1,3 +1,9 @@
+import {
+  planReviewCutTransitions,
+  reviewCutTransitionAt,
+  type ReviewCutTransitionPlan,
+} from '../../features/video/review/cuts';
+import { createReviewTransitionFrames, paintReviewCutTransition } from './cut-transition-frames';
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
 import {
@@ -109,6 +115,7 @@ export async function writeReviewFrames(args: {
   args.signal.addEventListener('abort', dispose, { once: true });
   let output: Output | null = null;
   let source: ReviewRenderSource | null = null;
+  let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
   try {
     source = await openReviewRenderSource(args, input, preparation);
     const receipt: ReviewPacketReceipt = {
@@ -157,6 +164,12 @@ export async function writeReviewFrames(args: {
     const audioOut = tracks.audio;
     await tracks.output.start();
     const frameSink = new VideoSampleSink(source.video);
+    const transitions = planReviewCutTransitions(args.index.duration, args.edits);
+    if (transitions.length)
+      transitionFrames = createReviewTransitionFrames(
+        new VideoSampleSink(source.video),
+        args.signal
+      );
     for (const window of preparation.windows) {
       const segment = window.segment;
       args.signal.throwIfAborted();
@@ -189,6 +202,8 @@ export async function writeReviewFrames(args: {
         context: source.context,
         image: source.image,
         frameSink,
+        transitions,
+        transitionFrames,
         videoOut,
         resultDuration: receipt.resultDuration,
         onProgress: args.onProgress ?? undefined,
@@ -207,6 +222,7 @@ export async function writeReviewFrames(args: {
     await output?.cancel().catch(() => undefined);
     throw error;
   } finally {
+    transitionFrames?.dispose();
     source?.image?.close();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
@@ -468,6 +484,8 @@ export async function renderRenderWindowFrames(args: {
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
   frameSink: VideoSampleSink;
+  transitions?: readonly ReviewCutTransitionPlan[];
+  transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
   resultDuration: number;
   onProgress: ((fraction: number) => void) | undefined;
@@ -512,7 +530,13 @@ export async function renderRenderWindowFrames(args: {
           comment.renderToVideo &&
           isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
       );
-      sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+      const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
+      if (blend) {
+        const frames = await args.transitionFrames?.load(blend.plan);
+        signal.throwIfAborted();
+        if (!frames) throw new QuickEditExportUnavailable(['transition-frames']);
+        paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
+      } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
       drawReviewSceneFrame(context, {
         canvas,
         layout,
@@ -537,7 +561,10 @@ export async function renderRenderWindowFrames(args: {
           scale: args.sceneScale ?? 1,
         })
       );
-      const encoded = new VideoSample(canvas, { timestamp, duration: 1 / fps });
+      const encoded = new VideoSample(canvas, {
+        timestamp,
+        duration: Math.min(1 / fps, window.segment.resultEnd - timestamp),
+      });
       try {
         await videoOut.add(encoded);
       } finally {

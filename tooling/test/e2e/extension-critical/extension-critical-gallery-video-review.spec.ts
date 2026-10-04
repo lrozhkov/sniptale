@@ -3187,3 +3187,305 @@ for (const variant of [
     }
   });
 }
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`cut transition inspector and rendered export in ${variant.locale}/${variant.theme}`, async ({
+    page,
+  }, testInfo) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
+      await button('gallery.videoReview.cutMode').click();
+      await timelineGesture(page, 2.1, 4.1);
+      await dialog
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.cutTransition') })
+        .click();
+      const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
+      const type = settings.getByRole('button', {
+        name: label('gallery.videoReview.zoomTransitionType'),
+        exact: true,
+      });
+      await expect(type).toContainText(label('gallery.videoReview.transitionNone'));
+      await type.click();
+      await page
+        .getByRole('option', {
+          name: label(
+            variant.locale === 'ru'
+              ? 'gallery.videoReview.cutFadeBlack'
+              : 'gallery.videoReview.cutDissolve'
+          ),
+          exact: true,
+        })
+        .click();
+      const duration = settings.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomTransitionDuration'),
+        exact: true,
+      });
+      await duration.fill('1');
+      await duration.press('Tab');
+      await expect(duration).toHaveValue('1');
+      await expect(
+        settings.getByRole('textbox', {
+          name: label('gallery.videoReview.cutTransitionBefore'),
+          exact: true,
+        })
+      ).toHaveValue('0.5');
+      await duration.fill('2');
+      await duration.press('Escape');
+      await expect(dialog).toBeVisible();
+      await expect(duration).toHaveValue('1');
+      await duration.fill('0');
+      await duration.press('Tab');
+      await expect(type).toContainText(label('gallery.videoReview.transitionNone'));
+      await button('gallery.videoReview.undo').click();
+      await dialog.locator('[data-ui="gallery.videoReview.editBlock"]').click();
+      await expect(duration).toHaveValue('1');
+      await page.setViewportSize({ width: 800, height: 600 });
+      for (const field of await settings.getByRole('textbox').all()) {
+        await field.scrollIntoViewIfNeeded();
+        await expect(field).toBeInViewport();
+      }
+      await dialog.screenshot({
+        path: testInfo.outputPath(`cut-settings-small-${variant.locale}.png`),
+      });
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await dialog.screenshot({ path: testInfo.outputPath(`cut-settings-${variant.locale}.png`) });
+      await button('gallery.videoReview.pointerTool').click();
+      await timelineGesture(page, 1.7);
+      await dialog.locator('video').evaluate(async (video: HTMLVideoElement) => {
+        await new Promise<void>((resolve) => {
+          video.addEventListener('seeked', () => resolve(), { once: true });
+          video.currentTime = 1.701;
+        });
+      });
+      const canvas = dialog.locator('[data-ui="gallery.videoReview.cutTransitionCanvas"]');
+      await expect(canvas).toBeVisible();
+      await expect.poll(() => canvas.evaluate((node: HTMLCanvasElement) => node.width)).toBe(160);
+      await dialog.screenshot({
+        path: testInfo.outputPath(`cut-transition-${variant.locale}.png`),
+      });
+      const previewPixels = await canvas.evaluate((node: HTMLCanvasElement) =>
+        Array.from(node.getContext('2d')!.getImageData(0, 0, 160, 90).data)
+      );
+      // Compare the encoded scene at a normal export resolution; the 160×90 fixture's
+      // source-size bitrate deliberately prioritizes size and obscures individual pixels.
+      await button('gallery.videoReview.advancedEditing').click();
+      await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+      await button('videoEditor.exportDialog.resolutionLabel').click();
+      await page.getByRole('option', { name: '480p', exact: true }).click();
+      const downloading = page.waitForEvent('download');
+      await button('gallery.videoReview.downloadVideo').click();
+      const download = await downloading;
+      await download.saveAs(testInfo.outputPath('cut-transition.webm'));
+      const encoded = (await readFile(await download.path())).toString('base64');
+      const outputPixels = await page.evaluate(async (encoded) => {
+        const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: 'video/webm' }));
+        const video = document.createElement('video');
+        video.muted = true;
+        try {
+          await new Promise<void>((resolve, reject) => {
+            video.onloadeddata = () => resolve();
+            video.onerror = () => reject(new Error('decode failed'));
+            video.src = url;
+          });
+          await new Promise<void>((resolve) => {
+            video.onseeked = () => resolve();
+            video.currentTime = 1.701;
+          });
+          const canvas = document.createElement('canvas');
+          canvas.width = 160;
+          canvas.height = 90;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(video, 0, 0, 160, 90);
+          return Array.from(context.getImageData(0, 0, 160, 90).data);
+        } finally {
+          video.removeAttribute('src');
+          video.load();
+          URL.revokeObjectURL(url);
+        }
+      }, encoded);
+      const meanDifference =
+        outputPixels.reduce(
+          (sum, value, index) => sum + Math.abs(value - previewPixels[index]!),
+          0
+        ) / outputPixels.length;
+      expect(meanDifference).toBeLessThan(8);
+      const input = new Input({
+        source: new BlobSource(new Blob([Uint8Array.from(await readFile(await download.path()))])),
+        formats: ALL_FORMATS,
+      });
+      try {
+        expect(await input.getDurationFromMetadata()).toBeCloseTo(10, 1);
+      } finally {
+        input.dispose();
+      }
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}
+
+// Tiny VP8 VFR fixture: timestamps 0,.3,…,5.7,5.9. Only1.8 is blue and4.2 green;
+// every other frame is red. Cut2–4 and fragment1.7–4.3 must never borrow red endpoints.
+// Generated with ffmpeg color=red:s=160x90:r=10:d=6, conditional blue/lime drawbox,
+// select='not(mod(n,3))+eq(n,59)', -fps_mode vfr -c:v libvpx -b:v250k -g1.
+test('cut transition VFR fragment excludes cut and outside-fragment rasters', async ({
+  page,
+}, testInfo) => {
+  const host = await startHostServer();
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-cut-vfr.webm', { width: 160, height: 90, duration: 6 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('dialog');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
+    await button('gallery.videoReview.advancedEditing').click();
+    await button('gallery.videoReview.cutMode').click();
+    await timelineGesture(page, 2, 4);
+    await dialog
+      .locator('summary')
+      .filter({ hasText: translate('gallery.videoReview.cutTransition', 'en') })
+      .click();
+    const settings = dialog.locator('[data-ui="gallery.videoReview.cutTransition"]');
+    await settings
+      .getByRole('button', {
+        name: translate('gallery.videoReview.zoomTransitionType', 'en'),
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole('option', {
+        name: translate('gallery.videoReview.cutDissolve', 'en'),
+        exact: true,
+      })
+      .click();
+    const duration = settings.getByRole('textbox', {
+      name: translate('gallery.videoReview.zoomTransitionDuration', 'en'),
+      exact: true,
+    });
+    await duration.fill('1');
+    await duration.press('Tab');
+    await button('gallery.videoReview.pointerTool').click();
+    await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+    await button('videoEditor.exportDialog.resolutionLabel').click();
+    await page.getByRole('option', { name: '480p', exact: true }).click();
+    await button('gallery.videoReview.exportFrameRate').click();
+    await page.getByRole('option', { name: '30', exact: true }).click();
+    const fullDownload = page.waitForEvent('download');
+    await button('gallery.videoReview.downloadVideo').click();
+    const full = await fullDownload;
+    const fullPixels = await readTransitionVideoPixels(
+      page,
+      (await readFile(await full.path())).toString('base64'),
+      [2.001, 2.2]
+    );
+    for (const pixel of fullPixels) expect(pixel[0], JSON.stringify(fullPixels)).toBeLessThan(15);
+    await timelineGesture(page, 1.7, 4.3);
+    const downloading = page.waitForEvent('download');
+    await button('gallery.videoReview.downloadSelection').click();
+    const download = await downloading;
+    await download.saveAs(testInfo.outputPath('vfr-fragment.webm'));
+    const encoded = (await readFile(await download.path())).toString('base64');
+    const pixels = await readTransitionVideoPixels(page, encoded, [0.001, 0.2, 0.4, 0.59]);
+    for (const [index, pixel] of pixels.entries()) {
+      expect(pixel[0]).toBeLessThan(15);
+      expect(pixel[1]! + pixel[2]!).toBeGreaterThan(180);
+      // Compare channel proportions: lossy YUV conversion changes absolute chroma.
+      // One30fps sample plus conversion tolerance stays below9% of this0.6s blend.
+      const incoming = pixel[1]! / (pixel[1]! + pixel[2]!);
+      expect(Math.abs(incoming - [0.001, 0.2, 0.4, 0.59][index]! / 0.6)).toBeLessThan(0.09);
+    }
+    expect(pixels[0]![2]).toBeGreaterThan(230);
+    expect(pixels.at(-1)![1]).toBeGreaterThan(180);
+    const input = new Input({
+      source: new BlobSource(new Blob([Uint8Array.from(await readFile(await download.path()))])),
+      formats: ALL_FORMATS,
+    });
+    try {
+      expect(await input.getDurationFromMetadata()).toBeCloseTo(0.6, 1);
+    } finally {
+      input.dispose();
+    }
+    //1.9–2 contains no decoded sample; refusing export is required, never borrow1.8.
+    await timelineGesture(page, 1.9, 4.3);
+    const unexpectedDownloads: string[] = [];
+    page.on('download', (file) => unexpectedDownloads.push(file.suggestedFilename()));
+    await button('gallery.videoReview.downloadSelection').click();
+    await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
+    await expect(
+      dialog.getByText(translate('gallery.videoReview.cutTransitionFramesUnavailable', 'en'), {
+        exact: false,
+      })
+    ).toBeVisible();
+    expect(unexpectedDownloads).toEqual([]);
+  } finally {
+    await new Promise<void>((resolve) => host.server.close(() => resolve()));
+  }
+});
+
+async function readTransitionVideoPixels(page: Page, encoded: string, times: number[]) {
+  return page.evaluate(
+    async ({ encoded, times }) => {
+      const bytes = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'video/webm' }));
+      const video = document.createElement('video');
+      video.muted = true;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          video.onloadeddata = () => resolve();
+          video.onerror = () => reject(new Error('VFR output decode failed'));
+          video.src = url;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 90;
+        const context = canvas.getContext('2d')!;
+        const pixels: number[][] = [];
+        for (const time of times) {
+          await new Promise<void>((resolve) => {
+            video.onseeked = () => resolve();
+            video.currentTime = time;
+          });
+          context.drawImage(video, 0, 0, 160, 90);
+          pixels.push(Array.from(context.getImageData(80, 45, 1, 1).data));
+        }
+        return pixels;
+      } finally {
+        video.removeAttribute('src');
+        video.load();
+        URL.revokeObjectURL(url);
+      }
+    },
+    { encoded, times }
+  );
+}

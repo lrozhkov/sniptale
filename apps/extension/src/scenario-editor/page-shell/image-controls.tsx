@@ -55,6 +55,7 @@ function GuideImageControlsView({
   onClose,
   onEscape,
   onEdit,
+  onStartFraming,
   stepId,
   t,
   url,
@@ -69,6 +70,7 @@ function GuideImageControlsView({
   onClose: () => void;
   onEscape?: () => void;
   onEdit?: () => void;
+  onStartFraming?: () => void;
   stepId?: string;
   t: Translate;
 }) {
@@ -112,6 +114,9 @@ function GuideImageControlsView({
           </>
         )}
         <GuideImageGeometryFields
+          framing={framing}
+          onStartFraming={onStartFraming}
+          startDisabled={disabled || !url}
           overview={
             framing && (
               <GuideImageOverview
@@ -155,6 +160,9 @@ function GuideImageControlsView({
 
 /** Geometry settings work against either the active draft or the selected saved image. */
 function GuideImageGeometryFields({
+  framing,
+  onStartFraming,
+  startDisabled,
   overview,
   block,
   geometryDisabled,
@@ -162,6 +170,9 @@ function GuideImageGeometryFields({
   geometry,
   t,
 }: {
+  framing: boolean;
+  onStartFraming: (() => void) | undefined;
+  startDisabled: boolean;
   overview: ReactNode;
   block: GuideImageBlock;
   geometryDisabled: boolean;
@@ -175,31 +186,52 @@ function GuideImageGeometryFields({
       icon={ScanLine}
       title={t('scenario.editor.guideFramingGroup')}
     >
-      <p>{t('scenario.editor.guideImageGestureHint')}</p>
-      <fieldset className="contents" disabled={geometryDisabled}>
-        <SegmentedSwitch
-          activeId={block.fit}
-          ariaLabel={t('scenario.editor.guideImageFit')}
-          options={[
-            { id: 'contain', label: t('scenario.editor.guideImageContain') },
-            { id: 'cover', label: t('scenario.editor.guideImageCover') },
-          ]}
-          onChange={(fit) => geometry({ kind: 'fit', fit })}
-        />
-      </fieldset>
-      {overview}
-      <GuideImageRangeField
-        label={t('scenario.editor.guideImageZoom')}
-        min={10}
-        max={10000}
-        sliderMax={400}
-        step={10}
-        disabled={geometryDisabled}
-        value={Math.round(block.contentTransform.scale * 100)}
-        onChange={(value) =>
-          geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
-        }
-      />
+      {!framing && (
+        <ScenarioInspectorActionButton
+          disabled={startDisabled || !onStartFraming}
+          onClick={onStartFraming}
+        >
+          <ScanLine size={16} aria-hidden="true" />
+          {t('scenario.editor.guideEditImageFrame')}
+        </ScenarioInspectorActionButton>
+      )}
+      {framing && (
+        <>
+          <fieldset className="contents" disabled={geometryDisabled}>
+            <SegmentedSwitch
+              activeId={block.fit}
+              ariaLabel={t('scenario.editor.guideImageFit')}
+              options={[
+                { id: 'contain', label: t('scenario.editor.guideImageContain') },
+                { id: 'cover', label: t('scenario.editor.guideImageCover') },
+              ]}
+              onChange={(fit) => geometry({ kind: 'fit', fit })}
+            />
+          </fieldset>
+          {overview}
+          <GuideImageRangeField
+            label={t('scenario.editor.guideImageZoom')}
+            min={10}
+            max={10000}
+            sliderMax={400}
+            step={10}
+            disabled={geometryDisabled}
+            value={Math.round(block.contentTransform.scale * 100)}
+            onChange={(value) =>
+              geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
+            }
+          />
+          <div className="guide-image-reset-actions">
+            <ContentToolbarButton
+              title={t('scenario.editor.guideImageCenter')}
+              disabled={geometryDisabled}
+              onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
+            >
+              <Focus size={16} aria-hidden="true" />
+            </ContentToolbarButton>
+          </div>
+        </>
+      )}
       {(['width', 'height'] as const).map((dimension) => (
         <GuideImageRangeField
           key={dimension}
@@ -222,13 +254,6 @@ function GuideImageGeometryFields({
         />
       ))}
       <div className="guide-image-reset-actions">
-        <ContentToolbarButton
-          title={t('scenario.editor.guideImageCenter')}
-          disabled={geometryDisabled}
-          onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
-        >
-          <Focus size={16} aria-hidden="true" />
-        </ContentToolbarButton>
         <ContentToolbarButton
           title={t('scenario.editor.guideImageReset')}
           disabled={geometryDisabled || !dimensions}

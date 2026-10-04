@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { createReviewFragment } from './fragment';
+import { planReviewCutTransitions } from './cuts';
 import { buildReviewTimeMap } from './timeline';
 import type { ReviewEdit } from './types';
 
@@ -58,4 +59,45 @@ it('preserves advanced fragment endpoints between keyframes', () => {
   const fragment = createReviewFragment({ ...input, snapToKeyframes: false });
   expect(fragment).toMatchObject({ start: 1.8, end: 8.1 });
   expect(buildReviewTimeMap(10, fragment!.edits).at(-1)?.resultEnd).toBeCloseTo(6.3);
+});
+
+it('retains transition intent but constrains endpoint authority to the selected fragment', () => {
+  const edits: ReviewEdit[] = [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 4,
+      end: 6,
+      requestedStart: 4,
+      requestedEnd: 6,
+      transition: { type: 'dissolve', before: 2, after: 2 },
+    },
+  ];
+  const original = structuredClone(edits);
+  const fragment = createReviewFragment({
+    ...input,
+    edits,
+    snapToKeyframes: false,
+    selection: { kind: 'range', start: 3.75, end: 6.5 },
+  })!;
+  expect(planReviewCutTransitions(10, fragment.edits)).toEqual([
+    {
+      id: 'cut',
+      type: 'dissolve',
+      seam: 0.25,
+      before: 0.25,
+      after: 0.5,
+      left: { start: 3.75, end: 4 },
+      right: { start: 6, end: 6.5 },
+    },
+  ]);
+  expect(buildReviewTimeMap(10, fragment.edits).at(-1)?.resultEnd).toBe(0.75);
+  const edge = createReviewFragment({
+    ...input,
+    edits,
+    snapToKeyframes: false,
+    selection: { kind: 'range', start: 5, end: 8 },
+  })!;
+  expect(planReviewCutTransitions(10, edge.edits)).toEqual([]);
+  expect(edits).toEqual(original);
 });

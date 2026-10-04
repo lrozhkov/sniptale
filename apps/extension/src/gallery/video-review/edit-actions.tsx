@@ -28,6 +28,8 @@ import {
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   canvas: 'gallery.videoReview.canvas',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
+  'cut-transition': 'gallery.videoReview.cutTransition',
+  'transition-frames': 'gallery.videoReview.cutTransitionFramesUnavailable',
   zoom: 'gallery.videoReview.exportBlockerZoom',
   background: 'gallery.videoReview.exportBlockerBackground',
   comments: 'gallery.videoReview.exportBlockerComments',

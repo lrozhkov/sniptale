@@ -1,5 +1,9 @@
 import { useRef, useState } from 'react';
-import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
+import type {
+  ReviewAnchor,
+  ReviewEdit,
+  ReviewCutTransition,
+} from '../../features/video/review/types';
 import {
   createReviewCut,
   createReviewSpeed,
@@ -83,7 +87,11 @@ export function useReviewEdits(props: {
     const kind = before?.kind ?? requestedKind ?? mode;
     if (!kind || pending.current) return false;
     const planned = candidate(kind, selection, before);
-    const after = planned && { ...planned, id: before?.id ?? crypto.randomUUID() };
+    const after = planned && {
+      ...planned,
+      id: before?.id ?? crypto.randomUUID(),
+      ...(before?.kind === 'cut' && before.transition ? { transition: before.transition } : {}),
+    };
     if (!after) {
       props.onInvalid?.();
       return false;
@@ -119,6 +127,13 @@ export function useReviewEdits(props: {
         ? props.commit(selected, { ...selected, audio: value })
         : undefined,
     selected,
+    changeSelectedTransition: (transition: ReviewCutTransition | null) => {
+      if (selected?.kind !== 'cut') return undefined;
+      props.pause();
+      const cut = { ...selected };
+      delete cut.transition;
+      return props.commit(selected, transition ? { ...cut, transition } : cut);
+    },
     commitRange,
     apply: (kind: 'cut' | 'speed', selection: ReviewAnchor) => commitRange(selection, null, kind),
     canApply: (kind: 'cut' | 'speed', selection: ReviewAnchor) => !!candidate(kind, selection),

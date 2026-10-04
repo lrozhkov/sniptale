@@ -66,6 +66,28 @@
       "reviewDate": "2026-09-06",
       "astHash": "8e0fb95ad721a34198331fa05f0e3381d962ec1089a3282d379408f60636892c",
       "signatureHash": "99bc8f53332cdb91cb2856b5f298ed8492021b86e698d8380c534924bc6d9bdc"
+    },
+    {
+      "file": "apps/extension/src/gallery/video-review/index.tsx",
+      "symbol": "ReviewEditor",
+      "rule": "structural-function-risk",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: ReviewEditor is a single UI composition with 8 statements, cyclomatic9, cognitive8 and nesting1. This change only adds a typed cut-preview binding to its existing stage, increasing JSX length to156 without adding a durable writer, transaction or recovery authority. Stage, inspector, timeline and voiceover already have concrete owners. Splitting another forwarding-only component to reduce line count would add navigation without separating an independent responsibility.",
+      "removalCondition": "Remove when the exact AST or signature changes; reassess any independent ownership, new durable authority, mixed fixture lifecycle, or review finding. Remove when the analyzer models this cohesive JSX/test shape. Independent architecture review must validate the classification.",
+      "reviewDate": "2026-10-04",
+      "astHash": "8f7208049817ff99e7b9d423d17a33932bd5bfa7f5e1f93e51521f6a49548209",
+      "signatureHash": "735e231ed936189e911f456a3d6b0bf409abf9cf5ed37b9d28077544dbd150dc"
+    },
+    {
+      "file": "apps/extension/src/workflows/video-review/render-export.test.ts",
+      "symbol": "<file>",
+      "rule": "structural-file-risk",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This file holds the frame-render export contract tests and one shared decoder/output fixture. The added tests prove transition raster admission/cleanup and exact fractional output duration through the same writeReviewFrames entrypoint. Its score2 and cohesion1.00 are unchanged; the sole blocking change is848lines crossing the800-line file cap. Fixtures are reset for each test and no production state or owner is introduced. Splitting requires either a fixture-only forwarding surface or duplicated decoder mocks, without reducing an actual ownership defect.",
+      "removalCondition": "Remove when the exact AST or signature changes; reassess any independent ownership, new durable authority, mixed fixture lifecycle, or review finding. Remove when the analyzer models this cohesive JSX/test shape. Independent architecture review must validate the classification.",
+      "reviewDate": "2026-10-04",
+      "astHash": "2b8968699df53d14e6a37cf9fc1e15f69f6f85b2431b173fc9f3aadb61ca8856",
+      "signatureHash": "a2e7b978385578d8defe4646c0f15ffb22b2295ce641c6d881e0925898b7fbb6"
     }
   ]
 }

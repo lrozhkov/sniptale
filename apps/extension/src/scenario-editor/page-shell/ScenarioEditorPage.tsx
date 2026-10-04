@@ -474,6 +474,17 @@ function GuideContextualInspector({
       htmlDefaults={project.htmlExport}
       url={images[framing.target.block.assetId]}
       disabled={disabled}
+      onStartFraming={() => {
+        if (!framing.target) return;
+        const target = framing.target;
+        const surface = [
+          ...document.querySelectorAll<HTMLElement>('.guide-block[data-block-id]'),
+        ].find((element) => element.dataset['blockId'] === target.block.id);
+        surface
+          ?.querySelector<HTMLButtonElement>('[data-frame-image]')
+          ?.focus({ preventScroll: true });
+        framing.select(target.item.id, target.block.id, true);
+      }}
       onChange={framing.change}
       onClose={framing.close}
       onEscape={framing.imageId ? framing.finishFraming : framing.close}

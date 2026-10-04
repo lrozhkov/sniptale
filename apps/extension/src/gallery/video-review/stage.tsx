@@ -1,3 +1,4 @@
+import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import { ReviewStageFocusControl, type ReviewStageFocus } from './stage-focus';
@@ -67,6 +68,7 @@ function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
 /** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
 export function ReviewStage(props: {
   backgroundImageUrl?: string | undefined;
+  cutPreview?: ReviewCutPreviewBinding | undefined;
   url: string;
   source: ReviewSource;
   video: RefObject<HTMLVideoElement | null>;
@@ -146,6 +148,7 @@ export function ReviewStage(props: {
         </div>
         <ReviewSceneVideo
           url={props.url}
+          cutPreview={props.cutPreview}
           video={props.video}
           {...(props.scene ? { scene: props.scene } : {})}
           layout={sceneLayout}
@@ -199,6 +202,7 @@ function ReviewStageComments(props: {
 
 /** One composition-space video: fitted inside the padded content rect, cropped by the clip. */
 function ReviewSceneVideo(props: {
+  cutPreview?: ReviewCutPreviewBinding | undefined;
   url: string;
   video: RefObject<HTMLVideoElement | null>;
   scene?: {
@@ -281,6 +285,22 @@ function ReviewSceneVideo(props: {
         onEnded={() => props.onPlaying(false)}
         onError={props.onError}
       />
+      {props.cutPreview && props.layout ? (
+        <ReviewCutTransitionPreview
+          binding={props.cutPreview}
+          video={props.video}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            width: props.layout.videoRect.width,
+            height: props.layout.videoRect.height,
+            transformOrigin: '0 0',
+            transform: videoTransform,
+            maxWidth: 'none',
+          }}
+        />
+      ) : null}
       {props.projected ? (
         <ReviewRegionOverlay
           drawing={props.drawing}

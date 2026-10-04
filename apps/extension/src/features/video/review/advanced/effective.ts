@@ -99,6 +99,8 @@ export function resolveQuickEditEffectiveState(
 export type QuickEditExportReason =
   | 'canvas'
   | 'precise-edits'
+  | 'cut-transition'
+  | 'transition-frames'
   | 'zoom'
   | 'background'
   | 'comments'
@@ -135,11 +137,14 @@ export function resolveQuickEditExportPlan(args: {
     reviewVisibleEditBoundaries(args.document.edits).some(
       (time) => !args.videoCopyBoundaries!.some((boundary) => Math.abs(boundary - time) < 0.000001)
     );
+  const transitions = args.document.edits.some((edit) => edit.kind === 'cut' && edit.transition);
+  const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
+  if (transitions) visual.push('cut-transition');
   if (args.advanced.ui.mode !== 'advanced') {
-    if (preciseEdits)
+    if (visual.length)
       return args.videoRenderAvailable === false
         ? { kind: 'unavailable', reasons: ['video-encoder'] }
-        : { kind: 'ready', video: 'render', audio: 'copy', reasons: ['precise-edits'] };
+        : { kind: 'ready', video: 'render', audio: 'copy', reasons: visual };
     return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
   }
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
@@ -160,7 +165,6 @@ export function resolveQuickEditExportPlan(args: {
     )
   )
     audio.push('original-audio');
-  const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (args.advanced.canvas) visual.push('canvas');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');

@@ -18,7 +18,13 @@ vi.mock('./render-spotlight', () => ({ drawReviewSpotlight: vi.fn() }));
 
 const state = vi.hoisted(() => ({
   configurations: [] as unknown[],
-  encoded: [] as { timestamp: number; close: unknown; width: number; height: number }[],
+  encoded: [] as {
+    timestamp: number;
+    duration: number;
+    close: unknown;
+    width: number;
+    height: number;
+  }[],
   composited: [] as unknown[][],
   drawn: [] as { draw: unknown; close: unknown }[],
   audioTrack: null as null | {
@@ -31,17 +37,31 @@ const state = vi.hoisted(() => ({
 vi.mock('mediabunny', () => {
   class VideoSample {
     timestamp: number;
+    duration: number;
     width: number;
     height: number;
     close = vi.fn();
     draw = vi.fn();
-    constructor(source: HTMLCanvasElement | null, init: { timestamp: number }) {
+    constructor(source: HTMLCanvasElement | null, init: { timestamp: number; duration?: number }) {
       this.timestamp = init.timestamp;
+      this.duration = init.duration ?? 0;
       this.width = source?.width ?? 0;
       this.height = source?.height ?? 0;
     }
   }
   class VideoSampleSink {
+    async getSample(time: number) {
+      const sample = new VideoSample(null, { timestamp: Math.floor(time * 2) / 2 });
+      state.drawn.push({ draw: sample.draw, close: sample.close });
+      return sample;
+    }
+    async *samples(start: number, end: number) {
+      const timestamp = Math.ceil(start * 2) / 2;
+      if (timestamp >= end) return;
+      const sample = new VideoSample(null, { timestamp });
+      state.drawn.push({ draw: sample.draw, close: sample.close });
+      yield sample;
+    }
     async *samplesAtTimestamps(times: readonly number[]) {
       for (const time of times) {
         const sample = new VideoSample(null, { timestamp: time });
@@ -79,6 +99,7 @@ vi.mock('mediabunny', () => {
     add = vi.fn(async (sample: VideoSample) => {
       state.encoded.push({
         timestamp: sample.timestamp,
+        duration: sample.duration,
         close: sample.close,
         width: sample.width,
         height: sample.height,
@@ -780,3 +801,47 @@ it.each(['fixed', 'follow-video'] as const)(
     }
   }
 );
+
+it('renders a transition on the unchanged result clock and releases endpoint samples', async () => {
+  state.drawn.length = 0;
+  state.encoded.length = 0;
+  const args = argsFixture();
+  args.edits = [{ ...cutEdit(0.5, 1), transition: { type: 'dissolve', before: 0.5, after: 0.5 } }];
+  const receipt = await writeReviewFrames(args);
+  expect(receipt.resultDuration).toBe(1.5);
+  expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1]);
+  expect(state.drawn).toHaveLength(5);
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+  state.drawn.length = 0;
+  await expect(
+    writeReviewFrames({
+      ...args,
+      onProgress() {
+        throw new Error('stop render');
+      },
+    })
+  ).rejects.toThrow('stop render');
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('refuses an export whose retained side contains no admissible transition frame', async () => {
+  state.drawn.length = 0;
+  const args = argsFixture();
+  args.edits = [
+    { ...cutEdit(0.5, 1.75), transition: { type: 'dissolve', before: 0.5, after: 0.5 } },
+  ];
+  await expect(writeReviewFrames(args)).rejects.toMatchObject({
+    name: 'QuickEditExportUnavailable',
+    reasons: ['transition-frames'],
+  });
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('ends the final rendered frame at the exact retained duration instead of adding a full frame', async () => {
+  state.encoded.length = 0;
+  const args = argsFixture();
+  args.index.duration = 2.03;
+  await writeReviewFrames(args);
+  const last = state.encoded.at(-1)!;
+  expect(last.timestamp + last.duration).toBeCloseTo(2.03, 8);
+});

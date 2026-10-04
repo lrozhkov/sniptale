@@ -281,3 +281,40 @@ it('applies absolute subsequent Speed and reopens old snapshot history without r
   expect(reopened?.history.slice(0, 2)).toEqual(legacyHistory);
   expect(recording.sourceAnchor).toEqual([{ start: 2, end: 6, offset: 0, duration: 2 }]);
 });
+
+it('roundtrips per-cut transition edits through workspace history without shifting montage time', () => {
+  let snapshot = initial();
+  const cut: ReviewEdit = {
+    id: 'cut',
+    kind: 'cut',
+    start: 2,
+    end: 4,
+    requestedStart: 2,
+    requestedEnd: 4,
+  };
+  snapshot = commit(snapshot, { id: 'add', at: 1, target: 'edit', before: null, after: cut });
+  const before = document(snapshot);
+  const edited: ReviewEdit = {
+    ...cut,
+    transition: { type: 'dissolve', before: 0.25, after: 0.75 },
+  };
+  snapshot = commit(snapshot, {
+    id: 'transition',
+    at: 2,
+    target: 'edit',
+    before: cut,
+    after: edited,
+  });
+  expect(document(snapshot).edits).toEqual([edited]);
+  expect(buildReviewTimeMap(12, document(snapshot).edits)).toEqual(
+    buildReviewTimeMap(12, before.edits)
+  );
+  expect(document(snapshot).advancedContent).toEqual(before.advancedContent);
+  const reopened = parseVideoWorkspace(JSON.parse(JSON.stringify(snapshot.workspace)));
+  expect(reopened).toEqual(snapshot.workspace);
+  snapshot = { ...snapshot, workspace: reopened! };
+  snapshot = applyLocalReviewChange(snapshot, { kind: 'history', direction: 'undo' });
+  expect(document(snapshot).edits).toEqual([cut]);
+  snapshot = applyLocalReviewChange(snapshot, { kind: 'history', direction: 'redo' });
+  expect(document(snapshot).edits).toEqual([edited]);
+});

@@ -1,6 +1,27 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  cutTransitionFramesUnavailable: {
+    ru: 'Для перехода недостаточно сохранённых кадров. Сдвиньте границу вырезания или отключите переход.',
+    en: 'Not enough retained frames for this transition. Adjust the cut boundary or disable the transition.',
+  },
+  cutTransition: { ru: 'Переход на стыке', en: 'Cut transition' },
+  cutDissolve: { ru: 'Растворение', en: 'Dissolve' },
+  cutFadeBlack: { ru: 'Через чёрный', en: 'Fade through black' },
+  cutTransitionBefore: { ru: 'До стыка', en: 'Before cut' },
+  cutTransitionAfter: { ru: 'После стыка', en: 'After cut' },
+  cutTransitionHint: {
+    ru: 'Длительность монтажа не меняется. Используются только сохранённые соседние кадры. При растворении граничные кадры удерживаются; звук остаётся без перехода.',
+    en: 'Montage duration stays unchanged. Only retained neighboring frames are used. Dissolve holds boundary frames; audio keeps its existing cut.',
+  },
+  cutTransitionUnavailable: {
+    ru: 'Нет сохранённого материала с обеих сторон. Настройки сохранены, переход не применяется.',
+    en: 'Retained material is needed on both sides. Settings are saved; this transition is not applied.',
+  },
+  cutTransitionEffective: {
+    ru: 'С учётом соседнего материала: до стыка {before} с, после {after} с.',
+    en: 'With available neighboring material: {before} s before, {after} s after.',
+  },
   backgroundImage: { ru: 'Изображение', en: 'Image' },
   backgroundImporting: { ru: 'Загрузка фона…', en: 'Importing background…' },
   backgroundImportFailed: {

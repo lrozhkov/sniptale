@@ -672,7 +672,14 @@ it('keeps a framing session out of autosave and commits all geometry once on Don
   );
   await render();
   const image = container.querySelector('[data-block-id="one"]')!;
-  await click('Frame and image', image);
+  await act(async () =>
+    image
+      .querySelector('figure')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+  );
+  const inspector = container.querySelector('#guide-inspector-panel')!;
+  expect(inspector.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  await click('Frame and image', inspector);
   await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
   await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '300');
   await settleAutosave();

@@ -68,3 +68,97 @@ for (const [theme, locale] of [
     issues.assertClean();
   });
 }
+
+for (const [theme, locale] of [
+  ['light', 'en'],
+  ['dark', 'ru'],
+] as const) {
+  test(`image crop controls retain application surfaces in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    const image = page.locator('[data-block-id="before"]');
+    await image.locator('img').click();
+    const inspector = page.locator('.guide-image-inspector');
+    const zoom = inspector.locator('input[type="range"]').first();
+    await expect(inspector.locator('.guide-image-overview-map')).toHaveCount(0);
+    await inspector
+      .getByRole('button', {
+        name: locale === 'en' ? 'Frame and image' : 'Рамка и изображение',
+        exact: true,
+      })
+      .click();
+    await expect(image.locator('[data-frame-image]')).toBeFocused();
+    await expect(inspector.locator('.guide-image-overview-map')).toBeVisible();
+    await expect(zoom).toHaveAttribute('aria-label', locale === 'en' ? 'Zoom, %' : 'Масштаб, %');
+    const toolbar = image.locator('.guide-image-tools');
+    const cancel = toolbar.getByRole('button', {
+      name: locale === 'en' ? 'Cancel' : 'Отмена',
+      exact: true,
+    });
+    const bounds = toolbar.locator('button[aria-pressed]');
+    const colors = await cancel.evaluate((button) => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--sniptale-color-surface-panel)';
+      probe.style.color = 'var(--sniptale-color-text-primary)';
+      button.append(probe);
+      const style = getComputedStyle(probe);
+      const result = {
+        background: style.backgroundColor,
+        color: style.color,
+        selected: '',
+        hover: '',
+      };
+      probe.style.backgroundColor =
+        'color-mix(in srgb, var(--sniptale-color-accent) 15%, var(--sniptale-color-surface-panel))';
+      result.selected = getComputedStyle(probe).backgroundColor;
+      probe.style.backgroundColor =
+        'color-mix(in srgb, var(--sniptale-color-text-primary) 8%, var(--sniptale-color-surface-panel))';
+      result.hover = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return result;
+    });
+    await page.mouse.move(1, 1);
+    await expect(cancel).toHaveCSS('background-color', colors.background);
+    await expect(cancel).toHaveCSS('color', colors.color);
+    await expect(bounds).toHaveCSS('background-color', colors.selected);
+    await bounds.click();
+    await page.mouse.move(1, 1);
+    await expect(bounds).toHaveAttribute('aria-pressed', 'false');
+    await expect(bounds).toHaveCSS('background-color', colors.background);
+    await expect(bounds).toHaveCSS('color', colors.color);
+    await bounds.hover();
+    await expect(bounds).toHaveCSS('background-color', colors.hover);
+    await cancel.hover();
+    await expect(cancel).toHaveCSS('background-color', colors.hover);
+    await expect(cancel).toHaveCSS('color', colors.color);
+    await bounds.click();
+    await expect(bounds).toHaveAttribute('aria-pressed', 'true');
+    await expect(bounds).toHaveCSS('color', colors.color);
+    await expect(bounds).toHaveCSS('background-color', colors.selected);
+    await page.screenshot({ path: `.tmp/backlog7/w10-crop-${theme}.png` });
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await expect(cancel).toBeInViewport();
+    await page.screenshot({ path: `.tmp/backlog7/w10-crop-${theme}-compact.png` });
+    await cancel.click();
+    await inspector
+      .getByRole('button', {
+        name: locale === 'en' ? 'Quarter width' : 'На четверть ширины',
+        exact: true,
+      })
+      .click();
+    await inspector
+      .getByRole('button', {
+        name: locale === 'en' ? 'Frame and image' : 'Рамка и изображение',
+        exact: true,
+      })
+      .click();
+    expect((await image.locator('figure').boundingBox())!.width).toBeLessThan(160);
+    await expect(cancel).toHaveCSS('height', '24px');
+    await expect(cancel).toHaveCSS('padding-left', '0px');
+    await cancel.click();
+    await expect(inspector.locator('.guide-image-overview-map')).toHaveCount(0);
+    await expect(image.locator('figure')).toHaveAttribute('data-editing', 'false');
+  });
+}

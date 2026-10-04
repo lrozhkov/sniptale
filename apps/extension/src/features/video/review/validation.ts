@@ -8,6 +8,7 @@ import type {
   ReviewAnchor,
   ReviewAnnotation,
   ReviewEdit,
+  ReviewCutTransition,
   ReviewOperation,
   ReviewRegion,
   ReviewSource,
@@ -140,7 +141,11 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
     requestedStart: value['requestedStart'],
     requestedEnd: value['requestedEnd'],
   };
-  if (value['kind'] === 'cut') return { ...range, kind: 'cut' };
+  if (value['kind'] === 'cut') {
+    if (value['transition'] === undefined) return { ...range, kind: 'cut' };
+    const transition = parseCutTransition(value['transition']);
+    return transition ? { ...range, kind: 'cut', transition } : null;
+  }
   const rate = value['rate'];
   const audio = value['audio'];
   if (
@@ -150,6 +155,25 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
   )
     return null;
   return { ...range, kind: 'speed', rate, audio };
+}
+
+/** Invalid authored transitions refuse the operation instead of degrading it to a hard cut. */
+function parseCutTransition(value: unknown): ReviewCutTransition | null {
+  if (!isRecord(value)) return null;
+  const type = value['type'];
+  const before = value['before'];
+  const after = value['after'];
+  if (
+    (type !== 'dissolve' && type !== 'fade-black') ||
+    !finite(before) ||
+    !finite(after) ||
+    before < 0 ||
+    after < 0 ||
+    before + after <= 0 ||
+    before + after > 60
+  )
+    return null;
+  return { type, before, after };
 }
 
 function parseCanvasComment(value: unknown, duration: number): CanvasComment | null {

@@ -1,3 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
+import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
+import { planReviewCutTransitions } from '../../features/video/review/cuts';
+import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
+import { ReviewDetails, reviewSelectFieldClassName } from './controls';
+import { formatNumber, useAppLocale } from '../../platform/i18n';
 import { ReviewOriginalAudioInspector } from './original-audio-inspector';
 import { planReviewActionEdits } from '../../features/video/review/action-edits';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -175,6 +181,15 @@ function SelectedEdit(
           onAudio={editing.changeSelectedAudio}
         />
       ) : null}
+      {selected.kind === 'cut' ? (
+        <CutTransitionFields
+          key={selected.id}
+          edit={selected}
+          edits={resource.session.getSnapshot().document.edits}
+          duration={resource.source.duration}
+          onChange={editing.changeSelectedTransition}
+        />
+      ) : null}
       <ReviewEditRangeFields
         key={`${selected.id}:${advanced.ui.mode}`}
         edit={selected}
@@ -196,5 +211,118 @@ function SelectedEdit(
         </ReviewButton>
       </div>
     </div>
+  );
+}
+
+/** One local gesture draft; the existing edit command remains the only durable writer. */
+function CutTransitionFields(props: {
+  edit: Extract<ReviewEdit, { kind: 'cut' }>;
+  edits: readonly ReviewEdit[];
+  duration: number;
+  onChange(value: ReviewCutTransition | null): Promise<boolean> | undefined;
+}) {
+  const locale = useAppLocale();
+  const [draft, setDraft] = useState(props.edit.transition ?? null);
+  const [saving, setSaving] = useState(false);
+  const pending = useRef(false);
+  useEffect(() => setDraft(props.edit.transition ?? null), [props.edit]);
+  const commit = async (value: ReviewCutTransition | null) => {
+    if (pending.current) return;
+    const next = value && value.before + value.after > 0 ? value : null;
+    if (JSON.stringify(next) === JSON.stringify(props.edit.transition ?? null)) return;
+    pending.current = true;
+    setSaving(true);
+    setDraft(next);
+    try {
+      if (!(await props.onChange(next))) setDraft(props.edit.transition ?? null);
+    } finally {
+      pending.current = false;
+      setSaving(false);
+    }
+  };
+  const plan = planReviewCutTransitions(props.duration, props.edits).find(
+    (item) => item.id === props.edit.id
+  );
+  const total = draft ? draft.before + draft.after : 0;
+  const change = (field: 'total' | 'before' | 'after', value: number) => {
+    if (!draft) return null;
+    const next =
+      field === 'total'
+        ? {
+            ...draft,
+            before: total > 0 ? (value * draft.before) / total : value / 2,
+            after: total > 0 ? (value * draft.after) / total : value / 2,
+          }
+        : { ...draft, [field]: value };
+    return next;
+  };
+  return (
+    <ReviewDetails
+      level="section"
+      label={translate('gallery.videoReview.cutTransition')}
+      preferenceId="gallery.videoReview.cutTransition"
+    >
+      <fieldset
+        disabled={saving}
+        className="min-w-0 space-y-2"
+        data-ui="gallery.videoReview.cutTransition"
+      >
+        <SelectField<ReviewCutTransition['type'] | 'none'>
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.zoomTransitionType')}
+          value={draft?.type ?? 'none'}
+          options={[
+            { value: 'none', label: translate('gallery.videoReview.transitionNone') },
+            { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
+            { value: 'fade-black', label: translate('gallery.videoReview.cutFadeBlack') },
+          ]}
+          onChange={(type) =>
+            void commit(type === 'none' ? null : { before: 0.25, after: 0.25, ...draft, type })
+          }
+        />
+        {draft ? (
+          <>
+            {(['total', 'before', 'after'] as const).map((field) => (
+              <NumericRow
+                key={field}
+                appearance="plain"
+                className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+                label={translate(
+                  field === 'total'
+                    ? 'gallery.videoReview.zoomTransitionDuration'
+                    : field === 'before'
+                      ? 'gallery.videoReview.cutTransitionBefore'
+                      : 'gallery.videoReview.cutTransitionAfter'
+                )}
+                value={field === 'total' ? total : draft[field]}
+                min={0}
+                max={field === 'total' ? 60 : 60 - draft[field === 'before' ? 'after' : 'before']}
+                unit="s"
+                step={0.05}
+                precision={3}
+                onPreviewValue={(value) => setDraft(change(field, value))}
+                onCommitValue={(value) => void commit(change(field, value))}
+              />
+            ))}
+            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+              {translate('gallery.videoReview.cutTransitionHint')}
+            </p>
+            <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+              {plan
+                ? translate('gallery.videoReview.cutTransitionEffective')
+                    .replace(
+                      '{before}',
+                      formatNumber(plan.before, { maximumFractionDigits: 3 }, locale)
+                    )
+                    .replace(
+                      '{after}',
+                      formatNumber(plan.after, { maximumFractionDigits: 3 }, locale)
+                    )
+                : translate('gallery.videoReview.cutTransitionUnavailable')}
+            </p>
+          </>
+        ) : null}
+      </fieldset>
+    </ReviewDetails>
   );
 }

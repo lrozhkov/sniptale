@@ -15,6 +15,7 @@ it('refuses a whole move when independent keyframe snapping would resize the edi
     end: 2,
     requestedStart: 0,
     requestedEnd: 2,
+    transition: { type: 'dissolve', before: 0.25, after: 0.75 },
   };
   const commit = vi.fn(async () => true);
   let hook!: ReturnType<typeof useReviewEdits>;
@@ -36,7 +37,10 @@ it('refuses a whole move when independent keyframe snapping would resize the edi
     await act(async () => hook.commitRange({ kind: 'range', start: 4, end: 6 }, existing));
     expect(commit).not.toHaveBeenCalled();
     await act(async () => hook.commitRange({ kind: 'range', start: 7, end: 9 }, existing));
-    expect(commit).toHaveBeenCalledWith(existing, expect.objectContaining({ start: 7, end: 9 }));
+    expect(commit).toHaveBeenCalledWith(
+      existing,
+      expect.objectContaining({ start: 7, end: 9, transition: existing.transition })
+    );
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
@@ -264,6 +268,76 @@ it('rejects duplicate and failed interval commands without losing selection, and
       await pending;
     });
     expect(seek).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps each cut transition through resize and refuses failed property commits', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  const first: ReviewEdit = {
+    id: 'a',
+    kind: 'cut',
+    start: 2,
+    end: 4,
+    requestedStart: 2,
+    requestedEnd: 4,
+  };
+  const second: ReviewEdit = {
+    id: 'b',
+    kind: 'cut',
+    start: 6,
+    end: 8,
+    requestedStart: 6,
+    requestedEnd: 8,
+  };
+  let hook!: ReturnType<typeof useReviewEdits>;
+  let accepted = true;
+  let current: ReviewEdit[] = [];
+  function Harness() {
+    const [edits, setEdits] = useState([first, second]);
+    current = edits;
+    hook = useReviewEdits({
+      duration: 10,
+      boundaries: [0, 2, 4, 6, 8, 10],
+      snapToKeyframes: false,
+      edits,
+      pause: vi.fn(),
+      seek: vi.fn(),
+      setSelection: vi.fn(),
+      commit: async (before, after) => {
+        if (!accepted) return false;
+        setEdits((items) => items.map((item) => (item.id === before?.id && after ? after : item)));
+        return true;
+      },
+    });
+    return null;
+  }
+  const transition = { type: 'dissolve' as const, before: 0.25, after: 0.75 };
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.select(first));
+    await act(async () => {
+      await hook.changeSelectedTransition(transition);
+    });
+    expect(hook.selected).toEqual({ ...first, transition });
+    expect(current.find((edit) => edit.id === 'b')).toEqual(second);
+    await act(async () => {
+      await hook.commitRange({ kind: 'range', start: 2.5, end: 4.5 }, hook.selected);
+    });
+    expect(hook.selected).toMatchObject({ start: 2.5, end: 4.5, transition });
+    accepted = false;
+    await act(async () => {
+      await hook.changeSelectedTransition(null);
+    });
+    expect(hook.selected).toMatchObject({ transition });
+    accepted = true;
+    await act(async () => {
+      await hook.changeSelectedTransition(null);
+    });
+    expect(hook.selected).not.toHaveProperty('transition');
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
