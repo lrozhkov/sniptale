@@ -81,6 +81,35 @@ for (const [theme, locale] of [
     const image = page.locator('[data-block-id="before"]');
     await image.locator('img').click();
     const inspector = page.locator('.guide-image-inspector');
+    const actions = inspector.locator('.guide-image-controls > button');
+    await expect(actions).toHaveCount(2);
+    expect(
+      await actions.first().evaluate((button) => {
+        const settings = button.parentElement!.querySelectorAll('.guide-inspector-group');
+        return [...settings].every(
+          (group) => !!(group.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING)
+        );
+      })
+    ).toBe(true);
+    const placement = inspector.getByRole('group', {
+      name: locale === 'en' ? 'Block width' : 'Ширина блока',
+      exact: true,
+    });
+    const boxes = await placement.getByRole('button').evaluateAll((buttons) =>
+      buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        return { y: rect.y, height: rect.height, width: rect.width };
+      })
+    );
+    expect(boxes).toHaveLength(4);
+    for (const box of boxes) {
+      expect(box.y).toBeCloseTo(boxes[0]!.y, 1);
+      expect(box.height).toBeCloseTo(boxes[0]!.height, 1);
+      expect(box.width).toBeGreaterThan(30);
+    }
+    await actions.last().scrollIntoViewIfNeeded();
+    await expect(actions.last()).toBeInViewport();
+    await page.screenshot({ path: `.tmp/backlog7/w11-image-actions-${theme}.png` });
     const zoom = inspector.locator('input[type="range"]').first();
     await expect(inspector.locator('.guide-image-overview-map')).toHaveCount(0);
     await inspector
@@ -90,6 +119,7 @@ for (const [theme, locale] of [
       })
       .click();
     await expect(image.locator('[data-frame-image]')).toBeFocused();
+    await expect(actions).toHaveCount(0);
     await expect(inspector.locator('.guide-image-overview-map')).toBeVisible();
     await expect(zoom).toHaveAttribute('aria-label', locale === 'en' ? 'Zoom, %' : 'Масштаб, %');
     const toolbar = image.locator('.guide-image-tools');

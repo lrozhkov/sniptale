@@ -95,23 +95,13 @@ function GuideImageControlsView({
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
         {!framing && (
-          <>
-            <GuideBlockPlacement
-              item={{ layout }}
-              block={block}
-              disabled={disabled}
-              onChange={onChange}
-              t={t}
-            />
-            <GuideImageActions
-              block={block}
-              stepId={stepId}
-              url={url}
-              disabled={disabled}
-              onEdit={onEdit}
-              t={t}
-            />
-          </>
+          <GuideBlockPlacement
+            item={{ layout }}
+            block={block}
+            disabled={disabled}
+            onChange={onChange}
+            t={t}
+          />
         )}
         <GuideImageGeometryFields
           framing={framing}
@@ -149,6 +139,14 @@ function GuideImageControlsView({
               htmlDefaults={htmlDefaults}
               disabled={disabled}
               onChange={onChange}
+              t={t}
+            />
+            <GuideImageActions
+              block={block}
+              stepId={stepId}
+              url={url}
+              disabled={disabled}
+              onEdit={onEdit}
               t={t}
             />
           </>
