@@ -437,3 +437,72 @@ for (const theme of ['light', 'dark'] as const) {
     }
   });
 }
+
+test('quick editor zoom retains playhead and selected focus through repeated scales', async ({
+  page,
+}) => {
+  const host = await startHostServer();
+  try {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('dialog');
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: translate(key, 'en'), exact: true });
+    await button('gallery.videoReview.advancedEditing').click();
+    const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+    const box = (await ruler.boundingBox())!;
+    await ruler.click({ position: { x: box.width * 0.65, y: box.height / 2 } });
+    const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+    const sourceTime = await plane.getAttribute('aria-valuenow');
+    const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+    const zoom = dialog.getByRole('slider', {
+      name: translate('videoEditor.timeline.zoom', 'en'),
+      exact: true,
+    });
+    const center = async () =>
+      viewport.evaluate((node) => {
+        const bounds = node.getBoundingClientRect();
+        const plane = node.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+        const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+        return bounds.x + gutter + (node.clientWidth - gutter) / 2;
+      });
+    const playhead = dialog.locator('[data-ui="gallery.videoReview.playhead"]');
+    for (const key of ['End', 'Home', 'End']) {
+      await zoom.press(key);
+      if (key !== 'Home') {
+        const marker = (await playhead.boundingBox())!;
+        expect(Math.abs(marker.x + marker.width / 2 - (await center()))).toBeLessThan(3);
+      }
+      await expect(plane).toHaveAttribute('aria-valuenow', sourceTime!);
+    }
+    await zoom.press('Home');
+    await button('gallery.videoReview.zoomAdd').click();
+    const block = dialog
+      .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+      .first();
+    await button('gallery.videoReview.timelineStart').click();
+    const startTime = await plane.getAttribute('aria-valuenow');
+    for (const key of ['End', 'Home', 'End']) {
+      await zoom.press(key);
+      if (key !== 'Home') {
+        const selected = (await block.boundingBox())!;
+        expect(Math.abs(selected.x + selected.width / 2 - (await center()))).toBeLessThan(3);
+      }
+      await expect(block).toHaveAttribute('aria-pressed', 'true');
+      await expect(plane).toHaveAttribute('aria-valuenow', startTime!);
+    }
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      host.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

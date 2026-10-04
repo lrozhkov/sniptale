@@ -601,3 +601,64 @@ it('cancels focus capture and preview when the drawing capability changes', () =
   expect(commit).not.toHaveBeenCalled();
   expect(plane.releasePointerCapture).toHaveBeenCalled();
 });
+
+it('centers the source playhead through repeated zoom changes without seeking or selecting', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 7 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  const width = viewport.clientWidth - gutter;
+  for (const slider of [25, 50, 75, 40, 0]) {
+    changeZoom(host, String(slider));
+    const zoom = 2 ** (slider / 25);
+    const expected = Math.max(0, Math.min(width * (zoom - 1), width * zoom * 0.7 - width / 2));
+    expect(viewport.scrollLeft).toBeCloseTo(expected);
+  }
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(props.onSelect).not.toHaveBeenCalled();
+});
+
+it.each([0, 1, 5, 9, 10])(
+  'centers or clamps selected source anchor %s even with playhead at start',
+  (anchor) => {
+    const { host, props } = renderTimeline({ duration: 10, time: 0, zoomAnchor: anchor });
+    const viewport = host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.timelineViewport"]'
+    )!;
+    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+    const width =
+      viewport.clientWidth -
+      Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+    for (const value of [25, 50, 75]) {
+      changeZoom(host, String(value));
+      const zoom = 2 ** (value / 25);
+      expect(viewport.scrollLeft).toBeCloseTo(
+        Math.max(0, Math.min(width * (zoom - 1), (anchor / 10) * width * zoom - width / 2))
+      );
+    }
+    expect(props.onSeek).not.toHaveBeenCalled();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  }
+);
+
+it('defers zoom and its scroll change until the existing before-action gate accepts', () => {
+  let accept: (() => void) | undefined;
+  const { host, props } = renderTimeline({
+    duration: 10,
+    time: 7,
+    beforeAction: (action) => {
+      accept = action;
+    },
+  });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  expect(viewport.scrollLeft).toBe(0);
+  expect(accept).toBeDefined();
+  act(() => accept?.());
+  expect(viewport.scrollLeft).toBeGreaterThan(0);
+  expect(props.onSeek).not.toHaveBeenCalled();
+});

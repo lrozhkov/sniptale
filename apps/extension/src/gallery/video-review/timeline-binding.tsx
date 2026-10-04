@@ -116,6 +116,7 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  zoomAnchor?: number | null | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
     cutting: Editing['cutting'];
@@ -230,6 +231,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      zoomAnchor={props.zoomAnchor}
       beforeAction={props.beforeAction}
       onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
       exportActive={props.exportActive}
@@ -309,18 +311,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                   props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
                 }
                 projection={projection}
-                snapTimes={[
-                  ...(props.outputTime === null ? [] : [props.outputTime]),
-                  ...props.edits
-                    .flatMap((edit) => [
-                      props.toOutputTime(edit.start),
-                      props.toOutputTime(edit.end),
-                    ])
-                    .filter((time): time is number => time !== null),
-                  ...props.advanced.zoom.regions
-                    .filter((region) => !region.dormant)
-                    .flatMap((region) => [region.start, region.end]),
-                ]}
+                snapTimes={reviewAudioSnapTimes(props)}
                 audioState={props.audioState}
                 waveforms={props.waveforms}
                 resultDuration={props.resultDuration}
@@ -466,4 +457,17 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
       },
     },
   };
+}
+
+/** Projects the existing audio lane snap targets onto its result clock. */
+function reviewAudioSnapTimes(props: TimelineBindingProps) {
+  return [
+    ...(props.outputTime === null ? [] : [props.outputTime]),
+    ...props.edits
+      .flatMap((edit) => [props.toOutputTime(edit.start), props.toOutputTime(edit.end)])
+      .filter((time): time is number => time !== null),
+    ...props.advanced.zoom.regions
+      .filter((region) => !region.dormant)
+      .flatMap((region) => [region.start, region.end]),
+  ];
 }

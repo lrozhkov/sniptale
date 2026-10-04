@@ -467,6 +467,7 @@ function ReviewEditor({
           }
         >
           <ReviewTimelineBinding
+            zoomAnchor={state.zoomAnchor}
             beforeAction={state.beforeAction}
             onOpenExport={() => requestExport((value) => value + 1)}
             exportActive={navigation.shown === 'export'}

@@ -1,4 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { ReviewBeforeAction } from './note-transitions';
+import type { ReviewEdit } from '../../features/video/review/types';
+import { reviewTimelineNavigationBounds } from './track-projection';
 
 /** The viewport owns the label gutter and usable ruler width at every resize. */
 export function useReviewTimelineGeometry(
@@ -37,4 +40,65 @@ export function useReviewTimelineGeometry(
     return () => observer.disconnect();
   }, [audioVisible, zoomVisible, markersCount]);
   return { viewport, gutter, width };
+}
+
+/** Commits admitted zoom requests after the ruler has adopted its new scale. */
+export function useReviewTimelineNavigation(
+  props: {
+    duration: number;
+    time: number;
+    edits?: readonly ReviewEdit[];
+    zoomAnchor?: number | null | undefined;
+    beforeAction?: ReviewBeforeAction | undefined;
+    onSeek(time: number, snap?: boolean): void;
+  },
+  { viewport, gutter, width }: ReturnType<typeof useReviewTimelineGeometry>
+) {
+  const [zoom, setZoom] = useState(1);
+  const zoomTarget = useRef<number | null>(null);
+  const navigation = useMemo(
+    () => reviewTimelineNavigationBounds(props.duration, props.edits ?? []),
+    [props.duration, props.edits]
+  );
+  useLayoutEffect(() => {
+    const target = zoomTarget.current;
+    zoomTarget.current = null;
+    if (target !== null && viewport.current && props.duration > 0) {
+      viewport.current.scrollLeft = Math.max(
+        0,
+        Math.min(width * (zoom - 1), (target / props.duration) * width * zoom - width / 2)
+      );
+      return;
+    }
+    if (props.time === navigation.start || props.time === navigation.end)
+      revealBoundary(viewport.current, props.time, navigation, props.duration, gutter, width, zoom);
+  }, [props.time, navigation, props.duration, zoom, gutter, width, viewport]);
+  const navigate = (target: number) => {
+    (props.beforeAction ?? ((action) => action()))(() => {
+      props.onSeek(target, false);
+      revealBoundary(viewport.current, target, navigation, props.duration, gutter, width, zoom);
+    });
+  };
+  const onZoom = (value: number) =>
+    (props.beforeAction ?? ((action) => action()))(() => {
+      if (value === zoom) return;
+      zoomTarget.current = props.zoomAnchor ?? props.time;
+      setZoom(value);
+    });
+  return { zoom, navigation, navigate, onZoom };
+}
+
+function revealBoundary(
+  node: HTMLDivElement | null,
+  target: number,
+  navigation: { start: number; end: number },
+  duration: number,
+  gutter: number,
+  width: number,
+  zoom: number
+) {
+  if (!node || duration <= 0) return;
+  const x = gutter + (target / duration) * width * zoom;
+  if (x < node.scrollLeft + 16 || x > node.scrollLeft + node.clientWidth - 24)
+    node.scrollLeft = target === navigation.start ? 0 : Math.max(0, x - node.clientWidth + 24);
 }

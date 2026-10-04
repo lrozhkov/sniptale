@@ -9,7 +9,7 @@ import { useReviewExport } from './use-export';
 import { useReviewAdvanced } from './use-advanced';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { useReviewTransport } from './use-review-transport';
-import { useReviewSelection } from './use-review-selection';
+import { reviewSelectionSourceTime, useReviewSelection } from './use-review-selection';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
 
@@ -243,6 +243,14 @@ function assembleReviewEditorState(
   const { audio, canvasComments, comments, telemetry, projected } = wiring;
   return {
     ...core,
+    zoomAnchor: reviewSelectionSourceTime(
+      core.activeSelection,
+      snapshot.document,
+      core.advanced,
+      core.source.duration,
+      projected.markers,
+      wiring.exporter.index === null || !!wiring.exporter.index.audioCodec
+    ),
     editing: { ...cuts, exporter: wiring.exporter },
     moveHistory: wiring.moveHistory,
     audio,
