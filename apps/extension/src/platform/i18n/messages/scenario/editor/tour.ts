@@ -278,6 +278,21 @@ export const scenarioTourMessages = {
   tourRestart: { ru: 'В начало', en: 'Restart' },
   tourPosition: { ru: 'Положение', en: 'Position' },
   tourObjectLabel: { ru: 'Название действия', en: 'Action label' },
+  tourMarkerColor: { ru: 'Цвет точки', en: 'Marker color' },
+  tourMarkerPulseColor: { ru: 'Цвет пульсации', en: 'Pulse color' },
+  tourMarkerSize: { ru: 'Размер точки', en: 'Marker size' },
+  tourMarkerInherit: { ru: 'Стиль точки тура', en: 'Use tour marker style' },
+  tourMarkerPulseReset: { ru: 'Использовать акцент взаимодействия', en: 'Use interaction accent' },
+  tourCalloutGap: { ru: 'Расстояние до пояснения', en: 'Callout distance' },
+  tourCalloutGapHint: {
+    ru: 'Расстояние от центра точки до пояснения.',
+    en: 'Distance from the hotspot center to the callout.',
+  },
+  tourInteractionAccent: { ru: 'Акцент взаимодействия', en: 'Interaction accent' },
+  tourInteractionAccentHint: {
+    ru: 'Фокус, выбор и цвет пульсации по умолчанию.',
+    en: 'Focus, selection and the default pulse color.',
+  },
   tourTargetArea: { ru: 'Область автоприближения', en: 'Auto-zoom area' },
   tourTargetAreaHint: {
     ru: 'При автоматической камере и одной точке просмотр показывает точку вместе с этой областью.',

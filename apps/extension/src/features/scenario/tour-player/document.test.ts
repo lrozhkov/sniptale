@@ -737,3 +737,55 @@ it('returns to the last callout text page and keeps empty slides and ending reac
     empty.close();
   }
 });
+
+it('exports marker overrides without rewriting source points', async () => {
+  const args = fixture();
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  args.tour.style.markerAppearance = { color: '#2367ab', pulseColor: '#ab3267', size: 48 };
+  args.tour.style.hotspotAppearance = {
+    ...args.tour.style.textAppearance,
+    calloutGap: 80,
+  };
+  slide.hotspots.push({
+    ...slide.hotspots[0]!,
+    id: 'local',
+    point: { x: 0.75, y: 0.5 },
+    pulse: false,
+    markerAppearance: { color: '#123456', pulseColor: null, size: 16 },
+  });
+  const saved = JSON.stringify(args.tour);
+  const dom = open(await buildTourPlayerHtml(args));
+  try {
+    const markers = [...dom.window.document.querySelectorAll<HTMLElement>('.tour-hotspot')];
+    expect(markers[0]!.style.getPropertyValue('--tour-marker-color')).toBe('#2367ab');
+    expect(markers[0]!.style.getPropertyValue('--tour-marker-size')).toBe('48px');
+    expect(markers[1]!.style.getPropertyValue('--tour-marker-color')).toBe('#123456');
+    expect(markers[1]!.style.getPropertyValue('--tour-marker-pulse-color')).toBe(
+      args.tour.style.accent
+    );
+    expect(markers[1]!.dataset['pulse']).toBe('false');
+    const exported = JSON.parse(dom.window.document.querySelector('#tour-data')!.textContent!);
+    expect(exported.tour.style.hotspotAppearance.calloutGap).toBe(80);
+    expect(
+      exported.tour.slides[0].hotspots.map((point: { point: unknown }) => point.point)
+    ).toEqual(slide.hotspots.map((point) => point.point));
+    expect(JSON.stringify(args.tour)).toBe(saved);
+  } finally {
+    dom.close();
+  }
+});
+
+it('keeps legacy marker rendering transparent with its existing responsive size and accent pulse', async () => {
+  const args = fixture();
+  const dom = open(await buildTourPlayerHtml(args));
+  try {
+    const marker = dom.window.document.querySelector<HTMLElement>('.tour-hotspot')!;
+    expect(marker.style.getPropertyValue('--tour-marker-color')).toBe('transparent');
+    expect(marker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(args.tour.style.accent);
+    expect(marker.style.getPropertyValue('--tour-marker-size')).toBe('');
+    expect(marker.dataset['pulse']).toBe('true');
+  } finally {
+    dom.close();
+  }
+});

@@ -756,3 +756,26 @@ it('keeps marker and auto-zoom rectangle independent and bounds the rectangle', 
   expect(current().hotspots[0]!.targetRect).toBeNull();
   expect(current().hotspots[0]!.point).toEqual(point);
 });
+
+it('edits marker defaults and independent local size without changing pulse or source geometry', async () => {
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Hotspot');
+  await fill('Marker size', '40');
+  expect(project.tour!.style.markerAppearance).toEqual({ color: null, pulseColor: null, size: 40 });
+  scope = 'selection';
+  presentation = 'all';
+  draw();
+  await click('Hotspot');
+  const point = structuredClone(current().hotspots[0]!.point);
+  const pulse = current().hotspots[0]!.pulse;
+  await click('Use tour marker style');
+  await fill('Marker size', '50');
+  expect(current().hotspots[0]!.markerAppearance?.size).toBe(50);
+  expect(project.tour!.style.markerAppearance?.size).toBe(40);
+  expect(current().hotspots[0]!.point).toEqual(point);
+  expect(current().hotspots[0]!.pulse).toBe(pulse);
+  await click('Use tour marker style');
+  expect(current().hotspots[0]!.markerAppearance).toBeNull();
+});

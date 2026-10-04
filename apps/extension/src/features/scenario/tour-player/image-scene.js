@@ -5,6 +5,7 @@ import { bindTourObjectDrag } from './authoring.js';
 import {
   getTourSlideObjects,
   resolveTourMask,
+  resolveTourMarkerAppearance,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 function projectImagePoint(box, point) {
@@ -27,6 +28,7 @@ export function renderTourImage(
     signal,
     autoZoom,
     maskDefaults,
+    style,
   }
 ) {
   if (!slide.image) {
@@ -73,6 +75,11 @@ export function renderTourImage(
     const point = projectImagePoint(imageBox, hotspot.point);
     button.style.left = `${point.x}px`;
     button.style.top = `${point.y}px`;
+    const marker = resolveTourMarkerAppearance(style, hotspot);
+    button.style.setProperty('--tour-marker-color', marker.color ?? 'transparent');
+    button.style.setProperty('--tour-marker-pulse-color', marker.pulseColor ?? style.accent);
+    if (hotspot.markerAppearance || style.markerAppearance)
+      button.style.setProperty('--tour-marker-size', `${marker.size}px`);
     button.dataset.pulse = String(hotspot.pulse);
     button.hidden = point.x < 0 || point.y < 0 || point.x > stageWidth || point.y > stageHeight;
     button.title = hotspot.label;

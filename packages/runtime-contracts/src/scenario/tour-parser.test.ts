@@ -4,6 +4,8 @@ import { parseTourDocument, tourDocumentSchema } from './tour-parser';
 import {
   getTourSlideObjects,
   resolveTourMask,
+  resolveTourMarkerAppearance,
+  TOUR_MARKER_DEFAULTS,
   resolveTourTextAppearance,
   tourTextDefaults,
   TOUR_MASK_DEFAULTS,
@@ -563,4 +565,104 @@ it('rejects malformed style defaults and inheritance flags without losing legacy
     }).status
   ).toBe('invalid');
   expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+});
+
+describe('marker appearance and callout distance', () => {
+  it('preserves legacy absence and resolves fresh defaults without materializing fields', () => {
+    const value = document();
+    const before = structuredClone(value);
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: before });
+    const resolved = resolveTourMarkerAppearance(value.style);
+    expect(resolved).toEqual({ color: null, pulseColor: null, size: 30 });
+    expect(resolved).not.toBe(TOUR_MARKER_DEFAULTS);
+    resolved.size = 64;
+    expect(resolveTourMarkerAppearance(value.style).size).toBe(30);
+    expect(resolveTourTextAppearance('hotspot', null, value.style.textAppearance).calloutGap).toBe(
+      30
+    );
+    expect(value).toEqual(before);
+  });
+  it('uses whole-object local precedence and null reset without aliasing defaults', () => {
+    const style = {
+      ...document().style,
+      markerAppearance: { color: '#123456', pulseColor: '#abcdef', size: 48 },
+    };
+    const local = { markerAppearance: { color: null, pulseColor: null, size: 16 } };
+    expect(resolveTourMarkerAppearance(style, local)).toEqual(local.markerAppearance);
+    expect(resolveTourMarkerAppearance(style, local)).not.toBe(local.markerAppearance);
+    expect(resolveTourMarkerAppearance(style, { markerAppearance: null })).toEqual(
+      style.markerAppearance
+    );
+    expect(resolveTourMarkerAppearance(style)).not.toBe(style.markerAppearance);
+    const defaults = { ...style.textAppearance, calloutGap: 70 };
+    expect(resolveTourTextAppearance('hotspot', style.textAppearance, defaults).calloutGap).toBe(
+      70
+    );
+    expect(
+      resolveTourTextAppearance('hotspot', { ...defaults, calloutGap: 0 }, defaults).calloutGap
+    ).toBe(0);
+  });
+  it.each([
+    [16, 0],
+    [64, 120],
+  ])('roundtrips marker size %s and gap %s boundaries', (size, calloutGap) => {
+    const value = document();
+    value.style.markerAppearance = { color: '#Ab12EF', pulseColor: null, size };
+    value.style.hotspotAppearance = { ...value.style.textAppearance, calloutGap };
+    const slide = imageSlide();
+    slide.hotspots[0]!.markerAppearance = { color: null, pulseColor: '#abcdef', size };
+    slide.hotspots[0]!.appearance = { ...value.style.textAppearance, calloutGap };
+    value.slides[0] = slide;
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    slide.hotspots[0]!.markerAppearance = null;
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+  });
+  it('rejects malformed marker fields at both global and local boundaries', () => {
+    const valid = { color: null, pulseColor: null, size: 30 };
+    for (const markerAppearance of [
+      ...[15, 65, NaN, Infinity, -Infinity, '30'].map((size) => ({ ...valid, size })),
+      ...['red', '#fff', '#12345678', 'url(x)', 'transparent'].flatMap((color) => [
+        { ...valid, color },
+        { ...valid, pulseColor: color },
+      ]),
+      { ...valid, extra: true },
+      { size: 30 },
+    ]) {
+      const value = document();
+      expect(
+        parseTourDocument({ ...value, style: { ...value.style, markerAppearance } }).status
+      ).toBe('invalid');
+      const slide = imageSlide();
+      expect(
+        parseTourDocument({
+          ...value,
+          slides: [{ ...slide, hotspots: [{ ...slide.hotspots[0], markerAppearance }] }],
+        }).status
+      ).toBe('invalid');
+    }
+    const value = document();
+    expect(
+      parseTourDocument({ ...value, style: { ...value.style, markerAppearance: null } }).status
+    ).toBe('invalid');
+  });
+  it('rejects invalid distances and unknown appearance fields', () => {
+    const value = document();
+    for (const patch of [
+      ...[-1, 121, NaN, Infinity, -Infinity, '30', null].map((calloutGap) => ({ calloutGap })),
+      { extra: true },
+    ]) {
+      const appearance = { ...value.style.textAppearance, ...patch };
+      expect(
+        parseTourDocument({ ...value, style: { ...value.style, hotspotAppearance: appearance } })
+          .status
+      ).toBe('invalid');
+      const slide = imageSlide();
+      expect(
+        parseTourDocument({
+          ...value,
+          slides: [{ ...slide, hotspots: [{ ...slide.hotspots[0], appearance }] }],
+        }).status
+      ).toBe('invalid');
+    }
+  });
 });

@@ -48,6 +48,8 @@ export const TOUR_HINT_SURFACE: TourHintSurface = {
 };
 
 export interface TourTextAppearance {
+  /** Distance from the hotspot center in CSS pixels; captions ignore it. */
+  calloutGap?: number | undefined;
   surface?: TourHintSurface | undefined;
   presentation: 'callout' | 'caption-top' | 'caption-bottom';
   alignment: 'start' | 'center' | 'end';
@@ -66,6 +68,7 @@ export function resolveTourTextAppearance(
   const appearance = value ?? defaults;
   return {
     ...appearance,
+    calloutGap: appearance.calloutGap ?? defaults.calloutGap ?? 30,
     ...((appearance.surface ?? defaults.surface)
       ? { surface: appearance.surface ?? defaults.surface }
       : {}),
@@ -78,7 +81,27 @@ export function resolveTourTextAppearance(
   };
 }
 
+export interface TourMarkerAppearance {
+  color: string | null;
+  pulseColor: string | null;
+  size: number;
+}
+export const TOUR_MARKER_DEFAULTS: TourMarkerAppearance = {
+  color: null,
+  pulseColor: null,
+  size: 30,
+};
+
+/** Resolve whole-object overrides without materializing or aliasing authored defaults. */
+export function resolveTourMarkerAppearance(
+  style: TourDocument['style'],
+  hotspot?: Pick<TourHotspot, 'markerAppearance'>
+): TourMarkerAppearance {
+  return { ...(hotspot?.markerAppearance ?? style.markerAppearance ?? TOUR_MARKER_DEFAULTS) };
+}
+
 export interface TourHotspot {
+  markerAppearance?: TourMarkerAppearance | null | undefined;
   narration?: TourObjectNarration | null | undefined;
   id: string;
   point: TourPoint;
@@ -293,6 +316,7 @@ export interface TourDocument {
     surface: string;
     textAppearance: TourTextAppearance;
     hotspotAppearance?: TourTextAppearance | undefined;
+    markerAppearance?: TourMarkerAppearance | undefined;
     maskDefaults?: TourMaskDefaults | undefined;
   };
   playback: { autoplay: boolean; loop: boolean; minimumHoldSeconds: number; autoZoom: boolean };

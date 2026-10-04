@@ -1,3 +1,5 @@
+import { writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
 import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 import { expect, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
@@ -558,5 +560,238 @@ for (const locale of ['en', 'ru'] as const) {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
+  });
+}
+
+for (const [locale, theme, viewport] of [
+  ['ru', 'light', { width: 1280, height: 560 }],
+  ['en', 'dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`tour marker defaults survive overrides preview and saved HTML in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(page, hostOrigin, theme, locale, viewport, 'compare', {
+      tourFixture: '1',
+    });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    const category = (name: string) =>
+      panel.getByRole('navigation').getByRole('button', { name, exact: true });
+    const numeric = async (name: string, value: string) => {
+      const input = panel.getByRole('textbox', { name, exact: true });
+      await input.fill(value);
+      await input.press('Enter');
+    };
+    const color = async (label: string, value: string) => {
+      const field = panel
+        .locator('[data-ui="shared.ui.compact-inspector.color-field"]')
+        .filter({ has: page.locator('span[title]').filter({ hasText: label }) });
+      await field.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
+      await field.getByRole('textbox').fill(value);
+      await field.getByRole('textbox').press('Enter');
+    };
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+      .click();
+    await category(t('scenario.editor.tourHotspot')).click();
+    await color(t('scenario.editor.tourMarkerColor'), '#2563eb');
+    await color(t('scenario.editor.tourMarkerPulseColor'), '#16a34a');
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourMarkerPulseReset'), exact: true })
+      .click();
+    await expect(
+      panel.getByRole('button', { name: t('scenario.editor.tourMarkerPulseReset'), exact: true })
+    ).toBeDisabled();
+    await color(t('scenario.editor.tourMarkerPulseColor'), '#16a34a');
+    await numeric(t('scenario.editor.tourMarkerSize'), '20');
+    await numeric(t('scenario.editor.tourCalloutGap'), '60');
+    await numeric(t('scenario.editor.tourHintWidth'), '200');
+    await info.attach(`global-marker-fields-${locale}`, {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+    await page.locator('.tour-slide-select').first().click();
+    await category(t('scenario.editor.tourObjects')).click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
+    await panel
+      .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
+      .fill('Marker spacing proof');
+    await category(t('scenario.editor.appearance')).click();
+    const inherit = panel.getByRole('switch', {
+      name: t('scenario.editor.tourMarkerInherit'),
+      exact: true,
+    });
+    await expect(inherit).toBeChecked();
+    await expect(
+      panel.getByRole('textbox', { name: t('scenario.editor.tourMarkerSize'), exact: true })
+    ).toHaveValue('20');
+    const central = panel.getByRole('switch', {
+      name: t('scenario.editor.tourUseCentralStyle'),
+      exact: true,
+    });
+    await central.uncheck();
+    await expect(
+      panel.getByRole('textbox', { name: t('scenario.editor.tourCalloutGap'), exact: true })
+    ).toHaveValue('60');
+    await numeric(t('scenario.editor.tourCalloutGap'), '80');
+    await central.check();
+    await inherit.uncheck();
+    await color(t('scenario.editor.tourMarkerColor'), '#111827');
+    await numeric(t('scenario.editor.tourMarkerSize'), '48');
+    await info.attach(`local-marker-fields-${locale}`, {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+    const marker = page.locator('.tour-stage-host .tour-hotspot').first();
+    await expect(marker).toHaveCSS('width', '48px');
+    await inherit.check();
+    await expect(marker).toHaveCSS('width', '20px');
+    await expect
+      .poll(() => marker.evaluate((node) => getComputedStyle(node, '::before').borderTopColor))
+      .toBe('rgb(22, 163, 74)');
+    await panel
+      .getByRole('switch', { name: t('scenario.editor.tourPulse'), exact: true })
+      .uncheck();
+    await expect(marker).toHaveAttribute('data-pulse', 'false');
+    const markerPaint = (node: Element) => ({
+      color: getComputedStyle(node, '::after').backgroundColor,
+      pulse: getComputedStyle(node).getPropertyValue('--tour-marker-pulse-color').trim(),
+      size: getComputedStyle(node).getPropertyValue('--tour-marker-size').trim(),
+    });
+    await expect
+      .poll(() => marker.evaluate(markerPaint))
+      .toEqual({
+        color: 'rgb(37, 99, 235)',
+        pulse: '#16a34a',
+        size: '20px',
+      });
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
+      .click();
+    await category(t('scenario.editor.tourObjects')).click();
+    await panel.locator('.tour-object-add button').click();
+    await page
+      .getByRole('group', { name: t('scenario.editor.tourAddObject'), exact: true })
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
+    await category(t('scenario.editor.appearance')).click();
+    await expect(inherit).toBeChecked();
+    await expect(
+      panel.getByRole('textbox', { name: t('scenario.editor.tourMarkerSize'), exact: true })
+    ).toHaveValue('20');
+    await category(t('scenario.editor.textLabel')).click();
+    await numeric('X', '95');
+    await numeric('Y', '5');
+    await panel
+      .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
+      .fill('Corner spacing proof');
+    await expect(page.locator('.tour-stage-host .tour-hotspot')).toHaveCount(2);
+    await expect(page.getByRole('status').first()).toHaveText(t('scenario.editor.guideSaved'));
+    await page.reload();
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    await page.locator('.tour-slide-select').first().click();
+    await expect
+      .poll(() => marker.evaluate(markerPaint))
+      .toEqual({
+        color: 'rgb(37, 99, 235)',
+        pulse: '#16a34a',
+        size: '20px',
+      });
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    await marker.hover();
+    const hint = page.locator('.tour-stage-host [data-tour-hint]');
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText('Marker spacing proof');
+    const gap = await hint.evaluate((node) => {
+      const point = (node.getRootNode() as ShadowRoot | Document)
+        .querySelector('.tour-hotspot')!
+        .getBoundingClientRect();
+      const box = node.getBoundingClientRect();
+      const x = point.x + point.width / 2;
+      const y = point.y + point.height / 2;
+      return Math.min(
+        ...[box.left - x, x - box.right, box.top - y, y - box.bottom].filter((value) => value >= 0)
+      );
+    });
+    // The marker is inside the stage border; the hint is positioned in its outer viewport.
+    expect(Math.abs(gap - 60)).toBeLessThanOrEqual(1);
+    await page.locator('.tour-stage-host .tour-hotspot').nth(1).hover();
+    await expect(hint).toContainText('Corner spacing proof');
+    const corner = await hint.boundingBox();
+    const stage = await page.locator('.tour-stage-host [data-tour-stage]').boundingBox();
+    expect(corner!.x).toBeGreaterThanOrEqual(stage!.x + 7);
+    expect(corner!.y).toBeGreaterThanOrEqual(stage!.y + 7);
+    expect(corner!.x + corner!.width).toBeLessThanOrEqual(stage!.x + stage!.width - 7);
+    expect(corner!.y + corner!.height).toBeLessThanOrEqual(stage!.y + stage!.height - 7);
+
+    await page
+      .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
+      .click();
+    await page.evaluate(() => {
+      const chunks: Uint8Array[] = [];
+      Object.defineProperty(window, 'showSaveFilePicker', {
+        configurable: true,
+        value: async () => ({
+          createWritable: async () =>
+            new WritableStream<Uint8Array>({
+              write: (chunk) => {
+                chunks.push(chunk);
+              },
+            }),
+        }),
+      });
+      Object.defineProperty(window, 'savedMarkerTour', {
+        configurable: true,
+        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+      });
+    });
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedMarkerTour'))))
+      .toContain('<!doctype html>');
+    const html = await page.evaluate(() => String(Reflect.get(window, 'savedMarkerTour')));
+    const output = info.outputPath('marker-tour.html');
+    await writeFile(output, html);
+    await page.goto(pathToFileURL(output).href);
+    const exported = page.locator('.tour-hotspot').first();
+    await expect
+      .poll(() => exported.evaluate(markerPaint))
+      .toEqual({
+        color: 'rgb(37, 99, 235)',
+        pulse: '#16a34a',
+        size: '20px',
+      });
+    await expect(exported).toHaveAttribute('data-pulse', 'false');
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+    await expect
+      .poll(() => exported.evaluate((node) => node.getBoundingClientRect().width))
+      .toBeGreaterThanOrEqual(44);
+    await expect
+      .poll(() => exported.evaluate(markerPaint))
+      .toEqual({
+        color: 'rgb(37, 99, 235)',
+        pulse: '#16a34a',
+        size: '20px',
+      });
+    await info.attach(`saved-marker-tour-${locale}`, {
+      body: await page.screenshot({ fullPage: false }),
+      contentType: 'image/png',
+    });
+    await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
+    await cdp.detach();
   });
 }

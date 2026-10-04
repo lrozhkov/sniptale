@@ -944,6 +944,25 @@ for (const [locale, theme] of [
         }
       }
       if (key === 'tourHotspot') {
+        await category(t('scenario.editor.appearance')).click();
+        const markerInheritance = panel.getByRole('switch', {
+          name: t('scenario.editor.tourMarkerInherit'),
+          exact: true,
+        });
+        const markerSize = panel.getByRole('textbox', {
+          name: t('scenario.editor.tourMarkerSize'),
+          exact: true,
+        });
+        await expect(markerInheritance).toBeChecked();
+        await expect(markerSize).toBeDisabled();
+        await markerInheritance.uncheck();
+        await markerSize.fill('48');
+        await markerSize.press('Enter');
+        await expect(markerSize).toHaveValue('48');
+        await markerInheritance.check();
+        await expect(markerSize).toHaveValue('30');
+        await expect(markerSize).toBeDisabled();
+        await category(t('scenario.editor.tourNarration')).click();
         await expect(panel).not.toContainText('review-voice-speech.wav');
         await panel
           .locator('.tour-audio-acquisition input[type="file"]')

@@ -4,6 +4,7 @@ import { webcrypto } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { admitSavedScenarioHtml } from './preview-document';
 import { SCENARIO_PREVIEW_MAX_BYTES } from './preview-contract';
+import retainedTourRuntime from './preview-document.retained-tour.fixture.txt?raw';
 beforeEach(() => {
   vi.stubGlobal('Blob', NodeBlob);
   vi.stubGlobal('crypto', webcrypto);
@@ -326,4 +327,27 @@ it('admits the retained caption-aware guide runtime while rejecting archive-sele
   expect(await admitSavedScenarioHtml(unknown.blob, 'guide', current.hash)).toBe(false);
   const wrongMode = await fixture('tour', retainedCaptionGuideRuntime);
   expect(await admitSavedScenarioHtml(wrongMode.blob, 'tour', current.hash)).toBe(false);
+});
+
+// Immutable pre-marker-controls bundle from the 3542f819 test build; never regenerate from current code.
+it('admits the exact retained tour runtime without extending guide or archive-selected trust', async () => {
+  const current = await fixture('tour');
+  const retained = await fixture('tour', retainedTourRuntime);
+  expect(new TextEncoder().encode(retainedTourRuntime)).toHaveLength(124519);
+  expect(retained.hash).toBe('wcvHun2bWRhYVo/KsSUC86BDTL0POnoKio273Y5dkb4=');
+  expect(current.hash).not.toBe(retained.hash);
+  expect(await admitSavedScenarioHtml(retained.blob, 'tour', current.hash)).toBe(true);
+  expect(await retained.blob.text()).toBe(retained.html);
+  expect(document.querySelector('#tour-player')).toBeNull();
+  for (const html of [
+    retained.html.replace('<script>', '<script>/* modified */'),
+    retained.html.replace("default-src 'none'", 'default-src *'),
+    retained.html.replace('media-src data:', 'media-src data: https:'),
+    retained.html.replace('</body>', '<script>alert(1)</script></body>'),
+  ])
+    expect(await admitSavedScenarioHtml(new Blob([html]), 'tour', current.hash)).toBe(false);
+  const unknown = await fixture('tour', retainedTourRuntime + '\n// unknown executable');
+  expect(await admitSavedScenarioHtml(unknown.blob, 'tour', current.hash)).toBe(false);
+  const wrongMode = await fixture('guide', retainedTourRuntime);
+  expect(await admitSavedScenarioHtml(wrongMode.blob, 'guide', current.hash)).toBe(false);
 });

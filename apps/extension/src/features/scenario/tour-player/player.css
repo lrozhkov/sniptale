@@ -179,8 +179,9 @@ a:focus-visible {
   transform: translate(-50%, -50%);
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  --tour-marker-default-size: 30px;
+  width: var(--tour-marker-size, var(--tour-marker-default-size));
+  height: var(--tour-marker-size, var(--tour-marker-default-size));
   padding: 0;
   border: none;
   border-radius: 50%;
@@ -191,11 +192,19 @@ a:focus-visible {
   z-index: 2;
   cursor: pointer;
 }
+.tour-hotspot::after {
+  content: '';
+  position: absolute;
+  inset: calc((100% - var(--tour-marker-size, var(--tour-marker-default-size))) / 2);
+  border-radius: 50%;
+  background: var(--tour-marker-color, transparent);
+  pointer-events: none;
+}
 .tour-hotspot[data-pulse='true']::before {
   content: '';
   position: absolute;
-  inset: -5px;
-  border: 2px solid var(--tour-accent);
+  inset: calc((100% - var(--tour-marker-size, var(--tour-marker-default-size))) / 2 - 5px);
+  border: 2px solid var(--tour-marker-pulse-color, var(--tour-accent));
   border-radius: 50%;
   animation: tour-pulse 1.8s ease-out infinite;
   pointer-events: none;
@@ -422,8 +431,9 @@ a:focus-visible {
 }
 @media (pointer: coarse) {
   .tour-hotspot {
-    width: 44px;
-    height: 44px;
+    --tour-marker-default-size: 44px;
+    width: max(44px, var(--tour-marker-size, var(--tour-marker-default-size)));
+    height: max(44px, var(--tour-marker-size, var(--tour-marker-default-size)));
   }
   .tour-hint-controls button {
     width: 44px;

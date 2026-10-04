@@ -6,6 +6,9 @@ const retainedGuideRuntimeHashes = [
   'Om79Cdbfp0CYdQb8K01kOmAsY7YHTTtCrkrwSnNfFHo=', // Before viewer controls (2367c5e618).
 ];
 
+// Exact pre-marker-controls tour bundle from 3542f819; guide policy never admits it.
+const retainedTourRuntimeHashes = ['wcvHun2bWRhYVo/KsSUC86BDTL0POnoKio273Y5dkb4='];
+
 /** Runs only in the opaque sandbox: inert admission precedes mounting the original saved Blob. */
 export async function admitSavedScenarioHtml(
   blob: Blob,
@@ -25,8 +28,10 @@ export async function admitSavedScenarioHtml(
     policies[0]?.getAttribute('http-equiv')?.toLowerCase() !== 'content-security-policy'
   )
     return false;
-  const trustedHashes =
-    mode === 'guide' ? [scriptHash, ...retainedGuideRuntimeHashes] : [scriptHash];
+  const trustedHashes = [
+    scriptHash,
+    ...(mode === 'guide' ? retainedGuideRuntimeHashes : retainedTourRuntimeHashes),
+  ];
   const admittedHash = trustedHashes.find((hash) => {
     const expectedPolicy =
       mode === 'guide'

@@ -1,4 +1,8 @@
-import { tourTextDefaults } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  tourTextDefaults,
+  resolveTourMarkerAppearance,
+  type TourMarkerAppearance,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useTourInspectorSections } from './settings-sections';
 import type {
   TourHotspot,
@@ -6,7 +10,16 @@ import type {
   TourRect,
   TourDocument,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { Crosshair, MessageSquare, ScanLine, Palette, MousePointer2 } from 'lucide-react';
+import {
+  RotateCcw,
+  Crosshair,
+  MessageSquare,
+  ScanLine,
+  Palette,
+  MousePointer2,
+} from 'lucide-react';
+import { ColorField } from '../../../ui/compact-inspector-controls/controls';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReactNode } from 'react';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { GuideInspectorGroup } from '../inspector';
@@ -87,6 +100,30 @@ export function TourHotspotSettings({
             />
             {t('scenario.editor.tourPulse')}
           </label>
+          <label className="guide-number-toggle">
+            <ProductToggle
+              size="sm"
+              disabled={disabled}
+              checked={!value.markerAppearance}
+              aria-label={t('scenario.editor.tourMarkerInherit')}
+              onClick={() =>
+                onChange({
+                  ...value,
+                  markerAppearance: value.markerAppearance
+                    ? null
+                    : resolveTourMarkerAppearance(tour.style),
+                })
+              }
+            />
+            {t('scenario.editor.tourMarkerInherit')}
+          </label>
+          <TourMarkerFields
+            value={resolveTourMarkerAppearance(tour.style, value)}
+            accent={tour.style.accent}
+            disabled={disabled || !value.markerAppearance}
+            t={t}
+            onChange={(markerAppearance) => onChange({ ...value, markerAppearance })}
+          />
           <TourTextPresentation
             kind="hotspot"
             value={value.appearance}
@@ -263,5 +300,71 @@ function TourRectFields({
         ))}
       </div>
     </>
+  );
+}
+
+/** Whole-object marker snapshots share controls between tour defaults and hotspot overrides. */
+export function TourMarkerFields({
+  value,
+  accent,
+  disabled,
+  onChange,
+  t,
+}: {
+  value: TourMarkerAppearance;
+  accent: string;
+  disabled: boolean;
+  onChange: (value: TourMarkerAppearance) => void;
+  t: Translate;
+}) {
+  return (
+    <div className="tour-text-field">
+      <ColorField
+        triggerVariant="swatch"
+        floatingPlacement="side"
+        layout="stacked"
+        label={t('scenario.editor.tourMarkerColor')}
+        title={t('scenario.editor.tourMarkerColor')}
+        value={value.color ?? 'transparent'}
+        palette={['#ffffff', '#111827', '#f97316', '#2563eb']}
+        disabled={disabled}
+        allowAlpha={false}
+        allowTransparent
+        onChange={(color) => onChange({ ...value, color: color === 'transparent' ? null : color })}
+      />
+      <div className="flex items-end gap-2">
+        <ColorField
+          className="min-w-0 flex-1"
+          triggerVariant="swatch"
+          floatingPlacement="side"
+          layout="stacked"
+          label={t('scenario.editor.tourMarkerPulseColor')}
+          title={t('scenario.editor.tourMarkerPulseColor')}
+          value={value.pulseColor ?? accent}
+          palette={['#ffffff', '#111827', '#f97316', '#2563eb']}
+          disabled={disabled}
+          allowAlpha={false}
+          allowTransparent={false}
+          onChange={(pulseColor) => onChange({ ...value, pulseColor })}
+        />
+        <ContentToolbarButton
+          className="shrink-0"
+          title={t('scenario.editor.tourMarkerPulseReset')}
+          disabled={disabled || value.pulseColor === null}
+          onClick={() => onChange({ ...value, pulseColor: null })}
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      <TourInspectorNumericRow
+        label={t('scenario.editor.tourMarkerSize')}
+        value={value.size}
+        min={16}
+        max={64}
+        unit="px"
+        disabled={disabled}
+        onChange={(size) => onChange({ ...value, size })}
+      />
+    </div>
   );
 }

@@ -173,6 +173,19 @@ export function TourTextPresentation({
           />
           {effective.presentation === 'callout' && (
             <>
+              {kind === 'hotspot' && (
+                <div title={t('scenario.editor.tourCalloutGapHint')}>
+                  <TourInspectorNumericRow
+                    label={t('scenario.editor.tourCalloutGap')}
+                    value={effective.calloutGap ?? 30}
+                    min={0}
+                    max={120}
+                    unit="px"
+                    disabled={disabled}
+                    onChange={(calloutGap) => onChange({ ...effective, calloutGap })}
+                  />
+                </div>
+              )}
               <span>{t('scenario.editor.tourTextPlacement')}</span>
               <CompactSelect
                 aria-label={t('scenario.editor.tourTextPlacement')}

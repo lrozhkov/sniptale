@@ -423,3 +423,110 @@ it('exposes hotspot coordinates in Text and annotation categories without mutati
   draw();
   expect(host.querySelectorAll('[data-testid="narration-slot"]')).toHaveLength(1);
 });
+
+it('resets pulse color to interaction accent without discarding marker color or size', async () => {
+  project.tour!.style.markerAppearance = { color: '#123456', pulseColor: '#abcdef', size: 44 };
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Hotspot');
+  await click('Use interaction accent');
+  expect(project.tour!.style.markerAppearance).toEqual({
+    color: '#123456',
+    pulseColor: null,
+    size: 44,
+  });
+  await fill('Marker size', '99');
+  expect(project.tour!.style.markerAppearance?.size).toBe(64);
+  disabled = true;
+  draw();
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Marker size"]')?.disabled).toBe(
+    true
+  );
+});
+
+it('inherits callout distance, allows local override, and never offers it for slide captions', async () => {
+  project.tour!.style.hotspotAppearance = {
+    ...project.tour!.style.textAppearance,
+    presentation: 'callout',
+    calloutGap: 45,
+  };
+  await click('Hotspot');
+  await click('Use tour style');
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Callout distance"]')?.value).toBe(
+    '45'
+  );
+  await fill('Callout distance', '120');
+  expect(current().hotspots[0]!.appearance?.calloutGap).toBe(120);
+  expect(project.tour!.style.hotspotAppearance.calloutGap).toBe(45);
+  await click('Use tour style');
+  expect(current().hotspots[0]!.appearance).toBeNull();
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Slide explanation');
+  expect(host.querySelector('[aria-label="Callout distance"]')).toBeNull();
+});
+
+async function color(label: string, value: string) {
+  await click(label);
+  await fill(label, value);
+}
+
+it('commits global and local marker colors while preserving independent snapshots', async () => {
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Hotspot');
+  await color('Marker color', '#123456');
+  await color('Pulse color', '#abcdef');
+  await fill('Callout distance', '60');
+  expect(project.tour!.style.markerAppearance).toEqual({
+    color: '#123456',
+    pulseColor: '#abcdef',
+    size: 30,
+  });
+  expect(project.tour!.style.hotspotAppearance?.calloutGap).toBe(60);
+  scope = 'selection';
+  presentation = 'all';
+  draw();
+  await click('Hotspot');
+  await click('Use tour marker style');
+  await color('Marker color', '#2563eb');
+  await color('Pulse color', '#f97316');
+  expect(current().hotspots[0]!.markerAppearance).toEqual({
+    color: '#2563eb',
+    pulseColor: '#f97316',
+    size: 30,
+  });
+  await color('Marker color', 'transparent');
+  await click('Use interaction accent');
+  expect(current().hotspots[0]!.markerAppearance).toEqual({
+    color: null,
+    pulseColor: null,
+    size: 30,
+  });
+  expect(project.tour!.style.markerAppearance).toEqual({
+    color: '#123456',
+    pulseColor: '#abcdef',
+    size: 30,
+  });
+  expect(current().hotspots[0]!.appearance).toBeNull();
+});
+
+it('edits interaction accent without replacing authored marker colors or tour geometry', async () => {
+  project.tour!.style.markerAppearance = { color: '#123456', pulseColor: '#abcdef', size: 44 };
+  const slides = structuredClone(project.tour!.slides);
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Appearance');
+  await color('Interaction accent', '#2563eb');
+  expect(project.tour!.style.accent).toBe('#2563eb');
+  expect(project.tour!.style.markerAppearance).toEqual({
+    color: '#123456',
+    pulseColor: '#abcdef',
+    size: 44,
+  });
+  expect(project.tour!.slides).toEqual(slides);
+});

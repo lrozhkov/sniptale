@@ -1,12 +1,14 @@
 import { DEFAULT_DRAWING_COLORS } from '../../../features/drawing/public';
 import {
   tourTextDefaults,
+  resolveTourMarkerAppearance,
   type TourDocument,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Palette, MessageSquare } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
+import { TourMarkerFields } from './object-settings';
 import { TourTextPresentation } from './fields';
 import type { Translate } from '../../../platform/i18n';
 
@@ -67,7 +69,7 @@ export function TourDocumentSettings({
           />
           {(
             [
-              { key: 'accent', label: t('scenario.editor.appearanceAccent') },
+              { key: 'accent', label: t('scenario.editor.tourInteractionAccent') },
               { key: 'text', label: t('scenario.editor.tourSceneTextColor') },
             ] as const
           ).map(({ key, label }) => (
@@ -78,7 +80,7 @@ export function TourDocumentSettings({
               palette={DEFAULT_DRAWING_COLORS}
               key={key}
               label={label}
-              title={label}
+              title={key === 'accent' ? t('scenario.editor.tourInteractionAccentHint') : label}
               value={tour.style[key]}
               disabled={disabled}
               allowAlpha={false}
@@ -87,6 +89,17 @@ export function TourDocumentSettings({
             />
           ))}
         </>
+      )}
+      {section === 'hotspots' && (
+        <TourMarkerFields
+          value={resolveTourMarkerAppearance(tour.style)}
+          accent={tour.style.accent}
+          disabled={disabled}
+          t={t}
+          onChange={(markerAppearance) =>
+            onChange({ ...tour, style: { ...tour.style, markerAppearance } })
+          }
+        />
       )}
       {section !== 'appearance' && (
         <TourTextPresentation

@@ -102,6 +102,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
           signal,
           autoZoom: tour.playback.autoZoom,
           maskDefaults: tour.style.maskDefaults,
+          style: tour.style,
         }
       );
       hints = slide.image ? slideExplanations(slide) : [];

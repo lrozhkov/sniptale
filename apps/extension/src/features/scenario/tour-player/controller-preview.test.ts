@@ -467,3 +467,53 @@ it.each(['loading', 'running'] as const)(
     expect(root.dataset['slideId']).toBe('first');
   }
 );
+
+it('renders inherited and local marker colors and diameter independently of pulse', async () => {
+  instantImages();
+  playbackFrames();
+  const tour = previewTour();
+  Object.assign(tour.style, {
+    markerAppearance: { color: '#2367ab', pulseColor: '#ab3267', size: 48 },
+  });
+  const slide = imageSlide('markers');
+  slide.hotspots = [
+    {
+      id: 'inherited',
+      point: { x: 0.3, y: 0.4 },
+      targetRect: null,
+      label: 'Inherited',
+      text: 'Details',
+      action: { kind: 'none' },
+      appearance: null,
+      pulse: false,
+    },
+    {
+      id: 'local',
+      point: { x: 0.7, y: 0.6 },
+      targetRect: null,
+      label: 'Local',
+      text: 'Details',
+      action: { kind: 'none' },
+      appearance: null,
+      pulse: true,
+    },
+  ];
+  Object.assign(slide.hotspots[1]!, {
+    markerAppearance: { color: '#123456', pulseColor: null, size: 16 },
+  });
+  tour.slides = [slide];
+  const saved = JSON.stringify(tour);
+  const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+  await settleMedia();
+  const markers = [...root.querySelectorAll<HTMLElement>('.tour-hotspot')];
+  expect(markers).toHaveLength(2);
+  expect(markers[0]!.style.getPropertyValue('--tour-marker-color')).toBe('#2367ab');
+  expect(markers[0]!.style.getPropertyValue('--tour-marker-pulse-color')).toBe('#ab3267');
+  expect(markers[0]!.style.getPropertyValue('--tour-marker-size')).toBe('48px');
+  expect(markers[0]!.dataset['pulse']).toBe('false');
+  expect(markers[1]!.style.getPropertyValue('--tour-marker-color')).toBe('#123456');
+  expect(markers[1]!.style.getPropertyValue('--tour-marker-pulse-color')).toBe(tour.style.accent);
+  expect(markers[1]!.style.getPropertyValue('--tour-marker-size')).toBe('16px');
+  expect(markers[1]!.dataset['pulse']).toBe('true');
+  expect(JSON.stringify(tour)).toBe(saved);
+});

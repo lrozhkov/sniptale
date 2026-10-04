@@ -180,3 +180,85 @@ it('keeps a legacy anchored annotation at the slide edge independently of the ac
   expect(hint.dataset['presentation']).toBe('callout');
   expect(root.querySelector('[data-tour-hint-text]')!.textContent).toBe('Text');
 });
+
+it.each(['left', 'right', 'top', 'bottom'] as const)(
+  'uses authored callout distance from the point center on %s',
+  async (placement) => {
+    const { player, root } = await mount();
+    const viewport = root.querySelector('[data-tour-viewport]')!;
+    const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 1000 },
+      clientHeight: { value: 700 },
+    });
+    Object.defineProperties(hint, { offsetWidth: { value: 100 }, offsetHeight: { value: 50 } });
+    const input = authoringInput();
+    const slide = input.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    slide.hotspots[0]!.appearance = { presentation: 'callout', alignment: 'start', placement };
+    Object.assign(slide.hotspots[0]!.appearance!, { calloutGap: 80 });
+    player.update(input);
+    const marker = root.querySelector<HTMLElement>('.tour-hotspot')!;
+    const x = Number.parseFloat(marker.style.left);
+    const y = Number.parseFloat(marker.style.top) + (700 - 562.5) / 2;
+    const left = Number.parseFloat(hint.style.left);
+    const top = Number.parseFloat(hint.style.top);
+    expect(
+      placement === 'left'
+        ? x - left - 100
+        : placement === 'right'
+          ? left - x
+          : placement === 'top'
+            ? y - top - 50
+            : top - y
+    ).toBe(80);
+  }
+);
+
+it('inherits global gap, applies a local gap, and restores the default without changing captions', async () => {
+  const { player, root } = await mount();
+  const viewport = root.querySelector('[data-tour-viewport]')!;
+  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+  Object.defineProperties(viewport, { clientWidth: { value: 1000 }, clientHeight: { value: 700 } });
+  Object.defineProperties(hint, { offsetWidth: { value: 100 }, offsetHeight: { value: 50 } });
+  const input = authoringInput();
+  const slide = input.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  input.tour.style.hotspotAppearance = {
+    presentation: 'callout',
+    placement: 'right',
+    alignment: 'start',
+    calloutGap: 70,
+  };
+  const markerGap = () =>
+    Number.parseFloat(hint.style.left) -
+    Number.parseFloat(root.querySelector<HTMLElement>('.tour-hotspot')!.style.left);
+  player.update(input);
+  expect(markerGap()).toBe(70);
+  slide.hotspots[0]!.appearance = { ...input.tour.style.hotspotAppearance, calloutGap: 100 };
+  player.update(input);
+  expect(markerGap()).toBe(100);
+  slide.hotspots[0]!.appearance = null;
+  player.update(input);
+  expect(markerGap()).toBe(70);
+  slide.annotations = [
+    {
+      id: 'caption',
+      text: 'Caption',
+      anchor: null,
+      appearance: {
+        presentation: 'caption-bottom',
+        placement: 'auto',
+        alignment: 'start',
+        calloutGap: 0,
+      },
+    },
+  ];
+  player.update(input);
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  const position = { top: hint.style.top, left: hint.style.left };
+  slide.annotations[0]!.appearance!.calloutGap = 120;
+  player.update(input);
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect({ top: hint.style.top, left: hint.style.left }).toEqual(position);
+});

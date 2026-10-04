@@ -45,6 +45,13 @@ export const tourActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('slide'), slideId: id }).strict(),
   z.object({ kind: z.literal('url'), url }).strict(),
 ]);
+const markerAppearance = z
+  .object({
+    color: color.nullable(),
+    pulseColor: color.nullable(),
+    size: z.number().finite().min(16).max(64),
+  })
+  .strict();
 const textAppearance = z
   .object({
     surface: z
@@ -58,6 +65,7 @@ const textAppearance = z
       })
       .strict()
       .optional(),
+    calloutGap: z.number().finite().min(0).max(120).optional(),
     presentation: z.enum(['callout', 'caption-top', 'caption-bottom']),
     alignment: z.enum(['start', 'center', 'end']),
     placement: z.enum(['auto', 'top', 'bottom', 'left', 'right']),
@@ -102,6 +110,7 @@ const image = z
 export const tourObjectSchemas = {
   hotspot: z
     .object({
+      markerAppearance: markerAppearance.nullable().optional(),
       id,
       point,
       targetRect: rect.nullable(),
@@ -212,6 +221,7 @@ export const tourDocumentSchema = z
         surface: color,
         textAppearance,
         hotspotAppearance: textAppearance.optional(),
+        markerAppearance: markerAppearance.optional(),
         maskDefaults: z
           .object({
             highlight: z.object({ paint: tourPaintSchema, opacity: fraction }).strict(),
