@@ -246,12 +246,14 @@
   [data-ui='gallery.videoReview.inspector'] .review-inspector-danger {
     min-height: 36px !important;
     padding-inline: 10px !important;
+  }
+  [data-ui='gallery.videoReview.inspector'] :is(.review-inspector-danger, [data-note-delete]) {
     color: var(--sniptale-color-danger) !important;
-    border-color: color-mix(in srgb, var(--sniptale-color-danger) 24%, transparent) !important;
-    background: color-mix(in srgb, var(--sniptale-color-danger) 6%, transparent) !important;
+    border-color: transparent !important;
+    background: transparent !important;
   }
   [data-ui='gallery.videoReview.inspector']
-    .review-inspector-danger:is(:hover, :focus-visible):not(:disabled) {
+    :is(.review-inspector-danger, [data-note-delete]):hover:not(:disabled) {
     color: var(--sniptale-color-danger) !important;
     border-color: color-mix(in srgb, var(--sniptale-color-danger) 45%, transparent) !important;
     background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent) !important;

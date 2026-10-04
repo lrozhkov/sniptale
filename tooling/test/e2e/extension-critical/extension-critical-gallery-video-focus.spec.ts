@@ -319,3 +319,121 @@ for (const variant of [
     }
   });
 }
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`quick editor resize hover and quiet deletion in ${theme}`, async ({ page }, testInfo) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': theme },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', {
+          name: translate('gallery.videoReview.advancedEditing', 'en'),
+          exact: true,
+        })
+        .click();
+      await dialog
+        .getByRole('button', { name: translate('gallery.videoReview.zoomAdd', 'en'), exact: true })
+        .click();
+      const block = dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first();
+      const inspectEdges = async (handles = block.locator('[data-zoom-edge]')) => {
+        await expect(handles).toHaveCount(2);
+        for (const handle of await handles.all()) {
+          await handle.scrollIntoViewIfNeeded();
+          const box = (await handle.boundingBox())!;
+          const x = box.x + box.width / 2;
+          const y = box.y + box.height / 2;
+          await page.mouse.move(x, y);
+          const cursor = await page.evaluate(
+            ({ x, y }) => {
+              const hit = document.elementFromPoint(x, y);
+              return hit
+                ? {
+                    cursor: getComputedStyle(hit).cursor,
+                    html: hit.outerHTML,
+                    parent: hit.parentElement?.outerHTML.slice(0, 700),
+                  }
+                : null;
+            },
+            { x, y }
+          );
+          expect
+            .soft(cursor?.cursor, `grip under pointer: ${JSON.stringify(cursor)}`)
+            .toBe('ew-resize');
+        }
+      };
+      await inspectEdges();
+      const zoom = dialog.getByRole('slider', {
+        name: translate('videoEditor.timeline.zoom', 'en'),
+        exact: true,
+      });
+      await zoom.focus();
+      for (let i = 0; i < 8; i += 1) await zoom.press('ArrowRight');
+      await inspectEdges();
+      const end = (await block.locator('[data-zoom-edge="end"]').boundingBox())!;
+      await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(end.x + end.width / 2 + 20, end.y + end.height / 2, { steps: 4 });
+      await page.mouse.up();
+      await inspectEdges();
+      const remove = dialog
+        .locator('[data-ui="gallery.videoReview.inspector"] .review-inspector-danger')
+        .first();
+      await remove.scrollIntoViewIfNeeded();
+      await page.mouse.move(0, 0);
+      await expect.soft(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await remove.hover();
+      await expect.soft(remove).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect.soft(remove).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await page.mouse.move(0, 0);
+      await expect.soft(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await page.screenshot({ path: testInfo.outputPath(`quiet-delete-${theme}.png`) });
+      await dialog
+        .getByRole('button', { name: translate('gallery.videoReview.fit', 'en'), exact: true })
+        .click();
+      for (const kind of ['cutMode', 'originalAudioRange'] as const) {
+        await dialog
+          .getByRole('button', {
+            name: translate(`gallery.videoReview.${kind}`, 'en'),
+            exact: true,
+          })
+          .first()
+          .click();
+        const lane =
+          kind === 'cutMode'
+            ? dialog.locator('[data-ui="gallery.videoReview.sourceLane"]')
+            : dialog.locator('[data-original-audio-lane]');
+        const bounds = (await lane.boundingBox())!;
+        const from = kind === 'cutMode' ? 0.25 : 0.55;
+        await page.mouse.move(bounds.x + bounds.width * from, bounds.y + bounds.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(
+          bounds.x + bounds.width * (from + 0.15),
+          bounds.y + bounds.height / 2,
+          {
+            steps: 4,
+          }
+        );
+        await page.mouse.up();
+        await inspectEdges(lane.locator(kind === 'cutMode' ? '[data-edge]' : '[data-audio-edge]'));
+      }
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}

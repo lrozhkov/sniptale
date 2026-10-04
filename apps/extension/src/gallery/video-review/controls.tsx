@@ -31,7 +31,8 @@ export function reviewTimelineItemTone(
 
 /** Consistent visible grips and hit areas across editable timeline lanes. */
 export const reviewTimelineResizeHandleClassName =
-  'absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center rounded ' +
+  'absolute inset-y-0 z-10 flex w-3 items-center justify-center rounded ' +
+  '!cursor-ew-resize disabled:!cursor-default [&_*]:!cursor-[inherit] ' +
   'bg-[var(--sniptale-color-surface-hover)]';
 
 const iconButtonBase =

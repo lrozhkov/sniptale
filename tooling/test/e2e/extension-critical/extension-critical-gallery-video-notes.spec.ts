@@ -82,6 +82,23 @@ for (const variant of [
       expect(deleteBox.height).toBe(32);
       expect(deleteBox.y).toBe(editBox.y);
       expect(deleteBox.x).toBeGreaterThan(editBox.x);
+      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      const danger = await remove.evaluate((node) => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--sniptale-color-danger)';
+        node.append(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      });
+      await expect(remove).toHaveCSS('color', danger);
+      await remove.hover();
+      await expect(remove).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).not.toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await edit.hover();
+      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(remove).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
       await edit.click();
       await expect(field).toBeFocused();
       await page.keyboard.press('Tab');
