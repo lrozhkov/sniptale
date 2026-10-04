@@ -64,6 +64,7 @@ function selectAssets<T extends { id: string; mime: string }>(
   inputAssets: readonly T[]
 ) {
   const required = new Map<string, 'image' | 'audio'>();
+  if (tour.stage.image) required.set(tour.stage.image.assetId, 'image');
   for (const slide of tour.slides) {
     if (slide.kind === 'image' && slide.requiresTargetReview)
       throw new Error('Tour image targets require review before export.');
@@ -108,6 +109,10 @@ async function buildTourPlayerShell(args: {
   const payload = {
     tour: {
       ...viewerTour,
+      stage: {
+        ...tour.stage,
+        ...(tour.stage.image !== undefined ? { image: imageProjection(tour.stage.image) } : {}),
+      },
       slides: tour.slides.map((slide) => {
         if (slide.kind === 'navigation')
           return {

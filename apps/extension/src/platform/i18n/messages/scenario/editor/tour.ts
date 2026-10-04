@@ -326,6 +326,7 @@ export const scenarioTourMessages = {
   tourCallout: { ru: 'У точки', en: 'At hotspot' },
   tourCaptionTop: { ru: 'Сверху', en: 'Top captions' },
   tourCaptionBottom: { ru: 'Снизу', en: 'Bottom captions' },
+  tourRemoveStageImage: { ru: 'Удалить изображение фона', en: 'Remove stage image' },
   tourFit: { ru: 'Изображение', en: 'Image fit' },
   tourAlt: { ru: 'Описание изображения', en: 'Image description' },
   tourContain: { ru: 'Вписать', en: 'Fit' },

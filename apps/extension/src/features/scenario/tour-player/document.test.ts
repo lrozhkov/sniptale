@@ -28,7 +28,7 @@ const labels: TourPlayerLabels = {
 };
 const png =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=';
-function fixture() {
+function fixture(binding: 'slides' | 'stage' = 'slides') {
   const tour = createTourDocument('tour');
   const slide = createTourImageSlide('one');
   slide.title = 'First';
@@ -54,6 +54,10 @@ function fixture() {
     },
   ];
   tour.slides = [slide, { ...createTourImageSlide('two'), title: 'Second', image: slide.image }];
+  if (binding === 'stage') {
+    tour.stage.image = slide.image;
+    tour.slides = tour.slides.map((item) => ({ ...item, image: null }));
+  }
   tour.endScreen.title = 'Done';
   return {
     tour,
@@ -81,15 +85,27 @@ function open(html: string) {
   return { window, close: () => frame.remove() };
 }
 
-it('embeds one media copy, fixed script CSP, and no source provenance', async () => {
-  const html = await buildTourPlayerHtml(fixture());
-  expect(html.split(png)).toHaveLength(2);
-  expect(html).not.toContain('private-file.png');
-  expect(html).not.toContain('private-library');
-  expect(html).toContain('default-src &#39;none&#39;');
-  expect(html).toContain('sha256-');
-  expect(html).not.toContain('chrome-extension://');
-});
+it.each(['slides', 'stage'] as const)(
+  'embeds %s media once with public metadata and fixed CSP',
+  async (binding) => {
+    const html = await buildTourPlayerHtml(fixture(binding));
+    const payload = JSON.parse(
+      new DOMParser().parseFromString(html, 'text/html').querySelector('#tour-data')!.textContent!
+    );
+    expect(payload.tour.stage.image ?? payload.tour.slides[0].image).toEqual({
+      assetId: 'image',
+      width: 640,
+      height: 360,
+      alt: 'Screenshot',
+    });
+    expect(html.split(png)).toHaveLength(2);
+    expect(html).not.toContain('private-file.png');
+    expect(html).not.toContain('private-library');
+    expect(html).toContain('default-src &#39;none&#39;');
+    expect(html).toContain('sha256-');
+    expect(html).not.toContain('chrome-extension://');
+  }
+);
 it('treats authored text as text through both JSON and visible title boundaries', async () => {
   const args = fixture();
   const attack = '</script><img src=x onerror="globalThis.pwned=1">';
@@ -121,7 +137,7 @@ it('uses the same standalone runtime for hotspots, back history, ending and rest
   expect(current()).toBe('one');
   dom.close();
 });
-it('projects manual camera and markers through one source-image box', async () => {
+it('projects the camera and legacy marker appearance through one source-image box', async () => {
   const args = fixture();
   const first = args.tour.slides[0]!;
   if (first.kind !== 'image') throw new Error('image expected');
@@ -131,41 +147,53 @@ it('projects manual camera and markers through one source-image box', async () =
   const image = dom.window.document.querySelector<HTMLElement>('.tour-image')!;
   expect(marker.style.left).toBe('320px');
   expect(marker.style.top).toBe('180px');
+  expect(marker.style.getPropertyValue('--tour-marker-color')).toBe('transparent');
+  expect(marker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(args.tour.style.accent);
+  expect(marker.style.getPropertyValue('--tour-marker-size')).toBe('');
+  expect(marker.dataset['pulse']).toBe('true');
   expect(image.style.width).toBe('1280px');
   dom.close();
 });
-it('rejects missing, duplicate, conflicting media and unprepared redaction', async () => {
-  const args = fixture();
-  await expect(buildTourPlayerHtml({ ...args, assets: [] })).rejects.toThrow('Missing');
-  await expect(
-    buildTourPlayerHtml({ ...args, assets: [...args.assets, ...args.assets] })
-  ).rejects.toThrow('Duplicate');
-  await expect(
-    buildTourPlayerHtml({ ...args, assets: [{ id: 'image', mime: 'image/svg+xml', base64: png }] })
-  ).rejects.toThrow('Invalid embedded');
-  const first = args.tour.slides[0]!;
-  if (first.kind !== 'image') throw new Error('image expected');
-  first.masks = [
-    {
-      id: 'mask',
-      kind: 'redact',
-      rect: { x: 0, y: 0, width: 0.5, height: 0.5 },
-      color: '#000000',
-      opacity: 1,
-    },
-  ];
-  await expect(buildTourPlayerHtml(args)).rejects.toThrow('rasterized');
-  first.masks = [];
-  first.narration = {
-    assetId: 'image',
-    duration: 1,
-    trimStart: 0,
-    trimEnd: 1,
-    gain: 1,
-    transcript: '',
-  };
-  await expect(buildTourPlayerHtml(args)).rejects.toThrow('Invalid tour');
-});
+it.each(['slides', 'stage'] as const)(
+  'rejects invalid %s media and unprepared redaction',
+  async (binding) => {
+    const args = fixture(binding);
+    await expect(buildTourPlayerHtml({ ...args, assets: [] })).rejects.toThrow('Missing');
+    await expect(
+      buildTourPlayerHtml({ ...args, assets: [...args.assets, ...args.assets] })
+    ).rejects.toThrow('Duplicate');
+    for (const asset of [
+      { id: 'image', mime: 'image/svg+xml', base64: png },
+      { id: 'image', mime: 'audio/wav', base64: png },
+      { id: 'image', mime: 'image/png', base64: 'not base64!!' },
+    ]) {
+      const exported = buildTourPlayerHtml({ ...args, assets: [asset] });
+      await expect(exported).rejects.toThrow('Invalid embedded');
+    }
+    const first = args.tour.slides[0]!;
+    if (first.kind !== 'image') throw new Error('image expected');
+    first.masks = [
+      {
+        id: 'mask',
+        kind: 'redact',
+        rect: { x: 0, y: 0, width: 0.5, height: 0.5 },
+        color: '#000000',
+        opacity: 1,
+      },
+    ];
+    await expect(buildTourPlayerHtml(args)).rejects.toThrow('rasterized');
+    first.masks = [];
+    first.narration = {
+      assetId: 'image',
+      duration: 1,
+      trimStart: 0,
+      trimEnd: 1,
+      gain: 1,
+      transcript: '',
+    };
+    await expect(buildTourPlayerHtml(args)).rejects.toThrow('Invalid tour');
+  }
+);
 
 it('supports document keyboard navigation while leaving input arrows alone', async () => {
   const dom = open(await buildTourPlayerHtml(fixture()));
@@ -551,12 +579,6 @@ it('separates action callouts and slide captions despite a shared caption defaul
   dom.close();
 });
 
-it('rejects invalid embedded media before export', async () => {
-  const broken = fixture();
-  broken.assets = [{ id: 'image', mime: 'image/png', base64: 'not base64!!' }];
-  await expect(buildTourPlayerHtml(broken)).rejects.toThrow('Invalid embedded tour media.');
-});
-
 it('streams the same shell through an abortable blob with embedded assets', async () => {
   const args = fixture();
   const blob = await buildTourPlayerBlob({
@@ -771,20 +793,6 @@ it('exports marker overrides without rewriting source points', async () => {
       exported.tour.slides[0].hotspots.map((point: { point: unknown }) => point.point)
     ).toEqual(slide.hotspots.map((point) => point.point));
     expect(JSON.stringify(args.tour)).toBe(saved);
-  } finally {
-    dom.close();
-  }
-});
-
-it('keeps legacy marker rendering transparent with its existing responsive size and accent pulse', async () => {
-  const args = fixture();
-  const dom = open(await buildTourPlayerHtml(args));
-  try {
-    const marker = dom.window.document.querySelector<HTMLElement>('.tour-hotspot')!;
-    expect(marker.style.getPropertyValue('--tour-marker-color')).toBe('transparent');
-    expect(marker.style.getPropertyValue('--tour-marker-pulse-color')).toBe(args.tour.style.accent);
-    expect(marker.style.getPropertyValue('--tour-marker-size')).toBe('');
-    expect(marker.dataset['pulse']).toBe('true');
   } finally {
     dom.close();
   }

@@ -10,10 +10,12 @@ import {
   getTourImages,
 } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { createTranslator } from '../../../platform/i18n';
+import { createTranslator, translate } from '../../../platform/i18n';
 import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { TourInspector } from './inspector';
 import type { TourSelection } from './selection';
+const uploadStage = vi.fn<(file: File, signal: AbortSignal) => Promise<boolean>>();
+let importDisabled = false;
 let root: Root;
 let host: HTMLDivElement;
 let project: GuideProject;
@@ -23,6 +25,8 @@ let disabled: boolean;
 let presentation: 'all' | 'sections';
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  uploadStage.mockReset().mockResolvedValue(true);
+  importDisabled = false;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -67,6 +71,8 @@ function draw() {
   act(() =>
     root.render(
       <TourInspector
+        onUploadStage={uploadStage}
+        importDisabled={importDisabled}
         presentation={presentation}
         narration={<div data-testid="narration-slot" />}
         tour={project.tour!}
@@ -529,4 +535,76 @@ it('edits interaction accent without replacing authored marker colors or tour ge
     size: 44,
   });
   expect(project.tour!.slides).toEqual(slides);
+});
+
+it('edits stage image fit and removal without changing slide resources or authored paint', async () => {
+  project.tour!.stage.image = structuredClone(current().image);
+  const before = structuredClone(current());
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Appearance');
+  await choose('Image fit', 'Fit');
+  expect(project.tour!.stage.imageFit).toBe('contain');
+  await choose('Image fit', 'Fill');
+  expect(project.tour!.stage.imageFit).toBe('cover');
+  await click('Remove stage image');
+  expect(project.tour!.stage.image).toBeNull();
+  expect(project.tour!.stage.background).toBe('#111827');
+  expect(current()).toEqual(before);
+  expect(host.querySelector('[aria-label="Image fit"]')).toBeNull();
+});
+
+it('uses the shared stage uploader with cancellation and separate import admission', async () => {
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Appearance');
+  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  expect(input).not.toBeNull();
+  const file = new File(['image'], 'stage.png', { type: 'image/png' });
+  let finish: ((value: boolean) => void) | undefined;
+  uploadStage.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  Object.defineProperty(input, 'files', { value: [file], configurable: true });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(uploadStage).toHaveBeenCalledWith(file, expect.any(AbortSignal));
+  expect(input.disabled).toBe(true);
+  await click('Cancel preparation');
+  expect(uploadStage.mock.calls[0]?.[1].aborted).toBe(true);
+  await act(async () => finish?.(false));
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  importDisabled = true;
+  draw();
+  expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.disabled).toBe(true);
+  expect(host.querySelector<HTMLButtonElement>('[aria-label="Stage background"]')?.disabled).toBe(
+    false
+  );
+  scope = 'selection';
+  draw();
+  expect(host.querySelector('input[type="file"]')).toBeNull();
+});
+
+it('applies stage gradient and solid paint while clearing only the stage image binding', async () => {
+  project.tour!.stage.image = structuredClone(current().image);
+  const before = structuredClone(current());
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Appearance');
+  await click('Stage background');
+  await click(translate('highlighter.paintPicker.linear'));
+  await click(translate('shared.ui.colorSelectorApply'));
+  expect(project.tour!.stage.paint?.kind).toBe('gradient');
+  expect(project.tour!.stage.image).toBeNull();
+  expect(project.tour!.stage.background).toMatch(/^#[a-f0-9]{6}$/i);
+  await click('Stage background');
+  await click(translate('highlighter.paintPicker.solid'));
+  await click(translate('shared.ui.colorSelectorApply'));
+  expect(project.tour!.stage.paint?.kind).toBe('solid');
+  expect(current()).toEqual(before);
 });

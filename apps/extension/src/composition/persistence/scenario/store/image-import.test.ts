@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
+  createTourDocument,
   createGuideImageBlock,
   createGuideProject,
   createGuideStep,
@@ -743,3 +744,46 @@ it.each(
     expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts).toHaveLength(1);
   }
 );
+
+it('imports stage background through the shared transaction without changing the caller', async () => {
+  const args = input();
+  args.project.tour = createTourDocument();
+  const original = structuredClone(args.project);
+  const result = await importScenarioImages({
+    ...args,
+    placement: { kind: 'tour-stage-background' },
+  });
+  expect(result.tour?.stage.image).toMatchObject({ width: 120, height: 80 });
+  expect(result.tour?.slides).toEqual(original.tour?.slides);
+  expect(args.project).toEqual(original);
+  expect(io.commit).toHaveBeenCalledOnce();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts).toHaveLength(1);
+});
+it('rejects invalid stage acquisition, preserves publication cleanup authority and compensates abort', async () => {
+  const args = input();
+  const placement = { kind: 'tour-stage-background' as const };
+  await expect(importScenarioImages({ ...args, placement })).rejects.toThrow('unavailable');
+  args.project.tour = createTourDocument();
+  await expect(
+    importScenarioImages({ ...args, placement, sources: [...args.sources, ...args.sources] })
+  ).rejects.toThrow('unavailable');
+  expect(io.write).not.toHaveBeenCalled();
+  io.commit.mockRejectedValueOnce(new Error('publication rejected'));
+  await expect(importScenarioImages({ ...args, placement })).rejects.toThrow(
+    'publication rejected'
+  );
+  expect(io.discard).not.toHaveBeenCalled();
+  io.commit.mockClear();
+  const controller = new AbortController();
+  await expect(
+    importScenarioImages({
+      ...args,
+      placement,
+      signal: controller.signal,
+      onProgress: () => controller.abort(),
+    })
+  ).rejects.toThrow();
+  expect(io.discard).toHaveBeenCalledOnce();
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(args.project.tour.stage.image).toBeUndefined();
+});

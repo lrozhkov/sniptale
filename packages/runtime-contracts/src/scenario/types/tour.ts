@@ -309,7 +309,13 @@ export interface TourDocument {
   audioResources?: TourAudioResource[] | undefined;
   version: 1;
   id: string;
-  stage: { aspect: '16:9' | '4:3' | '9:16'; background: string };
+  stage: {
+    aspect: '16:9' | '4:3' | '9:16';
+    background: string;
+    paint?: Paint | undefined;
+    image?: TourImage | null | undefined;
+    imageFit?: 'contain' | 'cover' | undefined;
+  };
   style: {
     accent: string;
     text: string;

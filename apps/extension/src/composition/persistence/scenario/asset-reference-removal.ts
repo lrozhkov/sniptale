@@ -32,6 +32,10 @@ function removeFromProject(project: GuideProject, assetIds: ReadonlySet<string>)
   }
   const tour = project.tour;
   if (!tour) return changed;
+  if (tour.stage.image && assetIds.has(tour.stage.image.assetId)) {
+    tour.stage.image = null;
+    changed = true;
+  }
   if (tour.audioResources) {
     tour.audioResources = tour.audioResources.filter((resource) => {
       if (!assetIds.has(resource.assetId)) return true;

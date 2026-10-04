@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
 import { expect, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
+import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
 
 async function expectFittedFrame(player: Locator) {
@@ -793,5 +794,292 @@ for (const [locale, theme, viewport] of [
     });
     await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     await cdp.detach();
+  });
+}
+
+async function decodeStageBackground(stage: Locator) {
+  return stage.evaluate(async (node) => {
+    const source = getComputedStyle(node).backgroundImage.match(/url\("([^"]+)"\)/)![1]!;
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d')!;
+    context.drawImage(image, 0, 0);
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      pixel: [...context.getImageData(48, 80, 1, 1).data],
+    };
+  });
+}
+
+async function inspectStageContent(player: Locator) {
+  return player.locator('[data-tour-stage]').evaluate((stage) => {
+    const frame = stage.getBoundingClientRect();
+    const image = stage.querySelector<HTMLImageElement>('.tour-image')!;
+    const point = stage.querySelector<HTMLElement>('.tour-hotspot')!;
+    const relative = (node: Element) => {
+      const box = node.getBoundingClientRect();
+      return [
+        (box.x - frame.x) / frame.width,
+        (box.y - frame.y) / frame.height,
+        box.width / frame.width,
+        box.height / frame.height,
+      ].map((value) => Math.round(value * 1000) / 1000);
+    };
+    return {
+      aspect: Math.round((frame.width / frame.height) * 1000) / 1000,
+      image: relative(image),
+      source: [image.naturalWidth, image.naturalHeight, image.alt],
+      point: [point.style.left, point.style.top],
+      pointFraction: [
+        parseFloat(point.style.left) / stage.clientWidth,
+        parseFloat(point.style.top) / stage.clientHeight,
+      ],
+    };
+  });
+}
+
+for (const [locale, theme, viewport] of [
+  ['ru', 'light', { width: 1280, height: 560 }],
+  ['en', 'dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`tour stage background preserves content and saved HTML in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await openVisualHarness(page, hostOrigin, theme, locale, viewport, 'compare', {
+      tourFixture: '1',
+    });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: t('scenario.editor.tourObjects'), exact: true })
+      .click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
+    const appearance = async () => {
+      await page
+        .locator('.guide-page-header')
+        .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+        .click();
+    };
+    await appearance();
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: t('scenario.editor.tourPlayback'), exact: true })
+      .click();
+    await panel
+      .getByRole('switch', { name: t('scenario.editor.tourAutoZoom'), exact: true })
+      .uncheck();
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+      .click();
+    await expect(
+      panel.getByRole('button', {
+        name: t('scenario.editor.guideUploadImage'),
+        exact: true,
+      })
+    ).toBeVisible();
+    await panel.getByRole('button', { name: t('scenario.editor.tourAspect'), exact: true }).click();
+    await page.getByRole('option', { name: '4:3', exact: true }).click();
+    const player = page.locator('.tour-stage-host');
+    const stage = player.locator('[data-tour-stage]');
+    await expect(player.locator('.tour-hotspot')).toHaveCount(1);
+    await expect(player.locator('.tour-image')).toBeVisible();
+    const original = await inspectStageContent(player);
+    expect(original.aspect).toBeCloseTo(4 / 3, 2);
+    expect(original.image[3]).toBeLessThan(0.9);
+    const paint = async (mode: 'solid' | 'linear') => {
+      await panel
+        .getByRole('button', { name: t('scenario.editor.tourBackground'), exact: true })
+        .click();
+      const popup = page.locator('[data-ui="shared.ui.paint-selector.popup"]');
+      await popup
+        .getByRole('button', { name: t(`highlighter.paintPicker.${mode}`), exact: true })
+        .click();
+      const apply = popup.getByRole('button', {
+        name: t('shared.ui.colorSelectorApply'),
+        exact: true,
+      });
+      await expect(apply).toBeInViewport({ ratio: 1 });
+      await apply.click();
+      await expect(popup).toHaveCount(0);
+    };
+    await expect(stage).toHaveCSS('background-image', 'none');
+    await paint('linear');
+    await expect(stage).toHaveCSS('background-image', /linear-gradient/);
+    await paint('solid');
+    await expect(stage).toHaveCSS('background-image', 'none');
+    await paint('linear');
+    await expect(stage).toHaveCSS('background-image', /linear-gradient/);
+    const gradient = await stage.evaluate((node) => getComputedStyle(node).backgroundImage);
+    const imageFile = async (color: string, name: string) => {
+      const encoded = await page.evaluate((fill) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 96;
+        canvas.height = 160;
+        const context = canvas.getContext('2d')!;
+        context.fillStyle = fill;
+        context.fillRect(0, 0, 96, 160);
+        return canvas.toDataURL('image/png').split(',')[1]!;
+      }, color);
+      return { name, mimeType: 'image/png', buffer: Buffer.from(encoded, 'base64') };
+    };
+    const first = await imageFile('#d946ef', 'stage-portrait.png');
+    const replacement = await imageFile('#22c55e', 'stage-replacement.png');
+    const upload = panel.locator('input[type="file"][accept*="image/"]');
+    await upload.setInputFiles(first);
+    await expect(stage).toHaveCSS('background-image', /url\(/);
+    await expect(stage).toHaveCSS('background-size', 'cover, auto');
+    const chooseFit = async (fit: 'tourContain' | 'tourCover') => {
+      await panel.getByRole('button', { name: t('scenario.editor.tourFit'), exact: true }).click();
+      await page.getByRole('option', { name: t(`scenario.editor.${fit}`), exact: true }).click();
+    };
+    await chooseFit('tourContain');
+    await expect(stage).toHaveCSS('background-size', 'contain, auto');
+    await chooseFit('tourCover');
+    await expect(stage).toHaveCSS('background-size', 'cover, auto');
+    await chooseFit('tourContain');
+    const firstBackground = await stage.evaluate((node) => getComputedStyle(node).backgroundImage);
+    await upload.setInputFiles(replacement);
+    await expect(stage).not.toHaveCSS('background-image', firstBackground);
+    await expect(stage).toHaveCSS('background-size', 'contain, auto');
+    expect(await inspectStageContent(player)).toEqual(original);
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourRemoveStageImage'), exact: true })
+      .click();
+    await expect(stage).toHaveCSS('background-image', gradient);
+    await page.getByRole('button', { name: t('scenario.editor.undo'), exact: true }).click();
+    await expect(stage).toHaveCSS('background-image', /url\(/);
+    await expect(page.getByRole('status').first()).toHaveText(t('scenario.editor.guideSaved'));
+    const reopen = new URL(page.url());
+    reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+    reopen.searchParams.set('theme', theme);
+    reopen.searchParams.set('locale', locale);
+    await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    await expect(stage).toHaveCSS('background-size', 'contain, auto');
+    expect(await inspectStageContent(player)).toEqual(original);
+    await appearance();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.guideOpenImageLibrary'), exact: true })
+      .click();
+    const drawer = page.locator('#guide-resource-drawer');
+    const select = drawer.getByRole('button', {
+      name: `${t('gallery.app.selectItem')}: Library screenshot.png`,
+      exact: true,
+    });
+    await expect(select).toBeVisible();
+    await select.click();
+    await expect(drawer.locator('.guide-import-count')).toHaveText(
+      t('scenario.editor.guideImportSelectedCount').replace('{count}', '1')
+    );
+    const importSelected = drawer.getByRole('button', {
+      name: t('scenario.editor.guideImportSelected'),
+      exact: true,
+    });
+    await expect(importSelected).toBeInViewport({ ratio: 1 });
+    await importSelected.click();
+    await expect(drawer).toHaveCount(0);
+    await expect(stage).toHaveCSS('background-image', /url\(/);
+    expect(await inspectStageContent(player)).toEqual(original);
+    await page.getByRole('button', { name: t('scenario.editor.undo'), exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText(t('scenario.editor.guideSaved'));
+    expect(await decodeStageBackground(stage)).toEqual({
+      width: 96,
+      height: 160,
+      pixel: [34, 197, 94, 255],
+    });
+    await info.attach(`stage-background-${locale}`, {
+      body: await page.screenshot({
+        fullPage: false,
+        path: info.outputPath(`editor-stage-${locale}.png`),
+      }),
+      contentType: 'image/png',
+    });
+    await page.evaluate(() => {
+      const chunks: Uint8Array[] = [];
+      Object.defineProperty(window, 'showSaveFilePicker', {
+        configurable: true,
+        value: async () => ({
+          createWritable: async () =>
+            new WritableStream<Uint8Array>({
+              write: (chunk) => {
+                chunks.push(chunk);
+              },
+            }),
+        }),
+      });
+      Object.defineProperty(window, 'savedStageTour', {
+        configurable: true,
+        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+      });
+    });
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedStageTour'))))
+      .toContain('<!doctype html>');
+    const html = await page.evaluate(() => String(Reflect.get(window, 'savedStageTour')));
+    const output = info.outputPath('stage-background-tour.html');
+    await writeFile(output, html);
+    await page.context().setOffline(true);
+    try {
+      await page.goto(pathToFileURL(output).href);
+      const standalone = page.locator('#tour-player');
+      await expect(standalone.locator('.tour-image')).toBeVisible();
+      await expect(standalone.locator('.tour-scene')).toHaveCSS('opacity', '1');
+      const savedStage = standalone.locator('[data-tour-stage]');
+      await expect(savedStage).toHaveCSS('background-size', 'contain, auto');
+      await expect(savedStage).toHaveCSS('background-image', /url\("data:image/);
+      expect(await decodeStageBackground(savedStage)).toEqual({
+        width: 96,
+        height: 160,
+        pixel: [34, 197, 94, 255],
+      });
+      const savedContent = await inspectStageContent(standalone);
+      expect(savedContent.aspect).toEqual(original.aspect);
+      expect(savedContent.source).toEqual(original.source);
+      for (const [index, value] of savedContent.pointFraction.entries())
+        expect(value).toBeCloseTo(original.pointFraction[index]!, 3);
+      for (const [index, value] of savedContent.image.entries())
+        expect(value).toBeCloseTo(original.image[index]!, 2);
+      await writeFile(
+        info.outputPath('stage-geometry.json'),
+        JSON.stringify(
+          {
+            viewport,
+            locale,
+            theme,
+            original,
+            savedContent,
+            background: await decodeStageBackground(savedStage),
+          },
+          null,
+          2
+        )
+      );
+      await info.attach(`offline-stage-background-${locale}`, {
+        body: await page.screenshot({
+          fullPage: false,
+          path: info.outputPath(`offline-stage-${locale}.png`),
+        }),
+        contentType: 'image/png',
+      });
+    } finally {
+      await page.context().setOffline(false);
+    }
   });
 }

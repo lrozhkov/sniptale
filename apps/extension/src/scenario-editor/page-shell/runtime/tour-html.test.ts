@@ -214,3 +214,46 @@ it('preserves base64 across chunk boundaries and distinguishes history failure a
   expect(await saveTourHtml(artifact, new AbortController().signal)).toBe('history-failed');
   expect(abort).not.toHaveBeenCalled();
 });
+
+it('shares baked redacted bytes with the stage and strips its private provenance', async () => {
+  const args = fixture();
+  const tour = args.project.tour!;
+  const slide = tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Missing image slide');
+  tour.stage.image = structuredClone(slide.image);
+  const original = JSON.stringify(tour);
+  const artifact = await prepareTourHtml(args);
+  const html = await artifact.blob.text();
+  expect(io.raster).toHaveBeenCalledTimes(1);
+  expect(io.raster.mock.calls[0]![1]).toHaveLength(1);
+  expect(html.split(btoa('sanitized'))).toHaveLength(2);
+  expect(html).not.toContain(`data:image/png;base64,${btoa('image')}`);
+  expect(html).not.toContain('private-gallery');
+  expect(html).not.toContain('private-file.png');
+  expect(html).toContain('"stage":');
+  expect(JSON.stringify(tour)).toBe(original);
+});
+
+it('prepares a stage-only image through the shared raster authority and fails missing bytes', async () => {
+  const args = fixture();
+  const slide = args.project.tour!.slides[0]!;
+  if (slide.kind !== 'image' || !slide.image) throw new Error('Missing image slide');
+  args.project.tour!.stage.image = { ...slide.image, assetId: 'stage-only' };
+  io.asset.mockImplementation(
+    async (id: string) =>
+      new Blob([id], {
+        type: id === 'audio' ? 'audio/wav' : 'image/png',
+      })
+  );
+  const artifact = await prepareTourHtml(args);
+  expect(artifact.mediaCount).toBe(3);
+  expect(io.asset.mock.calls.map(([id]) => id)).toContain('stage-only');
+  expect(io.raster).toHaveBeenCalledTimes(2);
+  expect(await artifact.blob.text()).not.toContain('private-gallery');
+  io.asset.mockImplementation(async (id: string) =>
+    id === 'stage-only'
+      ? undefined
+      : new Blob([id], { type: id === 'audio' ? 'audio/wav' : 'image/png' })
+  );
+  await expect(prepareTourHtml(args)).rejects.toThrow('Missing tour media');
+});

@@ -97,7 +97,8 @@ function useGuideImageResources({
   const single =
     target?.kind === 'replace-image' ||
     target?.kind === 'tour-image' ||
-    target?.kind === 'tour-background';
+    target?.kind === 'tour-background' ||
+    target?.kind === 'tour-stage-background';
   const limit = target?.kind === 'tour-slides' ? 300 : 50;
   const chooseLibrary = (id: string, name: string) => {
     if (locked) return;
@@ -241,6 +242,7 @@ function importDestinationLabel(props: ResourceProps, placement: 'steps' | 'bloc
   const kind = target?.kind ?? placement;
   if (kind === 'tour-slides') return t('scenario.editor.guideImportTourSlides');
   if (kind === 'tour-image') return t('scenario.editor.guideImportTourImage');
+  if (kind === 'tour-stage-background') return t('scenario.editor.tourBackground');
   if (kind === 'tour-background') return t('scenario.editor.guideImportTourBackground');
   if (kind === 'steps') return t('scenario.editor.guideImportStepsHint');
   const stepId = target && 'stepId' in target ? target.stepId : selectedStepId;

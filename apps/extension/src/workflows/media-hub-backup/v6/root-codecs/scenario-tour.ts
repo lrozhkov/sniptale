@@ -15,6 +15,10 @@ export function encodePortableTour(tour: TourDocument) {
   };
   return {
     ...tour,
+    stage: {
+      ...tour.stage,
+      ...(tour.stage.image === undefined ? {} : { image: media(tour.stage.image) }),
+    },
     slides: tour.slides.map((slide) => ({
       ...slide,
       narration: media(slide.narration),
@@ -66,9 +70,12 @@ export function decodePortableTour(
         : null;
     return { ...rest, assetId, editDocumentId, galleryAssetId };
   };
+  if (!record(value['stage'])) throw new Error('Portable tour stage is invalid.');
+  const stage = value['stage'];
   const slides: unknown[] = value['slides'];
   const decoded = {
     ...value,
+    stage: { ...stage, ...('image' in stage ? { image: media(stage['image'], true) } : {}) },
     slides: slides.map((slide) => {
       if (!record(slide)) throw new Error('Portable tour slide is invalid.');
       const narration = media(slide['narration'], false);

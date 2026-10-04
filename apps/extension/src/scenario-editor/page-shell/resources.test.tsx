@@ -341,3 +341,16 @@ it.each(['steps', 'blocks', 'replacement', 'tour', 'disabled'] as const)(
     expect(host.textContent).toContain('Video frame preview');
   }
 );
+
+it('selects one library image for the global tour stage without slide placement controls', async () => {
+  await render(null, { kind: 'tour-stage-background' });
+  await files('first.png', 'background.png');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe('Stage background');
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 1');
+  expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0]).toMatchObject({
+    placement: { kind: 'tour-stage-background' },
+    sources: [{ kind: 'library', mediaId: 'background.png' }],
+  });
+});

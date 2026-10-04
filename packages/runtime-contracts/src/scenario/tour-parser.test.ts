@@ -666,3 +666,72 @@ describe('marker appearance and callout distance', () => {
     }
   });
 });
+
+describe('stage background boundary', () => {
+  it('retains legacy absence without materializing background defaults', () => {
+    const value = document();
+    const parsed = parseTourDocument(value);
+    expect(parsed).toEqual({ status: 'ok', document: value });
+    if (parsed.status !== 'ok') throw new Error('Expected document');
+    expect(Object.keys(parsed.document.stage).sort()).toEqual(['aspect', 'background']);
+  });
+  it.each(['contain', 'cover'] as const)(
+    'roundtrips a gradient and stage image with %s fit',
+    (imageFit) => {
+      const value = document();
+      value.stage.image = imageSlide().image;
+      value.stage.imageFit = imageFit;
+      value.stage.paint = {
+        kind: 'gradient',
+        gradient: {
+          type: 'linear',
+          angle: 45,
+          interpolation: 'srgb',
+          repeat: { enabled: false, span: 1 },
+          stops: [
+            { id: 'a', color: '#112233ff', position: 0, midpoint: 0.5 },
+            { id: 'b', color: '#abcdef80', position: 1, midpoint: 0.5 },
+          ],
+        },
+      };
+      const before = structuredClone(value);
+      const parsed = parseTourDocument(value);
+      expect(parsed).toEqual({ status: 'ok', document: before });
+      if (parsed.status !== 'ok') throw new Error('Expected document');
+      parsed.document.stage.image!.alt = 'changed';
+      expect(value).toEqual(before);
+      value.stage.image = null;
+      value.stage.paint = { kind: 'solid', color: '#123456ff' };
+      expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    }
+  );
+  it('rejects malformed stage fields using existing paint and image admission', () => {
+    const value = document();
+    for (const patch of [
+      { imageFit: 'stretch' },
+      { imageFit: null },
+      { paint: null },
+      { paint: { kind: 'solid', color: 'url(https://example.com)' } },
+      { paint: { kind: 'solid', color: '#123456ff', extra: true } },
+      { image: { ...imageSlide().image, width: 0 } },
+      { image: { ...imageSlide().image, assetId: 'bad id!' } },
+      { image: { ...imageSlide().image, url: 'https://example.com' } },
+      { background: 'url(https://example.com)' },
+      { extra: true },
+    ]) {
+      expect(parseTourDocument({ ...value, stage: { ...value.stage, ...patch } }).status).toBe(
+        'invalid'
+      );
+    }
+  });
+  it('rejects stage images sharing an audio resource or narration identity', () => {
+    const value = document();
+    value.stage.image = { ...imageSlide().image!, assetId: 'audio' };
+    expect(parseTourDocument(value).status).toBe('invalid');
+    value.slides = [];
+    value.audioResources = [{ assetId: 'audio', duration: 12, name: 'Voice' }];
+    expect(parseTourDocument(value).status).toBe('invalid');
+    value.audioResources = [];
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+  });
+});

@@ -1,10 +1,14 @@
+import { createSolidPaint, getRepresentativeColor } from '@sniptale/foundation/paint';
+import { CompactPaintSelector } from '../../../ui/paint-selector';
+import { GuideImageUpload } from '../image-upload';
+import { ScenarioInspectorActionButton } from '../inspector-actions';
 import { DEFAULT_DRAWING_COLORS } from '../../../features/drawing/public';
 import {
   tourTextDefaults,
   resolveTourMarkerAppearance,
   type TourDocument,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { Palette, MessageSquare } from 'lucide-react';
+import { Palette, MessageSquare, Trash2 } from 'lucide-react';
 import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
@@ -18,12 +22,16 @@ export function TourDocumentSettings({
   tour,
   disabled,
   onChange,
+  onUploadStage,
+  importDisabled = disabled,
   t,
 }: {
   section: 'appearance' | 'explanations' | 'hotspots';
   tour: TourDocument;
   disabled: boolean;
   onChange: (tour: TourDocument) => boolean;
+  onUploadStage?: ((file: File, signal: AbortSignal) => Promise<boolean>) | undefined;
+  importDisabled?: boolean | undefined;
   t: Translate;
 }) {
   return (
@@ -54,18 +62,13 @@ export function TourDocumentSettings({
               onChange={(aspect) => onChange({ ...tour, stage: { ...tour.stage, aspect } })}
             />
           </div>
-          <ColorField
-            triggerVariant="swatch"
-            floatingPlacement="side"
-            layout="stacked"
-            palette={DEFAULT_DRAWING_COLORS}
-            label={t('scenario.editor.tourBackground')}
-            title={t('scenario.editor.tourBackground')}
-            value={tour.stage.background}
+          <TourStageBackgroundSettings
+            stage={tour.stage}
             disabled={disabled}
-            allowAlpha={false}
-            allowTransparent={false}
-            onChange={(background) => onChange({ ...tour, stage: { ...tour.stage, background } })}
+            importDisabled={importDisabled}
+            onUploadStage={onUploadStage}
+            onChange={(stage) => onChange({ ...tour, stage })}
+            t={t}
           />
           {(
             [
@@ -123,5 +126,73 @@ export function TourDocumentSettings({
         />
       )}
     </GuideInspectorGroup>
+  );
+}
+
+/** Stage paint and image binding share one background, independently of slide content. */
+function TourStageBackgroundSettings({
+  stage,
+  disabled,
+  importDisabled,
+  onUploadStage,
+  onChange,
+  t,
+}: {
+  stage: TourDocument['stage'];
+  disabled: boolean;
+  importDisabled: boolean;
+  onUploadStage?: ((file: File, signal: AbortSignal) => Promise<boolean>) | undefined;
+  onChange: (stage: TourDocument['stage']) => boolean;
+  t: Translate;
+}) {
+  return (
+    <>
+      <CompactPaintSelector
+        triggerVariant="swatch"
+        palette={DEFAULT_DRAWING_COLORS}
+        label={t('scenario.editor.tourBackground')}
+        title={t('scenario.editor.tourBackground')}
+        value={stage.paint ?? createSolidPaint(stage.background)}
+        disabled={disabled}
+        onChange={(paint) =>
+          onChange({
+            ...stage,
+            paint,
+            background: getRepresentativeColor(paint).slice(0, 7),
+            image: null,
+          })
+        }
+      />
+      {onUploadStage && (
+        <GuideImageUpload
+          compact
+          placement={{ kind: 'tour-stage-background' }}
+          disabled={importDisabled}
+          onUpload={onUploadStage}
+          t={t}
+        />
+      )}
+      {stage.image && (
+        <>
+          <CompactSelect
+            aria-label={t('scenario.editor.tourFit')}
+            value={stage.imageFit ?? 'cover'}
+            disabled={disabled}
+            options={[
+              { value: 'contain', label: t('scenario.editor.tourContain') },
+              { value: 'cover', label: t('scenario.editor.tourCover') },
+            ]}
+            onChange={(imageFit) => onChange({ ...stage, imageFit })}
+          />
+          <ScenarioInspectorActionButton
+            disabled={disabled}
+            onClick={() => onChange({ ...stage, image: null })}
+          >
+            <Trash2 size={15} aria-hidden="true" />
+            {t('scenario.editor.tourRemoveStageImage')}
+          </ScenarioInspectorActionButton>
+        </>
+      )}
+    </>
   );
 }

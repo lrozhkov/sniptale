@@ -382,6 +382,7 @@ it('copies tour images once across representations and independently copies narr
   slide.hotspots[0]!.narration = { ...slide.narration, trigger: 'activation' };
   source.tour.audioResources = [{ assetId: 'detached-audio', duration: 3, name: 'Unused.wav' }];
   source.tour.slides = [slide];
+  source.tour.stage.image = structuredClone(slide.image);
   const image = await io.asset('source-image');
   io.asset.mockImplementation(async (id) =>
     id === 'source-audio' || id === 'detached-audio'
@@ -404,6 +405,9 @@ it('copies tour images once across representations and independently copies narr
   const copied = result.tour?.slides[0];
   if (copied?.kind !== 'image') throw new Error('Expected tour image');
   expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);
+  expect(result.tour?.stage.image).toEqual(copied.image);
+  expect(result.tour?.stage.image?.editDocumentId).not.toBe('source-document');
+  expect(source.tour.stage.image?.assetId).toBe('source-image');
   expect(copied.narration?.assetId).not.toBe('source-audio');
   expect(copied.hotspots[0]?.action).toEqual({ kind: 'slide', slideId: copied.id });
   expect(copied.hotspots[0]!.narration?.assetId).toBe(copied.narration?.assetId);

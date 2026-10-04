@@ -213,7 +213,15 @@ export const tourDocumentSchema = z
       .max(TOUR_LIMITS.maxAudioResources)
       .optional(),
     id,
-    stage: z.object({ aspect: z.enum(['16:9', '4:3', '9:16']), background: color }).strict(),
+    stage: z
+      .object({
+        aspect: z.enum(['16:9', '4:3', '9:16']),
+        background: color,
+        paint: tourPaintSchema.optional(),
+        image: image.nullable().optional(),
+        imageFit: z.enum(['contain', 'cover']).optional(),
+      })
+      .strict(),
     style: z
       .object({
         accent: color,
@@ -301,6 +309,7 @@ function validReferences(document: TourDocument): boolean {
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
     if (image && audio.has(image.assetId)) return false;
   }
+  if (document.stage.image && audio.has(document.stage.image.assetId)) return false;
   const ids = new Set([document.id]);
   const slides = new Set(document.slides.map((slide) => slide.id));
   const claim = (value: string) => {

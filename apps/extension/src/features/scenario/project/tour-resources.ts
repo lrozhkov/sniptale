@@ -7,12 +7,14 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 
-/** Includes navigation backgrounds; occurrence identity stays independent of shared media. */
+/** Includes stage and navigation backgrounds; occurrence identity stays independent of shared media. */
 export function getTourImages(tour: TourDocument): TourImage[] {
-  return tour.slides.flatMap((slide) => {
+  const images = tour.slides.flatMap((slide) => {
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
     return image ? [image] : [];
   });
+  if (tour.stage.image) images.push(tour.stage.image);
+  return images;
 }
 
 /** Logical resources of both representations; persistence owns byte acquisition and lifetime. */

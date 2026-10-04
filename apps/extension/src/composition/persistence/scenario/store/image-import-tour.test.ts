@@ -56,3 +56,18 @@ it('updates navigation background without changing its buttons or text', () => {
     background: { image },
   });
 });
+
+it('admits one stage background at full slide capacity and copies only its image', () => {
+  const project = createGuideProject('Project');
+  const placement = { kind: 'tour-stage-background' as const };
+  expect(() => admitTourImageImport(project, placement, 1)).toThrow('unavailable');
+  expect(project.tour).toBeUndefined();
+  project.tour = createTourDocument();
+  project.tour.slides = Array.from({ length: 300 }, (_, i) => createTourImageSlide(String(i)));
+  const original = structuredClone(project.tour);
+  expect(() => admitTourImageImport(project, placement, 2)).toThrow('unavailable');
+  admitTourImageImport(project, placement, 1);
+  placeTourImportedImage(project, placement, { image, title: 'Ignored', description: 'Ignored' });
+  expect(project.tour).toEqual({ ...original, stage: { ...original.stage, image } });
+  expect(project.tour.stage.image).not.toBe(image);
+});

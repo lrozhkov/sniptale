@@ -6,7 +6,11 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from './factories';
-import { getScenarioResourceReferences, remapTourIdentities } from './tour-resources';
+import {
+  getTourImages,
+  getScenarioResourceReferences,
+  remapTourIdentities,
+} from './tour-resources';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
 
 it('retains shared guide images, tour backgrounds, annotation documents and audio', () => {
@@ -219,4 +223,30 @@ it('projects ordered entry cues and only the explicitly activated object', async
     getTourNarrationCues(slide, { kind: 'activation', objectId: 'detail' }).map((c) => c.objectId)
   ).toEqual(['detail']);
   expect(getTourNarrationCues(slide, { kind: 'activation', objectId: 'missing' })).toEqual([]);
+});
+
+it('includes the mutable stage occurrence and retains shared slide references independently', () => {
+  const project = createGuideProject('Project');
+  const tour = (project.tour = createTourDocument());
+  const slide = createTourImageSlide();
+  const image = {
+    assetId: 'shared',
+    editDocumentId: 'edit',
+    galleryAssetId: null,
+    width: 10,
+    height: 10,
+    alt: '',
+    source: { kind: 'import' as const, filename: 'a.png' },
+  };
+  tour.stage.image = { ...image };
+  slide.image = { ...image };
+  tour.slides = [slide];
+  expect(getTourImages(tour)).toHaveLength(2);
+  expect(getTourImages(tour)).toContain(tour.stage.image);
+  expect(getTourImages(tour).find((entry) => entry === tour.stage.image)).toBe(tour.stage.image);
+  tour.stage.image = null;
+  expect([...getScenarioResourceReferences(project).assets]).toEqual(['shared']);
+  expect([...getScenarioResourceReferences(project).documents]).toEqual(['edit']);
+  tour.stage.image = { ...image, assetId: 'stage-only' };
+  expect(getScenarioResourceReferences(project).assets.has('stage-only')).toBe(true);
 });

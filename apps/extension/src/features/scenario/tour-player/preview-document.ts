@@ -6,8 +6,11 @@ const retainedGuideRuntimeHashes = [
   'Om79Cdbfp0CYdQb8K01kOmAsY7YHTTtCrkrwSnNfFHo=', // Before viewer controls (2367c5e618).
 ];
 
-// Exact pre-marker-controls tour bundle from 3542f819; guide policy never admits it.
-const retainedTourRuntimeHashes = ['wcvHun2bWRhYVo/KsSUC86BDTL0POnoKio273Y5dkb4='];
+// Exact retired Tour bundles; guide policy never admits them.
+const retainedTourRuntimeHashes = [
+  'wcvHun2bWRhYVo/KsSUC86BDTL0POnoKio273Y5dkb4=', // Before marker controls (3542f819).
+  'Wzekv7b/kkq0XmPuhHgXIz8+9wALBHFuTqMr2mAuGfQ=', // Before stage backgrounds (4777f97e).
+];
 
 /** Runs only in the opaque sandbox: inert admission precedes mounting the original saved Blob. */
 export async function admitSavedScenarioHtml(

@@ -10,13 +10,17 @@ import {
 export type TourImageImportPlacement =
   | { kind: 'tour-slides'; beforeSlideId?: string }
   | { kind: 'tour-image'; slideId: string }
-  | { kind: 'tour-background'; slideId: string };
+  | { kind: 'tour-background'; slideId: string }
+  | { kind: 'tour-stage-background' };
 
 export function isTourImageImportPlacement(value: {
   kind: string;
 }): value is TourImageImportPlacement {
   return (
-    value.kind === 'tour-slides' || value.kind === 'tour-image' || value.kind === 'tour-background'
+    value.kind === 'tour-slides' ||
+    value.kind === 'tour-image' ||
+    value.kind === 'tour-background' ||
+    value.kind === 'tour-stage-background'
   );
 }
 
@@ -37,6 +41,10 @@ export function admitTourImageImport(
     )
       throw new Error('The tour insertion position is unavailable.');
     project.tour ??= createTourDocument();
+    return;
+  }
+  if (placement.kind === 'tour-stage-background') {
+    if (!project.tour || count !== 1) throw new Error('The tour background is unavailable.');
     return;
   }
   const slide = project.tour?.slides.find((entry) => entry.id === placement.slideId);
@@ -63,6 +71,10 @@ export function placeTourImportedImage(
         : tour.slides.findIndex((slide) => slide.id === placement.beforeSlideId);
     if (index < 0) throw new Error('The tour insertion position is unavailable.');
     tour.slides.splice(index, 0, ...proposal.tour.slides);
+    return;
+  }
+  if (placement.kind === 'tour-stage-background') {
+    tour.stage.image = structuredClone(material.image);
     return;
   }
   const slide = tour.slides.find((entry) => entry.id === placement.slideId);

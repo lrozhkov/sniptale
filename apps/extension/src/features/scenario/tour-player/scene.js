@@ -1,3 +1,4 @@
+import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { createTourMotion } from './motion.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
@@ -144,14 +145,14 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
     render();
     motion?.reflow({ stageWidth, stageHeight });
   }
-  applySceneStyle(root, stage, tour);
+  applySceneStyle(root, stage, tour, media);
   return {
     update(next) {
       tour = next.tour;
       media.clear();
       for (const asset of next.assets) media.set(asset.id, asset.src);
       hintController.setDefaultAppearance(tour.style);
-      applySceneStyle(root, stage, tour);
+      applySceneStyle(root, stage, tour, media);
     },
     selectObject(id) {
       selectedObjectId = id;
@@ -231,11 +232,24 @@ function sceneElements(document, onAction, policy) {
   return { element, actionButton };
 }
 
-function applySceneStyle(root, stage, tour) {
+function applySceneStyle(root, stage, tour, media) {
   root.style.setProperty('--tour-accent', tour.style.accent);
   root.style.setProperty('--tour-text', tour.style.text);
   root.style.setProperty('--tour-surface', tour.style.surface);
-  stage.style.background = tour.stage.background;
+  stage.style.background = tour.stage.paint
+    ? serializePaintToCss(tour.stage.paint)
+    : tour.stage.background;
+  const source = tour.stage.image && media.get(tour.stage.image.assetId);
+  if (source) {
+    const underlay = stage.style.backgroundImage;
+    stage.style.backgroundImage = `url("${source}")${underlay && underlay !== 'none' ? `, ${underlay}` : ''}`;
+    stage.style.backgroundPosition = 'center';
+    stage.style.backgroundRepeat = 'no-repeat';
+    stage.style.backgroundSize =
+      underlay && underlay !== 'none'
+        ? `${tour.stage.imageFit ?? 'cover'}, auto`
+        : (tour.stage.imageFit ?? 'cover');
+  }
 }
 
 /** Viewport geometry and font metrics jointly determine scene and explanation layout. */

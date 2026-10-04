@@ -121,6 +121,7 @@ function TourSettingsPanel({
   importDisabled = disabled,
   t,
   onImportNarration,
+  onImport,
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
@@ -179,6 +180,14 @@ function TourSettingsPanel({
       <div className="guide-panel-scroll">
         {project.tour && (
           <TourInspector
+            importDisabled={importDisabled}
+            onUploadStage={(file, signal) =>
+              onImport({
+                sources: [{ kind: 'file', file }],
+                placement: { kind: 'tour-stage-background' },
+                signal,
+              })
+            }
             imageActions={
               slide &&
               image && (

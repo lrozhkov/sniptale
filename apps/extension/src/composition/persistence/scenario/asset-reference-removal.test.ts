@@ -105,6 +105,8 @@ function fixture() {
     timing: slide.timing,
   };
   tour.slides = [slide, navigation];
+  tour.stage.image = structuredClone(slide.image);
+  tour.stage.imageFit = 'contain';
   tour.audioResources = [
     { assetId: 'audio-remove', duration: 2, name: 'Remove' },
     { assetId: 'audio-keep', duration: 3, name: 'Keep' },
@@ -127,6 +129,8 @@ it('removes selected image and audio references from current and saved history',
   expect(next.workspaceRevision).toBe(entry.workspaceRevision + 1);
   expect(next.history?.[0]?.savedAt).toBe(entry.history?.[0]?.savedAt);
   for (const project of [next.project, ...(next.history ?? []).map((version) => version.project)]) {
+    expect(project.tour?.stage.image).toBeNull();
+    expect(project.tour?.stage.imageFit).toBe('contain');
     const refs = getScenarioResourceReferences(project);
     expect(refs.assets.has('image-remove')).toBe(false);
     expect(refs.assets.has('audio-remove')).toBe(false);

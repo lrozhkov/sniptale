@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createGradientPaint } from '@sniptale/foundation/paint';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
 import { buildTourPlayerHtml } from './document';
@@ -516,4 +517,50 @@ it('renders inherited and local marker colors and diameter independently of puls
   expect(markers[1]!.style.getPropertyValue('--tour-marker-size')).toBe('16px');
   expect(markers[1]!.dataset['pulse']).toBe('true');
   expect(JSON.stringify(tour)).toBe(saved);
+});
+
+it('updates stage paint and image layers without changing scene geometry', async () => {
+  instantImages();
+  const tour = previewTour();
+  tour.slides = [imageSlide('first')];
+  const assets = [{ id: 'image', mime: 'image/png', base64: 'AA==' }];
+  const { root, player } = await mount(tour, assets);
+  const stage = root.querySelector<HTMLElement>('[data-tour-stage]')!;
+  const dimensions = [stage.style.width, stage.style.height];
+  expect(stage.style.backgroundColor).toBe('rgb(17, 24, 39)');
+  tour.stage.paint = { kind: 'solid', color: '#123456' };
+  tour.stage.image = imageSlide('background').image;
+  tour.stage.imageFit = 'contain';
+  const update = (src = 'data:image/png;base64,AA==') =>
+    player.update({ tour, labels, assets: [{ id: 'image', src }] });
+  update();
+  expect(stage.style.backgroundColor).toBe('rgb(18, 52, 86)');
+  expect(stage.style.backgroundImage).toContain('data:image/png;base64,AA==');
+  expect(stage.style.backgroundSize).toBe('contain');
+  expect(stage.style.backgroundRepeat).toBe('no-repeat');
+  let stop = 0;
+  tour.stage.paint = createGradientPaint('#abcdef', () => `stop-${++stop}`);
+  update();
+  expect(stage.style.backgroundImage).toContain('linear-gradient');
+  expect(stage.style.backgroundImage).toContain('data:image/png;base64,AA==');
+  expect(stage.style.backgroundSize).toBe('contain, auto');
+  tour.stage.image = null;
+  update();
+  expect(stage.style.backgroundImage).toContain('linear-gradient');
+  expect(stage.style.backgroundImage).not.toContain('url(');
+  tour.stage.paint = { kind: 'solid', color: '#123456' };
+  tour.stage.image = imageSlide('background').image;
+  update('data:image/png;base64,AQ==');
+  expect(stage.style.backgroundImage).toContain('data:image/png;base64,AQ==');
+  delete tour.stage.imageFit;
+  update();
+  expect(stage.style.backgroundSize).toBe('cover');
+  player.update({ tour, labels, assets: [] });
+  expect(stage.style.backgroundImage).not.toContain('url(');
+  tour.stage.image = null;
+  delete tour.stage.paint;
+  update();
+  expect(stage.style.backgroundImage).not.toContain('url(');
+  expect(stage.style.backgroundColor).toBe('rgb(17, 24, 39)');
+  expect([stage.style.width, stage.style.height]).toEqual(dimensions);
 });

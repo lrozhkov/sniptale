@@ -53,6 +53,7 @@ it('applies source-metadata privacy to historical captures as well as the curren
   const slide = createTourImageSlide('tour-image');
   slide.image = image;
   project.tour = createTourDocument('tour');
+  project.tour.stage.image = structuredClone(image);
   project.tour.slides = [
     slide,
     {

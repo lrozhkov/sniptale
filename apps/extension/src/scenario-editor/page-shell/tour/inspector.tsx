@@ -44,6 +44,8 @@ import type { TourSelection } from './selection';
 
 type InspectorProps = {
   imageActions?: ReactNode;
+  onUploadStage?: (file: File, signal: AbortSignal) => Promise<boolean>;
+  importDisabled?: boolean;
   presentation?: 'all' | 'sections';
   narration?: ReactNode;
   tour: TourDocument;
@@ -137,9 +139,21 @@ function TourDocumentCategories({
   tour,
   disabled,
   onChangeTour,
+  onUploadStage,
+  importDisabled,
   t,
-}: Pick<InspectorProps, 'tour' | 'disabled' | 'onChangeTour' | 't'>) {
-  const documentSettings = { tour, disabled, onChange: onChangeTour, t };
+}: Pick<
+  InspectorProps,
+  'tour' | 'disabled' | 'onChangeTour' | 'onUploadStage' | 'importDisabled' | 't'
+>) {
+  const documentSettings = {
+    tour,
+    disabled,
+    onChange: onChangeTour,
+    t,
+    onUploadStage,
+    importDisabled,
+  };
   return [
     {
       id: 'appearance',

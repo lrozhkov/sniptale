@@ -26,6 +26,7 @@ function source() {
     transcript: 'voice',
   };
   tour.slides = [slide];
+  tour.stage.image = structuredClone(slide.image);
   return tour;
 }
 const refs = {
@@ -40,6 +41,11 @@ it('roundtrips portable image and audio references and remaps editor/library ide
   const portable = encodePortableTour(source());
   expect(JSON.stringify(portable)).not.toContain('"assetId"');
   const restored = decodePortableTour(portable, refs);
+  expect(restored.stage.image).toMatchObject({
+    assetId: 'new-image',
+    editDocumentId: 'new-edit',
+    galleryAssetId: 'new-gallery',
+  });
   const slide = restored.slides[0];
   expect(slide?.narration?.assetId).toBe('new-audio');
   if (slide?.kind !== 'image') throw new Error('Expected image');
@@ -58,4 +64,23 @@ it('rejects missing children and malformed portable tour before publication', ()
   ).toThrow('missing');
   expect(() => decodePortableTour(source(), refs)).toThrow('reference');
   expect(() => decodePortableTour({ slides: new Array(301) }, refs)).toThrow('invalid');
+});
+
+it('rejects foreign or physical stage references independently of valid slide media', () => {
+  const portable = encodePortableTour(source());
+  for (const image of [
+    { ...portable.stage.image, scenarioAssetId: 'foreign' },
+    { ...portable.stage.image, assetId: 'physical' },
+    {},
+  ]) {
+    expect(() =>
+      decodePortableTour({ ...portable, stage: { ...portable.stage, image } }, refs)
+    ).toThrow();
+  }
+});
+it('preserves absent and explicitly removed legacy stage bindings without materializing defaults', () => {
+  const tour = createTourDocument('legacy');
+  expect(decodePortableTour(encodePortableTour(tour), refs).stage).toEqual(tour.stage);
+  tour.stage.image = null;
+  expect(decodePortableTour(encodePortableTour(tour), refs).stage).toEqual(tour.stage);
 });
