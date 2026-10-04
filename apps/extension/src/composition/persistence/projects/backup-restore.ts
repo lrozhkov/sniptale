@@ -1,3 +1,10 @@
+import { promoteProjectSourceLifecycles } from './new-reference-admission';
+import {
+  STORE_NAME,
+  MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
+  SCENARIO_ASSETS_STORE,
+} from '../infrastructure/indexed-db/core';
 import { assertPreparedProjectAssetSources } from './source-admission';
 import { assertMediaSourceReplaceable } from './source-admission';
 import {
@@ -345,6 +352,16 @@ export async function putVideoProjectBackupRestore(args: {
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
   await publishProjectSidecars(args.root, args.stores);
+  await promoteProjectSourceLifecycles(
+    args.root.entry.project,
+    {
+      mediaLibraryStore: args.tx.objectStore(MEDIA_LIBRARY_STORE),
+      projectAssetStore: args.tx.objectStore(PROJECT_ASSETS_STORE),
+      scenarioAssetStore: args.tx.objectStore(SCENARIO_ASSETS_STORE),
+      recordingStore: args.tx.objectStore(STORE_NAME),
+    },
+    Date.now()
+  );
   await releaseUnpublishedProjectAssets(args.tx, releasedCandidates, args.operation);
   return { conflicted, imported: true };
 }

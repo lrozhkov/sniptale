@@ -140,3 +140,24 @@ it('admits a new scenario origin through its aggregate owner', async () => {
     )
   ).resolves.toBeUndefined();
 });
+
+it('promotes the canonical mirror of an accepted project asset', async () => {
+  const { promoteProjectSourceLifecycles } = await import('./new-reference-admission');
+  const { asset, project, stores } = fixture();
+  const media = createMediaLibraryEntry({
+    id: `project-asset:${asset.id}`,
+    source: { kind: 'project-asset', projectAssetId: asset.id },
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  const put = vi.fn();
+  stores.mediaLibraryStore = {
+    get: vi.fn(async () => media),
+    put,
+  } as unknown as Stores['mediaLibraryStore'];
+  await promoteProjectSourceLifecycles(project, stores, 50);
+  expect(put).toHaveBeenCalledWith({
+    ...media,
+    workspaceRevision: 0,
+    lifecycle: { storageClass: 'library', savedAt: 50, updatedAt: 50 },
+  });
+});

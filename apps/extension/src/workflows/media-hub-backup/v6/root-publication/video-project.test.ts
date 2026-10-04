@@ -335,3 +335,94 @@ it('duplicates a private representation without recreating a Library card', asyn
   expect(values.get('asset_owners')).toHaveLength(1);
   expect(values.get('media_library')).toBeUndefined();
 });
+
+it('rolls back promoted recording and parent when the later archive checkpoint fails', async () => {
+  const { createMediaLibraryEntry } =
+    await import('../../../../composition/persistence/projects/index.test-support');
+  const lifecycle = { storageClass: 'temporary' as const, savedAt: null, updatedAt: 1 };
+  const recording = {
+    id: 'recording',
+    assetId: 'bytes',
+    filename: 'source.webm',
+    mimeType: 'video/webm',
+    size: 4,
+    createdAt: 1,
+    lifecycle,
+  };
+  const media = createMediaLibraryEntry({
+    id: 'recording:recording',
+    source: { kind: 'recording', recordingId: recording.id },
+    lifecycle,
+  });
+  const persisted = new Map<string, Map<string, unknown>>([
+    ['recordings', new Map([[recording.id, recording]])],
+    ['media_library', new Map([[media.id, media]])],
+  ]);
+  const before = structuredClone(persisted);
+  let pending = structuredClone(persisted);
+  const abort = vi.fn();
+  mocks.mutate.mockImplementation(async (callback) =>
+    callback({
+      get: async (name: string, key: string) => persisted.get(name)?.get(key),
+      transaction: (names: readonly string[]) => {
+        let aborted = false;
+        pending = structuredClone(persisted);
+        return {
+          objectStore: (name: string) => {
+            if (!names.includes(name)) throw new Error(`Missing transaction store ${name}`);
+            if (!pending.has(name)) pending.set(name, new Map());
+            const table = pending.get(name)!;
+            return {
+              get: async (key: string) => table.get(key),
+              getAll: async () => [...table.values()],
+              put: async (value: { id: string }) => {
+                table.set(value.id, structuredClone(value));
+              },
+              delete: async (key: string) => {
+                table.delete(key);
+              },
+              index: () => ({ getAll: async () => [], count: async () => 0 }),
+            };
+          },
+          abort: () => {
+            aborted = true;
+            abort();
+          },
+          get done() {
+            if (!aborted) {
+              persisted.clear();
+              for (const [name, table] of pending) persisted.set(name, table);
+            }
+            return Promise.resolve();
+          },
+        };
+      },
+    })
+  );
+  mocks.checkpoint.mockImplementationOnce(async () => {
+    expect(pending.get('media_library')!.get(media.id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+    expect(pending.get('recordings')!.get(recording.id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+    expect(pending.get('video_projects')!.size).toBe(1);
+    expect(persisted).toEqual(before);
+    throw new Error('Late checkpoint rejected');
+  });
+  const entry = createVideoProjectEntryWithMediaClip({ id: 'p' });
+  entry.project.assets[0]!.source = { kind: 'recording', recordingId: recording.id };
+  const metadata = {
+    entry: { ...entry, project: encodePortableVideoProjectAssetRefs(entry.project) },
+    projectAssets: [],
+    projectExports: [],
+  };
+  assertPortableJson(metadata);
+  const args = publishArgs(metadata, [], {
+    [`media:library-item:${media.id}`]: media.id,
+  });
+  await expect(videoProjectRootPublisher.publish(args)).rejects.toThrow('Late checkpoint rejected');
+  expect(mocks.checkpoint).toHaveBeenCalledOnce();
+  expect(abort).toHaveBeenCalledOnce();
+  expect(persisted).toEqual(before);
+});

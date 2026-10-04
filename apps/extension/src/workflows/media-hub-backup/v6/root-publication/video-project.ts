@@ -1,4 +1,5 @@
 import {
+  STORE_NAME,
   IMAGE_WORKSPACES_STORE,
   SCENARIO_ASSETS_STORE,
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
@@ -47,6 +48,23 @@ import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
 import { preparePortableAggregatePresentation } from './presentation';
 import { transformPortableVideoProjectReferences } from './video-project-references';
+
+const VIDEO_PROJECT_RESTORE_STORES = [
+  STORE_NAME,
+  VIDEO_PROJECTS_STORE,
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+  MEDIA_LIBRARY_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+  THUMBNAILS_STORE,
+  AGGREGATE_PRESENTATIONS_STORE,
+  ASSET_REFS_STORE,
+  ASSET_OWNERS_STORE,
+  ASSET_OPERATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  SCENARIO_ASSETS_STORE,
+] as const;
 
 function newId() {
   if (typeof crypto.randomUUID !== 'function')
@@ -227,24 +245,7 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
     let conflicted = false;
     let imported = false;
     await runWithIndexedDbMutation(async (db) => {
-      const tx = db.transaction(
-        [
-          VIDEO_PROJECTS_STORE,
-          PROJECT_ASSETS_STORE,
-          PROJECT_EXPORTS_STORE,
-          MEDIA_LIBRARY_STORE,
-          VIDEO_WORKSPACES_STORE,
-          VIDEO_WORKSPACE_DRAFTS_STORE,
-          THUMBNAILS_STORE,
-          AGGREGATE_PRESENTATIONS_STORE,
-          ASSET_REFS_STORE,
-          ASSET_OWNERS_STORE,
-          ASSET_OPERATIONS_STORE,
-          IMAGE_WORKSPACES_STORE,
-          SCENARIO_ASSETS_STORE,
-        ],
-        'readwrite'
-      );
+      const tx = db.transaction(VIDEO_PROJECT_RESTORE_STORES, 'readwrite');
       try {
         const restored = await putVideoProjectBackupRestore({
           tx,

@@ -120,6 +120,7 @@ export function createVideoProjectRestoreTransaction(
     thumbnails: stores.thumbnails,
     scenario_assets: stores.scenarioAssets,
     image_workspaces: empty,
+    recordings: empty,
   };
   return {
     objectStore: (name: keyof typeof byName) => byName[name],

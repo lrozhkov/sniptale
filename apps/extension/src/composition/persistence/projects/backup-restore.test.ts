@@ -492,3 +492,74 @@ it('refuses a prepared shared project asset removed before consumer publication'
   expect(target.projects.put).not.toHaveBeenCalled();
   expect(target.assets.put).not.toHaveBeenCalled();
 });
+
+it('pins a direct Library source only when the archive parent is accepted', async () => {
+  const { createMediaLibraryEntry } = await import('./index.test-support');
+  const entry = createVideoProjectEntryWithMediaClip();
+  entry.project.assets[0]!.source = { kind: 'library-asset', mediaId: 'original' };
+  const source = createMediaLibraryEntry({
+    id: 'original',
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  for (const strategy of ['skip', 'replace'] as const) {
+    const target = stores();
+    target.projects.get = vi.fn(async () => entry);
+    target.media.get = vi.fn(async (key) => (key === source.id ? source : undefined));
+    await putVideoProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exports: [] },
+      stores: target,
+      tx: createVideoProjectRestoreTransaction(target),
+      strategy,
+    });
+    if (strategy === 'skip') expect(target.media.put).not.toHaveBeenCalled();
+    else
+      expect(target.media.put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: source.id,
+          lifecycle: expect.objectContaining({ storageClass: 'library' }),
+        })
+      );
+  }
+});
+
+it('publishes an accepted canonical project asset as permanent', async () => {
+  const target = stores();
+  const entry = createVideoProjectEntryWithMediaClip();
+  const assets = new Map<IDBValidKey, unknown>();
+  const media = new Map<IDBValidKey, unknown>();
+  target.assets.get = vi.fn(async (key) => assets.get(key));
+  target.assets.put = vi.fn(async (value) => {
+    assets.set(value.id, value);
+  });
+  target.media.get = vi.fn(async (key) => media.get(key));
+  target.media.put = vi.fn(async (value) => {
+    media.set(value.id, value);
+  });
+  await putVideoProjectBackupRestore({
+    operation: operation(),
+    strategy: 'replace',
+    stores: target,
+    tx: createVideoProjectRestoreTransaction(target),
+    root: {
+      entry,
+      exports: [],
+      assets: [
+        {
+          entry: {
+            id: 'project-asset-1',
+            assetId: 'local',
+            createdAt: 1,
+            mimeType: ref.mimeType,
+            size: ref.size,
+          },
+          filename: 'image.png',
+          ref,
+        },
+      ],
+    },
+  });
+  expect(media.get('project-asset:project-asset-1')).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+  });
+});

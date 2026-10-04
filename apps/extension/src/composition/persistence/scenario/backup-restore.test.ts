@@ -578,6 +578,7 @@ function restoreTransaction(target: ScenarioBackupRestoreStores) {
     asset_owners: target.owners,
     asset_refs: target.refs,
     media_library: graph,
+    recordings: graph,
     project_assets: graph,
     video_projects: graph,
   };
@@ -670,3 +671,68 @@ it.each([false, true])(
     expect(target.owners.put).not.toHaveBeenCalled();
   }
 );
+
+it('pins a restored scenario source only after accepting its parent', async () => {
+  const { createGuideStep, createGuideImageBlock } =
+    await import('../../../features/scenario/project/factories');
+  const { createMediaLibraryEntry } = await import('../projects/index.test-support');
+  const entry = projectEntry();
+  const step = createGuideStep('Imported');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'block',
+      assetId: 'child',
+      width: 1,
+      height: 1,
+      source: { kind: 'import', filename: 'image.png' },
+    }),
+  ];
+  entry.project.items = [step];
+  const asset = {
+    id: 'child',
+    projectId: entry.id,
+    assetId: 'local',
+    galleryAssetId: 'original',
+    mimeType: 'image/png',
+    width: 1,
+    height: 1,
+    size: 1,
+    createdAt: 1,
+  };
+  const media = createMediaLibraryEntry({
+    id: 'original',
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  for (const strategy of ['skip', 'replace'] as const) {
+    const target = stores();
+    target.projects.get = vi.fn(async () => entry);
+    target.assets.get = vi.fn(async () => asset);
+    const base = restoreTransaction(target);
+    const put = vi.fn();
+    const tx = {
+      objectStore: (name: Parameters<typeof base.objectStore>[0]) =>
+        name === 'media_library' ? { get: async () => media, put } : base.objectStore(name),
+    } as typeof base;
+    await putScenarioProjectBackupRestore({
+      stores: target,
+      tx,
+      strategy,
+      operation: operation(),
+      root: {
+        entry,
+        assets: [{ entry: asset, ref }],
+        exports: [],
+        exportThumbnails: [],
+        stepDocuments: [],
+      },
+    });
+    if (strategy === 'skip') expect(put).not.toHaveBeenCalled();
+    else
+      expect(put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: media.id,
+          lifecycle: expect.objectContaining({ storageClass: 'library' }),
+        })
+      );
+  }
+});

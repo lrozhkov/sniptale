@@ -117,7 +117,16 @@ it('repairs used logical sources even when their parent is already permanent', a
       originMediaId: media.id,
     })
   );
+  const mirror = createMediaLibraryEntry({
+    id: 'project-asset:project-asset-1',
+    source: { kind: 'project-asset', projectAssetId: 'project-asset-1' },
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  });
+  persisted.get('media_library')!.set(mirror.id, mirror);
   await repairTemporaryProjectLifecycles(100);
+  expect(persisted.get('media_library')!.get(mirror.id)).toMatchObject({
+    lifecycle: { storageClass: 'library', savedAt: 100 },
+  });
   expect(persisted.get('media_library')!.get(media.id)).toMatchObject({
     lifecycle: { storageClass: 'library', savedAt: 100 },
   });

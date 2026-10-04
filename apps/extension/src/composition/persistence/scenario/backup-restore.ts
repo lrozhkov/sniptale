@@ -1,3 +1,4 @@
+import { promoteScenarioSourceLifecycles } from './library-publication';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import { detachScenarioVideoAssets } from './video-asset-detachment';
 import { MEDIA_LIBRARY_STORE, type initDB } from '../infrastructure/indexed-db/core';
@@ -287,5 +288,6 @@ export async function putScenarioProjectBackupRestore(args: {
   await publishScenarioAssets(args.root, args.stores);
   await publishScenarioDocuments(args.root, args.stores);
   await publishScenarioSidecars(args.root, args.stores);
+  await promoteScenarioSourceLifecycles(args.tx, args.root.entry, Date.now());
   return { conflicted, imported: true };
 }

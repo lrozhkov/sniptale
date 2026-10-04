@@ -1,5 +1,10 @@
+import { encodePortableScenarioProjectEntry } from '../root-codecs/projects';
 import { expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../../../features/scenario/project/public';
+import {
+  createGuideStep,
+  createGuideImageBlock,
+} from '../../../../features/scenario/project/factories';
 import { createMediaLibraryEntry } from '../../../../composition/persistence/projects/index.test-support';
 import { scenarioChildUsesMedia } from '../../../../composition/persistence/media-library/dependencies';
 import { parseScenarioAssetEntry } from '../../../../composition/persistence/scenario/read-guards';
@@ -20,9 +25,11 @@ vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation'
 import { scenarioProjectRootPublisher } from './scenario-project';
 
 function installDatabase(rows: Map<string, Map<string, unknown>>) {
+  let working = rows;
+  const writes: Array<{ name: string; value: unknown }> = [];
   const table = (name: string) => {
-    if (!rows.has(name)) rows.set(name, new Map());
-    return rows.get(name)!;
+    if (!working.has(name)) working.set(name, new Map());
+    return working.get(name)!;
   };
   const store = (name: string) => ({
     get: async (key: IDBValidKey) => table(name).get(String(key)),
@@ -33,6 +40,7 @@ function installDatabase(rows: Map<string, Map<string, unknown>>) {
         ? String([value['ownerKind'], value['ownerId'], value['role']])
         : String(value['operationId'] ?? value['id'] ?? value['assetId'] ?? value['aggregateId']);
       table(name).set(key, structuredClone(value));
+      writes.push({ name, value: structuredClone(value) });
     },
     index: (key: string) => ({
       getAll: async (id: string) =>
@@ -50,22 +58,43 @@ function installDatabase(rows: Map<string, Map<string, unknown>>) {
   io.db.mockResolvedValue({
     get: async (name: string, key: IDBValidKey) => store(name).get(key),
     transaction: () => {
-      const before = structuredClone(rows);
+      working = structuredClone(rows);
+      let aborted = false;
       return {
         objectStore: store,
-        done: Promise.resolve(),
+        get done() {
+          if (!aborted) {
+            rows.clear();
+            for (const [name, values] of working) rows.set(name, values);
+          }
+          working = rows;
+          return Promise.resolve();
+        },
         abort: () => {
-          rows.clear();
-          for (const [name, values] of before) rows.set(name, values);
+          aborted = true;
+          working = rows;
         },
       };
     },
   });
+  return writes;
 }
 
 function input(strategy: 'replace' | 'skip', staleCheckpoint = false) {
   const project = createGuideProject('Scenario', 'scenario', 1);
+  const step = createGuideStep('Used');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'block',
+      assetId: 'captured',
+      width: 100,
+      height: 50,
+      source: { kind: 'import', filename: 'image.png' },
+    }),
+  ];
+  project.items = [step];
   const media = createMediaLibraryEntry({
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
     id: 'scenario-asset:captured',
     source: { kind: 'stored-asset', assetId: 'published-new' },
   });
@@ -101,7 +130,7 @@ function input(strategy: 'replace' | 'skip', staleCheckpoint = false) {
       ]),
     ],
   ]);
-  installDatabase(rows);
+  const writes = installDatabase(rows);
   const ref = {
     assetId: 'frozen-old',
     createdAt: 1,
@@ -121,7 +150,13 @@ function input(strategy: 'replace' | 'skip', staleCheckpoint = false) {
       },
       objects: [],
       metadata: portableJson({
-        entry: { id: project.id, project, createdAt: 1, updatedAt: 1, workspaceRevision: 1 },
+        entry: encodePortableScenarioProjectEntry({
+          id: project.id,
+          project,
+          createdAt: 1,
+          updatedAt: 1,
+          workspaceRevision: 1,
+        }),
         assets: [
           {
             entry: {
@@ -152,7 +187,7 @@ function input(strategy: 'replace' | 'skip', staleCheckpoint = false) {
     session,
     staged: [{ objectId: 'image', ref }],
   };
-  return { args, media, ref, rows };
+  return { args, media, ref, rows, writes };
 }
 
 it.each(['replace', 'skip'] as const)(
@@ -163,7 +198,9 @@ it.each(['replace', 'skip'] as const)(
       imported: true,
       retainedAssetIds: [ref.assetId],
     });
-    expect(rows.get('media_library')!.get(media.id)).toEqual(media);
+    expect(rows.get('media_library')!.get(media.id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
     const child = parseScenarioAssetEntry(rows.get('scenario_assets')!.get('captured'));
     const root = parseMediaLibraryEntry(rows.get('media_library')!.get(media.id));
     if (!child || !root) throw new Error('Missing committed identities');
@@ -177,11 +214,20 @@ it.each(['replace', 'skip'] as const)(
 );
 
 it('aborts frozen resource and owner writes when the real archive checkpoint refuses', async () => {
-  const { args, media, rows } = input('replace', true);
+  const { args, media, rows, writes } = input('replace', true);
+  const beforeCheckpoint = structuredClone(rows.get('asset_operations'));
   await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow(
     'Archive restore root checkpoint does not match'
   );
-  expect(rows.get('scenario_projects')!.size).toBe(0);
+  expect(writes).toContainEqual({
+    name: 'media_library',
+    value: expect.objectContaining({
+      id: media.id,
+      lifecycle: expect.objectContaining({ storageClass: 'library' }),
+    }),
+  });
+  expect(rows.get('asset_operations')).toEqual(beforeCheckpoint);
+  expect(rows.get('scenario_projects')?.size ?? 0).toBe(0);
   expect(rows.get('scenario_assets')?.size ?? 0).toBe(0);
   expect(rows.get('asset_owners')!.size).toBe(1);
   expect(rows.get('media_library')!.get(media.id)).toEqual(media);

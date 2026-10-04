@@ -1,3 +1,4 @@
+import { promoteLinkedRecordingLifecycles } from '../library-lifecycle/project-recordings';
 import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import type { VideoProject } from '../../../features/video/project/types';
 import { videoSourceReferences } from '../media-library/dependencies';
@@ -80,15 +81,22 @@ export async function assertNewProjectSources(
 /** Called only by an accepted parent commit, never by source preparation. */
 export async function promoteProjectSourceLifecycles(
   project: VideoProject,
-  stores: Parameters<typeof assertNewProjectSources>[2],
+  stores: Omit<Parameters<typeof assertNewProjectSources>[2], 'scenarioProjectStore'>,
   now: number
 ): Promise<void> {
   const mediaIds = new Set<string>();
+  const recordingIds = new Set<string>();
   for (const locator of locators(project)) {
+    if (locator.kind === 'recording') recordingIds.add(locator.id);
     if (locator.kind === 'library-asset') mediaIds.add(locator.id);
     if (locator.kind === 'project-asset') {
       const asset = parseProjectAssetEntry(await stores.projectAssetStore.get(locator.id));
-      if (asset?.originMediaId) mediaIds.add(asset.originMediaId);
+      if (asset?.id !== locator.id) continue;
+      if (asset.originMediaId) mediaIds.add(asset.originMediaId);
+      const mirrorId = `project-asset:${asset.id}`;
+      const mirror = parseMediaLibraryEntry(await stores.mediaLibraryStore.get(mirrorId));
+      if (mirror?.source.kind === 'project-asset' && mirror.source.projectAssetId === asset.id)
+        mediaIds.add(mirrorId);
     }
     if (locator.kind === 'scenario-asset') {
       const asset = parseScenarioAssetEntry(await stores.scenarioAssetStore.get(locator.id));
@@ -96,6 +104,12 @@ export async function promoteProjectSourceLifecycles(
         mediaIds.add(asset.borrowedMediaId ?? asset.galleryAssetId ?? `scenario-asset:${asset.id}`);
     }
   }
+  await promoteLinkedRecordingLifecycles({
+    recordingIds,
+    mediaStore: stores.mediaLibraryStore,
+    recordingStore: stores.recordingStore,
+    now,
+  });
   await promoteReferencedMediaLifecycles({
     mediaIds,
     mediaStore: stores.mediaLibraryStore,
