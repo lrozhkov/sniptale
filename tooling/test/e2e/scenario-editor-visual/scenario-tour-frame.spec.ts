@@ -55,7 +55,7 @@ for (const theme of ['light', 'dark'] as const) {
       hostOrigin,
       theme,
       'en',
-      { width: 1280, height: 900 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );
@@ -84,8 +84,8 @@ for (const theme of ['light', 'dark'] as const) {
       })
     ).toBeCloseTo(16.67, 2);
     for (const size of [
-      { width: 1280, height: 900 },
-      { width: 1920, height: 640 },
+      { width: 1280, height: 560 },
+      { width: 1920, height: 900 },
     ]) {
       await page.setViewportSize(size);
       await expectFittedFrame(host);
@@ -104,7 +104,7 @@ for (const theme of ['light', 'dark'] as const) {
       .frameLocator('iframe')
       .locator('#tour-player');
     await expectFittedFrame(exported);
-    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await expectFittedFrame(exported);
     await info.attach(`export-frame-${theme}`, {
       body: await page.screenshot(),
@@ -150,7 +150,7 @@ for (const [locale, theme] of [
       hostOrigin,
       theme,
       locale,
-      { width: 1280, height: 720 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );
@@ -317,7 +317,7 @@ for (const [locale, theme] of [
       hostOrigin,
       theme,
       locale,
-      { width: 1280, height: 720 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );
@@ -410,7 +410,7 @@ for (const locale of ['en', 'ru'] as const) {
       hostOrigin,
       'light',
       locale,
-      { width: 1280, height: 720 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );

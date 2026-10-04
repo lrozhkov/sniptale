@@ -1,4 +1,5 @@
 import { expect, type Page, type ViewportSize } from '@playwright/test';
+import { PRIMARY_BROWSER_VIEWPORTS } from '../support/browser-viewport';
 import {
   applyHarnessBootstrap,
   SCENARIO_EDITOR_VISUAL_HARNESS_PATH,
@@ -6,12 +7,8 @@ import {
 
 export const SCENARIO_VISUAL_THEMES = ['light', 'dark'] as const;
 export const SCENARIO_VISUAL_LOCALES = ['ru', 'en'] as const;
-export const SCENARIO_VISUAL_VIEWPORTS: Array<{ name: string; size: ViewportSize }> = [
-  { name: 'qhd', size: { height: 1440, width: 2560 } },
-  { name: 'desktop', size: { height: 1080, width: 1920 } },
-  { name: 'hd', size: { height: 720, width: 1280 } },
-  { name: 'minimum', size: { height: 640, width: 1024 } },
-];
+export const SCENARIO_VISUAL_VIEWPORTS: Array<{ name: string; size: ViewportSize }> =
+  PRIMARY_BROWSER_VIEWPORTS.map(({ name, size }) => ({ name, size: { ...size } }));
 
 export function createPageIssueCollector(page: Page) {
   const issues: string[] = [];
@@ -27,7 +24,7 @@ export async function openVisualHarness(
   hostOrigin: string,
   theme: 'light' | 'dark',
   locale: 'ru' | 'en',
-  viewport: ViewportSize,
+  viewport?: ViewportSize,
   stepId = 'compare',
   extraParams?: Record<string, string>
 ) {
@@ -37,7 +34,7 @@ export async function openVisualHarness(
   url.searchParams.set('locale', locale);
   url.searchParams.set('stepId', stepId);
   for (const [key, value] of Object.entries(extraParams ?? {})) url.searchParams.set(key, value);
-  await page.setViewportSize(viewport);
+  if (viewport) await page.setViewportSize(viewport);
   await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('main article')).toHaveCount(2);

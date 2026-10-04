@@ -52,7 +52,7 @@ test('guide navigation and edits survive a real local save and reopen', async ({
   hostOrigin,
 }) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await verifyStepNavigation(page);
   await verifySaveAndReopen(page);
   await assertVisualAcceptance(page);
@@ -64,7 +64,7 @@ test('workspace navigation preserves field focus and primary actions at enlarged
   hostOrigin,
 }) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1024, height: 640 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await verifyWorkspacePanelsAndFocus(page);
   issues.assertClean();
 });
@@ -74,7 +74,7 @@ test('project copies preserve unsaved content and images after deleting the orig
   hostOrigin,
 }) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await verifyIndependentProjectCopy(page);
   issues.assertClean();
 });
@@ -107,7 +107,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     await verifyImageFraming(page, testInfo);
     issues.assertClean();
   });
@@ -145,7 +145,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     await verifyGuideAppearance(page, testInfo);
     issues.assertClean();
   });
@@ -155,7 +155,7 @@ test('panel headers close panels and transparent dividers resize the workspace',
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 900 });
   const header = page.locator('.guide-page-header');
   expect((await header.boundingBox())?.height).toBeLessThanOrEqual(52);
   expect((await page.locator('.guide-project-name').boundingBox())?.width).toBeLessThan(
@@ -185,7 +185,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 768 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     const trigger = page.locator('.guide-page-header .guide-action-menu-anchor button');
     await trigger.focus();
     await page.keyboard.press('ArrowDown');
@@ -197,7 +197,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toBeFocused();
     const box = await menu.boundingBox();
     expect(box?.width).toBeLessThanOrEqual(240);
-    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1024);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1280);
     await testInfo.attach(`project-menu-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -212,7 +212,7 @@ test('document text fits its content while wrapping and resizing', async ({
   page,
   hostOrigin,
 }, testInfo) => {
-  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1024, height: 768 });
+  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 560 });
   const title = page.locator('article#compare > header :is(input, textarea)');
   await title.fill(
     'A long step title that should wrap naturally across the document without hiding its ending'
@@ -231,7 +231,7 @@ test('document text fits its content while wrapping and resizing', async ({
     contentType: 'image/png',
   });
   const narrowHeight = await body.evaluate((field) => field.clientHeight);
-  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.setViewportSize({ width: 1920, height: 900 });
   await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(narrowHeight);
   await body.fill('Short explanation.');
   await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(50);
@@ -335,10 +335,10 @@ test('resources open in a wide drawer and return focus to their inspector', asyn
   await expect(drawer.getByRole('navigation', { name: 'Library sections' })).toBeVisible();
   await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
   await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
-  await page.setViewportSize({ width: 640, height: 720 });
+  await page.setViewportSize({ width: 1280, height: 560 });
   const box = await drawer.boundingBox();
   expect(box?.x).toBeGreaterThanOrEqual(0);
-  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(640);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1280);
   await testInfo.attach('resources-drawer-narrow', {
     body: await page.screenshot(),
     contentType: 'image/png',
@@ -431,17 +431,17 @@ test('inline text highlights its own rounded edge and hides empty placeholders o
   ).toBe('1');
 });
 
-test('project title expands within the center and history sits beside the outer menu', async ({
+test('project title uses the center and history sits beside the outer menu', async ({
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 900 });
   const header = page.locator('.guide-page-header');
   const title = header.locator('input');
   const before = (await title.boundingBox())!.width;
   await title.focus();
   expect(await title.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('none');
-  expect((await title.boundingBox())!.width).toBeGreaterThan(before);
+  expect((await title.boundingBox())!.width).toBeCloseTo(before, 0);
   const menu = header.locator('.guide-action-menu-anchor');
   const redo = header.getByRole('button', { name: 'Redo', exact: true });
   expect((await menu.boundingBox())!.x).toBeGreaterThan((await redo.boundingBox())!.x);
@@ -740,7 +740,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const step = page.locator('article#compare');
     const first = step.locator('[data-block-id="before"]');
     const second = step.locator('[data-block-id="after"]');
@@ -772,7 +772,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
     await expect(first).toHaveAttribute('data-width', '50');
-    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const narrowFirst = await first.boundingBox();
     const narrowSecond = await second.boundingBox();
     expect(
@@ -795,7 +795,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const step = page.locator('article#compare');
     const blocks = step.locator('.guide-block');
     const order = () =>
@@ -878,7 +878,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       hostOrigin,
       theme,
       'en',
-      { width: 1920, height: 1080 },
+      { width: 1920, height: 900 },
       'text-only'
     );
     const step = page.locator('article#text-only');
@@ -951,7 +951,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     const step = page.locator('article#text-only');
     for (const [command, kind] of [
       ['Text', 'text'],
@@ -980,7 +980,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       const actionBox = await block.locator('.guide-block-actions button').first().boundingBox();
       if (!widthBox || !actionBox) throw new Error('Missing block controls');
       expect(widthBox.x).toBeGreaterThanOrEqual(box.x + box.width);
-      expect(widthBox.x + widthBox.width).toBeLessThanOrEqual(1024);
+      expect(widthBox.x + widthBox.width).toBeLessThanOrEqual(1280);
       expect(
         Math.abs(widthBox.y + widthBox.height / 2 - handle.y - handle.height / 2)
       ).toBeLessThan(1);
@@ -1014,7 +1014,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     const field = page.locator('article#compare textarea.guide-description').first();
     await field.focus();
     const wrapper = field.locator('..');
@@ -1048,7 +1048,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     // Dismissing the inspector keeps the same overlay geometry at the supported minimum.
     await page.locator('.guide-inspector-panel .guide-panel-heading button').first().click();
     await field.focus();
@@ -1115,7 +1115,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(
       drawer.getByRole('button', { name: 'Add frame as step', exact: true })
     ).toBeEnabled();
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await drawer
       .getByRole('button', { name: 'Add frame as step', exact: true })
       .click({ trial: true, timeout: 5000 });
@@ -1368,7 +1368,7 @@ for (const [theme, locale] of [
     page,
     hostOrigin,
   }) => {
-    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
     const header = page.locator('.guide-page-header');
     const title = header.locator('.guide-project-name input');
     const feedback = page.locator('.guide-page-feedback');
@@ -1408,7 +1408,7 @@ for (const [theme, locale] of [
       await expect(feedback).toHaveAttribute('data-status', 'failed');
       await expect(feedback.getByRole('alert')).toHaveCount(1);
       for (const width of [1280, 1920]) {
-        await page.setViewportSize({ width, height: width === 1920 ? 1080 : 720 });
+        await page.setViewportSize({ width, height: width === 1920 ? 900 : 560 });
         const nameBox = await title.boundingBox();
         const actions = await header.locator('.guide-header-actions').boundingBox();
         expect(nameBox).not.toBeNull();
@@ -1432,3 +1432,57 @@ for (const [theme, locale] of [
     await expect(feedback).toHaveCount(0);
   });
 }
+
+test('below HD the editor keeps its layout and scrolls horizontally to controls', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
+  const viewport = page.locator('.guide-editor-viewport');
+  const surface = page.locator('.guide-page');
+  const inspector = page.locator('#guide-inspector-panel');
+  const widths = async () => ({
+    surface: (await surface.boundingBox())!.width,
+    inspector: (await inspector.boundingBox())!.width,
+    center: (await page.locator('.guide-center-panel').boundingBox())!.width,
+  });
+  const hd = await widths();
+  for (const width of [1281, 1280, 1279, 1024, 800]) {
+    await page.setViewportSize({ width, height: 560 });
+    if (width <= 1280) expect(await widths()).toEqual(hd);
+    else expect((await widths()).surface).toBe(width);
+    await expect(inspector).not.toHaveCSS('position', 'absolute');
+    await expect(page.getByRole('separator', { name: 'Inspector', exact: true })).toBeVisible();
+    await viewport.evaluate((node) => {
+      node.scrollLeft = node.scrollWidth;
+    });
+    const scrollLeft = await viewport.evaluate((node) => node.scrollLeft);
+    if (width < 1280) expect(scrollLeft).toBeGreaterThan(0);
+    else expect(scrollLeft).toBe(0);
+    const showAll = inspector.getByRole('button', { name: 'Show all settings', exact: true });
+    await showAll.click();
+    await inspector.getByRole('button', { name: 'Show settings sections', exact: true }).click();
+    await viewport.evaluate((node) => {
+      node.scrollLeft = 0;
+    });
+    expect(await viewport.evaluate((node) => node.scrollLeft)).toBe(0);
+  }
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  const cancel = page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true });
+  await expect(cancel).toBeInViewport();
+  await cancel.click();
+  await page.screenshot({ path: '.tmp/backlog7/b14-minimum-viewport.png', fullPage: false });
+  await page.setViewportSize({ width: 800, height: 560 });
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.locator('.guide-export-workspace')).toHaveCSS('min-width', '1280px');
+  await viewport.evaluate((node) => {
+    node.scrollLeft = node.scrollWidth;
+  });
+  await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
+  await expect(page.locator('.guide-print')).toHaveCSS('min-width', '1280px');
+  await page.emulateMedia({ media: 'print' });
+  await expect(viewport).toHaveCSS('overflow', 'visible');
+  await expect(page.locator('.guide-print')).toHaveCSS('min-width', '0px');
+});

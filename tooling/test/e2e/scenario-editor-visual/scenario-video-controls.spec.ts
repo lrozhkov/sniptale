@@ -5,7 +5,7 @@ import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-vis
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
   test(`video rows and draft controls in ${theme}`, async ({ page, hostOrigin }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     const url = new URL(page.url());
     url.searchParams.set('videoFixture', '1');
     url.searchParams.set('actionFixture', '1');

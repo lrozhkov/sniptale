@@ -7,7 +7,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const title = await page.getByRole('textbox', { name: 'Scenario', exact: true }).inputValue();
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     const reader = page.locator('.guide-reader');
@@ -44,7 +44,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.setViewportSize({ width: 800, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await expect(
       reader.getByRole('button', { name: 'Back to editing', exact: true })
     ).toBeInViewport();

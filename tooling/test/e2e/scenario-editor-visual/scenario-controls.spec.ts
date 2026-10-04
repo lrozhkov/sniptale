@@ -292,7 +292,7 @@ test('tour inspector and canvas controls keep contextual geometry', async ({
 });
 
 for (const theme of ['light', 'dark'] as const) {
-  for (const width of [1280, 1024]) {
+  for (const width of [1920, 1280]) {
     test(`scenario control geometry and pointer focus in ${theme} at ${width}`, async ({
       page,
       hostOrigin,
@@ -300,12 +300,9 @@ for (const theme of ['light', 'dark'] as const) {
       const issues = createPageIssueCollector(page);
       await openVisualHarness(page, hostOrigin, theme, 'ru', {
         width,
-        height: width === 1024 ? 640 : 900,
+        height: width === 1280 ? 560 : 900,
       });
-      const closeInspector = page
-        .locator('.guide-inspector-panel .guide-panel-heading button')
-        .first();
-      if (width === 1024 && (await closeInspector.isVisible())) await closeInspector.click();
+      await expect(page.locator('.guide-inspector-panel')).toBeVisible();
       const pane = page.locator('.guide-center-panel > .guide-document-scroll');
       await pane.evaluate((node) => {
         node.scrollTop = 0;
@@ -536,11 +533,11 @@ test('scenario header undo and redo stay icon-only and accessible', async ({
   issues.assertClean();
 });
 
-test('scenario title stays compact on hover and expands only for editing', async ({
+test('scenario title keeps available width across hover and editing', async ({
   page,
   hostOrigin,
 }, testInfo) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 900 });
   const header = page.locator('.guide-page-header');
   const title = header.locator('.guide-project-name');
   const input = title.locator('input');
@@ -549,7 +546,7 @@ test('scenario title stays compact on hover and expands only for editing', async
   await title.hover();
   expect(await width()).toBeCloseTo(compact, 0);
   await input.focus();
-  expect(await width()).toBeGreaterThan(compact + 30);
+  expect(await width()).toBeCloseTo(compact, 0);
   await input.press('Tab');
   await header.getByRole('button', { name: 'Appearance', exact: true }).focus();
   expect(await width()).toBeCloseTo(compact, 0);
@@ -580,7 +577,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     hostOrigin,
   }) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const step = page.locator('article#compare');
     const text = step.locator('.guide-block[data-kind="text"]').first();
     await text.locator('textarea').focus();
@@ -629,7 +626,7 @@ for (const [locale, theme] of [
       hostOrigin,
       theme,
       locale,
-      { width: 1280, height: 720 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );
@@ -675,3 +672,57 @@ for (const [locale, theme] of [
     await expect(page.locator('.tour-stage-host [data-tour-scene] img').first()).toBeVisible();
   });
 }
+
+test('unfocused project title shows all fitting text without requiring focus', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 900 });
+  const header = page.locator('.guide-page-header');
+  const title = header.locator('.guide-project-name input');
+  await title.fill('Project title fitting the available space W');
+  await header.getByRole('button', { name: 'Appearance', exact: true }).focus();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const geometry = await title.evaluate((input) => {
+    if (!(input instanceof HTMLInputElement)) throw new Error('Missing title input');
+    const style = getComputedStyle(input);
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+    const text = context.measureText(input.value).width;
+    const rect = input.getBoundingClientRect();
+    const actions = input
+      .closest('.guide-page-header')!
+      .querySelector('.guide-header-actions')!
+      .getBoundingClientRect();
+    const padding = Number.parseFloat(style.paddingLeft) + Number.parseFloat(style.paddingRight);
+    const borders =
+      Number.parseFloat(style.borderLeftWidth) + Number.parseFloat(style.borderRightWidth);
+    return {
+      text,
+      content: rect.width - padding - borders,
+      available: actions.left - rect.left - padding - borders - 8,
+    };
+  });
+  expect(geometry.available).toBeGreaterThan(geometry.text);
+  expect(geometry.content).toBeGreaterThanOrEqual(geometry.text);
+});
+
+test('MV3 fixture applies the configured CSS viewport before application navigation', async ({
+  page,
+  hostOrigin,
+  viewport,
+}) => {
+  await page.addInitScript(() => {
+    Reflect.set(window, 'initialLayoutViewport', {
+      width: window.innerWidth,
+      height: window.innerHeight,
+      dpr: window.devicePixelRatio,
+    });
+  });
+  await openVisualHarness(page, hostOrigin, 'light', 'en');
+  expect(await page.evaluate(() => Reflect.get(window, 'initialLayoutViewport'))).toEqual({
+    ...viewport,
+    dpr: 1,
+  });
+});

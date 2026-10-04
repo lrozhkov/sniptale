@@ -1,5 +1,5 @@
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
-import { GuideSnapButton } from './layout-assistance';
+import { GuideSnapButton, GuideBoundariesButton } from './layout-assistance';
 import { GuideVoiceField } from './voice-field';
 import { useLayoutEffect, useRef, useState, type ReactNode, type Ref } from 'react';
 import { GuideAiEntry } from './ai-assistant';
@@ -121,7 +121,12 @@ export function GuidePageHeader({
           )}
           {project && (
             <>
-              {showSnap && <GuideSnapButton t={t} disabled={disabled} />}
+              {showSnap && (
+                <>
+                  <GuideSnapButton t={t} disabled={disabled} />
+                  <GuideBoundariesButton t={t} disabled={disabled} />
+                </>
+              )}
               <ContentToolbarButton
                 className="guide-labeled-action"
                 data-header-collapse="2"

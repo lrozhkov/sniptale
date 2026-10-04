@@ -116,12 +116,6 @@
   width: 100%;
   justify-content: center;
 }
-@media (max-width: 1100px) {
-  .guide-export-workspace {
-    grid-template-columns: minmax(0, 1fr) clamp(15rem, 28%, 18rem);
-  }
-}
-
 /* Output settings use the same compact value hierarchy as editing inspectors. */
 .guide-export-controls {
   --sniptale-compact-font-size: 12px;

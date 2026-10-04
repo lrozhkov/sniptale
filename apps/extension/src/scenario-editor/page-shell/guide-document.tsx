@@ -26,6 +26,7 @@ import { GuideBlockActions } from './block-actions';
 import { GuideImageSurface } from './image-surface';
 import { GuideImageUpload } from './image-upload';
 import { GuideNoteBlock } from './note-block';
+import { useGuideLayoutAssistance } from './layout-assistance';
 
 export type GuideFocusRequest = {
   sequence: number;
@@ -77,6 +78,7 @@ export function GuideDocument({
   onFrameImage,
   t,
 }: GuideDocumentProps) {
+  const { showBoundaries } = useGuideLayoutAssistance();
   const content = useRef<HTMLDivElement>(null);
   const instructions = useId();
   const [textEditing, setTextEditing] = useState(false);
@@ -87,6 +89,7 @@ export function GuideDocument({
     selectedBlockId,
     select: onSelectBlock,
     clear: () => onClearSelection?.(),
+    onTextEditing: setTextEditing,
   });
   useEffect(
     () => focusGuideTarget(content.current, selectedId, focusRequest),
@@ -98,20 +101,10 @@ export function GuideDocument({
       <div
         ref={content}
         className="guide-document"
+        data-show-boundaries={showBoundaries || undefined}
         tabIndex={-1}
         style={guideDocumentStyle(project.style)}
         {...selection}
-        onFocusCapture={(event) => {
-          selection.onFocusCapture(event);
-          setTextEditing(event.target.matches('textarea'));
-        }}
-        onBlurCapture={(event) => {
-          setTextEditing(
-            event.relatedTarget instanceof Element &&
-              event.currentTarget.contains(event.relatedTarget) &&
-              event.relatedTarget.matches('textarea')
-          );
-        }}
       >
         <span id={instructions} className="sr-only">
           {t('scenario.editor.guideSelectionHelp')}

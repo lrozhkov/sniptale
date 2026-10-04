@@ -21,6 +21,7 @@ export async function insertGuideBlock(page: Page, step: Locator, command: strin
   const trigger = step.locator(
     '.guide-insertion-block[data-end="true"] .guide-insert-anchor > button'
   );
+  await expect(trigger).toBeEnabled();
   await trigger.focus();
   await page.keyboard.press('ArrowDown');
   await page
@@ -365,7 +366,7 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
-  await page.setViewportSize({ width: 1024, height: 640 });
+  await page.setViewportSize({ width: 1280, height: 560 });
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -421,7 +422,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   expect([...savedImage.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
   await expect(apply).toBeEnabled();
   await expect(page.locator('.guide-image-editor')).toHaveCount(1);
-  await page.setViewportSize({ width: 1024, height: 640 });
+  await page.setViewportSize({ width: 1280, height: 560 });
   await expect(apply).toBeVisible();
   await expect(apply).toBeEnabled();
   const documentBar = child.locator('[data-ui="editor.floating.document-bar"]');
@@ -437,7 +438,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
           toolBounds.x >= documentBounds.x + documentBounds.width ||
           toolBounds.x + toolBounds.width <= documentBounds.x) &&
         toolBounds.x >= 0 &&
-        toolBounds.x + toolBounds.width <= 1024
+        toolBounds.x + toolBounds.width <= 1280
       );
     })
     .toBe(true);

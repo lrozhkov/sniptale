@@ -28,7 +28,7 @@ for (const theme of ['light', 'dark'] as const) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     const reopenUrl = page.url();
     const articles = page.locator('.guide-document > article');
     const first = articles.first();
@@ -95,7 +95,7 @@ for (const theme of ['light', 'dark'] as const) {
       await item.locator('.guide-item-actions button').click();
       await page.getByRole('button', { name: 'Удалить элемент', exact: true }).click();
     }
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const canvasEmpty = page.locator('.guide-document-empty .guide-image-slot');
     await expect(canvasEmpty).toBeVisible();
     await page.screenshot({ path: `tasks/scenario-image-drop/canvas-empty-${theme}.png` });

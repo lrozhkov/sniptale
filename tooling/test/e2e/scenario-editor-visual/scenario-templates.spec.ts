@@ -42,13 +42,13 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1920, height: 900 });
     const sourceUrl = page.url();
     await page.getByRole('button', { name: 'Сохранить как макет', exact: true }).click();
     await page
       .getByRole('textbox', { name: 'Название макета', exact: true })
       .fill('Макет с изображениями');
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const controls = page.locator('.guide-template-controls');
     await expect(controls.getByRole('textbox')).toBeInViewport();
     expect(await controls.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
@@ -81,7 +81,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       hostOrigin,
       theme,
       'ru',
-      { width: 1920, height: 1080 },
+      { width: 1920, height: 900 },
       'text-only'
     );
     const targetUrl = page.url();
@@ -94,7 +94,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(targetImages).toHaveCount(0);
     await page.getByRole('button', { name: 'Повторить', exact: true }).click();
     await expect(targetImages).toHaveCount(2);
-    await expect(page.locator('.guide-page-feedback')).toHaveAttribute('data-status', 'saved');
+    await expect(page.locator('[data-ui="autosave-control"] button')).toHaveAttribute(
+      'aria-label',
+      /Saved|Сохранено/u
+    );
 
     await page.goto(sourceUrl);
     await page

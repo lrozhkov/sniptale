@@ -6,7 +6,7 @@ test('guide insertion does not force menu-sized vertical whitespace at HD', asyn
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   const metrics = await page.locator('article#compare .guide-step-blocks').evaluate((node) => {
     const css = getComputedStyle(node);
     return {
@@ -22,8 +22,9 @@ test('guide insertion opens across the row width without precise plus targeting 
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   const insert = page.locator('.guide-insertion-item[data-insert-before="compare"]');
+  await expect(insert.locator('button .lucide-ellipsis')).toHaveCount(1);
   await insert.locator('button').scrollIntoViewIfNeeded();
   const button = (await insert.locator('button').boundingBox())!;
   await page.mouse.move(button.x + button.width / 2 + 55, button.y + button.height / 2);
@@ -36,7 +37,7 @@ for (const theme of ['light', 'dark'] as const) {
       page,
       hostOrigin,
     }) => {
-      await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 720 });
+      await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
       await page
         .locator('.guide-page-header')
         .getByRole('button', { name: 'Appearance', exact: true })
@@ -241,7 +242,7 @@ test('guide start, end and empty insertion rails leave text and neighboring poin
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 560 });
   const emptyStep = page.locator('article#text-only');
   await expect(emptyStep.locator('.guide-empty-step')).toBeVisible();
   await page.mouse.move(10, 10);
@@ -299,7 +300,7 @@ for (const theme of ['light', 'dark'] as const) {
       page,
       hostOrigin,
     }, info) => {
-      await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 720 });
+      await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
       await page
         .locator('.guide-page-header')
         .getByRole('button', { name: 'Appearance', exact: true })
@@ -389,7 +390,7 @@ test('guide insertion ignores quick pointer passes but keeps dwell and keyboard 
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   const anchor = page.locator(
     '.guide-insertion-item[data-insert-before="compare"] .guide-insert-anchor'
   );

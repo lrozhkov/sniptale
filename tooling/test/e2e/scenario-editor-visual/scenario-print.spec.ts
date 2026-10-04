@@ -77,7 +77,7 @@ for (const theme of ['light', 'dark'] as const) {
         contentType: 'application/pdf',
       });
     }
-    await page.setViewportSize({ width: 800, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await expect(page.getByRole('button', { name: 'Print / PDF', exact: true })).toBeInViewport();
     await expect(
       page.getByRole('button', { name: 'Back to export', exact: true })

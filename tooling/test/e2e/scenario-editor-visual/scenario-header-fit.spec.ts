@@ -7,15 +7,9 @@ test('tour header collapses labels in priority order and restores them without w
   hostOrigin,
 }, testInfo) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(
-    page,
-    hostOrigin,
-    'dark',
-    'ru',
-    { width: 1920, height: 1080 },
-    'compare',
-    { tourFixture: '1' }
-  );
+  await openVisualHarness(page, hostOrigin, 'dark', 'ru', { width: 1920, height: 900 }, 'compare', {
+    tourFixture: '1',
+  });
   await page.getByRole('button', { name: 'Интерактивный тур', exact: true }).click();
   await page
     .locator('.tour-header-controls')
@@ -23,7 +17,7 @@ test('tour header collapses labels in priority order and restores them without w
     .click();
   const header = page.locator('.guide-page-header');
   for (const width of [1920, 1600, 1440, 1280, 1920]) {
-    await page.setViewportSize({ width, height: 1080 });
+    await page.setViewportSize({ width, height: width === 1280 ? 560 : 900 });
     await expect
       .poll(() => header.evaluate((node) => node.scrollWidth <= node.clientWidth))
       .toBe(true);

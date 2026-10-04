@@ -8,7 +8,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
     url.searchParams.set('projectId', `numbering-${crypto.randomUUID()}`);
     url.searchParams.set('theme', theme);
@@ -60,12 +60,12 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(outline.nth(1)).toHaveText('3');
     await expect(outline.nth(2)).toHaveText('A.1');
     await page.getByRole('textbox', { name: 'Custom number', exact: true }).fill('W'.repeat(32));
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await first.locator('header').scrollIntoViewIfNeeded();
     const headerWidth = (await first.locator('header').boundingBox())!.width;
     expect((await firstNumber.boundingBox())!.width).toBeLessThanOrEqual(headerWidth * 0.41);
     await expect(firstNumber).toHaveText('W'.repeat(32));
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.setViewportSize({ width: 1920, height: 900 });
     await page.getByRole('textbox', { name: 'Custom number', exact: true }).fill('');
     await expect(firstNumber).toHaveText('3');
     await second.getByRole('textbox', { name: 'Step title', exact: true }).focus();

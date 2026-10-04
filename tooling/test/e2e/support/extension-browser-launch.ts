@@ -2,7 +2,14 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
+import {
+  chromium,
+  type Browser,
+  type BrowserContext,
+  type Page,
+  type ViewportSize,
+} from 'playwright';
+import { resolveBrowserViewport } from './browser-viewport';
 
 type LaunchedBrowser = {
   browser: Browser;
@@ -12,6 +19,7 @@ type LaunchedBrowser = {
 };
 
 type LaunchExtensionBrowserOptions = {
+  viewport?: ViewportSize;
   extensionBuildDir?: string;
   userDataDir?: string;
 };
@@ -94,6 +102,7 @@ async function removeOwnedUserDataDir(userDataDir: string): Promise<void> {
 export async function launchExtensionBrowser(
   options: LaunchExtensionBrowserOptions = {}
 ): Promise<LaunchedBrowser> {
+  const viewport = options.viewport ?? resolveBrowserViewport();
   const ownsUserDataDir = options.userDataDir === undefined;
   const userDataDir = options.userDataDir ?? (await mkdtemp(join(tmpdir(), 'sniptale-pw-')));
   const extensionPath = resolveExtensionPath(options.extensionBuildDir);
@@ -102,6 +111,8 @@ export async function launchExtensionBrowser(
 
   try {
     context = await chromium.launchPersistentContext(userDataDir, {
+      viewport,
+      deviceScaleFactor: 1,
       args: getChromiumLaunchArgs(),
       channel: 'chromium',
       headless: process.env.PLAYWRIGHT_HEADLESS !== '0',

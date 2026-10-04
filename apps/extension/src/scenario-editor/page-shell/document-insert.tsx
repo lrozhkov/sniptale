@@ -137,7 +137,7 @@ export function GuideDocumentInsert({
     >
       <div className="guide-insertion-chrome">
         <GuideInsertActions
-          icon={target.kind === 'block' ? <Ellipsis size={16} aria-hidden="true" /> : undefined}
+          icon={<Ellipsis size={16} aria-hidden="true" />}
           label={t(
             target.kind === 'item'
               ? 'scenario.editor.guideInsertItem'

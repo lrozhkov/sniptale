@@ -30,6 +30,7 @@ it('selects content first, finishes Enter in place and returns Escape to step se
           selectedBlockId,
           select,
           clear,
+          onTextEditing: vi.fn(),
         })}
       >
         <article id="step" tabIndex={0}>
@@ -147,4 +148,71 @@ it('distinguishes pointer selection from keyboard focus and removes modality lis
   expect(surface.getAttribute('data-selection-input')).toBe('pointer');
   host.remove();
   vi.unstubAllGlobals();
+});
+
+it('tracks textarea focus within the document and clears editing on commands or exit', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const outside = document.createElement('textarea');
+  document.body.append(host, outside);
+  const root = createRoot(host);
+  const calls: unknown[][] = [];
+  const select = vi.fn((item: string, block: string | null) => calls.push(['select', item, block]));
+  const onTextEditing = vi.fn((editing: boolean) => calls.push(['editing', editing]));
+  try {
+    await act(async () =>
+      root.render(
+        <div
+          {...guideDocumentSelection({
+            selectedId: null,
+            selectedBlockId: null,
+            select,
+            clear: vi.fn(),
+            onTextEditing,
+          })}
+        >
+          <article id="step">
+            <div data-block-id="text">
+              <textarea aria-label="First" />
+              <textarea aria-label="Second" />
+              <button className="guide-action-menu">Command</button>
+            </div>
+          </article>
+        </div>
+      )
+    );
+    const first = host.querySelector<HTMLTextAreaElement>('[aria-label="First"]')!;
+    const second = host.querySelector<HTMLTextAreaElement>('[aria-label="Second"]')!;
+    await act(async () => first.focus());
+    expect(calls).toEqual([
+      ['select', 'step', 'text'],
+      ['editing', true],
+    ]);
+    calls.length = 0;
+    await act(async () => second.focus());
+    expect(calls).toEqual([
+      ['editing', true],
+      ['select', 'step', 'text'],
+      ['editing', true],
+    ]);
+    calls.length = 0;
+    await act(async () => host.querySelector('button')!.focus());
+    expect(calls).toEqual([
+      ['editing', false],
+      ['editing', false],
+    ]);
+    await act(async () => first.focus());
+    calls.length = 0;
+    await act(async () => outside.focus());
+    expect(calls).toEqual([['editing', false]]);
+    await act(async () => first.focus());
+    calls.length = 0;
+    await act(async () => first.blur());
+    expect(calls).toEqual([['editing', false]]);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    outside.remove();
+    vi.unstubAllGlobals();
+  }
 });

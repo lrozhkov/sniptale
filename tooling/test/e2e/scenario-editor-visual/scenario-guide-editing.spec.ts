@@ -8,7 +8,7 @@ for (const [theme, locale] of [
 ] as const) {
   test(`guide editing and insertion stay separate in ${theme}`, async ({ page, hostOrigin }) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
     const insertion = page.locator('.guide-document > .guide-insertion-item').first();
     const plus = insertion.locator('button');
     const menu = page.locator('.guide-action-menu--insert');
@@ -83,7 +83,7 @@ for (const [theme, locale, mode] of [
     page,
     hostOrigin,
   }) => {
-    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
     const image = page.locator('[data-block-id="before"]');
     await image.locator('img').click();
     const inspector = page.locator('.guide-image-inspector');
@@ -186,9 +186,9 @@ for (const [theme, locale, mode] of [
     await expect(bounds).toHaveCSS('color', colors.color);
     await expect(bounds).toHaveCSS('background-color', colors.selected);
     await page.screenshot({ path: `.tmp/backlog7/b12-crop-${theme}-${mode}.png` });
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await expect(cancel).toBeInViewport();
-    await page.screenshot({ path: `.tmp/backlog7/b12-crop-${theme}-${mode}-compact.png` });
+    await page.screenshot({ path: `.tmp/backlog7/b12-crop-${theme}-${mode}-hd.png` });
     await cancel.click();
     await selectSection(locale === 'en' ? 'Placement' : 'Размещение');
     await inspector
@@ -222,12 +222,10 @@ for (const [theme, locale] of [
     hostOrigin,
   }) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
     await page.locator('[data-block-id="before"] img').click();
     const inspector = page.locator('.guide-inspector-panel');
-    await page
-      .getByRole('button', { name: locale === 'en' ? 'Inspector' : 'Настройки', exact: true })
-      .click();
+    await expect(inspector).toBeVisible();
     const categories = inspector.locator('nav');
     await expect(categories.getByRole('button')).toHaveCount(4);
     await categories
@@ -266,7 +264,7 @@ for (const [theme, locale] of [
           })
           .click();
     }
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await page.locator('[data-block-id="description"] textarea').click();
     await page
       .getByRole('button', {

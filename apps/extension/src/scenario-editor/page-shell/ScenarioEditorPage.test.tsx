@@ -472,6 +472,7 @@ it('navigates from current resources and collapses panels without changing the d
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(true);
   await click('Outline');
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(false);
+  await click('Close', container.querySelector('#guide-inspector-panel')!);
   const actions = container.querySelector('.guide-header-actions')!;
   const reopen = actions.querySelector('[aria-controls="guide-inspector-panel"]');
   expect(reopen).not.toBeNull();

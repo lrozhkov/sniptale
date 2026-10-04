@@ -2,6 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 type PanelSide = 'left' | 'right';
 type GuideLeftSection = 'structure' | 'resources';
+const minimumEditorWidth = 1280;
+const layoutWidth = () => Math.max(minimumEditorWidth, window.innerWidth);
 const limits = {
   left: { min: 180, max: 320, initial: 320 },
   right: { min: 260, max: 420, initial: 420 },
@@ -11,19 +13,16 @@ const limits = {
 export function useGuidePanels() {
   const [presentation, setPresentation] = useState<'sections' | 'all'>('sections');
   const [rightScope, setRightScope] = useState<'selection' | 'document'>('selection');
-  const [viewport, setViewport] = useState(() => window.innerWidth);
-  const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 720);
+  const [viewport, setViewport] = useState(layoutWidth);
+  const [leftOpen, setLeftOpen] = useState(true);
   const [leftSection, setLeftSection] = useState<GuideLeftSection>('structure');
-  const [rightOpen, setRightOpen] = useState(() => window.innerWidth >= 1200);
+  const [rightOpen, setRightOpen] = useState(true);
   const [requested, setWidths] = useState(() => ({
     left: 320,
-    right:
-      window.innerWidth >= 1200
-        ? Math.max(260, Math.min(420, window.innerWidth - 32 - 640 - 320))
-        : 420,
+    right: Math.max(260, Math.min(420, layoutWidth() - 32 - 640 - 320)),
   }));
   const budget = viewport - 32 - 640;
-  const inline = viewport >= 1200 && leftOpen && rightOpen;
+  const inline = leftOpen && rightOpen;
   const left = Math.min(requested.left, inline ? Math.max(180, budget - 260) : 320);
   const right = Math.min(requested.right, inline ? Math.max(260, budget - left) : 420);
   const widths = { left, right };
@@ -33,7 +32,7 @@ export function useGuidePanels() {
   };
   const cancel = useRef<(() => void) | null>(null);
   useEffect(() => {
-    const measure = () => setViewport(window.innerWidth);
+    const measure = () => setViewport(layoutWidth());
     const releaseGesture = () => cancel.current?.();
     window.addEventListener('resize', measure);
     return () => {

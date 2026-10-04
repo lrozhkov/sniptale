@@ -7,7 +7,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     await page.evaluate(() => {
       const original = chrome.runtime.sendMessage.bind(chrome.runtime);
       const requests: unknown[] = [];
@@ -238,7 +238,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     await page.getByRole('button', { name: 'Помощь AI', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Выбрать шаги', exact: true }).click();

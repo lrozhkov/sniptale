@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuidePageHeader, GuidePageFeedback } from './header';
+import { GuideLayoutAssistance } from './layout-assistance';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -29,6 +30,8 @@ async function draw(
     contextControls?: ReactNode;
     representationControls?: ReactNode;
     feedback?: ReactNode;
+    showSnap?: boolean;
+    disabled?: boolean;
   } = {}
 ) {
   const autosave = vi.fn();
@@ -36,38 +39,42 @@ async function draw(
   const duplicate = vi.fn();
   const remove = vi.fn();
   const reload = vi.fn();
+  const change = vi.fn();
   const project = createGuideProject('Project', 'guide', 1);
   const t = createTranslator('en');
   await act(async () =>
     root.render(
-      <GuidePageHeader
-        project={project}
-        feedback={options.feedback}
-        autosaveEnabled
-        onAutosaveChange={autosave}
-        status="failed"
-        commandsDisabled={options.commandsDisabled ?? false}
-        contextControls={options.contextControls}
-        representationControls={options.representationControls}
-        disabled={false}
-        onAppearance={appearance}
-        appearanceActive={options.appearanceActive ?? false}
-        onDuplicate={duplicate}
-        onDelete={remove}
-        onReload={reload}
-        onPreview={vi.fn()}
-        previewRef={createRef<HTMLButtonElement>()}
-        previewDisabled={false}
-        canUndo={false}
-        canRedo={false}
-        onUndo={vi.fn()}
-        onRedo={vi.fn()}
-        onChange={vi.fn()}
-        t={t}
-      />
+      <GuideLayoutAssistance>
+        <GuidePageHeader
+          project={project}
+          feedback={options.feedback}
+          autosaveEnabled
+          onAutosaveChange={autosave}
+          status="failed"
+          commandsDisabled={options.commandsDisabled ?? false}
+          contextControls={options.contextControls}
+          representationControls={options.representationControls}
+          disabled={options.disabled ?? false}
+          showSnap={options.showSnap ?? true}
+          onAppearance={appearance}
+          appearanceActive={options.appearanceActive ?? false}
+          onDuplicate={duplicate}
+          onDelete={remove}
+          onReload={reload}
+          onPreview={vi.fn()}
+          previewRef={createRef<HTMLButtonElement>()}
+          previewDisabled={false}
+          canUndo={false}
+          canRedo={false}
+          onUndo={vi.fn()}
+          onRedo={vi.fn()}
+          onChange={change}
+          t={t}
+        />
+      </GuideLayoutAssistance>
     )
   );
-  return { appearance, duplicate, remove, reload, autosave };
+  return { appearance, duplicate, remove, reload, autosave, change };
 }
 
 function headerButton(name: string) {
@@ -218,3 +225,21 @@ it.each(['saved', 'dirty'] as const)(
     expect(host.querySelector('.guide-page-feedback')).toBeNull();
   }
 );
+
+it('keeps Guide boundaries disposable, adjacent to snapping and independent of project updates', async () => {
+  const { change } = await draw();
+  const button = () =>
+    host.querySelector<HTMLButtonElement>('button[aria-label="Show boundaries"]')!;
+  expect(button().getAttribute('aria-pressed')).toBe('false');
+  expect(button().previousElementSibling?.querySelector('.lucide-magnet')).not.toBeNull();
+  await act(async () => button().click());
+  expect(button().getAttribute('aria-pressed')).toBe('true');
+  expect(change).not.toHaveBeenCalled();
+  await draw({ showSnap: false });
+  expect(button()).toBeNull();
+  await draw({ disabled: true });
+  expect(button().getAttribute('aria-pressed')).toBe('true');
+  expect(button().disabled).toBe(true);
+  await act(async () => button().click());
+  expect(button().getAttribute('aria-pressed')).toBe('true');
+});

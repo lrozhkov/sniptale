@@ -8,7 +8,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     const panel = page.locator('#guide-inspector-panel');
     await expect(panel).toBeVisible();
     await expect(panel.locator('h2')).toHaveText('Compare two images');
@@ -53,7 +53,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
             .map((node) => node.textContent)
         )
     ).toEqual([]);
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await testInfo.attach(`inspector-minimum-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -740,7 +740,7 @@ for (const [locale, theme] of [
       `chrome-extension://${extensionId}`,
       theme,
       locale,
-      { width: 1280, height: 720 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );
@@ -821,7 +821,7 @@ for (const [locale, theme] of [
       hostOrigin,
       theme,
       locale,
-      { width: 1280, height: 720 },
+      { width: 1280, height: 560 },
       'compare',
       { tourFixture: '1' }
     );
@@ -991,7 +991,7 @@ for (const [locale, theme] of [
     hostOrigin,
   }, info) => {
     const t = createTranslator(locale);
-    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
     const panel = page.locator('#guide-inspector-panel');
     const step = page.locator('article#compare');
     await step.locator('.guide-block[data-kind="text"] textarea').first().focus();

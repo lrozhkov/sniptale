@@ -27,7 +27,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     await page.getByRole('button', { name: 'Ресурсы', exact: true }).click();
     const panel = page.locator('#guide-library-panel');
     const rows = panel.locator('.guide-resource-row');
@@ -51,7 +51,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       .click();
     await page.getByRole('button', { name: 'Compare two images · 1', exact: true }).click();
     await expect(page.locator('article#compare')).toHaveAttribute('data-selected', 'true');
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const footer = panel.locator('.guide-resource-footer');
     await expect(footer).toBeInViewport();
     await testInfo.attach(`resources-${theme}`, {
@@ -105,7 +105,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     await page.getByRole('button', { name: 'Ресурсы', exact: true }).click();
     const trigger = page
       .locator('#guide-library-panel')
@@ -130,12 +130,12 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(allMaterials).toHaveAttribute('aria-pressed', 'true');
     await expect(allMaterials.locator('svg')).toBeVisible();
     for (const width of [1280, 2560]) {
-      await page.setViewportSize({ width, height: 720 });
+      await page.setViewportSize({ width, height: width === 1280 ? 560 : 1280 });
       const geometry = (await drawer.boundingBox())!;
       expect(geometry.width).toBeGreaterThanOrEqual(width * 0.75);
       expect(geometry.width).toBeLessThanOrEqual(width - 24);
     }
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
     await expect(list).toHaveAttribute('data-layout', 'strip');
     const preview = drawer.locator('.guide-library-preview');

@@ -15,6 +15,7 @@ export function guideDocumentSelection(params: {
   selectedBlockId: string | null;
   select: (itemId: string, blockId: string | null) => void;
   clear: () => void;
+  onTextEditing: (editing: boolean) => void;
 }) {
   function target(root: HTMLElement, value: EventTarget | null) {
     if (!(value instanceof Element) || !root.contains(value)) return null;
@@ -43,8 +44,16 @@ export function guideDocumentSelection(params: {
     },
     onFocusCapture(event: FocusEvent<HTMLDivElement>) {
       const current = target(event.currentTarget, event.target);
-      if (!current || current.value.closest('.guide-insertion, .guide-action-menu')) return;
-      select(current);
+      if (current && !current.value.closest('.guide-insertion, .guide-action-menu'))
+        select(current);
+      params.onTextEditing(event.target.matches(FIELD));
+    },
+    onBlurCapture(event: FocusEvent<HTMLDivElement>) {
+      params.onTextEditing(
+        event.relatedTarget instanceof Element &&
+          event.currentTarget.contains(event.relatedTarget) &&
+          event.relatedTarget.matches(FIELD)
+      );
     },
     onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
       if (event.defaultPrevented || event.nativeEvent.isComposing) return;

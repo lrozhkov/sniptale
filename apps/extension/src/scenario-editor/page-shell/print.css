@@ -71,9 +71,12 @@
 @media print {
   html,
   body,
-  #root {
+  #root,
+  .guide-editor-viewport,
+  .guide-editor-viewport > * {
     height: auto !important;
     min-height: 0 !important;
+    min-width: 0 !important;
     overflow: visible !important;
     margin: 0 !important;
     padding: 0 !important;

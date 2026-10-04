@@ -29,8 +29,19 @@ import { useGuidePanels } from './panel-layout';
 import { useGuidePageState } from './runtime/use-state';
 import { ScenarioEditorStart } from './start';
 
+/** Keeps the desktop editing surface reachable by scrolling below the supported HD viewport. */
+function ScenarioEditorViewport() {
+  return (
+    <div className="guide-editor-viewport">
+      <ScenarioEditorPage />
+    </div>
+  );
+}
+
+export { ScenarioEditorViewport as ScenarioEditorPage };
+
 /** Composes the local guide workspace around its single edit/save state owner. */
-export function ScenarioEditorPage() {
+function ScenarioEditorPage() {
   const t = createTranslator(useAppLocale());
   const state = useGuidePageState();
   const panels = useGuidePanels();
@@ -584,7 +595,7 @@ function useGuideBlockSelection(
       selectItem(itemId, false);
       if (blockId !== selection?.blockId) cancelFraming();
       setSelection(blockId ? { itemId, blockId } : null);
-      if (blockId && !panels.rightOpen && window.innerWidth >= 1200) panels.toggleRight();
+      if (blockId && !panels.rightOpen) panels.toggleRight();
     },
     select: (itemId: string, blockId: string, editing: boolean) => {
       if (!editing) {

@@ -16,7 +16,7 @@ for (const theme of ['light', 'dark'] as const) {
   ].join(' ');
   test(title, async ({ page, hostOrigin }, testInfo) => {
     await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const id = crypto.randomUUID();
     const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
     url.search = new URLSearchParams({

@@ -3,6 +3,7 @@ import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
+import { insertGuideBlock } from './scenario-editor-visual.state-steps';
 
 test('exports only framed pixels, applies bulk overrides and restores inheritance locally', async ({
   page,
@@ -139,7 +140,7 @@ for (const theme of ['light', 'dark'] as const) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     await page.getByRole('button', { name: 'Экспорт', exact: true }).click();
     await page.locator('.guide-html-export button').first().click();
     await page.getByRole('switch', { name: 'Оптимизировать размер', exact: true }).click();
@@ -147,8 +148,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.keyboard.press('Escape');
     await expect(page.locator('.guide-html-workbench')).toBeVisible();
     const bounds = await page.locator('.guide-html-workbench').boundingBox();
-    expect(bounds?.height).toBe(640);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1024);
+    expect(bounds?.height).toBe(720);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
     await page.getByRole('button', { name: 'Рассчитать размер', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Сохранить HTML', exact: true })).toBeEnabled();
     await testInfo.attach(`html-ru-${theme}`, {
@@ -194,7 +195,10 @@ for (const theme of ['light', 'dark'] as const) {
     await alignment.getByRole('button', { name: 'Start', exact: true }).click();
     await page.locator('.guide-history-controls button').first().click();
     await expect(caption).toHaveCSS('text-align', 'end');
-    await expect(page.locator('.guide-page-feedback')).toHaveAttribute('data-status', 'saved');
+    await expect(page.locator('[data-ui="autosave-control"] button')).toHaveAttribute(
+      'aria-label',
+      /Saved|Сохранено/u
+    );
     await page.reload();
     await expect(caption).toHaveCSS('text-align', 'end');
     await page.getByRole('button', { name: 'Export', exact: true }).click();
@@ -251,4 +255,86 @@ async function expectCaptionAlignment(caption: Locator, alignment: 'start' | 'ce
     };
   });
   expect(Math.abs(geometry[alignment])).toBeLessThan(1);
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`guide boundaries preserve geometry and stay out of outputs in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
+    const step = page.locator('article#compare');
+    for (const label of ['Heading', 'Note', 'Image']) {
+      await step.focus();
+      await step.locator('.guide-insertion-block[data-end="true"]').scrollIntoViewIfNeeded();
+      await insertGuideBlock(page, step, label);
+      if (label !== 'Image')
+        await expect(
+          step.locator('.guide-block').last().locator('input, textarea').first()
+        ).toBeFocused();
+    }
+    await page.locator('main.guide-page').focus();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    const document = page.locator('.guide-document');
+    const toggle = page.getByRole('button', { name: 'Show boundaries', exact: true });
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    const before = await boundaryGeometry(document);
+    for (const kind of ['heading', 'text', 'image', 'image-slot', 'note'])
+      expect(before.map((block) => block.kind)).toContain(kind);
+    await toggle.click();
+    await expect(document).toHaveAttribute('data-show-boundaries', 'true');
+    expect(await boundaryGeometry(document)).toEqual(before);
+    const neutral = document.locator('.guide-block:not([data-selected="true"])');
+    for (const block of await neutral.all())
+      await expect(block).toHaveCSS('outline-style', 'solid');
+    await page.screenshot({ path: `.tmp/backlog7/b14-boundaries-${theme}.png`, fullPage: false });
+    await toggle.press('Space');
+    await expect(document).not.toHaveAttribute('data-show-boundaries');
+    expect(await boundaryGeometry(document)).toEqual(before);
+    await toggle.press('Space');
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await expect(page.locator('[data-show-boundaries]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to editing', exact: true }).click();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
+    await page.emulateMedia({ media: 'print' });
+    await expect(page.locator('[data-show-boundaries]')).toHaveCount(0);
+    await expect(page.locator('.guide-editor-viewport')).toHaveCSS('overflow', 'visible');
+    await page.emulateMedia({ media: 'screen' });
+    await page.getByRole('button', { name: 'Back to export', exact: true }).click();
+    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+    await installSink(page);
+    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
+    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    const html = await page.evaluate(() => Reflect.get(window, 'savedGuideHtml'));
+    expect(typeof html).toBe('string');
+    expect(html).not.toContain('data-show-boundaries');
+    await page.reload();
+    await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  });
+}
+
+async function boundaryGeometry(document: Locator) {
+  return document.locator('.guide-block').evaluateAll((blocks) =>
+    blocks.map((block) => {
+      const rect = block.getBoundingClientRect();
+      const controls = [
+        ...block.querySelectorAll('.guide-block-actions, .guide-block-grip, .guide-block-width'),
+      ].map((control) => {
+        const style = getComputedStyle(control);
+        return [style.visibility, style.opacity, style.pointerEvents];
+      });
+      return {
+        kind: block.getAttribute('data-kind'),
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height,
+        controls,
+      };
+    })
+  );
 }

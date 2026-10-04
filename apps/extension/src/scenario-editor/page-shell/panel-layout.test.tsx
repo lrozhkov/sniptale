@@ -63,3 +63,27 @@ it('releases pointer listeners when the workspace unmounts', () => {
   expect(remove).toHaveBeenCalledWith('keydown', expect.any(Function));
   remove.mockRestore();
 });
+
+it('uses the same panel budget below HD and keeps user visibility choices on resize', () => {
+  let current: ReturnType<typeof useGuidePanels> | undefined;
+  function LayoutProbe() {
+    current = useGuidePanels();
+    return null;
+  }
+  vi.stubGlobal('innerWidth', 1024);
+  act(() => root.render(<LayoutProbe />));
+  expect(current?.leftOpen).toBe(true);
+  expect(current?.rightOpen).toBe(true);
+  expect(current?.widths).toEqual({ left: 320, right: 288 });
+  act(() => current?.toggleLeft());
+  vi.stubGlobal('innerWidth', 1920);
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(current?.leftOpen).toBe(false);
+  act(() => current?.toggleLeft());
+  act(() => current?.resize('right', 420));
+  expect(current?.widths.right).toBe(420);
+  vi.stubGlobal('innerWidth', 800);
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(current?.widths).toEqual({ left: 320, right: 288 });
+  expect(current?.rightOpen).toBe(true);
+});

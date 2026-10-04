@@ -6,7 +6,7 @@ test('guide HTML reading settings survive return and repeated export', async ({
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1024, height: 640 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await page.getByRole('button', { name: 'Export', exact: true }).click();
   await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
   await page.getByRole('button', { name: 'Step by step', exact: true }).click();
@@ -27,7 +27,7 @@ test('guide export opens the shared reader workspace on the first click', async 
   hostOrigin,
 }, testInfo) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'dark', 'ru', { width: 1024, height: 640 });
+  await openVisualHarness(page, hostOrigin, 'dark', 'ru', { width: 1280, height: 560 });
   await page.getByRole('button', { name: 'Экспорт', exact: true }).click();
   const reader = page.locator('main.guide-export-workspace');
   await expect(reader).toBeVisible();
@@ -39,7 +39,7 @@ test('guide export opens the shared reader workspace on the first click', async 
   await expect(inspector).toBeVisible();
   const inspectorBox = await inspector.boundingBox();
   expect(inspectorBox).not.toBeNull();
-  expect(inspectorBox!.height).toBeGreaterThanOrEqual(640 - 16 - 1);
+  expect(inspectorBox!.height).toBeGreaterThanOrEqual(560 - 16 - 1);
   await expect(
     inspector.getByRole('button', { name: 'Вернуться к редактированию', exact: true })
   ).toBeVisible();
@@ -70,7 +70,7 @@ test('guide HTML export keeps image selection inside the inspector at minimum wi
   hostOrigin,
 }, testInfo) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'dark', 'ru', { width: 1024, height: 640 });
+  await openVisualHarness(page, hostOrigin, 'dark', 'ru', { width: 1280, height: 560 });
   await page.getByRole('button', { name: 'Экспорт', exact: true }).click();
   await page.getByRole('button', { name: 'Сохранить автономный HTML', exact: true }).click();
   const workspace = page.locator('main.guide-export-workspace.guide-html-workbench');
@@ -113,7 +113,7 @@ test('tour HTML export prepares the sandboxed preview inside the shared workspac
     hostOrigin,
     'light',
     'en',
-    { width: 1024, height: 640 },
+    { width: 1280, height: 560 },
     'compare',
     { tourFixture: '1' }
   );
@@ -253,7 +253,7 @@ for (const locale of ['ru', 'en'] as const) {
   for (const theme of ['light', 'dark'] as const) {
     test(`output inspector presentation ${locale} ${theme}`, async ({ page, hostOrigin }, info) => {
       await page.emulateMedia({ colorScheme: theme });
-      await openVisualHarness(page, hostOrigin, theme, locale, { width: 1024, height: 640 });
+      await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
       const editingSelect = page
         .locator('.guide-inspector-panel [data-ui="shared.ui.compact-select"] > button')
         .first();
@@ -339,8 +339,8 @@ for (const locale of ['en', 'ru'] as const) {
           landscape: 'Landscape',
         };
     await openVisualHarness(page, hostOrigin, ru ? 'light' : 'dark', locale, {
-      width: 1024,
-      height: 640,
+      width: 1280,
+      height: 560,
     });
     await page.getByRole('button', { name: words.export, exact: true }).click();
     const formats = page.getByRole('group', { name: words.format, exact: true });
