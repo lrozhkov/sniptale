@@ -31,7 +31,6 @@ function ReviewZoomLane(props: {
   resultDuration: number;
   outputTime: number | null;
   edits: readonly ReviewEdit[];
-  boundaries: readonly number[] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   onAdd(): void;
   sourceSelection?: ReviewAnchor | undefined;
@@ -50,7 +49,6 @@ function ReviewZoomLane(props: {
       time={props.outputTime}
       regions={props.advanced.zoom.regions}
       edits={props.edits}
-      boundaries={props.boundaries}
       toOutputTime={props.toOutputTime}
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}
@@ -277,7 +275,6 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 resultDuration={props.resultDuration}
                 outputTime={props.outputTime}
                 edits={props.edits}
-                boundaries={props.editing.exporter.index?.boundaries}
                 zoom={props.zoom}
                 onAdd={onZoomAdd}
                 toOutputTime={props.toOutputTime}
@@ -460,14 +457,18 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
 }
 
 /** Projects the existing audio lane snap targets onto its result clock. */
-function reviewAudioSnapTimes(props: TimelineBindingProps) {
+export function reviewAudioSnapTimes(
+  props: Pick<TimelineBindingProps, 'outputTime' | 'edits' | 'toOutputTime' | 'advanced'>
+) {
   return [
     ...(props.outputTime === null ? [] : [props.outputTime]),
     ...props.edits
       .flatMap((edit) => [props.toOutputTime(edit.start), props.toOutputTime(edit.end)])
       .filter((time): time is number => time !== null),
-    ...props.advanced.zoom.regions
-      .filter((region) => !region.dormant)
-      .flatMap((region) => [region.start, region.end]),
+    ...(resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible
+      ? props.advanced.zoom.regions
+          .filter((region) => !region.dormant)
+          .flatMap((region) => [region.start, region.end])
+      : []),
   ];
 }

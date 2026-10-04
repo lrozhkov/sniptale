@@ -506,3 +506,93 @@ test('quick editor zoom retains playhead and selected focus through repeated sca
     );
   }
 });
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`quick editor focus magnets use visible targets in ${variant.locale}/${variant.theme}`, async ({
+    page,
+  }) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
+      await expect(button('gallery.videoReview.cutMode')).toHaveAttribute(
+        'title',
+        translate('gallery.videoReview.cutGesture', variant.locale)
+      );
+      await button('gallery.videoReview.advancedEditing').click();
+      await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute('title', /Shift/);
+      await button('gallery.videoReview.zoomAdd').click();
+      const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
+      const block = lane.locator('[role="button"]').first();
+      const bounds = (await lane.boundingBox())!;
+      const pixelsPerSecond = bounds.width / 12;
+      const move = async (delta: number, shift = false) => {
+        const box = (await block.boundingBox())!;
+        if (shift) await page.keyboard.down('Shift');
+        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 + delta, box.y + box.height / 2, { steps: 4 });
+        await page.mouse.up();
+        if (shift) await page.keyboard.up('Shift');
+      };
+      // The fixture has codec keyframes at 0,2,4,...; no timeline object occupies 2s.
+      const freeStart = 2 - 4 / pixelsPerSecond;
+      await move(freeStart * pixelsPerSecond);
+      await expect
+        .poll(
+          async () =>
+            Math.abs(((await persistedFocus(page))?.start ?? -10) - freeStart) * pixelsPerSecond
+        )
+        .toBeLessThan(1.5);
+      const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      const rulerBox = (await ruler.boundingBox())!;
+      await ruler.click({ position: { x: (rulerBox.width * 8) / 12, y: rulerBox.height / 2 } });
+      const playhead = Number(
+        await dialog
+          .locator('[data-ui="gallery.videoReview.timePlane"]')
+          .getAttribute('aria-valuenow')
+      );
+      const current = (await persistedFocus(page))!;
+      const length = current.end - current.start;
+      await move((playhead - length - current.start) * pixelsPerSecond + 4);
+      await expect
+        .poll(
+          async () =>
+            Math.abs(((await persistedFocus(page))?.end ?? -10) - playhead) * pixelsPerSecond
+        )
+        .toBeLessThan(1.5);
+      await move(-4, true);
+      await expect
+        .poll(
+          async () =>
+            Math.abs(
+              ((await persistedFocus(page))?.end ?? -10) - (playhead - 4 / pixelsPerSecond)
+            ) * pixelsPerSecond
+        )
+        .toBeLessThan(1.5);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}

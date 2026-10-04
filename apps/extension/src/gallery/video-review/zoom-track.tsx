@@ -40,7 +40,6 @@ type ZoomTrackProps = {
   time: number | null;
   regions: readonly QuickEditZoomRegion[];
   edits: readonly ReviewEdit[];
-  boundaries: readonly number[] | undefined;
   /** Source-to-result projection; removed source points return null. */
   toOutputTime(source: number): number | null;
   selectedId: string | null;
@@ -97,9 +96,9 @@ function zoomDragRange(args: {
     : getSnapCandidates({
         edits: [],
         playhead: null,
-        zoomRegions: args.regions.filter((region) => !region.dormant),
+        zoomRegions: args.regions.filter((item) => item.id !== region.id && !item.dormant),
         boundaries: args.snapEdges,
-      }).filter((value) => value !== region.start && value !== region.end);
+      });
   if (args.edge === 'move') {
     const freeStart = Math.max(0, Math.min(duration - args.length, region.start + args.delta));
     const snappedStart = snapTimelineTime(freeStart, candidates, threshold);
@@ -186,21 +185,17 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
   });
   const shownRange = (region: QuickEditZoomRegion) =>
     preview?.id === region.id ? preview : region;
-  const { edits, boundaries, time, toOutputTime } = props;
-  // One result-time candidate set: source edit/boundary edges projected, removed points dropped.
+  const { edits, time, toOutputTime, duration } = props;
+  // Visible result-time endpoints, projected edit edges and playhead; codec frames are not focus targets.
   const snapEdges = useMemo(() => {
-    const values = new Set<number>();
+    const values = new Set<number>([0, duration]);
     for (const value of edits.flatMap((edit) => [edit.start, edit.end])) {
-      const projected = toOutputTime(value);
-      if (projected !== null) values.add(projected);
-    }
-    for (const value of boundaries ?? []) {
       const projected = toOutputTime(value);
       if (projected !== null) values.add(projected);
     }
     if (time !== null) values.add(time);
     return [...values].sort((a, b) => a - b);
-  }, [edits, boundaries, time, toOutputTime]);
+  }, [edits, time, toOutputTime, duration]);
   return (
     <ReviewTrackRow
       muted={props.enabled === false}
@@ -254,7 +249,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
             snapEdges={snapEdges}
             sourceSnapEdges={getSnapCandidates({
               edits,
-              ...(boundaries ? { boundaries } : {}),
+              boundaries: [0, props.projection?.duration ?? duration],
               playhead: time === null ? null : (props.projection?.source(time) ?? time),
             })}
             region={region}

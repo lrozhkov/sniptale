@@ -3,6 +3,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAudioTrack } from './audio-track';
+import { reviewAudioSnapTimes } from './timeline-binding';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createTrackProjection } from './track-projection';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -684,3 +686,80 @@ it('mutes a whole added-audio row only when its nonempty clips are all muted', (
   renderTrack({ ...audio, voiceover: [mutedClip, clip('v2', 3, 2)] });
   expect(voiceover?.getAttribute('data-review-track-muted')).toBe('false');
 });
+
+it.each(['voiceover', 'music'] as const)(
+  'keeps %s magnets limited to currently visible focus edges',
+  async (laneKey) => {
+    const advanced = createQuickEditAdvancedState();
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
+    advanced.zoom.regions = [
+      {
+        id: 'focus',
+        start: 3,
+        end: 5,
+        transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+      },
+    ];
+    for (const visible of [true, false]) {
+      advanced.ui.tracks.zoom = visible;
+      const snapTimes = reviewAudioSnapTimes({
+        advanced,
+        outputTime: 9,
+        edits: [],
+        toOutputTime: (time) => time,
+      });
+      const lanes = renderTrack(
+        {
+          original: { muted: false, volume: 1 },
+          voiceover: laneKey === 'voiceover' ? [clip('moving', 1, 1)] : [],
+          music: laneKey === 'music' ? [clip('moving', 1, 1)] : [],
+        },
+        false,
+        snapTimes
+      );
+      const lane = lanes[laneKey === 'voiceover' ? 1 : 2]!;
+      vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+      const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+      Object.assign(block, { setPointerCapture: vi.fn() });
+      for (const [type, clientX] of [
+        ['pointerdown', 0],
+        ['pointermove', 195],
+        ['pointerup', 195],
+      ] as const)
+        await act(async () =>
+          block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX, button: 0 }))
+        );
+      expect(onMoveClip).toHaveBeenLastCalledWith(laneKey, 'moving', visible ? 3 : 2.95);
+    }
+  }
+);
+
+it.each(['voiceover', 'music'] as const)(
+  'excludes %s own and dormant clip boundaries from magnets',
+  async (laneKey) => {
+    for (const delta of [5, 195]) {
+      const clips = [clip('moving', 1, 1), { ...clip('dormant', 3, 1), dormant: true }];
+      const lanes = renderTrack({
+        original: { muted: false, volume: 1 },
+        voiceover: laneKey === 'voiceover' ? clips : [],
+        music: laneKey === 'music' ? clips : [],
+      });
+      const lane = lanes[laneKey === 'voiceover' ? 1 : 2]!;
+      vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+      const block = lane.querySelector<HTMLDivElement>('[data-audio-id="moving"]')!;
+      Object.assign(block, { setPointerCapture: vi.fn() });
+      for (const [type, clientX] of [
+        ['pointerdown', 0],
+        ['pointermove', delta],
+        ['pointerup', delta],
+      ] as const)
+        await act(async () =>
+          block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX, button: 0 }))
+        );
+      expect(onMoveClip).toHaveBeenLastCalledWith(laneKey, 'moving', 1 + delta / 100);
+    }
+  }
+);

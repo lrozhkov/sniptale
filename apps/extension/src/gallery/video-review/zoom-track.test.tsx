@@ -74,7 +74,6 @@ function renderTrack(
         {...(time === null ? { time: null } : { time })}
         regions={regions}
         edits={overrides?.edits ?? edits}
-        boundaries={[0, 2, 4, 6, 8, 10]}
         toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
         projection={overrides?.projection}
         selectedId={null}
@@ -513,3 +512,62 @@ for (const spotlight of [false, true]) {
     }
   );
 }
+
+it('does not magnet focus to invisible codec keyframes', async () => {
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 0, 1)], commit, vi.fn(), 9);
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block, 'pointerdown', 0);
+  await track.event(block, 'pointermove', 195);
+  await track.event(block, 'pointerup', 195);
+  expect(commit).toHaveBeenLastCalledWith(
+    'a',
+    { start: expect.closeTo(1.95, 8), end: expect.closeTo(2.95, 8) },
+    'move'
+  );
+});
+
+it('retains a visible playhead target coinciding with the moving focus old edge', async () => {
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 2, 4)], commit, vi.fn(), 2);
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block, 'pointerdown', 200);
+  await track.event(block, 'pointermove', 205);
+  await track.event(block, 'pointerup', 205);
+  expect(commit).toHaveBeenLastCalledWith('a', { start: 2, end: 4 }, 'move');
+});
+
+it.each([false, true])(
+  'preserves visible timeline-end snapping with Shift bypass %s',
+  async (shift) => {
+    const commit = vi.fn();
+    const track = renderTrack([zoom('a', 1, 2)], commit, vi.fn(), 9);
+    const block = track.blocks[0]!;
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    await track.event(block, 'pointerdown', 100);
+    await track.event(block, 'pointermove', 5, shift);
+    await track.event(block, 'pointerup', 5, shift);
+    expect(commit).toHaveBeenLastCalledWith(
+      'a',
+      {
+        start: expect.closeTo(shift ? 0.05 : 0, 8),
+        end: expect.closeTo(shift ? 1.05 : 1, 8),
+      },
+      'move'
+    );
+  }
+);

@@ -352,3 +352,48 @@ it('keeps compact range notes above source content without changing authored anc
   expect(onComment).toHaveBeenCalledExactlyOnceWith(note);
   expect(note.anchor).toEqual({ kind: 'range', start: 2, end: 6 });
 });
+
+it.each(['start', 'end', 'move'] as const)(
+  'does not snap source %s gestures to their own old edges',
+  async (edge) => {
+    const change = vi.fn();
+    const edit = cut(2, 4);
+    const lane = renderLane({
+      edits: [edit],
+      onChangeEdit: change,
+      time: 9,
+      selection: { kind: 'point', time: 9 },
+      boundaries: [],
+    });
+    const at = edge === 'end' ? 400 : 200;
+    await lane.event(edge === 'move' ? lane.block : lane[edge], 'pointerdown', at);
+    await lane.event(lane.block, 'pointermove', at + 5);
+    await lane.event(lane.block, 'pointerup', at + 5);
+    expect(change).toHaveBeenLastCalledWith(edit, {
+      kind: 'range',
+      start: edge === 'end' ? 2 : 2.05,
+      end: edge === 'start' ? 4 : 4.05,
+    });
+  }
+);
+
+it.each(['playhead', 'neighbor'] as const)(
+  'retains a source %s target coinciding with its old edge',
+  async (target) => {
+    const change = vi.fn();
+    const edit = cut(2, 4);
+    const lane = renderLane({
+      edits: target === 'neighbor' ? [edit, { ...cut(1, 2), id: 'neighbor' }] : [edit],
+      onChangeEdit: change,
+      time: target === 'playhead' ? 2 : 9,
+      selection: { kind: 'point', time: 9 },
+      boundaries: [],
+    });
+    await lane.event(lane.block, 'pointerdown', 200);
+    await lane.event(lane.block, 'pointermove', 205);
+    expect(lane.block.style.left).toBe('20%');
+    expect(lane.block.style.width).toBe('20%');
+    await lane.event(lane.block, 'pointerup', 205);
+    expect(change).not.toHaveBeenCalled();
+  }
+);

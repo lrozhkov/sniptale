@@ -36,7 +36,7 @@ export function snapReviewEditDrag(args: {
   if (args.bypass || !args.edits || args.widthPx <= 0) return { ...free, guide: null };
   const threshold = (SNAP_THRESHOLD_PX * args.duration) / args.widthPx;
   const candidates = getSnapCandidates({
-    edits: args.edits,
+    edits: args.edits.filter((edit) => edit.id !== args.current.id),
     playhead: args.playhead,
     ...(args.boundaries ? { boundaries: args.boundaries } : {}),
   });
