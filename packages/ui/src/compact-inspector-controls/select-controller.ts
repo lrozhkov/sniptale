@@ -237,7 +237,17 @@ function bindSelectPositionListeners(
     return undefined;
   }
 
-  return bindFloatingInteractionPositionListeners(anchor, updateMenuPosition);
+  const unbind = bindFloatingInteractionPositionListeners(anchor, updateMenuPosition);
+  const bounds = anchor?.closest<HTMLElement>('[data-compact-select-menu-bounds]');
+  const observer =
+    bounds && typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(updateMenuPosition)
+      : undefined;
+  if (bounds) observer?.observe(bounds);
+  return () => {
+    observer?.disconnect();
+    unbind?.();
+  };
 }
 
 function removeSelectDismissListeners(

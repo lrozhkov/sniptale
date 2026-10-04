@@ -295,3 +295,51 @@ it('covers trigger guards, refs, outside close, and focus leave close', async ()
   });
   expect(document.body.querySelector('[role="listbox"]')).toBeNull();
 });
+
+it('tracks opted-in settings bounds resizing and releases the observer on dismissal', async () => {
+  let resize: ResizeObserverCallback | undefined;
+  const observe = vi.fn();
+  const disconnect = vi.fn();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        resize = callback;
+      }
+      observe = observe;
+      disconnect = disconnect;
+      unobserve = vi.fn();
+    }
+  );
+  try {
+    render(
+      <div data-compact-select-menu-bounds="">
+        <CompactSelect aria-label="Theme" value="dark" onChange={vi.fn()} options={THEME_OPTIONS} />
+      </div>
+    );
+    const bounds = getContainer().querySelector<HTMLElement>('[data-compact-select-menu-bounds]')!;
+    let width = 300;
+    bounds.getBoundingClientRect = () => ({ left: 20, width }) as DOMRect;
+    getTrigger().getBoundingClientRect = () =>
+      ({ left: 200, width: 100, top: 40, bottom: 72 }) as DOMRect;
+    await act(async () => {
+      getTrigger().click();
+      await nextFrame();
+    });
+    const menu = document.body.querySelector<HTMLElement>('[role="listbox"]')!;
+    expect(observe).toHaveBeenCalledWith(bounds);
+    expect(menu.style.width).toBe('300px');
+    expect(menu.style.left).toBe('20px');
+    expect(menu.style.top).toBe('77px');
+    await act(async () => {
+      width = 250;
+      resize?.([], {} as ResizeObserver);
+    });
+    expect(menu.style.width).toBe('250px');
+    expect(menu.style.top).toBe('77px');
+    await act(async () => getTrigger().click());
+    expect(disconnect).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

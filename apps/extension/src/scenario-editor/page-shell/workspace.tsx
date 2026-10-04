@@ -279,7 +279,9 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
   const { t } = props;
   const grouped =
     props.panels.rightScope === 'selection' &&
-    !props.inspectedBlockKind &&
+    (!props.inspectedBlockKind ||
+      props.inspectedBlockKind === 'image' ||
+      props.inspectedBlockKind === 'text') &&
     props.project.items.some((item) => item.id === props.selectedId && item.kind === 'step');
   return (
     <FloatingChromePanel

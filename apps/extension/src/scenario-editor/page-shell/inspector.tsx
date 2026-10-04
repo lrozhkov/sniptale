@@ -78,6 +78,7 @@ export function GuideInspectorGroup({
       <div
         id={bodyId}
         className="guide-inspector-group-body"
+        data-compact-select-menu-bounds=""
         hidden={collapsible && !categorized && !expanded}
       >
         {children}

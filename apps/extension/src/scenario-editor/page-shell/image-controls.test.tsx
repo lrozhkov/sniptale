@@ -50,7 +50,8 @@ async function render(
   url: string | null = 'blob:image',
   disabled = false,
   image = block,
-  framing = false
+  framing = false,
+  presentation: 'all' | 'sections' = 'all'
 ) {
   await act(async () =>
     root.render(
@@ -60,6 +61,7 @@ async function render(
         }
       >
         <GuideImageControls
+          presentation={presentation}
           onStartFraming={startFraming}
           stepId="step"
           onEdit={edit}
@@ -318,4 +320,56 @@ it('offers framing entry without exposing draft-only geometry outside the sessio
   await render('blob:image', true);
   await click('Frame and image');
   expect(startFraming).toHaveBeenCalledOnce();
+});
+
+it('keeps every image field and bottom action available across inspector presentations', async () => {
+  const labels = () =>
+    [...host.querySelectorAll<HTMLInputElement>('input[aria-label]')].map((input) =>
+      input.getAttribute('aria-label')
+    );
+  await render();
+  const allLabels = new Set(labels());
+  await render('blob:image', false, block, false, 'sections');
+  const nav = host.querySelector('nav')!;
+  const names = [...nav.querySelectorAll('button')].map((button) =>
+    button.getAttribute('aria-label')!
+  );
+  expect(names).toEqual(['Placement', 'Framing', 'Description', 'HTML images']);
+  const sectionLabels = new Set<string | null>();
+  for (const name of names) {
+    await click(name);
+    for (const label of labels()) sectionLabels.add(label);
+    expect(host.querySelector('[data-inspector-edit-image]')).not.toBeNull();
+  }
+  expect(sectionLabels).toEqual(allLabels);
+  await render('blob:image', false, block, false, 'all');
+  await render('blob:image', false, block, false, 'sections');
+  expect(host.querySelector('nav [aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
+    'HTML images'
+  );
+  expect(change).not.toHaveBeenCalled();
+  await click('Replace image');
+  expect(requestResource).toHaveBeenCalledWith({
+    kind: 'replace-image',
+    stepId: 'step',
+    blockId: block.id,
+  });
+});
+
+it('restricts active framing to its category without dropping the draft fields', async () => {
+  await render('blob:image', false, block, false, 'sections');
+  await click('Description');
+  await render(
+    'blob:image',
+    false,
+    { ...block, contentTransform: { scale: 2, x: 0, y: 0 } },
+    true,
+    'sections'
+  );
+  expect(
+    [...host.querySelectorAll('nav button')].map((button) => button.getAttribute('aria-label'))
+  ).toEqual(['Framing']);
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')?.value).toBe('200');
+  expect(host.querySelector('[data-inspector-edit-image]')).toBeNull();
+  expect(change).not.toHaveBeenCalled();
 });

@@ -29,6 +29,9 @@ export function getSelectedIndex<T extends string>(
 
 export function resolveCompactSelectMenuStyle(anchor: HTMLElement): CSSProperties {
   const rect = anchor.getBoundingClientRect();
+  // Opt-in settings containers own horizontal space; the control still owns vertical placement.
+  const bounds = anchor.closest<HTMLElement>('[data-compact-select-menu-bounds]');
+  const horizontal = bounds?.getBoundingClientRect() ?? rect;
   const gap = 5;
   const viewportPadding = 8;
   const viewportWidth = window.innerWidth || rect.right + viewportPadding;
@@ -37,11 +40,11 @@ export function resolveCompactSelectMenuStyle(anchor: HTMLElement): CSSPropertie
   const placeAbove = belowRoom < 104 && aboveRoom > belowRoom;
   const maxHeight = Math.max(96, Math.min(208, placeAbove ? aboveRoom - gap : belowRoom - gap));
   const width = Math.min(
-    Math.max(rect.width, 144),
+    Math.max(horizontal.width, bounds ? 0 : 144),
     Math.max(96, viewportWidth - viewportPadding * 2)
   );
   const left = Math.min(
-    Math.max(rect.left, viewportPadding),
+    Math.max(horizontal.left, viewportPadding),
     Math.max(viewportPadding, viewportWidth - viewportPadding - width)
   );
 

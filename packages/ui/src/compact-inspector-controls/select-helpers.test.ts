@@ -54,3 +54,20 @@ it('positions compact select menus below, above, and clamped to the viewport', (
   expect(aboveStyle.top).toBe(135);
   expect(aboveStyle.maxHeight).toBeGreaterThanOrEqual(96);
 });
+
+it('uses the nearest opted-in settings width without moving the menu below its section', () => {
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1000 });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
+  const outer = anchorRect({ left: 400, width: 400, bottom: 700 });
+  const content = anchorRect({ left: 460, width: 320, bottom: 650 });
+  const trigger = anchorRect({ left: 680, width: 100, top: 90, bottom: 122 });
+  outer.setAttribute('data-compact-select-menu-bounds', '');
+  content.setAttribute('data-compact-select-menu-bounds', '');
+  outer.append(content);
+  content.append(trigger);
+  expect(resolveCompactSelectMenuStyle(trigger)).toMatchObject({ left: 460, width: 320, top: 127 });
+  content.getBoundingClientRect = () => ({ left: 870, width: 110 }) as DOMRect;
+  expect(resolveCompactSelectMenuStyle(trigger)).toMatchObject({ left: 870, width: 110, top: 127 });
+  content.getBoundingClientRect = () => ({ left: 950, width: 320 }) as DOMRect;
+  expect(resolveCompactSelectMenuStyle(trigger)).toMatchObject({ left: 672, width: 320, top: 127 });
+});

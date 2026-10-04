@@ -1,7 +1,8 @@
 import { useGuideImageFraming } from './image-framing-session';
 import { GuideImageOverview } from './image-overview';
 import { GuideBlockPlacement } from './block-inspector';
-import type { KeyboardEvent, ReactNode } from 'react';
+import { Fragment, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { ScenarioInspectorActionButton, ScenarioInspectorBackButton } from './inspector-actions';
 import { useGuideResourceRequest } from './resource-drawer';
 import { GuideHtmlImageFields } from './html-image-fields';
@@ -9,6 +10,7 @@ import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { ProductRange, ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
+  Columns2,
   MousePointer2,
   Focus,
   Maximize2,
@@ -28,7 +30,11 @@ import {
   type GuideHtmlImageSettings,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
-import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
+import {
+  GuideInspectorGroup,
+  GuideInspectorNumber,
+  InspectorCategorizedContent,
+} from './inspector';
 import { changeGuideImageGeometry, constrainGuideImage } from './image-geometry';
 
 /** Framing fields belong to the selected image in the existing right inspector. */
@@ -48,6 +54,7 @@ export function GuideImageControls(props: Parameters<typeof GuideImageControlsVi
 function GuideImageControlsView({
   block,
   framing = false,
+  presentation = 'all',
   layout = 'stacked',
   htmlDefaults,
   disabled,
@@ -62,6 +69,7 @@ function GuideImageControlsView({
 }: {
   block: GuideImageBlock;
   framing?: boolean;
+  presentation?: 'all' | 'sections';
   layout?: import('@sniptale/runtime-contracts/scenario/types/guide').GuideStep['layout'];
   htmlDefaults?: GuideHtmlImageSettings | undefined;
   url: string | null | undefined;
@@ -83,6 +91,32 @@ function GuideImageControlsView({
     change: Parameters<typeof changeGuideImageGeometry>[1],
     group: string | null = null
   ) => onChange(constrain(changeGuideImageGeometry(block, change)), group);
+  const [activeSection, setActiveSection] = useState('placement');
+  const sections = guideImageSections(
+    { block, framing, layout, htmlDefaults, disabled, onChange, t },
+    <GuideImageGeometryFields
+      framing={framing}
+      onStartFraming={onStartFraming}
+      startDisabled={disabled || !url}
+      overview={
+        framing && (
+          <GuideImageOverview
+            block={block}
+            url={url}
+            dimensions={dimensions}
+            disabled={geometryDisabled}
+            onChange={(next) => onChange(constrain(next), null)}
+            t={t}
+          />
+        )
+      }
+      block={block}
+      geometryDisabled={geometryDisabled}
+      dimensions={dimensions}
+      geometry={geometry}
+      t={t}
+    />
+  );
   return (
     <div
       className="guide-image-inspector"
@@ -94,66 +128,121 @@ function GuideImageControlsView({
       />
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
-        {!framing && (
-          <GuideBlockPlacement
-            item={{ layout }}
-            block={block}
-            disabled={disabled}
-            onChange={onChange}
-            t={t}
+        {presentation === 'all' ? (
+          sections.map(({ id, content }) => <Fragment key={id}>{content}</Fragment>)
+        ) : (
+          <CategorizedInspector
+            dataUi="scenario-editor.inspector-categories"
+            ariaLabel={t('scenario.editor.guideEditImageFrame')}
+            initialSection={activeSection}
+            onSectionChange={setActiveSection}
+            sections={sections}
+            showSectionHeading
+            renderSection={(id) => (
+              <InspectorCategorizedContent>
+                {sections.find((section) => section.id === id)?.content}
+              </InspectorCategorizedContent>
+            )}
           />
         )}
-        <GuideImageGeometryFields
-          framing={framing}
-          onStartFraming={onStartFraming}
-          startDisabled={disabled || !url}
-          overview={
-            framing && (
-              <GuideImageOverview
-                block={block}
-                url={url}
-                dimensions={dimensions}
-                disabled={geometryDisabled}
-                onChange={(next) => onChange(constrain(next), null)}
-                t={t}
-              />
-            )
-          }
-          block={block}
-          geometryDisabled={geometryDisabled}
-          dimensions={dimensions}
-          geometry={geometry}
-          t={t}
-        />
         {!framing && (
-          <>
-            <GuideImageDescriptionFields
-              block={block}
-              disabled={disabled}
-              onChange={onChange}
-              t={t}
-            />
-            <ImageActionContext source={block.source} t={t} />
-            <ImageHtmlSettings
-              block={block}
-              htmlDefaults={htmlDefaults}
-              disabled={disabled}
-              onChange={onChange}
-              t={t}
-            />
-            <GuideImageActions
-              block={block}
-              stepId={stepId}
-              url={url}
-              disabled={disabled}
-              onEdit={onEdit}
-              t={t}
-            />
-          </>
+          <GuideImageActions
+            block={block}
+            stepId={stepId}
+            url={url}
+            disabled={disabled}
+            onEdit={onEdit}
+            t={t}
+          />
         )}
       </fieldset>
     </div>
   );
+}
+
+/** Both presentations consume the same ordered inventory of available image settings. */
+function guideImageSections(
+  {
+    block,
+    framing,
+    layout = 'stacked',
+    htmlDefaults,
+    disabled,
+    onChange,
+    t,
+  }: Pick<
+    Parameters<typeof GuideImageControlsView>[0],
+    'block' | 'framing' | 'layout' | 'htmlDefaults' | 'disabled' | 'onChange' | 't'
+  >,
+  geometryContent: ReactNode
+) {
+  return [
+    ...(!framing
+      ? [
+          {
+            id: 'placement',
+            label: t('scenario.editor.guidePlacementGroup'),
+            icon: Columns2,
+            content: (
+              <GuideBlockPlacement
+                item={{ layout }}
+                block={block}
+                disabled={disabled}
+                onChange={onChange}
+                t={t}
+              />
+            ),
+          },
+        ]
+      : []),
+    {
+      id: 'framing',
+      label: t('scenario.editor.guideFramingGroup'),
+      icon: ScanLine,
+      content: geometryContent,
+    },
+    ...(!framing
+      ? [
+          {
+            id: 'description',
+            label: t('scenario.editor.guideDescriptionGroup'),
+            icon: Text,
+            content: (
+              <GuideImageDescriptionFields
+                block={block}
+                disabled={disabled}
+                onChange={onChange}
+                t={t}
+              />
+            ),
+          },
+          ...(block.source.kind === 'video-frame' && block.source.action
+            ? [
+                {
+                  id: 'videoActionContext',
+                  label: t('scenario.editor.guideVideoActionContext'),
+                  icon: MousePointer2,
+                  content: <ImageActionContext source={block.source} t={t} />,
+                },
+              ]
+            : []),
+          {
+            id: 'htmlImages',
+            label: t('scenario.editor.htmlImages'),
+            icon: Maximize2,
+            content: (
+              <ImageHtmlSettings
+                block={block}
+                htmlDefaults={htmlDefaults}
+                disabled={disabled}
+                onChange={onChange}
+                t={t}
+              />
+            ),
+          },
+        ]
+      : []),
+  ];
 }
 
 /** Geometry settings work against either the active draft or the selected saved image. */

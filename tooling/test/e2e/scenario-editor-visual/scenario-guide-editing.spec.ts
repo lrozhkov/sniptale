@@ -36,7 +36,11 @@ for (const [theme, locale] of [
     await expect(block).toBeFocused();
     await block.press('Enter');
     await field.press('Escape');
-    await block.press('Escape');
+    await expect(page.locator('article#compare')).toBeFocused();
+    await expect(block).toHaveAttribute('data-selected', 'false');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('article#compare')).toBeFocused();
+    await field.click();
     await expect(block).toBeFocused();
     await expect(block).toHaveAttribute('data-selected', 'true');
     await expect(block).toHaveCSS('outline-style', 'none');
@@ -81,6 +85,12 @@ for (const [theme, locale] of [
     const image = page.locator('[data-block-id="before"]');
     await image.locator('img').click();
     const inspector = page.locator('.guide-image-inspector');
+    await page
+      .getByRole('button', {
+        name: locale === 'en' ? 'Show all settings' : 'Показать все настройки',
+        exact: true,
+      })
+      .click();
     const actions = inspector.locator('.guide-image-controls > button');
     await expect(actions).toHaveCount(2);
     expect(
@@ -190,5 +200,99 @@ for (const [theme, locale] of [
     await cancel.click();
     await expect(inspector.locator('.guide-image-overview-map')).toHaveCount(0);
     await expect(image.locator('figure')).toHaveAttribute('data-editing', 'false');
+  });
+}
+
+for (const [theme, locale] of [
+  ['light', 'en'],
+  ['dark', 'ru'],
+] as const) {
+  test(`inspector categories, menu bounds and height scrub agree in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1024, height: 640 });
+    await page.locator('[data-block-id="before"] img').click();
+    const inspector = page.locator('.guide-inspector-panel');
+    await page
+      .getByRole('button', { name: locale === 'en' ? 'Inspector' : 'Настройки', exact: true })
+      .click();
+    const categories = inspector.locator('nav');
+    await expect(categories.getByRole('button')).toHaveCount(4);
+    await categories
+      .getByRole('button', {
+        name: locale === 'en' ? 'HTML images' : 'Изображения в HTML',
+        exact: true,
+      })
+      .click();
+    const inherit = inspector.getByRole('switch').first();
+    if (await inherit.isChecked()) await inherit.click();
+    const select = inspector.locator('[aria-haspopup="listbox"]').first();
+    for (const mode of ['sections', 'all'] as const) {
+      await select.click();
+      const menu = page.getByRole('listbox');
+      const bounds = await select.evaluate((element) => {
+        const rect = element.closest('[data-compact-select-menu-bounds]')!.getBoundingClientRect();
+        return { x: rect.x, width: rect.width };
+      });
+      const box = (await menu.boundingBox())!;
+      expect(box.x).toBeCloseTo(bounds.x, 1);
+      expect(box.width).toBeCloseTo(bounds.width, 1);
+      const triggerBox = (await select.boundingBox())!;
+      expect(
+        Math.min(
+          Math.abs(box.y - triggerBox.y - triggerBox.height - 5),
+          Math.abs(box.y + box.height - triggerBox.y + 5)
+        )
+      ).toBeLessThan(2);
+      await page.keyboard.press('Escape');
+      await expect(select).toBeFocused();
+      if (mode === 'sections')
+        await page
+          .getByRole('button', {
+            name: locale === 'en' ? 'Show all settings' : 'Показать все настройки',
+            exact: true,
+          })
+          .click();
+    }
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.locator('[data-block-id="description"] textarea').click();
+    await page
+      .getByRole('button', {
+        name: locale === 'en' ? 'Show settings sections' : 'Показать разделы настроек',
+        exact: true,
+      })
+      .click();
+    await expect(categories.getByRole('button')).toHaveCount(2);
+    const label = locale === 'en' ? 'Minimum height' : 'Минимальная высота';
+    const height = inspector.getByRole('textbox', { name: label, exact: true });
+    const row = height.locator(
+      'xpath=ancestor::*[@data-ui="shared.ui.compact-inspector.numeric-row"]'
+    );
+    await row.hover();
+    const slider = inspector.getByRole('slider', {
+      name: `${label} range`,
+      exact: true,
+      includeHidden: true,
+    });
+    await expect(slider).toBeVisible();
+    await slider.focus();
+    await slider.press('ArrowRight');
+    await expect(height).toHaveValue('1');
+    await page.locator('.guide-history-controls button').first().click();
+    await expect(height).toHaveValue('0');
+    await height.fill('180');
+    await height.press('Enter');
+    await expect(slider).toHaveValue('180');
+    await page.screenshot({ path: `.tmp/backlog7/b10-inspector-${theme}.png` });
+    await inspector
+      .getByRole('button', {
+        name: locale === 'en' ? 'Automatic height' : 'По содержимому',
+        exact: true,
+      })
+      .click();
+    await expect(height).toHaveValue('0');
+    issues.assertClean();
   });
 }

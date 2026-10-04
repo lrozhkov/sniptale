@@ -465,6 +465,7 @@ function GuideContextualInspector({
     return <p className="guide-inspector-hint">{t('scenario.editor.guideSelectForSettings')}</p>;
   return framing.target?.block.kind === 'image' ? (
     <GuideImageControls
+      presentation={presentation}
       layout={framing.target.item.layout}
       stepId={framing.target.item.id}
       onEdit={() => {
@@ -492,6 +493,7 @@ function GuideContextualInspector({
     />
   ) : framing.target ? (
     <GuideBlockInspector
+      presentation={presentation}
       item={framing.target.item}
       block={framing.target.block}
       disabled={disabled}
@@ -771,7 +773,6 @@ function GuidePageFeedback({
   );
 }
 
-/** Empty and unavailable project recovery actions share the page state owner. */
 /** Adapts library, drop and upload gestures to the existing single import transaction. */
 function guideImageImportCommands(commit: ReturnType<typeof useGuidePageState>['commitChange']) {
   const resources = (input: Extract<Parameters<typeof commit>[0], { kind: 'import' }>['input']) =>

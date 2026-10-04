@@ -82,7 +82,7 @@ async function click(label: string) {
   if (!button) throw new Error(`Missing ${label}`);
   await act(async () => button.click());
 }
-it('keeps document entry separate and only shows presentation controls for the step', async () => {
+it('keeps document entry separate and shows presentation controls for the step and text selection', async () => {
   await act(async () => root.render(<Workspace />));
   expect(host.querySelector('.guide-inspector-scope')).toBeNull();
   await click('Select step');
@@ -95,7 +95,7 @@ it('keeps document entry separate and only shows presentation controls for the s
   ).toBeNull();
   await click('Select block');
   expect(panel.querySelector('h2')?.textContent).toBe('Text');
-  expect(panel.querySelector('[aria-label="Show settings sections"]')).toBeNull();
+  expect(panel.querySelector('[aria-label="Show settings sections"]')).not.toBeNull();
   await click('Document entry');
   expect(panel.querySelector('h2')?.textContent).toBe(t('scenario.editor.guideEntireDocument'));
   expect(panel.querySelector('[aria-label="Show all settings"]')).toBeNull();

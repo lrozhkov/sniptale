@@ -215,6 +215,7 @@ it('keeps one framing draft bound to its inspector and discards it on selection 
   );
   expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
+  await click('Description', inspector.querySelector('nav')!);
   await act(async () =>
     inspector
       .querySelector('.guide-image-description input')!
@@ -679,12 +680,21 @@ it('keeps a framing session out of autosave and commits all geometry once on Don
   );
   const inspector = container.querySelector('#guide-inspector-panel')!;
   expect(inspector.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  await click('Framing', inspector.querySelector('nav')!);
   await click('Frame and image', inspector);
   await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
   await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '300');
   await settleAutosave();
   expect(io.save).not.toHaveBeenCalled();
   expect(image.querySelector('img')?.style.scale).toBe('3');
+  await click('Show all settings', inspector);
+  expect(image.querySelector('img')?.style.scale).toBe('3');
+  await click('Show settings sections', inspector);
+  expect(inspector.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')?.value).toBe(
+    '300'
+  );
+  await settleAutosave();
+  expect(io.save).not.toHaveBeenCalled();
   await click('Done', image);
   await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(1);
