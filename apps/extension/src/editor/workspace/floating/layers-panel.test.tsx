@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   layers: vi.fn(() => <div data-ui="mock.layers" />),
   layersProps: vi.fn(() => ({ layers: [] })),
   onExpand: vi.fn(),
+  onCollapse: vi.fn(),
 }));
 
 vi.mock('../../application/controller-context', () => ({
@@ -68,7 +69,7 @@ function renderPanel(
         hasImage
         heightRatio={options.heightRatio ?? null}
         preferenceError={options.preferenceError ?? null}
-        onCollapse={vi.fn()}
+        onCollapse={mocks.onCollapse}
         onExpand={mocks.onExpand}
         onHeightRatioChange={onHeightRatioChangeMock}
       />
@@ -290,3 +291,25 @@ it('replaces the list with inline effects and returns through the layers navigat
   );
   expect(mocks.setInspector).toHaveBeenCalledWith('tool');
 });
+
+it.each(['canvas-size', 'frame', 'tool'])(
+  'cancels crop only when collapsing the canvas-size panel, from %s',
+  (inspector) => {
+    renderPanel({ inspector });
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.collapse-button"]')
+        ?.click();
+    });
+    expect(mocks.onCollapse).toHaveBeenCalledOnce();
+    expect(mocks.editorController.cancelCropMode).toHaveBeenCalledTimes(
+      inspector === 'canvas-size' ? 1 : 0
+    );
+    if (inspector === 'canvas-size') {
+      expect(mocks.setActiveTool).toHaveBeenCalledWith('select');
+      expect(mocks.setInspector).toHaveBeenCalledWith('tool');
+    } else {
+      expect(mocks.setActiveTool).not.toHaveBeenCalled();
+    }
+  }
+);

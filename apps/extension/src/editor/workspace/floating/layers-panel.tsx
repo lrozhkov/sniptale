@@ -247,6 +247,7 @@ export function EditorFloatingLayersPanel({
       hasImage={hasImage}
       height={height}
       onCollapse={() => {
+        if (documentController.inspector === 'canvas-size') toolbarActions.activateTool('select');
         if (documentController.inspector === 'layer-effects')
           documentController.setInspector('tool');
         onCollapse();
