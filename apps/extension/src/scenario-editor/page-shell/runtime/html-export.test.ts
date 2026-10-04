@@ -2,7 +2,6 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_HTML_IMAGES } from '../html-image-settings';
 import {
   createGuideImageBlock,
-  createGuideStep,
   createGuideProject,
 } from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
@@ -29,7 +28,7 @@ vi.mock('../html-document', () => ({ buildGuideHtml: io.render }));
 vi.mock('../../../composition/persistence/scenario/export-artifacts', () => ({
   createScenarioHtmlCapture: io.capture,
 }));
-import { exportGuideHtml, measureGuideHtml, prepareGuideHtml } from './html-export';
+import { exportGuideHtml, prepareGuideHtml } from './html-export';
 
 function setup() {
   const chunks: Uint8Array[] = [];
@@ -206,21 +205,7 @@ it('does not serialize MIME parameters into an HTML attribute', async () => {
   expect(html.startsWith('<image href="data:image/png;base64,')).toBe(true);
 });
 
-it('measures the exact streamed file size and rejects unresolved raster markers', async () => {
-  const s = setup();
-  const block = createGuideImageBlock({
-    id: 'image',
-    assetId: 'asset',
-    width: 100,
-    height: 50,
-    source: { kind: 'import', filename: 'image.png' },
-  });
-  const step = createGuideStep('Step');
-  step.blocks = [block];
-  s.args.project.items = [step];
-  const measured = await measureGuideHtml(s.args);
-  await exportGuideHtml(s.args);
-  expect(measured.size).toBe(s.chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+it('rejects unresolved raster markers and aborts the sink', async () => {
   const next = setup();
   io.render.mockReturnValueOnce({
     html: '<image href="data:image/png;base64,SNIPTALE_ASSET_9">',

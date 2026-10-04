@@ -9,12 +9,11 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
-    const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
-    url.searchParams.set('projectId', `numbering-${crypto.randomUUID()}`);
+    const url = new URL(page.url());
+    url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
     url.searchParams.set('theme', theme);
     url.searchParams.set('locale', 'en');
     url.searchParams.set('stepId', 'compare');
-    await page.goto(url.toString());
     await page.getByRole('button', { name: 'Show all settings', exact: true }).click();
     const first = page.locator('article#compare');
     const second = page.locator('article#text-only');
@@ -220,10 +219,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       });
     });
     await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'accentExportHtml');
       if (typeof value !== 'string') throw new Error('Missing exported HTML');

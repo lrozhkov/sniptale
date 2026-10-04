@@ -3262,24 +3262,6 @@
       }
     },
     {
-      "id": "d820944f93a38345249f4911fbcc7d9d51ab8ea32eb6b2bf09ca565d9cdd42b8",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/scenario-editor/page-shell/html-workbench.tsx <-> apps/extension/src/scenario-editor/page-shell/tour/export.tsx",
-      "reason": "Guide HTML save invokes job.run(true) after measurement; tour save invokes job.save after ready. Both use ProductActionButton and cancellation already; common icon/label markup does not unify export jobs or their resource sessions.",
-      "removalCondition": "Remove when this exact pair disappears or its described host/transaction/schema distinction is replaced by one evidenced semantic owner.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/html-workbench.tsx",
-        "start": 156,
-        "end": 177
-      },
-      "secondFile": {
-        "path": "apps/extension/src/scenario-editor/page-shell/tour/export.tsx",
-        "start": 139,
-        "end": 161
-      }
-    },
-    {
       "id": "d89ed9a8151a66bd45841521da4084ec221befa25d45687a88dfcef2892fd008",
       "classification": "tool-noise",
       "owner": "apps/extension/src/settings/sections/styles/annotations",

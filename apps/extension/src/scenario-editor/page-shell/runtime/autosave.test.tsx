@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { act } from 'react';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import { reduceGuideHistory } from './history';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createGuideProject } from '../../../features/scenario/project/public';
+import { createGuideProject, createGuideStep } from '../../../features/scenario/project/public';
 const save = vi.hoisted(() => vi.fn());
 vi.mock('../../../composition/persistence/scenario/store/public', () => ({
   saveScenarioProjectRecord: save,
@@ -198,4 +200,68 @@ it('does not reuse a source acknowledgement after another mutation replaces the 
   await autosave.flushLatest();
   expect(save).toHaveBeenCalledTimes(2);
   expect(save).toHaveBeenLastCalledWith(input.project, { baseUpdatedAt: 3 });
+});
+
+it('settles canonical nested key reordering after a concurrent edit and history timestamp rebase', async () => {
+  const project = createGuideProject('Guide', 'guide', 1);
+  project.items = [{ ...createGuideStep('Step', 'step'), numbering: { restartAt: 2 } }];
+  input = { ...input, project };
+  let release!: () => void;
+  save.mockImplementationOnce(
+    (source) =>
+      new Promise((resolve) => {
+        release = () => {
+          const parsed = parseGuideProject({ ...source, updatedAt: 2 });
+          if (parsed.status !== 'ok') throw new Error('Invalid fixture');
+          resolve(parsed.project);
+        };
+      })
+  );
+  save.mockImplementationOnce(async (source) => {
+    const parsed = parseGuideProject({ ...source, updatedAt: 3 });
+    if (parsed.status !== 'ok') throw new Error('Invalid fixture');
+    return parsed.project;
+  });
+  save.mockRejectedValue(new Error('Unexpected duplicate canonical save'));
+  input.onPublish = (committed, source) => {
+    // A queued history publication rebases the current draft rather than adopting source identity.
+    const current = { ...input.project! };
+    const history = reduceGuideHistory(
+      { present: current, past: [], future: [], group: null },
+      { kind: 'publish', project: committed, source }
+    );
+    input = { ...input, project: history.present };
+    act(() => root.render(<Harness />));
+  };
+  act(() => root.render(<Harness />));
+  const flushed = autosave.flushLatest();
+  input = {
+    ...input,
+    project: { ...project, items: [{ ...project.items[0]!, numbering: { restartAt: 3 } }] },
+  };
+  act(() => root.render(<Harness />));
+  await act(async () => release());
+  await expect(flushed).resolves.toMatchObject({
+    updatedAt: 3,
+    items: [{ numbering: { restartAt: 3 } }],
+  });
+  expect(save).toHaveBeenCalledTimes(2);
+  expect(input.onStatus).toHaveBeenLastCalledWith('saved');
+  expect(input.busy.current).toBe(false);
+});
+
+it('preserves array ordering as a real edit when flushing', async () => {
+  const project = createGuideProject('Guide', 'guide', 1);
+  project.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];
+  input = {
+    ...input,
+    saved: { current: project },
+    project: { ...project, items: [...project.items].reverse() },
+  };
+  save.mockImplementation(async (source) => ({ ...source, updatedAt: 2 }));
+  act(() => root.render(<Harness />));
+  await expect(autosave.flushLatest()).resolves.toMatchObject({
+    items: [{ id: 'second' }, { id: 'first' }],
+  });
+  expect(save).toHaveBeenCalledOnce();
 });

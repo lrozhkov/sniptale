@@ -1,25 +1,26 @@
-import { expect } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+import { expect, type Page, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { createPageIssueCollector, openVisualHarness } from './scenario-editor-visual.helpers';
 
-test('guide HTML reading settings survive return and repeated export', async ({
+test('guide HTML downloads directly and preserves reading settings for repeated export', async ({
   page,
   hostOrigin,
 }) => {
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await page.getByRole('button', { name: 'Export', exact: true }).click();
-  await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
   await page.getByRole('button', { name: 'Step by step', exact: true }).click();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
-  await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const html = await downloadGuideHtml(page);
+    expect(html).toContain('data-reading-mode="steps"');
+    await expect(page.locator('main.guide-reader')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await expect(page.locator('.guide-html-workbench')).toHaveCount(0);
+  }
 });
 
 test('guide export opens the shared reader workspace on the first click', async ({
@@ -65,41 +66,31 @@ test('guide export opens the shared reader workspace on the first click', async 
   issues.assertClean();
 });
 
-test('guide HTML export keeps image selection inside the inspector at minimum width', async ({
+test('guide direct HTML export stays in the reader at minimum width', async ({
   page,
   hostOrigin,
 }, testInfo) => {
   const issues = createPageIssueCollector(page);
   await openVisualHarness(page, hostOrigin, 'dark', 'ru', { width: 1280, height: 560 });
   await page.getByRole('button', { name: 'Экспорт', exact: true }).click();
-  await page.getByRole('button', { name: 'Сохранить автономный HTML', exact: true }).click();
-  const workspace = page.locator('main.guide-export-workspace.guide-html-workbench');
-  await expect(workspace).toBeVisible();
-  await expect(workspace.locator('.guide-page-header')).toHaveCount(0);
+  const workspace = page.locator('main.guide-reader');
   const stage = workspace.locator('.guide-export-stage');
   const inspector = workspace.locator('.guide-export-inspector');
-  await expect(inspector.locator('.guide-html-thumbnail')).toHaveCount(2);
-  await expect(stage.locator('.guide-html-preview-image img')).toBeVisible();
-  const stageBox = await stage.boundingBox();
-  const inspectorBox = await inspector.boundingBox();
-  expect(stageBox!.width).toBeGreaterThan(600);
-  expect(inspectorBox!.width).toBeGreaterThan(200);
-  await testInfo.attach('guide-workspace-idle-ru-dark-minimum', {
-    body: await page.screenshot(),
-    contentType: 'image/png',
-  });
-  await page.getByRole('button', { name: 'Рассчитать размер', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Сохранить HTML', exact: true })).toBeEnabled();
-  await expect(inspector.locator('.guide-export-heading output')).not.toBeEmpty();
-  await testInfo.attach('guide-workspace-measured-ru-dark-minimum', {
+  const html = await downloadGuideHtml(page, 'ru');
+  expect(html).toContain('data-guide-viewer');
+  await expect(workspace).toBeVisible();
+  await expect(inspector.locator('.guide-html-thumbnail')).toHaveCount(0);
+  await expect(stage.locator('.guide-read-document article')).toHaveCount(2);
+  expect((await stage.boundingBox())!.width).toBeGreaterThan(600);
+  expect((await inspector.boundingBox())!.width).toBeGreaterThan(200);
+  await expect(inspector.locator('.guide-export-actions')).toBeInViewport();
+  await testInfo.attach('guide-direct-html-ru-dark-minimum', {
     body: await page.screenshot(),
     contentType: 'image/png',
   });
   await page.keyboard.press('Escape');
   await expect(workspace).toHaveCount(0);
-  await expect(
-    page.getByRole('button', { name: 'Сохранить автономный HTML', exact: true })
-  ).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Экспорт', exact: true })).toBeFocused();
   issues.assertClean();
 });
 
@@ -269,12 +260,7 @@ for (const locale of ['ru', 'en'] as const) {
       await expect(
         inspector.locator('[data-ui="shared.ui.compact-select"] > button').first()
       ).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      await inspector
-        .getByRole('button', {
-          name: locale === 'ru' ? 'Сохранить автономный HTML' : 'Save standalone HTML',
-          exact: true,
-        })
-        .click();
+      await downloadGuideHtml(page, locale);
       const heading = inspector.locator('.guide-export-heading');
       const top = (await heading.boundingBox())!.y;
       const body = inspector.locator('.guide-export-inspector-body');
@@ -290,7 +276,6 @@ for (const locale of ['ru', 'en'] as const) {
         body: await inspector.screenshot(),
         contentType: 'image/png',
       });
-      await page.keyboard.press('Escape');
       await inspector
         .getByRole('button', {
           name: locale === 'ru' ? 'Печать / PDF' : 'Print / PDF',
@@ -347,28 +332,16 @@ for (const locale of ['en', 'ru'] as const) {
     await expect(formats).toBeInViewport();
     const print = formats.getByRole('button', { name: words.print, exact: true });
     expect((await print.boundingBox())!.height).toBeGreaterThanOrEqual(40);
-    await page.getByRole('button', { name: words.html, exact: true }).click();
-    await expect(page.getByRole('heading', { name: words.title, exact: true })).toBeVisible();
+    const html = await downloadGuideHtml(page, locale);
+    expect(html).toContain('data-guide-viewer');
     const inspector = page.locator('.guide-export-inspector');
-    await expect(inspector.locator('.guide-inspector-group').nth(1)).toHaveAttribute(
-      'aria-label',
-      words.settings
-    );
-    const preview = page
-      .locator('.guide-export-stage')
-      .getByRole('group', { name: words.preview, exact: true })
-      .first();
-    await expect(preview).toBeInViewport();
-    await preview.getByRole('button', { name: '100%', exact: true }).click();
-    await expect(page.locator('.guide-html-preview-image')).toHaveAttribute('data-zoom', 'full');
-    const back = page.getByRole('button', { name: words.back, exact: true });
-    expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(40);
+    await expect(page.locator('main.guide-reader')).toBeVisible();
+    await expect(inspector.locator('.guide-export-formats')).toBeInViewport();
+    await expect(inspector.locator('.guide-html-fields')).toHaveCount(0);
     await info.attach(`html-composition-${locale}`, {
-      body: await page.screenshot({ path: `.tmp/backlog6-w22-html-${locale}.png` }),
+      body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await back.click();
-    await expect(page.getByRole('button', { name: words.html, exact: true })).toBeFocused();
     await print.click();
     const paper = page.locator('.guide-print');
     await paper.getByRole('button', { name: words.landscape, exact: true }).click();
@@ -389,3 +362,180 @@ for (const locale of ['en', 'ru'] as const) {
     );
   });
 }
+
+async function downloadGuideHtml(page: Page, locale: 'en' | 'ru' = 'en') {
+  await page.evaluate(() => {
+    const chunks: Uint8Array[] = [];
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: async () => ({
+        createWritable: async () =>
+          new WritableStream<Uint8Array>({
+            write: (chunk) => {
+              chunks.push(chunk);
+            },
+          }),
+      }),
+    });
+    Object.defineProperty(window, 'workspaceExportHtml', {
+      configurable: true,
+      get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+    });
+  });
+  await page
+    .getByRole('button', {
+      name: locale === 'ru' ? 'Сохранить автономный HTML' : 'Save standalone HTML',
+      exact: true,
+    })
+    .click();
+  await expect(page.locator('.guide-html-export [role="status"]')).toHaveText(
+    locale === 'ru' ? 'HTML сохранён' : 'HTML saved'
+  );
+  return page.evaluate(() => {
+    const html: unknown = Reflect.get(window, 'workspaceExportHtml');
+    if (typeof html !== 'string' || !html.includes('<!doctype html>'))
+      throw new Error('Missing downloaded HTML');
+    return html;
+  });
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+]) {
+  test(`top flow titles ellipsize without losing navigation at ${viewport.width}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const theme = viewport.width === 1280 ? 'light' : 'dark';
+    await openVisualHarness(page, hostOrigin, theme, 'en', viewport);
+    const sectionTitle = 'UnbrokenNavigationTitle'.repeat(5);
+    const titles = [
+      'A long Latin step title that must remain complete in the document and downloaded file',
+      'Длинный заголовок шага на русском языке сохраняется целиком при просмотре и экспорте',
+    ];
+    await page.getByRole('textbox', { name: 'Section title', exact: true }).fill(sectionTitle);
+    const fields = page.getByRole('textbox', { name: 'Step title', exact: true });
+    for (let index = 0; index < titles.length; index++)
+      await fields.nth(index).fill(titles[index]!);
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
+    const layout = page.locator('.guide-reader-body');
+    await expect(layout).toHaveAttribute('data-reading-mode', 'flow');
+    await expect(layout).toHaveAttribute('data-navigation', 'top');
+    await inspectNavigationTitles(layout.locator('.guide-reading-nav'), page);
+    for (const title of titles)
+      await expect(layout.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Step navigation', exact: true }).click();
+    await page.getByRole('option', { name: 'On the left', exact: true }).click();
+    await expect(layout.locator('.guide-reading-title').first()).toHaveCSS('white-space', 'normal');
+    await page.getByRole('button', { name: 'Step navigation', exact: true }).click();
+    await page.getByRole('option', { name: 'At the top', exact: true }).click();
+    await page.getByRole('button', { name: 'Step by step', exact: true }).click();
+    await expect(layout.locator('.guide-reading-title').first()).toBeHidden();
+    await page.getByRole('button', { name: 'Document', exact: true }).click();
+    const before = await layout
+      .locator('.guide-document-scroll')
+      .evaluate((node) => node.scrollTop);
+    const html = await downloadGuideHtml(page);
+    expect(await layout.locator('.guide-document-scroll').evaluate((node) => node.scrollTop)).toBe(
+      before
+    );
+    await info.attach(`reader-title-ellipsis-${viewport.width}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    const filename = info.outputPath('long-titles.html');
+    await writeFile(filename, html);
+    await page.goto(pathToFileURL(filename).href);
+    await page.evaluate(() => document.fonts.ready);
+    await inspectNavigationTitles(page.locator('.guide-reading-nav'), page);
+    await expect(page.getByRole('heading', { name: sectionTitle, exact: true })).toHaveText(
+      sectionTitle
+    );
+    for (const title of titles)
+      await expect(page.getByRole('heading', { name: title, exact: true })).toHaveText(title);
+    await info.attach(`standalone-title-ellipsis-${viewport.width}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+}
+
+async function inspectNavigationTitles(nav: Locator, page: Page) {
+  const links = nav.locator('a');
+  await expect(links).toHaveCount(2);
+  for (const link of await links.all()) {
+    const title = link.locator('.guide-reading-title');
+    const full = await title.textContent();
+    await expect(link).toHaveAttribute('title', full!);
+    expect(await link.getAttribute('aria-label')).toContain(full);
+    const geometry = await link.evaluate((node) => {
+      const label = node.querySelector<HTMLElement>('.guide-reading-title')!;
+      const badge = node.querySelector<HTMLElement>('.guide-reading-badge')!;
+      const box = node.getBoundingClientRect();
+      const mark = badge.getBoundingClientRect();
+      return {
+        clipped: label.scrollWidth > label.clientWidth,
+        width: label.getBoundingClientRect().width,
+        cap: Number.parseFloat(getComputedStyle(label).maxWidth),
+        badgeVisible: mark.width >= 16 && mark.left >= box.left && mark.right <= box.right,
+        fits: box.width <= node.parentElement!.clientWidth,
+      };
+    });
+    expect(geometry.clipped).toBe(true);
+    expect(geometry.width).toBeLessThanOrEqual(geometry.cap + 1);
+    expect(geometry.badgeVisible).toBe(true);
+    expect(geometry.fits).toBe(true);
+    await expect(title).toHaveCSS('text-overflow', 'ellipsis');
+    await link.focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(link).toBeFocused();
+    await expect.poll(() => link.evaluate((node) => node.matches(':focus-visible'))).toBe(true);
+    await expect(link).toHaveCSS('outline-style', 'solid');
+    await page.keyboard.press('Enter');
+    const target = await link.getAttribute('data-guide-target');
+    await expect(page.locator(`[id="${target}"]`)).toBeVisible();
+  }
+}
+
+test('direct HTML cancellation keeps the reader available for retry', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Step by step', exact: true }).click();
+  await page.evaluate(() => {
+    Object.defineProperty(window, 'showSaveFilePicker', {
+      configurable: true,
+      value: () =>
+        new Promise((_, reject) => {
+          Reflect.set(window, 'cancelWorkspacePicker', () =>
+            reject(new DOMException('Cancelled', 'AbortError'))
+          );
+        }),
+    });
+  });
+  const html = page.getByRole('button', { name: 'Save standalone HTML', exact: true });
+  await html.click();
+  await expect(html).toBeDisabled();
+  await expect(
+    page.getByRole('button', { name: 'Save Markdown with images (ZIP)', exact: true })
+  ).toBeDisabled();
+  await expect(page.locator('main.guide-reader')).toBeVisible();
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await page.evaluate(() => {
+    const cancel: unknown = Reflect.get(window, 'cancelWorkspacePicker');
+    if (typeof cancel !== 'function') throw new Error('Picker did not open');
+    cancel();
+  });
+  await expect(html).toBeEnabled();
+  await expect(page.locator('.guide-html-export [role="status"]')).toHaveCount(0);
+  const artifact = await downloadGuideHtml(page);
+  expect(artifact).toContain('data-reading-mode="steps"');
+  await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+});

@@ -81,7 +81,7 @@ export function useGuideAutosave(input: AutosaveInput) {
       if (!source || !base || source.id !== projectId || args.conflict) return null;
       if (
         (source === acknowledged.current?.source && base === acknowledged.current.committed) ||
-        JSON.stringify({ ...source, updatedAt: 0 }) === JSON.stringify({ ...base, updatedAt: 0 })
+        guideDraftContent(source) === guideDraftContent(base)
       ) {
         args.onStatus('saved');
         return base;
@@ -130,4 +130,15 @@ export function useGuideAutosave(input: AutosaveInput) {
       if (latest.current.enabled !== false && latest.current.dirty) void flushLatest();
     },
   };
+}
+
+/** Persistence reorders object keys; only the aggregate timestamp is outside draft content. */
+function guideDraftContent(project: GuideProject): string {
+  return JSON.stringify({ ...project, updatedAt: 0 }, (_key, value: unknown) =>
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+        )
+      : value
+  );
 }

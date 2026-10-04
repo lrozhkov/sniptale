@@ -1,4 +1,3 @@
-import { GuideHtmlWorkbench } from './html-workbench';
 import { GuideHtmlExport } from './html-export';
 import { GuidePrint, useGuidePrintMode } from './print';
 import { GuideExportWorkspace } from './export-workspace';
@@ -18,7 +17,6 @@ export function GuideReader({
   images,
   initialId,
   onClose,
-  onChange,
   feedback,
   t,
 }: {
@@ -26,19 +24,17 @@ export function GuideReader({
   images: Record<string, string | null>;
   initialId: string | null;
   onClose: () => void;
-  onChange: (project: GuideProject) => void;
   feedback?: ReactNode;
   t: Translate;
 }) {
   const print = useGuidePrintMode();
-  const html = useGuideReaderMode(() => {});
   const { options, setOptions, pages, panel, index, current, select, move } = useReaderNavigation(
     project,
     initialId
   );
   const { mode } = options;
   useEffect(() => {
-    if (mode !== 'steps' || html.active || print.active) return;
+    if (mode !== 'steps' || print.active) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -47,22 +43,7 @@ export function GuideReader({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [mode, move, html.active, print.active]);
-  if (html.active)
-    return (
-      <GuideHtmlWorkbench
-        initialReading={options}
-        project={project}
-        images={images}
-        onChange={onChange}
-        feedback={feedback}
-        onClose={(reading) => {
-          setOptions(reading);
-          html.close();
-        }}
-        t={t}
-      />
-    );
+  }, [mode, move, print.active]);
   if (print.active)
     return (
       <GuidePrint
@@ -145,7 +126,7 @@ export function GuideReader({
       actions={
         <fieldset className="guide-export-formats">
           <legend>{t('scenario.editor.guideExportFormat')}</legend>
-          <GuideHtmlExport project={project} t={t} onOpenHtml={html.open} htmlRef={html.trigger} />
+          <GuideHtmlExport project={project} t={t} reading={options} />
           <ContentToolbarButton
             className="guide-labeled-action"
             ref={print.trigger}

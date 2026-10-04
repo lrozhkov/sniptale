@@ -5,7 +5,7 @@ import { test } from '../support/extension-fixture';
 import { openVisualHarness } from './scenario-editor-visual.helpers';
 import { insertGuideBlock } from './scenario-editor-visual.state-steps';
 
-test('exports only framed pixels, applies bulk overrides and restores inheritance locally', async ({
+test('exports framed pixels with guide defaults, independent overrides and local inheritance reset', async ({
   page,
   hostOrigin,
 }, testInfo) => {
@@ -31,70 +31,78 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
   await frame.press('ArrowRight');
   await frame.press('ArrowRight');
   await figure.getByRole('button', { name: 'Done', exact: true }).click();
-  await page.getByRole('button', { name: 'Export', exact: true }).click();
-  await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-  await page.getByRole('button', { name: 'Select all images', exact: true }).click();
-  await page.getByRole('button', { name: 'Saved content', exact: true }).click();
+  await page
+    .locator('.guide-page-header')
+    .getByRole('button', { name: 'Appearance', exact: true })
+    .click();
+  const defaults = page.locator('.guide-default-appearance .guide-html-fields');
+  await defaults.getByRole('button', { name: 'Saved content', exact: true }).click();
   await page.getByRole('option', { name: 'Visible frame', exact: true }).click();
+  await expect(defaults.getByRole('switch', { name: 'Click to view', exact: true })).toBeDisabled();
   await expect(
-    page.locator('.guide-html-thumbnail small').filter({ hasText: 'Override' })
-  ).toHaveCount(2);
-  await expect(page.getByRole('switch', { name: 'Click to view', exact: true })).toBeDisabled();
-  await expect(page.getByRole('switch', { name: 'Click to view', exact: true })).not.toBeChecked();
-  await page.getByRole('button', { name: 'Select image 1', exact: true }).click();
-  await page.getByRole('button', { name: 'Saved content', exact: true }).click();
+    defaults.getByRole('switch', { name: 'Click to view', exact: true })
+  ).not.toBeChecked();
+  await page.locator('[data-block-id="after"] img').click();
+  const inspector = page.locator('.guide-image-inspector');
+  await inspector.locator('nav').getByRole('button', { name: 'HTML images', exact: true }).click();
+  const inherit = inspector.getByRole('switch', { name: 'Guide defaults', exact: true });
+  await inherit.uncheck();
+  await inspector.getByRole('button', { name: 'Saved content', exact: true }).click();
   await page.getByRole('option', { name: 'Full image', exact: true }).click();
-  await expect(page.getByRole('switch', { name: 'Click to view', exact: true })).toBeChecked();
+  await expect(inspector.getByRole('switch', { name: 'Click to view', exact: true })).toBeChecked();
   await testInfo.attach('html-overrides', {
     body: await page.screenshot(),
     contentType: 'image/png',
   });
   await installSink(page);
-  await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-  await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-  await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+  await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
   const html = await page.evaluate(() => {
     const value: unknown = Reflect.get(window, 'savedGuideHtml');
     if (typeof value !== 'string') throw new Error('No HTML');
     return value;
   });
-  await page.getByRole('button', { name: 'Restore guide defaults', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to editing', exact: true }).click();
+  await page.locator('[data-block-id="after"] img').click();
+  await inspector.locator('nav').getByRole('button', { name: 'HTML images', exact: true }).click();
+  await inherit.check();
+  await expect(inspector.getByRole('button', { name: 'Saved content', exact: true })).toContainText(
+    'Visible frame'
+  );
   await expect(
-    page.locator('.guide-html-thumbnail small').filter({ hasText: 'Override' })
-  ).toHaveCount(1);
+    inspector.getByRole('switch', { name: 'Click to view', exact: true })
+  ).toBeDisabled();
   const file = testInfo.outputPath('cropped.html');
   await writeFile(file, html);
   await page.context().setOffline(true);
   await page.goto(pathToFileURL(file).href);
   await expect(page.getByRole('button', { name: 'Open image', exact: true })).toHaveCount(1);
   expect(await page.locator('defs image').count()).toBe(2);
-  const samples = await page
-    .locator('defs image')
-    .first()
-    .evaluate(async (node) => {
-      const image = new Image();
-      image.src = node.getAttribute('href')!;
-      await image.decode();
-      const bitmap = await createImageBitmap(image);
-      try {
-        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(bitmap, 0, 0);
-        const alpha = (x: number, y: number) => ctx.getImageData(x, y, 1, 1).data[3];
-        return {
-          width: bitmap.width,
-          height: bitmap.height,
-          left: alpha(40, 100),
-          middle: alpha(100, 100),
-          right: alpha(170, 100),
-          top: alpha(100, 40),
-          shifted: alpha(155, 100),
-        };
-      } finally {
-        bitmap.close();
-      }
-    });
+  const samples = await page.locator('[data-block-id="before"] use').evaluate(async (node) => {
+    const source = document.querySelector(node.getAttribute('href')!)!;
+    const image = new Image();
+    image.src = source.getAttribute('href')!;
+    await image.decode();
+    const bitmap = await createImageBitmap(image);
+    try {
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(bitmap, 0, 0);
+      const alpha = (x: number, y: number) => ctx.getImageData(x, y, 1, 1).data[3];
+      return {
+        width: bitmap.width,
+        height: bitmap.height,
+        left: alpha(40, 100),
+        middle: alpha(100, 100),
+        right: alpha(170, 100),
+        top: alpha(100, 40),
+        shifted: alpha(155, 100),
+      };
+    } finally {
+      bitmap.close();
+    }
+  });
   expect(samples).toEqual({
     width: 200,
     height: 200,
@@ -104,6 +112,11 @@ test('exports only framed pixels, applies bulk overrides and restores inheritanc
     top: 0,
     shifted: 255,
   });
+  await page.locator('[data-block-id="after"] .guide-read-image').hover();
+  await expect(page.getByRole('button', { name: 'Open image', exact: true })).toHaveCSS(
+    'opacity',
+    '1'
+  );
   await page.getByRole('button', { name: 'Open image', exact: true }).click();
   await expect(page.locator('dialog img')).toHaveJSProperty('naturalWidth', 960);
   await page.keyboard.press('Escape');
@@ -144,23 +157,29 @@ for (const theme of ['light', 'dark'] as const) {
     hostOrigin,
   }, testInfo) => {
     await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
-    await page.getByRole('button', { name: 'Экспорт', exact: true }).click();
-    await page.locator('.guide-html-export button').first().click();
-    await page.getByRole('switch', { name: 'Оптимизировать размер', exact: true }).click();
-    await page.getByRole('button', { name: 'Качество WebP', exact: true }).click();
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: 'Оформление', exact: true })
+      .click();
+    const fields = page.locator('.guide-default-appearance .guide-html-fields');
+    await fields.getByRole('switch', { name: 'Оптимизировать размер', exact: true }).check();
+    await fields.getByRole('button', { name: 'Качество WebP', exact: true }).click();
     await page.keyboard.press('Escape');
-    await expect(page.locator('.guide-html-workbench')).toBeVisible();
-    const bounds = await page.locator('.guide-html-workbench').boundingBox();
-    expect(bounds?.height).toBe(720);
+    await expect(
+      fields.getByRole('button', { name: 'Качество WebP', exact: true })
+    ).toBeInViewport();
+    await installSink(page);
+    await page.getByRole('button', { name: 'Экспорт', exact: true }).click();
+    const html = page.getByRole('button', { name: 'Сохранить автономный HTML', exact: true });
+    await expect(html).toBeInViewport();
+    await html.click();
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML сохранён');
+    await expect(page.locator('.guide-reader')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
-    await page.getByRole('button', { name: 'Рассчитать размер', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Сохранить HTML', exact: true })).toBeEnabled();
     await testInfo.attach(`html-ru-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.getByRole('button', { name: 'Вернуться к экспорту', exact: true }).click();
-    await expect(page.locator('.guide-html-export button').first()).toBeFocused();
   });
 }
 
@@ -211,12 +230,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.guide-print figcaption').first()).toHaveCSS('text-align', 'end');
     await page.emulateMedia({ media: 'screen' });
     await page.getByRole('button', { name: 'Back to export', exact: true }).click();
-    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
     await installSink(page);
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'savedGuideHtml');
       if (typeof value !== 'string') throw new Error('Missing exported HTML');
@@ -228,6 +244,8 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(pathToFileURL(file).href);
     await expect(page.locator('article figcaption').first()).toHaveCSS('text-align', 'end');
     const open = page.getByRole('button', { name: 'Open image', exact: true }).first();
+    await open.locator('..').hover();
+    await expect(open).toHaveCSS('opacity', '1');
     await open.click();
     await expectCaptionAlignment(page.locator('dialog figcaption'), 'end');
     await page.screenshot({ path: `.tmp/backlog7/b12-caption-${theme}.png` });
@@ -235,6 +253,8 @@ for (const theme of ['light', 'dark'] as const) {
     await open.evaluate((element) =>
       element.setAttribute('data-caption-alignment', 'url(https://invalid.example/)')
     );
+    await open.locator('..').hover();
+    await expect(open).toHaveCSS('opacity', '1');
     await open.click();
     await expect(page.locator('dialog figcaption')).toHaveCSS('text-align', 'center');
     await page.context().setOffline(false);
@@ -306,12 +326,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.guide-editor-viewport')).toHaveCSS('overflow', 'visible');
     await page.emulateMedia({ media: 'screen' });
     await page.getByRole('button', { name: 'Back to export', exact: true }).click();
-    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
     await installSink(page);
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
     const html = await page.evaluate(() => Reflect.get(window, 'savedGuideHtml'));
     expect(typeof html).toBe('string');
     expect(html).not.toContain('data-show-boundaries');

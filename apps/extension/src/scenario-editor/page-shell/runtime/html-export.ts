@@ -136,25 +136,3 @@ async function writeGuideHtml(
     writer.releaseLock();
   }
 }
-
-/** Exact UTF-8 size includes fonts, fixed viewer and each unique base64 payload once. */
-export async function measureGuideHtml(args: {
-  project: GuideProject;
-  reading?: GuideReadingOptions;
-  t: Translate;
-  theme: 'light' | 'dark';
-  signal: AbortSignal;
-}) {
-  const media = await measureHtmlImages(args.project, args.signal);
-  const { buildGuideHtml } = await import('../html-document');
-  const document = await buildGuideHtml(args.project, args.t, args.theme, media, args.reading);
-  args.signal.throwIfAborted();
-  const size =
-    new TextEncoder().encode(document.html).length +
-    media.rasters.reduce(
-      (sum, raster, index) =>
-        sum + 4 * Math.ceil(raster.size / 3) - `SNIPTALE_ASSET_${index}`.length,
-      0
-    );
-  return { size, ...media };
-}

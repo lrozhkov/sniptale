@@ -99,7 +99,6 @@ function ScenarioEditorPage() {
         project={project}
         images={state.images}
         initialId={state.selectedId}
-        onChange={state.update}
         feedback={
           status === 'failed' || status === 'conflict' || state.actionError ? feedback : null
         }

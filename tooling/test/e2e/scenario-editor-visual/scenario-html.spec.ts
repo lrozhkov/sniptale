@@ -52,14 +52,11 @@ for (const theme of ['light', 'dark'] as const) {
       });
     });
     await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await testInfo.attach(`workbench-${theme}`, {
+    await testInfo.attach(`reader-export-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
     await expect(page.locator('html')).toHaveAttribute('data-file-closed', 'true');
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'savedGuideHtml');
@@ -84,6 +81,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('defs image')).toHaveCount(1);
     await expect(page.getByRole('button', { name: 'Open image', exact: true })).toHaveCount(2);
     const open = page.getByRole('button', { name: 'Open image', exact: true }).first();
+    await open.locator('..').hover();
+    await expect(open).toHaveCSS('opacity', '1');
     await open.click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect

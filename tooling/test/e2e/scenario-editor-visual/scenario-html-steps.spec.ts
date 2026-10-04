@@ -32,7 +32,6 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'Step navigation', exact: true }).click();
       await page.getByRole('option', { name: 'On the left', exact: true }).click();
     }
-    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Step by step', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -55,14 +54,10 @@ for (const theme of ['light', 'dark'] as const) {
         get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
       });
     });
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Document', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Step by step', exact: true }).click();
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-reader')).toBeVisible();
+    await expect(page.locator('.guide-reader .guide-html-fields')).toHaveCount(0);
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'readingExportHtml');
       if (typeof value !== 'string') throw new Error('Missing HTML');
@@ -270,13 +265,6 @@ for (const theme of ['light', 'dark'] as const) {
     await imageInspector.getByRole('switch', { name: 'Guide defaults', exact: true }).uncheck();
     await chooseHtmlOption(page, individual, 'Saved content', 'Full image');
     await page.getByRole('button', { name: 'Export', exact: true }).click();
-    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-    const workbench = page.locator('.guide-html-fields');
-    await expectFrameFields(workbench);
-    await page.getByRole('button', { name: 'Select image 1', exact: true }).click();
-    await expect(
-      workbench.getByRole('button', { name: 'Saved content', exact: true })
-    ).toContainText('Full image');
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
       Object.defineProperty(window, 'showSaveFilePicker', {
@@ -295,10 +283,10 @@ for (const theme of ['light', 'dark'] as const) {
         get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
       });
     });
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-export-status')).toHaveText('HTML saved');
+    await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-reader')).toBeVisible();
+    await expect(page.locator('.guide-reader .guide-html-fields')).toHaveCount(0);
     const html = await page.evaluate(() => {
       const result: unknown = Reflect.get(window, 'defaultsExportHtml');
       if (typeof result !== 'string') throw new Error('Missing saved HTML');
