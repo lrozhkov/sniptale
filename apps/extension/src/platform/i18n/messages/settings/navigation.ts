@@ -49,6 +49,7 @@ export const settingsNavigationMessages = defineMessageSource({
     ru: 'Хранилище и черновики',
     en: 'Storage and drafts',
   },
+  drafts: { ru: 'Черновики', en: 'Drafts' },
   annotations: {
     ru: 'Рамки и аннотации',
     en: 'Frames and annotations',
@@ -106,6 +107,10 @@ export const settingsNavigationMessages = defineMessageSource({
       ru: 'Управляйте локальным хранилищем, сроками хранения и черновиками.',
       en: 'Manage local storage, retention periods, and drafts.',
     },
+    drafts: {
+      ru: 'Управляйте рабочими копиями, корзиной и сроками хранения.',
+      en: 'Manage working copies, Trash, and retention periods.',
+    },
     annotations: {
       ru: 'Настройте рамки, выноски, нумерацию и теги для аннотаций.',
       en: 'Configure frames, callouts, numbering, and annotation tags.',
@@ -140,9 +145,13 @@ export const settingsNavigationMessages = defineMessageSource({
     },
   },
   views: {
+    interface: { ru: 'Интерфейс', en: 'Interface' },
+    contextMenu: { ru: 'Контекстное меню', en: 'Context menu' },
     settings: { ru: 'Настройки', en: 'Settings' },
     storage: { ru: 'Хранилище', en: 'Storage' },
     folderTemplates: { ru: 'Шаблоны папок', en: 'Folder templates' },
+    files: { ru: 'Файлы', en: 'Files' },
+    drafts: { ru: 'Черновики', en: 'Drafts' },
     templates: { ru: 'Шаблоны', en: 'Templates' },
     prompts: { ru: 'Промпты', en: 'Prompts' },
     image: { ru: 'Изображения', en: 'Images' },

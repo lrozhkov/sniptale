@@ -3,7 +3,11 @@ import { useEditorStore } from '../../state/useEditorStore';
 
 import type { SourceState } from '../../document/model/source-state';
 import { createInsertedImageObject, createTechnicalDataTextObject } from '../tools/insertions';
-import type { EditorTechnicalDataKind, EditorTechnicalDataLayout } from '../tools/technical-data';
+import type {
+  EditorTechnicalDataKind,
+  EditorTechnicalDataLayout,
+} from '../../../features/editor/document/technical-data';
+import { getEditorEditingDocumentSize } from '../../document/canvas-surface/editing-surface';
 
 export async function insertEditorImageObject(options: {
   canvas: Canvas | null;
@@ -33,8 +37,8 @@ export async function insertEditorImageObject(options: {
     dataUrl,
     name,
     source,
-    canvasWidth: canvas.getWidth(),
-    canvasHeight: canvas.getHeight(),
+    canvasWidth: getEditorEditingDocumentSize(canvas)?.width ?? canvas.getWidth(),
+    canvasHeight: getEditorEditingDocumentSize(canvas)?.height ?? canvas.getHeight(),
     nextLabelIndex: nextLabelIndex('image'),
     prepareObject,
   });
@@ -76,8 +80,9 @@ export function insertEditorTechnicalDataObject(options: {
     source,
     sourceUrl: store.browserFrame.url.trim(),
     sourceTitle: store.pageTitle.trim(),
+    capturedAt: store.capturedAt,
     nextLabelIndex: nextLabelIndex('text'),
-    textSettings: store.toolSettings.text,
+    textSettings: store.technicalDataTextSettings,
     prepareObject,
   });
   canvas.add(text);

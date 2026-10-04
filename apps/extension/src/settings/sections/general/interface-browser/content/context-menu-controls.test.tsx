@@ -25,6 +25,12 @@ function createState() {
       showVideoEditor: true,
     },
     contextMenuOptions: buildAppearanceContextMenuOptions('ru'),
+    contextMenuCatalogStatus: 'ready',
+    contextMenuSettingsStatus: 'ready',
+    contextMenuQuickActions: [],
+    contextMenuViewportPresets: [],
+    retryContextMenuCatalog: vi.fn(),
+    retryContextMenuSettings: vi.fn(),
     locale: 'ru',
     updateContextMenu: vi.fn().mockResolvedValue(undefined),
   };
@@ -57,46 +63,17 @@ describe('ContextMenuControls', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders context menu toggles and forwards item updates', async () => {
+  it('renders one command tree and routes the global switch', async () => {
     const state = createState();
-
     await renderWithState(state);
-
     expect(container?.textContent).toContain('Контекстное меню браузера');
-    expect(container?.textContent).toContain('Команды в меню');
-    expect(container?.textContent).toContain('Копировать название и ссылку');
-    expect(container?.textContent).toContain('Размер окна');
-    expect(container?.querySelector('button[aria-label="Настройки"]')).toBeTruthy();
-    expect(
-      container
-        ?.querySelector('button[aria-label="Настройки"] > span')
-        ?.className.includes('bg-[var(--sniptale-color-accent)]')
-    ).toBe(true);
-    expect(
-      [...(container?.querySelectorAll<HTMLElement>('*') ?? [])].some(
-        (element) =>
-          typeof element.className === 'string' && element.className.includes('rounded-[18px]')
-      )
-    ).toBe(false);
-
-    const pageLinkToggle = container?.querySelector(
-      'button[aria-label="Копировать название и ссылку"]'
-    ) as HTMLButtonElement;
-
-    await act(async () => {
-      pageLinkToggle.click();
-    });
-
-    expect(state.updateContextMenu).toHaveBeenCalledWith({ showPageLinkCopy: false });
-
-    const windowResizeToggle = container?.querySelector(
-      'button[aria-label="Размер окна"]'
-    ) as HTMLButtonElement;
-
-    await act(async () => {
-      windowResizeToggle.click();
-    });
-
-    expect(state.updateContextMenu).toHaveBeenCalledWith({ showWindowResize: false });
+    expect(container?.querySelector('[role="tree"]')).toBeTruthy();
+    expect(container?.textContent).toContain('Каталог команд');
+    expect(container?.textContent).not.toContain('Предпросмотр меню');
+    const ownerToggle = container?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Показывать меню Sniptale"]'
+    );
+    await act(async () => ownerToggle?.click());
+    expect(state.updateContextMenu).toHaveBeenCalledWith({ enabled: false });
   });
 });

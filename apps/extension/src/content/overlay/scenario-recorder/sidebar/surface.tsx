@@ -1,18 +1,24 @@
-import type { MouseEventHandler, RefObject } from 'react';
+import { getControlIconButtonClassName } from '@sniptale/ui/control-language';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { AppWindow } from 'lucide-react';
+import type { MouseEvent, MouseEventHandler, RefObject } from 'react';
 import { translate } from '../../../../platform/i18n';
 import { ScenarioRecorderSidebarHeader } from './header';
+import {
+  ScenarioSidebarCaptureMode,
+  ScenarioSidebarProjectPicker,
+  type ScenarioSidebarControlsProps,
+} from './controls';
 import { ScenarioRecorderSidebarStepCard } from './step-card';
 import type { ScenarioRecorderSidebarStep } from './types';
 
 interface ScenarioRecorderSidebarStepListProps {
-  dragStepId: string | null;
   highlightedStepId: string | null;
   onDeleteStep: (stepId: string) => void;
   onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
   onMoveStep: (stepId: string, toIndex: number) => void;
   onPreviewOpen: (step: ScenarioRecorderSidebarStep) => void;
   recentSteps: ScenarioRecorderSidebarStep[];
-  setDragStepId: (stepId: string | null) => void;
   stepsContainerRef: RefObject<HTMLDivElement | null>;
 }
 
@@ -20,19 +26,18 @@ function ScenarioRecorderStepList(props: ScenarioRecorderSidebarStepListProps) {
   return (
     <div
       ref={props.stepsContainerRef}
-      className="grid min-w-0 max-h-[420px] gap-2 overflow-auto pr-1"
+      className="grid min-w-0 min-h-0 max-h-[420px] gap-2 overflow-auto pr-1"
     >
       {props.recentSteps.map((step, index) => (
         <ScenarioRecorderSidebarStepCard
           key={step.id}
-          dragStepId={props.dragStepId}
           highlightedStepId={props.highlightedStepId}
-          index={index}
+          moveUpIndex={props.recentSteps[index - 1]?.position ?? null}
+          moveDownIndex={props.recentSteps[index + 1]?.position ?? null}
           onDeleteStep={props.onDeleteStep}
           onInspectStep={props.onInspectStep}
           onMoveStep={props.onMoveStep}
           onPreviewOpen={props.onPreviewOpen}
-          setDragStepId={props.setDragStepId}
           step={step}
         />
       ))}
@@ -40,28 +45,44 @@ function ScenarioRecorderStepList(props: ScenarioRecorderSidebarStepListProps) {
   );
 }
 
-function ScenarioRecorderSidebarFooter(props: { onOpenEditor: () => void }) {
+function ScenarioRecorderSidebarFooter(props: {
+  onFinish: () => void;
+  onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
+  captureBusy: boolean;
+  finishBusy: boolean;
+}) {
   return (
-    <button
-      type="button"
-      onClick={props.onOpenEditor}
-      data-ui="content.scenario.sidebar.open-editor"
-      className="inline-flex min-w-0 w-full items-center justify-center overflow-hidden rounded-[14px]
-        border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_82%,transparent)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_54%,transparent)]
-        px-4 py-3 text-sm font-semibold text-[var(--sniptale-color-text-primary)] transition
-        hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-strong)_72%,transparent)]
-        hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_84%,transparent)]"
-    >
-      {translate('scenario.content.openEditorCta')}
-    </button>
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+      <button
+        type="button"
+        onClick={(event) => void props.onCaptureVisible(event)}
+        disabled={props.captureBusy}
+        aria-busy={props.captureBusy}
+        data-ui="content.scenario.sidebar.capture-visible"
+        aria-label={translate('content.toolbar.visibleArea')}
+        title={translate('content.toolbar.visibleArea')}
+        className={getControlIconButtonClassName({ density: 'compact' })}
+      >
+        <AppWindow aria-hidden="true" size={18} />
+      </button>
+      <ProductActionButton
+        tone="primary"
+        disabled={props.captureBusy}
+        aria-busy={props.finishBusy}
+        onClick={props.onFinish}
+        data-ui="content.scenario.sidebar.finish"
+        className="min-w-0 w-full"
+      >
+        {translate(props.finishBusy ? 'scenario.content.finishing' : 'scenario.content.finish')}
+      </ProductActionButton>
+    </div>
   );
 }
 
 function getScenarioRecorderSidebarSurfaceClassName(dragging: boolean) {
   return [
-    'sniptale-scenario-recorder-sidebar pointer-events-auto fixed z-40 grid min-w-0',
-    'w-[336px] gap-3 overflow-hidden rounded-[22px] border p-3',
+    'sniptale-scenario-recorder-sidebar pointer-events-auto fixed z-40 flex min-w-0 flex-col',
+    'w-[336px] max-h-[calc(100vh-24px)] gap-3 overflow-hidden rounded-[22px] border p-3',
     'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_88%,transparent)]',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_98%,transparent)]',
     'shadow-[0_18px_38px_color-mix(in_srgb,var(--sniptale-color-overlay)_14%,transparent)]',
@@ -96,40 +117,45 @@ function ScenarioRecorderSidebarRecentSteps(props: ScenarioRecorderSidebarStepLi
   }
 
   return (
-    <div className="relative min-w-0">
+    <div className="relative min-w-0 min-h-0 overflow-auto">
       <ScenarioRecorderStepList
-        dragStepId={props.dragStepId}
         highlightedStepId={props.highlightedStepId}
         onDeleteStep={props.onDeleteStep}
         onInspectStep={props.onInspectStep}
         onMoveStep={props.onMoveStep}
         onPreviewOpen={props.onPreviewOpen}
         recentSteps={props.recentSteps}
-        setDragStepId={props.setDragStepId}
         stepsContainerRef={props.stepsContainerRef}
       />
     </div>
   );
 }
 
-export function ScenarioRecorderSidebarSurface(props: {
-  dragging: boolean;
-  dragStepId: string | null;
-  highlightedStepId: string | null;
-  onDeleteStep: (stepId: string) => void;
-  onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
-  onMoveStep: (stepId: string, toIndex: number) => void;
-  onOpenEditor: () => void;
-  onPreviewOpen: (step: ScenarioRecorderSidebarStep) => void;
-  onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
-  position: { x: number; y: number };
-  projectName: string | null;
-  recentSteps: ScenarioRecorderSidebarStep[];
-  setDragStepId: (stepId: string | null) => void;
-  sidebarRef: RefObject<HTMLElement | null>;
-  uiScale?: number;
-  stepsContainerRef: RefObject<HTMLDivElement | null>;
-}) {
+export function ScenarioRecorderSidebarSurface(
+  props: ScenarioSidebarControlsProps & {
+    dragging: boolean;
+    highlightedStepId: string | null;
+    onDeleteStep: (stepId: string) => void;
+    onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
+    onMoveStep: (stepId: string, toIndex: number) => void;
+    onFinish: () => void;
+    onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+    onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
+    captureBusy: boolean;
+    finishBusy: boolean;
+    onPreviewOpen: (step: ScenarioRecorderSidebarStep) => void;
+    onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
+    onProjectMenuToggle: () => void;
+    onProjectMenuClose: () => void;
+    projectMenuOpen: boolean;
+    position: { x: number; y: number };
+    projectName: string | null;
+    recentSteps: ScenarioRecorderSidebarStep[];
+    sidebarRef: RefObject<HTMLElement | null>;
+    uiScale?: number;
+    stepsContainerRef: RefObject<HTMLDivElement | null>;
+  }
+) {
   return (
     <aside
       ref={props.sidebarRef}
@@ -137,25 +163,38 @@ export function ScenarioRecorderSidebarSurface(props: {
       style={getScenarioRecorderSidebarSurfaceStyle(props.position, props.uiScale ?? 1)}
       className={getScenarioRecorderSidebarSurfaceClassName(props.dragging)}
     >
-      <ScenarioRecorderSidebarHeader
-        dragging={props.dragging}
-        onMouseDown={props.onSidebarHeaderMouseDown}
-        projectName={props.projectName}
-      />
+      <fieldset disabled={props.finishBusy} className="contents">
+        <ScenarioRecorderSidebarHeader
+          dragging={props.dragging}
+          onCollapse={props.onCollapse}
+          onMouseDown={props.onSidebarHeaderMouseDown}
+          onProjectMenuToggle={props.onProjectMenuToggle}
+          projectMenuOpen={props.projectMenuOpen}
+          projectName={props.projectName}
+        />
 
-      <ScenarioRecorderSidebarRecentSteps
-        dragStepId={props.dragStepId}
-        highlightedStepId={props.highlightedStepId}
-        onDeleteStep={props.onDeleteStep}
-        onInspectStep={props.onInspectStep}
-        onMoveStep={props.onMoveStep}
-        onPreviewOpen={props.onPreviewOpen}
-        recentSteps={props.recentSteps}
-        setDragStepId={props.setDragStepId}
-        stepsContainerRef={props.stepsContainerRef}
-      />
+        {props.projectMenuOpen ? (
+          <ScenarioSidebarProjectPicker {...props} onClose={props.onProjectMenuClose} />
+        ) : null}
+        <ScenarioSidebarCaptureMode {...props} />
 
-      <ScenarioRecorderSidebarFooter onOpenEditor={props.onOpenEditor} />
+        <ScenarioRecorderSidebarRecentSteps
+          highlightedStepId={props.highlightedStepId}
+          onDeleteStep={props.onDeleteStep}
+          onInspectStep={props.onInspectStep}
+          onMoveStep={props.onMoveStep}
+          onPreviewOpen={props.onPreviewOpen}
+          recentSteps={props.recentSteps}
+          stepsContainerRef={props.stepsContainerRef}
+        />
+
+        <ScenarioRecorderSidebarFooter
+          onFinish={props.onFinish}
+          onCaptureVisible={props.onCaptureVisible}
+          captureBusy={props.captureBusy}
+          finishBusy={props.finishBusy}
+        />
+      </fieldset>
     </aside>
   );
 }

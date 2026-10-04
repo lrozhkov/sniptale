@@ -8,9 +8,11 @@ Workflow graphs live in [`.github/workflows`](../../.github/workflows). Machine 
 
 Dependency freshness covers every identity registered by machine policy. The check is read-only.
 
+The canonical npm installation uses the dedicated lock under `tooling/configs/ci/npm`. Upstream npm tarballs restore bundled dependencies during `npm ci`; the installation completes only after `tooling/ci/npm-runtime.mjs` normalizes the two reviewed dependencies to their locked replacements and verifies resolution from npm and their actual consumers. Local and container provisioning run this step with lifecycle scripts disabled. Local cache reuse validates the bound lock, replacement versions, and runtime resolution before publishing its PATH.
+
 ## Proof graph
 
-Ready pull requests run the Fast PR Gate through the trusted reusable canonical-proof workflow.
+Ready pull requests run the Pull request checks through the trusted reusable Checks workflow.
 
 Release provenance admits an exact Fast proof before release execution. [Wrapper summary](wrapper-summary.md#freshness-and-reuse) owns proof composition and reuse behavior.
 
@@ -18,7 +20,7 @@ Repository-audit, topology, and mutation evidence run after proof sealing in a s
 
 Selectel connectivity checks controller admission without provisioning. Infrastructure smoke provisions one disposable runner and must prove cleanup. Selectel maintenance performs recovery and scheduled cleanup without entering the QA graph.
 
-Continuous Deployment accepts an admitted provenance finalizer result. It does not provision Selectel or rerun QA.
+Publish release accepts an admitted provenance finalizer result. It does not provision Selectel or rerun QA.
 
 ## Candidate admission
 

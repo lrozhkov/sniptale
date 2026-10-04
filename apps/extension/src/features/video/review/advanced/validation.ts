@@ -116,6 +116,15 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   const exit = parseZoomTransition(value['exit']);
   if (!transform || !enter || !exit) return null;
   if (value['linkTo'] !== undefined && !identity(value['linkTo'])) return null;
+  const sourceAnchor = value['sourceAnchor'];
+  if (
+    sourceAnchor !== undefined &&
+    (!isRecord(sourceAnchor) ||
+      !isBoundedNumber(sourceAnchor['start'], 0, MAX_QUICK_EDIT_TIME) ||
+      !isBoundedNumber(sourceAnchor['end'], 0, MAX_QUICK_EDIT_TIME) ||
+      sourceAnchor['start'] >= sourceAnchor['end'])
+  )
+    return null;
   if (
     value['linkEasing'] !== undefined &&
     value['linkEasing'] !== 'linear' &&
@@ -127,6 +136,11 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     id: value['id'],
     start: value['start'],
     end: value['end'],
+    ...(isRecord(sourceAnchor) &&
+    typeof sourceAnchor['start'] === 'number' &&
+    typeof sourceAnchor['end'] === 'number'
+      ? { sourceAnchor: { start: sourceAnchor['start'], end: sourceAnchor['end'] } }
+      : {}),
     transform,
     enter,
     exit,
@@ -151,7 +165,11 @@ function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
     if (ids.has(region.id)) return null;
     ids.add(region.id);
     if (region.dormant) continue;
-    if (previous && region.start < previous.end) return null;
+    if (
+      previous &&
+      (region.sourceAnchor?.start ?? region.start) < (previous.sourceAnchor?.end ?? previous.end)
+    )
+      return null;
     previous = region;
   }
   return regions;
@@ -176,18 +194,23 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
 
 function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | null {
   if (!isRecord(value)) return null;
-  if (value['enabled'] === false) return { enabled: false };
+  const behavior = value['zoomBehavior'];
+  if (behavior !== undefined && behavior !== 'fixed' && behavior !== 'follow-video') return null;
+  const motion: Pick<QuickEditBackgroundSettings, 'zoomBehavior'> = behavior
+    ? { zoomBehavior: behavior }
+    : {};
+  if (value['enabled'] === false) return { enabled: false, ...motion };
   if (value['enabled'] !== true) return null;
   const layout = parseBackgroundLayout(value['layout']);
   if (!layout) return null;
   if (value['type'] === 'solid') {
     const color = typeof value['color'] === 'string' ? normalizePaintColor(value['color']) : null;
-    return color ? { enabled: true, type: 'solid', color, layout } : null;
+    return color ? { enabled: true, type: 'solid', color, layout, ...motion } : null;
   }
   if (value['type'] === 'gradient') {
     const paint = parsePaint({ kind: 'gradient', gradient: value['gradient'] });
     if (!paint || paint.kind !== 'gradient') return null;
-    return { enabled: true, type: 'gradient', gradient: paint.gradient, layout };
+    return { enabled: true, type: 'gradient', gradient: paint.gradient, layout, ...motion };
   }
   if (value['type'] === 'image') {
     return identity(value['assetId']) &&
@@ -196,6 +219,7 @@ function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | 
           enabled: true,
           type: 'image',
           assetId: value['assetId'],
+          ...motion,
           imageFit: value['imageFit'],
           layout,
         }
@@ -209,6 +233,7 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     !isRecord(value) ||
     !identity(value['id']) ||
     !identity(value['assetId']) ||
+    (value['tempo'] !== undefined && !isBoundedNumber(value['tempo'], 0.25, 4)) ||
     !isBoundedNumber(value['timelineStart'], 0, MAX_QUICK_EDIT_TIME) ||
     !isBoundedNumber(value['sourceOffset'], 0, MAX_QUICK_EDIT_TIME) ||
     !isBoundedNumber(value['duration'], 0.001, MAX_QUICK_EDIT_TIME) ||
@@ -225,6 +250,7 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
   if (sourceAnchor === null) return null;
   return {
     ...(sourceAnchor ? { sourceAnchor } : {}),
+    ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
     id: value['id'],
     assetId: value['assetId'],
     timelineStart: value['timelineStart'],
@@ -275,7 +301,7 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
   if (
     segments === null ||
     (voiceover.some((clip) => clip.sourceAnchor) && !segments) ||
-    music.some((clip) => clip.sourceAnchor)
+    music.some((clip) => clip.sourceAnchor || clip.tempo !== undefined)
   )
     return null;
   const timing = segments ? { voiceoverSegments: segments } : {};

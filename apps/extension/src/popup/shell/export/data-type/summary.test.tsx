@@ -130,3 +130,12 @@ describe('renderDataTypeSummaryItems', () => {
     expect(container?.querySelector('button')).toBeNull();
   });
 });
+
+it('keeps selected artifacts visible without removal controls while disabled', async () => {
+  const toggles = createToggleProps();
+  toggles.disabled = true;
+  await renderSummary([createSummaryItem('json', 'JSON')], toggles);
+  expect(container?.textContent).toContain('JSON');
+  expect(container?.querySelector('button')).toBeNull();
+  expect(toggles.setIncludeJson).not.toHaveBeenCalled();
+});

@@ -59,6 +59,9 @@ export function buildGuidePreviewSteps({
               assetId: block.assetId,
               alt: block.alt,
               caption: block.caption,
+              ...(block.captionAlignment === undefined
+                ? {}
+                : { captionAlignment: block.captionAlignment }),
               frame: { ...block.frame },
               fit: block.fit,
               contentTransform: { ...block.contentTransform },

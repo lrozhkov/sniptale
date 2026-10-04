@@ -87,7 +87,7 @@ it('creates a new preset with sanitized path and closes the editor', async () =>
   });
   expect(persistSettings).toHaveBeenCalledWith({ presets: sync.presets });
   expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-  expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
+  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetCreated');
 });
 
 it('updates an existing preset and keeps its previous path when sanitized input is empty', async () => {
@@ -110,7 +110,7 @@ it('updates an existing preset and keeps its previous path when sanitized input 
     path: 'Existing',
   });
   expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-  expect(mocks.toastSuccessMock).not.toHaveBeenCalled();
+  expect(mocks.toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetUpdated');
 });
 
 it('rejects blank names before persisting settings', async () => {

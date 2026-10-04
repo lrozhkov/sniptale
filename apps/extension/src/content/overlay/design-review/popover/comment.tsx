@@ -1,8 +1,20 @@
 import { CornerDownLeft } from 'lucide-react';
 import { useId, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../../../platform/i18n';
+import { useDesignReviewInputModality } from '../input-modality';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { DesignReviewCommentVoiceButton } from './comment-voice-button';
+
+const COMMENT_FOCUS_CLASS_NAMES = {
+  keyboard: [
+    'has-[textarea:focus]:ring-1',
+    'has-[textarea:focus]:ring-[color:var(--sniptale-color-border-strong)]',
+  ].join(' '),
+  pointer: [
+    'has-[textarea:focus]:ring-1',
+    'has-[textarea:focus]:ring-[color:var(--sniptale-color-border-soft)]',
+  ].join(' '),
+} as const;
 
 export function PageStyleCommentField(props: {
   actions: DesignReviewActions['comment'] & {
@@ -27,6 +39,7 @@ export function PageStyleCommentField(props: {
     .filter(Boolean)
     .join(' ');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const focusModality = useDesignReviewInputModality();
 
   useLayoutEffect(() => {
     resizeCommentTextarea(textareaRef.current);
@@ -56,11 +69,11 @@ export function PageStyleCommentField(props: {
         )}
       </div>
       <div
+        data-focus-modality={focusModality}
         className={[
           'overflow-visible rounded-[9px] border bg-[var(--sniptale-color-surface-input)]',
-          'border-[color:var(--sniptale-color-border-soft)]',
-          'focus-within:border-[var(--sniptale-color-accent)] focus-within:ring-2',
-          'focus-within:ring-[color:var(--sniptale-color-accent-soft)]',
+          'border-[color:var(--sniptale-color-border-strong)]',
+          COMMENT_FOCUS_CLASS_NAMES[focusModality],
         ].join(' ')}
       >
         <textarea
@@ -101,10 +114,10 @@ export function PageStyleCommentField(props: {
         />
         {props.footer ? (
           <div
-            className="flex min-h-10 items-center gap-2 px-2 py-1"
+            className="flex min-h-10 flex-wrap items-center gap-1 px-2 py-1"
             data-ui="content.design-review.comment-footer"
           >
-            <div className="min-w-0 flex-1">{props.footer}</div>
+            <div className="min-w-0 flex-[1_1_210px]">{props.footer}</div>
             <DesignReviewCommentVoiceButton
               disabled={props.disabled}
               onStart={() => {

@@ -104,3 +104,36 @@ describe('library facet boundaries', () => {
     ).toBe(true);
   });
 });
+
+it.each(['Release.2026.09.30', 'Guide, version.12', 'project.pdf', 'photo.png', 'clip.webm'])(
+  'does not treat project name %s as a file',
+  (filename) => {
+    for (const mimeType of [
+      'application/x-sniptale-scenario',
+      'application/x-sniptale-video-project',
+    ]) {
+      const project = { ...item, filename, mimeType };
+      expect(getLibraryFacetValue(project, 'format', now)).toBeNull();
+      expect(
+        matchesLibraryFilters(
+          project,
+          { facetFilters: { ...empty, format: ['pdf', '30', '12'] } },
+          now
+        )
+      ).toBe(false);
+    }
+  }
+);
+
+it.each([
+  ['export.html', 'application/x-sniptale-scenario-export', 'html'],
+  ['export.zip', 'application/x-sniptale-scenario-export', 'zip'],
+  ['untitled', 'image/png', 'png'],
+  ['untitled', 'video/webm; codecs=vp8', 'webm'],
+  ['untitled', 'application/octet-stream', null],
+  ['untitled', '', null],
+  ['name.bad suffix', '', null],
+  ['no-extension', 'application/x-sniptale-scenario-export', null],
+])('classifies actual filename %s and MIME %s', (filename, mimeType, expected) => {
+  expect(getLibraryFacetValue({ ...item, filename, mimeType }, 'format', now)).toBe(expected);
+});

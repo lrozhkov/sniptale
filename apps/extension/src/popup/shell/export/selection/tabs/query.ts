@@ -19,6 +19,7 @@ import type { PopupExportTabItem } from './types';
 
 type LoadAvailableTabsArgs = {
   activeTabCapabilities: ActiveTabCapabilities;
+  initialTabId?: number;
   fingerprintRef: MutableRefObject<string | null>;
   hasHydratedSelectionRef: MutableRefObject<boolean>;
   pageAccessStatus: PageAccessStatus | null;
@@ -49,11 +50,18 @@ async function handleLoadedTabs(
     return;
   }
 
+  const nextTabs = getTabsForCurrentWindow(grantedTabs, args.activeTabCapabilities);
   applyLoadedTabs({
     fingerprintRef: args.fingerprintRef,
     hasHydratedSelectionRef: args.hasHydratedSelectionRef,
-    nextTabs: getTabsForCurrentWindow(grantedTabs, args.activeTabCapabilities),
-    persistedSelection,
+    nextTabs,
+    persistedSelection:
+      args.initialTabId === undefined
+        ? persistedSelection
+        : {
+            selectedTabIds: [args.initialTabId],
+            tabsFingerprint: createTabsFingerprint(nextTabs),
+          },
     setAvailableTabs: args.setAvailableTabs,
     setSelectedTabIds: args.setSelectedTabIds,
   });
@@ -73,15 +81,22 @@ async function handleFallbackTabs(
     return;
   }
 
+  const fallbackTabs = getGrantedFallbackTabs({
+    activeTabCapabilities: args.activeTabCapabilities,
+    pageAccessStatus: args.pageAccessStatus,
+  });
   applyFallbackTabs({
     activeTabCapabilities: args.activeTabCapabilities,
-    fallbackTabs: getGrantedFallbackTabs({
-      activeTabCapabilities: args.activeTabCapabilities,
-      pageAccessStatus: args.pageAccessStatus,
-    }),
+    fallbackTabs,
     fingerprintRef: args.fingerprintRef,
     hasHydratedSelectionRef: args.hasHydratedSelectionRef,
-    persistedSelection,
+    persistedSelection:
+      args.initialTabId === undefined
+        ? persistedSelection
+        : {
+            selectedTabIds: [args.initialTabId],
+            tabsFingerprint: createTabsFingerprint(fallbackTabs),
+          },
     setAvailableTabs: args.setAvailableTabs,
     setSelectedTabIds: args.setSelectedTabIds,
   });
@@ -185,6 +200,7 @@ function getGrantedFallbackTabs(args: {
 
 export function useAvailableTabQuery(args: {
   activeTabCapabilities: ActiveTabCapabilities;
+  initialTabId?: number;
   fingerprintRef: MutableRefObject<string | null>;
   hasHydratedSelectionRef: MutableRefObject<boolean>;
   hasResolvedQueryRef: MutableRefObject<boolean>;
@@ -201,6 +217,7 @@ export function useAvailableTabQuery(args: {
     let cancelled = false;
     loadAvailableTabs({
       activeTabCapabilities: args.activeTabCapabilities,
+      ...(args.initialTabId !== undefined ? { initialTabId: args.initialTabId } : {}),
       fingerprintRef: args.fingerprintRef,
       hasHydratedSelectionRef: args.hasHydratedSelectionRef,
       markQueryResolved: () => {
@@ -221,6 +238,7 @@ export function useAvailableTabQuery(args: {
     args.hasHydratedSelectionRef,
     args.hasResolvedQueryRef,
     args.isActive,
+    args.initialTabId,
     args.pageAccessStatus,
     args.setAvailableTabs,
     args.setSelectedTabIds,

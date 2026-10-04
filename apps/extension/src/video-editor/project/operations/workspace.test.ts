@@ -69,7 +69,7 @@ vi.mock('./assets', async (importOriginal) => {
 
 async function mockRecordingProjectLoad() {
   const recordingEntry = {
-    blob: new Blob(['video'], { type: 'video/webm' }),
+    file: new Blob(['video'], { type: 'video/webm' }),
     createdAt: 1,
     filename: 'recording.webm',
     id: 'recording-1',
@@ -117,9 +117,8 @@ function mockImportedRecordingAsset() {
     type: VideoProjectAssetType.RECORDING,
     name: 'recording.webm',
     source: {
-      kind: 'project-asset',
-      projectAssetId: 'project-asset-1',
-      originRecordingId: 'recording-1',
+      kind: 'recording',
+      recordingId: 'recording-1',
     },
     metadata: {
       width: 1280,
@@ -145,14 +144,27 @@ describe('loadInitialProjectFromLocation', () => {
   });
 
   it('fails for a missing explicit project', verifyMissingProject);
-  it('creates a blank project without an explicit target', verifyBlankProjectCreation);
+  it('stays idle without an explicit target', verifyBlankProjectCreation);
   it('hydrates cursor telemetry from a recording', verifyRecordingHydration);
-  it('rolls back the imported asset when project persistence fails', verifyRecordingAssetRollback);
+  it(
+    'preserves the shared recording when project persistence fails',
+    verifyRecordingPersistenceFailure
+  );
   it('leaves plain recordings without cursor telemetry', verifyPlainRecordingHydration);
-  it('migrates persisted legacy recording assets', verifyPersistedRecordingMigration);
-  it('rolls back failed persisted project migration', verifyPersistedRecordingMigrationRollback);
-  it('routes explicit project query loads through migration', verifyProjectQueryMigrationPath);
-  it('rejects malformed persisted projects before migration', verifyMalformedPersistedProject);
+  it(
+    'opens persisted recording references without copying or rewriting',
+    verifyPersistedRecordingReferences
+  );
+  it(
+    'opens persisted recording references even when their source is unavailable',
+    verifyUnavailablePersistedRecording
+  );
+  it('rejects a project moved to trash after the start list was read', verifyTrashedProject);
+  it(
+    'preserves recording references on explicit project query loads',
+    verifyProjectQueryReferencePath
+  );
+  it('rejects malformed persisted projects before opening', verifyMalformedPersistedProject);
 });
 
 async function verifyMissingProject() {
@@ -167,15 +179,10 @@ async function verifyMissingProject() {
 }
 
 async function verifyBlankProjectCreation() {
-  const blankProject = createEmptyVideoProject('Blank');
-
-  vi.spyOn(Date, 'now').mockReturnValue(blankProject.createdAt);
-  getVideoProject.mockResolvedValue({ status: 'notFound' });
-
   const result = await loadInitialProjectFromLocation();
 
-  expect(result.project.id).toBeTruthy();
-  expect(saveVideoProject).toHaveBeenCalledTimes(1);
+  expect(result).toEqual({ project: null, recordingId: null });
+  expect(saveVideoProject).not.toHaveBeenCalled();
 }
 
 async function verifyRecordingHydration() {
@@ -184,22 +191,21 @@ async function verifyRecordingHydration() {
 
   const result = await loadInitialProjectFromLocation();
 
-  expect(result.project.cursorTrack?.captureMode).toBe('separate');
-  expect(result.project.cursorTrack?.samples[0]?.id).toBe('sample-1');
-  expect(result.project.assets[0]?.source).toEqual({
-    kind: 'project-asset',
-    projectAssetId: 'project-asset-1',
-    originRecordingId: 'recording-1',
+  expect(result.project!.cursorTrack?.captureMode).toBe('separate');
+  expect(result.project!.cursorTrack?.samples[0]?.id).toBe('sample-1');
+  expect(result.project!.assets[0]?.source).toEqual({
+    kind: 'recording',
+    recordingId: 'recording-1',
   });
 }
 
-async function verifyRecordingAssetRollback() {
+async function verifyRecordingPersistenceFailure() {
   await mockRecordingProjectLoad();
   saveVideoProject.mockRejectedValue(new Error('persist failed'));
   window.history.replaceState({}, '', '/video-editor.html?id=recording-1');
 
   await expect(loadInitialProjectFromLocation()).rejects.toThrow('persist failed');
-  expect(deleteProjectAsset).toHaveBeenCalledWith('project-asset-1');
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
 }
 
 async function verifyPlainRecordingHydration() {
@@ -209,57 +215,48 @@ async function verifyPlainRecordingHydration() {
 
   const result = await loadInitialProjectFromLocation();
 
-  expect(result.project.source).toEqual({
+  expect(result.project!.source).toEqual({
     kind: 'recording',
     recordingId: 'recording-1',
   });
-  expect(result.project.cursorTrack).toBeNull();
-  expect(result.project.actionEvents).toEqual([]);
+  expect(result.project!.cursorTrack).toBeNull();
+  expect(result.project!.actionEvents).toEqual([]);
 }
 
-async function verifyPersistedRecordingMigration() {
+async function verifyPersistedRecordingReferences() {
   const persistedProject = createPersistedLegacyRecordingProject();
   getVideoProject.mockResolvedValue({ project: persistedProject, status: 'ready' });
   mockImportedRecordingAsset();
 
   const project = await openPersistedProject('project-1');
 
-  expect(importRecordingProjectAssetMock).toHaveBeenCalledWith('recording-1');
-  expect(project.assets[0]?.source).toEqual({
-    kind: 'project-asset',
-    projectAssetId: 'project-asset-1',
-    originRecordingId: 'recording-1',
-  });
-  expect(project.assets[0]?.id).toBeTruthy();
-  expect(project.assets[0]?.recordingPart).toEqual(persistedProject.assets[0]?.recordingPart);
-  expect(project.assets[0]?.recordingPart).toEqual({ recordingId: 'recording-1', role: 'primary' });
-  expect(saveVideoProject).toHaveBeenCalledWith(
-    expect.objectContaining({
-      id: project.id,
-      assets: [
-        expect.objectContaining({
-          source: {
-            kind: 'project-asset',
-            projectAssetId: 'project-asset-1',
-            originRecordingId: 'recording-1',
-          },
-        }),
-      ],
-    }),
-    { baseRevision: persistedProject.updatedAt }
-  );
+  expect(importRecordingProjectAssetMock).not.toHaveBeenCalled();
+  expect(project.assets).toEqual(persistedProject.assets);
+  expect(saveVideoProject).not.toHaveBeenCalled();
 }
 
-async function verifyPersistedRecordingMigrationRollback() {
+async function verifyUnavailablePersistedRecording() {
   getVideoProject.mockResolvedValue({
     project: createPersistedLegacyRecordingProject(),
     status: 'ready',
   });
-  mockImportedRecordingAsset();
-  saveVideoProject.mockRejectedValue(new Error('persist failed'));
+  getRecording.mockResolvedValue(undefined);
+  importRecordingProjectAssetMock.mockRejectedValue(new Error('Missing source'));
+  const project = await openPersistedProject('project-1');
+  expect(project.assets[0]?.source).toEqual({ kind: 'recording', recordingId: 'recording-1' });
+  expect(importRecordingProjectAssetMock).not.toHaveBeenCalled();
+  expect(saveVideoProject).not.toHaveBeenCalled();
+  expect(deleteProjectAsset).not.toHaveBeenCalled();
+}
 
-  await expect(openPersistedProject('project-1')).rejects.toThrow('persist failed');
-  expect(deleteProjectAsset).toHaveBeenCalledWith('project-asset-1');
+async function verifyTrashedProject() {
+  getVideoProject.mockResolvedValue({
+    project: createPersistedLegacyRecordingProject(),
+    status: 'ready',
+    lifecycle: { trashedAt: 500 },
+  });
+  await expect(openPersistedProject('project-1')).rejects.toThrow('unavailable');
+  expect(saveVideoProject).not.toHaveBeenCalled();
 }
 
 async function verifyMalformedPersistedProject() {
@@ -276,7 +273,7 @@ async function verifyMalformedPersistedProject() {
   expect(saveVideoProject).not.toHaveBeenCalled();
 }
 
-async function verifyProjectQueryMigrationPath() {
+async function verifyProjectQueryReferencePath() {
   getVideoProject.mockResolvedValue({
     project: createPersistedLegacyRecordingProject(),
     status: 'ready',
@@ -286,11 +283,10 @@ async function verifyProjectQueryMigrationPath() {
 
   const result = await loadInitialProjectFromLocation();
 
-  expect(importRecordingProjectAssetMock).toHaveBeenCalledWith('recording-1');
-  expect(result.project.assets[0]?.source).toEqual({
-    kind: 'project-asset',
-    projectAssetId: 'project-asset-1',
-    originRecordingId: 'recording-1',
+  expect(importRecordingProjectAssetMock).not.toHaveBeenCalled();
+  expect(result.project!.assets[0]?.source).toEqual({
+    kind: 'recording',
+    recordingId: 'recording-1',
   });
 }
 

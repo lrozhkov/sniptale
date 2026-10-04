@@ -12,6 +12,7 @@ export interface RetainedEditorBootstrapEntry {
   id: string;
   dataUrl: string;
   document?: EditorDocument | null;
+  capturedAt?: number;
   sourceFaviconUrl?: string | null;
   url?: string;
   title?: string;
@@ -47,6 +48,7 @@ export function parseRetainedBootstrapEntry(
   }
 
   const document = value['document'];
+  const capturedAt = value['capturedAt'];
   const sourceFaviconUrl = value['sourceFaviconUrl'];
   const title = value['title'];
   const url = value['url'];
@@ -57,6 +59,8 @@ export function parseRetainedBootstrapEntry(
     !isImageDataUrl(dataUrl) ||
     typeof value['createdAt'] !== 'number' ||
     !Number.isFinite(value['createdAt']) ||
+    (capturedAt !== undefined &&
+      (typeof capturedAt !== 'number' || !Number.isFinite(capturedAt) || capturedAt < 0)) ||
     !isOptionalNullableString(sourceFaviconUrl) ||
     !isOptionalString(url) ||
     !isOptionalString(title) ||
@@ -67,6 +71,7 @@ export function parseRetainedBootstrapEntry(
 
   return {
     createdAt: value['createdAt'],
+    ...(capturedAt === undefined ? {} : { capturedAt }),
     dataUrl,
     ...(document === undefined ? {} : { document }),
     id: value['id'],

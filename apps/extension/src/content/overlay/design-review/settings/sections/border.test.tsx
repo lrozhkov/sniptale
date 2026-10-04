@@ -13,7 +13,7 @@ const actions: DesignReviewActions = {
     startComposition: vi.fn(),
     updateDraft: vi.fn(),
   },
-  copyElement: vi.fn(async () => undefined),
+  copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
   delete: vi.fn(),
   resetValue: vi.fn(),
@@ -76,6 +76,17 @@ it('owns four compact linkable border groups without nested disclosures', () => 
   expect(root.querySelectorAll('[data-side-link="all"]')).toHaveLength(4);
   expect(root.textContent).toContain('Толщина');
   expect(root.textContent).toContain('Цвет рамки');
+  const colorGroup = root.querySelector('[data-side-field-label="Цвет рамки"]');
+  expect(
+    colorGroup?.querySelector('[data-ui="content.design-review.side-values-compact"]')?.className
+  ).toContain('w-full');
+  expect(colorGroup?.querySelector('[data-ui="shared.ui.color-selector.trigger"]')).not.toBeNull();
+  expect(colorGroup?.querySelector('.basis-full')).toBeNull();
+  expect(
+    root.querySelector(
+      '[data-side-field-label="Толщина"] [data-ui="content.design-review.side-values-compact"]'
+    )?.className
+  ).toContain('w-full');
   expect(root.textContent).toContain('Скругление');
   expect(root.querySelector('details')).toBeNull();
 });

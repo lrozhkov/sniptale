@@ -1,4 +1,5 @@
 import type { Canvas } from 'fabric';
+import { cancelEditorFreehandPreview } from './runtime.render';
 import { createEditorDrawingEventHandlers } from './drawing';
 import { createPanEventHandlers } from './pan';
 import { createRuntimeEventHandlers } from './runtime';
@@ -18,8 +19,8 @@ function composeEditorControllerEventHandlers(
     handleWindowMouseMove: (event) => {
       pan.handleWindowMouseMove(event);
     },
-    handleWindowMouseUp: () => {
-      pan.handleWindowMouseUp();
+    handleWindowMouseUp: (event) => {
+      pan.handleWindowMouseUp(event);
     },
   };
 }
@@ -61,6 +62,7 @@ export function attachEditorControllerEventHandlers(options: {
   window.addEventListener('pointerup', handlers.handleWindowPointerUp);
   window.addEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement.addEventListener('mousedown', handlers.handleViewportMouseDown, true);
+  viewportElement.addEventListener('contextmenu', handlers.handleViewportContextMenu, true);
   viewportElement.addEventListener('wheel', handlers.handleViewportWheel, { passive: false });
   viewportElement.addEventListener('scroll', handlers.handleViewportScroll, { passive: true });
 
@@ -76,6 +78,7 @@ export function detachEditorControllerEventHandlers(options: {
   viewportResizeObserver: ResizeObserver | null;
 }): void {
   const { canvas, viewportElement, handlers, viewportResizeObserver } = options;
+  cancelEditorFreehandPreview(canvas);
   canvas.off('selection:created', handlers.handleSelectionChange);
   canvas.off('selection:updated', handlers.handleSelectionChange);
   canvas.off('selection:cleared', handlers.handleSelectionChange);
@@ -100,6 +103,7 @@ export function detachEditorControllerEventHandlers(options: {
   window.removeEventListener('pointerup', handlers.handleWindowPointerUp);
   window.removeEventListener('pointercancel', handlers.handlePointerCancel);
   viewportElement?.removeEventListener('mousedown', handlers.handleViewportMouseDown, true);
+  viewportElement?.removeEventListener('contextmenu', handlers.handleViewportContextMenu, true);
   viewportElement?.removeEventListener('wheel', handlers.handleViewportWheel);
   viewportElement?.removeEventListener('scroll', handlers.handleViewportScroll);
   viewportResizeObserver?.disconnect();

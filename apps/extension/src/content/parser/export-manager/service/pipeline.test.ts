@@ -115,7 +115,7 @@ function createEmptyTransferResult() {
 
 function expectSuccessfulPipelineResult(progressSpy: ReturnType<typeof vi.fn>, result: unknown) {
   expect(result).toMatchObject({
-    filename: 'export.zip',
+    filename: expect.stringMatching(/^Sniptale_page_.*\.zip$/),
     stats: {
       sectionsCount: 1,
       rowsCount: 2,
@@ -214,7 +214,7 @@ describe('export-manager service-pipeline branch coverage', () => {
     await expect(
       runExportManagerPipeline(state, createExportOptions({ includeJson: false }), [])
     ).resolves.toMatchObject({
-      filename: 'export.zip',
+      filename: expect.stringMatching(/^Sniptale_page_.*\.zip$/),
     });
 
     expect(buildExportDataMock).not.toHaveBeenCalled();

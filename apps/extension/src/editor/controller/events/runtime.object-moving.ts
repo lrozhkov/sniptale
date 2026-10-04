@@ -21,7 +21,7 @@ export function createObjectMovingHandler(
     }
 
     bindings.applyGridSnap(event.target);
-    if (syncCropGuideInteraction(bindings, event.target)) {
+    if (syncCropGuideInteraction(bindings, event.target, 'move')) {
       bindings.getCanvas()?.requestRenderAll();
       bindings.syncRuntimeState();
       return;

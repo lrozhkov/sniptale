@@ -4,6 +4,7 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   guideRowStart: { ru: 'Начинать с новой строки', en: 'Start a new row' },
   guideRemoveRowStart: { ru: 'Убрать перенос строки', en: 'Remove row break' },
   guideSnapLayout: { ru: 'Привязка размеров', en: 'Snap block sizes' },
+  guideShowBoundaries: { ru: 'Показывать границы', en: 'Show boundaries' },
   guideSnapLayoutHint: {
     ru: 'Привязка к соседним блокам и колонкам · Alt — временно отключить',
     en: 'Snap to neighboring blocks and columns · Alt bypasses snapping',
@@ -33,6 +34,7 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   guideHeadingMedium: { ru: 'Средний', en: 'Medium' },
   guideTextNormal: { ru: 'Обычный', en: 'Normal' },
   guideTextLarge: { ru: 'Крупный', en: 'Large' },
+  guideCaptionAlignment: { ru: 'Выравнивание подписи', en: 'Caption alignment' },
   guideTextAlignment: { ru: 'Выравнивание', en: 'Text alignment' },
   guideTextStart: { ru: 'По началу', en: 'Start' },
   guideTextCenter: { ru: 'По центру', en: 'Center' },
@@ -72,5 +74,10 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   appearancePlain: { ru: 'Текст', en: 'Plain' },
   appearanceBadge: { ru: 'Плашка', en: 'Badge' },
   appearanceAccent: { ru: 'Акцентный цвет', en: 'Accent color' },
+  appearanceAccentElements: { ru: 'Номера и ссылки', en: 'Numbers and links' },
+  appearanceAccentHint: {
+    ru: 'Цвет текстовых номеров шагов и ссылок при просмотре и экспорте. Номера на плашках сохраняют своё оформление.',
+    en: 'Colors plain step numbers and links in preview and export. Badge numbers keep their own appearance.',
+  },
   appearanceAccentReset: { ru: 'Цвет по умолчанию', en: 'Default accent' },
 });

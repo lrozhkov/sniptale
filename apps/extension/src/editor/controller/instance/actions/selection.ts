@@ -10,6 +10,7 @@ export {
   previewSelectionSettingsForController,
   redoForController,
   resetToOriginalForController,
+  restoreOriginalDocumentForController,
   undoForController,
 } from './selection-document-actions';
 export {
@@ -20,6 +21,8 @@ export {
   applyLayerEffectForController,
   applyLayerTransformationForController,
   mergeSelectedLayersForController,
+  groupSelectedLayersForController,
+  ungroupSelectedLayersForController,
   previewLayerEffectForController,
   removeLayerEffectForController,
   renameLayerForController,

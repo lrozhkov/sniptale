@@ -20,6 +20,7 @@ export function ExportRoute({ startup }: { startup: PopupStartupDescriptor }) {
   return (
     <ExportPage
       isActive
+      {...(startup.page === 'export' && startup.launch ? { launch: startup.launch } : {})}
       activeTabCapabilities={capabilities}
       pageAccess={pageAccess}
       {...(startup.page === 'export' && startup.destination

@@ -210,3 +210,15 @@ describe('useScreenshotController', () => {
     await expectInvalidationReturnsActiveRunBaselineAndCleansSelection();
   });
 });
+
+it('releases an active selection on unmount after its countdown already elapsed', async () => {
+  await renderHarness(false);
+  expect(latestActionArgs).not.toBeNull();
+  latestActionArgs!.session.runActive = true;
+  act(() => {
+    root?.unmount();
+  });
+  root = null;
+  expect(handleCancelCountdownMock).toHaveBeenCalledOnce();
+  expect(disableSelectionModeIfLoadedMock).toHaveBeenCalledOnce();
+});

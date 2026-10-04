@@ -29,27 +29,41 @@ export function sizeTourHint({ hint, hintText, surface, appearance, stageWidth, 
     hint.style.borderRadius =
       appearance.presentation === 'caption-top'
         ? `0 0 ${surface.radius}px ${surface.radius}px`
-        : `${surface.radius}px ${surface.radius}px 0 0`;
+        : '0 0 0 0';
   const header = hint.querySelector('.tour-hint-header');
   const controls = hint.querySelector('.tour-hint-controls');
   const chromeHeight = caption
-    ? Math.max(28, controls.offsetHeight)
+    ? Math.max(28, controls.offsetHeight) +
+      Math.max(0, ...Array.from(header.children, (node) => node.offsetHeight))
     : header.offsetHeight + controls.offsetHeight;
-  const textHeight = maximumHeight - chromeHeight - surface.padding * 2 - (caption ? 10 : 18);
+  const textHeight = maximumHeight - chromeHeight - surface.padding * 2 - (caption ? 16 : 18);
   hintText.style.maxHeight = `${Math.max(1, textHeight)}px`;
 }
 
 /** Project the two navigation levels without a compound, ambiguous counter. */
-export function updateTourHintNavigation(hint, { index, count, page, pages, pointLabel }) {
+export function updateTourHintNavigation(
+  hint,
+  {
+    index,
+    count,
+    page,
+    pages,
+    pointLabel,
+    position = { index, count },
+    previousAvailable = false,
+    nextAvailable = false,
+  }
+) {
   const pageCount = hint.querySelector('[data-tour-hint-count]');
   const pointCount = hint.querySelector('[data-tour-hint-point-count]');
   pageCount.textContent = `${page + 1} / ${pages}`;
   pageCount.hidden = pages < 2;
-  const position = `${index + 1} / ${count}`;
-  pointCount.textContent =
-    hint.dataset.presentation === 'callout' ? `${pointLabel} ${position}` : position;
-  pointCount.setAttribute('aria-label', `${pointLabel} ${position}`);
-  pointCount.hidden = count < 2;
-  hint.querySelector('[data-tour-hint-previous]').disabled = index === 0 && page === 0;
-  hint.querySelector('[data-tour-hint-next]').disabled = index === count - 1 && page === pages - 1;
+  const label = `${position.index + 1} / ${position.count}`;
+  pointCount.textContent = label;
+  pointCount.setAttribute('aria-label', `${pointLabel} ${label}`);
+  pointCount.hidden = position.count < 2 && hint.dataset.presentation !== 'callout';
+  hint.querySelector('[data-tour-hint-previous]').disabled =
+    index === 0 && page === 0 && !previousAvailable;
+  hint.querySelector('[data-tour-hint-next]').disabled =
+    index === count - 1 && page === pages - 1 && !nextAvailable;
 }

@@ -69,6 +69,7 @@ function clickButton(button: Element | null | undefined) {
 
 function renderHeader(props: Partial<Parameters<typeof GalleryHeader>[0]> = {}) {
   const headerProps = {
+    resultActions: { visible: false, count: 0, disabled: false, onSelectAll: vi.fn() },
     allTags: [],
     activeStorageBarClass: 'storage-normal',
     folderFilter: 'all' as const,
@@ -83,6 +84,7 @@ function renderHeader(props: Partial<Parameters<typeof GalleryHeader>[0]> = {}) 
     onImportBackupClick: vi.fn(),
     onImportMediaClick: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),
@@ -178,7 +180,7 @@ it('wires compact search, sort, and centered view-mode controls without manual r
   expect(productSelectPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       className: expect.stringContaining('!h-8'),
-      containerClassName: expect.stringContaining('w-[9.5rem]'),
+      containerClassName: expect.stringContaining('w-[10.5rem]'),
       controlSize: 'sm',
       value: 'newest',
     })
@@ -190,6 +192,25 @@ it('wires compact search, sort, and centered view-mode controls without manual r
   expect(container?.textContent).not.toContain('gallery.app.description');
 });
 
+it('keeps Trash search, sort and all view controls without Library actions', () => {
+  const props = renderHeader({
+    trashMode: true,
+    search: 'deleted',
+    selectedItems: [createMediaItem({ id: 'selected' })],
+  });
+  const input = container?.querySelector<HTMLInputElement>('input');
+  expect(container?.textContent).toContain('gallery.app.trashTitle');
+  expect(input?.value).toBe('deleted');
+  expect(input?.getAttribute('aria-label')).toBe('gallery.app.trashSearchLabel');
+  expect(input?.placeholder).toBe('gallery.app.trashSearchPlaceholder');
+  expect(container?.querySelector('[data-ui="test.sort"]')).not.toBeNull();
+  expect(container?.querySelectorAll('[data-ui^="gallery.header.view-mode."]')).toHaveLength(3);
+  expect(container?.querySelector('[data-ui="gallery.header.storage"]')).toBeNull();
+  expect(container?.textContent).not.toContain('gallery.app.selectedPrefix');
+  act(() => updateInputValue(input!, 'another'));
+  expect(props.onSearchChange).toHaveBeenCalled();
+});
+
 it('keeps canonical name sorts and removes size sorting for scenarios', () => {
   renderHeader({ folderFilter: 'scenario' });
 
@@ -198,6 +219,11 @@ it('keeps canonical name sorts and removes size sorting for scenarios', () => {
     .find((props) => props.value === 'newest');
   expect(sortProps.options).toEqual(
     expect.arrayContaining([{ value: 'name-asc', label: 'gallery.app.sortNameAsc' }])
+  );
+  expect(sortProps.options).toEqual(
+    expect.arrayContaining([
+      { value: 'recently-modified', label: 'gallery.app.sortRecentlyModified' },
+    ])
   );
   expect(sortProps.options).not.toEqual(
     expect.arrayContaining([expect.objectContaining({ value: 'size-desc' })])
@@ -326,4 +352,40 @@ it('renders banner actions only when warning copy exists', () => {
     root?.render(<GalleryHeaderBanner banner={null} onBannerDismiss={vi.fn()} />);
   });
   expect(container?.textContent).not.toContain('Storage warning');
+});
+
+it('replaces Found with selection actions and restores it after deselection', () => {
+  expect(renderHeader().resultActions.visible).toBe(false);
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
+  const resultActions = { visible: true, count: 7, disabled: false, onSelectAll: vi.fn() };
+  renderHeader({ resultActions });
+  const results = container?.querySelector('[data-ui="gallery.results.toolbar"]');
+  expect(results?.textContent).toContain('gallery.app.facetResults: 7');
+  expect(container?.querySelector('header')?.className).toContain('max-2xl:h-[5.25rem]');
+  clickButton(results?.querySelector('button'));
+  expect(resultActions.onSelectAll).toHaveBeenCalledOnce();
+  const selectedItems = [createMediaItem({ id: 'selected' })];
+  const selected = renderHeader({ resultActions, selectedItems });
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
+  expect(container?.textContent).toContain('gallery.app.selectedPrefix 1');
+  clickButton(container?.querySelector('button[aria-label="gallery.app.clearSelection"]'));
+  expect(selected.onClearSelection).toHaveBeenCalledOnce();
+  renderHeader({ resultActions, selectedItems: [] });
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).not.toBeNull();
+  renderHeader({ resultActions, trashMode: true });
+  expect(container?.querySelector('[data-ui="gallery.results.toolbar"]')).toBeNull();
+});
+
+it('passes the shell search navigation contract through the header controls', () => {
+  const inputRef = { current: null as HTMLInputElement | null };
+  const onExit = vi.fn();
+  renderHeader({ searchNavigation: { inputRef, onExit }, search: 'preserved' });
+  expect(inputRef.current).toBe(container?.querySelector('input'));
+  act(() =>
+    inputRef.current?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(onExit).toHaveBeenCalledOnce();
+  expect(inputRef.current?.value).toBe('preserved');
 });

@@ -1,3 +1,7 @@
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
+import { createTrackProjection } from './track-projection';
+import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
+import { retimeReviewVoiceover } from '../../features/video/review/voiceover-timing';
 import { useEffect, useState } from 'react';
 import type {
   ReviewDocument,
@@ -5,7 +9,10 @@ import type {
   ReviewSelection,
 } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
-import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
+import type {
+  QuickEditAdvancedState,
+  QuickEditZoomRegion,
+} from '../../features/video/review/advanced/types';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
 
 /** Builds the history deletion represented by a text or edit selection. */
@@ -105,4 +112,121 @@ export function useReviewSelectionLifecycle(args: {
     if (args.selection.kind !== 'annotation') args.clearAnnotation();
   }, [args]);
   return remove;
+}
+
+/** Projects the active object's center onto the source clock used by the quick timeline. */
+export function reviewSelectionSourceTime(
+  selection: ReviewSelection,
+  document: ReviewDocument,
+  advanced: QuickEditAdvancedState,
+  duration: number,
+  markers: readonly ReviewTelemetryMarker[] = [],
+  originalAudioVisible = true
+): number | null {
+  if (!selectionTrackVisible(selection, advanced, originalAudioVisible)) return null;
+  const midpoint = (range: { start: number; end: number } | undefined) =>
+    range ? (range.start + range.end) / 2 : null;
+  switch (selection.kind) {
+    case 'none':
+      return null;
+    case 'edit':
+      return midpoint(document.edits.find((item) => item.id === selection.id));
+    case 'annotation': {
+      const anchor = document.annotations.find((item) => item.id === selection.id)?.anchor;
+      return anchor?.kind === 'point' ? anchor.time : midpoint(anchor);
+    }
+    case 'canvas-comment': {
+      const comment = document.canvasComments.find((item) => item.id === selection.id);
+      return comment?.visible ? ((comment.start ?? 0) + (comment.end ?? duration)) / 2 : null;
+    }
+    case 'telemetry':
+      return midpoint(
+        markers.find(
+          (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+        )
+      );
+    case 'zoom':
+      return midpoint(
+        focusSourceRange(
+          advanced.zoom.regions.find((item) => item.id === selection.id && !item.dormant),
+          duration,
+          document.edits
+        )
+      );
+    case 'zoom-link': {
+      const link = resolveQuickEditZoomLink(advanced.zoom.regions, selection.id);
+      return link ? focusLinkSourceTime(link, duration, document.edits) : null;
+    }
+    case 'original-audio':
+      return midpoint(advanced.audio.original.ranges?.find((item) => item.id === selection.id));
+    case 'audio': {
+      const clip = advanced.audio[selection.lane].find(
+        (item) => item.id === selection.id && !item.dormant
+      );
+      if (!clip) return null;
+      if (selection.lane === 'voiceover' && advanced.audio.voiceoverSegments)
+        return midpoint(
+          reviewVoiceoverRange(retimeReviewVoiceover(clip, advanced.audio.voiceoverSegments))
+        );
+      const range = reviewVoiceoverRange(clip);
+      const projection = createTrackProjection(duration, document.edits);
+      return (projection.source(range.start) + projection.source(range.end, 'end')) / 2;
+    }
+  }
+}
+
+function focusSourceRange(
+  region: QuickEditZoomRegion | undefined,
+  duration: number,
+  edits: ReviewDocument['edits']
+) {
+  if (!region || region.dormant) return undefined;
+  if (region.sourceAnchor) return region.sourceAnchor;
+  const projection = createTrackProjection(duration, edits);
+  return { start: projection.source(region.start), end: projection.source(region.end, 'end') };
+}
+
+/** Hidden advanced lanes keep their selection but cannot anchor viewport navigation. */
+function selectionTrackVisible(
+  selection: ReviewSelection,
+  advanced: QuickEditAdvancedState,
+  originalAudioVisible: boolean
+) {
+  const features = resolveQuickEditEffectiveFeatures(advanced);
+  switch (selection.kind) {
+    case 'zoom':
+      return features.zoomTrackVisible;
+    case 'zoom-link':
+      return features.zoomApplied;
+    case 'audio':
+      return features.audioTrackVisible;
+    case 'telemetry':
+      return features.actionsTrackVisible;
+    case 'canvas-comment':
+      return features.overlaysVisible;
+    case 'original-audio':
+      return features.mode === 'advanced' && originalAudioVisible;
+    default:
+      return true;
+  }
+}
+
+/** Link geometry uses the result gap projected to source, excluding cut-crossing links. */
+function focusLinkSourceTime(
+  link: { source: QuickEditZoomRegion; target: QuickEditZoomRegion },
+  duration: number,
+  edits: ReviewDocument['edits']
+) {
+  const projection = createTrackProjection(duration, edits);
+  const from = link.source.sourceAnchor;
+  const to = link.target.sourceAnchor;
+  if (
+    from &&
+    to &&
+    projection.cuts.some((cut) => cut.sourceStart < to.start && cut.sourceEnd > from.end)
+  )
+    return null;
+  const start = projection.source(link.source.end, 'end');
+  const end = projection.source(link.target.start);
+  return end > start ? (start + end) / 2 : null;
 }

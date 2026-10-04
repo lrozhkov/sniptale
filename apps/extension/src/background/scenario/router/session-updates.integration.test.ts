@@ -31,6 +31,9 @@ import {
 
 async function routeMessage(message: Record<string, unknown>) {
   const scenarioSessionService = createScenarioSessionServiceStub();
+  vi.mocked(scenarioSessionService.setSidebarVisible).mockResolvedValue(
+    createBaseScenarioSession()
+  );
   const sendResponse = vi.fn();
   routeScenarioMessage({
     message: message as never,

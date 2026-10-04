@@ -882,6 +882,86 @@ for (const extensionPage of builtExtensionPages) {
   });
 }
 
+test('image editor docks history below the top toolbar at HD and scrolls below it', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.goto(`${hostOrigin}/tooling/test/harness/editor.html`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await expect(page.locator('[data-ui="editor.floating.document-bar"]')).toBeVisible();
+  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toBeHidden();
+
+  const measure = () =>
+    page.evaluate(() => {
+      const bounds = (name: string) => {
+        const element = document.querySelector(`[data-ui="${name}"]`);
+        if (!element) throw new Error(`Missing editor toolbar group: ${name}`);
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+      };
+      return {
+        documentBar: bounds('editor.floating.document-bar'),
+        rail: bounds('editor.floating.tool-rail'),
+        history: bounds('editor.floating.tool-rail.history'),
+        view: bounds('editor.floating.view-controls'),
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: document.documentElement.clientWidth,
+      };
+    });
+
+  const hd = await measure();
+  expect(hd.documentBar.right).toBeLessThan(hd.rail.left);
+  expect(hd.rail.right).toBeLessThan(hd.view.left);
+  expect(hd.view.right).toBeLessThanOrEqual(1280);
+  expect(Math.max(hd.documentBar.top, hd.rail.top, hd.view.top)).toBeLessThan(16);
+  expect(hd.history.left).toBe(12);
+  expect(hd.history.right).toBeLessThan(hd.rail.left);
+  expect(hd.history.bottom).toBe(708);
+  expect(hd.documentWidth).toBe(1280);
+
+  await page.locator('[data-ui="editor.floating.tool-rail.history.reset"]').click();
+  const historyChoices = page.locator(
+    '[data-ui="editor.floating.tool-rail.history.reset-choices"]'
+  );
+  await expect(historyChoices).toBeVisible();
+  const choicesBounds = await historyChoices.boundingBox();
+  expect(choicesBounds).not.toBeNull();
+  expect(choicesBounds!.y + choicesBounds!.height).toBeLessThan(hd.history.top);
+  await page.keyboard.press('Escape');
+
+  await page.setViewportSize({ width: 1600, height: 720 });
+  const wide = await measure();
+  expect(wide.rail.right).toBeLessThan(wide.history.left);
+  expect(wide.history.top).toBeLessThan(16);
+
+  await page.setViewportSize({ width: 700, height: 720 });
+  const narrow = await measure();
+  expect(narrow.documentWidth).toBe(1280);
+  expect(narrow.viewportWidth).toBe(700);
+  for (const group of ['documentBar', 'rail', 'history', 'view'] as const) {
+    expect(narrow[group]).toEqual(hd[group]);
+  }
+  await expect(page.locator('[data-ui="editor.floating.document-bar.save-button"]')).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.scrollLeft = 580;
+  });
+  expect(await page.evaluate(() => document.documentElement.scrollLeft)).toBe(580);
+
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.evaluate(() => {
+    document.documentElement.scrollLeft = 0;
+  });
+  await page.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+  await expect(page.locator('[data-ui="content.toolbar.future-frame-callout"]')).toBeVisible();
+  const expanded = await measure();
+  expect((expanded.rail.left + expanded.rail.right) / 2).toBeCloseTo(640, 0);
+  expect(expanded.documentBar.right).toBeLessThan(expanded.rail.left);
+  expect(expanded.rail.right).toBeLessThan(expanded.view.left);
+  expect(expanded.documentWidth).toBe(1280);
+});
+
 test('content runtime is not injected before explicit site access', async ({
   page,
   hostOrigin,
@@ -1114,6 +1194,78 @@ test('settings AI sections render provider, model, and prompt template surfaces'
   await expect(
     settingsContent.getByRole('region', { name: SETTINGS_AI_SAVED_PROMPTS_LABEL, exact: true })
   ).toBeVisible();
+});
+
+test('settings subpage navigation seals the header edge while content scrolls', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1100, height: 650 });
+  await page.goto(`${hostOrigin}/tooling/test/harness/settings.html`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await page.getByRole('button', { name: 'Файлы и хранилище', exact: true }).click();
+  const nav = page.locator('[data-ui="settings.subpage-tabs"]');
+  await expect(nav).toBeVisible();
+  await page.waitForTimeout(300);
+  const geometry = () =>
+    page.evaluate(() => {
+      const header = document.querySelector('[data-ui="settings.page.header"]');
+      const scroll = document.querySelector('[data-ui="settings.page.content-scroll"]');
+      const tabs = document.querySelector('[data-ui="settings.subpage-tabs"]');
+      const firstButton = tabs?.querySelector('button');
+      if (!header || !scroll || !tabs || !firstButton) throw new Error('Settings tabs missing');
+      return {
+        backgroundColor: getComputedStyle(tabs).backgroundColor,
+        backgroundImage: getComputedStyle(tabs).backgroundImage,
+        buttonTop: firstButton.getBoundingClientRect().top,
+        headerBottom: header.getBoundingClientRect().bottom,
+        navLeft: tabs.getBoundingClientRect().left,
+        navRight: tabs.getBoundingClientRect().right,
+        navTop: tabs.getBoundingClientRect().top,
+        coversHeaderBand:
+          document.elementFromPoint(
+            tabs.getBoundingClientRect().left + 100,
+            header.getBoundingClientRect().bottom + 8
+          ) === tabs,
+        scrollLeft: scroll.getBoundingClientRect().left,
+        scrollRight: scroll.getBoundingClientRect().right,
+        scrollbarGutter: scroll.offsetWidth - scroll.clientWidth,
+      };
+    });
+  const initial = await geometry();
+  await page.locator('[data-ui="settings.page.content-scroll"]').evaluate((element) => {
+    element.scrollTop = 400;
+  });
+  const scrolled = await geometry();
+  expect(scrolled.navTop).toBeCloseTo(initial.headerBottom, 0);
+  expect(scrolled.backgroundColor).toMatch(/^rgb\(/u);
+  expect(scrolled.backgroundImage).toContain('linear-gradient');
+  expect(scrolled.coversHeaderBand).toBe(true);
+  expect(scrolled.navLeft).toBeLessThanOrEqual(scrolled.scrollLeft + 1);
+  expect(scrolled.navRight).toBeGreaterThanOrEqual(
+    scrolled.scrollRight - scrolled.scrollbarGutter - 1
+  );
+  expect(scrolled.buttonTop).toBeCloseTo(initial.buttonTop, 0);
+});
+
+test('settings wrapped subpage tabs keep keyboard focus below the sticky surface', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 420, height: 600 });
+  await page.goto(`${hostOrigin}/tooling/test/harness/settings.html?section=annotations`, {
+    waitUntil: 'domcontentloaded',
+  });
+  const nav = page.locator('[data-ui="settings.subpage-tabs"]').first();
+  await expect(nav).toBeVisible();
+  await page.waitForTimeout(300);
+  await nav.locator('button').last().focus();
+  for (let index = 0; index < 4; index += 1) await page.keyboard.press('Tab');
+  const focusTop = await page.evaluate(() => document.activeElement?.getBoundingClientRect().top);
+  const navBottom = (await nav.boundingBox())?.y ?? 0;
+  const navHeight = (await nav.boundingBox())?.height ?? 0;
+  expect(focusTop).toBeGreaterThanOrEqual(navBottom + navHeight - 1);
 });
 
 test('design-system page keeps theme ownership local and contains floating previews', async ({

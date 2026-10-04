@@ -116,6 +116,7 @@ export const SETTINGS_TRANSFER_REGISTRY = [
   ...domain('capture.saving', [
     field('capture.saving', 'templates', { kind: 'collection', dynamicItems: true }),
     field('capture.saving', 'defaults'),
+    field('capture.saving', 'filenameRules'),
   ]),
   ...domain('capture.retention', [field('capture.retention', 'policy')]),
   ...domain('styles.borders', [
@@ -136,12 +137,14 @@ export const SETTINGS_TRANSFER_REGISTRY = [
   ]),
   ...domain('styles.tool-presets', [
     field('styles.tool-presets', 'items', { kind: 'collection', dynamicItems: true }),
+    field('styles.tool-presets', 'preferences'),
   ]),
   ...domain('styles.palettes', [
     field('styles.palettes', 'items', { kind: 'collection', dynamicItems: true }),
   ]),
   ...domain('styles.surfaces', [
     field('styles.surfaces', 'items', { kind: 'collection', dynamicItems: true }),
+    field('styles.surfaces', 'defaults'),
   ]),
   ...domain('styles.video-effects', [
     field('styles.video-effects', 'items', { kind: 'collection', dynamicItems: true }),
@@ -149,6 +152,7 @@ export const SETTINGS_TRANSFER_REGISTRY = [
   ]),
   ...domain('styles.gradients', [
     field('styles.gradients', 'items', { kind: 'collection', dynamicItems: true }),
+    field('styles.gradients', 'defaults'),
   ]),
   ...domain('ai.providers', [
     field('ai.providers', 'items', { kind: 'collection', dynamicItems: true }),

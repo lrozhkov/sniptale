@@ -1,6 +1,121 @@
 import { defineMessageSource } from '../source';
 
 export const galleryAppMessages = defineMessageSource({
+  sidebarCollapse: { ru: 'Свернуть меню библиотеки', en: 'Collapse library sidebar' },
+  sidebarExpand: { ru: 'Развернуть меню библиотеки', en: 'Expand library sidebar' },
+  trashTitle: { ru: 'Корзина', en: 'Trash Bin' },
+  trashSummaryCount: { ru: 'В корзине', en: 'In Trash Bin' },
+  trashTotalSize: { ru: 'Общий объём', en: 'Total size' },
+  trashSizeExplanation: {
+    ru: 'Объём всех материалов корзины, включая связанные ресурсы, документы и предпросмотры. Размер файла в строке не включает эти ресурсы.',
+    en: 'Retained resources across the whole Trash Bin, including related assets, documents and previews. Row file sizes exclude these resources.',
+  },
+  trashRetentionDetails: { ru: 'Как работает автоочистка', en: 'How automatic cleanup works' },
+  trashCountLoading: { ru: 'Загрузка корзины…', en: 'Loading Trash Bin…' },
+  trashSizeLoading: { ru: 'Подсчёт объёма…', en: 'Calculating size…' },
+  trashSizeUnavailable: { ru: 'Объём недоступен', en: 'Size unavailable' },
+  returnToLibrary: { ru: 'В библиотеку', en: 'Back to Library' },
+  trashRetentionTitle: { ru: 'Автоочистка корзины', en: 'Automatic Trash Bin cleanup' },
+  trashRetentionEnabled: { ru: 'Включить автоочистку', en: 'Enable automatic cleanup' },
+  trashRetentionDays: { ru: 'Удалять через', en: 'Delete after' },
+  trashRetentionDaySuffix: { ru: 'дн.', en: 'days' },
+  trashRetentionExplanation: {
+    ru: 'Подходящие материалы удаляются навсегда при следующем открытии или обновлении Библиотеки, включая возврат к вкладке и изменения медиацентра. После включения могут удалиться и материалы, срок которых уже истёк. Файлы, используемые в проектах, сохраняются.',
+    en: 'Eligible items are permanently deleted on a later Library open or refresh, including when the tab becomes visible again or the media hub changes. Items already past the selected age can be deleted after you enable cleanup. Media used by projects is retained.',
+  },
+  trashRetentionLoading: { ru: 'Загружаем настройку…', en: 'Loading setting…' },
+  trashRetentionUnavailable: {
+    ru: 'Не удалось загрузить настройку автоочистки.',
+    en: 'Could not load the automatic cleanup setting.',
+  },
+  trashRetentionSaving: { ru: 'Сохраняем…', en: 'Saving…' },
+  trashRetentionSaveFailed: {
+    ru: 'Не удалось сохранить настройку. Предыдущее значение сохранено.',
+    en: 'Could not save the setting. The previous value is retained.',
+  },
+  trashRetentionRetry: { ru: 'Повторить', en: 'Retry' },
+  trashSelectAll: { ru: 'Выбрать всё', en: 'Select all' },
+  trashDeselectAll: { ru: 'Снять всё выделение', en: 'Deselect All' },
+  restoreTrash: { ru: 'Восстановить выбранное', en: 'Restore selected' },
+  restoreItem: { ru: 'Восстановить', en: 'Restore' },
+  restoringItem: { ru: 'Восстанавливаем…', en: 'Restoring…' },
+  restoreItemFailed: {
+    ru: 'Не удалось восстановить материал. Повторите попытку.',
+    en: 'Could not restore this item. Try again.',
+  },
+  permanentDelete: { ru: 'Удалить навсегда', en: 'Delete permanently' },
+  emptyTrash: { ru: 'Очистить корзину', en: 'Empty Trash Bin' },
+  confirmPermanentDelete: { ru: 'Нажмите ещё раз, чтобы удалить', en: 'Click again to confirm' },
+  moveToTrash: { ru: 'Переместить в корзину', en: 'Move to Trash Bin' },
+  moveToTrashConfirm: {
+    ru: 'Переместить выбранные материалы в корзину? Их можно будет восстановить.',
+    en: 'Move the selected items to the Trash Bin? You can restore them later.',
+  },
+  permanentDeleteConfirm: {
+    ru: 'Удалить выбранные материалы навсегда? Восстановить их будет невозможно.',
+    en: 'Permanently delete the selected items? This cannot be undone.',
+  },
+  deleteChecking: { ru: 'Проверяем связи материалов…', en: 'Checking item references…' },
+  deleteStateChanged: {
+    ru: 'Материал изменился. Обновите библиотеку и заново выберите удаление.',
+    en: 'This item changed. Refresh the library and choose deletion again.',
+  },
+  deleteReferencesChanged: {
+    ru: 'Связи с проектами изменились после подтверждения. Заново выберите удаление и проверьте предупреждение.',
+    en: 'Project references changed after confirmation. Choose deletion again and review the warning.',
+  },
+  deletePrimaryNextStep: {
+    ru: 'Сначала удалите зависимые проекты или сохраните файл.',
+    en: 'Delete the dependent projects first or keep the file.',
+  },
+  deleteRequiredSource: {
+    ru: 'Этот файл нужен проекту как основной источник. Сначала удалите зависимый проект или сохраните файл.',
+    en: 'A project requires this file as its primary source. Delete the dependent project first or keep the file.',
+  },
+  deleteScenarioBusy: {
+    ru: 'Связанный сценарий открыт в редакторе или его ресурсы используются. Закройте редактор, дождитесь завершения экспорта и повторите удаление.',
+    en: 'A linked scenario is open in an editor or its resources are in use. Close the editor, wait for export to finish, and retry deletion.',
+  },
+  deleteInvalidGraph: {
+    ru: 'Не удалось проверить сохранённые связи проектов. Материал сохранён. Проверьте доступность проектов перед повторным удалением.',
+    en: 'Stored project references could not be verified. The item is retained. Check that the projects are available before retrying deletion.',
+  },
+  deleteInvalidVideoProject: {
+    ru: 'Удаление остановлено: не удалось проверить данные видеопроекта и его связь с файлом. Файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: a video project and its file references could not be verified. The file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteInvalidScenarioProject: {
+    ru: 'Удаление остановлено: данные связанного сценария не прошли проверку. Файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: a linked scenario did not pass validation. The file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteInvalidScenarioAsset: {
+    ru: 'Удаление остановлено: не удалось проверить ресурс сценария и его связь с файлом. Файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: a scenario resource and its file reference could not be verified. The file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteInvalidQuickEdit: {
+    ru: 'Удаление остановлено: не удалось проверить данные быстрого редактирования другого файла. Удаляемый файл сохранён. Обновление библиотеки не исправит эту запись.',
+    en: 'Deletion stopped: another file’s quick-edit data could not be verified. The selected file is retained. Refreshing the library will not repair this record.',
+  },
+  deleteSourceUnavailable: {
+    ru: 'Исходные данные файла недоступны. Не удалось завершить удаление; обновите библиотеку и повторите попытку.',
+    en: 'The original file data is unavailable. Deletion could not finish; refresh the library and retry.',
+  },
+  deleteUnsupportedSource: {
+    ru: 'Этот тип материала нельзя удалить с изменением связанных проектов. Сначала удалите его из проектов.',
+    en: 'This item type cannot be deleted while changing linked projects. Remove it from the projects first.',
+  },
+  deletePendingPublication: {
+    ru: 'Сохранение изображения ещё не завершено. Дождитесь завершения сохранения и повторите удаление.',
+    en: 'The image save has not finished. Wait for it to complete and retry deletion.',
+  },
+  trashEmpty: { ru: 'Корзина пуста', en: 'Trash Bin is empty' },
+  trashNoResults: { ru: 'В корзине ничего не найдено', en: 'No matching items in Trash Bin' },
+  trashSearchPlaceholder: { ru: 'Поиск', en: 'Search' },
+  trashSearchLabel: { ru: 'Поиск в корзине', en: 'Search Trash Bin' },
+  trashCleanupFailed: {
+    ru: 'Не удалось завершить автоочистку корзины. Оставшиеся материалы сохранены; повторите обновление.',
+    en: 'Automatic Trash Bin cleanup could not finish. Remaining items are retained; refresh to retry.',
+  },
   title: {
     ru: 'Библиотека',
     en: 'Library',
@@ -36,6 +151,14 @@ export const galleryAppMessages = defineMessageSource({
   updatingPreview: {
     ru: 'Обновляем превью…',
     en: 'Updating preview…',
+  },
+  previewUnavailable: {
+    ru: 'Превью недоступно',
+    en: 'Preview unavailable',
+  },
+  openEditorToRetryPreview: {
+    ru: 'Открыть редактор для повтора превью',
+    en: 'Open editor to retry preview',
   },
   storageTitle: {
     ru: 'Хранилище',
@@ -123,6 +246,10 @@ export const galleryAppMessages = defineMessageSource({
   facetResetAll: {
     ru: 'Сбросить',
     en: 'Reset',
+  },
+  savedViewsHeading: {
+    ru: 'Сохранённые виды',
+    en: 'Saved views',
   },
   savedViewSave: {
     ru: 'Сохранить вид',
@@ -283,6 +410,10 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Поиск в Библиотеке',
     en: 'Search Library',
   },
+  clearSearch: {
+    ru: 'Очистить поиск',
+    en: 'Clear search',
+  },
   scopeLabel: {
     ru: 'Фильтр по типу хранения',
     en: 'Storage type filter',
@@ -303,6 +434,7 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Сначала новые',
     en: 'Newest first',
   },
+  sortRecentlyModified: { ru: 'Недавно изменённые', en: 'Recently modified' },
   sortOldest: {
     ru: 'Сначала старые',
     en: 'Oldest first',
@@ -415,6 +547,14 @@ export const galleryAppMessages = defineMessageSource({
     ru: 'Ничего не найдено',
     en: 'Nothing found',
   },
+  emptyLibraryTitle: {
+    ru: 'Библиотека пока пуста',
+    en: 'Your Library is empty',
+  },
+  emptyLibraryDescription: {
+    ru: 'Сделайте снимок, запишите видео или импортируйте файл — материалы появятся здесь.',
+    en: 'Capture a screenshot, record a video, or import a file to see your materials here.',
+  },
   emptyDescription: {
     ru: 'Измените фильтры, поисковую строку или настройки сохранения в Библиотеку.',
     en: 'Adjust filters, the search query, or library save settings.',
@@ -506,5 +646,21 @@ export const galleryAppMessages = defineMessageSource({
   deleteSelectedConfirm: {
     ru: 'Удалённые материалы нельзя будет восстановить.',
     en: 'Deleted items cannot be recovered.',
+  },
+  deleteAffectsProjects: {
+    ru: 'Файл также будет удалён из проектов:',
+    en: 'The file will also be removed from these projects:',
+  },
+  deleteHistoryWarning: {
+    ru: 'Связанные состояния истории также будут очищены. Сами проекты останутся.',
+    en: 'Related history states will also be cleared. The projects will remain.',
+  },
+  deleteBlockedTitle: {
+    ru: 'Сначала замените основной файл',
+    en: 'Replace the primary file first',
+  },
+  deleteBlockedPrimary: {
+    ru: 'Файл является обязательным исходником для проектов:',
+    en: 'This file is required as the primary source for:',
   },
 });

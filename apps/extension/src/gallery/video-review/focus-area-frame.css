@@ -1,0 +1,66 @@
+.review-focus-frame {
+  position: absolute;
+  pointer-events: auto;
+  cursor: move;
+  outline: none;
+  border-style: solid;
+  border-color: transparent;
+}
+.review-focus-frame[data-controls-visible='true'],
+.review-focus-frame[data-pointer-interaction='false']:focus-visible,
+[data-review-camera-area]:focus-visible
+  ~ [data-focus-plane]
+  .review-focus-frame[data-pointer-interaction='false'] {
+  border-color: var(--sniptale-color-accent);
+}
+.review-focus-grip {
+  position: absolute;
+  width: min(12px, 50%);
+  height: min(12px, 50%);
+  box-shadow: inset 0 0 0 1px white;
+  border-radius: 2px;
+  background: var(--sniptale-color-accent);
+  opacity: 0;
+}
+.review-focus-grip[data-resize='nw'],
+.review-focus-grip[data-resize='ne'] {
+  top: 0;
+}
+.review-focus-grip[data-resize='sw'],
+.review-focus-grip[data-resize='se'] {
+  bottom: 0;
+}
+.review-focus-grip[data-resize='nw'],
+.review-focus-grip[data-resize='sw'] {
+  left: 0;
+}
+.review-focus-grip[data-resize='ne'],
+.review-focus-grip[data-resize='se'] {
+  right: 0;
+}
+.review-focus-grip[data-resize='nw'],
+.review-focus-grip[data-resize='se'] {
+  cursor: nwse-resize;
+}
+.review-focus-grip[data-resize='ne'],
+.review-focus-grip[data-resize='sw'] {
+  cursor: nesw-resize;
+}
+.review-focus-center {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: none;
+  background: var(--sniptale-color-accent);
+  opacity: 0;
+}
+.review-focus-frame[data-controls-visible='true'] > span,
+.review-focus-frame[data-pointer-interaction='false']:focus-visible > span,
+[data-review-camera-area]:focus-visible
+  ~ [data-focus-plane]
+  .review-focus-frame[data-pointer-interaction='false']
+  > span {
+  opacity: 1;
+}

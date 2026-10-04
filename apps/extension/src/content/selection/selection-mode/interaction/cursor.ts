@@ -7,7 +7,7 @@ const SELECTION_CURSOR_STYLE_ID = 'sniptale-crosshair-cursor';
 type SelectionModeCursorSession = Pick<SelectionModeSession, 'cursorStyleCleanup'>;
 
 export function enableSelectionModeCursor(state: SelectionModeCursorSession): void {
-  const cursor = createCrosshairCursor();
+  const cursor = createSelectionCrosshairCursor();
   state.cursorStyleCleanup?.();
   state.cursorStyleCleanup = mountStyleInAccessibleDocuments({
     styleId: SELECTION_CURSOR_STYLE_ID,
@@ -37,7 +37,7 @@ export function disableSelectionModeCursor(state: SelectionModeCursorSession): v
   state.cursorStyleCleanup = null;
 }
 
-function createCrosshairCursor(): string {
+export function createSelectionCrosshairCursor(): string {
   const strokeColor = resolveSelectionCursorStroke();
   const svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">',

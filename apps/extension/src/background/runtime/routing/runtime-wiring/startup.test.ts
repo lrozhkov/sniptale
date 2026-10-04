@@ -5,6 +5,7 @@ const migrateCalloutSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => tru
 const migrateStepBadgeSystemPresetCatalog = vi.hoisted(() => vi.fn(async () => true));
 const ensureActivePageAccessRuntime = vi.hoisted(() => vi.fn(async () => undefined));
 const cleanupDrafts = vi.hoisted(() => vi.fn(async () => undefined));
+const repairTemporaryProjectLifecycles = vi.hoisted(() => vi.fn(async () => 0));
 const recoverPendingVideoRecordingCameraPeerCleanup = vi.hoisted(() => vi.fn(async () => true));
 const loadSettings = vi.hoisted(() =>
   vi.fn(async () => ({
@@ -22,6 +23,7 @@ vi.mock('../../../../composition/persistence/library-lifecycle', async (importOr
     typeof import('../../../../composition/persistence/library-lifecycle')
   >()),
   cleanupDrafts,
+  repairTemporaryProjectLifecycles,
 }));
 
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
@@ -92,6 +94,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
 
   runStartupMaintenance(state, logger);
   await flushMicrotasks();
+  await flushMicrotasks();
 
   expect(cleanupDrafts).toHaveBeenCalledWith({
     policy: {
@@ -119,7 +122,7 @@ it('runs startup maintenance and warns when maintenance promises reject', async 
     expect.any(Error)
   );
   expect(logger.warn).toHaveBeenCalledWith(
-    'Draft cleanup failed (non-critical)',
+    'Project retention or draft cleanup failed',
     expect.any(Error)
   );
   expect(logger.warn).toHaveBeenCalledWith(
@@ -160,8 +163,24 @@ it('does not schedule draft cleanup when automatic cleanup is disabled', async (
 
   runStartupMaintenance(createModeState(), logger);
   await flushMicrotasks();
+  await flushMicrotasks();
+
+  expect(repairTemporaryProjectLifecycles).toHaveBeenCalled();
+  expect(cleanupDrafts).not.toHaveBeenCalled();
+});
+
+it('does not start draft cleanup if project retention repair fails', async () => {
+  repairTemporaryProjectLifecycles.mockRejectedValueOnce(new Error('repair unavailable'));
+  cleanupDrafts.mockClear();
+  runStartupMaintenance(createModeState(), logger);
+  await flushMicrotasks();
+  await flushMicrotasks();
 
   expect(cleanupDrafts).not.toHaveBeenCalled();
+  expect(logger.warn).toHaveBeenCalledWith(
+    'Project retention or draft cleanup failed',
+    expect.objectContaining({ message: 'repair unavailable' })
+  );
 });
 
 it('resets reconstructible and disposable state during startup maintenance', () => {

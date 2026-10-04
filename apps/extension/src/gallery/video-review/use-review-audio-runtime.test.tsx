@@ -3,13 +3,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
-  createDefaultEngine,
   useReviewAudioRuntime,
   type ReviewAudioClipBuffer,
   type ReviewAudioEngine,
 } from './use-review-audio-runtime';
-import type { QuickEditClipSchedule } from '../../features/video/review/advanced/audio-plan';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
+import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
+import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   id: 'a',
@@ -23,70 +23,6 @@ const clip = (patch: Partial<QuickEditAudioClip> = {}): QuickEditAudioClip => ({
   fadeOut: 0,
   ...patch,
 });
-
-class FakeParam {
-  value = 0;
-  readonly points: Array<[string, number, number]> = [];
-  setValueAtTime(value: number, time: number) {
-    this.points.push(['set', value, time]);
-  }
-  linearRampToValueAtTime(value: number, time: number) {
-    this.points.push(['ramp', value, time]);
-  }
-}
-
-class FakeNode {
-  readonly gain = new FakeParam();
-  buffer: unknown = null;
-  onended: (() => void) | null = null;
-  readonly destinations: unknown[] = [];
-  started: number[] | null = null;
-  stopped = false;
-  connect(destination: unknown) {
-    this.destinations.push(destination);
-    return this;
-  }
-  disconnect() {
-    this.destinations.length = 0;
-  }
-  start(when: number, offset: number, duration: number) {
-    this.started = [when, offset, duration];
-  }
-  stop() {
-    this.stopped = true;
-  }
-}
-
-class FakeContext {
-  readonly destination = new FakeNode();
-  currentTime = 50;
-  captured: unknown = null;
-  readonly sources: FakeNode[] = [];
-  readonly gains: FakeNode[] = [];
-  resumed = false;
-  close = vi.fn(async () => undefined);
-  createGain() {
-    const node = new FakeNode();
-    this.gains.push(node);
-    return node;
-  }
-  createBufferSource() {
-    const node = new FakeNode();
-    this.sources.push(node);
-    return node;
-  }
-  createMediaElementSource(element: unknown) {
-    this.captured = element;
-    return new FakeNode();
-  }
-  resume() {
-    this.resumed = true;
-    return Promise.resolve();
-  }
-  decodeAudioData() {
-    return Promise.resolve({ duration: 9 });
-  }
-}
 
 class FakeEngine implements ReviewAudioEngine {
   scheduled: Array<{ schedule: unknown; buffer: unknown }> = [];
@@ -105,6 +41,13 @@ class FakeEngine implements ReviewAudioEngine {
   async decode() {
     return this.decoded;
   }
+  async prepareClip(
+    _buffer: ReviewAudioClipBuffer,
+    _entry: QuickEditAudioPlanEntry,
+    _signal: AbortSignal
+  ) {
+    return this.decoded;
+  }
   scheduleClip(schedule: unknown, buffer: unknown) {
     this.scheduled.push({ schedule, buffer });
     return { stop: () => undefined };
@@ -116,6 +59,85 @@ class FakeEngine implements ReviewAudioEngine {
     this.stops += 1;
   }
 }
+
+it('keeps music alive through a source Cut jump and reschedules only a real output seek', async () => {
+  const map = createReviewTimeMap(12, [
+    { id: 'cut', kind: 'cut', start: 3, end: 6, requestedStart: 3, requestedEnd: 6 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 6,
+      end: 10,
+      requestedStart: 6,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const engine = new FakeEngine();
+  const music = [clip({ timelineStart: 0, duration: 7, sourceOffset: 1 })];
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2.9,
+    music,
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  const stops = engine.stops;
+  engine.currentTime = 100.1;
+  await act(async () => root.render(<Harness outputTime={map.sourceToTimeline(6)!} />));
+  engine.currentTime = 100.6;
+  await act(async () => root.render(<Harness outputTime={map.sourceToTimeline(7)!} />));
+  expect(engine.stops).toBe(stops);
+  expect(engine.scheduled).toHaveLength(1);
+  await act(async () => root.render(<Harness outputTime={5} />));
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 6, duration: 2 });
+});
+
+it.each(['pause', 'seek'] as const)(
+  'rejects pending tempo preparation after %s and retries from the current clock',
+  async (action) => {
+    const engine = new FakeEngine();
+    const gates: { signal: AbortSignal; resolve(buffer: ReviewAudioClipBuffer): void }[] = [];
+    vi.spyOn(engine, 'prepareClip').mockImplementation(
+      (_buffer, _entry, signal) => new Promise((resolve) => gates.push({ signal, resolve }))
+    );
+    const onFailure = vi.fn();
+    const { Harness } = renderRuntime({
+      createEngine: () => engine,
+      playing: true,
+      outputTime: 3,
+      voiceover: [clip({ sourceOffset: 1, duration: 2, playbackRate: 2 })],
+      resolveAsset: async () => new Blob(),
+      onFailure,
+    });
+    await act(async () => {
+      root.render(<Harness />);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(gates).toHaveLength(1);
+    await act(async () =>
+      root.render(action === 'pause' ? <Harness playing={false} /> : <Harness outputTime={3.5} />)
+    );
+    expect(gates[0]!.signal.aborted).toBe(true);
+    await act(async () => gates[0]!.resolve({ duration: 2 }));
+    expect(engine.scheduled).toHaveLength(0);
+    if (action === 'pause') await act(async () => root.render(<Harness playing />));
+    expect(gates).toHaveLength(2);
+    engine.currentTime = 100.25;
+    await act(async () => gates[1]!.resolve({ duration: 2 }));
+    expect(engine.scheduled).toHaveLength(1);
+    expect(engine.scheduled[0]!.schedule).toMatchObject({
+      when: 100.25,
+      playbackRate: 1,
+      offset: action === 'pause' ? 1.25 : 1.75,
+      duration: action === 'pause' ? 0.75 : 0.25,
+    });
+    expect(onFailure).not.toHaveBeenCalled();
+  }
+);
 
 type RuntimeArgs = Parameters<typeof useReviewAudioRuntime>[0];
 
@@ -134,15 +156,6 @@ afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
-
-function captureFakeContext(assign: (made: FakeContext) => void): typeof AudioContext {
-  const Constructing = function () {
-    const made = new FakeContext();
-    assign(made);
-    return made;
-  };
-  return Constructing as unknown as typeof AudioContext;
-}
 
 function renderRuntime(args: Partial<RuntimeArgs>) {
   const base: RuntimeArgs = {
@@ -187,7 +200,7 @@ it('schedules a running external clip from the current output time', async () =>
     duration: 3,
     envelope: [
       [100, 1],
-      [103, 0],
+      [103, 1],
     ],
   });
   expect(engine.scheduled[0]!.buffer).toBe(engine.decoded);
@@ -227,6 +240,27 @@ it('schedules future clips with lead-in', async () => {
   });
   expect(engine.scheduled).toHaveLength(1);
   expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 103, offset: 0, duration: 4 });
+});
+
+it('silences original and external clips during capture, then restores the authored gain', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2,
+    music: [clip()],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => {
+    root.render(<Harness />);
+    await Promise.resolve();
+  });
+  const before = engine.stops;
+  await act(async () => root.render(<Harness playing={false} silent />));
+  expect(engine.stops).toBeGreaterThan(before);
+  expect(engine.gains.at(-1)).toBe(0);
+  await act(async () => root.render(<Harness playing={false} silent={false} />));
+  expect(engine.gains.at(-1)).toBe(1);
 });
 
 it('stops all nodes on pause', async () => {
@@ -348,93 +382,6 @@ it('keeps original-audio amplification in the graph gain', async () => {
     await Promise.resolve();
   });
   expect(engine.gains.at(-1)).toBe(1);
-});
-
-it('builds the default Web Audio engine graph', async () => {
-  let context!: FakeContext;
-  vi.stubGlobal(
-    'AudioContext',
-    captureFakeContext((made) => (context = made))
-  );
-  const element = document.createElement('video');
-  const engine = createDefaultEngine(element);
-  expect(context.captured).toBe(element);
-  engine!.setOriginalGain(2);
-  expect(context.gains[0]!.gain.value).toBe(2);
-  engine!.setOriginalGain(0.5);
-  expect(context.gains[0]!.gain.value).toBe(1);
-  const schedule = {
-    when: 60,
-    offset: 2,
-    duration: 3,
-    envelope: [
-      [60, 1],
-      [63, 0],
-    ] as QuickEditClipSchedule['envelope'],
-  };
-  const handle = engine!.scheduleClip(schedule, { duration: 9 });
-  expect(context.sources).toHaveLength(1);
-  expect(context.sources[0]!.started).toEqual([60, 2, 3]);
-  expect(context.sources[0]!.destinations[0]).toBe(context.gains[1]);
-  const gain = context.gains[1]!;
-  expect(gain.gain.points).toEqual([
-    ['set', 1, 60],
-    ['ramp', 0, 63],
-  ]);
-  handle.stop();
-  expect(context.sources[0]!.stopped).toBe(true);
-  expect(context.sources[0]!.destinations).toHaveLength(0);
-  context.sources[0]!.onended?.();
-  engine!.dispose();
-  engine!.dispose();
-  expect(context.close).toHaveBeenCalledTimes(1);
-  vi.unstubAllGlobals();
-});
-
-it('creates a default engine without a captured element', async () => {
-  let context!: FakeContext;
-  vi.stubGlobal(
-    'AudioContext',
-    captureFakeContext((made) => (context = made))
-  );
-  const engine = createDefaultEngine(null);
-  expect(context.captured).toBeNull();
-  engine!.setOriginalGain(2);
-  expect(context.gains).toHaveLength(0);
-  const handle = engine!.scheduleClip(
-    {
-      when: 60,
-      offset: 0,
-      duration: 2,
-      envelope: [[60, 1]] as QuickEditClipSchedule['envelope'],
-    },
-    { duration: 2 }
-  );
-  handle.stop();
-  vi.unstubAllGlobals();
-});
-
-it('ignores stop failures from finished clip sources', async () => {
-  let context!: FakeContext;
-  vi.stubGlobal(
-    'AudioContext',
-    captureFakeContext((made) => (context = made))
-  );
-  const engine = createDefaultEngine(null);
-  const handle = engine!.scheduleClip(
-    {
-      when: 60,
-      offset: 0,
-      duration: 2,
-      envelope: [[60, 1]] as QuickEditClipSchedule['envelope'],
-    },
-    { duration: 2 }
-  );
-  context.sources[0]!.stop = () => {
-    throw new Error('already ended');
-  };
-  expect(() => handle.stop()).not.toThrow();
-  vi.unstubAllGlobals();
 });
 
 it('does not reschedule during sustained playback', async () => {
@@ -596,4 +543,23 @@ it('accounts for elapsed decoding time instead of starting late audio from its o
     resolve(new Blob());
   });
   expect(engine.scheduled[0]!.schedule).toMatchObject({ when: 101, offset: 2, duration: 2 });
+});
+
+it('schedules a zero-fade voiceover at constant volume through its end', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 4,
+    voiceover: [clip({ volume: 0.7 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  expect(engine.scheduled[0]!.schedule).toMatchObject({
+    duration: 2,
+    envelope: [
+      [100, 0.7],
+      [102, 0.7],
+    ],
+  });
 });

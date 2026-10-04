@@ -1,5 +1,6 @@
+import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate } from '../../platform/i18n';
-import { ChevronRight } from 'lucide-react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import {
@@ -13,7 +14,9 @@ export function reviewTimelineItemTone(
   kind: 'neutral' | 'cut' | 'speed' | 'focus' = 'neutral'
 ): string {
   const border = selected
-    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)]'
+    ? 'border-[var(--sniptale-color-accent)] text-[var(--sniptale-color-accent)] ' +
+      '[--review-item-foreground:var(--sniptale-color-text-primary)] [--review-waveform-opacity:1] ' +
+      '[--review-label-weight:600]'
     : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]';
   const surface = {
     neutral: 'bg-[var(--sniptale-color-surface-hover)]',
@@ -28,25 +31,31 @@ export function reviewTimelineItemTone(
 
 /** Consistent visible grips and hit areas across editable timeline lanes. */
 export const reviewTimelineResizeHandleClassName =
-  'absolute inset-y-0 z-10 flex w-3 cursor-ew-resize items-center justify-center rounded ' +
+  'absolute inset-y-0 z-10 flex w-3 items-center justify-center rounded ' +
+  '!cursor-ew-resize disabled:!cursor-default [&_*]:!cursor-[inherit] ' +
   'bg-[var(--sniptale-color-surface-hover)]';
 
 const iconButtonBase =
   '!h-8 !w-8 !min-h-8 !shadow-none !border !border-solid !border-transparent ' +
   '!bg-transparent !text-[var(--sniptale-color-text-secondary)] ' +
-  'enabled:hover:!border-[var(--sniptale-color-border-strong)] ' +
   'enabled:hover:!text-[var(--sniptale-color-text-primary)] ' +
   'disabled:!text-[var(--sniptale-color-text-muted)] disabled:!bg-transparent disabled:opacity-40';
 
-/** Selected tools use an accent icon; only hover draws a border. */
-export const reviewIconButtonClassName =
-  iconButtonBase +
+const iconHoverBorder = ' enabled:hover:!border-[var(--sniptale-color-border-strong)] ';
+const iconSelection =
   ' aria-pressed:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-pressed:hover:!text-[var(--sniptale-color-accent-emphasis)]';
+
+/** Selected tools use an accent icon; only hover draws a border. */
+export const reviewIconButtonClassName = iconButtonBase + iconHoverBorder + iconSelection;
+
+/** Compact lane toggles brighten their icon while retaining a quiet border. */
+export const reviewCompactTrackButtonClassName = iconButtonBase + iconSelection;
 
 /** Lane status highlights suppression; aria-pressed still reports whether the lane is enabled. */
 export const reviewTrackStatusButtonClassName =
   iconButtonBase +
+  iconHoverBorder +
   ' enabled:aria-[pressed=false]:!text-[var(--sniptale-color-accent)] ' +
   'enabled:aria-[pressed=false]:hover:!text-[var(--sniptale-color-accent-emphasis)]';
 
@@ -57,7 +66,7 @@ export const reviewTextButtonClassName =
 /** Reversible delete actions keep the same geometry with a distinct danger tone. */
 export const reviewDeleteButtonClassName =
   reviewTextButtonClassName +
-  ' !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
+  ' review-inspector-danger !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
 
 /** Read-only timing uses the same label/value row as editable inspector parameters. */
 export function ReviewInterval({ start, end }: { start: number; end: number }) {
@@ -66,7 +75,7 @@ export function ReviewInterval({ start, end }: { start: number; end: number }) {
       className="flex min-h-8 items-center justify-between gap-3 py-0.5"
       data-ui="gallery.videoReview.interval"
     >
-      <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+      <span className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
         {translate(
           start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
         )}
@@ -81,11 +90,7 @@ export function ReviewInterval({ start, end }: { start: number; end: number }) {
 }
 
 /** Inline parameter selectors use the same geometry and typography as numeric rows. */
-export const reviewSelectFieldClassName =
-  '!min-h-8 !rounded-none !border-0 !bg-transparent !px-0 !py-0 ' +
-  '[&>span]:!whitespace-normal [&>span]:!overflow-visible [&>span]:!text-xs ' +
-  '[&>span]:!font-semibold [&>span]:!text-[var(--sniptale-color-text-secondary)] ' +
-  '[&>div]:!w-auto [&>div]:!max-w-[65%]';
+export const reviewSelectFieldClassName = '!min-h-9 !border-0 !bg-transparent !px-0 !py-0';
 
 /** Same control language as the gallery inspector, with a stable accessible label. */
 export function ReviewButton({
@@ -156,18 +161,38 @@ export function reviewEventLabel(kind: string): string {
 }
 
 /** Rare numeric adjustments stay keyboard-accessible behind a native disclosure. */
-export function ReviewDetails({ label, children }: { label: string; children: ReactNode }) {
+export function ReviewDetails({
+  label,
+  preferenceId,
+  children,
+  icon: Icon,
+  level = 'group',
+  initiallyOpen,
+}: {
+  label: string;
+  preferenceId: string;
+  children: ReactNode;
+  icon?: LucideIcon;
+  level?: 'section' | 'group';
+  initiallyOpen?: boolean;
+}) {
+  const [open, setOpen] = useInspectorDisclosure(preferenceId, initiallyOpen ?? false);
+  const Heading = level === 'section' ? 'h3' : 'h4';
   return (
-    <details className="group min-w-0">
-      <summary
-        className="flex cursor-pointer list-none items-center gap-2 py-2 text-xs font-semibold
-        text-[var(--sniptale-color-text-secondary)] hover:text-[var(--sniptale-color-text-primary)]
-        focus-visible:outline focus-visible:outline-[var(--sniptale-color-accent)] [&::-webkit-details-marker]:hidden"
-      >
-        <ChevronRight size={14} aria-hidden="true" className="shrink-0 group-open:rotate-90" />
-        {label}
+    <details
+      data-ui="gallery.videoReview.disclosure"
+      data-level={level}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
+      }}
+    >
+      <summary>
+        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
+        <Heading>{label}</Heading>
+        <ChevronDown size={level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>
-      <div className="space-y-3 pt-2">{children}</div>
+      <div className="review-inspector-section-body">{children}</div>
     </details>
   );
 }

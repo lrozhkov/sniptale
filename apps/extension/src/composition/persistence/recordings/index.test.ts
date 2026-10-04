@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  deleteUnreferenced: vi.fn(),
   buildDelete: vi.fn(),
   completeDelete: vi.fn(),
   dbGet: vi.fn(),
@@ -11,7 +12,11 @@ const mocks = vi.hoisted(() => ({
   saveBatch: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../media-library/delete-cascade', () => ({
+  deleteUnreferencedMediaSource: mocks.deleteUnreferenced,
+}));
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   ASSET_OPERATIONS_STORE: 'asset_operations',
   ASSET_OWNERS_STORE: 'asset_owners',
   ASSET_REFS_STORE: 'asset_refs',
@@ -115,76 +120,22 @@ describe('recordings catalog', () => {
     expect(mocks.readFile).not.toHaveBeenCalled();
   });
 
-  it('commits a physical-delete intent with the graph unlink and completes it afterward', async () => {
-    const deletes: Array<[string, unknown]> = [];
-    const puts: Array<[string, unknown]> = [];
-    const stores = new Map<string, ReturnType<typeof createStore>>();
-    const tx = {
-      done: Promise.resolve(),
-      objectStore(name: string) {
-        let store = stores.get(name);
-        if (!store) {
-          store = createStore(name, deletes, puts);
-          stores.set(name, store);
-        }
-        return store;
-      },
-    };
-    const db = { transaction: vi.fn().mockReturnValue(tx) };
-    mocks.runMutation.mockImplementation(async (operation) => operation(db));
-
-    await deleteRecording(stored.id);
-
-    expect(puts).toContainEqual([
-      'asset_operations',
-      expect.objectContaining({ assetIds: ['asset-1'], kind: 'physical-delete' }),
-    ]);
-    expect(mocks.completeDelete).toHaveBeenCalledWith(
-      expect.objectContaining({ assetIds: ['asset-1'] })
-    );
-  });
-
-  it('keeps a shared asset and skips physical deletion', async () => {
-    const stores = new Map<string, ReturnType<typeof createStore>>();
-    const tx = {
-      done: Promise.resolve(),
-      objectStore(name: string) {
-        let store = stores.get(name);
-        if (!store) {
-          store = createStore(name, [], []);
-          if (name === 'asset_owners')
-            store.index = vi.fn(() => ({ count: vi.fn().mockResolvedValue(1) }));
-          stores.set(name, store);
-        }
-        return store;
-      },
-    };
-    mocks.runMutation.mockImplementation(async (operation) => operation({ transaction: () => tx }));
-
-    await deleteRecording(stored.id);
-
+  it('propagates source-admission failure from common service deletion', async () => {
+    const failure = new Error('retained consumer');
+    mocks.deleteUnreferenced.mockRejectedValueOnce(failure);
+    await expect(deleteRecording(stored.id)).rejects.toBe(failure);
+    expect(mocks.deleteUnreferenced).toHaveBeenCalledWith({
+      id: `recording:${stored.id}`,
+      source: { kind: 'recording', recordingId: stored.id },
+    });
     expect(mocks.completeDelete).not.toHaveBeenCalled();
   });
 
   it('streams the compatibility Blob input through the batch owner', async () => {
     const blob = new Blob(['video'], { type: 'video/webm' });
     await saveRecording('recording-1', blob, 'recording.webm');
-
     expect(mocks.saveBatch).toHaveBeenCalledWith([
       { blob, filename: 'recording.webm', id: 'recording-1' },
     ]);
   });
 });
-
-function createStore(
-  name: string,
-  deletes: Array<[string, unknown]>,
-  puts: Array<[string, unknown]>
-) {
-  return {
-    delete: vi.fn(async (key: unknown) => deletes.push([name, key])),
-    get: vi.fn().mockResolvedValue(name === 'recordings' ? stored : undefined),
-    index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
-    put: vi.fn(async (value: unknown) => puts.push([name, value])),
-  };
-}

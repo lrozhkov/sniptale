@@ -1,3 +1,6 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
+import { areNewReviewSourcesAvailable, readReviewReadySources } from './new-reference-admission';
 import {
   STORE_NAME,
   PROJECT_ASSETS_STORE,
@@ -20,7 +23,7 @@ import {
 } from '../../../features/video/review/document';
 import { parseReviewOperation, parseReviewSource } from '../../../features/video/review/validation';
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
-import type { ReviewSource } from '../../../features/video/review/types';
+import type { ReviewHistoryDirection, ReviewSource } from '../../../features/video/review/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
 
@@ -100,30 +103,39 @@ export async function readVideoWorkspace(
 
 async function mutate<T>(
   aggregateId: string,
-  operation: (tx: WriteTransaction) => Promise<T>
+  operation: (tx: WriteTransaction, prepared: ReviewReadySources) => Promise<T>,
+  admitsSources = false
 ): Promise<T> {
-  return runWithIndexedDbMutation(async (db) => {
-    const tx = beginWriteTransaction(db);
-    try {
-      const media = parseMediaLibraryEntry(
-        await tx.objectStore(MEDIA_LIBRARY_STORE).get(aggregateId)
-      );
-      if (!media || !media.mimeType.startsWith('video/'))
-        throw new VideoWorkspaceError('missing-media');
-      const result = await operation(tx);
-      await tx.done;
-      return result;
-    } catch (error) {
+  const execute = (prepared: ReviewReadySources) =>
+    runWithIndexedDbMutation(async (db) => {
+      const tx = beginWriteTransaction(db);
       try {
-        tx.abort();
-      } catch {
-        /* A failed transaction may already be inactive. */
+        const media = parseMediaLibraryEntry(
+          await tx.objectStore(MEDIA_LIBRARY_STORE).get(aggregateId)
+        );
+        if (!media || !media.mimeType.startsWith('video/'))
+          throw new VideoWorkspaceError('missing-media');
+        const result = await operation(tx, prepared);
+        await tx.done;
+        return result;
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {
+          /* A failed transaction may already be inactive. */
+        }
+        await tx.done.catch(() => undefined);
+        throw error;
       }
-      await tx.done.catch(() => undefined);
-      throw error;
-    }
-  });
+    });
+  if (!admitsSources) return execute(new Map());
+  await initDB();
+  return runWithDurableAssetLifecycleLock(async () =>
+    execute(await readReviewReadySources(aggregateId))
+  );
 }
+
+type ReviewReadySources = Awaited<ReturnType<typeof readReviewReadySources>>;
 
 /** Opens the single session, retaining its complete history and recovery field on re-entry. */
 export async function openVideoWorkspace(
@@ -181,7 +193,8 @@ async function requireSnapshot(
 
 async function putWorkspace(
   tx: WriteTransaction,
-  workspace: VideoWorkspace
+  workspace: VideoWorkspace,
+  prepared: ReviewReadySources = new Map()
 ): Promise<VideoWorkspace> {
   const next = parseVideoWorkspace({
     ...workspace,
@@ -189,6 +202,22 @@ async function putWorkspace(
     updatedAt: Math.max(Date.now(), workspace.updatedAt),
   });
   if (!next) throw new VideoWorkspaceError('invalid');
+  const previous = parseVideoWorkspace(
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).get(next.aggregateId)
+  );
+  if (!previous) throw new VideoWorkspaceError('invalid');
+  if (
+    !(await areNewReviewSourcesAvailable(
+      next,
+      previous,
+      {
+        assets: tx.objectStore(PROJECT_ASSETS_STORE),
+        media: tx.objectStore(MEDIA_LIBRARY_STORE),
+      },
+      prepared
+    ))
+  )
+    throw new VideoWorkspaceError('missing-media');
   await tx.objectStore(VIDEO_WORKSPACES_STORE).put(next);
   return next;
 }
@@ -201,56 +230,66 @@ export async function commitVideoWorkspace(args: {
   operation: unknown;
   consumeDraftRevision?: number;
 }): Promise<VideoWorkspaceSnapshot> {
-  return mutate(args.aggregateId, async (tx) => {
-    const { workspace, draft } = await requireSnapshot(
-      tx,
-      args.aggregateId,
-      args.expectedRevision,
-      args.expectedSourceAssetId
-    );
-    const parsed = parseReviewOperation(args.operation, workspace.source.duration);
-    if (!parsed) throw new VideoWorkspaceError('invalid');
-    const operation =
-      parsed.target === 'edit'
-        ? {
-            ...parsed,
-            preserveFocusAnchors: true as const,
-            preserveVoiceoverAnchors: true as const,
-          }
-        : parsed;
-    if (
-      args.consumeDraftRevision !== undefined &&
-      (!draft ||
-        draft.revision !== args.consumeDraftRevision ||
-        operation.target !== 'annotation' ||
-        JSON.stringify(operation.after) !== JSON.stringify(draft.annotation) ||
-        JSON.stringify(operation.before) !== JSON.stringify(draft.before))
-    )
-      throw new VideoWorkspaceError('conflict');
-    const document = replayReviewHistory(
-      workspace.history,
-      workspace.cursor,
-      workspace.source,
-      reviewAdvancedContentBaseline(workspace.advanced)
-    );
-    applyReviewOperation(document, operation, workspace.source);
-    const next = await putWorkspace(tx, {
-      ...workspace,
-      history: [...workspace.history.slice(0, workspace.cursor), operation],
-      cursor: workspace.cursor + 1,
-    });
-    if (args.consumeDraftRevision !== undefined)
-      await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
-    return { workspace: next, draft: args.consumeDraftRevision === undefined ? draft : null };
-  });
+  return mutate(
+    args.aggregateId,
+    async (tx, prepared) => {
+      const { workspace, draft } = await requireSnapshot(
+        tx,
+        args.aggregateId,
+        args.expectedRevision,
+        args.expectedSourceAssetId
+      );
+      const parsed = parseReviewOperation(args.operation, workspace.source.duration);
+      if (!parsed) throw new VideoWorkspaceError('invalid');
+      const operation =
+        parsed.target === 'edit'
+          ? {
+              ...parsed,
+              preserveFocusAnchors: true as const,
+              preserveUnderCuts: true as const,
+              preserveVoiceoverAnchors: true as const,
+              normalizeVoiceoverTempo: true as const,
+            }
+          : parsed;
+      if (
+        args.consumeDraftRevision !== undefined &&
+        (!draft ||
+          draft.revision !== args.consumeDraftRevision ||
+          operation.target !== 'annotation' ||
+          JSON.stringify(operation.after) !== JSON.stringify(draft.annotation) ||
+          JSON.stringify(operation.before) !== JSON.stringify(draft.before))
+      )
+        throw new VideoWorkspaceError('conflict');
+      const document = replayReviewHistory(
+        workspace.history,
+        workspace.cursor,
+        workspace.source,
+        reviewAdvancedContentBaseline(workspace.advanced)
+      );
+      applyReviewOperation(document, operation, workspace.source);
+      const next = await putWorkspace(
+        tx,
+        {
+          ...workspace,
+          history: [...workspace.history.slice(0, workspace.cursor), operation],
+          cursor: workspace.cursor + 1,
+        },
+        prepared
+      );
+      if (args.consumeDraftRevision !== undefined)
+        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
+      return { workspace: next, draft: args.consumeDraftRevision === undefined ? draft : null };
+    },
+    isRecord(args.operation) && args.operation['target'] === 'advancedContent'
+  );
 }
 
-/** Moves one strict undo/redo step; a boundary click does not create a revision. */
+/** Moves the existing cursor atomically; a boundary click does not create a revision. */
 export async function moveVideoWorkspaceHistory(args: {
   aggregateId: string;
   expectedRevision: number;
   expectedSourceAssetId: string;
-  direction: 'undo' | 'redo';
+  direction: ReviewHistoryDirection;
 }): Promise<VideoWorkspaceSnapshot> {
   return mutate(args.aggregateId, async (tx) => {
     const snapshot = await requireSnapshot(
@@ -259,8 +298,16 @@ export async function moveVideoWorkspaceHistory(args: {
       args.expectedRevision,
       args.expectedSourceAssetId
     );
-    const cursor = snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
-    if (cursor < 0 || cursor > snapshot.workspace.history.length) return snapshot;
+    const cursor =
+      args.direction === 'start'
+        ? 0
+        : snapshot.workspace.cursor + (args.direction === 'undo' ? -1 : 1);
+    if (
+      cursor === snapshot.workspace.cursor ||
+      cursor < 0 ||
+      cursor > snapshot.workspace.history.length
+    )
+      return snapshot;
     return { ...snapshot, workspace: await putWorkspace(tx, { ...snapshot.workspace, cursor }) };
   });
 }
@@ -272,20 +319,24 @@ export async function saveVideoWorkspaceAdvanced(args: {
   expectedSourceAssetId: string;
   advanced: unknown;
 }): Promise<VideoWorkspaceSnapshot> {
-  return mutate(args.aggregateId, async (tx) => {
-    const snapshot = await requireSnapshot(
-      tx,
-      args.aggregateId,
-      args.expectedRevision,
-      args.expectedSourceAssetId
-    );
-    const advanced = loadQuickEditAdvancedState(args.advanced);
-    if (!advanced) throw new VideoWorkspaceError('invalid');
-    return {
-      ...snapshot,
-      workspace: await putWorkspace(tx, { ...snapshot.workspace, advanced }),
-    };
-  });
+  return mutate(
+    args.aggregateId,
+    async (tx, prepared) => {
+      const snapshot = await requireSnapshot(
+        tx,
+        args.aggregateId,
+        args.expectedRevision,
+        args.expectedSourceAssetId
+      );
+      const advanced = loadQuickEditAdvancedState(args.advanced);
+      if (!advanced) throw new VideoWorkspaceError('invalid');
+      return {
+        ...snapshot,
+        workspace: await putWorkspace(tx, { ...snapshot.workspace, advanced }, prepared),
+      };
+    },
+    true
+  );
 }
 
 /** Saves or explicitly discards field recovery, independently of the document history. */
@@ -328,4 +379,58 @@ export async function saveVideoWorkspaceDraft(args: {
     await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).put(draft);
     return { ...snapshot, draft };
   });
+}
+
+/** Atomically saves a paused editor buffer, rejecting both document and draft-only competitors. */
+export async function saveVideoWorkspaceSnapshot(args: {
+  aggregateId: string;
+  expectedRevision: number;
+  expectedDraftRevision: number | null;
+  expectedSourceAssetId: string;
+  workspace: unknown;
+  draft: unknown;
+}): Promise<VideoWorkspaceSnapshot> {
+  return mutate(
+    args.aggregateId,
+    async (tx, prepared) => {
+      const current = await requireSnapshot(
+        tx,
+        args.aggregateId,
+        args.expectedRevision,
+        args.expectedSourceAssetId
+      );
+      if ((current.draft?.revision ?? null) !== args.expectedDraftRevision)
+        throw new VideoWorkspaceError('conflict');
+      const workspace = parseVideoWorkspace(args.workspace);
+      if (
+        !workspace ||
+        workspace.aggregateId !== args.aggregateId ||
+        workspace.sourceAssetId !== current.workspace.sourceAssetId ||
+        JSON.stringify(workspace.source) !== JSON.stringify(current.workspace.source)
+      )
+        throw new VideoWorkspaceError('invalid');
+      const parsedDraft =
+        args.draft === null
+          ? null
+          : parseVideoWorkspaceDraft(args.draft, workspace.source.duration);
+      if (args.draft !== null && (!parsedDraft || parsedDraft.aggregateId !== args.aggregateId))
+        throw new VideoWorkspaceError('invalid');
+      const next = await putWorkspace(
+        tx,
+        {
+          ...workspace,
+          revision: current.workspace.revision,
+          createdAt: current.workspace.createdAt,
+        },
+        prepared
+      );
+      const draft = parsedDraft
+        ? { ...parsedDraft, revision: (current.draft?.revision ?? 0) + 1, updatedAt: Date.now() }
+        : null;
+      if (draft) await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).put(draft);
+      else await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(args.aggregateId);
+      return { workspace: next, draft };
+    },
+    true
+  );
 }

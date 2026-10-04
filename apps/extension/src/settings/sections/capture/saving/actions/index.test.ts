@@ -242,7 +242,7 @@ describe('save presets section validation actions', () => {
       path: 'Shots--/nested',
     });
     expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetCreated');
 
     const callCount = sync.updateSettings.mock.calls.length;
     await actions.handleSavePreset('   ', 'ignored', true);
@@ -269,7 +269,7 @@ describe('save presets section edit validation actions', () => {
       path: 'Existing',
     });
     expect(dialogState.closeEditor).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(toastSuccessMock).toHaveBeenCalledWith('savePresets.messages.presetUpdated');
   });
 });
 

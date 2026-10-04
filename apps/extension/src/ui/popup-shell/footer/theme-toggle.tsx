@@ -12,12 +12,6 @@ import {
 } from '../../theme/index';
 
 const logger = createLogger({ namespace: 'shared:ui:popup-footer' });
-const THEME_ICON_CLASS_NAME = [
-  'h-3.5 w-3.5 transition-transform duration-200 ease-out',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-  'motion-reduce:transition-none',
-].join(' ');
-
 function resolveFooterTheme(): AppTheme {
   const preference = getStoredThemePreference() ?? 'system';
 
@@ -26,11 +20,11 @@ function resolveFooterTheme(): AppTheme {
 
 function getFooterThemeButtonClassName() {
   return [
-    'group inline-flex h-7 w-7 items-center justify-center rounded-full border-none transition-colors',
-    'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_88%,transparent)]',
-    'text-[var(--sniptale-color-accent)]',
-    'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_96%,transparent)]',
+    'inline-flex h-7 w-7 items-center justify-center rounded-full border-none transition-colors',
+    'bg-transparent text-[var(--sniptale-color-text-secondary)]',
+    'hover:bg-[var(--sniptale-color-surface-hover)]',
     'hover:text-[var(--sniptale-color-text-primary)]',
+    'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
   ].join(' ');
 }
 
@@ -121,10 +115,7 @@ export function PopupFooterThemeToggle() {
       role="group"
       aria-label={translate('popup.common.footerThemeToggleAria')}
       className={[
-        [
-          'inline-flex h-8 items-center rounded-full',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]',
-        ].join(' '),
+        ['inline-flex h-8 items-center rounded-full', 'bg-transparent'].join(' '),
         'p-0.5 shadow-none',
       ].join(' ')}
     >
@@ -137,7 +128,7 @@ export function PopupFooterThemeToggle() {
         onClick={() => setNextPreference(nextPreference)}
         className={getFooterThemeButtonClassName()}
       >
-        <ThemeIcon className={THEME_ICON_CLASS_NAME} />
+        <ThemeIcon className="h-3.5 w-3.5" />
       </button>
     </div>
   );

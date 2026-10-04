@@ -1,13 +1,8 @@
 import React, { useState } from 'react';
-import {
-  ProductGlassChip,
-  ProductGlassRow,
-  ProductGlassSectionLabel,
-} from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
 import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
-import type { CompactSelectOption } from '../../chrome/ui';
+import { SelectField, type CompactSelectOption } from '../../chrome/ui';
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
 
 interface BrowserFrameState {
@@ -21,9 +16,9 @@ export const BrowserFrameBehaviorSections: React.FC<{
   browserFrame: BrowserFrameState;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
 }> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => (
-  <fieldset className="space-y-3">
+  <fieldset className="space-y-2.5">
     <legend className="sr-only">{translate('editor.compact.browserFrameLayout')}</legend>
-    <BrowserFrameChoiceRow
+    <SelectField
       label={translate('editor.compact.canvasBehavior')}
       options={browserCanvasModeOptions}
       value={browserFrame.canvasMode}
@@ -33,7 +28,7 @@ export const BrowserFrameBehaviorSections: React.FC<{
         )
       }
     />
-    <BrowserFrameChoiceRow
+    <SelectField
       label={translate('editor.compact.sceneBehavior')}
       options={browserContentModeOptions}
       value={browserFrame.contentMode}
@@ -45,31 +40,6 @@ export const BrowserFrameBehaviorSections: React.FC<{
     />
   </fieldset>
 );
-
-function BrowserFrameChoiceRow<T extends string>(props: {
-  label: string;
-  onChange: (value: T) => void;
-  options: CompactSelectOption<T>[];
-  value: T;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <ProductGlassSectionLabel>{props.label}</ProductGlassSectionLabel>
-      <ProductGlassRow>
-        {props.options.map((option) => (
-          <ProductGlassChip
-            key={option.value}
-            active={option.value === props.value}
-            aria-pressed={option.value === props.value}
-            onClick={() => props.onChange(option.value)}
-          >
-            {option.label}
-          </ProductGlassChip>
-        ))}
-      </ProductGlassRow>
-    </div>
-  );
-}
 
 export const BrowserFrameInsertSection: React.FC<{
   disabled?: boolean;

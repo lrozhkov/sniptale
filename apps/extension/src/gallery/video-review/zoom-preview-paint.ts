@@ -1,4 +1,12 @@
-import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
+import { serializePaintToCss } from '@sniptale/foundation/paint';
+import {
+  computeQuickEditSceneCamera,
+  computeQuickEditVisibleSourceRect,
+} from '../../features/video/review/advanced/scene';
+import type {
+  QuickEditBackgroundSettings,
+  QuickEditZoomRegion,
+} from '../../features/video/review/advanced/types';
 import type {
   computeQuickEditSceneLayout,
   QuickEditRect,
@@ -11,6 +19,7 @@ export type ZoomPreviewLayout = ReturnType<typeof computeQuickEditSceneLayout>;
 export function paintZoomPreview(
   context: CanvasRenderingContext2D,
   args: {
+    background?: QuickEditBackgroundSettings;
     accent: string;
     camera: QuickEditZoomRegion['transform'];
     frame: ZoomPreviewFrame | null;
@@ -19,18 +28,21 @@ export function paintZoomPreview(
     view: 'area' | 'result';
     width: number;
     cornerRadius?: number;
+    showControls?: boolean;
   }
 ) {
   const { videoRect, videoTransform } = args.layout;
+  const motion = computeQuickEditSceneCamera(args.layout, args.background ?? { enabled: false });
+  const clip = args.view === 'area' ? videoRect : motion.videoClip;
   context.clearRect(0, 0, args.width, args.height);
   context.save();
   context.beginPath();
   context.roundRect(
-    videoRect.x,
-    videoRect.y,
-    videoRect.width,
-    videoRect.height,
-    args.cornerRadius ?? 0
+    clip.x,
+    clip.y,
+    clip.width,
+    clip.height,
+    (args.cornerRadius ?? 0) * (args.view === 'result' ? motion.scale : 1)
   );
   context.clip();
   const target = args.view === 'area' ? videoRect : videoTransform;
@@ -41,19 +53,23 @@ export function paintZoomPreview(
     context.fillRect(target.x, target.y, target.width, target.height);
   }
   context.restore();
-  if (args.view === 'area') {
+  if (args.view === 'area' && args.showControls !== false) {
+    const visible = computeQuickEditVisibleSourceRect(
+      args.layout,
+      args.background ?? { enabled: false },
+      args
+    );
     const footprint: QuickEditRect = {
-      x: videoRect.x + ((videoRect.x - videoTransform.x) / videoTransform.width) * videoRect.width,
-      y:
-        videoRect.y + ((videoRect.y - videoTransform.y) / videoTransform.height) * videoRect.height,
-      width: videoRect.width / args.camera.scale,
-      height: videoRect.height / args.camera.scale,
+      x: videoRect.x + visible.x * videoRect.width,
+      y: videoRect.y + visible.y * videoRect.height,
+      width: visible.width * videoRect.width,
+      height: visible.height * videoRect.height,
     };
     context.strokeStyle = args.accent;
     context.lineWidth = 2;
     context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   }
-  if (args.view !== 'area') return;
+  if (args.view !== 'area' || args.showControls === false) return;
   context.fillStyle = args.accent;
   context.beginPath();
   context.arc(
@@ -64,4 +80,11 @@ export function paintZoomPreview(
     Math.PI * 2
   );
   context.fill();
+}
+
+/** CSS background paint shared by the source preview and its camera canvas. */
+export function previewBackgroundPaint(background: QuickEditBackgroundSettings): string {
+  if (!background.enabled || background.type === 'image') return '#000000';
+  if (background.type === 'solid') return background.color;
+  return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
 }

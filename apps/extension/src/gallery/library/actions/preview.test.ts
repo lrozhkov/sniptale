@@ -3,7 +3,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createClosePreviewAction, createSaveMetadataAction, resetPreviewChanges } from './preview';
-import { createNavigatePreviewAction } from './preview-navigation';
+import {
+  createNavigatePreviewAction,
+  createPreviewNavigationCoordinator,
+} from './preview-navigation';
 import {
   createController,
   createMediaItem,
@@ -178,6 +181,177 @@ async function verifyFailedPreviewNavigationKeepsCurrentItem() {
   expect(getState().preview.session.item).toEqual(currentItem);
 }
 
+async function verifyCleanPreviewNavigationAvoidsLibraryRefresh() {
+  const currentItem = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const nextItem = createMediaItem({ filename: 'next.png', id: 'asset-2' });
+  const { controller, getState } = createController({ previewItem: currentItem });
+
+  await createNavigatePreviewAction(controller)(nextItem, runBusyAction);
+
+  expect(getState().preview.session.item).toEqual(nextItem);
+  expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
+}
+
+async function verifyNewestDirtyNavigationWins() {
+  const first = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const second = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+  const third = createMediaItem({ filename: 'third.png', id: 'asset-3' });
+  const { controller, getState } = createController({
+    filenameDraft: 'renamed.png',
+    previewItem: first,
+  });
+  let resolveSave!: () => void;
+  updateMediaLibraryEntrySafelyMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (resolveSave = resolve))
+  );
+  const coordinator = createPreviewNavigationCoordinator();
+  const navigate = createNavigatePreviewAction(controller, coordinator, () => controller.state);
+
+  const toSecond = navigate(second, runBusyAction);
+  const toThird = navigate(third, runBusyAction);
+  expect(getState().preview.session.item).toEqual(first);
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledTimes(1);
+  resolveSave();
+  await Promise.all([toSecond, toThird]);
+
+  expect(getState().preview.session.item).toEqual(third);
+  expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(1);
+}
+
+async function verifyEditedDraftStopsPendingNavigation() {
+  const first = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const second = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'renamed.png',
+    previewItem: first,
+  });
+  let resolveSave!: () => void;
+  updateMediaLibraryEntrySafelyMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (resolveSave = resolve))
+  );
+  const navigate = createNavigatePreviewAction(
+    controller,
+    createPreviewNavigationCoordinator(),
+    () => controller.state
+  );
+
+  const pending = navigate(second, runBusyAction);
+  controller.actions.preview.setFilenameDraft('newer.png');
+  resolveSave();
+  await pending;
+
+  expect(getState().preview.session.item).toEqual(first);
+  expect(getState().preview.draft.filename).toBe('newer.png');
+  expect(controller.actions.storage.refresh).not.toHaveBeenCalled();
+}
+
+async function verifySettledSaveIsNotReusedForLaterEdit() {
+  const first = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const second = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'renamed.png',
+    previewItem: first,
+  });
+  let resolveSave!: () => void;
+  updateMediaLibraryEntrySafelyMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (resolveSave = resolve))
+  );
+  const coordinator = createPreviewNavigationCoordinator();
+  const navigate = createNavigatePreviewAction(controller, coordinator, () => controller.state);
+
+  const firstAttempt = navigate(second, runBusyAction);
+  controller.actions.preview.setFilenameDraft('newer.png');
+  resolveSave();
+  await firstAttempt;
+  expect(getState().preview.session.item).toEqual(first);
+
+  controller.actions.preview.setPreview({
+    inspectorCollapsed: false,
+    item: { ...first, filename: 'external.png', updatedAt: first.updatedAt + 1 },
+    url: null,
+  });
+  controller.actions.preview.setFilenameDraft('renamed.png');
+  await navigate(second, runBusyAction);
+
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledTimes(2);
+  expect(getState().preview.session.item).toEqual(second);
+}
+
+async function verifyRevertedDraftIsSavedAfterPendingNavigation() {
+  const first = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const second = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'temporary.png',
+    previewItem: first,
+  });
+  let resolveSave!: () => void;
+  updateMediaLibraryEntrySafelyMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (resolveSave = resolve))
+  );
+  const coordinator = createPreviewNavigationCoordinator();
+  const navigate = createNavigatePreviewAction(controller, coordinator, () => controller.state);
+
+  const firstAttempt = navigate(second, runBusyAction);
+  controller.actions.preview.setFilenameDraft('first.png');
+  resolveSave();
+  await firstAttempt;
+  expect(getState().preview.session.item).toEqual(first);
+
+  await navigate(second, runBusyAction);
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenNthCalledWith(2, 'asset-1', {
+    filename: 'first.png',
+  });
+  expect(getState().preview.session.item).toEqual(second);
+}
+
+async function verifyNavigationWritesAreOrdered() {
+  const first = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const second = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'temporary.png',
+    previewItem: first,
+  });
+  let resolveFirst!: () => void;
+  updateMediaLibraryEntrySafelyMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (resolveFirst = resolve))
+  );
+  const coordinator = createPreviewNavigationCoordinator();
+  const navigate = createNavigatePreviewAction(controller, coordinator, () => controller.state);
+  const firstAttempt = navigate(second, runBusyAction);
+  controller.actions.preview.setFilenameDraft('latest.png');
+  const latestAttempt = navigate(second, runBusyAction);
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenCalledTimes(1);
+  resolveFirst();
+  await Promise.all([firstAttempt, latestAttempt]);
+  expect(updateMediaLibraryEntrySafelyMock).toHaveBeenNthCalledWith(2, 'asset-1', {
+    filename: 'latest.png',
+  });
+  expect(getState().preview.session.item).toEqual(second);
+}
+
+async function verifyClosedPreviewRejectsPendingNavigation() {
+  const first = createMediaItem({ filename: 'first.png', id: 'asset-1' });
+  const second = createMediaItem({ filename: 'second.png', id: 'asset-2' });
+  const { controller, getState } = createController({
+    filenameDraft: 'renamed.png',
+    previewItem: first,
+  });
+  let resolveSave!: () => void;
+  updateMediaLibraryEntrySafelyMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (resolveSave = resolve))
+  );
+  const coordinator = createPreviewNavigationCoordinator();
+  const navigate = createNavigatePreviewAction(controller, coordinator, () => controller.state);
+
+  const pending = navigate(second, runBusyAction);
+  coordinator.revision += 1;
+  controller.actions.preview.setPreview({ inspectorCollapsed: false, item: null, url: null });
+  resolveSave();
+  await pending;
+
+  expect(getState().preview.session.item).toBeNull();
+}
+
 async function verifyMissingPreviewMetadataNoop() {
   const { controller } = createController();
 
@@ -188,6 +362,25 @@ async function verifyMissingPreviewMetadataNoop() {
 }
 
 describe('gallery app preview and shared actions', () => {
+  it(
+    'switches a clean preview without rescanning the library',
+    verifyCleanPreviewNavigationAvoidsLibraryRefresh
+  );
+  it('commits only the newest overlapping dirty navigation', verifyNewestDirtyNavigationWins);
+  it(
+    'keeps a newer metadata draft during a pending navigation save',
+    verifyEditedDraftStopsPendingNavigation
+  );
+  it('does not reuse a settled save for a later edit', verifySettledSaveIsNotReusedForLaterEdit);
+  it(
+    'saves a draft restored to its old baseline after a pending write',
+    verifyRevertedDraftIsSavedAfterPendingNavigation
+  );
+  it('orders different drafts before committing navigation', verifyNavigationWritesAreOrdered);
+  it(
+    'does not reopen a closed preview after a pending save',
+    verifyClosedPreviewRejectsPendingNavigation
+  );
   it('persists media draft metadata when closing the preview', verifyPreviewMetadataCloseFlow);
   it(
     'persists scenario draft metadata only on preview close',

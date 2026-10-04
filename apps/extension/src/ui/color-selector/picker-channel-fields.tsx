@@ -11,7 +11,7 @@ type PickerChannelField = {
 
 function PickerChannelFieldGrid(props: { fields: readonly PickerChannelField[] }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid min-w-0 grid-cols-3 gap-1">
       {props.fields.map((field) => (
         <PickerNumericInputField
           key={field.ariaLabel}
@@ -36,16 +36,8 @@ export function PickerRgbFields(props: {
   red: number | string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <PickerModeLabelRow
-        mode={props.mode}
-        onCycle={props.onCycle}
-        labels={[
-          translate('shared.ui.colorSelectorRed'),
-          translate('shared.ui.colorSelectorGreen'),
-          translate('shared.ui.colorSelectorBlue'),
-        ]}
-      />
+    <div className="grid items-center gap-1 @min-[240px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
+      <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerChannelFieldGrid
         fields={[
           {
@@ -83,16 +75,8 @@ export function PickerHslFields(props: {
   saturation: number | string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <PickerModeLabelRow
-        mode={props.mode}
-        onCycle={props.onCycle}
-        labels={[
-          translate('shared.ui.colorSelectorHue'),
-          translate('shared.ui.colorSelectorSaturation'),
-          translate('shared.ui.colorSelectorLightness'),
-        ]}
-      />
+    <div className="grid items-center gap-1 @min-[240px]/picker:grid-cols-[3.5rem_minmax(0,1fr)]">
+      <PickerModeLabelRow mode={props.mode} onCycle={props.onCycle} />
       <PickerChannelFieldGrid
         fields={[
           {

@@ -143,7 +143,7 @@ function createDragFrames(dom: SelectionModeDom, visual: ResolvedBorderPresetVis
 function expectDragFrameStyles(dom: SelectionModeDom) {
   expect(dom.dragFrame).not.toBeNull();
   expect(dom.overlayContainer?.querySelectorAll('.sniptale-selection-drag-frame')).toHaveLength(1);
-  expect(dom.dragFrame?.style.border).toContain('3px dotted');
+  expect(dom.dragFrame?.style.outline).toContain('3px dotted');
   expect(dom.dragFrame?.style.backgroundColor).toBe('rgba(34, 197, 94, 0.24)');
   expect(dom.dragFrame?.style.borderRadius).toBe('10px');
   expect(dom.dragFrame?.style.boxShadow).not.toContain('9999px');

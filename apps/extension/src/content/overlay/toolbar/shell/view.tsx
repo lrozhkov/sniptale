@@ -1,4 +1,5 @@
 import React from 'react';
+import { ToolbarDockingGuides } from './docking-guides';
 import { ContentToolbarDragHandle, ContentToolbarShell } from '@sniptale/ui/content-toolbar';
 import { ToolbarPrimaryControls } from '../controls/primary';
 import { ToolbarSecondaryControls } from '../controls/secondary';
@@ -24,6 +25,15 @@ function getToolbarVisibilityStyle(
   } as const;
 }
 
+function clearPointerActivatedToolbarFocus(event: React.MouseEvent<HTMLDivElement>) {
+  if (event.button !== 0 || !(event.target instanceof Element)) return;
+  const button = event.target.closest<HTMLButtonElement>('button.sniptale-btn');
+  if (!button || !event.currentTarget.contains(button) || button.disabled) return;
+  // Both native mousedown and the activation bridge focus after this handler unless cancelled.
+  event.preventDefault();
+  if (button.matches(':focus')) button.blur();
+}
+
 export function ToolbarShellContent(props: {
   toolbarProps: ToolbarProps;
   viewModel: ToolbarViewModel;
@@ -38,6 +48,9 @@ export function ToolbarShellContent(props: {
 
   return (
     <>
+      {derivedState.isDragging && !derivedState.freePlacement ? (
+        <ToolbarDockingGuides activeEdge={derivedState.dockPreview} uiScale={uiScale} />
+      ) : null}
       {menuOpen ? <div className="sniptale-toolbar-menu-interaction-guard" aria-hidden /> : null}
       <div
         className="sniptale-toolbar-positioner"
@@ -55,6 +68,7 @@ export function ToolbarShellContent(props: {
           data-display-mode={derivedState.displayMode}
           data-video-recording={toolbarProps.videoRecordingMode ? 'true' : undefined}
           data-menu-open={menuOpen ? 'true' : undefined}
+          onMouseDownCapture={clearPointerActivatedToolbarFocus}
           onMouseOverCapture={onHoverCapture}
         >
           <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>

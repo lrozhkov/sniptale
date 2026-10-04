@@ -96,6 +96,7 @@ beforeEach(() => {
       objectStore: vi.fn(() => ({
         delete: txDeleteMock,
         get: txGetMock,
+        getAll: vi.fn(async () => []),
         index: vi.fn(() => ({ getAll: txIndexGetAllMock })),
         put: txPutMock,
       })),
@@ -140,7 +141,7 @@ it('stores scenario projects with refreshed timestamps and parses reads', async 
   );
 });
 
-it('lists and cascade-deletes stored scenario projects', async () => {
+it('lists projects and preserves malformed children during parent deletion', async () => {
   dbGetAllMock.mockResolvedValue([
     createProjectRecord('project-1', 'Existing', 10, 12345),
     createProjectRecord('project-2', 'Older', 5, 20),
@@ -178,15 +179,8 @@ it('lists and cascade-deletes stored scenario projects', async () => {
       workspaceRevision: 1,
     },
   ]);
-  await deleteScenarioProject('project-1');
-
-  expect(txDeleteMock).toHaveBeenNthCalledWith(1, 'project-1');
-  expect(txDeleteMock).toHaveBeenNthCalledWith(2, 'asset-1');
-  expect(txDeleteMock).toHaveBeenNthCalledWith(3, 'asset-2');
-  expect(txDeleteMock).toHaveBeenNthCalledWith(4, 'export-1');
-  expect(txDeleteMock).toHaveBeenNthCalledWith(5, 'export-2');
-  expect(txDeleteMock).toHaveBeenNthCalledWith(6, 'step-1');
-  expect(txDeleteMock).toHaveBeenNthCalledWith(7, ['scenario', 'project-1']);
+  await expect(deleteScenarioProject('project-1')).rejects.toThrow('Invalid scenario resource');
+  expect(txDeleteMock).not.toHaveBeenCalled();
 });
 
 it('handles missing project records and guarded fresh project timestamps', async () => {

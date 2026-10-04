@@ -4,6 +4,7 @@ import type { EditorFrameSettings } from '../../../features/editor/document/type
 import type { CompactSelectOption } from '../../chrome/ui';
 import { renderEditorInspectorFrameSection } from './size';
 import { EditorInspectorResizeToolSection } from './resize-tool';
+import { EditorInspectorDocumentPanel, type DocumentInspectorMode } from './document-panel';
 import {
   renderEditorInspectorContentSurfaceSections,
   type EditorInspectorContentSurfaceSectionsProps,
@@ -22,6 +23,7 @@ export interface EditorInspectorContentBodyProps extends EditorInspectorContentS
   imageAspectRatio: number | null;
   canvasAspectRatio: number | null;
   frameDraft: EditorFrameSettings;
+  lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   framePaddingSummary: string;
   layoutModeLabel: string;
   backgroundModeLabel: string;
@@ -65,12 +67,8 @@ export function renderEditorInspectorContentBody(
     return renderEditorInspectorResizeToolSection(props, controller);
   }
 
-  if (props.inspector === 'image-size') {
-    return renderEditorInspectorResizeToolSection(props, controller);
-  }
-
-  if (props.inspector === 'canvas-size') {
-    return renderEditorInspectorResizeToolSection(props, controller);
+  if (isDocumentInspectorMode(props.inspector)) {
+    return renderEditorInspectorDocumentPanel(props, props.inspector);
   }
 
   if (props.inspector === 'frame') {
@@ -78,6 +76,51 @@ export function renderEditorInspectorContentBody(
   }
 
   return renderEditorInspectorContentSurfaceSections(props);
+}
+
+function isDocumentInspectorMode(
+  inspector: string
+): inspector is 'browser-frame' | 'meta' | 'image-size' | 'canvas-size' {
+  return (
+    inspector === 'browser-frame' ||
+    inspector === 'meta' ||
+    inspector === 'image-size' ||
+    inspector === 'canvas-size'
+  );
+}
+
+function renderEditorInspectorDocumentPanel(
+  props: EditorInspectorContentBodyProps,
+  inspector: DocumentInspectorMode
+) {
+  return (
+    <EditorInspectorDocumentPanel
+      browserCanvasModeOptions={props.browserCanvasModeOptions}
+      browserContentModeOptions={props.browserContentModeOptions}
+      browserFrame={props.browserFrame}
+      canvasAspectRatio={props.canvasAspectRatio}
+      canvasSize={props.canvasSize}
+      canvasSizeDraft={props.canvasSizeDraft}
+      canvasSizeLocked={props.canvasSizeLocked}
+      canvasSizeText={props.canvasSizeText}
+      cropReady={props.cropReady}
+      cropSelection={props.cropSelection}
+      imageAspectRatio={props.imageAspectRatio}
+      imageSizeDraft={props.imageSizeDraft}
+      imageSizeLocked={props.imageSizeLocked}
+      imageSizeText={props.imageSizeText}
+      inspector={inspector}
+      setCanvasSizeDraft={props.setCanvasSizeDraft}
+      setCanvasSizeLocked={props.setCanvasSizeLocked}
+      setImageSizeDraft={props.setImageSizeDraft}
+      setImageSizeLocked={props.setImageSizeLocked}
+      syncBrowserFrame={props.syncBrowserFrame}
+      updateLockedDraft={props.updateLockedDraft}
+      {...(props.insertOrUpdateBrowserFrame === undefined
+        ? {}
+        : { insertOrUpdateBrowserFrame: props.insertOrUpdateBrowserFrame })}
+    />
+  );
 }
 
 function renderEditorInspectorResizeToolSection(

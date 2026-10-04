@@ -1,3 +1,5 @@
+import { getGalleryPrimaryShortcut, getGalleryShortcutTitle } from '../keyboard/shortcut-labels';
+import { isGalleryScenarioExportItem } from '../items';
 import { Archive, Download, FolderArchive, Trash2, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -64,21 +66,28 @@ function GallerySelectionActions(
 ) {
   return (
     <>
-      <button
-        type="button"
-        aria-label={translate('gallery.app.selectionBackup')}
-        title={translate('gallery.app.selectionBackup')}
-        onClick={props.onSelectionBackup}
-        className={gallerySelectionActionClassName}
-      >
-        <Archive className="h-4 w-4" aria-hidden="true" />
-        <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
-      </button>
+      {props.selectedItems.some((item) => !isGalleryScenarioExportItem(item)) ? (
+        <button
+          type="button"
+          aria-label={translate('gallery.app.selectionBackup')}
+          title={translate('gallery.app.selectionBackup')}
+          onClick={props.onSelectionBackup}
+          className={gallerySelectionActionClassName}
+        >
+          <Archive className="h-4 w-4" aria-hidden="true" />
+          <span className="hidden 2xl:inline">{translate('gallery.app.selectionBackup')}</span>
+        </button>
+      ) : null}
       <button
         type="button"
         aria-label={translate('common.actions.delete')}
-        title={translate('common.actions.delete')}
-        onClick={() => props.onDeleteMany(props.selectedItems)}
+        title={getGalleryShortcutTitle(translate('common.actions.delete'), 'Del')}
+        onClick={(event) =>
+          props.onDeleteMany(props.selectedItems, {
+            anchor: event.currentTarget,
+            keyboard: event.detail === 0,
+          })
+        }
         className={galleryDangerSelectionActionClassName}
       >
         <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -136,9 +145,9 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
       <button
         type="button"
         aria-label={translate('gallery.app.clearSelection')}
-        title={translate('gallery.app.clearSelection')}
+        title={getGalleryShortcutTitle(translate('gallery.app.clearSelection'), 'Escape')}
         onClick={onClearSelection}
-        className={galleryClearSelectionClassName}
+        className={['sniptale-dismiss-button', galleryClearSelectionClassName].join(' ')}
       >
         <X className="h-4 w-4" aria-hidden="true" />
       </button>
@@ -146,31 +155,72 @@ export function GallerySelectionBar(props: GallerySelectionBarProps) {
         aria-hidden="true"
         className="mx-0.5 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
       />
-      <GallerySelectionTagInput
-        {...(allTags === undefined ? {} : { allTags })}
-        onApplySelectionTag={onApplySelectionTag}
-        onSelectionTagDraftChange={onSelectionTagDraftChange}
-        selectionTagDraft={selectionTagDraft}
-      />
-      <button
-        type="button"
-        aria-label={downloadLabel}
-        title={downloadLabel}
-        onClick={onSelectionZip}
-        className={gallerySelectionActionClassName}
-      >
-        {downloadsSingleOriginal ? (
-          <Download className="h-4 w-4" aria-hidden="true" />
-        ) : (
-          <FolderArchive className="h-4 w-4" aria-hidden="true" />
-        )}
-        <span className="hidden 2xl:inline">{downloadLabel}</span>
-      </button>
+      {selectedItems.some((item) => !isGalleryScenarioExportItem(item)) ? (
+        <>
+          <GallerySelectionTagInput
+            {...(allTags === undefined ? {} : { allTags })}
+            onApplySelectionTag={onApplySelectionTag}
+            onSelectionTagDraftChange={onSelectionTagDraftChange}
+            selectionTagDraft={selectionTagDraft}
+          />
+          <button
+            type="button"
+            aria-label={downloadLabel}
+            title={downloadLabel}
+            onClick={onSelectionZip}
+            className={gallerySelectionActionClassName}
+          >
+            {downloadsSingleOriginal ? (
+              <Download className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <FolderArchive className="h-4 w-4" aria-hidden="true" />
+            )}
+            <span className="hidden 2xl:inline">{downloadLabel}</span>
+          </button>
+        </>
+      ) : null}
       <GallerySelectionActions
         onDeleteMany={onDeleteMany}
         onSelectionBackup={onSelectionBackup}
         selectedItems={selectedItems}
       />
+    </div>
+  );
+}
+
+/** Result actions use the same current filtered set and selection callback as the sidebar. */
+export interface GalleryFoundResultsProps {
+  count: number;
+  disabled: boolean;
+  onSelectAll(): void;
+}
+
+export function GalleryFoundResultsBar(props: GalleryFoundResultsProps) {
+  return (
+    <div
+      role="toolbar"
+      aria-label={translate('gallery.app.facetResults')}
+      data-ui="gallery.results.toolbar"
+      className="flex h-8 min-w-0 items-center gap-2"
+    >
+      <span className="whitespace-nowrap px-1 text-xs text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.app.facetResults')}:{' '}
+        <span className="font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+          {props.count}
+        </span>
+      </span>
+      <button
+        type="button"
+        disabled={props.disabled || props.count === 0}
+        className={gallerySelectionActionClassName}
+        title={getGalleryShortcutTitle(
+          translate('gallery.app.selectAllResults'),
+          getGalleryPrimaryShortcut('A')
+        )}
+        onClick={props.onSelectAll}
+      >
+        {translate('gallery.app.selectAllResults')}
+      </button>
     </div>
   );
 }

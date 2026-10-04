@@ -58,3 +58,24 @@ describe('selection-mode runtime setup', () => {
     expect(session.currentState).toBe('confirmed');
   });
 });
+
+it('uses immutable frozen bounds for selection and returns to live measurements without a frame', () => {
+  const { runtime, session } = createSetupFixture();
+  const element = document.createElement('div');
+  vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(new DOMRect(300, 400, 20, 30));
+  expect(runtime.getAbsolutePosition(element)).toEqual({ x: 300, y: 400, width: 20, height: 30 });
+  session.frozenFrame = {
+    dataUrl: 'data:image/png;base64,frame',
+    geometry: {
+      width: 1200,
+      height: 800,
+      scale: 1,
+      getRect: () => ({ x: 10, y: 20, width: 100, height: 80 }),
+      targetAt: () => element,
+      assertViewport: vi.fn(),
+    },
+  };
+  expect(runtime.getAbsolutePosition(element)).toEqual({ x: 10, y: 20, width: 100, height: 80 });
+  session.frozenFrame = null;
+  expect(runtime.getAbsolutePosition(element).x).toBe(300);
+});

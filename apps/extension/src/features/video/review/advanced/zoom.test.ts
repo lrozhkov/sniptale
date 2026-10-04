@@ -4,6 +4,7 @@ import {
   clampQuickEditZoomRegion,
   createQuickEditZoomRegion,
   insertQuickEditZoomRegion,
+  fitQuickEditZoomTransitions,
   moveQuickEditZoomRegion,
   resolveQuickEditZoomLink,
   trimQuickEditZoomRegion,
@@ -235,4 +236,75 @@ describe('trimQuickEditZoomRegion', () => {
       trimQuickEditZoomRegion({ regions, id: 'a', edge: 'end', time: 0, timelineDuration: 10 })
     ).toEqual({ start: 0, end: 0.001 });
   });
+});
+
+describe('effect animation duration budget', () => {
+  it.each([0.001, 0.1, 0.5])('fits defaults into a %s second effect', (duration) => {
+    const created = createQuickEditZoomRegion({ id: 'short', at: 0, duration });
+    expect(created.enter.duration).toBeCloseTo(duration / 2, 8);
+    expect(created.exit.duration).toBeCloseTo(duration / 2, 8);
+  });
+
+  it('caps an edited phase without changing the other phase', () => {
+    const original = region('a', 0, 2);
+    const updated = updateQuickEditZoomRegion([original], 'a', {
+      enter: { type: 'linear', duration: 5 },
+    })[0]!;
+    expect(updated.enter.duration).toBeCloseTo(1.7);
+    expect(updated.exit).toEqual(original.exit);
+    expect(original.enter.duration).toBe(0.3);
+  });
+
+  it('contracts both phases proportionally on a boundary edit', () => {
+    const original = {
+      ...region('a', 0, 10),
+      enter: { type: 'linear' as const, duration: 4 },
+      exit: { type: 'linear' as const, duration: 2 },
+    };
+    const updated = updateQuickEditZoomRegion([original], 'a', { end: 3 })[0]!;
+    expect(updated.enter.duration).toBe(2);
+    expect(updated.exit.duration).toBe(1);
+  });
+});
+
+it('fits source defaults before projecting draw/action geometry at high Speed', () => {
+  const created = createQuickEditZoomRegion({
+    id: 'fast',
+    at: 0,
+    duration: 0.1,
+    sourceAnchor: { start: 0, end: 1 },
+  });
+  expect(created.enter.duration).toBe(0.3);
+  expect(created.exit.duration).toBe(0.3);
+});
+
+it('preserves valid five-second phases, zeroes none and derives legacy values without repair', () => {
+  const original = {
+    ...region('legacy', 0, 2),
+    enter: { type: 'linear' as const, duration: 4 },
+    exit: { type: 'linear' as const, duration: 2 },
+  };
+  expect(fitQuickEditZoomTransitions(original)).toMatchObject({
+    enter: { duration: 4 / 3 },
+    exit: { duration: 2 / 3 },
+  });
+  expect(original.enter.duration).toBe(4);
+  expect(updateQuickEditZoomRegion([original], 'legacy', { scale: 2 })[0]!.enter).toEqual(
+    original.enter
+  );
+  const long = {
+    ...region('long', 0, 10),
+    enter: { type: 'linear' as const, duration: 5 },
+    exit: { type: 'linear' as const, duration: 5 },
+  };
+  expect(fitQuickEditZoomTransitions(long)).toEqual(long);
+  const none = updateQuickEditZoomRegion([long], 'long', {
+    enter: { type: 'none', duration: 5 },
+  })[0]!;
+  expect(none.enter.duration).toBe(0);
+  expect(none.exit.duration).toBe(5);
+  expect(
+    updateQuickEditZoomRegion([none], 'long', { exit: { type: 'linear', duration: 12 } })[0]!.exit
+      .duration
+  ).toBe(10);
 });

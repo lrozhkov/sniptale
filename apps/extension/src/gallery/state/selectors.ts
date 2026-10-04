@@ -1,13 +1,14 @@
+import { buildGalleryListLayout } from '../library/main-content/recording-units';
 import { compareStrings, translate } from '../../platform/i18n';
 import { formatBytes } from '../../platform/i18n/format-bytes';
 import type { ScenarioProjectSummary } from '../../features/scenario/contracts/types/project';
 import {
   FOLDER_FILTER_KIND_MAP,
-  getGalleryGridCardLayout,
   GRID_CARD_MIN_WIDTH_BY_MODE,
   GRID_GAP,
   GRID_OVERSCAN_ROWS,
 } from '../library/constants';
+import { getGalleryGridLayout } from '../library/grid-layout';
 import type {
   FolderFilter,
   GalleryFolderCounts,
@@ -20,7 +21,7 @@ import type {
   SortMode,
 } from './types';
 import { isGalleryMediaItem, type GalleryItem } from '../library/items';
-import { formatDate } from '../library/ui';
+import { createGalleryDateFormatter } from '../library/ui/date';
 import { getGalleryDateBucketLabel } from './date-facets';
 import {
   SIZE_BUCKETS,
@@ -184,7 +185,7 @@ function matchesGalleryFolderFilter(
   }
 
   if (folderFilter === 'scenario') {
-    return kind === 'scenario' || kind === 'scenario-export';
+    return kind === 'scenario';
   }
 
   return FOLDER_FILTER_KIND_MAP[folderFilter].includes(kind);
@@ -196,25 +197,27 @@ export function getGalleryCounts(
 ): GalleryFolderCounts {
   const next: GalleryFolderCounts = {
     all: 0,
+    audio: 0,
     screenshot: 0,
     recording: 0,
     export: 0,
     'web-snapshot': 0,
     scenario: 0,
+    'video-project': 0,
   };
 
   for (const item of items) {
     next.all += 1;
 
-    if (item.kind === 'scenario' || item.kind === 'scenario-export') {
-      next.scenario += 1;
-      if (item.kind === 'scenario') {
-        continue;
-      }
-    }
+    if (item.kind === 'scenario') next.scenario += 1;
+    if (item.kind === 'video-project') next['video-project'] = (next['video-project'] ?? 0) + 1;
 
     if (FOLDER_FILTER_KIND_MAP.screenshot.includes(item.kind)) {
       next.screenshot += 1;
+    }
+
+    if (FOLDER_FILTER_KIND_MAP.audio.includes(item.kind)) {
+      next.audio += 1;
     }
 
     if (FOLDER_FILTER_KIND_MAP.recording.includes(item.kind)) {
@@ -244,17 +247,21 @@ export function getFilteredScenarioProjects(args: {
   sortMode: SortMode;
 }) {
   const normalizedSearch = args.search.trim().toLowerCase();
+  const matchesDate = createDateSearchMatcher(normalizedSearch);
   const result = args.projects.filter((project) => {
     if (!normalizedSearch) {
       return true;
     }
 
-    return [project.name, formatDate(project.createdAt), formatDate(project.updatedAt)].some(
-      (value) => value.toLowerCase().includes(normalizedSearch)
+    return (
+      project.name.toLowerCase().includes(normalizedSearch) ||
+      matchesDate(project.createdAt) ||
+      matchesDate(project.updatedAt)
     );
   });
 
   result.sort((left, right) => {
+    if (args.sortMode === 'recently-modified') return compareRecentlyModified(left, right);
     if (args.sortMode === 'oldest') {
       return left.updatedAt - right.updatedAt;
     }
@@ -273,8 +280,34 @@ export function getFilteredScenarioProjects(args: {
   return result;
 }
 
+function compareRecentlyModified(
+  left: Pick<GalleryItem, 'id' | 'createdAt' | 'updatedAt'>,
+  right: Pick<GalleryItem, 'id' | 'createdAt' | 'updatedAt'>
+) {
+  const timestamp = (item: typeof left) => {
+    if (Number.isFinite(item.updatedAt) && item.updatedAt >= 0) return item.updatedAt;
+    return Number.isFinite(item.createdAt) && item.createdAt >= 0 ? item.createdAt : 0;
+  };
+  const difference = timestamp(right) - timestamp(left);
+  return difference || (left.id < right.id ? -1 : left.id > right.id ? 1 : 0);
+}
+
 export function getAllGalleryTags(items: GalleryItem[]): string[] {
   return Array.from(new Set(items.flatMap((item) => item.tags))).sort(compareStrings);
+}
+
+function createDateSearchMatcher(search: string): (timestamp: number) => boolean {
+  const formattedDates = new Map<number, string>();
+  let dateFormatter: Intl.DateTimeFormat | undefined;
+  return (timestamp) => {
+    let formatted = formattedDates.get(timestamp);
+    if (formatted === undefined) {
+      dateFormatter ??= createGalleryDateFormatter();
+      formatted = dateFormatter.format(timestamp).toLowerCase();
+      formattedDates.set(timestamp, formatted);
+    }
+    return formatted.includes(search);
+  };
 }
 
 export function getFilteredGalleryItems(args: {
@@ -289,6 +322,7 @@ export function getFilteredGalleryItems(args: {
 }): GalleryItem[] {
   const now = args.now ?? Date.now();
   const normalizedSearch = args.search.trim().toLowerCase();
+  const matchesDate = createDateSearchMatcher(normalizedSearch);
   const scope = args.scope ?? 'library';
   const taggedItems = args.items.filter((item) =>
     matchesLibraryFilters(
@@ -310,18 +344,18 @@ export function getFilteredGalleryItems(args: {
       return true;
     }
 
-    return [
-      item.filename,
-      item.sourceTitle ?? '',
-      item.sourceUrl ?? '',
-      item.mimeType,
-      ...item.tags,
-      formatDate(item.createdAt),
-      formatDate(item.updatedAt),
-    ].some((value) => value.toLowerCase().includes(normalizedSearch));
+    return (
+      [item.filename, item.sourceTitle ?? '', item.sourceUrl ?? '', item.mimeType].some((value) =>
+        value.toLowerCase().includes(normalizedSearch)
+      ) ||
+      item.tags.some((tag) => tag.toLowerCase().includes(normalizedSearch)) ||
+      matchesDate(item.createdAt) ||
+      matchesDate(item.updatedAt)
+    );
   });
 
   result.sort((left, right) => {
+    if (args.sortMode === 'recently-modified') return compareRecentlyModified(left, right);
     if (args.sortMode === 'oldest') {
       return left.createdAt - right.createdAt;
     }
@@ -351,43 +385,71 @@ export function getGalleryGridMetrics(args: {
   viewMode: GalleryViewMode;
   viewportHeight: number;
 }): GalleryGridMetrics & { visibleItems: GalleryItem[] } {
-  const displayItems =
-    args.viewMode === 'list'
-      ? args.filteredItems
-      : collapseGalleryRecordingGroups(args.filteredItems);
+  return createGalleryGridMetrics(args)(args);
+}
 
-  if (args.viewMode === 'list') {
-    return {
-      columnCount: 1,
-      startRow: 0,
-      totalRows: displayItems.length,
-      visibleItems: displayItems,
-    };
-  }
-
-  const cardMinWidth = GRID_CARD_MIN_WIDTH_BY_MODE[args.viewMode];
-  const columnCount = Math.max(
-    1,
-    Math.floor((args.gridWidth + GRID_GAP) / (cardMinWidth + GRID_GAP))
-  );
-  const { rowHeight } = getGalleryGridCardLayout({
-    columnCount,
-    gridWidth: args.gridWidth,
-    viewMode: args.viewMode,
-  });
+/** Prepares immutable layout once; scrolling only selects a window of that layout. */
+export function createGalleryGridMetrics(args: {
+  filteredItems: GalleryItem[];
+  gridWidth: number;
+  viewMode: GalleryViewMode;
+}): (viewport: {
+  scrollTop: number;
+  viewportHeight: number;
+}) => GalleryGridMetrics & { visibleItems: GalleryItem[] } {
+  const listLayout = args.viewMode === 'list' ? buildGalleryListLayout(args.filteredItems) : null;
+  const displayItems = listLayout?.rows ?? collapseGalleryRecordingGroups(args.filteredItems);
+  const cardMinWidth = args.viewMode === 'list' ? 1 : GRID_CARD_MIN_WIDTH_BY_MODE[args.viewMode];
+  const columnCount = listLayout
+    ? 1
+    : Math.max(1, Math.floor((args.gridWidth + GRID_GAP) / (cardMinWidth + GRID_GAP)));
+  const rowTops =
+    listLayout?.rowTops ??
+    getGalleryGridLayout({
+      columnCount,
+      gridWidth: args.gridWidth,
+      items: displayItems,
+      viewMode: args.viewMode === 'list' ? 'compact-grid' : args.viewMode,
+    }).rowTops;
   const totalRows = Math.ceil(displayItems.length / columnCount);
-  const startRow = Math.max(0, Math.floor(args.scrollTop / rowHeight) - GRID_OVERSCAN_ROWS);
-  const endRow = Math.min(
-    totalRows,
-    Math.ceil((args.scrollTop + args.viewportHeight) / rowHeight) + GRID_OVERSCAN_ROWS
-  );
-
-  return {
-    columnCount,
-    startRow,
-    totalRows,
-    visibleItems: displayItems.slice(startRow * columnCount, endRow * columnCount),
+  const totalHeight = rowTops[totalRows] ?? 0;
+  let previous: (GalleryGridMetrics & { visibleItems: GalleryItem[] }) | undefined;
+  let previousEnd = -1;
+  return (viewport) => {
+    const scrollTop = Math.min(
+      Math.max(0, viewport.scrollTop),
+      Math.max(0, totalHeight - viewport.viewportHeight)
+    );
+    const firstVisibleRow = Math.max(0, findFirstRowAfter(rowTops, scrollTop) - 1);
+    const lastVisibleRow = findFirstRowAfter(
+      rowTops,
+      scrollTop + Math.max(1, viewport.viewportHeight)
+    );
+    const startRow = Math.max(0, Math.min(firstVisibleRow, totalRows - 1) - GRID_OVERSCAN_ROWS);
+    const endRow = Math.min(totalRows, lastVisibleRow + GRID_OVERSCAN_ROWS);
+    if (previous?.startRow === startRow && previousEnd === endRow) return previous;
+    previousEnd = endRow;
+    previous = {
+      columnCount,
+      rowTops,
+      ...(listLayout ? { rowBottoms: listLayout.rowBottoms } : {}),
+      startRow,
+      totalRows,
+      visibleItems: displayItems.slice(startRow * columnCount, endRow * columnCount),
+    };
+    return previous;
   };
+}
+
+function findFirstRowAfter(rowTops: number[], offset: number): number {
+  let low = 0;
+  let high = rowTops.length;
+  while (low < high) {
+    const middle = (low + high) >>> 1;
+    if ((rowTops[middle] ?? 0) <= offset) low = middle + 1;
+    else high = middle;
+  }
+  return low;
 }
 
 export function collapseGalleryRecordingGroups(items: GalleryItem[]): GalleryItem[] {

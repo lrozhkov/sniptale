@@ -11,6 +11,7 @@ import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing
 interface SettingsStore {
   settings: NormalizedSettings;
   isLoading: boolean;
+  hasLoaded: boolean;
   error: string | null;
   loadSettings: () => Promise<void>;
   updateSettings: (settings: SettingsPatch) => Promise<void>;
@@ -46,7 +47,7 @@ function beginSettingsWrite(state: SettingsWriteState, set: SettingsStoreSet) {
 function finishSettingsWrite(
   state: SettingsWriteState,
   set: SettingsStoreSet,
-  patch: Partial<Pick<SettingsStore, 'settings' | 'error'>> = {}
+  patch: Partial<Pick<SettingsStore, 'settings' | 'error' | 'hasLoaded'>> = {}
 ) {
   state.pendingWriteCount = Math.max(0, state.pendingWriteCount - 1);
   set(patch);
@@ -72,7 +73,7 @@ async function loadSettingsIntoStore(
     }
 
     syncSettingsWriteQueue(state, settings);
-    set({ settings, isLoading: false });
+    set({ settings, isLoading: false, hasLoaded: true });
   } catch (error) {
     if (isStaleLoadResult(state, loadVersion)) {
       set({ isLoading: false });
@@ -104,7 +105,7 @@ function createUpdateSettingsAction(
     try {
       const updatedSettings = await writeOperation;
       syncSettingsWriteQueue(state, updatedSettings);
-      finishSettingsWrite(state, set, { settings: updatedSettings, error: null });
+      finishSettingsWrite(state, set, { settings: updatedSettings, error: null, hasLoaded: true });
     } catch (error) {
       const resolvedError = createUserFacingErrorMessage({
         cause: error,
@@ -131,7 +132,7 @@ function createClearSettingsAction(
     try {
       const settings = await writeOperation;
       syncSettingsWriteQueue(state, settings);
-      finishSettingsWrite(state, set, { settings, error: null });
+      finishSettingsWrite(state, set, { settings, error: null, hasLoaded: true });
     } catch (error) {
       const resolvedError = createUserFacingErrorMessage({
         cause: error,
@@ -150,6 +151,7 @@ function createSettingsStoreState(): StateCreator<SettingsStore> {
   return (set, get) => ({
     settings: DEFAULT_SETTINGS,
     isLoading: false,
+    hasLoaded: false,
     error: null,
 
     loadSettings: () => loadSettingsIntoStore(writeState, set),

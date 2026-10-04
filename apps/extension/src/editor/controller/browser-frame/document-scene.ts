@@ -4,6 +4,7 @@ import type {
   EditorFrameSettings,
 } from '../../../features/editor/document/types';
 import { relayoutEditorScene } from '../document/scene/relayout';
+import { setEditorEditingSurfaceDimensions } from '../../document/canvas-surface/editing-surface';
 
 import type { SourceState } from '../../document/model/source-state';
 
@@ -33,7 +34,7 @@ export function relayoutEditorControllerScene(options: {
     return null;
   }
 
-  options.canvas.setDimensions(nextScene.canvasSize);
+  setEditorEditingSurfaceDimensions(options.canvas, nextScene.canvasSize);
   return {
     source: nextScene.source,
     canvasSize: nextScene.canvasSize,

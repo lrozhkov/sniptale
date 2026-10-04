@@ -10,15 +10,6 @@ vi.mock('./menus', () => ({
   ToolbarViewportMenu: () => <div data-ui="test.viewport" />,
 }));
 
-vi.mock('../scenario/controls', () => ({
-  ToolbarScenarioControls: (props: { showWorkflowActions?: boolean }) => (
-    <div
-      data-ui="test.scenario-controls"
-      data-workflow-actions={props.showWorkflowActions ? 'true' : 'false'}
-    />
-  ),
-}));
-
 import { ToolbarCaptureMenuGroup } from './menu-group';
 import type { ToolbarProps } from '../types';
 import { useToolbarMenuState } from '../state/menu';
@@ -97,24 +88,14 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-it('places persistent scenario controls directly after the after-capture action', () => {
+it('keeps scenario project and capture-mode controls off the main toolbar', () => {
   renderMenuGroup(createScenario());
 
   const order = Array.from(container.querySelectorAll('[data-ui]')).map((element) =>
     element.getAttribute('data-ui')
   );
-  expect(order).toEqual([
-    'test.capture-action',
-    'test.scenario-controls',
-    'test.timer',
-    'test.viewport',
-  ]);
-  expect(
-    container
-      .querySelector('[data-ui="test.scenario-controls"]')
-      ?.getAttribute('data-workflow-actions')
-  ).toBe('false');
+  expect(order).toEqual(['test.capture-action', 'test.timer', 'test.viewport']);
 
   renderMenuGroup();
-  expect(container.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
+  expect(container.querySelector('[data-ui="test.capture-action"]')).not.toBeNull();
 });

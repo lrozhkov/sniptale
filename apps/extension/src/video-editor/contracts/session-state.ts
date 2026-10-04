@@ -1,1 +1,1 @@
-export type VideoEditorSaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error';
+export type VideoEditorSaveState = 'idle' | 'dirty' | 'saving' | 'saved' | 'error' | 'conflict';

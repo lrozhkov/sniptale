@@ -3,6 +3,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewAudioTrack } from './audio-track';
+import { reviewAudioSnapTimes } from './timeline-binding';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createTrackProjection } from './track-projection';
 import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -70,11 +72,13 @@ const renderTrack = (
   hasOriginalAudio = true,
   assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
   projection?: Parameters<typeof ReviewAudioTrack>[0]['projection'],
-  waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms']
+  waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms'],
+  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction']
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
+        beforeAction={beforeAction}
         projection={projection}
         waveforms={waveforms}
         assets={assets}
@@ -93,27 +97,130 @@ const renderTrack = (
       />
     );
   });
+  for (const block of host.querySelectorAll('[data-audio-id]'))
+    Object.assign(block, { hasPointerCapture: () => false, releasePointerCapture: vi.fn() });
   return [...host.querySelectorAll('[data-ui="gallery.videoReview.audioLane"]')];
 };
 
 it('shows the three semantic lanes and toggles the original mute', async () => {
   const lanes = renderTrack();
   expect(lanes).toHaveLength(3);
-  expect(lanes[0]!.parentElement!.parentElement!.textContent).toContain(
-    'gallery.videoReview.audioOriginal'
-  );
-  expect(lanes[1]!.parentElement!.parentElement!.textContent).toContain(
-    'gallery.videoReview.audioVoiceover'
-  );
-  expect(lanes[2]!.parentElement!.parentElement!.textContent).toContain(
-    'gallery.videoReview.audioMusic'
-  );
-  const mute = lanes[0]!.parentElement!.parentElement!.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.audioEnabled"]'
-  )!;
+  expect(lanes[0]!.closest('.grid')?.textContent).toContain('gallery.videoReview.audioOriginal');
+  expect(lanes[1]!.closest('.grid')?.textContent).toContain('gallery.videoReview.audioVoiceover');
+  expect(lanes[2]!.closest('.grid')?.textContent).toContain('gallery.videoReview.audioMusic');
+  const mute = lanes[0]!
+    .closest('.grid')!
+    .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.muteSourceAudio"]')!;
   expect(mute.getAttribute('aria-pressed')).toBe('true');
   await act(async () => mute.click());
   expect(onOriginal).toHaveBeenCalledWith({ muted: true });
+});
+
+it('stacks overlapping voiceovers without moving neighbors and retains rows during a drag', async () => {
+  const lanes = renderTrack({
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('first', 1, 3), clip('second', 2, 3), clip('third', 2, 1), clip('next', 5, 2)],
+    music: [],
+  });
+  const lane = lanes[1]!;
+  const blocks = [...lane.querySelectorAll<HTMLDivElement>('[role="button"]')];
+  expect(blocks.map((block) => block.style.top)).toEqual(['0px', '36px', '72px', '0px']);
+  expect((lane as HTMLElement).style.height).toBe('104px');
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 104));
+  const moving = blocks[1]!;
+  Object.assign(moving, { setPointerCapture: vi.fn() });
+  await act(async () =>
+    moving.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200 }))
+  );
+  await act(async () =>
+    moving.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 300, shiftKey: true })
+    )
+  );
+  expect(moving.style.top).toBe('36px');
+  expect(blocks[0]!.style.left).toBe('10%');
+  await act(async () =>
+    moving.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 300 }))
+  );
+  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'second', 3);
+  expect(onMoveClip).toHaveBeenCalledOnce();
+});
+
+it('selects a stacked voiceover from the keyboard without moving or trimming it', async () => {
+  const lanes = renderTrack({
+    original: { muted: false, volume: 1 },
+    voiceover: [clip('a', 1, 3), clip('b', 2, 2)],
+    music: [],
+  });
+  const block = lanes[1]!.querySelectorAll<HTMLElement>('[role="button"]')[1]!;
+  await act(async () =>
+    block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(onSelect).toHaveBeenCalledWith('b');
+  expect(onMoveClip).not.toHaveBeenCalled();
+  expect(onTrimClip).not.toHaveBeenCalled();
+});
+
+it('retains one music gesture owner when the visible pieces disappear during movement', async () => {
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ]);
+  const lanes = renderTrack(
+    { original: { muted: false, volume: 1 }, voiceover: [], music: [clip('music', 1, 3)] },
+    false,
+    [],
+    true,
+    undefined,
+    projection
+  );
+  const lane = lanes[2]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  await act(async () =>
+    block
+      .querySelectorAll('[data-music-offset]')[1]!
+      .dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 500 }))
+  );
+  await act(async () =>
+    block.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 700, shiftKey: true })
+    )
+  );
+  expect(lane.querySelector('[role="button"]')).toBe(block);
+  expect(block.querySelectorAll('[data-music-offset]')).toHaveLength(1);
+  await act(async () =>
+    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 700 }))
+  );
+  expect(onMoveClip).toHaveBeenCalledWith('music', 'music', 3);
+});
+
+it('splits the displayed music at cuts while keeping continuous sample offsets', () => {
+  const projection = createTrackProjection(10, [
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ]);
+  const lanes = renderTrack(
+    {
+      original: { muted: false, volume: 1 },
+      voiceover: [],
+      music: [clip('music', 1, 4)],
+    },
+    false,
+    [],
+    true,
+    undefined,
+    projection
+  );
+  const blocks = [...lanes[2]!.querySelectorAll<HTMLDivElement>('[data-music-offset]')];
+  expect(lanes[2]!.querySelectorAll('[role="button"]')).toHaveLength(1);
+  expect(blocks).toHaveLength(2);
+  expect(Number.parseFloat(blocks[0]!.style.left)).toBeCloseTo(0);
+  expect(Number.parseFloat(blocks[0]!.style.width)).toBeCloseTo(100 / 6);
+  expect(Number.parseFloat(blocks[1]!.style.left)).toBeCloseTo(50);
+  expect(Number.parseFloat(blocks[1]!.style.width)).toBeCloseTo(50);
+  expect(blocks.map((block) => block.dataset['musicOffset'])).toEqual(['0', '1']);
+  expect(blocks[0]!.querySelector('[data-audio-edge="end"]')).toBeNull();
+  expect(blocks[1]!.querySelector('[data-audio-edge="start"]')).toBeNull();
 });
 
 it('imports audio through the hidden file picker', async () => {
@@ -258,6 +365,47 @@ it('keeps the preview duration while moving near the timeline end (A3)', async (
   expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 8);
 });
 
+it('keeps music playback duration while its source-axis width changes at a speed segment', async () => {
+  const speed = {
+    id: 'speed',
+    kind: 'speed' as const,
+    start: 2,
+    end: 6,
+    requestedStart: 2,
+    requestedEnd: 6,
+    rate: 2 as const,
+    audio: 'speed' as const,
+  };
+  const projection = createTrackProjection(10, [speed]);
+  const audio = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [clip('music', 0, 2)],
+  };
+  const lanes = renderTrack(audio, false, [], true, undefined, projection);
+  const lane = lanes[2]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLElement>('[role="button"]')!;
+  Object.assign(block, { setPointerCapture: vi.fn() });
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+  const send = (kind: string, x: number) =>
+    act(async () =>
+      block.dispatchEvent(
+        new MouseEvent(kind, { bubbles: true, clientX: x, button: 0, shiftKey: true })
+      )
+    );
+  await send('pointerdown', 0);
+  await send('pointermove', 300);
+  expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(35);
+  await send('pointerup', 300);
+  expect(onMoveClip).toHaveBeenCalledWith('music', 'music', 2.5);
+  renderTrack({ ...audio, music: [clip('music', 2.5, 2)] }, false, [], true, undefined, projection);
+  expect(
+    Number.parseFloat(lane.querySelector<HTMLElement>('[role="button"]')!.style.width)
+  ).toBeCloseTo(35);
+});
+
 it('discards a drag preview on pointer cancellation without committing it', async () => {
   const lanes = renderTrack({
     original: { muted: false, volume: 1 },
@@ -300,10 +448,12 @@ it('snaps audio placement to projected edit edges and allows Shift to bypass', a
     });
   await send('pointerdown', 0);
   await send('pointermove', 95);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   await send('pointerup', 95);
   expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 3);
   await send('pointerdown', 0);
   await send('pointermove', 95, true);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
   await send('pointerup', 95, true);
   expect(onMoveClip).toHaveBeenLastCalledWith('voiceover', 'a1', 2.95);
 });
@@ -383,7 +533,7 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
       voiceoverSegments: buildReviewTimeMap(10, edits),
     },
     false,
-    [4.75],
+    [createTrackProjection(10, edits).output(6.375)],
     true,
     undefined,
     createTrackProjection(10, edits)
@@ -397,13 +547,47 @@ it('shows an anchored recording until playback ends and snaps its audible end wh
     block.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 200 }))
   );
   await act(async () =>
-    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 340 }))
+    block.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 280 }))
   );
-  expect(parseFloat(block.style.left)).toBeCloseTo(35);
+  expect(parseFloat(block.style.left)).toBeCloseTo(27.5);
+  expect(parseFloat(block.style.width)).toBeCloseTo(36.25);
+  expect(recording.duration).toBe(2);
   await act(async () =>
-    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 340 }))
+    block.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 280 }))
   );
-  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 3.5);
+  expect(onMoveClip).toHaveBeenCalledWith('voiceover', 'a1', 2.75);
+});
+
+it('displays the native-tempo source footprint under Speed', () => {
+  const recording = anchorReviewVoiceover(clip('a1', 2, 2), buildReviewTimeMap(10, []));
+  const edits = [
+    {
+      id: 'speed',
+      kind: 'speed' as const,
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2 as const,
+      audio: 'speed' as const,
+    },
+  ];
+  const lanes = renderTrack(
+    {
+      original: { muted: false, volume: 1 },
+      music: [],
+      voiceover: [recording],
+      voiceoverSegments: buildReviewTimeMap(10, edits),
+    },
+    false,
+    [],
+    true,
+    undefined,
+    createTrackProjection(10, edits)
+  );
+  const block = lanes[1]!.querySelector<HTMLElement>('[role="button"]')!;
+  expect(block.style.left).toBe('20%');
+  expect(parseFloat(block.style.width)).toBeCloseTo(40);
 });
 
 it('moves anchored waveform samples with the clip before release and restores on Escape', async () => {
@@ -451,3 +635,131 @@ it('moves anchored waveform samples with the clip before release and restores on
   expect(block.style.left).toBe('20%');
   expect(peaks()).toBe(before);
 });
+
+it('retains an audio clip move when pointerup precedes note admission', async () => {
+  let admit!: () => void;
+  const lanes = renderTrack(
+    { original: { muted: false, volume: 1 }, voiceover: [], music: [clip('music', 2, 2)] },
+    false,
+    [],
+    true,
+    undefined,
+    undefined,
+    undefined,
+    (action) => {
+      admit = action;
+    }
+  );
+  const lane = lanes[2]!;
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+  const block = lane.querySelector<HTMLElement>('[role="button"]')!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  for (const [type, x] of [
+    ['pointerdown', 200],
+    ['pointermove', 400],
+    ['pointerup', 400],
+  ] as const) {
+    await act(async () =>
+      block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, button: 0 }))
+    );
+  }
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onMoveClip).not.toHaveBeenCalled();
+  await act(async () => admit());
+  expect(onSelect).toHaveBeenCalledExactlyOnceWith('music');
+  expect(onMoveClip).toHaveBeenCalledExactlyOnceWith('music', 'music', 4);
+});
+
+it('mutes a whole added-audio row only when its nonempty clips are all muted', () => {
+  const mutedClip = { ...clip('v1', 0, 2), muted: true };
+  const audio = { original: { muted: false, volume: 1 }, voiceover: [mutedClip], music: [] };
+  const lanes = renderTrack(audio);
+  const voiceover = lanes[1]!.closest('[data-review-track-muted]');
+  expect(voiceover?.getAttribute('data-review-track-muted')).toBe('true');
+  expect(
+    lanes[2]!.closest('[data-review-track-muted]')?.getAttribute('data-review-track-muted')
+  ).toBe('false');
+  renderTrack({ ...audio, voiceover: [mutedClip, clip('v2', 3, 2)] });
+  expect(voiceover?.getAttribute('data-review-track-muted')).toBe('false');
+});
+
+it.each(['voiceover', 'music'] as const)(
+  'keeps %s magnets limited to currently visible focus edges',
+  async (laneKey) => {
+    const advanced = createQuickEditAdvancedState();
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.zoom = true;
+    advanced.zoom.regions = [
+      {
+        id: 'focus',
+        start: 3,
+        end: 5,
+        transform: { scale: 2, centerX: 0.5, centerY: 0.5 },
+        enter: { type: 'none', duration: 0 },
+        exit: { type: 'none', duration: 0 },
+      },
+    ];
+    for (const visible of [true, false]) {
+      advanced.ui.tracks.zoom = visible;
+      const snapTimes = reviewAudioSnapTimes({
+        advanced,
+        outputTime: 9,
+        edits: [],
+        toOutputTime: (time) => time,
+      });
+      const lanes = renderTrack(
+        {
+          original: { muted: false, volume: 1 },
+          voiceover: laneKey === 'voiceover' ? [clip('moving', 1, 1)] : [],
+          music: laneKey === 'music' ? [clip('moving', 1, 1)] : [],
+        },
+        false,
+        snapTimes
+      );
+      const lane = lanes[laneKey === 'voiceover' ? 1 : 2]!;
+      vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+      const block = lane.querySelector<HTMLDivElement>('[role="button"]')!;
+      Object.assign(block, { setPointerCapture: vi.fn() });
+      for (const [type, clientX] of [
+        ['pointerdown', 0],
+        ['pointermove', 195],
+        ['pointerup', 195],
+      ] as const)
+        await act(async () =>
+          block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX, button: 0 }))
+        );
+      expect(onMoveClip).toHaveBeenLastCalledWith(laneKey, 'moving', visible ? 3 : 2.95);
+    }
+  }
+);
+
+it.each(['voiceover', 'music'] as const)(
+  'excludes %s own and dormant clip boundaries from magnets',
+  async (laneKey) => {
+    for (const delta of [5, 195]) {
+      const clips = [clip('moving', 1, 1), { ...clip('dormant', 3, 1), dormant: true }];
+      const lanes = renderTrack({
+        original: { muted: false, volume: 1 },
+        voiceover: laneKey === 'voiceover' ? clips : [],
+        music: laneKey === 'music' ? clips : [],
+      });
+      const lane = lanes[laneKey === 'voiceover' ? 1 : 2]!;
+      vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 32));
+      const block = lane.querySelector<HTMLDivElement>('[data-audio-id="moving"]')!;
+      Object.assign(block, { setPointerCapture: vi.fn() });
+      for (const [type, clientX] of [
+        ['pointerdown', 0],
+        ['pointermove', delta],
+        ['pointerup', delta],
+      ] as const)
+        await act(async () =>
+          block.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX, button: 0 }))
+        );
+      expect(onMoveClip).toHaveBeenLastCalledWith(laneKey, 'moving', 1 + delta / 100);
+    }
+  }
+);

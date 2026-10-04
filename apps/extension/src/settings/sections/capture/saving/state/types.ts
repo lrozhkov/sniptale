@@ -60,6 +60,10 @@ export interface SavePresetsRowHandlers {
 }
 
 export interface SavePresetsListProps extends SavePresetsRowHandlers {
+  defaultExportPresetId?: string | null;
+  defaultImagePresetId?: string | null;
+  defaultVideoPresetId?: string | null;
+  isLoading?: boolean;
   confirmDelete: SavePreset | null;
   confirmDeletePreset: () => Promise<void>;
   editingPreset?: SavePreset;

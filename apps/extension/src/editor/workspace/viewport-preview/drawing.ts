@@ -1,4 +1,10 @@
-import { PREVIEW_FPS } from './helpers';
+import type { Canvas } from 'fabric';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
+import { getPreviewContentRect, PREVIEW_FPS } from './helpers';
+import {
+  getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
+} from '../../document/canvas-surface/editing-surface';
 
 function syncPreviewCanvasSize(args: {
   previewCanvas: HTMLCanvasElement;
@@ -22,10 +28,30 @@ function hasDrawableCanvasSize(canvas: HTMLCanvasElement): boolean {
   return canvas.width > 0 && canvas.height > 0;
 }
 
+function renderFabricPreviewSource(
+  canvas: Canvas,
+  documentSize: { width: number; height: number },
+  previewWidth: number
+): HTMLCanvasElement {
+  const multiplier = previewWidth / documentSize.width;
+  if (canvas instanceof EditorCanvas && canvas.hasVirtualViewport) {
+    return canvas.renderDocumentCanvas(multiplier);
+  }
+  const margin = getEditorWorkspaceMargin(documentSize);
+  return canvas.toCanvasElement(multiplier, {
+    left: margin,
+    top: margin,
+    width: documentSize.width,
+    height: documentSize.height,
+  });
+}
+
 function drawPreviewFrame(args: {
   sourceCanvas: HTMLCanvasElement;
+  fabricCanvas?: Canvas | null;
   previewCanvas: HTMLCanvasElement;
   previewSize: { width: number; height: number };
+  documentSize?: { width: number; height: number };
 }) {
   const pixelRatio = window.devicePixelRatio || 1;
   syncPreviewCanvasSize({
@@ -36,7 +62,7 @@ function drawPreviewFrame(args: {
 
   const context = args.previewCanvas.getContext('2d');
   if (!context) {
-    return;
+    return false;
   }
 
   context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
@@ -45,30 +71,72 @@ function drawPreviewFrame(args: {
   // `hasImage` flips to true before Fabric finishes sizing the backing canvas.
   // Skip this frame until the source canvas becomes drawable instead of throwing.
   if (!hasDrawableCanvasSize(args.sourceCanvas)) {
-    return;
+    return false;
   }
 
   context.imageSmoothingEnabled = true;
+  const documentSize = args.documentSize;
+  const content = getPreviewContentRect(
+    args.previewSize,
+    documentSize ?? { width: args.sourceCanvas.width, height: args.sourceCanvas.height }
+  );
+  if (documentSize && args.fabricCanvas) {
+    const rendered = renderFabricPreviewSource(args.fabricCanvas, documentSize, content.width);
+    context.drawImage(rendered, content.left, content.top, content.width, content.height);
+    return true;
+  }
+  const surface = documentSize ? getEditorEditingSurfaceSize(documentSize) : null;
+  const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
+  const sourceLeft = surface ? (args.sourceCanvas.width * margin) / surface.width : 0;
+  const sourceTop = surface ? (args.sourceCanvas.height * margin) / surface.height : 0;
+  const sourceWidth =
+    surface && documentSize
+      ? (args.sourceCanvas.width * documentSize.width) / surface.width
+      : args.sourceCanvas.width;
+  const sourceHeight =
+    surface && documentSize
+      ? (args.sourceCanvas.height * documentSize.height) / surface.height
+      : args.sourceCanvas.height;
   context.drawImage(
     args.sourceCanvas,
-    0,
-    0,
-    args.sourceCanvas.width,
-    args.sourceCanvas.height,
-    0,
-    0,
-    args.previewSize.width,
-    args.previewSize.height
+    sourceLeft,
+    sourceTop,
+    sourceWidth,
+    sourceHeight,
+    content.left,
+    content.top,
+    content.width,
+    content.height
   );
+  return true;
 }
 
 export function startEditorViewportPreviewLoop(args: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  getCanvas?: () => Canvas | null;
   previewCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   previewSize: { width: number; height: number };
+  documentSize?: { width: number; height: number };
 }) {
   let frameId = 0;
   let lastDrawAt = 0;
+  let dirty = true;
+  let stopped = false;
+  let fabricCanvas: Canvas | null | undefined;
+  let unsubscribe: (() => void) | undefined;
+  let pixelRatio = window.devicePixelRatio || 1;
+
+  const syncCanvas = () => {
+    const next = args.getCanvas?.();
+    if (next === fabricCanvas) return;
+    unsubscribe?.();
+    fabricCanvas = next;
+    dirty = true;
+    unsubscribe = next?.on('after:render', (event) => {
+      // Export/minimap rendering also fires this event, but does not change the live scene.
+      if (event.ctx === next.getContext()) dirty = true;
+    });
+  };
 
   const drawPreview = () => {
     const sourceCanvas = args.canvasRef.current;
@@ -79,22 +147,38 @@ export function startEditorViewportPreviewLoop(args: {
       args.previewSize.width <= 0 ||
       args.previewSize.height <= 0
     ) {
-      return;
+      return false;
     }
 
-    drawPreviewFrame({ sourceCanvas, previewCanvas, previewSize: args.previewSize });
+    return drawPreviewFrame({
+      sourceCanvas,
+      ...(args.getCanvas ? { fabricCanvas: args.getCanvas() } : {}),
+      previewCanvas,
+      previewSize: args.previewSize,
+      ...(args.documentSize ? { documentSize: args.documentSize } : {}),
+    });
   };
 
   const animate = (timestamp: number) => {
-    if (timestamp - lastDrawAt >= 1000 / PREVIEW_FPS) {
-      drawPreview();
+    if (stopped) return;
+    syncCanvas();
+    const nextPixelRatio = window.devicePixelRatio || 1;
+    if (nextPixelRatio !== pixelRatio) {
+      pixelRatio = nextPixelRatio;
+      dirty = true;
+    }
+    if ((!fabricCanvas || dirty) && timestamp - lastDrawAt >= 1000 / PREVIEW_FPS) {
+      dirty = !drawPreview();
       lastDrawAt = timestamp;
     }
     frameId = window.requestAnimationFrame(animate);
   };
 
+  syncCanvas();
   frameId = window.requestAnimationFrame(animate);
   return () => {
+    stopped = true;
+    unsubscribe?.();
     if (frameId !== 0) {
       window.cancelAnimationFrame(frameId);
     }

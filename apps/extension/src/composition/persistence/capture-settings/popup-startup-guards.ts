@@ -36,7 +36,7 @@ function parsePopupPage(value: unknown): PopupStartupState['lastPage'] | null {
 }
 
 function parseExportDestination(value: unknown): PopupStartupState['lastExportDestination'] | null {
-  return value === 'export' || value === 'save' ? value : null;
+  return value === 'export' || value === 'save' || value === 'html' ? value : null;
 }
 
 export function parseStoredPopupStartupState(value: unknown): Partial<PopupStartupState> {

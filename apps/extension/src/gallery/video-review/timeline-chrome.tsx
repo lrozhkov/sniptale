@@ -1,8 +1,22 @@
+import { ReviewResetControl } from './reset-control';
+import { AutosaveControl } from '@sniptale/ui/autosave-control';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
-import { Play, BetweenHorizontalStart, Undo2, Redo2, StickyNote } from 'lucide-react';
-import type { ReactNode, CSSProperties } from 'react';
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  BetweenHorizontalStart,
+  Undo2,
+  Redo2,
+  StickyNote,
+  FileVideo,
+} from 'lucide-react';
+import { useState, type ReactNode, type CSSProperties } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
@@ -62,6 +76,10 @@ export function ReviewToolbar(props: {
   tools?: ReactNode;
   expandedTools?: boolean;
   onPlay(): void;
+  onOpenExport?: (() => void) | undefined;
+  exportActive?: boolean | undefined;
+  navigation: { start: number; end: number };
+  onNavigate(time: number): void;
   zoom: number;
   onZoom(value: number): void;
 }) {
@@ -73,11 +91,15 @@ export function ReviewToolbar(props: {
       </div>
       <div data-toolbar-transport className="flex shrink-0 items-center justify-center gap-2">
         <ReviewButton
+          label={translate('gallery.videoReview.timelineStart')}
+          className={plain}
+          disabled={Math.abs(props.time - props.navigation.start) < 0.0001}
+          onClick={() => props.onNavigate(props.navigation.start)}
+        >
+          <SkipBack size={16} strokeWidth={2.2} aria-hidden="true" />
+        </ReviewButton>
+        <ReviewButton
           label={translate(
-            props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
-          )}
-          toolbarPriority={3}
-          toolbarLabel={translate(
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
           onClick={props.onPlay}
@@ -85,13 +107,18 @@ export function ReviewToolbar(props: {
           aria-pressed={props.playing}
         >
           {props.playing ? (
-            <svg viewBox="0 0 16 16" className="size-4" fill="currentColor" aria-hidden="true">
-              <rect x="4" y="3" width="2" height="10" />
-              <rect x="10" y="3" width="2" height="10" />
-            </svg>
+            <Pause size={16} strokeWidth={2.2} aria-hidden="true" />
           ) : (
-            <Play size={16} strokeWidth={2.2} />
+            <Play size={16} strokeWidth={2.2} aria-hidden="true" />
           )}
+        </ReviewButton>
+        <ReviewButton
+          label={translate('gallery.videoReview.timelineEnd')}
+          className={plain}
+          disabled={Math.abs(props.time - props.navigation.end) < 0.0001}
+          onClick={() => props.onNavigate(props.navigation.end)}
+        >
+          <SkipForward size={16} strokeWidth={2.2} aria-hidden="true" />
         </ReviewButton>
         <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
           {playbackTime(props.time)} / {playbackTime(props.duration)}
@@ -139,6 +166,22 @@ export function ReviewToolbar(props: {
         >
           <BetweenHorizontalStart size={16} strokeWidth={2} />
         </ReviewButton>
+        {props.onOpenExport ? (
+          <>
+            <ReviewToolbarSeparator />
+            <ReviewButton
+              data-ui="gallery.videoReview.openExport"
+              label={translate('gallery.videoReview.exportSection')}
+              toolbarLabel={translate('gallery.videoReview.exportSection')}
+              toolbarPriority={3}
+              aria-pressed={!!props.exportActive}
+              className={plain}
+              onClick={props.onOpenExport}
+            >
+              <FileVideo size={16} aria-hidden="true" />
+            </ReviewButton>
+          </>
+        ) : null}
       </div>
     </div>
   );
@@ -149,8 +192,20 @@ export function ReviewHistoryControls(props: {
   busy: boolean;
   cursor: number;
   length: number;
-  onHistory(direction: 'undo' | 'redo'): void;
+  onHistory(
+    direction: import('../../features/video/review/types').ReviewHistoryDirection | 'reset'
+  ): void | Promise<unknown>;
   onAddNote?(): void;
+  autosave?: {
+    enabled: boolean;
+    error: string | null;
+    errorMessage: string | null;
+    dirty: boolean;
+    saving: boolean;
+    busy: boolean;
+    onReload(): Promise<void>;
+    onChange(enabled: boolean): void;
+  };
 }) {
   return (
     <>
@@ -166,6 +221,7 @@ export function ReviewHistoryControls(props: {
           <StickyNote size={16} aria-hidden="true" />
         </ReviewButton>
       ) : null}
+      {props.onAddNote ? <ReviewToolbarSeparator /> : null}
       {(['undo', 'redo'] as const).map((direction) => (
         <ReviewButton
           key={direction}
@@ -185,6 +241,98 @@ export function ReviewHistoryControls(props: {
           {direction === 'undo' ? <Undo2 size={16} /> : <Redo2 size={16} />}
         </ReviewButton>
       ))}
+      <ReviewResetControl
+        busy={props.busy}
+        cursor={props.cursor}
+        autosaveEnabled={props.autosave?.enabled ?? true}
+        onStart={async () => props.onHistory('start')}
+        onReset={async () => props.onHistory('reset')}
+      />
+      {props.autosave && (
+        <>
+          <ReviewToolbarSeparator />
+          <ReviewAutosaveControl {...props.autosave} />
+          <ReviewToolbarSeparator compactOnly />
+        </>
+      )}
+    </>
+  );
+}
+
+function ReviewToolbarSeparator({ compactOnly = false }: { compactOnly?: boolean }) {
+  return (
+    <span
+      data-ui="gallery.videoReview.toolbar.separator"
+      data-compact-only={compactOnly || undefined}
+      aria-hidden="true"
+      className="mx-1 h-4 w-px shrink-0 self-center bg-[var(--sniptale-color-border-soft)]"
+    />
+  );
+}
+
+function ReviewAutosaveControl(props: {
+  enabled: boolean;
+  error: string | null;
+  errorMessage: string | null;
+  dirty: boolean;
+  saving: boolean;
+  busy: boolean;
+  onReload(): Promise<void>;
+  onChange(enabled: boolean): void;
+}) {
+  const [confirmReload, setConfirmReload] = useState(false);
+  let state: 'saved' | 'dirty' | 'saving' | 'error' | 'conflict' = 'saved';
+  if (props.dirty) state = 'dirty';
+  if (props.saving) state = 'saving';
+  if (props.error) state = props.error === 'conflict' ? 'conflict' : 'error';
+  return (
+    <>
+      <AutosaveControl
+        enabled={props.enabled}
+        onChange={props.onChange}
+        state={state}
+        openOnError
+        actions={
+          props.error ? (
+            <ProductActionButton
+              compact
+              tone="secondary"
+              disabled={props.busy}
+              onClick={() => setConfirmReload(true)}
+            >
+              {translate('gallery.videoReview.reload')}
+            </ProductActionButton>
+          ) : null
+        }
+        labels={{
+          title: translate('editor.documentActions.autosaveTitle'),
+          switch: translate('editor.documentActions.autosaveSwitch'),
+          on: translate('editor.documentActions.autosaveOnDescription'),
+          off: translate('editor.documentActions.autosaveOffDescription'),
+          paused: translate('editor.documentActions.autosaveOffStatus'),
+          dirty: translate('common.states.dirty'),
+          saving: translate('common.states.saving'),
+          saved: translate('common.states.saved'),
+          error: translate('editor.documentActions.saveErrorTitle'),
+          errorDescription:
+            props.errorMessage ?? translate('editor.documentActions.autosaveErrorDescription'),
+          conflict: translate('editor.documentActions.autosaveConflict'),
+          close: translate('common.actions.close'),
+        }}
+      />
+      <ProductConfirmDialog
+        isOpen={confirmReload}
+        isLoading={props.busy}
+        title={translate('gallery.videoReview.reload')}
+        message={translate('editor.documentActions.autosaveReloadWarning')}
+        confirmText={translate('gallery.videoReview.reload')}
+        cancelText={translate('common.actions.cancel')}
+        onCancel={() => setConfirmReload(false)}
+        onConfirm={async () => {
+          await props.onReload();
+          setConfirmReload(false);
+        }}
+      />
     </>
   );
 }

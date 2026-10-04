@@ -10,6 +10,7 @@ type PersistenceLockMode = 'exclusive' | 'shared';
 const persistenceMutationPermitBrand = Symbol('persistenceMutationPermit');
 const persistenceMutationTransitionPermitBrand = Symbol('persistenceMutationTransitionPermit');
 const durableAssetOperationPermitBrand = Symbol('durableAssetOperationPermit');
+const durableAssetLifecyclePermitBrand = Symbol('durableAssetLifecyclePermit');
 
 export interface PersistenceMutationPermit {
   readonly [persistenceMutationPermitBrand]: true;
@@ -17,6 +18,10 @@ export interface PersistenceMutationPermit {
 
 export interface DurableAssetOperationPermit {
   readonly [durableAssetOperationPermitBrand]: true;
+}
+
+export interface DurableAssetLifecyclePermit {
+  readonly [durableAssetLifecyclePermitBrand]: true;
 }
 
 export interface PersistenceMutationTransitionPermit {
@@ -40,32 +45,45 @@ export interface PersistenceMutationTransitionLease {
 export interface PersistenceLockManager {
   request<T>(
     name: string,
-    options: { mode: PersistenceLockMode },
-    operation: () => T | Promise<T>
+    options: { mode: PersistenceLockMode; ifAvailable?: boolean },
+    operation: (lock?: unknown) => T | Promise<T>
   ): Promise<T>;
 }
 
 let lockManagerForTests: PersistenceLockManager | null = null;
 const fallbackQueues = new Map<string, Promise<void>>();
+const fallbackExclusiveRequests = new Map<string, number>();
 const activePersistenceMutationPermits = new WeakSet<object>();
 const activePersistenceMutationTransitionPermits = new WeakSet<object>();
 const activeDurableAssetOperationPermits = new WeakSet<object>();
+const activeDurableAssetLifecyclePermits = new WeakSet<object>();
+let heldPersistenceMutationTransitions = 0;
 
 const fallbackLockManager: PersistenceLockManager = {
   request<T>(
     name: string,
-    _options: { mode: PersistenceLockMode },
-    operation: () => T | Promise<T>
+    options: { mode: PersistenceLockMode; ifAvailable?: boolean },
+    operation: (lock?: unknown) => T | Promise<T>
   ): Promise<T> {
+    if (options.ifAvailable && fallbackExclusiveRequests.has(name))
+      return Promise.resolve(operation(null));
+    if (options.mode === 'exclusive')
+      fallbackExclusiveRequests.set(name, (fallbackExclusiveRequests.get(name) ?? 0) + 1);
     const queue = fallbackQueues.get(name) ?? Promise.resolve();
     const execution = queue.then(operation);
-    fallbackQueues.set(
-      name,
-      execution.then(
-        () => undefined,
-        () => undefined
-      )
+    const settled = execution.then(
+      () => undefined,
+      () => undefined
     );
+    fallbackQueues.set(name, settled);
+    void settled.then(() => {
+      if (options.mode === 'exclusive') {
+        const remaining = (fallbackExclusiveRequests.get(name) ?? 1) - 1;
+        if (remaining) fallbackExclusiveRequests.set(name, remaining);
+        else fallbackExclusiveRequests.delete(name);
+      }
+      if (fallbackQueues.get(name) === settled) fallbackQueues.delete(name);
+    });
     return execution;
   },
 };
@@ -76,6 +94,7 @@ export function installPersistenceLockManagerForTests(
   lockManagerForTests = lockManager;
   if (lockManager === null) {
     fallbackQueues.clear();
+    fallbackExclusiveRequests.clear();
   }
 }
 
@@ -93,6 +112,26 @@ function getPersistenceLockManager(): PersistenceLockManager {
     throw new Error('Persistent mutation coordination is unavailable');
   }
   return fallbackLockManager;
+}
+
+/**
+ * True while this context already holds the shared transition gate — a workflow
+ * transition or a staged writer lease. Cold admission must fail before requesting the exclusive
+ * gate in this state so the workflow can release its lease and retry.
+ */
+export function isPersistenceMutationTransitionHeld(): boolean {
+  return heldPersistenceMutationTransitions > 0;
+}
+
+async function runWithHeldPersistenceMutationTransition<T>(
+  operation: () => T | Promise<T>
+): Promise<T> {
+  heldPersistenceMutationTransitions += 1;
+  try {
+    return await operation();
+  } finally {
+    heldPersistenceMutationTransitions -= 1;
+  }
 }
 
 function runWithPersistenceLock<T>(
@@ -114,6 +153,17 @@ export function runWithPersistenceMutationPermit<T>(
   return runWithPersistenceLock('shared', () => runWithActiveMutationPermit(operation));
 }
 
+/** Refuses rather than queues a page-local draft across an active privacy erasure. */
+export function tryRunWithPersistenceMutationPermit<T>(
+  operation: (permit: PersistenceMutationPermit) => T | Promise<T>
+): Promise<T | null> {
+  return getPersistenceLockManager().request(
+    PERSISTENCE_LOCK_NAME,
+    { mode: 'shared', ifAvailable: true },
+    (lock) => (lock === null ? null : runWithActiveMutationPermit(operation))
+  );
+}
+
 /**
  * Reserves the complete persistent mutation authority for an atomic cross-domain workflow.
  * The transition lease keeps privacy erasure ordered outside the workflow while the active
@@ -125,7 +175,10 @@ export function runWithExclusivePersistenceMutationPermit<T>(
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    () => runWithPersistenceLock('exclusive', () => runWithActiveMutationPermit(operation))
+    () =>
+      runWithHeldPersistenceMutationTransition(() =>
+        runWithPersistenceLock('exclusive', () => runWithActiveMutationPermit(operation))
+      )
   );
 }
 
@@ -140,17 +193,18 @@ export function runWithPersistenceMutationTransition<T>(
   return getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    async () => {
-      const permit: PersistenceMutationTransitionPermit = {
-        [persistenceMutationTransitionPermitBrand]: true,
-      };
-      activePersistenceMutationTransitionPermits.add(permit);
-      try {
-        return await operation(permit);
-      } finally {
-        activePersistenceMutationTransitionPermits.delete(permit);
-      }
-    }
+    () =>
+      runWithHeldPersistenceMutationTransition(async () => {
+        const permit: PersistenceMutationTransitionPermit = {
+          [persistenceMutationTransitionPermitBrand]: true,
+        };
+        activePersistenceMutationTransitionPermits.add(permit);
+        try {
+          return await operation(permit);
+        } finally {
+          activePersistenceMutationTransitionPermits.delete(permit);
+        }
+      })
   );
 }
 
@@ -178,10 +232,11 @@ export async function acquirePersistenceMutationTransition(): Promise<Persistenc
   const lifetime = getPersistenceLockManager().request(
     PERSISTENCE_TRANSITION_LOCK_NAME,
     { mode: 'shared' },
-    async () => {
-      resolveAcquired();
-      await released;
-    }
+    () =>
+      runWithHeldPersistenceMutationTransition(async () => {
+        resolveAcquired();
+        await released;
+      })
   );
   void lifetime.catch(rejectAcquired);
   await acquired;
@@ -196,11 +251,44 @@ export async function acquirePersistenceMutationTransition(): Promise<Persistenc
   };
 }
 
-export function runWithDurableAssetLifecycleLock<T>(operation: () => T | Promise<T>): Promise<T> {
+export function runWithDurableAssetLifecycleLock<T>(
+  operation: (permit: DurableAssetLifecyclePermit) => T | Promise<T>,
+  permit?: DurableAssetLifecyclePermit
+): Promise<T> {
+  if (permit && activeDurableAssetLifecyclePermits.has(permit))
+    return Promise.resolve().then(() => operation(permit));
   return getPersistenceLockManager().request(
     DURABLE_ASSET_LIFECYCLE_LOCK_NAME,
     { mode: 'exclusive' },
-    operation
+    async () => {
+      const acquired: DurableAssetLifecyclePermit = { [durableAssetLifecyclePermitBrand]: true };
+      activeDurableAssetLifecyclePermits.add(acquired);
+      try {
+        return await operation(acquired);
+      } finally {
+        activeDurableAssetLifecyclePermits.delete(acquired);
+      }
+    }
+  );
+}
+
+/** Maintenance yields immediately to an existing or queued lifecycle operation. */
+export function tryRunWithDurableAssetLifecycleLock<T>(
+  operation: (permit: DurableAssetLifecyclePermit) => T | Promise<T>
+): Promise<T | null> {
+  return getPersistenceLockManager().request(
+    DURABLE_ASSET_LIFECYCLE_LOCK_NAME,
+    { mode: 'exclusive', ifAvailable: true },
+    async (lock) => {
+      if (lock === null) return null;
+      const permit: DurableAssetLifecyclePermit = { [durableAssetLifecyclePermitBrand]: true };
+      activeDurableAssetLifecyclePermits.add(permit);
+      try {
+        return await operation(permit);
+      } finally {
+        activeDurableAssetLifecyclePermits.delete(permit);
+      }
+    }
   );
 }
 
@@ -257,6 +345,7 @@ export type PersistenceMutationDomain =
   | 'screenshot-setup'
   | 'step-badge-presets'
   | 'surface-style-presets'
+  | 'technical-data-preference'
   | 'video-settings';
 
 export function runWithPersistenceDomainMutationLock<T>(

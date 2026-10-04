@@ -17,7 +17,7 @@ vi.mock('../assets', async (importOriginal) => ({
 
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
-  blobToDataUrl: vi.fn(async (blob: Blob) => `data:${blob.type};base64,cmVzdG9yZWQ=`),
+  blobToDataUrl: vi.fn(async (blob: Blob) => `data:${blob.type};base64,${btoa(await blob.text())}`),
 }));
 
 import {
@@ -77,7 +77,7 @@ it('extracts all supported editor raster fields into immutable asset slots', asy
   expect(parsePersistedEditorDocument(prepared.document)).toEqual(prepared.document);
 });
 
-it('hydrates files through temporary object URLs and revokes every URL exactly once', async () => {
+it('hydrates the source into a stable URL without a temporary object URL', async () => {
   const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
   mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
   const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:source');
@@ -88,14 +88,14 @@ it('hydrates files through temporary object URLs and revokes every URL exactly o
     refs: prepared.objects.map(({ ref }) => ref),
   });
 
-  expect(hydrated.document.sourceImageData).toBe('blob:source');
+  expect(hydrated.document.sourceImageData).toBe('data:image/png;base64,c291cmNl');
   hydrated.release();
   hydrated.release();
-  expect(createObjectUrl).toHaveBeenCalledTimes(1);
-  expect(revokeObjectUrl).toHaveBeenCalledTimes(1);
+  expect(createObjectUrl).not.toHaveBeenCalled();
+  expect(revokeObjectUrl).not.toHaveBeenCalled();
 });
 
-it('reuses hydrated immutable assets without reading their OPFS-backed object URLs again', async () => {
+it('reuses hydrated immutable assets without staging their OPFS files again', async () => {
   const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
   mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
   vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:hydrated-source');
@@ -139,14 +139,39 @@ it('hydrates a shared immutable asset once and clears every runtime capability o
     refs: [sourceRef],
   });
 
-  expect(createObjectUrl).toHaveBeenCalledOnce();
-  expect(hydrated.document.sourceImageData).toBe('blob:shared');
-  expect(hydrated.document.canvasJson).toContain('blob:shared');
+  expect(createObjectUrl).not.toHaveBeenCalled();
+  expect(hydrated.document.sourceImageData).toBe('data:image/png;base64,c2hhcmVk');
+  expect(hydrated.document.canvasJson).toContain(hydrated.document.sourceImageData);
   expect(hydrated.assetsByRuntimeUrl.size).toBe(1);
   hydrated.release();
   hydrated.release();
-  expect(revokeObjectUrl).toHaveBeenCalledOnce();
+  expect(revokeObjectUrl).not.toHaveBeenCalled();
   expect(hydrated.assetsByRuntimeUrl.size).toBe(0);
+});
+
+it('keeps the source image in an undo snapshot loadable after runtime asset release', async () => {
+  const prepared = await preparePersistedEditorDocument(createEditorDocumentFixture());
+  const sourceRef = prepared.refs[0]!;
+  const document = {
+    ...prepared.document,
+    assets: [
+      { assetId: sourceRef.assetId, role: 'source-image' },
+      { assetId: sourceRef.assetId, role: 'canvas:$.objects[0].src' },
+    ],
+    canvasJson: JSON.stringify({
+      objects: [{ src: `sniptale-asset:${sourceRef.assetId}`, type: 'image' }],
+    }),
+  };
+  mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  const hydrated = await hydratePersistedEditorDocument({ document, refs: [sourceRef] });
+  const undoSnapshot = JSON.parse(JSON.stringify(hydrated.document)) as typeof hydrated.document;
+
+  hydrated.release();
+
+  expect(undoSnapshot.sourceImageData).toMatch(/^data:image\/png;base64,/);
+  expect(JSON.parse(undoSnapshot.canvasJson).objects[0].src).toBe(undoSnapshot.sourceImageData);
+  expect(revoke).not.toHaveBeenCalledWith(undoSnapshot.sourceImageData);
 });
 
 it('reuses unchanged slots while staging changed runtime binaries', async () => {
@@ -266,32 +291,41 @@ it('hydrates every optional asset slot and nested canvas reference', async () =>
     refs: prepared.objects.map(({ ref }) => ref),
   });
 
-  expect(hydrated.document.frame.backgroundImageData).toBe('blob:frame-background');
-  expect(hydrated.document.browserFrame?.faviconDataUrl).toBe('blob:browser-favicon');
-  expect(hydrated.document.canvasJson).toContain('blob:canvas:$.objects[0].src');
+  expect(hydrated.document.frame.backgroundImageData).toMatch(/^data:image\/png;base64,/);
+  expect(hydrated.document.browserFrame?.faviconDataUrl).toMatch(/^data:image\/png;base64,/);
+  expect(JSON.parse(hydrated.document.canvasJson).objects[0].src).toMatch(
+    /^data:image\/png;base64,/
+  );
   hydrated.release();
-  expect(createObjectUrl).toHaveBeenCalledTimes(4);
-  expect(revokeObjectUrl).toHaveBeenCalledTimes(4);
+  expect(createObjectUrl).not.toHaveBeenCalled();
+  expect(revokeObjectUrl).not.toHaveBeenCalled();
 });
 
-it('revokes created URLs when hydration discovers a missing ref', async () => {
+it('rejects a missing ref after reading another asset without creating object URLs', async () => {
   const document = createEditorDocumentFixture();
   document.frame.backgroundImageData = 'data:image/png;base64,Ymc=';
+  document.browserFrame = {
+    canvasMode: 'resize',
+    contentMode: 'push-down',
+    faviconDataUrl: 'data:image/png;base64,aWNvbg==',
+    title: 'Page',
+    url: 'https://example.test',
+  };
   const prepared = await preparePersistedEditorDocument(document);
   mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
-  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:source');
+  vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:background');
   const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
 
   await expect(
     hydratePersistedEditorDocument({
       document: prepared.document,
-      refs: prepared.objects.slice(0, 1).map(({ ref }) => ref),
+      refs: prepared.objects.slice(0, 2).map(({ ref }) => ref),
     })
   ).rejects.toThrow('Editor document asset ref is missing');
-  expect(revokeObjectUrl).toHaveBeenCalledWith('blob:source');
+  expect(revokeObjectUrl).not.toHaveBeenCalled();
 });
 
-it('materializes file-backed slots only for the retiring legacy transfer boundary', async () => {
+it('materializes file-backed slots for the retiring legacy transfer boundary', async () => {
   const document = createEditorDocumentFixture();
   document.frame.backgroundImageData = 'data:image/png;base64,Ymc=';
   document.browserFrame = {
@@ -327,3 +361,73 @@ it('reports cleanup failures together with the original preparation error', asyn
     errors: expect.arrayContaining([cleanupFailure]),
   });
 });
+
+it.each(['Схема.png', 'data: diagram', 'blob: sketch'])(
+  'preserves caption %s through storage, hydration and legacy transfer',
+  async (displayName) => {
+    const document = { ...createEditorDocumentFixture(), displayName };
+    const prepared = await preparePersistedEditorDocument(document);
+    const parsed = parsePersistedEditorDocument(prepared.document)!;
+    expect(parsed).not.toBeNull();
+    expect(parsed.displayName).toBe(document.displayName);
+    mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+    const args = { document: parsed, refs: prepared.refs };
+    const hydrated = await hydratePersistedEditorDocument(args);
+    const transferred = await materializePersistedEditorDocumentForLegacyTransfer(args);
+    for (const result of [hydrated.document, transferred]) {
+      expect(result.displayName).toBe(document.displayName);
+      expect(result.sourceName).toBe(document.sourceName);
+    }
+    hydrated.release();
+  }
+);
+
+it.each([undefined, 'Displayed caption'])(
+  'preserves image metadata across codec boundaries with caption %s',
+  async (displayName) => {
+    const document = createEditorDocumentFixture();
+    if (displayName !== undefined) document.displayName = displayName;
+    else delete document.displayName;
+    Object.assign(document, {
+      sourceName: 'source.png',
+      sourceWidth: 1200,
+      sourceHeight: 800,
+      canvasWidth: 900,
+      canvasHeight: 600,
+      sourceLeft: 12,
+      sourceTop: 24,
+      sourceDisplayWidth: 450,
+      sourceDisplayHeight: 300,
+    });
+    const metadata = {
+      sourceName: document.sourceName,
+      sourceWidth: 1200,
+      sourceHeight: 800,
+      canvasWidth: 900,
+      canvasHeight: 600,
+      sourceLeft: 12,
+      sourceTop: 24,
+      sourceDisplayWidth: 450,
+      sourceDisplayHeight: 300,
+    };
+    const prepared = await preparePersistedEditorDocument(document);
+    mocks.readAssetFile.mockResolvedValue(new File(['source'], 'source', { type: 'image/png' }));
+    const hydrated = await hydratePersistedEditorDocument({
+      document: prepared.document,
+      refs: prepared.refs,
+    });
+    const legacy = await materializePersistedEditorDocumentForLegacyTransfer({
+      document: prepared.document,
+      refs: prepared.refs,
+    });
+    for (const result of [prepared.document, hydrated.document, legacy]) {
+      expect(result).toMatchObject(metadata);
+      expect(Object.hasOwn(result, 'displayName')).toBe(displayName !== undefined);
+      expect(result.displayName).toBe(displayName);
+    }
+    expect(prepared.document.version).toBe(3);
+    expect(hydrated.document.version).toBe(2);
+    expect(legacy.version).toBe(2);
+    hydrated.release();
+  }
+);

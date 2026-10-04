@@ -1,10 +1,46 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  startDescription: {
+    ru: 'Создайте проект или продолжите работу с сохранённым видео.',
+    en: 'Create a project or continue working on a saved video.',
+  },
+  startRecent: { ru: 'Недавние видеопроекты', en: 'Recent video projects' },
   recordAudioMicrophone: { ru: 'Запись с микрофона', en: 'Record microphone' },
   recordAudioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
+  recordAudioPlayVideo: {
+    ru: 'Воспроизводить видео при записи (без звука)',
+    en: 'Play video while recording (sound muted)',
+  },
+  recordAudioSaveFailedRetry: {
+    ru: 'Не удалось завершить сохранение. Запись осталась здесь — повторите попытку или скачайте оригинал.',
+    en: 'Could not finish saving. Your recording is still here; retry or download the original.',
+  },
+  recordAudioDownloadOriginal: { ru: 'Скачать исходную запись', en: 'Download original recording' },
+  recordAudioPrepareFailed: {
+    ru: 'Не удалось обработать запись для добавления. Скачайте оригинал, чтобы сохранить весь дубль.',
+    en: 'Could not prepare the recording for insertion. Download the original to keep the whole take.',
+  },
+  recordAudioDownloadFailed: {
+    ru: 'Не удалось начать скачивание. Запись осталась здесь — попробуйте ещё раз.',
+    en: 'Could not start the download. Your recording is still here; try again.',
+  },
+  recordAudioDiscardTitle: { ru: 'Отказаться от записи?', en: 'Discard recording?' },
+  recordAudioDiscardMessage: {
+    ru: 'Эта запись ещё не сохранена. Если отказаться от неё, записанный звук будет потерян. Можно вернуться к записи и продолжить работу.',
+    en: 'This recording has not been saved. Discarding it will lose the captured sound. You can return to your recording and continue working.',
+  },
+  recordAudioKeep: { ru: 'Вернуться к записи', en: 'Keep recording' },
+  recordAudioDiscard: { ru: 'Отказаться от записи', en: 'Discard recording' },
   recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
+  recordAudioSeconds: { ru: 'сек', en: 'sec' },
+  recordAudioLimitInvalid: {
+    ru: 'Введите длительность больше нуля, не превышающую доступный максимум.',
+    en: 'Enter a duration greater than zero and within the available maximum.',
+  },
   recordAudioRemaining: { ru: 'Осталось', en: 'Remaining' },
+  recordAudioPause: { ru: 'Пауза', en: 'Pause' },
+  recordAudioResume: { ru: 'Продолжить', en: 'Resume' },
   recordAudioInsert: { ru: 'Вставить в промежуток', en: 'Insert into gap' },
   recordAudioSaveMaterial: { ru: 'Сохранить в материалы', en: 'Save to materials' },
   recordAudioStartFailed: {
@@ -12,6 +48,18 @@ export const videoEditorAppMessages = defineMessageSource({
     en: 'Recording could not start. Try again.',
   },
   recordAudioPreparing: { ru: 'Подготовка записи…', en: 'Preparing recording…' },
+  recordAudioSignal: {
+    label: { ru: 'Уровень микрофона', en: 'Microphone level' },
+    preparing: { ru: 'Подготовка микрофона', en: 'Preparing microphone' },
+    listening: { ru: 'Ожидание сигнала', en: 'Waiting for signal' },
+    voice: { ru: 'Голос поступает', en: 'Voice detected' },
+    silence: { ru: 'Тишина', en: 'Silence' },
+    paused: { ru: 'Запись на паузе', en: 'Recording paused' },
+    unavailable: {
+      ru: 'Нет сигнала микрофона',
+      en: 'Microphone signal unavailable',
+    },
+  },
   recordAudioDevice: { ru: 'Микрофон', en: 'Microphone' },
   recordAudioDefaultDevice: { ru: 'По умолчанию', en: 'Default device' },
   saveChangesFailed: { ru: 'Не удалось сохранить изменения', en: 'Changes could not be saved' },
@@ -50,8 +98,8 @@ export const videoEditorAppMessages = defineMessageSource({
   trackOrder: { ru: 'Порядок дорожки', en: 'Track order' },
   resizeMaterials: { ru: 'Ширина материалов', en: 'Materials width' },
   resizeTimeline: { ru: 'Высота просмотра', en: 'Viewer height' },
-  sourceInLabel: { ru: 'In', en: 'In' },
-  sourceOutLabel: { ru: 'Out', en: 'Out' },
+  sourceInLabel: { ru: 'Начало', en: 'Start' },
+  sourceOutLabel: { ru: 'Конец', en: 'End' },
   closeSource: { ru: 'Закрыть исходник', en: 'Close source' },
   sourceViewer: { ru: 'Исходник', en: 'Source' },
   montageViewer: { ru: 'Монтаж', en: 'Timeline' },
@@ -125,8 +173,8 @@ export const videoEditorAppMessages = defineMessageSource({
   materialsOverlay: { ru: 'Наложить в текущий момент', en: 'Overlay at playhead' },
   materialsEmpty: { ru: 'В проекте пока нет материалов.', en: 'No materials in this project yet.' },
   documentTitle: {
-    ru: 'Sniptale — Видео-редактор',
-    en: 'Sniptale — Video editor',
+    ru: 'Видеоредактор',
+    en: 'Video editor',
   },
   recordingNotFoundPrefix: {
     ru: 'Запись "',

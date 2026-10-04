@@ -65,6 +65,27 @@ describe('Fabric drawing adapter', () => {
     expect(context.fill).toHaveBeenCalledTimes(4);
   });
 
+  it('removes invisible Fabric stroke geometry from a prepared saved text box', () => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'saved-text',
+        kind: 'text',
+        bounds: { x: 10, y: 15, width: 120, height: 40 },
+        text: 'Saved text',
+        color: '#111',
+        backgroundColor: null,
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    object.set({ strokeWidth: 1 });
+
+    applyEditorDrawingTextVisuals(object);
+
+    expect(object.strokeWidth).toBe(0);
+  });
+
   it('expands a new text box while typing until the shared working-area limit', () => {
     const object = createEditorDrawingFabricObject(
       {
@@ -84,6 +105,28 @@ describe('Fabric drawing adapter', () => {
     expect(synchronizeEditorDrawingTextLayout(object)).toBe(true);
     expect(object.width).toBeGreaterThan(80);
     expect(object.width).toBeLessThanOrEqual(220);
+  });
+
+  it('keeps every line of a growing multiline textbox inside its selection bounds', () => {
+    const object = createEditorDrawingFabricObject(
+      {
+        id: 'text-multiline',
+        kind: 'text',
+        bounds: { x: 5, y: 6, width: 180, height: 30 },
+        text: 'One\nTwo',
+        color: '#111',
+        backgroundColor: null,
+        fontFamily: 'sans',
+        fontSize: 24,
+      },
+      1
+    ) as Textbox;
+    object.set({ text: 'One\nTwo\nThree\nFour\nFive\nSix' });
+    object.initDimensions();
+
+    expect(synchronizeEditorDrawingTextLayout(object)).toBe(true);
+    expect(object.height).toBeGreaterThanOrEqual(object.calcTextHeight() + 4);
+    expect(object._textLines).toHaveLength(6);
   });
 
   it.each([

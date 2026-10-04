@@ -5,11 +5,12 @@ import {
   getFilteredGalleryItems,
   getGalleryFacets,
   getGalleryCounts,
-  getGalleryGridMetrics,
+  createGalleryGridMetrics,
 } from './selectors';
 import type { GalleryAppState } from './types';
 import type { GalleryViewMode } from './types';
 import type { GalleryItem } from '../library/items';
+import { isGallerySelectableItem } from '../library/items';
 import type { useGalleryFilterState } from './useGalleryFilterState';
 import type { useGalleryLibraryState } from './useGalleryLibraryState';
 import type { useGalleryViewportState } from './useGalleryViewportState';
@@ -17,6 +18,29 @@ import type { useGalleryViewportState } from './useGalleryViewportState';
 type GalleryFiltersState = ReturnType<typeof useGalleryFilterState>;
 type GalleryLibraryState = ReturnType<typeof useGalleryLibraryState>;
 type GalleryViewportState = ReturnType<typeof useGalleryViewportState>;
+
+function hasGalleryResultContext(state: GalleryFiltersState['state']): boolean {
+  return (
+    !state.trashMode &&
+    (state.folderFilter !== 'all' ||
+      state.scope !== 'all' ||
+      Boolean(state.activeSavedView) ||
+      state.appliedSearch.trim().length > 0 ||
+      state.activeTags.length > 0 ||
+      Object.values(state.facetFilters).some((values) => values.length > 0))
+  );
+}
+
+const TRASH_ACTIVE_TAGS: string[] = [];
+const TRASH_FACET_FILTERS: GalleryFiltersState['state']['facetFilters'] = {
+  created: [],
+  duration: [],
+  format: [],
+  resolution: [],
+  size: [],
+  source: [],
+  updated: [],
+};
 
 function getGalleryStoragePressureClass(storageInfo: GalleryLibraryState['storageInfo']) {
   return getActiveStorageBarClass(
@@ -35,12 +59,21 @@ function getSelectedGallerySize(items: GalleryLibraryState['items']) {
   return items.reduce((total, item) => total + item.size, 0);
 }
 
+function getGalleryTrashRootCount(items: GalleryLibraryState['items']): number {
+  const roots = new Set<string>();
+  for (const item of items) {
+    if (item.lifecycle?.trashedAt === undefined || !isGallerySelectableItem(item)) continue;
+    roots.add(`${item.kind}:${item.entityId ?? item.id}`);
+  }
+  return roots.size;
+}
+
 function getDerivedFilteredGalleryItems(args: {
   activeTags: GalleryFiltersState['state']['activeTags'];
   facetFilters: GalleryFiltersState['state']['facetFilters'];
   folderFilter: GalleryFiltersState['state']['folderFilter'];
   items: GalleryLibraryState['items'];
-  search: GalleryFiltersState['state']['search'];
+  search: GalleryFiltersState['state']['appliedSearch'];
   scope: GalleryFiltersState['state']['scope'];
   sortMode: GalleryFiltersState['state']['sortMode'];
 }) {
@@ -55,28 +88,13 @@ function getDerivedFilteredGalleryItems(args: {
   });
 }
 
-function getDerivedGalleryGridMetrics(args: {
-  filteredItems: ReturnType<typeof getFilteredGalleryItems>;
-  gridWidth: GalleryViewportState['gridWidth'];
-  scrollTop: GalleryViewportState['scrollTop'];
-  viewMode: GalleryViewMode;
-  viewportHeight: GalleryViewportState['viewportHeight'];
-}) {
-  return getGalleryGridMetrics({
-    filteredItems: args.filteredItems,
-    gridWidth: args.gridWidth,
-    scrollTop: args.scrollTop,
-    viewMode: args.viewMode,
-    viewportHeight: args.viewportHeight,
-  });
-}
-
 function useGalleryFilterDerivedState(props: {
   filters: GalleryFiltersState;
   library: GalleryLibraryState;
 }) {
   const { filters, library } = props;
 
+  const counts = useMemo(() => getGalleryCounts(library.items), [library.items]);
   const scopedItems = useMemo(
     () =>
       library.items.filter(
@@ -86,7 +104,6 @@ function useGalleryFilterDerivedState(props: {
       ),
     [filters.state.scope, library.items]
   );
-  const counts = useMemo(() => getGalleryCounts(scopedItems), [scopedItems]);
   const allTags = useMemo(() => getAllGalleryTags(scopedItems), [scopedItems]);
   const facets = useMemo(
     () =>
@@ -111,7 +128,7 @@ function useGalleryFilterDerivedState(props: {
         facetFilters: filters.state.facetFilters,
         folderFilter: filters.state.folderFilter,
         items: library.items,
-        search: filters.state.search,
+        search: filters.state.appliedSearch,
         scope: filters.state.scope,
         sortMode: filters.state.sortMode,
       }),
@@ -119,7 +136,7 @@ function useGalleryFilterDerivedState(props: {
       filters.state.activeTags,
       filters.state.facetFilters,
       filters.state.folderFilter,
-      filters.state.search,
+      filters.state.appliedSearch,
       filters.state.scope,
       filters.state.sortMode,
       library.items,
@@ -155,32 +172,57 @@ export function useGalleryDerivedState(props: {
   viewMode: GalleryViewMode;
   viewport: GalleryViewportState;
 }) {
-  const { filters, library, viewport, viewMode } = props;
-  const filterState = useGalleryFilterDerivedState({ filters, library });
+  const { filters, viewport, viewMode } = props;
+  const modeItems = useMemo(
+    () =>
+      props.library.items.filter(
+        (item) =>
+          Boolean(item.lifecycle?.trashedAt !== undefined) === Boolean(filters.state.trashMode)
+      ),
+    [props.library.items, filters.state.trashMode]
+  );
+  const library = { ...props.library, items: modeItems };
+  const trashSummary = useMemo(
+    () => ({
+      count: getGalleryTrashRootCount(props.library.items),
+      size: props.library.trashUsage,
+    }),
+    [props.library.items, props.library.trashUsage]
+  );
+  const modeFilters = filters.state.trashMode
+    ? {
+        ...filters,
+        state: {
+          ...filters.state,
+          activeTags: TRASH_ACTIVE_TAGS,
+          facetFilters: TRASH_FACET_FILTERS,
+          folderFilter: 'all' as const,
+          scope: 'all' as const,
+        },
+      }
+    : filters;
+  const filterState = useGalleryFilterDerivedState({ filters: modeFilters, library });
   const selectionState = useGallerySelectionDerivedState({
     items: library.items,
     selectedIds: filters.state.selectedIds,
   });
-  const gridMetrics = useMemo(
+  const selectGridMetrics = useMemo(
     () =>
-      getDerivedGalleryGridMetrics({
+      createGalleryGridMetrics({
         filteredItems: filterState.filteredItems,
         gridWidth: viewport.gridWidth,
-        scrollTop: viewport.scrollTop,
         viewMode,
-        viewportHeight: viewport.viewportHeight,
       }),
-    [
-      filterState.filteredItems,
-      viewMode,
-      viewport.gridWidth,
-      viewport.scrollTop,
-      viewport.viewportHeight,
-    ]
+    [filterState.filteredItems, viewMode, viewport.gridWidth]
   );
+  const gridMetrics = selectGridMetrics({
+    scrollTop: viewport.scrollTop,
+    viewportHeight: viewport.viewportHeight,
+  });
 
   return {
     activeStorageBarClass: getGalleryStoragePressureClass(library.storageInfo),
+    hasResultContext: hasGalleryResultContext(filters.state),
     allItems: library.items,
     allTags: filterState.allTags,
     counts: filterState.counts,
@@ -189,6 +231,7 @@ export function useGalleryDerivedState(props: {
     gridMetrics,
     selectedItems: selectionState.selectedItems,
     selectedSize: selectionState.selectedSize,
+    trashSummary,
   } satisfies Pick<
     GalleryAppState['derived'],
     | 'activeStorageBarClass'
@@ -198,6 +241,8 @@ export function useGalleryDerivedState(props: {
     | 'facets'
     | 'filteredItems'
     | 'gridMetrics'
+    | 'hasResultContext'
+    | 'trashSummary'
   > &
     Pick<GalleryAppState['selection'], 'selectedItems' | 'selectedSize'> & {
       gridMetrics: GalleryAppState['derived']['gridMetrics'] & { visibleItems: GalleryItem[] };

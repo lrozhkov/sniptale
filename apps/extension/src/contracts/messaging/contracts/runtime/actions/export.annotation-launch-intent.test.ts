@@ -29,3 +29,16 @@ it('parses popup export launch-intent requests and authoritative nullable result
   expect(() => contract.parseResponse({ page: 'home', success: true })).toThrow();
   expect(() => contract.parseResponse({ success: true })).toThrow();
 });
+
+it('validates the one-shot automatic-start hint', () => {
+  const contract =
+    runtimeActionExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];
+  expect(contract.parseResponse({ page: 'export', startExport: true, success: true })).toEqual({
+    page: 'export',
+    startExport: true,
+    success: true,
+  });
+  expect(() =>
+    contract.parseResponse({ page: 'export', startExport: 'true', success: true })
+  ).toThrow();
+});

@@ -35,9 +35,9 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
   loadSettings: loadSettingsMock,
 }));
 
-vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/foundation/utils/filename')>()),
-  generateFilename: generateFilenameMock,
+vi.mock('../../../workflows/file-naming/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/file-naming/index')>()),
+  createScreenshotFilename: generateFilenameMock,
 }));
 
 vi.mock('../index', async (importOriginal) => ({
@@ -205,7 +205,11 @@ async function verifiesFullCaptureFailures() {
   await flushPromises();
 
   expect(loadSettingsMock).toHaveBeenCalled();
-  expect(generateFilenameMock).toHaveBeenCalledWith('full', 'png');
+  expect(generateFilenameMock).toHaveBeenCalledWith(
+    'full',
+    'png',
+    expect.objectContaining({ imageFormat: 'png' })
+  );
   expect(settingsFailureContext.sendResponse).toHaveBeenCalledWith({
     success: false,
     error: 'settings failed',
@@ -231,7 +235,11 @@ describe('capture-router-handlers.full edit actions', () => {
     await flushPromises();
 
     expect(loadSettingsMock).toHaveBeenCalled();
-    expect(generateFilenameMock).toHaveBeenCalledWith('full', 'jpeg');
+    expect(generateFilenameMock).toHaveBeenCalledWith(
+      'full',
+      'jpeg',
+      expect.objectContaining({ imageFormat: 'jpeg' })
+    );
     expect(openEditorWithImageMock).toHaveBeenCalledWith('data:image/jpeg;base64,9', {
       tabId: 42,
     });

@@ -118,6 +118,55 @@ beforeEach(() => {
 });
 
 describe('video project backup inventory', () => {
+  it('ignores an unrelated invalid video project during selected image backup', async () => {
+    const db = database([], new Map(), [{ id: 'unrelated-project', project: null }]);
+    const roots = await buildVideoProjectRootInventory({
+      db,
+      options: createMediaHubBackupExportOptions({
+        scope: 'selected',
+        selected: { mediaAssetIds: ['image-one'], scenarioProjectIds: [], videoProjectIds: [] },
+      }),
+      paths,
+    });
+    expect(roots).toEqual([]);
+  });
+
+  it('still rejects an invalid video project explicitly selected for backup', async () => {
+    const db = database([], new Map(), [{ id: 'selected-project', project: null }]);
+    await expect(
+      buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions({
+          scope: 'selected',
+          selected: {
+            mediaAssetIds: [],
+            scenarioProjectIds: [],
+            videoProjectIds: ['selected-project'],
+          },
+        }),
+        paths,
+      })
+    ).rejects.toThrow('Stored video project is invalid');
+  });
+
+  it('does not silently drop a malformed row when a video project is selected', async () => {
+    const db = database([], new Map(), [{ id: 123, project: null }]);
+    await expect(
+      buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions({
+          scope: 'selected',
+          selected: {
+            mediaAssetIds: [],
+            scenarioProjectIds: [],
+            videoProjectIds: ['selected-project'],
+          },
+        }),
+        paths,
+      })
+    ).rejects.toThrow('Stored video project is invalid');
+  });
+
   it('archives review-referenced external audio assets with portable-safe metadata', async () => {
     const entry = createVideoProjectEntryWithMediaClip();
     const db = database(
@@ -125,10 +174,7 @@ describe('video project backup inventory', () => {
         assetEntry('project-asset-1', 'local-video', 'video/webm', 10),
         assetEntry('music', 'local-music', 'audio/mpeg', 8),
       ],
-      new Map([
-        ['project-asset:project-asset-1', createMediaLibraryEntry({ filename: 'take.webm' })],
-        ['project-asset:music', createMediaLibraryEntry({ filename: 'theme.mp3' })],
-      ]),
+      new Map([['project-asset:music', createMediaLibraryEntry({ filename: 'theme.mp3' })]]),
       [entry],
       [workspaceRow]
     );
@@ -146,7 +192,7 @@ describe('video project backup inventory', () => {
       filename: asset.filename,
     }));
     expect(assets).toEqual([
-      { id: 'project-asset-1', filename: 'take.webm' },
+      { id: 'project-asset-1', filename: 'Asset 001.webm' },
       { id: 'music', filename: 'theme.mp3' },
     ]);
     expect(roots[0]!.descriptor.objectCount).toBe(2);
@@ -157,9 +203,7 @@ describe('video project backup inventory', () => {
     // The review references project-asset:music but that store row is gone.
     const db = database(
       [assetEntry('project-asset-1', 'local-video', 'video/webm', 10)],
-      new Map([
-        ['project-asset:project-asset-1', createMediaLibraryEntry({ filename: 'take.webm' })],
-      ]),
+      new Map([]),
       [entry],
       [workspaceRow]
     );
@@ -171,4 +215,59 @@ describe('video project backup inventory', () => {
       })
     ).rejects.toThrow('Review-referenced project asset is missing: project-asset:music.');
   });
+});
+
+it.each([true, false])(
+  'projects recording metadata privacy in full project backup: %s',
+  async (includeTelemetry) => {
+    const entry = createVideoProjectEntryWithMediaClip();
+    entry.project.assets = [];
+    entry.project.clips = [];
+    const recordingMetadata = {
+      captureMode: 'TAB' as const,
+      displaySurface: 'browser' as const,
+      actionCount: 5,
+      hasPointer: false,
+    };
+    const exportEntry = {
+      id: 'copy',
+      projectId: entry.id,
+      assetId: 'output',
+      filename: 'copy.webm',
+      createdAt: 1,
+      size: 4,
+      width: 320,
+      height: 180,
+      duration: 3,
+      fps: 15,
+      mimeType: 'video/webm',
+      recordingMetadata,
+    };
+    const db = { ...database([], new Map(), [entry]), getAllFromIndex: async () => [exportEntry] };
+    const [root] = await buildVideoProjectRootInventory({
+      db,
+      paths,
+      options: createMediaHubBackupExportOptions({ includeTelemetry }),
+    });
+    const portable = parsePortableVideoProjectMetadata((await root!.load()).metadata);
+    expect(portable.projectExports[0]?.entry.recordingMetadata).toEqual(
+      includeTelemetry ? recordingMetadata : undefined
+    );
+    expect(root!.summary.telemetryCount).toBe(includeTelemetry ? 1 : 0);
+  }
+);
+
+it('preserves private representation visibility in the portable project inventory', async () => {
+  const entry = createVideoProjectEntryWithMediaClip();
+  const db = database([assetEntry('project-asset-1', 'local-video', 'video/webm', 10)], new Map(), [
+    entry,
+  ]);
+  const roots = await buildVideoProjectRootInventory({
+    db,
+    options: createMediaHubBackupExportOptions({ includeDrafts: true, scope: 'all' }),
+    paths,
+  });
+  const payload = await roots[0]!.load();
+  const metadata = parsePortableVideoProjectMetadata(payload.metadata);
+  expect(metadata.projectAssets[0]).toMatchObject({ publishToLibrary: false });
 });

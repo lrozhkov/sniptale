@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollText } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 import { AnnotatableImageToolbar } from '../annotatable-image-surface';
 import { DISABLED_EDITOR_ICON_HOVER_CLASS_NAME } from './styles.constants';
 
@@ -61,7 +61,7 @@ export function ImageEditorIcon({ className }: { className?: string }) {
 }
 
 export function ScenarioEditorIcon({ className }: { className?: string }) {
-  return <ScrollText aria-hidden="true" className={className} />;
+  return <BookOpen aria-hidden="true" className={className} />;
 }
 
 export function EditorToolbarShell({

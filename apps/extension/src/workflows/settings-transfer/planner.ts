@@ -330,6 +330,12 @@ function remapImportedValue(
   path: string,
   remaps: CollectionRemaps
 ): SettingsTransferJsonValue {
+  if (
+    typeof value === 'string' &&
+    path.startsWith('interface.preferences.contextMenu.layout.nodes') &&
+    path.endsWith('.command')
+  )
+    return remapContextMenuCommand(value, remaps);
   const targetCollection = referenceTargetCollection(path);
   if (typeof value === 'string' && targetCollection) {
     return remaps.get(targetCollection)?.get(value) ?? value;
@@ -352,6 +358,24 @@ function remapImportedValue(
   );
 }
 
+function remapContextMenuCommand(command: string, remaps: CollectionRemaps): string {
+  const quickActionPrefix = 'sniptale.screenshots.quick-action.';
+  if (command.startsWith(quickActionPrefix)) {
+    const id = command.slice(quickActionPrefix.length);
+    const next = remaps.get('capture.quick-actions.items')?.get(id);
+    return next ? `${quickActionPrefix}${next}` : command;
+  }
+  const viewportPrefix = 'sniptale.window-resize.preset.';
+  if (!command.startsWith(viewportPrefix)) return command;
+  const encodedId = command.slice(viewportPrefix.length);
+  try {
+    const next = remaps.get('capture.viewport-presets.items')?.get(decodeURIComponent(encodedId));
+    return next ? `${viewportPrefix}${encodeURIComponent(next)}` : command;
+  } catch {
+    return command;
+  }
+}
+
 function referenceTargetCollection(path: string): string | null {
   if (path === 'styles.video-effects.preferences.packId') return 'styles.video-effects.items';
   if (path.startsWith('capture.quick-actions.items.') && path.endsWith('.viewportPresetId'))
@@ -365,6 +389,14 @@ function referenceTargetCollection(path: string): string | null {
   if (path.endsWith('.linkedTemplates.calloutPresetId')) return 'styles.callouts.presets';
   if (path.endsWith('.linkedTemplates.stepBadgePresetId')) return 'styles.numbering.presets';
   if (path.endsWith('.tagIds')) return 'styles.tags.tags';
+  if (path === 'styles.tags.activeFilterTagIds') return 'styles.tags.tags';
+  for (const domainId of ['styles.surfaces', 'styles.gradients']) {
+    if (
+      path.startsWith(`${domainId}.defaultPresetIdBySurface.`) ||
+      path.startsWith(`${domainId}.favoriteIdsBySurface.`)
+    )
+      return `${domainId}.presets`;
+  }
   const directTargets: Record<string, string> = {
     'styles.borders.defaultBorderPresetId': 'styles.borders.borderPresets',
     'styles.callouts.defaultPresetId': 'styles.callouts.presets',

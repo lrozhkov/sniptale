@@ -1,4 +1,4 @@
-import { Camera, Images } from 'lucide-react';
+import { Camera, Library } from 'lucide-react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../../../contracts/settings';
 import { translate } from '../../../../platform/i18n/popup';
@@ -13,6 +13,12 @@ import {
 import { openImageEditor, openLibrary } from '../../navigation/actions';
 import { actionFooterSurfaceClassName } from '../../../../ui/popup-shell/action-footer/tokens';
 import { ImageEditorIcon } from '@sniptale/ui/editor-chrome';
+
+const HOVER_ACCENT_ICON_CLASS_NAME = [
+  'text-[var(--sniptale-color-text-secondary)]',
+  'group-hover:text-[var(--sniptale-color-accent)]',
+  'group-focus-visible:text-[var(--sniptale-color-accent)]',
+].join(' ');
 
 export function ScreenshotSetupPanel(props: {
   config: ScreenshotCaptureConfig;
@@ -40,7 +46,7 @@ export function ScreenshotSetupPanel(props: {
             />
           )}
           <ImageQualityField config={props.config} patch={patch} />
-          {desktop ? null : <TabCaptureCountdownField config={props.config} patch={patch} />}
+          <TabCaptureCountdownField config={props.config} patch={patch} />
         </div>
       </div>
       <div className={`mt-3 ${actionFooterSurfaceClassName}`}>
@@ -61,15 +67,15 @@ export function ScreenshotSetupPanel(props: {
           <PopupActionButton
             icon={ImageEditorIcon}
             label={translate('popup.home.imageEditorLabel')}
-            iconClassName="text-[var(--sniptale-color-text-secondary)]"
+            iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
             compact
             title={translate('popup.home.imageEditorTitle')}
             onClick={openImageEditor}
           />
           <PopupActionButton
-            icon={Images}
+            icon={Library}
             label={translate('popup.home.libraryLabel')}
-            iconClassName="text-[var(--sniptale-color-text-secondary)]"
+            iconClassName={HOVER_ACCENT_ICON_CLASS_NAME}
             compact
             title={translate('popup.home.libraryTitle')}
             onClick={() => openLibrary('screenshot')}

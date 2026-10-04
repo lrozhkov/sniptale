@@ -10,7 +10,6 @@ import {
   getCalloutFrameColors,
   resolveCalloutColorBindings,
 } from '../../features/highlighter/callout-color-bindings';
-import type { FrameAnnotationToolbarBounds } from './toolbar-placement';
 import {
   CalloutVoiceButton,
   resolveCalloutVoiceButtonLeftOffset,
@@ -36,7 +35,6 @@ export function EditorFrameCallout(props: {
   onMoveEnd?: () => void;
   isSettingsOpen: boolean;
   onSettingsOpen: (anchor: HTMLButtonElement) => void;
-  onOccupiedBoundsChange: (bounds: FrameAnnotationToolbarBounds | null) => void;
   projectMoveRect?: (rect: { x: number; y: number; width: number; height: number }) => {
     x: number;
     y: number;
@@ -50,23 +48,6 @@ export function EditorFrameCallout(props: {
   );
   const settingsAnchorRef = React.useRef<HTMLButtonElement | null>(null);
   const contentEditableRef = React.useRef<HTMLDivElement | null>(null);
-  const frameId = props.snapshot.id;
-  const onOccupiedBoundsChange = props.onOccupiedBoundsChange;
-  React.useLayoutEffect(() => {
-    const measure = () => onOccupiedBoundsChange(measureCalloutOccupiedBounds(frameId));
-    measure();
-    const elements = getCalloutOccupiedElements(frameId);
-    const observer =
-      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => measure());
-    elements.forEach((element) => observer?.observe(element));
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
-    };
-  }, [frameId, onOccupiedBoundsChange, props.isSettingsOpen, props.selected]);
   const apply = (nextCallout: typeof callout) =>
     props.onSnapshotChange(setFrameCallout(props.snapshot, props.calloutIndex, nextCallout));
   const preview = (nextCallout: typeof callout) =>
@@ -97,6 +78,18 @@ export function EditorFrameCallout(props: {
     titleText: callout.content.titleText,
     voiceActive: voice.state.active,
   });
+  const handleEditingBlur = (event?: React.FocusEvent<HTMLDivElement>) => {
+    const target = event?.relatedTarget;
+    if (
+      props.isSettingsOpen &&
+      target instanceof Element &&
+      props.controlsPortalTarget?.contains(target) &&
+      target.closest('.sniptale-callout-settings-popover')
+    ) {
+      return;
+    }
+    editing.events.blur(event);
+  };
   const actions = createFrameCalloutActions({
     apply,
     callout,
@@ -129,6 +122,7 @@ export function EditorFrameCallout(props: {
           : {})}
         editing={{
           ...editing,
+          events: { ...editing.events, blur: handleEditingBlur },
           layout: { ...editing.layout, floatingToolbarRect: null },
         }}
         frameBorderWidth={surface.strokeVisible ? surface.geometry.strokeWidth : 0}
@@ -156,7 +150,7 @@ export function EditorFrameCallout(props: {
         )}
         settings={settings}
         settingsAnchorRef={settingsAnchorRef}
-        showSettingsHandle={!props.selected || props.isSettingsOpen}
+        showSettingsHandle
         zIndex={props.snapshot.ordering + 1}
       />
     </>
@@ -180,34 +174,4 @@ export function resolveCalloutCenter(
     height: rect.height,
   });
   return { x: logical.x + logical.width / 2, y: logical.y + logical.height / 2 };
-}
-
-function getCalloutOccupiedElements(frameId: string): HTMLElement[] {
-  return Array.from(
-    document.querySelectorAll<HTMLElement>(
-      '.sniptale-callout, [data-sniptale-callout-control-frame-id]'
-    )
-  ).filter(
-    (element) =>
-      element.dataset['frameId'] === frameId ||
-      element.dataset['sniptaleCalloutControlFrameId'] === frameId
-  );
-}
-
-function measureCalloutOccupiedBounds(frameId: string): FrameAnnotationToolbarBounds | null {
-  const elements = getCalloutOccupiedElements(frameId).filter((element) => {
-    const style = getComputedStyle(element);
-    return style.display !== 'none' && style.visibility !== 'hidden';
-  });
-  if (elements.length === 0) return null;
-  return elements.reduce<FrameAnnotationToolbarBounds | null>((bounds, element) => {
-    const rect = element.getBoundingClientRect();
-    if (!bounds) return { bottom: rect.bottom, left: rect.left, right: rect.right, top: rect.top };
-    return {
-      bottom: Math.max(bounds.bottom, rect.bottom),
-      left: Math.min(bounds.left, rect.left),
-      right: Math.max(bounds.right, rect.right),
-      top: Math.min(bounds.top, rect.top),
-    };
-  }, null);
 }

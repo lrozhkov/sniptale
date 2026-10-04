@@ -1,14 +1,36 @@
 import type React from 'react';
+import { useState } from 'react';
 
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import {
   ProductGlassLinkedPaddingFields,
-  ProductGlassRange,
   type ProductGlassLinkedPaddingValue,
 } from '@sniptale/ui/product-glass-controls';
-import { NumericValueField } from '../../chrome/ui';
+import { NumericRangeScrub } from '../../../ui/compact-inspector-controls';
+import { NumericRow, NumericValueField } from '../../chrome/ui';
 import { PanelSection } from './shared';
+
+type PaddingHoverSide = keyof ProductGlassLinkedPaddingValue | 'all';
+
+function readPaddingHoverSide(target: EventTarget | null): PaddingHoverSide | null {
+  const value =
+    target instanceof Element
+      ? target.closest<HTMLElement>('[data-padding-hover]')?.dataset['paddingHover']
+      : null;
+  switch (value) {
+    case 'all':
+    case 'top':
+    case 'right':
+    case 'bottom':
+    case 'left':
+      return value;
+    case null:
+    case undefined:
+    default:
+      return null;
+  }
+}
 
 function selectFramePadding(frame: EditorFrameSettings): ProductGlassLinkedPaddingValue {
   return {
@@ -36,54 +58,121 @@ export function FramePaddingFields(props: {
   frameDraft: EditorFrameSettings;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
 }) {
+  const [hoveredSide, setHoveredSide] = useState<PaddingHoverSide | null>(null);
+  const [focusedSide, setFocusedSide] = useState<PaddingHoverSide | null>(null);
+  const [rangeActive, setRangeActive] = useState(false);
   return (
-    <ProductGlassLinkedPaddingFields
-      labels={{
-        padding: translate('highlighter.editor.paddingLabel'),
-        top: translate('highlighter.editor.paddingTop'),
-        right: translate('highlighter.editor.paddingRight'),
-        bottom: translate('highlighter.editor.paddingBottom'),
-        left: translate('highlighter.editor.paddingLeft'),
-        link: translate('highlighter.editor.paddingLinked'),
-        unlink: translate('highlighter.editor.paddingSeparate'),
-      }}
-      padding={selectFramePadding(props.frameDraft)}
-      onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
-      renderUniformField={({ onChange, value }) => (
-        <ProductGlassRange
-          aria-label={translate('highlighter.editor.paddingLabel')}
-          max={512}
+    <div
+      className="relative"
+      data-ui="editor.frame.padding-fields"
+      onPointerMoveCapture={(event) => setHoveredSide(readPaddingHoverSide(event.target))}
+      onPointerLeave={() => setHoveredSide(null)}
+      onFocusCapture={(event) => setFocusedSide(readPaddingHoverSide(event.target))}
+      onBlurCapture={(event) => setFocusedSide(readPaddingHoverSide(event.relatedTarget))}
+    >
+      <ProductGlassLinkedPaddingFields
+        fieldLayout="full-row"
+        labels={{
+          padding: translate('highlighter.editor.paddingLabel'),
+          top: translate('highlighter.editor.paddingTop'),
+          right: translate('highlighter.editor.paddingRight'),
+          bottom: translate('highlighter.editor.paddingBottom'),
+          left: translate('highlighter.editor.paddingLeft'),
+          link: translate('highlighter.editor.paddingLinked'),
+          unlink: translate('highlighter.editor.paddingSeparate'),
+        }}
+        padding={selectFramePadding(props.frameDraft)}
+        onChange={(padding) => updateFramePadding(props.setFrameDraft, padding)}
+        renderUniformField={({ onChange, value }) => (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-8"
+            data-ui="editor.frame.padding-slider"
+            data-padding-hover="all"
+          >
+            <NumericRangeScrub
+              active={rangeActive}
+              label={translate('highlighter.editor.paddingLabel')}
+              onActiveChange={setRangeActive}
+              onCommitValue={onChange}
+              onPreviewValue={onChange}
+              scrub={{ min: 0, max: 256, step: 1 }}
+              value={value}
+              visible={
+                rangeActive ||
+                hoveredSide === 'all' ||
+                hoveredSide === 'top' ||
+                focusedSide === 'top'
+              }
+            />
+          </div>
+        )}
+        renderValueField={({ compact, label, onChange, side, value }) => (
+          <div className="min-w-0" data-padding-side={side}>
+            <PaddingValue
+              compact={compact}
+              label={label}
+              value={value}
+              onChange={onChange}
+              side={side}
+              revealSlider={hoveredSide === side || focusedSide === side}
+            />
+          </div>
+        )}
+      />
+    </div>
+  );
+}
+
+function PaddingValue(props: {
+  compact: boolean;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  side: PaddingHoverSide;
+  revealSlider: boolean;
+}) {
+  return (
+    <div className="min-w-0" data-padding-hover={props.side}>
+      {props.compact ? (
+        <NumericValueField
+          className="w-full!"
+          focusAppearance="accent-box"
+          label={props.label}
+          max={4096}
           min={0}
-          onChange={(event) => onChange(Number(event.currentTarget.value))}
-          step={4}
-          value={value}
+          onCommitValue={props.onChange}
+          onPreviewValue={props.onChange}
+          unit="px"
+          value={props.value}
+        />
+      ) : (
+        <NumericRow
+          label={props.label}
+          max={4096}
+          min={0}
+          onCommitValue={props.onChange}
+          onPreviewValue={props.onChange}
+          unit="px"
+          value={props.value}
+          scrub={{ min: 0, max: 256, step: 1, value: Math.min(256, props.value) }}
+          revealScrub={props.revealSlider}
         />
       )}
-      renderValueField={({ compact, label, onChange, side, value }) => (
-        <div className="min-w-0" data-padding-side={side}>
-          <NumericValueField
-            className={compact ? '!h-7 !w-[4.75rem] !px-1' : '!w-full'}
-            label={label}
-            max={512}
-            min={0}
-            onCommitValue={onChange}
-            onPreviewValue={onChange}
-            unit="px"
-            value={value}
-          />
-        </div>
-      )}
-    />
+    </div>
   );
 }
 
 export function FramePaddingSection(props: {
   frameDraft: EditorFrameSettings;
   framePaddingSummary?: string;
+  hideHeader?: boolean;
   setFrameDraft: React.Dispatch<React.SetStateAction<EditorFrameSettings>>;
 }) {
   return (
-    <PanelSection label={translate('editor.scene.scenePaddingSection')}>
+    <PanelSection
+      label={translate('editor.scene.scenePaddingSection')}
+      hideHeader={props.hideHeader ?? false}
+    >
       <FramePaddingFields frameDraft={props.frameDraft} setFrameDraft={props.setFrameDraft} />
     </PanelSection>
   );

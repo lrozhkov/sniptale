@@ -1,3 +1,7 @@
+import {
+  createRecommendedContextMenuSettings,
+  parseContextMenuLayout,
+} from '../../../contracts/settings/context-menu-layout';
 import type {
   CaptureActionType,
   ContentToolbarPreferences,
@@ -15,6 +19,10 @@ import {
   parseFullPageQualityPolicy,
 } from '../../../contracts/full-page-capture';
 import { browserStorage } from '../infrastructure/browser-storage';
+import {
+  runWithPersistenceMutationPermit,
+  type PersistenceMutationPermit,
+} from '../infrastructure/mutation-barrier';
 import { isCaptureActionTypeValue } from '@sniptale/runtime-contracts/capture/action';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseStoredSettings } from './guards';
@@ -33,24 +41,43 @@ import {
   parsePagePackageCaptureTimingPolicy,
 } from '@sniptale/runtime-contracts/page-package';
 
+import { parseFilenameRules } from '../../../features/file-naming/rules';
+import {
+  contextMenuLayoutChunkKeys,
+  decodeContextMenuLayoutChunks,
+  parseContextMenuLayoutChunkManifest,
+  prepareContextMenuSettingsSyncWrite,
+} from './context-menu-layout-chunks';
+
 const STORAGE_KEY = 'sniptale_settings';
+const LAYOUT_CHUNKS_FIELD = 'contextMenuLayoutChunks';
 const logger = createLogger({ namespace: 'SharedSettingsStorage' });
 let settingsMutationQueue = Promise.resolve<NormalizedSettings | null>(null);
+const SETTINGS_LOCK = 'sniptale:settings';
+let testSettingsQueue: Promise<unknown> = Promise.resolve();
+
+function withSettingsLock<T>(operation: () => Promise<T>): Promise<T> {
+  if (typeof navigator !== 'undefined' && navigator.locks) {
+    return navigator.locks.request(SETTINGS_LOCK, { mode: 'exclusive' }, operation);
+  }
+  if (typeof chrome !== 'undefined') {
+    return Promise.reject(new Error('Settings mutation coordination is unavailable.'));
+  }
+  const execution = testSettingsQueue.then(operation);
+  testSettingsQueue = execution.catch(() => undefined);
+  return execution;
+}
+
+function withSettingsMutation<T>(
+  operation: (permit: PersistenceMutationPermit) => Promise<T>
+): Promise<T> {
+  // The global shared permit orders settings writes against exclusive transfer and privacy erasure.
+  return runWithPersistenceMutationPermit((permit) => withSettingsLock(() => operation(permit)));
+}
 
 const DEFAULT_VIEWPORT_PRESETS: ViewportPreset[] = createSystemViewportPresetCatalog();
 
-const DEFAULT_CONTEXT_MENU_SETTINGS: ContextMenuSettings = {
-  enabled: true,
-  showScreenshots: true,
-  showVideo: true,
-  showExport: true,
-  showImageEditor: true,
-  showVideoEditor: true,
-  showGallery: true,
-  showPageLinkCopy: true,
-  showWindowResize: true,
-  showSettings: true,
-};
+const DEFAULT_CONTEXT_MENU_SETTINGS = createRecommendedContextMenuSettings();
 
 const DEFAULT_CONTENT_TOOLBAR_SETTINGS: ContentToolbarPreferences = {
   displayMode: 'horizontal',
@@ -94,7 +121,7 @@ function cloneViewportPresets(presets: readonly ViewportPreset[]): ViewportPrese
 }
 
 function cloneContextMenuSettings(settings: ContextMenuSettings): ContextMenuSettings {
-  return { ...settings };
+  return { ...settings, ...(settings.layout ? { layout: structuredClone(settings.layout) } : {}) };
 }
 
 function cloneContentToolbarSettings(
@@ -146,7 +173,16 @@ function resolveCaptureAction(value: unknown): CaptureActionType {
  * Callers that change one field should use patchSettings so queued read-modify-write merges
  * against the latest persisted payload.
  */
-export async function saveSettings(settings: Settings): Promise<void> {
+async function writeSettings(settings: Settings, permit: PersistenceMutationPermit): Promise<void> {
+  if (
+    settings.contextMenu.layout !== undefined &&
+    !parseContextMenuLayout(settings.contextMenu.layout)
+  ) {
+    throw new Error('Context menu layout is invalid');
+  }
+  if (settings.filenameRules != null && !parseFilenameRules(settings.filenameRules)) {
+    throw new Error('Filename rules are invalid');
+  }
   if (
     settings.exportResourceLimits !== undefined &&
     !parseExportResourceLimits(settings.exportResourceLimits)
@@ -165,9 +201,55 @@ export async function saveSettings(settings: Settings): Promise<void> {
   ) {
     throw new Error('Page capture timing settings are invalid');
   }
-  await browserStorage.sync.set({ [STORAGE_KEY]: settings });
+  const stored = await browserStorage.sync.get([STORAGE_KEY]);
+  const previous = stored[STORAGE_KEY];
+  const oldManifest =
+    previous && typeof previous === 'object' && !Array.isArray(previous)
+      ? parseContextMenuLayoutChunkManifest(
+          (previous as Record<string, unknown>)[LAYOUT_CHUNKS_FIELD]
+        )
+      : null;
+  const previousLayout = oldManifest
+    ? await decodeContextMenuLayoutChunks(
+        oldManifest,
+        await browserStorage.sync.get(contextMenuLayoutChunkKeys(oldManifest))
+      )
+    : null;
+  const prepared = await prepareContextMenuSettingsSyncWrite(settings, oldManifest, previousLayout);
+  let manifestWriteAttempted = false;
+  try {
+    if (prepared.newChunkKeys.length) await browserStorage.sync.set(prepared.chunkValues, permit);
+    manifestWriteAttempted = true;
+    await browserStorage.sync.set({ [STORAGE_KEY]: prepared.settingsValue }, permit);
+  } catch (error) {
+    if (manifestWriteAttempted) {
+      try {
+        if (Object.hasOwn(stored, STORAGE_KEY))
+          await browserStorage.sync.set({ [STORAGE_KEY]: previous }, permit);
+        else await browserStorage.sync.remove([STORAGE_KEY], permit);
+      } catch {
+        // A rejected restore may still have committed; verify the actual stored value below.
+      }
+      const restored = await browserStorage.sync.get([STORAGE_KEY]).catch(() => null);
+      if (restored === null || JSON.stringify(restored[STORAGE_KEY]) !== JSON.stringify(previous)) {
+        throw new Error('Settings rollback could not be verified', { cause: error });
+      }
+    }
+    if (prepared.newChunkKeys.length)
+      await browserStorage.sync.remove(prepared.newChunkKeys, permit).catch(() => undefined);
+    throw error;
+  }
+  if (prepared.retiredChunkKeys.length) {
+    await browserStorage.sync
+      .remove(prepared.retiredChunkKeys, permit)
+      .catch(() => logger.warn('Could not remove retired context menu layout chunks'));
+  }
 
   logger.debug('Saved settings payload');
+}
+
+export function saveSettings(settings: Settings): Promise<void> {
+  return withSettingsMutation((permit) => writeSettings(settings, permit));
 }
 
 function normalizeLoadedSettings(parsedValue: Partial<Settings>): NormalizedSettings {
@@ -229,11 +311,24 @@ function normalizeLocalStoragePolicy(parsedValue: Partial<Settings>): LocalStora
   return {
     ...DEFAULT_LOCAL_STORAGE_POLICY,
     defaultDestination: parsedValue.localStoragePolicy?.defaultDestination ?? legacyDestination,
+    recordingDestination:
+      parsedValue.localStoragePolicy?.recordingDestination ??
+      parsedValue.localStoragePolicy?.defaultDestination ??
+      legacyDestination,
+    webSnapshotDestination:
+      parsedValue.localStoragePolicy?.webSnapshotDestination ??
+      DEFAULT_LOCAL_STORAGE_POLICY.webSnapshotDestination,
     cleanupEnabled:
       parsedValue.localStoragePolicy?.cleanupEnabled ?? DEFAULT_LOCAL_STORAGE_POLICY.cleanupEnabled,
     draftRetentionDays:
       parsedValue.localStoragePolicy?.draftRetentionDays ??
       DEFAULT_LOCAL_STORAGE_POLICY.draftRetentionDays,
+    trashCleanupEnabled:
+      parsedValue.localStoragePolicy?.trashCleanupEnabled ??
+      DEFAULT_LOCAL_STORAGE_POLICY.trashCleanupEnabled,
+    trashRetentionDays:
+      parsedValue.localStoragePolicy?.trashRetentionDays ??
+      DEFAULT_LOCAL_STORAGE_POLICY.trashRetentionDays,
     videoDraftRetentionDays:
       parsedValue.localStoragePolicy?.videoDraftRetentionDays ??
       DEFAULT_LOCAL_STORAGE_POLICY.videoDraftRetentionDays,
@@ -248,6 +343,22 @@ export async function loadSettings(): Promise<NormalizedSettings> {
   const getSyncStorageValue = browserStorage.sync.get.bind(browserStorage.sync);
   const result = await getSyncStorageValue([STORAGE_KEY]);
   const parsedSettings = parseStoredSettings(result[STORAGE_KEY]);
+  const stored = result[STORAGE_KEY];
+  if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+    const rawManifest = (stored as Record<string, unknown>)[LAYOUT_CHUNKS_FIELD];
+    if (rawManifest !== undefined) {
+      const manifest = parseContextMenuLayoutChunkManifest(rawManifest);
+      if (!manifest) throw new Error('Stored context menu layout manifest is invalid');
+      const chunks = await browserStorage.sync.get(contextMenuLayoutChunkKeys(manifest));
+      const layout = await decodeContextMenuLayoutChunks(manifest, chunks);
+      if (!layout) throw new Error('Stored context menu layout chunks are incomplete or invalid');
+      parsedSettings.value.contextMenu = {
+        ...DEFAULT_CONTEXT_MENU_SETTINGS,
+        ...parsedSettings.value.contextMenu,
+        layout,
+      };
+    }
+  }
 
   if (parsedSettings.hasInvalidRoot) {
     logger.warn('Ignoring invalid settings payload root from storage');
@@ -262,8 +373,43 @@ export async function loadSettings(): Promise<NormalizedSettings> {
   return normalizeLoadedSettings(parsedSettings.value);
 }
 
+/** Observe the normalized settings authority, including key removal, across extension pages. */
+export function subscribeToSettingsChanges(
+  listener: (settings: NormalizedSettings) => void
+): () => void {
+  if (typeof chrome === 'undefined') return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'sync' || !Object.prototype.hasOwnProperty.call(changes, STORAGE_KEY)) return;
+    const change = changes[STORAGE_KEY];
+    const previous = normalizeLoadedSettings(parseStoredSettings(change?.oldValue).value);
+    const next = normalizeLoadedSettings(parseStoredSettings(change?.newValue).value);
+    if (
+      Object.keys(next.localStoragePolicy).every(
+        (key) =>
+          next.localStoragePolicy[key as keyof LocalStoragePolicy] ===
+          previous.localStoragePolicy[key as keyof LocalStoragePolicy]
+      )
+    )
+      return;
+    listener(next);
+  });
+}
+
 export async function clearSettings(): Promise<void> {
-  await browserStorage.sync.remove([STORAGE_KEY]);
+  await withSettingsMutation(async (permit) => {
+    const stored = await browserStorage.sync.get([STORAGE_KEY]);
+    const value = stored[STORAGE_KEY];
+    const manifest =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? parseContextMenuLayoutChunkManifest(
+            (value as Record<string, unknown>)[LAYOUT_CHUNKS_FIELD]
+          )
+        : null;
+    await browserStorage.sync.remove(
+      [STORAGE_KEY, ...(manifest ? contextMenuLayoutChunkKeys(manifest) : [])],
+      permit
+    );
+  });
   logger.debug('Cleared settings payload');
 }
 
@@ -321,41 +467,73 @@ function applySettingsPatch(
  * Failed writes reject to the caller and the queue remains usable for later mutations.
  */
 export async function patchSettings(settingsPatch: SettingsPatch): Promise<NormalizedSettings> {
-  return queueSettingsMutation(async () => {
-    const currentSettings = await loadSettings();
-    const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const currentSettings = await loadSettings();
+      const nextSettings = applySettingsPatch(currentSettings, settingsPatch);
 
-    await saveSettings(nextSettings);
-    return nextSettings;
-  });
+      await writeSettings(nextSettings, permit);
+      return nextSettings;
+    })
+  );
+}
+
+export class StaleLocalStoragePolicyError extends Error {
+  constructor() {
+    super('Local storage policy changed before the update was committed.');
+    this.name = 'StaleLocalStoragePolicyError';
+  }
+}
+
+/** Reject a policy edit based on an obsolete cross-page value inside the settings lock. */
+export function patchLocalStoragePolicy(
+  patch: Partial<LocalStoragePolicy>,
+  expected: LocalStoragePolicy
+): Promise<NormalizedSettings> {
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const current = await loadSettings();
+      const currentPolicy = current.localStoragePolicy;
+      for (const key of Object.keys(currentPolicy) as (keyof LocalStoragePolicy)[]) {
+        if (currentPolicy[key] !== expected[key]) throw new StaleLocalStoragePolicyError();
+      }
+      const next = applySettingsPatch(current, { localStoragePolicy: patch });
+      await writeSettings(next, permit);
+      return next;
+    })
+  );
 }
 
 export async function resetSettingsToDefaults(): Promise<NormalizedSettings> {
-  return queueSettingsMutation(async () => {
-    const nextSettings = createDefaultSettings();
-    await saveSettings(nextSettings);
-    return nextSettings;
-  });
+  return queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const nextSettings = createDefaultSettings();
+      await writeSettings(nextSettings, permit);
+      return nextSettings;
+    })
+  );
 }
 
 /** Removes retired synchronized fields while preserving every current stored property. */
 export async function removeRetiredSynchronizedSettings(): Promise<void> {
-  await queueSettingsMutation(async () => {
-    const stored = await browserStorage.sync.get([STORAGE_KEY]);
-    const raw = stored[STORAGE_KEY];
-    const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
-    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-      return loadSettings();
-    }
+  await queueSettingsMutation(() =>
+    withSettingsMutation(async (permit) => {
+      const stored = await browserStorage.sync.get([STORAGE_KEY]);
+      const raw = stored[STORAGE_KEY];
+      const retiredField = ['raw', 'Diagnostics', 'Enabled'].join('');
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return loadSettings();
+      }
 
-    const nextRaw = { ...(raw as Record<string, unknown>) };
-    const removedDiagnostics = retiredField in nextRaw;
-    if (!removedDiagnostics) {
-      return loadSettings();
-    }
+      const nextRaw = { ...(raw as Record<string, unknown>) };
+      const removedDiagnostics = retiredField in nextRaw;
+      if (!removedDiagnostics) {
+        return loadSettings();
+      }
 
-    delete nextRaw[retiredField];
-    await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw });
-    return loadSettings();
-  });
+      delete nextRaw[retiredField];
+      await browserStorage.sync.set({ [STORAGE_KEY]: nextRaw }, permit);
+      return loadSettings();
+    })
+  );
 }

@@ -5,6 +5,14 @@ export const editorToolbarLayerMessages = defineMessageSource({
     ru: 'Объединить слои',
     en: 'Merge layers',
   },
+  groupLayers: {
+    ru: 'Сгруппировать слои',
+    en: 'Group layers',
+  },
+  ungroupLayers: {
+    ru: 'Разгруппировать слои',
+    en: 'Ungroup layers',
+  },
   duplicateLayer: {
     ru: 'Дублировать слой',
     en: 'Duplicate layer',
@@ -36,6 +44,10 @@ export const editorToolbarLayerMessages = defineMessageSource({
   layerEffectsTitle: {
     ru: 'Эффекты слоя',
     en: 'Layer effects',
+  },
+  layerEffectsBackToLayers: {
+    ru: 'Назад к списку слоёв',
+    en: 'Back to layer list',
   },
   layerEffectsSubtitle: {
     ru: 'Коррекции, трансформации и фильтры для выбранного слоя',

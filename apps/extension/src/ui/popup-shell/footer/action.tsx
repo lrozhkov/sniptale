@@ -5,20 +5,13 @@ function cx(...classNames: Array<string | false | null | undefined>): string {
 }
 
 const POPUP_FOOTER_ACTION_BASE_CLASS_NAME = [
-  'group inline-flex items-center justify-center gap-2 border-none outline-none transition-colors',
-  'focus-visible:outline-none',
-  'focus-visible:shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_18%,transparent)]',
+  'inline-flex items-center justify-center gap-2 border-none transition-colors',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
   'bg-transparent',
   'text-[var(--sniptale-color-text-secondary)]',
   'shadow-none',
-  'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
-  'focus-visible:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)]',
-].join(' ');
-const POPUP_FOOTER_ACTION_CONTENT_CLASS_NAME = [
-  'transition-transform duration-200 ease-out',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-  'motion-reduce:transition-none',
 ].join(' ');
 
 function getPopupFooterActionClassName(iconOnlyMode: boolean) {
@@ -57,12 +50,8 @@ export function PopupFooterAction({
       data-ui={dataUi ?? 'shared.ui.popup-footer-action'}
       className={getPopupFooterActionClassName(iconOnlyMode)}
     >
-      <Icon className={`h-3.5 w-3.5 text-current ${POPUP_FOOTER_ACTION_CONTENT_CLASS_NAME}`} />
-      {!iconOnlyMode ? (
-        <span className={POPUP_FOOTER_ACTION_CONTENT_CLASS_NAME}>{label}</span>
-      ) : (
-        <span className="sr-only">{label}</span>
-      )}
+      <Icon className="h-3.5 w-3.5 text-current" />
+      {!iconOnlyMode ? <span>{label}</span> : <span className="sr-only">{label}</span>}
     </button>
   );
 }

@@ -26,9 +26,7 @@ export function ensureQuickEditHoverOverlay(state: QuickEditOverlayState): HTMLE
       opacity 0.15s ease-out;
     z-index: 2147483645;
     display: none;
-    box-shadow:
-      0 0 8px color-mix(in srgb, var(--sniptale-color-info) 24%, transparent),
-      0 0 16px color-mix(in srgb, var(--sniptale-color-info) 12%, transparent);
+    box-shadow: none;
   `;
 
   appendToContentOverlayRoot(hoverOverlay);

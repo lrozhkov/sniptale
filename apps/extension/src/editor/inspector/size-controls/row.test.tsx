@@ -43,7 +43,7 @@ function renderRow(props?: Partial<ComponentProps<typeof SizeControlsRow>>) {
 }
 
 function queryInput(dataUi: string) {
-  return container?.querySelector(`[data-ui="${dataUi}"]`) as HTMLInputElement | null;
+  return container?.querySelector(`[data-ui="${dataUi}"] input`) as HTMLInputElement | null;
 }
 
 function setInputValue(input: HTMLInputElement, value: string) {
@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 function registerOrderTest() {
-  it('keeps the canonical width-lock-height order', () => {
+  it('places an icon-only aspect toggle between the labeled dimensions', () => {
     renderRow();
 
     const row = container?.querySelector('[data-ui="editor.size-controls.row"]');
@@ -77,15 +77,19 @@ function registerOrderTest() {
     expect(rowChildren[0]?.querySelector('[aria-label="editor.compact.widthDimension"]')).not.toBe(
       null
     );
-    expect(rowChildren[1]?.getAttribute('title')).toBe('editor.compact.keepAspectRatio');
+    expect(rowChildren[1]?.getAttribute('aria-pressed')).toBe('true');
+    expect(rowChildren[1]?.getAttribute('aria-label')).toBe('editor.compact.keepAspectRatio');
+    expect(rowChildren[1]?.textContent).toBe('');
+    expect(rowChildren[1]?.querySelector('.lucide-link-2')).not.toBeNull();
     expect(
       rowChildren[2]?.querySelector('[aria-label="editor.compact.heightDimension"]')
     ).not.toBeNull();
+    expect(row?.className).toContain('grid-cols-[minmax(0,1fr)_2.25rem_minmax(0,1fr)]');
   });
 }
 
 function registerCommitAndResetTest() {
-  it('commits sanitized values on blur or Enter and resets drafts on Escape', () => {
+  it('commits numeric values on blur or Enter and resets drafts on Escape', () => {
     const onWidthChange = vi.fn();
     const onHeightChange = vi.fn();
 
@@ -95,7 +99,7 @@ function registerCommitAndResetTest() {
       queryInput('editor.size-controls.row.width')?.focus();
     });
     act(() => {
-      setInputValue(queryInput('editor.size-controls.row.width')!, '0020abc');
+      setInputValue(queryInput('editor.size-controls.row.width')!, '0020');
     });
     act(() => {
       queryInput('editor.size-controls.row.height')?.focus();
@@ -142,13 +146,13 @@ function registerToggleTest() {
 }
 
 function registerDraftStateEdgeTest() {
-  it('resets empty drafts and resyncs when external dimensions change', () => {
+  it('resets invalid drafts and resyncs when external dimensions change', () => {
     const onWidthChange = vi.fn();
 
     renderRow({ onWidthChange, width: 1280 });
 
     act(() => {
-      setInputValue(queryInput('editor.size-controls.row.width')!, '');
+      setInputValue(queryInput('editor.size-controls.row.width')!, 'invalid');
     });
     act(() => {
       queryInput('editor.size-controls.row.width')!.dispatchEvent(
@@ -187,3 +191,22 @@ function registerSizeControlsRowTests() {
 }
 
 describe('SizeControlsRow', registerSizeControlsRowTests);
+
+it('commits each shared stepper change once and keeps integer dimensions', () => {
+  const onWidthChange = vi.fn();
+  renderRow({ onWidthChange });
+  act(() => {
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="editor.compact.widthDimension increase"]')
+      ?.click();
+  });
+  expect(onWidthChange).toHaveBeenCalledExactlyOnceWith(1281);
+  act(() => queryInput('editor.size-controls.row.width')?.focus());
+  act(() => setInputValue(queryInput('editor.size-controls.row.width')!, '20.6'));
+  act(() =>
+    queryInput('editor.size-controls.row.width')?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' })
+    )
+  );
+  expect(onWidthChange).toHaveBeenLastCalledWith(21);
+});

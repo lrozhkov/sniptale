@@ -16,6 +16,8 @@ export function createVideoEditorTimelineState(set: VideoEditorStoreSet) {
     recordingId: null,
     isReady: false,
     error: null,
+    autosaveEnabled: true,
+    setAutosaveEnabled: (autosaveEnabled: boolean) => set({ autosaveEnabled }),
     saveState: 'idle' as const,
     currentTime: 0,
     isPlaying: false,

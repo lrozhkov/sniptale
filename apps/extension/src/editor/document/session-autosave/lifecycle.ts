@@ -5,6 +5,8 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   clearPendingAutosaveTimer,
+  interruptImagePresentation,
+  releaseAutosaveInteraction,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
 } from './state';
@@ -16,6 +18,10 @@ export function activateAutosaveContext(
   options: { preserveHydratedDocument?: boolean } = {}
 ): void {
   clearPendingAutosaveTimer(state);
+  interruptImagePresentation(state);
+  releaseAutosaveInteraction(state);
+  state.presentationPending = false;
+  state.presentationRetryAttempt = 0;
   if (!options.preserveHydratedDocument) {
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
@@ -23,7 +29,11 @@ export function activateAutosaveContext(
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
+  state.hasUnsavedChanges = false;
   state.activeContext = context;
+  state.contextGeneration += 1;
+  state.presentationRetryPromise = null;
+  if (!options.preserveHydratedDocument) state.enabled = true;
   useEditorStore.getState().setSessionId(context.aggregateId);
 }
 
@@ -31,7 +41,9 @@ export function rebindAutosaveAggregate(
   state: EditorSessionAutosaveState,
   context: ActiveEditorSessionContext
 ): void {
+  const enabled = state.enabled;
   activateAutosaveContext(state, context, { preserveHydratedDocument: true });
+  state.enabled = enabled;
 }
 
 export function updateAutosaveContext(
@@ -66,6 +78,7 @@ export async function restoreAutosaveDraft(
   activateAutosaveContext(state, {
     aggregateId: entry.aggregateId,
     durableRevision: entry.revision,
+    requireExistingRoot: true,
     renderPresentation,
     sourceUrl: entry.sourceUrl,
     sourceTitle: entry.sourceTitle,
@@ -81,21 +94,35 @@ export async function discardAutosaveDraft(
   _aggregateId?: string | null
 ): Promise<void> {
   clearPendingAutosaveTimer(state);
+  interruptImagePresentation(state);
+  releaseAutosaveInteraction(state);
+  state.presentationPending = false;
+  state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
+  state.hasUnsavedChanges = false;
   state.activeContext = null;
+  state.contextGeneration += 1;
+  state.presentationRetryPromise = null;
+  state.enabled = true;
   useEditorStore.getState().setSessionId(null);
   setEditorSaveState('idle');
 }
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   clearPendingAutosaveTimer(state);
+  interruptImagePresentation(state);
+  releaseAutosaveInteraction(state);
+  state.presentationPending = false;
+  state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.activeContext = null;
+  state.contextGeneration += 1;
+  state.presentationRetryPromise = null;
 }

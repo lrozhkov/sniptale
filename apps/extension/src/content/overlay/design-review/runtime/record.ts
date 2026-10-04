@@ -43,7 +43,7 @@ export function commitDesignReviewAction(args: {
   flushPendingPageStyleHistory();
   const rollbackPoint = browserAnnotationSession.captureFailedMutationRollbackPoint();
   const transactionId = createTransactionId('action');
-  if (!pagePreparationHistory.beginTransaction(transactionId)) {
+  if (!pagePreparationHistory.beginTransaction(transactionId, null, 'design-review')) {
     throw new Error('Design Review action history transaction is unavailable');
   }
 
@@ -145,7 +145,7 @@ export function retainDesignReviewRecovery(args: {
     return [];
   }
   const transactionId = createTransactionId('recovery');
-  if (!pagePreparationHistory.beginTransaction(transactionId)) {
+  if (!pagePreparationHistory.beginTransaction(transactionId, null, 'design-review')) {
     return [
       ...publishDesignReviewRecovery(args),
       'Design Review recovery history transaction is unavailable',
@@ -167,7 +167,7 @@ export function deleteDesignReviewRecord(target: PageStyleMutationElement): void
 
   const transactionId = createTransactionId('delete');
   const rollbackPoint = browserAnnotationSession.captureFailedMutationRollbackPoint();
-  if (!pagePreparationHistory.beginTransaction(transactionId)) {
+  if (!pagePreparationHistory.beginTransaction(transactionId, null, 'design-review')) {
     throw new Error('Design Review delete history transaction is unavailable');
   }
 

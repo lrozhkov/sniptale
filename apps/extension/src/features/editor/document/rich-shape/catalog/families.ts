@@ -1,5 +1,7 @@
 export const EDITOR_RICH_SHAPE_FAMILY = {
   OFFICE: 'office',
+  CURSOR: 'cursor',
+  STAMP: 'stamp',
   LINE: 'line',
   CONNECTOR: 'connector',
   ARROW: 'arrow',
@@ -13,6 +15,17 @@ export const EDITOR_RICH_SHAPE_FAMILY = {
 } as const;
 
 export const EDITOR_RICH_SHAPE_KINDS_BY_FAMILY = {
+  [EDITOR_RICH_SHAPE_FAMILY.CURSOR]: [
+    'cursor-pointer',
+    'cursor-hand',
+    'cursor-move',
+    'cursor-text',
+    'cursor-resize-horizontal',
+    'cursor-resize-vertical',
+    'cursor-resize-diagonal',
+    'cursor-resize-diagonal-reverse',
+  ],
+  [EDITOR_RICH_SHAPE_FAMILY.STAMP]: ['stamp-check', 'stamp-error', 'stamp-warning', 'stamp-tag'],
   [EDITOR_RICH_SHAPE_FAMILY.OFFICE]: [
     'rectangle',
     'round-rectangle',

@@ -65,6 +65,7 @@ it('keeps crop cleanup and replacement inside the draw-session owner', () => {
   });
   expect(replacement.clearedExistingCropGuide).toBe(true);
   expect(replacement.drawSession.pointerId).toBeNull();
+  expect(canvas.getObjects()).not.toContain(existingGuide);
   canvas.dispose();
 });
 
@@ -93,6 +94,27 @@ it('discards missing and undersized drawing sessions', () => {
     })
   ).toEqual({ drawSession: null, kind: 'discard' });
 });
+
+it.each(['crop', 'shape', 'arrow', 'blur'] as const)(
+  'discards a %s click even when Fabric geometry includes stroke or controls',
+  (tool) => {
+    const object = new Rect({ height: 20, width: 20 });
+    expect(
+      completeEditorDrawSession({
+        canvasDocumentSize,
+        drawSession: {
+          object,
+          objectId: `${tool}-click`,
+          pointerId: null,
+          start: new Point(20, 20),
+          lastPoint: new Point(21, 21),
+          tool,
+        },
+        minDrawSize: 8,
+      })
+    ).toEqual({ drawSession: null, kind: 'discard' });
+  }
+);
 
 it('completes text, crop, and regular drawing sessions through their canonical outcomes', () => {
   const text = new Textbox('Text');
@@ -138,4 +160,5 @@ it('completes text, crop, and regular drawing sessions through their canonical o
       minDrawSize: 4,
     })
   ).toEqual(expect.objectContaining({ cropGuide: crop, kind: 'crop' }));
+  expect(crop.hasBorders).toBe(false);
 });

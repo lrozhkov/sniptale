@@ -164,3 +164,42 @@ describe('selection-mode public api', () => {
   registerDisableApiNoRejectTest();
   registerIsActiveApiTest();
 });
+
+it('settles a replaced selection and prevents its pending preparation from mounting over the new one', async () => {
+  const fixture = createEnableApiFixture();
+  fixture.session.isActive = false;
+  let finishPreparation: () => void = () => undefined;
+  fixture.prepareUi.mockImplementationOnce(
+    () =>
+      new Promise<undefined>((resolve) => {
+        finishPreparation = () => resolve(undefined);
+      })
+  );
+  const first = enableSelectionModeApi(fixture.args);
+  const firstRejected = expect(first).rejects.toThrow('Cancelled by user');
+  const second = enableSelectionModeApi(fixture.args);
+  await Promise.resolve();
+  finishPreparation();
+  await firstRejected;
+  expect(fixture.createOverlayContainer).toHaveBeenCalledOnce();
+  fixture.session.resolveCallback?.({ x: 1, y: 2, width: 30, height: 40 });
+  await expect(second).resolves.toEqual({ x: 1, y: 2, width: 30, height: 40 });
+});
+
+it('does not mount after cancellation during preparation', async () => {
+  const fixture = createEnableApiFixture();
+  fixture.session.isActive = false;
+  let finishPreparation: () => void = () => undefined;
+  fixture.prepareUi.mockImplementationOnce(
+    () =>
+      new Promise<undefined>((resolve) => {
+        finishPreparation = () => resolve(undefined);
+      })
+  );
+  const pending = enableSelectionModeApi(fixture.args);
+  const rejected = expect(pending).rejects.toThrow('Cancelled by user');
+  disableSelectionModeApi(fixture.args);
+  finishPreparation();
+  await rejected;
+  expect(fixture.createOverlayContainer).not.toHaveBeenCalled();
+});

@@ -91,6 +91,18 @@ export function estimateUtf8Bytes(value: string, maxBytes = Number.POSITIVE_INFI
   return bytes;
 }
 
+export function truncateUtf8Text(value: string, maxBytes: number): string {
+  let bytes = 0;
+  let result = '';
+  for (const character of value) {
+    const characterBytes = estimateUtf8Bytes(character, maxBytes);
+    if (bytes + characterBytes > maxBytes) break;
+    result += character;
+    bytes += characterBytes;
+  }
+  return result;
+}
+
 export function isBoundedUtf8Text(value: unknown, maxBytes: number): value is string {
   return (
     typeof value === 'string' && value.length > 0 && estimateUtf8Bytes(value, maxBytes) <= maxBytes

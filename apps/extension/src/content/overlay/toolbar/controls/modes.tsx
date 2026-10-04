@@ -1,14 +1,10 @@
 import React, { useRef } from 'react';
 import {
   Bot,
-  BrushCleaning,
   Check,
   MessageSquarePlus,
   MousePointerClick,
-  PanelBottomClose,
   Pencil,
-  Pin,
-  PinOff,
   SwatchBook,
   TextCursor,
   TextCursorInput,
@@ -36,7 +32,6 @@ import {
 import { getToolbarMenuPosition } from '../menu/position';
 import { ModeSelectorButton } from './mode-selector-button';
 import type { ToolbarPageEditingMode } from '../types';
-import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 
 const MODE_ICON_CLASS_NAME = 'sniptale-toolbar-mode-icon h-[18px] w-[18px] shrink-0';
 const TOOLBAR_SIDEBAR_RIGHT_INSET_PX = 348;
@@ -331,6 +326,7 @@ function PageEditingModeButton(props: {
       dataUi={`content.toolbar.page-editing-mode.${props.mode}`}
       disabled={props.disabled}
       title={copy.title}
+      onMouseDown={(event) => event.preventDefault()}
       onClick={(event) => {
         event.stopPropagation();
         props.onSelect(props.mode);
@@ -412,7 +408,6 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
             />
           ) : null}
         </div>
-        {selectedMode === 'cursor' ? <NavigationToolbarActions {...props} /> : null}
       </ContentToolbarGroup>
       {selectedMode === 'cursor' || selectedMode === 'video-recording' ? null : (
         <ContentToolbarDivider
@@ -421,61 +416,6 @@ export function ToolbarModeButtons(props: ToolbarModeButtonsProps) {
         />
       )}
       <ToolbarQuickEditModeButtons {...props} />
-    </>
-  );
-}
-
-function NavigationToolbarActions(props: ToolbarModeButtonsProps) {
-  const pinned = props.pinToTab === true || props.pinToTabLocked === true;
-  return (
-    <>
-      <ContentToolbarButton
-        type="button"
-        dataUi="content.toolbar.navigation.clear-page-preparation"
-        tone="danger"
-        disabled={props.canClearPagePreparation !== true}
-        title={translate('content.toolbar.clearPagePreparation')}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onClearPagePreparation?.();
-        }}
-      >
-        <BrushCleaning size={18} strokeWidth={2} />
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        type="button"
-        active={pinned}
-        aria-pressed={pinned}
-        dataUi="content.toolbar.navigation.pin-to-tab"
-        disabled={props.pinToTabLocked === true || props.pinToTabAvailable !== true}
-        title={
-          props.pinToTabLocked
-            ? translate('content.toolbar.pinToTabLockedHint')
-            : !props.pinToTabAvailable
-              ? translate('content.toolbar.pinToTabUnavailableHint')
-              : translate('content.toolbar.pinToTab')
-        }
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onPinToTabChange?.(
-            props.pinToTab !== true,
-            createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
-          );
-        }}
-      >
-        {pinned ? <Pin size={18} strokeWidth={2} /> : <PinOff size={18} strokeWidth={2} />}
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        type="button"
-        dataUi="content.toolbar.navigation.collapse"
-        title={translate('content.toolbar.hideToolbar')}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onHide?.();
-        }}
-      >
-        <PanelBottomClose size={18} strokeWidth={2} />
-      </ContentToolbarButton>
     </>
   );
 }

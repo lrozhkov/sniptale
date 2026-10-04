@@ -1,8 +1,12 @@
+import { AutosaveControl } from '@sniptale/ui/autosave-control';
+import { ToolbarSeparator } from './separator';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProjectMenu } from './project-menu';
 import { Redo2, Undo2, Magnet } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import {
+  useVideoEditorAutosaveController,
   useVideoEditorHistoryController,
   useVideoEditorHeaderController,
 } from '../../../runtime/controller/composition/hooks';
@@ -11,6 +15,7 @@ import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
 import type { ProjectTimelineToolbarProps } from './types';
+import { requestVideoEditorSaveRetry } from '../../../runtime/session/save-retry';
 
 type ToolbarTrailingControlsInput = Pick<
   ProjectTimelineToolbarProps,
@@ -141,6 +146,8 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
           <Redo2 aria-hidden="true" />
         </ContentToolbarButton>
         <ToolbarSeparator />
+        <TimelineAutosaveControl />
+        <ToolbarSeparator />
         <ProjectTimelineToolbarTrailingActions
           {...createToolbarTrailingControlsProps(controlsProps)}
         />
@@ -165,11 +172,42 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
   );
 }
 
-function ToolbarSeparator() {
+function TimelineAutosaveControl() {
+  const autosave = useVideoEditorAutosaveController();
+  const header = useVideoEditorHeaderController();
+  if (!header) return null;
   return (
-    <span
-      aria-hidden="true"
-      className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
+    <AutosaveControl
+      {...autosave}
+      openOnError
+      actions={
+        header.saveStateMeta.state === 'conflict' ? (
+          <ProductActionButton compact tone="secondary" onClick={() => window.location.reload()}>
+            {translate('editor.documentActions.reloadLatest')}
+          </ProductActionButton>
+        ) : header.saveStateMeta.state === 'error' ? (
+          <ProductActionButton compact tone="secondary" onClick={requestVideoEditorSaveRetry}>
+            {translate('common.actions.retry')}
+          </ProductActionButton>
+        ) : null
+      }
+      state={
+        header.saveStateMeta.state === 'idle' ? 'dirty' : (header.saveStateMeta.state ?? 'saved')
+      }
+      labels={{
+        title: translate('editor.documentActions.autosaveTitle'),
+        switch: translate('editor.documentActions.autosaveSwitch'),
+        errorDescription: translate('editor.documentActions.autosaveErrorDescription'),
+        on: translate('editor.documentActions.autosaveOnDescription'),
+        off: translate('editor.documentActions.autosaveOffDescription'),
+        paused: translate('editor.documentActions.autosaveOffStatus'),
+        dirty: translate('common.states.dirty'),
+        saving: translate('common.states.saving'),
+        saved: translate('common.states.saved'),
+        error: translate('editor.documentActions.saveErrorTitle'),
+        conflict: translate('editor.documentActions.autosaveConflict'),
+        close: translate('common.actions.close'),
+      }}
     />
   );
 }

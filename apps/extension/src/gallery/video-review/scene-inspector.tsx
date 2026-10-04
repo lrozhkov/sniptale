@@ -35,8 +35,7 @@ export function ReviewCanvasSettings(props: {
     (item) => item.canvas.width === size.width && item.canvas.height === size.height
   );
   return (
-    <section className="space-y-3" data-ui="gallery.videoReview.canvasSettings">
-      <h4 className="text-sm font-semibold">{translate('gallery.videoReview.canvas')}</h4>
+    <section className="space-y-2" data-ui="gallery.videoReview.canvasSettings">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('videoEditor.sidebar.canvasFormatLabel')}
@@ -105,7 +104,6 @@ export function ReviewSceneAudio(props: {
   if (!lanes.length) return null;
   return (
     <section className="space-y-2" data-ui="gallery.videoReview.sceneAudio">
-      <h4 className="text-sm font-semibold">{translate('gallery.videoReview.volume')}</h4>
       {lanes.map((lane) => {
         const change = (value: number) =>
           lane.key === 'original'

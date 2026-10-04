@@ -21,6 +21,7 @@ import {
 import { registerFrameAnnotationDraftFlusher } from './draft-coordinator';
 import { applyFrameAnnotationCommand } from './commands';
 import type { EditorFrameAnnotationPlaneController } from './types';
+import { getEditorDocumentClientRect } from '../document/canvas-surface/editing-surface';
 import { createFrameAnnotationFromDefaults } from './creation-defaults';
 import { useFrameAnnotationKeyboard } from './keyboard';
 import { createFrameAnnotationLayerLabel } from './layer-label';
@@ -37,7 +38,7 @@ type DragState = {
 };
 
 type FrameDragCoordinateSpace = {
-  canvasRect: DOMRect;
+  canvasRect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'>;
   documentSize: { width: number; height: number };
 };
 
@@ -140,14 +141,14 @@ export function useFrameAnnotationInteraction(props: {
       cancelScheduledDragRender();
       finishDragRef.current(event);
     };
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerFinish);
-    window.addEventListener('pointercancel', handlePointerFinish);
+    document.addEventListener('pointermove', handlePointerMove, true);
+    document.addEventListener('pointerup', handlePointerFinish, true);
+    document.addEventListener('pointercancel', handlePointerFinish, true);
     return () => {
       cancelScheduledDragRender();
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerFinish);
-      window.removeEventListener('pointercancel', handlePointerFinish);
+      document.removeEventListener('pointermove', handlePointerMove, true);
+      document.removeEventListener('pointerup', handlePointerFinish, true);
+      document.removeEventListener('pointercancel', handlePointerFinish, true);
     };
   }, [cancelScheduledDragRender, stageDragDraft]);
   React.useEffect(
@@ -192,7 +193,8 @@ function createPlaneEvents(input: {
       input.commitPendingHistory();
       const coordinateSpace = resolveFrameDragCoordinateSpace(
         input.props.canvasRef.current,
-        input.props.controller.canvasDocumentSize
+        input.props.controller.canvasDocumentSize,
+        input.props.controller.canvas
       );
       if (!coordinateSpace) return;
       const point = toLogicalPoint(event, coordinateSpace);
@@ -240,6 +242,7 @@ function createObjectDragActions(input: ObjectActionInput) {
       snapshot: FrameAnnotationSnapshotV1,
       event: React.PointerEvent
     ) => {
+      if (event.button !== 0) return;
       if (props.activeTool !== 'frame-annotation' && props.activeTool !== 'select') return;
       if (!canMutateFrameAnnotationProxy(object)) return;
       input.commitPendingHistory();
@@ -261,6 +264,7 @@ function createObjectDragActions(input: ObjectActionInput) {
       direction: ResizeDirection,
       calloutCenter: { x: number; y: number } | null
     ) => {
+      if (event.button !== 0) return;
       if (!canMutateFrameAnnotationProxy(object)) return;
       input.commitPendingHistory();
       startExistingDrag(
@@ -453,7 +457,11 @@ function buildProjection(
       props.activeTool === 'frame-annotation' || props.activeTool === 'select'
         ? (draft?.id ?? canonicalSelectedId)
         : null,
-    scale: getProjectionScale(props.canvasRef.current, props.controller.canvasDocumentSize),
+    scale: getProjectionScale(
+      props.canvasRef.current,
+      props.controller.canvasDocumentSize,
+      props.controller.canvas
+    ),
     focusFrames,
     focusOpacity: focusFrames.reduce(
       (maximum, frame) => Math.max(maximum, frame.focusSettings?.opacity ?? 0.5),
@@ -569,7 +577,8 @@ function startExistingDrag(
 ) {
   const coordinateSpace = resolveFrameDragCoordinateSpace(
     props.canvasRef.current,
-    props.controller.canvasDocumentSize
+    props.controller.canvasDocumentSize,
+    props.controller.canvas
   );
   if (!coordinateSpace) return;
   const point = toLogicalPoint(event, coordinateSpace);
@@ -591,6 +600,8 @@ function startExistingDrag(
 }
 
 function captureDragPointer(event: React.PointerEvent): void {
+  const focusedElement = event.currentTarget.ownerDocument.activeElement;
+  if (focusedElement instanceof HTMLElement) focusedElement.blur();
   try {
     event.currentTarget.setPointerCapture(event.pointerId);
   } catch {
@@ -634,16 +645,21 @@ function runCommand(input: {
   input.forceRender();
 }
 
-function getProjectionScale(canvas: HTMLCanvasElement | null, size?: { width: number }): number {
-  const rect = canvas?.getBoundingClientRect();
+function getProjectionScale(
+  canvas: HTMLCanvasElement | null,
+  size: { width: number; height: number },
+  fabricCanvas: EditorFrameAnnotationPlaneController['canvas']
+): number {
+  const rect = getEditorDocumentClientRect(canvas, size, fabricCanvas);
   return rect && size && size.width > 0 ? rect.width / size.width : 1;
 }
 
 function resolveFrameDragCoordinateSpace(
   canvas: HTMLCanvasElement | null,
-  size?: { width: number; height: number }
+  size: { width: number; height: number },
+  fabricCanvas: EditorFrameAnnotationPlaneController['canvas']
 ): FrameDragCoordinateSpace | null {
-  const canvasRect = canvas?.getBoundingClientRect();
+  const canvasRect = getEditorDocumentClientRect(canvas, size, fabricCanvas);
   if (!canvasRect || !size || canvasRect.width <= 0 || canvasRect.height <= 0) return null;
   return { canvasRect, documentSize: { ...size } };
 }

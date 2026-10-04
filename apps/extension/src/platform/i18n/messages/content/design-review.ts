@@ -5,6 +5,24 @@ import { contentDesignReviewOptionMessages } from './design-review-options';
 export const contentDesignReviewMessages = defineMessageSource({
   ...contentDesignReviewOptionMessages,
   ...contentDesignReviewAppearanceMessages,
+  showDistances: {
+    ru: 'Показать расстояния до соседних элементов',
+    en: 'Show distances to sibling elements',
+  },
+  hideDistances: {
+    ru: 'Скрыть расстояния до соседних элементов',
+    en: 'Hide distances to sibling elements',
+  },
+  showLayoutGuides: {
+    ru: 'Показать расстояния до контейнера и экрана и направляющие',
+    en: 'Show container and viewport distances and guides',
+  },
+  hideLayoutGuides: {
+    ru: 'Скрыть расстояния до контейнера и экрана и направляющие',
+    en: 'Hide container and viewport distances and guides',
+  },
+  parentDistanceLabel: { ru: 'Контейнер', en: 'Parent' },
+  viewportDistanceLabel: { ru: 'Экран', en: 'Viewport' },
   title: {
     ru: 'Дизайн-ревью',
     en: 'Design review',
@@ -232,6 +250,10 @@ export const contentDesignReviewMessages = defineMessageSource({
   close: {
     ru: 'Закрыть',
     en: 'Close',
+  },
+  actionLabel: {
+    ru: 'Тип замечания',
+    en: 'Feedback type',
   },
   actionRefine: {
     ru: 'Доработать',

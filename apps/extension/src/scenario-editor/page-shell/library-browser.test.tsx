@@ -266,3 +266,84 @@ it('keeps a native drag source mounted while focus refreshes library metadata', 
   await act(async () => finish([{ ...item }]));
   expect(host.querySelector('.guide-library-card')).toBe(card);
 });
+
+it('applies a nonempty format preset to filenames and extensionless MIME metadata', async () => {
+  io.list.mockResolvedValue([
+    { ...item, id: 'file', filename: 'File.png' },
+    { ...item, id: 'fallback', filename: 'Extensionless' },
+    { ...item, id: 'jpeg', filename: 'Other.jpg', mimeType: 'image/jpeg' },
+  ]);
+  io.views.mockResolvedValue([
+    {
+      id: 'format-view',
+      name: 'PNG files',
+      folderFilter: 'all',
+      createdAt: 1,
+      updatedAt: 1,
+      filters: {
+        activeTags: [],
+        scope: 'all',
+        facetFilters: {
+          created: [],
+          updated: [],
+          format: ['png'],
+          size: [],
+          resolution: [],
+          duration: [],
+          source: [],
+        },
+      },
+    },
+  ]);
+  await render();
+  await click('PNG files');
+  const cards = Array.from(host.querySelectorAll('.guide-library-card')).map(
+    (card) => card.textContent
+  );
+  expect(cards.join(' ')).toContain('File.png');
+  expect(cards.join(' ')).toContain('Extensionless');
+  expect(cards.join(' ')).not.toContain('Other.jpg');
+});
+
+it('collapses cards independently of ordered insertion and releases a filtered preview URL', async () => {
+  await render(false, ['image']);
+  expect(host.querySelector('.guide-library-preview')).toBeNull();
+  await click('Current.png');
+  const previewUrl = host.querySelector('.guide-library-preview img')?.getAttribute('src');
+  await click('Hide materials');
+  expect(host.querySelector('.guide-library-card')).toBeNull();
+  expect(host.querySelector('.guide-library-preview img')?.getAttribute('src')).toBe(previewUrl);
+  expect(io.choose).not.toHaveBeenCalled();
+  await click('Show materials');
+  expect(host.querySelector('.guide-library-card-select')?.textContent).toBe('1');
+  await click('Video');
+  expect(host.querySelector('.guide-library-preview')).toBeNull();
+  expect(io.revoke).toHaveBeenCalledWith(previewUrl);
+  expect(
+    host.querySelector('[data-ui="library-materials-list"]')?.getAttribute('data-layout')
+  ).toBe('grid');
+});
+
+it.each(['image', 'video'] as const)(
+  'returns from %s preview without clearing selected order or category',
+  async (kind) => {
+    io.list.mockResolvedValue([
+      item,
+      { ...item, id: 'clip', kind: 'video', mimeType: 'video/mp4', filename: 'Clip.mp4' },
+    ]);
+    await render(false, ['image']);
+    await click('All materials');
+    const name = kind === 'image' ? 'Current.png' : 'Clip.mp4';
+    for (let cycle = 0; cycle < 2; cycle++) {
+      await click(name);
+      expect(host.querySelector('.guide-library-preview')).not.toBeNull();
+      if (cycle === 0) await click('Hide materials');
+      await click('Back to materials');
+      expect(host.querySelector('.guide-library-preview')).toBeNull();
+      expect(host.querySelector('[data-layout="grid"]')).not.toBeNull();
+      expect(host.querySelector('.guide-library-card-select')?.textContent).toBe('1');
+      expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
+      expect(document.activeElement?.textContent).toContain(name);
+    }
+  }
+);

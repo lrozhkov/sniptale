@@ -1,8 +1,11 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import { videoEntryIsUnrelated, reviewWorkspaceUsesMedia } from '../media-library/dependencies';
 import type { VideoWorkspace } from '../review-workspaces/contracts';
 import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
 import type { StoredProjectExportEntry, VideoProjectEntry } from './contracts';
 import { parseProjectExportEntry, parseVideoProjectEntry } from './read-guards';
+import { scenarioChildIsUnrelated } from '../media-library/dependencies';
 
 const PROJECT_ASSET_PREFIX = 'project-asset:';
 
@@ -18,6 +21,7 @@ interface ProjectAssetOwnershipStores {
   exports: ProjectExportListStore;
   projects: ListStore;
   videoWorkspaces: ListStore;
+  scenarioAssets: ListStore;
 }
 
 export interface ProjectAssetOwnership {
@@ -96,11 +100,79 @@ export async function collectProjectAssetOwnership(args: {
     collectTargetAggregates(args.projectId, owned, args.stores.exports),
     collectOtherDirectAssetIds(args.projectId, args.stores.projects),
   ]);
+  const ownedReviews = await args.stores.videoWorkspaces.getAll();
+  let expanded = true;
+  while (expanded) {
+    const previousSize = owned.size;
+    for (const raw of ownedReviews) {
+      const review = parseVideoWorkspace(raw);
+      if (review && targetAggregates.has(review.aggregateId)) addReviewAssetIds(review, owned);
+    }
+    for (const id of owned) targetAggregates.add(`${PROJECT_ASSET_PREFIX}${id}`);
+    expanded = owned.size !== previousSize;
+  }
   await classifyReviewAssetIds({
     owned,
     protectedIds,
     targetAggregates,
     videoWorkspaces: args.stores.videoWorkspaces,
   });
+  const [rawProjects, rawReviews] = await Promise.all([
+    args.stores.projects.getAll(),
+    args.stores.videoWorkspaces.getAll(),
+  ]);
+  const rawChildren = await args.stores.scenarioAssets.getAll();
+  for (const projectAssetId of owned) {
+    const target = {
+      id: `${PROJECT_ASSET_PREFIX}${projectAssetId}`,
+      source: { kind: 'project-asset' as const, projectAssetId },
+    };
+    const videoUses = rawProjects.some(
+      (raw) =>
+        !(isRecord(raw) && raw['id'] === args.projectId) &&
+        !videoEntryIsUnrelated(raw, target, new Set())
+    );
+    const reviewUses = rawReviews.some((raw) => {
+      if (
+        isRecord(raw) &&
+        typeof raw['aggregateId'] === 'string' &&
+        targetAggregates.has(raw['aggregateId'])
+      )
+        return false;
+      const review = parseVideoWorkspace(raw);
+      return !review || reviewWorkspaceUsesMedia(review, target);
+    });
+    if (
+      videoUses ||
+      reviewUses ||
+      rawChildren.some((child) => !scenarioChildIsUnrelated(child, target))
+    )
+      protectedIds.add(projectAssetId);
+  }
+  protectRetainedReviewChildren(rawReviews, owned, protectedIds);
   return { owned, protected: protectedIds };
+}
+
+function protectRetainedReviewChildren(
+  rawReviews: readonly unknown[],
+  owned: ReadonlySet<string>,
+  protectedIds: Set<string>
+): void {
+  let expanded = true;
+  while (expanded) {
+    const previousSize = protectedIds.size;
+    for (const raw of rawReviews) {
+      if (
+        !isRecord(raw) ||
+        typeof raw['aggregateId'] !== 'string' ||
+        !raw['aggregateId'].startsWith(PROJECT_ASSET_PREFIX) ||
+        !protectedIds.has(raw['aggregateId'].slice(PROJECT_ASSET_PREFIX.length))
+      )
+        continue;
+      const review = parseVideoWorkspace(raw);
+      if (review) addReviewAssetIds(review, protectedIds);
+      else for (const id of owned) protectedIds.add(id);
+    }
+    expanded = protectedIds.size !== previousSize;
+  }
 }

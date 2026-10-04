@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Keyboard, MousePointer2, Minus, Plus } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { GuideVideoAction } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -71,60 +71,107 @@ export function GuideVideoActionNavigation({
         ))}
         {!available.length && <small>{t('scenario.editor.guideVideoNoActions')}</small>}
       </div>
-      <div className="guide-video-time-scroll">
-        <div
-          className="guide-video-time-plane"
-          style={{ width: `${zoom * 100}%` }}
-          role="slider"
-          tabIndex={0}
-          aria-label={t('scenario.editor.guideVideoPosition')}
-          aria-valuemin={0}
-          aria-valuemax={duration}
-          aria-valuenow={playback.media.time}
-          onKeyDown={(event) => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-            event.preventDefault();
-            seek(
-              event.key === 'Home'
-                ? 0
-                : event.key === 'End'
-                  ? duration
-                  : playback.media.time + (event.key === 'ArrowLeft' ? -0.1 : 0.1)
-            );
-          }}
-          onPointerDown={(event) => {
-            if (event.button !== 0 || !duration) return;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            const rect = event.currentTarget.getBoundingClientRect();
-            seek(((event.clientX - rect.left) / rect.width) * duration);
-          }}
-          onPointerMove={(event) => {
-            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
-            const rect = event.currentTarget.getBoundingClientRect();
-            seek(((event.clientX - rect.left) / rect.width) * duration);
-          }}
-        >
-          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
-            <span
-              className="guide-video-tick"
-              key={fraction}
-              style={{ left: `${fraction * 100}%` }}
-            >
-              {(duration * fraction).toFixed(1)}
-            </span>
-          ))}
-          {available.map((action) => (
-            <i
-              key={action.id}
-              className="guide-video-event-tick"
-              style={{ left: `${(action.time / duration) * 100}%` }}
-            />
-          ))}
+      <GuideVideoTimePlane playback={playback} actions={available} zoom={zoom} t={t} />
+    </div>
+  );
+}
+
+/** Pointer preview is disposable; only captured gestures and keyboard commands seek. */
+function GuideVideoTimePlane({
+  playback,
+  actions,
+  zoom,
+  t,
+}: {
+  playback: Playback;
+  actions: readonly GuideVideoAction[];
+  zoom: number;
+  t: Translate;
+}) {
+  const [hover, setHover] = useState<{ time: number; flip: boolean } | null>(null);
+  const duration = playback.media.duration ?? 0;
+  const ready = playback.ready && duration > 0;
+  useEffect(() => setHover(null), [zoom, duration, ready]);
+  const seek = (time: number) => {
+    playback.video.current?.pause();
+    playback.seek(time);
+  };
+  const pointerTime = (event: PointerEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return rect.width > 0
+      ? Math.max(0, Math.min(duration, ((event.clientX - rect.left) / rect.width) * duration))
+      : 0;
+  };
+  return (
+    <div className="guide-video-time-scroll" onScroll={() => setHover(null)}>
+      <div
+        className="guide-video-time-plane"
+        style={{ width: `${zoom * 100}%` }}
+        role="slider"
+        tabIndex={ready ? 0 : -1}
+        aria-disabled={!ready}
+        aria-label={t('scenario.editor.guideVideoPosition')}
+        aria-valuemin={0}
+        aria-valuemax={duration}
+        aria-valuenow={playback.media.time}
+        onKeyDown={(event) => {
+          if (!ready || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+          event.preventDefault();
+          seek(
+            event.key === 'Home'
+              ? 0
+              : event.key === 'End'
+                ? duration
+                : playback.media.time + (event.key === 'ArrowLeft' ? -0.1 : 0.1)
+          );
+        }}
+        onPointerDown={(event) => {
+          if (event.button !== 0 || !ready) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          seek(pointerTime(event));
+        }}
+        onPointerMove={(event) => {
+          if (!ready) return;
+          const time = pointerTime(event);
+          if (event.pointerType !== 'touch') {
+            const viewport = event.currentTarget.parentElement!.getBoundingClientRect();
+            setHover({ time, flip: event.clientX > viewport.right - 60 });
+          }
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) seek(time);
+        }}
+        onPointerLeave={() => setHover(null)}
+        onPointerCancel={() => setHover(null)}
+        onPointerUp={(event) => {
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+      >
+        {[0, 0.25, 0.5, 0.75, 1].map((fraction) => (
+          <span className="guide-video-tick" key={fraction} style={{ left: `${fraction * 100}%` }}>
+            {(duration * fraction).toFixed(1)}
+          </span>
+        ))}
+        {actions.map((action) => (
           <i
-            className="guide-video-playhead"
-            style={{ left: `${duration ? (playback.media.time / duration) * 100 : 0}%` }}
+            key={action.id}
+            className="guide-video-event-tick"
+            style={{ left: `${(action.time / duration) * 100}%` }}
           />
-        </div>
+        ))}
+        {hover && (
+          <span
+            className="guide-video-hover-guide"
+            aria-hidden="true"
+            style={{ left: `${(hover.time / duration) * 100}%` }}
+          >
+            <span data-flip={hover.flip}>{hover.time.toFixed(2)}</span>
+          </span>
+        )}
+        <i
+          className="guide-video-playhead"
+          style={{ left: `${duration ? (playback.media.time / duration) * 100 : 0}%` }}
+        />
       </div>
     </div>
   );

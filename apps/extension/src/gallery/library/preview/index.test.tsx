@@ -3,13 +3,17 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createScenarioExportItem, createVideoProjectItem } from '../actions/test-support/index';
+import {
+  createMediaItem,
+  createScenarioExportItem,
+  createScenarioItem,
+  createVideoProjectItem,
+} from '../actions/test-support/index';
 import { PreviewPanel } from './index';
 import type { PreviewPanelProps } from './types';
 
-const { formatDateMock, getGalleryItemKindLabelMock, translateMock } = vi.hoisted(() => ({
+const { formatDateMock, translateMock } = vi.hoisted(() => ({
   formatDateMock: vi.fn(() => '31 Mar 2026'),
-  getGalleryItemKindLabelMock: vi.fn(() => 'Screenshot'),
   translateMock: vi.fn((key: string) => key),
 }));
 
@@ -21,22 +25,37 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
   formatDate: formatDateMock,
-  getGalleryItemKindLabel: getGalleryItemKindLabelMock,
+}));
+
+vi.mock('../../video-review', () => ({
+  VideoReview: (props: { aggregateId: string }) => (
+    <div data-ui="preview.videoReview">{props.aggregateId}</div>
+  ),
 }));
 
 vi.mock('./media', () => ({
-  PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'onClose' | 'previewUrl'>) => (
+  PreviewMedia: (props: Pick<PreviewPanelProps, 'item' | 'previewUrl'>) => (
     <div data-ui="preview.media">
       {props.item.filename}:{props.previewUrl ?? 'no-preview'}
-      <button type="button" data-ui="preview.close" onClick={props.onClose}>
-        close
-      </button>
     </div>
   ),
 }));
 
 vi.mock('./sidebar-sections', () => ({
-  PreviewActions: () => <div data-ui="preview.actions" />,
+  PreviewActions: (props: Pick<PreviewPanelProps, 'trashMode' | 'onRestoreTrash'>) =>
+    props.trashMode ? (
+      <section data-ui="preview.actions">
+        <button
+          type="button"
+          data-ui="gallery.preview.restore"
+          onClick={() => void props.onRestoreTrash?.()}
+        >
+          Restore
+        </button>
+      </section>
+    ) : (
+      <div data-ui="preview.actions" />
+    ),
   PreviewMetadataCards: (props: Pick<PreviewPanelProps, 'item'>) => (
     <div data-ui="preview.metadata">{props.item.mimeType}</div>
   ),
@@ -44,6 +63,7 @@ vi.mock('./sidebar-sections', () => ({
     <div data-ui="preview.tags">{props.tagDraft}</div>
   ),
   PreviewPromotionAction: () => <div data-ui="preview.promotion" />,
+  PreviewProjectUsage: () => <div data-ui="preview.project-usage" />,
 }));
 
 let container: HTMLDivElement | null = null;
@@ -141,13 +161,13 @@ it('renders preview shell, updates the filename, and forwards close actions', ()
 
   render(props);
 
-  expect(container?.textContent).toContain('gallery.preview.inspector');
-  expect(container?.textContent).toContain('Screenshot');
+  expect(container?.textContent).not.toContain('gallery.preview.inspector');
+  expect(container?.textContent).toContain('gallery.preview.folderScreenshot');
   expect(container?.textContent).toContain('31 Mar 2026');
-  expect(container?.querySelector('[data-ui="preview.promotion"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
 
   const input = container?.querySelector('input');
-  const closeButton = container?.querySelector('[data-ui="preview.close"]');
+  const closeButton = container?.querySelector('button[aria-label="common.actions.close"]');
 
   if (!(input instanceof HTMLInputElement) || !(closeButton instanceof HTMLButtonElement)) {
     throw new Error('Expected preview panel controls');
@@ -180,6 +200,20 @@ it('renders source link when available and fallback copy when missing', () => {
   expect(container?.textContent).toContain('gallery.preview.sourceMissing');
 });
 
+it('shows Trash source and filename as inert metadata', () => {
+  const props = createProps({
+    trashMode: true,
+    onRestoreTrash: vi.fn(async () => true),
+    item: { ...createProps().item, sourceUrl: 'https://example.test/source' },
+  });
+  render(props);
+  expect(container?.textContent).toContain('https://example.test/source');
+  expect(container?.querySelector('a[href]')).toBeNull();
+  expect(container?.querySelector('input:not([type="range"])')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.promotion"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.actions"]')).not.toBeNull();
+});
+
 it('renders unsafe source urls as inert text instead of links', () => {
   render(
     createProps({
@@ -194,7 +228,25 @@ it('renders unsafe source urls as inert text instead of links', () => {
   expect(container?.querySelector('a[href]')).toBeNull();
 });
 
-it('shows the draft deletion date below the creation date in the inspector header', () => {
+it.each([
+  [createMediaItem({ kind: 'screenshot' }), 'folderScreenshot', 'image'],
+  [createMediaItem({ kind: 'image' }), 'folderScreenshot', 'image'],
+  [createMediaItem({ kind: 'recording' }), 'folderRecording', 'video'],
+  [createMediaItem({ kind: 'video' }), 'folderRecording', 'video'],
+  [createMediaItem({ kind: 'export' }), 'folderRecording', 'video'],
+  [createMediaItem({ kind: 'audio' }), 'kindAudio', 'audio-lines'],
+  [createMediaItem({ kind: 'web-archive' }), 'folderWebSnapshot', 'archive'],
+  [createScenarioItem(), 'folderScenario', 'book-open'],
+  [createScenarioExportItem(), 'folderExport', 'file-text'],
+  [createVideoProjectItem(), 'folderVideoProject', 'clapperboard'],
+] as const)('shows the sidebar category and icon for %j', (item, label, icon) => {
+  render(createProps({ item }));
+  const heading = container?.querySelector('[data-ui="gallery.preview.inspectorHeader"] h2');
+  expect(heading?.textContent).toBe(`gallery.preview.${label}`);
+  expect(heading?.querySelector(`svg.lucide-${icon}[aria-hidden="true"]`)).not.toBeNull();
+});
+
+it('places draft saving beside the deletion date in the inspector header', () => {
   const baseProps = createProps();
 
   render(
@@ -210,13 +262,19 @@ it('shows the draft deletion date below the creation date in the inspector heade
   expect(formatDateMock).toHaveBeenCalledWith(1);
   expect(formatDateMock).toHaveBeenCalledWith(99);
   expect(container?.textContent).toContain('gallery.app.draftExpires 31 Mar 2026');
+  expect(
+    container?.querySelector(
+      '[data-ui="gallery.preview.inspectorHeader"] [data-ui="preview.promotion"]'
+    )
+  ).not.toBeNull();
 });
 
-it('uses project name as the source fallback for scenario export items and keeps filename read-only', () => {
+it('uses project name as the source fallback and keeps non-HTML exports read-only', () => {
   render(
     createProps({
       item: createScenarioExportItem({
-        filename: 'scenario-export.zip',
+        filename: 'scenario-export.pdf',
+        format: 'pdf',
         project: {
           availability: 'available' as const,
           id: 'project-1',
@@ -271,6 +329,105 @@ it('hides the inspector sidebar when collapsed and closes on Escape', () => {
   expect(props.onClose).toHaveBeenCalledTimes(1);
 });
 
+it('retains external opener and search fallback when the list owns its own preview return', async () => {
+  const opener = document.createElement('button');
+  document.body.append(opener);
+  opener.focus();
+  const props = createProps({
+    trashMode: true,
+    listFocusReturn: true,
+    inspectorCollapsed: true,
+    onRestoreTrash: vi.fn(async () => true),
+  });
+  render(props);
+  expect(document.activeElement?.getAttribute('data-ui')).toBe('gallery.preview.restore');
+  expect(container?.querySelector('aside [data-ui="gallery.preview.restore"]')).not.toBeNull();
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+  expect(props.onClose).toHaveBeenCalledOnce();
+  await act(async () => root?.render(null));
+  await Promise.resolve();
+  expect(document.activeElement).toBe(opener);
+
+  const search = document.createElement('input');
+  search.setAttribute('data-ui', 'test.search');
+  const searchLabel = document.createElement('label');
+  searchLabel.setAttribute('data-ui', 'gallery.header.search');
+  searchLabel.append(search);
+  document.body.append(searchLabel);
+  opener.focus();
+  render(props);
+  opener.remove();
+  await act(async () =>
+    container?.querySelector<HTMLButtonElement>('[data-ui="gallery.preview.restore"]')?.click()
+  );
+  expect(props.onRestoreTrash).toHaveBeenCalledOnce();
+  await act(async () => root?.render(null));
+  await Promise.resolve();
+  expect(document.activeElement).toBe(search);
+  searchLabel.remove();
+});
+
+it('keeps keyboard focus within a Trash preview with the inspector open', () => {
+  render(
+    createProps({
+      trashMode: true,
+      inspectorCollapsed: true,
+      onRestoreTrash: vi.fn(async () => true),
+    })
+  );
+  const restore = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.restore"]'
+  );
+  const close = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="common.actions.close"]'
+  );
+  close?.focus();
+  act(() =>
+    close?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).toBe(restore);
+  act(() =>
+    restore?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).toBe(close);
+});
+
+it('keeps focus on Restore when navigating between Trash previews in one session', async () => {
+  const first = createProps({ trashMode: true, onRestoreTrash: vi.fn(async () => true) });
+  act(() => root?.render(<PreviewPanel {...first} />));
+  const second = createProps({
+    ...first,
+    item: { ...first.item, id: 'asset-2', filename: 'next.png' },
+  });
+  await act(async () => root?.render(<PreviewPanel {...second} />));
+  await Promise.resolve();
+  expect(document.activeElement).toBe(
+    container?.querySelector('[data-ui="gallery.preview.restore"]')
+  );
+});
+
+it('resets video review mode when the unkeyed preview changes items', () => {
+  const video = createMediaItem({
+    id: 'video-a',
+    filename: 'first.webm',
+    kind: 'recording',
+    mimeType: 'video/webm',
+  });
+  render(createProps({ item: video, initialMode: 'edit' }));
+  expect(container?.querySelector('[data-ui="preview.videoReview"]')?.textContent).toBe('video-a');
+
+  render(createProps({ item: { ...createProps().item, id: 'image-b' } }));
+  expect(container?.querySelector('[data-ui="preview.videoReview"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="preview.media"]')).not.toBeNull();
+
+  render(createProps({ item: video }));
+  expect(container?.querySelector('[data-ui="preview.videoReview"]')).toBeNull();
+});
+
 it('navigates adjacent media with arrow keys but preserves arrow editing inside fields', () => {
   const onPrevious = vi.fn();
   const onNext = vi.fn();
@@ -298,4 +455,69 @@ it('navigates adjacent media with arrow keys but preserves arrow editing inside 
     input?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
   });
   expect(onNext).toHaveBeenCalledOnce();
+});
+
+it('keeps close and inspector toggle outside the pending metadata boundary', () => {
+  const props = createProps({ item: createMediaItem() });
+  render(props);
+  const header = container?.querySelector('[data-ui="gallery.preview.windowControls"]');
+  const close = header?.querySelector<HTMLButtonElement>(
+    'button[aria-label="common.actions.close"]'
+  );
+  const toggle = header?.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.hideInspector"]'
+  );
+  expect(close?.closest('[inert]')).toBeNull();
+  expect(toggle?.closest('[inert]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="preview.metadata"]')?.closest('[inert]')
+  ).not.toBeNull();
+  act(() => {
+    close?.click();
+    toggle?.click();
+  });
+  expect(props.onClose).toHaveBeenCalledOnce();
+  expect(props.onInspectorToggle).toHaveBeenCalledOnce();
+});
+
+it.each([
+  createMediaItem(),
+  createMediaItem({ kind: 'recording', mimeType: 'video/webm' }),
+  createMediaItem({ kind: 'audio', mimeType: 'audio/wav' }),
+  createMediaItem({ kind: 'web-archive' }),
+  createVideoProjectItem(),
+  createScenarioItem(),
+  createScenarioExportItem(),
+])('retains close/toggle nodes and focus for $kind across inspector toggles', async (item) => {
+  const props = createProps({ item });
+  render(props);
+  const close = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="common.actions.close"]'
+  );
+  const toggle = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.preview.hideInspector"]'
+  );
+  expect(close).not.toBeNull();
+  expect(toggle).not.toBeNull();
+  for (const inspectorCollapsed of [true, false, true, false]) {
+    act(() => toggle?.focus());
+    render({ ...props, inspectorCollapsed });
+    await Promise.resolve();
+    expect(container?.querySelector('button[aria-label="common.actions.close"]')).toBe(close);
+    expect(
+      container?.querySelector(
+        `button[aria-label="gallery.preview.${inspectorCollapsed ? 'show' : 'hide'}Inspector"]`
+      )
+    ).toBe(toggle);
+    expect(document.activeElement).toBe(toggle);
+  }
+});
+
+it('allows editing the selected HTML export filename', () => {
+  const item = createScenarioExportItem({ filename: 'saved-guide.html', format: 'html' });
+  render(createProps({ item, filenameDraft: item.filename }));
+  const input = container?.querySelector('input');
+  expect(input).toBeInstanceOf(HTMLInputElement);
+  expect(input?.readOnly).toBe(false);
+  expect(input?.labels?.[0]?.textContent).toBe('gallery.preview.filename');
 });

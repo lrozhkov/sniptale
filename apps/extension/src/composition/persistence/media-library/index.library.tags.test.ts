@@ -61,6 +61,13 @@ beforeEach(() => {
   dbMocks.initDBMock.mockResolvedValue({
     get: dbMocks.getMock,
     put: dbMocks.putMock,
+    transaction: () => ({
+      done: Promise.resolve(),
+      objectStore: () => ({
+        get: dbMocks.getMock,
+        put: (entry: unknown) => dbMocks.putMock('media_library', entry),
+      }),
+    }),
   });
 });
 
@@ -100,4 +107,33 @@ it('skips writes when every added tag already exists on the current record', asy
     })
   );
   expect(dbMocks.putMock).not.toHaveBeenCalled();
+});
+
+it('does not recreate a permanently deleted media item when a stale tag editor submits', async () => {
+  dbMocks.getMock.mockResolvedValue(undefined);
+  const { addMediaLibraryEntryTags } = await import('./index.library.ts');
+  await expect(addMediaLibraryEntryTags('deleted-item', ['new'])).rejects.toThrow(
+    'Asset deleted-item'
+  );
+  expect(dbMocks.putMock).not.toHaveBeenCalled();
+});
+
+it('preserves the authoritative Trash admission while saving tags from an already-open editor', async () => {
+  const lifecycle = {
+    savedAt: null,
+    storageClass: 'temporary' as const,
+    updatedAt: 100,
+    trashedAt: 500,
+  };
+  dbMocks.getMock.mockResolvedValue(createMediaEntry({ lifecycle, tags: ['existing'] }));
+  const { addMediaLibraryEntryTags } = await import('./index.library.ts');
+  const result = await addMediaLibraryEntryTags('asset-1', ['new']);
+  expect(result.lifecycle).toEqual(lifecycle);
+  expect(dbMocks.putMock).toHaveBeenCalledWith(
+    'media_library',
+    expect.objectContaining({
+      lifecycle,
+      tags: ['existing', 'new'],
+    })
+  );
 });

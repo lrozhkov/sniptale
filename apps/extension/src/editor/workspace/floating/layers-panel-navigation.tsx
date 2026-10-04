@@ -3,7 +3,6 @@ import type { ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import type { EditorInspector } from '../../state/types';
 import { EditorIconButton, cx } from '../../chrome/ui';
-import { LayerInsertImageControl } from '../../inspector/layers/file-input';
 
 export type EditorLayersPanelMode =
   | 'layers'
@@ -104,7 +103,6 @@ export function EditorFloatingLayersNavigation(props: {
       )}
     >
       {layersMode ? renderModeButton(layersMode, props) : null}
-      <LayerInsertImageControl />
       {settingsModes.map((mode) => renderModeButton(mode, props))}
       <span aria-hidden="true" className={props.collapsed ? 'h-5 w-px' : 'ml-auto'} />
       {props.collapsed || !props.onCollapse ? null : (

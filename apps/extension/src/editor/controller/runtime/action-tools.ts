@@ -14,6 +14,7 @@ export function applyEditorControllerToolMode(options: {
   applyEditorToolMode({
     canvas: options.canvas,
     activeTool: options.activeTool,
+    arrowDrawFromTip: useEditorStore.getState().toolSettings.arrow.drawFromTip,
     enabled: options.enabled,
     hasCropGuide: options.hasCropGuide,
     clearCropSelection: options.clearCropSelection,

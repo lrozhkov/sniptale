@@ -59,7 +59,14 @@ export function createScenarioExportGalleryItem(
     hasThumbnail: false,
     id: `scenario-export:${exportEntry.id}`,
     kind: 'scenario-export',
-    lifecycle: resolveLifecycle(project.lifecycle, project.updatedAt),
+    lifecycle: {
+      storageClass: project.lifecycle?.storageClass ?? 'library',
+      savedAt: project.lifecycle?.savedAt ?? exportEntry.createdAt,
+      updatedAt: exportEntry.trashState?.updatedAt ?? exportEntry.createdAt,
+      ...(exportEntry.trashState?.trashedAt !== undefined
+        ? { trashedAt: exportEntry.trashState.trashedAt }
+        : {}),
+    },
     size: exportEntry.size,
     sourceFavicon: null,
     sourceTitle: project.name,
@@ -126,21 +133,22 @@ export function createGalleryItems(args: {
       }
     });
   });
-  const rawMediaItems = args.mediaItems
-    .filter((media) => media.source.kind !== 'project-asset')
-    .map((media) => {
-      const item = createGalleryMediaItem(media);
-      if (media.kind !== 'image' && media.kind !== 'screenshot') return item;
-      const presentation = presentations.get(
-        serializeAggregateRef({ id: media.id, kind: 'image' })
-      );
-      return {
-        ...item,
-        hasThumbnail: Boolean(presentation),
-        presentationRevision: presentation?.presentationRevision ?? null,
-        workspaceRevision: media.workspaceRevision ?? 0,
-      };
-    });
+  const rawMediaItems = args.mediaItems.map((media) => {
+    const item = createGalleryMediaItem(media);
+    if (
+      (media.kind !== 'image' && media.kind !== 'screenshot') ||
+      media.source.kind !== 'screenshot'
+    ) {
+      return item;
+    }
+    const presentation = presentations.get(serializeAggregateRef({ id: media.id, kind: 'image' }));
+    return {
+      ...item,
+      hasThumbnail: Boolean(presentation),
+      presentationRevision: presentation?.presentationRevision ?? null,
+      workspaceRevision: media.workspaceRevision ?? 0,
+    };
+  });
   const recordingGroupCounts = new Map<string, number>();
   rawMediaItems.forEach((item) => {
     if (!item.recordingGroup) return;

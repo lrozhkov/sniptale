@@ -197,7 +197,7 @@ export function applyEditorDrawingTextVisuals(textbox: Textbox): void {
     textbox._wrapText = (lines, width) =>
       adapter.wrapText(lines, Math.max(1, width - DRAWING_TEXT_HORIZONTAL_PADDING));
   }
-  textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR });
+  textbox.set({ lineHeight: DRAWING_TEXT_LINE_HEIGHT_FACTOR, strokeWidth: 0 });
   textbox._renderTextLinesBackground = (context) =>
     renderEditorDrawingTextBackground(textbox, context);
   textbox.initDimensions();
@@ -224,7 +224,10 @@ export function synchronizeEditorDrawingTextLayout(textbox: Textbox): boolean {
     textbox.set({ width });
     textbox.initDimensions();
   }
-  const height = resolveDrawingTextHeight(textbox.text ?? '', textbox.fontSize, width, measure);
+  const height = Math.max(
+    resolveDrawingTextHeight(textbox.text ?? '', textbox.fontSize, width, measure),
+    textbox.calcTextHeight() + DRAWING_TEXT_VERTICAL_PADDING * 2
+  );
   const heightChanged = Math.abs(textbox.height - height) >= 0.5;
   if (!widthChanged && !heightChanged) {
     return false;

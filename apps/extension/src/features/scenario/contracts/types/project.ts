@@ -49,6 +49,6 @@ export interface ScenarioPreviewStep {
   numberLabel: string | null;
   images: Pick<
     GuideImageBlock,
-    'id' | 'assetId' | 'alt' | 'caption' | 'frame' | 'fit' | 'contentTransform'
+    'id' | 'assetId' | 'alt' | 'caption' | 'captionAlignment' | 'frame' | 'fit' | 'contentTransform'
   >[];
 }

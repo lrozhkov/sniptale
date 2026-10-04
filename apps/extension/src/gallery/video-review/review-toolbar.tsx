@@ -1,3 +1,4 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import type { useReviewAudio } from './use-review-audio';
 import { translate } from '../../platform/i18n';
 import {
@@ -6,7 +7,13 @@ import {
 } from '../../features/video/review/advanced/effective';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { reviewIconButtonClassName, ReviewButton } from './controls';
+import {
+  reviewIconButtonClassName,
+  reviewCompactTrackButtonClassName,
+  reviewTextButtonClassName,
+  ReviewButton,
+} from './controls';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
 import { Activity, AudioLines, Focus, PanelsTopLeft, Volume2 } from 'lucide-react';
@@ -17,21 +24,21 @@ const plain = reviewIconButtonClassName;
 type Editing = ReturnType<typeof useReviewEdits>;
 
 type ToolbarProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   focusTool?: { active: boolean; available: boolean; onToggle(): void };
   originalAudioEditor?: ReturnType<typeof useReviewAudio>;
   editing: {
     mode: 'cut' | 'speed' | null;
     rate: Editing['rate'];
     audio: Editing['audio'];
-    selected: boolean;
     exporter: { index: ReviewMediaIndex | null; phase: 'idle' | 'exporting' | 'publishing' };
     setCutting(cutting: false): void;
     canApply: Editing['canApply'];
     toggle(kind: 'cut' | 'speed'): void;
     changeRate(rate: Editing['rate']): void;
     changeAudio(audio: Editing['audio']): void;
-    remove(): void;
   };
+  selectedObject?: boolean;
   busy: boolean;
   composerBusy: boolean;
   selection: ReviewAnchor;
@@ -46,7 +53,9 @@ type ToolbarProps = {
 /** Tools, comment entry, fragment export, and the advanced shell share one quiet toolbar. */
 export function ReviewTimelineToolbar(props: ToolbarProps) {
   const busy = props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle';
+  const admit = props.beforeAction ?? ((action: () => void) => action());
   const advanced = props.advanced;
+  const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
   return (
     <>
       {advanced.ui.mode === 'basic' ? (
@@ -54,8 +63,18 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           className="flex shrink-0 items-center gap-0.5"
           data-ui="gallery.videoReview.workspaceTools"
         >
-          <ReviewModeControl advanced={advanced} busy={busy} setMode={props.setMode} />
-          <ReviewHistoryTrackControl {...props} busy={busy} />
+          <ReviewModeControl
+            advanced={advanced}
+            busy={busy}
+            setMode={(mode) => admit(() => props.setMode(mode))}
+          />
+          <ReviewHistoryTrackControl
+            {...props}
+            setTrackVisibility={(track, visible) =>
+              admit(() => props.setTrackVisibility(track, visible))
+            }
+            busy={busy}
+          />
         </div>
       ) : null}
       <div
@@ -72,22 +91,24 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           }
           available={!!props.editing.exporter.index}
           cutAvailable={
-            !props.originalAudioEditor?.originalRangeSelected &&
-            (props.selection.kind !== 'range' || props.editing.canApply('cut', props.selection))
+            (props.selectedObject || !props.originalAudioEditor?.originalRangeSelected) &&
+            (props.selectedObject ||
+              props.selection.kind !== 'range' ||
+              props.editing.canApply('cut', props.selection))
           }
           speedAvailable={
-            !props.originalAudioEditor?.originalRangeSelected &&
-            (props.selection.kind !== 'range' || props.editing.canApply('speed', props.selection))
+            (props.selectedObject || !props.originalAudioEditor?.originalRangeSelected) &&
+            (props.selectedObject ||
+              props.selection.kind !== 'range' ||
+              props.editing.canApply('speed', props.selection))
           }
           busy={busy}
           rate={props.editing.rate}
           audio={props.editing.audio}
-          selected={!!props.editing.selected}
-          onPointer={() => props.editing.setCutting(false)}
-          onToggle={props.editing.toggle}
-          onRate={props.editing.changeRate}
-          onAudio={props.editing.changeAudio}
-          onRemove={props.editing.remove}
+          onPointer={() => admit(() => props.editing.setCutting(false))}
+          onToggle={(kind) => admit(() => props.editing.toggle(kind))}
+          onRate={(rate) => admit(() => props.editing.changeRate(rate))}
+          onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
         />
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewButton
@@ -97,38 +118,60 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
             aria-pressed={props.focusTool.active}
             className={plain}
             disabled={busy || !props.focusTool.available}
-            onClick={props.focusTool.onToggle}
+            onClick={() => admit(props.focusTool!.onToggle)}
           >
             <Focus size={16} aria-hidden="true" />
           </ReviewButton>
         ) : null}
-        {advanced.ui.mode === 'advanced' &&
-        props.editing.exporter.index?.audioCodec &&
-        props.originalAudioEditor ? (
+        {advanced.ui.mode === 'advanced' && props.originalAudioEditor ? (
           <ReviewButton
             label={translate('gallery.videoReview.originalAudioRange')}
             toolbarLabel={translate('gallery.videoReview.volume')}
-            title={translate('gallery.videoReview.originalAudioRangeHint')}
+            title={translate(
+              sourceAudioReady
+                ? 'gallery.videoReview.originalAudioRangeHint'
+                : 'gallery.videoReview.originalAudioUnavailable'
+            )}
             aria-pressed={props.originalAudioEditor.originalTool}
             className={plain}
-            disabled={
-              busy ||
-              (!props.originalAudioEditor.originalTool &&
-                props.selection.kind === 'range' &&
-                !props.originalAudioEditor.canAddOriginal(props.selection))
+            disabled={busy || !sourceAudioReady}
+            onClick={() =>
+              admit(() => {
+                props.editing.setCutting(false);
+                if (props.originalAudioEditor?.originalTool)
+                  props.originalAudioEditor.setOriginalTool(false);
+                else if (!props.selectedObject && props.selection.kind === 'range') {
+                  if (!props.originalAudioEditor?.addOriginal(props.selection))
+                    props.originalAudioEditor?.setOriginalTool(true);
+                } else
+                  props.originalAudioEditor?.setOriginalTool(
+                    !props.originalAudioEditor.originalTool
+                  );
+              })
             }
-            onClick={() => {
-              props.editing.setCutting(false);
-              if (props.originalAudioEditor?.originalTool)
-                props.originalAudioEditor.setOriginalTool(false);
-              else if (props.selection.kind === 'range')
-                props.originalAudioEditor?.addOriginal(props.selection);
-              else
-                props.originalAudioEditor?.setOriginalTool(!props.originalAudioEditor.originalTool);
-            }}
           >
             <Volume2 size={16} aria-hidden="true" />
           </ReviewButton>
+        ) : null}
+        {advanced.ui.mode === 'advanced' &&
+        props.originalAudioEditor?.originalTool &&
+        sourceAudioReady ? (
+          <ProductSelect
+            aria-label={translate('gallery.videoReview.volume')}
+            controlSize="sm"
+            className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+            containerClassName="!w-auto !min-w-0 shrink-0"
+            menuWidth={112}
+            value={String(props.originalAudioEditor.defaultOriginalVolume)}
+            disabled={busy}
+            options={[0, 0.25, 0.5, 0.75, 1, 1.5, 2].map((volume) => ({
+              value: String(volume),
+              label: `${Math.round(volume * 100)}%`,
+            }))}
+            onChange={(value) =>
+              admit(() => props.originalAudioEditor?.setDefaultOriginalVolume(Number(value)))
+            }
+          />
         ) : null}
         <ReviewFragmentAction
           selection={props.selection}
@@ -136,7 +179,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           index={props.editing.exporter.index}
           edits={props.edits}
           busy={busy}
-          onDownload={props.onDownloadFragment}
+          onDownload={() => admit(props.onDownloadFragment)}
         />
       </div>
     </>
@@ -151,6 +194,7 @@ function ReviewModeControl(props: {
   setMode(mode: 'basic' | 'advanced'): void;
 }) {
   const advanced = props.advanced.ui.mode === 'advanced';
+  const buttonClassName = props.compact ? reviewCompactTrackButtonClassName : plain;
   return (
     <ReviewButton
       label={translate('gallery.videoReview.advancedEditing')}
@@ -163,7 +207,7 @@ function ReviewModeControl(props: {
       )}
       aria-pressed={advanced}
       disabled={props.busy}
-      className={`${plain} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : '!w-auto gap-2'}`}
+      className={`${buttonClassName} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : '!w-auto gap-2'}`}
       onClick={() => props.setMode(advanced ? 'basic' : 'advanced')}
     >
       <PanelsTopLeft size={props.compact ? 14 : 16} className="shrink-0" aria-hidden="true" />
@@ -195,7 +239,7 @@ export function ReviewTrackControls(props: {
           <ReviewButton
             label={translate('gallery.videoReview.zoomTrack')}
             aria-pressed={features.zoomTrackVisible}
-            className={`${reviewIconButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
             onClick={() => props.setTrackVisibility('zoom', !advanced.ui.tracks.zoom)}
           >
             <Focus size={14} aria-hidden="true" />
@@ -203,7 +247,7 @@ export function ReviewTrackControls(props: {
           <ReviewButton
             label={translate('gallery.videoReview.audioTrack')}
             aria-pressed={features.audioTrackVisible}
-            className={`${reviewIconButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+            className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
             onClick={() => props.setTrackVisibility('audio', !advanced.ui.tracks.audio)}
           >
             <AudioLines size={14} aria-hidden="true" />
@@ -221,6 +265,7 @@ function ReviewHistoryTrackControl(
   }
 ) {
   if (!props.telemetryAvailable) return null;
+  const buttonClassName = props.compact ? reviewCompactTrackButtonClassName : plain;
   return (
     <ReviewButton
       label={translate('gallery.videoReview.telemetry')}
@@ -228,7 +273,7 @@ function ReviewHistoryTrackControl(
       toolbarLabel={props.compact ? undefined : translate('gallery.videoReview.telemetry')}
       aria-pressed={props.advanced.ui.tracks.actions}
       disabled={props.busy}
-      className={`${plain} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : ''}`}
+      className={`${buttonClassName} ${props.compact ? '!h-6 !min-h-6 !w-6 !px-1' : ''}`}
       onClick={() => props.setTrackVisibility('actions', !props.advanced.ui.tracks.actions)}
     >
       <Activity size={props.compact ? 14 : 16} aria-hidden="true" />

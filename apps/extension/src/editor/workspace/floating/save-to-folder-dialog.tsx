@@ -58,7 +58,10 @@ export function EditorSaveToFolderDialog(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={anchorEl}
-      className="sniptale-save-dialog !w-[min(560px,calc(100vw-24px))] max-h-[calc(100vh-5rem)] !p-0 overflow-y-auto"
+      className={[
+        'sniptale-save-dialog !rounded-none !w-[min(560px,calc(100vw-24px))]',
+        'max-h-[calc(100vh-5rem)] !p-0 overflow-y-auto',
+      ].join(' ')}
       dataUi="editor.floating.document-bar.save-to-folder-popover"
       isOpen
       popoverRef={popoverRef}
@@ -127,15 +130,17 @@ function useSaveToFolderPopoverPosition(anchorEl: HTMLElement | null): CSSProper
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }
   const margin = 12;
-  const gap = 8;
+  const gap = 12;
   const width = Math.min(560, window.innerWidth - margin * 2);
   const anchor = anchorEl.getBoundingClientRect();
+  const toolbar = anchorEl.closest('.sniptale-toolbar-root')?.getBoundingClientRect();
+  const bottom = Math.max(anchor.bottom, toolbar?.bottom ?? anchor.bottom);
   const left = Math.max(margin, Math.min(anchor.right - width, window.innerWidth - width - margin));
   return {
     left,
-    maxHeight: `calc(100vh - ${anchor.bottom + gap + margin}px)`,
+    maxHeight: `calc(100vh - ${bottom + gap + margin}px)`,
     position: 'fixed',
-    top: anchor.bottom + gap,
+    top: bottom + gap,
     width,
     zIndex: 2147483647,
   };

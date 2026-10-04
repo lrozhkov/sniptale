@@ -32,6 +32,7 @@ function createFrameSectionProps(overrides: Record<string, unknown> = {}) {
   return {
     scenePresetHeader: null,
     frameDraft: DEFAULT_EDITOR_FRAME_SETTINGS,
+    lastFillModeRef: { current: 'color' as const },
     framePaddingSummary: '128 / 128 / 128 / 128',
     backgroundPreviewStyle: {},
     frameLayoutModeOptions: [{ value: 'expand-canvas' as const, label: 'Expand' }],

@@ -5,7 +5,6 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  contextMenu: vi.fn(() => <div data-ui="context-menu" />),
   openExtensionShortcutsPage: vi.fn(),
   themeChips: vi.fn(() => <div data-ui="theme-chips" />),
 }));
@@ -39,9 +38,6 @@ vi.mock('@sniptale/ui/product-form-controls', () => ({
     </select>
   ),
 }));
-vi.mock('./context-menu-controls', () => ({
-  ContextMenuControls: mocks.contextMenu,
-}));
 vi.mock('./theme-chips', () => ({
   ThemeChips: mocks.themeChips,
 }));
@@ -72,6 +68,12 @@ function createState(overrides: Partial<AppearanceSectionState> = {}): Appearanc
       showVideoEditor: true,
     },
     contextMenuOptions: buildAppearanceContextMenuOptions('en'),
+    contextMenuCatalogStatus: 'ready',
+    contextMenuSettingsStatus: 'ready',
+    contextMenuQuickActions: [],
+    contextMenuViewportPresets: [],
+    retryContextMenuCatalog: vi.fn(),
+    retryContextMenuSettings: vi.fn(),
     languagePreference: 'ru',
     locale: 'en',
     localeOptions: buildAppearanceLocaleOptions('en'),
@@ -114,7 +116,7 @@ it('renders appearance owners and routes locale controls', () => {
   renderCard(state);
 
   expect(container?.querySelector('[data-ui="theme-chips"]')).not.toBeNull();
-  expect(container?.querySelector('[data-ui="context-menu"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="context-menu"]')).toBeNull();
   expect(container?.firstElementChild?.className).not.toContain('divide-y');
   expect(container?.firstElementChild?.className).not.toContain('rounded');
 
@@ -140,7 +142,6 @@ it('renders appearance owners and routes locale controls', () => {
   });
   expect(state.popupStartup.updateSelection).toHaveBeenCalledWith('video:screen');
   expect(mocks.themeChips).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
-  expect(mocks.contextMenu).toHaveBeenCalledWith(expect.objectContaining({ state }), undefined);
 
   const shortcutButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent?.includes('settings.appearance.keyboardShortcutsButton')

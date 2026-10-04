@@ -5,7 +5,6 @@ import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/captur
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
 import { loadScreenshotCaptureRuntimeContext } from '../../capture/quick-actions/flow/load';
-import { selectAndCaptureDesktopQuickAction } from '../../capture/quick-actions/desktop/workflow';
 import { handleQuickAction } from '../../capture/routes';
 import {
   openGalleryPage,
@@ -71,7 +70,7 @@ function buildCaptureConfig(
 ): ScreenshotCaptureConfig {
   return {
     afterCapture,
-    delay: null,
+    delay: screenshotMode === 'desktop' ? 3 : null,
     exitAfterCapture: false,
     imageFormat: afterCapture === 'copy' ? 'png' : null,
     imageQuality: null,
@@ -127,15 +126,7 @@ async function runCaptureFromCommand(
   const target = await requireCommandTab(tab);
   const config = captureConfigs[command];
   const runtimeContext = await loadScreenshotCaptureRuntimeContext(config);
-  await ensureCommandPageRuntime(target);
-  const desktopSelection =
-    config.screenshotMode === 'desktop'
-      ? await selectAndCaptureDesktopQuickAction({
-          context: runtimeContext,
-          tabId: target.id,
-          targetTab: target,
-        })
-      : undefined;
+  if (config.screenshotMode !== 'desktop') await ensureCommandPageRuntime(target);
   const result = await handleQuickAction({
     actionId: `command:${command}`,
     captureGuardState: state.captureGuardState,
@@ -146,7 +137,6 @@ async function runCaptureFromCommand(
     viewportState: state.viewportState,
     webSnapshotViewerPorts: state.webSnapshotViewerPorts,
     runtimeContext,
-    ...(desktopSelection === undefined ? {} : { desktopSelection }),
   });
   if (result.result === 'failed') throw new Error(result.error);
   if (result.result === 'blocked') throw new Error('capture-blocked');

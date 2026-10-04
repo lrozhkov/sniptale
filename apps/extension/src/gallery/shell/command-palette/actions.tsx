@@ -6,7 +6,7 @@ import {
   FileStack,
   FolderArchive,
   Image,
-  Images,
+  Library,
   RefreshCw,
   Search,
   Trash2,
@@ -21,6 +21,7 @@ import {
 } from '../../../ui/command-palette/action-builders';
 import type { CommandPaletteAction } from '../../../ui/command-palette/types';
 import { SIDEBAR_FOLDERS } from '../../library/constants';
+import { isGalleryFolderAvailable } from '../../library/sidebar/folder-visibility';
 import type { GalleryCommandPaletteController, SortMode } from '../../state/types';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import { FOLDER_LABELS, getKindIcon, isImageKind } from '../../library/ui';
@@ -32,13 +33,20 @@ const sortModeIcons: Record<SortMode, typeof Search> = {
   'name-asc': Search,
   'name-desc': Search,
   'size-desc': Boxes,
+  'recently-modified': Search,
 };
 
 function buildGalleryFolderFilterActions(
   controller: GalleryCommandPaletteController
 ): CommandPaletteAction[] {
-  return SIDEBAR_FOLDERS.map((folder) => {
-    const icon = folder === 'all' ? commandPaletteIcon(Images) : buildGalleryFolderIcon(folder);
+  if (controller.state.filters.trashMode) return [];
+
+  const { counts } = controller.state.derived;
+  const countsKnown = controller.state.storage.hasLoadedLibrarySnapshot;
+  return SIDEBAR_FOLDERS.filter(
+    (folder) => !countsKnown || isGalleryFolderAvailable(counts, folder)
+  ).map((folder) => {
+    const icon = folder === 'all' ? commandPaletteIcon(Library) : buildGalleryFolderIcon(folder);
 
     return createCommandPaletteToggleAction({
       id: `gallery-filter-folder-${folder}`,
@@ -69,6 +77,7 @@ function buildGallerySortActions(
     'name-asc',
     'name-desc',
     ...(controller.state.filters.folderFilter === 'scenario' ? [] : (['size-desc'] as const)),
+    'recently-modified',
   ];
 
   return sortModes.map((sortMode) => {
@@ -79,6 +88,7 @@ function buildGallerySortActions(
       'name-asc': translate('gallery.app.sortNameAsc'),
       'name-desc': translate('gallery.app.sortNameDesc'),
       'size-desc': translate('gallery.app.sortSizeDesc'),
+      'recently-modified': translate('gallery.app.sortRecentlyModified'),
     }[sortMode];
 
     return createCommandPaletteToggleAction({
@@ -231,7 +241,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(Download),
       disabled: !previewItem,
       disabledReason: !previewItem ? disabledReason : undefined,
-      onSelect: () => actions.preview.download(),
+      onSelect: async () => {
+        await actions.preview.download();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-download-original',
@@ -240,7 +252,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(Download),
       disabled: !hasEditedImageContent,
       disabledReason: !hasEditedImageContent ? disabledReason : undefined,
-      onSelect: () => actions.preview.downloadOriginal(),
+      onSelect: async () => {
+        await actions.preview.downloadOriginal();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-copy',
@@ -249,7 +263,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(Image),
       disabled: !previewItem,
       disabledReason: !previewItem ? disabledReason : undefined,
-      onSelect: () => actions.preview.copy(),
+      onSelect: async () => {
+        await actions.preview.copy();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-save-copy',
@@ -258,7 +274,9 @@ function buildGalleryPreviewMediaActions({
       icon: commandPaletteIcon(FileStack),
       disabled: !imageAggregate,
       disabledReason: !imageAggregate ? disabledReason : undefined,
-      onSelect: () => actions.preview.saveCopy(),
+      onSelect: async () => {
+        await actions.preview.saveCopy();
+      },
     }),
     createCommandPaletteRunAction({
       id: 'gallery-preview-restore-original',

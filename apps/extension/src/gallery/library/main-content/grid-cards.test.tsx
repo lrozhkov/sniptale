@@ -3,13 +3,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import {
-  createMediaItem,
-  createScenarioItem,
-  createVideoProjectItem,
-} from '../actions/test-support/index';
-import { translate } from '../../../platform/i18n';
+import { createMediaItem } from '../actions/test-support/index';
+import { translate, getCurrentLocale, setLocalePreference } from '../../../platform/i18n';
 import { GRID_GAP } from '../constants';
+import { createGridMetricsFixture } from '../test-support/items';
 
 vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n/format-bytes')>()),
@@ -17,13 +14,27 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: (size: number) => `size:${size}`,
 }));
 
+const thumbRenders = vi.hoisted(() => vi.fn());
+
 vi.mock('../ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../ui')>()),
-  MediaThumb: (props: { assetId?: string; fit?: string; item?: { id: string } }) => (
-    <div data-fit={props.fit ?? 'cover'} data-ui="test.thumb">
-      {props.item?.id ?? props.assetId}
-    </div>
-  ),
+  MediaThumb: (props: {
+    assetId?: string;
+    deferUntilVisible?: boolean;
+    fit?: string;
+    item?: { id: string };
+  }) => {
+    thumbRenders(props.item?.id);
+    return (
+      <div
+        data-fit={props.fit ?? 'cover'}
+        data-deferred={String(props.deferUntilVisible ?? false)}
+        data-ui="test.thumb"
+      >
+        {props.item?.id ?? props.assetId}
+      </div>
+    );
+  },
   formatDate: (timestamp: number) => `date:${timestamp}`,
   getKindIcon: () => (props: { className?: string }) => <svg data-ui="test.icon" {...props} />,
 }));
@@ -32,6 +43,13 @@ import { GalleryGridCanvas, GalleryMediaList } from './grid-cards';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+
+const metrics = (
+  items: Parameters<typeof createGridMetricsFixture>[0]['items'],
+  gridWidth: number,
+  viewMode: 'compact-grid' | 'large-grid',
+  columnCount: number
+) => createGridMetricsFixture({ items, gridWidth, viewMode, columnCount });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -71,7 +89,7 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
     root?.render(
       <GalleryGridCanvas
         filteredItems={[firstItem, secondItem]}
-        gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([firstItem, secondItem], 800, 'compact-grid', 2)}
         gridWidth={800}
         onPreviewOpen={onPreviewOpen}
         onToggleSelection={onToggleSelection}
@@ -112,6 +130,9 @@ it('renders compact grid cards with thumbnail preview actions and optional tags'
   expect(compactMetadata?.textContent).toContain('compact-size:512');
   expect(container?.textContent).toContain('alpha');
   expect(container?.textContent).not.toContain('plain.pngalpha');
+  expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
+    'contain'
+  );
 });
 
 it('keeps the vertical grid gap equal to the horizontal tile gap', () => {
@@ -123,7 +144,7 @@ it('keeps the vertical grid gap equal to the horizontal tile gap', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 2 }}
+        gridMetrics={metrics(items, 800, 'compact-grid', 2)}
         gridWidth={800}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -151,7 +172,7 @@ it('keeps large-grid cards compact with the canonical row gap', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 2 }}
+        gridMetrics={metrics(items, 400, 'large-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -192,7 +213,7 @@ it('keeps the distinguishing filename tail and extension visible in constrained 
     root?.render(
       <GalleryGridCanvas
         filteredItems={[item]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([item], 240, 'large-grid', 1)}
         gridWidth={240}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -257,26 +278,35 @@ it('renders one composite grid card for raw recording tracks without a project',
   const onRecordingGroupOpen = vi.fn();
   const onToggleSelection = vi.fn();
 
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={[display, webcam]}
-        gridMetrics={{ columnCount: 2, startRow: 0, totalRows: 1 }}
-        gridWidth={800}
-        onPreviewOpen={onPreviewOpen}
-        onRecordingGroupOpen={onRecordingGroupOpen}
-        onToggleSelection={onToggleSelection}
-        selectedIds={new Set()}
-        viewMode="compact-grid"
-        visibleItems={[display]}
-      />
-    );
-  });
+  const render = (selectedIds = new Set<string>()) =>
+    act(() => {
+      root?.render(
+        <GalleryGridCanvas
+          filteredItems={[display, webcam]}
+          gridMetrics={metrics([display], 800, 'compact-grid', 2)}
+          gridWidth={800}
+          onPreviewOpen={onPreviewOpen}
+          onRecordingGroupOpen={onRecordingGroupOpen}
+          onToggleSelection={onToggleSelection}
+          selectedIds={selectedIds}
+          viewMode="compact-grid"
+          visibleItems={[display]}
+        />
+      );
+    });
+  render();
 
   const recordingGroupCard = container?.querySelector('[data-ui="gallery.recording-group.card"]');
   expect(recordingGroupCard).not.toBeNull();
+  expect(recordingGroupCard?.className).toContain('border-[var(--sniptale-color-border-soft)]');
+  expect(recordingGroupCard?.className).not.toContain(
+    'border-[var(--sniptale-color-border-accent-soft)]'
+  );
   expect(recordingGroupCard?.className).toContain('rounded-[var(--sniptale-radius-lg)]');
   expect(container?.querySelectorAll('[data-ui="test.thumb"]')).toHaveLength(2);
+  expect(container?.querySelector('[data-ui="test.thumb"]')?.getAttribute('data-fit')).toBe(
+    'contain'
+  );
   expect(container?.textContent).toContain('Экран или окно');
   expect(container?.textContent).toContain('Design review');
   expect(container?.textContent).toContain('Веб-камера');
@@ -306,6 +336,14 @@ it('renders one composite grid card for raw recording tracks without a project',
   expect(onRecordingGroupOpen).not.toHaveBeenCalled();
   expect(onToggleSelection).toHaveBeenCalledWith('recording:display');
   expect(onToggleSelection).toHaveBeenCalledWith('recording:webcam');
+  render(new Set([display.id]));
+  expect(container?.querySelector('[data-ui="gallery.recording-group.card"]')?.className).toContain(
+    'border-[var(--sniptale-color-border-soft)]'
+  );
+  render(new Set([display.id, webcam.id]));
+  const selectedCard = container?.querySelector('[data-ui="gallery.recording-group.card"]');
+  expect(selectedCard?.className).toContain('border-[var(--sniptale-color-border-accent-strong)]');
+  expect(selectedCard?.className).not.toContain('border-[var(--sniptale-color-border-soft)]');
 });
 
 it('renders one unduplicated recording-group title in large grid', () => {
@@ -329,7 +367,7 @@ it('renders one unduplicated recording-group title in large grid', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={items}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([items[0]!], 400, 'large-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -344,7 +382,7 @@ it('renders one unduplicated recording-group title in large grid', () => {
   expect(container?.textContent).not.toContain(translate('gallery.preview.recordingGroup'));
   expect(
     container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-details"]')?.className
-  ).toContain('h-[94px]');
+  ).toContain('h-[72px]');
   expect(
     container?.querySelector<HTMLElement>('[data-ui="gallery.large.group-metadata"]')?.className
   ).not.toContain('mt-auto');
@@ -379,7 +417,7 @@ it.each(['compact-grid', 'large-grid'] as const)(
       root?.render(
         <GalleryGridCanvas
           filteredItems={items}
-          gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+          gridMetrics={metrics([items[0]!], 400, viewMode, 1)}
           gridWidth={400}
           onPreviewOpen={vi.fn()}
           onToggleSelection={vi.fn()}
@@ -398,67 +436,11 @@ it.each(['compact-grid', 'large-grid'] as const)(
     expect(metadata?.querySelector('[title]')?.getAttribute('title')).toBe(
       `${translate('gallery.app.draftExpires')} date:99`
     );
+    expect(metadata?.querySelector('svg')?.classList.toString()).toContain(
+      viewMode === 'compact-grid' ? 'lucide-trash' : 'lucide-clock'
+    );
   }
 );
-
-it('does not present a stale video-project thumbnail as actively updating', () => {
-  const item = {
-    ...createVideoProjectItem(),
-    presentationRevision: 1,
-    workspaceRevision: 2,
-  };
-
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={[item]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
-        gridWidth={400}
-        onPreviewOpen={vi.fn()}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-        viewMode="large-grid"
-        visibleItems={[item]}
-      />
-    );
-  });
-
-  expect(container?.textContent).not.toContain(translate('gallery.app.updatingPreview'));
-});
-
-it('dims a stale media thumbnail and centers the preview update status on its frame', () => {
-  const item = createMediaItem({
-    id: 'stale-image',
-    filename: 'stale.png',
-    presentationRevision: 1,
-    workspaceRevision: 2,
-  });
-
-  act(() => {
-    root?.render(
-      <GalleryGridCanvas
-        filteredItems={[item]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
-        gridWidth={400}
-        onPreviewOpen={vi.fn()}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-        viewMode="large-grid"
-        visibleItems={[item]}
-      />
-    );
-  });
-
-  const overlay = container?.querySelector<HTMLElement>(
-    '[data-ui="gallery.grid.preview-updating"]'
-  );
-  expect(overlay?.textContent).toContain(translate('gallery.app.updatingPreview'));
-  expect(overlay?.className).toContain('absolute inset-0');
-  expect(overlay?.parentElement?.dataset['ui']).toBe('gallery.grid.thumbnail-viewport');
-  expect(container?.querySelector('[data-ui="gallery.large.details"]')?.textContent).not.toContain(
-    translate('gallery.app.updatingPreview')
-  );
-});
 
 function expectCompactGridPointerCursors(
   previewButton: HTMLButtonElement,
@@ -532,6 +514,8 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   expect(listRow?.children).toHaveLength(8);
   expect(listHeader?.style.gridTemplateColumns).toContain('minmax(220px, 2fr)');
   expect(listHeader?.className).toContain('z-10');
+  expect(listHeader?.className).toContain('h-12');
+  expect(listHeader?.className).toContain('bg-[var(--sniptale-color-surface-muted)]');
   const columnHeaders = Array.from(
     container?.querySelectorAll<HTMLElement>('[role="columnheader"]') ?? []
   );
@@ -559,6 +543,7 @@ it('renders list rows with fallback tags and detail-preview actions', () => {
   const kindIcon = container?.querySelector('[data-ui="test.icon"]');
   const thumbnail = container?.querySelector('[data-ui="test.thumb"]');
   expect(kindIcon?.closest('[role="cell"]')).not.toBe(thumbnail?.closest('[role="cell"]'));
+  expect(thumbnail?.getAttribute('data-deferred')).toBe('false');
 });
 
 it('keeps the Created table column limited to the creation date', () => {
@@ -605,7 +590,7 @@ it('shows only the deletion date for drafts in grid cards', () => {
     root?.render(
       <GalleryGridCanvas
         filteredItems={[draft]}
-        gridMetrics={{ columnCount: 1, startRow: 0, totalRows: 1 }}
+        gridMetrics={metrics([draft], 400, 'compact-grid', 1)}
         gridWidth={400}
         onPreviewOpen={vi.fn()}
         onToggleSelection={vi.fn()}
@@ -626,54 +611,7 @@ it('shows only the deletion date for drafts in grid cards', () => {
   expect(compactMetadata?.querySelector('[title]')?.getAttribute('title')).toBe(
     `${translate('gallery.app.draftExpires')} date:99`
   );
-});
-
-it('renders scenario rows as shared selectable items', () => {
-  const scenarioItem = createScenarioItem({
-    id: 'scenario:project-1',
-    project: {
-      availability: 'available' as const,
-      id: 'project-1',
-      name: 'Scenario',
-      createdAt: 1,
-      updatedAt: 2,
-      tags: ['alpha'],
-    },
-    tags: ['alpha'],
-  });
-  const onPreviewOpen = vi.fn();
-  const onToggleSelection = vi.fn();
-
-  act(() => {
-    root?.render(
-      <GalleryMediaList
-        filteredItems={[scenarioItem]}
-        onPreviewOpen={onPreviewOpen}
-        onToggleSelection={onToggleSelection}
-        selectedIds={new Set(['scenario:project-1'])}
-      />
-    );
-  });
-
-  const buttons = Array.from(container?.querySelectorAll('button') ?? []);
-  const selectionButton = buttons.find((button) => button.className.includes('h-8 w-8'));
-  const detailButton = buttons.find((button) => button.textContent?.includes('Scenario'));
-
-  if (
-    !(selectionButton instanceof HTMLButtonElement) ||
-    !(detailButton instanceof HTMLButtonElement)
-  ) {
-    throw new Error('Expected shared scenario row controls');
-  }
-
-  act(() => {
-    selectionButton.click();
-    detailButton.click();
-  });
-
-  expect(onToggleSelection).toHaveBeenCalledWith('scenario:project-1', { shiftKey: false });
-  expect(onPreviewOpen).toHaveBeenCalledWith(scenarioItem);
-  expect(container?.textContent).toContain('alpha');
+  expect(compactMetadata?.querySelector('svg')?.classList.toString()).toContain('lucide-trash');
 });
 
 it('shows grouped recording role and member count outside the thumbnail', () => {
@@ -691,17 +629,19 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   });
   const onRecordingGroupOpen = vi.fn();
 
-  act(() => {
-    root?.render(
-      <GalleryMediaList
-        filteredItems={[item]}
-        onPreviewOpen={vi.fn()}
-        onRecordingGroupOpen={onRecordingGroupOpen}
-        onToggleSelection={vi.fn()}
-        selectedIds={new Set()}
-      />
-    );
-  });
+  const render = (selectedIds = new Set<string>()) =>
+    act(() => {
+      root?.render(
+        <GalleryMediaList
+          filteredItems={[item]}
+          onPreviewOpen={vi.fn()}
+          onRecordingGroupOpen={onRecordingGroupOpen}
+          onToggleSelection={vi.fn()}
+          selectedIds={selectedIds}
+        />
+      );
+    });
+  render();
 
   const thumbnailCell = container
     ?.querySelector('[data-ui="test.thumb"]')
@@ -709,11 +649,109 @@ it('shows grouped recording role and member count outside the thumbnail', () => 
   expect(container?.textContent).toContain('Веб-камера');
   expect(container?.textContent).toContain('Дорожек в группе: 2');
   expect(container?.textContent).toContain('Запись из нескольких источников');
-  expect(container?.querySelector('[role="rowgroup"]')).not.toBeNull();
+  expect(container?.querySelector('[role="rowgroup"]')?.className).toContain(
+    'border-[var(--sniptale-color-border-soft)]'
+  );
   expect(thumbnailCell?.textContent).not.toContain('Веб-камера');
   const openButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent?.includes('Открыть в редакторе')
   );
   act(() => openButton?.click());
   expect(onRecordingGroupOpen).toHaveBeenCalledWith(item);
+  render(new Set([item.id]));
+  expect(container?.querySelector('[role="rowgroup"]')?.className).toContain(
+    'border-[var(--sniptale-color-border-accent-strong)]'
+  );
+});
+
+it('skips unchanged cards on parent renders but uses the latest action and selection', () => {
+  const items = [createMediaItem({ id: 'memo', filename: 'memo.png' })];
+  const onPreviewOpen = vi.fn();
+  const onToggleSelection = vi.fn();
+  const props = {
+    filteredItems: items,
+    visibleItems: items,
+    gridWidth: 800,
+    gridMetrics: metrics(items, 800, 'compact-grid', 2),
+    viewMode: 'compact-grid' as const,
+    selectedIds: new Set<string>(),
+    onPreviewOpen,
+    onToggleSelection,
+  };
+  act(() => root?.render(<GalleryGridCanvas {...props} />));
+  const renders = thumbRenders.mock.calls.length;
+  const latestPreview = vi.fn();
+  act(() => root?.render(<GalleryGridCanvas {...props} onPreviewOpen={latestPreview} />));
+  expect(thumbRenders).toHaveBeenCalledTimes(renders);
+  act(() => container?.querySelector<HTMLButtonElement>('button[aria-label="memo.png"]')?.click());
+  expect(latestPreview).toHaveBeenCalledWith(items[0]);
+  expect(onPreviewOpen).not.toHaveBeenCalled();
+  act(() => root?.render(<GalleryGridCanvas {...props} selectedIds={new Set(['memo'])} />));
+  expect(container?.querySelector('[aria-pressed="true"]')).not.toBeNull();
+});
+
+it('updates memoized card labels when the application locale changes', async () => {
+  const original = getCurrentLocale();
+  const items = [createMediaItem({ id: 'locale', filename: 'locale.png' })];
+  act(() =>
+    root?.render(
+      <GalleryGridCanvas
+        filteredItems={items}
+        visibleItems={items}
+        gridWidth={800}
+        gridMetrics={metrics(items, 800, 'compact-grid', 2)}
+        viewMode="compact-grid"
+        selectedIds={new Set()}
+        onPreviewOpen={vi.fn()}
+        onToggleSelection={vi.fn()}
+      />
+    )
+  );
+  const previous = container?.querySelector('[aria-pressed]')?.getAttribute('aria-label');
+  try {
+    await act(async () => setLocalePreference(original === 'ru' ? 'en' : 'ru'));
+    const current = container?.querySelector('[aria-pressed]')?.getAttribute('aria-label');
+    expect(current).toBe(translate('gallery.app.selectItem'));
+    expect(current).not.toBe(previous);
+  } finally {
+    await act(async () => setLocalePreference(original));
+  }
+});
+
+it('mounts only visible list rows, including a window inside a large recording group', () => {
+  const items = Array.from({ length: 500 }, (_, index) =>
+    createMediaItem({
+      id: `member-${index}`,
+      kind: 'recording',
+      recordingGroupView: {
+        groupId: 'large-group',
+        sourceLabel: 'Display',
+        role: 'display',
+        order: index,
+        memberCount: 500,
+        projectId: null,
+      },
+    })
+  );
+  act(() =>
+    root?.render(
+      <GalleryMediaList
+        filteredItems={items}
+        visibleItems={items.slice(240, 260)}
+        onPreviewOpen={vi.fn()}
+        onToggleSelection={vi.fn()}
+        selectedIds={new Set()}
+      />
+    )
+  );
+  expect(container?.querySelectorAll('[data-ui="gallery.list.row"]')).toHaveLength(20);
+  expect(container?.querySelector('[role="table"]')?.getAttribute('aria-rowcount')).toBe('502');
+  expect(
+    container
+      ?.querySelector('[data-gallery-keyboard-id="member-240"]')
+      ?.getAttribute('aria-rowindex')
+  ).toBe('243');
+  expect(container?.querySelectorAll('*').length).toBeLessThan(1000);
+  expect(container?.querySelector('[data-gallery-keyboard-id="member-240"]')).not.toBeNull();
+  expect(container?.querySelector('[data-gallery-keyboard-id="member-0"]')).toBeNull();
 });

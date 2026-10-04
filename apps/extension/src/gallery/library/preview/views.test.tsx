@@ -163,6 +163,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('ResizeObserver', PreviewResizeObserverStub);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   PreviewImagePreloaderStub.autoLoad = true;
   PreviewImagePreloaderStub.instances = [];
   vi.stubGlobal('Image', PreviewImagePreloaderStub);
@@ -181,13 +183,21 @@ afterEach(() => {
   container = null;
   Reflect.deleteProperty(HTMLElement.prototype, 'animate');
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
+function renderMediaMarkup(node: ReactNode) {
+  renderNode(null);
+  renderNode(node);
+  act(() => container?.querySelector('video')?.dispatchEvent(new Event('loadeddata')));
+  return container?.innerHTML ?? '';
+}
+
 it('renders media previews for image, video, audio, and empty states', () => {
-  const imageMarkup = renderToStaticMarkup(
+  const imageMarkup = renderMediaMarkup(
     <PreviewMedia {...createProps({ previewUrl: 'blob:image' })} />
   );
-  const videoMarkup = renderToStaticMarkup(
+  const videoMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
@@ -195,7 +205,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
       })}
     />
   );
-  const audioMarkup = renderToStaticMarkup(
+  const audioMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createItem({ kind: 'audio', mimeType: 'audio/mpeg' }),
@@ -203,7 +213,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
       })}
     />
   );
-  const emptyMarkup = renderToStaticMarkup(
+  const emptyMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createItem(),
@@ -211,7 +221,7 @@ it('renders media previews for image, video, audio, and empty states', () => {
       })}
     />
   );
-  const videoProjectMarkup = renderToStaticMarkup(
+  const videoProjectMarkup = renderMediaMarkup(
     <PreviewMedia
       {...createProps({
         item: createVideoProjectItem({ id: 'video-project:project-1' }),
@@ -222,163 +232,158 @@ it('renders media previews for image, video, audio, and empty states', () => {
 
   expect(imageMarkup).toContain('<img');
   expect(imageMarkup).toContain('data-ui="preview.media.scrollable"');
+  expect(imageMarkup).toContain('data-ui="gallery.preview.zoomSlider"');
+  expect(imageMarkup).toContain('data-ui="gallery.preview.zoomSliderGroup"');
+  expect(imageMarkup).toContain('aria-hidden="true"');
   expect(imageMarkup).not.toContain('rounded-[16px]');
   expect(imageMarkup).toContain('max-h-none max-w-none');
   expect(imageMarkup).not.toContain('max-h-full max-w-full shrink-0 select-none object-contain');
   expect(videoMarkup).toContain('<video');
+  expect(videoMarkup).toContain('data-ui="gallery.preview.video-frame"');
   expect(videoMarkup).toContain('data-ui="preview.media.contained"');
   expect(videoMarkup).toContain('preload="metadata"');
-  expect(videoMarkup).toContain(
-    'class="block h-auto max-h-full w-auto max-w-full bg-black object-contain"'
-  );
+  expect(videoMarkup).toContain('class="block h-full w-full bg-transparent object-contain"');
   expect(videoMarkup).toContain('gallery.preview.videoLoading');
   expect(audioMarkup).toContain('<audio');
-  expect(videoProjectMarkup).toContain('lucide-video');
+  expect(videoProjectMarkup).toContain('lucide-clapperboard');
+  expect(videoProjectMarkup).toContain('data-ui="gallery.preview.project-thumbnail"');
+  expect(videoProjectMarkup).toContain('max-h-[360px]');
+  expect(videoProjectMarkup).not.toContain('gallery.preview.openInEditor');
   expect(emptyMarkup).not.toContain('<img');
   expect(emptyMarkup).not.toContain('<video');
   expect(emptyMarkup).not.toContain('<audio');
 });
 
-it('keeps adjacent navigation in the fixed toolbar and exposes video readiness', () => {
-  const onPrevious = vi.fn();
-  const onNext = vi.fn();
-  renderNode(
-    <PreviewMedia
-      {...createProps({
-        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
-        navigation: {
-          current: 2,
-          total: 3,
-          hasPrevious: true,
-          hasNext: true,
-          onPrevious,
-          onNext,
-        },
-      })}
-    />
-  );
-
-  const previousButton = container?.querySelector('button[aria-label="gallery.preview.previous"]');
-  const nextButton = container?.querySelector('button[aria-label="gallery.preview.next"]');
-  const video = container?.querySelector('video');
-  if (video) {
-    Object.defineProperty(video, 'duration', { configurable: true, value: 12 });
+it('keeps Restore as the only Trash item operation across media and project previews', () => {
+  for (const item of [
+    createItem(),
+    createItem({ kind: 'recording', mimeType: 'video/webm' }),
+    createItem({ kind: 'audio', mimeType: 'audio/mpeg' }),
+    createVideoProjectItem({ id: 'video-project:deleted' }),
+    createScenarioExportItem({ id: 'scenario-export:deleted' }),
+  ]) {
+    renderNode(
+      <PreviewPanel
+        {...createProps({ item, trashMode: true, onRestoreTrash: vi.fn(async () => true) })}
+      />
+    );
+    const restore = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.preview.restore"]'
+    );
+    expect(restore).not.toBeNull();
+    expect(restore?.closest('aside')).not.toBeNull();
+    expect(restore?.closest('section')?.textContent).toContain('gallery.preview.actions');
+    expect(restore?.className).toContain('w-full');
+    expect(restore?.closest('[data-ui="gallery.preview.inspectorContent"]')?.className).toContain(
+      'overflow-y-auto'
+    );
+    expect(
+      container?.querySelector(
+        '[data-ui="gallery.preview.surface"] > div [data-ui="gallery.preview.restore"]'
+      )
+    ).toBeNull();
+    expect(container?.querySelector('[data-ui="gallery.videoReview.enter"]')).toBeNull();
+    expect(container?.querySelector('[data-ui="gallery.preview.actions"]')).not.toBeNull();
+    expect(container?.querySelector('a[href]')).toBeNull();
+    expect(container?.querySelector('input:not([type="range"])')).toBeNull();
   }
-  expect(container?.textContent).toContain('2 / 3');
-  expect(container?.querySelector('[role="status"]')).not.toBeNull();
-
-  act(() => {
-    previousButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    nextButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    video?.dispatchEvent(new Event('loadedmetadata', { bubbles: true }));
-  });
-
-  expect(onPrevious).toHaveBeenCalledOnce();
-  expect(onNext).toHaveBeenCalledOnce();
-  expect(container?.querySelector('[role="status"]')).toBeNull();
 });
 
-it('probes local video duration so the full timeline becomes seekable early', () => {
+it('keeps Trash Restore in the inspector with unavailable content and permits retry', async () => {
+  let resolveFirst!: (value: boolean) => void;
+  const onRestoreTrash = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveFirst = resolve;
+        })
+    )
+    .mockResolvedValueOnce(true);
   renderNode(
-    <PreviewMedia
+    <PreviewPanel
       {...createProps({
-        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
-      })}
-    />
-  );
-
-  const video = container?.querySelector('video');
-  if (!video) {
-    throw new Error('Expected video preview');
-  }
-
-  let duration = Number.POSITIVE_INFINITY;
-  Object.defineProperty(video, 'duration', {
-    configurable: true,
-    get: () => duration,
-  });
-  Object.defineProperty(video, 'currentTime', {
-    configurable: true,
-    value: 0,
-    writable: true,
-  });
-
-  act(() => video.dispatchEvent(new Event('loadedmetadata', { bubbles: true })));
-  expect(video.currentTime).toBe(Number.MAX_SAFE_INTEGER);
-  expect(container?.querySelector('[role="status"]')).not.toBeNull();
-
-  duration = 42;
-  act(() => video.dispatchEvent(new Event('durationchange', { bubbles: true })));
-  expect(video.currentTime).toBe(0);
-  expect(container?.querySelector('[role="status"]')).toBeNull();
-});
-
-it('keeps the current image visible until the adjacent image is ready and slides it in', () => {
-  const firstItem = createItem({ id: 'asset-1', filename: 'first.png' });
-  const nextItem = createItem({ id: 'asset-2', filename: 'next.png' });
-  const navigation = {
-    current: 1,
-    total: 2,
-    hasPrevious: false,
-    hasNext: true,
-    onPrevious: vi.fn(),
-    onNext: vi.fn(),
-  };
-
-  renderNode(
-    <PreviewMedia {...createProps({ item: firstItem, navigation, previewUrl: 'blob:first' })} />
-  );
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
-
-  renderNode(
-    <PreviewMedia
-      {...createProps({
-        item: nextItem,
-        navigation: { ...navigation, current: 2, hasPrevious: true, hasNext: false },
         previewUrl: null,
+        inspectorCollapsed: true,
+        trashMode: true,
+        onRestoreTrash,
       })}
     />
   );
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
+  const restore = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.restore"]'
+  );
+  expect(restore).not.toBeNull();
+  expect(restore?.closest('aside')).not.toBeNull();
+  await act(async () => {
+    restore?.click();
+    restore?.click();
+  });
+  expect(onRestoreTrash).toHaveBeenCalledTimes(1);
+  expect(restore?.disabled).toBe(true);
+  expect(restore?.getAttribute('aria-busy')).toBe('true');
+  await act(async () => resolveFirst(false));
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    'gallery.app.restoreItemFailed'
+  );
+  expect(restore?.disabled).toBe(false);
+  await act(async () => restore?.click());
+  expect(onRestoreTrash).toHaveBeenCalledTimes(2);
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
+});
 
-  animateMock.mockClear();
-  PreviewImagePreloaderStub.autoLoad = false;
+it('rejects an initial video edit intent in Trash while retaining video playback', () => {
+  renderNode(
+    <PreviewPanel
+      {...createProps({
+        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
+        initialMode: 'edit',
+        trashMode: true,
+        onRestoreTrash: vi.fn(async () => true),
+      })}
+    />
+  );
+  expect(container?.querySelector('video')).not.toBeNull();
+  expect(container?.querySelector('[data-test-review]')).toBeNull();
+  expect(container?.querySelector('[data-ui="gallery.preview.restore"]')).not.toBeNull();
+});
+
+it('suppresses native audio download affordances in Trash', () => {
   renderNode(
     <PreviewMedia
       {...createProps({
-        item: nextItem,
-        navigation: { ...navigation, current: 2, hasPrevious: true, hasNext: false },
-        previewUrl: 'blob:next',
+        item: createItem({ kind: 'audio', mimeType: 'audio/mpeg' }),
+        previewUrl: 'blob:audio',
+        trashMode: true,
+        onRestoreTrash: vi.fn(async () => true),
       })}
     />
   );
+  const audio = container?.querySelector('audio');
+  expect(audio?.controls).toBe(true);
+  expect(audio?.getAttribute('controlslist')).toBe('nodownload');
+  const contextMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+  act(() => audio?.dispatchEvent(contextMenu));
+  expect(contextMenu.defaultPrevented).toBe(true);
+});
 
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:first');
-  act(() => PreviewImagePreloaderStub.instances.at(-1)?.complete());
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:next');
-  expect(animateMock).toHaveBeenCalledWith(
-    expect.arrayContaining([
-      expect.objectContaining({
-        opacity: 0.82,
-        transform: 'translate3d(18px, 0, 0)',
-      }),
-    ]),
-    expect.objectContaining({ duration: 260 })
-  );
-
-  renderNode(<PreviewMedia {...createProps({ item: firstItem, navigation, previewUrl: null })} />);
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:next');
-
-  animateMock.mockClear();
+it('disables Restore while another Trash storage operation is busy', () => {
+  const onRestoreTrash = vi.fn(async () => true);
   renderNode(
-    <PreviewMedia {...createProps({ item: firstItem, navigation, previewUrl: 'blob:first' })} />
+    <PreviewPanel
+      {...createProps({
+        trashMode: true,
+        restoreBusy: true,
+        onRestoreTrash,
+      })}
+    />
   );
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:next');
-  act(() => PreviewImagePreloaderStub.instances.at(-1)?.complete());
-  expect(animateMock).toHaveBeenCalledWith(
-    expect.arrayContaining([expect.objectContaining({ transform: 'translate3d(-18px, 0, 0)' })]),
-    expect.objectContaining({ duration: 260 })
+  const restore = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.preview.restore"]'
   );
+  expect(restore?.disabled).toBe(true);
+  act(() => restore?.click());
+  expect(onRestoreTrash).not.toHaveBeenCalled();
 });
 
 it('renders metadata cards, fallback values, and tag editor states', () => {
@@ -451,7 +456,7 @@ it('renders image-only actions conditionally', () => {
   expect(imageMarkup).toContain('gallery.preview.actions');
   expect(imageMarkup).toContain('gallery.preview.fileActions');
   expect(imageMarkup).not.toContain('gallery.preview.changeActions');
-  expect(editedImageMarkup).toContain('gallery.preview.changeActions');
+  expect(editedImageMarkup).not.toContain('gallery.preview.changeActions');
   expect(imageMarkup).not.toContain('grid-cols-2');
   expect(imageMarkup).toContain('border-none');
   expect(imageMarkup).toContain('h-10 min-h-10');
@@ -472,7 +477,8 @@ it('renders image-only actions conditionally', () => {
 it('hides destructive and reset actions for scenario exports without pending changes', () => {
   const previewProps = createProps({
     item: createScenarioExportItem({
-      filename: 'scenario-export.zip',
+      filename: 'scenario-export.pdf',
+      format: 'pdf',
       project: {
         availability: 'available' as const,
         id: 'project-1',
@@ -585,4 +591,143 @@ it('starts a routed video in quick edit and stays in preview after returning', (
   renderNode(<PreviewPanel {...props} previewUrl="blob:loaded" />);
   expect(container!.querySelector('[data-test-review]')).toBeNull();
   expect(container!.querySelector('[data-ui="gallery.videoReview.enter"]')).not.toBeNull();
+});
+
+it('keeps native-size video scrolling keys inside the player without navigating the gallery', () => {
+  const onPrevious = vi.fn();
+  const onNext = vi.fn();
+  renderNode(
+    <PreviewPanel
+      {...createProps({
+        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
+        navigation: { current: 2, total: 3, hasPrevious: true, hasNext: true, onPrevious, onNext },
+      })}
+    />
+  );
+  const scale = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.preview.player.scale"]'
+  )!;
+  act(() => scale.click());
+  const original = [
+    ...document.querySelectorAll<HTMLButtonElement>('[role="listbox"] [role="option"]'),
+  ].find((option) => option.textContent?.includes('gallery.preview.player.original'));
+  act(() => original?.click());
+  const viewport = container!.querySelector<HTMLElement>(
+    '[data-ui="gallery.preview.player"] [tabindex="0"]'
+  )!;
+  for (const key of ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']) {
+    const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    act(() => {
+      viewport.focus();
+      viewport.dispatchEvent(event);
+    });
+    expect(event.defaultPrevented).toBe(false);
+  }
+  expect(onPrevious).not.toHaveBeenCalled();
+  expect(onNext).not.toHaveBeenCalled();
+  act(() =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(onNext).toHaveBeenCalledOnce();
+});
+
+it('keeps video menu arrow keys from navigating adjacent Gallery items', () => {
+  const onNext = vi.fn();
+  renderNode(
+    <PreviewPanel
+      {...createProps({
+        item: createItem({ kind: 'recording', mimeType: 'video/webm' }),
+        navigation: {
+          current: 1,
+          total: 2,
+          hasPrevious: false,
+          hasNext: true,
+          onPrevious: vi.fn(),
+          onNext,
+        },
+      })}
+    />
+  );
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[aria-label="gallery.preview.player.speed"]')
+      ?.click()
+  );
+  const option = document.querySelector<HTMLButtonElement>('[role="listbox"] [role="option"]');
+  act(() =>
+    option?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(onNext).not.toHaveBeenCalled();
+});
+
+it('keeps video project editor action in the inspector, not over the preview', () => {
+  const props = createProps({ item: createVideoProjectItem() });
+  renderNode(<PreviewPanel {...props} />);
+  expect(container?.querySelector('[data-ui="gallery.preview.project-thumbnail"]')).toBeTruthy();
+  const open = [...container!.querySelectorAll('button')].filter(
+    (button) => button.textContent === 'gallery.preview.openInEditor'
+  );
+  expect(open).toHaveLength(1);
+  expect(open[0]?.closest('aside')).toBeTruthy();
+  act(() => open[0]?.click());
+  expect(props.onEdit).toHaveBeenCalledOnce();
+});
+
+it('shows the exported file duration in the inspector when the catalogue has none', () => {
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+  const item = createItem({
+    kind: 'export',
+    mimeType: 'video/webm',
+    duration: null,
+    source: { kind: 'project-export', exportId: 'legacy', projectId: 'missing' },
+  });
+  renderNode(<PreviewPanel {...createProps({ item, previewUrl: 'blob:legacy-export' })} />);
+  const video = container!.querySelector('video')!;
+  Object.defineProperty(video, 'duration', { configurable: true, value: 4.25 });
+  act(() => {
+    video.dispatchEvent(new Event('loadedmetadata'));
+    video.dispatchEvent(new Event('loadeddata'));
+  });
+  expect(container!.querySelector('[data-ui="gallery.preview.inspector"]')?.textContent).toContain(
+    '4.3 gallery.preview.durationSuffix'
+  );
+});
+
+it('keeps decoded duration with its source and never transfers it to the next export', () => {
+  const first = createItem({
+    id: 'export:one',
+    kind: 'export',
+    mimeType: 'video/webm',
+    duration: 100,
+    source: { kind: 'project-export', exportId: 'one', projectId: 'gone' },
+  });
+  renderNode(<PreviewPanel {...createProps({ item: first, previewUrl: 'blob:one' })} />);
+  const firstVideo = container!.querySelector('video')!;
+  Object.defineProperty(firstVideo, 'duration', { configurable: true, value: 4.25 });
+  act(() => {
+    firstVideo.dispatchEvent(new Event('loadedmetadata'));
+    firstVideo.dispatchEvent(new Event('loadeddata'));
+  });
+  const inspector = () =>
+    container!.querySelector('[data-ui="gallery.preview.inspector"]')?.textContent;
+  expect(inspector()).toContain('4.3 gallery.preview.durationSuffix');
+  const second = createItem({
+    id: 'export:two',
+    kind: 'export',
+    mimeType: 'video/webm',
+    duration: null,
+    source: { kind: 'project-export', exportId: 'two', projectId: 'gone' },
+  });
+  renderNode(<PreviewPanel {...createProps({ item: second, previewUrl: 'blob:two' })} />);
+  expect(inspector()).not.toContain('4.3 gallery.preview.durationSuffix');
+  const secondVideo = [...container!.querySelectorAll('video')].at(-1)!;
+  Object.defineProperty(secondVideo, 'duration', { configurable: true, value: 8.5 });
+  act(() => {
+    secondVideo.dispatchEvent(new Event('loadedmetadata'));
+    secondVideo.dispatchEvent(new Event('loadeddata'));
+  });
+  expect(inspector()).toContain('8.5 gallery.preview.durationSuffix');
+  expect(first.duration).toBe(100);
+  expect(second.duration).toBeNull();
 });

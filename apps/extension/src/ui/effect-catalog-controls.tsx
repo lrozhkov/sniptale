@@ -106,6 +106,7 @@ export function EffectCatalogControls({
           (themeSelect ?? <span className="flex-1" />)
         )}
         <EditorIconButton
+          className={searching ? 'sniptale-dismiss-button' : ''}
           ref={searchButton}
           aria-expanded={searching}
           disabled={disabled}

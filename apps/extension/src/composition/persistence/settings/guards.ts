@@ -24,6 +24,8 @@ import {
   type PagePackageCaptureTimingPolicy,
 } from '@sniptale/runtime-contracts/page-package';
 
+import { parseFilenameRules } from '../../../features/file-naming/rules';
+
 interface ParsedSettingsStorageValue {
   hasInvalidRoot: boolean;
   invalidFieldCount: number;
@@ -109,6 +111,18 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
     return INVALID_FIELD;
   }
 
+  const freePlacement = value['freePlacement'];
+  const dockEdge = value['dockEdge'];
+  if (freePlacement !== undefined && !isBoolean(freePlacement)) return INVALID_FIELD;
+  if (
+    dockEdge !== undefined &&
+    dockEdge !== 'top' &&
+    dockEdge !== 'bottom' &&
+    dockEdge !== 'left' &&
+    dockEdge !== 'right'
+  )
+    return INVALID_FIELD;
+
   const position = value['position'];
   if (position !== undefined && position !== null) {
     if (!isRecord(position) || !isNumber(position['x']) || !isNumber(position['y'])) {
@@ -125,6 +139,8 @@ function parseOptionalContentToolbar(value: unknown): ParsedFieldValue<ContentTo
         };
 
   return {
+    ...(freePlacement === undefined ? {} : { freePlacement }),
+    ...(dockEdge === undefined ? {} : { dockEdge }),
     displayMode: displayMode ?? 'horizontal',
     compactMenus: isBoolean(value['compactMenus']) ? value['compactMenus'] : false,
     position: parsedPosition,
@@ -183,14 +199,24 @@ function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<Local
   if (value === undefined) return undefined;
   if (!isRecord(value)) return INVALID_FIELD;
   const defaultDestination = value['defaultDestination'];
+  const recordingDestination = value['recordingDestination'];
+  const webSnapshotDestination = value['webSnapshotDestination'];
   const cleanupEnabled = value['cleanupEnabled'];
   const draftRetentionDays = value['draftRetentionDays'];
   const videoDraftRetentionDays = value['videoDraftRetentionDays'];
+  const trashCleanupEnabled = value['trashCleanupEnabled'];
+  const trashRetentionDays = value['trashRetentionDays'];
   return {
     defaultDestination:
       defaultDestination === 'temporary' || defaultDestination === 'library'
         ? defaultDestination
         : DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
+    ...(recordingDestination === 'temporary' || recordingDestination === 'library'
+      ? { recordingDestination }
+      : {}),
+    ...(webSnapshotDestination === 'temporary' || webSnapshotDestination === 'library'
+      ? { webSnapshotDestination }
+      : {}),
     cleanupEnabled: isBoolean(cleanupEnabled)
       ? cleanupEnabled
       : DEFAULT_LOCAL_STORAGE_POLICY.cleanupEnabled,
@@ -198,6 +224,13 @@ function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<Local
       isNumber(draftRetentionDays) && retentionDays.has(draftRetentionDays)
         ? draftRetentionDays
         : DEFAULT_LOCAL_STORAGE_POLICY.draftRetentionDays,
+    trashCleanupEnabled: isBoolean(trashCleanupEnabled)
+      ? trashCleanupEnabled
+      : DEFAULT_LOCAL_STORAGE_POLICY.trashCleanupEnabled,
+    trashRetentionDays:
+      isNumber(trashRetentionDays) && retentionDays.has(trashRetentionDays)
+        ? trashRetentionDays
+        : DEFAULT_LOCAL_STORAGE_POLICY.trashRetentionDays,
     videoDraftRetentionDays:
       isNumber(videoDraftRetentionDays) && retentionDays.has(videoDraftRetentionDays)
         ? videoDraftRetentionDays
@@ -379,6 +412,11 @@ export function parseStoredSettings(value: unknown): ParsedSettingsStorageValue 
   }
 
   const scalarFields = parseScalarSettingsFields(value);
+  if (value['filenameRules'] !== undefined) {
+    const rules = parseFilenameRules(value['filenameRules']);
+    scalarFields.value.filenameRules = rules;
+    if (!rules && value['filenameRules'] !== null) scalarFields.invalidFieldCount += 1;
+  }
   const invalidFieldCount =
     scalarFields.invalidFieldCount + parseArraySettingsFields(value, scalarFields.value);
 

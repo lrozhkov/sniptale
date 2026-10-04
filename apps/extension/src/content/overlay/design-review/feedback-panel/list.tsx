@@ -3,6 +3,7 @@ import { translate } from '../../../../platform/i18n';
 import type { BrowserDomAnnotationRecord } from '../../../parser/page-preparation/annotations';
 import { getDesignReviewActionOption, getDesignReviewActionTone } from '../action-catalog';
 import { getDesignReviewRecordAction } from '../records';
+import { FeedbackPreview } from './preview';
 import type { FeedbackActionFilter } from './filter';
 
 function getElementLabel(record: BrowserDomAnnotationRecord): string {
@@ -43,52 +44,6 @@ function matchesQuery(record: BrowserDomAnnotationRecord, query: string): boolea
     .some((value) => value!.toLocaleLowerCase().includes(query));
 }
 
-function FeedbackPreview(props: { record: BrowserDomAnnotationRecord; rect: DOMRect }) {
-  const action = getDesignReviewRecordAction(props.record);
-  const option = getDesignReviewActionOption(action);
-  const Icon = option.icon;
-  const width = Math.min(300, Math.max(0, window.innerWidth - 24));
-  const position = {
-    left:
-      props.rect.right + 12 + width <= window.innerWidth - 12
-        ? props.rect.right + 12
-        : Math.max(12, props.rect.left - width - 12),
-    top: Math.min(Math.max(12, props.rect.top), Math.max(12, window.innerHeight - 260)),
-    width,
-  };
-  return (
-    <aside
-      className={[
-        'pointer-events-none fixed z-[2147483647] rounded-[12px] border p-4 shadow-2xl',
-        'border-[color:var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
-      ].join(' ')}
-      data-ui="content.design-review.feedback-preview"
-      style={position}
-    >
-      <div
-        className={`flex items-center gap-2 text-sm font-bold ${getDesignReviewActionTone(action)}`}
-      >
-        <Icon size={18} />
-        {translate(option.labelKey)}
-      </div>
-      <div className="mt-2 text-xs text-[var(--sniptale-color-text-secondary)]">
-        {getElementLabel(props.record)}
-      </div>
-      <div className="mt-1 truncate font-mono text-[10px] text-[var(--sniptale-color-text-dim)]">
-        {props.record.evidence.targetPath}
-      </div>
-      <div className="my-3 border-t border-solid border-[color:var(--sniptale-color-border-soft)]" />
-      <p className="whitespace-pre-wrap break-words text-xs leading-5">
-        {getRecordSummary(props.record)}
-      </p>
-      <div className="mt-3 text-right text-[10px] text-[var(--sniptale-color-text-dim)]">
-        {translate('content.designReview.panelClickHint')}
-      </div>
-    </aside>
-  );
-}
-
 export function FeedbackList(props: {
   filter: FeedbackActionFilter;
   onOpenRecord: (annotationId: number) => boolean;
@@ -97,7 +52,7 @@ export function FeedbackList(props: {
 }) {
   const [hovered, setHovered] = useState<{
     record: BrowserDomAnnotationRecord;
-    rect: DOMRect;
+    anchor: HTMLElement;
   } | null>(null);
   const query = props.query.trim().toLocaleLowerCase();
   const visibleRecords = props.records.filter(
@@ -134,13 +89,9 @@ export function FeedbackList(props: {
                 setHovered(null);
                 props.onOpenRecord(record.annotationId);
               }}
-              onMouseEnter={(event) =>
-                setHovered({ record, rect: event.currentTarget.getBoundingClientRect() })
-              }
+              onMouseEnter={(event) => setHovered({ record, anchor: event.currentTarget })}
               onMouseLeave={() => setHovered(null)}
-              onFocus={(event) =>
-                setHovered({ record, rect: event.currentTarget.getBoundingClientRect() })
-              }
+              onFocus={(event) => setHovered({ record, anchor: event.currentTarget })}
               onBlur={() => setHovered(null)}
             >
               <span className="flex items-center gap-2">
@@ -170,7 +121,14 @@ export function FeedbackList(props: {
           );
         })
       )}
-      {hovered ? <FeedbackPreview record={hovered.record} rect={hovered.rect} /> : null}
+      {hovered && visibleRecords.includes(hovered.record) ? (
+        <FeedbackPreview
+          record={hovered.record}
+          anchor={hovered.anchor}
+          summary={getRecordSummary(hovered.record)}
+          label={getElementLabel(hovered.record)}
+        />
+      ) : null}
     </div>
   );
 }

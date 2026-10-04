@@ -4,6 +4,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewZoomEditor } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { reconcileReviewFocus, projectReviewFocus } from '../../features/video/review/focus-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type {
   QuickEditZoomRegion,
   QuickEditZoomState,
@@ -39,6 +41,39 @@ function apply(setZoom: ReturnType<typeof vi.fn>, zoom: QuickEditZoomState) {
   const update = setZoom.mock.lastCall?.[0] as (zoom: QuickEditZoomState) => QuickEditZoomState;
   return update(zoom);
 }
+
+it('creates the default focus with two source seconds under video Speed', () => {
+  const setZoom = vi.fn();
+  const map = buildReviewTimeMap(20, [
+    {
+      id: 's',
+      kind: 'speed',
+      start: 2,
+      end: 8,
+      requestedStart: 2,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      setZoom,
+      zoom: { enabled: true, regions: [] },
+      timelineDuration: 17,
+      timeMap: map,
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.add(3, 17));
+  expect(apply(setZoom, { enabled: true, regions: [] }).regions[0]).toMatchObject({
+    start: 3,
+    end: 4,
+    sourceAnchor: { start: 4, end: 6 },
+  });
+});
 
 it('owns region selection, updates, and the stage focus overlay through one hook', async () => {
   const setZoom = vi.fn((_update: (zoom: QuickEditZoomState) => QuickEditZoomState) => undefined);
@@ -315,3 +350,199 @@ it('selects a contextual focus with its supplied geometry and refuses occupied i
   expect(created.id).not.toBe(target.id);
   expect(onSelectionChange).toHaveBeenCalledWith(created.id);
 });
+
+it('stores source geometry when creating and editing focus around an existing cut', () => {
+  const timeMap = buildReviewTimeMap(8, [
+    {
+      id: 'cut',
+      kind: 'cut',
+      start: 2,
+      end: 4,
+      requestedStart: 2,
+      requestedEnd: 4,
+    },
+  ]);
+  let zoom = createQuickEditAdvancedState().zoom;
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom,
+      timelineDuration: 6,
+      timeMap,
+      setZoom(update) {
+        zoom = update(zoom);
+      },
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.add(1, 6));
+  expect(zoom.regions[0]).toMatchObject({ start: 1, end: 2, sourceAnchor: { start: 1, end: 3 } });
+  act(() => root.render(<Harness />));
+  act(() => editor.change(zoom.regions[0]!.id, { end: 4 }));
+  expect(zoom.regions[0]).toMatchObject({ start: 1, end: 4, sourceAnchor: { start: 1, end: 6 } });
+});
+
+it('commits authored source intent under a Cut and rejects stale source collisions', () => {
+  const cut = {
+    id: 'cut',
+    kind: 'cut' as const,
+    start: 3,
+    end: 7,
+    requestedStart: 3,
+    requestedEnd: 7,
+  };
+  const zoom = {
+    ...createQuickEditAdvancedState().zoom,
+    regions: [
+      { ...region('focus', 0, 2), sourceAnchor: { start: 0, end: 2 } },
+      { ...region('neighbor', 4, 6), sourceAnchor: { start: 8, end: 10 } },
+    ],
+  };
+  const setZoom = vi.fn();
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      setZoom,
+      zoom,
+      timelineDuration: 6,
+      timeMap: buildReviewTimeMap(10, [cut]),
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.commitDrag('focus', { start: 0, end: 2 }, 'move', { start: 4, end: 6 }));
+  const hidden = apply(setZoom, zoom);
+  expect(hidden.regions[0]).toMatchObject({ start: 0, end: 2, sourceAnchor: { start: 4, end: 6 } });
+  act(() => editor.commitDrag('focus', { start: 3, end: 4 }, 'move', { start: 6, end: 8 }));
+  expect(apply(setZoom, hidden).regions[0]).toMatchObject({
+    start: 3,
+    end: 4,
+    sourceAnchor: { start: 6, end: 8 },
+  });
+  for (const anchor of [
+    { start: 7, end: 9 },
+    { start: -1, end: 1 },
+    { start: 9, end: 11 },
+    { start: 4, end: 4 },
+    { start: NaN, end: 5 },
+  ]) {
+    act(() => editor.commitDrag('focus', { start: 0, end: 2 }, 'move', anchor));
+    expect(apply(setZoom, hidden)).toBe(hidden);
+  }
+});
+
+it.each(
+  (['start', 'end'] as const).flatMap((edge) =>
+    (['source', 'result', 'inspector'] as const).map((method) => ({ edge, method }))
+  )
+)('contracts phases on the $edge edge through $method under Speed', ({ edge, method }) => {
+  const original = {
+    ...region('focus', 0, 5),
+    sourceAnchor: { start: 0, end: 10 },
+    enter: { type: 'linear' as const, duration: 4 },
+    exit: { type: 'linear' as const, duration: 2 },
+  };
+  let zoom: QuickEditZoomState = { enabled: true, regions: [original] };
+  const timeMap = buildReviewTimeMap(10, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 10,
+      requestedStart: 0,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom,
+      timeMap,
+      timelineDuration: 5,
+      setZoom(update) {
+        zoom = update(zoom);
+      },
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  const sourceAnchor = edge === 'start' ? { start: 7, end: 10 } : { start: 0, end: 3 };
+  act(() => {
+    const range = { start: sourceAnchor.start / 2, end: sourceAnchor.end / 2 };
+    if (method === 'inspector') editor.change('focus', { [edge]: range[edge] });
+    else editor.commitDrag('focus', range, edge, method === 'source' ? sourceAnchor : undefined);
+  });
+  expect(zoom.regions[0]).toMatchObject({
+    sourceAnchor,
+    enter: { duration: 2 },
+    exit: { duration: 1 },
+  });
+  expect(original.enter.duration).toBe(4);
+});
+
+it.each([
+  [{ scale: 3 }, { transform: { scale: 3 } }],
+  [{ centerX: 0.7 }, { transform: { centerX: 0.7 } }],
+  [{ centerY: 0.2 }, { transform: { centerY: 0.2 } }],
+  [{ enter: { type: 'ease-in-out' as const, duration: 0.7 } }, { enter: { duration: 0.7 } }],
+  [{ exit: { type: 'ease-in-out' as const, duration: 0.6 } }, { exit: { duration: 0.6 } }],
+])(
+  'commits property %j beside a cut-hidden region without changing source intent',
+  (patch, expected) => {
+    const cut = {
+      id: 'cut',
+      kind: 'cut' as const,
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+    };
+    const retained = reconcileReviewFocus({
+      regions: [region('hidden', 2, 4), region('visible', 6, 8)],
+      duration: 10,
+      before: [],
+      after: [cut],
+      edit: cut,
+      preserveUnderCuts: true,
+    });
+    const timeMap = buildReviewTimeMap(10, [cut]);
+    expect(retained.map(({ start, end }) => ({ start, end }))).toEqual([
+      { start: 2, end: 4 },
+      { start: 2, end: 4 },
+    ]);
+    expect(projectReviewFocus(retained, timeMap).map(({ id }) => id)).toEqual(['visible']);
+    let zoom = { enabled: true, regions: retained };
+    let editor!: ReturnType<typeof useReviewZoomEditor>;
+    function Harness() {
+      editor = useReviewZoomEditor({
+        zoom,
+        timelineDuration: 6,
+        timeMap,
+        setZoom: (update) => {
+          zoom = update(zoom);
+        },
+      });
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    act(() => editor.change('visible', patch));
+    expect(zoom.regions[1]).toMatchObject(expected);
+    expect(zoom.regions[0]).toEqual(retained[0]);
+    expect(zoom.regions.map(({ sourceAnchor, dormant }) => ({ sourceAnchor, dormant }))).toEqual(
+      retained.map(({ sourceAnchor, dormant }) => ({ sourceAnchor, dormant }))
+    );
+    const restored = reconcileReviewFocus({
+      regions: zoom.regions,
+      duration: 10,
+      before: [cut],
+      after: [],
+      edit: null,
+      preserveUnderCuts: true,
+    });
+    expect(restored[1]).toMatchObject({ ...expected, start: 6, end: 8 });
+    expect(restored[0]).toMatchObject({ start: 2, end: 4 });
+  }
+);

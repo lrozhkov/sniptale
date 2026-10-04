@@ -36,12 +36,12 @@ export function promoteLibraryLifecycle(
   if (lifecycle.storageClass === 'library') {
     return lifecycle;
   }
-  return { storageClass: 'library', updatedAt, savedAt: updatedAt };
+  return { ...lifecycle, storageClass: 'library', updatedAt, savedAt: updatedAt };
 }
 
 export function matchesLibraryLifecycleScope(
   lifecycle: LibraryLifecycle,
   scope: LibraryLifecycleScope
 ): boolean {
-  return scope === 'all' || lifecycle.storageClass === scope;
+  return lifecycle.trashedAt === undefined && (scope === 'all' || lifecycle.storageClass === scope);
 }

@@ -9,6 +9,14 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     ru: 'Цвет рабочей зоны',
     en: 'Workspace color',
   },
+  hideSelectionWhileDragging: {
+    ru: 'Скрывать рамку при перетаскивании',
+    en: 'Hide selection frame while dragging',
+  },
+  selectionVisibilitySaveFailed: {
+    ru: 'Не удалось сохранить настройку',
+    en: 'Could not save this setting',
+  },
   workspaceBacking: {
     ru: 'Фон рабочей зоны',
     en: 'Workspace background',
@@ -109,6 +117,10 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
     ru: 'Данные страницы',
     en: 'Page details',
   },
+  technicalDataTextSettings: {
+    ru: 'Параметры текста',
+    en: 'Text settings',
+  },
   technicalDataLayoutColumn: {
     ru: 'Столбец',
     en: 'Column',
@@ -138,5 +150,9 @@ export const editorCompactWorkspaceMessages = defineMessageSource({
   technicalDataInsert: {
     ru: 'Добавить текст',
     en: 'Add text',
+  },
+  technicalDataPreferenceSaveFailed: {
+    ru: 'Текст добавлен, но выбор не удалось сохранить. Повторите вставку позже.',
+    en: 'Text added, but your selection could not be saved. Try inserting again later.',
   },
 });

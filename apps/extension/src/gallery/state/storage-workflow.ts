@@ -9,6 +9,8 @@ type GalleryStorageWorkflowState = Pick<
   | 'activeImport'
   | 'banner'
   | 'confirmDialog'
+  | 'deletionRequest'
+  | 'hasLoadedLibrarySnapshot'
   | 'isBusy'
   | 'isLoading'
   | 'pendingExport'
@@ -28,6 +30,7 @@ type GalleryStorageWorkflowActions = Pick<
   | 'setActiveImport'
   | 'setBanner'
   | 'setConfirmDialog'
+  | 'setDeletionRequest'
   | 'setPendingExport'
   | 'setPendingImport'
   | 'setPendingMediaImport'
@@ -47,6 +50,8 @@ function buildGalleryStorageWorkflowState(
     activeImport: surface.state.activeImport,
     banner: surface.state.banner,
     confirmDialog: surface.state.confirmDialog,
+    deletionRequest: surface.state.deletionRequest,
+    hasLoadedLibrarySnapshot: library.hasLoadedLibrarySnapshot,
     isBusy: surface.state.isBusy,
     isLoading: library.isLoading,
     pendingExport: surface.state.pendingExport,
@@ -70,6 +75,7 @@ function buildGalleryStorageWorkflowActions(
     refresh: library.refresh,
     setBanner: surface.actions.setBanner,
     setConfirmDialog: surface.actions.setConfirmDialog,
+    setDeletionRequest: surface.actions.setDeletionRequest,
     setPendingExport: surface.actions.setPendingExport,
     setPendingImport: surface.actions.setPendingImport,
     setPendingMediaImport: surface.actions.setPendingMediaImport,
@@ -90,7 +96,14 @@ export function useGalleryStorageWorkflow({
 
         return {
           ...previous,
-          item: previewItem ? (items.find((item) => item.id === previewItem.id) ?? null) : null,
+          item: previewItem
+            ? (items.find(
+                (item) =>
+                  item.id === previewItem.id &&
+                  (item.lifecycle?.trashedAt !== undefined) ===
+                    (previewItem.lifecycle?.trashedAt !== undefined)
+              ) ?? null)
+            : null,
           url: null,
         };
       });

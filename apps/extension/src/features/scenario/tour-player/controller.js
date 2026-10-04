@@ -1,3 +1,4 @@
+import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourScene } from './scene.js';
 import { createTourPlayback } from './playback.js';
 import { createTourChrome } from './chrome.js';
@@ -9,103 +10,97 @@ export function createTourPlayer(root, input, options = {}) {
   const lifetime = new AbortController();
   delete root.dataset.slideId;
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
-  const viewport = query('viewport');
   const scene = query('scene');
-  const title = query('title');
-  const counter = query('counter');
-  const previous = query('previous');
-  const next = query('next');
-  const contents = query('contents');
-  const navigation = query('navigation');
-  let index = 0;
+  const updatePosition = createTourPosition(root, labels);
+  let index = Math.max(
+    0,
+    tour.slides.findIndex((slide) => slide.id === options.initialSlideId)
+  );
   let ended = false;
   const history = [];
-  const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
+  const { go, manualGo, projectedIndex, canMove } = createTourNavigation({
+    signal: lifetime.signal,
+    current: () => (ended ? tour.slides.length : index),
+    limit: () => tour.slides.length - Number(!tour.endScreen.enabled),
+    playback: () => playback,
+    commit,
+  });
+  const authoringNavigation = options.authoring?.navigation;
+  const view = createTourScene(root, input, act, lifetime.signal, options, {
+    canMove,
+    refreshNarration: () => playback?.refreshAudioControls(),
+    move: (direction) => {
+      manualGo(projectedIndex() + direction, true, direction, null, { gesture: true });
+    },
+    fullView: () => {
+      playback?.interact();
+      view.toggleFullView();
+    },
+    position: (hintIndex) => explanationPosition(tour, index, hintIndex),
+  });
   const chrome = options.authoring ? null : createTourChrome(root, lifetime.signal);
   const playback = options.authoring
     ? null
     : createTourPlayback(root, input, {
         signal: lifetime.signal,
         motion: view.motion,
-        navigate: (target, restart = false) => {
-          if (restart) history.length = 0;
-          go(target, !restart);
+        navigate: (target, restart = false, immediate = false) => {
+          if (immediate) commit(target, true, 0, null, false);
+          else go(target, !restart, 0, restart ? 0 : null, restart);
         },
-        silent: options.preview,
         chrome,
       });
-  function manualGo(target, recordHistory = true) {
-    playback?.interact();
-    go(target, recordHistory);
-  }
   function act(action) {
-    if (options.authoring || options.preview) return;
-    if (action.kind !== 'none') playback?.interact();
-    if (action.kind === 'next') go(index + 1);
-    else if (action.kind === 'previous') go(index - 1);
-    else if (action.kind === 'restart') {
-      history.length = 0;
-      go(0, false);
-    } else if (action.kind === 'end') go(tour.slides.length);
-    else if (action.kind === 'slide')
-      go(tour.slides.findIndex((slide) => slide.id === action.slideId));
+    dispatchTourAction(action, options, tour.slides, projectedIndex(), manualGo, playback);
   }
-  function go(target, recordHistory = true) {
-    if (
-      lifetime.signal.aborted ||
-      target < 0 ||
-      target > tour.slides.length ||
-      (target === tour.slides.length && !tour.endScreen.enabled)
-    )
-      return;
+  function commit(target, recordHistory, hintEdge, historyLength, restart) {
+    if (restart) playback?.restartVisit();
+    if (historyLength !== null) history.length = historyLength;
     if (recordHistory && (target !== index || ended)) {
-      history.push(index);
+      history.push(ended ? 'end' : index);
       if (history.length > 1000) history.shift();
     }
     ended = target === tour.slides.length && tour.endScreen.enabled;
     index = Math.min(target, Math.max(0, tour.slides.length - 1));
-    render();
+    render(hintEdge);
   }
   function back() {
-    const target = history.pop();
-    manualGo(target ?? Math.max(0, index - 1), false);
+    const previous = previousTourTarget(history, tour, index);
+    manualGo(previous.target, false, 0, previous.length, { gesture: true });
   }
-  function render() {
+  function render(hintEdge = 0) {
     if (lifetime.signal.aborted) return;
     const slide = tour.slides[index];
-    title.textContent = ended ? tour.endScreen.title : (slide?.title ?? '');
-    counter.textContent = ended
-      ? labels.finished
-      : `${tour.slides.length ? index + 1 : 0} / ${tour.slides.length}`;
-    previous.disabled = !ended && index === 0 && history.length === 0;
-    next.disabled =
-      ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
-    view.show(slide, ended);
+    updatePosition(tour, index, ended, history.length);
+    navigationInput.updateControls();
+    view.show(slide, ended, hintEdge);
     playback?.show(tour, index, ended, input.assets);
     root.dataset.slideId = ended ? 'end' : (slide?.id ?? '');
   }
-  previous.addEventListener('click', back, { signal: lifetime.signal });
-  next.addEventListener('click', () => manualGo(index + 1), { signal: lifetime.signal });
-  contents.addEventListener(
-    'click',
-    () => {
-      playback?.pause();
-      view.openContents(tour.slides, index, manualGo);
+  const navigationInput = mountTourNavigationInput(root, options, lifetime.signal, {
+    move: manualGo,
+    back,
+    index: projectedIndex,
+    slides: () => tour.slides,
+    space: (next) => {
+      if (playback?.mode === 'manual') next();
+      else playback?.pause();
     },
-    { signal: lifetime.signal }
-  );
-  bindTourKeyboard(root.ownerDocument, navigation, options, lifetime.signal, {
-    ArrowRight: () => manualGo(index + 1),
-    ArrowLeft: back,
-    Home: () => manualGo(0),
-    End: () => manualGo(tour.slides.length - 1),
+    openContents: (select) => {
+      playback?.interact();
+      const choose = (target) => {
+        if (target !== (ended ? tour.slides.length : index)) select(target);
+      };
+      view.openContents(tour.slides, ended ? 'end' : index, choose, tour.endScreen);
+    },
   });
-  observeViewport(viewport, view.resize, lifetime.signal);
+  observeViewport(root, view.resize, lifetime.signal);
   view.resize();
   render();
   return {
     update(nextInput) {
       if (lifetime.signal.aborted) return;
+      playback?.interact();
       const previousId = tour.slides[index]?.id;
       input = nextInput;
       tour = nextInput.tour;
@@ -118,7 +113,10 @@ export function createTourPlayer(root, input, options = {}) {
       view.resize();
       render();
     },
-    selectObject: view.selectObject,
+    selectObject(id) {
+      view.selectObject(id);
+      navigationInput.updateControls();
+    },
     selectEnd() {
       if (lifetime.signal.aborted) return;
       if (options.authoring) {
@@ -129,7 +127,10 @@ export function createTourPlayer(root, input, options = {}) {
     select(slideId) {
       if (lifetime.signal.aborted) return;
       const target = tour.slides.findIndex((slide) => slide.id === slideId);
-      if (target >= 0 && (target !== index || ended)) manualGo(target, false);
+      if (target >= 0 && (target !== index || ended)) {
+        if (authoringNavigation) go(target, false);
+        else manualGo(target, false);
+      }
     },
     dispose() {
       if (lifetime.signal.aborted) return;
@@ -137,6 +138,82 @@ export function createTourPlayer(root, input, options = {}) {
       view.closeContents();
       scene.replaceChildren();
     },
+  };
+}
+
+/** Authored actions carry an explicit restart command; history length is never a visit signal. */
+function dispatchTourAction(action, options, slides, index, manualGo, playback) {
+  if (options.authoring || (options.preview && action.kind === 'url')) return;
+  const target = actionSlideIndex(action, slides, index);
+  const restart = action.kind === 'restart';
+  if (target !== null)
+    manualGo(target, !restart, 0, restart ? 0 : null, { gesture: true, restart });
+  else if (action.kind === 'url') playback?.pause();
+  else playback?.interact('point');
+}
+
+/** One admitted destination owns commit; cancellation never consumes history. */
+function createTourNavigation({ signal, current, limit, playback, commit }) {
+  let pending = null;
+  const accepts = (target) => !signal.aborted && target >= 0 && target <= limit();
+  const projectedIndex = () => pending?.target ?? current();
+  function go(target, recordHistory = true, hintEdge = 0, historyLength = null, restart = false) {
+    if (!accepts(target)) return;
+    const request = { target };
+    pending = request;
+    const complete = () => {
+      if (pending !== request || signal.aborted) return;
+      pending = null;
+      commit(target, recordHistory, hintEdge, historyLength, restart);
+    };
+    if (playback())
+      playback().depart({
+        complete,
+        cancel: () => {
+          if (pending === request) pending = null;
+        },
+      });
+    else complete();
+  }
+  return {
+    go,
+    projectedIndex,
+    canMove: (direction) => accepts(projectedIndex() + direction),
+    manualGo(target, recordHistory = true, hintEdge = 0, historyLength = null, command = null) {
+      if (!accepts(target)) return;
+      playback()?.interact(command?.gesture ? 'navigation' : undefined);
+      go(target, recordHistory, hintEdge, historyLength, Boolean(command?.restart));
+    },
+  };
+}
+
+/** Resolve transient end history against the current document after live updates. */
+function previousTourTarget(history, tour, index) {
+  let length = history.length;
+  let target = history[--length];
+  while (target === 'end' && !tour.endScreen.enabled) target = history[--length];
+  return {
+    target: target === 'end' ? tour.slides.length : (target ?? Math.max(0, index - 1)),
+    length: Math.max(0, length),
+  };
+}
+
+/** Binds navigation DOM once; selection and history remain controller-owned. */
+function createTourPosition(root, labels) {
+  const query = (name) => root.querySelector(`[data-tour-${name}]`);
+  const title = query('title');
+  const counter = query('counter');
+  const previous = query('previous');
+  const next = query('next');
+  return (tour, index, ended, historyLength) => {
+    const slide = tour.slides[index];
+    title.textContent = ended ? tour.endScreen.title : (slide?.title ?? '');
+    counter.textContent = ended
+      ? labels.finished
+      : `${tour.slides.length ? index + 1 : 0} / ${tour.slides.length}`;
+    previous.disabled = !ended && index === 0 && historyLength === 0;
+    next.disabled =
+      ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
   };
 }
 
@@ -149,10 +226,20 @@ function handleTourKeyboard(event, navigationOpen, actions) {
       event.target.closest('input,textarea,select,[contenteditable]'))
   )
     return;
+  if (
+    event.key === ' ' &&
+    (event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.isComposing ||
+      isTourNativeControl(event))
+  )
+    return;
   const action = Object.hasOwn(actions, event.key) ? actions[event.key] : null;
   if (!action) return;
   event.preventDefault();
-  action();
+  if (event.key !== ' ' || !event.repeat) action();
 }
 
 /** Viewport observation shares the mounted player abort lifetime. */
@@ -160,19 +247,128 @@ function observeViewport(viewport, resize, signal) {
   const observer = globalThis.ResizeObserver ? new globalThis.ResizeObserver(resize) : null;
   if (observer) {
     observer.observe(viewport);
+    const toolbar = viewport.querySelector('.tour-toolbar');
+    if (toolbar) observer.observe(toolbar);
     signal.addEventListener('abort', () => observer.disconnect(), { once: true });
   } else globalThis.addEventListener('resize', resize, { signal: signal });
 }
 
-function bindTourKeyboard(document, navigation, options, signal, actions) {
-  document.addEventListener(
-    'keydown',
-    (event) =>
-      handleTourKeyboard(
-        event,
-        navigation.open || Boolean(options.authoring || options.preview),
-        actions
-      ),
+function isTourNativeControl(event) {
+  return event
+    .composedPath()
+    .some(
+      (node) =>
+        node instanceof globalThis.Element &&
+        node.matches(
+          'input,textarea,select,button,a,[contenteditable],' +
+            '[role="button"],[role="slider"],[role="combobox"],' +
+            '[role="menuitem"],[role="listbox"],[role="switch"]'
+        )
+    );
+}
+
+function bindTourKeyboard(root, navigation, options, signal, actions) {
+  if (options.authoring) return;
+  const document = root.ownerDocument;
+  if (!root.hasAttribute('tabindex')) root.tabIndex = -1;
+  root.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!isTourNativeControl(event)) root.focus({ preventScroll: true });
+    },
     { signal }
   );
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (event.key === ' ' && !event.composedPath().includes(root)) {
+        const standalone =
+          root.getRootNode() === document &&
+          document.querySelectorAll('[data-tour-mode]').length === 1 &&
+          (event.target === document || event.target === document.body);
+        if (!standalone) return;
+      }
+      handleTourKeyboard(
+        event,
+        navigation.open || Boolean(options.authoring) || (options.preview && event.key !== ' '),
+        actions
+      );
+    },
+    { signal }
+  );
+}
+
+/** Mounted navigation input routes editor selection and playback commands through their owners. */
+function mountTourNavigationInput(root, options, signal, actions) {
+  const authoring = options.authoring?.navigation;
+  const query = (name) => root.querySelector(`[data-tour-${name}]`);
+  function manualGo(target, recordHistory = true) {
+    if (authoring) {
+      const slide = actions.slides()[target];
+      if (slide) authoring.selectSlide(slide.id);
+      return;
+    }
+    actions.move(target, recordHistory, 0, null, { gesture: true });
+  }
+  query('previous').addEventListener(
+    'click',
+    () => {
+      if (authoring) authoring.move(-1);
+      else actions.back();
+    },
+    { signal }
+  );
+  function next() {
+    if (query('next').disabled) return;
+    if (authoring) authoring.move(1);
+    else manualGo(actions.index() + 1);
+  }
+  query('next').addEventListener('click', next, { signal });
+  query('contents').addEventListener('click', () => actions.openContents(manualGo), { signal });
+  bindTourKeyboard(root, query('navigation'), options, signal, {
+    ArrowRight: next,
+    ' ': () => actions.space(next),
+    ArrowLeft: actions.back,
+    Home: () => manualGo(0),
+    End: () => manualGo(actions.slides().length - 1),
+  });
+  return {
+    manualGo,
+    updateControls() {
+      if (!authoring) return;
+      query('previous').disabled = !authoring.canMove(-1);
+      query('next').disabled = !authoring.canMove(1);
+    },
+  };
+}
+
+/** Empty and navigation slides remain explicit stops in the authored sequence. */
+function explanationPosition(tour, slideIndex, hintIndex) {
+  const counts = tour.slides.map((slide) =>
+    slide.kind === 'image' && slide.image
+      ? Math.max(1, getTourSlideObjects(slide).filter((entry) => entry.type !== 'mask').length)
+      : 1
+  );
+  return {
+    index: counts.slice(0, slideIndex).reduce((sum, count) => sum + count, 0) + hintIndex,
+    count: counts.reduce((sum, count) => sum + count, Number(tour.endScreen.enabled)),
+  };
+}
+
+/** Resolves authored slide destinations without owning history or playback effects. */
+function actionSlideIndex(action, slides, index) {
+  switch (action.kind) {
+    case 'next':
+      return index + 1;
+    case 'previous':
+      return index - 1;
+    case 'restart':
+      return 0;
+    case 'end':
+      return slides.length;
+    case 'slide':
+      return slides.findIndex((slide) => slide.id === action.slideId);
+    default:
+      return null;
+  }
 }

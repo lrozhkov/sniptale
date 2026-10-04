@@ -10,6 +10,8 @@ import { EDITOR_BOOTSTRAP_QUERY_PARAM } from '../../../features/editor/contracts
 import { readEditorAssetId } from '@sniptale/runtime-contracts/editor/session';
 import { createSecureRandomUuid as createAggregateId } from '@sniptale/platform/security/secure-random-id';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
+import { MissingAssetObjectError } from '../../../composition/persistence/assets';
+import { MissingEditorDocumentAssetError } from '../../../composition/persistence/document-assets';
 import { type EditorSessionAutosaveService } from '../session-autosave';
 
 interface EditorPageLocationState {
@@ -25,16 +27,19 @@ interface EditorPageAssetRestoreSource {
   sourceFaviconUrl: string | null;
   sourceTitle: string;
   sourceUrl: string;
+  capturedAt: number | null;
 }
 
 interface EditorPageBootstrapRestoreSource {
   kind: 'bootstrap';
   payload: EditorBootstrapPayload;
+  capturedAt: number | null;
 }
 
 interface EditorPageDraftRestoreSource {
   kind: 'draft';
   entry: NonNullable<Awaited<ReturnType<EditorSessionAutosaveService['restoreDraft']>>>;
+  capturedAt: number | null;
 }
 
 interface EditorPageEmptyRestoreSource {
@@ -46,6 +51,22 @@ type EditorPageRestoreSource =
   | EditorPageBootstrapRestoreSource
   | EditorPageDraftRestoreSource
   | EditorPageEmptyRestoreSource;
+
+export class MissingEditorOriginalError extends Error {
+  override name = 'MissingEditorOriginalError';
+
+  constructor() {
+    super('The original image file is missing from local storage.');
+  }
+}
+
+export class MissingEditorDraftAssetError extends Error {
+  override name = 'MissingEditorDraftAssetError';
+
+  constructor() {
+    super('A stored editor document file is missing from local storage.');
+  }
+}
 
 function readEditorBootstrapId(search: string): string | null {
   return new URLSearchParams(search).get(EDITOR_BOOTSTRAP_QUERY_PARAM);
@@ -66,7 +87,7 @@ export function replaceEditorPageAggregateId(aggregateId: string): void {
 /** Starts a fresh standalone draft for a local image opened in the current editor tab. */
 export function beginEditorPageLocalDraft(args: {
   autosaveService: Pick<EditorSessionAutosaveService, 'activate'>;
-  renderPresentation: () => Promise<string> | string;
+  renderPresentation: (signal?: AbortSignal) => Promise<string> | string;
   sourceTitle: string;
 }): string {
   const aggregateId = createAggregateId();
@@ -121,11 +142,20 @@ export function ensureEditorPageAggregateId(locationState: EditorPageLocationSta
 
 async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRestoreSource> {
   const [blob, asset] = await Promise.all([
-    getMediaAssetBlob(assetId),
+    getMediaAssetBlob(assetId).catch((error: unknown) => {
+      if (
+        error instanceof MissingAssetObjectError ||
+        (error instanceof Error && error.name === 'NotFoundError')
+      ) {
+        throw new MissingEditorOriginalError();
+      }
+      throw error;
+    }),
     getMediaLibraryEntry(assetId),
   ]);
 
   if (!blob) {
+    if (asset) throw new MissingEditorOriginalError();
     return { kind: 'empty' };
   }
 
@@ -137,7 +167,20 @@ async function resolveEditorAssetSource(assetId: string): Promise<EditorPageRest
     sourceFaviconUrl: asset?.sourceFavicon ?? null,
     sourceTitle: asset?.sourceTitle ?? asset?.filename ?? '',
     sourceUrl: asset?.sourceUrl ?? '',
+    capturedAt: asset?.createdAt ?? null,
   };
+}
+
+async function resolveOriginalCaptureTime(
+  aggregateId: string,
+  fallback: number | null
+): Promise<number | null> {
+  try {
+    const asset = await getMediaLibraryEntry(aggregateId);
+    return asset?.createdAt ?? fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 /**
@@ -149,11 +192,24 @@ export async function resolveEditorPageRestoreSource(
   autosaveService: Pick<EditorSessionAutosaveService, 'restoreDraft'>,
   isCurrent?: () => boolean
 ): Promise<EditorPageRestoreSource> {
-  const draftEntry = await autosaveService.restoreDraft(aggregateId, isCurrent);
+  let draftEntry: Awaited<ReturnType<EditorSessionAutosaveService['restoreDraft']>>;
+  try {
+    draftEntry = await autosaveService.restoreDraft(aggregateId, isCurrent);
+  } catch (error) {
+    if (
+      error instanceof MissingAssetObjectError ||
+      error instanceof MissingEditorDocumentAssetError ||
+      (error instanceof Error && error.name === 'NotFoundError')
+    ) {
+      throw new MissingEditorDraftAssetError();
+    }
+    throw error;
+  }
   if (draftEntry) {
     return {
       kind: 'draft',
       entry: draftEntry,
+      capturedAt: await resolveOriginalCaptureTime(aggregateId, draftEntry.createdAt ?? null),
     };
   }
 
@@ -162,6 +218,10 @@ export async function resolveEditorPageRestoreSource(
     return {
       kind: 'bootstrap',
       payload: bootstrapPayload,
+      capturedAt: await resolveOriginalCaptureTime(
+        aggregateId,
+        bootstrapPayload.capturedAt ?? null
+      ),
     };
   }
 

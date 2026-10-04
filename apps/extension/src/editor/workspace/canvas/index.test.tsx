@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
-import { expect, it } from 'vitest';
+import { act } from 'react';
+import { expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_WORKSPACE_SETTINGS } from '../../../features/editor/document/constants';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
+import { useEditorStore } from '../../state/useEditorStore';
 import {
   cleanupDom,
   createControllerMock,
@@ -22,7 +25,7 @@ async function renderGridSize(gridSize: number) {
   });
   renderWithController(<CanvasWrapper hasImage />, createControllerMock());
 
-  return document.querySelector<HTMLDivElement>('.pointer-events-none.absolute.inset-0.z-20');
+  return document.querySelector<HTMLDivElement>('[data-ui="editor.canvas.document-grid"]');
 }
 
 it('renders live grid density variants through the canvas wrapper', async () => {
@@ -51,5 +54,34 @@ it('renders the empty intake path without grid overlay when no document is loade
 
   expect(document.querySelector('[data-ui="editor.canvas.wrapper"]')).not.toBeNull();
   expect(document.querySelector('[data-ui="editor.canvas.empty-dropzone"]')).not.toBeNull();
-  expect(document.querySelector('.pointer-events-none.absolute.inset-0.z-20')).toBeNull();
+  expect(document.querySelector('[data-ui="editor.canvas.document-grid"]')).toBeNull();
+});
+
+it('updates only live canvas presentation when outside visibility or crop mode changes', async () => {
+  resetEditorStore({ showOutsideCanvas: false, canvasCropMode: 'crop', activeTool: 'select' });
+  const { CanvasWrapper } = await import('.');
+  const canvas = Object.create(EditorCanvas.prototype) as EditorCanvas;
+  canvas.setShowOutsideCanvas = vi.fn();
+  const controller = {
+    ...createControllerMock(),
+    getPublicApiAdapter: () => ({ canvas }),
+  };
+  renderWithController(<CanvasWrapper hasImage />, controller);
+  expect(canvas.setShowOutsideCanvas).toHaveBeenLastCalledWith(false);
+
+  act(() => useEditorStore.getState().setShowOutsideCanvas(true));
+  expect(canvas.setShowOutsideCanvas).toHaveBeenLastCalledWith(true);
+
+  act(() => useEditorStore.getState().setShowOutsideCanvas(false));
+  expect(canvas.setShowOutsideCanvas).toHaveBeenLastCalledWith(false);
+
+  act(() => {
+    useEditorStore.getState().setCanvasCropMode('expand');
+    useEditorStore.getState().setActiveTool('crop');
+  });
+  expect(canvas.setShowOutsideCanvas).toHaveBeenLastCalledWith(true);
+  act(() => {
+    useEditorStore.getState().setShowOutsideCanvas(true);
+    useEditorStore.getState().setCanvasCropMode('crop');
+  });
 });

@@ -8,6 +8,7 @@ import {
   sanitizeWebSnapshotAttribute,
   sanitizeWebSnapshotFilename,
   sanitizeWebSnapshotHtml,
+  sanitizeWebSnapshotXhtml,
   shouldExcludeWebSnapshotFormControlValue,
   WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE,
 } from './sanitize';
@@ -391,3 +392,55 @@ it('projects safe anchors as inert external targets and removes external resourc
   expect(html).not.toContain('https://tracker.example/icon.svg');
   expect(html).not.toContain('https://tracker.example/poster.png');
 });
+
+it('removes SVG mutation elements only for the explicit standalone policy, including shadow roots', () => {
+  const svg =
+    '<svg><a><set attributeName="href" to="https://example.test/" />' +
+    '<animate attributeName="href" values="https://example.test/" />' +
+    '<animateMotion /><animateTransform /><discard /><text>Saved</text></a></svg>';
+  const source = `${svg}<x-card><template shadowrootmode="open">${svg}</template></x-card>`;
+  const passive = sanitizeWebSnapshotHtml(source, null, {
+    offlineOnly: true,
+    removeSvgAnimations: true,
+  });
+  expect(passive).not.toMatch(/<(?:set|animate|discard)/u);
+  expect(passive).toContain('Saved');
+  expect(sanitizeWebSnapshotHtml(source, null)).toContain('<set');
+});
+
+it.each(['html', 'xhtml'] as const)(
+  'preserves hostile %s fragment attributes without interpreting markup',
+  (format) => {
+    const fragment = '#"/><img src=x onerror=alert(1)><script>alert(2)</script>&';
+    const anchor = document.createElement('a');
+    anchor.setAttribute('href', fragment);
+    anchor.textContent = 'Saved link';
+    const fallback = document.createElement('a');
+    fallback.setAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE, fragment);
+    fallback.textContent = 'Fallback link';
+    const body =
+      format === 'html'
+        ? anchor.outerHTML + fallback.outerHTML
+        : new XMLSerializer().serializeToString(anchor) +
+          new XMLSerializer().serializeToString(fallback);
+    const options = { offlineOnly: true, allowStandaloneNavigation: true };
+    const serialized =
+      format === 'html'
+        ? sanitizeWebSnapshotHtml(body, null, options)
+        : sanitizeWebSnapshotXhtml(
+            `<html xmlns="http://www.w3.org/1999/xhtml"><head/><body>${body}</body></html>`,
+            null,
+            options
+          );
+    const restored = new DOMParser().parseFromString(
+      serialized,
+      format === 'html' ? 'text/html' : 'application/xhtml+xml'
+    );
+    expect(restored.querySelector('parsererror')).toBeNull();
+    expect(Array.from(restored.querySelectorAll('a'), (link) => link.getAttribute('href'))).toEqual(
+      [fragment, fragment]
+    );
+    expect(restored.querySelector('img, script, [onerror]')).toBeNull();
+    expect(restored.querySelector('body')?.textContent).toBe('Saved linkFallback link');
+  }
+);

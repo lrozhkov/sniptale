@@ -5,11 +5,21 @@ import { isStorageQuotaHeadroomError } from '../storage-capacity';
 
 type MediaHubStorageFailureKind = 'quota' | 'database' | 'disk';
 
-interface MediaHubStorageError extends Error {
-  kind: MediaHubStorageFailureKind;
-  operation: string;
-  originalName: string;
-  isMediaHubStorageError: true;
+class MediaHubStorageError extends Error {
+  readonly isMediaHubStorageError = true;
+  constructor(
+    readonly kind: MediaHubStorageFailureKind,
+    readonly operation: string,
+    readonly originalName: string
+  ) {
+    super(buildUserMessage(kind, operation));
+    this.name = 'MediaHubStorageError';
+  }
+}
+
+/** Recognizes only errors normalized by this owner; raw error text is not user-facing. */
+export function isMediaHubStorageError(error: unknown): error is MediaHubStorageError {
+  return error instanceof MediaHubStorageError;
 }
 
 function resolveErrorName(error: unknown): string {
@@ -127,13 +137,7 @@ function normalizeMediaHubStorageError(
     return null;
   }
 
-  const nextError = new Error(buildUserMessage(kind, operation)) as MediaHubStorageError;
-  nextError.name = 'MediaHubStorageError';
-  nextError.kind = kind;
-  nextError.operation = operation;
-  nextError.originalName = name;
-  nextError.isMediaHubStorageError = true;
-  return nextError;
+  return new MediaHubStorageError(kind, operation, name);
 }
 
 export async function withMediaHubWriteGuard<T>(

@@ -45,7 +45,33 @@ export function useLoadedReview(aggregateId: string) {
 
 /** React view of the serialized workflow snapshot. */
 export function useReviewSnapshot(session: Session) {
-  return useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
+  const snapshot = useSyncExternalStore(
+    session.subscribe,
+    session.getSnapshot,
+    session.getSnapshot
+  );
+  useEffect(() => {
+    const protect = (event: BeforeUnloadEvent) => {
+      if (!session.getSnapshot().dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protect);
+    return () => window.removeEventListener('beforeunload', protect);
+  }, [session]);
+  return snapshot;
+}
+
+function useComposerUnloadProtection(latest: RefObject<{ dirty: boolean }>) {
+  useEffect(() => {
+    const protect = (event: BeforeUnloadEvent) => {
+      if (!latest.current.dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protect);
+    return () => window.removeEventListener('beforeunload', protect);
+  }, [latest]);
 }
 
 /** Coalesces field recovery without making typing into document-history operations. */
@@ -58,11 +84,13 @@ export function useReviewComposer(session: Session) {
     saving: false,
   });
   const latest = useRef({ annotation, before, dirty: false, version: 0 });
+  useComposerUnloadProtection(latest);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstDirtyAt = useRef<number | null>(null);
   const draining = useRef<Promise<void> | null>(null);
   const mounted = useRef(true);
-  const committing = useRef(false);
+  const committing = useRef<Promise<void> | null>(null);
+  const [finishing, setFinishing] = useState(false);
   const flush = useCallback((): Promise<void> => {
     if (timer.current) clearTimeout(timer.current);
     timer.current = null;
@@ -122,48 +150,36 @@ export function useReviewComposer(session: Session) {
     };
     setField((field) => ({ ...field, annotation: null, before: null, dirty: false }));
   };
-  const commitField = async (action: () => Promise<void>) => {
-    if (committing.current) return;
-    committing.current = true;
-    try {
-      await action();
-    } finally {
-      committing.current = false;
-    }
+  const commitField = (action: () => Promise<void>): Promise<void> => {
+    if (committing.current) return committing.current;
+    setFinishing(true);
+    const task = action();
+    committing.current = task;
+    void task
+      .finally(() => {
+        committing.current = null;
+        if (mounted.current) setFinishing(false);
+      })
+      .catch(() => undefined);
+    return task;
   };
+  const completion = createComposerCompletion({
+    session,
+    flush,
+    getCurrent: () => latest.current,
+    commitField,
+    clearLocal,
+  });
   return {
     annotation,
     before,
     dirty,
     saving,
+    finishing,
+    getCurrent: () => latest.current,
     change,
     flush,
-    save: () =>
-      commitField(async () => {
-        await flush();
-        const captured = latest.current;
-        if (!captured.annotation) return;
-        if (JSON.stringify(captured.annotation) === JSON.stringify(captured.before)) {
-          await session.saveDraft(null, null);
-        } else
-          await session.commit(
-            {
-              id: crypto.randomUUID(),
-              at: Date.now(),
-              target: 'annotation',
-              before: captured.before,
-              after: captured.annotation,
-            },
-            true
-          );
-        clearLocal();
-      }),
-    discard: () =>
-      commitField(async () => {
-        await flush();
-        await session.saveDraft(null, null);
-        clearLocal();
-      }),
+    ...completion,
     reload: () =>
       commitField(async () => {
         if (timer.current) clearTimeout(timer.current);
@@ -183,6 +199,51 @@ export function useReviewComposer(session: Session) {
           dirty: false,
         }));
       }),
+  };
+}
+
+/** Completion creates one annotation history step; recovery scheduling stays in the field owner. */
+function createComposerCompletion(args: {
+  session: Session;
+  flush(): Promise<void>;
+  getCurrent(): { annotation: ReviewAnnotation | null; before: ReviewAnnotation | null };
+  commitField(action: () => Promise<void>): Promise<void>;
+  clearLocal(): void;
+}) {
+  const save = () =>
+    args.commitField(async () => {
+      await args.flush();
+      const captured = args.getCurrent();
+      if (!captured.annotation) return;
+      if (JSON.stringify(captured.annotation) === JSON.stringify(captured.before))
+        await args.session.saveDraft(null, null);
+      else
+        await args.session.commit(
+          {
+            id: crypto.randomUUID(),
+            at: Date.now(),
+            target: 'annotation',
+            before: captured.before,
+            after: captured.annotation,
+          },
+          true
+        );
+      args.clearLocal();
+    });
+  const discard = () =>
+    args.commitField(async () => {
+      await args.flush();
+      await args.session.saveDraft(null, null);
+      args.clearLocal();
+    });
+  return {
+    save,
+    discard,
+    finishNew: () => {
+      const current = args.getCurrent();
+      if (!current.annotation || current.before) return Promise.resolve();
+      return current.annotation.text.trim() ? save() : discard();
+    },
   };
 }
 

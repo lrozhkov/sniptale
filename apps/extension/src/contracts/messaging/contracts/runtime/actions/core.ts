@@ -62,7 +62,10 @@ import { SETTINGS_TRANSFER_MAX_BYTES } from '../../../../settings-transfer';
 import { isSettingsTransferResponse } from './settings-transfer-response-guard';
 import { isFullPageCaptureGeometry } from '../../../../full-page-capture';
 import type { RuntimeContentActionRequestByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/content-action';
-import type { RuntimeFrameAnnotationRasterRequestByType } from '../../runtime-message/frame-annotation-raster.types';
+import type {
+  RuntimeFrameAnnotationRasterRequestByType,
+  RuntimeFrameAnnotationRasterResponseByType,
+} from '../../runtime-message/frame-annotation-raster.types';
 
 type OpenEditorWithImageMessage =
   RuntimeContentActionRequestByType[typeof MessageType.OPEN_EDITOR_WITH_IMAGE] & {
@@ -277,30 +280,40 @@ function isDesktopFrameAckResponse(
 }
 
 const isDesktopFrameCaptureResponseEnvelope = createRuntimeResponseGuard<
-  RuntimeMessageResponse<{
-    result: 'captured';
-    dataUrl: string;
-    width: number;
-    height: number;
-  }>
+  RuntimeMessageResponse<
+    | { result: 'cancelled' }
+    | {
+        result: 'captured';
+        dataUrl: string;
+        width: number;
+        height: number;
+      }
+  >
 >({
   optional: {
-    result: (value) => value === 'captured',
+    result: (value) => value === 'captured' || value === 'cancelled',
     dataUrl: isImageDataUrl,
     width: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
     height: (value) => isNumber(value) && Number.isSafeInteger(value) && value > 0,
   },
 });
-function isDesktopFrameCaptureResponse(value: unknown): value is RuntimeMessageResponse<{
-  result: 'captured';
-  dataUrl: string;
-  width: number;
-  height: number;
-}> {
+function isDesktopFrameCaptureResponse(value: unknown): value is RuntimeMessageResponse<
+  | { result: 'cancelled' }
+  | {
+      result: 'captured';
+      dataUrl: string;
+      width: number;
+      height: number;
+    }
+> {
   return (
     isDesktopFrameCaptureResponseEnvelope(value) &&
     isRecord(value) &&
     (value['success'] !== true ||
+      (value['result'] === 'cancelled' &&
+        !('dataUrl' in value) &&
+        !('width' in value) &&
+        !('height' in value)) ||
       (value['result'] === 'captured' &&
         isImageDataUrl(value['dataUrl']) &&
         isNumber(value['width']) &&
@@ -321,6 +334,10 @@ function isFrameAnnotationRasterResponse(
     (value['success'] !== true || isString(value['result']))
   );
 }
+
+const isOffscreenRasterResponseEnvelope = createRuntimeResponseGuard<
+  RuntimeFrameAnnotationRasterResponseByType[typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]
+>({ optional: { result: isString, leaseId: isFrameAnnotationRasterLeaseId } });
 
 export const runtimeActionCoreMessageContracts = {
   [MessageType.SETTINGS_TRANSFER]: {
@@ -366,14 +383,30 @@ export const runtimeActionCoreMessageContracts = {
   [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
     parseRequest: createGuardParser(
       'runtime OFFSCREEN_FRAME_ANNOTATION_RASTERIZE message',
-      createMessageGuard({
-        type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
-        required: { capabilityToken: isString, reference: isFrameAnnotationRasterReference },
-      })
+      (
+        value
+      ): value is RuntimeFrameAnnotationRasterRequestByType[typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE] =>
+        isRecord(value) &&
+        value['type'] === MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE &&
+        isString(value['capabilityToken']) &&
+        ((value['operation'] === 'prepare' &&
+          isFrameAnnotationRasterLeaseId(value['leaseId']) &&
+          !('reference' in value)) ||
+          (!('operation' in value) &&
+            !('leaseId' in value) &&
+            isFrameAnnotationRasterReference(value['reference'])))
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_FRAME_ANNOTATION_RASTERIZE response',
-      isFrameAnnotationRasterResponse
+      (
+        value
+      ): value is RuntimeFrameAnnotationRasterResponseByType[typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE] =>
+        isOffscreenRasterResponseEnvelope(value) &&
+        (value.success !== true ||
+          (value.result === 'applied' && !('leaseId' in value)) ||
+          (value.result === 'prepared' &&
+            'leaseId' in value &&
+            isFrameAnnotationRasterLeaseId(value.leaseId)))
     ),
   },
   [MessageType.OFFSCREEN_WRITE_IMAGE_CLIPBOARD]: {
@@ -414,10 +447,13 @@ export const runtimeActionCoreMessageContracts = {
         required: {
           capabilityToken: isString,
           requestId: isDesktopCaptureCorrelationId,
-          streamId: (value) => isString(value) && value.length > 0 && value.length <= 4096,
+          delaySeconds: (value) => value === 0 || value === 3 || value === 5 || value === 10,
           imageFormat: isScreenshotImageFormat,
           imageQuality: (value) =>
             isNumber(value) && Number.isFinite(value) && value >= 1 && value <= 100,
+        },
+        optional: {
+          streamId: (value) => isString(value) && value.length > 0 && value.length <= 4096,
         },
       })
     ),

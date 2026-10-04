@@ -1,4 +1,4 @@
-import { parsePersistedEditorDocument } from '../../document-assets';
+import { parsePersistedEditorDocument } from '../../document-assets/parser';
 import type { StoredScenarioStepEditorDocumentEntry } from '../contracts';
 import { type ParsedStoredEntriesValue } from '../../infrastructure/indexed-db/guards/entries';
 import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/validation/primitives';

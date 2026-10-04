@@ -1,17 +1,21 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { Activity } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewRuler, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
-import { useEffect, useRef, useState, type ReactNode, type CSSProperties } from 'react';
+import type { ReactNode, CSSProperties } from 'react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewTelemetryStrip } from './timeline-telemetry';
 import { useReviewTimelinePlaneDrag } from './timeline-drag';
+import { ReviewTimelineHoverGuide, useReviewTimelineHover } from './timeline-hover';
+import { useReviewTimelineGeometry, useReviewTimelineNavigation } from './timeline-geometry';
 import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   busy?: boolean;
   duration: number;
   time: number;
@@ -20,6 +24,7 @@ type TimelineProps = {
   annotations: readonly ReviewAnnotation[];
   edits?: readonly ReviewEdit[];
   selectedEditId?: string | undefined;
+  zoomAnchor?: number | null | undefined;
   historyControls?: ReactNode;
   tools?: ReactNode;
   trackControls?: ReactNode;
@@ -29,6 +34,9 @@ type TimelineProps = {
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
+  onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
+  originalRangeTool?: boolean;
+  snapRangePreview?: boolean;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onEdit?(edit: ReviewEdit): void;
   markers: readonly ReviewTelemetryMarker[];
@@ -37,45 +45,38 @@ type TimelineProps = {
   onClearSelection?(): void;
   onSelect(value: ReviewAnchor): void;
   onPlay(): void;
+  onOpenExport?: (() => void) | undefined;
+  exportActive?: boolean | undefined;
   onMarker(marker: ReviewTelemetryMarker): void;
   onComment(annotation: ReviewAnnotation): void;
 };
+
 /** One source lane, with an independent ruler/playhead rather than browser slider chrome. */
 export function ReviewTimeline(props: TimelineProps) {
-  const [zoom, setZoom] = useState(1);
-  const [gutter, setGutter] = useState(192);
-  const viewport = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(640);
   const audioVisible = !!props.audioTrack;
   const zoomVisible = !!props.zoomTrack;
-  useEffect(() => {
-    const node = viewport.current;
-    if (!node) return;
-    const measure = () => {
-      const headers = node.querySelectorAll<HTMLElement>(
-        '[data-ui="gallery.videoReview.trackHeader"]'
-      );
-      const natural = Math.max(
-        120,
-        ...Array.from(headers, (header) => {
-          const label = header.querySelector<HTMLElement>('[data-track-label]');
-          const controls = header.querySelector<HTMLElement>('[data-track-controls]');
-          return (label?.scrollWidth ?? 0) + (controls?.scrollWidth ?? 0) + 44;
-        })
-      );
-      const next = Math.min(Math.round(node.clientWidth * 0.4) || 260, Math.ceil(natural));
-      setGutter(next);
-      setWidth(Math.max(1, node.clientWidth - next));
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    node
-      .querySelectorAll('[data-track-label], [data-track-controls]')
-      .forEach((item) => observer.observe(item));
-    return () => observer.disconnect();
-  }, [audioVisible, zoomVisible, props.markers.length]);
+  const { viewport, gutter, width } = useReviewTimelineGeometry(
+    audioVisible,
+    zoomVisible,
+    props.markers.length
+  );
+  const { zoom, navigation, navigate, onZoom } = useReviewTimelineNavigation(props, {
+    viewport,
+    gutter,
+    width,
+  });
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
+  const hover = useReviewTimelineHover({
+    busy: !!props.busy,
+    duration: props.duration,
+    gutter,
+    width,
+    zoom,
+    focusEnabled: !!props.onFocusRangeCommit,
+    originalEnabled: !!props.originalRangeTool,
+    snapRangePreview: !!props.snapRangePreview,
+    boundaries: props.boundaries,
+  });
   return (
     <section
       data-ui="gallery.videoReview.timeline"
@@ -84,13 +85,18 @@ export function ReviewTimeline(props: TimelineProps) {
     >
       <ReviewToolbar
         {...props}
+        navigation={navigation}
+        onNavigate={navigate}
         resultDuration={createReviewTimeMap(props.duration, props.edits ?? []).getDuration()}
         zoom={zoom}
-        onZoom={setZoom}
+        onPlay={() => (props.beforeAction ?? ((action) => action()))(props.onPlay)}
+        onZoom={onZoom}
       />
       <div
         ref={viewport}
         data-ui="gallery.videoReview.timelineViewport"
+        style={{ overflowX: zoom === 1 ? 'hidden' : 'auto' }}
+        onScroll={hover.clear}
         className="w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain"
       >
         <div
@@ -103,18 +109,37 @@ export function ReviewTimeline(props: TimelineProps) {
           aria-valuemax={props.duration}
           aria-valuenow={props.time}
           aria-valuetext={reviewTimeLabel(props.time)}
-          className="group/plane relative cursor-crosshair overflow-clip pb-2 outline-none"
+          className="group/plane relative overflow-clip pb-2 outline-none"
           style={
             {
-              width: gutter + Math.max(1, width * zoom),
+              // CSS follows the resized viewport before ResizeObserver can update ruler measurements.
+              width: zoom === 1 ? '100%' : `calc(${zoom * 100}% - ${gutter * (zoom - 1)}px)`,
               '--review-track-gutter': `${gutter}px`,
+              cursor: hover.cursor,
             } as CSSProperties
           }
+          onPointerDownCapture={hover.clear}
           onPointerDown={plane.onPointerDown}
-          onPointerMove={plane.onPointerMove}
-          onPointerUp={plane.onPointerUp}
-          onPointerCancel={plane.onPointerCancel}
+          onPointerMove={(event) => {
+            plane.onPointerMove(event);
+            hover.move(event, plane.activeLane());
+          }}
+          onPointerUp={(event) => {
+            plane.onPointerUp(event);
+            hover.clear();
+          }}
+          onPointerCancel={() => {
+            plane.onPointerCancel();
+            hover.clear();
+          }}
+          onPointerLeave={hover.clear}
         >
+          <ReviewTimelineHoverGuide
+            hover={hover.hover}
+            viewport={viewport}
+            gutter={gutter}
+            width={width}
+          />
           <ReviewTrackRow label="" icon={props.trackControls}>
             <ReviewRuler duration={props.duration} width={Math.max(1, width * zoom)} />
           </ReviewTrackRow>
@@ -137,7 +162,11 @@ export function ReviewTimeline(props: TimelineProps) {
                 />
               </ReviewTrackRow>
             ) : null}
-            <ReviewSourceLane {...props} />
+            <ReviewSourceLane
+              {...props}
+              rangeEnabled={!props.onFocusRangeCommit && !props.originalRangeTool}
+              snapToKeyframes={!!props.boundaries}
+            />
           </div>
           <div
             aria-hidden="true"

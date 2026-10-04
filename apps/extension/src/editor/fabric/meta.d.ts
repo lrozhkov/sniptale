@@ -86,6 +86,7 @@ declare module 'fabric' {
     sniptaleFrameAnnotationRevision?: number;
     sniptaleFrameAnnotationJson?: string;
     sniptaleDrawingJson?: string;
+    sniptaleScenarioBlurJson?: string;
     sniptaleDrawingTextAutoWidth?: boolean;
     sniptaleDrawingTextMaxWidth?: number;
   }

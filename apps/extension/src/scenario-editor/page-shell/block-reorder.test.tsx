@@ -137,7 +137,9 @@ it.each(['Escape', 'pointercancel', 'blur', 'disable', 'unmount', 'lostpointerca
     else
       await act(async () => {
         if (reason === 'Escape')
-          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+          host
+            .querySelector('button')!
+            .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
         else if (reason === 'lostpointercapture')
           host.querySelector('button')!.dispatchEvent(new Event(reason));
         else window.dispatchEvent(new Event(reason));
@@ -318,4 +320,26 @@ it('keeps a drag through an equivalent autosave copy and uses the latest operati
     targetItemId: 'other',
     blockId: 'a',
   });
+});
+
+it('cancels from the focused grip before selection navigation and restores block focus', async () => {
+  await render();
+  const handle = host.querySelector<HTMLButtonElement>('button')!;
+  const block = handle.closest<HTMLElement>('.guide-block')!;
+  block.tabIndex = 0;
+  const navigate = vi.fn();
+  host.addEventListener('keydown', navigate);
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 300);
+  await act(async () =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(navigate).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(block);
+  expect(operate).not.toHaveBeenCalled();
+  await act(async () =>
+    block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(navigate).toHaveBeenCalledOnce();
+  host.removeEventListener('keydown', navigate);
 });

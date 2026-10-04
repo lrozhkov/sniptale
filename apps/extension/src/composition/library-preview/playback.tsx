@@ -17,8 +17,9 @@ export function useLibraryPlayback(
     time: number;
     paused: boolean;
     muted: boolean;
+    volume: number;
     ready: boolean;
-  }>({ duration: null, time: 0, paused: true, muted: false, ready: false });
+  }>({ duration: null, time: 0, paused: true, muted: false, volume: 1, ready: false });
   const [failed, setFailed] = useState(false);
   const ready = src !== null && media.ready;
   const sync = () => {
@@ -53,7 +54,7 @@ export function useLibraryPlayback(
   usePlaybackSpaceShortcut(toggle, enabled);
   useEffect(() => {
     probingDuration.current = false;
-    setMedia({ duration: null, time: 0, paused: true, muted: false, ready: false });
+    setMedia({ duration: null, time: 0, paused: true, muted: false, volume: 1, ready: false });
     setFailed(false);
     latestReady.current?.(false);
     const node = video.current;
@@ -78,10 +79,20 @@ export function useLibraryPlayback(
       node.currentTime = Math.max(0, Math.min(node.duration, time));
       sync();
     },
+    setVolume(volume: number) {
+      const node = video.current;
+      if (!node || !Number.isFinite(volume)) return;
+      node.volume = Math.max(0, Math.min(1, volume));
+      node.muted = false;
+      sync();
+    },
     toggleMute() {
       const node = video.current;
       if (!node) return;
-      node.muted = !node.muted;
+      if (node.volume === 0) {
+        node.volume = 1;
+        node.muted = false;
+      } else node.muted = !node.muted;
       sync();
     },
   };
@@ -97,5 +108,6 @@ function readMediaState(node: HTMLVideoElement, probing: boolean) {
     time: probing ? 0 : node.currentTime,
     paused: node.paused,
     muted: node.muted,
+    volume: node.volume,
   };
 }

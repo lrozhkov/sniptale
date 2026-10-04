@@ -1,3 +1,7 @@
+import {
+  resolveGallerySelectionRange,
+  type GalleryToggleSelectionOptions,
+} from '../library/keyboard/selection-range';
 import { useEffect, useRef } from 'react';
 import type { GalleryAppStateController, GalleryViewMode } from './types';
 import { isGalleryMediaItem, isGallerySelectableItem, type GalleryItem } from '../library/items';
@@ -17,11 +21,14 @@ function toggleSelectedGalleryItem(
   filteredItems: GalleryItem[],
   selectionAnchorRef: { current: string | null },
   assetId: string,
-  shiftKey = false
+  options: GalleryToggleSelectionOptions = {}
 ) {
-  const selectableIds = filteredItems.filter(isGallerySelectableItem).map((item) => item.id);
+  const selectable = new Set(filteredItems.filter(isGallerySelectableItem).map((item) => item.id));
+  const selectableIds = options.orderedIds
+    ? options.orderedIds.filter((id) => selectable.has(id))
+    : [...selectable];
 
-  if (shiftKey && selectionAnchorRef.current) {
+  if (options.shiftKey && selectionAnchorRef.current) {
     const rangeStart = selectableIds.indexOf(selectionAnchorRef.current);
     const rangeEnd = selectableIds.indexOf(assetId);
 
@@ -74,7 +81,9 @@ function buildGalleryFilterViewState(filters: GalleryFiltersState) {
     savedViewsLoadFailed: filters.state.savedViewsLoadFailed,
     savedViewsLoaded: filters.state.savedViewsLoaded,
     search: filters.state.search,
+    appliedSearch: filters.state.appliedSearch,
     scope: filters.state.scope,
+    trashMode: filters.state.trashMode,
     sortMode: filters.state.sortMode,
   };
 }
@@ -112,10 +121,13 @@ function buildGalleryDerivedViewState(
     allItems: derived.allItems,
     allTags: derived.allTags,
     counts: derived.counts,
+    trashSummary: derived.trashSummary,
+    hasResultContext: derived.hasResultContext,
     facets: derived.facets,
     filteredItems: derived.filteredItems,
     gridMetrics: {
       columnCount: derived.gridMetrics.columnCount,
+      rowTops: derived.gridMetrics.rowTops,
       startRow: derived.gridMetrics.startRow,
       totalRows: derived.gridMetrics.totalRows,
     },
@@ -143,17 +155,29 @@ function buildGalleryAppActions(args: {
       setFolderFilter: args.filters.actions.setFolderFilter,
       setFacetFilter: args.filters.actions.setFacetFilter,
       setSearch: args.filters.actions.setSearch,
+      commitSearch: args.filters.actions.commitSearch,
       setScope: args.filters.actions.setScope,
+      setTrashMode: args.filters.actions.setTrashMode,
       setSortMode: args.filters.actions.setSortMode,
       updateSavedView: args.filters.actions.updateSavedView,
     },
     preview: {
+      acknowledgePresented: args.preview.actions.acknowledgePresented,
       setFilenameDraft: args.preview.actions.setFilenameDraft,
       setPreview: args.preview.actions.setPreview,
       setTagDraft: args.preview.actions.setTagDraft,
       setTagDrafts: args.preview.actions.setTagDrafts,
     },
     selection: {
+      selectRange: (range) => {
+        const next = resolveGallerySelectionRange(
+          range,
+          new Set(args.derived.filteredItems.filter(isGallerySelectableItem).map((item) => item.id))
+        );
+        if (!next) return args.filters.state.selectedIds;
+        args.filters.actions.setSelectedIds(next);
+        return next;
+      },
       setSelectedIds: args.filters.actions.setSelectedIds,
       setSelectionTagDraft: args.filters.actions.setSelectionTagDraft,
       toggleSelection: (assetId, options) =>
@@ -162,7 +186,7 @@ function buildGalleryAppActions(args: {
           args.derived.filteredItems,
           args.selectionAnchorRef,
           assetId,
-          options?.shiftKey
+          options
         ),
     },
     storage: {
@@ -176,6 +200,7 @@ function buildGalleryAppActions(args: {
       setActiveImport: args.storage.setActiveImport,
       setBanner: args.storage.setBanner,
       setConfirmDialog: args.storage.setConfirmDialog,
+      setDeletionRequest: args.storage.setDeletionRequest,
       setPendingExport: args.storage.setPendingExport,
       setPendingImport: args.storage.setPendingImport,
       setPendingMediaImport: args.storage.setPendingMediaImport,
@@ -187,6 +212,10 @@ function buildGalleryAppActions(args: {
 function getInitialRecordingPreviewId(): string | null {
   const params = new URLSearchParams(window.location.search);
   return params.get('recordingId');
+}
+
+function getInitialMediaPreviewId(): string | null {
+  return new URLSearchParams(window.location.search).get('mediaId');
 }
 
 function findRecordingPreviewItem(items: GalleryItem[], recordingId: string): GalleryItem | null {
@@ -208,16 +237,22 @@ function useInitialRecordingPreview({
   setPreview: GalleryPreviewState['actions']['setPreview'];
 }) {
   const initialRecordingIdRef = useRef(getInitialRecordingPreviewId());
+  const initialMediaIdRef = useRef(getInitialMediaPreviewId());
   const appliedRef = useRef(false);
   const quickEditRef = useRef(new URLSearchParams(window.location.search).get('mode') === 'edit');
 
   useEffect(() => {
     const recordingId = initialRecordingIdRef.current;
-    if (appliedRef.current || !recordingId) {
+    const mediaId = initialMediaIdRef.current;
+    if (appliedRef.current || (!recordingId && !mediaId)) {
       return;
     }
 
-    const item = findRecordingPreviewItem(allItems, recordingId);
+    const item = mediaId
+      ? (allItems.find(
+          (entry) => isGalleryMediaItem(entry) && (entry.entityId ?? entry.id) === mediaId
+        ) ?? null)
+      : findRecordingPreviewItem(allItems, recordingId!);
     if (!item) {
       return;
     }
@@ -240,7 +275,9 @@ export function useGalleryAppState(viewMode: GalleryViewMode): GalleryAppStateCo
     setPreview: preview.actions.setPreview,
     setSelectedIds: filters.actions.setSelectedIds,
   });
-  const viewport = useGalleryViewportState();
+  const viewport = useGalleryViewportState(
+    storage.state.hasLoadedLibrarySnapshot || !storage.state.isLoading
+  );
   const derived = useGalleryDerivedState({
     filters,
     library: storage.library,

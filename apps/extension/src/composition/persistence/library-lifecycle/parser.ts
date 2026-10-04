@@ -23,14 +23,16 @@ export function parseLibraryLifecycle(
   const storageClass = value['storageClass'];
   const updatedAt = value['updatedAt'];
   const savedAt = value['savedAt'];
+  const trashedAt = value['trashedAt'];
   if (
     (storageClass !== 'temporary' && storageClass !== 'library') ||
     !isFiniteNumber(updatedAt) ||
+    (trashedAt !== undefined && (!isFiniteNumber(trashedAt) || trashedAt < 0)) ||
     (savedAt !== null && !isFiniteNumber(savedAt)) ||
     (storageClass === 'temporary' && savedAt !== null) ||
     (storageClass === 'library' && savedAt === null)
   ) {
     return null;
   }
-  return { storageClass, updatedAt, savedAt };
+  return { storageClass, updatedAt, savedAt, ...(trashedAt === undefined ? {} : { trashedAt }) };
 }

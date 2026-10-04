@@ -49,3 +49,18 @@ it('owns Export launch selection and route-local capability state', () => {
   );
   act(() => root.unmount());
 });
+
+it('passes the tab-bound launch to Export without replacing saved settings', () => {
+  mocks.stage.mockClear();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const launch = { tabId: 7, startExport: true };
+  act(() =>
+    root.render(<ExportRoute startup={{ page: 'export', destination: 'export', launch }} />)
+  );
+  expect(mocks.exportPage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ launch, initialDestination: 'export' })
+  );
+  expect(mocks.stage).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});

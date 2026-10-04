@@ -9,6 +9,7 @@ import {
   runWithDurableAssetOperation,
   runWithDurableAssetOperationRecovery,
   runWithPersistenceMutationPermit,
+  tryRunWithPersistenceMutationPermit,
   runWithPersistenceMutationTransition,
   runWithPersistenceMutationTransitionRecovery,
   runWithExclusivePersistenceMutationPermit,
@@ -19,6 +20,28 @@ import {
   type PersistenceLockManager,
   type PersistenceMutationTransitionPermit,
 } from './mutation-barrier';
+
+it('reuses only an active lifecycle permit and reacquires the lock after its owner finishes', async () => {
+  const requests: string[] = [];
+  installPersistenceLockManagerForTests({
+    async request(name, _options, operation) {
+      requests.push(name);
+      return operation();
+    },
+  });
+  let previous: Parameters<typeof runWithDurableAssetLifecycleLock>[1];
+  await runWithDurableAssetLifecycleLock(async (permit) => {
+    previous = permit;
+    await runWithDurableAssetLifecycleLock(async (nested) => {
+      expect(nested).toBe(permit);
+    }, permit);
+    expect(requests).toHaveLength(1);
+  });
+  await runWithDurableAssetLifecycleLock(async (permit) => {
+    expect(permit).not.toBe(previous);
+  }, previous);
+  expect(requests).toHaveLength(2);
+});
 
 interface PendingLock {
   mode: 'exclusive' | 'shared';
@@ -80,9 +103,12 @@ function createLockManager(): PersistenceLockManager {
   return {
     request<T>(
       name: string,
-      options: { mode: 'exclusive' | 'shared' },
-      operation: () => T | Promise<T>
+      options: { mode: 'exclusive' | 'shared'; ifAvailable?: boolean },
+      operation: (lock?: unknown) => T | Promise<T>
     ) {
+      const state = getLockState(name);
+      if (options.ifAvailable && (state.activeExclusive || state.pending.length > 0))
+        return Promise.resolve(operation(null));
       return new Promise<T>((resolve, reject) => {
         getLockState(name).pending.push({
           mode: options.mode,
@@ -538,4 +564,21 @@ it('rejects forged and expired recovery permits by reacquiring their owner locks
     'sniptale:persistence:privacy-erasure:durable-asset-operations',
     'sniptale:persistence:privacy-erasure:durable-asset-operations',
   ]);
+});
+
+it('refuses a page-local draft during erasure without publishing after verification', async () => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const erase = vi.fn(async () => gate);
+  const erasure = runWithPersistentDataErasureBarrier(erase);
+  await vi.waitFor(() => expect(erase).toHaveBeenCalledOnce());
+  const publish = vi.fn(() => true);
+  expect(await tryRunWithPersistenceMutationPermit(publish)).toBeNull();
+  release();
+  await erasure;
+  expect(publish).not.toHaveBeenCalled();
+  expect(await tryRunWithPersistenceMutationPermit(publish)).toBe(true);
+  expect(publish).toHaveBeenCalledOnce();
 });

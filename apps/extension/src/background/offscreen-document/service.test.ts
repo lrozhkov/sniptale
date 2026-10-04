@@ -201,11 +201,11 @@ async function verifyRecreateAfterRuntimeStartupFailure() {
   expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
   expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
     url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA', 'CLIPBOARD'],
+    reasons: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
     justification: 'Retry startup',
   });
 }
-async function verifyRecreateAfterReadyTimeout() {
+async function verifyReuseAfterReadyTimeout() {
   vi.useFakeTimers();
   const manager = await loadOffscreenManager();
   randomUuidMock.mockReturnValueOnce('startup-1').mockReturnValueOnce('startup-2');
@@ -214,13 +214,10 @@ async function verifyRecreateAfterReadyTimeout() {
   const timeoutResult = manager.waitForOffscreenReady(25).catch((error: unknown) => error);
   await vi.advanceTimersByTimeAsync(25);
   await expectReadyTimeout(timeoutResult);
-  await expect(manager.ensureOffscreenDocument('Retry after timeout')).resolves.toBe(true);
-  expect(browserOffscreenCloseDocumentMock).toHaveBeenCalledOnce();
-  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledWith({
-    url: 'chrome-extension://id/apps/extension/src/offscreen/offscreen.html?offscreenStartupId=startup-2',
-    reasons: ['USER_MEDIA', 'CLIPBOARD'],
-    justification: 'Retry after timeout',
-  });
+  await expect(manager.ensureOffscreenDocument('Retry after timeout')).resolves.toBe(false);
+  expect(browserOffscreenCloseDocumentMock).not.toHaveBeenCalled();
+  expect(browserOffscreenCreateDocumentMock).toHaveBeenCalledOnce();
+  expect(manager.markOffscreenDocumentReady('startup-1')).toBe(true);
 }
 async function verifyRetryFailsWhenBrokenOffscreenDocumentCannotBeClosed() {
   vi.useFakeTimers();
@@ -280,7 +277,7 @@ describe('offscreen-manager waitForOffscreenReady', () => {
     'recreates the offscreen document after a runtime startup failure',
     verifyRecreateAfterRuntimeStartupFailure
   );
-  it('recreates the offscreen document after a ready timeout', verifyRecreateAfterReadyTimeout);
+  it('recreates the offscreen document after a ready timeout', verifyReuseAfterReadyTimeout);
   it(
     'allows a package download to wait for cold bootstrap until it is cancelled',
     verifyCancellableWaitWithoutStartupTimeout

@@ -1,4 +1,4 @@
-import type { FabricObject } from 'fabric';
+import { Rect, type FabricObject } from 'fabric';
 import {
   clampRectangleGeometry,
   resolveRectangleDimension,
@@ -13,7 +13,11 @@ import {
 } from './visual-state';
 
 function isEditorRectangleTarget(object: FabricObject): object is RectangleLike {
-  return object.sniptaleRole === 'annotation' && object.sniptaleType === 'shape';
+  return (
+    object instanceof Rect &&
+    object.sniptaleRole === 'annotation' &&
+    object.sniptaleType === 'shape'
+  );
 }
 
 export function normalizeScaledRectangleTarget(object: FabricObject): boolean {

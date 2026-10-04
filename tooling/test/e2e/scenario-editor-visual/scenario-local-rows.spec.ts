@@ -1,8 +1,11 @@
 import { expect, type Locator, type Page } from '@playwright/test';
 import { test } from '../support/extension-fixture';
+import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
+import { insertGuideBlock } from './scenario-editor-visual.state-steps';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
 
 async function drag(page: Page, block: Locator, x: number, y: number) {
+  await block.focus();
   const grip = block.locator('.guide-block-grip');
   await grip.focus();
   await expect(grip).toHaveCSS('opacity', '1');
@@ -20,16 +23,17 @@ for (const theme of ['light', 'dark'] as const) {
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
-    const reopen = page.url();
+    const reopen = new URL(page.url());
+    reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+    reopen.searchParams.set('theme', theme);
+    reopen.searchParams.set('locale', 'en');
     const step = page.locator('article#text-only');
     for (const text of ['First', 'Second', 'Third']) {
-      const add = step
-        .locator('.guide-insertion-block')
-        .last()
-        .getByRole('button', { name: 'Heading', exact: true });
-      await add.focus();
-      await add.click();
-      await step.locator('.guide-block textarea').last().fill(text);
+      await insertGuideBlock(page, step, 'Heading');
+      const heading = step.locator('.guide-block textarea').last();
+      await heading.fill(text);
+      await heading.press('Escape');
+      await expect(step).toBeFocused();
     }
     const blocks = step.locator('.guide-block');
     const ids = await blocks.evaluateAll((nodes) =>
@@ -39,12 +43,17 @@ for (const theme of ['light', 'dark'] as const) {
     const second = blocks.nth(1);
     const third = blocks.nth(2);
     for (const block of [first, second, third]) {
+      await block.focus();
       const width = block.locator('.guide-block-width');
       await width.focus();
       await width.click();
     }
-    await second.getByRole('button', { name: 'Start a new row', exact: true }).focus();
-    await second.getByRole('button', { name: 'Start a new row', exact: true }).click();
+    await second.focus();
+    await expect(second).toHaveAttribute('data-selected', 'true');
+    await page
+      .locator('.guide-block-inspector')
+      .getByRole('switch', { name: 'Start a new row', exact: true })
+      .check();
     await expect(step.locator('.guide-block-row')).toHaveCount(2);
     const b = await second.boundingBox();
     const a = await first.boundingBox();
@@ -75,7 +84,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(step.locator('.guide-block-row')).toHaveCount(2);
     await expect(first).toHaveAttribute('data-width', '50');
     await expect(page.getByRole('status').first()).toHaveText('Saved');
-    await page.goto(reopen);
+    await page.goto(reopen.toString());
     await expect(step.locator('.guide-block-row')).toHaveCount(2);
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     const reader = page.locator('.guide-reader article#text-only');
@@ -83,7 +92,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(reader.locator(`[data-block-id="${ids[0]}"]`)).toHaveAttribute('data-width', '50');
     await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
     await expect(page.locator('.guide-print article#text-only .guide-block-row')).toHaveCount(2);
-    await page.goto(reopen);
+    await page.goto(reopen.toString());
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
@@ -104,10 +113,7 @@ for (const theme of ['light', 'dark'] as const) {
       });
     });
     await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-html-settings > [role=status]')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'rowsHtml');
       if (typeof value !== 'string') throw new Error('Missing HTML');

@@ -2,8 +2,8 @@ import React from 'react';
 import type { BrowserFrameState } from '../../../features/editor/document/types';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
+import { EditorInspectorDetails } from '../grouped';
 import { TextField } from '../../chrome/ui';
-import { PanelSection } from './shared';
 import { BrowserFrameBehaviorSections, BrowserFrameInsertSection } from './browser-frame-sections';
 
 function renderBrowserFrameTextInput(args: {
@@ -60,7 +60,7 @@ function BrowserFrameUrlSection(props: {
     <div className="space-y-1.5">
       {renderBrowserFrameTextInput({
         action: 'browser-frame-url',
-        ariaLabel: translate('editor.compact.urlMockup'),
+        ariaLabel: translate('editor.compact.pageUrl'),
         ...(props.validationMessage ? { describedBy: errorId } : {}),
         invalid: props.validationMessage !== null,
         label: translate('editor.compact.pageUrl'),
@@ -95,15 +95,7 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
 
   return (
     <div className="space-y-3">
-      <PanelSection label={translate('editor.compact.browserFrameLayout')}>
-        <BrowserFrameBehaviorSections
-          browserCanvasModeOptions={browserCanvasModeOptions}
-          browserContentModeOptions={browserContentModeOptions}
-          browserFrame={browserFrame}
-          syncBrowserFrame={syncBrowserFrame}
-        />
-      </PanelSection>
-      <PanelSection label={translate('editor.compact.browserFrameSettings')}>
+      <div className="space-y-2">
         <div className="space-y-3">
           <BrowserFrameTitleSection
             browserFrame={browserFrame}
@@ -115,7 +107,18 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
             syncBrowserFrame={syncBrowserFrame}
           />
         </div>
-      </PanelSection>
+      </div>
+      <EditorInspectorDetails
+        preferenceId="browser-frame:layout"
+        label={translate('editor.compact.browserFrameLayout')}
+      >
+        <BrowserFrameBehaviorSections
+          browserCanvasModeOptions={browserCanvasModeOptions}
+          browserContentModeOptions={browserContentModeOptions}
+          browserFrame={browserFrame}
+          syncBrowserFrame={syncBrowserFrame}
+        />
+      </EditorInspectorDetails>
       <BrowserFrameInsertSection
         disabled={validationMessage !== null}
         insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame ?? (() => undefined)}

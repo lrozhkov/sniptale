@@ -23,6 +23,7 @@ vi.mock('../../../../platform/i18n/popup', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 vi.mock('../data-type/section', () => ({
+  WebCopyResourceControls: () => <div data-ui="resources">resources</div>,
   ExportDataTypeSection: (props: DrawerProps) => {
     mocks.dataTypes(props);
     return (
@@ -194,15 +195,19 @@ it('switches the common editor between independent download and Library preferen
   expect(mocks.dataTypes).toHaveBeenLastCalledWith(
     expect.objectContaining({ destination: 'export', includeFiles: true })
   );
-  expect(container?.textContent).toContain('packageDestinationDownloadDescription');
-  expect(container?.textContent).toContain('packageDestinationLibraryDescription');
+  expect(
+    container?.querySelector('button[aria-label="popup.export.packageDestinationDownload"]')
+  ).not.toBeNull();
+  expect(
+    container?.querySelector('button[aria-label="popup.export.packageDestinationLibrary"]')
+  ).not.toBeNull();
   const libraryButton = [...(container?.querySelectorAll('button') ?? [])].find((button) =>
     button.textContent?.includes('packageDestinationLibrary')
   );
   act(() => libraryButton?.click());
 
   expect(props.onDestinationChange).toHaveBeenCalledWith('save');
-  expect(libraryButton?.className).toContain('transition-[flex-grow');
+  expect(libraryButton?.getAttribute('aria-pressed')).toBe('false');
 });
 
 it('keeps destination switching available when no page is selected', () => {
@@ -232,4 +237,38 @@ it('shows the no-selectable-tabs hint only after loaded disabled state has no se
 
   renderReady(createProps({ disabled: true, hasLoadedPreferences: true, selectedCount: 0 }));
   expect(container?.textContent).toContain(hint);
+});
+
+it('shows HTML composition and resource settings without ZIP component controls', async () => {
+  renderReady(createProps({ destination: 'html' }));
+  expect(container?.textContent).toContain('packageDestinationHtmlDescription');
+  expect(container?.querySelector('[data-ui="html-composition"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="pages"]')).not.toBeNull();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="popup.export.selection-trigger"]')
+      ?.click()
+  );
+  expect(container?.querySelector('[data-ui="html-resource-settings"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="data-types"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="pages"]')).toBeNull();
+});
+
+it('uses the expanding transition for all three destinations', () => {
+  renderReady(createProps({ destination: 'html' }));
+  const library = [
+    ...(container?.querySelectorAll<HTMLButtonElement>('button[aria-pressed]') ?? []),
+  ].find(
+    (button) => button.getAttribute('aria-label') === 'popup.export.packageDestinationLibrary'
+  );
+  act(() => library?.click());
+  renderReady(createProps({ destination: 'save' }));
+  const switchButtons = [...(container?.querySelectorAll('button[aria-pressed]') ?? [])];
+  expect(switchButtons).toHaveLength(3);
+  expect(switchButtons.every((button) => button.className.includes('transition-[flex-grow'))).toBe(
+    true
+  );
+  expect(
+    switchButtons.find((button) => button.getAttribute('aria-pressed') === 'true')?.className
+  ).toContain('grow-');
 });

@@ -1,3 +1,6 @@
+import { acquireFrozenSelectionFrame } from '../../../selection/selection-mode/frozen-acquisition';
+import { prepareFrozenSelectionFrame } from '../../../selection/selection-mode/frozen';
+import type { FrozenSelectionFrame } from '../../../selection/selection-mode/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import type { CaptureResponse } from '../../../../contracts/messaging/contracts/response-types';
@@ -89,16 +92,46 @@ async function captureSelectionFrameWithRetry(
   throw new Error(lastError);
 }
 
-async function captureRegularSelectionDataUrl(
+async function captureFrozenFrame(
   runtime: ScreenshotControllerRuntime,
   runToken: number | undefined,
   contentIntentSource: ContentPrivilegedActionIntentSource | undefined
+): Promise<FrozenSelectionFrame> {
+  setUIHidden(true);
+  await waitForUiHideSettle();
+  assertCurrentScreenshotRun(runtime, runToken);
+  const acquired = await acquireFrozenSelectionFrame(
+    () => captureSelectionFrameWithRetry(runtime, runToken, contentIntentSource),
+    { onChanged: 'area-only' }
+  );
+  const { dataUrl, geometry } = acquired;
+  assertCurrentScreenshotRun(runtime, runToken);
+  await withCaptureStepTimeout({
+    promise: prepareFrozenSelectionFrame({ dataUrl, geometry }),
+    step: 'selection-frame-decode',
+    timeoutMs: CAPTURE_RESPONSE_TIMEOUT_MS,
+  });
+  assertCurrentScreenshotRun(runtime, runToken);
+  geometry.assertViewport();
+  setUIHidden(false);
+  return acquired;
+}
+
+async function captureRegularSelectionDataUrl(
+  runtime: ScreenshotControllerRuntime,
+  runToken: number | undefined,
+  contentIntentSource: ContentPrivilegedActionIntentSource | undefined,
+  freezeSelection = false
 ): Promise<ResolvedSelectionCapture> {
+  const frozenFrame = freezeSelection
+    ? await captureFrozenFrame(runtime, runToken, contentIntentSource)
+    : undefined;
   logSelectionScreenshotDiag('runSelectionScreenshot.await-selection');
   let confirmedIntentSource = contentIntentSource;
   const area = await enableSelectionModeDeferredIfCurrent(
     () => isCurrentScreenshotRun(runtime, runToken),
     {
+      ...(frozenFrame ? { frozenFrame } : {}),
       captureAction: runtime.captureActionRef.current,
       onCaptureActionChange: runtime.setCaptureAction,
       onConfirmEvent: (event) => {
@@ -114,16 +147,14 @@ async function captureRegularSelectionDataUrl(
   await waitForUiHideSettle();
   assertCurrentScreenshotRun(runtime, runToken);
 
-  const capturedFrameDataUrl = await captureSelectionFrameWithRetry(
-    runtime,
-    runToken,
-    confirmedIntentSource
-  );
+  frozenFrame?.geometry.assertViewport();
+  const capturedFrameDataUrl =
+    frozenFrame?.dataUrl ??
+    (await captureSelectionFrameWithRetry(runtime, runToken, confirmedIntentSource));
   assertCurrentScreenshotRun(runtime, runToken);
-  return {
-    contentIntentSource: confirmedIntentSource,
-    dataUrl: await cropImage(capturedFrameDataUrl, area),
-  };
+  const dataUrl = await cropImage(capturedFrameDataUrl, area);
+  frozenFrame?.geometry.assertViewport();
+  return { contentIntentSource: confirmedIntentSource, dataUrl };
 }
 
 async function resolveSelectionDataUrl(
@@ -135,7 +166,12 @@ async function resolveSelectionDataUrl(
         contentIntentSource: options.contentIntentSource,
         dataUrl: await runtime.captureAdapter.captureSelection(),
       }
-    : await captureRegularSelectionDataUrl(runtime, options.runToken, options.contentIntentSource);
+    : await captureRegularSelectionDataUrl(
+        runtime,
+        options.runToken,
+        options.contentIntentSource,
+        options.freezeSelection
+      );
 
   assertCurrentScreenshotRun(runtime, options.runToken);
   return selectionCapture;

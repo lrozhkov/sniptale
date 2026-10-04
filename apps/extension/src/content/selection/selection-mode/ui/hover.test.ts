@@ -83,7 +83,7 @@ describe('selection-mode hover frame', () => {
     expect(dom.hoverFrame?.style.top).toBe('48px');
     expect(dom.hoverFrame?.style.width).toBe('280px');
     expect(dom.hoverFrame?.style.height).toBe('140px');
-    expect(dom.hoverFrame?.style.border).toContain('3px dashed');
+    expect(dom.hoverFrame?.style.outline).toContain('3px dashed');
     expect(dom.hoverFrame?.style.backgroundColor).toBe('rgba(192, 132, 252, 0.3)');
     expect(dom.hoverFrame?.style.borderRadius).toBe('6px');
     expect(dom.hoverFrame?.style.display).toBe('block');

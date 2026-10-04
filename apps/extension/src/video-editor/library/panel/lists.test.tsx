@@ -48,16 +48,38 @@ function render(items: MediaLibraryItem[]) {
     root.render(<LibraryMediaSection items={items} thumbnails={{}} onAddMedia={vi.fn()} />)
   );
 }
-it('selects media and recovers selection when a filter removes the selected item', () => {
+it('previews only explicitly selected visible media and restores the grid when filtered out', () => {
   const items = [item('first'), item('second')];
   render(items);
+  expect(container.querySelector('[data-ui=selected]')).toBeNull();
+  expect(
+    container.querySelector('[data-ui="library-materials-list"]')?.getAttribute('data-layout')
+  ).toBe('grid');
   act(() => container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')[1]!.click());
   expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('second');
   expect(container.querySelectorAll('button[aria-pressed]')[1]?.getAttribute('aria-pressed')).toBe(
     'true'
   );
   render(items.slice(0, 1));
-  expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('first');
+  expect(container.querySelector('[data-ui=selected]')).toBeNull();
   render([]);
-  expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('empty');
+  expect(container.querySelector('[data-ui=selected]')).toBeNull();
+});
+
+it('marks selection with a quiet size-stable cue separate from hover and focus', () => {
+  render([item('first'), item('second')]);
+  const buttons = container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]');
+  act(() => buttons[0]!.click());
+  expect(buttons[0]?.getAttribute('aria-pressed')).toBe('true');
+  expect(buttons[0]?.className).not.toContain('border-accent');
+  expect(buttons[0]?.className).not.toContain('surface-panel)]');
+  expect(
+    buttons[0]?.querySelector('[data-ui="video-editor.library.selection-mark"]')
+  ).not.toBeNull();
+  expect(buttons[1]?.querySelector('[data-ui="video-editor.library.selection-mark"]')).toBeNull();
+  expect(buttons[0]?.className).toContain('focus-visible:ring');
+  act(() => buttons[1]!.click());
+  expect(
+    buttons[1]?.querySelector('[data-ui="video-editor.library.selection-mark"]')
+  ).not.toBeNull();
 });

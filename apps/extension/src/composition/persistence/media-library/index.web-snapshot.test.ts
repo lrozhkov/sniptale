@@ -2,6 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry, MediaThumbnailEntry } from './contracts';
 
 const mocks = vi.hoisted(() => ({
+  listMediaAssetProjectUsage: vi.fn(async () => []),
+  deleteCascade: vi.fn(),
   deleteProjectAsset: vi.fn(),
   deleteProjectExport: vi.fn(),
   deleteRecording: vi.fn(),
@@ -14,6 +16,16 @@ const mocks = vi.hoisted(() => ({
   txDelete: vi.fn(),
   txGet: vi.fn(),
   txPut: vi.fn(),
+}));
+vi.mock('./usage', () => ({
+  listMediaAssetProjectUsage: mocks.listMediaAssetProjectUsage,
+}));
+vi.mock('./delete-cascade.sources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./delete-cascade.sources')>()),
+  recoverMediaSourcePublications: vi.fn(),
+}));
+vi.mock('./delete-cascade', () => ({
+  deleteMediaAssetWithProjectCascade: mocks.deleteCascade,
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -41,8 +53,6 @@ vi.mock('../assets', async (importOriginal) => ({
   listReadyJournals: vi.fn(async () => []),
 }));
 
-import { deleteProjectAsset, deleteProjectExport } from '../projects/index';
-import { deleteRecording } from '../recordings/index';
 import {
   deleteMediaLibraryAsset,
   deleteMediaThumbnail,
@@ -101,15 +111,12 @@ it('resolves and deletes web snapshot media through the linked package owner', a
   await deleteMediaLibraryAsset('asset-web');
 
   expect(mocks.getWebSnapshotPackageFile).toHaveBeenCalledWith('snapshot-1');
-  expect(mocks.deleteWebSnapshotMediaAsset).toHaveBeenCalledWith({
-    assetId: 'asset-web',
-    snapshotId: 'snapshot-1',
-  });
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-web', []);
   expect(mocks.txDelete).not.toHaveBeenCalledWith('asset-web');
 });
 
 it('updates metadata and handles thumbnail helpers through the media library stores', async () => {
-  mocks.get.mockResolvedValueOnce(
+  mocks.txGet.mockResolvedValueOnce(
     createMediaEntry({
       filename: 'old.png',
       id: 'asset-1',
@@ -134,8 +141,7 @@ it('updates metadata and handles thumbnail helpers through the media library sto
   await deleteMediaThumbnail('asset-1');
   await getMediaThumbnail('asset-1');
 
-  expect(mocks.put).toHaveBeenCalledWith(
-    'media_library',
+  expect(mocks.txPut).toHaveBeenCalledWith(
     expect.objectContaining({ filename: 'new.png', tags: ['new'] })
   );
   expect(mocks.put).toHaveBeenCalledWith('thumbnails', thumbnail);
@@ -177,11 +183,8 @@ it('deletes regular media assets after cleaning their source records', async () 
   await deleteMediaLibraryAsset('asset-project');
   await deleteMediaLibraryAsset('missing');
 
-  expect(deleteRecording).toHaveBeenCalledWith('recording-1');
-  expect(deleteProjectExport).toHaveBeenCalledWith('export-1');
-  expect(deleteRecording).toHaveBeenCalledOnce();
-  expect(deleteProjectAsset).toHaveBeenCalledWith('project-asset-1');
-  expect(mocks.txDelete).toHaveBeenCalledWith('asset-recording');
-  expect(mocks.txDelete).toHaveBeenCalledWith('asset-export');
-  expect(mocks.txDelete).toHaveBeenCalledWith('asset-project');
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-recording', []);
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-export', []);
+  expect(mocks.deleteCascade).toHaveBeenCalledWith('asset-project', []);
+  expect(mocks.txDelete).not.toHaveBeenCalledWith('asset-export');
 });

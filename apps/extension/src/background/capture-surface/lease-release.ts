@@ -19,12 +19,7 @@ export class CaptureSurfaceLeaseRelease {
     const state = this.requireExactTopLease(request);
     if (state.entry.phase !== 'conflict') throw new CaptureSurfaceError('stale-generation');
     const stack = this.registry.getStack(state.entry.tabId);
-    const parent = stack?.at(-2);
-    this.registry.remove(state);
-    if (parent) {
-      parent.entry.phase = 'conflict';
-      parent.entry.updatedAt = this.registry.nextTimestamp();
-    }
+    for (const abandoned of [...(stack ?? [])]) this.registry.remove(abandoned);
     await this.registry.persist();
   }
 
@@ -47,6 +42,17 @@ export class CaptureSurfaceLeaseRelease {
     const parent = stack?.at(-1);
     if (parent) parent.entry.phase = 'applied';
     await this.registry.persist();
+  }
+
+  private async releaseOrAbandon(state: CaptureSurfaceLeaseState): Promise<void> {
+    try {
+      await this.release(state.applied);
+    } catch (error) {
+      if (!(error instanceof CaptureSurfaceError) || error.code !== 'restore-conflict') {
+        throw error;
+      }
+      await this.abandonConflicted(state.applied);
+    }
   }
 
   private requireExactTopLease(request: CaptureSurfaceReleaseRequest): CaptureSurfaceLeaseState {
@@ -85,7 +91,7 @@ export class CaptureSurfaceLeaseRelease {
         tabId: top.entry.tabId,
         target: 'window',
       });
-      await this.release(top.applied);
+      await this.releaseOrAbandon(top);
     }
   }
 
@@ -96,7 +102,7 @@ export class CaptureSurfaceLeaseRelease {
       if (owned.length === 0) return;
       const top = stack!.at(-1)!;
       if (owners.has(top.entry.owner)) {
-        await this.release(top.applied);
+        await this.releaseOrAbandon(top);
         continue;
       }
       const suspended = owned.at(-1)!;

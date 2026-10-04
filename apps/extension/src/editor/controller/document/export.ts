@@ -18,6 +18,11 @@ import type {
 } from '../../document/model/render-options';
 
 import type { SourceState } from '../../document/model/source-state';
+import {
+  getEditorEditingDocumentSize,
+  getEditorWorkspaceMargin,
+} from '../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 export function buildEditorCanvasDocument(options: {
   canvas: Canvas | null;
@@ -25,6 +30,7 @@ export function buildEditorCanvasDocument(options: {
   canvasDocumentSize: { width: number; height: number };
   frame: EditorFrameSettings;
   browserFrame: BrowserFrameState;
+  displayName?: string;
 }): EditorDocument {
   if (!options.canvas || !options.source) {
     throw new Error(translate('editor.runtime.editorNotInitialized'));
@@ -34,6 +40,7 @@ export function buildEditorCanvasDocument(options: {
     version: 2,
     sourceImageData: options.source.dataUrl,
     sourceName: options.source.name,
+    ...(options.displayName === undefined ? {} : { displayName: options.displayName }),
     sourceWidth: options.source.intrinsicWidth,
     sourceHeight: options.source.intrinsicHeight,
     canvasWidth: options.canvasDocumentSize.width,
@@ -65,7 +72,38 @@ function resolveRenderedCanvasElement(
   canvas: Canvas,
   outputSize?: EditorRenderedImageSize
 ): HTMLCanvasElement {
-  const sourceCanvas = canvas.toCanvasElement(1);
+  const cropGuides = canvas.getObjects().filter((object) => object.sniptaleRole === 'crop-guide');
+  const visibility = cropGuides.map((object) => object.visible);
+  cropGuides.forEach((object) => {
+    object.visible = false;
+  });
+  let sourceCanvas: HTMLCanvasElement;
+  try {
+    const documentSize = getEditorEditingDocumentSize(canvas);
+    const margin = documentSize ? getEditorWorkspaceMargin(documentSize) : 0;
+    sourceCanvas =
+      canvas instanceof EditorCanvas && canvas.hasVirtualViewport
+        ? canvas.renderDocumentCanvas(
+            documentSize && outputSize
+              ? Math.min(
+                  normalizeOutputSize(outputSize).width / documentSize.width,
+                  normalizeOutputSize(outputSize).height / documentSize.height
+                )
+              : 1
+          )
+        : documentSize
+          ? canvas.toCanvasElement(1, {
+              left: margin,
+              top: margin,
+              width: documentSize.width,
+              height: documentSize.height,
+            })
+          : canvas.toCanvasElement(1);
+  } finally {
+    cropGuides.forEach((object, index) => {
+      object.visible = visibility[index] ?? true;
+    });
+  }
   if (!outputSize) {
     return sourceCanvas;
   }

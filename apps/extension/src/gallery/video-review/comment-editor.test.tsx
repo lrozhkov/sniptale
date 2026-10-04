@@ -2,6 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ReviewInspectorPresentation } from './inspector-sections';
 import { ReviewCanvasCommentEditor, ReviewCanvasCommentsSection } from './comment-editor';
 import { createCanvasComment } from '../../features/video/review/comments';
 import type { CanvasComment, ReviewAnnotation } from '../../features/video/review/types';
@@ -224,4 +225,135 @@ it('keeps intermediate numeric input and commits the complete style with pending
     text: 'New text',
     style: { ...comment().style, fontSize: 18 },
   });
+});
+
+it('groups existing overlay settings and keeps delete outside routine toggles', async () => {
+  const render = (mode: 'all' | 'sections') =>
+    root.render(
+      <ReviewInspectorPresentation value={mode}>
+        <ReviewCanvasCommentEditor
+          comment={comment()}
+          annotations={[]}
+          duration={10}
+          busy={false}
+          onPatch={vi.fn()}
+          onSwitchAttachment={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      </ReviewInspectorPresentation>
+    );
+  await act(async () => render('all'));
+  const remove = host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')!;
+  expect(remove.closest('[data-inspector-choices]')).toBeNull();
+  expect(host.querySelectorAll('[data-level="section"]')).toHaveLength(3);
+  await act(async () => render('sections'));
+  expect(host.querySelectorAll('nav button')).toHaveLength(3);
+  expect(host.querySelector('textarea')).not.toBeNull();
+  await act(async () => (host.querySelectorAll('nav button')[1] as HTMLButtonElement).click());
+  expect(host.querySelector('input[min="10"]')).not.toBeNull();
+  expect(host.querySelector('textarea')).toBeNull();
+});
+
+it('keeps linked annotation text read-only without copying it into appearance patches', async () => {
+  const onPatch = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewCanvasCommentEditor
+        comment={{ ...comment(), annotationId: 'a1' }}
+        annotations={annotations}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const area = host.querySelector('textarea')!;
+  expect(area.disabled).toBe(true);
+  expect(area.readOnly).toBe(true);
+  expect(area.value).toBe('');
+  expect(area.placeholder).toBe('gallery.videoReview.overlayLinkedHint');
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayVisible"]')!
+      .click()
+  );
+  expect(onPatch).toHaveBeenCalledWith({ visible: false });
+});
+
+it('commits a pending text draft when focus leaves the inspector', async () => {
+  const onPatch = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const area = host.querySelector('textarea')!;
+  await act(async () => {
+    area.focus();
+    typeValue(area, 'Leaving inspector');
+    area.blur();
+  });
+  expect(onPatch).toHaveBeenCalledWith({ text: 'Leaving inspector' });
+});
+
+it('disables text editing while the existing comment is busy', async () => {
+  await act(async () =>
+    root.render(
+      <ReviewCanvasCommentEditor
+        comment={comment()}
+        annotations={[]}
+        duration={10}
+        busy={true}
+        onPatch={vi.fn()}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  expect(host.querySelector('textarea')!.disabled).toBe(true);
+  expect(
+    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.overlayDelete"]')!
+      .disabled
+  ).toBe(true);
+});
+
+it('preserves stored numeric values when an empty draft loses focus', async () => {
+  const onPatch = vi.fn();
+  const stored = {
+    ...comment(),
+    style: { ...comment().style, width: 300, fontSize: 18, padding: 12, radius: 8 },
+  };
+  await act(async () =>
+    root.render(
+      <ReviewCanvasCommentEditor
+        comment={stored}
+        annotations={[]}
+        duration={10}
+        busy={false}
+        onPatch={onPatch}
+        onSwitchAttachment={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const input = host.querySelector<HTMLInputElement>('input[min="10"]')!;
+  expect(input.value).toBe('18');
+  await act(async () => {
+    input.focus();
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.blur();
+  });
+  expect(input.value).toBe('18');
+  expect(onPatch).toHaveBeenCalledWith({ text: 'Hello', style: stored.style });
 });

@@ -25,14 +25,18 @@ const db = {
   ),
   transaction: vi.fn((names: string | string[]) => {
     const allowed = new Set(Array.isArray(names) ? names : [names]);
+    const before = new Map([...allowed].map((name) => [name, new Map(getStore(name))]));
     return {
-      abort: vi.fn(),
+      abort: vi.fn(() => {
+        for (const [name, rows] of before) stores.set(name, rows);
+      }),
       done: Promise.resolve(),
       objectStore: (name: string) => {
         if (!allowed.has(name)) throw new Error(`Unexpected store ${name}`);
         return {
           delete: async (id: unknown) => void getStore(name).delete(normalizeKey(id)),
           get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
+          getAll: async () => [...getStore(name).values()],
           index: () => ({
             count: async (assetId: string) =>
               [...getStore(name).values()].filter(
@@ -68,11 +72,16 @@ const db = {
   }),
 };
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   AGGREGATE_PRESENTATIONS_STORE: 'aggregate_presentations',
   ASSET_OPERATIONS_STORE: 'asset_operations',
   ASSET_OWNERS_STORE: 'asset_owners',
   ASSET_REFS_STORE: 'asset_refs',
+  MEDIA_LIBRARY_STORE: 'media_library',
+  PROJECT_ASSETS_STORE: 'project_assets',
+  VIDEO_PROJECTS_STORE: 'video_projects',
+  STORE_NAME: 'recordings',
   SCENARIO_ASSETS_STORE: 'scenario_assets',
   SCENARIO_EXPORTS_STORE: 'scenario_exports',
   SCENARIO_PROJECTS_STORE: 'scenario_projects',
@@ -80,7 +89,9 @@ vi.mock('../infrastructure/indexed-db/core', () => ({
   initDB: vi.fn(async () => db),
 }));
 
-vi.mock('../assets', () => ({
+vi.mock('../assets', async () => ({
+  parseAssetOwner: (await vi.importActual<typeof import('../assets/guards')>('../assets/guards'))
+    .parseAssetOwner,
   buildPhysicalDeleteOperation: () => ({
     assetIds: [],
     createdAt: 1,
@@ -95,7 +106,9 @@ vi.mock('../assets', () => ({
     createdAt: 1,
     journalId: 'journal-1',
   })),
+  deleteReadyJournal: vi.fn(async () => undefined),
   deleteAssetObject: vi.fn(async () => undefined),
+  cancelAssetPublication: vi.fn(async () => undefined),
   discardPreparedAsset: vi.fn(async () => undefined),
   parseAssetRef: (value: unknown) => value,
   publishReadyJournalWithRetry: vi.fn(async (journal, publish) => publish(journal)),
@@ -176,6 +189,10 @@ beforeEach(() => {
     'asset_operations',
     'asset_owners',
     'asset_refs',
+    'media_library',
+    'project_assets',
+    'video_projects',
+    'recordings',
     'scenario_assets',
     'scenario_exports',
     'scenario_projects',

@@ -114,7 +114,11 @@ it('persists gallery and scenario outputs before returning the capture payload',
     payload: { dataUrl: 'data:image/png;base64,1', jobId: 'job-1' },
   });
 
-  expect(ports.generateFilename).toHaveBeenCalledWith('visible', 'png');
+  expect(ports.generateFilename).toHaveBeenCalledWith(
+    'visible',
+    'png',
+    expect.objectContaining({ imageFormat: 'png' })
+  );
   expect(ports.saveScreenshotToMediaHubFromDataUrl).toHaveBeenCalledWith(
     'data:image/png;base64,1',
     'visible.png',
@@ -163,4 +167,49 @@ it('marks the capture job failed when persistence rejects', async () => {
   expect(ports.transitionCaptureJob).toHaveBeenCalledWith('job-2', 'failed', {
     error: 'gallery unavailable',
   });
+});
+
+it('carries custom image rules into an edited capture and preserves its publication identity', async () => {
+  const { createScreenshotFilename } = await import('../../../workflows/file-naming');
+  const ports = createPorts(
+    createSettings({ filenameRules: { template: 'Project', images: 'Image' } })
+  );
+  ports.generateFilename = createScreenshotFilename;
+  const result = await runStartCaptureUseCase(
+    {
+      actionType: 'edit',
+      capture: async () => 'data:image/png;base64,image',
+      captureTarget: 'visible',
+      resolvedTabId: 1,
+      scenarioCapture: undefined,
+      scenarioSessionService: createScenarioSessionServiceStub(),
+    },
+    ports
+  );
+  expect(result.filename).toBe('Image_visible.png');
+  expect(result.payload).toEqual({ assetId: 'asset-1', dataUrl: 'data:image/png;base64,image' });
+  expect(ports.saveScreenshotToMediaHubFromDataUrl).toHaveBeenCalledWith(
+    'data:image/png;base64,image',
+    'Image_visible.png',
+    1,
+    'temporary'
+  );
+});
+
+it('propagates a persistence failure even when the job cannot be marked failed', async () => {
+  const ports = createPorts();
+  vi.mocked(ports.saveScreenshotToMediaHubFromDataUrl).mockRejectedValueOnce('unavailable');
+  vi.mocked(ports.transitionCaptureJob).mockRejectedValueOnce(new Error('job gone'));
+  await expect(
+    runStartCaptureUseCase(
+      {
+        capture: async () => ({ dataUrl: 'data:image/png;base64,image', jobId: 'gone' }),
+        captureTarget: 'visible',
+        resolvedTabId: 1,
+        scenarioCapture: undefined,
+        scenarioSessionService: createScenarioSessionServiceStub(),
+      },
+      ports
+    )
+  ).rejects.toBe('unavailable');
 });

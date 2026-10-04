@@ -78,11 +78,15 @@ it('derives preview geometry and starts drawing only while open with an image', 
 
   expect(lastHook?.previewSize).toEqual({ height: 80, width: 140 });
   expect(lastHook?.viewportCenter).toEqual({ x: 0.125, y: 0.25 });
-  expect(lastHook?.viewportFrame).toEqual({ height: 40, left: 0, top: 0, width: 35 });
+  expect(lastHook?.contentRect).toEqual({ height: 70, left: 0, top: 5, width: 140 });
+  expect(lastHook?.viewportFrame).toEqual({ height: 35, left: 0, top: 5, width: 35 });
   expect(mocks.startLoop).not.toHaveBeenCalled();
 
   act(() => root?.render(<Probe hasImage open />));
   expect(mocks.startLoop).toHaveBeenCalledOnce();
+  expect(mocks.startLoop).toHaveBeenCalledWith(
+    expect.objectContaining({ documentSize: { width: 800, height: 400 } })
+  );
 });
 
 it('routes preview client points through navigation helper and cleans up drawing', () => {
@@ -96,4 +100,15 @@ it('routes preview client points through navigation helper and cleans up drawing
 
   act(() => root?.unmount());
   expect(mocks.stopLoop).toHaveBeenCalledOnce();
+});
+
+it('cancels the drawing loop and discards the previous drag when reopened', () => {
+  renderProbe({ hasImage: true, open: true });
+  lastHook!.dragPointerIdRef.current = 17;
+  act(() => root?.render(<Probe hasImage open={false} />));
+  expect(mocks.stopLoop).toHaveBeenCalledOnce();
+  expect(lastHook!.dragPointerIdRef.current).toBeNull();
+  act(() => root?.render(<Probe hasImage open />));
+  expect(lastHook!.dragPointerIdRef.current).toBeNull();
+  expect(mocks.startLoop).toHaveBeenCalledTimes(2);
 });

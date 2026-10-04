@@ -1,3 +1,4 @@
+import type { ProjectAssetPublicationOptions } from '../../composition/persistence/projects/index';
 import {
   addMediaLibraryEntryTags,
   deleteMediaLibraryAsset,
@@ -32,6 +33,8 @@ import { translate } from '../../platform/i18n';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 import { assertSafeProjectAssetStorageInput } from '../../features/media-hub/project-assets';
 import { withMediaHubWriteGuard } from '../../features/media-hub/storage-errors';
+import { PrimaryMediaAssetDeleteError } from '../../composition/persistence/media-library/deletion-errors';
+import type { MediaAssetProjectUsage } from '../../composition/persistence/media-library/usage';
 
 export { deleteStorageCleanupCandidatesSafely, getStorageCleanupReport } from './store.cleanup';
 
@@ -122,14 +125,17 @@ export async function saveProjectAssetSafely(
   id: string,
   blob: Blob,
   mimeType: string,
-  filename = id
+  filename = id,
+  createdAt = Date.now(),
+  options: ProjectAssetPublicationOptions = {}
 ): Promise<void> {
   assertSafeMediaFilename(filename);
   assertSafeProjectAssetStorageInput(blob, mimeType);
   await withMediaHubWriteGuard(translate('shared.mediaHub.saveProjectAssetAction'), () =>
-    saveProjectAsset(id, blob, mimeType, filename)
+    saveProjectAsset(id, blob, mimeType, filename, createdAt, options)
   );
-  publishMediaHubLibraryChanged('create', [`project-asset:${id}`]);
+  if (options.publishToLibrary !== false)
+    publishMediaHubLibraryChanged('create', [`project-asset:${id}`]);
 }
 
 export async function saveProjectExportSafely(entry: SaveProjectExportInput): Promise<void> {
@@ -170,13 +176,27 @@ export async function addMediaLibraryEntryTagsSafely(
   publishMediaHubLibraryChanged('update', [assetId]);
 }
 
-export async function deleteMediaLibraryAssetsBatchSafely(assetIds: string[]): Promise<void> {
-  await withMediaHubWriteGuard(translate('shared.mediaHub.deleteMediaBatchAction'), async () => {
-    for (const assetId of assetIds) {
-      await deleteMediaLibraryAsset(assetId);
-    }
-  });
-  publishMediaHubLibraryChanged('delete', assetIds);
+export async function deleteMediaLibraryAssetsBatchSafely(
+  assetIds: string[],
+  expectedUsageById?: ReadonlyMap<string, readonly MediaAssetProjectUsage[]>
+): Promise<void> {
+  try {
+    await withMediaHubWriteGuard(translate('shared.mediaHub.deleteMediaBatchAction'), async () => {
+      if (assetIds.some((id) => expectedUsageById?.get(id)?.some((usage) => usage.primary))) {
+        throw new PrimaryMediaAssetDeleteError();
+      }
+      for (const assetId of assetIds) {
+        const expectedUsage = expectedUsageById?.get(assetId);
+        await deleteMediaLibraryAsset(
+          assetId,
+          expectedUsage === undefined ? {} : { expectedUsage }
+        );
+      }
+    });
+  } finally {
+    // A later item can fail after earlier commits. Always invalidate the visible list.
+    publishMediaHubLibraryChanged('delete', assetIds);
+  }
 }
 
 export async function deleteOrphanedRawRecordingsSafely(recordingIds: string[]): Promise<void> {

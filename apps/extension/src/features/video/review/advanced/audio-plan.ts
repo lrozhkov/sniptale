@@ -11,6 +11,8 @@ export interface QuickEditAudioPlanEntry {
   volume: number;
   fadeIn: number;
   fadeOut: number;
+  playbackRate?: number;
+  fadePhase?: { offset: number; duration: number };
 }
 
 /**
@@ -32,6 +34,8 @@ export function buildQuickEditAudioPlan(args: {
       volume: clip.muted ? 0 : clip.volume,
       fadeIn: clip.fadeIn,
       fadeOut: clip.fadeOut,
+      ...(clip.playbackRate ? { playbackRate: clip.playbackRate } : {}),
+      ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
     }))
   );
 }
@@ -41,26 +45,36 @@ type QuickEditAudioEnvelope = readonly (readonly [number, number])[];
 
 /** Clip-local gain envelope; a mid-clip start resumes at the matching gain. */
 export function buildQuickEditClipEnvelope(args: {
-  entry: Pick<QuickEditAudioPlanEntry, 'volume' | 'fadeIn' | 'fadeOut'>;
+  entry: Pick<
+    QuickEditAudioPlanEntry,
+    'volume' | 'fadeIn' | 'fadeOut' | 'playbackRate' | 'fadePhase'
+  >;
   duration: number;
   elapsed: number;
 }): QuickEditAudioEnvelope {
   const { volume, fadeIn, fadeOut } = args.entry;
   const duration = Math.max(0, args.duration);
   const elapsed = Math.min(Math.max(0, args.elapsed), duration);
+  const rate = args.entry.playbackRate ?? 1;
+  const phaseOffset = args.entry.fadePhase?.offset ?? 0;
+  const phaseDuration = args.entry.fadePhase?.duration ?? duration;
   const gainAt = (time: number) => {
+    const phase = phaseOffset + time * rate;
     let gain = volume;
-    if (fadeIn > 0 && time < fadeIn) gain = Math.min(gain, (volume * time) / fadeIn);
-    if (fadeOut > 0 && duration - time < fadeOut)
-      gain = Math.min(gain, (volume * (duration - time)) / fadeOut);
+    if (fadeIn > 0 && phase < fadeIn) gain = Math.min(gain, (volume * phase) / fadeIn);
+    if (fadeOut > 0 && phaseDuration - phase < fadeOut)
+      gain = Math.min(gain, (volume * (phaseDuration - phase)) / fadeOut);
     return Math.max(0, gain);
   };
   const points: [number, number][] = [[elapsed, gainAt(elapsed)]];
-  if (fadeIn > 0 && fadeIn < duration && fadeIn > elapsed) points.push([fadeIn, gainAt(fadeIn)]);
-  const fadeOutStart = duration - fadeOut;
-  if (fadeOut > 0 && fadeOutStart > elapsed && fadeOutStart > 0)
+  const fadeInEnd = (fadeIn - phaseOffset) / rate;
+  if (fadeIn > 0 && fadeInEnd < duration && fadeInEnd > elapsed)
+    points.push([fadeInEnd, gainAt(fadeInEnd)]);
+  const fadeOutStart = (phaseDuration - fadeOut - phaseOffset) / rate;
+  if (fadeOut > 0 && fadeOutStart > elapsed && fadeOutStart > 0 && fadeOutStart < duration)
     points.push([fadeOutStart, gainAt(fadeOutStart)]);
-  points.push([duration, 0]);
+  // The scheduled source stops at the clip end; only an authored fade lowers its gain.
+  points.push([duration, gainAt(duration)]);
   return points;
 }
 
@@ -71,6 +85,7 @@ export interface QuickEditClipSchedule {
   offset: number;
   /** Seconds of asset to play. */
   duration: number;
+  playbackRate?: number;
   /** Audio-clock gain automation points. */
   envelope: QuickEditAudioEnvelope;
 }
@@ -96,8 +111,9 @@ export function planQuickEditClipPlayback(args: {
   }).map(([local, value]) => [when + (local - Math.max(0, elapsed)), value] as const);
   return {
     when,
-    offset: args.entry.sourceOffset + Math.max(0, elapsed),
-    duration: remaining,
+    offset: args.entry.sourceOffset + Math.max(0, elapsed) * (args.entry.playbackRate ?? 1),
+    duration: remaining * (args.entry.playbackRate ?? 1),
+    ...(args.entry.playbackRate ? { playbackRate: args.entry.playbackRate } : {}),
     envelope,
   };
 }

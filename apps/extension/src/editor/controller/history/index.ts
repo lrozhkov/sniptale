@@ -2,17 +2,198 @@ import { isEditorDocument } from '../../../features/editor/document/guards';
 import { type EditorDocument } from '../../../features/editor/document/types';
 import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
 
-export function createEditorSnapshotHistory(document: EditorDocument): SnapshotHistory<string> {
-  return new SnapshotHistory<string>(JSON.stringify(document));
+const HISTORY_BINARY_INLINE_LIMIT = 4_096;
+const HISTORY_BINARY_TOKEN_PREFIX = 'sniptale-history-asset:';
+const CANVAS_BINARY_FIELDS = new Set([
+  'src',
+  'sniptaleBackgroundImageData',
+  'sniptaleBlurSourceData',
+]);
+const DOCUMENT_BINARY_FIELDS = new Set([
+  'sourceImageData',
+  'backgroundImageData',
+  'faviconDataUrl',
+]);
+
+type EditorHistoryAssets = {
+  byUrl: Map<string, string>;
+  byToken: Map<string, string>;
+  tokensBySnapshot: Map<string, Set<string>>;
+  nextId: number;
+};
+
+const historyAssets = new WeakMap<SnapshotHistory<string>, EditorHistoryAssets>();
+
+function encodeBinary(
+  value: unknown,
+  key: string,
+  assets: EditorHistoryAssets,
+  tokens: Set<string>
+): unknown {
+  if (
+    typeof value !== 'string' ||
+    !value.startsWith('data:') ||
+    value.length < HISTORY_BINARY_INLINE_LIMIT ||
+    !(DOCUMENT_BINARY_FIELDS.has(key) || CANVAS_BINARY_FIELDS.has(key))
+  ) {
+    return value;
+  }
+  const existing = assets.byUrl.get(value);
+  if (existing) {
+    tokens.add(existing);
+    return existing;
+  }
+  const token = `${HISTORY_BINARY_TOKEN_PREFIX}${assets.nextId++}`;
+  assets.byUrl.set(value, token);
+  assets.byToken.set(token, value);
+  tokens.add(token);
+  return token;
 }
 
-function parseEditorSnapshotDocument(value: string): EditorDocument | null {
+function encodeEditorSnapshot(
+  document: EditorDocument,
+  assets: EditorHistoryAssets,
+  tokens: Set<string>
+): string {
+  return JSON.stringify(document, (key, value: unknown) => {
+    if (key === 'canvasJson' && typeof value === 'string') {
+      return JSON.stringify(JSON.parse(value) as unknown, (canvasKey, canvasValue: unknown) =>
+        encodeBinary(canvasValue, canvasKey, assets, tokens)
+      );
+    }
+    return encodeBinary(value, key, assets, tokens);
+  });
+}
+
+function decodeEditorSnapshot(value: string, assets?: EditorHistoryAssets): unknown {
+  const document = JSON.parse(value) as unknown;
+  if (!assets || !isRecord(document)) return document;
+  restoreBinaryFields(document, DOCUMENT_BINARY_FIELDS, assets);
+  const canvasJson = document['canvasJson'];
+  if (typeof canvasJson === 'string') {
+    const canvas = JSON.parse(canvasJson) as unknown;
+    if (canvasJson.includes(HISTORY_BINARY_TOKEN_PREFIX)) {
+      restoreBinaryFields(canvas, CANVAS_BINARY_FIELDS, assets);
+    }
+    document['canvasJson'] = JSON.stringify(canvas);
+  }
+  return document;
+}
+
+function restoreBinaryFields(
+  root: unknown,
+  fieldNames: ReadonlySet<string>,
+  assets: EditorHistoryAssets
+): void {
+  const pending: unknown[] = [root];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (Array.isArray(current)) {
+      for (const child of current) {
+        if (typeof child === 'object' && child !== null) pending.push(child);
+      }
+      continue;
+    }
+    if (!isRecord(current)) continue;
+    for (const [key, child] of Object.entries(current)) {
+      if (typeof child === 'string' && fieldNames.has(key)) {
+        current[key] = assets.byToken.get(child) ?? child;
+      } else if (typeof child === 'object' && child !== null) {
+        pending.push(child);
+      }
+    }
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function pruneEditorHistoryAssets(
+  history: SnapshotHistory<string>,
+  assets: EditorHistoryAssets
+): void {
+  const retainedSnapshots = new Set(history.getSnapshots());
+  for (const snapshot of assets.tokensBySnapshot.keys()) {
+    if (!retainedSnapshots.has(snapshot)) assets.tokensBySnapshot.delete(snapshot);
+  }
+  const retained = new Set<string>();
+  for (const tokens of assets.tokensBySnapshot.values()) {
+    for (const token of tokens) retained.add(token);
+  }
+  for (const [token, url] of assets.byToken) {
+    if (retained.has(token)) continue;
+    assets.byToken.delete(token);
+    assets.byUrl.delete(url);
+  }
+}
+
+export function createEditorSnapshotHistory(document: EditorDocument): SnapshotHistory<string> {
+  const assets: EditorHistoryAssets = {
+    byUrl: new Map(),
+    byToken: new Map(),
+    tokensBySnapshot: new Map(),
+    nextId: 0,
+  };
+  const tokens = new Set<string>();
+  const snapshot = encodeEditorSnapshot(document, assets, tokens);
+  const history = new SnapshotHistory<string>(snapshot);
+  assets.tokensBySnapshot.set(snapshot, tokens);
+  historyAssets.set(history, assets);
+  return history;
+}
+
+export function resetEditorSnapshotHistory(
+  history: SnapshotHistory<string>,
+  document: EditorDocument
+): void {
+  const assets = historyAssets.get(history);
+  const tokens = new Set<string>();
+  const snapshot = assets
+    ? encodeEditorSnapshot(document, assets, tokens)
+    : JSON.stringify(document);
+  history.reset(snapshot);
+  if (assets) {
+    assets.tokensBySnapshot.clear();
+    assets.tokensBySnapshot.set(snapshot, tokens);
+  }
+  if (assets) pruneEditorHistoryAssets(history, assets);
+}
+
+export function readCurrentEditorSnapshot(
+  history: SnapshotHistory<string> | null
+): EditorDocument | null {
+  return history
+    ? parseEditorSnapshotDocument(history.getCurrent(), historyAssets.get(history))
+    : null;
+}
+
+function parseEditorSnapshotDocument(
+  value: string,
+  assets?: EditorHistoryAssets
+): EditorDocument | null {
   try {
-    const parsed: unknown = JSON.parse(value);
-    return isEditorDocument(parsed) ? parsed : null;
+    const parsed = decodeEditorSnapshot(value, assets);
+    return isEditorHistoryDocument(parsed) ? parsed : null;
   } catch {
     return null;
   }
+}
+
+function isEditorHistoryDocument(value: unknown): value is EditorDocument {
+  if (isEditorDocument(value)) return true;
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('sourceImageData' in value) ||
+    typeof value.sourceImageData !== 'string' ||
+    !value.sourceImageData.startsWith('blob:') ||
+    value.sourceImageData.length <= 'blob:'.length
+  ) {
+    return false;
+  }
+  // Legacy history can contain runtime Blob URLs; import validation still requires image data URLs.
+  return isEditorDocument({ ...value, sourceImageData: 'data:image/png;base64,QUJDRA==' });
 }
 
 export function undoEditorSnapshot(history: SnapshotHistory<string> | null): EditorDocument | null {
@@ -21,7 +202,12 @@ export function undoEditorSnapshot(history: SnapshotHistory<string> | null): Edi
     return null;
   }
 
-  return parseEditorSnapshotDocument(state.current);
+  const document = parseEditorSnapshotDocument(
+    state.current,
+    history ? historyAssets.get(history) : undefined
+  );
+  if (!document) history?.redo();
+  return document;
 }
 
 export function redoEditorSnapshot(history: SnapshotHistory<string> | null): EditorDocument | null {
@@ -30,7 +216,12 @@ export function redoEditorSnapshot(history: SnapshotHistory<string> | null): Edi
     return null;
   }
 
-  return parseEditorSnapshotDocument(state.current);
+  const document = parseEditorSnapshotDocument(
+    state.current,
+    history ? historyAssets.get(history) : undefined
+  );
+  if (!document) history?.undo();
+  return document;
 }
 
 export function pushEditorSnapshotHistory(options: {
@@ -42,6 +233,13 @@ export function pushEditorSnapshotHistory(options: {
     return false;
   }
 
-  options.history.push(JSON.stringify(options.exportDocument()));
+  const assets = historyAssets.get(options.history);
+  const tokens = new Set<string>();
+  const snapshot = assets
+    ? encodeEditorSnapshot(options.exportDocument(), assets, tokens)
+    : JSON.stringify(options.exportDocument());
+  options.history.push(snapshot);
+  if (assets) assets.tokensBySnapshot.set(snapshot, tokens);
+  if (assets) pruneEditorHistoryAssets(options.history, assets);
   return true;
 }

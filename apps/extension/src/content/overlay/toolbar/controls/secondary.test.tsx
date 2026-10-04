@@ -24,7 +24,9 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
 
 vi.mock('../capture', () => ({
   ToolbarCaptureActions: (props: {
+    autoBlurEnabled?: boolean;
     displayMode: string;
+    isNavigationMode?: boolean;
     onPinToTabChange: () => void;
     pinToTab: boolean;
     pinToTabAvailable: boolean;
@@ -34,6 +36,8 @@ vi.mock('../capture', () => ({
     <div
       data-ui="test.capture-actions"
       data-display-mode={props.displayMode}
+      data-navigation-mode={props.isNavigationMode ? 'true' : 'false'}
+      data-auto-blur-enabled={props.autoBlurEnabled ? 'true' : 'false'}
       data-pin-to-tab={props.pinToTab ? 'true' : 'false'}
       data-pin-to-tab-available={props.pinToTabAvailable ? 'true' : 'false'}
       data-pin-to-tab-locked={props.pinToTabLocked ? 'true' : 'false'}
@@ -78,9 +82,16 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function createToolbarProps(params?: { designReviewPanelOpen?: boolean; isCursorMode?: boolean }) {
+function createToolbarProps(params?: {
+  autoBlurEnabled?: boolean;
+  designReviewPanelOpen?: boolean;
+  isCursorMode?: boolean;
+}) {
   return {
     aiPickMode: false,
+    ...(params?.autoBlurEnabled === undefined
+      ? {}
+      : { autoBlur: { autoApplyEnabled: params.autoBlurEnabled } }),
     currentViewport: null,
     framesCount: 0,
     designReviewPanelOpen: params?.designReviewPanelOpen ?? false,
@@ -176,6 +187,7 @@ function createViewModel(params: {
 }
 
 async function renderSecondaryControls(params: {
+  autoBlurEnabled?: boolean;
   captureAction: 'download_default' | 'scenario';
   designReviewMode?: boolean;
   designReviewPanelOpen?: boolean;
@@ -196,6 +208,9 @@ async function renderSecondaryControls(params: {
       <ToolbarSecondaryControls
         toolbarProps={
           createToolbarProps({
+            ...(params.autoBlurEnabled === undefined
+              ? {}
+              : { autoBlurEnabled: params.autoBlurEnabled }),
             ...(params.designReviewPanelOpen === undefined
               ? {}
               : { designReviewPanelOpen: params.designReviewPanelOpen }),
@@ -275,6 +290,25 @@ async function verifiesModeDependentUtilityVisibility() {
     document
       .querySelector('[data-ui="test.capture-actions"]')
       ?.getAttribute('data-pin-to-tab-locked')
+  ).toBe('false');
+}
+
+async function verifiesNavigationActionsReachCaptureGroup() {
+  await renderSecondaryControls({
+    autoBlurEnabled: true,
+    captureAction: 'download_default',
+    isCursorMode: true,
+  });
+  const capture = document.querySelector('[data-ui="test.capture-actions"]');
+  expect(capture?.getAttribute('data-navigation-mode')).toBe('true');
+  expect(capture?.getAttribute('data-auto-blur-enabled')).toBe('true');
+
+  await renderSecondaryControls({
+    captureAction: 'download_default',
+    designReviewMode: true,
+  });
+  expect(
+    document.querySelector('[data-ui="test.capture-actions"]')?.getAttribute('data-navigation-mode')
   ).toBe('false');
 }
 
@@ -363,6 +397,10 @@ describe('ToolbarSecondaryControls', () => {
   it(
     'forwards mode-dependent utility visibility and persisted display mode state',
     verifiesModeDependentUtilityVisibility
+  );
+  it(
+    'forwards Navigation pin controls to the capture group',
+    verifiesNavigationActionsReachCaptureGroup
   );
   it(
     'suppresses cursor-only utility controls while a quick-edit transition is pending',

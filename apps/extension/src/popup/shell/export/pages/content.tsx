@@ -37,13 +37,13 @@ function renderReadyContent(
   onDestinationChange: (destination: PopupPackageDestination) => void,
   webCopyResources: WebCopyResourcePreferences
 ) {
-  const { derived, preferences, tabs } = controller.state;
+  const { preferences, tabs } = controller.state;
   return (
     <ExportReadySection
       activeSourceMode={tabs.activeSourceMode}
       availableTabs={tabs.availableTabs}
       destination={destination}
-      disabled={Boolean(derived.exportDisabledReason) || !preferences.hasLoadedPreferences}
+      disabled={!preferences.hasLoadedPreferences}
       filterQuery={tabs.filterQuery}
       filteredTabs={tabs.filteredTabs}
       hasLoadedPreferences={preferences.hasLoadedPreferences}

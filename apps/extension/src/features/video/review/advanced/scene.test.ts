@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   computeQuickEditContentRect,
   computeQuickEditSceneLayout,
+  computeQuickEditSceneCamera,
   computeQuickEditVideoTransform,
   evaluateQuickEditCameraAtTime,
   quickEditCanvasPointToContent,
@@ -355,3 +356,56 @@ it('does not let an inactive transition shorten the opposite phase', () => {
   );
   expect(camera.scale).toBeCloseTo(1.5);
 });
+
+it.each(['none', 'linear', 'ease-in-out'] as const)(
+  'keeps background coverage throughout %s zoom with edge camera targets',
+  (type) => {
+    for (const output of [
+      { width: 800, height: 450 },
+      { width: 450, height: 800 },
+    ]) {
+      for (const center of [0, 0.5, 1]) {
+        const regions = [
+          {
+            id: 'zoom',
+            start: 0,
+            end: 4,
+            transform: { scale: 3, centerX: center, centerY: center },
+            enter: { type, duration: 1 },
+            exit: { type, duration: 1 },
+          },
+        ];
+        for (const time of [0, 0.25, 0.5, 1, 2, 3.5, 3.75, 4]) {
+          const camera = evaluateQuickEditCameraAtTime(regions, time);
+          const background = {
+            enabled: true as const,
+            type: 'solid' as const,
+            color: '#000000ff',
+            zoomBehavior: 'follow-video' as const,
+            layout: { padding: 40, cornerRadius: 20 },
+          };
+          const layout = computeQuickEditSceneLayout({
+            output,
+            canvas: output,
+            source: { width: 800, height: 450 },
+            background,
+            camera,
+          });
+          const motion = computeQuickEditSceneCamera(layout, background);
+          expect(motion.videoClip).toEqual(layout.videoTransform);
+          expect(motion.x).toBeLessThanOrEqual(0.000001);
+          expect(motion.y).toBeLessThanOrEqual(0.000001);
+          expect(motion.x + output.width * motion.scale).toBeGreaterThanOrEqual(
+            output.width - 0.000001
+          );
+          expect(motion.y + output.height * motion.scale).toBeGreaterThanOrEqual(
+            output.height - 0.000001
+          );
+          expect(
+            computeQuickEditSceneCamera(layout, { ...background, zoomBehavior: 'fixed' })
+          ).toEqual({ x: 0, y: 0, scale: 1, videoClip: layout.videoRect });
+        }
+      }
+    }
+  }
+);

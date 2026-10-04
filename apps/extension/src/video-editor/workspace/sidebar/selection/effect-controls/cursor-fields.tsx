@@ -209,7 +209,10 @@ function CursorSkinToggles(props: {
         label={translate('videoEditor.sidebar.cursorVisibleLabel')}
         onChange={(checked) => props.onUpdateCursorSkin({ hidden: !checked })}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+      <InspectorDetails
+        preferenceId="cursor-fields:videoEditor.sidebar.inspectorMoreDetails"
+        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+      >
         {' '}
         <CursorSkinToggle
           checked={props.shadow}

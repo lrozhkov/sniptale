@@ -98,6 +98,76 @@ it('rolls the optimistic pin toggle back when background persistence fails', asy
   expect(getLatestState().pinToTab).toBe(false);
 });
 
+it('reports whether the background confirmed a pin request before dependent work proceeds', async () => {
+  await renderHarness();
+  expect(getLatestState().pinToTabConfirmed).toBe(false);
+
+  let accepted = false;
+  await act(async () => {
+    accepted = await getLatestState().setPinToTab(true);
+  });
+  expect(accepted).toBe(true);
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+
+  pinSessionMocks.write.mockResolvedValueOnce({
+    pinToTabAvailable: false,
+    status: 'acknowledged',
+    value: false,
+  });
+  await act(async () => {
+    accepted = await getLatestState().setPinToTab(true);
+  });
+  expect(accepted).toBe(false);
+  expect(getLatestState().pinToTab).toBe(false);
+  expect(getLatestState().pinToTabConfirmed).toBe(false);
+});
+
+it('keeps an optimistic pin unconfirmed until the background responds', async () => {
+  const pending = createDeferred<{
+    pinToTabAvailable: boolean;
+    status: 'acknowledged';
+    value: boolean;
+  }>();
+  pinSessionMocks.write.mockReturnValueOnce(pending.promise);
+  await renderHarness();
+
+  let result: Promise<boolean> | undefined;
+  act(() => {
+    result = getLatestState().setPinToTab(true);
+  });
+  expect(getLatestState().pinToTab).toBe(true);
+  expect(getLatestState().pinToTabConfirmed).toBe(false);
+
+  await act(async () => {
+    pending.resolve({ pinToTabAvailable: true, status: 'acknowledged', value: true });
+    expect(await result).toBe(true);
+  });
+  expect(getLatestState().pinToTabConfirmed).toBe(true);
+});
+
+it('does not accept an acknowledged pin superseded by a later request', async () => {
+  const pending = createDeferred<{
+    pinToTabAvailable: boolean;
+    status: 'acknowledged';
+    value: boolean;
+  }>();
+  pinSessionMocks.write.mockReturnValueOnce(pending.promise);
+  await renderHarness();
+
+  let first: Promise<boolean> | undefined;
+  let second: Promise<boolean> | undefined;
+  act(() => {
+    first = getLatestState().setPinToTab(true);
+    second = getLatestState().setPinToTab(false);
+  });
+  await act(async () => {
+    pending.resolve({ pinToTabAvailable: true, status: 'acknowledged', value: true });
+    expect(await first).toBe(false);
+    expect(await second).toBe(true);
+  });
+  expect(getLatestState().pinToTabConfirmed).toBe(false);
+});
+
 it('refreshes pin availability when the tab regains focus after permission changes', async () => {
   pinSessionMocks.load
     .mockResolvedValueOnce({ pinToTab: true, pinToTabAvailable: true })
@@ -227,7 +297,7 @@ it('rolls back to confirmed authority when a superseded optimistic write is foll
   expect(getLatestState().pinToTab).toBe(false);
 });
 
-it('rolls back to a stale acknowledged write when the current write fails', async () => {
+it('does not treat a superseded acknowledgement as the confirmed current pin', async () => {
   pinSessionMocks.write
     .mockResolvedValueOnce({ pinToTabAvailable: true, status: 'acknowledged', value: true })
     .mockRejectedValueOnce(new Error('runtime unavailable'));
@@ -243,7 +313,8 @@ it('rolls back to a stale acknowledged write when the current write fails', asyn
     await Promise.resolve();
   });
 
-  expect(getLatestState().pinToTab).toBe(true);
+  expect(getLatestState().pinToTab).toBe(false);
+  expect(getLatestState().pinToTabConfirmed).toBe(false);
 });
 
 it('rolls an optimistic toolbar show back when visibility persistence fails', async () => {

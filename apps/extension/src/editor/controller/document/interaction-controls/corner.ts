@@ -1,4 +1,5 @@
 import type { Control, FabricObject } from 'fabric';
+import { createCornerCursorStyleHandler } from '../../../drawing/object/controls/corner-cursor';
 import {
   DEFAULT_CORNER_CONTROLS,
   EDITOR_CORNER_CONTROL_SIZE,
@@ -9,6 +10,7 @@ import {
 import { clamp, isActiveControl } from './base';
 
 type ControlStyleOverride = Parameters<Control['render']>[3];
+const patchedCornerCursors = new WeakSet<Control>();
 
 function getObjectScaledDimension(object: FabricObject, axis: 'height' | 'width'): number {
   const getter = axis === 'width' ? object.getScaledWidth : object.getScaledHeight;
@@ -65,6 +67,10 @@ export function patchCornerControl(control: Control | undefined, key: string): v
 
   control.sizeX = EDITOR_CORNER_CONTROL_SIZE_HOVER;
   control.sizeY = EDITOR_CORNER_CONTROL_SIZE_HOVER;
+  if (!patchedCornerCursors.has(control)) {
+    control.cursorStyleHandler = createCornerCursorStyleHandler(control.cursorStyleHandler);
+    patchedCornerCursors.add(control);
+  }
   control.render = createCornerControlRender(key);
 }
 

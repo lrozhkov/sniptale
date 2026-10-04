@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import {
   VideoExportFormat,
   type VideoExportFormat as VideoExportFormatValue,
@@ -33,7 +34,9 @@ export function parseProjectAssetEntry(value: unknown): StoredProjectAssetEntry 
     !isString(value['assetId']) ||
     !isString(value['mimeType']) ||
     !isNumber(value['createdAt']) ||
-    !isNumber(value['size'])
+    !isNumber(value['size']) ||
+    (value['originMediaId'] !== undefined &&
+      (!isString(value['originMediaId']) || value['originMediaId'].length === 0))
   ) {
     return null;
   }
@@ -43,11 +46,19 @@ export function parseProjectAssetEntry(value: unknown): StoredProjectAssetEntry 
     id: value['id'],
     mimeType: value['mimeType'],
     size: value['size'],
+    ...(typeof value['originMediaId'] === 'string'
+      ? { originMediaId: value['originMediaId'] }
+      : {}),
   };
 }
 
 export function parseProjectExportEntry(value: unknown): StoredProjectExportEntry | null {
   if (!isRecord(value)) return null;
+  const recordingMetadata =
+    value['recordingMetadata'] === undefined
+      ? undefined
+      : parseRecordingMetadata(value['recordingMetadata']);
+  if (recordingMetadata === null) return null;
   const format = value['format'];
   const mimeType = value['mimeType'];
   if (
@@ -77,6 +88,7 @@ export function parseProjectExportEntry(value: unknown): StoredProjectExportEntr
     projectId: value['projectId'],
     size: value['size'],
     width: value['width'],
+    ...(recordingMetadata === undefined ? {} : { recordingMetadata }),
     ...(format === undefined ? {} : { format }),
     ...(mimeType === undefined ? {} : { mimeType }),
   };

@@ -11,7 +11,12 @@ const mocks = vi.hoisted(() => ({
   ]),
   complete: vi.fn(),
   createBlur: vi.fn(() => ({ set: vi.fn(), setCoords: vi.fn() })),
-  createBounds: vi.fn(() => ({ x: 1, y: 2, width: 30, height: 40 })),
+  createBounds: vi.fn((_start: { x: number; y: number }, _point: { x: number; y: number }) => ({
+    x: 1,
+    y: 2,
+    width: 30,
+    height: 40,
+  })),
   createDrawing: vi.fn(),
   createFabric: vi.fn(() => ({ sniptaleId: 'draft-1' })),
   cropDown: vi.fn(() => false),
@@ -20,7 +25,10 @@ const mocks = vi.hoisted(() => ({
   readDrawing: vi.fn(),
   replaceFabric: vi.fn(() => ({ sniptaleId: 'replacement' })),
   state: {
+    canvasCropMode: 'crop',
     toolSettings: {
+      blur: { amount: 20 },
+      arrow: { drawFromTip: false },
       text: {
         backgroundColor: null,
         color: '#111111',
@@ -86,13 +94,16 @@ function createCanvas() {
     _currentTransform: null as null | Record<string, unknown>,
     add: vi.fn(),
     discardActiveObject: vi.fn(),
+    defaultCursor: 'tool-cursor',
     endCurrentTransform: vi.fn(),
     getActiveObjects: vi.fn<() => unknown[]>(() => []),
     getScenePoint: vi.fn(
       (event: { point?: { x: number; y: number } }) => event.point ?? { x: 10, y: 20 }
     ),
+    getZoom: vi.fn(() => 1),
     remove: vi.fn(),
     requestRenderAll: vi.fn(),
+    renderTop: vi.fn(),
     setCursor: vi.fn(),
     setActiveObject: vi.fn(),
     skipTargetFind: false,
@@ -116,6 +127,7 @@ function createBindings(tool = 'pencil') {
     }),
     getActiveTool: vi.fn(() => tool),
     getCanvas: vi.fn(() => canvas),
+    getCanvasDocumentSize: vi.fn(() => ({ width: 800, height: 600 })),
     getDrawSession: vi.fn(() => drawSession),
     getSource: vi.fn(() => ({ id: 'source-1' })),
     nextLabelIndex: vi.fn(() => 1),
@@ -153,6 +165,8 @@ function fabricPointerEvent(pointerId: number): { e: MouseEvent } {
 
 function resetDrawingMocks() {
   vi.clearAllMocks();
+  mocks.state.toolSettings.arrow.drawFromTip = false;
+  mocks.state.canvasCropMode = 'crop';
   mocks.cropDown.mockReturnValue(false);
   mocks.isTextTarget.mockReturnValue(false);
   mocks.isDrawingSelection.mockReturnValue(false);
@@ -162,6 +176,25 @@ function resetDrawingMocks() {
 
 describe('shared drawing event orchestration', () => {
   beforeEach(resetDrawingMocks);
+
+  it('keeps the arrow gesture mode captured at pointer down and preserves its tool cursor', () => {
+    mocks.state.toolSettings.arrow.drawFromTip = true;
+    const arrow = { id: 'arrow-1', kind: 'arrow', start: { x: 10, y: 20 }, end: { x: 10, y: 20 } };
+    mocks.createDrawing.mockReturnValue(arrow);
+    mocks.readDrawing.mockReturnValue(arrow);
+    mocks.updateDrawing.mockReturnValue(arrow);
+    const { bindings, canvas, handlers } = createBindings('arrow');
+    handlers.handleMouseDown(pointerEvent() as never);
+    expect(bindings.setDrawSession).toHaveBeenCalledWith(
+      expect.objectContaining({ arrowDrawFromTip: true })
+    );
+    expect(canvas.setCursor).toHaveBeenCalledWith('tool-cursor');
+    mocks.state.toolSettings.arrow.drawFromTip = false;
+    handlers.handleMouseMove(pointerEvent({ point: { x: 40, y: 35 } }) as never);
+    expect(mocks.updateDrawing).toHaveBeenCalledWith(
+      expect.objectContaining({ arrowFreeAngle: true, arrowFromTip: true })
+    );
+  });
 
   it('routes drawing starts and ignores non-drawing pointer paths', () => {
     const ignored = createBindings('select');
@@ -185,6 +218,42 @@ describe('shared drawing event orchestration', () => {
     expect(frame.bindings.startDrawSession).not.toHaveBeenCalled();
     expect(frame.handlers.handlePathCreated({} as never)).toBeUndefined();
     expect(frame.handlers.handleMouseDownBefore({} as never)).toBeUndefined();
+  });
+
+  it('leaves the expansion guide handles interactive without starting a crop draft', () => {
+    mocks.state.canvasCropMode = 'expand';
+    const { bindings, canvas, handlers } = createBindings('crop');
+    canvas.getActiveObjects.mockReturnValue([{ sniptaleRole: 'crop-guide' }]);
+    handlers.handleMouseDown({
+      ...pointerEvent(),
+      target: { sniptaleRole: 'crop-guide' },
+    } as never);
+
+    expect(mocks.cropDown).toHaveBeenCalledOnce();
+    expect(bindings.startDrawSession).not.toHaveBeenCalled();
+    expect(canvas.skipTargetFind).toBe(false);
+    expect(canvas.discardActiveObject).not.toHaveBeenCalled();
+  });
+
+  it('starts a fresh expansion selection on empty workspace', () => {
+    mocks.state.canvasCropMode = 'expand';
+    const { handlers } = createBindings('crop');
+    handlers.handleMouseDown(pointerEvent() as never);
+    expect(mocks.cropDown).toHaveBeenCalledOnce();
+  });
+
+  it('does not start any drawing tool or change selection on a middle click', () => {
+    for (const tool of ['pencil', 'shape', 'text', 'blur', 'crop', 'step']) {
+      const { bindings, canvas, handlers } = createBindings(tool);
+      canvas.getActiveObjects.mockReturnValue([{}]);
+      handlers.handleMouseDown(pointerEvent({ button: 1 }) as never);
+
+      expect(bindings.startDrawSession).not.toHaveBeenCalled();
+      expect(canvas.discardActiveObject).not.toHaveBeenCalled();
+      expect(canvas.setActiveObject).not.toHaveBeenCalled();
+      expect(mocks.cropDown).not.toHaveBeenCalled();
+      expect(mocks.stepDown).not.toHaveBeenCalled();
+    }
   });
 
   it('creates shared vector, shape, text, and blur drafts through their canonical owners', () => {
@@ -310,6 +379,66 @@ describe('shared drawing event orchestration', () => {
     expect(crop.canvas.requestRenderAll).toHaveBeenCalledOnce();
   });
 
+  it('keeps the live bounded crop rectangle inside the image while dragging from outside', () => {
+    const cropObject = { set: vi.fn(), setCoords: vi.fn() };
+    const crop = createBindings('crop');
+    crop.bindings.getDrawSession.mockReturnValue({
+      object: cropObject,
+      start: { x: -50, y: -30 },
+      tool: 'crop',
+    });
+    mocks.createBounds.mockImplementationOnce((start, point) => ({
+      x: Math.min(start.x, point.x),
+      y: Math.min(start.y, point.y),
+      width: Math.abs(point.x - start.x),
+      height: Math.abs(point.y - start.y),
+    }));
+
+    crop.handlers.handleMouseMove(pointerEvent({ point: { x: 900, y: 700 } }) as never);
+
+    expect(cropObject.set).toHaveBeenCalledWith({
+      left: 0,
+      top: 0,
+      width: 800,
+      height: 600,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  });
+});
+
+describe('drawing beyond the image and canvas', () => {
+  beforeEach(resetDrawingMocks);
+
+  it('keeps a free crop draft inside the scrollable workspace while dragging beyond its edge', () => {
+    mocks.state.canvasCropMode = 'expand';
+    const cropObject = { set: vi.fn(), setCoords: vi.fn() };
+    const crop = createBindings('crop');
+    crop.bindings.getDrawSession.mockReturnValue({
+      object: cropObject,
+      start: { x: -100, y: -80 },
+      tool: 'crop',
+    });
+    mocks.createBounds.mockImplementationOnce((start, point) => ({
+      x: Math.min(start.x, point.x),
+      y: Math.min(start.y, point.y),
+      width: Math.abs(point.x - start.x),
+      height: Math.abs(point.y - start.y),
+    }));
+
+    crop.handlers.handleMouseMove(pointerEvent({ point: { x: 5000, y: 5000 } }) as never);
+
+    expect(mocks.createBounds).toHaveBeenCalledWith({ x: -100, y: -80 }, { x: 2828, y: 2628 });
+    expect(cropObject.set).toHaveBeenCalledWith({
+      left: -100,
+      top: -80,
+      width: 2928,
+      height: 2708,
+      scaleX: 1,
+      scaleY: 1,
+    });
+  });
+
   it('continues and completes a drawing when the pointer leaves the Fabric canvas', () => {
     const path = createBindings('marker');
     const pathObject = { id: 'path-object' };
@@ -430,7 +559,7 @@ describe('drawing pointer continuity', () => {
 
     expect(mocks.appendSamples).toHaveBeenCalledOnce();
     expect(mocks.stageDrawing).toHaveBeenCalledOnce();
-    expect(requestFrame).not.toHaveBeenCalled();
+    expect(requestFrame).toHaveBeenCalledOnce();
   });
 
   it('cancels queued drawing work and the Fabric transform on pointer cancellation', () => {
@@ -600,4 +729,21 @@ describe('drawing selection interactions', () => {
     expect(mocks.createDrawing).not.toHaveBeenCalled();
     expect(shape.bindings.startDrawSession).not.toHaveBeenCalled();
   });
+});
+
+it.each(['pencil', 'marker'])('does not repaint the committed scene on %s moves', (kind) => {
+  resetDrawingMocks();
+  const path = createBindings(kind);
+  path.bindings.setDrawSession({
+    object: new FabricObject({ visible: false }),
+    pointerId: null,
+    start: { x: 0, y: 0 },
+    tool: kind,
+  });
+  mocks.readDrawing.mockReturnValue({ id: 'live-stroke', kind, samples: [] });
+  for (let i = 0; i < 8; i++) {
+    path.handlers.handleMouseMove(pointerEvent({ point: { x: i, y: i } }) as never);
+  }
+  expect(mocks.stageDrawing).toHaveBeenCalledTimes(8);
+  expect(path.canvas.requestRenderAll).not.toHaveBeenCalled();
 });

@@ -77,7 +77,7 @@ export function PickerControls(props: {
   rgbInputs: ReturnType<typeof useRgbInputs>;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="space-y-1.5">
       <PickerToolbar
         allowTransparent={props.allowTransparent !== false}
         eyedropperAvailable={props.eyedropper.eyedropperAvailable}
@@ -99,6 +99,7 @@ export function PickerControls(props: {
         <div data-ui="shared.ui.color-selector.opacity">
           <NumericRow
             appearance="plain"
+            className="min-h-7! grid-cols-[minmax(0,1fr)_auto]! py-0!"
             label={translate('shared.ui.colorSelectorAlpha')}
             min={0}
             max={100}

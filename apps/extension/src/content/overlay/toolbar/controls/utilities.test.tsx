@@ -17,7 +17,6 @@ let root: Root | null = null;
 
 function createProps() {
   return {
-    framesCount: 1,
     futureFrameStyle: {
       blurSettings: { amount: 8, blurType: 'gaussian' as const, showBorder: true },
       borderSettings: DEFAULT_BORDER_PRESET,
@@ -32,6 +31,7 @@ function createProps() {
     autoBlur: {
       autoApplyAllowed: true,
       autoApplyEnabled: false,
+      pinToTabAvailable: false,
       isApplying: false,
       onApplyOnce: vi.fn(async () => undefined),
       onOpenAutoApplySettings: vi.fn(),
@@ -40,7 +40,6 @@ function createProps() {
     },
     compactMenus: false,
     displayMode: 'horizontal' as const,
-    onClearHighlights: vi.fn(),
     onFutureFrameEffectModeChange: vi.fn(),
     sidebarVisible: false,
     screenshotMode: false,
@@ -123,10 +122,10 @@ describe('ToolbarUtilityButtons', () => {
     });
 
     expect(props.autoBlur.onOpenSettings).toHaveBeenCalledTimes(1);
-    expect(props.onClearHighlights).not.toHaveBeenCalled();
+    expect(container?.querySelector('[data-ui="content.toolbar.clear-frames-button"]')).toBeNull();
   });
 
-  it('shows only sensitive-data blur beside Cursor while pin or scenario allows it', async () => {
+  it('always shows sensitive-data blur beside Navigation', async () => {
     const props = createProps();
 
     await renderUtilities({ ...props, highlighterMode: false, isCursorMode: true });
@@ -136,7 +135,7 @@ describe('ToolbarUtilityButtons', () => {
 
     props.autoBlur.autoApplyAllowed = false;
     await renderUtilities({ ...props, highlighterMode: false, isCursorMode: true });
-    expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).toBeNull();
+    expect(container?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')).not.toBeNull();
   });
 
   it('disables auto-enable when the toolbar is not pinned or scenario-owned', async () => {
@@ -156,6 +155,24 @@ describe('ToolbarUtilityButtons', () => {
     expect(
       toggle?.querySelector('.sniptale-toolbar-menu-item-hint')?.getAttribute('class')
     ).toContain('sniptale-toolbar-menu-item-hint--show-compact');
+  });
+
+  it('offers automatic blur from an unpinned Navigation toolbar when pinning is available', async () => {
+    const props = createProps();
+    props.autoBlur.autoApplyAllowed = false;
+    props.autoBlur.pinToTabAvailable = true;
+    await renderUtilities({ ...props, highlighterMode: false, isCursorMode: true });
+    await act(async () => {
+      container
+        ?.querySelector('[data-ui="content.toolbar.auto-blur-button"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    const toggle = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.auto-blur-toggle"]'
+    );
+    expect(toggle?.disabled).toBe(false);
+    await act(async () => toggle?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(props.autoBlur.onOpenAutoApplySettings).toHaveBeenCalledOnce();
   });
 
   it('opens configuration before enabling auto-blur and directly toggles only an enabled mode', async () => {

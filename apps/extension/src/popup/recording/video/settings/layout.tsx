@@ -1,3 +1,4 @@
+import { InlineCurtainSelect } from '../../../../ui/popup-shell/inline-curtain/select';
 import { getCurrentLocale, translate } from '../../../../platform/i18n/popup';
 import {
   CaptureMode,
@@ -58,16 +59,17 @@ export function VideoSettingsGrid({
         settings={settings}
         onSettingsChange={onSettingsChange}
       />
-      <CounterCard
+      <InlineCurtainSelect
+        ariaLabel={translate('popup.video.countdownLabel')}
         label={translate('popup.video.countdownLabel')}
         description={translate('popup.video.countdownDescription')}
-        value={settings.countdownSeconds}
-        min={0}
-        max={10}
-        suffix={translate('popup.video.secondsSuffix')}
-        formatValue={formatCountdownOption}
-        formatSelectedValue={formatCountdownOption}
-        onChange={(value) => onSettingsChange({ countdownSeconds: value })}
+        value={String(settings.countdownSeconds)}
+        options={[3, 5, 10].map((value) => ({
+          value: String(value),
+          label: formatCountdownOption(value),
+        }))}
+        selectedLabel={formatCountdownOption(settings.countdownSeconds)}
+        onChange={(value) => onSettingsChange({ countdownSeconds: Number(value) })}
       />
       {showSourceCount ? (
         <CounterCard

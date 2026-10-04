@@ -27,7 +27,8 @@ type ExportSelectionSectionShellProps = {
 const shellClassName = 'flex min-h-0 flex-col overflow-hidden';
 
 const triggerClassName = [
-  'min-w-0 flex-1 py-1.5 text-left outline-none',
+  'group flex min-w-0 flex-1 items-center gap-1 rounded-[9px] px-2 py-1.5 text-left outline-none',
+  'transition-colors hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
   'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
 ].join(' ');
 
@@ -161,13 +162,7 @@ export function ExportSelectionSectionShell({
 
   return (
     <section ref={rootRef} className={cx(shellClassName, isExpanded && 'flex-1', className)}>
-      <div
-        className={[
-          'group -mx-1 flex w-[calc(100%+8px)] items-center gap-1 rounded-[9px] px-2',
-          'transition-colors',
-          'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
-        ].join(' ')}
-      >
+      <div className="flex w-full items-center gap-1">
         <button
           ref={triggerRef}
           type="button"
@@ -186,6 +181,13 @@ export function ExportSelectionSectionShell({
           >
             {title}
           </span>
+          <ChevronRight
+            aria-hidden="true"
+            className={[
+              'h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity duration-150',
+              'group-hover:opacity-100 group-focus-visible:opacity-100',
+            ].join(' ')}
+          />
         </button>
         {onOpenSettings ? (
           <button
@@ -203,15 +205,6 @@ export function ExportSelectionSectionShell({
             {translate('popup.export.settingsAction')}
           </button>
         ) : null}
-        <ChevronRight
-          aria-hidden="true"
-          className={[
-            'h-3.5 w-3.5 shrink-0 translate-x-0.5 opacity-0',
-            'transition-[opacity,transform] duration-150',
-            'group-hover:translate-x-0 group-hover:opacity-100',
-            'group-focus-within:translate-x-0 group-focus-within:opacity-100',
-          ].join(' ')}
-        />
       </div>
       <div
         id={drawerId}

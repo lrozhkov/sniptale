@@ -151,22 +151,25 @@ function expectValidatedRecordingRoutes(settings: ReturnType<typeof createExport
     desktopMediaRequestGeneration: 'generation-1',
     desktopMediaRequestId: 'request-1',
   });
-  expect(startRecordingMock).toHaveBeenCalledWith({
-    streamId: 'stream-1',
-    settings,
-    tabId: 7,
-    viewport: { width: 1440, height: 900, devicePixelRatio: 2 },
-    recordingId: 'recording-1',
-    captureMode: CaptureMode.TAB,
-    cropRegion: { x: 1, y: 2, width: 3, height: 4 },
-    generation: 1,
-    streamInstanceId: 'stream-instance-1',
-    sourceContext: {
-      favicon: 'https://example.com/favicon.ico',
-      title: 'Example page',
-      url: 'https://example.com/article',
+  expect(startRecordingMock).toHaveBeenCalledWith(
+    {
+      streamId: 'stream-1',
+      settings,
+      tabId: 7,
+      viewport: { width: 1440, height: 900, devicePixelRatio: 2 },
+      recordingId: 'recording-1',
+      captureMode: CaptureMode.TAB,
+      cropRegion: { x: 1, y: 2, width: 3, height: 4 },
+      generation: 1,
+      streamInstanceId: 'stream-instance-1',
+      sourceContext: {
+        favicon: 'https://example.com/favicon.ico',
+        title: 'Example page',
+        url: 'https://example.com/article',
+      },
     },
-  });
+    expect.any(Function)
+  );
   expect(stopRecordingMock).toHaveBeenCalledOnce();
   expect(pauseRecordingMock).toHaveBeenCalledOnce();
   expect(resumeRecordingMock).toHaveBeenCalledOnce();
@@ -311,13 +314,16 @@ async function verifiesOptionalRuntimeFieldsStayOmittedWhenAbsent() {
   });
   await flushRuntimeRouting();
 
-  expect(startRecordingMock).toHaveBeenCalledWith({
-    generation: 1,
-    recordingId: 'recording-minimal',
-    settings: createExportSettings(),
-    streamId: 'stream-minimal',
-    streamInstanceId: 'stream-instance-minimal',
-  });
+  expect(startRecordingMock).toHaveBeenCalledWith(
+    {
+      generation: 1,
+      recordingId: 'recording-minimal',
+      settings: createExportSettings(),
+      streamId: 'stream-minimal',
+      streamInstanceId: 'stream-instance-minimal',
+    },
+    expect.any(Function)
+  );
   expect(stopRecordingMock).toHaveBeenCalledWith(
     {
       generation: 1,

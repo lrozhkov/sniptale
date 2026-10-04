@@ -35,6 +35,13 @@ function createEvidence(selector: string): BrowserAnnotationTargetEvidence {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.stubGlobal('innerHeight', 720);
   vi.stubGlobal('innerWidth', 1280);
   Object.defineProperties(HTMLElement.prototype, {
@@ -88,13 +95,13 @@ it('lists only Design Review feedback and opens the live element from the row or
   ).toBe('3');
 
   act(() => items[0]?.dispatchEvent(new MouseEvent('mouseover', { bubbles: true })));
-  expect(
-    container.querySelector('[data-ui="content.design-review.feedback-preview"]')
-  ).not.toBeNull();
+  const preview = document.querySelector('[data-ui="content.design-review.feedback-preview"]');
+  expect(preview).not.toBeNull();
+  expect(preview?.closest('[data-ui="content.design-review.feedback-panel"]')).toBeNull();
 
   act(() => (items[0] as HTMLButtonElement).click());
   expect(onOpenRecord).toHaveBeenCalledWith(1);
-  expect(container.querySelector('[data-ui="content.design-review.feedback-preview"]')).toBeNull();
+  expect(document.querySelector('[data-ui="content.design-review.feedback-preview"]')).toBeNull();
 
   const close = container.querySelector<HTMLButtonElement>(
     '[aria-label="content.designReview.panelClose"]'
@@ -190,7 +197,7 @@ it('filters actions and dismisses the highest floating layer with focus restorat
   expect(document.activeElement).toBe(toolbarToggle);
 });
 
-it('defers Escape to an open popover action menu before closing the feedback panel', async () => {
+it('closes the feedback panel with Escape while the action switch is present', async () => {
   const onClose = vi.fn();
   act(() => {
     root.render(
@@ -200,18 +207,9 @@ it('defers Escape to an open popover action menu before closing the feedback pan
       </>
     );
   });
-  const actionTrigger = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
-    (button) => button.textContent?.includes('content.designReview.actionRefine')
-  );
-  if (!actionTrigger) throw new Error('Expected Design Review action trigger');
-  act(() => actionTrigger.click());
-  expect(container.querySelector('[data-ui="content.design-review.action-menu"]')).not.toBeNull();
-
-  await act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }));
-  });
-  expect(container.querySelector('[data-ui="content.design-review.action-menu"]')).toBeNull();
-  expect(onClose).not.toHaveBeenCalled();
+  expect(
+    container.querySelectorAll('[data-ui="content.design-review.action-switch"] button')
+  ).toHaveLength(5);
 
   await act(async () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' }));

@@ -5,6 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomTrack } from './zoom-track';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { ReviewEdit } from '../../features/video/review/types';
+import { createTrackProjection } from './track-projection';
+import { reconcileReviewFocus } from '../../features/video/review/focus-edits';
+import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -28,6 +31,9 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
+const locale = vi.hoisted(() => ({ value: 'en' as 'en' | 'ru' }));
+vi.mock('../../platform/i18n/locale/hook', () => ({ useAppLocale: () => locale.value }));
+
 const zoom = (id: string, start: number, end: number): QuickEditZoomRegion => ({
   id,
   start,
@@ -49,23 +55,27 @@ function renderTrack(
   onAdd = vi.fn(),
   time: number | null = 6,
   overrides?: {
+    beforeAction?: Parameters<typeof ReviewZoomTrack>[0]['beforeAction'];
     edits?: ReviewEdit[];
     toOutputTime?: (source: number) => number | null;
     enabled?: boolean;
     onLink?: (id: string, targetId: string | null) => void;
     onSelectLink?: (id: string) => void;
     linkSelectedId?: string | null;
+    projection?: ReturnType<typeof createTrackProjection>;
+    duration?: number;
   }
 ) {
   act(() => {
     root.render(
       <ReviewZoomTrack
-        duration={10}
+        beforeAction={overrides?.beforeAction}
+        duration={overrides?.duration ?? 10}
         {...(time === null ? { time: null } : { time })}
         regions={regions}
         edits={overrides?.edits ?? edits}
-        boundaries={[0, 2, 4, 6, 8, 10]}
         toOutputTime={overrides?.toOutputTime ?? ((source: number) => source)}
+        projection={overrides?.projection}
         selectedId={null}
         onSelect={vi.fn()}
         onAdd={onAdd}
@@ -101,6 +111,49 @@ it('adds regions through the lane button', async () => {
   expect(onAdd).toHaveBeenCalledOnce();
 });
 
+it('keeps source width while moving focus across a speed segment', async () => {
+  const speed: ReviewEdit = {
+    id: 'speed',
+    kind: 'speed',
+    start: 2,
+    end: 6,
+    requestedStart: 2,
+    requestedEnd: 6,
+    rate: 2,
+    audio: 'speed',
+  };
+  const projection = createTrackProjection(10, [speed]);
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), null, {
+    projection,
+    toOutputTime: projection.output,
+  });
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  expect(block.style.width).toBe('20%');
+  await track.event(block, 'pointerdown', 0);
+  await track.event(block, 'pointermove', 300, true);
+  expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+  await track.event(block, 'pointerup', 300, true);
+  expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', { start: 3, end: 5 });
+  renderTrack(
+    [{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }],
+    commit,
+    vi.fn(),
+    null,
+    {
+      projection,
+      toOutputTime: projection.output,
+    }
+  );
+  expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(20);
+});
+
 it('snaps to edit edges projected into result time (R03)', async () => {
   const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);
   const sourceEdits: ReviewEdit[] = [
@@ -119,6 +172,7 @@ it('snaps to edit edges projected into result time (R03)', async () => {
   });
   await track.event(first, 'pointerdown', 100);
   await track.event(first, 'pointermove', 400);
+  expect(Number.parseFloat(first.style.width)).toBeCloseTo(20);
   await track.event(first, 'pointerup', 400);
   // Source edge 6 projects to result 3: the move snaps there instead of 2.75.
   expect(commit).toHaveBeenLastCalledWith('a', { start: 3, end: 5 }, 'move');
@@ -242,3 +296,278 @@ it('moves a whole region and keeps a trim drag inside the neighbor window', asyn
   await track.event(second, 'pointerup', 195);
   expect(commit).toHaveBeenCalledTimes(3);
 });
+
+for (const width of [1000, 4000]) {
+  for (const edge of ['start', 'end'] as const) {
+    it(`clamps ${edge} through the opposite edge at timeline width ${width}`, async () => {
+      const commit = vi.fn();
+      const track = renderTrack([zoom('a', 2, 4)], commit);
+      vi.mocked(track.lane.getBoundingClientRect).mockReturnValue(new DOMRect(0, 0, width, 32));
+      const block = track.blocks[0]!;
+      Object.assign(block, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: vi.fn(),
+      });
+      await track.event(
+        block.querySelector(`[data-zoom-edge="${edge}"]`)!,
+        'pointerdown',
+        ((edge === 'start' ? 2 : 4) * width) / 10
+      );
+      await track.event(block, 'pointermove', edge === 'start' ? width : -width, true);
+      expect((Number.parseFloat(block.style.width) * width) / 100).toBeCloseTo(24);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(
+        edge === 'start' ? 40 - 2400 / width : 20
+      );
+      await track.event(block, 'pointerup', edge === 'start' ? width : -width, true);
+      const range = commit.mock.calls[0]![1];
+      expect(range.end - range.start).toBeCloseTo(240 / width);
+      expect(edge === 'start' ? range.end : range.start).toBe(edge === 'start' ? 4 : 2);
+      renderTrack([{ ...zoom('a', 2, 4), ...range }], commit);
+      expect((Number.parseFloat(block.style.width) * width) / 100).toBeCloseTo(24);
+    });
+  }
+}
+
+it('keeps a cut-boundary fixed end and speed-projected minimum consistent with the preview', async () => {
+  const sourceEdits: ReviewEdit[] = [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 4,
+      requestedStart: 0,
+      requestedEnd: 4,
+      rate: 2,
+      audio: 'speed',
+    },
+    { id: 'cut', kind: 'cut', start: 4, end: 5, requestedStart: 4, requestedEnd: 5 },
+  ];
+  const projection = createTrackProjection(10, sourceEdits);
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 1, 2)], commit, vi.fn(), null, { projection });
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block.querySelector('[data-zoom-edge="start"]')!, 'pointerdown', 200);
+  await track.event(block, 'pointermove', 900, true);
+  expect(Number.parseFloat(block.style.width)).toBeCloseTo(2.4);
+  expect(Number.parseFloat(block.style.left)).toBeCloseTo(37.6);
+  await track.event(block, 'pointerup', 900, true);
+  expect(commit).toHaveBeenCalledWith('a', { start: 1.88, end: 2 }, 'start', {
+    start: 3.76,
+    end: 4,
+  });
+  expect(projection.source(commit.mock.calls[0]![1].end, 'end')).toBe(4);
+  expect(host.querySelector('[data-zoom-guide]')).toBeNull();
+});
+
+it('keeps focus selection and final range through delayed note admission', async () => {
+  let admit!: () => void;
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 2, 4)], commit, vi.fn(), null, {
+    beforeAction: (action) => {
+      admit = action;
+    },
+  });
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block, 'pointerdown', 200);
+  await track.event(block, 'pointermove', 400);
+  await track.event(block, 'pointerup', 400);
+  expect(commit).not.toHaveBeenCalled();
+  await act(async () => admit());
+  expect(commit).toHaveBeenCalledExactlyOnceWith('a', { start: 4, end: 6 }, 'move');
+});
+
+it('formats timeline scale and tooltip with one localized decimal without mutating the region', () => {
+  const region = zoom('fraction', 2, 4);
+  region.transform.scale = 1.6666666667;
+  for (const [language, expected] of [
+    ['en', '1.7×'],
+    ['ru', '1,7×'],
+  ] as const) {
+    locale.value = language;
+    const view = renderTrack([region], vi.fn());
+    expect(view.blocks[0]!.textContent).toContain(expected);
+    expect(view.blocks[0]!.title).toContain(expected);
+    expect(view.blocks[0]!.textContent).not.toContain('666666');
+    expect(region.transform.scale).toBe(1.6666666667);
+  }
+  region.transform.scale = 2;
+  const view = renderTrack([region], vi.fn());
+  expect(view.blocks[0]!.title).toContain('2×');
+  expect(view.blocks[0]!.title).not.toContain('2,0');
+  locale.value = 'en';
+});
+
+it('marks disabled focus content as muted without disabling selection', async () => {
+  const view = renderTrack([zoom('z1', 2, 4)], vi.fn(), vi.fn(), 0, { enabled: false });
+  const row = view.lane.closest('[data-review-track-muted]');
+  expect(row?.getAttribute('data-review-track-muted')).toBe('true');
+  expect(view.blocks[0]!.tabIndex).toBe(0);
+  expect(view.blocks[0]!.getAttribute('aria-disabled')).toBeNull();
+  renderTrack([zoom('z1', 2, 4)], vi.fn());
+  expect(row?.getAttribute('data-review-track-muted')).toBe('false');
+});
+
+for (const spotlight of [false, true]) {
+  it(
+    'keeps authored plate geometry when Cut is created over existing focus ' +
+      (spotlight ? 'Spotlight' : 'Zoom'),
+    () => {
+      const cut: ReviewEdit = {
+        id: 'cut',
+        kind: 'cut',
+        start: 3,
+        end: 7,
+        requestedStart: 3,
+        requestedEnd: 7,
+      };
+      const original = {
+        ...zoom('a', 2, 6),
+        ...(spotlight ? { spotlight: createQuickEditSpotlight() } : {}),
+      };
+      const regions = reconcileReviewFocus({
+        regions: [original],
+        duration: 10,
+        before: [],
+        after: [cut],
+        edit: cut,
+        preserveUnderCuts: true,
+      });
+      const projection = createTrackProjection(10, [cut]);
+      const track = renderTrack(regions, vi.fn(), vi.fn(), null, {
+        projection,
+        edits: [cut],
+        duration: projection.resultDuration,
+      });
+      expect(track.blocks[0]!.style.left).toBe('20%');
+      expect(track.blocks[0]!.style.width).toBe('40%');
+      expect(track.blocks[0]!.dataset['cutSuppressed']).toBe('true');
+    }
+  );
+
+  it(
+    'does not stretch or jump authored focus dragged under an existing Cut ' +
+      (spotlight ? 'Spotlight' : 'Zoom'),
+    async () => {
+      const cut: ReviewEdit = {
+        id: 'cut',
+        kind: 'cut',
+        start: 3,
+        end: 7,
+        requestedStart: 3,
+        requestedEnd: 7,
+      };
+      const projection = createTrackProjection(10, [cut]);
+      const region = {
+        ...zoom('a', 0, 2),
+        sourceAnchor: { start: 0, end: 2 },
+        ...(spotlight ? { spotlight: createQuickEditSpotlight() } : {}),
+      };
+      const commit = vi.fn();
+      const track = renderTrack([region], commit, vi.fn(), null, {
+        projection,
+        edits: [cut],
+        duration: projection.resultDuration,
+      });
+      const block = track.blocks[0]!;
+      Object.assign(block, {
+        setPointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+        releasePointerCapture: vi.fn(),
+      });
+      await track.event(block, 'pointerdown', 100);
+      await track.event(block, 'pointermove', 500, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(40);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      expect(block.dataset['cutSuppressed']).toBe('true');
+      await track.event(block, 'pointermove', 600, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(50);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      await track.event(block, 'pointermove', 800, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(70);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      expect(block.dataset['cutSuppressed']).toBe('false');
+      await track.event(block, 'pointermove', 200, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(10);
+      expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+      expect(block.dataset['cutSuppressed']).toBe('false');
+      await track.event(block, 'pointermove', 700, true);
+      expect(Number.parseFloat(block.style.left)).toBeCloseTo(60);
+      expect(block.dataset['cutSuppressed']).toBe('true');
+      await track.event(block, 'pointerup', 700, true);
+      expect(commit).toHaveBeenCalledExactlyOnceWith('a', { start: 3, end: 4 }, 'move', {
+        start: 6,
+        end: 8,
+      });
+    }
+  );
+}
+
+it('does not magnet focus to invisible codec keyframes', async () => {
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 0, 1)], commit, vi.fn(), 9);
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block, 'pointerdown', 0);
+  await track.event(block, 'pointermove', 195);
+  await track.event(block, 'pointerup', 195);
+  expect(commit).toHaveBeenLastCalledWith(
+    'a',
+    { start: expect.closeTo(1.95, 8), end: expect.closeTo(2.95, 8) },
+    'move'
+  );
+});
+
+it('retains a visible playhead target coinciding with the moving focus old edge', async () => {
+  const commit = vi.fn();
+  const track = renderTrack([zoom('a', 2, 4)], commit, vi.fn(), 2);
+  const block = track.blocks[0]!;
+  Object.assign(block, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  await track.event(block, 'pointerdown', 200);
+  await track.event(block, 'pointermove', 205);
+  await track.event(block, 'pointerup', 205);
+  expect(commit).toHaveBeenLastCalledWith('a', { start: 2, end: 4 }, 'move');
+});
+
+it.each([false, true])(
+  'preserves visible timeline-end snapping with Shift bypass %s',
+  async (shift) => {
+    const commit = vi.fn();
+    const track = renderTrack([zoom('a', 1, 2)], commit, vi.fn(), 9);
+    const block = track.blocks[0]!;
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    await track.event(block, 'pointerdown', 100);
+    await track.event(block, 'pointermove', 5, shift);
+    await track.event(block, 'pointerup', 5, shift);
+    expect(commit).toHaveBeenLastCalledWith(
+      'a',
+      {
+        start: expect.closeTo(shift ? 0.05 : 0, 8),
+        end: expect.closeTo(shift ? 1.05 : 1, 8),
+      },
+      'move'
+    );
+  }
+);

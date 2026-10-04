@@ -177,6 +177,47 @@ it('renders a non-interactive marker and touch-safe plane surface', () => {
   const { plane, planeRef } = renderPlane();
 
   expect(plane.className).toContain('touch-none');
+  expect(plane.className).toContain('cursor-pointer');
   expect(planeRef.current).toBe(plane);
   expect(plane.querySelector('.pointer-events-none')).not.toBeNull();
+});
+
+it('keeps the selection marker above both color gradients and visible at the corners', () => {
+  const { plane } = renderPlane({ saturation: 0, value: 1 });
+  const marker = plane.querySelector('[data-ui="shared.ui.color-selector.plane-marker"]');
+
+  expect(marker?.getAttribute('class')).toContain('z-10');
+  expect(marker?.querySelector('circle[stroke="#000"]')).not.toBeNull();
+  expect(marker?.querySelector('circle[stroke="#fff"]')).not.toBeNull();
+  expect((marker as HTMLElement).style.left).toBe('0%');
+  expect(plane.className).not.toContain('overflow-hidden');
+  expect(marker?.querySelectorAll('circle')).toHaveLength(2);
+  expect(marker?.getAttribute('width')).toBe('16');
+});
+
+it('supports focused keyboard selection and keeps the marker synchronized', () => {
+  const onSelectionChange = vi.fn();
+  const { plane } = renderPlane({ onSelectionChange, saturation: 0.5, value: 0.6 });
+  expect(plane.tabIndex).toBe(0);
+  act(() => {
+    plane.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+  });
+  expect(onSelectionChange).toHaveBeenCalledWith({ saturation: 0.51, value: 0.6 });
+  act(() =>
+    root?.render(
+      <ColorPlane
+        getColorFromPlanePoint={({ left, top }) => `#${left}-${top}`}
+        hue={120}
+        onSelectionChange={onSelectionChange}
+        planeColor="#123456"
+        planeRef={{ current: plane }}
+        saturation={0.51}
+        value={0.6}
+      />
+    )
+  );
+  const marker = plane.querySelector<SVGElement>(
+    '[data-ui="shared.ui.color-selector.plane-marker"]'
+  );
+  expect(marker?.style.left).toBe('51%');
 });

@@ -272,4 +272,19 @@ describe('frame annotation producer history integration', () => {
     expect(browserAnnotationSession.captureSnapshot().frameOrders).toEqual([]);
     expect(pagePreparationHistory.getState()).toMatchObject({ canRedo: false, canUndo: false });
   });
+  it('commits Annotation independently while another owner holds a transaction open', async () => {
+    pagePreparationHistory.beginTransaction('style-pending', null, 'design-review');
+    const harness = requireHarness();
+    const mutate = harness.withHistoryCommit(() =>
+      harness.setFrames([createFrameDataFixture('foreign-frame')])
+    );
+    act(() => mutate());
+    await act(async () => vi.runAllTimersAsync());
+    expect(pagePreparationHistory.hasPendingSnapshotChanges('design-review')).toBe(false);
+    expect(pagePreparationHistory.hasChanges('annotation')).toBe(true);
+    pagePreparationHistory.cancelTransaction('style-pending');
+    act(() => expect(pagePreparationHistory.resetScope('annotation')).toBe(true));
+    expect(requireHarness().refs.framesRef.current).toEqual([]);
+    expect(browserAnnotationSession.captureSnapshot().frameOrders).toEqual([]);
+  });
 });

@@ -1,9 +1,11 @@
+import { createPagePackageHtmlDownload } from './html';
 import { parseAssetRef, readAssetFile, type AssetRef } from '../../composition/persistence/assets';
 
 const MAX_PAGE_PACKAGE_DOWNLOAD_LEASES = 8;
 const UNCONFIRMED_LEASE_TTL_MS = 60_000;
 
 type DownloadLease = {
+  downloadFormat: 'html' | undefined;
   confirmed: boolean;
   leaseId: string;
   operationId: string;
@@ -14,7 +16,10 @@ type DownloadLease = {
 
 // policyStateId: page-package-download-leases
 const leases = new Map<string, DownloadLease>();
-const leaseCreations = new Map<string, { promise: Promise<DownloadLease>; reference: AssetRef }>();
+const leaseCreations = new Map<
+  string,
+  { promise: Promise<DownloadLease>; reference: AssetRef; downloadFormat: 'html' | undefined }
+>();
 
 function sameReference(left: AssetRef, right: AssetRef): boolean {
   return (
@@ -38,19 +43,26 @@ export async function createPagePackageDownloadLease(args: {
   downloadOperationId: string;
   filename: string;
   reference: unknown;
+  downloadFormat?: 'html';
 }): Promise<{ leaseId: string; result: 'leased'; url: string }> {
   const reference = parseAssetRef(args.reference);
   if (!reference) throw new Error('Invalid Page Package download asset reference.');
   const existing = leases.get(args.downloadOperationId);
   if (existing) {
-    if (!sameReference(existing.reference, reference)) {
+    if (
+      !sameReference(existing.reference, reference) ||
+      existing.downloadFormat !== args.downloadFormat
+    ) {
       throw new Error('Page Package download operation changed its asset reference.');
     }
     return { leaseId: existing.leaseId, result: 'leased', url: existing.url };
   }
   const pending = leaseCreations.get(args.downloadOperationId);
   if (pending) {
-    if (!sameReference(pending.reference, reference)) {
+    if (
+      !sameReference(pending.reference, reference) ||
+      pending.downloadFormat !== args.downloadFormat
+    ) {
       throw new Error('Page Package download operation changed its asset reference.');
     }
     const lease = await pending.promise;
@@ -65,19 +77,22 @@ export async function createPagePackageDownloadLease(args: {
     if (file.size !== reference.size || file.type !== reference.mimeType) {
       throw new Error('Page Package download asset no longer matches its reference.');
     }
+    const output =
+      args.downloadFormat === 'html' ? await createPagePackageHtmlDownload(file) : file;
     const lease: DownloadLease = {
+      downloadFormat: args.downloadFormat,
       confirmed: false,
       leaseId: crypto.randomUUID(),
       operationId: args.downloadOperationId,
       reference,
       timer: null,
-      url: URL.createObjectURL(file),
+      url: URL.createObjectURL(output),
     };
     lease.timer = setTimeout(() => revokeLease(lease), UNCONFIRMED_LEASE_TTL_MS);
     leases.set(lease.operationId, lease);
     return lease;
   })();
-  const reservation = { promise: creation, reference };
+  const reservation = { promise: creation, reference, downloadFormat: args.downloadFormat };
   leaseCreations.set(args.downloadOperationId, reservation);
   try {
     const lease = await creation;

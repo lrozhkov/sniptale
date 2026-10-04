@@ -48,6 +48,8 @@ describe('SnapshotHistory limits', () => {
     history.push('b');
     history.push('c');
 
+    expect(history.getSnapshots()).toEqual(['b', 'c']);
+
     expect(history.getState()).toEqual({
       canRedo: false,
       canUndo: true,
@@ -58,6 +60,8 @@ describe('SnapshotHistory limits', () => {
 
     expect(history.undo()?.current).toBe('b');
     history.push('d');
+
+    expect(history.getSnapshots()).toEqual(['b', 'd']);
 
     expect(history.getState()).toEqual({
       canRedo: false,

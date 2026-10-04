@@ -160,8 +160,9 @@ export const test = base.extend<ExtensionFixture>({
     await use(launchedExtension.context);
   },
 
-  page: async ({ context }, use) => {
+  page: async ({ context, viewport }, use) => {
     const page = await context.newPage();
+    if (viewport) await page.setViewportSize(viewport);
     await dismissFirstRunPrompt(page);
 
     try {
@@ -178,15 +179,13 @@ export const test = base.extend<ExtensionFixture>({
     { scope: 'worker' },
   ],
 
-  openExtensionPage: async ({ context, extensionId }, use) => {
+  openExtensionPage: async ({ context, extensionId, viewport }, use) => {
     await use(async (path, options = {}) => {
       const page = await context.newPage();
+      const pageViewport = options.viewport ?? viewport;
+      if (pageViewport) await page.setViewportSize(pageViewport);
       await dismissFirstRunPrompt(page);
       const url = buildExtensionUrl(extensionId, path);
-
-      if (options.viewport) {
-        await page.setViewportSize(options.viewport);
-      }
 
       await page.setContent(`
         <!doctype html>

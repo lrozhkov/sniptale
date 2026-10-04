@@ -1,3 +1,5 @@
+import { loadSettings } from '../settings';
+import { resolveInitialStorageClass } from '../library-lifecycle/policy';
 import {
   createAssetPublicationJournal,
   discardPreparedAsset,
@@ -78,6 +80,8 @@ export async function saveWebSnapshotMediaAsset(
   const screenshotDimensions = await runStage('validate web snapshot screenshot', () =>
     validateWebSnapshotScreenshotBlob(input.screenshotBlob)
   );
+  const storageClass =
+    input.storageClass ?? resolveInitialStorageClass(await loadSettings(), 'web-snapshot');
   await recoverWebSnapshotPublications();
   const assetId = input.id ?? crypto.randomUUID();
   const now = Date.now();
@@ -102,7 +106,14 @@ export async function saveWebSnapshotMediaAsset(
   let journalCreated = false;
   try {
     const mediaEntry = await runStage('create web snapshot media entry', () =>
-      createWebSnapshotMediaEntry({ assetId, input, now, screenshotDimensions, snapshot })
+      createWebSnapshotMediaEntry({
+        assetId,
+        input,
+        now,
+        screenshotDimensions,
+        snapshot,
+        storageClass,
+      })
     );
     const journal = await createAssetPublicationJournal({
       assetRefs: [packageObject.ref, screenshotObject.ref],

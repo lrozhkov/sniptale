@@ -28,20 +28,26 @@ afterEach(async () => {
 });
 
 function renderLane(args: {
+  beforeAction?: Parameters<typeof ReviewSourceLane>[0]['beforeAction'];
   edits: ReviewEdit[];
   onChangeEdit: (edit: ReviewEdit, range: ReviewAnchor) => void;
   time: number;
   selection: ReviewAnchor;
+  boundaries?: number[];
+  snapToKeyframes?: boolean;
+  plane?: { left: number; width: number };
 }) {
   act(() => {
     root.render(
       <ReviewSourceLane
+        beforeAction={args.beforeAction}
         duration={10}
         time={args.time}
         selection={args.selection}
         annotations={[]}
         edits={args.edits}
-        boundaries={[0, 2, 4, 6, 8, 10]}
+        boundaries={args.boundaries ?? [0, 2, 4, 6, 8, 10]}
+        {...(args.snapToKeyframes ? { snapToKeyframes: true } : {})}
         onEdit={vi.fn()}
         onChangeEdit={args.onChangeEdit}
         onSeek={vi.fn()}
@@ -51,7 +57,9 @@ function renderLane(args: {
     );
   });
   const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
-  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 1000, 48));
+  vi.spyOn(lane, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(args.plane?.left ?? 0, 0, args.plane?.width ?? 1000, 48)
+  );
   const button = lane.querySelector<HTMLButtonElement>('button')!;
   const block = button.parentElement!;
   Object.assign(block, {
@@ -179,6 +187,99 @@ it('snaps boundary drags to candidates inside the pixel threshold with a shift b
   expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 2, end: 6.05 });
 });
 
+it('keeps a whole source edit at its original width when only one edge meets a magnet', async () => {
+  const change = vi.fn();
+  const edit = cut(2, 4);
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 5,
+    selection: { kind: 'point', time: 5 },
+  });
+  await lane.event(lane.block, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 305);
+  expect(lane.block.style.left).toBe('30%');
+  expect(lane.block.style.width).toBe('20%');
+  await lane.event(lane.block, 'pointerup', 305);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 3, end: 5 });
+
+  await lane.event(lane.block, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 305, { shiftKey: true });
+  expect(parseFloat(lane.block.style.width)).toBeCloseTo(20);
+  await lane.event(lane.block, 'pointerup', 305);
+  expect(change).toHaveBeenLastCalledWith(edit, { kind: 'range', start: 3.05, end: 5.05 });
+});
+
+it('keeps a basic edit in place when the target keyframe has no equal-length partner', async () => {
+  const change = vi.fn();
+  const edit = cut(0, 2);
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    boundaries: [0, 2, 4, 7, 9, 10],
+    snapToKeyframes: true,
+  });
+  await lane.event(lane.block, 'pointerdown', 0);
+  await lane.event(lane.block, 'pointermove', 400);
+  expect(lane.block.style.left).toBe('0%');
+  expect(lane.block.style.width).toBe('20%');
+  await lane.event(lane.block, 'pointerup', 400);
+  expect(change).not.toHaveBeenCalled();
+  await lane.event(lane.block, 'pointerdown', 0);
+  await lane.event(lane.block, 'pointermove', 700);
+  expect(lane.block.style.left).toBe('70%');
+  expect(lane.block.style.width).toBe('20%');
+  await lane.event(lane.block, 'pointerup', 700);
+  expect(change).toHaveBeenCalledWith(edit, { kind: 'range', start: 7, end: 9 });
+});
+
+it.each([
+  { left: 0, width: 500, travel: 124.5 },
+  { left: -240, width: 1500, travel: 373.5 },
+])('moves a speed block near the track end at width $width and scroll $left', async (plane) => {
+  const change = vi.fn();
+  const edit: ReviewEdit = {
+    ...cut(5.5, 7.5),
+    kind: 'speed',
+    rate: 2,
+    audio: 'speed',
+  };
+  const lane = renderLane({
+    edits: [edit],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    boundaries: [8.01, 9.95],
+    plane,
+  });
+  await lane.event(lane.block, 'pointerdown', 0);
+  await lane.event(lane.block, 'pointermove', plane.travel);
+  expect(Number.parseFloat(lane.block.style.width)).toBeCloseTo(20);
+  expect(Number.parseFloat(lane.block.style.left)).toBeCloseTo(79.5);
+  await lane.event(lane.block, 'pointerup', plane.travel);
+  const committed = change.mock.calls[0]?.[1] as ReviewAnchor;
+  expect(committed.kind).toBe('range');
+  if (committed.kind === 'range') {
+    expect(committed.start).toBeCloseTo(7.95);
+    expect(committed.end).toBeCloseTo(9.95);
+    expect(committed.end - committed.start).toBeCloseTo(2);
+  }
+  renderLane({
+    edits: [{ ...edit, start: 7.95, end: 9.95 }],
+    onChangeEdit: change,
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    plane,
+  });
+  expect(
+    Number.parseFloat(
+      host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.editBlock"]')!.style.width
+    )
+  ).toBeCloseTo(20);
+});
+
 it('keeps resize geometry while a deferred commit is pending and restores it on rejection', async () => {
   let settle!: () => void;
   const pending = new Promise<void>((resolve) => {
@@ -198,3 +299,101 @@ it('keeps resize geometry while a deferred commit is pending and restores it on 
   await act(async () => settle());
   expect(lane.block.style.width).toBe('20%');
 });
+
+it('retains the complete edit drag until new-note admission finishes', async () => {
+  let admit!: () => void;
+  const change = vi.fn();
+  const edit = cut(2, 4);
+  const lane = renderLane({
+    edits: [edit],
+    time: 0,
+    selection: { kind: 'point', time: 0 },
+    onChangeEdit: change,
+    beforeAction: (action) => {
+      admit = action;
+    },
+  });
+  await lane.event(lane.block, 'pointerdown', 200);
+  await lane.event(lane.block, 'pointermove', 400);
+  await lane.event(lane.block, 'pointerup', 400);
+  expect(change).not.toHaveBeenCalled();
+  await act(async () => admit());
+  expect(change).toHaveBeenCalledExactlyOnceWith(edit, { kind: 'range', start: 4, end: 6 });
+});
+
+it('keeps compact range notes above source content without changing authored anchors', async () => {
+  const note = {
+    id: 'interval-note',
+    text: 'A long note '.repeat(100),
+    anchor: { kind: 'range' as const, start: 2, end: 6 },
+  };
+  const onComment = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewSourceLane
+        duration={10}
+        time={0}
+        selection={{ kind: 'point', time: 0 }}
+        annotations={[note]}
+        onSeek={vi.fn()}
+        onSelect={vi.fn()}
+        onComment={onComment}
+      />
+    )
+  );
+  const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
+  const marker = lane.querySelector<HTMLButtonElement>('button')!;
+  expect(Number.parseFloat(marker.style.top) + 16).toBeLessThanOrEqual(0);
+  expect(marker.style.height).toBe('16px');
+  expect(marker.style.left).toBe('20%');
+  expect(marker.style.width).toBe('40%');
+  expect(marker.title).toBe(note.text);
+  await act(async () => marker.click());
+  expect(onComment).toHaveBeenCalledExactlyOnceWith(note);
+  expect(note.anchor).toEqual({ kind: 'range', start: 2, end: 6 });
+});
+
+it.each(['start', 'end', 'move'] as const)(
+  'does not snap source %s gestures to their own old edges',
+  async (edge) => {
+    const change = vi.fn();
+    const edit = cut(2, 4);
+    const lane = renderLane({
+      edits: [edit],
+      onChangeEdit: change,
+      time: 9,
+      selection: { kind: 'point', time: 9 },
+      boundaries: [],
+    });
+    const at = edge === 'end' ? 400 : 200;
+    await lane.event(edge === 'move' ? lane.block : lane[edge], 'pointerdown', at);
+    await lane.event(lane.block, 'pointermove', at + 5);
+    await lane.event(lane.block, 'pointerup', at + 5);
+    expect(change).toHaveBeenLastCalledWith(edit, {
+      kind: 'range',
+      start: edge === 'end' ? 2 : 2.05,
+      end: edge === 'start' ? 4 : 4.05,
+    });
+  }
+);
+
+it.each(['playhead', 'neighbor'] as const)(
+  'retains a source %s target coinciding with its old edge',
+  async (target) => {
+    const change = vi.fn();
+    const edit = cut(2, 4);
+    const lane = renderLane({
+      edits: target === 'neighbor' ? [edit, { ...cut(1, 2), id: 'neighbor' }] : [edit],
+      onChangeEdit: change,
+      time: target === 'playhead' ? 2 : 9,
+      selection: { kind: 'point', time: 9 },
+      boundaries: [],
+    });
+    await lane.event(lane.block, 'pointerdown', 200);
+    await lane.event(lane.block, 'pointermove', 205);
+    expect(lane.block.style.left).toBe('20%');
+    expect(lane.block.style.width).toBe('20%');
+    await lane.event(lane.block, 'pointerup', 205);
+    expect(change).not.toHaveBeenCalled();
+  }
+);

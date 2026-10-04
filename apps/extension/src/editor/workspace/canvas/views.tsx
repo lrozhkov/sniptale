@@ -1,7 +1,10 @@
 import { FolderOpen, ImagePlus } from 'lucide-react';
 import React from 'react';
 import { translate } from '../../../platform/i18n';
-import { AnnotatableImageSurface } from '@sniptale/ui/annotatable-image-surface';
+import {
+  AnnotatableImageSurface,
+  annotatableImageCheckerboardStyle,
+} from '@sniptale/ui/annotatable-image-surface';
 import { getControlPrimaryButtonClassName } from '@sniptale/ui/control-language';
 import {
   EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI,
@@ -11,21 +14,18 @@ import {
 import { EditorFrameAnnotationPlane } from '../../frame-annotation/plane';
 import type { EditorFrameAnnotationPlaneController } from '../../frame-annotation/types';
 import type { EditorLayerItem, EditorTool } from '../../../features/editor/document/types';
+import {
+  getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
+} from '../../document/canvas-surface/editing-surface';
 
 const emptyStateButtonClassName = [
   'mt-5',
   getControlPrimaryButtonClassName({ density: 'compact' }),
 ].join(' ');
 
-const stageClassName =
-  'box-border grid h-max min-h-full w-max min-w-full place-items-center ' +
-  'px-6 py-6 sm:px-8 sm:py-8 xl:px-10 xl:py-10';
-
-const stagePannableStyle = {
-  minHeight: 'calc(100% + max(32rem, 100vh))',
-  minWidth: 'calc(100% + max(48rem, 130vw))',
-  padding: 'max(16rem, 50vh) max(24rem, 65vw)',
-} satisfies React.CSSProperties;
+const stageClassName = 'box-border grid h-max min-h-full w-max min-w-full place-items-center';
+const emptyStagePaddingClassName = 'px-6 py-6 sm:px-8 sm:py-8 xl:px-10 xl:py-10';
 
 const emptyStateTitleClassName =
   'mt-5 max-w-[420px] text-3xl font-semibold leading-tight ' +
@@ -65,6 +65,8 @@ export function CanvasViewport(props: {
   activeTool?: EditorTool;
   hasImage: boolean;
   backgroundColor: string;
+  showOutsideCanvas?: boolean;
+  canvasCropMode?: 'crop' | 'expand';
   controller?: EditorFrameAnnotationPlaneController;
   dataUi?: string;
   surfaceRef?: React.Ref<HTMLDivElement>;
@@ -78,6 +80,7 @@ export function CanvasViewport(props: {
     ? ({
         borderWidth: 0,
         boxShadow: 'none',
+        backgroundColor: props.backgroundColor,
       } satisfies React.CSSProperties)
     : undefined;
 
@@ -102,6 +105,9 @@ function CanvasStage(
     Parameters<typeof CanvasViewport>[0],
     | 'activeTool'
     | 'canvasRef'
+    | 'backgroundColor'
+    | 'showOutsideCanvas'
+    | 'canvasCropMode'
     | 'controller'
     | 'gridStyle'
     | 'hasImage'
@@ -112,18 +118,47 @@ function CanvasStage(
     surfaceStyle: React.CSSProperties | undefined;
   }
 ) {
+  const documentSize = props.controller?.canvasDocumentSize ?? { width: 0, height: 0 };
+  const surfaceSize = getEditorEditingSurfaceSize(documentSize);
+  const margin = getEditorWorkspaceMargin(documentSize);
+  const left = `${(margin / Math.max(1, surfaceSize.width)) * 100}%`;
+  const top = `${(margin / Math.max(1, surfaceSize.height)) * 100}%`;
+  const right = `${((margin + documentSize.width) / Math.max(1, surfaceSize.width)) * 100}%`;
+  const bottom = `${((margin + documentSize.height) / Math.max(1, surfaceSize.height)) * 100}%`;
+  const bottomInset = `var(--editor-workspace-bottom-inset, ${(margin / Math.max(1, surfaceSize.height)) * 100}%)`;
+  const imageStyle = {
+    left: `var(--editor-workspace-image-left, ${left})`,
+    top: `var(--editor-workspace-image-top, ${top})`,
+    width: `var(--editor-workspace-image-width, ${(documentSize.width / Math.max(1, surfaceSize.width)) * 100}%)`,
+    height: `var(--editor-workspace-image-height, ${(documentSize.height / Math.max(1, surfaceSize.height)) * 100}%)`,
+  } satisfies React.CSSProperties;
+  const freeCanvasSelection = props.activeTool === 'crop' && props.canvasCropMode === 'expand';
+  const revealOutside = props.showOutsideCanvas !== false || freeCanvasSelection;
+  const maskOpacity = freeCanvasSelection ? 'opacity-0' : revealOutside ? 'opacity-[0.78]' : '';
+  const maskClassName = `pointer-events-none absolute z-40 ${maskOpacity}`;
+  const maskStyle = { backgroundColor: props.backgroundColor };
   return (
     <div
       ref={props.stageRef}
-      className={stageClassName}
-      style={props.hasImage ? stagePannableStyle : undefined}
+      className={
+        props.hasImage ? stageClassName : `${stageClassName} ${emptyStagePaddingClassName}`
+      }
     >
       <div ref={props.surfaceRef} data-ui={EDITOR_CANVAS_CONTEXT_SURFACE_DATA_UI}>
         <AnnotatableImageSurface
-          checkerboard={props.hasImage}
+          checkerboard={false}
           className={props.hasImage ? 'rounded-none' : 'border-transparent shadow-none'}
           {...(props.surfaceStyle === undefined ? {} : { style: props.surfaceStyle })}
         >
+          <div
+            className="pointer-events-none absolute z-0"
+            data-ui="editor.canvas.document-checkerboard"
+            style={
+              props.hasImage && documentSize.width > 0 && documentSize.height > 0
+                ? { ...annotatableImageCheckerboardStyle, ...imageStyle, clipPath: 'inset(1px)' }
+                : { display: 'none' }
+            }
+          />
           <canvas ref={props.canvasRef} className="relative z-10 block" />
           {props.hasImage && props.controller ? (
             <EditorFrameAnnotationPlane
@@ -134,7 +169,56 @@ function CanvasStage(
             />
           ) : null}
           {props.hasImage && props.gridStyle ? (
-            <div className="pointer-events-none absolute inset-0 z-20" style={props.gridStyle} />
+            <div
+              className="pointer-events-none absolute z-20"
+              data-ui="editor.canvas.document-grid"
+              style={{ ...imageStyle, ...props.gridStyle }}
+            />
+          ) : null}
+          {props.hasImage && documentSize.width > 0 && documentSize.height > 0 ? (
+            <>
+              <div
+                className={maskClassName}
+                style={{ ...maskStyle, left: 0, right: 0, top: 0, height: imageStyle.top }}
+              />
+              <div
+                className={maskClassName}
+                style={{
+                  ...maskStyle,
+                  left: 0,
+                  right: 0,
+                  top: `var(--editor-workspace-image-bottom, ${bottom})`,
+                  bottom: 0,
+                }}
+              />
+              <div
+                className={maskClassName}
+                data-ui="editor.canvas.workspace-mask-left"
+                style={{
+                  ...maskStyle,
+                  left: 0,
+                  top: imageStyle.top,
+                  bottom: bottomInset,
+                  width: imageStyle.left,
+                }}
+              />
+              <div
+                className={maskClassName}
+                data-ui="editor.canvas.workspace-mask-right"
+                style={{
+                  ...maskStyle,
+                  left: `var(--editor-workspace-image-right, ${right})`,
+                  top: imageStyle.top,
+                  bottom: bottomInset,
+                  right: 0,
+                }}
+              />
+              <div
+                className="pointer-events-none absolute z-40 border border-[var(--sniptale-color-border-soft)]"
+                data-ui="editor.canvas.document-boundary"
+                style={imageStyle}
+              />
+            </>
           ) : null}
         </AnnotatableImageSurface>
       </div>

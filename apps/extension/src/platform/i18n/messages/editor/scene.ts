@@ -5,6 +5,30 @@ function sentence(...parts: string[]) {
 }
 
 export const editorSceneMessages = defineMessageSource({
+  backgroundPanelSection: {
+    ru: 'Фон и изображение',
+    en: 'Background and image',
+  },
+  additionalSection: {
+    ru: 'Дополнительно',
+    en: 'Additional',
+  },
+  glowLabel: {
+    ru: 'Свечение',
+    en: 'Glow',
+  },
+  glowSize: {
+    ru: 'Размер тени',
+    en: 'Shadow size',
+  },
+  glowAdvanced: {
+    ru: 'Параметры свечения',
+    en: 'Glow options',
+  },
+  borderAdvanced: {
+    ru: 'Параметры рамки',
+    en: 'Border options',
+  },
   placementSection: {
     ru: 'Размещение',
     en: 'Placement',
@@ -12,6 +36,10 @@ export const editorSceneMessages = defineMessageSource({
   backgroundTypeSection: {
     ru: 'Тип фона',
     en: 'Background type',
+  },
+  backgroundFillMode: {
+    ru: 'Заливка',
+    en: 'Fill',
   },
   scenePreviewSection: {
     ru: 'Превью сцены',

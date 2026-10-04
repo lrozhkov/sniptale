@@ -1,157 +1,149 @@
 // @vitest-environment jsdom
-
-import type React from 'react';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-
-vi.mock('@sniptale/ui/product-glass-controls', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/ui/product-glass-controls')>()),
-  ProductGlassLinkedPaddingFields: (props: {
-    padding: { top: number; right: number; bottom: number; left: number };
-    onChange: (padding: { top: number; right: number; bottom: number; left: number }) => void;
-    renderValueField: (props: {
-      compact: boolean;
-      label: string;
-      onChange: (value: number) => void;
-      side: 'top';
-      value: number;
-    }) => React.ReactNode;
-  }) => (
-    <>
-      {props.renderValueField({
-        compact: true,
-        label: 'Top',
-        onChange: vi.fn(),
-        side: 'top',
-        value: props.padding.top,
-      })}
-      {props.renderValueField({
-        compact: false,
-        label: 'Top',
-        onChange: vi.fn(),
-        side: 'top',
-        value: props.padding.top,
-      })}
-      <button
-        type="button"
-        data-testid="linked-padding"
-        onClick={() => props.onChange({ top: 24, right: 24, bottom: 24, left: 24 })}
-      >
-        {Object.values(props.padding).join('/')}
-      </button>
-    </>
-  ),
-}));
-
-vi.mock('./shared', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./shared')>()),
-  PanelSection: (props: { label: string; value?: string; children: React.ReactNode }) => (
-    <section data-testid="panel-section">
-      <span>{props.label}</span>
-      {props.value ? <span>{props.value}</span> : null}
-      {props.children}
-    </section>
-  ),
-}));
-
+import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document/constants';
 import { FramePaddingSection } from './padding';
 
-const FRAME = {
-  backgroundColor: '#fff',
-  backgroundGradientAngle: 45,
-  backgroundGradientFrom: '#111111',
-  backgroundGradientTo: '#222222',
-  backgroundImageData: null,
-  backgroundImageFit: 'cover',
-  backgroundMode: 'gradient',
-  browserMode: false,
-  browserTitle: '',
-  browserUrl: '',
-  layoutMode: 'expand-canvas',
-  paddingBottom: 12,
-  paddingLeft: 12,
-  paddingRight: 12,
-  paddingTop: 12,
-} as const;
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-async function renderUi(element: React.ReactNode) {
-  if (!container) {
-    container = document.createElement('div');
-    document.body.appendChild(container);
-    root = createRoot(container);
-  }
-
-  await act(async () => {
-    root?.render(element);
-  });
+let container: HTMLDivElement;
+let root: Root;
+let current = DEFAULT_EDITOR_FRAME_SETTINGS;
+function Harness() {
+  const [frame, setFrame] = useState(DEFAULT_EDITOR_FRAME_SETTINGS);
+  current = frame;
+  return <FramePaddingSection frameDraft={frame} setFrameDraft={setFrame} />;
 }
-
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  await act(async () => root.render(<Harness />));
 });
-
 afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.unstubAllGlobals();
+});
+async function enterValue(value: string) {
+  const field = container.querySelector<HTMLInputElement>('input[type="text"]')!;
   await act(async () => {
-    root?.unmount();
+    field.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  container?.remove();
-  container = null;
-  root = null;
+  await act(async () =>
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+}
+it('keeps a compact slider and supports manual padding above its common range', async () => {
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  expect(range.max).toBe('256');
+  expect(range.value).toBe('32');
+  await enterValue('1024');
+  expect(current).toMatchObject({
+    paddingTop: 1024,
+    paddingRight: 1024,
+    paddingBottom: 1024,
+    paddingLeft: 1024,
+  });
+  expect(range.value).toBe('256');
+  await enterValue('-10');
+  expect(current.paddingTop).toBe(0);
+  await enterValue('9000');
+  expect(current.paddingTop).toBe(4096);
+  await enterValue('invalid');
+  expect(current.paddingTop).toBe(4096);
+});
+it('offers four independently editable sides without short inline sliders', async () => {
+  for (const name of ['all', 'vertical', 'horizontal']) {
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(`[data-padding-link="${name}"]`)?.click()
+    );
+  }
+  expect(container.querySelectorAll('input[type="range"]')).toHaveLength(4);
+  await enterValue('75');
+  expect(current).toMatchObject({
+    paddingTop: 75,
+    paddingRight: 32,
+    paddingBottom: 32,
+    paddingLeft: 32,
+  });
 });
 
-it('renders padding controls without repeating the summary and forwards numeric input updates', async () => {
-  const setFrameDraft = vi.fn((value) =>
-    typeof value === 'function' ? value(FRAME as never) : value
+it('places the linked padding slider below its value with a complete focus outline', () => {
+  const fields = container.querySelector('[data-ui="shared.linked-padding-fields"]');
+  const row = fields?.firstElementChild;
+  const range = fields?.querySelector('input[type="range"]');
+  expect(row?.querySelector('input[type="text"]')).not.toBeNull();
+  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')).not.toBeNull();
+  expect(range?.closest('[data-ui="editor.frame.padding-slider"]')?.className).toContain(
+    'absolute'
   );
-
-  await renderUi(
-    <FramePaddingSection
-      frameDraft={FRAME as never}
-      framePaddingSummary="12 / 12 / 12 / 12"
-      setFrameDraft={setFrameDraft}
-    />
-  );
-
-  expect(container?.querySelector('[data-testid="panel-section"]')?.textContent).not.toContain(
-    '12 / 12 / 12 / 12'
-  );
-
-  await act(async () => {
-    (
-      container?.querySelector('[data-testid="linked-padding"]') as HTMLButtonElement | undefined
-    )?.click();
-  });
-
-  expect(setFrameDraft).toHaveBeenCalledTimes(1);
-  expect((setFrameDraft.mock.calls[0]![0] as (frame: typeof FRAME) => typeof FRAME)(FRAME)).toEqual(
-    {
-      ...FRAME,
-      paddingBottom: 24,
-      paddingLeft: 24,
-      paddingRight: 24,
-      paddingTop: 24,
-    }
-  );
+  expect(
+    range
+      ?.closest('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+      ?.getAttribute('aria-hidden')
+  ).toBe('true');
+  expect(range?.getAttribute('tabindex')).toBe('-1');
+  expect(row?.querySelector('[data-focus-appearance="accent-box"]')).not.toBeNull();
 });
 
-it('maps frame padding to the shared linked-padding control', async () => {
-  const setFrameDraft = vi.fn((value) =>
-    typeof value === 'function' ? value(FRAME as never) : value
+it('reveals just one side slider while unlinked padding labels are hovered', async () => {
+  for (const name of ['all', 'vertical', 'horizontal']) {
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(`[data-padding-link="${name}"]`)?.click()
+    );
+  }
+  const label = container.querySelector<HTMLElement>('[data-padding-hover="top"]');
+  await act(async () => {
+    label?.dispatchEvent(new PointerEvent('pointermove', { bubbles: true }));
+  });
+  const rows = Array.from(
+    container.querySelectorAll<HTMLElement>('[data-ui="shared.ui.compact-inspector.numeric-row"]')
   );
+  expect(rows.map((row) => row.dataset['rangeVisible'])).toEqual([
+    'true',
+    'false',
+    'false',
+    'false',
+  ]);
+});
 
-  await renderUi(
-    <FramePaddingSection
-      frameDraft={FRAME as never}
-      framePaddingSummary="12 / 12 / 12 / 12"
-      setFrameDraft={setFrameDraft}
-    />
-  );
+it('keeps the linked padding slider keyboard reachable after numeric input focus', async () => {
+  const input = container.querySelector<HTMLInputElement>('input[type="text"]')!;
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  await act(async () => input.focus());
+  expect(range.tabIndex).toBe(0);
+  expect(range.closest('[data-ui="shared.linked-padding-fields"]')).not.toBeNull();
+});
 
-  expect(container?.querySelector('[data-testid="linked-padding"]')?.textContent).toBe(
-    '12/12/12/12'
+it('retains the scrub during dragging after leaving the padding label', async () => {
+  const label = container.querySelector('[data-padding-hover="all"]')!;
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  const fields = container.querySelector('[data-ui="editor.frame.padding-fields"]')!;
+  await act(async () => label.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(range.tabIndex).toBe(0);
+  await act(async () => range.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  await act(async () =>
+    fields.dispatchEvent(
+      new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body })
+    )
   );
+  expect(range.tabIndex).toBe(0);
+  await act(async () => range.dispatchEvent(new PointerEvent('pointerup', { bubbles: true })));
+  expect(range.tabIndex).toBe(-1);
+});
+
+it('reveals the linked slider from the gap between label and value and keeps it reachable', async () => {
+  const row = container.querySelector(
+    '[data-ui="shared.linked-padding-fields"]'
+  )!.firstElementChild!;
+  const range = container.querySelector<HTMLInputElement>('input[type="range"]')!;
+  await act(async () => row.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(range.tabIndex).toBe(0);
+  await act(async () => range.dispatchEvent(new PointerEvent('pointermove', { bubbles: true })));
+  expect(range.tabIndex).toBe(0);
+  await enterValue('48');
+  expect(current.paddingTop).toBe(48);
 });

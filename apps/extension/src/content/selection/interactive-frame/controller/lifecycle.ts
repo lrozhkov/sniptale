@@ -4,6 +4,7 @@ import {
   useInteractiveFrameEditingKeyboardEffect,
   useInteractiveFrameEditingOverlayEffect,
   useInteractiveFrameIdleReset,
+  useInteractiveFrameResetFinalization,
 } from './edit-mode-effects';
 import {
   addExitFrameEditingListener,
@@ -211,6 +212,7 @@ export function useInteractiveFrameEditingEffects(params: {
   handleDeleteRef: React.MutableRefObject<() => void>;
 }) {
   useInteractiveFrameIdleReset(params);
+  useInteractiveFrameResetFinalization(params.state, params.handleSaveRef);
   useInteractiveFrameEditingOverlayEffect(params.state, params.isCalloutEditing);
   useInteractiveFrameEditingKeyboardEffect(params);
 }

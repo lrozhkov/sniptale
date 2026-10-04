@@ -82,10 +82,21 @@ function getGalleryDateFacetValue(
   return getGalleryDateBucket(id === 'created' ? item.createdAt : item.updatedAt, now);
 }
 
-function getGalleryFormat(item: LibraryFilterItem): string {
-  const extension = item.filename.split('.').pop()?.trim().toLowerCase();
-  if (extension && extension !== item.filename.toLowerCase()) return extension;
-  return item.mimeType.split('/').pop()?.toLowerCase() ?? item.mimeType.toLowerCase();
+function getGalleryFormat(item: LibraryFilterItem): string | null {
+  const mimeType = item.mimeType.split(';')[0]?.trim().toLowerCase() ?? '';
+  if (
+    mimeType === 'application/x-sniptale-scenario' ||
+    mimeType === 'application/x-sniptale-video-project'
+  ) {
+    return null;
+  }
+  const extension = /\.([a-z0-9]{1,16})$/u.exec(item.filename.trim().toLowerCase())?.[1];
+  if (extension) return extension;
+  if (mimeType === 'application/octet-stream' || mimeType.startsWith('application/x-sniptale-'))
+    return null;
+  return (
+    /^(?:image|video|audio|application|text)\/([a-z0-9][a-z0-9.+-]*)$/u.exec(mimeType)?.[1] ?? null
+  );
 }
 
 function getGallerySizeBucket(size: number): string {

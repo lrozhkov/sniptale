@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Images } from 'lucide-react';
+import { Library } from 'lucide-react';
 import {
   getControlPrimaryButtonClassName,
   getControlSecondaryButtonClassName,
@@ -104,7 +104,7 @@ export function MediaImportConflictModalContent(props: {
           onClick={() => props.onImport(strategy)}
           className={getControlPrimaryButtonClassName({ density: 'compact' })}
         >
-          <Images className="h-4 w-4" aria-hidden="true" />
+          <Library className="h-4 w-4" aria-hidden="true" />
           {translate('gallery.importModal.mediaConflictContinue')}
         </button>
       </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
+import type { BrowserFrameState } from '../../../../features/editor/document/types';
 
 type Assert<T extends true> = T;
 type LoadOptionsKeepCanvasAndPrepared = Assert<
@@ -15,7 +16,7 @@ type LoadOptionsKeepCanvasAndPrepared = Assert<
 type CallbacksKeepRequiredHooks = Assert<
   AppliedDocumentCanvasLoadCallbacks extends {
     prepareObject: (...args: never[]) => void;
-    rebuildFrameDecorations: () => Promise<void>;
+    rebuildFrameDecorations: (browserFrame: BrowserFrameState) => Promise<void>;
   }
     ? true
     : false

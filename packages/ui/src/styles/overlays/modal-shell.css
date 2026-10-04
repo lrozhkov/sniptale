@@ -42,10 +42,10 @@
 .sniptale-modal-close {
   border: none;
   background: transparent;
-  color: var(--sniptale-color-text-secondary);
+  color: var(--sniptale-color-text-muted);
 }
 
 .sniptale-modal-close:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 78%, transparent);
+  background: transparent;
   color: var(--sniptale-color-text-primary-strong);
 }

@@ -89,3 +89,21 @@ it('blocks null, empty, all-selected, locked, and id-less selection movement', (
   expect(moveLayerSelectionToEdge(createCanvas([first], [first]), 'front')).toBe(false);
   expect(moveLayerSelectionToEdge(createCanvas([locked, first], [locked]), 'back')).toBe(false);
 });
+
+it('sends the browser window behind annotations but keeps chrome with the source above the background', () => {
+  const background = createObject('background', {
+    sniptaleRole: 'background',
+    sniptaleType: 'background',
+  });
+  const source = createObject('source', { sniptaleType: 'source-image', sniptaleLocked: true });
+  const header = createObject('header', { sniptaleType: 'browser-frame' });
+  const annotation = createObject('annotation');
+  const canvas = createCanvas([background, annotation, source, header], [source]);
+  expect(moveLayerSelectionToEdge(canvas, 'back')).toBe(true);
+  expect(canvas.moveObjectTo.mock.calls).toEqual([
+    [background, 0],
+    [source, 1],
+    [header, 2],
+    [annotation, 3],
+  ]);
+});

@@ -23,18 +23,39 @@ export function getPreviewSize(
     return { width: resolvedMaxWidth, height: PREVIEW_MIN_HEIGHT };
   }
 
-  const aspectRatio = canvasWidth / canvasHeight;
-  let width = resolvedMaxWidth;
-  let height = width / aspectRatio;
-
-  if (height > PREVIEW_MAX_HEIGHT) {
-    height = PREVIEW_MAX_HEIGHT;
-    width = height * aspectRatio;
-  }
-
   return {
-    width: Math.round(clamp(width, PREVIEW_MIN_WIDTH, resolvedMaxWidth)),
-    height: Math.round(clamp(height, PREVIEW_MIN_HEIGHT, PREVIEW_MAX_HEIGHT)),
+    width: Math.round(resolvedMaxWidth),
+    height: Math.round(
+      clamp((resolvedMaxWidth * canvasHeight) / canvasWidth, PREVIEW_MIN_HEIGHT, PREVIEW_MAX_HEIGHT)
+    ),
+  };
+}
+
+export interface PreviewContentRect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+export function getPreviewContentRect(
+  previewSize: { width: number; height: number },
+  documentSize: { width: number; height: number }
+): PreviewContentRect {
+  if (documentSize.width <= 0 || documentSize.height <= 0) {
+    return { left: 0, top: 0, ...previewSize };
+  }
+  const scale = Math.min(
+    previewSize.width / documentSize.width,
+    previewSize.height / documentSize.height
+  );
+  const width = documentSize.width * scale;
+  const height = documentSize.height * scale;
+  return {
+    left: (previewSize.width - width) / 2,
+    top: (previewSize.height - height) / 2,
+    width,
+    height,
   };
 }
 
@@ -85,31 +106,39 @@ export function getViewportFrame(args: {
   const { visibleBottom, visibleLeft, visibleRight, visibleTop } = getVisibleViewportBounds(
     args.viewport
   );
+  const content = getPreviewContentRect(args.previewSize, {
+    width: args.viewport.canvasWidth,
+    height: args.viewport.canvasHeight,
+  });
 
   const safeLeft = Math.min(visibleLeft, visibleRight);
   const safeTop = Math.min(visibleTop, visibleBottom);
   const widthRatio = Math.max(0, (visibleRight - safeLeft) / args.viewport.scaledCanvasWidth);
   const heightRatio = Math.max(0, (visibleBottom - safeTop) / args.viewport.scaledCanvasHeight);
   const frameWidth = Math.min(
-    args.previewSize.width,
-    Math.max(VIEWPORT_FRAME_MIN_SIZE, Math.round(widthRatio * args.previewSize.width))
+    content.width,
+    Math.max(VIEWPORT_FRAME_MIN_SIZE, widthRatio * content.width)
   );
   const frameHeight = Math.min(
-    args.previewSize.height,
-    Math.max(VIEWPORT_FRAME_MIN_SIZE, Math.round(heightRatio * args.previewSize.height))
+    content.height,
+    Math.max(VIEWPORT_FRAME_MIN_SIZE, heightRatio * content.height)
   );
 
   return {
-    left: clampFrame(
-      (safeLeft / args.viewport.scaledCanvasWidth) * args.previewSize.width,
-      frameWidth,
-      args.previewSize.width
-    ),
-    top: clampFrame(
-      (safeTop / args.viewport.scaledCanvasHeight) * args.previewSize.height,
-      frameHeight,
-      args.previewSize.height
-    ),
+    left:
+      content.left +
+      clampFrame(
+        (safeLeft / args.viewport.scaledCanvasWidth) * content.width,
+        frameWidth,
+        content.width
+      ),
+    top:
+      content.top +
+      clampFrame(
+        (safeTop / args.viewport.scaledCanvasHeight) * content.height,
+        frameHeight,
+        content.height
+      ),
     width: frameWidth,
     height: frameHeight,
   };

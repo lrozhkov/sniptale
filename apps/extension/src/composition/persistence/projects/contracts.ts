@@ -1,3 +1,4 @@
+import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoExportFormat, VideoProject } from '../../../features/video/project/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 
@@ -72,6 +73,8 @@ export function resolveVideoProjectReadResult(result: VideoProjectReadResult): V
 }
 
 export interface ProjectAssetEntry {
+  /** Private acquisition keeps insertion identity before a placement is durably saved. */
+  originMediaId?: string;
   assetId: string;
   id: string;
   mimeType: string;
@@ -98,6 +101,8 @@ export type ProjectAssetReadResult =
     };
 
 export interface ProjectExportEntry {
+  /** Frozen acquisition facts; never describes the processed output file. */
+  recordingMetadata?: RecordingMetadata;
   assetId: string;
   id: string;
   projectId: string;

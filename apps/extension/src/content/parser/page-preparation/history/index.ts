@@ -16,6 +16,8 @@ export { HistoryLocatorAllocationError } from './dom-locators';
 export { captureFrameSessionSnapshot, hydrateFrameSessionSnapshot } from './frame-session';
 export type {
   FrameSessionSnapshot,
+  PagePreparationChangeScope,
+  PagePreparationResetScope,
   PageDomElementState,
   PageDomMutationBatch,
   PageDomMutationPatch,

@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../file-naming/index';
 import {
   createDirectFileSink,
   type ArchiveTransferProgress,
@@ -30,6 +31,7 @@ import { scenarioProjectRootPublisher } from './root-publication/scenario-projec
 import { videoProjectRootPublisher } from './root-publication/video-project';
 import { listGallerySavedViews } from '../../../composition/persistence/gallery-saved-views';
 import { runWithScenarioResourceRead } from '../../../composition/persistence/scenario/resource-sessions';
+import { backfillScenarioLibraryAssets } from '../../../composition/persistence/scenario/library-publication';
 
 export type MediaHubImportConflictStrategy = ArchiveRestoreStrategy;
 
@@ -55,14 +57,11 @@ export interface MediaHubImportResultV6 {
   skipped: number;
 }
 
-function defaultFilename() {
-  return `media-hub-backup-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`;
-}
-
 export async function inspectLocalMediaHubBackup(
   rawOptions: Partial<MediaHubBackupExportOptions> = {}
 ): Promise<MediaHubLocalBackupSummary> {
   await recoverAssetPublications();
+  await backfillScenarioLibraryAssets();
   const options = createMediaHubBackupExportOptions(rawOptions);
   const plan = await runWithScenarioResourceRead(() =>
     buildMediaHubBackupExportPlanFromLibraryV6(options)
@@ -128,10 +127,17 @@ export async function exportMediaHubBackup(
   } = {}
 ): Promise<void> {
   const options = createMediaHubBackupExportOptions(rawOptions);
+  await backfillScenarioLibraryAssets();
   const sink = await createDirectFileSink({
     description: translate('gallery.backupExportModal.archiveDescription'),
     extension: '.zip',
-    filename: runtime.filename ?? defaultFilename(),
+    filename:
+      runtime.filename ??
+      (await createOutputFilename({
+        category: 'archives',
+        type: 'media-hub-backup',
+        extension: 'zip',
+      })),
     mimeType: 'application/zip',
   });
   try {

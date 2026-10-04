@@ -13,6 +13,7 @@ import {
   cloneSettingsTransferJsonValue,
   selectSettingsTransferModelMetadata,
 } from '../../../contracts/settings-transfer';
+import { parseContextMenuTree } from '../../../contracts/settings/context-menu-layout';
 import { selectSettingsTransferProviderMetadata } from '../../../contracts/settings-transfer';
 import { getGradientPresetDisplayName } from '../../../features/highlighter/gradient-presets/display-name';
 import { getCalloutPresetDisplayName } from '../../../features/highlighter/callout-presets/display-name';
@@ -127,6 +128,7 @@ export async function readSettingsTransferSnapshot(
     }),
     'capture.after-capture': payload({ action: settings.captureAction }),
     'capture.saving': payload({
+      filenameRules: settings.filenameRules ?? { template: '' },
       templates: settings.presets ?? [],
       defaultImagePresetId: settings.defaultImagePresetId ?? null,
       defaultVideoPresetId: settings.defaultVideoPresetId ?? null,
@@ -194,6 +196,16 @@ export function collectSettingsTransferDependencies(
   domains: Record<string, SettingsTransferDomainPayload>
 ): Record<string, string[]> {
   const result: Record<string, string[]> = {};
+  const video = asRecord(domains['capture.video']?.data);
+  const videoProfiles = Array.isArray(video?.['profiles']) ? video['profiles'] : [];
+  if (
+    typeof video?.['qualityProfileId'] === 'string' &&
+    videoProfiles.some((profile) => asRecord(profile)?.['id'] === video['qualityProfileId'])
+  ) {
+    result['capture.video.selection'] = [`capture.video.profiles.${video['qualityProfileId']}`];
+  }
+  const menuDependencies = collectContextMenuDependencies(domains);
+  if (menuDependencies.length > 0) result['interface.preferences.context-menu'] = menuDependencies;
   const viewport = asRecord(domains['capture.viewport-presets']?.data);
   if (typeof viewport?.['defaultId'] === 'string') {
     result['capture.viewport-presets.default'] = [
@@ -213,7 +225,78 @@ export function collectSettingsTransferDependencies(
   if (typeof models?.['defaultModelId'] === 'string') {
     result['ai.models.default'] = [`ai.models.items.${models['defaultModelId']}`];
   }
+  const tags = asRecord(domains['styles.tags']?.data);
+  const tagDependencies = availableReferences(
+    tags?.['activeFilterTagIds'],
+    itemIds(tags?.['tags']),
+    'styles.tags.items.'
+  );
+  if (tagDependencies.length > 0) result['styles.tags.active-filter'] = tagDependencies;
+  for (const domainId of ['styles.surfaces', 'styles.gradients'] as const) {
+    const style = asRecord(domains[domainId]?.data);
+    const references = [
+      ...Object.values(asRecord(style?.['defaultPresetIdBySurface']) ?? {}),
+      ...Object.values(asRecord(style?.['favoriteIdsBySurface']) ?? {}).flatMap(
+        (value): unknown[] => (Array.isArray(value) ? (value as unknown[]) : [])
+      ),
+    ];
+    const dependencies = availableReferences(
+      references,
+      itemIds(style?.['presets']),
+      `${domainId}.items.`
+    );
+    if (dependencies.length > 0) result[`${domainId}.defaults`] = dependencies;
+  }
   return result;
+}
+
+function availableReferences(value: unknown, availableIds: Set<string>, prefix: string): string[] {
+  const references = Array.isArray(value) ? value : [];
+  return [
+    ...new Set(
+      references
+        .filter((id): id is string => typeof id === 'string' && availableIds.has(id))
+        .map((id) => `${prefix}${id}`)
+    ),
+  ];
+}
+
+function collectContextMenuDependencies(
+  domains: Record<string, SettingsTransferDomainPayload>
+): string[] {
+  const preferences = asRecord(domains['interface.preferences']?.data);
+  const contextMenu = asRecord(preferences?.['contextMenu']);
+  const layout = parseContextMenuTree(contextMenu?.['layout']);
+  if (!layout) return [];
+  const quickActions = itemIds(asRecord(domains['capture.quick-actions']?.data)?.['items']);
+  const viewports = itemIds(asRecord(domains['capture.viewport-presets']?.data)?.['items']);
+  const commands: string[] = [];
+  const pending = [...layout.nodes];
+  while (pending.length) {
+    const node = pending.pop()!;
+    if (node.type === 'section') pending.push(...node.children);
+    else commands.push(node.command);
+  }
+  const dependencies = new Set<string>();
+  for (const command of commands) {
+    const quickActionPrefix = 'sniptale.screenshots.quick-action.';
+    const viewportPrefix = 'sniptale.window-resize.preset.';
+    if (command.startsWith(quickActionPrefix)) {
+      const id = command.slice(quickActionPrefix.length);
+      if (quickActions.has(id)) dependencies.add(`capture.quick-actions.items.${id}`);
+    } else if (command.startsWith(viewportPrefix)) {
+      const id = decodeURIComponent(command.slice(viewportPrefix.length));
+      if (viewports.has(id)) dependencies.add(`capture.viewport-presets.items.${id}`);
+    }
+  }
+  return [...dependencies];
+}
+
+function itemIds(value: unknown): Set<string> {
+  if (!Array.isArray(value)) return new Set();
+  return new Set(
+    value.map((item) => asRecord(item)?.['id']).filter((id): id is string => typeof id === 'string')
+  );
 }
 
 function payload(value: unknown): SettingsTransferDomainPayload {

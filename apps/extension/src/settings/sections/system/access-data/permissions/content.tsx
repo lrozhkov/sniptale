@@ -251,6 +251,7 @@ export function PermissionsSectionContent(props: {
   return (
     <div className={settingsSectionClassName}>
       <SettingsSubpageTabs
+        placement="inline"
         activeId={view}
         ariaLabel={translate('settings.permissions.permissionKindTabsLabel')}
         items={[

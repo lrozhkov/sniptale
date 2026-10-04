@@ -9,8 +9,16 @@ export function createTourNavigation({
   authoring,
 }) {
   let navigationPage = 0;
-  function render(slide, stageWidth, stageHeight) {
-    return renderTourNavigationScene({
+  let composition = null;
+  function render(slide, stageWidth, stageHeight, selectedObjectId) {
+    const reveal =
+      authoring &&
+      (composition?.slide !== slide ||
+        composition?.stageWidth !== stageWidth ||
+        composition?.stageHeight !== stageHeight ||
+        composition?.selectedObjectId !== selectedObjectId);
+    composition = { slide, stageWidth, stageHeight, selectedObjectId };
+    const rendered = renderTourNavigationScene({
       root,
       slide,
       stageWidth,
@@ -21,14 +29,17 @@ export function createTourNavigation({
       actionButton,
       authoring,
       page: navigationPage,
+      selectedObjectId: reveal ? selectedObjectId : null,
       onPage: (page) => {
         navigationPage = page;
         redraw();
       },
     });
+    navigationPage = rendered.page;
+    return rendered;
   }
 
-  function openContents(slides, index, onSelect) {
+  function openContents(slides, index, onSelect, endScreen) {
     const navigation = root.querySelector('[data-tour-navigation]');
     const trigger = root.querySelector('[data-tour-contents]');
     if (navigation.open) {
@@ -38,28 +49,37 @@ export function createTourNavigation({
     navigation.replaceChildren();
     const list = element('div', 'tour-contents-list');
     let current = null;
-    slides.forEach((slide, number) => {
-      const button = actionButton(`${number + 1}. ${slide.title}`, { kind: 'none' }, 'tour-button');
-      button.title = slide.title;
-      if (number === index) {
+    const entries = slides.map((slide, number) => ({
+      key: number,
+      label: `${number + 1}. ${slide.title}`,
+      title: slide.title,
+    }));
+    if (endScreen?.enabled)
+      entries.push({ key: 'end', label: labels.end ?? labels.finished, title: endScreen.title });
+    entries.forEach((entry) => {
+      const button = actionButton(entry.label, { kind: 'none' }, 'tour-button');
+      button.title = entry.title;
+      if (entry.key === index) {
         button.setAttribute('aria-current', 'step');
         current = button;
       }
       button.addEventListener('click', () => {
-        onSelect(number);
+        onSelect(entry.key === 'end' ? slides.length : entry.key);
         closeContents(true);
       });
       list.append(button);
     });
-    navigation.append(list);
-    const player = root.getBoundingClientRect();
-    const bounds = trigger.getBoundingClientRect();
-    navigation.style.left = `${bounds.left - player.left}px`;
-    navigation.style.top = `${bounds.bottom - player.top + 6}px`;
+    const header = element('div', 'tour-contents-header');
+    const heading = element('h2', 'tour-contents-title');
+    heading.textContent = labels.contents;
+    const close = actionButton(labels.close, { kind: 'none' }, 'tour-button');
+    close.addEventListener('click', () => closeContents(true));
+    header.append(heading, close);
+    navigation.append(header, list);
     navigation.setAttribute('open', '');
     trigger.setAttribute('aria-expanded', 'true');
     current?.scrollIntoView?.({ block: 'nearest' });
-    current?.focus({ preventScroll: true });
+    (current ?? close).focus({ preventScroll: true });
     root.ownerDocument.addEventListener('keydown', onContentsKey, true);
     root.ownerDocument.addEventListener('pointerdown', onContentsPointerDown, true);
   }
@@ -77,15 +97,35 @@ export function createTourNavigation({
 
   function onContentsKey(event) {
     const navigation = root.querySelector('[data-tour-navigation]');
-    if (event.key !== 'Escape' || !navigation.open || event.defaultPrevented) return;
-    event.preventDefault();
-    closeContents(true);
+    if (!navigation.open || event.defaultPrevented) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      closeContents(true);
+    } else if (event.key === 'Tab') {
+      const buttons = [...navigation.querySelectorAll('button')];
+      const active = navigation.getRootNode().activeElement;
+      const next = buttons.indexOf(active) + (event.shiftKey ? -1 : 1);
+      if (next < 0 || next >= buttons.length) {
+        event.preventDefault();
+        buttons[event.shiftKey ? buttons.length - 1 : 0]?.focus();
+      }
+    }
   }
 
   function onContentsPointerDown(event) {
     const navigation = root.querySelector('[data-tour-navigation]');
     if (!navigation.open || !(event.target instanceof globalThis.Element)) return;
-    if (navigation.contains(event.target) || event.target.closest('[data-tour-contents]')) return;
+    if (
+      event
+        .composedPath()
+        .some(
+          (node) =>
+            node === navigation ||
+            (node instanceof globalThis.Element && node.matches('[data-tour-contents]'))
+        )
+    )
+      return;
     closeContents(false);
   }
 
@@ -95,6 +135,7 @@ export function createTourNavigation({
     closeContents: () => closeContents(false),
     reset() {
       navigationPage = 0;
+      composition = null;
     },
   };
 }

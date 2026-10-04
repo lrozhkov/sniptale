@@ -140,10 +140,11 @@ function PlaybackSummaryMeta(props: {
           >
             {loopRange}
             <ContentToolbarButton
+              tone="close"
               title={translate('videoEditor.timeline.clearRange')}
               dataUi="video-editor.timeline.toolbar.clear-range"
               onClick={props.onClearPlaybackRange}
-              className="!h-4 !w-4 !min-w-4 !p-0 !text-[var(--sniptale-color-accent-emphasis)] [&_svg]:!size-3"
+              className="!h-4 !w-4 !min-w-4 !p-0 [&_svg]:!size-3"
             >
               <X aria-hidden="true" />
             </ContentToolbarButton>

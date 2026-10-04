@@ -6,7 +6,7 @@ This document owns wrapper scope, freshness, locks, handoffs, and observability.
 
 ## Local wrappers
 
-- `qa:preflight` reads the current diff or explicit files. It writes an observability record but does not format, lock, build, or write proof state.
+- `qa:preflight` reads the current diff or explicit files. It writes an observability record but does not format, lock, build, or write proof state. In the Codex desktop sandbox, run it with escalated command permissions on the first attempt: its Git subprocesses can fail with `spawnSync git EPERM` under default sandbox permissions.
 - Advisory diagnosis is an embedded, non-blocking stage of `qa:preflight`, `qa:checkpoint`, and checkpoint reuse in `qa:closeout`; it has no standalone workflow command.
 - `qa:structural-audit` writes a manual non-blocking repository topology report.
 - `qa:release-harness` formats supported changed files, validates QA composition and applicable dependencies, runs selected harness proof, and writes a content-bound freshness stamp.

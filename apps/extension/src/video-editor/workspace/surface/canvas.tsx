@@ -220,6 +220,7 @@ function VideoEditorWorkspaceUpper(
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
         <PreviewStage
+          mutePreviewAudio={recordingLayout.audioRecordingDialogOpen}
           headerContent={viewerHeading}
           headerActions={
             <VideoEditorWorkspaceHeaderActions

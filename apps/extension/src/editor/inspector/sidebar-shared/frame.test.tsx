@@ -108,7 +108,7 @@ it('renders the aspect toggle and reflects checked state in the status text', ()
   expect(onClick).toHaveBeenCalledOnce();
 });
 
-it('renders a compact aspect toggle for inline size controls', () => {
+it('renders a compact icon aspect toggle with pressed state and accessible name', () => {
   const onClick = vi.fn();
   renderAspectToggle(<AspectToggle checked compact onClick={onClick} />);
 
@@ -118,7 +118,19 @@ it('renders a compact aspect toggle for inline size controls', () => {
   });
 
   expect(button?.title).toBe('editor.compact.keepAspectRatio');
+  expect(button?.getAttribute('aria-label')).toBe('editor.compact.keepAspectRatio');
   expect(button?.getAttribute('aria-pressed')).toBe('true');
+  expect(button?.textContent).toBe('');
+  expect(button?.querySelector('.lucide-link-2')).not.toBeNull();
   expect(container?.textContent).not.toContain('editor.compact.linked');
   expect(onClick).toHaveBeenCalledOnce();
+});
+
+it('shows an unlinked icon without an accent state when proportions are unlocked', () => {
+  renderAspectToggle(<AspectToggle checked={false} compact onClick={vi.fn()} />);
+
+  const button = container?.querySelector('button');
+  expect(button?.getAttribute('aria-pressed')).toBe('false');
+  expect(button?.querySelector('.lucide-unlink-2')).not.toBeNull();
+  expect(button?.className).not.toContain('text-[var(--sniptale-color-accent)]');
 });

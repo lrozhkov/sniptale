@@ -31,7 +31,7 @@ it('adds only the two workspace stores and preserves all beta1 stores and contra
   ]);
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(transaction.abort).not.toHaveBeenCalled();
-  expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 2 });
+  expect(puts).toHaveBeenCalledWith({ domainId: 'mediaLibrary', schemaVersion: 3 });
   for (const name of betaV1Fixture.stores) expect(names.has(name)).toBe(true);
 });
 

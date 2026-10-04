@@ -44,21 +44,14 @@ it('prepends frame mode commands before surface commands and updates frame draft
   const params = createInspectorCommandParams();
   const commands = buildFrameCompactCommands(params as never);
 
-  expect(commands.map((command) => command.id)).toEqual([
-    'frame-layout-mode',
-    'frame-background-mode',
-    'surface-command',
-  ]);
+  expect(commands.map((command) => command.id)).toEqual(['frame-layout-mode', 'surface-command']);
   expect(((commands[0]!.content as any).props.children as any).props.ariaLabel).toBe('Размещение');
-  expect(((commands[1]!.content as any).props.children as any).props.ariaLabel).toBe('Тип фона');
 
   const layoutOnChange = ((commands[0]!.content as any).props.children as any).props.onChange;
-  const backgroundOnChange = ((commands[1]!.content as any).props.children as any).props.onChange;
 
   layoutOnChange('solid');
-  backgroundOnChange('color');
 
-  expect(params.setFrameDraft).toHaveBeenCalledTimes(2);
+  expect(params.setFrameDraft).toHaveBeenCalledTimes(1);
   expect(mocks.surfaceCommandsMock).toHaveBeenCalledWith(params);
 });
 

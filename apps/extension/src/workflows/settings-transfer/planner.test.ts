@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { cloneSettingsTransferJsonValue } from '../../contracts/settings-transfer';
 import { planSettingsTransfer } from './planner';
 import { parseSettingsTransferDomains } from './domain-parser';
 
@@ -197,4 +198,111 @@ describe('settings transfer planner', () => {
       ],
     });
   });
+});
+
+describe('settings transfer copied-item references', () => {
+  it('remaps context menu commands when a referenced action or viewport is copied', () => {
+    const menu = (quickId: string, viewportId: string) => ({
+      contextMenu: {
+        layout: {
+          version: 2,
+          nodes: [
+            {
+              type: 'command',
+              command: `sniptale.screenshots.quick-action.${quickId}`,
+              enabled: true,
+            },
+            {
+              type: 'command',
+              command: `sniptale.window-resize.preset.${encodeURIComponent(viewportId)}`,
+              enabled: true,
+            },
+          ],
+        },
+      },
+    });
+    const plan = planSettingsTransfer({
+      current: {
+        'interface.preferences': { schemaVersion: 1, data: menu('action-a', 'size/a') },
+        'capture.quick-actions': {
+          schemaVersion: 1,
+          data: { items: [{ id: 'action-a', name: 'Local' }] },
+        },
+        'capture.viewport-presets': {
+          schemaVersion: 1,
+          data: { items: [{ id: 'size/a', name: 'Local' }] },
+        },
+      },
+      imported: {
+        'interface.preferences': { schemaVersion: 1, data: menu('action-a', 'size/a') },
+        'capture.quick-actions': {
+          schemaVersion: 1,
+          data: { items: [{ id: 'action-a', name: 'Imported' }] },
+        },
+        'capture.viewport-presets': {
+          schemaVersion: 1,
+          data: { items: [{ id: 'size/a', name: 'Imported' }] },
+        },
+      },
+      strategy: 'safe-merge',
+    });
+    expect(plan.domains['interface.preferences']?.data).toMatchObject(
+      menu('action-a-imported', 'size/a-imported')
+    );
+  });
+
+  it.each([
+    [
+      'styles.tags',
+      { tags: [{ id: 'a', label: 'Local' }], activeFilterTagIds: ['a'] },
+      { tags: [{ id: 'a', label: 'Imported' }], activeFilterTagIds: ['a'] },
+      'activeFilterTagIds',
+    ],
+    [
+      'styles.surfaces',
+      {
+        presets: [{ id: 'a', name: 'Local' }],
+        defaultPresetIdBySurface: { 'highlighter-callout': 'a' },
+        favoriteIdsBySurface: { 'highlighter-callout': ['a'] },
+      },
+      {
+        presets: [{ id: 'a', name: 'Imported' }],
+        defaultPresetIdBySurface: { 'highlighter-callout': 'a' },
+        favoriteIdsBySurface: { 'highlighter-callout': ['a'] },
+      },
+      'defaultPresetIdBySurface',
+    ],
+    [
+      'styles.gradients',
+      {
+        presets: [{ id: 'a', name: 'Local' }],
+        defaultPresetIdBySurface: { 'highlighter-frame-fill': 'a' },
+        favoriteIdsBySurface: { 'highlighter-frame-fill': ['a'] },
+      },
+      {
+        presets: [{ id: 'a', name: 'Imported' }],
+        defaultPresetIdBySurface: { 'highlighter-frame-fill': 'a' },
+        favoriteIdsBySurface: { 'highlighter-frame-fill': ['a'] },
+      },
+      'defaultPresetIdBySurface',
+    ],
+  ] as const)(
+    'remaps %s preferences when a referenced item is copied',
+    (domainId, current, imported, referenceField) => {
+      const plan = planSettingsTransfer({
+        current: {
+          [domainId]: { schemaVersion: 1, data: cloneSettingsTransferJsonValue(current) },
+        },
+        imported: {
+          [domainId]: { schemaVersion: 1, data: cloneSettingsTransferJsonValue(imported) },
+        },
+        strategy: 'safe-merge',
+      });
+      expect(JSON.stringify(plan.domains[domainId]?.data)).toContain('a-imported');
+      const data = plan.domains[domainId]?.data;
+      const reference =
+        data && !Array.isArray(data) && typeof data === 'object' ? data[referenceField] : undefined;
+      expect(JSON.stringify(reference)).toContain('a-imported');
+    }
+  );
 });

@@ -7,6 +7,7 @@ import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../features/editor/document
 import type { EditorSelectionState } from '../../../features/editor/document/types';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
 import { useInspectorSidebarDraftState } from './drafts';
+import { useEditorStore } from '../../state/useEditorStore';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -63,6 +64,47 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  useEditorStore.getState().setFreshImageBackgroundPending(false);
+});
+
+it('suggests a gradient card only for a newly opened image background draft', () => {
+  useEditorStore.getState().setFreshImageBackgroundPending(true);
+  const cleanOpenFrame = createCleanOpenFrame();
+  const args = {
+    canvasHeight: 720,
+    canvasWidth: 1280,
+    frame: cleanOpenFrame,
+    inspector: 'frame',
+    sceneBackgroundPresets: createDefaultEditorPresetStorageState().sceneBackground,
+    isResizableLayerSelection: false,
+    selection: DEFAULT_SELECTION,
+    sourceHeight: 720,
+    sourceName: 'capture',
+    sourceWidth: 1280,
+  };
+  const hook = renderHook(args);
+  expect(hook.getValue()?.frameDraft).toMatchObject({
+    backgroundMode: 'gradient',
+    backgroundGradientFrom: '#f97316ff',
+    backgroundGradientTo: '#ec4899ff',
+    paddingTop: 32,
+    paddingRight: 32,
+    paddingBottom: 32,
+    paddingLeft: 32,
+    sourceImage: { radius: 12, shadow: 14 },
+  });
+  expect(cleanOpenFrame).toMatchObject({ backgroundMode: 'color', paddingTop: 0 });
+  expect(useEditorStore.getState().freshImageBackgroundPending).toBe(false);
+  act(() => hook.getValue()?.setFrameDraft((draft) => ({ ...draft, paddingTop: 0 })));
+  hook.rerender({ ...args, inspector: 'tool' });
+  hook.rerender(args);
+  expect(hook.getValue()?.frameDraft.paddingTop).toBe(0);
+  expect(hook.getValue()?.frameDraft.backgroundMode).toBe('gradient');
+  act(() => hook.getValue()?.resetFrameDraft());
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
+  hook.rerender({ ...args, inspector: 'tool' });
+  hook.rerender(args);
+  expect(hook.getValue()?.frameDraft).toEqual(cleanOpenFrame);
 });
 
 it('keeps frame drafts aligned with authoritative defaults without suggested padding bootstrap', () => {
@@ -80,7 +122,7 @@ it('keeps frame drafts aligned with authoritative defaults without suggested pad
   });
 
   expect(hook.getValue()?.frameDraft).toEqual(DEFAULT_EDITOR_FRAME_SETTINGS);
-  expect(hook.getValue()?.frameDraft.paddingTop).toBe(128);
+  expect(hook.getValue()?.frameDraft.paddingTop).toBe(32);
 });
 
 it('seeds the scene draft from the opened document instead of a background template', () => {
@@ -200,6 +242,95 @@ it('keeps image, canvas, and layer drafts stable across unchanged and clamped in
   hook.rerender({ ...args });
 
   expect(hook.getValue()?.canvasSizeDraft).toBe(initialCanvasDraft);
+});
+
+it('preserves the inspected layer size during a temporary selection gap', () => {
+  const selection: EditorSelectionState = {
+    ...DEFAULT_SELECTION,
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectId: 'layer-1',
+    selectedObjectIds: ['layer-1'],
+    selectedObjectType: 'image',
+    selectedObjectWidth: 640,
+    selectedObjectHeight: 360,
+  };
+  const args = {
+    canvasHeight: 720,
+    canvasWidth: 1280,
+    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    inspector: 'layer-effects',
+    sceneBackgroundPresets: createDefaultEditorPresetStorageState().sceneBackground,
+    isResizableLayerSelection: true,
+    selection,
+    sourceHeight: 720,
+    sourceName: 'capture',
+    sourceWidth: 1280,
+  };
+  const hook = renderHook(args);
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 640, height: 360 });
+  hook.rerender({ ...args, isResizableLayerSelection: false, selection: DEFAULT_SELECTION });
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 640, height: 360 });
+  hook.rerender({
+    ...args,
+    selection: { ...selection, selectedObjectWidth: 320, selectedObjectHeight: 180 },
+  });
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 320, height: 180 });
+});
+
+it('resets an edited resize draft when a different equal-sized layer is selected', () => {
+  const selection: EditorSelectionState = {
+    ...DEFAULT_SELECTION,
+    hasSelection: true,
+    selectedObjectCount: 1,
+    selectedObjectId: 'layer-1',
+    selectedObjectIds: ['layer-1'],
+    selectedObjectType: 'image',
+    selectedObjectWidth: 640,
+    selectedObjectHeight: 360,
+  };
+  const args = {
+    canvasHeight: 720,
+    canvasWidth: 1280,
+    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    inspector: 'layer-effects',
+    sceneBackgroundPresets: createDefaultEditorPresetStorageState().sceneBackground,
+    isResizableLayerSelection: true,
+    selection,
+    sourceHeight: 720,
+    sourceName: 'capture',
+    sourceWidth: 1280,
+  };
+  const hook = renderHook(args);
+  act(() => hook.getValue()?.setLayerSizeDraft({ width: 900, height: 500 }));
+  hook.rerender({ ...args, isResizableLayerSelection: false, selection: DEFAULT_SELECTION });
+  hook.rerender(args);
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 900, height: 500 });
+  hook.rerender({
+    ...args,
+    selection: {
+      ...selection,
+      selectedObjectId: 'layer-2',
+      selectedObjectIds: ['layer-2'],
+    },
+  });
+  expect(hook.getValue()?.layerSizeDraft).toEqual({ width: 640, height: 360 });
+});
+
+it('keeps image dimensions editable after a crop leaves fractional source geometry', () => {
+  const hook = renderHook({
+    canvasHeight: 1000,
+    canvasWidth: 2000,
+    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
+    inspector: 'image-size',
+    isResizableLayerSelection: false,
+    selection: DEFAULT_SELECTION,
+    sourceHeight: 999.6,
+    sourceName: 'capture',
+    sourceWidth: 1999.4,
+  });
+
+  expect(hook.getValue()?.imageSizeDraft).toEqual({ height: 1000, width: 1999 });
 });
 
 it('preserves a dirty scene draft when legacy template storage changes and can cancel it', () => {

@@ -1,17 +1,19 @@
-import { useEditorEmbedContext } from '../../application/embed-context/context';
-import { Redo2, RotateCcw, Undo2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect } from 'react';
 import type { EditorTool } from '../../../features/editor/document/types';
-import { ContentToolbarButton, ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
+import { ContentToolbarDivider } from '@sniptale/ui/content-toolbar';
 import { CanvasToolButtons, type CanvasToolAction } from '@sniptale/ui/canvas-tools';
 import {
   createCanvasToolAction,
   type CanvasToolDescriptorKind,
 } from '@sniptale/ui/canvas-tools/descriptors';
-import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
+import {
+  FloatingChromeDivider,
+  FloatingChromeToolbar,
+  floatingChromeClassNames,
+} from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
-import { useEditorController } from '../../application/controller-context';
-import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
+import { useEditorEmbedContext } from '../../application/embed-context/context';
+import { useEditorStore } from '../../state/useEditorStore';
 import { getToolLabel } from '../../chrome/tool-icons';
 import {
   initializeFrameAnnotationCreationDefaults,
@@ -20,26 +22,19 @@ import {
 } from '../../frame-annotation/creation-defaults';
 import { FrameAnnotationCreationControls } from '../../../composition/frame-annotation-controls/creation-controls';
 import { loadHighlighterSettings } from '../../../composition/persistence/highlighter';
-import { getRedoButtonTitle, getUndoButtonTitle } from '../toolbar/history-titles';
 import { getDocumentRequiredTitle } from '../toolbar/section-helpers';
 import type { EditorToolbarContentProps } from '../toolbar/types';
-import { EditorAnchoredConfirmPopover } from './anchored-feedback';
+import { EditorFloatingToolHistoryControls } from './history-controls';
+import { DocumentAutosaveStatus } from './document-autosave-status';
 
 const TOOL_RAIL_STACK_CLASS_NAME = floatingChromeClassNames(
   'absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-start gap-3',
-  'max-[720px]:left-3 max-[720px]:right-3 max-[720px]:translate-x-0',
-  'max-[720px]:flex-wrap'
+  'max-[1499px]:left-[calc(50%-6rem)]',
+  'max-[1439px]:!left-0 max-[1439px]:!right-0 max-[1439px]:!translate-none',
+  'max-[1439px]:justify-center'
 );
 
-const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames(
-  'flex-row overflow-visible',
-  'max-[720px]:flex-wrap max-[720px]:content-start max-[720px]:gap-1'
-);
-
-const TOOL_HISTORY_CONTROLS_CLASS_NAME = floatingChromeClassNames(
-  'flex-row items-center gap-1.5 p-1.5',
-  'min-[721px]:absolute min-[721px]:left-[calc(100%+0.75rem)] min-[721px]:top-0'
-);
+const TOOL_RAIL_CLASS_NAME = floatingChromeClassNames('flex-row overflow-visible');
 
 const DRAWING_TOOL_ORDER: readonly EditorTool[] = [
   'pencil',
@@ -70,7 +65,6 @@ type EditorFloatingToolRailProps = EditorToolbarContentProps & {
 };
 
 export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
-  const embed = useEditorEmbedContext();
   const annotationDefaults = useFrameAnnotationCreationDefaults();
   const frameAnnotationActive = props.isToolButtonActive('frame-annotation');
   useEffect(() => {
@@ -95,14 +89,7 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
   });
 
   return (
-    <div
-      data-ui="editor.floating.tool-rail.stack"
-      className={floatingChromeClassNames(
-        TOOL_RAIL_STACK_CLASS_NAME,
-        embed.mode === 'scenario' &&
-          'min-[721px]:max-[1439px]:!top-[4.75rem] max-[720px]:!top-[8.5rem]'
-      )}
-    >
+    <div data-ui="editor.floating.tool-rail.stack" className={TOOL_RAIL_STACK_CLASS_NAME}>
       <FloatingChromeToolbar
         aria-label={translate('shared.ui.commandPaletteToolsSection')}
         className={TOOL_RAIL_CLASS_NAME}
@@ -112,6 +99,7 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
         <ContentToolbarDivider dataUi="editor.floating.tool-rail.divider.before-frame" />
         <div className="contents">
           <FrameAnnotationCreationControls
+            allowInactiveFrameMenu
             context="content"
             disabled={!props.hasImage}
             frameActive={frameAnnotationActive}
@@ -128,11 +116,24 @@ export function EditorFloatingToolRail(props: EditorFloatingToolRailProps) {
         <CanvasToolButtons actions={drawingActions} dataUi="editor.floating.tool-rail" />
       </FloatingChromeToolbar>
       <EditorFloatingToolHistoryControls
+        autosaveControl={<ImageHistoryAutosave hasImage={props.hasImage} />}
         hasImage={props.hasImage}
         history={props.history}
         onBeforeSelectionAwareAction={props.onBeforeSelectionAwareAction}
       />
     </div>
+  );
+}
+
+function ImageHistoryAutosave({ hasImage }: { hasImage: boolean }) {
+  const standalone = useEditorEmbedContext().mode !== 'scenario';
+  const sessionId = useEditorStore((state) => state.sessionId);
+  if (!standalone || !hasImage) return null;
+  return (
+    <>
+      <FloatingChromeDivider vertical />
+      <DocumentAutosaveStatus key={sessionId} />
+    </>
   );
 }
 
@@ -169,6 +170,7 @@ function isDrawingOptionsTool(tool: EditorTool): boolean {
     tool === 'marker' ||
     tool === 'shape' ||
     tool === 'arrow' ||
+    tool === 'blur' ||
     tool === 'text'
   );
 }
@@ -188,80 +190,4 @@ function getEditorToolTitle(tool: EditorTool): string {
               ? 'content.toolbar.drawingSelectModifierHint'
               : null;
   return modifierKey ? `${label}\n${translate(modifierKey)}` : label;
-}
-
-function EditorFloatingToolHistoryControls(props: {
-  hasImage: boolean;
-  history: { canUndo: boolean; canRedo: boolean; index: number };
-  onBeforeSelectionAwareAction: () => void;
-}) {
-  const controller = useEditorController();
-  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
-  const resetButtonRef = useRef<HTMLButtonElement>(null);
-  const resetAvailable = props.hasImage && props.history.index > 0;
-  const runSelectionAwareAction = (label: string, action: () => Promise<void> | void) =>
-    fireAndReportEditorAction(label, async () => {
-      props.onBeforeSelectionAwareAction();
-      controller.clearSelection();
-      await action();
-    });
-
-  const confirmReset = async () => {
-    await runAndReportEditorAction('toolbar-reset-to-original', async () => {
-      props.onBeforeSelectionAwareAction();
-      controller.clearSelection();
-      await controller.resetToOriginal();
-    });
-    setResetConfirmOpen(false);
-  };
-
-  return (
-    <>
-      <FloatingChromeToolbar
-        dataUi="editor.floating.tool-rail.history"
-        className={TOOL_HISTORY_CONTROLS_CLASS_NAME}
-      >
-        <ContentToolbarButton
-          title={getUndoButtonTitle(props.history.canUndo)}
-          disabled={!props.history.canUndo}
-          onClick={() => runSelectionAwareAction('toolbar-undo', () => controller.undo())}
-          dataUi="editor.floating.tool-rail.history.undo"
-        >
-          <Undo2 size={18} strokeWidth={2} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          title={getRedoButtonTitle(props.history.canRedo)}
-          disabled={!props.history.canRedo}
-          onClick={() => runSelectionAwareAction('toolbar-redo', () => controller.redo())}
-          dataUi="editor.floating.tool-rail.history.redo"
-        >
-          <Redo2 size={18} strokeWidth={2} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          ref={resetButtonRef}
-          title={translate('editor.toolbar.resetOriginalTooltip')}
-          disabled={!resetAvailable}
-          active={resetConfirmOpen}
-          aria-expanded={resetConfirmOpen}
-          aria-haspopup="dialog"
-          onClick={() => setResetConfirmOpen((open) => !open)}
-          dataUi="editor.floating.tool-rail.history.reset"
-        >
-          <RotateCcw size={18} strokeWidth={2} />
-        </ContentToolbarButton>
-      </FloatingChromeToolbar>
-      {resetConfirmOpen ? (
-        <EditorAnchoredConfirmPopover
-          anchorEl={resetButtonRef.current}
-          title={translate('editor.toolbar.resetOriginalTitle')}
-          message={translate('editor.toolbar.resetOriginalMessage')}
-          confirmText={translate('editor.toolbar.resetOriginal')}
-          cancelText={translate('common.actions.cancel')}
-          dataUi="editor.floating.tool-rail.history.reset-confirm"
-          onCancel={() => setResetConfirmOpen(false)}
-          onConfirm={confirmReset}
-        />
-      ) : null}
-    </>
-  );
 }

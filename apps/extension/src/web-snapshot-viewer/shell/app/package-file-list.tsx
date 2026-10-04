@@ -1,4 +1,4 @@
-import { Download, File, Image, LoaderCircle } from 'lucide-react';
+import { Download, ExternalLink, Eye, File, Image, LoaderCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { translate, type AppLocale } from '../../../platform/i18n';
 import type { ViewerPackageFile } from '../../viewer/package-files';
@@ -16,9 +16,11 @@ export function ViewerPackageFileList(props: {
   files: ViewerPackageFile[];
   locale: AppLocale;
   onDownloadPackageFile: (file: ViewerPackageFile) => Promise<void>;
+  onOpenPackageFile: (file: ViewerPackageFile) => Promise<void>;
+  onPreviewPackageFile: (file: ViewerPackageFile, trigger: HTMLButtonElement) => void;
 }) {
   const [activePath, setActivePath] = useState<string | null>(null);
-  const [errorPath, setErrorPath] = useState<string | null>(null);
+  const [error, setError] = useState<{ kind: 'download' | 'open'; path: string } | null>(null);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;
@@ -27,14 +29,19 @@ export function ViewerPackageFileList(props: {
     };
   }, []);
   const downloadLabel = translate('webSnapshotViewer.app.downloadAsset', props.locale);
-  const downloadPackageFile = (file: ViewerPackageFile) => {
+  const openLabel = translate('webSnapshotViewer.app.openAsset', props.locale);
+  const previewLabel = translate('webSnapshotViewer.app.previewAsset', props.locale);
+  const runPackageFileAction = (
+    file: ViewerPackageFile,
+    kind: 'download' | 'open',
+    action: () => Promise<void>
+  ) => {
     if (activePath !== null) return;
     setActivePath(file.path);
-    setErrorPath(null);
-    void props
-      .onDownloadPackageFile(file)
+    setError(null);
+    void action()
       .catch(() => {
-        if (mountedRef.current) setErrorPath(file.path);
+        if (mountedRef.current) setError({ kind, path: file.path });
       })
       .finally(() => {
         if (mountedRef.current) setActivePath(null);
@@ -57,11 +64,38 @@ export function ViewerPackageFileList(props: {
                 className="size-5 shrink-0 text-[var(--sniptale-color-text-muted)]"
               />
               <button
+                aria-label={`${previewLabel}: ${file.name}`}
+                className={downloadButtonClassName}
+                onClick={(event) => props.onPreviewPackageFile(file, event.currentTarget)}
+                title={previewLabel}
+                type="button"
+              >
+                <Eye aria-hidden="true" size={13} />
+              </button>
+              <button
+                aria-label={`${openLabel}: ${file.name}`}
+                className={downloadButtonClassName}
+                disabled={activePath !== null}
+                onClick={() =>
+                  runPackageFileAction(file, 'open', () => props.onOpenPackageFile(file))
+                }
+                title={openLabel}
+                type="button"
+              >
+                {isActive ? (
+                  <LoaderCircle aria-hidden="true" className="animate-spin" size={13} />
+                ) : (
+                  <ExternalLink aria-hidden="true" size={13} />
+                )}
+              </button>
+              <button
                 type="button"
                 aria-label={`${downloadLabel}: ${file.name}`}
                 className={downloadButtonClassName}
                 disabled={activePath !== null}
-                onClick={() => downloadPackageFile(file)}
+                onClick={() =>
+                  runPackageFileAction(file, 'download', () => props.onDownloadPackageFile(file))
+                }
                 title={downloadLabel}
               >
                 {isActive ? (
@@ -83,12 +117,17 @@ export function ViewerPackageFileList(props: {
                 </p>
               </div>
             </div>
-            {errorPath === file.path ? (
+            {error?.path === file.path ? (
               <p
                 className="px-11 pb-2 text-[10px] text-[var(--sniptale-color-danger)]"
                 role="status"
               >
-                {translate('webSnapshotViewer.app.packageFileDownloadFailed', props.locale)}
+                {translate(
+                  error.kind === 'open'
+                    ? 'webSnapshotViewer.app.assetOpenFailed'
+                    : 'webSnapshotViewer.app.packageFileDownloadFailed',
+                  props.locale
+                )}
               </p>
             ) : null}
           </article>

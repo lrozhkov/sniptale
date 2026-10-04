@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import {
   createMediaItem,
+  createVideoProjectItem,
   createScenarioExportItem,
   createScenarioItem,
 } from '../actions/test-support';
@@ -208,8 +209,7 @@ it('shows read-only tags without an input for non-editable exports', async () =>
     )
   );
 
-  const tagButton = container.querySelector('button');
-  expect(tagButton?.hasAttribute('disabled')).toBe(true);
+  expect(container.querySelector('button')).toBeNull();
   expect(container.querySelector('input')).toBeNull();
   expect(container.textContent).toContain('published');
   await act(async () => root.unmount());
@@ -369,4 +369,230 @@ it('disables promotion while the storage mutation is pending', async () => {
   await act(async () => resolvePromotion?.());
   expect(button?.hasAttribute('disabled')).toBe(false);
   await act(async () => root.unmount());
+});
+
+it('keeps navigation and file commands neutral with matching geometry', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  await act(async () => root.render(<PreviewActions {...createProps()} />));
+  const commands = [...container.querySelectorAll('button')].filter(
+    (button) => button.textContent !== 'common.actions.delete'
+  );
+  expect(commands.length).toBeGreaterThan(1);
+  for (const command of commands) {
+    expect(command.className).not.toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
+    expect(command.className).toContain('!px-3');
+  }
+  await act(async () => root.unmount());
+});
+
+it('confirms copy only after success, blocks repeats and clears feedback on selection changes', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  let finish: (value: boolean) => void = () => undefined;
+  const onCopy = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const props = { ...createProps(), onCopy };
+  await act(async () => root.render(<PreviewActions {...props} />));
+  const copyButton = () =>
+    [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'gallery.preview.copy'
+    )!;
+  await act(async () => {
+    copyButton().click();
+    copyButton().click();
+  });
+  expect(onCopy).toHaveBeenCalledTimes(1);
+  expect(copyButton().disabled).toBe(true);
+  expect(copyButton().getAttribute('aria-label')).toBe('gallery.preview.copy');
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => finish(true));
+  expect(container.textContent).toContain('gallery.preview.copied');
+  await act(async () =>
+    root.render(<PreviewActions {...props} item={{ ...props.item, id: 'next' }} />)
+  );
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => copyButton().click());
+  await act(async () => finish(false));
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    'gallery.preview.actionRetry'
+  );
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => copyButton().click());
+  await act(async () =>
+    root.render(<PreviewActions {...props} item={{ ...props.item, id: 'third' }} />)
+  );
+  await act(async () => finish(true));
+  expect(container.textContent).not.toContain('gallery.preview.copied');
+  await act(async () => root.unmount());
+});
+
+it('expires successful feedback and reports rejected actions', async () => {
+  vi.useFakeTimers();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    const props = {
+      ...createProps(),
+      onCopy: vi.fn().mockResolvedValueOnce(true).mockRejectedValueOnce(new Error('failed')),
+    };
+    await act(async () => root.render(<PreviewActions {...props} />));
+    const button = [...container.querySelectorAll('button')].find(
+      (entry) => entry.textContent === 'gallery.preview.copy'
+    )!;
+    await act(async () => button.click());
+    expect(button.textContent).toBe('gallery.preview.copied');
+    await act(async () => vi.advanceTimersByTime(2000));
+    expect(button.textContent).toBe('gallery.preview.copy');
+    await act(async () => button.click());
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    vi.useRealTimers();
+  }
+});
+
+it('opens an available video project from detail actions', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const props = { ...createProps(), item: createVideoProjectItem() };
+  await act(async () => root.render(<PreviewActions {...props} />));
+  const open = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'gallery.preview.openInEditor'
+  );
+  expect(open).toBeDefined();
+  await act(async () => open?.click());
+  expect(props.onEdit).toHaveBeenCalledOnce();
+  await act(async () => root.unmount());
+});
+
+it('keeps promotion and independent Delete available for temporary scenario exports', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onPromote = vi.fn(async () => undefined);
+  const item = {
+    ...createScenarioExportItem(),
+    lifecycle: { savedAt: null, storageClass: 'temporary' as const, updatedAt: 1 },
+  };
+  await act(async () =>
+    root.render(
+      <>
+        <PreviewPromotionAction {...createProps(onPromote)} item={item} />
+        <PreviewActions {...createProps(onPromote)} item={item} />
+      </>
+    )
+  );
+  const save = Array.from(container.querySelectorAll('button')).find(
+    (button) => button.textContent === 'gallery.preview.saveToLibrary'
+  );
+  expect(save).toBeDefined();
+  expect(
+    container
+      .querySelector('[data-ui="gallery.preview.lifecycle-actions"]')
+      ?.querySelectorAll('button')
+  ).toHaveLength(1);
+  expect(container.textContent).toContain('common.actions.delete');
+  await act(async () => save?.click());
+  expect(onPromote).toHaveBeenCalledOnce();
+  act(() => root.unmount());
+});
+
+it('offers draft reset for HTML filenames while export tags remain read-only', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const onResetChanges = vi.fn();
+  const item = createScenarioExportItem({ format: 'html', tags: ['project-tag'] });
+  await act(async () =>
+    root.render(
+      <>
+        <PreviewActions {...createProps()} item={item} hasChanges onResetChanges={onResetChanges} />
+        <PreviewTagEditor
+          item={item}
+          onAddTag={vi.fn()}
+          onRemoveTag={vi.fn()}
+          onTagDraftChange={vi.fn()}
+          tagDraft=""
+          tagDrafts={['project-tag']}
+        />
+      </>
+    )
+  );
+  const reset = [...container.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('gallery.preview.resetChanges')
+  );
+  expect(reset).toBeDefined();
+  await act(async () => reset?.click());
+  expect(onResetChanges).toHaveBeenCalledOnce();
+  expect(container.querySelector('input')).toBeNull();
+  await act(async () => root.unmount());
+});
+
+it('resets promotion feedback when the inspector switches to another draft', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const props = createProps(
+    vi.fn(async () => {
+      throw new Error('write failed');
+    })
+  );
+  await act(async () => root.render(<PreviewPromotionAction {...props} />));
+  await act(async () => container.querySelector('button')?.click());
+  expect(container.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () =>
+    root.render(<PreviewPromotionAction {...props} item={{ ...props.item, id: 'next-draft' }} />)
+  );
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  act(() => root.unmount());
+});
+
+it('omits redundant headings for one file action and distinguishes save-copy from promotion', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const props = createProps();
+  await act(async () =>
+    root.render(<PreviewActions {...props} item={createMediaItem({ kind: 'audio' })} />)
+  );
+  expect(container.textContent).not.toContain('gallery.preview.fileActions');
+  expect(container.querySelector('#preview-actions-heading')).toBeNull();
+  expect(container.textContent).toContain('gallery.preview.download');
+  expect(container.textContent).toContain('common.actions.delete');
+  await act(async () => root.render(<PreviewActions {...props} onSaveCopy={vi.fn()} />));
+  expect(container.querySelector('#preview-actions-heading')?.className).toContain('text-xs');
+  const copy = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'gallery.preview.saveCopy'
+  );
+  expect(copy?.querySelector('.lucide-copy-plus')).not.toBeNull();
+  expect(container.textContent).toContain('gallery.preview.fileActions');
+  act(() => root.unmount());
+});
+
+it('uses the same navigation icon for image, recording and project editors', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const props = createProps();
+  const items = [
+    createMediaItem(),
+    createVideoProjectItem(),
+    createMediaItem({ source: { kind: 'recording', recordingId: 'r' }, kind: 'video' }),
+  ];
+  for (const item of items) {
+    await act(async () => root.render(<PreviewActions {...props} item={item} />));
+    const open = [...container.querySelectorAll('button')].find((button) =>
+      ['gallery.preview.openInEditor', 'gallery.videoReview.openVideoEditor'].includes(
+        button.textContent ?? ''
+      )
+    );
+    expect(open?.querySelector('.lucide-arrow-up-right')).not.toBeNull();
+    await act(async () => open?.click());
+  }
+  expect(props.onEdit).toHaveBeenCalledTimes(3);
+  act(() => root.unmount());
 });

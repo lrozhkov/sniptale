@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 const KEYDOWN_LISTENER_OPTIONS = { capture: true };
+type PlaybackSpaceTargetPolicy = 'native-controls' | 'all-targets';
 function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const owner = target.closest('[contenteditable]');
@@ -23,11 +24,20 @@ function isEditableTarget(target: EventTarget | null): boolean {
   );
 }
 /** Registers Space for one active transport; the context owner releases it on deactivation. */
-function registerPlaybackSpaceShortcut(togglePlayback: () => void): () => void {
+function registerPlaybackSpaceShortcut(
+  togglePlayback: () => void,
+  targetPolicy: PlaybackSpaceTargetPolicy
+): () => void {
   const restoreFocusPaint = () =>
     document.documentElement.removeAttribute('data-video-editor-focus');
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.code !== 'Space' || isEditableTarget(event.target)) {
+    const nativeDisclosure =
+      event.target instanceof Element &&
+      event.target.closest('summary, [role="switch"], [data-ui="library-media-footer"]');
+    if (
+      event.code !== 'Space' ||
+      (targetPolicy === 'native-controls' && (isEditableTarget(event.target) || nativeDisclosure))
+    ) {
       restoreFocusPaint();
       return;
     }
@@ -48,11 +58,15 @@ function registerPlaybackSpaceShortcut(togglePlayback: () => void): () => void {
 }
 
 /** Keeps transport ownership stable across playback updates while invoking the latest action. */
-export function usePlaybackSpaceShortcut(togglePlayback: () => void, enabled = true): void {
+export function usePlaybackSpaceShortcut(
+  togglePlayback: () => void,
+  enabled = true,
+  targetPolicy: PlaybackSpaceTargetPolicy = 'native-controls'
+): void {
   const latestToggle = useRef(togglePlayback);
   latestToggle.current = togglePlayback;
   useEffect(() => {
     if (!enabled) return;
-    return registerPlaybackSpaceShortcut(() => latestToggle.current());
-  }, [enabled]);
+    return registerPlaybackSpaceShortcut(() => latestToggle.current(), targetPolicy);
+  }, [enabled, targetPolicy]);
 }

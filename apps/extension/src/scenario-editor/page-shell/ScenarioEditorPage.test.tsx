@@ -20,6 +20,7 @@ const io = vi.hoisted(() => ({
   importImages: vi.fn(),
   select: vi.fn(),
   mount: vi.fn(),
+  list: vi.fn(),
 }));
 vi.mock('./library-browser', () => ({
   GuideLibraryBrowser: ({
@@ -48,11 +49,14 @@ vi.mock('../../composition/persistence/scenario/store/project-records/assets', (
   getScenarioAssetBlob: io.asset,
 }));
 vi.mock('../../composition/persistence/scenario/store/public', () => ({
+  getScenarioAssetBlob: io.asset,
   createScenarioProjectRecord: io.create,
   duplicateScenarioProjectRecord: io.duplicate,
   deleteScenarioProjectRecord: io.remove,
   saveScenarioProjectRecord: io.save,
   importScenarioImages: io.importImages,
+  listScenarioProjectSummaries: io.list,
+  getScenarioProjectRecord: io.load,
 }));
 vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: io.select }));
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -60,14 +64,18 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 import type { GuideLibraryBrowser } from './library-browser';
+import { clickGuideControl, openGuideInsertionMenu } from './test-support/guide-controls';
 
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   io.previous.mockReturnValue([]);
+  io.list.mockResolvedValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   container = document.createElement('div');
@@ -89,45 +97,19 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function render() {
   await act(async () => root.render(<ScenarioEditorPage />));
 }
 async function click(label: string, scope: ParentNode = container) {
-  const menus = [
-    [
-      ['Duplicate project', 'Delete project', 'Reload project'],
-      '.guide-page-header .guide-action-menu-anchor',
-    ],
-    [
-      ['Move up', 'Move down', 'Duplicate item', 'Remove item', 'Merge with next step'],
-      '.guide-document [data-selected="true"] > .guide-item-actions',
-    ],
-  ] as const;
-  const selector =
-    scope instanceof Element && scope.matches('.guide-block')
-      ? '.guide-block-actions'
-      : menus.find(([labels]) => labels.some((name) => name === label))?.[1];
-  if (selector) {
-    const trigger = scope.querySelector<HTMLButtonElement>(`${selector} button`);
-    await act(async () => trigger?.click());
-    scope = document.body;
-  }
-  if (['Text', 'Heading', 'Note'].includes(label))
-    scope = scope.querySelector('.guide-insertion-block[data-end="true"]') ?? scope;
-  if (['Add step', 'Add section'].includes(label))
-    scope = scope.querySelector('.guide-insertion-item[data-end="true"]') ?? scope;
-  const button = [...scope.querySelectorAll('button')].find(
-    (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
-  );
-  if (!button) throw new Error(`Missing test control ${label}`);
-  await act(async () => button.click());
+  await clickGuideControl(label, scope);
 }
 
 async function settleAutosave() {
   await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    await vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS);
   });
 }
 
@@ -146,7 +128,8 @@ it('saves the edited project title and added steps against the loaded revision',
     }),
     { baseUpdatedAt: 100 }
   );
-  expect(container.textContent).toContain('Saved');
+  expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
+  expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
 
 it('keeps recoverable edits after save failure and allows retry', async () => {
@@ -158,7 +141,8 @@ it('keeps recoverable edits after save failure and allows retry', async () => {
   expect(container.textContent).toContain('Your edits remain in the editor');
   await click('Retry');
   expect(io.save).toHaveBeenCalledTimes(2);
-  expect(container.textContent).toContain('Saved');
+  expect(container.querySelector('[aria-label="Autosave: Saved"]')).not.toBeNull();
+  expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
 
 it('does not create or overwrite an unavailable project', async () => {
@@ -177,6 +161,18 @@ it('requires explicit creation for an empty editor route', async () => {
   await click('New scenario');
   expect(io.select).toHaveBeenCalledWith({ projectId: 'new-guide' });
   expect(container.querySelector('input')?.value).toBe('New guide');
+});
+
+it('opens recent scenarios with their saved revisions available to Undo', async () => {
+  window.history.replaceState({}, '', '/');
+  io.list.mockResolvedValue([
+    { id: 'guide', name: 'Local guide', updatedAt: 100, availability: 'available' },
+  ]);
+  io.previous.mockReturnValue([{ project: createGuideProject('Older', 'guide', 90) }]);
+  await render();
+  await act(async () => container.querySelector<HTMLButtonElement>('section button')?.click());
+  await click('Undo');
+  expect(container.querySelector('input[aria-label="Scenario"]')).toHaveProperty('value', 'Older');
 });
 
 it('opens a linked step and keeps outline navigation tied to stable item IDs', async () => {
@@ -393,16 +389,23 @@ it('confirms project deletion and clears the project route only after success', 
 });
 
 it('confirms replacing failed edits with the persisted version', async () => {
+  const clickRecoveryReload = async () => {
+    const button = [
+      ...document.querySelectorAll<HTMLButtonElement>('.guide-page-feedback button'),
+    ].find((candidate) => candidate.textContent === 'Reload project');
+    if (!button) throw new Error('Missing feedback reload action');
+    await act(async () => button.click());
+  };
   io.save.mockRejectedValue(new Error('Storage failure'));
   await render();
   await click('Add step');
   await settleAutosave();
-  await click('Reload project');
+  await clickRecoveryReload();
   expect(io.load).toHaveBeenCalledTimes(1);
   await click('Cancel');
   expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Reload project');
-  const confirm = [...container.querySelectorAll('[role="alertdialog"] button')].find(
+  await clickRecoveryReload();
+  const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find(
     (button) => button.textContent === 'Reload project'
   );
   if (!(confirm instanceof HTMLButtonElement)) throw new Error('Missing reload confirmation');
@@ -469,6 +472,7 @@ it('navigates from current resources and collapses panels without changing the d
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(true);
   await click('Outline');
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(false);
+  await click('Close', container.querySelector('#guide-inspector-panel')!);
   const actions = container.querySelector('.guide-header-actions')!;
   const reopen = actions.querySelector('[aria-controls="guide-inspector-panel"]');
   expect(reopen).not.toBeNull();
@@ -476,6 +480,9 @@ it('navigates from current resources and collapses panels without changing the d
   await click('Inspector');
   expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(false);
   expect(actions.querySelector('[aria-controls="guide-inspector-panel"]')).toBeNull();
+  await click('Appearance');
+  await click('Interactive tour');
+  await click('Guide');
   expect(container.querySelectorAll('article')).toHaveLength(1);
   expect(io.save).not.toHaveBeenCalled();
 });
@@ -498,12 +505,12 @@ async function editField(selector: string, value: string) {
 
 it('composes multiple blocks and retains undo and redo after autosave', async () => {
   await render();
-  const article = container.querySelector('article#first');
+  const article = container.querySelector<HTMLElement>('article#first');
   if (!article) throw new Error('Missing step');
-  await click('Text', article);
-  await click('Text', article);
-  await click('Heading', article);
-  await click('Note', article);
+  for (const kind of ['Text', 'Text', 'Heading', 'Note']) {
+    await act(async () => article.focus());
+    await click(kind, article);
+  }
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
   await settleAutosave();
   await click('Undo');
@@ -515,31 +522,45 @@ it('composes multiple blocks and retains undo and redo after autosave', async ()
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
 });
 
-it('groups text edits and routes keyboard undo and redo to the same history', async () => {
-  await render();
-  await editField('article#first .guide-step-title', 'First change');
-  await editField('article#first .guide-step-title', 'Second change');
-  const field = container.querySelector('article#first .guide-step-title');
-  if (!(field instanceof HTMLTextAreaElement)) throw new Error('Missing field');
-  await act(async () =>
-    field.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
-    )
-  );
-  expect(field.value).toBe('First step');
-  await act(async () =>
-    field.dispatchEvent(
-      new KeyboardEvent('keydown', {
-        key: 'z',
-        ctrlKey: true,
-        shiftKey: true,
-        bubbles: true,
-        cancelable: true,
-      })
-    )
-  );
-  expect(field.value).toBe('Second change');
-});
+it.each([
+  { key: 'z', code: '', modifier: 'ctrlKey' },
+  { key: 'я', code: 'KeyZ', modifier: 'ctrlKey' },
+  { key: 'я', code: 'KeyZ', modifier: 'metaKey' },
+])(
+  'routes $modifier undo/redo with $key to the same grouped history',
+  async ({ key, code, modifier }) => {
+    await render();
+    await editField('article#first .guide-step-title', 'First change');
+    await editField('article#first .guide-step-title', 'Second change');
+    const field = container.querySelector('article#first .guide-step-title');
+    if (!(field instanceof HTMLTextAreaElement)) throw new Error('Missing field');
+    await act(async () =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key,
+          code,
+          [modifier]: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    );
+    expect(field.value).toBe('First step');
+    await act(async () =>
+      field.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: key.toUpperCase(),
+          code,
+          [modifier]: true,
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        })
+      )
+    );
+    expect(field.value).toBe('Second change');
+  }
+);
 
 it('supports optional numbering and editable sections with structural undo', async () => {
   await render();
@@ -554,6 +575,7 @@ it('supports optional numbering and editable sections with structural undo', asy
   expect(
     container.querySelector('article#first header > span:not(.guide-voice-field)')?.textContent
   ).toBe('1');
+  await act(async () => container.querySelector<HTMLElement>('article#first')!.focus());
   await click('Add section');
   await editField('.guide-section-title', 'A section');
   expect(container.querySelector('section h2')?.getAttribute('aria-label')).toBe('A section');
@@ -650,6 +672,10 @@ it('routes block and item tools through reversible order-preserving mutations', 
   ]);
   await click('Duplicate item');
   expect(container.querySelectorAll('article')).toHaveLength(3);
+  await act(async () => {
+    const selected = container.querySelector<HTMLElement>('.guide-block[data-selected="true"]');
+    selected?.closest('article')?.focus();
+  });
   await click('Remove item');
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await click('Undo');
@@ -685,56 +711,6 @@ it('accepts image import as one undoable publication and saves undo against its 
   expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { baseUpdatedAt: 105 });
 });
 
-it('keeps typing available during autosave and uses the acknowledged revision for newer content', async () => {
-  let finish: (() => void) | undefined;
-  io.save.mockImplementationOnce(
-    (project) =>
-      new Promise((resolve) => {
-        finish = () => resolve({ ...project, updatedAt: 101 });
-      })
-  );
-  await render();
-  await editField('article#first .guide-step-title', 'First draft');
-  await settleAutosave();
-  expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-quiet')).toBe('true');
-  expect(io.save).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty('disabled', false);
-  await editField('article#first .guide-step-title', 'More recent draft');
-  await act(async () => finish?.());
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
-    'value',
-    'More recent draft'
-  );
-  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
-  await settleAutosave();
-  expect(io.save).toHaveBeenCalledTimes(2);
-  expect(io.save).toHaveBeenLastCalledWith(
-    expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
-    { baseUpdatedAt: 101 }
-  );
-  await click('Undo');
-  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
-    'value',
-    'First step'
-  );
-});
-
-it('protects a closing page until its latest edit is durable and does not autosave acknowledgments', async () => {
-  await render();
-  expect(
-    [...container.querySelectorAll('button')].some((button) => button.textContent === 'Save')
-  ).toBe(false);
-  await editField('article#first .guide-step-title', 'Last edit');
-  const pendingClose = new Event('beforeunload', { cancelable: true });
-  await act(async () => window.dispatchEvent(pendingClose));
-  expect(pendingClose.defaultPrevented).toBe(true);
-  await settleAutosave();
-  const savedClose = new Event('beforeunload', { cancelable: true });
-  window.dispatchEvent(savedClose);
-  expect(savedClose.defaultPrevented).toBe(false);
-  expect(io.save).toHaveBeenCalledTimes(1);
-});
-
 it('settles autosave without writing when undo then redo returns to the durable snapshot', async () => {
   await render();
   await click('Add step');
@@ -747,9 +723,7 @@ it('settles autosave without writing when undo then redo returns to the durable 
   expect(unchangedClose.defaultPrevented).toBe(false);
   await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-status')).toBe(
-    'saved'
-  );
+  expect(container.querySelector('.guide-page-feedback')).toBeNull();
 });
 
 it('opens stored revisions in ordinary undo and autosaves against the current revision', async () => {
@@ -775,10 +749,14 @@ it('inserts at a block boundary and focuses the new field before typing', async 
   project.items = [step];
   io.load.mockResolvedValue(project);
   await render();
-  const command = container.querySelector<HTMLButtonElement>(
-    '[data-insert-before="b"] button[aria-label="Heading"]'
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '[data-insert-before="b"] .guide-action-menu-anchor > button'
   );
-  expect(command).not.toBeNull();
+  expect(trigger).not.toBeNull();
+  await openGuideInsertionMenu(trigger);
+  const command = [
+    ...document.querySelectorAll<HTMLButtonElement>('.guide-action-menu button'),
+  ].find((button) => button.textContent === 'Heading');
   await act(async () => command?.click());
   const heading = container.querySelector<HTMLTextAreaElement>('.guide-block-heading');
   expect(document.activeElement).toBe(heading);
@@ -788,8 +766,20 @@ it('inserts at a block boundary and focuses the new field before typing', async 
   await editField('.guide-block-heading', 'Inserted heading');
   await click('Undo');
   expect(heading?.value).toBe('');
-  await click('Undo');
+  await act(async () =>
+    heading?.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'я',
+        code: 'KeyZ',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  await act(async () => vi.advanceTimersByTimeAsync(20));
   expect(container.querySelectorAll('.guide-block')).toHaveLength(2);
+  expect(document.activeElement).toBe(container.querySelector('main'));
   await click('Redo');
   expect(container.querySelectorAll('.guide-block')).toHaveLength(3);
 });

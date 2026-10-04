@@ -58,8 +58,14 @@ export function handleSelectionModeMouseDown(
     return;
   }
 
-  const target = resolveSelectionModePointerTarget(event, iframe);
+  const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
+    if (state.frozenFrame && (state.currentState === 'idle' || state.currentState === 'hover')) {
+      stopSelectionModeEvent(event);
+      state.hoveredElement = null;
+      state.mouseDownPoint = { x: event.clientX, y: event.clientY };
+      state.hasMovedEnough = false;
+    }
     return;
   }
 
@@ -184,7 +190,12 @@ export function handleSelectionModeMouseMove(
     return;
   }
 
-  const target = resolveSelectionModePointerTarget(event, iframe);
+  if (state.frozenFrame?.areaOnly) {
+    options.hideHoverFrame();
+    return;
+  }
+
+  const target = resolveSelectionModePointerTarget(event, iframe, state.frozenFrame);
   if (!target) {
     options.hideHoverFrame();
     return;

@@ -1,18 +1,22 @@
+import { useMediaThumbUrl } from './thumbnail-provider';
 import {
   Archive,
   AudioLines,
-  FileStack,
+  BookOpen,
+  Clapperboard,
   FileText,
   Image as ImageIcon,
-  Images,
+  Library,
   Video,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { formatDateTime, getCurrentLocale, translate } from '../../../platform/i18n';
+import { translate } from '../../../platform/i18n';
 import type { FolderFilter } from '../types';
+import { FOLDER_FILTER_KIND_MAP, SIDEBAR_FOLDERS } from '../constants';
 import type { RecordingGroupMemberRole } from '../../../features/media-hub/recording-groups';
-import { ensureGalleryItemThumbnail, type GalleryItem, type GalleryItemKind } from '../items';
+import { type GalleryItem, type GalleryItemKind } from '../items';
 import { createMediaThumbFallbackItem } from './fallback-items';
+import { formatDurationLabel } from '../../../composition/audio-recording/format';
 
 const GALLERY_THUMB_FALLBACK_CLASS_NAME =
   'flex h-full w-full items-center justify-center text-[var(--sniptale-color-text-secondary)]';
@@ -25,21 +29,43 @@ const GALLERY_THUMB_FALLBACK_SURFACE_CLASS_NAME = [
 ].join('');
 
 export const FOLDER_LABELS: Record<FolderFilter, string> = {
-  all: translate('gallery.preview.folderAll'),
-  screenshot: translate('gallery.preview.folderScreenshot'),
-  recording: translate('gallery.preview.folderRecording'),
-  export: translate('gallery.preview.folderExport'),
-  'web-snapshot': translate('gallery.preview.folderWebSnapshot'),
-  scenario: translate('gallery.preview.folderScenario'),
+  get all() {
+    return translate('gallery.preview.folderAll');
+  },
+  get audio() {
+    return translate('gallery.preview.kindAudio');
+  },
+  get screenshot() {
+    return translate('gallery.preview.folderScreenshot');
+  },
+  get recording() {
+    return translate('gallery.preview.folderRecording');
+  },
+  get export() {
+    return translate('gallery.preview.folderExport');
+  },
+  get 'web-snapshot'() {
+    return translate('gallery.preview.folderWebSnapshot');
+  },
+  get scenario() {
+    return translate('gallery.preview.folderScenario');
+  },
+  get 'video-project'() {
+    return translate('gallery.preview.folderVideoProject');
+  },
 };
 
 export function getGalleryFolderIcon(folder: FolderFilter) {
   if (folder === 'all') {
-    return Images;
+    return Library;
   }
 
   if (folder === 'scenario') {
-    return FileStack;
+    return BookOpen;
+  }
+
+  if (folder === 'export') {
+    return FileText;
   }
 
   if (folder === 'web-snapshot') {
@@ -47,6 +73,17 @@ export function getGalleryFolderIcon(folder: FolderFilter) {
   }
 
   return getKindIcon(folder);
+}
+
+/** Resolves the item's category independently of the currently selected library filter. */
+export function getGalleryItemFolder(kind: GalleryItemKind): FolderFilter {
+  return (
+    SIDEBAR_FOLDERS.find((folder) => {
+      if (folder === 'all') return false;
+      if (folder === 'scenario') return kind === 'scenario';
+      return FOLDER_FILTER_KIND_MAP[folder].includes(kind);
+    }) ?? 'all'
+  );
 }
 
 export function getGalleryItemKindLabel(kind: GalleryItemKind): string {
@@ -85,31 +122,20 @@ export function getRecordingGroupRoleLabel(role: RecordingGroupMemberRole): stri
   }
 }
 
-export function formatDate(timestamp: number): string {
-  return formatDateTime(
-    timestamp,
-    {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    },
-    getCurrentLocale()
-  );
-}
+export { formatDate } from './date';
 
 export function getKindIcon(kind: GalleryItemKind) {
   switch (kind) {
     case 'recording':
     case 'export':
     case 'video':
-    case 'video-project':
       return Video;
+    case 'video-project':
+      return Clapperboard;
     case 'audio':
       return AudioLines;
     case 'scenario':
-      return FileStack;
+      return BookOpen;
     case 'scenario-export':
       return FileText;
     case 'web-archive':
@@ -127,51 +153,11 @@ export function isVideoKind(kind: GalleryItemKind): boolean {
   return kind === 'recording' || kind === 'export' || kind === 'video' || kind === 'video-project';
 }
 
-function loadThumbUrl(item: GalleryItem, setThumbUrl: (value: string | null) => void) {
-  let disposed = false;
-  let objectUrl: string | null = null;
-
-  ensureGalleryItemThumbnail(item)
-    .then((thumb) => {
-      if (disposed) {
-        return;
-      }
-      if (!thumb) {
-        setThumbUrl(null);
-        return;
-      }
-
-      objectUrl = URL.createObjectURL(thumb.blob);
-      setThumbUrl(objectUrl);
-    })
-    .catch(() => {
-      if (disposed) {
-        return;
-      }
-      setThumbUrl(null);
-    });
-
-  return () => {
-    disposed = true;
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
-    }
-  };
-}
-
-function getGalleryItemThumbnailIdentity(item: GalleryItem): string {
-  if (item.type === 'video-project') {
-    return `${item.id}:${item.hasThumbnail}:${item.thumbnailSourceMediaId ?? ''}`;
-  }
-  if (item.type === 'scenario' || item.type === 'scenario-export') {
-    return `${item.id}:${item.hasThumbnail}:${item.project.updatedAt}`;
-  }
-  return `${item.id}:${item.hasThumbnail}:${item.entityId ?? item.id}`;
-}
-
 type MediaThumbProps = {
   assetId?: string;
+  deferUntilVisible?: boolean;
   fit?: 'contain' | 'cover';
+  showProjectHint?: boolean;
   item?: GalleryItem;
   kind?: GalleryItemKind;
 };
@@ -200,30 +186,69 @@ function useResolvedMediaThumbItem(props: MediaThumbProps): GalleryItem {
 
 export function MediaThumb(props: MediaThumbProps) {
   const item = useResolvedMediaThumbItem(props);
-  const itemRef = useRef(item);
-  itemRef.current = item;
-  const thumbnailIdentity = getGalleryItemThumbnailIdentity(item);
-  const [thumbUrl, setThumbUrl] = useState<string | null>(null);
-
+  const deferUntilVisible =
+    props.deferUntilVisible === true && (item.type === 'scenario' || item.type === 'video-project');
+  const visibilityRoot = useRef<HTMLDivElement>(null);
+  const [visibility, setVisibility] = useState({ visible: false, epoch: 0 });
+  const visible = !deferUntilVisible || visibility.visible;
+  const epoch = deferUntilVisible ? visibility.epoch : 0;
   useEffect(() => {
-    return loadThumbUrl(itemRef.current, setThumbUrl);
-  }, [thumbnailIdentity]);
-
-  const Icon = getKindIcon(item.kind);
-
-  if (thumbUrl) {
-    return (
-      <img
-        src={thumbUrl}
-        alt={translate('gallery.preview.thumbnailAlt')}
-        className={`pointer-events-none h-full w-full object-center ${
-          props.fit === 'contain' ? 'object-contain' : 'object-cover'
-        }`}
-        data-fit={props.fit ?? 'cover'}
-      />
+    if (!deferUntilVisible) return;
+    const root = visibilityRoot.current;
+    if (!root) return;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisibility((current) => ({ visible: true, epoch: current.epoch + 1 }));
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const nextVisible = entries.some((entry) => entry.isIntersecting);
+        setVisibility((current) =>
+          current.visible === nextVisible
+            ? current
+            : { visible: nextVisible, epoch: current.epoch + 1 }
+        );
+      },
+      { rootMargin: '300px 0px' }
     );
-  }
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [deferUntilVisible]);
 
+  const thumbUrl = useMediaThumbUrl(item, visible, epoch);
+  const content = thumbUrl ? (
+    <img
+      src={thumbUrl}
+      alt={translate('gallery.preview.thumbnailAlt')}
+      className={`pointer-events-none h-full w-full object-center ${
+        props.fit === 'contain' ? 'object-contain' : 'object-cover'
+      }`}
+      data-fit={props.fit ?? 'cover'}
+    />
+  ) : (
+    <MediaThumbFallback item={item} showProjectHint={props.showProjectHint ?? true} />
+  );
+
+  return deferUntilVisible ? (
+    <div
+      ref={visibilityRoot}
+      className="pointer-events-none h-full w-full"
+      data-ui="gallery.thumb.visibility-root"
+    >
+      {content}
+    </div>
+  ) : (
+    content
+  );
+}
+
+function MediaThumbFallback(props: { item: GalleryItem; showProjectHint: boolean }) {
+  const { item } = props;
+  const Icon = getKindIcon(item.kind);
+  const isProject = item.type === 'scenario' || item.type === 'video-project';
+  const isAudio = item.kind === 'audio';
+  const duration =
+    isAudio && item.duration !== null && Number.isFinite(item.duration) ? item.duration : null;
   return (
     <div
       className={[
@@ -232,7 +257,31 @@ export function MediaThumb(props: MediaThumbProps) {
         GALLERY_THUMB_FALLBACK_SURFACE_CLASS_NAME,
       ].join(' ')}
     >
-      <Icon className="h-10 w-10 opacity-80" />
+      <div className="max-w-full space-y-1 px-2 text-center">
+        <Icon
+          className={
+            isAudio
+              ? 'mx-auto h-4 w-4 opacity-80'
+              : isProject
+                ? 'mx-auto h-6 w-6 opacity-80'
+                : 'h-10 w-10 opacity-80'
+          }
+          aria-hidden="true"
+        />
+        {isAudio ? (
+          <div data-ui="gallery.thumb.audio" className="min-w-0 space-y-1">
+            <p className="line-clamp-2 break-words text-xs font-medium" title={item.filename}>
+              {item.filename}
+            </p>
+            {duration !== null ? (
+              <p className="text-[10px] tabular-nums">{formatDurationLabel(duration)}</p>
+            ) : null}
+          </div>
+        ) : null}
+        {props.showProjectHint && isProject ? (
+          <p className="text-xs">{translate('gallery.preview.projectPreviewMissing')}</p>
+        ) : null}
+      </div>
     </div>
   );
 }

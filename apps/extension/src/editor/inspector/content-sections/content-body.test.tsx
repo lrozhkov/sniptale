@@ -34,7 +34,7 @@ it('routes image size and canvas crop through separate fixed modes', async () =>
       .filter((button) => button.textContent?.includes('editor.compact.applyImageSize'))
       .forEach((button) => button.click());
   });
-  expect(document.body.textContent).toContain('editor.compact.imageSize');
+  expect(document.querySelector('section[aria-label="editor.compact.imageSize"]')).not.toBeNull();
   expect(document.body.textContent).not.toContain('editor.compact.cropCanvas');
   expect(controller.resizeImage).toHaveBeenCalledWith(900, 600);
   expect(controller.resizeCanvas).not.toHaveBeenCalled();
@@ -57,7 +57,7 @@ it('routes image size and canvas crop through separate fixed modes', async () =>
       .filter((button) => button.textContent?.includes('editor.compact.applyCropCanvas'))
       .forEach((button) => button.click());
   });
-  expect(document.body.textContent).toContain('editor.compact.cropCanvas');
+  expect(document.querySelector('section[aria-label="editor.compact.cropCanvas"]')).not.toBeNull();
   expect(document.body.textContent).not.toContain('editor.compact.imageSize');
   expect(controller.resizeCanvas).toHaveBeenCalledWith(900, 600);
 });
@@ -73,7 +73,7 @@ it('renders the crop branch without an image-size mode switch', async () => {
     controller
   );
 
-  expect(document.body.textContent).toContain('editor.compact.cropCanvas');
+  expect(document.querySelector('section[aria-label="editor.compact.cropCanvas"]')).not.toBeNull();
   expect(document.body.textContent).not.toContain('editor.compact.imageSize');
   expect(controller.previewCanvasSize).not.toHaveBeenCalled();
 

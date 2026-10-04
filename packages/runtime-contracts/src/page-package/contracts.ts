@@ -205,6 +205,7 @@ export interface PagePackageJobTab {
 }
 
 export interface PagePackageJobStatusV1 {
+  downloadFormat?: 'html';
   activatedTabIds: number[];
   effectiveComponentPlan: PagePackageEffectiveComponentPlanV1;
   effectiveOptions: PagePackageExportOptionsV1;
@@ -226,18 +227,6 @@ export interface PagePackageSource {
   faviconUrl: string | null;
 }
 
-function truncatePagePackageUtf8(value: string, maxBytes: number): string {
-  let bytes = 0;
-  let result = '';
-  for (const character of value) {
-    const characterBytes = estimateUtf8Bytes(character, maxBytes);
-    if (bytes + characterBytes > maxBytes) break;
-    result += character;
-    bytes += characterBytes;
-  }
-  return result;
-}
-
 export function normalizePagePackageOptionalUrl(value: string | null | undefined): string | null {
   return typeof value === 'string' &&
     estimateUtf8Bytes(value, MAX_PAGE_PACKAGE_URL_BYTES) <= MAX_PAGE_PACKAGE_URL_BYTES
@@ -253,10 +242,7 @@ export function normalizePagePackageWarnings(values: readonly string[]): string[
     if (warnings.length >= MAX_PAGE_PACKAGE_WARNINGS) break;
     const remaining = MAX_PAGE_PACKAGE_WARNINGS_BYTES - totalBytes;
     if (remaining <= 0) break;
-    const warning = truncatePagePackageUtf8(
-      value,
-      Math.min(MAX_PAGE_PACKAGE_WARNING_BYTES, remaining)
-    );
+    const warning = truncateUtf8Text(value, Math.min(MAX_PAGE_PACKAGE_WARNING_BYTES, remaining));
     if (retained.has(warning)) continue;
     retained.add(warning);
     warnings.push(warning);
@@ -336,4 +322,4 @@ export interface PageCollectionManifest {
   warnings: string[];
   stats: PageCollectionStats;
 }
-import { estimateUtf8Bytes } from '../validation/base64';
+import { estimateUtf8Bytes, truncateUtf8Text } from '../validation/base64';

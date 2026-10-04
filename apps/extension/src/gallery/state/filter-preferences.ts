@@ -9,9 +9,11 @@ const FOLDERS = new Set<string>([
   'all',
   'screenshot',
   'recording',
+  'audio',
   'export',
   'web-snapshot',
   'scenario',
+  'video-project',
 ]);
 const SCOPES = new Set<string>(['all', 'library', 'temporary']);
 const FACET_IDS = [

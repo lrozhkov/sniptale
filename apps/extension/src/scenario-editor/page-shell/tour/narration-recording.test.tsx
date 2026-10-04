@@ -133,6 +133,8 @@ it('requires explicit dismissal and keeps Escape from discarding a draft', async
   );
   expect(close).not.toHaveBeenCalled();
   act(() => button('Cancel').click());
+  expect(close).not.toHaveBeenCalled();
+  act(() => button('Discard recording').click());
   expect(close).toHaveBeenCalledOnce();
 });
 

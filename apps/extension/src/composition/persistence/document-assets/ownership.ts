@@ -27,6 +27,7 @@ export async function replaceEditorDocumentAssetOwnership(args: {
   stores: EditorDocumentAssetStores;
 }): Promise<void> {
   const nextRoles = new Set(args.nextDocument.assets.map((asset) => asset.role));
+  const retainedAssetIds = new Set(args.nextDocument.assets.map((asset) => asset.assetId));
   for (const previous of args.previousDocument?.assets ?? []) {
     if (nextRoles.has(previous.role)) continue;
     await removeEditorDocumentAssetOwner({
@@ -34,6 +35,7 @@ export async function replaceEditorDocumentAssetOwnership(args: {
       ownerId: args.ownerId,
       ownerKind: args.ownerKind,
       physicalDelete: args.physicalDelete,
+      retainedAssetIds,
       role: previous.role,
       stores: args.stores,
     });
@@ -46,6 +48,7 @@ export async function replaceEditorDocumentAssetOwnership(args: {
       ownerId: args.ownerId,
       ownerKind: args.ownerKind,
       physicalDelete: args.physicalDelete,
+      retainedAssetIds,
       role: previous.role,
       stores: args.stores,
     });
@@ -82,10 +85,14 @@ async function removeEditorDocumentAssetOwner(args: {
   ownerKind: string;
   physicalDelete: PhysicalDeleteAssetOperation;
   role: string;
+  retainedAssetIds?: ReadonlySet<string>;
   stores: EditorDocumentAssetStores;
 }): Promise<void> {
   await args.stores.owners.delete!([args.ownerKind, args.ownerId, args.role]);
-  if ((await args.stores.owners.index!('assetId').count(args.assetId)) === 0) {
+  if (
+    !args.retainedAssetIds?.has(args.assetId) &&
+    (await args.stores.owners.index!('assetId').count(args.assetId)) === 0
+  ) {
     await args.stores.refs.delete!(args.assetId);
     args.physicalDelete.assetIds.push(args.assetId);
   }

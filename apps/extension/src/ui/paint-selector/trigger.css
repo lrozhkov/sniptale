@@ -1,0 +1,67 @@
+@layer theme, base, components, utilities;
+
+[data-ui='shared.ui.paint-selector'][data-trigger-variant='swatch'] {
+  container: paint-inspector / inline-size;
+}
+.paint-inspector-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 12rem);
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  font: 500 12px / 18px var(--sniptale-font-sans);
+}
+.paint-inspector-label {
+  min-width: 0;
+  color: var(--sniptale-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.paint-inspector-field > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.paint-inspector-field > button:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+}
+.paint-inspector-field > button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 0;
+}
+.paint-inspector-field > button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.paint-inspector-swatch {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+}
+.paint-inspector-value {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.paint-inspector-field > button > svg {
+  flex: none;
+  color: var(--sniptale-color-text-secondary);
+}
+@container paint-inspector (max-width: 280px) {
+  .paint-inspector-field {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

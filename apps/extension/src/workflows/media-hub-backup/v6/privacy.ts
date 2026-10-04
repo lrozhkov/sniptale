@@ -1,3 +1,4 @@
+import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
@@ -27,8 +28,10 @@ export function projectMediaEntryPrivacy(
   entry: Omit<MediaLibraryEntry, 'blob'>,
   options: MediaHubBackupExportOptions
 ): Omit<MediaLibraryEntry, 'blob'> {
+  const { recordingMetadata, ...metadata } = entry;
   return {
-    ...entry,
+    ...metadata,
+    ...projectRecordingMetadataPrivacy(recordingMetadata, options),
     ...(entry.recordingGroup
       ? { recordingGroup: projectRecordingGroupMemberPrivacy(entry.recordingGroup, options) }
       : {}),
@@ -151,4 +154,12 @@ function projectScenarioPagePrivacy(
     title: options.includeSourceMetadata ? page.title : null,
     url: options.includeSourceMetadata ? sanitizeProvenanceUrl(page.url) : null,
   };
+}
+
+/** Acquisition snapshots follow the existing opt-in for recording activity in explicit backups. */
+export function projectRecordingMetadataPrivacy(
+  recordingMetadata: RecordingMetadata | undefined,
+  options: MediaHubBackupExportOptions
+): { recordingMetadata?: RecordingMetadata } {
+  return options.includeTelemetry && recordingMetadata ? { recordingMetadata } : {};
 }

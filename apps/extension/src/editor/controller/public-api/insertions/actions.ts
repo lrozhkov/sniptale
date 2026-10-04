@@ -2,7 +2,7 @@ import { insertEditorImageObject, insertEditorTechnicalDataObject } from '../../
 import type {
   EditorTechnicalDataKind,
   EditorTechnicalDataLayout,
-} from '../../tools/technical-data';
+} from '../../../../features/editor/document/technical-data';
 import { insertEditorControllerRichShapeFromAdapter } from '../rich-shape-adapter';
 import type { EditorInsertionControllerApi } from './contracts';
 

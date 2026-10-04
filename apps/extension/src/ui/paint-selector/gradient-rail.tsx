@@ -10,12 +10,18 @@ import {
 import { translate } from '../../platform/i18n';
 
 const RAIL_CLASS_NAME = [
-  'relative h-14 cursor-crosshair overflow-visible rounded-[12px] border-2',
+  'relative h-7 cursor-pointer overflow-visible rounded-[var(--sniptale-radius-sm)] border-2',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
   'shadow-[inset_0_1px_2px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_10%,transparent)]',
 ].join(' ');
-const MIDPOINT_CLASS_NAME =
-  'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45 border border-white bg-black/60 shadow';
+const MIDPOINT_CLASS_NAME = [
+  'absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rotate-45',
+  'cursor-ew-resize border border-white bg-black/60 shadow',
+].join(' ');
+const SELECTED_STOP_CLASS_NAME = [
+  'z-10 border-[var(--sniptale-color-accent)] ring-2 ring-[var(--sniptale-color-accent)]',
+  'ring-offset-1 ring-offset-[var(--sniptale-color-surface-panel)]',
+].join(' ');
 const STOP_DRAG_THRESHOLD_PX = 3;
 
 export function GradientRail(props: {
@@ -75,6 +81,7 @@ export function GradientRail(props: {
       <div
         ref={railRef}
         className={RAIL_CLASS_NAME}
+        title={translate('highlighter.paintPicker.addStopHint')}
         style={{
           backgroundImage: serializePaintToCss({ kind: 'gradient', gradient: props.gradient }),
         }}
@@ -118,9 +125,9 @@ export function GradientRail(props: {
             aria-pressed={props.selectedStopId === stop.id}
             className={[
               'absolute top-full mt-1.5 h-5 w-4 -translate-x-1/2 rounded-b-[5px] border-2',
-              'bg-white shadow-sm transition-transform hover:scale-110',
+              'cursor-grab bg-white shadow-sm transition-transform hover:scale-110 active:cursor-grabbing',
               props.selectedStopId === stop.id
-                ? 'border-[var(--sniptale-color-accent)]'
+                ? SELECTED_STOP_CLASS_NAME
                 : 'border-[var(--sniptale-color-border-strong)]',
             ].join(' ')}
             style={{ left: `${stop.position * 100}%`, backgroundColor: stop.color }}

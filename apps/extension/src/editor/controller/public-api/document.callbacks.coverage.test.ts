@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storeState = {
   browserFrame: { url: 'https://example.com' },
+  setShowOutsideCanvas: vi.fn(),
+  setCanvasCropMode: vi.fn(),
   frame: { padding: 8 },
 };
 

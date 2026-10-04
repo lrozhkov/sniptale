@@ -1,5 +1,11 @@
-import { moveReviewVoiceover, trimReviewVoiceover } from '../voiceover-edits';
-import type { QuickEditAudioClip, QuickEditOriginalAudio } from './types';
+import { retimeReviewVoiceover } from '../voiceover-timing';
+import {
+  anchorReviewVoiceover,
+  moveReviewVoiceover,
+  trimReviewVoiceover,
+} from '../voiceover-edits';
+import type { QuickEditAudioClip, QuickEditAudioState, QuickEditOriginalAudio } from './types';
+import type { ReviewTimeSegment } from '../timeline';
 
 /** Renderer-consistent clip bounds, matching the persisted validation. */
 const MIN_CLIP_SECONDS = 0.001;
@@ -39,6 +45,7 @@ export function updateQuickEditAudioClip(
     timelineStart: Math.max(0, next.timelineStart),
     duration: Math.max(MIN_CLIP_SECONDS, next.duration),
     sourceOffset: Math.max(0, next.sourceOffset),
+    ...(next.tempo === undefined ? {} : { tempo: clamp(next.tempo, 0.25, 4) }),
     volume: clamp(next.volume, 0, MAX_CLIP_VOLUME),
     fadeIn: clamp(next.fadeIn, 0, MAX_CLIP_FADE),
     fadeOut: clamp(next.fadeOut, 0, MAX_CLIP_FADE),
@@ -77,10 +84,18 @@ export function trimQuickEditAudioClip(
   edge: 'start' | 'end',
   timelineTime: number,
   timelineDuration: number,
-  assetDuration?: number
+  assetDuration?: number,
+  voiceoverSegments?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
   if (clip.sourceAnchor)
-    return trimReviewVoiceover(clip, edge, timelineTime, timelineDuration, assetDuration);
+    return trimReviewVoiceover(
+      retimeReviewVoiceover(clip, voiceoverSegments),
+      edge,
+      timelineTime,
+      timelineDuration,
+      assetDuration,
+      voiceoverSegments
+    );
   if (edge === 'start') {
     const minStart = Math.max(0, clip.timelineStart - clip.sourceOffset);
     const nextStart = clamp(
@@ -114,9 +129,11 @@ export function trimQuickEditAudioClip(
 export function moveQuickEditAudioClip(
   clip: QuickEditAudioClip,
   requestedStart: number,
-  timelineDuration: number
+  timelineDuration: number,
+  voiceoverSegments?: readonly ReviewTimeSegment[]
 ): QuickEditAudioClip {
-  if (clip.sourceAnchor) return moveReviewVoiceover(clip, requestedStart, timelineDuration);
+  if (clip.sourceAnchor)
+    return moveReviewVoiceover(clip, requestedStart, timelineDuration, voiceoverSegments);
   return {
     ...clip,
     timelineStart: clamp(requestedStart, 0, Math.max(0, timelineDuration - clip.duration)),
@@ -129,4 +146,22 @@ export function resolveOriginalAudioPlayback(
   speedMuted: boolean
 ): QuickEditOriginalAudio {
   return { muted: speedMuted || original.muted, volume: original.volume };
+}
+
+/** Own-tempo edits establish lossless timing before applying the bounded clip patch. */
+export function updateQuickEditVoiceoverTempo(args: {
+  audio: QuickEditAudioState;
+  id: string;
+  patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>;
+  segments: readonly ReviewTimeSegment[];
+}): QuickEditAudioState {
+  const segments = args.audio.voiceoverSegments ?? [...args.segments];
+  return {
+    ...args.audio,
+    voiceoverSegments: segments,
+    voiceover: args.audio.voiceover.map((stored) => {
+      const clip = anchorReviewVoiceover(stored, segments);
+      return clip.id === args.id ? updateQuickEditAudioClip(clip, args.patch) : clip;
+    }),
+  };
 }

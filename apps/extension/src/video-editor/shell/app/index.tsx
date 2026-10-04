@@ -11,11 +11,13 @@ import { VideoEditorCompositionProvider } from '../../runtime/controller/composi
 import { VideoEditorWorkspace } from '../../workspace/surface';
 import { VideoEditorCommandPalette } from '../command-palette';
 import { VideoEditorStatusScreen } from '../status-screen';
+import { VideoEditorStart } from './start';
+import { useVideoEditorWheelZoomGuard } from './wheel-zoom';
 
 /** Boots the single editor composition owner around a stable shell-gate child. */
 export const App: React.FC = () => {
-  usePageLocaleMetadata('videoEditor.app.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  useVideoEditorWheelZoomGuard();
   return (
     <WorkspacePreferencesProvider>
       <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>
@@ -33,12 +35,17 @@ export function VideoEditorShellGate(props: {
   setCommandPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }): React.JSX.Element {
   const shell = useVideoEditorShellController();
+  usePageLocaleMetadata(
+    'videoEditor.app.documentTitle',
+    shell.isReady && !shell.error ? shell.project?.name : null
+  );
   if (!shell.isReady) {
     return <VideoEditorStatusScreen mode="loading" />;
   }
-  if (shell.error || !shell.project) {
+  if (shell.error) {
     return <VideoEditorStatusScreen mode="error" error={shell.error ?? ''} />;
   }
+  if (!shell.project) return <VideoEditorStart />;
   return <VideoEditorReadySurface {...props} />;
 }
 

@@ -183,3 +183,21 @@ it('uses declared container duration when the last WebM packet has no inferred d
   expect(result.source.duration).toBe(8);
   expect(mocks.duration).not.toHaveBeenCalled();
 });
+
+it('preserves exported acquisition facts without rebuilding them from current telemetry', async () => {
+  const recordingMetadata = {
+    captureMode: 'CAMERA',
+    displaySurface: null,
+    actionCount: 3,
+    hasPointer: false,
+  };
+  mocks.media.mockResolvedValueOnce({
+    filename: 'copy.webm',
+    mimeType: 'video/webm',
+    source: { kind: 'recording', recordingId: 'copy' },
+    recordingMetadata,
+  });
+  const result = await loadVideoReviewSource('recording:copy', new AbortController().signal);
+  expect(result.recordingMetadata).toEqual(recordingMetadata);
+  expect(result.telemetry).toBeNull();
+});

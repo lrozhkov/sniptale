@@ -120,7 +120,7 @@ vi.mock('./actions', () => ({
   showBackgroundContextMenuError: showBackgroundContextMenuErrorMock,
 }));
 
-import { initializeBackgroundContextMenus } from './service';
+import { initializeBackgroundContextMenus, rebuildBackgroundContextMenus } from './service';
 
 function createSettings() {
   return {
@@ -247,6 +247,24 @@ it('registers listeners, rebuilds on relevant storage changes, and routes clicks
   expect(showBackgroundContextMenuErrorMock).not.toHaveBeenCalled();
 });
 
+it('retries a menu rebuild when sync delivers layout chunks after the settings manifest', async () => {
+  await initializeAndFlushListeners();
+  loadSettingsMock.mockRejectedValueOnce(new Error('Context menu layout chunks are incomplete'));
+
+  storageListener?.({ sniptale_settings: { newValue: {}, oldValue: {} } }, 'sync');
+  await vi.waitFor(() => expect(loggerErrorMock).toHaveBeenCalledOnce());
+  expect(browserContextMenusRemoveAllMock).not.toHaveBeenCalled();
+
+  storageListener?.(
+    {
+      'sniptale_context_menu_layout_00000000-0000-0000-0000-000000000000_0': { newValue: 'chunk' },
+    },
+    'sync'
+  );
+  await vi.waitFor(() => expect(browserContextMenusRemoveAllMock).toHaveBeenCalledOnce());
+  expect(loadSettingsMock).toHaveBeenCalledTimes(2);
+});
+
 it('returns a composite disposer for the registered listener subscriptions', async () => {
   const { dispose } = await initializeAndFlushListeners();
 
@@ -262,6 +280,7 @@ it('routes listener failures into the shared error-feedback seam and logs refres
   hasContextMenuVideoPresetMock.mockRejectedValueOnce(new Error('preset-failed'));
 
   await initializeAndFlushListeners();
+  await rebuildBackgroundContextMenus();
 
   clickedListener?.(
     { menuItemId: buildContextMenuQuickActionId('qa-2') } as chrome.contextMenus.OnClickData,
@@ -292,4 +311,28 @@ it('logs rebuild failures from the storage listener', async () => {
       expect.objectContaining({ message: DUPLICATE_MENU_ID_ERROR })
     );
   });
+});
+
+it('refreshes menu section availability from the current viewport catalog on menu shown', async () => {
+  const currentSettings = createSettings();
+  loadSettingsMock.mockResolvedValue(currentSettings);
+  resolveContextMenuDynamicStateMock.mockReturnValue({
+    'sniptale.section.tools': { visible: false },
+  });
+  const dispose = initializeBackgroundContextMenus(createDeps());
+  buildContextMenuDescriptorsMock.mockReturnValue([
+    { id: 'sniptale.root', title: 'Sniptale' },
+    { id: 'sniptale.section.tools', parentId: 'sniptale.root', title: 'Tools' },
+    { id: 'sniptale.video.preset', parentId: 'sniptale.section.tools', title: 'Preset' },
+  ]);
+  await rebuildBackgroundContextMenus();
+  shownListener?.({}, createContextMenuTestTab());
+  await vi.waitFor(() =>
+    expect(resolveContextMenuDynamicStateMock).toHaveBeenCalledWith({
+      hasVideoPreset: true,
+      descriptors: buildContextMenuDescriptorsMock.mock.results.at(-1)?.value,
+      tab: createContextMenuTestTab(),
+    })
+  );
+  dispose();
 });

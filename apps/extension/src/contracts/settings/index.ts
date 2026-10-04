@@ -33,6 +33,8 @@ export interface SavePreset {
 }
 
 export interface ContextMenuSettings {
+  /** Missing layout retains the original root ordering. */
+  layout?: import('./context-menu-layout').ContextMenuLayout;
   enabled: boolean;
   showScreenshots: boolean;
   showVideo: boolean;
@@ -46,6 +48,7 @@ export interface ContextMenuSettings {
 }
 
 export type ContentToolbarDisplayMode = 'horizontal' | 'vertical';
+export type ContentToolbarDockEdge = 'top' | 'bottom' | 'left' | 'right';
 
 export interface ContentToolbarPosition {
   x: number;
@@ -53,6 +56,9 @@ export interface ContentToolbarPosition {
 }
 
 export interface ContentToolbarPreferences {
+  /** Legacy absence uses docking at the top edge. */
+  freePlacement?: boolean;
+  dockEdge?: ContentToolbarDockEdge;
   displayMode: ContentToolbarDisplayMode;
   compactMenus: boolean;
   position: ContentToolbarPosition | null;
@@ -62,12 +68,23 @@ export type LocalStorageDestination = 'temporary' | 'library';
 
 export interface LocalStoragePolicy {
   cleanupEnabled: boolean;
+  /** New image captures; also the migration fallback for legacy recording preferences. */
   defaultDestination: LocalStorageDestination;
+  recordingDestination?: LocalStorageDestination;
+  webSnapshotDestination?: LocalStorageDestination;
   draftRetentionDays: number;
   videoDraftRetentionDays: number;
+  /** Missing legacy values disable automatic permanent deletion from trash. */
+  trashCleanupEnabled?: boolean;
+  /** Days since trash admission; normalized settings default to 30. */
+  trashRetentionDays?: number;
 }
 
+import type { FilenameRules } from '../../features/file-naming/rules';
+
 export interface Settings {
+  /** Undefined selects defaults; null records an unusable stored rule and selects strict fallback. */
+  filenameRules?: FilenameRules | null;
   captureAction: CaptureActionType;
   contentToolbar?: ContentToolbarPreferences;
   contextMenu: ContextMenuSettings;

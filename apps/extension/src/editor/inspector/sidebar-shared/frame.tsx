@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link2 } from 'lucide-react';
+import { Link2, Unlink2 } from 'lucide-react';
 import type { EditorFrameSettings } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
 import { cx } from '../../chrome/ui';
@@ -41,28 +41,39 @@ type AspectToggleProps = {
   onClick: () => void;
 };
 
+const COMPACT_ASPECT_LOCKED_CLASS_NAME = [
+  'border-[color:var(--sniptale-color-border-strong)]',
+  'bg-[color:var(--sniptale-color-surface-hover)]',
+  'text-[color:var(--sniptale-color-text-primary)]',
+].join(' ');
+const COMPACT_ASPECT_UNLOCKED_CLASS_NAME = [
+  'border-transparent bg-transparent text-[color:var(--sniptale-color-text-secondary)]',
+  'hover:text-[color:var(--sniptale-color-text-primary)]',
+].join(' ');
+
 function CompactAspectToggle({ checked, onClick }: AspectToggleProps) {
   const title = translate('editor.compact.keepAspectRatio');
-  const compactClass = [
-    'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] border',
-    'border-[color:var(--sniptale-color-border-soft)]',
-    'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_86%,transparent)]',
-    'text-[color:var(--sniptale-color-text-muted)] transition hover:brightness-110',
-  ].join(' ');
-  const compactActiveClass =
-    'border-[color:var(--sniptale-color-border-accent-strong)] bg-[color:var(--sniptale-color-accent-soft)] ' +
-    'text-[color:var(--sniptale-color-accent)]';
-
   return (
     <button
       type="button"
       title={title}
       aria-label={title}
       aria-pressed={checked}
-      className={cx(compactClass, checked && compactActiveClass)}
+      data-ui="editor.size-controls.aspect-toggle"
+      className={cx(
+        'inline-flex h-8 w-9 cursor-pointer items-center justify-center rounded-[9px] border',
+        'transition-colors hover:bg-[color:var(--sniptale-color-surface-hover)]',
+        'focus-visible:outline-2 focus-visible:outline-offset-2',
+        'focus-visible:outline-[color:var(--sniptale-color-focus-ring)]',
+        checked ? COMPACT_ASPECT_LOCKED_CLASS_NAME : COMPACT_ASPECT_UNLOCKED_CLASS_NAME
+      )}
       onClick={onClick}
     >
-      <Link2 size={16} strokeWidth={2} />
+      {checked ? (
+        <Link2 size={16} strokeWidth={2} aria-hidden="true" />
+      ) : (
+        <Unlink2 size={16} strokeWidth={2} aria-hidden="true" />
+      )}
     </button>
   );
 }

@@ -105,7 +105,7 @@ export function useCalloutEditingFocusEffect(args: {
       writeSanitizedInnerHtml(el, htmlContent, CALLOUT_HTML_SANITIZER_OPTIONS);
     }
 
-    el.focus();
+    el.focus({ preventScroll: true });
     const focusRetryId = window.requestAnimationFrame(() => {
       const interactionRoot = el.closest('.sniptale-callout') ?? el;
       const root = el.getRootNode();

@@ -3,9 +3,29 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { pagePreparationHistory } from '../../../parser/page-preparation/history';
+import {
+  pagePreparationHistory,
+  type PagePreparationResetScope,
+} from '../../../parser/page-preparation/history';
 import { ToolbarHistoryControls } from './history';
+import { useToolbarMenuState } from '../state/menu';
+
+function HistoryHarness(
+  props: Omit<Parameters<typeof ToolbarHistoryControls>[0], 'displayMode' | 'toolbarMenuState'>
+) {
+  const toolbarMenuState = useToolbarMenuState();
+  return (
+    <ToolbarHistoryControls
+      {...props}
+      displayMode="horizontal"
+      toolbarMenuState={toolbarMenuState}
+    />
+  );
+}
 import { dispatchFrameEditingChanged } from '../../../platform/page-context/mode-events';
+
+// Vitest exposes the active JSDOM instance for URL changes without recreating the environment.
+declare const jsdom: { reconfigure(options: { url: string }): void };
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -18,7 +38,18 @@ let historyState = { canRedo: false, canUndo: false, revision: 0 };
 let openTransactions = false;
 let listener: (() => void) | null = null;
 
-function renderComponent(screenshotMode = true) {
+function renderComponent(
+  screenshotMode = true,
+  reset: {
+    canClearPagePreparation: boolean;
+    onClearPagePreparation: () => void;
+    resetScope?: PagePreparationResetScope;
+  } = {
+    canClearPagePreparation: false,
+    onClearPagePreparation: () => undefined,
+  },
+  isNavigationMode = false
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.append(container);
@@ -26,7 +57,13 @@ function renderComponent(screenshotMode = true) {
   }
 
   act(() => {
-    root?.render(<ToolbarHistoryControls screenshotMode={screenshotMode} />);
+    root?.render(
+      <HistoryHarness
+        screenshotMode={screenshotMode}
+        isNavigationMode={isNavigationMode}
+        {...reset}
+      />
+    );
   });
 }
 
@@ -147,7 +184,7 @@ function verifyDisabledPreparationMode() {
     new KeyboardEvent('keydown', { bubbles: true, code: 'KeyZ', ctrlKey: true, key: 'я' })
   );
 
-  expect(container?.textContent).toBe('');
+  expect(container?.querySelector('[data-ui="content.toolbar.reset-all-button"]')).not.toBeNull();
   expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
 }
 
@@ -239,11 +276,50 @@ describe('ToolbarHistoryControls', () => {
     'does not intercept hotkeys inside editable targets or during inline edit sessions',
     verifyEditableTargetBypass
   );
-  it(
-    'does not render or bind hotkeys when page preparation mode is off',
-    verifyDisabledPreparationMode
-  );
+  it('does not bind hotkeys when page preparation mode is off', verifyDisabledPreparationMode);
+  it('places reset beside undo and redo and runs it outside screenshot mode', () => {
+    const onClearPagePreparation = vi.fn();
+    renderComponent(false, { canClearPagePreparation: true, onClearPagePreparation });
+
+    const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+    expect(buttons.map((button) => button.dataset['ui'])).toEqual([
+      'content.toolbar.history-undo-button',
+      'content.toolbar.history-redo-button',
+      'content.toolbar.reset-all-button',
+    ]);
+    const reset = buttons[2];
+    expect(reset?.querySelector('svg')?.classList.contains('lucide-rotate-ccw')).toBe(true);
+    expect(reset?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
+    act(() => reset?.click());
+    expect(onClearPagePreparation).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+    expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+  });
   it('refreshes button state from the subscribed history store', verifySubscribedStateRefresh);
+  it('offers reset for committed changes while an editor keeps a transaction open', () => {
+    historyState = { canRedo: false, canUndo: true, revision: 1 };
+    openTransactions = true;
+    renderComponent(true, { canClearPagePreparation: true, onClearPagePreparation: vi.fn() });
+    expect(
+      container?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.reset-all-button"]')
+        ?.disabled
+    ).toBe(false);
+  });
+  it('shows only Reset all in ordinary navigation and keeps shared history', () => {
+    historyState = { canRedo: true, canUndo: true, revision: 2 };
+    renderComponent(
+      false,
+      { canClearPagePreparation: true, onClearPagePreparation: vi.fn() },
+      true
+    );
+    expect(
+      Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).map(
+        (button) => button.dataset['ui']
+      )
+    ).toEqual(['content.toolbar.reset-all-button']);
+    expect(pagePreparationHistory.undo).not.toHaveBeenCalled();
+    expect(pagePreparationHistory.redo).not.toHaveBeenCalled();
+  });
   it(
     'keeps undo and redo disabled until a document-mode transaction closes',
     verifyOpenTransactionBlocksHistoryControls
@@ -253,3 +329,48 @@ describe('ToolbarHistoryControls', () => {
     verifyFrameEditingBlocksHistoryControls
   );
 });
+
+const resetScopes: readonly PagePreparationResetScope[] = [
+  'all',
+  'drawing',
+  'annotation',
+  'content-editing',
+  'design-review',
+];
+it.each(resetScopes)(
+  'omits local file save in %s mode after mode switches and reopening',
+  (resetScope) => {
+    const originalUrl = window.location.href;
+    jsdom.reconfigure({ url: 'file:///tmp/prepared-page.html' });
+    expect(window.location.protocol).toBe('file:');
+    const picker = vi.fn();
+    Object.defineProperty(window, 'showSaveFilePicker', { configurable: true, value: picker });
+    const reset = { canClearPagePreparation: true, onClearPagePreparation: vi.fn(), resetScope };
+    const assertActions = (navigation: boolean) => {
+      expect(
+        container?.querySelector('[data-ui="content.toolbar.local-html-save-button"]')
+      ).toBeNull();
+      expect(container?.querySelectorAll('button')).toHaveLength(navigation ? 1 : 3);
+      expect(
+        container?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.reset-all-button"]')
+          ?.disabled
+      ).toBe(false);
+    };
+    try {
+      renderComponent(true, reset);
+      assertActions(false);
+      renderComponent(false, reset, true);
+      assertActions(true);
+      act(() => root?.unmount());
+      root = null;
+      container?.remove();
+      container = null;
+      renderComponent(true, reset);
+      assertActions(false);
+      expect(picker).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(window, 'showSaveFilePicker');
+      jsdom.reconfigure({ url: originalUrl });
+    }
+  }
+);

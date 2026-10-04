@@ -14,6 +14,7 @@ import {
 } from '../../platform/frame';
 import {
   projectSelectablePageElement,
+  resolveSelectablePageElement,
   resolveSelectablePageProjection,
 } from '../page-element-target';
 import {
@@ -21,6 +22,7 @@ import {
   isTrustedMouseEvent,
   isTrustedPointerEvent,
 } from '../../platform/trusted-events';
+import { createDesignReviewMeasurements } from './measurements';
 import { mountDesignReviewCursor } from './cursor';
 import { hideDesignReviewFrame, removeDesignReviewFrame, showDesignReviewFrame } from './frame';
 import { addInaccessibleIframeSelectionListener } from './inaccessible-iframe';
@@ -32,6 +34,8 @@ export interface DesignReviewSelection {
 }
 
 export interface DesignReviewPickerRuntime {
+  setMeasurementsEnabled: (enabled: boolean) => void;
+  setMeasurementsExpanded: (expanded: boolean) => void;
   dismissSelection: () => void;
   dispose: () => void;
   selectElement: (element: Element) => boolean;
@@ -178,7 +182,11 @@ function handlePickerClick(
     claimPageClick(event);
     return;
   }
-  if (isInspectorInteractionEvent(event) || inspectorPointerGestureStarted) return;
+  if (isInspectorInteractionEvent(event)) return;
+  if (inspectorPointerGestureStarted) {
+    claimPageClick(event);
+    return;
+  }
 
   const contentOwned = isContentOwnedEvent(event);
   const dismissed = args.onInspectorDismissRequested();
@@ -225,20 +233,31 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     inspectorPointerGestureStarted: false,
     selectedElement: null,
   };
+  const measurements = createDesignReviewMeasurements();
   const cleanupCursor = mountDesignReviewCursor();
   const cleanupMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mousemove',
-    (event, iframe) => handlePickerMouseMove(state, event, iframe),
+    (event, iframe) => {
+      handlePickerMouseMove(state, event, iframe);
+      if (isTrustedMouseEvent(event) && !state.inspectorPointerGestureStarted)
+        measurements.hover(state.selectedElement ?? resolveSelectablePageElement(event, iframe));
+    },
     { capture: true }
   );
   const cleanupLeave = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'mouseleave',
-    () => handlePickerMouseLeave(state),
+    () => {
+      handlePickerMouseLeave(state);
+      measurements.hover(state.selectedElement);
+    },
     { capture: true }
   );
   const cleanupClick = addEventListenerToAllWindowsDynamic<MouseEvent>(
     'click',
-    (event, iframe) => handlePickerClick(state, args, event, iframe),
+    (event, iframe) => {
+      handlePickerClick(state, args, event, iframe);
+      if (isTrustedMouseEvent(event)) measurements.hover(state.selectedElement);
+    },
     { capture: true }
   );
   const cleanupPointerDown = addEventListenerToAllWindowsDynamic<PointerEvent>(
@@ -280,13 +299,20 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
     },
     { capture: true }
   );
-  const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) =>
-    handleInaccessibleIframeSelection(state, args, iframe)
-  );
+  const cleanupInaccessibleIframes = addInaccessibleIframeSelectionListener((iframe) => {
+    handleInaccessibleIframeSelection(state, args, iframe);
+    measurements.hover(state.selectedElement);
+  });
 
   return {
-    dismissSelection: () => dismissPickerSelection(state),
+    dismissSelection: () => {
+      dismissPickerSelection(state);
+      measurements.hover(null);
+    },
+    setMeasurementsEnabled: measurements.setEnabled,
+    setMeasurementsExpanded: measurements.setExpanded,
     dispose: () => {
+      measurements.dispose();
       cleanupMove();
       cleanupLeave();
       cleanupClick();
@@ -298,6 +324,10 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
       cleanupCursor();
       removeDesignReviewFrame();
     },
-    selectElement: (element) => selectPickerElement(state, args, element),
+    selectElement: (element) => {
+      const selected = selectPickerElement(state, args, element);
+      if (selected) measurements.hover(state.selectedElement);
+      return selected;
+    },
   };
 }

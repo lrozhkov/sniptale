@@ -242,3 +242,22 @@ it('rejects two imported replacements that target the same original view', async
   ).rejects.toMatchObject({ code: 'conflict' } satisfies Partial<GallerySavedViewError>);
   await expect(listGallerySavedViews()).resolves.toEqual([existing]);
 });
+
+it('persists and parses Audio saved views', async () => {
+  const created = await createGallerySavedView({ filters, folderFilter: 'audio', name: 'Sound' });
+  await expect(listGallerySavedViews()).resolves.toEqual([created]);
+  expect(parsePortableGallerySavedViews([created])).toEqual([created]);
+});
+
+it.each(['video-project', 'export'] as const)(
+  'round-trips a saved filter under %s',
+  async (folderFilter) => {
+    const created = await createGallerySavedView({
+      filters,
+      folderFilter,
+      name: 'Editing',
+    });
+    await expect(listGallerySavedViews()).resolves.toEqual([created]);
+    expect(parsePortableGallerySavedViews([created])).toEqual([created]);
+  }
+);

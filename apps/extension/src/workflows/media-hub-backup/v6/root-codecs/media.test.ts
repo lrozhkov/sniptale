@@ -95,6 +95,45 @@ it('parses a standalone project video review without changing the supplied metad
   expect(input).toEqual(before);
 });
 
+it('admits a durable scenario image and a project audio file as portable library roots', () => {
+  const image = metadata();
+  const { projectExport: _export, videoReview: _review, ...imageRoot } = image;
+  expect(
+    parsePortableMediaMetadata({
+      ...imageRoot,
+      entry: {
+        ...imageRoot.entry,
+        id: 'scenario-asset:one',
+        kind: 'image',
+        mimeType: 'image/png',
+        filename: 'image.png',
+        originalFilename: 'image.png',
+        source: { kind: 'stored-asset', assetId: 'portable' },
+      },
+    }).entry.source
+  ).toEqual({ kind: 'stored-asset', assetId: 'portable' });
+  expect(
+    parsePortableMediaMetadata({
+      ...imageRoot,
+      entry: {
+        ...imageRoot.entry,
+        id: 'project-asset:audio',
+        kind: 'audio',
+        mimeType: 'audio/webm',
+        filename: 'audio.webm',
+        originalFilename: 'audio.webm',
+        source: { kind: 'project-asset', projectAssetId: 'audio' },
+      },
+      projectAsset: {
+        id: 'audio',
+        mimeType: 'audio/webm',
+        size: 6,
+        createdAt: 1,
+      },
+    }).projectAsset?.mimeType
+  ).toBe('audio/webm');
+});
+
 it('rejects invalid byte ownership, local identity, history and review source', () => {
   const input = metadata();
   expect(() =>
@@ -157,4 +196,28 @@ it('requires an exact recording source and sidecar identity association', () => 
       entry: { ...input.entry, id: 'recording:other-recording' },
     })
   ).toThrow('recording association');
+});
+
+it('refuses a published root that declares private acquisition membership', async () => {
+  const { createMediaLibraryEntry } =
+    await import('../../../../composition/persistence/projects/index.test-support');
+  const entry = createMediaLibraryEntry({
+    id: 'project-asset:public',
+    kind: 'video',
+    mimeType: 'video/webm',
+    source: { kind: 'project-asset', projectAssetId: 'public' },
+  });
+  expect(() =>
+    parsePortableMediaMetadata({
+      entry,
+      originalObjectId: 'body',
+      projectAsset: {
+        id: 'public',
+        mimeType: entry.mimeType,
+        size: entry.size,
+        createdAt: 1,
+        originMediaId: 'private-origin',
+      },
+    })
+  ).toThrow('association is invalid');
 });

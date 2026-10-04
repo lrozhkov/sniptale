@@ -5,6 +5,7 @@ export interface DrawSession {
   pointerId: number | null;
   start: Point;
   lastPoint?: Point;
+  arrowDrawFromTip?: boolean;
   objectId: string;
   object?: FabricObject;
 }
@@ -19,6 +20,7 @@ export interface CropSelection {
 export interface ApplyDocumentOptions {
   resetHistory?: boolean;
   updateOriginal?: boolean;
+  preserveViewport?: boolean;
 }
 
 export interface OpenImageOptions {

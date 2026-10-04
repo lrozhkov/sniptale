@@ -85,7 +85,7 @@ export const CONTENT_SIZE_TOOLTIP_INPUT_STYLE_TEXT = `
     .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:hover:not(:disabled) svg,
   .sniptale-content-size-tooltip[data-variant='frame-edit']
     .${CONTENT_SIZE_TOOLTIP_CANCEL_ACTION_CLASS_NAME}:focus-visible svg {
-    color: var(--sniptale-color-danger);
+    color: var(--sniptale-color-text-primary-strong);
   }
 
   .sniptale-content-size-tooltip[data-variant='frame-edit']
@@ -285,7 +285,10 @@ export function getContentSizeTooltipActionButtonStyle(
       : {
           background: 'color-mix(in srgb, var(--sniptale-color-surface-hover) 58%, transparent)',
         }),
-    color: 'var(--sniptale-color-text-primary)',
+    color:
+      variant === 'frame-edit'
+        ? 'var(--sniptale-color-text-muted)'
+        : 'var(--sniptale-color-text-primary)',
   };
 }
 

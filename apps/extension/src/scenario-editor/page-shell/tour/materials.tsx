@@ -1,4 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  resolveThemeSafePortalTarget,
+  useResolvedPortalTheme,
+} from '@sniptale/ui/theme/safe-portal';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import type { Translate } from '../../../platform/i18n';
@@ -21,6 +26,8 @@ export function TourResources({
   onSelect: (id: string) => void;
   state: ReturnType<typeof useTourSelection>;
 }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  const theme = useResolvedPortalTheme(anchor.current);
   const [preview, setPreview] = useState<{ src: string; title: string } | null>(null);
   const resources = new Map<string, { slide: TourSlide; ids: string[] }>();
   for (const slide of project.tour?.slides ?? []) {
@@ -32,11 +39,11 @@ export function TourResources({
   }
   return (
     <>
-      <div className="tour-resource-list">
+      <div className="tour-resource-list" ref={anchor}>
         {[...resources].map(([id, { slide, ids }]) => (
           <div
             key={id}
-            className="tour-resource-row"
+            className="tour-resource-row guide-resource-row"
             draggable
             onDragStart={(event) => {
               event.dataTransfer.effectAllowed = 'copy';
@@ -47,48 +54,59 @@ export function TourResources({
             }}
           >
             <button
-              className="tour-resource-thumbnail"
+              className="guide-resource-main"
               onClick={() => onSelect(slide.id)}
               title={slide.title || t('scenario.editor.tourUntitled')}
             >
-              {images[id] ? <img src={images[id]!} alt="" /> : <Image size={20} />}
+              <span className="guide-resource-thumb">
+                {images[id] ? <img src={images[id]!} alt="" /> : <Image size={20} />}
+              </span>
+              <span className="guide-resource-name">
+                {slide.title || t('scenario.editor.tourUntitled')}
+              </span>
             </button>
-            <span>{slide.title || t('scenario.editor.tourUntitled')}</span>
-            <ContentToolbarButton
-              disabled={!images[id]}
-              title={t('scenario.editor.tourPreviewImage')}
-              onClick={() => {
-                const src = images[id];
-                if (src) setPreview({ src, title: slide.title });
-              }}
-            >
-              <Expand size={15} />
-            </ContentToolbarButton>
-            <ContentToolbarButton
-              title={`${t('scenario.editor.tourUsed')}: ${ids.length}`}
-              onClick={() => {
-                const current =
-                  state.selection?.kind === 'slide' ? ids.indexOf(state.selection.slideId) : -1;
-                const next = ids[(current + 1) % ids.length];
-                if (next) onSelect(next);
-              }}
-            >
-              <ArrowRight size={12} />
-              <span>{ids.length}</span>
-            </ContentToolbarButton>
+            <div className="guide-resource-actions">
+              <ContentToolbarButton
+                tone="utility"
+                disabled={!images[id]}
+                title={t('scenario.editor.tourPreviewImage')}
+                onClick={() => {
+                  const src = images[id];
+                  if (src) setPreview({ src, title: slide.title });
+                }}
+              >
+                <Expand size={16} aria-hidden="true" />
+              </ContentToolbarButton>
+              <ContentToolbarButton
+                tone="utility"
+                title={`${t('scenario.editor.tourUsed')}: ${ids.length}`}
+                onClick={() => {
+                  const current =
+                    state.selection?.kind === 'slide' ? ids.indexOf(state.selection.slideId) : -1;
+                  const next = ids[(current + 1) % ids.length];
+                  if (next) onSelect(next);
+                }}
+              >
+                <ArrowRight size={16} aria-hidden="true" />
+              </ContentToolbarButton>
+            </div>
           </div>
         ))}
       </div>
-      {preview && (
-        <GuideResourceDialog
-          title={preview.title || t('scenario.editor.tourPreviewImage')}
-          id="tour-resource-preview"
-          onClose={() => setPreview(null)}
-          t={t}
-        >
-          <img className="tour-resource-preview" src={preview.src} alt={preview.title} />
-        </GuideResourceDialog>
-      )}
+      {preview &&
+        createPortal(
+          <div className="sniptale-ai-modal-root" data-theme={theme ?? undefined}>
+            <GuideResourceDialog
+              title={preview.title || t('scenario.editor.tourPreviewImage')}
+              id="tour-resource-preview"
+              onClose={() => setPreview(null)}
+              t={t}
+            >
+              <img className="tour-resource-preview" src={preview.src} alt={preview.title} />
+            </GuideResourceDialog>
+          </div>,
+          resolveThemeSafePortalTarget(anchor.current)
+        )}
     </>
   );
 }

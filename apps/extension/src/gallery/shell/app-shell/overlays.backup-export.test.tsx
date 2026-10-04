@@ -45,6 +45,7 @@ function createCallbackProps() {
     onBannerDismiss: vi.fn(),
     onClearSelection: vi.fn(),
     onConfirmDialogClose: vi.fn(),
+    onDeletionRequestClose: vi.fn(),
     onDeleteMany: vi.fn(),
     onExportBackup: vi.fn(),
     onFilenameChange: vi.fn(),
@@ -75,6 +76,7 @@ function createCallbackProps() {
     onResetFilters: vi.fn(),
     onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),
@@ -82,6 +84,7 @@ function createCallbackProps() {
     onViewModeChange: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
   };
 }
 

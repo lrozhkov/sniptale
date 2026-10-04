@@ -20,6 +20,7 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
     onCreateProject: vi.fn(),
     onDialogVisibilityChange: vi.fn(),
   }),
+  useVideoEditorAutosaveController: () => ({ enabled: true, onChange: vi.fn() }),
   useVideoEditorHistoryController: () => ({
     canUndo: false,
     canRedo: false,
@@ -27,6 +28,7 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
     onRedo: vi.fn(),
   }),
   useVideoEditorHeaderController: () => ({
+    saveStateMeta: { state: 'saved' },
     grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
     onOpenExportDialog: vi.fn(),
   }),

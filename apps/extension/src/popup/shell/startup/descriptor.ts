@@ -31,6 +31,7 @@ export type PopupStartupDescriptor =
     }
   | {
       page: 'export';
-      destination?: 'export' | 'save';
+      destination?: 'export' | 'save' | 'html';
       launchSelection?: { includeAnnotations: true };
+      launch?: { tabId: number; startExport: boolean; sourceDocumentId?: string };
     };

@@ -61,6 +61,11 @@ export function PalettesSettings() {
             </ProductActionButton>
           ))}
         </div>
+        {state.key === 'drawing' ? (
+          <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+            {translate('settings.editor.drawingQuickColorsDescription')}
+          </p>
+        ) : null}
         <SettingsCollection
           ariaLabel={translate('settings.editor.paletteTitle')}
           items={items}

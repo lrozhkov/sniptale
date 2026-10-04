@@ -46,8 +46,8 @@ export const contentToolbarDesignReviewMessages = defineMessageSource({
     en: 'Report copied',
   },
   annotationExportPageSuccess: {
-    ru: 'Полный архив страницы отправлен в загрузки',
-    en: 'Complete page archive sent to Downloads',
+    ru: 'Открыт процесс экспорта страницы',
+    en: 'Page export progress opened',
   },
   annotationExportOpenSuccess: {
     ru: 'Открыт экспорт страницы',

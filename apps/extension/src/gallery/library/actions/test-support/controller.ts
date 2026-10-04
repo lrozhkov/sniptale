@@ -87,6 +87,7 @@ function createControllerActions(
       setFolderFilter: () => undefined,
       setFacetFilter: () => undefined,
       setSearch: () => undefined,
+      commitSearch: () => undefined,
       setScope: () => undefined,
       setSortMode: () => undefined,
       updateSavedView: async () => Promise.reject(new Error('Not implemented in test controller.')),
@@ -105,6 +106,7 @@ function createControllerActions(
         stateRef,
       }),
       toggleSelection: () => undefined,
+      selectRange: () => new Set(),
     },
     storage: {
       refresh: vi.fn(async () => undefined),
@@ -124,6 +126,7 @@ function createControllerActions(
       },
       setActiveImport: createNestedSetter({ area: 'storage', key: 'activeImport', stateRef }),
       setBanner: createNestedSetter({ area: 'storage', key: 'banner', stateRef }),
+      setDeletionRequest: createNestedSetter({ area: 'storage', key: 'deletionRequest', stateRef }),
       setConfirmDialog: createNestedSetter({ area: 'storage', key: 'confirmDialog', stateRef }),
       setPendingExport: createNestedSetter({ area: 'storage', key: 'pendingExport', stateRef }),
       setPendingImport: createNestedSetter({ area: 'storage', key: 'pendingImport', stateRef }),

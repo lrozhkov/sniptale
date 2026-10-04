@@ -2,7 +2,10 @@ import { RECORDING_EXPORT_FILENAME_PREFIX } from '@sniptale/ui/branding';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveRecordingsBatchWithCompletionSafely } from '../../workflows/media-hub/store';
 import { loadSettings } from '../../composition/persistence/settings';
-import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../composition/persistence/library-lifecycle';
+import {
+  DEFAULT_LOCAL_STORAGE_POLICY,
+  resolveInitialStorageClass,
+} from '../../composition/persistence/library-lifecycle';
 import { sendRuntimeMessage } from '../../platform/runtime-messaging/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { beginRecordingFinalization, finishRecordingFinalization } from './finalization-replay';
@@ -38,11 +41,6 @@ interface FinalizeRecordingInput {
 
 function buildTimestamp(): string {
   return new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-}
-
-export function buildRecordingFilename(mimeType: string): string {
-  const { extension } = resolveVideoRecordingArtifact(mimeType);
-  return `${RECORDING_EXPORT_FILENAME_PREFIX}-${buildTimestamp()}.${extension}`;
 }
 
 export function buildSidecarFilename(filenameSuffix: string, mimeType: string): string {
@@ -154,9 +152,10 @@ export async function finalizeRecording(
           ...(input.recordingGroups?.[artifact.artifactId]
             ? { recordingGroup: input.recordingGroups[artifact.artifactId] }
             : {}),
-          storageClass:
-            settings?.localStoragePolicy.defaultDestination ??
-            DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
+          storageClass: resolveInitialStorageClass(
+            settings ?? { localStoragePolicy: DEFAULT_LOCAL_STORAGE_POLICY },
+            'recording'
+          ),
         })),
         createPostRecordResult(input.primaryRecordingId)
       );

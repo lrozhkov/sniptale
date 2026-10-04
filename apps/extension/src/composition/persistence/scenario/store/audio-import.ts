@@ -1,5 +1,7 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
+  TourBackgroundMusic,
   TourNarration,
   TourObjectNarration,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
@@ -27,6 +29,7 @@ export async function importScenarioNarration(args: {
   slideId: string | null;
   objectId?: string | null;
   expectedNarration: TourNarration | TourObjectNarration | null;
+  destination?: { kind: 'background-music'; expected: TourBackgroundMusic | null };
   blob: Blob;
   signal: AbortSignal;
 }): Promise<GuideProject> {
@@ -46,6 +49,14 @@ export async function importScenarioNarration(args: {
         narrationIdentity(target.narration ?? null) !== narrationIdentity(args.expectedNarration))
   )
     throw new Error('The narration target has changed.');
+  if (
+    args.destination &&
+    (args.slideId !== null ||
+      args.objectId != null ||
+      args.expectedNarration !== null ||
+      musicIdentity(tour.backgroundMusic ?? null) !== musicIdentity(args.destination.expected))
+  )
+    throw new Error('The music target has changed.');
   assertSafeScenarioAssetStorageInput(args.blob, args.blob.type);
   if (!isSafeScenarioAssetAudioMimeType(args.blob.type)) throw new Error('Unsupported audio.');
   const duration = await decodeNarrationDuration(args.blob);
@@ -75,6 +86,13 @@ export async function importScenarioNarration(args: {
           kind: 'replace-tour',
           tour: {
             ...tour,
+            ...(args.destination
+              ? {
+                  backgroundMusic: tour.backgroundMusic
+                    ? { ...tour.backgroundMusic, assetId: narration.assetId, duration }
+                    : createTourBackgroundMusic(narration),
+                }
+              : {}),
             audioResources: [
               ...getTourAudioResources(tour),
               {
@@ -145,4 +163,17 @@ async function decodeNarrationDuration(blob: Blob): Promise<number> {
   } finally {
     await context.close();
   }
+}
+
+function musicIdentity(value: TourBackgroundMusic | null): string {
+  return JSON.stringify(
+    value && [
+      value.assetId,
+      value.duration,
+      value.volume,
+      value.loop,
+      value.ducking.enabled,
+      value.ducking.level,
+    ]
+  );
 }

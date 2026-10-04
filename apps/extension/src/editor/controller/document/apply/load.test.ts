@@ -1,3 +1,9 @@
+// @vitest-environment jsdom
+import { FabricImage } from 'fabric';
+import {
+  DEFAULT_EDITOR_FRAME_SETTINGS,
+  DEFAULT_EDITOR_IMAGE_SETTINGS,
+} from '../../../../features/editor/document/constants';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -41,10 +47,17 @@ import {
 import type { LoadPreparedDocumentOptions } from './types';
 import { createFrameAnnotationProxy } from '../../../frame-annotation/proxy';
 import { CUSTOM_JSON_PROPS } from '../../../document/model/custom-json-props';
+import { SnapshotHistory } from '@sniptale/foundation/history/snapshot-history';
+import { undoEditorControllerSnapshot } from '../../public-api/document/history';
+import { createMockDocument } from '../../instance/bindings/test-fixtures-document';
+import { prepareAppliedDocument } from '..';
+import type { EditorDocument } from '../../../../features/editor/document/types';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 function createPreparedDocument() {
   return {
     canvasSize: { height: 20, width: 30 },
+    browserFrame: { enabled: true, title: 'Restored title' },
     normalizedDocument: {
       canvasJson: '{"objects":[]}',
       frame: { backgroundMode: 'color' },
@@ -69,12 +82,13 @@ describe('document apply load owner', () => {
     const prepareObject = vi.fn();
     const syncBackgroundLayer = vi.fn(async () => undefined);
 
+    const rebuildFrameDecorations = vi.fn(async () => undefined);
     await expect(
       loadPreparedDocumentOnCanvas({
         canvas: canvas as never,
         prepared: createPreparedDocument() as never,
         prepareObject,
-        rebuildFrameDecorations: vi.fn(async () => undefined),
+        rebuildFrameDecorations,
         syncBackgroundLayer,
         viewportDevicePixelRatioBaseline: 2,
         zoomLevel: 1,
@@ -93,7 +107,81 @@ describe('document apply load owner', () => {
       { backgroundMode: 'color' },
       { height: 20, width: 30 }
     );
+    expect(rebuildFrameDecorations).toHaveBeenCalledWith({
+      enabled: true,
+      title: 'Restored title',
+    });
     expect(mocks.renderCanvasAfterDocumentLoad).toHaveBeenCalledWith(canvas);
+  });
+
+  it('centers a newly opened document but keeps history replay at its current viewport', async () => {
+    const canvas = Object.assign(Object.create(EditorCanvas.prototype) as EditorCanvas, {
+      add: vi.fn(),
+      centerDocumentInViewport: vi.fn(),
+      ensureWorkspaceContainsObjects: vi.fn(),
+      getObjects: vi.fn(() => []),
+      loadFromJSON: vi.fn(async () => undefined),
+    });
+    const options = {
+      canvas,
+      prepared: createPreparedDocument() as never,
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: vi.fn(async () => undefined),
+      zoomLevel: 1,
+    };
+
+    await loadPreparedDocumentOnCanvas(options);
+    await loadPreparedDocumentOnCanvas({ ...options, preserveViewport: true });
+
+    expect(canvas.centerDocumentInViewport).toHaveBeenCalledOnce();
+    expect(canvas.ensureWorkspaceContainsObjects).toHaveBeenCalledTimes(2);
+    expect(mocks.prepareCanvasForDocumentLoad).toHaveBeenLastCalledWith(
+      expect.objectContaining({ preserveViewport: true })
+    );
+  });
+
+  it('recovers both the canvas and cursor when a history load fails after replacing objects', async () => {
+    const original = {
+      ...createMockDocument(),
+      canvasJson: JSON.stringify({ objects: [{ type: 'Rect', sniptaleId: 'original' }] }),
+    };
+    const edited = {
+      ...createMockDocument(),
+      canvasJson: JSON.stringify({ objects: [{ type: 'Rect', sniptaleId: 'edited' }] }),
+    };
+    const history = new SnapshotHistory(JSON.stringify(original));
+    history.push(JSON.stringify(edited));
+    let loadedObjects: Array<{ sniptaleId: string }> = [{ sniptaleId: 'edited' }];
+    const canvas = {
+      add: vi.fn(),
+      getObjects: () => loadedObjects,
+      loadFromJSON: vi.fn(async (json: string) => {
+        loadedObjects = (JSON.parse(json) as { objects: Array<{ sniptaleId: string }> }).objects;
+      }),
+    };
+    let failAfterReplacement = true;
+    const applyDocument = async (document: EditorDocument) => {
+      await loadPreparedDocumentOnCanvas({
+        canvas: createFabricCanvasFixture(canvas),
+        prepared: prepareAppliedDocument(document),
+        prepareObject: vi.fn(),
+        rebuildFrameDecorations: vi.fn(async () => undefined),
+        syncBackgroundLayer: async () => {
+          if (failAfterReplacement) {
+            failAfterReplacement = false;
+            throw new Error('background rebuild failed');
+          }
+        },
+        zoomLevel: 1,
+      });
+    };
+
+    await expect(
+      undoEditorControllerSnapshot({ applyDocument, history, publishHistoryDocument: vi.fn() })
+    ).rejects.toThrow('background rebuild failed');
+    expect(canvas.loadFromJSON).toHaveBeenCalledTimes(2);
+    expect(loadedObjects).toEqual([{ type: 'Rect', sniptaleId: 'edited' }]);
+    expect(history.getState().index).toBe(1);
   });
 
   it('skips rich shapes that cannot be reconstructed', () => {
@@ -159,4 +247,101 @@ describe('document apply load owner', () => {
       })
     ).rejects.toThrow('Invalid frame annotation proxy');
   });
+
+  it('loads a saved frame proxy from validated metadata when serialized Fabric geometry drifted', async () => {
+    const proxy = createFrameAnnotationProxy({
+      frame: { id: 'frame-1', x: 1, y: 2, width: 100, height: 80 },
+      label: 'Frame 1',
+      ordering: 0,
+    });
+    const canvas = {
+      add: vi.fn(),
+      getObjects: vi.fn(() => []),
+      loadFromJSON: vi.fn(async (_json: string) => undefined),
+    };
+    const prepared = createPreparedDocument();
+    prepared.normalizedDocument.richShapes = [];
+    prepared.normalizedDocument.canvasJson = JSON.stringify({
+      objects: [{ ...proxy.toObject([...CUSTOM_JSON_PROPS]), left: 48 }],
+    });
+
+    await loadPreparedDocumentOnCanvas({
+      canvas: createFabricCanvasFixture(canvas),
+      prepared: createTypedTestFixture<LoadPreparedDocumentOptions['prepared']>(prepared),
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: vi.fn(async () => undefined),
+      zoomLevel: 1,
+    });
+
+    const loaded = JSON.parse(String(canvas.loadFromJSON.mock.calls[0]?.[0])) as {
+      objects: Array<{ left: number }>;
+    };
+    expect(loaded.objects[0]?.left).toBe(1);
+  });
+});
+
+it.each([undefined, 3])(
+  'restores source styling using saved object metadata before frame fallback (%s)',
+  async (savedWidth) => {
+    const image = new FabricImage(document.createElement('img'), { width: 200, height: 100 });
+    image.sniptaleType = 'source-image';
+    image.sniptaleRole = 'source';
+    if (savedWidth !== undefined) image.sniptaleImageStrokeWidth = savedWidth;
+    const prepared = prepareAppliedDocument({
+      ...createMockDocument(),
+      canvasJson: '{"objects":[]}',
+      frame: {
+        ...DEFAULT_EDITOR_FRAME_SETTINGS,
+        sourceImage: { ...DEFAULT_EDITOR_IMAGE_SETTINGS, strokeWidth: 8, shadow: 45 },
+      },
+    });
+    await loadPreparedDocumentOnCanvas({
+      canvas: createFabricCanvasFixture({
+        add: vi.fn(),
+        getObjects: () => [image],
+        loadFromJSON: vi.fn(async () => undefined),
+      }),
+      prepared,
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: async () => undefined,
+      zoomLevel: 1,
+    });
+    expect(image.sniptaleImageStrokeWidth).toBe(savedWidth ?? 8);
+    expect(image.shadow?.color).toContain('0.45');
+    expect(image.objectCaching).toBe(false);
+  }
+);
+
+it('loads a captured scenario document through the actual Fabric receiver and preserves its source', async () => {
+  const { createScenarioCaptureEditorDocument } =
+    await import('../../../../features/scenario/capture-step/editor-document');
+  const document = createScenarioCaptureEditorDocument({
+    dataUrl: 'data:image/png;base64,doc',
+    sourceWidth: 320,
+    sourceHeight: 180,
+    overlays: [
+      { id: 'frame', kind: 'focus-rect', rect: { x: 10, y: 20, width: 80, height: 40 } },
+      { id: 'click', kind: 'click-ring', point: { x: 30, y: 40 } },
+    ],
+  });
+  const original = JSON.stringify(document);
+  const canvas = new EditorCanvas(window.document.createElement('canvas'), {
+    renderOnAddRemove: false,
+  });
+  try {
+    await loadPreparedDocumentOnCanvas({
+      canvas,
+      prepared: prepareAppliedDocument(document),
+      prepareObject: vi.fn(),
+      rebuildFrameDecorations: async () => undefined,
+      zoomLevel: 1,
+    });
+    expect(canvas.getObjects().map((object) => object.sniptaleType)).toEqual([
+      'frame-annotation',
+      'shape',
+    ]);
+    expect(JSON.stringify(document)).toBe(original);
+  } finally {
+    canvas.destroy();
+  }
 });

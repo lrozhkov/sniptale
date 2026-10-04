@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { MaterialAudioRecordingModal } from './index';
+import * as takeDownload from './download-take';
 vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
@@ -39,6 +40,8 @@ beforeEach(() => {
       durationLabel: '00:04',
       error: null,
       startRecording: vi.fn(async () => {}),
+      pauseRecording: vi.fn(),
+      resumeRecording: vi.fn(async () => {}),
       stopRecording: vi.fn(),
     },
     save: { audioBlob: source, trimStart: 1, trimEnd: 3, resetSession: vi.fn() },
@@ -126,7 +129,7 @@ it('does not submit a late encoding result after closing the dialog', async () =
   expect(apply).not.toHaveBeenCalled();
   expect(close).not.toHaveBeenCalled();
 });
-it('requires explicit dismissal and keeps Escape from discarding a draft', async () => {
+it('requires confirmation for Escape and explicit Cancel without discarding a draft', async () => {
   await render();
   act(() =>
     document
@@ -136,7 +139,11 @@ it('requires explicit dismissal and keeps Escape from discarding a draft', async
       )
   );
   expect(close).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alertdialog"]')).not.toBeNull();
+  act(() => button('Keep recording').click());
   act(() => button('Cancel').click());
+  expect(close).not.toHaveBeenCalled();
+  act(() => button('Discard recording').click());
   expect(close).toHaveBeenCalledOnce();
 });
 
@@ -173,4 +180,157 @@ it('reports a failed capture start with the shared recorder error', async () => 
     'Recording could not start. Try again.'
   );
   expect(close).not.toHaveBeenCalled();
+});
+
+it('asks before losing a recorded take and Cancel preserves the selected trim', async () => {
+  await render();
+  act(() => button('Cancel').click());
+  expect(close).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alertdialog"]')).not.toBeNull();
+  expect(io.session().save.resetSession).not.toHaveBeenCalled();
+});
+
+it('pauses active capture before asking to close without losing recorded chunks', async () => {
+  const state = io.session();
+  state.trim = null;
+  state.save.audioBlob = null;
+  state.transport.status = 'recording';
+  state.transport.pauseRecording = vi.fn();
+  await render();
+  act(() => button('Cancel').click());
+  expect(state.transport.pauseRecording).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
+  expect(state.save.resetSession).not.toHaveBeenCalled();
+});
+
+it('keeps confirmation focused, owns its keys and restores the initiating control', async () => {
+  await render();
+  const cancel = button('Cancel');
+  act(() => {
+    cancel.focus();
+    cancel.click();
+  });
+  expect(document.activeElement?.textContent).toBe('Keep recording');
+  await render();
+  expect(host.querySelector('[role="alertdialog"]')?.contains(document.activeElement)).toBe(true);
+  const space = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'Space',
+    key: ' ',
+  });
+  act(() => document.activeElement!.dispatchEvent(space));
+  expect(space.defaultPrevented).toBe(false);
+  expect(io.session().trim.playSelection).not.toHaveBeenCalled();
+  act(() =>
+    document.activeElement!.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+    )
+  );
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(close).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(cancel);
+  expect(io.session().save.audioBlob).toBe(source);
+  expect(io.session().save.trimStart).toBe(1);
+  expect(io.session().save.trimEnd).toBe(3);
+});
+
+it('confirms replacement once and keeps the take on cancelled Again', async () => {
+  await render();
+  const state = io.session();
+  act(() => button('Record again').click());
+  expect(state.transport.startRecording).not.toHaveBeenCalled();
+  act(() => button('Keep recording').click());
+  expect(state.save.audioBlob).toBe(source);
+  act(() => button('Record again').click());
+  const discard = button('Discard recording');
+  await act(async () => {
+    discard.click();
+    discard.click();
+  });
+  expect(state.transport.startRecording).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
+});
+
+it.each([false, true])(
+  'warns after failed save only without an actual retention receipt: retained=%s',
+  async (retained) => {
+    const onSave = vi.fn(
+      async (
+        _file: File,
+        _trim: unknown,
+        _signal: AbortSignal,
+        _take: Blob,
+        onRetained?: () => void
+      ) => {
+        if (retained) onRetained?.();
+        throw new Error('publication failed');
+      }
+    );
+    await act(async () =>
+      root.render(
+        <MaterialAudioRecordingModal
+          isOpen
+          onClose={close}
+          saveLabel="Apply narration"
+          onSave={onSave}
+        />
+      )
+    );
+    await act(async () => button('Apply narration').click());
+    expect(close).not.toHaveBeenCalled();
+    act(() => button('Cancel').click());
+    expect(close).toHaveBeenCalledTimes(retained ? 1 : 0);
+    expect(!!host.querySelector('[role="alertdialog"]')).toBe(!retained);
+  }
+);
+
+it('can recover the original take when decoding prevents every apply attempt', async () => {
+  io.encode.mockRejectedValue(new DOMException('decoder unavailable', 'EncodingError'));
+  const createUrl = vi.fn(() => 'blob:original-recovery');
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = createUrl;
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  await render();
+  await act(async () => button('Apply narration').click());
+  expect(apply).not.toHaveBeenCalled();
+  expect(close).not.toHaveBeenCalled();
+  expect(document.querySelector('audio')).not.toBeNull();
+  const recovery = button('Download original recording');
+  expect(recovery).toBeDefined();
+  await act(async () => recovery.click());
+  expect(createUrl).toHaveBeenCalledWith(source);
+  expect(click).toHaveBeenCalledOnce();
+  expect(io.encode).toHaveBeenCalledOnce();
+  expect(close).not.toHaveBeenCalled();
+  click.mockRestore();
+});
+
+it('admits one download and ignores its failure after a confirmed new take', async () => {
+  let reject!: (reason: Error) => void;
+  const download = vi.spyOn(takeDownload, 'downloadRecordedTake').mockImplementation(
+    () =>
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      })
+  );
+  await render();
+  await act(async () => {
+    button('Download original recording').click();
+    button('Download original recording').click();
+  });
+  expect(download).toHaveBeenCalledOnce();
+  expect(download).toHaveBeenCalledWith(source);
+  act(() => button('Record again').click());
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
+  await act(async () => button('Discard recording').click());
+  await act(async () => reject(new Error('old download failed')));
+  expect(document.querySelector('[role="alert"]')).toBeNull();
+  expect(button('Download original recording').disabled).toBe(false);
+  download.mockRestore();
 });

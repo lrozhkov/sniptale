@@ -35,7 +35,7 @@ const LAYER = {
   effects: [],
   id: 'layer-1',
   locked: false,
-  name: 'Layer 1',
+  name: 'Rectangle 1',
   previewColor: '#ffffff',
   previewDataUrl: null,
   previewTransparent: false,
@@ -47,9 +47,9 @@ const LAYER = {
   visible: true,
 } as const;
 
-function renderEditableName() {
+function renderEditableName(layer: Omit<typeof LAYER, 'name'> & { name: string } = LAYER) {
   const Harness = () => {
-    const editableName = useEditableLayerName(LAYER as never);
+    const editableName = useEditableLayerName(layer as never);
     return (
       <div>
         <button type="button" onClick={editableName.startEditing}>
@@ -64,7 +64,7 @@ function renderEditableName() {
         <button type="button" onClick={editableName.cancel}>
           cancel
         </button>
-        <LayerName editableName={editableName} layer={LAYER as never} />
+        <LayerName editableName={editableName} layer={layer as never} />
       </div>
     );
   };
@@ -115,16 +115,12 @@ it('starts editing on double click and commits a renamed layer on blur', () => {
   expect(renameLayerMock).toHaveBeenCalledWith('layer-1', 'Renamed Layer');
 });
 
-it('shows the secondary type/effect summary and cancels rename on escape', () => {
+it('shows the saved layer name and cancels rename on escape', () => {
   renderEditableName();
 
   expect(container?.textContent).toContain('Rectangle');
-  expect(container?.textContent).toContain('2 editor.toolbar.layerEffectsAppliedShort');
-  const secondary = Array.from(container?.querySelectorAll('span') ?? []).find((element) =>
-    element.className.includes('text-[10px]')
-  );
-  expect(secondary?.className).toContain('font-semibold uppercase');
-  expect(secondary?.className).not.toContain('tracking-');
+  expect(container?.textContent).not.toContain('editor.toolbar.layerEffectsAppliedShort');
+  expect(container?.textContent).toContain('Rectangle 1');
 
   act(() => {
     Array.from(container?.querySelectorAll('button') ?? [])
@@ -136,7 +132,13 @@ it('shows the secondary type/effect summary and cancels rename on escape', () =>
   });
 
   expect(renameLayerMock).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain('Layer 1');
+  expect(container?.textContent).toContain('Rectangle');
+});
+
+it.each(['Final 2', 'Rectangle 2'])('keeps the custom name %s visible', (name) => {
+  renderEditableName({ ...LAYER, name });
+
+  expect(container?.textContent).toContain(name);
 });
 
 it('skips rename commits for blank or unchanged names and starts editing from the name metadata block', () => {

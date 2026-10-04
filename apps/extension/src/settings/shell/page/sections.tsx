@@ -62,7 +62,14 @@ export function renderSettingsRouteContent(
   route: SettingsRoute,
   onViewChange: (view: string) => void
 ): ReactNode {
-  if (route.section === 'interface-browser') return <AppearanceSection />;
+  if (route.section === 'interface-browser') {
+    return (
+      <AppearanceSection
+        onViewChange={onViewChange}
+        {...(route.view === undefined ? {} : { view: route.view })}
+      />
+    );
+  }
   const Section = deferredSettingsSections[route.section];
   return (
     <Section

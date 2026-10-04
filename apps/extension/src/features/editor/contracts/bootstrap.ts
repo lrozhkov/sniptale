@@ -13,6 +13,7 @@ export interface EditorBootstrapPayload {
   sourceFaviconUrl?: string | null;
   url?: string;
   title?: string;
+  capturedAt?: number;
 }
 
 export function isEditorBootstrapPayload(value: unknown): value is EditorBootstrapPayload {
@@ -27,7 +28,11 @@ export function isEditorBootstrapPayload(value: unknown): value is EditorBootstr
     (document === undefined || document === null || isEditorDocument(document)) &&
     isOptionalNullableString(value['sourceFaviconUrl']) &&
     isOptionalString(value['url']) &&
-    isOptionalString(value['title'])
+    isOptionalString(value['title']) &&
+    (value['capturedAt'] === undefined ||
+      (typeof value['capturedAt'] === 'number' &&
+        Number.isFinite(value['capturedAt']) &&
+        value['capturedAt'] >= 0))
   );
 }
 export const EDITOR_BOOTSTRAP_QUERY_PARAM = 'bootstrap';

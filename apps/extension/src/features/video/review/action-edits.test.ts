@@ -41,7 +41,7 @@ it('keeps long action intervals exact and applies a restrained focus at verified
   });
   expect(result.contextual).toBe(false);
 });
-it('maps focus through cuts and speed, while refusing an overlapping source edit', () => {
+it('maps focus through cuts and speed, allowing a cut over a saved speed edit', () => {
   const speed: ReviewEdit = {
     id: 's',
     kind: 'speed',
@@ -54,7 +54,7 @@ it('maps focus through cuts and speed, while refusing an overlapping source edit
   };
   const result = plan({ edits: [cut, speed] });
   expect(result.focus).toMatchObject({ start: 0, end: 2 });
-  expect(result.cut).toBeNull();
+  expect(result.cut).toMatchObject({ start: 2, end: 6 });
   expect(result.speed).toBeNull();
   expect(result.editReason).toBe('overlap');
 });
@@ -98,4 +98,29 @@ it('follows safe-boundary admission and forbids cutting the whole video', () => 
   const entire = plan({ marker: { ...marker, start: 0, end: 10 } });
   expect(entire.cut).toBeNull();
   expect(entire.speed).not.toBeNull();
+});
+
+it('keeps phase defaults in source seconds for short accelerated actions', () => {
+  const result = plan({
+    marker: { ...marker, start: 2, end: 2.8 },
+    edits: [
+      {
+        id: 's',
+        kind: 'speed',
+        start: 0,
+        end: 10,
+        requestedStart: 0,
+        requestedEnd: 10,
+        rate: 4,
+        audio: 'speed',
+      },
+    ],
+  });
+  expect(result.focus).toMatchObject({
+    start: 0.5,
+    end: 0.7,
+    sourceAnchor: { start: 2, end: 2.8 },
+    enter: { duration: 0.3 },
+    exit: { duration: 0.3 },
+  });
 });

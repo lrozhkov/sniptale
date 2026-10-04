@@ -5,22 +5,16 @@ import {
   type DrawingObject,
   type DrawingPoint,
 } from '../../../features/drawing/public';
-import { parseEditorDrawingMetadata } from '../../document/import-boundary';
+import {
+  parseEditorDrawingMetadata,
+  serializeEditorDrawingMetadata,
+} from '../../document/import-boundary';
 
-const DRAWING_OBJECT_METADATA_VERSION = 1;
 const transientDrawingObjects = new WeakMap<FabricObject, DrawingObject>();
-
-interface EditorDrawingMetadata {
-  version: typeof DRAWING_OBJECT_METADATA_VERSION;
-  object: DrawingObject;
-}
 
 export function writeEditorDrawingObject(target: FabricObject, object: DrawingObject): void {
   transientDrawingObjects.delete(target);
-  target.sniptaleDrawingJson = JSON.stringify({
-    version: DRAWING_OBJECT_METADATA_VERSION,
-    object,
-  } satisfies EditorDrawingMetadata);
+  target.sniptaleDrawingJson = serializeEditorDrawingMetadata(object);
 }
 
 export function stageEditorDrawingObject(target: FabricObject, object: DrawingObject): void {

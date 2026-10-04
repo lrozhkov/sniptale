@@ -1,4 +1,6 @@
 import React from 'react';
+import '../../../ui/compact-inspector-controls/inspector-surface.css';
+import '../grouped/inspector.css';
 import { EditorInspectorContent } from '../content';
 import type { EditorInspectorContentController } from '../content/types';
 import { EditorInspectorLayersPanel } from '../layers';
@@ -8,8 +10,8 @@ import {
 } from './helpers';
 
 const scrollContainerClassName =
-  'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 lg:p-5 ' +
-  '[scrollbar-gutter:stable_both-edges]';
+  'sniptale-inspector-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto ' +
+  'px-3 py-3 [scrollbar-gutter:stable_both-edges]';
 
 export const EditorInspectorSidebarExpandedContent: React.FC<{
   hasImage: boolean;
@@ -21,7 +23,7 @@ export const EditorInspectorSidebarExpandedContent: React.FC<{
   return (
     <div className="min-h-0 flex-1 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]">
       <div className="flex h-full flex-col">
-        <div className={scrollContainerClassName}>
+        <div data-ui="editor.inspector.content" className={scrollContainerClassName}>
           <EditorInspectorContent {...contentProps} />
         </div>
         <EditorInspectorLayersPanel {...layersPanelProps} />

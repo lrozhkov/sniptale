@@ -12,6 +12,8 @@ export function useCanvasWrapperState() {
   const store = useEditorStore(
     useShallow((state) => ({
       activeTool: state.activeTool,
+      showOutsideCanvas: state.showOutsideCanvas,
+      canvasCropMode: state.canvasCropMode,
       layers: state.layers,
       selection: state.selection,
       setImageData: state.setImageData,

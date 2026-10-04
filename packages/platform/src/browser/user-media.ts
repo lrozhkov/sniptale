@@ -133,16 +133,31 @@ export function subscribeToMicrophoneDeviceChanges(listener: () => void): () => 
 
 export function observeMicrophoneLevel(
   track: MediaStreamTrack,
-  listener: (frame: MicrophoneLevelFrame) => void
+  listener: (frame: MicrophoneLevelFrame) => void,
+  onUnavailable?: () => void
 ): MicrophoneLevelMonitor {
   const audioContext = new AudioContext();
-  const source = audioContext.createMediaStreamSource(new MediaStream([track]));
-  const analyser = audioContext.createAnalyser();
+  let source: MediaStreamAudioSourceNode;
+  let analyser: AnalyserNode;
+  try {
+    source = audioContext.createMediaStreamSource(new MediaStream([track]));
+    analyser = audioContext.createAnalyser();
+  } catch (error) {
+    void audioContext.close().catch(() => undefined);
+    throw error;
+  }
   analyser.fftSize = 256;
   analyser.smoothingTimeConstant = 0.55;
   const samples = new Uint8Array(analyser.fftSize);
-  source.connect(analyser);
-  void audioContext.resume().catch(() => undefined);
+  try {
+    source.connect(analyser);
+  } catch (error) {
+    source.disconnect();
+    analyser.disconnect();
+    void audioContext.close().catch(() => undefined);
+    throw error;
+  }
+  void audioContext.resume().catch(() => onUnavailable?.());
   const intervalId = globalThis.setInterval(() => {
     analyser.getByteTimeDomainData(samples);
     let energy = 0;

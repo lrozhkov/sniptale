@@ -1,7 +1,11 @@
 import { appendScenarioSavedVersion } from '../history-model';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../contracts';
-import { createLibraryLifecycle, updateLibraryLifecycle } from '../../library-lifecycle/contracts';
+import {
+  createLibraryLifecycle,
+  promoteLibraryLifecycle,
+  updateLibraryLifecycle,
+} from '../../library-lifecycle/contracts';
 import type { LibraryStorageClass } from '../../library-lifecycle/contracts';
 
 function createScenarioProjectRevision(
@@ -37,10 +41,13 @@ export function createScenarioProjectEntry(args: {
     updatedAt,
     lifecycle: args.existing
       ? updateLibraryLifecycle(
-          args.existing.lifecycle ?? createLibraryLifecycle('library', args.existing.updatedAt),
+          promoteLibraryLifecycle(
+            args.existing.lifecycle ?? createLibraryLifecycle('library', args.existing.updatedAt),
+            updatedAt
+          ),
           updatedAt
         )
-      : createLibraryLifecycle(args.storageClass ?? 'library', updatedAt),
+      : createLibraryLifecycle('library', updatedAt),
     workspaceRevision: (args.existing?.workspaceRevision ?? 0) + 1,
   };
 }

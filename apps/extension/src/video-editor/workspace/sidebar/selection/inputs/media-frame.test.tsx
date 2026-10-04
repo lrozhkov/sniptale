@@ -121,17 +121,19 @@ afterEach(async () => {
 
 describe('workspace-sidebar/selection/media-frame', () => {
   it('renders media apply-to-track as a shared compact secondary action', async () => {
-    await renderHarness();
+    const onApplyMediaClipVisualsToTrack = vi.fn();
+    await renderHarness({ onApplyMediaClipVisualsToTrack });
 
     const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
-      (button) =>
-        button.hasAttribute('data-inspector-action') && button.className.includes('self-end')
+      (button) => button.closest('[data-ui="video-editor.inspector.actions"]') !== null
     );
 
     expect(container?.textContent).toContain('Вписывание');
     expect(container?.textContent).toContain('Масштаб');
     expect(applyButton).toBeDefined();
-    expect(applyButton?.className).toContain('hover:bg-[color:color-mix');
+    expect(applyButton?.getAttribute('data-inspector-tone')).toBe('secondary');
+    await act(async () => applyButton?.click());
+    expect(onApplyMediaClipVisualsToTrack).toHaveBeenCalledWith('clip-1');
     expect(applyButton?.closest('[data-ui="video-editor.inspector.actions"]')).not.toBeNull();
   });
 

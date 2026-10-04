@@ -1,14 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   UnsupportedAudioFileError,
   importReviewAudio,
   importedAudioClip,
   prepareReviewAudio,
+  type PreparedReviewAudio,
 } from './audio-import';
 
 const storeMocks = vi.hoisted(() => ({
   writeBlobToAsset: vi.fn(),
   createAssetPublicationJournal: vi.fn(),
+  cancelAssetPublication: vi.fn(async () => undefined),
   publishReadyJournalWithRetry: vi.fn(),
   releaseAssetReadyProtection: vi.fn(),
   discardPreparedAsset: vi.fn(),
@@ -21,6 +23,7 @@ vi.mock('../../composition/persistence/assets', async (importOriginal) => ({
   ...(await importOriginal()),
   writeBlobToAsset: storeMocks.writeBlobToAsset,
   createAssetPublicationJournal: storeMocks.createAssetPublicationJournal,
+  cancelAssetPublication: storeMocks.cancelAssetPublication,
   publishReadyJournalWithRetry: storeMocks.publishReadyJournalWithRetry,
   releaseAssetReadyProtection: storeMocks.releaseAssetReadyProtection,
   discardPreparedAsset: storeMocks.discardPreparedAsset,
@@ -29,6 +32,12 @@ vi.mock('../../composition/persistence/assets', async (importOriginal) => ({
 vi.mock('../../composition/persistence/projects/asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverProjectMediaPublications: storeMocks.recoverProjectMediaPublications,
+}));
+vi.mock('../../composition/persistence/infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: vi.fn(async () => ({ get: vi.fn(async () => undefined) })),
 }));
 vi.mock('../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: storeMocks.publishMediaHubLibraryChanged,
@@ -62,6 +71,13 @@ const preparedRef = {
 afterEach(() => {
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+});
+
+beforeEach(() => {
+  storeMocks.createAssetPublicationJournal.mockResolvedValue({
+    journalId: 'journal-1',
+    assetRefs: [preparedRef],
+  });
 });
 
 describe('prepareReviewAudio', () => {
@@ -124,6 +140,8 @@ describe('importReviewAudio', () => {
       attach: async (assetId, duration) => {
         expect(assetId).toMatch(/^project-asset:[0-9a-f-]+$/);
         expect(duration).toBe(3);
+        expect(storeMocks.createAssetPublicationJournal).toHaveBeenCalledOnce();
+        expect(storeMocks.publishReadyJournalWithRetry).not.toHaveBeenCalled();
       },
       assertCurrentTarget: () => undefined,
     });
@@ -152,8 +170,28 @@ describe('importReviewAudio', () => {
         assertCurrentTarget: () => undefined,
       })
     ).rejects.toThrow('autosave failed');
-    expect(storeMocks.discardPreparedAsset).toHaveBeenCalledTimes(1);
-    expect(storeMocks.createAssetPublicationJournal).not.toHaveBeenCalled();
+    expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
+    expect(storeMocks.createAssetPublicationJournal).toHaveBeenCalledOnce();
+    expect(storeMocks.cancelAssetPublication).toHaveBeenCalledWith(
+      expect.objectContaining({ journalId: 'journal-1' })
+    );
+  });
+
+  it('retains protected bytes when attachment may have committed before rejecting', async () => {
+    stubDuration(3);
+    storeMocks.writeBlobToAsset.mockResolvedValue({ ref: preparedRef });
+    await expect(
+      importReviewAudio({
+        file: file(8),
+        signal: new AbortController().signal,
+        attach: async () => {
+          throw new Error('acknowledgement failed');
+        },
+        hasDurableReference: () => true,
+        assertCurrentTarget: () => undefined,
+      })
+    ).rejects.toThrow('acknowledgement failed');
+    expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
   });
 
   it('keeps a publication journal for recovery when publishing fails after attachment', async () => {
@@ -173,20 +211,75 @@ describe('importReviewAudio', () => {
     expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
   });
 
-  it('keeps staged bytes when the publication journal cannot be created after attachment', async () => {
+  it('rejects before attachment and discards bytes when journal creation fails', async () => {
     stubDuration(3);
     storeMocks.writeBlobToAsset.mockResolvedValue({
       ref: { ...preparedRef, mimeType: 'audio/mpeg', size: 8 },
     });
     storeMocks.createAssetPublicationJournal.mockRejectedValueOnce(new Error('journal failed'));
+    const attach = vi.fn(async () => undefined);
+    await expect(
+      importReviewAudio({
+        file: file(8),
+        signal: new AbortController().signal,
+        attach,
+        assertCurrentTarget: () => undefined,
+      })
+    ).rejects.toThrow('journal failed');
+    expect(attach).not.toHaveBeenCalled();
+    expect(storeMocks.discardPreparedAsset).toHaveBeenCalledOnce();
+  });
+
+  it('stages fresh material on retry after journal creation fails before attachment', async () => {
+    stubDuration(3);
+    storeMocks.writeBlobToAsset.mockResolvedValue({ ref: preparedRef });
+    storeMocks.createAssetPublicationJournal.mockRejectedValueOnce(new Error('journal failed'));
+    const attach = vi.fn(async () => undefined);
+    await expect(
+      importReviewAudio({
+        file: file(8),
+        signal: new AbortController().signal,
+        attach,
+        assertCurrentTarget: () => undefined,
+      })
+    ).rejects.toThrow('journal failed');
+    await importReviewAudio({
+      file: file(8),
+      signal: new AbortController().signal,
+      attach,
+      assertCurrentTarget: () => undefined,
+    });
+    expect(attach).toHaveBeenCalledOnce();
+    expect(storeMocks.writeBlobToAsset).toHaveBeenCalledTimes(2);
+    expect(storeMocks.createAssetPublicationJournal).toHaveBeenCalledTimes(2);
+    expect(storeMocks.publishReadyJournalWithRetry).toHaveBeenCalledOnce();
+    expect(storeMocks.discardPreparedAsset).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the existing journal when a published take needs a retry', async () => {
+    stubDuration(3);
+    storeMocks.writeBlobToAsset.mockResolvedValue({ ref: preparedRef });
+    storeMocks.createAssetPublicationJournal.mockResolvedValueOnce({
+      journalId: 'journal-1',
+      assetRefs: [preparedRef],
+    });
+    storeMocks.publishReadyJournalWithRetry.mockRejectedValueOnce(new Error('publish failed'));
+    let prepared!: PreparedReviewAudio;
     await expect(
       importReviewAudio({
         file: file(8),
         signal: new AbortController().signal,
         attach: async () => undefined,
         assertCurrentTarget: () => undefined,
+        onPrepared: (staged) => {
+          prepared = staged;
+        },
       })
-    ).rejects.toThrow('journal failed');
+    ).rejects.toThrow('publish failed');
+    await expect(prepared.publish()).resolves.toBeUndefined();
+    expect(storeMocks.writeBlobToAsset).toHaveBeenCalledOnce();
+    expect(storeMocks.createAssetPublicationJournal).toHaveBeenCalledOnce();
+    expect(storeMocks.publishReadyJournalWithRetry).toHaveBeenCalledTimes(2);
     expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
   });
 
@@ -242,7 +335,10 @@ describe('importReviewAudio', () => {
         assertCurrentTarget: () => undefined,
       })
     ).rejects.toThrow();
-    expect(storeMocks.discardPreparedAsset).toHaveBeenCalledTimes(1);
+    expect(storeMocks.discardPreparedAsset).not.toHaveBeenCalled();
+    expect(storeMocks.cancelAssetPublication).toHaveBeenCalledWith(
+      expect.objectContaining({ journalId: 'journal-1' })
+    );
   });
 });
 

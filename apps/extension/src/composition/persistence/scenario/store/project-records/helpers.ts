@@ -27,9 +27,11 @@ export function mapScenarioAssetEntry(entry: DbScenarioAssetEntry): ScenarioAsse
 
 export function mapScenarioExportEntry(entry: DbScenarioExportEntry): ScenarioExportEntry {
   return {
+    ...(entry.html ? { html: { ...entry.html } } : {}),
     id: entry.id,
     projectId: entry.projectId,
     format: entry.format,
+    ...(entry.trashState ? { trashState: { ...entry.trashState } } : {}),
     filename: entry.filename,
     createdAt: entry.createdAt,
     size: entry.size,

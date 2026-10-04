@@ -24,9 +24,10 @@ export async function openScenarioEditor(args: {
   projectId: string | null;
   stepId?: string | null;
 }): Promise<void> {
-  await getContentRuntimeServices().messaging.sendRuntimeMessage({
+  const response = await getContentRuntimeServices().messaging.sendRuntimeMessage({
     type: MessageType.SCENARIO_OPEN_EDITOR,
     projectId: args.projectId,
     ...(args.stepId === undefined ? {} : { stepId: args.stepId }),
   });
+  if (!response.success) throw new Error('Scenario editor could not be opened');
 }

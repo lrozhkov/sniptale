@@ -33,9 +33,9 @@ export function LibraryMediaAdd(props: {
     }
   };
   return (
-    <div className="flex min-w-0 flex-col items-end gap-1">
+    <div className="flex min-w-0 shrink-0 flex-col items-end gap-1">
       <ContentToolbarButton
-        className={props.compact ? '!h-7 !w-7 !p-0' : 'shrink-0 !w-auto gap-1.5 !px-2'}
+        className={props.compact ? '!h-7 !w-7 !p-0' : 'shrink-0 !h-10 !w-auto gap-2 !px-4'}
         dataUi="video-editor.library.add-material"
         title={label}
         aria-label={label}

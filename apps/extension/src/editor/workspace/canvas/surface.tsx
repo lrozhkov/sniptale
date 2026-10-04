@@ -20,6 +20,8 @@ const canvasWrapperClassName =
 
 function CanvasContextZone(props: {
   backgroundColor: string;
+  showOutsideCanvas: boolean;
+  canvasCropMode: 'crop' | 'expand';
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   contextMenuState: CanvasContextMenuState | null;
   controller: CanvasSurfaceController;
@@ -43,6 +45,8 @@ function CanvasContextZone(props: {
         activeTool={props.controller.activeTool}
         hasImage={props.hasImage}
         backgroundColor={props.backgroundColor}
+        showOutsideCanvas={props.showOutsideCanvas}
+        canvasCropMode={props.canvasCropMode}
         controller={props.controller}
         viewportRef={props.viewportRef}
         stageRef={props.stageRef}
@@ -90,6 +94,8 @@ function CanvasSurfaceChrome(props: {
 
 interface CanvasWrapperSurfaceProps {
   backgroundColor: string;
+  showOutsideCanvas: boolean;
+  canvasCropMode: 'crop' | 'expand';
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   contextMenuState: CanvasContextMenuState | null;
   controller: CanvasSurfaceController;
@@ -137,6 +143,8 @@ export function CanvasWrapperSurface(props: CanvasWrapperSurfaceProps) {
       />
       <CanvasContextZone
         backgroundColor={props.backgroundColor}
+        showOutsideCanvas={props.showOutsideCanvas}
+        canvasCropMode={props.canvasCropMode}
         canvasRef={props.canvasRef}
         contextMenuState={props.contextMenuState}
         controller={props.controller}

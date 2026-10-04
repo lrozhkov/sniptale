@@ -1,6 +1,20 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorHtmlImageMessages = defineMessageSource({
+  htmlMeasureFailed: {
+    ru: 'Не удалось рассчитать размер HTML. Повторите попытку.',
+    en: 'Could not calculate HTML size. Try again.',
+  },
+  htmlMissingImage: {
+    ru: 'Изображение №{number} недоступно. Замените или удалите его в руководстве и повторите экспорт.',
+    en: 'Image #{number} is unavailable. Replace or remove it in the guide, then export again.',
+  },
   htmlImages: { ru: 'Изображения в HTML', en: 'HTML images' },
+  htmlExportTitle: { ru: 'Экспорт HTML', en: 'Export HTML' },
+  htmlImageSettings: { ru: 'Настройки изображений', en: 'Image settings' },
+  htmlSelectionHint: {
+    ru: 'Нажмите на изображение для просмотра. Отметьте изображения, чтобы настроить их отдельно.',
+    en: 'Click an image to preview it. Select images to adjust their settings separately.',
+  },
   htmlImageOpen: { ru: 'Открыть изображение', en: 'Open image' },
   htmlContent: { ru: 'Что сохранять', en: 'Saved content' },
   htmlFull: { ru: 'Полное изображение', en: 'Full image' },
@@ -9,6 +23,18 @@ export const scenarioEditorHtmlImageMessages = defineMessageSource({
   htmlOptimizeHint: {
     ru: 'WebP с потерями. Мелкий текст может стать менее чётким.',
     en: 'Lossy WebP. Small text may become less sharp.',
+  },
+  htmlFrameOptimizeHint: {
+    ru: 'Фрагмент всегда преобразуется в изображение с выбранным качеством.',
+    en: 'The visible frame is always rendered with the selected quality.',
+  },
+  htmlFrameSizeHint: {
+    ru: 'Ограничение размера применяется только к полному изображению.',
+    en: 'The size limit applies only to full images.',
+  },
+  htmlFrameViewerHint: {
+    ru: 'Просмотр по нажатию доступен только для полного изображения.',
+    en: 'Click-to-view is available only for full images.',
   },
   htmlMaxEdge: { ru: 'Максимальная сторона', en: 'Maximum edge' },
   htmlQuality: { ru: 'Качество WebP', en: 'WebP quality' },
@@ -30,7 +56,7 @@ export const scenarioEditorHtmlImageMessages = defineMessageSource({
   htmlSelect: { ru: 'Выбрать изображение', en: 'Select image' },
   htmlMeasure: { ru: 'Рассчитать размер', en: 'Calculate size' },
   htmlSave: { ru: 'Сохранить HTML', en: 'Save HTML' },
-  htmlBack: { ru: 'К просмотру сценария', en: 'Back to guide preview' },
+  htmlBack: { ru: 'Вернуться к экспорту', en: 'Back to export' },
   htmlPreviewLoading: { ru: 'Подготовка изображения…', en: 'Preparing image…' },
   htmlPreviewFailed: {
     ru: 'Не удалось подготовить изображение. Выберите его повторно.',
@@ -40,8 +66,8 @@ export const scenarioEditorHtmlImageMessages = defineMessageSource({
   htmlFit: { ru: 'Вписать', en: 'Fit' },
   htmlEmpty: { ru: 'В сценарии нет изображений', en: 'This guide has no images' },
   htmlMeasureHint: {
-    ru: 'Размер включает изображения, шрифты и просмотрщик. Изменения настроек сохраняются автоматически.',
-    en: 'Size includes images, fonts and viewer. Settings are saved automatically.',
+    ru: 'Выберите настройки, рассчитайте размер, затем сохраните HTML. Размер включает изображения, шрифты и просмотрщик. Настройки сохраняются автоматически.',
+    en: 'Choose settings, calculate the size, then save HTML. Size includes images, fonts and viewer. Settings are saved automatically.',
   },
   htmlException: { ru: 'Свои настройки', en: 'Override' },
 });

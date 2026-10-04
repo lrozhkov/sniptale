@@ -15,10 +15,13 @@ import {
   createController,
   createMediaItem,
   createScenarioItem,
+  createScenarioExportItem,
   createVideoProjectItem,
 } from './test-support/index';
 
 const {
+  readHtmlMock,
+  renameHtmlMock,
   getMediaAssetBlobMock,
   getAggregatePreviewBlobMock,
   copyImageAggregateMock,
@@ -29,6 +32,8 @@ const {
   openScenarioEditorPageMock,
   openVideoEditorPageMock,
 } = vi.hoisted(() => ({
+  readHtmlMock: vi.fn(),
+  renameHtmlMock: vi.fn(),
   getMediaAssetBlobMock: vi.fn(),
   getAggregatePreviewBlobMock: vi.fn(),
   copyImageAggregateMock: vi.fn(),
@@ -92,12 +97,27 @@ vi.mock('../../../platform/navigation/extension-pages/index', async (importOrigi
   openWebSnapshotViewerPage: vi.fn(),
 }));
 
+vi.mock('../../../composition/persistence/scenario/export-artifacts', () => ({
+  readScenarioHtmlArtifact: readHtmlMock,
+}));
+vi.mock('../../../composition/persistence/scenario/store/project-records/exports', () => ({
+  renameScenarioHtmlExportRecord: renameHtmlMock,
+}));
+import {
+  createPreviewNavigationCoordinator,
+  savePreviewDraftBeforeDownload,
+} from './preview-navigation';
+
+let clickedFilename = '';
 let anchorClickSpy = vi.fn();
 let originalCreateElement: typeof document.createElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
   anchorClickSpy = vi.fn();
+  readHtmlMock.mockReset();
+  renameHtmlMock.mockReset();
+  clickedFilename = '';
   originalCreateElement = document.createElement.bind(document);
   vi.stubGlobal(
     'ClipboardItem',
@@ -113,6 +133,7 @@ beforeEach(() => {
     }
     const anchor = originalCreateElement('a');
     anchor.click = () => {
+      clickedFilename = anchor.download;
       (anchorClickSpy as () => void)();
     };
     return anchor;
@@ -154,7 +175,7 @@ async function verifyPreviewDownloadAndCopyFlows() {
 
   await downloadPreviewItem(controller, runBusy);
   await flushMicrotasks();
-  await copyPreviewItem(controller, runBusy);
+  expect(await copyPreviewItem(controller, runBusy)).toBe(true);
   await flushMicrotasks();
 
   expect(anchorClickSpy).toHaveBeenCalledTimes(1);
@@ -162,6 +183,26 @@ async function verifyPreviewDownloadAndCopyFlows() {
   expect(setIsBusy).toHaveBeenNthCalledWith(1, true);
   expect(setIsBusy).toHaveBeenLastCalledWith(false);
 }
+
+it('downloads and copies scenario images from the stored asset', async () => {
+  const blob = new Blob(['image'], { type: 'image/png' });
+  const { controller } = createController({
+    previewItem: createMediaItem({
+      id: 'scenario-image-1',
+      kind: 'image',
+      source: { kind: 'stored-asset', assetId: 'scenario-image-1' },
+    }),
+  });
+  getMediaAssetBlobMock.mockResolvedValue(blob);
+
+  await downloadPreviewItem(controller, createRunBusy());
+  await copyPreviewItem(controller, createRunBusy());
+
+  expect(getMediaAssetBlobMock).toHaveBeenCalledWith('scenario-image-1');
+  expect(getAggregatePreviewBlobMock).not.toHaveBeenCalled();
+  expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+  expect(writeBrowserClipboardItemsMock).toHaveBeenCalledTimes(1);
+});
 
 async function verifyPreviewErrorBannerFlow() {
   const { controller } = createController({
@@ -174,7 +215,7 @@ async function verifyPreviewErrorBannerFlow() {
 
   await downloadPreviewItem(controller, createRunBusy(setBanner));
   await flushMicrotasks();
-  await copyPreviewItem(controller, createRunBusy(setBanner));
+  expect(await copyPreviewItem(controller, createRunBusy(setBanner))).toBe(false);
   await flushMicrotasks();
 
   expect(setBanner).toHaveBeenNthCalledWith(1, expect.stringContaining('broken.png'));
@@ -334,4 +375,78 @@ it('opens a recording in a new video project even when it belongs to a saved gro
   );
   expect(openVideoEditorPageMock).toHaveBeenCalledWith(null, 'rec-new');
   expect(openVideoEditorPageMock).not.toHaveBeenCalledWith('old-project', null);
+});
+
+it.each(['unsupported', 'invalid'] as const)(
+  'does not navigate an %s scenario to the editor',
+  (availability) => {
+    const item = createScenarioItem();
+    item.project.availability = availability;
+    openInEditor(item);
+    expect(openScenarioEditorPageMock).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['guide', 'tour'] as const)(
+  'downloads exact saved %s bytes using the committed latest name',
+  async (mode) => {
+    const item = createScenarioExportItem();
+    const blob = new Blob(['immutable saved file'], { type: 'text/html' });
+    const { controller } = createController({ previewItem: item, filenameDraft: 'new name' });
+    readHtmlMock.mockResolvedValueOnce({
+      entry: { ...item.exportEntry, filename: 'new name.html', html: { mode, assetId: 'body' } },
+      blob,
+    });
+    const coordinator = createPreviewNavigationCoordinator();
+    let finish!: () => void;
+    renameHtmlMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      })
+    );
+    const pending = downloadPreviewItem(controller, createRunBusy(), () =>
+      savePreviewDraftBeforeDownload(controller, coordinator, () => controller.state)
+    );
+    expect(readHtmlMock).not.toHaveBeenCalled();
+    finish();
+    expect(await pending).toBe(true);
+    expect(renameHtmlMock).toHaveBeenCalledExactlyOnceWith(item.entityId, 'new name.html');
+    expect(readHtmlMock).toHaveBeenCalledExactlyOnceWith(item.entityId);
+    expect(URL.createObjectURL).toHaveBeenCalledWith(blob);
+    expect(clickedFilename).toBe('new name.html');
+    expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+  }
+);
+it('does not download a stale draft after its save completes', async () => {
+  const { controller } = createController({
+    previewItem: createScenarioExportItem(),
+    filenameDraft: 'first',
+  });
+  const coordinator = createPreviewNavigationCoordinator();
+  let finish!: () => void;
+  renameHtmlMock.mockReturnValueOnce(
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    })
+  );
+  const pending = downloadPreviewItem(controller, createRunBusy(), () =>
+    savePreviewDraftBeforeDownload(controller, coordinator, () => controller.state)
+  );
+  controller.actions.preview.setFilenameDraft('newer');
+  finish();
+  expect(await pending).toBe(false);
+  expect(readHtmlMock).not.toHaveBeenCalled();
+  expect(anchorClickSpy).not.toHaveBeenCalled();
+});
+it('reports unavailable saved HTML without regenerating or downloading the current project', async () => {
+  const item = createScenarioExportItem();
+  const { controller } = createController({ previewItem: item });
+  readHtmlMock.mockResolvedValueOnce(null);
+  const banner = vi.fn();
+  expect(await downloadPreviewItem(controller, createRunBusy(banner), async () => false)).toBe(
+    false
+  );
+  expect(banner).toHaveBeenCalledWith(expect.stringContaining(item.filename));
+  expect(anchorClickSpy).not.toHaveBeenCalled();
+  expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
 });

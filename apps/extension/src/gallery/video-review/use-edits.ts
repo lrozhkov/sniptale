@@ -1,6 +1,14 @@
 import { useRef, useState } from 'react';
-import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
-import { createReviewCut, createReviewSpeed } from '../../features/video/review/cuts';
+import type {
+  ReviewAnchor,
+  ReviewEdit,
+  ReviewCutTransition,
+} from '../../features/video/review/types';
+import {
+  createReviewCut,
+  createReviewSpeed,
+  placeReviewEditMove,
+} from '../../features/video/review/cuts';
 
 type Speed = Extract<ReviewEdit, { kind: 'speed' }>;
 /** Each completed gesture or property change writes one reversible history operation. */
@@ -16,6 +24,7 @@ export function useReviewEdits(props: {
   setSelection(value: ReviewAnchor): void;
   commit(before: ReviewEdit | null, after: ReviewEdit | null): Promise<boolean>;
   selectedEditId?: string | null;
+  selectedObject?: boolean;
   onSelectedEditIdChange?(id: string | null): void;
 }) {
   const pending = useRef(false);
@@ -32,18 +41,31 @@ export function useReviewEdits(props: {
   const selected = props.edits.find((edit) => edit.id === selectedEditId) ?? null;
   const toggle = async (kind: 'cut' | 'speed' = 'cut') => {
     props.pause();
-    if (props.selection?.kind === 'range') return commitRange(props.selection, null, kind);
+    if (!selected && !props.selectedObject && props.selection?.kind === 'range')
+      return commitRange(props.selection, null, kind);
     setMode(mode === kind ? null : kind);
-    setSelectedEditId(null);
   };
   const candidate = (
     kind: 'cut' | 'speed',
     selection: ReviewAnchor,
     before: ReviewEdit | null = null
   ) => {
+    const movedRange =
+      before &&
+      selection.kind === 'range' &&
+      props.snapToKeyframes !== false &&
+      Math.abs(selection.end - selection.start - (before.end - before.start)) < 0.000001
+        ? placeReviewEditMove({
+            current: before,
+            requestedStart: selection.start,
+            boundaries: props.boundaries ?? [],
+            duration: props.duration,
+            edits: props.edits,
+          })
+        : null;
     const range = {
       id: before?.id ?? 'pending-edit',
-      selection,
+      selection: movedRange ? { kind: 'range' as const, ...movedRange } : selection,
       boundaries: props.boundaries ?? [],
       snapToKeyframes: props.snapToKeyframes !== false,
       duration: props.duration,
@@ -65,7 +87,11 @@ export function useReviewEdits(props: {
     const kind = before?.kind ?? requestedKind ?? mode;
     if (!kind || pending.current) return false;
     const planned = candidate(kind, selection, before);
-    const after = planned && { ...planned, id: before?.id ?? crypto.randomUUID() };
+    const after = planned && {
+      ...planned,
+      id: before?.id ?? crypto.randomUUID(),
+      ...(before?.kind === 'cut' && before.transition ? { transition: before.transition } : {}),
+    };
     if (!after) {
       props.onInvalid?.();
       return false;
@@ -75,7 +101,7 @@ export function useReviewEdits(props: {
     pending.current = true;
     try {
       if (await props.commit(before, after)) {
-        setMode(kind);
+        if (!before) setMode(kind);
         setSelectedEditId(after.id);
         props.setSelection({ kind: 'point', time: after.start });
         if (!before) props.seek(after.start);
@@ -90,44 +116,39 @@ export function useReviewEdits(props: {
   return {
     mode,
     cutting: mode !== null,
-    rate: selected?.kind === 'speed' ? selected.rate : rate,
-    audio: selected?.kind === 'speed' ? selected.audio : audio,
-    changeRate: async (value: Speed['rate']) => {
-      if (
-        selected?.kind !== 'speed' ||
-        (await props.commit(selected, { ...selected, rate: value }))
-      )
-        setRate(value);
-    },
-    changeAudio: async (value: Speed['audio']) => {
-      if (
-        selected?.kind !== 'speed' ||
-        (await props.commit(selected, { ...selected, audio: value }))
-      )
-        setAudio(value);
-    },
+    rate,
+    audio,
+    changeRate: setRate,
+    changeAudio: setAudio,
+    changeSelectedRate: (value: Speed['rate']) =>
+      selected?.kind === 'speed' ? props.commit(selected, { ...selected, rate: value }) : undefined,
+    changeSelectedAudio: (value: Speed['audio']) =>
+      selected?.kind === 'speed'
+        ? props.commit(selected, { ...selected, audio: value })
+        : undefined,
     selected,
+    changeSelectedTransition: (transition: ReviewCutTransition | null) => {
+      if (selected?.kind !== 'cut') return undefined;
+      props.pause();
+      const cut = { ...selected };
+      delete cut.transition;
+      return props.commit(selected, transition ? { ...cut, transition } : cut);
+    },
     commitRange,
     apply: (kind: 'cut' | 'speed', selection: ReviewAnchor) => commitRange(selection, null, kind),
     canApply: (kind: 'cut' | 'speed', selection: ReviewAnchor) => !!candidate(kind, selection),
     setCutting: (value: boolean) => {
       setMode(value ? 'cut' : null);
-      setSelectedEditId(null);
     },
     select: (edit: ReviewEdit) => {
       props.pause();
       setSelectedEditId(edit.id);
-      setMode(edit.kind);
-      if (edit.kind === 'speed') {
-        setRate(edit.rate);
-        setAudio(edit.audio);
-      }
       props.setSelection({ kind: 'range', start: edit.start, end: edit.end });
       props.seek(edit.start);
     },
     toggle,
     remove: () => {
-      if (selected) void props.commit(selected, null);
+      if (selected) return props.commit(selected, null);
     },
   };
 }

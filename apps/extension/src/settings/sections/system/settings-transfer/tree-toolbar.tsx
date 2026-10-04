@@ -52,6 +52,7 @@ export function SettingsTransferTreeToolbar(props: {
         ) : null}
         {props.query ? (
           <button
+            className={'sniptale-dismiss-button'}
             type="button"
             aria-label={translate('settings.settingsTransfer.clearSearch')}
             onClick={() => props.onQueryChange('')}

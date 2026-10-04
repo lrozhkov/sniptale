@@ -12,6 +12,7 @@ export function useReviewPlayback(props: {
   onSeek(value: number): void;
   onFailure(): void;
   original: QuickEditOriginalAudio;
+  silent?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
@@ -32,7 +33,7 @@ export function useReviewPlayback(props: {
       if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
       if (node.preservesPitch !== true) node.preservesPitch = true;
       const gain = originalAudioGainAt(latest.current.original, next, latest.current.edits);
-      const muted = settings.muted || gain === 0;
+      const muted = latest.current.silent || settings.muted || gain === 0;
       if (node.muted !== muted) node.muted = muted;
       // The element caps at one; the preview audio graph amplifies beyond it.
       const volume = Math.min(1, gain);
@@ -42,7 +43,7 @@ export function useReviewPlayback(props: {
     setTime(next);
     return next;
   };
-  const audioSettingsKey = JSON.stringify([props.original, props.edits]);
+  const audioSettingsKey = JSON.stringify([props.original, props.edits, props.silent]);
   const tick = useRef(synchronize);
   tick.current = synchronize;
   useEffect(() => {

@@ -17,12 +17,13 @@ function button(name: string) {
   if (!node) throw new Error('Missing button');
   return node;
 }
-async function open() {
+async function open(onAddTextStep?: (title: string, description: string) => boolean) {
   await act(async () =>
     root.render(
       <GuideVideoFrameResources
         mediaId="video"
         disabled={false}
+        {...(onAddTextStep ? { onAddTextStep } : {})}
         onImport={submit}
         t={createTranslator('en')}
       />
@@ -176,4 +177,91 @@ it('attaches the active action and omits it after seeking outside its interval',
   io.capture.mockResolvedValue({ blob: new Blob(['png']), timeSeconds: 3 });
   await act(async () => button('Add frame as step').click());
   expect(submit.mock.calls[1]![0].sources[0].source.action).toBeUndefined();
+});
+
+it('keeps capture actions inside the actual player fullscreen root', async () => {
+  await open();
+  const player = host.querySelector('[data-ui="library-media-player"]')!;
+  expect(player.contains(button('Add frame as step'))).toBe(true);
+});
+
+it('opens and cancels a frameless composer inside the player without changing the video', async () => {
+  const addText = vi.fn(() => true);
+  await open(addText);
+  const player = host.querySelector('[data-ui="library-media-player"]')!;
+  const video = host.querySelector('video')!;
+  video.currentTime = 2;
+  expect(host.querySelector('[aria-label="Step title"]')).toBeNull();
+  await act(async () => button('Add step without frame').click());
+  expect(player.contains(host.querySelector('[aria-label="Step title"]'))).toBe(true);
+  expect(document.activeElement).toBe(host.querySelector('[aria-label="Step title"]'));
+  expect(player.contains(button('Cancel'))).toBe(true);
+  await act(async () => button('Cancel').click());
+  expect(host.querySelector('[aria-label="Step title"]')).toBeNull();
+  await act(async () => button('Add step without frame').click());
+  expect(host.querySelector('[aria-label="Step title"]')).not.toBeNull();
+  expect(host.querySelector('video')).toBe(video);
+  expect(video.currentTime).toBe(2);
+  expect(addText).not.toHaveBeenCalled();
+  expect(io.capture).not.toHaveBeenCalled();
+  expect(submit).not.toHaveBeenCalled();
+});
+
+async function writeField(label: string, value: string) {
+  const field = host.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+    `[aria-label="${label}"]`
+  )!;
+  const prototype =
+    field.tagName === 'INPUT' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(prototype, 'value')!.set!.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+it('retains a cancelled draft and creates exactly one text step without capture or import', async () => {
+  const addText = vi.fn(() => true);
+  await open(addText);
+  await act(async () => button('Add step without frame').click());
+  await writeField('Step title', 'Text only');
+  const body = host.querySelector<HTMLTextAreaElement>('[aria-label="Text"]')!;
+  body.focus();
+  await writeField('Text', 'Details');
+  expect(document.activeElement).toBe(body);
+  const form = host.querySelector('form')!;
+  const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  await act(async () => form.dispatchEvent(escape));
+  expect(escape.defaultPrevented).toBe(true);
+  expect(host.querySelector('form')).toBeNull();
+  expect(document.activeElement).toBe(button('Add step without frame'));
+  await act(async () => button('Add step without frame').click());
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Step title"]')!.value).toBe(
+    'Text only'
+  );
+  const save = button('Save');
+  await act(async () => {
+    save.click();
+    save.click();
+  });
+  expect(addText).toHaveBeenCalledTimes(1);
+  expect(addText).toHaveBeenCalledWith('Text only', 'Details');
+  expect(io.capture).not.toHaveBeenCalled();
+  expect(submit).not.toHaveBeenCalled();
+  expect(host.querySelector('form')).toBeNull();
+});
+
+it('keeps rejected text draft retryable and preserves frame metadata capture', async () => {
+  const addText = vi.fn().mockReturnValueOnce(false).mockReturnValue(true);
+  await open(addText);
+  await act(async () => button('Add step without frame').click());
+  await writeField('Step title', 'Retry title');
+  await act(async () => button('Save').click());
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not add step');
+  expect(host.querySelector('form')).not.toBeNull();
+  await act(async () => button('Save').click());
+  expect(addText).toHaveBeenCalledTimes(2);
+  await act(async () => button('Edit step details').click());
+  await act(async () => button('Use this frame').click());
+  expect(submit).toHaveBeenCalledTimes(1);
+  expect(submit.mock.calls[0]![0].sources[0].title).toBe('Retry title');
 });

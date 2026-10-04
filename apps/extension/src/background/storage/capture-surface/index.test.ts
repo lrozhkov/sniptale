@@ -66,6 +66,30 @@ describe('window-only capture-surface journal', () => {
     await expect(readCaptureSurfaceJournal()).resolves.toEqual([aligning]);
   });
 
+  it.each(['screenshot', 'quick-action'] as const)(
+    'round-trips a prepared %s normalization snapshot',
+    async (owner) => {
+      const normalized = { ...prior, state: 'normal' as const };
+      const preparing = {
+        ...entry,
+        owner,
+        phase: 'prepared' as const,
+        prior: { ...prior, state: 'maximized' as const },
+        alignmentFrom: normalized,
+      };
+      await writeCaptureSurfaceJournal([preparing]);
+      mocks.get.mockResolvedValue({ 'capture-surface-journal-v1': [preparing] });
+      await expect(readCaptureSurfaceJournal()).resolves.toEqual([preparing]);
+    }
+  );
+
+  it('rejects a nonvideo intermediate without a non-normal prior window', async () => {
+    mocks.get.mockResolvedValue({
+      'capture-surface-journal-v1': [{ ...entry, phase: 'prepared', alignmentFrom: prior }],
+    });
+    await expect(readCaptureSurfaceJournal()).rejects.toThrow('invalid entry');
+  });
+
   it.each([null, { type: 'window' }, applied])(
     'rejects invalid or out-of-phase intermediate bounds',
     async (alignmentFrom) => {

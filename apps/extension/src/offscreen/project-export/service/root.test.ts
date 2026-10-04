@@ -152,7 +152,9 @@ beforeEach(() => {
   loadActiveLedgerMock.mockResolvedValue(null);
   markTerminalMock.mockResolvedValue(null);
   requestCancelMock.mockResolvedValue(null);
-  upsertLedgerMock.mockImplementation((input: unknown) => Promise.resolve(input));
+  upsertLedgerMock.mockImplementation((input: { jobId: string; projectId: string }) =>
+    Promise.resolve({ ...input, status: 'running', cancelRequested: false })
+  );
 });
 
 it('accepts duplicate starts for the same job id while that export is active', async () => {
@@ -171,7 +173,7 @@ it('accepts duplicate starts for the same job id while that export is active', a
   const firstStart = service.startProjectExport('job-1', project, settings);
 
   await expect(service.startProjectExport('job-1', project, settings)).resolves.toBeUndefined();
-  expect(renderCompositeExportMock).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(renderCompositeExportMock).toHaveBeenCalledTimes(1));
 
   resolvePendingRender(finishRender);
   await firstStart;
@@ -241,7 +243,7 @@ it('rejects different job ids while an export is active', async () => {
   await expect(service.startProjectExport('job-2', project, settings)).rejects.toThrow(
     'offscreenExport.alreadyRunning'
   );
-  expect(renderCompositeExportMock).toHaveBeenCalledTimes(1);
+  await vi.waitFor(() => expect(renderCompositeExportMock).toHaveBeenCalledTimes(1));
 
   resolvePendingRender(finishRender);
   await firstStart;

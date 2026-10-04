@@ -146,3 +146,15 @@ it('switches step sections and restores the section after showing all settings',
     'true'
   );
 });
+
+it('keeps selected-step style groups subordinate to Appearance', async () => {
+  await render();
+  const groups = host.querySelectorAll(
+    '.guide-appearance-heading + .guide-inspector-categorized .guide-style-fields > .guide-inspector-group'
+  );
+  expect(groups).toHaveLength(3);
+  for (const group of groups) {
+    expect(group.querySelector('h4')).not.toBeNull();
+    expect(group.getAttribute('data-level')).toBe('group');
+  }
+});

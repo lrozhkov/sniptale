@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   clampDrawingTextWidth,
   resolveDrawingTextNaturalWidth,
@@ -32,16 +32,26 @@ export type DrawingTextDraft = {
 export function useDrawingTextEditor(controller: ContentDrawingController) {
   const [draft, setDraftState] = useState<DrawingTextDraft | null>(null);
   const draftRef = useRef<DrawingTextDraft | null>(null);
-  const setDraft = useCallback((next: DrawingTextDraft | null) => {
-    draftRef.current = next;
-    setDraftState(next);
-  }, []);
+  const setDraft = useCallback(
+    (next: DrawingTextDraft | null) => {
+      draftRef.current = next;
+      setDraftState(next);
+      const text = next?.value.trim() ?? '';
+      const previous = next?.id
+        ? controller.session.getSnapshot().document.objects.find((object) => object.id === next.id)
+        : null;
+      controller.setPendingTextChange?.(
+        Boolean(text && (!previous || previous.kind !== 'text' || previous.text !== text))
+      );
+    },
+    [controller]
+  );
   const cancel = useCallback(() => setDraft(null), [setDraft]);
+  useEffect(() => () => controller.setPendingTextChange?.(false), [controller]);
 
   const commit = useCallback(() => {
     const current = draftRef.current;
     if (!current) return;
-    setDraft(null);
     const text = current.value.trim();
     if (text) {
       const snapshot = controller.session.getSnapshot();
@@ -86,6 +96,11 @@ export function useDrawingTextEditor(controller: ContentDrawingController) {
       };
       if (current.id) controller.session.replaceObject(object);
       else controller.session.commitObject(object);
+      if (controller.session.getSnapshot().document.objects.some((entry) => entry === object)) {
+        setDraft(null);
+      }
+    } else {
+      setDraft(null);
     }
   }, [controller, setDraft]);
 

@@ -1,7 +1,9 @@
-import { useEffect, useRef, type MutableRefObject } from 'react';
+import type { ReviewBeforeAction } from './note-transitions';
+import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
 type PlaneDragProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
   busy?: boolean | undefined;
   gutter?: number;
   duration: number;
@@ -12,6 +14,8 @@ type PlaneDragProps = {
   onSelect(value: ReviewAnchor): void;
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
+  onFocusRangePreview?: ((range: ReviewAnchor | null) => void) | undefined;
+  originalRangeTool?: boolean;
 };
 
 interface PlaneDragState {
@@ -22,9 +26,13 @@ interface PlaneDragState {
   selection: ReviewAnchor;
   time: number;
   pointerId: number;
+  admitted: boolean;
+  ended: boolean;
+  cancelled: boolean;
 }
 
 type CapturedPointerDrag = {
+  admission?: { cancel(): void };
   node: HTMLElement;
   pointerId: number;
 };
@@ -41,6 +49,7 @@ export function useReviewDragEscape<T extends CapturedPointerDrag>(
       event.preventDefault();
       event.stopImmediatePropagation();
       drag.current = null;
+      current.admission?.cancel();
       resetPreview();
       if (current.node.hasPointerCapture(current.pointerId))
         current.node.releasePointerCapture(current.pointerId);
@@ -50,7 +59,11 @@ export function useReviewDragEscape<T extends CapturedPointerDrag>(
   });
 }
 
-const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number, gutter: number) => {
+export const planeTime = (
+  event: React.PointerEvent<HTMLDivElement>,
+  duration: number,
+  gutter: number
+) => {
   const bounds = event.currentTarget.getBoundingClientRect();
   return Math.max(
     0,
@@ -61,53 +74,80 @@ const planeTime = (event: React.PointerEvent<HTMLDivElement>, duration: number, 
   );
 };
 
+/** The same hit zones drive both the gesture and its cursor/hover preview. */
+export function reviewPlaneLane(
+  target: EventTarget | null,
+  focusEnabled: boolean,
+  originalEnabled: boolean
+): 'source' | 'focus' | 'seek' | 'original' | 'item' | 'control' | 'gap' {
+  if (!(target instanceof Element)) return 'gap';
+  if (focusEnabled && target.closest('[data-ui="gallery.videoReview.editBlock"]')) return 'seek';
+  if (target.closest('button,[data-ui="gallery.videoReview.trackHeader"]')) return 'control';
+  if (target.closest('[data-ui="gallery.videoReview.editBlock"],[data-audio-id],[role="button"]'))
+    return 'item';
+  if (target.closest('[data-dragging="true"]')) return 'item';
+  const audio = target.closest('[data-ui="gallery.videoReview.audioLane"]');
+  if (audio)
+    return originalEnabled && audio.hasAttribute('data-original-audio-lane') ? 'original' : 'seek';
+  if (target.closest('[data-ui="gallery.videoReview.zoomLane"]'))
+    return focusEnabled ? 'focus' : 'seek';
+  if (
+    target.closest(
+      '[data-ui="gallery.videoReview.sourceLane"],[data-ui="gallery.videoReview.ruler"]'
+    )
+  )
+    return focusEnabled || originalEnabled ? 'seek' : 'source';
+  return 'gap';
+}
+
 /** Plane interaction state: seek, range dragging, and Escape restore; render stays separate. */
 export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
   const plane = useRef<HTMLDivElement>(null);
   const drag = useRef<PlaneDragState | null>(null);
-  useEffect(() => {
-    const cancel = (event: KeyboardEvent) => {
-      const current = drag.current;
-      if (event.key !== 'Escape' || !current) return;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      drag.current = null;
-      if (plane.current?.hasPointerCapture(current.pointerId))
-        plane.current.releasePointerCapture(current.pointerId);
-      props.onSeek(current.time, false);
-      props.onSelect(current.selection);
-    };
-    window.addEventListener('keydown', cancel, true);
-    return () => window.removeEventListener('keydown', cancel, true);
+  const commitRange = (current: PlaneDragState) => {
+    if (!current.range) return;
+    if (current.lane === 'focus') {
+      props.onFocusRangePreview?.(null);
+      props.onFocusRangeCommit?.(current.range);
+    } else props.onRangeCommit?.(current.range);
+  };
+  const restore = (current: PlaneDragState) => {
+    current.cancelled = true;
+    if (current.lane === 'focus') props.onFocusRangePreview?.(null);
+    if (!current.admitted) return;
+    props.onSeek(current.time, false);
+    props.onSelect(current.selection);
+  };
+  const lifetime = useReviewPlaneDragLifetime({
+    plane,
+    drag,
+    restore,
+    capability: props.onFocusRangeCommit
+      ? 'focus'
+      : props.originalRangeTool
+        ? 'original'
+        : 'source',
   });
   return {
     plane,
+    activeLane: () => drag.current?.lane,
     onPointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
-      if (
-        event.button !== 0 ||
-        (event.target instanceof Element &&
-          event.target.closest('button,[data-ui="gallery.videoReview.trackHeader"]'))
-      )
-        return;
+      if (event.button !== 0) return;
       const gutter = props.gutter ?? 0;
       if (event.clientX < event.currentTarget.getBoundingClientRect().left + gutter) return;
+      const hit = reviewPlaneLane(
+        event.target,
+        !!props.onFocusRangeCommit,
+        !!props.originalRangeTool
+      );
+      if (hit === 'control' || hit === 'item' || hit === 'original' || hit === 'gap') return;
       const time = planeTime(event, props.duration, gutter);
       if (props.busy) {
-        props.onSeek(time, false);
+        (props.beforeAction ?? ((action) => action()))(() => props.onSeek(time, false));
         return;
       }
-      const target = event.target instanceof Element ? event.target : null;
-      const focusLane = !!target?.closest('[data-ui="gallery.videoReview.zoomLane"]');
-      const audioLane = !!target?.closest('[data-ui="gallery.videoReview.audioLane"]');
-      const lane = focusLane
-        ? props.onFocusRangeCommit
-          ? 'focus'
-          : 'seek'
-        : audioLane
-          ? 'seek'
-          : 'source';
-      props.onClearSelection?.();
-      drag.current = {
+      const lane = hit;
+      const current: PlaneDragState = {
         lane,
         start: time,
         x: event.clientX,
@@ -115,16 +155,29 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         selection: props.selection,
         time: props.time,
         pointerId: event.pointerId,
+        admitted: false,
+        ended: false,
+        cancelled: false,
       };
+      drag.current = current;
       event.currentTarget.setPointerCapture(event.pointerId);
-      props.onSeek(time);
-      if (
-        lane !== 'source' ||
-        props.selection.kind !== 'range' ||
-        time < props.selection.start ||
-        time > props.selection.end
-      )
-        props.onSelect({ kind: 'point', time });
+      (props.beforeAction ?? ((action) => action()))(() => {
+        if (!lifetime.canAdmit(current)) return;
+        current.admitted = true;
+        props.onClearSelection?.();
+        props.onSeek(time);
+        if (current.range) {
+          if (lane === 'focus') props.onFocusRangePreview?.(current.range);
+          else props.onSelect(current.range);
+        } else if (
+          lane !== 'source' ||
+          props.selection.kind !== 'range' ||
+          time < props.selection.start ||
+          time > props.selection.end
+        )
+          props.onSelect({ kind: 'point', time });
+        if (current.ended) commitRange(current);
+      });
     },
     onPointerMove: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
@@ -141,26 +194,89 @@ export function useReviewTimelinePlaneDrag(props: PlaneDragProps) {
         start: Math.min(current.start, time),
         end: Math.max(current.start, time),
       };
-      props.onSelect(current.range);
+      if (current.admitted) {
+        if (current.lane === 'focus') props.onFocusRangePreview?.(current.range);
+        else props.onSelect(current.range);
+      }
     },
     onPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
       const current = drag.current;
       if (!current || event.pointerId !== current.pointerId) return;
       drag.current = null;
+      current.ended = true;
       if (event.currentTarget.hasPointerCapture(event.pointerId))
         event.currentTarget.releasePointerCapture(event.pointerId);
-      if (!props.busy && current.range) {
-        if (current.lane === 'focus') props.onFocusRangeCommit?.(current.range);
-        else props.onRangeCommit?.(current.range);
-      }
+      if (current.admitted) commitRange(current);
     },
     onPointerCancel: () => {
       const current = drag.current;
       drag.current = null;
       if (current) {
-        props.onSeek(current.time, false);
-        props.onSelect(current.selection);
+        lifetime.release(current);
+        restore(current);
       }
     },
   };
+}
+
+/** Capture lifetime owns cancellation and admission after delayed note completion. */
+function useReviewPlaneDragLifetime(props: {
+  plane: MutableRefObject<HTMLDivElement | null>;
+  drag: MutableRefObject<PlaneDragState | null>;
+  capability: 'source' | 'focus' | 'original';
+  restore(current: PlaneDragState): void;
+}) {
+  const { plane, drag, restore } = props;
+  const mounted = useRef(true);
+  const capability = useRef(props.capability);
+  capability.current = props.capability;
+  const canAdmit = useCallback(
+    (current: PlaneDragState) =>
+      mounted.current &&
+      !current.cancelled &&
+      (current.lane === 'seek' || current.lane === capability.current),
+    []
+  );
+  const release = useCallback(
+    (current: PlaneDragState) => {
+      if (plane.current?.hasPointerCapture(current.pointerId))
+        plane.current.releasePointerCapture(current.pointerId);
+    },
+    [plane]
+  );
+  const cancel = () => {
+    const current = drag.current;
+    drag.current = null;
+    if (!current) return;
+    release(current);
+    restore(current);
+  };
+  useEffect(() => {
+    const current = drag.current;
+    if (current && !canAdmit(current)) cancel();
+  });
+  const dispose = useCallback(() => {
+    mounted.current = false;
+    const current = drag.current;
+    drag.current = null;
+    if (current) {
+      current.cancelled = true;
+      release(current);
+    }
+  }, [drag, release]);
+  useEffect(() => {
+    mounted.current = true;
+    return dispose;
+  }, [dispose]);
+  useEffect(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || !drag.current) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      cancel();
+    };
+    window.addEventListener('keydown', onEscape, true);
+    return () => window.removeEventListener('keydown', onEscape, true);
+  });
+  return { canAdmit, release };
 }

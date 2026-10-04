@@ -17,11 +17,15 @@ function useStorageDraftsConfirmation(state: StorageDraftsState) {
     await state.runCleanup(true);
     close();
   };
+  const deleteExpired = async () => {
+    await state.runCleanup(false);
+    close();
+  };
   const reset = async () => {
     await state.updatePolicy(DEFAULT_LOCAL_STORAGE_POLICY);
     close();
   };
-  return { close, confirmation, deleteAll, reset, request: setConfirmation };
+  return { close, confirmation, deleteAll, deleteExpired, reset, request: setConfirmation };
 }
 
 function StorageDraftsResetAction(props: { busy: boolean; onRequest(): void }) {
@@ -41,14 +45,44 @@ function StorageDraftsResetAction(props: { busy: boolean; onRequest(): void }) {
   );
 }
 
-export function StorageDraftsSection(props: { view?: 'settings' | 'storage' }) {
-  const view = props.view === 'storage' ? 'storage' : 'settings';
-  const state = useStorageDraftsState();
-  const confirmation = useStorageDraftsConfirmation(state);
-
+function StoragePolicyLoadState(
+  props: Pick<StorageDraftsState, 'policyLoaded' | 'policyLoadFailed' | 'retryLoad'>
+) {
+  if (props.policyLoaded) return null;
   return (
-    <section className={settingsSectionClassName}>
-      {view === 'settings' ? (
+    <div
+      role="status"
+      className="flex flex-wrap items-center gap-3 text-sm text-[var(--sniptale-color-text-secondary)]"
+    >
+      <span>
+        {translate(
+          props.policyLoadFailed
+            ? 'settings.storageDrafts.policyUnavailable'
+            : 'settings.storageDrafts.loading'
+        )}
+      </span>
+      {props.policyLoadFailed ? (
+        <button
+          type="button"
+          className={getControlSecondaryButtonClassName({ density: 'compact' })}
+          onClick={() => void props.retryLoad()}
+        >
+          {translate('settings.storageDrafts.retry')}
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function StorageDraftsBody(props: {
+  confirmation: ReturnType<typeof useStorageDraftsConfirmation>;
+  state: StorageDraftsState;
+  view: 'drafts' | 'storage';
+}) {
+  const { confirmation, state, view } = props;
+  return (
+    <>
+      {view === 'drafts' ? (
         <StorageDraftsResetAction
           busy={state.busy}
           onRequest={() => confirmation.request('reset')}
@@ -58,14 +92,31 @@ export function StorageDraftsSection(props: { view?: 'settings' | 'storage' }) {
         {...state}
         view={view}
         onDeleteAllRequest={() => confirmation.request('delete-all')}
+        onDeleteExpiredRequest={() => confirmation.request('delete-expired')}
       />
       <StorageDraftsDialogs
         busy={state.busy}
         confirmation={confirmation.confirmation}
         onCancel={confirmation.close}
         onDeleteAll={confirmation.deleteAll}
+        onDeleteExpired={confirmation.deleteExpired}
         onReset={confirmation.reset}
       />
+    </>
+  );
+}
+
+export function StorageDraftsSection(props: { view?: string }) {
+  const view = props.view === 'storage' ? 'storage' : 'drafts';
+  const state = useStorageDraftsState();
+  const confirmation = useStorageDraftsConfirmation(state);
+
+  return (
+    <section className={settingsSectionClassName}>
+      <StoragePolicyLoadState {...state} />
+      {view === 'storage' || state.policyLoaded ? (
+        <StorageDraftsBody confirmation={confirmation} state={state} view={view} />
+      ) : null}
     </section>
   );
 }

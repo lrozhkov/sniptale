@@ -124,8 +124,8 @@ describe('editor-inspector-grid sections', () => {
     renderGridSections(<GridPanelSections {...props} />);
 
     act(() => {
-      findButtonByAriaLabel('editor.compact.hideGrid')?.click();
-      findButtonByAriaLabel('editor.compact.enableSnap')?.click();
+      findButtonByAriaLabel('editor.compact.showGrid')?.click();
+      findButtonByAriaLabel('editor.compact.enableGridSnap')?.click();
     });
 
     expect(props.updateWorkspace).toHaveBeenCalledWith({ gridEnabled: false });
@@ -155,4 +155,18 @@ describe('editor-inspector-grid sections', () => {
     expect(props.updateWorkspace).toHaveBeenCalledWith({ gridSize: 42 });
     expect(container?.querySelector('[data-testid="grid-size-input"]')).toBeNull();
   });
+});
+
+it('hides grid style controls without clearing their saved values', () => {
+  setupGridSectionsTest();
+  const props = createGridProps();
+  renderGridSections(<GridPanelSections {...props} gridEnabled={false} />);
+  expect(container?.querySelector('[data-testid="grid-size-range"]')).toBeNull();
+  expect(props.updateWorkspace).not.toHaveBeenCalled();
+  act(() => root?.render(<GridPanelSections {...props} />));
+  expect(container?.querySelector<HTMLInputElement>('[data-testid="grid-size-range"]')?.value).toBe(
+    '24'
+  );
+  act(() => root?.unmount());
+  container?.remove();
 });

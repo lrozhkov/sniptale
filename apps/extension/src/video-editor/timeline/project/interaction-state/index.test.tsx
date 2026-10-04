@@ -37,8 +37,8 @@ it('keeps drag geometry aligned when FX rows collapse without changing the proje
     expect(expanded.fxHeight).toBe(48);
     act(() => root.render(<Harness collapsed />));
     const collapsed = model!.trackLayoutModel.layoutByTrackId.get(clip.trackId)!;
-    expect(collapsed.fxHeight).toBe(20);
-    expect(collapsed.rowHeight).toBe(expanded.rowHeight - 28);
+    expect(collapsed.fxHeight).toBe(24);
+    expect(collapsed.rowHeight).toBe(expanded.rowHeight - 24);
     expect(collapsed.clipRowHeight).toBe(expanded.clipRowHeight);
     expect(collapsed.center).toBe(expanded.center);
     expect(props.project).toEqual(original);

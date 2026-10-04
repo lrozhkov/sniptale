@@ -6,6 +6,16 @@ export interface AudioRecordingModalProps {
   saveLabel?: string | undefined;
   captureLimitSeconds?: number | undefined;
   timeline?: AudioRecordingTimeline | undefined;
+  playVideo?: boolean | undefined;
+  playbackRunning?: boolean | undefined;
+  onPlayVideoChange?: ((value: boolean) => void) | undefined;
   onClose: () => void;
-  onSave: (file: File, trim: AudioTrimRange, signal: AbortSignal) => Promise<void>;
+  /** Notify retention only after a real durable reference, even if later publication fails. */
+  onSave: (
+    file: File,
+    trim: AudioTrimRange,
+    signal: AbortSignal,
+    take: Blob,
+    onRetained?: () => void
+  ) => Promise<void>;
 }

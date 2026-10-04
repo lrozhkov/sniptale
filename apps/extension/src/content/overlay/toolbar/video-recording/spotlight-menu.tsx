@@ -75,7 +75,7 @@ function useSpotlightMenuState(props: RecordingSpotlightMenuProps) {
   const closeMenu = useCallback(() => {
     if (props.toolbarMenuState) props.toolbarMenuState.closeMenu('recording-spotlight');
     else setLocalOpen(false);
-    queueMicrotask(() => triggerRef.current?.blur());
+    if (!props.toolbarMenuState) queueMicrotask(() => triggerRef.current?.blur());
   }, [props.toolbarMenuState]);
   const [draftSettings, setDraftSettings] = useState(props.settings);
   const [updating, setUpdating] = useState(false);

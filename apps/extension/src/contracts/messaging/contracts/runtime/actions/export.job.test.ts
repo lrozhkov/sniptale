@@ -289,3 +289,23 @@ it('covers routed Page Package policy branches and launch-intent responses', () 
   });
   expect(() => launch.parseResponse({ page: 'settings', success: true })).toThrow();
 });
+
+it('admits only the explicit HTML download format and preserves legacy requests', () => {
+  const request = {
+    type: MessageType.START_PAGE_PACKAGE_JOB,
+    includeWebCopy: true,
+    intent: 'export',
+    jobId: 'html-job',
+    locale: 'en',
+    options,
+    captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+    sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
+    warnings: [],
+  };
+  const start = runtimeActionExportMessageContracts[MessageType.START_PAGE_PACKAGE_JOB];
+  expect(start.parseRequest({ ...request, downloadFormat: 'html' })).toMatchObject({
+    downloadFormat: 'html',
+  });
+  expect(start.parseRequest(request)).not.toHaveProperty('downloadFormat');
+  expect(() => start.parseRequest({ ...request, downloadFormat: 'script' })).toThrow();
+});

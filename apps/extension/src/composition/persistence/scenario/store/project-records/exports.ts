@@ -4,6 +4,15 @@ import { publishMediaHubLibraryChanged } from '../../../../../features/media-hub
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
 import { mapScenarioExportEntry } from './helpers';
+import { renameScenarioHtmlExport } from '../../projects/exports';
+import { saveScenarioHtmlArtifact } from '../../export-artifacts';
+import type { AssetRef } from '../../../assets';
+
+/** Renames only the selected HTML catalogue record after an authoritative transaction. */
+export async function renameScenarioHtmlExportRecord(id: string, filename: string): Promise<void> {
+  await renameScenarioHtmlExport(id, filename);
+  publishMediaHubLibraryChanged('update', [`scenario-export:${id}`]);
+}
 
 /**
  * Persists an export audit entry for a scenario project.
@@ -13,6 +22,7 @@ export async function saveScenarioExportRecord(args: {
   format: ScenarioExportFormat;
   filename: string;
   size: number;
+  html?: { mode: 'guide' | 'tour'; ref: AssetRef };
 }): Promise<ScenarioExportEntry> {
   const entry: DbScenarioExportEntry = {
     id: crypto.randomUUID(),
@@ -21,9 +31,11 @@ export async function saveScenarioExportRecord(args: {
     filename: args.filename,
     createdAt: Date.now(),
     size: args.size,
+    ...(args.html ? { html: { mode: args.html.mode, assetId: args.html.ref.assetId } } : {}),
   };
 
-  await saveScenarioExport(entry);
+  if (args.html) await saveScenarioHtmlArtifact(entry, args.html.ref);
+  else await saveScenarioExport(entry);
   publishMediaHubLibraryChanged('create', [`scenario-export:${entry.id}`]);
   return mapScenarioExportEntry(entry);
 }

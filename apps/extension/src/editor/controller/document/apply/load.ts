@@ -1,3 +1,6 @@
+import { normalizeEditorImageSettings } from '../../../../features/editor/document/constants';
+import { applyImageSettings, readImageSettingsFromObject } from '../../../objects/image-style';
+import { getSourceObject } from '../layers';
 import type { Canvas } from 'fabric';
 import { createRichShapeObject } from '../../../objects/rich-shape';
 import { logEditorSourceTrace } from '../../core/debug';
@@ -7,21 +10,26 @@ import { ensureEditorSourceLayer } from '../source';
 import { prepareCanvasForDocumentLoad, renderCanvasAfterDocumentLoad } from './canvas';
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
 import { restoreFrameAnnotationProxyFromMetadata } from '../../../frame-annotation/proxy';
-import { assertValidFrameAnnotationsInCanvasJson } from '../../../frame-annotation/import-boundary';
+import { normalizeFrameAnnotationsInCanvasJson } from '../../../frame-annotation/import-boundary';
 import { assertValidEditorDrawingCanvasJson } from '../../../document/import-boundary';
 import { restoreCanonicalEditorDrawingObjects } from '../../../drawing/object/canonicalize';
 import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import { normalizeScenarioAnnotationsInCanvasJson } from '../../../document/scenario-annotation-import';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export async function loadPreparedDocumentOnCanvas(
   options: LoadPreparedDocumentOptions & AppliedDocumentCanvasLoadCallbacks
 ): Promise<SourceState | null> {
-  assertValidFrameAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson);
-  assertValidEditorDrawingCanvasJson(options.prepared.normalizedDocument.canvasJson);
-  await options.canvas.loadFromJSON(options.prepared.normalizedDocument.canvasJson);
+  const canvasJson = normalizeFrameAnnotationsInCanvasJson(
+    normalizeScenarioAnnotationsInCanvasJson(options.prepared.normalizedDocument.canvasJson)
+  );
+  assertValidEditorDrawingCanvasJson(canvasJson);
+  await options.canvas.loadFromJSON(canvasJson);
   const canvasPrepareOptions: Parameters<typeof prepareCanvasForDocumentLoad>[0] = {
     canvas: options.canvas,
     canvasSize: options.prepared.canvasSize,
     zoomLevel: options.zoomLevel,
+    ...(options.preserveViewport ? { preserveViewport: true } : {}),
   };
   if (options.viewportDevicePixelRatioBaseline !== undefined) {
     canvasPrepareOptions.viewportDevicePixelRatioBaseline =
@@ -49,6 +57,16 @@ export async function loadPreparedDocumentOnCanvas(
     source: options.prepared.source,
     prepareObject: options.prepareObject,
   });
+  const sourceObject = getSourceObject(options.canvas);
+  if (sourceObject) {
+    applyImageSettings(
+      sourceObject,
+      readImageSettingsFromObject(
+        sourceObject,
+        normalizeEditorImageSettings(options.prepared.normalizedDocument.frame.sourceImage)
+      )
+    );
+  }
   restoreCanonicalEditorDrawingObjects({
     canvas: options.canvas,
     prepareObject: options.prepareObject,
@@ -63,7 +81,11 @@ export async function loadPreparedDocumentOnCanvas(
     options.prepared.normalizedDocument.frame,
     options.prepared.canvasSize
   );
-  await options.rebuildFrameDecorations();
+  await options.rebuildFrameDecorations(options.prepared.browserFrame);
+  if (options.canvas instanceof EditorCanvas) {
+    options.canvas.ensureWorkspaceContainsObjects();
+    if (!options.preserveViewport) options.canvas.centerDocumentInViewport();
+  }
   renderCanvasAfterDocumentLoad(options.canvas);
   return source;
 }

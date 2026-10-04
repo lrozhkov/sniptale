@@ -8,9 +8,7 @@ type GridToggleSectionsProps = Pick<
 >;
 type GridToggleConfig = {
   active: boolean;
-  activeLabel: string;
   id: string;
-  inactiveLabel: string;
   label: string;
   onToggle: () => void;
 };
@@ -24,17 +22,13 @@ function buildGridToggleConfigs(
     {
       id: 'grid',
       active: gridEnabled,
-      label: translate('editor.compact.grid'),
-      activeLabel: translate('editor.compact.hideGrid'),
-      inactiveLabel: translate('editor.compact.showGrid'),
+      label: translate('editor.compact.showGrid'),
       onToggle: () => updateWorkspace({ gridEnabled: !gridEnabled }),
     },
     {
       id: 'snap',
       active: gridSnapEnabled,
-      label: translate('editor.compact.snap'),
-      activeLabel: translate('editor.compact.disableSnap'),
-      inactiveLabel: translate('editor.compact.enableSnap'),
+      label: translate('editor.compact.enableGridSnap'),
       onToggle: () => updateWorkspace({ gridSnapEnabled: !gridSnapEnabled }),
     },
   ];
@@ -47,7 +41,7 @@ function GridToggleSection(props: GridToggleConfig) {
       control={
         <ProductGlassSwitch
           on={props.active}
-          aria-label={props.active ? props.activeLabel : props.inactiveLabel}
+          aria-label={props.label}
           aria-pressed={props.active}
           onClick={props.onToggle}
         />

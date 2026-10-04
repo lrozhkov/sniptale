@@ -1,4 +1,4 @@
-import { GripVertical, Info, Trash2 } from 'lucide-react';
+import { ArrowUp, ArrowDown, Info, Trash2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { ScenarioRecorderSidebarStep } from './types';
 import {
@@ -30,28 +30,53 @@ function ScenarioRecorderDeleteButton(props: { onDelete: () => void }) {
   );
 }
 
-function ScenarioRecorderStepActions(props: {
+type StepActionProps = {
   onDeleteStep: (stepId: string) => void;
   onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
+  onMoveStep: (stepId: string, toIndex: number) => void;
+  moveUpIndex: number | null;
+  moveDownIndex: number | null;
   step: ScenarioRecorderSidebarStep;
-}) {
+};
+
+function ScenarioRecorderStepActions(props: StepActionProps) {
   return (
     <div
       data-ui="content.scenario.sidebar.step-rail-actions"
       className="flex max-h-0 flex-col items-center gap-1 overflow-hidden opacity-0
         transition-all duration-300 ease-out
-        group-hover:max-h-[120px] group-hover:opacity-100"
+        group-hover:max-h-[160px] group-hover:opacity-100
+        group-focus-within:max-h-[160px] group-focus-within:opacity-100"
     >
-      <button
-        type="button"
-        onClick={handleStepActionClick}
-        draggable
-        className={`${SCENARIO_RECORDER_RAIL_BUTTON_CLASS_NAME} cursor-grab text-[var(--sniptale-color-text-muted)]`}
-        title={translate('scenario.content.reorderStep')}
-        aria-label={translate('scenario.content.reorderStep')}
-      >
-        <GripVertical className="h-3.5 w-3.5" />
-      </button>
+      {(['up', 'down'] as const).map((direction) => {
+        const destination = direction === 'up' ? props.moveUpIndex : props.moveDownIndex;
+        const label = translate(
+          direction === 'up' ? 'scenario.content.moveStepUp' : 'scenario.content.moveStepDown'
+        );
+        return (
+          <button
+            key={direction}
+            type="button"
+            disabled={destination === null}
+            data-ui={`content.scenario.sidebar.step-move-${direction}`}
+            className={`${SCENARIO_RECORDER_RAIL_BUTTON_CLASS_NAME}
+              text-[var(--sniptale-color-text-secondary)] disabled:opacity-40 focus-visible:outline-2
+              focus-visible:outline-[var(--sniptale-color-border-accent-strong)]`}
+            title={label}
+            aria-label={label}
+            onClick={(event) => {
+              handleStepActionClick(event);
+              if (destination !== null) props.onMoveStep(props.step.id, destination);
+            }}
+          >
+            {direction === 'up' ? (
+              <ArrowUp aria-hidden="true" size={14} />
+            ) : (
+              <ArrowDown aria-hidden="true" size={14} />
+            )}
+          </button>
+        );
+      })}
       {props.step.metadata ? (
         <button
           type="button"
@@ -72,11 +97,7 @@ function ScenarioRecorderStepActions(props: {
   );
 }
 
-export function ScenarioRecorderStepRail(props: {
-  onDeleteStep: (stepId: string) => void;
-  onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
-  step: ScenarioRecorderSidebarStep;
-}) {
+export function ScenarioRecorderStepRail(props: StepActionProps) {
   return (
     <div
       data-ui="content.scenario.sidebar.step-rail"
@@ -95,6 +116,9 @@ export function ScenarioRecorderStepRail(props: {
         </div>
       )}
       <ScenarioRecorderStepActions
+        onMoveStep={props.onMoveStep}
+        moveUpIndex={props.moveUpIndex}
+        moveDownIndex={props.moveDownIndex}
         onDeleteStep={props.onDeleteStep}
         onInspectStep={props.onInspectStep}
         step={props.step}
@@ -112,13 +136,15 @@ export function ScenarioRecorderStepBody(props: {
       <div className="flex min-w-0 items-start justify-between gap-3 overflow-hidden">
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="line-clamp-2 text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-            {props.step.title || props.step.id}
+            {props.step.title ||
+              `${translate('scenario.content.step')} ${props.step.numberLabel ?? ''}`}
           </div>
         </div>
       </div>
       <div
         className="max-h-0 overflow-hidden opacity-0 transition-all duration-300 ease-out
-          group-hover:mt-2 group-hover:max-h-[176px] group-hover:opacity-100"
+          group-hover:mt-2 group-hover:max-h-[176px] group-hover:opacity-100
+          group-focus-within:mt-2 group-focus-within:max-h-[176px] group-focus-within:opacity-100"
       >
         <button
           type="button"

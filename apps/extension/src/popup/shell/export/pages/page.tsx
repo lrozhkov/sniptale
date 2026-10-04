@@ -12,6 +12,7 @@ import { type PopupExportController, usePopupExportController } from '../control
 import { useWebCopyResourcePreferences } from './snapshot-availability';
 import type { PopupPackageDestination } from '../data-type/package-controls';
 import { savePopupLastExportDestination } from '../../../../composition/persistence/capture-settings/popup-startup';
+import { useAutoExportLaunch, type PopupExportLaunch } from './use-auto-export-launch';
 
 type ExportController = PopupExportController;
 type ExportFooterActionsProps = Parameters<typeof ExportFooterActions>[0];
@@ -140,25 +141,29 @@ export function ExportPage({
   isActive,
   activeTabCapabilities,
   initialDestination = 'export',
+  launch,
   pageAccess = defaultPageAccessRuntime,
 }: {
   isActive: boolean;
   activeTabCapabilities: ActiveTabCapabilities;
   initialDestination?: PopupPackageDestination;
+  launch?: PopupExportLaunch;
   pageAccess?: PopupPageAccessRuntime;
 }) {
   const controller = usePopupExportController({
     activeTabCapabilities,
     isActive,
     pageAccess,
+    ...(launch ? { initialTabId: launch.tabId } : {}),
   });
+  useAutoExportLaunch({ controller, isActive, ...(launch ? { launch } : {}) });
   const webCopyResources = useWebCopyResourcePreferences();
   const [destination, setDestination] = useState<PopupPackageDestination>(initialDestination);
   const restrictedPageFeaturesTitle = activeTabCapabilities.isRestrictedPage
     ? translate('popup.common.restrictedPageFeatures')
     : null;
   const canExport =
-    destination === 'save'
+    destination !== 'export'
       ? controller.state.preferences.hasLoadedPreferences &&
         controller.state.tabs.selectedCount > 0 &&
         controller.state.derived.exportDisabledReason === null &&
@@ -171,7 +176,8 @@ export function ExportPage({
     canExport,
     controller,
     exportDisabledTitle,
-    onRequestExport: () => void controller.actions.handleStartExport(),
+    onRequestExport: () =>
+      void controller.actions.handleStartExport(destination === 'html' ? 'html' : undefined),
     ...(destination === 'save'
       ? { onRequestWebSnapshotSave: () => void controller.actions.handleSaveWebSnapshot() }
       : {}),

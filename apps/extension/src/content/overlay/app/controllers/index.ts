@@ -1,3 +1,4 @@
+import { pagePreparationHistory } from '../../../parser/page-preparation/history';
 import { useEffect, useRef } from 'react';
 import { disableAiPickModeIfLoaded } from '../../ai/pick/runtime/lazy';
 import { disableHighlighterMode } from '../../../selection/highlighter';
@@ -204,7 +205,7 @@ export function useContentAppControllers(
   modeState: ContentAppModeStateValue,
   dependencies: ContentAppControllerDependencies
 ): ContentCoreControllers {
-  const drawingController = useContentDrawingController();
+  const drawingController = useContentDrawingController(pagePreparationHistory);
   const scenarioController = useContentScenarioController(modeState);
   const baseAiController = useContentAiController(modeState, dependencies);
   const baseModeController = useContentToolbarModeController(modeState);

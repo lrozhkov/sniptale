@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_EDITOR_WORKSPACE_SETTINGS } from '../../../features/editor/document/constants';
 import { translate } from '../../../platform/i18n';
 import {
@@ -13,11 +13,15 @@ import {
   setInputFiles,
 } from '../../../../../../tooling/test/harness/editor/ownership/shell-helpers';
 
+let CanvasWrapper: (typeof import('.'))['CanvasWrapper'];
+beforeAll(async () => {
+  ({ CanvasWrapper } = await import('.'));
+});
+
 describe('canvas wrapper ownership seam', () => {
   it('mounts and disposes the provider-owned controller and forwards open-image requests', async () => {
     const { openEditorImageFromFileMock } = getEditorShellOwnershipMocks();
     const controller = createControllerMock();
-    const { CanvasWrapper } = await import('.');
 
     resetEditorStore({ imageData: null, viewportPreviewOpen: false });
     renderWithController(<CanvasWrapper hasImage={false} />, controller);
@@ -45,7 +49,6 @@ describe('canvas wrapper ownership seam', () => {
 
   it('renders the live canvas path with grid styling when an image is already loaded', async () => {
     const controller = createControllerMock();
-    const { CanvasWrapper } = await import('.');
 
     resetEditorStore({
       viewportPreviewOpen: false,
@@ -62,14 +65,17 @@ describe('canvas wrapper ownership seam', () => {
     expect(controller.mount).toHaveBeenCalledOnce();
     expect(document.querySelector('canvas')).not.toBeNull();
     expect(document.querySelector('[role="button"]')).toBeNull();
-    expect(document.querySelector('canvas')?.parentElement?.style.backgroundImage).toContain(
-      'linear-gradient(45deg'
-    );
+    expect(
+      document.querySelector<HTMLElement>('[data-ui="editor.canvas.document-grid"]')?.style
+        .backgroundImage
+    ).toContain('linear-gradient');
   });
 
   it('renders a checkerboard surface when the workspace background is transparent', async () => {
-    const controller = createControllerMock();
-    const { CanvasWrapper } = await import('.');
+    const controller = {
+      ...createControllerMock(),
+      canvasDocumentSize: { width: 100, height: 80 },
+    };
 
     resetEditorStore({
       viewportPreviewOpen: false,
@@ -81,8 +87,10 @@ describe('canvas wrapper ownership seam', () => {
     });
     renderWithController(<CanvasWrapper hasImage />, controller);
 
-    const canvasSurface = document.querySelector('canvas')?.parentElement;
-    const style = canvasSurface?.getAttribute('style') ?? '';
+    const checkerboard = document.querySelector<HTMLElement>(
+      '[data-ui="editor.canvas.document-checkerboard"]'
+    );
+    const style = checkerboard?.getAttribute('style') ?? '';
 
     expect(style).toContain('background-image');
     expect(style).toContain('linear-gradient(45deg');
@@ -178,6 +186,12 @@ describe('viewport preview ownership seam', () => {
 
     const previewSurfaceRef = {
       current: {
+        clientWidth: 200,
+        clientHeight: 200,
+        offsetWidth: 200,
+        offsetHeight: 200,
+        clientLeft: 0,
+        clientTop: 0,
         getBoundingClientRect: () => ({
           bottom: 260,
           height: 200,
@@ -197,12 +211,16 @@ describe('viewport preview ownership seam', () => {
       clientY: 110,
       controller: keyController,
       previewSurfaceRef,
+      previewSize: { width: 200, height: 200 },
+      contentRect: { left: 0, top: 0, width: 200, height: 200 },
     });
     navigateEditorViewportFromClientPoint({
       clientX: 150,
       clientY: 110,
       controller: keyController,
       previewSurfaceRef: { current: null },
+      previewSize: { width: 200, height: 200 },
+      contentRect: { left: 0, top: 0, width: 200, height: 200 },
     });
 
     expect(keyController.navigateViewportTo).toHaveBeenCalledWith(0.5, 0.25);

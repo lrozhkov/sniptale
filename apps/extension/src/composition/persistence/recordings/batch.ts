@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import type { LibraryStorageClass } from '../library-lifecycle/contracts';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
@@ -21,6 +22,8 @@ import {
   recoverRecordingAssetPublications,
   type RecordingPublicationPayload,
 } from './asset-publication';
+import { initDB, STORE_NAME } from '../infrastructure/indexed-db/core';
+import { parseRecordingEntry } from './index.guards';
 
 export interface SaveRecordingBatchInput {
   blob?: Blob;
@@ -32,6 +35,7 @@ export interface SaveRecordingBatchInput {
   recordingGroup?: RecordingGroupMember;
   storageClass?: LibraryStorageClass;
   mediaMetadata?: StoredRecordingEntry['mediaMetadata'];
+  recordingMetadata?: StoredRecordingEntry['recordingMetadata'];
 }
 
 function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
@@ -62,6 +66,9 @@ function validateInputs(inputs: readonly SaveRecordingBatchInput[]): void {
     ) {
       throw new Error('Recording media metadata is invalid.');
     }
+    if (input.recordingMetadata !== undefined && !parseRecordingMetadata(input.recordingMetadata)) {
+      throw new Error('Recording acquisition metadata is invalid.');
+    }
     ids.add(input.id);
   }
 }
@@ -70,9 +77,9 @@ async function writeInputsToAssets(
   inputs: readonly SaveRecordingBatchInput[]
 ): Promise<Array<{ input: SaveRecordingBatchInput; prepared: PreparedAssetObject }>> {
   const blobBytes = inputs.reduce((total, input) => total + (input.blob?.size ?? 0), 0);
-  if (blobBytes > 0) await assertAssetWriteAdmission(blobBytes);
   const prepared: Array<{ input: SaveRecordingBatchInput; prepared: PreparedAssetObject }> = [];
   try {
+    if (blobBytes > 0) await assertAssetWriteAdmission(blobBytes);
     for (const input of inputs) {
       prepared.push({
         input,
@@ -85,9 +92,11 @@ async function writeInputsToAssets(
     }
     return prepared;
   } catch (error) {
-    await Promise.all(
-      prepared.map(({ prepared: asset }) => discardPreparedAsset(asset.ref.assetId))
-    );
+    const stagedIds = new Set([
+      ...prepared.map(({ prepared: asset }) => asset.ref.assetId),
+      ...inputs.flatMap((input) => (input.preparedAsset ? [input.preparedAsset.ref.assetId] : [])),
+    ]);
+    await Promise.all([...stagedIds].map((assetId) => discardPreparedAsset(assetId)));
     throw error;
   }
 }
@@ -107,6 +116,9 @@ function createEntries(
       mimeType: prepared.ref.mimeType,
       ...(input.recordingGroup ? { recordingGroup: input.recordingGroup } : {}),
       ...(input.mediaMetadata ? { mediaMetadata: input.mediaMetadata } : {}),
+      ...(input.recordingMetadata
+        ? { recordingMetadata: parseRecordingMetadata(input.recordingMetadata)! }
+        : {}),
       size: prepared.ref.size,
     };
   });
@@ -126,12 +138,37 @@ async function saveRecordingEntries(
   // restarted MV3 worker, because that recovery is itself waiting for this asset lease to release.
   if (!inputs.some((input) => input.preparedAsset !== undefined)) {
     await recoverRecordingAssetPublications();
+    await initDB();
+  }
+  // Prepared assets already hold transition leases. Let publication own admission
+  // and release them on failure rather than rejecting outside its cleanup scope.
+  const expectedAssetIds: Record<string, string | null> = {};
+  try {
+    const db = inputs.some((input) => input.blob !== undefined) ? await initDB() : null;
+    for (const input of inputs) {
+      if (input.preparedAsset) {
+        expectedAssetIds[input.id] = null;
+        continue;
+      }
+      const raw: unknown = await db!.get(STORE_NAME, input.id);
+      const previous = parseRecordingEntry(raw);
+      if (raw !== undefined && (!previous || previous.id !== input.id))
+        throw new Error('Invalid existing recording source.');
+      expectedAssetIds[input.id] = previous?.assetId ?? null;
+    }
+  } catch (error) {
+    await Promise.all(
+      inputs.flatMap((input) =>
+        input.preparedAsset ? [discardPreparedAsset(input.preparedAsset.ref.assetId)] : []
+      )
+    );
+    throw error;
   }
   const preparedInputs = await writeInputsToAssets(inputs);
   const entries = createEntries(preparedInputs);
   let journalCreated = false;
   try {
-    const payload: RecordingPublicationPayload = { completion, entries };
+    const payload: RecordingPublicationPayload = { completion, entries, expectedAssetIds };
     const journal = await createAssetPublicationJournal({
       assetRefs: preparedInputs.map(({ prepared }) => prepared.ref),
       domain: RECORDING_ASSET_PUBLICATION_DOMAIN,

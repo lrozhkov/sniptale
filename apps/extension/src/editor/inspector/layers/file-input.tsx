@@ -6,7 +6,7 @@ import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import { insertEditorImageFromFile } from '../../document/file-actions';
 import { EditorIconButton } from '../../chrome/ui';
 
-export function LayerInsertImageControl() {
+export function LayerInsertImageControl({ withLabel = false }: { withLabel?: boolean }) {
   const controller = useEditorController();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -27,10 +27,11 @@ export function LayerInsertImageControl() {
       />
       <EditorIconButton
         title={translate('editor.toolbar.insertImage')}
-        className="h-8 w-8 shrink-0"
+        className={withLabel ? '!h-8 !w-auto shrink-0 gap-1 px-2 text-[11px]' : 'h-8 w-8 shrink-0'}
         onClick={() => inputRef.current?.click()}
       >
         <ImagePlus size={15} strokeWidth={2} />
+        {withLabel ? <span>{translate('editor.toolbar.insertImage')}</span> : null}
       </EditorIconButton>
     </>
   );

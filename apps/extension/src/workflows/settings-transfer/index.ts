@@ -2,6 +2,7 @@ export * from './registry';
 export * from './fingerprint';
 export * from './backup';
 export * from './domain-parser';
+export * from './durable-catalogs';
 export * from './package';
 export * from './node-projection';
 export * from './planner';

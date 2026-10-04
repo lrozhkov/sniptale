@@ -31,12 +31,25 @@ function createObject(id: string, overrides: Partial<LayerObject> = {}): LayerOb
 
 function createCanvas(): LayerCanvas {
   return {
+    getObjects: vi.fn(() => []),
     moveObjectTo: vi.fn(),
   } as unknown as LayerCanvas;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+it('allows the unlocked browser window to cross annotation layers as one unit', () => {
+  const source = createObject('source', { sniptaleType: 'source-image', sniptaleLocked: false });
+  const header = createObject('chrome', { sniptaleType: 'browser-frame' });
+  const annotation = createObject('annotation');
+  const canvas = createCanvas();
+  vi.mocked(canvas.getObjects).mockReturnValue([source, header, annotation] as never);
+  mocks.getLayerObjects.mockReturnValue([source, annotation]);
+  expect(reorderLayerObjects(canvas, 'source', 'annotation')).toBe(true);
+  expect(canvas.moveObjectTo).toHaveBeenCalledWith(source, 1);
+  expect(canvas.moveObjectTo).toHaveBeenCalledWith(header, 2);
 });
 
 it('reorders dragged layers using reversed layer panel order', () => {

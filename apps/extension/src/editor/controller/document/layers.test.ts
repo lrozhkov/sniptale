@@ -122,8 +122,29 @@ it('finds user layers and source layers through the canvas helpers', () => {
 
   expect(findObjectById(canvas, 'annotation-1')).toBe(annotation);
   expect(findObjectById(canvas, 'missing')).toBeUndefined();
-  expect(getLayerObjects(canvas)).toEqual([sourceImage, annotation, browserHeader]);
+  expect(getLayerObjects(canvas)).toEqual([sourceImage, annotation]);
   expect(getSourceObject(canvas)).toBe(sourceImage);
+});
+
+it('projects a browser window as one source layer instead of a separate chrome layer', () => {
+  const source = { ...createSourceImage(), sniptaleLocked: false };
+  const header = {
+    sniptaleId: 'browser-header',
+    sniptaleRole: 'annotation',
+    sniptaleType: 'browser-frame',
+    visible: true,
+  };
+  const layers = collectLayers(createCanvas([createBackgroundLayer(), source, header]));
+  expect(layers.map((layer) => layer.id)).toEqual(['source-image', 'background-1']);
+  expect(layers[0]).toEqual(
+    expect.objectContaining({
+      immutable: true,
+      reorderable: true,
+      name: expect.any(String),
+      typeLabel: expect.any(String),
+    })
+  );
+  expect(layers[0]?.name).toBe(layers[0]?.typeLabel);
 });
 
 it('uses scaled dimensions and fallback layer names when object metadata is incomplete', () => {
@@ -214,7 +235,7 @@ it('keeps the source layer immutable even when it is currently unlocked', () => 
   );
 });
 
-it('collects preview metadata and effect counts for raster layers', () => {
+it('collects effect counts without retaining raster previews for the layer list', () => {
   vi.stubGlobal(
     'crypto',
     Object.assign(globalThis.crypto, {
@@ -228,7 +249,7 @@ it('collects preview metadata and effect counts for raster layers', () => {
     expect.objectContaining({
       effectCount: 1,
       id: 'image-1',
-      previewDataUrl: 'https://example.com/layer.png',
+      previewDataUrl: null,
       raster: true,
       type: 'image',
     })
@@ -249,7 +270,7 @@ it('falls back to stroke colors and generated ids when layer metadata is incompl
   );
 });
 
-it('uses solid fills and canvas previews when they are available', () => {
+it('does not serialize canvas layers while collecting the list', () => {
   const fillLayer = {
     fill: '#00ff99',
     getScaledHeight: () => 20,
@@ -259,13 +280,14 @@ it('uses solid fills and canvas previews when they are available', () => {
     sniptaleType: 'rectangle',
     visible: true,
   };
-  const [canvasLayer, shapeLayer] = collectLayers(
-    createCanvas([fillLayer, createCanvasPreviewLayer()])
-  );
+  const canvasPreviewLayer = createCanvasPreviewLayer();
+  const imageElement = canvasPreviewLayer.getElement() as HTMLCanvasElement;
+  const toDataUrl = vi.spyOn(imageElement, 'toDataURL');
+  const [canvasLayer, shapeLayer] = collectLayers(createCanvas([fillLayer, canvasPreviewLayer]));
 
   expect(canvasLayer).toEqual(
     expect.objectContaining({
-      previewDataUrl: 'data:image/png;base64,canvas-preview',
+      previewDataUrl: null,
     })
   );
   expect(shapeLayer).toEqual(
@@ -273,4 +295,5 @@ it('uses solid fills and canvas previews when they are available', () => {
       previewColor: '#00ff99',
     })
   );
+  expect(toDataUrl).not.toHaveBeenCalled();
 });

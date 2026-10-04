@@ -88,7 +88,9 @@ function AutoBlurToggleItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoading' 
   const toggleDisabled =
     props.isLoading ||
     props.autoBlur.isApplying ||
-    (!props.autoBlur.autoApplyAllowed && !props.autoBlur.autoApplyEnabled);
+    (!props.autoBlur.autoApplyAllowed &&
+      !props.autoBlur.pinToTabAvailable &&
+      !props.autoBlur.autoApplyEnabled);
 
   return (
     <AutoBlurMenuItem
@@ -101,11 +103,11 @@ function AutoBlurToggleItem(props: Pick<DropdownProps, 'autoBlur' | 'isLoading' 
           : 'content.autoBlur.autoApplyEnabled'
       )}
       hint={translate(
-        props.autoBlur.autoApplyAllowed
+        props.autoBlur.autoApplyAllowed || props.autoBlur.pinToTabAvailable
           ? 'content.autoBlur.autoApplyEnableHint'
           : 'content.autoBlur.autoApplyBlockedHint'
       )}
-      showHintInCompact={toggleDisabled && !props.autoBlur.autoApplyAllowed}
+      showHintInCompact={toggleDisabled && !props.autoBlur.pinToTabAvailable}
       selected={props.autoBlur.autoApplyEnabled}
       onSelect={async () => {
         if (!props.autoBlur.autoApplyEnabled) {
@@ -202,7 +204,6 @@ function useAutoBlurMenuBindings(props: AutoBlurMenuProps) {
 
   const closeMenu = useCallback(() => {
     props.toolbarMenuState.closeMenu('auto-blur');
-    queueMicrotask(() => triggerRef.current?.focus());
   }, [props.toolbarMenuState]);
 
   useToolbarFloatingMenuDismissal({

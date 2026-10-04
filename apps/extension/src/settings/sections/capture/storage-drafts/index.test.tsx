@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
   loadSettings: vi.fn(),
   openGalleryPage: vi.fn(),
   openSettingsPage: vi.fn(),
-  patchSettings: vi.fn(),
+  patchLocalStoragePolicy: vi.fn(),
   showToast: vi.fn(),
   state: vi.fn(),
 }));
@@ -45,7 +45,7 @@ vi.mock('./use-storage-drafts-state', async (importOriginal) => ({
 vi.mock('../../../../composition/persistence/settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../composition/persistence/settings')>()),
   loadSettings: mocks.loadSettings,
-  patchSettings: mocks.patchSettings,
+  patchLocalStoragePolicy: mocks.patchLocalStoragePolicy,
 }));
 vi.mock('../../../../composition/persistence/library-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<
@@ -72,7 +72,7 @@ import {
   SettingsSectionHeaderActionsProvider,
 } from '../../../section-surface';
 
-function SectionHarness(props: { view?: 'settings' | 'storage' }) {
+function SectionHarness(props: { view?: 'drafts' | 'storage' }) {
   return (
     <SettingsSectionHeaderActionsProvider>
       <SettingsSectionHeader kicker="Хранилище" description="Описание" />
@@ -84,6 +84,7 @@ function SectionHarness(props: { view?: 'settings' | 'storage' }) {
 it('connects the storage policy state owner to all storage controls', async () => {
   const state = {
     busy: false,
+    policyLoaded: true,
     policy: {
       cleanupEnabled: true,
       defaultDestination: 'temporary',
@@ -125,6 +126,7 @@ it('connects the storage policy state owner to all storage controls', async () =
 it('renders usage, policy warnings, confirmation, and editable policy fields', async () => {
   const state = {
     busy: false,
+    policyLoaded: true,
     policy: {
       cleanupEnabled: true,
       defaultDestination: 'temporary' as const,
@@ -156,20 +158,47 @@ it('renders usage, policy warnings, confirmation, and editable policy fields', a
   );
   act(() => libraryOption?.click());
   expect(state.updatePolicy).toHaveBeenCalledWith({ defaultDestination: 'library' });
+  for (const [index, key, destination] of [
+    [1, 'recordingDestination', 'library'],
+    [2, 'webSnapshotDestination', 'temporary'],
+  ] as const) {
+    act(() => selects[index]?.click());
+    const label = translate(
+      destination === 'library'
+        ? 'settings.storageDrafts.destinationLibrary'
+        : 'settings.storageDrafts.destinationTemporary'
+    );
+    const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+      (candidate) => candidate.textContent?.includes(label)
+    );
+    expect(option).toBeDefined();
+    act(() => option?.click());
+    expect(state.updatePolicy).toHaveBeenLastCalledWith({ [key]: destination });
+  }
 
   act(() => root.render(<SectionHarness view="storage" />));
   expect(container.textContent).not.toContain(translate('settings.storageDrafts.newItemsTitle'));
   expect(container.textContent).toContain(translate('settings.storageDrafts.usageTitle'));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.deleteExpired'));
 
-  const storageButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button'));
-  const clickStorageAction = (label: string) => {
-    const button = storageButtons.find((candidate) => candidate.textContent?.includes(label));
+  const clickAction = (label: string) => {
+    const button = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (candidate) => candidate.textContent?.includes(label)
+    );
     expect(button).toBeDefined();
     act(() => button?.click());
   };
-  clickStorageAction(translate('settings.storageDrafts.openDrafts'));
-  clickStorageAction(translate('settings.storageDrafts.deleteExpired'));
-  clickStorageAction(translate('settings.storageDrafts.privacyLink'));
+  clickAction(translate('settings.storageDrafts.privacyLink'));
+  act(() => root.render(<SectionHarness view="drafts" />));
+  clickAction(translate('settings.storageDrafts.openDrafts'));
+  clickAction(translate('settings.storageDrafts.deleteExpired'));
+  expect(state.runCleanup).not.toHaveBeenCalled();
+  act(() => container.querySelector<HTMLButtonElement>('[data-testid="cancel"]')?.click());
+  expect(state.runCleanup).not.toHaveBeenCalled();
+  clickAction(translate('settings.storageDrafts.deleteExpired'));
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>('[data-testid="confirm"]')?.click();
+  });
 
   expect(mocks.openGalleryPage).toHaveBeenCalledWith({ scope: 'temporary' });
   expect(state.runCleanup).toHaveBeenCalledWith(false);
@@ -213,7 +242,7 @@ it('loads, updates, and cleans storage through the hook owner', async () => {
     totalBytes: 30,
   });
   mocks.getStorageEstimateInfo.mockResolvedValue({ remaining: 70, usage: 30 });
-  mocks.patchSettings.mockResolvedValue({
+  mocks.patchLocalStoragePolicy.mockResolvedValue({
     localStoragePolicy: { ...policy, cleanupEnabled: false },
   });
   mocks.cleanupDrafts.mockResolvedValue({ deletedCount: 2, deletedIds: ['a', 'b'] });
@@ -236,11 +265,154 @@ it('loads, updates, and cleans storage through the hook owner', async () => {
   await act(async () => state?.updatePolicy({ cleanupEnabled: false }));
   await act(async () => state?.runCleanup(true));
 
-  expect(mocks.patchSettings).toHaveBeenCalledWith({
-    localStoragePolicy: { cleanupEnabled: false },
-  });
+  expect(mocks.patchLocalStoragePolicy).toHaveBeenCalledWith({ cleanupEnabled: false }, policy);
   expect(mocks.cleanupDrafts).toHaveBeenCalledWith({ includeUnexpired: true, policy });
   expect(mocks.showToast).toHaveBeenCalled();
+  act(() => root.unmount());
+  container.remove();
+});
+
+it('keeps trash cleanup independent and disables its age control until enabled', () => {
+  const state = {
+    busy: false,
+    policyLoaded: true,
+    policy: {
+      cleanupEnabled: false,
+      defaultDestination: 'temporary' as const,
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+      trashCleanupEnabled: false,
+      trashRetentionDays: 30,
+    },
+    runCleanup: vi.fn(),
+    updatePolicy: vi.fn(),
+    usage: null,
+  };
+  mocks.state.mockReturnValue(state);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => root.render(<SectionHarness />));
+  const control = (label: string) =>
+    Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.getAttribute('aria-label') === label
+    );
+  const trashToggle = () => control(translate('settings.storageDrafts.trashCleanupEnabled'));
+  const trashAge = () => control(translate('settings.storageDrafts.trashRetention'));
+  expect(trashToggle()?.getAttribute('aria-checked')).toBe('false');
+  expect(trashAge()?.disabled).toBe(true);
+  expect(container.textContent).toContain(translate('settings.storageDrafts.trashCleanupDisabled'));
+  act(() => trashToggle()?.click());
+  expect(state.updatePolicy).toHaveBeenCalledWith({ trashCleanupEnabled: true });
+
+  state.policy.trashCleanupEnabled = true;
+  act(() => root.render(<SectionHarness />));
+  expect(trashAge()?.disabled).toBe(false);
+  expect(control(translate('settings.storageDrafts.ordinaryRetention'))?.disabled).toBe(true);
+  act(() => trashAge()?.click());
+  const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+    (button) => button.textContent === `7 ${translate('settings.storageDrafts.daySuffix')}`
+  );
+  act(() => option?.click());
+  expect(state.updatePolicy).toHaveBeenCalledWith({ trashRetentionDays: 7 });
+  state.busy = true;
+  act(() => root.render(<SectionHarness />));
+  expect(trashToggle()?.disabled).toBe(true);
+  expect(trashAge()?.disabled).toBe(true);
+  act(() => root.unmount());
+  container.remove();
+});
+
+it('hides policy controls until loaded and offers retry after a load failure', () => {
+  const retryLoad = vi.fn();
+  const state = {
+    busy: true,
+    policyLoaded: false,
+    policyLoadFailed: false,
+    policy: {
+      cleanupEnabled: true,
+      defaultDestination: 'temporary' as const,
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+    },
+    retryLoad,
+    runCleanup: vi.fn(),
+    updatePolicy: vi.fn(),
+    usage: null,
+  };
+  mocks.state.mockReturnValue(state);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => root.render(<SectionHarness />));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.loading'));
+  expect(container.textContent).not.toContain(translate('settings.storageDrafts.trashRetention'));
+
+  state.policyLoadFailed = true;
+  act(() => root.render(<SectionHarness />));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.policyUnavailable'));
+  const retry = Array.from(container.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes(translate('settings.storageDrafts.retry'))
+  );
+  act(() => retry?.click());
+  expect(retryLoad).toHaveBeenCalledTimes(1);
+  state.busy = false;
+  mocks.state.mockReturnValue({
+    ...state,
+    usage: { available: 70, drafts: 10, library: 20, total: 30 },
+  });
+  act(() => root.render(<SectionHarness view="storage" />));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.usageTitle'));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.policyUnavailable'));
+  const action = (label: string) =>
+    Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes(label)
+    );
+  expect(action(translate('settings.storageDrafts.privacyLink'))?.disabled).toBe(false);
+  expect(action(translate('settings.storageDrafts.openDrafts'))).toBeUndefined();
+  act(() => root.render(<SectionHarness view="drafts" />));
+  expect(action(translate('settings.storageDrafts.deleteAll'))).toBeUndefined();
+  act(() => root.unmount());
+  container.remove();
+});
+
+it('shows Trash save progress, acknowledgement, and retry in general Settings', () => {
+  const retryTrashPolicy = vi.fn();
+  const state = {
+    busy: true,
+    policyLoaded: true,
+    policy: {
+      cleanupEnabled: true,
+      defaultDestination: 'temporary' as const,
+      draftRetentionDays: 30,
+      videoDraftRetentionDays: 7,
+      trashCleanupEnabled: true,
+      trashRetentionDays: 30,
+    },
+    trashPolicyFeedback: 'saving',
+    retryTrashPolicy,
+    runCleanup: vi.fn(),
+    updatePolicy: vi.fn(),
+    usage: null,
+  };
+  mocks.state.mockReturnValue(state);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  act(() => root.render(<SectionHarness />));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.trashSaving'));
+  state.trashPolicyFeedback = 'saved';
+  act(() => root.render(<SectionHarness />));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.trashSaved'));
+  state.trashPolicyFeedback = 'error';
+  state.busy = false;
+  act(() => root.render(<SectionHarness />));
+  expect(container.textContent).toContain(translate('settings.storageDrafts.trashSaveFailed'));
+  const retry = Array.from(container.querySelectorAll('button')).find((button) =>
+    button.textContent?.includes(translate('settings.storageDrafts.retry'))
+  );
+  act(() => retry?.click());
+  expect(retryTrashPolicy).toHaveBeenCalledTimes(1);
   act(() => root.unmount());
   container.remove();
 });

@@ -48,3 +48,16 @@ it('rejects oversized and malformed annotation download payloads', () => {
     contract.parseRequest({ text: 7, type: MessageType.DOWNLOAD_BROWSER_ANNOTATIONS })
   ).toThrow();
 });
+
+it('accepts explicit launch mode and rejects malformed launch mode', () => {
+  const contract = contentActionRuntimeContracts[MessageType.OPEN_EXPORT_MODAL];
+  for (const startExport of [false, true]) {
+    const request = { type: MessageType.OPEN_EXPORT_MODAL, startExport };
+    expect(contract.parseRequest(request)).toEqual(request);
+  }
+  for (const startExport of ['true', 1, null, {}]) {
+    expect(() =>
+      contract.parseRequest({ type: MessageType.OPEN_EXPORT_MODAL, startExport })
+    ).toThrow();
+  }
+});

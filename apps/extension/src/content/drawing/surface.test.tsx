@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createDrawingSession } from '../../features/drawing/public';
+import { createDrawingSession, resolveDrawingToolCursor } from '../../features/drawing/public';
 import type { ContentDrawingController } from './controller';
 import { DrawingSurface, getDrawingViewportProjection, toDrawingScenePoint } from './surface';
 
@@ -232,7 +232,7 @@ it('shows only two endpoint handles without a dashed selection box for an arrow'
     return event;
   };
   act(() => canvas?.dispatchEvent(endpointEvent('pointerdown')));
-  expect(canvas?.style.cursor).toBe('grabbing');
+  expect(canvas?.style.cursor).toBe('none');
   act(() => canvas?.dispatchEvent(endpointEvent('pointerup')));
   expect(canvas?.style.cursor).toBe('grab');
   act(() => {
@@ -711,7 +711,7 @@ it('commits a speed-sampled pencil object and becomes click-through outside Draw
   const root = createRoot(host);
   act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
   const canvas = host.querySelector('canvas')!;
-  expect(canvas.style.cursor).toBe('crosshair');
+  expect(canvas.style.cursor).toBe(resolveDrawingToolCursor('pencil'));
   const hostPointer = vi.fn();
   const hostClick = vi.fn();
   const hostContextMenu = vi.fn();

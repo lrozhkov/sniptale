@@ -119,9 +119,36 @@ async function verifyStringifiedTabCaptureFailure() {
       },
       deps
     )
-  ).resolves.toBeNull();
+  ).rejects.toMatchObject({ code: 'internal-error' });
 
-  expect(deps.notifyStartFailed).toHaveBeenCalledWith('capture blocked');
+  expect(deps.notifyStartFailed).not.toHaveBeenCalled();
+}
+
+async function verifyUninvokedTabCaptureIsAFailure() {
+  const notifyStartFailed = vi.fn();
+  const deps = createResolveCaptureSourceDeps({
+    getCaptureSource: vi.fn(async () => {
+      throw new Error(
+        'Extension has not been invoked for the current page (see activeTab permission).'
+      );
+    }),
+    notifyStartFailed,
+  });
+
+  await expect(
+    resolveCaptureSource(
+      {
+        captureMode: CaptureMode.TAB,
+        tab: { id: 7 } as chrome.tabs.Tab,
+        tabId: 7,
+      },
+      deps
+    )
+  ).rejects.toMatchObject({ code: 'permission-required' });
+
+  expect(notifyStartFailed).not.toHaveBeenCalledWith(
+    expect.stringContaining('activeTab permission')
+  );
 }
 
 async function verifyScreenCaptureCancellation() {
@@ -213,8 +240,13 @@ describe('resolveCaptureSource', () => {
   it('returns null when area selection is cancelled for TAB_CROP mode', verifyTabCropCancellation);
 
   it(
-    'returns null and forwards stringified tab-capture failures',
+    'returns a coded failure without forwarding raw tab-capture exceptions',
     verifyStringifiedTabCaptureFailure
+  );
+
+  it(
+    'preserves an uninvoked tab-capture denial as a coded failure',
+    verifyUninvokedTabCaptureIsAFailure
   );
 
   it(

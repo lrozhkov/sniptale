@@ -127,3 +127,138 @@ it('places a right callout at the shared anchor gap', async () => {
   const anchorX = Number.parseFloat(root.querySelector<HTMLElement>('.tour-hotspot')!.style.left);
   expect(Number.parseFloat(hint.style.left)).toBe(anchorX + 30);
 });
+
+it.each([320, 640])(
+  'keeps legacy and inherited point captions anchored at width %s',
+  async (width) => {
+    const { player, root } = await mount();
+    const viewport = root.querySelector('[data-tour-viewport]')!;
+    Object.defineProperties(viewport, {
+      clientWidth: { value: width },
+      clientHeight: { value: 360 },
+    });
+    const input = authoringInput();
+    const slide = input.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    const hotspot = slide.hotspots[0]!;
+    const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+    for (const presentation of ['caption-top', 'caption-bottom'] as const) {
+      input.tour.style.textAppearance.presentation = presentation;
+      hotspot.appearance = null;
+      player.update(input);
+      expect(hint.dataset['presentation']).toBe('callout');
+      expect(Number.parseFloat(hint.style.width)).toBeLessThan(width);
+      hotspot.appearance = { presentation, alignment: 'center', placement: 'right' };
+      player.update(input);
+      expect(hint.dataset['presentation']).toBe('callout');
+      expect(hint.style.textAlign).toBe('center');
+      expect(root.querySelector<HTMLElement>('[data-tour-hint-toggle]')!.hidden).toBe(true);
+    }
+  }
+);
+
+it('keeps a legacy anchored annotation at the slide edge independently of the action point', async () => {
+  const { player, root } = await mount();
+  const input = authoringInput();
+  const slide = input.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  slide.annotations = [
+    {
+      id: 'note',
+      text: 'Independent note',
+      anchor: { x: 0.1, y: 0.2 },
+      appearance: { presentation: 'callout', placement: 'left', alignment: 'end' },
+    },
+  ];
+  player.update(input);
+  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+  expect(hint.dataset['presentation']).toBe('callout');
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(hint.dataset['presentation']).toBe('caption-bottom');
+  expect(root.querySelector('[data-tour-hint-text]')!.textContent).toBe('Independent note');
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click();
+  expect(hint.dataset['presentation']).toBe('callout');
+  expect(root.querySelector('[data-tour-hint-text]')!.textContent).toBe('Text');
+});
+
+it.each(['left', 'right', 'top', 'bottom'] as const)(
+  'uses authored callout distance from the point center on %s',
+  async (placement) => {
+    const { player, root } = await mount();
+    const viewport = root.querySelector('[data-tour-viewport]')!;
+    const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 1000 },
+      clientHeight: { value: 700 },
+    });
+    Object.defineProperties(hint, { offsetWidth: { value: 100 }, offsetHeight: { value: 50 } });
+    const input = authoringInput();
+    const slide = input.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    slide.hotspots[0]!.appearance = { presentation: 'callout', alignment: 'start', placement };
+    Object.assign(slide.hotspots[0]!.appearance!, { calloutGap: 80 });
+    player.update(input);
+    const marker = root.querySelector<HTMLElement>('.tour-hotspot')!;
+    const x = Number.parseFloat(marker.style.left);
+    const y = Number.parseFloat(marker.style.top) + (700 - 562.5) / 2;
+    const left = Number.parseFloat(hint.style.left);
+    const top = Number.parseFloat(hint.style.top);
+    expect(
+      placement === 'left'
+        ? x - left - 100
+        : placement === 'right'
+          ? left - x
+          : placement === 'top'
+            ? y - top - 50
+            : top - y
+    ).toBe(80);
+  }
+);
+
+it('inherits global gap, applies a local gap, and restores the default without changing captions', async () => {
+  const { player, root } = await mount();
+  const viewport = root.querySelector('[data-tour-viewport]')!;
+  const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
+  Object.defineProperties(viewport, { clientWidth: { value: 1000 }, clientHeight: { value: 700 } });
+  Object.defineProperties(hint, { offsetWidth: { value: 100 }, offsetHeight: { value: 50 } });
+  const input = authoringInput();
+  const slide = input.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image slide');
+  input.tour.style.hotspotAppearance = {
+    presentation: 'callout',
+    placement: 'right',
+    alignment: 'start',
+    calloutGap: 70,
+  };
+  const markerGap = () =>
+    Number.parseFloat(hint.style.left) -
+    Number.parseFloat(root.querySelector<HTMLElement>('.tour-hotspot')!.style.left);
+  player.update(input);
+  expect(markerGap()).toBe(70);
+  slide.hotspots[0]!.appearance = { ...input.tour.style.hotspotAppearance, calloutGap: 100 };
+  player.update(input);
+  expect(markerGap()).toBe(100);
+  slide.hotspots[0]!.appearance = null;
+  player.update(input);
+  expect(markerGap()).toBe(70);
+  slide.annotations = [
+    {
+      id: 'caption',
+      text: 'Caption',
+      anchor: null,
+      appearance: {
+        presentation: 'caption-bottom',
+        placement: 'auto',
+        alignment: 'start',
+        calloutGap: 0,
+      },
+    },
+  ];
+  player.update(input);
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  const position = { top: hint.style.top, left: hint.style.left };
+  slide.annotations[0]!.appearance!.calloutGap = 120;
+  player.update(input);
+  root.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect({ top: hint.style.top, left: hint.style.left }).toEqual(position);
+});

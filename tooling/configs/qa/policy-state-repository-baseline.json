@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 300,
-  "findingDigest": "sha256:69f71d6b49295b205d5c9749ad4bb149717c1e648c41138b14aa92b17ae2c264",
+  "findingCount": 314,
+  "findingDigest": "sha256:aec05f4a589f9afc3368b38975951ee279b6830ea7df7dd902e05ffc0bf7d24c",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -10,6 +10,104 @@
       "reason": "The exact files match broad state-like syntax signals but were reviewed as non-authoritative local state or test-reset seams; the heuristic cannot establish policy-state authority from syntax alone.",
       "removalCondition": "Remove an exact entry when the state-like signal disappears or the file becomes a registered policy-state authority.",
       "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.composition.persistence.library-lifecycle.trash",
+      "owner": "apps/extension/src/composition/persistence/library-lifecycle/trash.ts",
+      "reason": "The mutation-queue signal is the non-extension fallback scheduler. Trash decisions re-read parsed persistent lifecycle rows inside the existing admitted database owner; the queue grants no authorization or capability.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.composition.persistence.media-library.usage",
+      "owner": "apps/extension/src/composition/persistence/media-library/usage.ts",
+      "reason": "The top-level listener set invalidates an advisory usage cache. Destructive decisions use uncached persistent owner reads; listeners cannot grant persistence or deletion authority.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.composition.persistence.projects.voiceover-publication-lock",
+      "owner": "apps/extension/src/composition/persistence/projects/voiceover-publication-lock.ts",
+      "reason": "The top-level map serializes test/non-extension attachment callbacks. Extension admission uses Web Locks and the existing asset lifecycle owner; the map is not a policy or authorization store.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.content.overlay.design-review.session.comment-draft-finalization",
+      "owner": "apps/extension/src/content/overlay/design-review/session/comment-draft-finalization.ts",
+      "reason": "The active finalizer and listener set track the disposable comment field in one overlay. They invoke the existing session commit callback without storing identities, tokens, permissions, or privileged admission decisions.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.content.selection.interactive-frame.controller.reset-finalization",
+      "owner": "apps/extension/src/content/selection/interactive-frame/controller/reset-finalization.ts",
+      "reason": "The set holds synchronous UI cleanup callbacks ordered for Reset. It neither changes session admission nor grants runtime privileges.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.editor.controller.history.index",
+      "owner": "apps/extension/src/editor/controller/history/index.ts",
+      "reason": "The sets are fixed binary-field allowlists; the WeakMap interns document-local large data URLs for undo snapshots. Policy state and cross-runtime authority are absent.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.editor.controller.history.transition-queue",
+      "owner": "apps/extension/src/editor/controller/history/transition-queue.ts",
+      "reason": "The WeakMap orders document transitions per canvas and releases settled jobs. It stores no permission, identity, token, or cross-runtime admission decision.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.editor.controller.layer-actions.group",
+      "owner": "apps/extension/src/editor/controller/layer-actions/group.ts",
+      "reason": "The set is a constant catalogue of editable drawing object kinds. Group mutations still consume the controller-owned selection and history API; no new policy-state authority exists.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.editor.inspector.layers.helpers",
+      "owner": "apps/extension/src/editor/inspector/layers/helpers.ts",
+      "reason": "The set is the inspector projection of supported drawing object kinds. Pure layer-selection predicates cannot authorize privileged runtime operations.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.settings.sections.general.interface-browser.content.context-menu-draft-recovery",
+      "owner": "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-draft-recovery.ts",
+      "reason": "The queue-name signal matches pending draft storage helpers. This validated page-local settings recovery value uses the canonical persistence mutation barrier and cannot grant capabilities or runtime admission.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "id": "noise.policy-state-descriptor.web-snapshot-viewer.shell.app.asset-opening",
+      "owner": "apps/extension/src/web-snapshot-viewer/shell/app/asset-opening.ts",
+      "reason": "The set is an immutable passive image MIME allowlist, not mutable authority state. SVG bytes still pass through the canonical sanitizer and unknown types become plain text.",
+      "removalCondition": "Remove when this exact signal disappears or the owner acquires policy-state authority requiring a registered descriptor.",
+      "classification": "tool-noise"
+    },
+    {
+      "classification": "tool-noise",
+      "id": "editor-freehand-preview-render-scheduling",
+      "owner": "apps/extension/src/editor/controller/events/runtime.render.ts",
+      "reason": "pendingPreviews is a Canvas-keyed WeakMap of requestAnimationFrame handles used solely to coalesce and cancel disposable presentation work. The callback deletes the entry and rejects disposed/replaced canvas and session instances. Drawing session metadata remains authoritative; no capability or mutation queue is stored.",
+      "removalCondition": "Remove if this map controls authoritative mutations or privileged operations, its lifetime expands beyond canvas presentation, or the detector distinguishes animation-frame scheduling."
+    },
+    {
+      "classification": "tool-noise",
+      "id": "scenario-annotation-immutable-admission-sets",
+      "owner": "apps/extension/src/editor/document/scenario-annotation-import.ts",
+      "reason": "SCENARIO_KINDS and SCENARIO_FIELDS are fixed admission membership tables. They are only queried with has and never mutated after construction; they carry no session or capability authority.",
+      "removalCondition": "Remove if either set becomes runtime-mutable authority, the exact finding disappears after implementation changes, or the detector recognizes immutable membership tables."
+    },
+    {
+      "classification": "tool-noise",
+      "id": "platform-intl-advisory-formatter-cache",
+      "owner": "packages/platform/src/i18n/format.ts",
+      "reason": "numberFormatters and dateFormatters are advisory caches of Intl formatter instances, capped at 64 entries each and rebuilt on misses. Keys include locale/options and the date local-zone signature; unsafe-to-cache options bypass memoization. Discarding entries changes construction cost rather than domain authority.",
+      "removalCondition": "Remove if cached values become correctness or privilege authority, payload/lifetime changes invalidate this assessment, or the detector distinguishes advisory formatter memoization."
     }
   ],
   "findings": [
@@ -596,16 +694,34 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/trash.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.composition.persistence.library-lifecycle.trash"
+    },
+    {
       "file": "apps/extension/src/composition/persistence/media-library/read-guards.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/composition/persistence/media-library/usage.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.composition.persistence.media-library.usage"
+    },
+    {
       "file": "apps/extension/src/composition/persistence/privacy-erasure/page-local-storage.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/projects/voiceover-publication-lock.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.composition.persistence.projects.voiceover-publication-lock"
     },
     {
       "file": "apps/extension/src/composition/persistence/prompt-templates/index.ts",
@@ -746,6 +862,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/content/overlay/design-review/session/comment-draft-finalization.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name, top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.content.overlay.design-review.session.comment-draft-finalization"
+    },
+    {
       "file": "apps/extension/src/content/overlay/video-recording/transport/snapshot-channel.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -876,6 +998,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/content/selection/interactive-frame/controller/reset-finalization.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.content.selection.interactive-frame.controller.reset-finalization"
     },
     {
       "file": "apps/extension/src/content/selection/page-element-target/index.ts",
@@ -1034,6 +1162,30 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/editor/controller/events/runtime.render.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "editor-freehand-preview-render-scheduling"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/history/index.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.editor.controller.history.index"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/history/transition-queue.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.editor.controller.history.transition-queue"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/layer-actions/group.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.editor.controller.layer-actions.group"
+    },
+    {
       "file": "apps/extension/src/editor/controller/layer-effects/registry.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1064,6 +1216,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/editor/document/scenario-annotation-import.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "scenario-annotation-immutable-admission-sets"
+    },
+    {
       "file": "apps/extension/src/editor/frame-annotation/creation-defaults.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1074,6 +1232,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/layers/helpers.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.editor.inspector.layers.helpers"
     },
     {
       "file": "apps/extension/src/editor/inspector/tools/rich-shape/capabilities.ts",
@@ -1502,6 +1666,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/settings/sections/general/interface-browser/content/context-menu-draft-recovery.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.settings.sections.general.interface-browser.content.context-menu-draft-recovery"
+    },
+    {
       "file": "apps/extension/src/settings/sections/styles/annotations/borders/persistence.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
@@ -1568,6 +1738,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/web-snapshot-viewer/shell/app/asset-opening.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.web-snapshot-viewer.shell.app.asset-opening"
+    },
+    {
       "file": "apps/extension/src/web-snapshot-viewer/viewer/assets.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1602,6 +1778,12 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "packages/platform/src/i18n/format.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "platform-intl-advisory-formatter-cache"
     },
     {
       "file": "packages/platform/src/observability/diagnostics/sanitizer.core.ts",

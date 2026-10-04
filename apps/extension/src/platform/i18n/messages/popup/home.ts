@@ -38,7 +38,7 @@ export const popupHomeMessages = defineMessageSource({
     ru: 'Настроить и начать запись текущей вкладки',
     en: 'Configure and start recording the current tab',
   },
-  workspaceTitle: { ru: 'Рабочее пространство', en: 'Workspace' },
+  workspaceTitle: { ru: 'Приложения', en: 'Applications' },
   libraryLabel: { ru: 'Библиотека', en: 'Library' },
   libraryTitle: { ru: 'Открыть библиотеку', en: 'Open library' },
   videoEditorLabel: { ru: 'Редактор видео', en: 'Video editor' },

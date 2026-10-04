@@ -5,9 +5,9 @@ This file projects changeable values and inventories from their existing machine
 
 | Fact | Current projection | Machine authority |
 | --- | --- | --- |
-| Product version | `0.4.2` | `package.json#/version` |
+| Product version | `0.5.0` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
-| Persistence database version | `3` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
+| Persistence database version | `4` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
@@ -42,6 +42,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
 - `apps/extension/src/composition/gradient-preset-resources`
+- `apps/extension/src/composition/inspector-disclosures`
 - `apps/extension/src/composition/library-preview`
 - `apps/extension/src/composition/persistence/aggregate-presentations`
 - `apps/extension/src/composition/persistence/ai-settings`
@@ -66,6 +67,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/image-aggregates`
 - `apps/extension/src/composition/persistence/image-workspaces`
 - `apps/extension/src/composition/persistence/infrastructure`
+- `apps/extension/src/composition/persistence/inspector-disclosures`
 - `apps/extension/src/composition/persistence/library-lifecycle`
 - `apps/extension/src/composition/persistence/managed-preset-order`
 - `apps/extension/src/composition/persistence/media-library`
@@ -100,6 +102,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/features/ai`
 - `apps/extension/src/features/drawing`
 - `apps/extension/src/features/editor`
+- `apps/extension/src/features/file-naming`
 - `apps/extension/src/features/highlighter`
 - `apps/extension/src/features/keyboard-shortcuts`
 - `apps/extension/src/features/media-hub`
@@ -122,6 +125,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/command-palette`
 - `apps/extension/src/ui/compact-inspector-controls`
 - `apps/extension/src/ui/drawing-tools`
+- `apps/extension/src/ui/editor-start`
 - `apps/extension/src/ui/effect-catalog-controls.test.tsx`
 - `apps/extension/src/ui/effect-catalog-controls.tsx`
 - `apps/extension/src/ui/effect-catalog-preview-session.ts`
@@ -141,10 +145,12 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`
 - `apps/extension/src/workflows/editor`
+- `apps/extension/src/workflows/file-naming`
 - `apps/extension/src/workflows/media-hub`
 - `apps/extension/src/workflows/media-hub-backup`
 - `apps/extension/src/workflows/page-package`
 - `apps/extension/src/workflows/page-preparation`
+- `apps/extension/src/workflows/project-covers`
 - `apps/extension/src/workflows/scenario-capture-edit`
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/video`

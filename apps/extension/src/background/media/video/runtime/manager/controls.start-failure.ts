@@ -17,6 +17,7 @@ import {
 } from '../session-state';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
 import { cancelVideoSourceReadyWait, releaseVideoCaptureSurface } from '../../capture-surface';
+import type { VideoRecordingStartFailureCode } from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 const logger = createLogger({ namespace: 'BackgroundVideoRuntimeControls' });
 
@@ -44,9 +45,15 @@ function disableControlledCursorCapture(tabId: number): void {
 
 export async function notifyRecordingStartFailed(
   error: string,
-  options: { recordingId?: string; retainAuthority?: boolean } = {}
+  options: {
+    diagnosticCode?: VideoRecordingStartFailureCode;
+    recordingId?: string;
+    retainAuthority?: boolean;
+  } = {}
 ): Promise<void> {
-  logger.error('Recording start failed', error);
+  logger.error('Recording start failed', {
+    code: options.diagnosticCode ?? 'internal-error',
+  });
   const recordingId = options.recordingId ?? getVideoRecordingId();
   if (options.recordingId && !isCurrentVideoRecordingId(options.recordingId)) {
     logger.warn('Ignoring stale recording start failure', { recordingId: options.recordingId });

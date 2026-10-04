@@ -10,7 +10,8 @@ const io = vi.hoisted(() => ({
   finish: vi.fn(),
   publish: vi.fn(),
 }));
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   SCENARIO_PROJECTS_STORE: 'projects',
   SCENARIO_ASSETS_STORE: 'assets',
   SCENARIO_STEP_EDITOR_DOCUMENTS_STORE: 'documents',

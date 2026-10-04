@@ -245,3 +245,131 @@ it('preserves an off-scene handle coordinate when committing its existing value'
     sceneAnchors: { [handle.id]: { x: -150, y: 900 } },
   });
 });
+
+it('renders promoted advanced controls without a duplicate disclosure', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
+  const fixtureSource = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+    'utf8'
+  );
+  const document = JSON.parse(fixtureSource);
+  document.controls.at(-1).group = 'advanced';
+  const source = JSON.stringify(document);
+  const parsed = parseEffectV1Source(source);
+  if (!parsed.document) throw new Error('Expected callout fixture');
+  const handle = parsed.document.objectLayout!.handles![0]!;
+  const project = createEmptyVideoProject('Handle');
+  project.effectSnapshots = [
+    {
+      id: 'snapshot',
+      documentId: parsed.document.id,
+      kind: 'standalone',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(source).length,
+      schemaVersion: 'sniptale.effect.v1',
+      sha256: '0'.repeat(64),
+      source,
+    },
+  ];
+  project.effectInstances = [
+    {
+      id: 'callout',
+      kind: 'standalone',
+      snapshotId: 'snapshot',
+      enabled: true,
+      controls: {},
+      duration: 3,
+      playbackRate: 1,
+      startTime: 0,
+      target: { kind: 'scene' },
+      sceneAnchors: { [handle.id]: { x: -120, y: 900 } },
+    },
+  ];
+  const update = vi.fn();
+  act(() =>
+    root.render(
+      createEffectInstanceGroups({
+        project,
+        instanceId: 'callout',
+        target: { kind: 'scene' },
+        onUpdateEffectInstance: update,
+        onDeleteEffectInstance: vi.fn(),
+        onDuplicateEffectInstance: vi.fn(() => null),
+        onMoveEffectInstance: vi.fn(),
+      }).map((group) => (
+        <div key={group.id} data-semantic={group.semantic}>
+          {group.content}
+        </div>
+      ))
+    )
+  );
+  const advanced = container.querySelector('[data-semantic="advanced"]')!;
+  expect(advanced).not.toBeNull();
+  expect(advanced.querySelector('details')).toBeNull();
+  expect(advanced.querySelector('input,button')).not.toBeNull();
+});
+
+it('keeps target-effect parameters out of global navigation and disclosures independent', async () => {
+  const { InspectorDisclosurePreferences } =
+    await import('../../../../../composition/inspector-disclosures/state');
+  const { createInspectorDisclosureStore } =
+    await import('../../../../../composition/persistence/inspector-disclosures/store');
+  const project = createEmptyVideoProject('Nested effects');
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-video-blur.sniptale-effect.json',
+    'utf8'
+  );
+  project.effectSnapshots = [
+    {
+      id: 'blur',
+      documentId: 'sniptale-video-blur',
+      kind: 'targetEffect',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(source).length,
+      schemaVersion: 'sniptale.effect.v1',
+      sha256: '0'.repeat(64),
+      source,
+    },
+  ];
+  project.effectInstances = ['first', 'second'].map((id) => ({
+    id,
+    kind: 'targetEffect',
+    snapshotId: 'blur',
+    enabled: true,
+    controls: {},
+    duration: 2,
+    playbackRate: 1,
+    startTime: 0,
+    target: { kind: 'track', trackId: project.tracks[0]!.id },
+  }));
+  const groups = createEffectInstanceGroups({
+    project,
+    target: { kind: 'track', trackId: project.tracks[0]!.id },
+    onDeleteEffectInstance: vi.fn(),
+    onDuplicateEffectInstance: vi.fn(() => null),
+    onMoveEffectInstance: vi.fn(),
+    onUpdateEffectInstance: vi.fn(),
+  });
+  expect(groups.map((group) => group.id)).toEqual(['effect-v1']);
+  await act(async () =>
+    root.render(
+      <InspectorDisclosurePreferences scope="video:track" store={createInspectorDisclosureStore()}>
+        {groups[0]!.content}
+      </InspectorDisclosurePreferences>
+    )
+  );
+  const disclosures = container.querySelectorAll('details');
+  expect(disclosures).toHaveLength(2);
+  expect(disclosures[0]!.open).toBe(true);
+  expect(disclosures[1]!.open).toBe(true);
+  await act(async () => {
+    disclosures[0]!.open = false;
+    disclosures[0]!.dispatchEvent(new Event('toggle'));
+  });
+  expect(disclosures[0]!.open).toBe(false);
+  expect(disclosures[1]!.open).toBe(true);
+  expect(disclosures[1]!.querySelector('input')).not.toBeNull();
+  expect(disclosures[1]!.textContent).toContain('Радиус размытия');
+});

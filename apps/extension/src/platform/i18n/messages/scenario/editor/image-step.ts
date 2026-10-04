@@ -1,4 +1,8 @@
 export const scenarioEditorImageStepMessages = {
+  guideImageOverview: {
+    ru: 'Обзор изображения: переместить видимую область',
+    en: 'Image overview: move visible area',
+  },
   addImage: {
     ru: 'Добавить изображение',
     en: 'Add image',

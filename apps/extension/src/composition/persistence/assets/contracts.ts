@@ -95,5 +95,8 @@ export interface AssetReadyJournal<TPayload = unknown> {
 
 export interface AssetPublicationAdapter {
   domain: string;
-  publish(journal: AssetReadyJournal): Promise<void>;
+  publish(
+    journal: AssetReadyJournal,
+    lifecyclePermit?: import('../infrastructure/mutation-barrier').DurableAssetLifecyclePermit
+  ): Promise<void | 'defer'>;
 }

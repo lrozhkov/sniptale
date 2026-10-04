@@ -1,3 +1,4 @@
+import { createEditorSceneMutationCallbacks } from '../../public-api/scene-actions/callbacks';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import type { EditorControllerInstance } from '../types';
 import {
@@ -8,6 +9,7 @@ import {
   previewEditorCanvasSizeSelection,
 } from '../../crop-workflow';
 import { applyEditorViewportZoom } from '../../viewport';
+import { useEditorStore } from '../../../state/useEditorStore';
 
 const logger = createLogger({ namespace: 'EditorCrop' });
 
@@ -37,6 +39,7 @@ export function previewCanvasSizeForController(
     canvasDocumentSize: controller.canvasDocumentSize,
     width,
     height,
+    mode: useEditorStore.getState().canvasCropMode,
   });
   if (!nextState) {
     return;
@@ -77,6 +80,7 @@ export function cancelCropModeForController(controller: EditorControllerInstance
 
   controller.drawSession = nextState.drawSession;
   controller.cropSelection = nextState.cropSelection;
+  useEditorStore.getState().setCanvasCropMode('crop');
 }
 
 export async function applyCropSelectionForController(
@@ -107,7 +111,10 @@ export async function applyCropSelectionForController(
       );
     },
     switchToSelectTool: () => controller.switchToSelectTool(),
-    rebuildFrameDecorations: () => controller.rebuildFrameDecorations(),
+    rebuildFrameDecorations: () =>
+      createEditorSceneMutationCallbacks(
+        controller.getPublicApiAdapter()
+      ).rebuildFrameDecorations(),
     commitHistory: () => controller.commitHistory(),
     logCrop: (stage, payload) => logger.debug(stage, payload),
   });
@@ -117,4 +124,5 @@ export async function applyCropSelectionForController(
 
   controller.cropGuide = nextState.cropGuide;
   controller.cropSelection = nextState.cropSelection;
+  useEditorStore.getState().setCanvasCropMode('crop');
 }

@@ -57,7 +57,10 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const pointer = (type: string, x: number) => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
     Object.defineProperty(event, 'pointerId', { value: 1 });
-    plane.dispatchEvent(event);
+    (type === 'pointerdown'
+      ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+      : plane
+    ).dispatchEvent(event);
   };
   await act(async () => pointer('pointerdown', start));
   if (end !== undefined) await act(async () => pointer('pointermove', end));
@@ -96,31 +99,50 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await dragTimePlane(fixture.host, 0, 100);
     await act(async () =>
       fixture.host
-        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.cutLabel 0.0 – 1.0"]')!
+        .querySelector<HTMLButtonElement>(
+          '[aria-label^="gallery.videoReview.cutLabel · 0.0 – 1.0"]'
+        )!
         .click()
     );
     await fixture.click('pointerTool');
     await dragTimePlane(fixture.host, 200, 200);
     await fixture.click('zoomAdd');
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.button('exportVideo').disabled).toBe(false);
     const target = () => fixture.host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]');
     const preview = fixture.host.querySelector<HTMLCanvasElement>(
       '[data-ui="gallery.videoReview.zoomPreview"] canvas'
     )!;
     expect(target()).not.toBeNull();
     expect(preview.tabIndex).toBe(0);
+    await fixture.click('exportSection');
+    expect(fixture.button('exportVideo').disabled).toBe(false);
     await fixture.click('exportVideo');
     expect(integration.export).toHaveBeenCalledOnce();
     expect(target()).toBeNull();
-    expect(preview.tabIndex).toBe(-1);
+    await act(async () =>
+      fixture.host
+        .querySelector<HTMLElement>(
+          '[data-ui="gallery.videoReview.zoomLane"] [role="button"][data-cut-suppressed]'
+        )!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    const disabledPreview = fixture.host.querySelector<HTMLCanvasElement>(
+      '[data-ui="gallery.videoReview.zoomPreview"] canvas'
+    )!;
+    expect(disabledPreview.tabIndex).toBe(-1);
+    expect(target()).toBeNull();
+    expect(fixture.button('exportSection').disabled).toBe(false);
+    await fixture.click('exportSection');
+    expect(fixture.button('cancelExport').disabled).toBe(false);
     expect(fixture.button('undo').disabled).toBe(true);
     for (const label of ['advancedEditing', 'zoomTrack', 'audioTrack'])
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();
     await act(async () =>
-      preview.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      disabledPreview.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
+      )
     );
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(integration.commit).not.toHaveBeenCalled();
@@ -135,5 +157,59 @@ it('blocks history and destructive shortcuts while the export controls are disab
   } finally {
     await act(async () => fail?.(new Error('Cancelled test export')));
     await fixture.cleanup();
+  }
+});
+
+it('marks the export opener active only while its inspector panel is shown', async () => {
+  vi.useFakeTimers();
+  const fixture = createEditorFixture(integration);
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    vi.useRealTimers();
+    await fixture.click('exportSection');
+    const opener = fixture.host.querySelector('[data-ui="gallery.videoReview.openExport"]')!;
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"]')
+    ).not.toBeNull();
+    expect(opener.getAttribute('aria-pressed')).toBe('true');
+    const navigation = fixture.host.querySelector(
+      '[data-ui="gallery.videoReview.inspectorNavigation"]'
+    )!;
+    const tabs = () => Array.from(navigation.querySelectorAll<HTMLButtonElement>('button'));
+    expect(tabs()).toHaveLength(3);
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"] h3')
+    ).toBeNull();
+    const history = fixture.snapshot.workspace.history;
+    for (const section of ['scene', 'comments', 'exportSection']) {
+      await act(async () =>
+        tabs()
+          .find((node) => node.textContent === `gallery.videoReview.${section}`)!
+          .click()
+      );
+      expect(opener.getAttribute('aria-pressed')).toBe(
+        section === 'exportSection' ? 'true' : 'false'
+      );
+    }
+    expect(fixture.snapshot.workspace.history).toEqual(history);
+    await fixture.click('zoomAdd');
+    expect(opener.getAttribute('aria-pressed')).toBe('false');
+    expect(tabs()).toHaveLength(3);
+    expect(tabs().some((node) => node.textContent === 'gallery.videoReview.exportSection')).toBe(
+      false
+    );
+    expect(tabs().some((node) => node.textContent === 'gallery.videoReview.zoomRegionLabel')).toBe(
+      true
+    );
+    await act(async () => opener.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(opener.getAttribute('aria-pressed')).toBe('true');
+    expect(tabs()).toHaveLength(3);
+  } finally {
+    await fixture.cleanup();
+    vi.useRealTimers();
   }
 });

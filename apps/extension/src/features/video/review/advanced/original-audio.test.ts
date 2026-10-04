@@ -58,6 +58,7 @@ describe('source audio automation', () => {
       requestedEnd: 8,
     };
     expect(canPlaceOriginalAudioRange(range, [], [cut], 10)).toBe(false);
+    expect(canPlaceOriginalAudioRange(range, [range], [cut], 10, range.id)).toBe(true);
     expect(canPlaceOriginalAudioRange({ start: 3, end: 8 }, [], [cut], 10)).toBe(true);
   });
   it('processes only audio for gain edits and does not reencode video merely for an empty enabled focus lane', () => {

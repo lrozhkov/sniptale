@@ -74,14 +74,14 @@ function createUtilityButtonsProps(args: {
     isCursorMode: args.interactionMode === 'cursor',
     highlighterMode: args.interactionMode === 'highlighter',
     isLoading: args.viewModel.derivedState.isLoading,
-    framesCount: args.toolbarProps.framesCount ?? 0,
     navigationLockEnabled: args.viewModel.derivedState.navigationLockEnabled,
     lockDisabled: args.viewModel.derivedState.lockDisabled,
     toggleNavigationLock: args.viewModel.derivedState.toggleNavigationLock,
-    onClearHighlights: args.toolbarProps.onClearHighlights,
     toolbarMenuState: args.viewModel.toolbarMenuState,
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
+    freePlacement: args.viewModel.derivedState.freePlacement,
+    onFreePlacementChange: args.viewModel.derivedState.setFreePlacement,
     sidebarVisible: args.toolbarProps.scenario?.sidebarVisible ?? false,
     ...(args.toolbarProps.autoBlur === undefined ? {} : { autoBlur: args.toolbarProps.autoBlur }),
     ...(args.toolbarProps.futureFrameStyle === undefined ||
@@ -101,6 +101,7 @@ function createUtilityButtonsProps(args: {
 }
 
 function createCaptureActionProps(args: {
+  interactionMode: ReturnType<typeof resolveEffectiveInteractionMode>;
   onViewportChange: (viewport: { width: number; height: number } | null) => void;
   scenarioCaptureProps: ToolbarProps['scenario'] | undefined;
   toolbarProps: ToolbarProps;
@@ -108,10 +109,19 @@ function createCaptureActionProps(args: {
 }) {
   return {
     screenshotMode: args.viewModel.screenshotMode,
+    videoRecordingMode: args.toolbarProps.videoRecordingMode ?? false,
+    isNavigationMode:
+      args.interactionMode === 'cursor' &&
+      !args.toolbarProps.drawingMode &&
+      !args.viewModel.designReviewMode &&
+      !args.toolbarProps.videoRecordingMode,
+    autoBlurEnabled: args.toolbarProps.autoBlur?.autoApplyEnabled ?? false,
     isLoading: args.viewModel.derivedState.isLoading,
     captureAction: args.viewModel.capture.action,
     compactMenus: args.viewModel.derivedState.compactMenus,
     displayMode: args.viewModel.derivedState.displayMode,
+    freePlacement: args.viewModel.derivedState.freePlacement,
+    onFreePlacementChange: args.viewModel.derivedState.setFreePlacement,
     pinToTab: args.toolbarProps.pinToTab ?? false,
     pinToTabAvailable: args.toolbarProps.pinToTabAvailable ?? false,
     pinToTabLocked: args.toolbarProps.pinToTabLocked ?? false,
@@ -120,12 +130,20 @@ function createCaptureActionProps(args: {
     onPinToTabChange: args.toolbarProps.onPinToTabChange ?? (() => undefined),
     onCaptureActionChange: args.viewModel.capture.setAction,
     onClose: args.toolbarProps.onHide,
+    ...(args.toolbarProps.onClearPagePreparation === undefined
+      ? {}
+      : { onClearPagePreparation: args.toolbarProps.onClearPagePreparation }),
+    canClearPagePreparation: args.toolbarProps.canClearPagePreparation ?? false,
+    resetScope: args.toolbarProps.resetScope ?? 'all',
     onDisableScreenshotMode: (activationEvent?: Event) => {
       void args.viewModel.toggleMode('screenshot', activationEvent);
     },
     timerDelay: args.toolbarProps.timerDelay,
     onTimerDelayChange: args.toolbarProps.onTimerDelayChange,
-    currentViewport: args.viewModel.derivedState.currentViewport,
+    ...(args.toolbarProps.windowSize ? { windowSize: args.toolbarProps.windowSize } : {}),
+    currentViewport: args.toolbarProps.windowSize?.onlyDuringCapture
+      ? args.toolbarProps.windowSize.selection
+      : args.viewModel.derivedState.currentViewport,
     onViewportChange: args.onViewportChange,
     toolbarMenuState: args.viewModel.toolbarMenuState,
     onTakeScreenshot: args.toolbarProps.onTakeScreenshot,
@@ -147,6 +165,7 @@ function createSecondaryControlsRenderState(props: {
   return {
     interactionMode,
     captureActionProps: createCaptureActionProps({
+      interactionMode,
       onViewportChange: props.onViewportChange,
       scenarioCaptureProps,
       toolbarProps: props.toolbarProps,
@@ -169,6 +188,8 @@ export function ToolbarSecondaryControls(props: {
       <ToolbarVideoRecordingControls
         compactMenus={viewModel.derivedState.compactMenus}
         displayMode={viewModel.derivedState.displayMode}
+        freePlacement={viewModel.derivedState.freePlacement}
+        onFreePlacementChange={viewModel.derivedState.setFreePlacement}
         onCollapse={toolbarProps.onHide}
         onCompactMenusChange={viewModel.derivedState.setCompactMenus}
         onDisplayModeChange={viewModel.derivedState.setDisplayMode}

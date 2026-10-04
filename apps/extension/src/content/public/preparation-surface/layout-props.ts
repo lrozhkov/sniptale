@@ -64,6 +64,7 @@ export function projectPreparationScenario(
       applyCaptureAction: scenarioController.applyCaptureAction,
       createProject: scenarioController.createProject,
       deleteRecentStep: scenarioController.deleteRecentStep,
+      finishRecording: scenarioController.finishRecording,
       handleScreenshotModeDisabled: scenarioController.handleScreenshotModeDisabled,
       moveRecentStep: scenarioController.moveRecentStep,
       openEditor: scenarioController.openEditor,

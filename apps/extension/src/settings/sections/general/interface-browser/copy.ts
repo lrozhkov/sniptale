@@ -1,5 +1,5 @@
 import { SUPPORTED_LOCALES, translate, type AppLocale } from '../../../../platform/i18n';
-import type { ContextMenuSettings } from '../../../../contracts/settings';
+import type { ContextMenuItemKey } from '../../../../contracts/settings/context-menu-layout';
 import type { PopupStartupSelection } from '../../../../composition/persistence/capture-settings/popup-startup';
 
 export function buildPopupStartupOptions(locale: AppLocale): Array<{
@@ -18,6 +18,7 @@ export function buildPopupStartupOptions(locale: AppLocale): Array<{
     'tools',
     'export:download',
     'export:library',
+    'export:html',
   ];
   return values.map((value) => ({
     value,
@@ -53,7 +54,7 @@ export function buildAppearanceLocaleOptions(locale: AppLocale) {
 }
 
 export function buildAppearanceContextMenuOptions(locale: AppLocale): Array<{
-  key: Exclude<keyof ContextMenuSettings, 'enabled'>;
+  key: ContextMenuItemKey;
   label: string;
 }> {
   return [

@@ -62,7 +62,7 @@ it('renders binary header toggles as compact option rows', () => {
 });
 
 it('exports stable primary and secondary button class names', () => {
-  expect(primaryPanelButtonClassName).toContain('rounded-[12px]');
+  expect(primaryPanelButtonClassName).toContain('rounded-[var(--sniptale-radius-sm)]');
   expect(primaryPanelButtonClassName).toContain('disabled:opacity-50');
   expect(secondaryPanelButtonClassName).toContain('border-none');
   expect(secondaryPanelButtonClassName).toContain(
@@ -79,6 +79,6 @@ it('omits the value badge when a panel section has no value', () => {
 
   expect(markup).toContain('Background');
   expect(markup).toContain('rounded-[14px]');
-  expect(markup).toContain('text-[12px] font-bold uppercase');
+  expect(markup).not.toContain('uppercase');
   expect(markup).not.toContain('tracking-[0.14em]');
 });

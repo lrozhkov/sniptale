@@ -32,9 +32,9 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
   loadSettings: loadSettingsMock,
 }));
 
-vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/foundation/utils/filename')>()),
-  generateFilename: generateFilenameMock,
+vi.mock('../../../workflows/file-naming/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/file-naming/index')>()),
+  createScreenshotFilename: generateFilenameMock,
 }));
 
 vi.mock('../../media-hub/assets', async (importOriginal) => ({
@@ -271,7 +271,11 @@ it('prepares capture action settings and delivers the resulting response', async
   await flushPromises();
 
   expect(loadSettingsMock).toHaveBeenCalled();
-  expect(generateFilenameMock).toHaveBeenCalledWith('visible', 'png');
+  expect(generateFilenameMock).toHaveBeenCalledWith(
+    'visible',
+    'png',
+    expect.objectContaining({ imageFormat: 'png' })
+  );
   expect(sendResponse).toHaveBeenCalledWith({
     success: true,
     dataUrl: 'data:image/png;base64,10',

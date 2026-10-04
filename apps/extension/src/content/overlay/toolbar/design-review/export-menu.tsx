@@ -84,7 +84,7 @@ function AnnotationExportDropdown(
             <ProductToolbarMenuItem
               key={option.action}
               dataUi={`content.toolbar.annotation-export.${option.action}`}
-              disabled={props.busyAction !== null}
+              disabled={props.disabled || props.busyAction !== null}
               onClick={(event) => props.onSelect(option.action, event)}
               onMouseDown={preventToolbarMenuClick}
             >
@@ -100,7 +100,7 @@ function AnnotationExportDropdown(
           <ProductToolbarMenuItem
             className="min-w-0 flex-1"
             dataUi="content.toolbar.annotation-export.export-page"
-            disabled={props.busyAction !== null}
+            disabled={props.disabled || props.busyAction !== null}
             onClick={(event) => props.onSelect('export-page', event)}
             onMouseDown={preventToolbarMenuClick}
           >
@@ -114,7 +114,7 @@ function AnnotationExportDropdown(
             type="button"
             className="sniptale-btn shrink-0"
             data-ui="content.toolbar.annotation-export.configure-export"
-            disabled={props.busyAction !== null}
+            disabled={props.disabled || props.busyAction !== null}
             aria-label={translate('content.toolbar.annotationExportConfigureLabel')}
             title={translate('content.toolbar.annotationExportConfigureHint')}
             style={{ alignSelf: 'stretch', height: 'auto', minWidth: 38, padding: 0 }}
@@ -146,11 +146,11 @@ function getErrorMessage(action: ToolbarAnnotationExportAction): string {
 export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const busyRef = useRef(false);
   const [busyAction, setBusyAction] = useState<ToolbarAnnotationExportAction | null>(null);
   const open = props.toolbarMenuState.activeMenuType === 'annotations-export';
   const closeMenu = useCallback(() => {
     props.toolbarMenuState.closeMenu('annotations-export');
-    queueMicrotask(() => triggerRef.current?.focus());
   }, [props.toolbarMenuState]);
   const closeMenuWithoutFocus = useCallback(() => {
     props.toolbarMenuState.closeMenu('annotations-export');
@@ -172,7 +172,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
   const handleSelect = useCallback(
     (action: ToolbarAnnotationExportAction, event: React.MouseEvent<HTMLButtonElement>) => {
       preventToolbarMenuClick(event);
-      if (busyAction !== null) return;
+      if (props.disabled || busyRef.current) return;
 
       const contentIntentSource = createTrustedContentActionIntentSource(event.nativeEvent);
       if (!contentIntentSource) {
@@ -180,6 +180,7 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         return;
       }
 
+      busyRef.current = true;
       setBusyAction(action);
       void executeToolbarAnnotationExportAction(action, contentIntentSource)
         .then(() => {
@@ -190,10 +191,11 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
           showToast(getErrorMessage(action), 'error');
         })
         .finally(() => {
+          busyRef.current = false;
           setBusyAction(null);
         });
     },
-    [busyAction, closeMenuAfterAction]
+    [props.disabled, closeMenuAfterAction]
   );
 
   return (
@@ -205,7 +207,8 @@ export function AnnotationExportMenu(props: AnnotationExportMenuProps) {
         aria-haspopup="menu"
         data-menu-open={open ? 'true' : 'false'}
         dataUi="content.toolbar.annotation-export-button"
-        disabled={props.disabled}
+        disabled={props.disabled || busyAction !== null}
+        aria-busy={busyAction !== null}
         menuIndicator
         onClick={(event) => {
           event.stopPropagation();

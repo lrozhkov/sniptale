@@ -112,13 +112,18 @@ it('adds optional blocks and supports image block copy, move and removal', () =>
   expect(new Set(step.blocks.map((block) => block.id)).size).toBe(3);
 });
 
-it('creates empty optional steps and unnumbered sections', () => {
+it('creates editable steps and unnumbered sections', () => {
   const project = applyGuideStructureOperation(createGuideProject('Empty'), {
     kind: 'add-section',
   });
   const next = applyGuideStructureOperation(project, { kind: 'add-step' });
   expect(next.items[0]).toMatchObject({ kind: 'section', title: '' });
-  expect(next.items[1]).toMatchObject({ kind: 'step', title: '', showNumber: true, blocks: [] });
+  expect(next.items[1]).toMatchObject({
+    kind: 'step',
+    title: '',
+    showNumber: true,
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('') }],
+  });
 });
 
 it('rejects missing targets, invalid boundaries and crossing a section while preserving input', () => {
@@ -591,4 +596,76 @@ it('uses in-step ordering when transfer source and destination are the same', ()
     beforeBlockId: 'text',
   });
   expect(next.items[1]).toMatchObject({ blocks: [{ id: 'image' }, { id: 'text' }] });
+});
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'keeps target caption alignment %s when filling a slot and replacing its image',
+  (captionAlignment) => {
+    const source = applyGuideStructureOperation(fixture(), {
+      kind: 'add-block',
+      itemId: 'second',
+      blockKind: 'image-slot',
+    });
+    const first = source.items[1];
+    const second = source.items[2];
+    if (first?.kind !== 'step' || second?.kind !== 'step') throw new Error('Missing steps');
+    const image = first.blocks[1];
+    const slot = second.blocks[1];
+    if (image?.kind !== 'image' || slot?.kind !== 'image-slot') throw new Error('Missing images');
+    image.captionAlignment = captionAlignment === 'end' ? 'start' : 'end';
+    if (captionAlignment !== undefined) slot.captionAlignment = captionAlignment;
+    const original = structuredClone(source);
+    let current = source;
+    for (let replacement = 0; replacement < 2; replacement++) {
+      current = applyGuideStructureOperation(current, {
+        kind: 'place-image',
+        sourceBlockId: image.id,
+        itemId: second.id,
+        blockId: slot.id,
+      });
+      const item = current.items[2];
+      const target = item?.kind === 'step' ? item.blocks[1] : undefined;
+      expect(target).toMatchObject({ kind: 'image', id: slot.id, frame: slot.frame });
+      if (target?.kind !== 'image') throw new Error('Expected target image');
+      expect(target.captionAlignment).toBe(captionAlignment);
+      expect(Object.hasOwn(target, 'captionAlignment')).toBe(captionAlignment !== undefined);
+    }
+    expect(source).toEqual(original);
+  }
+);
+
+it('adds a complete frameless step atomically without changing existing media or content', () => {
+  const source = fixture();
+  const before = structuredClone(source);
+  const next = applyGuideStructureOperation(source, {
+    kind: 'add-step',
+    title: 'Explain the result',
+    description: 'First line\nSecond line',
+  });
+  expect(next.items.slice(0, -1)).toEqual(source.items);
+  expect(next.items.at(-1)).toMatchObject({
+    kind: 'step',
+    title: 'Explain the result',
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('First line\nSecond line') }],
+  });
+  const added = next.items.at(-1)!;
+  expect(added.kind === 'step' && added.blocks).toHaveLength(1);
+  expect(source).toEqual(before);
+  expect(applyGuideStructureOperation(source, { kind: 'add-step' }).items.at(-1)).toMatchObject({
+    title: '',
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('') }],
+  });
+});
+
+it('rejects invalid frameless content without partially inserting the step', () => {
+  const source = fixture();
+  const before = structuredClone(source);
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'add-step',
+      title: 'x'.repeat(GUIDE_LIMITS.maxLabelLength + 1),
+      description: 'Body',
+    })
+  ).toThrow('Guide content limits exceeded.');
+  expect(source).toEqual(before);
 });

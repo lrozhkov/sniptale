@@ -23,7 +23,7 @@ vi.mock('../../platform/media-utils/image-thumbnail', () => ({
 
 beforeEach(() => vi.clearAllMocks());
 
-it('flushes, commits presentation, and promotes in durable revision order', async () => {
+it('saves, commits presentation, and promotes in durable revision order', async () => {
   const order: string[] = [];
   mocks.commit.mockImplementation(async () => void order.push('commit'));
   mocks.promote.mockImplementation(async () => void order.push('promote'));
@@ -32,7 +32,7 @@ it('flushes, commits presentation, and promotes in durable revision order', asyn
   await promoteEditorImageToLibrary({
     aggregateId: 'image-1',
     port: {
-      flushAutosave: async (serialize) => {
+      saveNow: async (serialize) => {
         order.push('flush');
         serialize();
       },
@@ -55,7 +55,7 @@ it('stops before presentation and promotion when no durable revision exists', as
     promoteEditorImageToLibrary({
       aggregateId: 'image-1',
       port: {
-        flushAutosave: vi.fn(async () => undefined),
+        saveNow: vi.fn(async () => undefined),
         getDurableRevision: () => null,
         renderPresentation: vi.fn(async () => 'data:image/png;base64,YQ=='),
         serializeDocument: vi.fn(createEditorDocumentFixture),
@@ -74,7 +74,7 @@ it('does not promote when presentation commit fails', async () => {
     promoteEditorImageToLibrary({
       aggregateId: 'image-1',
       port: {
-        flushAutosave: vi.fn(async () => undefined),
+        saveNow: vi.fn(async () => undefined),
         getDurableRevision: () => 4,
         renderPresentation: vi.fn(async () => 'data:image/png;base64,YQ=='),
         serializeDocument: vi.fn(createEditorDocumentFixture),

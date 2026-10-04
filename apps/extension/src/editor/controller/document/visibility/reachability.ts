@@ -2,6 +2,10 @@ import type { Canvas, FabricObject } from 'fabric';
 import { clamp } from '../../../document/model';
 import { getLayerObjects } from '../layers';
 import type { CanvasSize } from './types';
+import {
+  getEditorEditingSurfaceSize,
+  getEditorWorkspaceMargin,
+} from '../../../document/canvas-surface/editing-surface';
 
 function getReachableVisibleSize(boundsSize: number, canvasSize: number) {
   return Math.min(
@@ -15,12 +19,13 @@ function resolveReachableBounds(args: {
   boundsSize: number;
   canvasSize: number;
   visibleSize: number;
+  origin: number;
 }) {
-  let min = args.visibleSize - args.boundsSize;
-  let max = args.canvasSize - args.visibleSize;
+  let min = args.origin + args.visibleSize - args.boundsSize;
+  let max = args.origin + args.canvasSize - args.visibleSize;
 
   if (min > max) {
-    const centered = (args.canvasSize - args.boundsSize) / 2;
+    const centered = args.origin + (args.canvasSize - args.boundsSize) / 2;
     min = centered;
     max = centered;
   }
@@ -38,17 +43,21 @@ export function ensureEditorObjectReachable(
   }
 
   const bounds = object.getBoundingRect();
-  const visibleWidth = getReachableVisibleSize(bounds.width, canvasDocumentSize.width);
-  const visibleHeight = getReachableVisibleSize(bounds.height, canvasDocumentSize.height);
+  const surfaceSize = getEditorEditingSurfaceSize(canvasDocumentSize);
+  const margin = getEditorWorkspaceMargin(canvasDocumentSize);
+  const visibleWidth = getReachableVisibleSize(bounds.width, surfaceSize.width);
+  const visibleHeight = getReachableVisibleSize(bounds.height, surfaceSize.height);
   const horizontalBounds = resolveReachableBounds({
     boundsSize: bounds.width,
-    canvasSize: canvasDocumentSize.width,
+    canvasSize: surfaceSize.width,
     visibleSize: visibleWidth,
+    origin: -margin,
   });
   const verticalBounds = resolveReachableBounds({
     boundsSize: bounds.height,
-    canvasSize: canvasDocumentSize.height,
+    canvasSize: surfaceSize.height,
     visibleSize: visibleHeight,
+    origin: -margin,
   });
 
   const nextBoundsLeft = clamp(bounds.left, horizontalBounds.min, horizontalBounds.max);

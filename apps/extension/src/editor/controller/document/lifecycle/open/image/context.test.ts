@@ -19,6 +19,11 @@ function createStoredFrame() {
     backgroundColor: '#123456',
     backgroundGradientAngle: 12,
     backgroundGradientFrom: '#abcdef',
+    backgroundGradientStops: ['#abcdef', '#333333', '#fedcba'],
+    backgroundGradientColorStops: [
+      { color: '#abcdef', offset: 0 },
+      { color: '#fedcba', offset: 1 },
+    ],
     backgroundGradientTo: '#fedcba',
     backgroundImageData: 'data:image/png;base64,background',
     backgroundImageFit: 'tile' as const,
@@ -29,6 +34,7 @@ function createStoredFrame() {
     paddingRight: 16,
     paddingBottom: 12,
     paddingLeft: 8,
+    sourceImage: { ...DEFAULT_EDITOR_FRAME_SETTINGS.sourceImage!, radius: 53, shadow: 60 },
   };
 }
 
@@ -59,6 +65,8 @@ it('opens a fresh image with a clean scene frame and keeps browser metadata over
     backgroundColor: 'transparent',
     backgroundGradientAngle: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientAngle,
     backgroundGradientFrom: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientFrom,
+    backgroundGradientStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientStops,
+    backgroundGradientColorStops: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientColorStops,
     backgroundGradientTo: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundGradientTo,
     backgroundImageData: null,
     backgroundImageFit: DEFAULT_EDITOR_FRAME_SETTINGS.backgroundImageFit,
@@ -68,6 +76,7 @@ it('opens a fresh image with a clean scene frame and keeps browser metadata over
     paddingRight: 0,
     paddingBottom: 0,
     paddingLeft: 0,
+    sourceImage: DEFAULT_EDITOR_FRAME_SETTINGS.sourceImage,
   });
 });
 

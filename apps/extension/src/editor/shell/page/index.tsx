@@ -9,20 +9,25 @@ import { EditorControllerProvider } from '../../application/controller-context';
 import { EditorEmbedProvider } from '../../application/embed-context/context';
 import {
   bootstrapEditorPageSession,
+  bindEditorAutosaveActivity,
   createEditorPageServices,
   flushEditorAutosaveIfNeeded,
   loadEditorPageDefaults,
   openEditorBootstrapPayload,
+  recoverMissingEditorPageDocument,
   type EditorPageServices,
 } from './runtime';
 import { useEditorStore } from '../../state/useEditorStore';
 import { createEditorPageEmbedProviderValue, startScenarioEditorEmbed } from './embed';
 import { EditorPageLayout } from './layout';
+import { ImageEditorStart } from './start';
 import { useEditorDrawingPreferencesSynchronization } from '../../drawing/preferences';
+import { EditorOpenStatusContext, useEditorOpenStatusOwner } from '../../runtime/open-status';
 
 function createEditorPageBootstrapLifecycle(args: {
   services: EditorPageServices;
   setPageTitle: (pageTitle: string) => void;
+  runOpen: (action: () => Promise<void>) => Promise<void>;
 }) {
   let cancelled = false;
   const request = {
@@ -36,7 +41,9 @@ function createEditorPageBootstrapLifecycle(args: {
 
     const detail: unknown = event.detail;
     if (isEditorBootstrapPayload(detail)) {
-      void openEditorBootstrapPayload(detail, request, args.services);
+      void args
+        .runOpen(() => openEditorBootstrapPayload(detail, request, args.services))
+        .catch(() => undefined);
     }
   };
 
@@ -52,24 +59,37 @@ function createEditorPageBootstrapLifecycle(args: {
 function useEditorPageBootstrapEffects(
   hasImageRef: React.MutableRefObject<boolean>,
   setPageTitle: (pageTitle: string) => void,
-  services: EditorPageServices
+  services: EditorPageServices,
+  runOpen: (action: () => Promise<void>) => Promise<void>
 ) {
   useEffect(() => {
     if (readEditorEmbedMode(window.location.search) === 'scenario') {
-      return startScenarioEditorEmbed({ controller: services.controller, setPageTitle });
+      return startScenarioEditorEmbed({ controller: services.controller, setPageTitle, runOpen });
     }
-    const lifecycle = createEditorPageBootstrapLifecycle({ services, setPageTitle });
+    const lifecycle = createEditorPageBootstrapLifecycle({ services, setPageTitle, runOpen });
 
     window.addEventListener(EDITOR_BOOTSTRAP_EVENT, lifecycle.handleBootstrap);
-    void bootstrapEditorPageSession(lifecycle.request, services);
+    void runOpen(() => bootstrapEditorPageSession(lifecycle.request, services)).catch(
+      () => undefined
+    );
 
     return () => {
       lifecycle.cancel();
       window.removeEventListener(EDITOR_BOOTSTRAP_EVENT, lifecycle.handleBootstrap);
     };
-  }, [services, setPageTitle]);
+  }, [services, setPageTitle, runOpen]);
 
   useEffect(() => {
+    if (readEditorEmbedMode(window.location.search) === 'scenario') return;
+    return bindEditorAutosaveActivity(services.autosaveService);
+  }, [services]);
+
+  useEffect(() => {
+    const protectUnsaved = (event: BeforeUnloadEvent) => {
+      if (!hasImageRef.current || !services.autosaveService.hasUnsavedChanges()) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
     const handlePageHide = () => flushEditorAutosaveIfNeeded(services, () => hasImageRef.current);
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -77,10 +97,12 @@ function useEditorPageBootstrapEffects(
       }
     };
 
+    window.addEventListener('beforeunload', protectUnsaved);
     window.addEventListener('pagehide', handlePageHide);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      window.removeEventListener('beforeunload', protectUnsaved);
       window.removeEventListener('pagehide', handlePageHide);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
@@ -100,6 +122,7 @@ function useEditorPageStoreSelection() {
   return useEditorStore(
     useShallow((state) => ({
       imageData: state.imageData,
+      pageTitle: state.pageTitle,
       hydrateDefaults: state.hydrateDefaults,
       hydrateWorkspaceDefaults: state.hydrateWorkspaceDefaults,
       setPageTitle: state.setPageTitle,
@@ -117,7 +140,6 @@ function useEditorPageServiceDisposal(services: EditorPageServices) {
 }
 
 export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterLayout }) => {
-  usePageLocaleMetadata('editor.page.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const embedMode = readEditorEmbedMode(window.location.search);
   const servicesRef = useRef<EditorPageServices | null>(null);
@@ -126,12 +148,14 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
   }
   const services = servicesRef.current;
 
-  const { imageData, hydrateDefaults, hydrateWorkspaceDefaults, setPageTitle } =
+  const { imageData, pageTitle, hydrateDefaults, hydrateWorkspaceDefaults, setPageTitle } =
     useEditorPageStoreSelection();
+  usePageLocaleMetadata('editor.page.documentTitle', imageData ? pageTitle : null);
   const hasImage = Boolean(imageData);
   const hasImageRef = useRef(hasImage);
   hasImageRef.current = hasImage;
   const embedProps = createEditorPageEmbedProviderValue(embedMode, services.controller);
+  const openStatus = useEditorOpenStatusOwner(embedMode === 'scenario' ? 'idle' : 'loading');
 
   useCommandPaletteHotkey({
     isOpen: commandPaletteOpen,
@@ -139,21 +163,35 @@ export const EditorPage: React.FC<{ afterLayout?: React.ReactNode }> = ({ afterL
     onClose: () => setCommandPaletteOpen(false),
   });
 
-  useEditorPageBootstrapEffects(hasImageRef, setPageTitle, services);
+  useEditorPageBootstrapEffects(hasImageRef, setPageTitle, services, openStatus.runOpen);
   useEditorDrawingPreferencesSynchronization();
   useEditorPageDefaultEffects(hydrateDefaults, hydrateWorkspaceDefaults);
   useEditorPageServiceDisposal(services);
 
   return (
     <EditorControllerProvider controller={services.controller}>
-      <EditorEmbedProvider {...embedProps}>
-        <EditorPageLayout
-          afterLayout={afterLayout}
-          commandPaletteOpen={commandPaletteOpen}
-          hasImage={hasImage}
-          onCloseCommandPalette={() => setCommandPaletteOpen(false)}
-        />
-      </EditorEmbedProvider>
+      <EditorOpenStatusContext.Provider value={openStatus}>
+        <EditorEmbedProvider {...embedProps}>
+          <EditorPageLayout
+            startPage={
+              embedMode === 'scenario' ? null : (
+                <ImageEditorStart services={services} runOpen={openStatus.runOpen} />
+              )
+            }
+            afterLayout={afterLayout}
+            commandPaletteOpen={commandPaletteOpen}
+            hasImage={hasImage}
+            openStatus={openStatus.status}
+            onCloseCommandPalette={() => setCommandPaletteOpen(false)}
+            onRecoverOriginal={async () => {
+              await recoverMissingEditorPageDocument();
+              await openStatus.runOpen(() =>
+                bootstrapEditorPageSession({ isCancelled: () => false, setPageTitle }, services)
+              );
+            }}
+          />
+        </EditorEmbedProvider>
+      </EditorOpenStatusContext.Provider>
     </EditorControllerProvider>
   );
 };

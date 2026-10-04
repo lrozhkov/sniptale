@@ -60,7 +60,7 @@ export function planReviewActionEdits(args: {
     focusStart !== undefined &&
     focusEnd !== undefined &&
     focusEnd - focusStart >= 0.001
-      ? focusForAction(marker, focusStart, focusEnd)
+      ? focusForAction(marker, focusStart, focusEnd, { start, end })
       : null;
   return {
     range,
@@ -77,10 +77,12 @@ export function planReviewActionEdits(args: {
 function focusForAction(
   marker: ReviewTelemetryMarker,
   start: number,
-  end: number
+  end: number,
+  sourceAnchor: NonNullable<QuickEditZoomRegion['sourceAnchor']>
 ): QuickEditZoomRegion {
   const region = createQuickEditZoomRegion({
     id: 'action-focus',
+    sourceAnchor,
     at: start,
     duration: end - start,
     endMax: end,

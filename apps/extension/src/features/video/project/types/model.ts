@@ -110,6 +110,11 @@ export type VideoTimelinePlacementMode =
 
 export type VideoProjectAssetSource =
   | {
+      /** Stable library identity survives deletion of its originating workspace. */
+      kind: 'library-asset';
+      mediaId: string;
+    }
+  | {
       kind: 'recording';
       recordingId: string;
     }
@@ -117,7 +122,7 @@ export type VideoProjectAssetSource =
       kind: 'project-asset';
       projectAssetId: string;
       originRecordingId?: string;
-      /** Library provenance for repeat-import detection; rendering uses the project-owned copy. */
+      /** Library insertion identity; rendering uses the project-owned representation. */
       originMediaId?: string;
     }
   | {

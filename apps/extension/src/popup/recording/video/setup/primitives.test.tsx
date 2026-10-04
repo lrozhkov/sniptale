@@ -13,6 +13,7 @@ vi.mock('../../../../ui/popup-shell/expanding-mode-button', () => ({
     active: boolean;
     description: string;
     disabled?: boolean;
+    disabledReason?: string | null;
     label: string;
     onClick: () => void;
   }) => {
@@ -81,7 +82,8 @@ it('forwards an explicit disabled state and renders inline selection content', (
         accentClassName="accent"
         active={false}
         disabled
-        hint="Unavailable"
+        disabledReason="Unavailable"
+        hint="Choose a window"
         icon={() => <svg />}
         label="Window"
         onClick={vi.fn()}
@@ -93,7 +95,12 @@ it('forwards an explicit disabled state and renders inline selection content', (
   );
 
   expect(mocks.stateButton).toHaveBeenCalledWith(
-    expect.objectContaining({ active: false, disabled: true })
+    expect.objectContaining({
+      active: false,
+      description: 'Choose a window',
+      disabled: true,
+      disabledReason: 'Unavailable',
+    })
   );
   expect(container?.querySelector('[aria-label="Quality selector"]')?.textContent).toBe('Quality');
   expect(container?.querySelector('[aria-label="Quality value"]')).not.toBeNull();

@@ -58,6 +58,7 @@ export function SelectInput<T extends string>({
 
   return (
     <CompactSelect
+      appearance="plain"
       aria-label={translate('videoEditor.sidebar.selectInputLabel')}
       value={value}
       onChange={onChange}
@@ -127,7 +128,12 @@ export function ColorField({
   };
 
   return (
-    <CompactInspectorColorField {...colorSelectorProps} {...(className ? { className } : {})} />
+    <CompactInspectorColorField
+      {...colorSelectorProps}
+      triggerVariant="swatch"
+      floatingPlacement="side"
+      {...(className ? { className } : {})}
+    />
   );
 }
 
@@ -138,7 +144,7 @@ export function ToggleField(props: {
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex min-h-9 items-center justify-between gap-3">
+    <div data-inspector-toggle className="flex min-h-9 items-center justify-between gap-3">
       <span className="min-w-0 text-[length:var(--sniptale-compact-font-size,12px)]">
         {props.label}
       </span>

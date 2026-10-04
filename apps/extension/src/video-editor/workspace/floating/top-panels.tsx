@@ -15,9 +15,11 @@ export function VideoEditorWorkspaceHeaderActions(props: {
         className="!h-9 !w-9 !min-w-9 !px-0"
         dataUi="video-editor.viewer.scene"
         title={translate('videoEditor.sidebar.sceneProperties')}
+        active={header.sceneSelected && props.inspectorOpen}
+        aria-pressed={header.sceneSelected && props.inspectorOpen}
         onClick={header.onSelectScene}
       >
-        <MonitorCog size={17} />
+        <MonitorCog size={17} aria-hidden="true" />
       </ContentToolbarButton>
       {!props.inspectorOpen && (
         <ContentToolbarButton

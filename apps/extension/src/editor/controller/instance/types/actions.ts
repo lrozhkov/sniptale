@@ -23,7 +23,7 @@ import type { EditorTextInlineStyleCommand } from '../../text-formatting';
 import type {
   EditorTechnicalDataKind,
   EditorTechnicalDataLayout,
-} from '../../tools/technical-data';
+} from '../../../../features/editor/document/technical-data';
 import type { EditorSelectionNudge } from '../../tools/nudge';
 import type { EditorControllerRelayoutOptions } from './shared';
 
@@ -40,6 +40,7 @@ export interface EditorControllerInstanceDocumentActions {
   undo(): Promise<void>;
   redo(): Promise<void>;
   resetToOriginal(): Promise<void>;
+  restoreOriginalDocument(original: EditorDocument, isCurrent: () => boolean): Promise<void>;
 }
 
 export interface EditorControllerInstanceLifecycleActions {

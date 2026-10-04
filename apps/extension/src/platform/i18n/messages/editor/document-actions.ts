@@ -9,13 +9,77 @@ export const editorDocumentActionsMessages = defineMessageSource({
     ru: 'В библиотеке',
     en: 'In library',
   },
+  autosaveConflict: {
+    ru: 'Проект изменён в другой вкладке. Сохранение заблокировано. Загрузите актуальную версию, чтобы продолжить; текущие правки будут заменены.',
+    en: 'This project changed in another tab. Saving is blocked. Reload the latest version to continue; your current edits will be replaced.',
+  },
+  autosaveTitle: {
+    ru: 'Автосохранение',
+    en: 'Autosave',
+  },
+  autosaveSwitch: {
+    ru: 'Автоматически',
+    en: 'Automatically',
+  },
+  autosaveOnDescription: {
+    ru: 'Изменения автоматически сохраняются в документ.',
+    en: 'Changes are saved to this document automatically.',
+  },
+  autosaveOffDescription: {
+    ru: 'Новые изменения останутся только в редакторе и пропадут при закрытии.',
+    en: 'New changes stay in the editor and will be lost when you close it.',
+  },
+  autosaveOffStatus: {
+    ru: 'Не сохраняется',
+    en: 'Not saving',
+  },
+  autosaveErrorDescription: {
+    ru: 'Последние изменения не сохранены. Проверьте доступные действия ниже.',
+    en: 'Your latest changes were not saved. Check the available actions below.',
+  },
+  autosaveReloadWarning: {
+    ru: 'Загрузить сохранённую версию? Незаписанные изменения будут заменены.',
+    en: 'Load the saved version? Unsaved changes will be replaced.',
+  },
   saveToLibrary: {
     ru: 'Сохранить в библиотеку',
     en: 'Save to library',
   },
+  savingToLibrary: {
+    ru: 'Сохранение в библиотеку',
+    en: 'Saving to library',
+  },
   saveToLibraryError: {
     ru: 'Не удалось сохранить в библиотеку. Черновик сохранён.',
     en: 'Could not save to the library. Your draft is safe.',
+  },
+  conflictTitle: {
+    ru: 'Изображение изменено в другой вкладке',
+    en: 'Image changed in another tab',
+  },
+  conflictDescription: {
+    ru: 'Сохраните свои правки отдельной копией или загрузите последнюю версию. При загрузке текущие правки будут заменены.',
+    en: 'Save your edits as a separate copy or load the latest version. Loading it will replace your current edits.',
+  },
+  saveErrorTitle: {
+    ru: 'Не удалось сохранить изменения',
+    en: 'Could not save changes',
+  },
+  saveErrorDescription: {
+    ru: 'Последние правки не сохранены. Не закрывайте вкладку. Скачайте изображение через панель, чтобы сохранить результат.',
+    en: 'Your latest edits have not been saved. Keep this tab open. Download the image from the toolbar to keep your work.',
+  },
+  previewErrorDescription: {
+    ru: 'Не удалось обновить превью. Сохранённый документ не затронут.',
+    en: 'Could not update the preview. Your saved document is safe.',
+  },
+  previewRequiresSavedDocument: {
+    ru: 'Сначала сохраните правки или дождитесь окончания сохранения. Если автосохранение выключено, включите его или отмените несохранённые правки. Затем повторите обновление превью.',
+    en: 'Save your edits or wait for saving to finish. If autosave is off, enable it or discard unsaved edits. Then retry the preview.',
+  },
+  retryPreview: {
+    ru: 'Повторить превью',
+    en: 'Retry preview',
   },
   reloadLatest: {
     ru: 'Загрузить актуальную версию',

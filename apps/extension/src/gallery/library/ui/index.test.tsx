@@ -1,22 +1,32 @@
 // @vitest-environment jsdom
 
+import { BookOpen } from 'lucide-react';
+
 import { act } from 'react';
+import { createVideoProjectItem } from '../test-support/items';
+import type { GalleryMediaItem } from '../items';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
+  translateMock,
   formatDateTimeMock,
   getAggregatePresentationMock,
   getCurrentLocaleMock,
   getMediaThumbnailMock,
+  getGalleryProjectCoverMock,
   revokeObjectURLMock,
 } = vi.hoisted(() => ({
+  translateMock: vi.fn((key: string) => key),
   formatDateTimeMock: vi.fn(() => 'Jan 01, 2024, 12:30 PM'),
   getAggregatePresentationMock: vi.fn(),
   getCurrentLocaleMock: vi.fn(() => 'en'),
   getMediaThumbnailMock: vi.fn(),
+  getGalleryProjectCoverMock: vi.fn(),
   revokeObjectURLMock: vi.fn(),
 }));
+
+vi.mock('../items/project-covers', () => ({ getGalleryProjectCover: getGalleryProjectCoverMock }));
 
 vi.mock('../../../composition/persistence/aggregate-presentations', async (importOriginal) => ({
   ...(await importOriginal<
@@ -39,7 +49,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   formatDateTime: formatDateTimeMock,
   getCurrentLocale: getCurrentLocaleMock,
-  translate: (key: string) => key,
+  translate: translateMock,
 }));
 
 import {
@@ -105,6 +115,7 @@ beforeEach(() => {
   });
   getMediaThumbnailMock.mockReset();
   getAggregatePresentationMock.mockReset();
+  getGalleryProjectCoverMock.mockReset();
   revokeObjectURLMock.mockReset();
 });
 
@@ -116,6 +127,17 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+});
+
+it('reads category labels in the current locale after preferences hydrate', () => {
+  expect(FOLDER_LABELS.screenshot).toBe('gallery.preview.folderScreenshot');
+  translateMock.mockImplementation((key) => `hydrated:${key}`);
+  try {
+    expect(FOLDER_LABELS.screenshot).toBe('hydrated:gallery.preview.folderScreenshot');
+    expect(FOLDER_LABELS.recording).toBe('hydrated:gallery.preview.folderRecording');
+  } finally {
+    translateMock.mockImplementation((key) => key);
+  }
 });
 
 async function verifyGalleryHelpersAndLoadedThumb() {
@@ -133,7 +155,8 @@ async function verifyGalleryHelpersAndLoadedThumb() {
   expect(FOLDER_LABELS.all).toBeTruthy();
   expect(FOLDER_LABELS.scenario).toBeTruthy();
   expect(FOLDER_LABELS['web-snapshot']).toBe('gallery.preview.folderWebSnapshot');
-  expect(getGalleryFolderIcon('scenario')).toBeTruthy();
+  expect(getGalleryFolderIcon('scenario')).toBe(BookOpen);
+  expect(getKindIcon('scenario')).toBe(BookOpen);
   expect(getGalleryFolderIcon('web-snapshot')).toBeTruthy();
   expect(getGalleryItemKindLabel('audio')).toBeTruthy();
   expect(getGalleryItemKindLabel('web-archive')).toBe('gallery.preview.kindWebSnapshot');
@@ -250,10 +273,7 @@ function runGalleryUiSuite() {
 
 describe('gallery-ui', runGalleryUiSuite);
 
-function createMediaThumbItem(
-  id: string,
-  updatedAt: number
-): NonNullable<Parameters<typeof MediaThumb>[0]['item']> {
+function createMediaThumbItem(id: string, updatedAt: number): GalleryMediaItem {
   return {
     id,
     entityId: id,
@@ -275,3 +295,146 @@ function createMediaThumbItem(
     type: 'media',
   };
 }
+
+it('clears the old project cover immediately when its workspace revision changes', async () => {
+  getGalleryProjectCoverMock.mockResolvedValueOnce(new Blob(['first']));
+  const item = {
+    ...createVideoProjectItem(),
+    hasThumbnail: true,
+    presentationRevision: 1,
+    workspaceRevision: 1,
+  };
+  renderItemThumb(item);
+  await flushEffects();
+  let resolveSecond: (blob: Blob) => void = () => {};
+  getGalleryProjectCoverMock.mockReturnValueOnce(
+    new Promise<Blob>((resolve) => {
+      resolveSecond = resolve;
+    })
+  );
+  renderItemThumb({ ...item, presentationRevision: 2, workspaceRevision: 2 });
+  expect(container?.querySelector('img')).toBeNull();
+  resolveSecond(new Blob(['second']));
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledTimes(2);
+  expect(getAggregatePresentationMock).not.toHaveBeenCalled();
+  expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:thumb');
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+});
+
+it('ignores an older project cover that finishes after the current revision', async () => {
+  let resolveOld: (blob: Blob) => void = () => {};
+  getGalleryProjectCoverMock.mockReturnValueOnce(
+    new Promise<Blob>((resolve) => {
+      resolveOld = resolve;
+    })
+  );
+  getGalleryProjectCoverMock.mockResolvedValueOnce(new Blob(['current']));
+  vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:current');
+  const item = { ...createVideoProjectItem(), workspaceRevision: 1 };
+  renderItemThumb(item);
+  renderItemThumb({ ...item, workspaceRevision: 2 });
+  await flushEffects();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:current');
+  resolveOld(new Blob(['old']));
+  await flushEffects();
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:current');
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+});
+
+it('requests only viewport-near project covers in a large mounted list and releases hidden URLs', async () => {
+  const observed = new Map<Element, IntersectionObserverCallback>();
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      private readonly callback: IntersectionObserverCallback;
+      constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        observed.set(target, this.callback);
+      }
+      unobserve(target: Element) {
+        observed.delete(target);
+      }
+      disconnect() {
+        for (const [target, callback] of observed)
+          if (callback === this.callback) observed.delete(target);
+      }
+    }
+  );
+  getGalleryProjectCoverMock.mockResolvedValue(new Blob(['cover']));
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+  const items = Array.from({ length: 80 }, (_, index) => ({
+    ...createVideoProjectItem(),
+    id: `video-project:${index}`,
+    entityId: `project-${index}`,
+  }));
+  act(() =>
+    root?.render(items.map((item) => <MediaThumb key={item.id} item={item} deferUntilVisible />))
+  );
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).not.toHaveBeenCalled();
+  const targets = [...observed.keys()];
+  expect(targets).toHaveLength(80);
+  act(() =>
+    observed.get(targets[41]!)?.(
+      [{ isIntersecting: true, target: targets[41]! } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    )
+  );
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledTimes(1);
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledWith(items[41], expect.any(AbortSignal));
+  expect(container?.querySelectorAll('img')).toHaveLength(1);
+  act(() =>
+    observed.get(targets[41]!)?.(
+      [{ isIntersecting: false, target: targets[41]! } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    )
+  );
+  await flushEffects();
+  expect(container?.querySelectorAll('img')).toHaveLength(0);
+  expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:thumb');
+  act(() =>
+    observed.get(targets[41]!)?.(
+      [{ isIntersecting: true, target: targets[41]! } as IntersectionObserverEntry],
+      {} as IntersectionObserver
+    )
+  );
+  await flushEffects();
+  expect(getGalleryProjectCoverMock).toHaveBeenCalledTimes(2);
+  act(() => root?.unmount());
+  root = null;
+  expect(observed.size).toBe(0);
+  expect(revokeObjectURLMock).toHaveBeenCalledTimes(2);
+});
+
+it('identifies audio thumbnails with the real name and known duration', async () => {
+  const item = {
+    ...createMediaThumbItem('audio', 1),
+    kind: 'audio' as const,
+    filename: 'A long recorded narration.webm',
+    duration: 125.2,
+    hasThumbnail: false,
+  };
+  renderItemThumb(item);
+  await flushEffects();
+  const preview = container!.querySelector('[data-ui="gallery.thumb.audio"]')!;
+  expect(preview.textContent).toContain(item.filename);
+  expect(preview.textContent).toContain('02:05');
+  expect(preview.querySelector('[title]')?.getAttribute('title')).toBe(item.filename);
+  renderItemThumb({ ...item, filename: 'Another recording.webm', duration: null });
+  await flushEffects();
+  expect(preview.textContent).toContain('Another recording.webm');
+  expect(preview.textContent).not.toContain('02:05');
+});
+
+it('matches guide and tour folders to document thumbnails and distinguishes editable video projects', () => {
+  expect(getGalleryFolderIcon('export')).toBe(getKindIcon('scenario-export'));
+  expect(getGalleryFolderIcon('video-project')).toBe(getKindIcon('video-project'));
+  expect(getGalleryFolderIcon('video-project')).not.toBe(getGalleryFolderIcon('recording'));
+  expect(getGalleryFolderIcon('scenario')).toBe(BookOpen);
+});

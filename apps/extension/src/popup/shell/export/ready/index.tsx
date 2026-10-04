@@ -1,8 +1,9 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useState } from 'react';
+import { FileCode } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n/popup';
-import { ExportDataTypeSection } from '../data-type/section';
+import { ExportDataTypeSection, WebCopyResourceControls } from '../data-type/section';
 import { ExportPagesSection } from '../pages/section';
 import type { PopupExportTabItem } from '../selection/tabs/types';
 import type { PopupPagePackagePreferenceState } from '../session/types';
@@ -13,6 +14,7 @@ import {
 import type { WebCopyResourcePreferences } from '../pages/snapshot-availability';
 import { usePageCaptureTimingPreferences } from '../pages/capture-timing';
 import { usePackageCaptureBehaviorPreferences } from '../data-type/capture-behavior';
+import { ExportSelectionSectionShell } from '../selection/section-shell';
 
 type ExportReadySectionProps = {
   activeSourceMode?: 'tabs' | 'urls';
@@ -62,6 +64,16 @@ type ExportReadySectionProps = {
   urlInputOverflow?: number;
 };
 
+const HTML_COMPOSITION_CARD_CLASS_NAME = [
+  'rounded-xl border border-[var(--sniptale-color-border-soft)]',
+  'bg-[var(--sniptale-color-surface-raised)] px-3 py-2.5',
+].join(' ');
+
+const HTML_COMPOSITION_ICON_CLASS_NAME = [
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+  'bg-[var(--sniptale-color-accent-soft)] text-[var(--sniptale-color-accent)]',
+].join(' ');
+
 function renderReadyHint(
   props: Pick<ExportReadySectionProps, 'disabled' | 'hasLoadedPreferences' | 'selectedCount'>
 ) {
@@ -87,6 +99,49 @@ function renderDataTypeSection(
   onOpenSettings: () => void,
   captureBehavior: ReturnType<typeof usePackageCaptureBehaviorPreferences>
 ) {
+  if (destination === 'html') {
+    return (
+      <ExportSelectionSectionShell
+        title={translate('popup.export.htmlCompositionTitle')}
+        drawerLabel={translate('popup.export.htmlResourceSettingsTitle')}
+        drawerDescription={translate('popup.export.htmlResourceSettingsDescription')}
+        isExpanded={isEditingDataTypes}
+        isOpen={isEditingDataTypes}
+        onClose={onClose}
+        onOpen={onOpen}
+        onOpenSettings={onOpenSettings}
+        settingsAriaLabel={translate('popup.export.htmlResourceSettingsTitle')}
+        bodyClassName={isEditingDataTypes ? 'min-h-0 overflow-y-auto px-3 pt-2' : 'pt-1'}
+      >
+        {isEditingDataTypes ? (
+          <div data-ui="html-resource-settings">
+            <WebCopyResourceControls
+              className="space-y-1"
+              disabled={props.disabled}
+              resources={props.webCopyResources}
+              offlineOnly
+            />
+          </div>
+        ) : (
+          <div className={HTML_COMPOSITION_CARD_CLASS_NAME} data-ui="html-composition">
+            <div className="flex items-start gap-2.5">
+              <span className={HTML_COMPOSITION_ICON_CLASS_NAME}>
+                <FileCode aria-hidden="true" className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-[var(--sniptale-color-text-primary)]">
+                  {translate('popup.export.htmlCompositionFileTitle')}
+                </p>
+                <p className="mt-0.5 text-[10px] leading-4 text-[var(--sniptale-color-text-secondary)]">
+                  {translate('popup.export.packageDestinationHtmlDescription')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </ExportSelectionSectionShell>
+    );
+  }
   return (
     <ExportDataTypeSection
       disabled={props.disabled}

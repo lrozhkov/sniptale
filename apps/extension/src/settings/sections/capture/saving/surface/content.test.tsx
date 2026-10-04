@@ -4,15 +4,20 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { rowsPropsSpy, listPropsSpy } = vi.hoisted(() => ({
-  rowsPropsSpy: vi.fn(),
+const { capturePropsSpy, downloadsPropsSpy, listPropsSpy } = vi.hoisted(() => ({
+  capturePropsSpy: vi.fn(),
+  downloadsPropsSpy: vi.fn(),
   listPropsSpy: vi.fn(),
 }));
 
 vi.mock('./cards', () => ({
-  SaveSettingsRows: (props: unknown) => {
-    rowsPropsSpy(props);
-    return <div data-testid="settings-rows" />;
+  CaptureActionRow: (props: unknown) => {
+    capturePropsSpy(props);
+    return <div data-testid="capture-row" />;
+  },
+  DownloadPresetRows: (props: unknown) => {
+    downloadsPropsSpy(props);
+    return <div data-testid="download-rows" />;
   },
 }));
 
@@ -68,7 +73,8 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  rowsPropsSpy.mockReset();
+  capturePropsSpy.mockReset();
+  downloadsPropsSpy.mockReset();
   listPropsSpy.mockReset();
 });
 
@@ -83,7 +89,8 @@ afterEach(() => {
 it('shows only compact settings on the settings subpage', () => {
   renderSection(createProps());
 
-  expect(container?.querySelector('[data-testid="settings-rows"]')).toBeTruthy();
+  expect(container?.querySelector('[data-testid="capture-row"]')).toBeTruthy();
+  expect(container?.querySelector('[data-testid="download-rows"]')).toBeNull();
   expect(container?.querySelector('[data-testid="presets-list"]')).toBeNull();
   expect(container?.firstElementChild?.className).toContain('max-w-[720px]');
 });
@@ -92,13 +99,29 @@ it('shows only folder templates and forwards their controller actions', () => {
   const props = createProps({ view: 'templates' });
   renderSection(props);
 
-  expect(container?.querySelector('[data-testid="settings-rows"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="capture-row"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="download-rows"]')).toBeNull();
   expect(container?.querySelector('[data-testid="presets-list"]')).toBeTruthy();
   expect(listPropsSpy).toHaveBeenCalledWith(
     expect.objectContaining({
       onEdit: props.openEditor,
       onMoveBefore: props.onMoveBefore,
       onSavePreset: props.handleSavePreset,
+    })
+  );
+});
+
+it('shows only file download controls on the files subpage', () => {
+  const props = createProps({ view: 'files', defaultImagePresetId: 'images' });
+  renderSection(props);
+
+  expect(container?.querySelector('[data-testid="capture-row"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="download-rows"]')).toBeTruthy();
+  expect(container?.querySelector('[data-testid="presets-list"]')).toBeNull();
+  expect(downloadsPropsSpy).toHaveBeenCalledWith(
+    expect.objectContaining({
+      defaultImagePresetId: 'images',
+      onDefaultImageChange: props.handleDefaultImageChange,
     })
   );
 });

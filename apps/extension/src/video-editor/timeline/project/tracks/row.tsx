@@ -4,7 +4,16 @@ import { useState } from 'react';
 import { createTrackEffectDropHandlers } from '../canvas/parts/effect-drop';
 import type { ProjectTimelineProps } from '../types';
 import { VideoTrackKind } from '../../../../features/video/project/types';
-import { Eye, EyeOff, Lock, Unlock, Volume2, VolumeX, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  Volume2,
+  VolumeX,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
@@ -96,8 +105,10 @@ export function ProjectTimelineTrackRow({
           <ContentToolbarButton
             dataUi="video-editor.timeline.track-fx"
             className={[
-              '!h-full !min-h-0 !w-full !justify-between !rounded-none !border-0 !px-3 !py-0 !shadow-none',
+              '!h-5 !min-h-0 !w-full !justify-between !rounded-none !border-0 !px-3 !py-0 !shadow-none',
               '!text-[10px] !font-normal !text-[var(--sniptale-color-text-muted)]',
+              'hover:!bg-[var(--sniptale-color-surface-hover)] focus-visible:!outline-2',
+              'focus-visible:!outline-[var(--sniptale-color-accent)]',
             ].join(' ')}
             onClick={onToggleFx}
             aria-expanded={!trackLayout?.fxCollapsed}
@@ -109,9 +120,9 @@ export function ProjectTimelineTrackRow({
           >
             <span>{translate('videoEditor.effectsLibrary.title')}</span>
             {trackLayout?.fxCollapsed ? (
-              <ChevronDown aria-hidden="true" size={10} />
+              <ChevronRight aria-hidden="true" size={12} />
             ) : (
-              <ChevronUp aria-hidden="true" size={10} />
+              <ChevronDown aria-hidden="true" size={12} />
             )}
           </ContentToolbarButton>
         </div>

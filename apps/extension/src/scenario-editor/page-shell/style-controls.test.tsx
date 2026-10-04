@@ -3,7 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
-import { createTranslator } from '../../platform/i18n';
+import { createTranslator, translate } from '../../platform/i18n';
 import { GuideStyleFields } from './style-controls';
 
 it('emits only each edited style property so other defaults remain inherited', async () => {
@@ -23,6 +23,21 @@ it('emits only each edited style property so other defaults remain inherited', a
         />
       )
     );
+    const pickerTrigger = host.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.color-selector.picker-trigger"]'
+    )!;
+    await act(async () => pickerTrigger.click());
+    const palette = document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')!;
+    const colors = palette.querySelectorAll<HTMLButtonElement>('button');
+    expect(colors.length).toBeGreaterThanOrEqual(8);
+    await act(async () => colors[0]!.click());
+    expect(change).not.toHaveBeenCalled();
+    const picker = document.querySelector('[data-ui="shared.ui.color-selector.picker"]')!;
+    const apply = [...picker.querySelectorAll('button')].find(
+      (button) => button.textContent === translate('shared.ui.colorSelectorApply')
+    )!;
+    await act(async () => apply.click());
+    expect(Object.keys(change.mock.lastCall?.[0] ?? {})).toEqual(['accentColor']);
     const cases = [
       ['Warm', { theme: 'warm' }],
       ['Serif', { font: 'serif' }],
@@ -66,3 +81,49 @@ async function chooseStyle(host: HTMLElement, label: string) {
   if (!button) throw new Error(`Missing ${label}`);
   await act(async () => button.click());
 }
+
+it.each([
+  [
+    'en',
+    'Colors plain step numbers and links in preview and export. Badge numbers keep their own appearance.',
+  ],
+  [
+    'ru',
+    'Цвет текстовых номеров шагов и ссылок при просмотре и экспорте. Номера на плашках сохраняют своё оформление.',
+  ],
+] as const)('names accent consumers without permanent %s inspector hints', async (locale, copy) => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const change = vi.fn();
+  try {
+    for (const nested of [false, true]) {
+      await act(async () =>
+        root.render(
+          <GuideStyleFields
+            style={createGuideProject('Guide').style}
+            nested={nested}
+            disabled={false}
+            onChange={change}
+            t={createTranslator(locale)}
+          />
+        )
+      );
+      const accent = host.querySelector('.guide-style-accent')!;
+      expect(accent.getAttribute('title')).toBe(copy);
+      expect(accent.textContent).toContain(
+        locale === 'ru' ? 'Номера и ссылки' : 'Numbers and links'
+      );
+      expect(host.textContent).not.toContain(copy);
+      expect(host.querySelector<HTMLButtonElement>('.guide-style-accent > button')?.disabled).toBe(
+        true
+      );
+      expect(change).not.toHaveBeenCalled();
+    }
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

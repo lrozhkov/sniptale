@@ -1,13 +1,22 @@
 import { defineMessageSource } from '../source';
-import {
-  sharedWebSnapshotProductNameMessage,
-  sharedWebSnapshotSingularNameMessage,
-} from '../shared/web-snapshot';
+import { sharedWebSnapshotSingularNameMessage } from '../shared/web-snapshot';
 
 export const webSnapshotViewerMessages = defineMessageSource({
   app: {
-    documentTitleFallback: sharedWebSnapshotProductNameMessage,
-    documentTitleSuffix: sharedWebSnapshotProductNameMessage,
+    exportHtml: {
+      ru: 'Скачать HTML',
+      en: 'Download HTML',
+    },
+    exportHtmlDescription: {
+      ru: 'Один HTML-файл с сохранёнными стилями, изображениями и шрифтами. Работает без интернета; скрипты и внешние ссылки отключены.',
+      en: 'One HTML file with saved styles, images and fonts. Works offline; scripts and external links are disabled.',
+    },
+    exportHtmlFailed: {
+      ru: 'Не удалось создать HTML. Повторите попытку или скачайте ZIP.',
+      en: 'Could not create HTML. Try again or download the ZIP.',
+    },
+    documentTitleFallback: sharedWebSnapshotSingularNameMessage,
+    documentTitleSuffix: sharedWebSnapshotSingularNameMessage,
     frameTitle: sharedWebSnapshotSingularNameMessage,
     modeLabel: {
       ru: 'Режим просмотра веб-снимка',
@@ -72,6 +81,26 @@ export const webSnapshotViewerMessages = defineMessageSource({
     downloadAsset: {
       ru: 'Скачать оригинал',
       en: 'Download original',
+    },
+    previewAsset: {
+      ru: 'Предпросмотр',
+      en: 'Preview',
+    },
+    closeAssetPreview: {
+      ru: 'Назад к файлам',
+      en: 'Back to files',
+    },
+    openAsset: {
+      ru: 'Открыть в новой вкладке',
+      en: 'Open in new tab',
+    },
+    assetOpenFailed: {
+      ru: 'Не удалось открыть файл. Попробуйте ещё раз.',
+      en: 'Could not open the file. Try again.',
+    },
+    previewZoom: {
+      ru: 'Масштаб предпросмотра',
+      en: 'Preview zoom',
     },
     exportActions: {
       ru: 'Скачать и экспортировать',

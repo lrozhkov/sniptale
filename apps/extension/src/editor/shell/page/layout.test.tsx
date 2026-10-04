@@ -28,6 +28,21 @@ vi.mock('../../workspace/floating', () => ({
   ),
 }));
 
+vi.mock('@sniptale/ui/product-feedback/confirm-dialog', () => ({
+  ProductConfirmDialog: ({
+    onConfirm,
+    onCancel,
+  }: {
+    onConfirm: () => void;
+    onCancel: () => void;
+  }) => (
+    <div data-ui="editor.page.recover-dialog">
+      <button onClick={onConfirm}>Confirm</button>
+      <button onClick={onCancel}>Cancel</button>
+    </div>
+  ),
+}));
+
 import { EditorPageLayout } from './layout';
 
 let container: HTMLDivElement | null = null;
@@ -50,24 +65,108 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function renderLayout(hasImage = true) {
+async function renderLayout(
+  hasImage = true,
+  openStatus: 'idle' | 'loading' | 'error' | 'missing' = 'idle',
+  onRecoverOriginal = vi.fn(async () => undefined)
+) {
   await act(async () => {
     root?.render(
       <EditorPageLayout
         afterLayout={<div data-ui="editor.after-layout">after</div>}
         commandPaletteOpen
         hasImage={hasImage}
+        openStatus={openStatus}
         onCloseCommandPalette={vi.fn()}
+        onRecoverOriginal={onRecoverOriginal}
       />
     );
   });
 }
+
+it('shows a blocking loading status and a recoverable error without raw exception text', async () => {
+  await renderLayout(false, 'loading');
+  expect(
+    container?.querySelector('[data-ui="editor.page.open-loading"]')?.getAttribute('role')
+  ).toBe('status');
+  expect(container?.querySelector('[data-ui="editor.canvas.empty-dropzone"]')).not.toBeNull();
+
+  await renderLayout(false, 'error');
+  expect(container?.querySelector('[data-ui="editor.page.open-loading"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="editor.page.open-error"]')?.getAttribute('role')).toBe(
+    'alert'
+  );
+  expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
+});
+
+it('keeps the canvas mounted behind the start surface while hiding working chrome', async () => {
+  await act(async () => {
+    root?.render(
+      <EditorPageLayout
+        commandPaletteOpen={false}
+        hasImage={false}
+        openStatus="idle"
+        onCloseCommandPalette={vi.fn()}
+        onRecoverOriginal={vi.fn(async () => undefined)}
+        startPage={<div data-ui="start-content">Start</div>}
+      />
+    );
+  });
+  expect(container?.querySelector('[data-ui="editor.canvas-wrapper"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="start-content"]')).not.toBeNull();
+  expect(
+    container
+      ?.querySelector('[data-ui="editor.floating-workspace"]')
+      ?.parentElement?.getAttribute('aria-hidden')
+  ).toBe('true');
+});
+
+it('requires confirmation before replacing a missing document with its original', async () => {
+  const recover = vi.fn(async () => undefined);
+  await renderLayout(false, 'missing', recover);
+  const recoveryButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.page.recover-original"]'
+  );
+  expect(recoveryButton).not.toBeNull();
+  expect(recover).not.toHaveBeenCalled();
+
+  await act(async () => recoveryButton?.click());
+  expect(container?.querySelector('[data-ui="editor.page.recover-dialog"]')).not.toBeNull();
+  expect(recover).not.toHaveBeenCalled();
+
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.page.recover-dialog"] button:last-child')
+      ?.click();
+  });
+  expect(recover).not.toHaveBeenCalled();
+  expect(container?.querySelector('[data-ui="editor.page.recover-dialog"]')).toBeNull();
+
+  await act(async () => recoveryButton?.click());
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="editor.page.recover-dialog"] button:first-child'
+      )
+      ?.click();
+  });
+  expect(recover).toHaveBeenCalledTimes(1);
+});
+
+it('shows a specific missing-original message without blocking the empty canvas intake', async () => {
+  await renderLayout(false, 'missing');
+  expect(
+    container?.querySelector('[data-ui="editor.page.open-missing"]')?.getAttribute('role')
+  ).toBe('alert');
+  expect(container?.querySelector('[data-ui="editor.canvas.empty-dropzone"]')).not.toBeNull();
+});
 
 it('renders the canonical canvas, floating workspace, command palette, and extension slot', async () => {
   await renderLayout();
 
   const pageRoot = container?.querySelector('[data-ui="editor.page.root"]');
   expect(pageRoot?.className).toContain('relative h-screen');
+  expect(pageRoot?.className).toContain('min-w-[1280px]');
   expect(pageRoot?.className).toContain('bg-[var(--sniptale-color-surface-canvas)]');
   expect(container?.querySelector('[data-ui="editor.canvas.layer"]')).not.toBeNull();
   expect(container?.querySelector('[data-ui="editor.floating-workspace"]')?.textContent).toBe(
@@ -116,3 +215,28 @@ it('blocks context menus outside the canonical canvas surface', async () => {
   expect(canvasSurfaceEvent.defaultPrevented).toBe(false);
   expect(emptyDropzoneEvent.defaultPrevented).toBe(false);
 });
+
+for (const openStatus of ['idle', 'loading', 'error', 'missing'] as const) {
+  it(`hides competing empty canvas in standalone ${openStatus} while keeping its controller mounted`, async () => {
+    await act(async () => {
+      root?.render(
+        <EditorPageLayout
+          commandPaletteOpen={false}
+          hasImage={false}
+          openStatus={openStatus}
+          onCloseCommandPalette={vi.fn()}
+          onRecoverOriginal={vi.fn(async () => undefined)}
+          startPage={<div>Current start</div>}
+        />
+      );
+    });
+    const layer = container?.querySelector('[data-ui="editor.canvas.layer"]');
+    expect(layer?.getAttribute('aria-hidden')).toBe('true');
+    expect(layer?.classList.contains('invisible')).toBe(true);
+    expect(layer?.querySelector('[data-ui="editor.canvas-wrapper"]')).not.toBeNull();
+    await renderLayout(true);
+    expect(
+      container?.querySelector('[data-ui="editor.canvas.layer"]')?.getAttribute('aria-hidden')
+    ).toBe('false');
+  });
+}

@@ -1,20 +1,9 @@
-import {
-  VIDEO_WORKSPACES_STORE,
-  VIDEO_WORKSPACE_DRAFTS_STORE,
-} from '../infrastructure/indexed-db/core.stores';
-import {
-  ASSET_OPERATIONS_STORE,
-  ASSET_OWNERS_STORE,
-  ASSET_REFS_STORE,
-  initDB,
-  MEDIA_LIBRARY_STORE,
-  PROJECT_EXPORTS_STORE,
-} from '../infrastructure/indexed-db/core';
-import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
+import { deleteUnreferencedMediaSource } from '../media-library/delete-cascade';
+import { MediaAssetDeletionBlockedError } from '../media-library/deletion-errors';
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
+import { ASSET_REFS_STORE, initDB, PROJECT_EXPORTS_STORE } from '../infrastructure/indexed-db/core';
 import {
   assertAssetWriteAdmission,
-  buildPhysicalDeleteOperation,
-  completePhysicalDeleteOperation,
   createAssetPublicationJournal,
   discardPreparedAsset,
   parseAssetRef,
@@ -29,14 +18,11 @@ import type { HydratedProjectExportEntry, StoredProjectExportEntry } from './con
 import { parseProjectExportEntry } from './read-guards';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import {
-  PROJECT_EXPORT_OWNER_KIND,
   PROJECT_EXPORT_PUBLICATION_DOMAIN,
-  PROJECT_MEDIA_ASSET_ROLE,
   publishProjectExportJournal,
   recoverProjectMediaPublications,
   type ProjectExportPublicationPayload,
 } from './asset-publication';
-import { deletePublishedProjectEntry } from './asset-references';
 
 export type SaveProjectExportInput = Omit<StoredProjectExportEntry, 'assetId' | 'size'> & {
   blob?: Blob;
@@ -44,6 +30,9 @@ export type SaveProjectExportInput = Omit<StoredProjectExportEntry, 'assetId' | 
 };
 
 function validateProjectExportInput(input: SaveProjectExportInput): void {
+  if (input.recordingMetadata !== undefined && !parseRecordingMetadata(input.recordingMetadata)) {
+    throw new Error('Export acquisition metadata is invalid.');
+  }
   if ((input.blob ? 1 : 0) + (input.preparedAsset ? 1 : 0) !== 1) {
     throw new Error('Project export must provide exactly one binary source.');
   }
@@ -55,7 +44,18 @@ export async function saveProjectExport(input: SaveProjectExportInput): Promise<
 
 export async function commitProjectExport(input: SaveProjectExportInput): Promise<void> {
   validateProjectExportInput(input);
-  await recoverProjectMediaPublications();
+  // Supplied staging objects already hold a transition lease; recovery cannot
+  // wait for that lease while publication is waiting for recovery.
+  let expectedAssetId: string | null = null;
+  if (!input.preparedAsset) {
+    await recoverProjectMediaPublications();
+    const sourceDb = await initDB();
+    const rawPrevious: unknown = await sourceDb.get(PROJECT_EXPORTS_STORE, input.id);
+    const previous = parseProjectExportEntry(rawPrevious);
+    if (rawPrevious !== undefined && (!previous || previous.id !== input.id))
+      throw new Error('Invalid existing project export.');
+    expectedAssetId = previous?.assetId ?? null;
+  }
   if (input.blob) await assertAssetWriteAdmission(input.blob.size);
   const prepared =
     input.preparedAsset ??
@@ -75,10 +75,13 @@ export async function commitProjectExport(input: SaveProjectExportInput): Promis
     width: input.width,
     ...(input.format ? { format: input.format } : {}),
     mimeType: prepared.ref.mimeType,
+    ...(input.recordingMetadata
+      ? { recordingMetadata: parseRecordingMetadata(input.recordingMetadata)! }
+      : {}),
   };
   let journalCreated = false;
   try {
-    const payload: ProjectExportPublicationPayload = { entry };
+    const payload: ProjectExportPublicationPayload = { entry, expectedAssetId };
     const journal = await createAssetPublicationJournal({
       assetRefs: [prepared.ref],
       domain: PROJECT_EXPORT_PUBLICATION_DOMAIN,
@@ -121,38 +124,13 @@ export async function listAllProjectExports(): Promise<StoredProjectExportEntry[
 
 export async function deleteProjectExport(id: string): Promise<void> {
   await recoverProjectMediaPublications();
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        PROJECT_EXPORTS_STORE,
-        MEDIA_LIBRARY_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        ASSET_OWNERS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OPERATIONS_STORE,
-      ],
-      'readwrite'
-    );
-    const entry = parseProjectExportEntry(await tx.objectStore(PROJECT_EXPORTS_STORE).get(id));
-    const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-    await deletePublishedProjectEntry({
-      countAssetOwners: (assetId) => ownerStore.index('assetId').count(assetId),
-      deleteAssetEntry: () => tx.objectStore(PROJECT_EXPORTS_STORE).delete(id),
-      deleteAssetOwner: () =>
-        ownerStore.delete([PROJECT_EXPORT_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
-      deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
-      deleteMediaEntry: async () => {
-        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectExportMediaId(id));
-        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createProjectExportMediaId(id));
-        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createProjectExportMediaId(id));
-      },
-      entry,
-      operation: physicalDelete,
-      recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),
-    });
-    await tx.done;
+  const db = await initDB();
+  const raw: unknown = await db.get(PROJECT_EXPORTS_STORE, id);
+  if (raw === undefined) return;
+  const entry = parseProjectExportEntry(raw);
+  if (!entry || entry.id !== id) throw new MediaAssetDeletionBlockedError('source-unavailable');
+  await deleteUnreferencedMediaSource({
+    id: createProjectExportMediaId(id),
+    source: { kind: 'project-export', exportId: id, projectId: entry.projectId },
   });
-  if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
 }

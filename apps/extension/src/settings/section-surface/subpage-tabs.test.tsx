@@ -24,10 +24,13 @@ it('uses ordinary route-navigation semantics and reports the selected destinatio
   );
   expect(container.querySelector('nav')?.getAttribute('aria-label')).toBe('Media');
   expect(container.querySelector('nav')?.className).toContain('sticky');
-  expect(container.querySelector('nav')?.className).toContain('top-0');
+  expect(container.querySelector('nav')?.className).toContain('settings-scroll-inset-top');
   expect(container.querySelector('[aria-current="page"]')?.textContent).toBe('Images');
-  expect(container.querySelector('nav')?.className).not.toContain('border');
+  expect(container.querySelector('nav')?.className).toContain('border-b');
   expect(container.querySelector('nav')?.className).not.toContain('shadow');
+  expect(container.querySelector('nav')?.style.backgroundColor).toBe(
+    'var(--sniptale-color-surface-canvas)'
+  );
   const activeButton = container.querySelector('[aria-current="page"]');
   const inactiveButton = container.querySelectorAll('button')[1];
   expect(activeButton?.className).toContain('min-h-11');
@@ -41,6 +44,24 @@ it('uses ordinary route-navigation semantics and reports the selected destinatio
   expect(inactiveButton?.className).toContain('hover:text-[var(--sniptale-color-text-primary)]');
   act(() => container.querySelectorAll('button')[1]?.click());
   expect(onChange).toHaveBeenCalledWith('video');
+  act(() => root.unmount());
+});
+
+it('keeps nested subpage navigation inline without competing for the sticky edge', () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  act(() =>
+    root.render(
+      <SettingsSubpageTabs
+        activeId="required"
+        ariaLabel="Permissions"
+        items={[{ id: 'required', label: 'Required' }]}
+        placement="inline"
+      />
+    )
+  );
+  expect(container.querySelector('nav')?.className).not.toContain('sticky');
+  expect(container.querySelector('nav')?.className).not.toContain('border-b');
   act(() => root.unmount());
 });
 

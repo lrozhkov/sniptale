@@ -1,3 +1,7 @@
+import {
+  parseContextMenuLayout,
+  repairStoredContextMenuTree,
+} from '../../../contracts/settings/context-menu-layout';
 import type { ContextMenuSettings, Settings } from '../../../contracts/settings';
 import { isBoolean, isRecord } from '../infrastructure/guards/primitives';
 
@@ -74,7 +78,16 @@ function parseContextMenuSettings(value: unknown): ParsedContextMenuField {
   }
 
   const nextValue: Partial<ContextMenuSettings> = {};
-  const invalidFieldCount = assignParsedContextMenuBooleanFields(nextValue, value);
+  let invalidFieldCount = assignParsedContextMenuBooleanFields(nextValue, value);
+  if (value['layout'] !== undefined) {
+    const layout = parseContextMenuLayout(value['layout']);
+    if (layout) nextValue.layout = layout;
+    else {
+      const repaired = repairStoredContextMenuTree(value['layout']);
+      if (repaired) nextValue.layout = repaired;
+      invalidFieldCount += 1;
+    }
+  }
 
   return { hasInvalidRoot: false, invalidFieldCount, value: nextValue };
 }

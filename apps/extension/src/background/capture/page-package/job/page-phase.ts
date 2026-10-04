@@ -151,6 +151,9 @@ async function requestPopupExportPagePackage(
       intent: job.status.intent,
       ordinal,
       options,
+      ...(job.sourceDocumentId && selected.tabId === job.status.orderedTabs[0]?.tabId
+        ? { sourceDocumentId: job.sourceDocumentId }
+        : {}),
       tabId: selected.tabId,
     }),
     job.abortController.signal

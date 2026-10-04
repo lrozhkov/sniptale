@@ -92,7 +92,12 @@ function ScenarioPreviewImage({ image }: { image: ScenarioPreviewStep['images'][
         )}
       </div>
       {image.caption && (
-        <figcaption className="break-words px-4 py-2 text-sm">{image.caption}</figcaption>
+        <figcaption
+          className="break-words px-4 py-2 text-sm"
+          style={{ textAlign: image.captionAlignment ?? 'center' }}
+        >
+          {image.caption}
+        </figcaption>
       )}
     </figure>
   );

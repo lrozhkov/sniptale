@@ -46,6 +46,22 @@ describe('frame UI store visibility hierarchy', () => {
     });
   });
 
+  it('releases selected frame highlight when its open popover is toggled closed', () => {
+    const store = useFrameUIStore.getState();
+    store.selectFrame('frame-a');
+    store.togglePopover('frame-a', 'frame-settings');
+    store.togglePopover('frame-a', 'frame-settings');
+
+    expect(useFrameUIStore.getState()).toMatchObject({
+      selectedFrameId: null,
+      activePopover: null,
+    });
+
+    store.selectFrame('frame-a');
+    store.togglePopover('frame-a', 'frame-settings');
+    expect(useFrameUIStore.getState().activePopover).toMatchObject({ frameId: 'frame-a' });
+  });
+
   it('keeps quick popovers independent from selection authority', () => {
     const store = useFrameUIStore.getState();
 

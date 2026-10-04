@@ -30,7 +30,12 @@ function getNodeTitle(value: React.ReactNode): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
-export function ColorField({ className, ...props }: CompactColorSelectorProps) {
+/** Stacked fields give the selector a full row; inline fields retain compact value sizing. */
+export function ColorField({
+  className,
+  layout = 'inline',
+  ...props
+}: CompactColorSelectorProps & { layout?: 'inline' | 'stacked' }) {
   const [open, setOpen] = useState(false);
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
@@ -42,11 +47,15 @@ export function ColorField({ className, ...props }: CompactColorSelectorProps) {
       data-ui="shared.ui.compact-inspector.color-field"
       data-open={open ? 'true' : 'false'}
       className={cx(
-        'flex min-h-10 w-full min-w-0 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-        open
-          ? 'border-[color:var(--sniptale-color-border-accent-strong)]'
-          : 'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
+        layout === 'stacked'
+          ? 'flex w-full min-w-0 flex-col items-stretch gap-1'
+          : cx(
+              'flex min-h-10 w-full min-w-0 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
+              'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
+              open
+                ? 'border-[color:var(--sniptale-color-border-accent-strong)]'
+                : 'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]'
+            ),
         className
       )}
     >
@@ -55,7 +64,7 @@ export function ColorField({ className, ...props }: CompactColorSelectorProps) {
       </span>
       <CompactColorSelector
         {...props}
-        className={COLOR_TRIGGER_CLASS_NAME}
+        className={layout === 'stacked' ? 'w-full min-w-0' : COLOR_TRIGGER_CLASS_NAME}
         onOpenChange={handleOpenChange}
       />
     </div>

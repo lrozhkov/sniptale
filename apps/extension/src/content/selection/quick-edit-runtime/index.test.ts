@@ -320,3 +320,25 @@ describe('quick-edit runtime', () => {
     verifyEscapeDisablesDocumentModeFirst
   );
 });
+
+it('finishes inline edits explicitly while keeping Content Editing enabled after owned toolbar focus', () => {
+  const controller = createQuickEditRuntimeController({ onDisableRequested: vi.fn() });
+  const element = createTextElement();
+  controller.mode.enable();
+  element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  element.textContent = 'Changed text';
+  const toolbar = document.createElement('div');
+  toolbar.dataset['ui'] = 'content.toolbar.root';
+  const button = document.createElement('button');
+  toolbar.append(button);
+  document.body.append(toolbar);
+  button.click();
+  expect(controller.editing.getEditingElements().size).toBe(1);
+  controller.editing.finishPendingChanges();
+  expect(historyMocks.commitTransaction).toHaveBeenCalledOnce();
+  expect(controller.editing.getEditingElements().size).toBe(0);
+  expect(element.contentEditable).not.toBe('true');
+  expect(element.textContent).toBe('Changed text');
+  expect(controller.mode.isEnabled()).toBe(true);
+  controller.mode.disable();
+});

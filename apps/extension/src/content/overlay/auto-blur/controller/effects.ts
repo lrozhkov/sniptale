@@ -130,16 +130,16 @@ export function useAutoBlurScanEffect(args: {
 }
 
 export function useHighlighterModeCloseEffect(args: {
-  autoApplyAllowed: boolean;
   closeForMode: () => void;
   highlighterMode: boolean;
+  navigationMode: boolean;
   isOpen: boolean;
 }) {
-  const { autoApplyAllowed, closeForMode, highlighterMode, isOpen } = args;
+  const { closeForMode, highlighterMode, navigationMode, isOpen } = args;
 
   useEffect(() => {
-    if (!highlighterMode && !autoApplyAllowed && isOpen) {
+    if (!highlighterMode && !navigationMode && isOpen) {
       closeForMode();
     }
-  }, [autoApplyAllowed, closeForMode, highlighterMode, isOpen]);
+  }, [closeForMode, highlighterMode, navigationMode, isOpen]);
 }

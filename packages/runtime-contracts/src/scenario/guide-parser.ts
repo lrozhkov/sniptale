@@ -116,6 +116,7 @@ const image = z
     editDocumentId: id.nullable(),
     alt: text,
     caption: text,
+    captionAlignment: z.enum(['start', 'center', 'end']).optional(),
     source: scenarioImageSourceSchema,
     frame: z
       .object({
@@ -242,6 +243,7 @@ const projectSchema = z
                         fit: true,
                         alt: true,
                         caption: true,
+                        captionAlignment: true,
                       })
                       .extend({ kind: z.literal('image-slot') })
                       .strict(),

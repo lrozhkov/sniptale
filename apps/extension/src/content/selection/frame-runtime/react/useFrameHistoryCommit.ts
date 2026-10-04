@@ -58,7 +58,7 @@ function runWithFrameHistoryCommit<T extends (...args: never[]) => unknown>(args
   queueDeferredCommit: (commitId: number) => void;
   setFrames: FrameSetter;
 }): ReturnType<T> {
-  const hasExternalTransaction = pagePreparationHistory.hasOpenTransactions();
+  const hasExternalTransaction = pagePreparationHistory.hasOpenTransactions('annotation');
   const commitId = hasExternalTransaction ? null : pagePreparationHistory.beginDeferredCommit();
   if (!hasExternalTransaction && commitId === null) {
     throw new Error('Frame history transaction is unavailable');

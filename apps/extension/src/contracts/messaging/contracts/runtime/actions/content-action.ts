@@ -33,7 +33,12 @@ import {
   isActivateVideoRecordingSurfaceMessage,
   isStartSavedTabVideoRecordingMessage,
   isVideoRecordingSurfaceSnapshot,
+  isVideoRecordingStartFailureCode,
 } from '@sniptale/runtime-contracts/video/types/messages.surface';
+
+function isLibraryDestinationRequestedMarker(value: unknown): value is true {
+  return value === true;
+}
 
 function isDesktopScreenshotPreparationRequest(value: unknown): value is {
   type: typeof MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE;
@@ -52,6 +57,7 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
   result: 'ready';
   imageFormat: ScreenshotImageFormat;
   imageQuality: number;
+  delaySeconds: number;
   requestId: string;
   reservationToken: string;
 }> {
@@ -60,6 +66,7 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
       result: isString,
       imageFormat: isString,
       imageQuality: isNumber,
+      delaySeconds: isNumber,
       requestId: isString,
       reservationToken: isString,
     },
@@ -69,6 +76,10 @@ function isDesktopScreenshotPreparationResponse(value: unknown): value is Runtim
   if (response['success'] !== true) return true;
   return (
     response['result'] === 'ready' &&
+    (response['delaySeconds'] === 0 ||
+      response['delaySeconds'] === 3 ||
+      response['delaySeconds'] === 5 ||
+      response['delaySeconds'] === 10) &&
     isScreenshotImageFormat(response['imageFormat']) &&
     isNumber(response['imageQuality']) &&
     Number.isFinite(response['imageQuality']) &&
@@ -92,6 +103,7 @@ export const contentActionRuntimeContracts = {
           surfaceSessionId: isString,
           surfaceToken: isString,
           snapshot: isVideoRecordingSurfaceSnapshot,
+          failureCode: isVideoRecordingStartFailureCode,
         },
       })
     ),
@@ -179,7 +191,10 @@ export const contentActionRuntimeContracts = {
       'runtime OPEN_EXPORT_MODAL message',
       createMessageGuard({
         type: MessageType.OPEN_EXPORT_MODAL,
-        optional: { contentIntent: isContentPrivilegedActionCapability },
+        optional: {
+          contentIntent: isContentPrivilegedActionCapability,
+          startExport: (value) => typeof value === 'boolean',
+        },
       })
     ),
     parseResponse: createGuardParser(
@@ -197,6 +212,7 @@ export const contentActionRuntimeContracts = {
           requestId: isString,
           source: isContentPrivilegedActionRequestSource,
         },
+        optional: { libraryDestinationRequested: isLibraryDestinationRequestedMarker },
       })
     ),
     parseResponse: createGuardParser(

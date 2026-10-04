@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import { initDB } from '../../../composition/persistence/infrastructure/indexed-db/core';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import type {
@@ -15,6 +16,7 @@ import {
 } from '../../../composition/persistence/settings-transfer';
 import { runWithExclusivePersistenceMutationPermit } from '../../../composition/persistence/infrastructure/mutation-barrier';
 import {
+  assertDurableSettingsTransferCatalogs,
   buildSettingsTransferPackage,
   buildExactRestoreDomainsBySelection,
   buildSettingsTransferTree,
@@ -44,7 +46,11 @@ export async function executeSettingsTransferOperation(message: SettingsTransfer
         tree,
       });
       return {
-        filename: createFilename(message.exportKind),
+        filename: await createOutputFilename({
+          category: 'resources',
+          type: `settings-${message.exportKind}`,
+          extension: 'sniptale-settings.json',
+        }),
         fileText: built.fileText,
       };
     }
@@ -71,9 +77,13 @@ async function inspectSettingsTransfer(fileText: string): Promise<SettingsTransf
     imported,
     strategy: 'safe-merge',
   });
+  assertDurableSettingsTransferCatalogs(
+    Object.fromEntries(Object.keys(imported).map((domainId) => [domainId, plan.domains[domainId]!]))
+  );
   const exactRestoreAvailable =
     transferPackage.exportKind === 'backup' &&
     isCompleteSettingsTransferBackup({ imported, current: currentDomains });
+  if (exactRestoreAvailable) assertDurableSettingsTransferCatalogs(imported);
   return {
     fingerprint: await fingerprintSettingsTransferDomains(currentDomains),
     package: { ...transferPackage, domains: imported },
@@ -136,6 +146,7 @@ async function commitSettingsTransfer(
     const affectedDomains = Object.fromEntries(
       Object.keys(selected).map((domainId) => [domainId, plan.domains[domainId]!])
     );
+    assertDurableSettingsTransferCatalogs(affectedDomains);
     const validatedDomains = parseSettingsTransferDomains(affectedDomains);
     await applySettingsTransferDomains({
       domains: validatedDomains,
@@ -161,10 +172,6 @@ function readAppVersion(): string {
   } catch {
     return '0.0.0';
   }
-}
-
-function createFilename(kind: 'backup' | 'selective'): string {
-  return `sniptale-settings-${kind}-${new Date().toISOString().slice(0, 10)}.sniptale-settings.json`;
 }
 
 export class SettingsTransferStalePlanError extends Error {}

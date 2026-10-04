@@ -86,7 +86,7 @@ describe('selection-mode final frame', () => {
     createSelectionModeFinalResizeHandles(frame, '#ef4444', 2);
 
     expect(frame.style.cssText).toContain('cursor: move');
-    expect(frame.style.cssText).toContain('border: 2px solid rgb(239, 68, 68)');
+    expect(frame.style.cssText).toContain('outline: 2px solid #ef4444');
     expect(
       frame.querySelector<HTMLElement>('.sniptale-resize-handle[data-direction="e"]')?.style.cssText
     ).toContain('cursor: ew-resize');

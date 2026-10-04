@@ -71,16 +71,44 @@ export const editorToolbarMessages = defineMessageSource({
     en: 'Reset to original',
   },
   resetOriginalTitle: {
-    ru: 'Сбросить все изменения?',
-    en: 'Reset all changes?',
+    ru: 'Вернуться к началу истории?',
+    en: 'Return to the start of history?',
   },
   resetOriginalMessage: {
-    ru: 'Документ вернётся к исходному состоянию. Эту операцию нельзя отменить.',
-    en: 'The document will return to its original state. This action cannot be undone.',
+    ru: 'Документ перейдёт к самому раннему состоянию истории. Изменения можно вернуть кнопкой «Повторить».',
+    en: 'The document will return to the earliest state in history. You can restore edits with Redo.',
   },
   resetOriginalTooltip: {
-    ru: 'Вернуть документ к исходному состоянию. Операцию нельзя отменить.',
-    en: 'Return the document to its original state. This action cannot be undone.',
+    ru: 'История и оригинал изображения',
+    en: 'History and original image',
+  },
+  historyChoicesTitle: {
+    ru: 'Вернуть изображение',
+    en: 'Revert image',
+  },
+  historyStart: {
+    ru: 'К началу истории',
+    en: 'To the start of history',
+  },
+  historyStartDescription: {
+    ru: 'К самому раннему доступному шагу. Правки можно повторить.',
+    en: 'Go to the earliest available step. Edits can be redone.',
+  },
+  restoreOriginal: {
+    ru: 'Восстановить оригинал',
+    en: 'Restore original',
+  },
+  restoreOriginalDescription: {
+    ru: 'Вернуть исходный файл и удалить всю историю правок.',
+    en: 'Restore the source file and delete all edit history.',
+  },
+  restoreOriginalTitle: {
+    ru: 'Восстановить оригинал?',
+    en: 'Restore the original?',
+  },
+  restoreOriginalMessage: {
+    ru: 'Документ вернётся к исходному снимку или файлу. Вся история правок будет удалена без возможности отмены.',
+    en: 'The document will return to the source capture or file. All edit history will be permanently deleted.',
   },
   annotationFrame: {
     ru: 'Рамка',
@@ -97,6 +125,10 @@ export const editorToolbarMessages = defineMessageSource({
   workspace: {
     ru: 'Рабочая зона',
     en: 'Workspace',
+  },
+  viewSettings: {
+    ru: 'Настройки рабочей зоны',
+    en: 'Workspace settings',
   },
   gridMode: {
     ru: 'Режим сетки',
@@ -193,6 +225,10 @@ export const editorToolbarMessages = defineMessageSource({
   layersTitle: {
     ru: 'Слои',
     en: 'Layers',
+  },
+  showOutsideCanvas: {
+    ru: 'Показывать фигуры за границей изображения',
+    en: 'Show shapes outside the image',
   },
   layersPreferenceSaveFailed: {
     ru: 'Не удалось сохранить состояние панели слоев.',

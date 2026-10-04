@@ -1,12 +1,9 @@
+import { createOutputFilename } from '../../workflows/file-naming/index';
 import { saveWebSnapshotMediaAssetSafely } from '../../workflows/media-hub/store';
 import { createMediaHubStorageHeadroomError } from '../../features/media-hub/storage-errors';
-import { sanitizeWebSnapshotFilename } from '../../features/web-snapshot/public';
 import { sanitizeWebSnapshotManifestProvenance } from '../../features/web-snapshot/provenance';
 import { ensureMediaHubStorageHeadroom } from '../../features/media-hub/storage-capacity';
-import type {
-  WebSnapshotManifest,
-  WebSnapshotSaveToGalleryPayload,
-} from '@sniptale/runtime-contracts/web-snapshot';
+import type { WebSnapshotSaveToGalleryPayload } from '@sniptale/runtime-contracts/web-snapshot';
 import { validateWebSnapshotPackage } from './web-snapshot-validation';
 
 interface SaveWebSnapshotToMediaHubInput {
@@ -15,11 +12,6 @@ interface SaveWebSnapshotToMediaHubInput {
   packageBlob: Blob;
   payload: WebSnapshotSaveToGalleryPayload;
   screenshotBlob: Blob;
-}
-
-function createSnapshotFilename(manifest: WebSnapshotManifest): string {
-  const sourceTitle = manifest.source.title ?? manifest.source.url ?? 'web-snapshot';
-  return `${sanitizeWebSnapshotFilename(sourceTitle, 'web-snapshot')}.sniptale-page-package.zip`;
 }
 
 function createWebSnapshotMediaHubStageError(stage: string, error: unknown): Error {
@@ -55,11 +47,17 @@ export async function saveWebSnapshotToMediaHub(
   await runWebSnapshotMediaHubStage('ensure web snapshot storage headroom', () =>
     ensureWebSnapshotStorageHeadroom(packageBlob.size + screenshotBlob.size)
   );
+  const filename = await createOutputFilename({
+    category: 'documents',
+    type: 'web-snapshot',
+    title: sanitizedManifest.source.title ?? undefined,
+    extension: 'sniptale-page-package.zip',
+  });
   const result = await runWebSnapshotMediaHubStage('save web snapshot media asset', () =>
     saveWebSnapshotMediaAssetSafely(
       {
         ...(input.assetId ? { id: input.assetId } : {}),
-        filename: createSnapshotFilename(sanitizedManifest),
+        filename,
         manifest: sanitizedManifest,
         packageBlob,
         screenshotBlob,

@@ -18,6 +18,15 @@ import {
   updateEditorDrawingShapeDraft,
 } from '../../drawing/object/vector';
 import type { EditorControllerEventBindings } from './types';
+import { requestEditorFreehandPreview } from './runtime.render';
+import {
+  getEditorFreeCanvasBounds,
+  normalizeEditorCropSelection,
+  normalizeEditorFreeCanvasSelection,
+} from '../tools/crop';
+import { useEditorStore } from '../../state/useEditorStore';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
+import { getEditorCanvasWorkspaceInsets } from '../../document/canvas-surface/editing-surface';
 
 function collectFreehandSamples(canvas: Canvas, events: readonly TPointerEvent[]): DrawingSample[] {
   return events.flatMap((event) => {
@@ -56,14 +65,49 @@ function createDraftBoundsUpdate(start: { x: number; y: number }, point: { x: nu
 }
 
 function updateCropDraft(
+  bindings: EditorControllerEventBindings,
   canvas: Canvas,
   object: FabricObject,
   start: { x: number; y: number },
   point: { x: number; y: number }
 ): void {
-  const { properties } = createDraftBoundsUpdate(start, point);
+  const size = bindings.getCanvasDocumentSize();
+  const mode = useEditorStore.getState().canvasCropMode;
+  if (mode === 'expand' && canvas instanceof EditorCanvas) {
+    canvas.extendWorkspaceToContain({
+      left: point.x,
+      top: point.y,
+      right: point.x,
+      bottom: point.y,
+    });
+  }
+  const insets = getEditorCanvasWorkspaceInsets(canvas, size);
+  const freeBounds =
+    mode === 'expand' ? getEditorFreeCanvasBounds(size, canvas.getZoom(), insets) : null;
+  const constrainedPoint = freeBounds
+    ? {
+        x: Math.max(freeBounds.left, Math.min(freeBounds.right, point.x)),
+        y: Math.max(freeBounds.top, Math.min(freeBounds.bottom, point.y)),
+      }
+    : point;
+  const bounds = createDrawingBounds(start, constrainedPoint);
+  const selection =
+    mode === 'crop'
+      ? normalizeEditorCropSelection(
+          { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height },
+          size
+        )
+      : normalizeEditorFreeCanvasSelection(
+          { left: bounds.x, top: bounds.y, width: bounds.width, height: bounds.height },
+          size,
+          canvas.getZoom(),
+          insets
+        );
   object.set({
-    ...properties,
+    left: selection.left,
+    top: selection.top,
+    width: selection.width,
+    height: selection.height,
     scaleX: 1,
     scaleY: 1,
   });
@@ -125,7 +169,11 @@ function applyDrawingPreview(
     return;
   }
   if (updateVectorPreview(object, drawing) || updateShapePreview(object, drawing)) {
-    canvas.requestRenderAll();
+    if (drawing.kind === 'pencil' || drawing.kind === 'marker') {
+      requestEditorFreehandPreview(bindings);
+    } else {
+      canvas.requestRenderAll();
+    }
     return;
   }
   replaceDraft(bindings, canvas, object, drawing);
@@ -142,7 +190,7 @@ export function updateEditorDrawingDraft(
   const point = canvas.getScenePoint(event);
   session.lastPoint = point;
   if (session.tool === 'crop') {
-    updateCropDraft(canvas, session.object, session.start, point);
+    updateCropDraft(bindings, canvas, session.object, session.start, point);
     return;
   }
   const drawing = readEditorDrawingObject(session.object);
@@ -161,6 +209,10 @@ export function updateEditorDrawingDraft(
           ),
         }
       : updateCreatedDrawingObject({
+          arrowFreeAngle: drawing.kind === 'arrow',
+          ...(session.arrowDrawFromTip === undefined
+            ? {}
+            : { arrowFromTip: session.arrowDrawFromTip }),
           modifiers,
           object: drawing,
           point,

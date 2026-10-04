@@ -5,6 +5,7 @@ import {
   tourLinearTimeline,
   tourSlideDuration,
   tourEntranceTiming,
+  tourHighlightTiming,
 } from './timing';
 import type {
   TourAction,
@@ -154,4 +155,30 @@ it('budgets all sequential entry narration while activation cues remain gesture-
   expect(tourSlideDuration(tour, slide)).toBe(10000);
   slide.buttons[0]!.narration!.trigger = 'activation';
   expect(tourSlideDuration(tour, slide)).toBe(5000);
+});
+
+it('adds highlight phase budgets without shortening hold or animating other mask kinds', () => {
+  const { tour } = fixture();
+  const slide = createTourImageSlide('highlight');
+  const animation = {
+    enter: { kind: 'fade' as const, durationMs: 400 },
+    exit: { kind: 'fade' as const, durationMs: 200 },
+  };
+  slide.masks = [
+    {
+      id: 'mask',
+      kind: 'highlight',
+      rect: { x: 0, y: 0, width: 1, height: 1 },
+      opacity: 0.5,
+      color: '#ffffff',
+      highlightAnimation: animation,
+    },
+  ];
+  tour.slides = [slide];
+  expect(tourHighlightTiming(tour, slide)).toEqual({ enterMs: 400, exitMs: 200 });
+  expect(tourEntranceTiming(tour, slide).total).toBe(400);
+  expect(tourLinearTimeline(tour)!.duration).toBe(tourSlideDuration(tour, slide) + 600);
+  expect(tourHighlightTiming(tour, slide, true)).toEqual({ enterMs: 0, exitMs: 0 });
+  slide.masks[0]!.kind = 'redact';
+  expect(tourHighlightTiming(tour, slide)).toEqual({ enterMs: 0, exitMs: 0 });
 });

@@ -10,6 +10,7 @@ const selectorMocks = vi.hoisted(() => ({
   getFilteredGalleryItems: vi.fn(),
   getGalleryCounts: vi.fn(),
   getGalleryGridMetrics: vi.fn(),
+  createGalleryGridMetrics: vi.fn(),
 }));
 
 vi.mock('./selectors', () => ({
@@ -21,6 +22,7 @@ vi.mock('./selectors', () => ({
   getGalleryCounts: selectorMocks.getGalleryCounts,
   getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: selectorMocks.getGalleryGridMetrics,
+  createGalleryGridMetrics: selectorMocks.createGalleryGridMetrics,
 }));
 
 import { useGalleryDerivedState } from './derived';
@@ -31,6 +33,7 @@ let latestValue: ReturnType<typeof useGalleryDerivedState> | null = null;
 
 const item = {
   id: 'asset-1',
+  type: 'media' as const,
   kind: 'screenshot' as const,
   filename: 'capture.png',
   originalFilename: 'capture.png',
@@ -70,7 +73,9 @@ function createProbeProps(
         setFolderFilter: vi.fn(),
         setFacetFilter: vi.fn(),
         setSearch: vi.fn(),
+        commitSearch: vi.fn(),
         setScope: vi.fn(),
+        setTrashMode: vi.fn(),
         setSelectedIds: vi.fn(),
         setSelectionTagDraft: vi.fn(),
         setSortMode: vi.fn(),
@@ -94,16 +99,20 @@ function createProbeProps(
         savedViewsLoadFailed: false,
         savedViewsLoaded: true,
         search: 'capture',
+        appliedSearch: 'capture',
         scope: 'library',
+        trashMode: false,
         selectedIds: new Set(['asset-1']),
         selectionTagDraft: '',
         sortMode: 'newest',
       },
     },
     library: {
+      hasLoadedLibrarySnapshot: true,
       isLoading: false,
       items: [item],
       refresh: vi.fn(),
+      trashUsage: { status: 'ready', bytes: 0 },
       storageInfo:
         storagePressure === undefined
           ? null
@@ -147,11 +156,16 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   latestValue = null;
+  selectorMocks.createGalleryGridMetrics.mockImplementation(
+    (geometry) => (viewport: object) =>
+      selectorMocks.getGalleryGridMetrics({ ...geometry, ...viewport })
+  );
   selectorMocks.getActiveStorageBarClass.mockReturnValue('storage-normal');
   selectorMocks.getAllGalleryTags.mockReturnValue(['alpha']);
   selectorMocks.getFilteredGalleryItems.mockReturnValue([item]);
   selectorMocks.getGalleryCounts.mockReturnValue({
     all: 1,
+    audio: 0,
     export: 0,
     recording: 0,
     scenario: 0,
@@ -192,4 +206,187 @@ it('passes non-healthy storage pressure through unchanged and handles missing st
 
   renderProbe(undefined);
   expect(selectorMocks.getActiveStorageBarClass).toHaveBeenLastCalledWith(undefined);
+});
+
+it('partitions trash before normal facets, counts, selection and search; trash ignores library filters', () => {
+  const props = createProbeProps('healthy');
+  const trashed = {
+    ...item,
+    id: 'trashed',
+    tags: ['trash-only'],
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1, trashedAt: 2 },
+  };
+  props.library.items = [item, trashed];
+  props.filters.state.selectedIds = new Set(['asset-1', 'trashed']);
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.trashSummary.count).toBe(1);
+  expect(latestValue?.allItems).toEqual([item]);
+  expect(latestValue?.selectedItems).toEqual([item]);
+  expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([item]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ items: [item] })
+  );
+  props.filters.state.trashMode = true;
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.trashSummary.count).toBe(1);
+  expect(latestValue?.allItems).toEqual([trashed]);
+  expect(latestValue?.selectedItems).toEqual([trashed]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      items: [trashed],
+      search: 'capture',
+      scope: 'all',
+      folderFilter: 'all',
+      activeTags: [],
+    })
+  );
+});
+
+it('counts every item in the current mode independently of storage scope', () => {
+  const props = createProbeProps('healthy');
+  const temporary = {
+    ...item,
+    id: 'temporary-asset',
+    lifecycle: { storageClass: 'temporary' as const, savedAt: 1, updatedAt: 1 },
+  };
+  const trashed = {
+    ...item,
+    id: 'trashed-asset',
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 1, trashedAt: 2 },
+  };
+  props.library.items = [item, temporary, trashed];
+
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getGalleryCounts).toHaveBeenLastCalledWith([item, temporary]);
+  expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([item]);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ scope: 'library' })
+  );
+
+  props.filters.state.scope = 'temporary';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getGalleryCounts).toHaveBeenLastCalledWith([item, temporary]);
+  expect(selectorMocks.getAllGalleryTags).toHaveBeenLastCalledWith([temporary]);
+
+  props.filters.state.trashMode = true;
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getGalleryCounts).toHaveBeenLastCalledWith([trashed]);
+});
+
+it.each([false, true])('keeps the %s mode selector idle for raw search edits', (trashMode) => {
+  const props = createProbeProps('healthy');
+  props.filters.state.trashMode = trashMode;
+  act(() => root?.render(<HookProbe {...props} />));
+  const initialCalls = selectorMocks.getFilteredGalleryItems.mock.calls.length;
+
+  for (const search of ['c', 'ca', 'cap']) {
+    props.filters.state.search = search;
+    act(() => root?.render(<HookProbe {...props} />));
+  }
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenCalledTimes(initialCalls);
+
+  props.filters.state.appliedSearch = 'cap';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenCalledTimes(initialCalls + 1);
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ search: 'cap' })
+  );
+
+  props.filters.state.sortMode = 'oldest';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(selectorMocks.getFilteredGalleryItems).toHaveBeenLastCalledWith(
+    expect.objectContaining({ search: 'cap', sortMode: 'oldest' })
+  );
+});
+
+it('keeps the complete Trash summary when search and type filters hide visible rows', () => {
+  const props = createProbeProps('healthy');
+  props.library.items = [
+    item,
+    {
+      ...item,
+      id: 'trash',
+      lifecycle: {
+        storageClass: 'library',
+        savedAt: 1,
+        updatedAt: 1,
+        trashedAt: 0,
+      },
+    },
+  ];
+  props.library.trashUsage = { status: 'ready', bytes: 3670016 };
+  props.filters.state.trashMode = true;
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.trashSummary).toEqual({
+    count: 1,
+    size: { status: 'ready', bytes: 3670016 },
+  });
+  selectorMocks.getFilteredGalleryItems.mockReturnValue([]);
+  props.filters.state.appliedSearch = 'no-match';
+  props.filters.state.folderFilter = 'recording';
+  act(() => root?.render(<HookProbe {...props} />));
+  expect(latestValue?.filteredItems).toEqual([]);
+  expect(latestValue?.trashSummary).toEqual({
+    count: 1,
+    size: { status: 'ready', bytes: 3670016 },
+  });
+});
+
+it('shows result actions only for committed Library result contexts', () => {
+  const props = createProbeProps('healthy');
+  const baseline: typeof props.filters.state = {
+    ...props.filters.state,
+    activeTags: [],
+    appliedSearch: '',
+    search: '',
+    scope: 'all' as const,
+  };
+  const contexts: Partial<typeof baseline>[] = [
+    { folderFilter: 'screenshot' as const },
+    { scope: 'library' as const },
+    { appliedSearch: 'needle' },
+    { activeTags: ['alpha'] },
+    {
+      activeSavedView: {
+        id: 'saved-view',
+        name: 'Saved',
+        createdAt: 1,
+        updatedAt: 1,
+        folderFilter: 'all',
+        filters: { scope: 'all', activeTags: [], facetFilters: baseline.facetFilters },
+      },
+    },
+    { facetFilters: { ...baseline.facetFilters, format: ['png'] } },
+  ];
+  function renderState(overrides: Partial<typeof baseline>) {
+    act(() =>
+      root?.render(
+        <HookProbe
+          {...props}
+          filters={{ ...props.filters, state: { ...baseline, ...overrides } }}
+        />
+      )
+    );
+    return latestValue?.hasResultContext;
+  }
+  expect(renderState({})).toBe(false);
+  expect(renderState({ search: 'unfinished query' })).toBe(false);
+  expect(renderState({ appliedSearch: '  ' })).toBe(false);
+  for (const context of contexts) {
+    expect(renderState(context)).toBe(true);
+    expect(renderState({ ...context, trashMode: true })).toBe(false);
+  }
+});
+
+it('prepares grid geometry only when items, width or mode change', () => {
+  const props = createProbeProps('healthy');
+  act(() => root?.render(<HookProbe {...props} />));
+  act(() =>
+    root?.render(<HookProbe {...props} viewport={{ ...props.viewport, scrollTop: 220 }} />)
+  );
+  expect(selectorMocks.createGalleryGridMetrics).toHaveBeenCalledTimes(1);
+  act(() =>
+    root?.render(<HookProbe {...props} viewport={{ ...props.viewport, gridWidth: 640 }} />)
+  );
+  expect(selectorMocks.createGalleryGridMetrics).toHaveBeenCalledTimes(2);
 });

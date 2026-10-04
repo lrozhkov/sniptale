@@ -1,4 +1,6 @@
-import { Control } from 'fabric';
+// @vitest-environment jsdom
+
+import { Canvas, Control, FabricObject } from 'fabric';
 import { expect, it, vi } from 'vitest';
 
 import { applyEditorObjectInteractionControls } from './interaction-controls/apply';
@@ -42,6 +44,24 @@ it('applies Miro-style corner-only visual controls with hidden edge resize targe
   expect(controls.tl.sizeX).toBe(17);
   expect(controls.mtr.withConnection).toBe(false);
   expect(controls.mtr.offsetY).toBe(-32);
+});
+
+it('uses diagonal cursors for default box corners even on elongated objects', () => {
+  const canvas = new Canvas(document.createElement('canvas'));
+  const object = new FabricObject({ width: 600, height: 12 });
+  canvas.add(object);
+  applyEditorObjectInteractionControls(object);
+  object.setCoords();
+  const control = object.controls['tl']!;
+
+  expect(
+    control.cursorStyleHandler(
+      new MouseEvent('mousemove'),
+      control,
+      object,
+      object.calcOCoords()['tl']!
+    )
+  ).toBe('nwse-resize');
 });
 
 it('renders hover-expanded corner and rotation controls while keeping edge controls invisible', () => {
@@ -129,7 +149,7 @@ it('shrinks corner handles smoothly for compact selected objects', () => {
 it('activates hidden edge resize controls along the whole border except corner handle zones', () => {
   const controls = createControlSet();
   const object = {
-    canvas: { getActiveObject: vi.fn() },
+    canvas: { getActiveObject: vi.fn(), viewportTransform: [1, 0, 0, 1, 0, 0] },
     controls,
     getCoords: () => [
       { x: 100, y: 100 },

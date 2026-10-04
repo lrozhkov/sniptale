@@ -70,17 +70,29 @@ beforeEach(() => {
   resetCountdownState();
 });
 
-it('enters COUNTDOWN state and clears the session id after a successful countdown', async () => {
-  await expect(runVideoRecordingCountdown(7, CaptureMode.TAB, defaultSettings)).resolves.toBe(true);
+it.each([3, 5, 10])(
+  'applies a %s second countdown and clears the session after success',
+  async (seconds) => {
+    await expect(
+      runVideoRecordingCountdown(7, CaptureMode.TAB, {
+        ...defaultSettings,
+        countdownSeconds: seconds,
+      })
+    ).resolves.toBe(true);
 
-  expect(setVideoRecordingCountdownSessionId).toHaveBeenNthCalledWith(1, 'session-1');
-  expect(setVideoRecordingRuntimeState).toHaveBeenCalledWith({
-    status: VideoRecordingStatus.COUNTDOWN,
-    countdownEndsAt: Date.now() + 3000,
-  });
-  expect(waitForCountdownTimer).toHaveBeenCalledWith('session-1', 3000, expect.any(Function));
-  expect(setVideoRecordingCountdownSessionId).toHaveBeenLastCalledWith(null);
-});
+    expect(setVideoRecordingCountdownSessionId).toHaveBeenNthCalledWith(1, 'session-1');
+    expect(setVideoRecordingRuntimeState).toHaveBeenCalledWith({
+      status: VideoRecordingStatus.COUNTDOWN,
+      countdownEndsAt: Date.now() + seconds * 1000,
+    });
+    expect(waitForCountdownTimer).toHaveBeenCalledWith(
+      'session-1',
+      seconds * 1000,
+      expect.any(Function)
+    );
+    expect(setVideoRecordingCountdownSessionId).toHaveBeenLastCalledWith(null);
+  }
+);
 
 it('uses PREPARING state when countdown is disabled', async () => {
   await expect(

@@ -33,10 +33,10 @@ describe('i18n runtime contract', () => {
     expect(translate('content.toolbar.quickEditDocumentModeDisable', 'en')).toBe(
       'Turn off free text edit'
     );
-    expect(translate('content.toolbar.localHtmlSaveLabel', 'ru')).toBe(
-      'Сохранить подготовленную HTML-страницу'
+    expect(translate('content.toolbar.clearPagePreparation', 'ru')).toBe('Сбросить всё');
+    expect(translate('content.toolbar.modeChangesCleared', 'en')).toBe(
+      'Changes in the current mode reset'
     );
-    expect(translate('content.toolbar.localHtmlSaveSaved', 'en')).toBe('Prepared HTML page saved');
   });
 
   it('falls back to the default locale dictionary for unsupported locale ids', () => {
@@ -70,9 +70,7 @@ describe('Web Snapshot i18n naming', () => {
     expect(translate('shared.mediaHub.saveWebSnapshotAction', 'ru')).toBe(
       'сохранение Веб-снимка в Библиотеку'
     );
-    expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe(
-      'Sniptale Web Snapshot'
-    );
+    expect(translate('webSnapshotViewer.app.documentTitleFallback', 'en')).toBe('Web Snapshot');
     expect(translate('gallery.preview.kindWebSnapshot', 'en')).toBe('Web Snapshot');
     expect(translate('gallery.preview.folderWebSnapshot', 'en')).toBe('Web Snapshots');
   });

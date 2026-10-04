@@ -11,11 +11,12 @@ const historyControllerMock = vi.fn();
 const workspaceSpy = vi.fn();
 const paletteSpy = vi.fn();
 const statusSpy = vi.fn();
+const startSpy = vi.fn();
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   useAppLocale: () => useAppLocaleMock(),
-  usePageLocaleMetadata: () => useAppLocaleMock(),
+  usePageLocaleMetadata: (...args: unknown[]) => useAppLocaleMock(...args),
 }));
 vi.mock('../../../ui/command-palette/hotkey', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../ui/command-palette/hotkey')>()),
@@ -48,13 +49,19 @@ vi.mock('../status-screen', () => ({
     return <div data-testid="status" />;
   },
 }));
+vi.mock('./start', () => ({
+  VideoEditorStart: () => {
+    startSpy();
+    return <div data-testid="start" />;
+  },
+}));
 
 interface AppControllerFixture {
   palette: Record<string, unknown>;
   shell: {
     error: string | null;
     isReady: boolean;
-    project: { id: string } | null;
+    project: { id: string; name?: string } | null;
   };
 }
 
@@ -77,7 +84,7 @@ function createReadyController() {
     shell: {
       error: null,
       isReady: true,
-      project: { id: 'project-1' },
+      project: { id: 'project-1', name: 'Video project' },
     },
   };
 }
@@ -86,6 +93,7 @@ function verifyWorkspaceBranch() {
   renderAppWithController(createReadyController());
 
   expect(useAppLocaleMock).toHaveBeenCalledTimes(1);
+  expect(useAppLocaleMock).toHaveBeenCalledWith('videoEditor.app.documentTitle', 'Video project');
   expect(useCommandPaletteHotkeyMock.mock.calls[0]?.[0]).toMatchObject({
     enabled: true,
     isOpen: false,
@@ -135,4 +143,10 @@ describe('video editor app', () => {
   );
 
   it('renders loading and error branches from shell state', verifyStatusBranches);
+  it('renders the start surface without working chrome when ready and projectless', () => {
+    renderAppWithController({ palette: {}, shell: { error: null, isReady: true, project: null } });
+    expect(startSpy).toHaveBeenCalledOnce();
+    expect(workspaceSpy).not.toHaveBeenCalled();
+    expect(paletteSpy).not.toHaveBeenCalled();
+  });
 });

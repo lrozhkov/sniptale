@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
 import { DesignReviewSettings } from './view';
+import { NumericField } from './numeric-field';
 
 const actions: DesignReviewActions = {
   close: vi.fn(),
@@ -14,7 +15,7 @@ const actions: DesignReviewActions = {
     startComposition: vi.fn(),
     updateDraft: vi.fn(),
   },
-  copyElement: vi.fn(async () => undefined),
+  copyElement: vi.fn(async () => true),
   copyPath: vi.fn(async () => undefined),
   delete: vi.fn(),
   resetValue: vi.fn(),
@@ -94,8 +95,9 @@ it('uses compact non-collapsible navigation and renders only the active logical 
   );
   expect(container.querySelector('[data-ui="content.design-review.side-values"]')).toBeNull();
   expect(container.querySelector('[data-ui="content.design-review.field"]')?.className).toContain(
-    'grid-cols-[7rem_minmax(0,1fr)]'
+    '!grid-cols-1'
   );
+  expect(container.querySelector('[data-ui="content.design-review.close-settings"]')).toBeNull();
   expect(container.querySelector('input[type="file"]')).toBeNull();
 });
 
@@ -143,4 +145,49 @@ it('shows image layout properties without preview or asset-upload controls', () 
   act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
   expect(container.textContent).toContain('Цвет');
   expect(container.textContent).not.toContain('Вписывание');
+});
+
+it.each([
+  ['12', '12px'],
+  ['auto', 'auto'],
+  ['calc(100% - 2em)', 'calc(100% - 2em)'],
+  ['2em', '2em'],
+  ['50%', '50%'],
+  ['', ''],
+])('preserves numeric field input transition %s as %s', (draft, expected) => {
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <NumericField
+        label="Width"
+        value="8px"
+        defaultValue="8px"
+        disabled={false}
+        onChange={onChange}
+      />
+    )
+  );
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  expect(input.value).toBe('8');
+  const unit = container.querySelector(`[id="${input.getAttribute('aria-describedby')}"]`);
+  expect(unit?.textContent).toBe('px');
+  expect(unit?.getAttribute('aria-hidden')).toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, draft);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenLastCalledWith(expected);
+});
+
+it('tracks keyboard and portaled pointer intent without changing the settings selection', () => {
+  act(() => root.render(<DesignReviewSettings actions={actions} disabled={false} state={state} />));
+  const panel = container.querySelector('[data-ui="content.design-review.settings"]')!;
+  expect(panel.getAttribute('data-focus-modality')).toBe('pointer');
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
+  expect(panel.getAttribute('data-focus-modality')).toBe('keyboard');
+  act(() => document.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(panel.getAttribute('data-focus-modality')).toBe('pointer');
+  expect(panel.querySelector('button[aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
+    'Текст'
+  );
 });

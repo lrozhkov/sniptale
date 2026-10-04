@@ -1,9 +1,8 @@
-import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
-import type { AssetRef } from '../assets';
-import type { PersistedEditorDocumentV3 } from '../document-assets';
+import type { AssetRef } from '../assets/contracts';
+import type { PersistedEditorDocumentV3 } from '../document-assets/contracts';
 
 export interface ScenarioSavedVersion {
   revision: number;
@@ -29,6 +28,8 @@ export interface ScenarioAssetEntry {
   id: string;
   projectId: string;
   galleryAssetId: string | null;
+  /** Exact existing library identity whose immutable object this child borrows. */
+  borrowedMediaId?: string;
   mimeType: string;
   width: number;
   height: number;
@@ -42,6 +43,8 @@ export interface HydratedScenarioAssetEntry extends ScenarioAssetEntry {
 
 export interface PreparedScenarioAssetEntry extends ScenarioAssetEntry {
   assetRef: AssetRef;
+  /** Transient copy instruction: own a new Library row while reusing borrowed source bytes. */
+  independentLibraryIdentity?: true;
 }
 
 export interface PendingScenarioAssetEntry {
@@ -54,14 +57,7 @@ export interface PendingScenarioAssetEntry {
   size: number;
 }
 
-export interface ScenarioExportEntry {
-  id: string;
-  projectId: string;
-  format: ScenarioExportFormat;
-  filename: string;
-  createdAt: number;
-  size: number;
-}
+export type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 
 export interface ScenarioStepEditorDocumentEntry {
   stepId: string;

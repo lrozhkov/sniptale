@@ -22,9 +22,14 @@ import type { WebSnapshotRecord } from '../../composition/persistence/web-snapsh
 const NativeURL = URL;
 
 const mocks = vi.hoisted(() => ({
+  getMediaLibraryEntry: vi.fn(),
   getWebSnapshotRecord: vi.fn(),
   getWebSnapshotScreenshotFile: vi.fn(),
   validateRetainedWebSnapshotScreenshot: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/media-library/index.library', () => ({
+  getMediaLibraryEntry: mocks.getMediaLibraryEntry,
 }));
 
 vi.mock('../../composition/persistence/web-snapshots', async (importOriginal) => ({
@@ -259,6 +264,7 @@ function mockLargeViewerZip(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getMediaLibraryEntry.mockResolvedValue(null);
   mocks.getWebSnapshotScreenshotFile.mockResolvedValue(
     new File(['png'], 'snapshot.png', { type: 'image/png' })
   );
@@ -623,4 +629,43 @@ it('keeps frame layout installation safe before attachment and cleans its own po
     frame.contentDocument!.querySelectorAll('[data-sniptale-viewer-layout-policy]')
   ).toHaveLength(0);
   frame.remove();
+});
+
+it('retains the saved archive filename when re-downloading a snapshot', async () => {
+  await stubWebSnapshotRecord({});
+  mocks.getMediaLibraryEntry.mockResolvedValue({
+    filename: 'My saved capture.sniptale-page-package.zip',
+  });
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  expect(mocks.getMediaLibraryEntry).toHaveBeenCalledWith('snapshot-1');
+  expect(loaded.archiveFilename).toBe('My saved capture.sniptale-page-package.zip');
+});
+
+it('exports a loaded package with real verified web-copy extraction as standalone HTML', async () => {
+  class ReadableBlob extends Blob {
+    text(): Promise<string> {
+      return readTestBlobText(this);
+    }
+  }
+  vi.stubGlobal('Blob', ReadableBlob);
+  let ordinal = 0;
+  stubObjectUrlStatics({ createObjectURL: vi.fn(() => `blob:asset-${ordinal++}`) });
+  await stubWebSnapshotRecord({
+    html: '<link rel="stylesheet" href="../assets/site.css"><img src="../assets/image.png">',
+    extras: {
+      'assets/site.css': 'body { background: url(image.png); }',
+      'assets/image.png': createPagePackagePngBytes(),
+    },
+  });
+  const loaded = await loadWebSnapshotPackage('snapshot-1');
+  const { createWebSnapshotHtmlExport } = await import('../../features/web-snapshot/html-export');
+  const artifact = await createWebSnapshotHtmlExport(loaded);
+  const html = await readTestBlobText(artifact.blob);
+  expect(html).toContain('data:image/png;base64,');
+  expect(html).toContain('data:text/css;charset=utf-8;base64,');
+  expect(html).not.toContain('blob:');
+  expect(loaded.packageFiles).toEqual([]);
+  await expect(loaded.extractPackageFile(WEB_SNAPSHOT_PACKAGE_PATHS.snapshotHtml)).rejects.toThrow(
+    'not available for download'
+  );
 });

@@ -35,3 +35,19 @@ it('omits empty swatch sections', () => {
     )
   ).toBe('');
 });
+
+it('makes picker palette colors pointer targets with a visible hover scale', () => {
+  const markup = renderToStaticMarkup(
+    <ColorSelectorSwatchSection
+      colors={['#ffffff']}
+      label=""
+      showLabel={false}
+      selectedColor="#ffffff"
+      title="Color"
+      onSelect={() => undefined}
+    />
+  );
+
+  expect(markup).toContain('cursor-pointer');
+  expect(markup).toContain('hover:scale-110');
+});

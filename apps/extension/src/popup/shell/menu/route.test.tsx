@@ -133,6 +133,20 @@ it('uses the shared screenshot icon set for visible, full-page, and selection ca
   expect(
     container.querySelector('[title="popup.home.captureSelectionHint"] svg')?.getAttribute('class')
   ).toContain('lucide-crop');
+  const captureButtons = [
+    'popup.home.captureVisibleHint',
+    'popup.home.captureFullHint',
+    'popup.home.captureSelectionHint',
+  ].map((title) => container.querySelector<HTMLButtonElement>(`[title="${title}"]`));
+  expect(captureButtons.every((button) => button?.className.includes('group '))).toBe(true);
+  expect(
+    captureButtons.every((button) =>
+      button?.querySelector('svg')?.getAttribute('class')?.includes('group-hover:scale-110')
+    )
+  ).toBe(true);
+  expect(
+    captureButtons.every((button) => button?.querySelector('span')?.className.includes('scale-'))
+  ).toBe(false);
 });
 
 it('wires the workspace, direct page tools and menu-only footer', async () => {
@@ -150,6 +164,8 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
     clickLabel('popup.home.scenarioEditorLabel');
     clickLabel('content.toolbar.drawingLabel');
     clickLabel('content.toolbar.highlighterLabel');
+    clickLabel('content.toolbar.quickEditLabel');
+    clickLabel('content.toolbar.designReviewLabel');
   });
 
   expect(mocks.openLibrary).toHaveBeenCalledWith();
@@ -167,17 +183,60 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
       .find((button) => button.textContent?.includes('popup.home.scenarioEditorLabel'))
       ?.querySelector('svg')
       ?.getAttribute('class')
-  ).toContain('lucide-scroll-text');
-  expect(mocks.openScreenshotMode.mock.calls).toEqual([['drawing'], ['highlighter']]);
-  expect(container.querySelector('[data-ui="popup.menu.workspace"]')?.className).toBe(
-    'mt-auto shrink-0'
+  ).toContain('lucide-book-open');
+  expect(mocks.openScreenshotMode.mock.calls).toEqual([
+    ['drawing'],
+    ['highlighter'],
+    ['quick-edit'],
+    ['design-review'],
+  ]);
+  expect(container.querySelector('[data-ui="popup.menu.workspace"]')?.textContent).toContain(
+    'popup.home.workspaceTitle'
+  );
+  expect(container.querySelector('[data-ui="popup.menu.tools"]')?.textContent).toContain(
+    'popup.home.toolsLabel'
   );
   const toolButtons = [
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.drawing"]'),
     container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.highlighter"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.quick-edit"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.design-review"]'),
   ];
   expect(toolButtons.every((button) => button !== null)).toBe(true);
-  expect(toolButtons.every((button) => button?.className.includes('min-h-12'))).toBe(true);
+  const quickScenario = container.querySelector<HTMLButtonElement>(
+    '[title="popup.home.quickEditTabHint"]'
+  );
+  expect(toolButtons.every((button) => button?.className === quickScenario?.className)).toBe(true);
+  expect(container.querySelector('[data-ui="popup.menu.tools"] .grid')?.className).toContain(
+    'grid-cols-4'
+  );
+  expect(container.querySelector('[data-ui="popup.menu.workspace"] .grid')?.className).toContain(
+    'grid-cols-4'
+  );
+  expect(container.querySelectorAll('[data-ui="popup.menu.workspace"] button')).toHaveLength(4);
+  expect(
+    [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.menu.workspace"] button'),
+    ].map((button) => button.textContent)
+  ).toEqual([
+    'popup.home.libraryLabel',
+    'popup.home.imageEditorLabel',
+    'popup.home.videoEditorLabel',
+    'popup.home.scenarioEditorLabel',
+  ]);
+  expect(container.querySelector('[data-ui="popup.menu.route"] > section')?.className).toContain(
+    'justify-between'
+  );
+  for (const selector of ['[data-ui="popup.menu.tools"]', '[data-ui="popup.menu.workspace"]']) {
+    expect(container.querySelector(selector)?.className).toContain('border-t');
+    expect(container.querySelector(selector)?.className).toContain('pt-2');
+  }
+  expect(
+    [
+      ...container.querySelectorAll<HTMLButtonElement>('[data-ui="popup.menu.workspace"] button'),
+    ].every((button) => button.className === quickScenario?.className)
+  ).toBe(true);
+  expect(toolButtons.every((button) => button?.className.includes('border-0'))).toBe(true);
   expect(
     toolButtons.every((button) =>
       button?.className.includes('hover:bg-[var(--sniptale-color-surface-hover)]')
@@ -185,10 +244,34 @@ it('wires the workspace, direct page tools and menu-only footer', async () => {
   ).toBe(true);
   expect(
     toolButtons.every((button) =>
-      button?.className.includes('hover:border-[var(--sniptale-color-border-accent-soft)]')
+      [...(button?.querySelectorAll('svg, span') ?? [])].every(
+        (content) => !content.getAttribute('class')?.includes('group-hover:-translate-y-px')
+      )
+    )
+  ).toBe(true);
+  expect(
+    toolButtons.every((button) =>
+      button?.querySelector('svg')?.getAttribute('class')?.includes('group-hover:scale-110')
     )
   ).toBe(true);
   expect(container.querySelector('[data-testid="menu-footer"]')).not.toBeNull();
+});
+
+it('renders page tools as disabled when the active tab cannot run them', async () => {
+  mocks.activeTabCapabilities.screenshotMode.reason = 'Page unavailable';
+  const { MenuRoute } = await import('./route');
+  act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
+
+  const buttons = [
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.drawing"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.highlighter"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.quick-edit"]'),
+    container.querySelector<HTMLButtonElement>('[data-ui="popup.menu.tool-action.design-review"]'),
+  ];
+  expect(buttons.every((button) => button?.disabled)).toBe(true);
+  expect(buttons.every((button) => button?.className.includes('disabled:opacity-45'))).toBe(true);
+  act(() => buttons.forEach((button) => button?.click()));
+  expect(mocks.openScreenshotMode).not.toHaveBeenCalled();
 });
 
 it('runs the secondary capture scenarios in their displayed order', async () => {
@@ -292,4 +375,17 @@ it('surfaces a rejected page-tool operation through the menu alert', async () =>
   const alertText = container.querySelector('[role="alert"]')?.textContent;
   expect(alertText).toContain('Sniptale');
   expect(alertText).not.toContain('Toolbar unavailable');
+});
+
+it('starts Screen or Window with a three-second delay', async () => {
+  const { MenuRoute } = await import('./route');
+  act(() => root.render(<MenuRoute navigateToDescriptor={mocks.navigateToDescriptor} />));
+  await act(async () => {
+    container
+      .querySelector<HTMLButtonElement>('[title="popup.home.quickDesktopEditHint"]')
+      ?.click();
+  });
+  expect(mocks.triggerScreenshotCapture).toHaveBeenCalledWith(
+    expect.objectContaining({ screenshotMode: 'desktop', delay: 3 })
+  );
 });

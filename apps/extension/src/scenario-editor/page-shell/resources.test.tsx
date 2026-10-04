@@ -3,13 +3,19 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
-const io = vi.hoisted(() => ({ list: vi.fn(), import: vi.fn(), revoke: vi.fn() }));
+const io = vi.hoisted(() => ({ list: vi.fn(), import: vi.fn(), revoke: vi.fn(), video: vi.fn() }));
 vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.list }));
 vi.mock('../../composition/persistence/gallery-saved-views', () => ({
   listGallerySavedViews: async () => [],
 }));
 vi.mock('../../composition/persistence/aggregate-presentations', () => ({
   getAggregatePresentation: async () => undefined,
+}));
+vi.mock('./video-frame-resources', () => ({
+  GuideVideoFrameResources: (props: unknown) => {
+    io.video(props);
+    return <p>Video frame preview</p>;
+  },
 }));
 import { GuideImageResources } from './resources';
 let root: Root;
@@ -34,7 +40,8 @@ afterEach(() => {
 });
 async function render(
   selectedStepId: string | null = 'step',
-  target?: NonNullable<ComponentProps<typeof GuideImageResources>['target']>
+  target?: NonNullable<ComponentProps<typeof GuideImageResources>['target']>,
+  overrides: Partial<ComponentProps<typeof GuideImageResources>> = {}
 ) {
   await act(async () =>
     root.render(
@@ -42,8 +49,10 @@ async function render(
         disabled={false}
         {...(target ? { target } : {})}
         selectedStepId={selectedStepId}
+        steps={[{ id: 'step', title: 'Destination step' }]}
         t={createTranslator('en')}
         onImport={io.import}
+        {...overrides}
       />
     )
   );
@@ -145,6 +154,10 @@ it('imports one selected source into the requested image block without a destina
       <GuideImageResources
         disabled={false}
         selectedStepId="other"
+        steps={[
+          { id: 'other', title: 'Other step' },
+          { id: 'target-step', title: 'Actual target' },
+        ]}
         target={{ kind: 'replace-image', stepId: 'target-step', blockId: 'target-image' }}
         t={createTranslator('en')}
         onImport={io.import}
@@ -153,6 +166,11 @@ it('imports one selected source into the requested image block without a destina
   );
   await files('first.png');
   await files('replacement.png');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(
+    'Replace image in step “Actual target”'
+  );
+  expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 1');
   await click('Import selected');
   expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(1);
   expect(io.import.mock.calls[0]?.[0].sources[0].mediaId).toBe('replacement.png');
@@ -203,5 +221,136 @@ it('imports a tour replacement as one image and keeps tour slide imports ordered
       { kind: 'library', mediaId: 'first.png' },
       { kind: 'library', mediaId: 'second.png' },
     ],
+  });
+});
+
+it('separates destination, ordered selection count and confirmation without changing selection', async () => {
+  await render();
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 0');
+  await files('first.png', 'second.png');
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 2');
+  await click('As blocks in selected step');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(
+    'Add to step “Destination step”'
+  );
+  expect(
+    [...host.querySelectorAll('.guide-library-card-select')].map((node) => node.textContent)
+  ).toEqual(['1', '2']);
+  await click('Each as a separate step');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(
+    'New steps in selection order'
+  );
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 2');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'steps' });
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 0');
+});
+
+it('keeps selected-step insertion disabled without a selected step', async () => {
+  await render(null);
+  const blocks = host.querySelector<HTMLButtonElement>('[title="As blocks in selected step"]')!;
+  expect(blocks.disabled).toBe(true);
+  await files('first.png');
+  await click('As blocks in selected step');
+  expect(blocks.getAttribute('aria-pressed')).toBe('false');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'steps' });
+});
+
+it.each([
+  [{ kind: 'tour-slides' as const }, 'New slides in selection order'],
+  [{ kind: 'tour-image' as const, slideId: 'slide' }, 'Replace slide image'],
+  [{ kind: 'tour-background' as const, slideId: 'slide' }, 'Replace slide background'],
+])('describes the fixed %s destination without Guide placement controls', async (target, label) => {
+  await render(null, target);
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(label);
+  expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
+});
+
+it('restores image import actions and preserves ordered selection and mode after video return', async () => {
+  await render();
+  await files('first.png', 'second.png');
+  await click('As blocks in selected step');
+  io.list.mockResolvedValue([
+    ...(await io.list()),
+    {
+      id: 'clip',
+      filename: 'Clip.mp4',
+      kind: 'video',
+      mimeType: 'video/mp4',
+      source: { kind: 'recording' },
+      tags: [],
+    },
+  ]);
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  await click('All materials');
+  for (let cycle = 0; cycle < 2; cycle++) {
+    await click('Clip.mp4');
+    expect(host.textContent).toContain('Video frame preview');
+    expect(host.querySelector<HTMLElement>('.guide-import-actions')?.hidden).toBe(true);
+    await click('Back to materials');
+    expect(host.textContent).not.toContain('Video frame preview');
+    expect(host.querySelector<HTMLElement>('.guide-import-actions')?.hidden).toBe(false);
+    expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 2');
+  }
+  await click('first.png');
+  await click('Back to materials');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0]).toMatchObject({
+    sources: [
+      { kind: 'library', mediaId: 'first.png' },
+      { kind: 'library', mediaId: 'second.png' },
+    ],
+    placement: { kind: 'blocks', stepId: 'step' },
+  });
+});
+
+it.each(['steps', 'blocks', 'replacement', 'tour', 'disabled'] as const)(
+  'admits frameless insertion only for an unlocked Guide steps destination: %s',
+  async (mode) => {
+    const add = vi.fn(() => true);
+    const target =
+      mode === 'replacement'
+        ? { kind: 'replace-image' as const, stepId: 'step', blockId: 'image' }
+        : mode === 'tour'
+          ? { kind: 'tour-slides' as const }
+          : undefined;
+    await render('step', target, { onAddTextStep: add });
+    if (mode === 'blocks') await click('As blocks in selected step');
+    io.list.mockResolvedValue([
+      {
+        id: 'clip',
+        filename: 'Clip.mp4',
+        kind: 'video',
+        mimeType: 'video/mp4',
+        source: { kind: 'recording' },
+        tags: [],
+      },
+    ]);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    await click('All materials');
+    await click('Clip.mp4');
+    if (mode === 'disabled') await render('step', target, { onAddTextStep: add, disabled: true });
+    const callback = io.video.mock.lastCall?.[0].onAddTextStep;
+    if (mode === 'steps' || mode === 'disabled') {
+      expect(callback('Title', 'Body')).toBe(mode === 'steps');
+      expect(add).toHaveBeenCalledTimes(mode === 'steps' ? 1 : 0);
+      if (mode === 'steps') expect(add).toHaveBeenCalledWith('Title', 'Body');
+    } else expect(callback).toBeUndefined();
+    expect(io.import).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Video frame preview');
+  }
+);
+
+it('selects one library image for the global tour stage without slide placement controls', async () => {
+  await render(null, { kind: 'tour-stage-background' });
+  await files('first.png', 'background.png');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe('Stage background');
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 1');
+  expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0]).toMatchObject({
+    placement: { kind: 'tour-stage-background' },
+    sources: [{ kind: 'library', mediaId: 'background.png' }],
   });
 });

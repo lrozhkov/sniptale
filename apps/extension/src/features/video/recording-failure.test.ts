@@ -19,3 +19,15 @@ it('does not expose arbitrary runtime failure text', () => {
   );
   expect(resolveVideoRecordingFailureMessage(null)).toBeNull();
 });
+
+it('shows the specific safe reason for a denied toolbar start', () => {
+  expect(resolveVideoRecordingFailureMessage('permission-required')).toBe(
+    'content.toolbar.videoRecordingStartPermissionRequired'
+  );
+});
+
+it('explains a selected window preset that Chrome cannot apply', () => {
+  expect(resolveVideoRecordingFailureMessage('viewport-verification-failed')).toBe(
+    'content.toolbar.videoRecordingStartViewportVerificationFailed'
+  );
+});

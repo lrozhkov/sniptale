@@ -25,6 +25,7 @@ it('pauses native playback before playing state is published, blocks busy playba
     paused = true;
   });
   const controller: AudioRecordingControllerState = {
+    meter: { status: 'idle', level: 0, peaks: [] },
     save: { audioBlob: new Blob(), resetSession: vi.fn(), trimStart: 0, trimEnd: 4 },
     transport: {
       elapsedSeconds: 4,
@@ -32,6 +33,8 @@ it('pauses native playback before playing state is published, blocks busy playba
       error: null,
       startRecording: vi.fn(),
       stopRecording: vi.fn(),
+      pauseRecording: vi.fn(),
+      resumeRecording: vi.fn(),
       status: 'recorded',
     },
     trim: {

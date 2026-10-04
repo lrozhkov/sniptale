@@ -23,8 +23,8 @@ describe('quick-edit canonical frame projection', () => {
 
     applyQuickEditFrameRect(frame, target);
 
-    expect(frame.style.left).toBe('4.25px');
-    expect(frame.style.top).toBe('14.25px');
+    expect(frame.style.left).toBe('6.25px');
+    expect(frame.style.top).toBe('16.25px');
     expect(frame.style.width).toBe('36.5px');
     expect(frame.style.height).toBe('46.5px');
   });

@@ -92,6 +92,7 @@ export interface DrawingArrowObject extends DrawingObjectBase {
 export interface DrawingBlurObject extends DrawingRotatableObjectBase {
   readonly kind: 'blur';
   readonly bounds: DrawingBounds;
+  readonly amount?: number;
 }
 
 export interface DrawingTextObject extends DrawingRotatableObjectBase {
@@ -133,9 +134,11 @@ export interface DrawingToolDefaults {
   readonly arrow: {
     readonly color: string;
     readonly design: DrawingArrowDesign;
+    readonly drawFromTip: boolean;
     readonly dynamicWidth: boolean;
     readonly width: number;
   };
+  readonly blur: { readonly amount: number };
   readonly text: {
     readonly color: string;
     readonly backgroundColor: string | null;
@@ -155,6 +158,7 @@ export const DRAWING_OUTLINE_WIDTHS = [2, 4, 8] as const;
 export const DRAWING_ARROW_WIDTHS = [8, 12, 18, 24] as const;
 export const DRAWING_MARKER_OPACITIES = [0.3, 0.6, 1] as const;
 export const DRAWING_TEXT_SIZES = [16, 24, 36] as const;
+export const DRAWING_BLUR_STRENGTHS = [2, 6, 20] as const;
 export const DRAWING_TEXT_FONT_FAMILIES: readonly DrawingFontFamily[] = [
   'sans',
   'serif',
@@ -198,7 +202,8 @@ export function createDefaultDrawingToolDefaults(
     pencil: { color: red, width: 4 },
     marker: { color: yellow, opacity: 0.3, width: 28 },
     shape: { color: red, fillColor: null, kind: 'rectangle', width: 4 },
-    arrow: { color: red, design: 'standard', dynamicWidth: true, width: 18 },
+    arrow: { color: red, design: 'standard', drawFromTip: false, dynamicWidth: true, width: 18 },
+    blur: { amount: 20 },
     text: { color: dark, backgroundColor: null, fontFamily: 'handwritten', fontSize: 24 },
   };
 }

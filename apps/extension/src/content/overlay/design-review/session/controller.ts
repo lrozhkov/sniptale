@@ -121,11 +121,12 @@ export function useDesignReviewController(params: UseDesignReviewControllerParam
       comment: comment.draftActions,
       copyElement: async () => {
         if (selection) {
-          await copyDesignReviewText(
+          return copyDesignReviewText(
             serializeDesignReviewRecord(selection.element),
             'content.designReview.elementCopied'
           );
         }
+        return false;
       },
       copyPath: async () => {
         if (selection) {

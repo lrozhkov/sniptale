@@ -29,7 +29,7 @@ it('keeps CodeQL scope, reuse authority, CI transport, and artifacts in one cont
   });
   for (const consumer of policy.consumers) expect(fs.existsSync(consumer)).toBe(true);
   expect(() => assertCodeqlConfigIsFresh()).not.toThrow();
-  expect(canonicalProof).toContain('Restore verified reusable proof inputs');
+  expect(canonicalProof).toContain('Restore verified inputs');
   expect(canonicalProof).toContain('select-codeql-proof.mjs restore-latest-release');
   expect(canonicalProof).toContain('SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof');
   expect(canonicalProof).toContain('SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif');

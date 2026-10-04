@@ -143,3 +143,86 @@ it('shows a custom percentage without selecting either fixed preset', async () =
     vi.unstubAllGlobals();
   }
 });
+
+it('preserves text settings across presentations and commits one scrubbed minimum height', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const item = createGuideStep('Step');
+  let block: import('@sniptale/runtime-contracts/scenario/types/guide').GuideBlock = {
+    kind: 'text',
+    id: 'text',
+    paragraphs: [],
+    minHeight: 120,
+  };
+  let presentation: 'all' | 'sections' = 'sections';
+  let disabled = false;
+  const change = vi.fn((next: typeof block) => {
+    block = next;
+    draw();
+  });
+  const draw = () =>
+    root.render(
+      <GuideBlockInspector
+        item={item}
+        block={block}
+        presentation={presentation}
+        disabled={disabled}
+        onChange={change}
+        onClose={vi.fn()}
+        t={createTranslator('en')}
+      />
+    );
+  const field = () => host.querySelector<HTMLInputElement>('input[type="text"]')!;
+  const range = () => host.querySelector<HTMLInputElement>('input[type="range"]')!;
+  try {
+    await act(async () => draw());
+    const categoryButtons = () => [...host.querySelectorAll<HTMLButtonElement>('nav button')];
+    expect(categoryButtons()).toHaveLength(2);
+    await act(async () => categoryButtons()[1]!.click());
+    expect(host.textContent).toContain('Reset text appearance');
+    await act(async () => {
+      presentation = 'all';
+      draw();
+    });
+    expect(field().value).toBe('120');
+    await act(async () => {
+      presentation = 'sections';
+      draw();
+    });
+    expect(host.textContent).toContain('Reset text appearance');
+    expect(change).not.toHaveBeenCalled();
+    await act(async () => categoryButtons()[0]!.click());
+    expect(range().min).toBe('0');
+    expect(range().max).toBe('7680');
+    expect(range().step).toBe('1');
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        range(),
+        '345'
+      );
+      range().dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(field().value).toBe('345');
+    expect(change).not.toHaveBeenCalled();
+    await act(async () => range().dispatchEvent(new Event('pointerup', { bubbles: true })));
+    expect(change).toHaveBeenCalledExactlyOnceWith({ ...block, minHeight: 345 }, null);
+    const reset = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+      (b) => b.textContent === 'Automatic height'
+    )!;
+    await act(async () => reset.click());
+    expect(field().value).toBe('0');
+    expect(change).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      disabled = true;
+      draw();
+    });
+    expect(field().disabled).toBe(true);
+    expect(range()).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

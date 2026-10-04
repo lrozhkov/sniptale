@@ -126,60 +126,63 @@ beforeEach(() => {
 });
 
 describe('multi-source finalization', () => {
-  it('commits every required artifact in one batch before project creation and staging deletion', async () => {
-    const session = createSession('multi-batch');
-    loadSettingsMock.mockResolvedValueOnce({
-      localStoragePolicy: { defaultDestination: 'temporary' },
-    });
-    await finalizeSession(session);
+  it.each(['temporary', 'library'] as const)(
+    'commits every required artifact in one batch before project creation and staging deletion',
+    async (recordingDestination) => {
+      const session = createSession('multi-batch');
+      loadSettingsMock.mockResolvedValueOnce({
+        localStoragePolicy: { defaultDestination: 'temporary', recordingDestination },
+      });
+      await finalizeSession(session);
 
-    expect(saveBatchMock).toHaveBeenCalledOnce();
-    expect(saveBatchMock.mock.calls[0]?.[0]).toHaveLength(2);
-    expect(saveBatchMock.mock.calls[0]?.[0]).toEqual([
-      expect.objectContaining({
-        recordingGroup: {
-          dimensions: { height: 720, width: 1280 },
-          groupId: 'multi-batch',
-          order: 0,
-          role: 'display',
-          sourceLabel: 'Source 1',
-        },
-        storageClass: 'temporary',
-      }),
-      expect.objectContaining({
-        recordingGroup: {
-          dimensions: { height: 720, width: 1280 },
-          groupId: 'multi-batch',
-          order: 1,
-          role: 'display',
-          sourceLabel: 'Source 2',
-        },
-        storageClass: 'temporary',
-      }),
-    ]);
-    expect(saveBatchMock.mock.calls[0]?.[1]).toEqual({
-      primaryRecordingId: 'multi-batch-window-1',
-      projectId: null,
-      recordingId: 'multi-batch',
-    });
-    expect(commitProjectMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }), {
-      baseRevision: null,
-    });
-    expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
-      commitProjectMock.mock.invocationCallOrder[0]!
-    );
-    expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(session.staging.delete).mock.invocationCallOrder[0]!
-    );
-    expect(updateOutboxMock).toHaveBeenCalledWith({
-      primaryRecordingId: 'multi-batch-window-1',
-      projectId: 'project-1',
-      recordingId: 'multi-batch',
-    });
-    expect(updateOutboxMock.mock.invocationCallOrder[0]).toBeLessThan(
-      notifySavedMock.mock.invocationCallOrder[0]!
-    );
-  });
+      expect(saveBatchMock).toHaveBeenCalledOnce();
+      expect(saveBatchMock.mock.calls[0]?.[0]).toHaveLength(2);
+      expect(saveBatchMock.mock.calls[0]?.[0]).toEqual([
+        expect.objectContaining({
+          recordingGroup: {
+            dimensions: { height: 720, width: 1280 },
+            groupId: 'multi-batch',
+            order: 0,
+            role: 'display',
+            sourceLabel: 'Source 1',
+          },
+          storageClass: recordingDestination,
+        }),
+        expect.objectContaining({
+          recordingGroup: {
+            dimensions: { height: 720, width: 1280 },
+            groupId: 'multi-batch',
+            order: 1,
+            role: 'display',
+            sourceLabel: 'Source 2',
+          },
+          storageClass: recordingDestination,
+        }),
+      ]);
+      expect(saveBatchMock.mock.calls[0]?.[1]).toEqual({
+        primaryRecordingId: 'multi-batch-window-1',
+        projectId: null,
+        recordingId: 'multi-batch',
+      });
+      expect(commitProjectMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }), {
+        baseRevision: null,
+      });
+      expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+        commitProjectMock.mock.invocationCallOrder[0]!
+      );
+      expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(session.staging.delete).mock.invocationCallOrder[0]!
+      );
+      expect(updateOutboxMock).toHaveBeenCalledWith({
+        primaryRecordingId: 'multi-batch-window-1',
+        projectId: 'project-1',
+        recordingId: 'multi-batch',
+      });
+      expect(updateOutboxMock.mock.invocationCallOrder[0]).toBeLessThan(
+        notifySavedMock.mock.invocationCallOrder[0]!
+      );
+    }
+  );
 
   it('publishes projectId null when optional project creation fails after media commit', async () => {
     const session = createSession('multi-project-failure');

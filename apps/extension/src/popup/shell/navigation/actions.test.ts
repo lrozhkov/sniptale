@@ -88,154 +88,65 @@ function resetPopupUtilsMocks() {
 }
 
 async function verifiesPopupOwnedDesktopSelection() {
-  mocks.captureDesktopScreenshotFrameMock.mockResolvedValue({
-    dataUrl: 'data:image/webp;base64,AA==',
-    width: 1200,
-    height: 800,
-  });
-  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValue({
-    status: 'selected',
-    selection: { label: 'Window', streamId: 'popup-desktop-stream' },
-  });
-  mocks.sendRuntimeMessageMock.mockImplementation(async (message: { type: string }) =>
-    message.type === MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE
-      ? {
-          success: true,
-          result: 'ready',
-          imageFormat: 'webp',
-          imageQuality: 72,
-          requestId: 'desktop-request',
-          reservationToken: 'desktop-reservation',
-        }
-      : { success: true }
-  );
+  mocks.sendRuntimeMessageMock.mockResolvedValue({ success: true, result: 'accepted' });
   const config = {
     screenshotMode: 'desktop' as const,
     viewportPresetId: null,
-    delay: null,
+    delay: 3 as const,
     afterCapture: 'download_default' as const,
     imageFormat: null,
     imageQuality: null,
     exitAfterCapture: false,
   };
-
   await triggerQuickAction('desktop-action', true);
   await triggerScreenshotCapture(config);
-
-  expect(mocks.chooseDesktopScreenshotSourceMock).toHaveBeenCalledTimes(2);
-  expect(mocks.chooseDesktopScreenshotSourceMock).toHaveBeenCalledWith();
   expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(1, {
-    type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
+    type: MessageType.TRIGGER_QUICK_ACTION,
     actionId: 'desktop-action',
     tabId: 42,
   });
   expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(2, {
-    type: MessageType.TRIGGER_QUICK_ACTION,
-    actionId: 'desktop-action',
-    desktopSelection: {
-      requestId: 'desktop-request',
-      reservationToken: 'desktop-reservation',
-      status: 'selected',
-      dataUrl: 'data:image/webp;base64,AA==',
-      width: 1200,
-      height: 800,
-    },
-    tabId: 42,
-  });
-  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(3, {
-    type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
-    config,
-    tabId: 42,
-  });
-  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(4, {
     type: MessageType.TRIGGER_SCREENSHOT_CAPTURE,
     config,
-    desktopSelection: {
-      requestId: 'desktop-request',
-      reservationToken: 'desktop-reservation',
-      status: 'selected',
-      dataUrl: 'data:image/webp;base64,AA==',
-      width: 1200,
-      height: 800,
-    },
     tabId: 42,
   });
-  expect(mocks.sendRuntimeMessageMock).not.toHaveBeenCalledWith(
-    expect.objectContaining({ desktopStreamId: expect.any(String) })
-  );
-  expect(mocks.captureDesktopScreenshotFrameMock).toHaveBeenCalledTimes(2);
-  expect(mocks.captureDesktopScreenshotFrameMock).toHaveBeenCalledWith({
-    streamId: 'popup-desktop-stream',
-    imageFormat: 'webp',
-    imageQuality: 72,
-  });
+  expect(mocks.chooseDesktopScreenshotSourceMock).not.toHaveBeenCalled();
+  expect(mocks.captureDesktopScreenshotFrameMock).not.toHaveBeenCalled();
 }
 
 async function verifiesDesktopSelectionCancellationAndFailure() {
-  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValueOnce({ status: 'cancelled' });
-  mocks.sendRuntimeMessageMock.mockResolvedValue({
-    success: true,
-    result: 'ready',
-    imageFormat: 'png',
-    imageQuality: 90,
-    requestId: 'cancel-request',
-    reservationToken: 'cancel-reservation',
-  });
+  mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'cancelled' });
   await triggerQuickAction('desktop-action', true);
-  expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
-    type: MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE,
-    actionId: 'desktop-action',
-    tabId: 42,
-  });
   expect(window.close).not.toHaveBeenCalled();
-
-  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValueOnce({
-    status: 'failed',
-    error: 'picker failed',
-  });
-  await expect(triggerQuickAction('desktop-action', true)).rejects.toThrow('picker failed');
-  expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledTimes(4);
-  expect(
-    mocks.sendRuntimeMessageMock.mock.calls.some(
-      ([message]) => message.type === MessageType.TRIGGER_QUICK_ACTION
-    )
-  ).toBe(true);
+  mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'picker failed' });
+  await expect(triggerQuickAction('desktop-action', true)).rejects.toThrow();
   expect(window.close).not.toHaveBeenCalled();
+  mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: true, result: 'accepted' });
+  await triggerQuickAction('desktop-action', true);
+  expect(window.close).toHaveBeenCalledOnce();
 }
 
 async function verifiesDesktopFrameFailureCancelsPreparation() {
-  mocks.chooseDesktopScreenshotSourceMock.mockResolvedValue({
-    status: 'selected',
-    selection: { label: 'Window', streamId: 'popup-desktop-stream' },
-  });
-  mocks.captureDesktopScreenshotFrameMock.mockRejectedValue(new Error('frame acquisition failed'));
-  mocks.sendRuntimeMessageMock.mockImplementation(async (message: { type: string }) =>
-    message.type === MessageType.PREPARE_DESKTOP_SCREENSHOT_CAPTURE
-      ? {
-          success: true,
-          result: 'ready',
-          imageFormat: 'png',
-          imageQuality: 90,
-          requestId: 'failed-frame-request',
-          reservationToken: 'failed-frame-reservation',
-        }
-      : { success: true, result: 'cancelled' }
+  let finish: ((value: unknown) => void) | undefined;
+  mocks.sendRuntimeMessageMock.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
   );
-
-  await expect(triggerQuickAction('desktop-action', true)).rejects.toThrow(
-    'frame acquisition failed'
+  const pending = triggerQuickAction('desktop-action', true);
+  await vi.waitFor(() =>
+    expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
+      type: MessageType.TRIGGER_QUICK_ACTION,
+      actionId: 'desktop-action',
+      tabId: 42,
+    })
   );
-  expect(mocks.sendRuntimeMessageMock).toHaveBeenNthCalledWith(2, {
-    type: MessageType.TRIGGER_QUICK_ACTION,
-    actionId: 'desktop-action',
-    desktopSelection: {
-      status: 'cancelled',
-      requestId: 'failed-frame-request',
-      reservationToken: 'failed-frame-reservation',
-    },
-    tabId: 42,
-  });
-  expect(window.close).not.toHaveBeenCalled();
+  window.close();
+  finish?.({ success: true, result: 'accepted' });
+  await pending;
+  expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledOnce();
+  expect(mocks.captureDesktopScreenshotFrameMock).not.toHaveBeenCalled();
 }
 
 function verifiesExtensionPageNavigation() {
@@ -358,7 +269,7 @@ function runPopupUtilsSuite() {
   );
   it('surfaces explicit and translated popup runtime errors', verifiesRuntimeErrors);
   it(
-    'selects desktop media in the popup before runtime delivery',
+    'delegates both desktop capture entries without popup media ownership',
     verifiesPopupOwnedDesktopSelection
   );
   it(
@@ -366,7 +277,7 @@ function runPopupUtilsSuite() {
     verifiesDesktopSelectionCancellationAndFailure
   );
   it(
-    'cancels the prepared desktop reservation when frame acquisition fails',
+    'requires no popup continuation to deliver the captured image',
     verifiesDesktopFrameFailureCancelsPreparation
   );
   it('opens tools with an explicit working mode', verifiesToolbarWorkingModeSelection);

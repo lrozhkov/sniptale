@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { EditorFrameSettings } from '../../../../features/editor/document/types';
 import { normalizeEditorImageSettings } from '../../../../features/editor/document/constants';
+import { resolveEditorSourceImageGlowBlur } from '../../../../features/editor/document/image-types';
 
 const PREVIEW_CLASS_NAME = [
   'grid h-32 overflow-hidden rounded-[12px] transition-[padding] duration-150',
@@ -20,10 +21,9 @@ function resolvePreviewPadding(frame: EditorFrameSettings) {
 function resolvePreviewShadow(sourceImage: ReturnType<typeof normalizeEditorImageSettings>) {
   if (sourceImage.shadow <= 0) return 'none';
   const opacity = Math.min(0.45, sourceImage.shadow / 180);
-  const distance = Math.max(2, sourceImage.shadowDistance ?? 4);
-  const blur = Math.max(4, sourceImage.shadowBlur ?? 12);
+  const blur = resolveEditorSourceImageGlowBlur(sourceImage);
   const color = sourceImage.shadowColor ?? '#000000';
-  return `0 ${distance}px ${blur}px color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
+  return `0 0 ${blur}px color-mix(in srgb, ${color} ${Math.round(opacity * 100)}%, transparent)`;
 }
 
 export function EditorInspectorFramePreviewCard(props: {
@@ -49,7 +49,7 @@ export function EditorInspectorFramePreviewCard(props: {
           className={SOURCE_PREVIEW_CLASS_NAME}
           style={{
             borderRadius: sourceImage.radius,
-            opacity: sourceImage.opacity,
+            opacity: 1,
             boxShadow: resolvePreviewShadow(sourceImage),
           }}
         />

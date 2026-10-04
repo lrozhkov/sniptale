@@ -13,7 +13,7 @@ import {
   EncodedVideoPacketSource,
   EncodedAudioPacketSource,
 } from 'mediabunny';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { inspectReviewMedia } from './media-index';
 import { writeReviewPackets } from './packet-export';
 import type { ReviewEdit } from '../../features/video/review/types';
@@ -228,6 +228,53 @@ it.each(['avc-aac.mp4', 'hevc-aac.mp4', 'vp8-opus.webm', 'vp9-opus.webm', 'av1-o
     );
   }
 );
+it('resolves exact cut boundaries when timestamp seeks return the preceding key packet', async () => {
+  const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-vp9-opus.webm')]);
+  const signal = new AbortController().signal;
+  const index = await inspectReviewMedia(file, signal);
+  const getKeyPacket = EncodedPacketSink.prototype.getKeyPacket;
+  const seek = vi
+    .spyOn(EncodedPacketSink.prototype, 'getKeyPacket')
+    .mockImplementation(function (this: EncodedPacketSink, timestamp, options) {
+      return getKeyPacket.call(this, timestamp - 0.001, options);
+    });
+  let bytes = new Uint8Array(0);
+  try {
+    const receipt = await writeReviewPackets({
+      file,
+      index,
+      edits,
+      signal,
+      writer: {
+        async writeAt(position, chunk) {
+          const data = new Uint8Array(await chunk.arrayBuffer());
+          const next = new Uint8Array(Math.max(bytes.length, position + data.length));
+          next.set(bytes);
+          next.set(data, position);
+          bytes = next;
+        },
+      },
+    });
+    expect((await videoHashes(new Blob([bytes]))).hashes).toEqual(
+      (await videoHashes(file, true)).hashes
+    );
+    expect(receipt.resultDuration).toBeCloseTo(8, 2);
+    expect(receipt.audioReencoded).toBe(false);
+    expect(receipt.audioRanges).toHaveLength(3);
+    await expect(
+      writeReviewPackets({
+        file,
+        index: { ...index, boundaries: [...index.boundaries, 1] },
+        edits: [{ ...edits[0]!, start: 1 }],
+        signal,
+        writer: { async writeAt() {} },
+      })
+    ).rejects.toThrow('boundary');
+  } finally {
+    seek.mockRestore();
+  }
+});
+
 it('rejects forged non-key cuts and propagates streamed quota failure', async () => {
   const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-vp8-opus.webm')]);
   const signal = new AbortController().signal;
@@ -241,6 +288,37 @@ it('rejects forged non-key cuts and propagates streamed quota failure', async ()
     writeReviewPackets({ file, index, signal, writer, edits: [{ ...edits[0]!, start: 1 }] })
   ).rejects.toThrow('verified');
   await expect(writeReviewPackets({ file, index, signal, writer, edits })).rejects.toThrow('Quota');
+});
+it('copies packets when an off-keyframe speed edit is entirely inside a cut', async () => {
+  const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-vp8-opus.webm')]);
+  const signal = new AbortController().signal;
+  const index = await inspectReviewMedia(file, signal);
+  const cut: ReviewEdit = {
+    id: 'cut',
+    kind: 'cut',
+    start: 2,
+    end: 4,
+    requestedStart: 2,
+    requestedEnd: 4,
+  };
+  const speed: ReviewEdit = {
+    id: 'speed',
+    kind: 'speed',
+    start: 2.25,
+    end: 3.75,
+    requestedStart: 2.25,
+    requestedEnd: 3.75,
+    rate: 2,
+    audio: 'mute',
+  };
+  const receipt = await writeReviewPackets({
+    file,
+    index,
+    signal,
+    edits: [cut, speed],
+    writer: { async writeAt() {} },
+  });
+  expect(receipt.videoPackets).toBeGreaterThan(0);
 });
 it('stops a real packet stream on cancellation', async () => {
   const file = new Blob([await readFile('tooling/test/e2e/fixtures/review-avc-aac.mp4')]);

@@ -17,6 +17,7 @@ export type RuntimePagePackageDownloadLeaseRequestByType = {
     downloadOperationId: string;
     filename: string;
     reference: PagePackageDownloadAssetRefPayload;
+    downloadFormat?: 'html';
   };
   [MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE]: {
     type: typeof MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE;

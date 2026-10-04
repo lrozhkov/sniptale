@@ -39,6 +39,13 @@ it('runs local full gates directly in WSL and keeps Docker limited to external r
   expect(toolchain).toContain("{ flag: 'wx', mode: 0o755 }");
   expect(toolchain).not.toContain('semgrep');
   expect(toolchain).toContain('createRuntimeParityReceipt({');
+  expect(toolchain).toContain("validateNpmInputs(path.resolve('tooling/configs/ci/npm'), lock)");
+  expect(toolchain).toContain(
+    'validateNpmRuntimeEnvironment(npm, lock, createToolchainEnvironment(paths))'
+  );
+  expect(toolchain).toContain("path.join(npm, 'node_modules/.bin')");
+  expect(toolchain).toContain('environment: installEnvironment');
+
   const runtimeParity = fs.readFileSync('tooling/ci/runtime-parity.mjs', 'utf8');
   expect(runtimeParity).toContain("{ id: 'node'");
   expect(runtimeParity).toContain("{ id: 'npm'");

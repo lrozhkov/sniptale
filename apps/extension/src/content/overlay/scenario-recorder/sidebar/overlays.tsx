@@ -66,14 +66,8 @@ function PreviewOverlayCloseButton(props: { onClose: () => void }) {
         props.onClose();
       }}
       data-ui="content.scenario.sidebar.floating-preview-close"
-      className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full
-        border border-[color:color-mix(in_srgb,var(--sniptale-color-border-strong)_58%,transparent)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]
-        shadow-[0_10px_22px_color-mix(in_srgb,var(--sniptale-color-overlay)_24%,transparent)]
-        backdrop-blur-[8px]
-        text-[var(--sniptale-color-text-primary)] transition
-        hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-strong)_72%,transparent)]
-        hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_92%,transparent)]"
+      className="sniptale-dismiss-button absolute right-3 top-3 inline-flex h-9 w-9
+        items-center justify-center rounded-full border transition"
       aria-label={translate('common.actions.close')}
       title={translate('common.actions.close')}
     >

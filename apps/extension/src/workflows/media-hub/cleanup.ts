@@ -146,6 +146,9 @@ function getBrokenMediaMirrors(args: {
       if (item.source.kind === 'web-snapshot') {
         return !webSnapshotIds.has(item.source.snapshotId);
       }
+      if (item.source.kind === 'stored-asset') {
+        return false;
+      }
       return !projectAssetIds.has(item.source.projectAssetId);
     })
     .map((item) => createAssetCandidate(item));

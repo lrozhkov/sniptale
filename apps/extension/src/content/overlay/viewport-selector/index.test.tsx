@@ -178,7 +178,7 @@ it('renders the selector without a synthetic loading contract and opens the menu
   expect(viewportSelectorMocks.menuStateChangeMock).toHaveBeenCalledWith(true);
   expect(container?.textContent).toContain('content.toolbar.viewportNativeLabel');
   expect(container?.textContent).toContain('HD');
-  expect(container?.textContent).toContain('viewportPresets.groups.window');
+  expect(container?.textContent).not.toContain('viewportPresets.groups.window');
   expect(container?.textContent).not.toContain('viewportPresets.groups.viewport');
   expect(container?.textContent).not.toContain('viewportPresets.availability.checking');
   const presetButton = Array.from(
@@ -194,7 +194,7 @@ it('renders the selector without a synthetic loading contract and opens the menu
   });
   expect(container?.textContent).not.toContain('viewportPresets.availability.checking');
   expect(container?.querySelectorAll('.sniptale-toolbar-menu-detail')).toHaveLength(0);
-  expect(container?.textContent?.split('viewportPresets.hints.window')).toHaveLength(2);
+  expect(container?.textContent).not.toContain('viewportPresets.hints.window');
   expect(
     container?.querySelector('.sniptale-popover-menu')?.querySelector('.sniptale-popover-icon')
   ).toBeNull();
@@ -205,7 +205,7 @@ it('hides group hints in compact menu view', async () => {
 
   await act(async () => container?.querySelector<HTMLButtonElement>('button')?.click());
 
-  expect(container?.textContent).toContain('viewportPresets.groups.window');
+  expect(container?.textContent).not.toContain('viewportPresets.groups.window');
   expect(container?.textContent).not.toContain('viewportPresets.groups.viewport');
   expect(container?.textContent).not.toContain('viewportPresets.hints.window');
   expect(container?.textContent).not.toContain('viewportPresets.hints.viewport');
@@ -279,4 +279,29 @@ it('renders the active availability notification above the preset list', async (
         )
       : false
   ).toBe(true);
+});
+
+it('places capture timing after the size list and keeps the menu open when changing timing', async () => {
+  const setOnlyDuringCapture = vi.fn();
+  await renderSelector({
+    windowSize: {
+      onlyDuringCapture: false,
+      busy: false,
+      selection: null,
+      select: vi.fn(),
+      setOnlyDuringCapture,
+    },
+  });
+  await act(async () => container?.querySelector<HTMLButtonElement>('button')?.click());
+  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  const timing = buttons.find((button) =>
+    button.textContent?.includes('content.toolbar.viewportDuringCapture')
+  );
+  expect(timing).toBeDefined();
+  expect(buttons.indexOf(timing!)).toBeGreaterThan(
+    buttons.findIndex((button) => button.textContent?.startsWith('Window HD'))
+  );
+  await act(async () => timing?.click());
+  expect(setOnlyDuringCapture).toHaveBeenCalledWith(true, null, null);
+  expect(container?.textContent).toContain('content.toolbar.viewportDuringCapture');
 });

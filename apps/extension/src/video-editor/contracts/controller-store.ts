@@ -38,6 +38,7 @@ type TimelineTrackAction =
   | 'clearUtilityLane';
 
 type TimelineClipAction =
+  | 'placeMaterial'
   | 'appendMaterial'
   | 'insertMaterial'
   | 'overlayMaterial'
@@ -141,6 +142,7 @@ type ProjectLifecycleAction =
   | 'syncProjectRevision'
   | 'setReady'
   | 'setError'
+  | 'setAutosaveEnabled'
   | 'setSaveState';
 
 /** Active project identity, readiness, save state, and lifecycle mutations. */
@@ -152,6 +154,7 @@ export interface ProjectLifecyclePort
   isReady: boolean;
   project: VideoProject | null;
   recordingId: string | null;
+  autosaveEnabled: boolean;
   saveState: VideoEditorSaveState;
 }
 

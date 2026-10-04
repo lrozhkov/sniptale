@@ -1,5 +1,10 @@
 import { expect, it } from 'vitest';
-import { getPreviewSize, getViewportCenter, getViewportFrame } from './helpers';
+import {
+  getPreviewContentRect,
+  getPreviewSize,
+  getViewportCenter,
+  getViewportFrame,
+} from './helpers';
 import type { EditorViewportMetrics } from './types';
 
 function viewport(overrides: Partial<EditorViewportMetrics> = {}): EditorViewportMetrics {
@@ -21,7 +26,36 @@ function viewport(overrides: Partial<EditorViewportMetrics> = {}): EditorViewpor
 it('calculates preview size for empty, wide, and tall canvases', () => {
   expect(getPreviewSize(0, 0, 80)).toEqual({ height: 80, width: 112 });
   expect(getPreviewSize(1600, 800, 196)).toEqual({ height: 98, width: 196 });
-  expect(getPreviewSize(400, 1200, 196)).toEqual({ height: 138, width: 112 });
+  expect(getPreviewSize(400, 1200, 196)).toEqual({ height: 138, width: 196 });
+});
+
+it.each([
+  { width: 1600, height: 200 },
+  { width: 400, height: 1200 },
+  { width: 800, height: 800 },
+])('centers an aspect-preserving document and its full viewport $width/$height', (documentSize) => {
+  const previewSize = getPreviewSize(documentSize.width, documentSize.height);
+  const rect = getPreviewContentRect(previewSize, documentSize);
+  expect(rect.width / rect.height).toBeCloseTo(documentSize.width / documentSize.height);
+  expect(rect.left * 2 + rect.width).toBeCloseTo(previewSize.width);
+  expect(rect.top * 2 + rect.height).toBeCloseTo(previewSize.height);
+  expect(
+    getViewportFrame({
+      previewSize,
+      viewport: viewport({
+        canvasWidth: documentSize.width,
+        canvasHeight: documentSize.height,
+        scaledCanvasWidth: documentSize.width,
+        scaledCanvasHeight: documentSize.height,
+        canvasOffsetLeft: 0,
+        canvasOffsetTop: 0,
+        scrollLeft: 0,
+        scrollTop: 0,
+        viewportWidth: documentSize.width,
+        viewportHeight: documentSize.height,
+      }),
+    })
+  ).toEqual(rect);
 });
 
 it('calculates viewport center and clamps invalid canvas metrics', () => {

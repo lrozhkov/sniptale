@@ -33,8 +33,11 @@ function FooterCopyButton(props: {
       <Icon
         className={cx(
           'h-[18px] w-[18px] shrink-0 transition-transform duration-200 ease-out',
-          'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-          'group-disabled:translate-y-0 motion-reduce:transition-none',
+          'group-hover:scale-110 group-focus-visible:scale-110',
+          'group-hover:brightness-110 group-focus-visible:brightness-110',
+          'group-disabled:scale-100 group-disabled:brightness-100 motion-reduce:transition-none',
+          'group-hover:text-[var(--sniptale-color-accent)]',
+          'group-focus-visible:text-[var(--sniptale-color-accent)]',
           isCopied
             ? 'text-[var(--sniptale-color-success)]'
             : 'text-[var(--sniptale-color-text-primary)]'

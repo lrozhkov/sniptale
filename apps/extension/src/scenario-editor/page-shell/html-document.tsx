@@ -1,3 +1,4 @@
+import { Search, X } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server.browser';
 import tokens from '@sniptale/ui/styles/design-tokens?raw';
 import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?inline';
@@ -19,6 +20,12 @@ import type {
 import type { Translate } from '../../platform/i18n';
 import { GuideReadDocument } from './reader-document';
 
+/** Fixed executable digest admits saved HTML without trusting hashes supplied by an archive. */
+export async function getGuideHtmlRuntimeHash(): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(viewerScript));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
+
 /** Static SVG references share raster bytes without requiring JavaScript to read the guide. */
 export async function buildGuideHtml(
   project: GuideProject,
@@ -27,8 +34,7 @@ export async function buildGuideHtml(
   media: { rasters: HtmlRaster[]; blocks: ReadonlyMap<string, number> },
   reading: GuideReadingOptions = DEFAULT_GUIDE_READING
 ) {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(viewerScript));
-  const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  const hash = await getGuideHtmlRuntimeHash();
   const exportedProject = {
     ...project,
     items: project.items.map((item) => ({ ...item, id: `guide-item-${item.id}` })),
@@ -121,27 +127,52 @@ export async function buildGuideHtml(
               </div>
             </div>
           </main>
-          <dialog data-guide-viewer="" aria-label={t('scenario.editor.htmlImageOpen')}>
-            <header>
-              <button type="button" data-zoom="" aria-pressed="false">
-                100%
-              </button>
-              <button type="button" data-close="">
-                {t('common.actions.close')}
-              </button>
-            </header>
-            <figure>
-              <div data-viewport="">
-                <img alt="" />
-              </div>
-              <figcaption />
-            </figure>
-          </dialog>
+          <HtmlImageViewer t={t} />
           <script>{viewerScript}</script>
         </body>
       </html>
     );
   return { html, rasters: media.rasters };
+}
+
+function HtmlImageViewer({ t }: { t: Translate }) {
+  return (
+    <dialog data-guide-viewer="" data-zoom="fit" aria-label={t('scenario.editor.htmlImageOpen')}>
+      <header>
+        <button
+          type="button"
+          data-fit=""
+          aria-pressed="true"
+          aria-label={t('scenario.editor.htmlFit')}
+          title={t('scenario.editor.htmlFit')}
+        >
+          {t('scenario.editor.htmlFit')}
+        </button>
+        <button type="button" data-zoom="" aria-pressed="false" aria-label="100%" title="100%">
+          100%
+        </button>
+        <button
+          type="button"
+          data-close=""
+          aria-label={t('common.actions.close')}
+          title={t('common.actions.close')}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </header>
+      <figure>
+        <div
+          data-viewport=""
+          tabIndex={0}
+          role="region"
+          aria-label={t('scenario.editor.htmlPreview')}
+        >
+          <img alt="" />
+        </div>
+        <figcaption />
+      </figure>
+    </dialog>
+  );
 }
 
 function HtmlImage({
@@ -198,12 +229,18 @@ function HtmlImage({
           data-guide-open={`guide-media-${index}`}
           data-alt={block.alt}
           data-caption={block.caption}
+          data-caption-alignment={block.captionAlignment ?? 'center'}
           aria-label={t('scenario.editor.htmlImageOpen')}
+          title={t('scenario.editor.htmlImageOpen')}
         >
-          +
+          <Search size={18} aria-hidden="true" />
         </button>
       )}
-      {block.caption && <figcaption>{block.caption}</figcaption>}
+      {block.caption && (
+        <figcaption style={{ textAlign: block.captionAlignment ?? 'center' }}>
+          {block.caption}
+        </figcaption>
+      )}
     </figure>
   );
 }

@@ -21,7 +21,7 @@ export function TourPlaybackSettings({
   const changeMinimum = (minimumHoldSeconds: number) =>
     onChange({ ...tour, playback: { ...tour.playback, minimumHoldSeconds } });
   return (
-    <GuideInspectorGroup icon={Play} title={t('scenario.editor.tourPlayback')}>
+    <GuideInspectorGroup id="playback" icon={Play} title={t('scenario.editor.tourPlayback')}>
       {(
         [
           ['autoplay', t('scenario.editor.tourAutoplay')],
@@ -76,18 +76,21 @@ export function TourTimingSettings({
   const changeHold = (holdSeconds: number) =>
     onChange({ ...slide, timing: { ...timing, holdSeconds } });
   return (
-    <GuideInspectorGroup icon={Timer} title={t('scenario.editor.tourTiming')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourDurationMode')}
-        value={timing.mode}
-        disabled={disabled}
-        options={[
-          { value: 'inherit', label: t('scenario.editor.tourInherited') },
-          { value: 'auto', label: t('scenario.editor.tourDurationAuto') },
-          { value: 'manual', label: t('scenario.editor.tourDurationManual') },
-        ]}
-        onChange={(mode) => onChange({ ...slide, timing: { ...timing, mode } })}
-      />
+    <GuideInspectorGroup id="timing" icon={Timer} title={t('scenario.editor.tourTiming')}>
+      <div className="tour-text-field">
+        <span>{t('scenario.editor.tourDurationMode')}</span>
+        <CompactSelect
+          aria-label={t('scenario.editor.tourDurationMode')}
+          value={timing.mode}
+          disabled={disabled}
+          options={[
+            { value: 'inherit', label: t('scenario.editor.tourInherited') },
+            { value: 'auto', label: t('scenario.editor.tourDurationAuto') },
+            { value: 'manual', label: t('scenario.editor.tourDurationManual') },
+          ]}
+          onChange={(mode) => onChange({ ...slide, timing: { ...timing, mode } })}
+        />
+      </div>
       {timing.mode === 'manual' && (
         <>
           <TourInspectorNumericRow
@@ -120,21 +123,24 @@ export function TourTimingSettings({
           )}
         </>
       )}
-      <CompactSelect
-        aria-label={t('scenario.editor.tourAutomaticTransition')}
-        value={timing.autoplayTarget ?? ''}
-        disabled={disabled}
-        options={[
-          { value: '', label: t('scenario.editor.tourFollowActions') },
-          ...tour.slides.map((entry, index) => ({
-            value: entry.id,
-            label: `${index + 1}. ${entry.title}`,
-          })),
-        ]}
-        onChange={(target) =>
-          onChange({ ...slide, timing: { ...timing, autoplayTarget: target || null } })
-        }
-      />
+      <div className="tour-text-field">
+        <span>{t('scenario.editor.tourAutomaticTransition')}</span>
+        <CompactSelect
+          aria-label={t('scenario.editor.tourAutomaticTransition')}
+          value={timing.autoplayTarget ?? ''}
+          disabled={disabled}
+          options={[
+            { value: '', label: t('scenario.editor.tourFollowActions') },
+            ...tour.slides.map((entry, index) => ({
+              value: entry.id,
+              label: `${index + 1}. ${entry.title}`,
+            })),
+          ]}
+          onChange={(target) =>
+            onChange({ ...slide, timing: { ...timing, autoplayTarget: target || null } })
+          }
+        />
+      </div>
       <p className="guide-inspector-hint">{t('scenario.editor.tourTimingHint')}</p>
     </GuideInspectorGroup>
   );

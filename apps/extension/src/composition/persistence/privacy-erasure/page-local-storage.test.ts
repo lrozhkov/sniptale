@@ -18,6 +18,7 @@ it('preserves locale and theme preferences in preserve mode', () => {
   window.localStorage.setItem('sniptale:trace:namespaces', 'ContentToolbarEventDelivery');
   window.localStorage.setItem('sniptale.gallery.filters', '{"version":1}');
   window.localStorage.setItem('sniptale.gallery.facet-disclosures', '[]');
+  window.localStorage.setItem('sniptale.context-menu.pending-layout', '{"version":2,"nodes":[]}');
 
   const removed = eraseExtensionPageLocalStorage(window.localStorage, {
     preservePreferences: true,
@@ -30,6 +31,7 @@ it('preserves locale and theme preferences in preserve mode', () => {
   expect(window.localStorage.getItem('sniptale-locale-preference')).toBe('en');
   expect(window.localStorage.getItem('sniptale.gallery.filters')).toBe('{"version":1}');
   expect(window.localStorage.getItem('sniptale.gallery.facet-disclosures')).toBe('[]');
+  expect(window.localStorage.getItem('sniptale.context-menu.pending-layout')).toBeNull();
   expect(
     verifyExtensionPageLocalStorageErased(window.localStorage, { preservePreferences: true })
   ).toBe(true);

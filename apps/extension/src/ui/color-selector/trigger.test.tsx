@@ -22,13 +22,11 @@ function renderTrigger(props: Partial<React.ComponentProps<typeof ColorSelectorT
   act(() => {
     root?.render(
       <ColorSelectorTrigger
-        expanded={false}
         formatMode="hex"
         label="Grid color"
-        title="Grid color"
         value="#123456"
         onOpenPicker={() => undefined}
-        onToggleExpanded={() => undefined}
+        onCommit={() => undefined}
         {...props}
       />
     );
@@ -59,107 +57,78 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('renders swatch-plus-hex trigger chrome with muted chevron styling', () => {
-  renderTrigger();
-
-  const pickerButton = getButton('shared.ui.colorSelectorChooseColor');
-  const trigger = container?.querySelector(
-    '[data-ui="shared.ui.color-selector.trigger"]'
-  ) as HTMLElement | null;
-  const paletteButton = getButton('Grid color');
-
-  expect(trigger?.className).toContain('focus-within:border-[var(--sniptale-field-border-active)]');
-  expect(trigger?.className).toContain('min-w-0');
-  expect(trigger?.className).toContain('overflow-hidden');
-  expect(trigger?.style.getPropertyValue('--sniptale-field-height')).toBe('40px');
-  expect(trigger?.style.getPropertyValue('--sniptale-field-bg-active')).toContain(
-    'color-mix(in srgb'
-  );
-  expect(pickerButton?.textContent).toContain('#123456'.toUpperCase());
-  expect(paletteButton?.getAttribute('aria-label')).toBe('Grid color');
-  expect(pickerButton?.className).toContain('focus-visible:outline-none');
-  expect(pickerButton?.className).toContain('justify-end');
-  expect(paletteButton?.className).toContain('focus-visible:outline-none');
-  expect(paletteButton?.className).toContain('justify-center');
-  expect(pickerButton?.getAttribute('data-ui')).toBe('shared.ui.color-selector.picker-trigger');
-  expect(paletteButton?.getAttribute('data-ui')).toBe('shared.ui.color-selector.palette-trigger');
-  expect(paletteButton?.textContent).toBe('');
-  expect(paletteButton?.querySelector('svg')?.className.baseVal).toContain('opacity-75');
-});
-
-it('marks the trigger chrome active while a palette or picker layer is open', () => {
-  renderTrigger({ active: true });
-
-  expect(
-    container?.querySelector('[data-ui="shared.ui.color-selector.trigger"]')?.className
-  ).toContain('border-[var(--sniptale-field-border-active)]');
-});
-
-it('renders the translated transparent label when the trigger value is transparent', () => {
-  renderTrigger({ value: 'transparent' });
-
-  expect(getButton('shared.ui.colorSelectorChooseColor')?.textContent).toContain(
-    'shared.ui.colorSelectorTransparent'
-  );
-  expect(
-    getButton('shared.ui.colorSelectorChooseColor')?.querySelector('span:last-child')?.className
-  ).toContain('italic');
-});
-
-it('renders rgb and hsl values without forcing hex uppercase styling', () => {
-  renderTrigger({ formatMode: 'rgb', value: '#abcdef' });
-  expect(getButton('shared.ui.colorSelectorChooseColor')?.textContent).toContain(
-    'RGB(171, 205, 239)'
-  );
-
-  renderTrigger({ formatMode: 'hsl', value: '#abcdef' });
-  expect(getButton('shared.ui.colorSelectorChooseColor')?.textContent).toContain(
-    'HSL(210, 68%, 80%)'
-  );
-
-  renderTrigger({ formatMode: 'rgb', value: 'not-a-color' });
-  expect(getButton('shared.ui.colorSelectorChooseColor')?.textContent).toContain(
-    'RGB(249, 115, 22)'
-  );
-
-  renderTrigger({ expanded: true, formatMode: 'hsl', value: 'also-bad' });
-  expect(getButton('shared.ui.colorSelectorChooseColor')?.textContent).toContain(
-    'HSL(25, 95%, 53%)'
-  );
-  expect(
-    container?.querySelector('[data-ui="shared.ui.color-selector.trigger"]')?.className
-  ).toContain('focus-within:bg-[var(--sniptale-field-bg-active)]');
-
-  renderTrigger({ formatMode: 'hex', value: 'not-a-color' });
-  expect(getButton('shared.ui.colorSelectorChooseColor')?.textContent).toContain('#F97316');
-});
-
-it('routes picker and palette clicks through their dedicated trigger zones', async () => {
+it('separates the picker swatch from editable text without a palette trigger', async () => {
   const onOpenPicker = vi.fn();
-  const onToggleExpanded = vi.fn();
-  renderTrigger({ onOpenPicker, onToggleExpanded });
-
-  const pickerButton = getButton('shared.ui.colorSelectorChooseColor');
-  const paletteButton = getButton('Grid color');
-
-  await act(async () => {
-    pickerButton?.click();
-    paletteButton?.click();
-  });
-
+  renderTrigger({ onOpenPicker });
+  expect(
+    container?.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+  ).toBeNull();
+  expect(getButton('Grid color')?.textContent).toBe('#123456');
+  await act(async () => getButton('shared.ui.colorSelectorChooseColor')?.click());
   expect(onOpenPicker).toHaveBeenCalledOnce();
-  expect(onToggleExpanded).toHaveBeenCalledOnce();
+  await act(async () => getButton('Grid color')?.click());
+  expect(container?.querySelector('input')?.value).toBe('#123456');
+  expect(document.activeElement).toBe(container?.querySelector('input'));
+  expect(onOpenPicker).toHaveBeenCalledOnce();
 });
 
-it('keeps the dedicated chevron trigger clickable', async () => {
-  const onToggleExpanded = vi.fn();
-  renderTrigger({ onToggleExpanded });
-
-  const paletteButton = getButton('Grid color');
-
+async function enterValue(value: string, key: string) {
+  await act(async () => getButton('Grid color')?.click());
+  const input = container!.querySelector('input')!;
   await act(async () => {
-    paletteButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await act(async () => input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+  return input;
+}
 
-  expect(onToggleExpanded).toHaveBeenCalledOnce();
+it('commits a normalized value once and restores keyboard focus', async () => {
+  const onCommit = vi.fn();
+  renderTrigger({ onCommit });
+  await enterValue('#abc', 'Enter');
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith('#aabbcc');
+  expect(document.activeElement).toBe(getButton('Grid color'));
+});
+
+it('retains invalid input without changing the color and Escape cancels it', async () => {
+  const onCommit = vi.fn();
+  renderTrigger({ onCommit });
+  const input = await enterValue('invalid', 'Enter');
+  expect(onCommit).not.toHaveBeenCalled();
+  expect(input.getAttribute('aria-invalid')).toBe('true');
+  expect(container?.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () =>
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(getButton('Grid color')?.textContent).toBe('#123456');
+  expect(document.activeElement).toBe(getButton('Grid color'));
+});
+
+it('rejects alpha and transparent input when unavailable for the consumer', async () => {
+  const onCommit = vi.fn();
+  renderTrigger({ onCommit, allowAlpha: false, allowTransparent: false });
+  await enterValue('#abcdef80', 'Enter');
+  expect(onCommit).not.toHaveBeenCalled();
+  await enterValue('transparent', 'Enter');
+  expect(onCommit).not.toHaveBeenCalled();
+});
+
+it('disables both actions and preserves formatted values', () => {
+  renderTrigger({ disabled: true, formatMode: 'rgb', value: '#abcdef' });
+  expect(getButton('Grid color')?.textContent).toBe('RGB(171, 205, 239)');
+  expect([...container!.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+});
+
+it('commits valid input on blur and discards an edit when the consumer value changes', async () => {
+  const onCommit = vi.fn();
+  renderTrigger({ onCommit });
+  const input = await enterValue('#abcdef', 'Tab');
+  await act(async () => input.blur());
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith('#abcdef');
+  await enterValue('#bad', 'Tab');
+  renderTrigger({ onCommit, value: '#111111' });
+  expect(container?.querySelector('input')).toBeNull();
+  expect(getButton('Grid color')?.textContent).toBe('#111111');
+  expect(onCommit).toHaveBeenCalledTimes(1);
 });

@@ -18,11 +18,9 @@ let root: Root | null = null;
 
 function ModeButtonsHarness(params: {
   aiPickMode?: boolean;
-  canClearPagePreparation?: boolean;
   designReviewMode?: boolean;
   drawingMode?: boolean;
   onDisableAiPickMode?: () => void;
-  onClearPagePreparation?: () => void;
   onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
   onToggleDesignReview?: () => void;
   onToggleDrawing?: () => void;
@@ -37,7 +35,6 @@ function ModeButtonsHarness(params: {
   const props: ToolbarModeButtonsProps = {
     isCursorMode: true,
     aiPickMode: params.aiPickMode ?? false,
-    canClearPagePreparation: params.canClearPagePreparation ?? false,
     designReviewMode: params.designReviewMode ?? false,
     drawingMode: params.drawingMode ?? false,
     videoRecordingMode: params.videoRecordingMode ?? false,
@@ -51,7 +48,6 @@ function ModeButtonsHarness(params: {
     toolbarMenuState,
     onEnableCursorMode: vi.fn(),
     onDisableAiPickMode: params.onDisableAiPickMode ?? vi.fn(),
-    onClearPagePreparation: params.onClearPagePreparation ?? vi.fn(),
     onSelectPageEditingMode: params.onSelectPageEditingMode ?? vi.fn(),
     onToggleDesignReview: params.onToggleDesignReview ?? vi.fn(),
     onToggleDrawing: params.onToggleDrawing ?? vi.fn(),
@@ -66,11 +62,9 @@ function ModeButtonsHarness(params: {
 function renderModeButtons(
   params: {
     aiPickMode?: boolean;
-    canClearPagePreparation?: boolean;
     designReviewMode?: boolean;
     drawingMode?: boolean;
     onDisableAiPickMode?: () => void;
-    onClearPagePreparation?: () => void;
     onSelectPageEditingMode?: (mode: 'block-selection' | 'direct-text' | 'ai') => void;
     onToggleDesignReview?: () => void;
     onToggleDrawing?: () => void;
@@ -117,6 +111,18 @@ it('activates Drawing through its distinct Working Mode option', () => {
       ?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
   });
   expect(onToggleDrawing).toHaveBeenCalledTimes(1);
+});
+
+it('shows the selected mode without a persistent focus-like active frame', () => {
+  renderModeButtons({ drawingMode: true });
+  const trigger = queryModeSelectorButton();
+  expect(trigger?.getAttribute('aria-label')).toBe('content.toolbar.drawingLabel');
+  expect(trigger?.querySelector('.sniptale-toolbar-mode-icon')).not.toBeNull();
+  expect(trigger?.classList.contains('sniptale-glass-toolbar-button--active')).toBe(false);
+  expect(trigger?.getAttribute('data-active')).toBeNull();
+  act(() => trigger?.click());
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(trigger?.classList.contains('sniptale-glass-toolbar-button--active')).toBe(false);
 });
 
 it('activates Video Recording from the real mode-menu mousedown event', () => {
@@ -174,27 +180,11 @@ it('restores Drawing when it is selected after deactivating Video Recording', as
   expect(onToggleDrawing).toHaveBeenCalledOnce();
 });
 
-it('shows the clear-all action in Navigation and routes it to the reset owner', () => {
-  const onClearPagePreparation = vi.fn();
-  renderModeButtons({ canClearPagePreparation: true, onClearPagePreparation });
-
-  const clearButton = document.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
-  );
-  expect(clearButton?.getAttribute('title')).toBe('content.toolbar.clearPagePreparation');
-  expect(clearButton?.querySelector('svg')?.classList.contains('lucide-brush-cleaning')).toBe(true);
-
-  act(() => clearButton?.click());
-  expect(onClearPagePreparation).toHaveBeenCalledOnce();
-});
-
-it('disables the clear-all action while page preparation history is empty', () => {
+it('keeps Navigation free of duplicate reset actions', () => {
   renderModeButtons();
   expect(
-    document.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.navigation.clear-page-preparation"]'
-    )?.disabled
-  ).toBe(true);
+    document.querySelector('[data-ui="content.toolbar.navigation.clear-page-preparation"]')
+  ).toBeNull();
 });
 
 afterEach(() => {
@@ -396,6 +386,44 @@ it('routes all three mutually exclusive Content Editing choices through one sele
 
   expect(onSelectPageEditingMode).toHaveBeenNthCalledWith(1, 'direct-text');
   expect(onSelectPageEditingMode).toHaveBeenNthCalledWith(2, 'ai');
+});
+
+it('retains keyboard focus and activation on a Page Editing button', () => {
+  const onSelectPageEditingMode = vi.fn();
+  renderModeButtons({ onSelectPageEditingMode, quickEditMode: true });
+  const directText = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.page-editing-mode.direct-text"]'
+  );
+  act(() => directText?.focus());
+  expect(document.activeElement).toBe(directText);
+  act(() => directText?.click());
+  expect(document.activeElement).toBe(directText);
+  expect(onSelectPageEditingMode).toHaveBeenCalledWith('direct-text');
+});
+
+it('keeps the page edit focused when a Page Editing mode is clicked with the mouse', () => {
+  const onSelectPageEditingMode = vi.fn();
+  renderModeButtons({
+    onSelectPageEditingMode,
+    quickEditDocumentMode: true,
+    quickEditMode: true,
+  });
+  const editor = document.createElement('div');
+  editor.contentEditable = 'true';
+  editor.tabIndex = 0;
+  document.body.append(editor);
+  editor.focus();
+  const directText = document.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.page-editing-mode.direct-text"]'
+  );
+  const press = new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0 });
+  act(() => {
+    directText?.dispatchEvent(press);
+    directText?.click();
+  });
+  expect(press.defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(editor);
+  expect(onSelectPageEditingMode).toHaveBeenCalledWith('direct-text');
 });
 
 it('blocks conflicting Content Editing actions while the AI transition is pending', () => {

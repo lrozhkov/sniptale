@@ -1,3 +1,4 @@
+import type { GalleryDeletionRequest } from '../library/deletion/types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   ActiveImportState,
@@ -20,6 +21,7 @@ export function useGallerySurfaceState() {
   const [pendingWebSnapshotImport, setPendingWebSnapshotImport] =
     useState<PendingWebSnapshotImportState | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<GalleryConfirmDialogState | null>(null);
+  const [deletionRequest, setDeletionRequest] = useState<GalleryDeletionRequest | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [activeBlockingOperationCount, setActiveBlockingOperationCount] = useState(0);
   const activeBlockingOperationsRef = useRef(new Set<symbol>());
@@ -68,6 +70,7 @@ export function useGallerySurfaceState() {
       setActiveImport,
       setBanner,
       setConfirmDialog,
+      setDeletionRequest,
       setPendingExport,
       setPendingImport,
       setPendingMediaImport,
@@ -77,6 +80,7 @@ export function useGallerySurfaceState() {
       activeImport,
       banner,
       confirmDialog,
+      deletionRequest,
       isBusy: activeBlockingOperationCount > 0,
       pendingExport,
       pendingImport,

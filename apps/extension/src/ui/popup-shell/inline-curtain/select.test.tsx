@@ -111,6 +111,19 @@ it('keeps parameter labels in the shared fixed-width column', () => {
   expect(label?.className).toContain('truncate');
 });
 
+it('keeps the settings action outside the highlighted disclosure target', () => {
+  renderSelectWithSecondaryAction();
+  const trigger = container?.querySelector<HTMLButtonElement>('button[aria-label="Device"]');
+  const settings = container?.querySelector<HTMLButtonElement>(
+    'button[aria-label="Open settings"]'
+  );
+  expect(trigger?.querySelector('svg')).not.toBeNull();
+  expect(settings?.querySelector('svg')).toBeNull();
+  expect(trigger?.className).toContain('hover:bg-');
+  expect(trigger?.parentElement?.className).not.toContain('hover:bg-');
+  expect(settings?.parentElement).toBe(trigger?.parentElement);
+});
+
 afterEach(() => {
   act(() => root?.unmount());
   root = null;

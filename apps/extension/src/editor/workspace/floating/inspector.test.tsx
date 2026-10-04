@@ -135,9 +135,15 @@ it('renders confirm dialogs from the shared document controller once', async () 
     message: 'Message',
     title: 'Title',
   };
+  const onConfirmDialogConfirm = vi.fn();
+  const onConfirmDialogCancel = vi.fn();
   const { EditorFloatingInspector } = await import('./inspector');
   const markup = renderToStaticMarkup(
-    renderInspector(EditorFloatingInspector as InspectorComponent, { confirmDialog })
+    renderInspector(EditorFloatingInspector as InspectorComponent, {
+      confirmDialog,
+      onConfirmDialogConfirm,
+      onConfirmDialogCancel,
+    })
   );
 
   expect(markup).toContain('mock.confirm-dialog');
@@ -146,7 +152,11 @@ it('renders confirm dialogs from the shared document controller once', async () 
     undefined
   );
   expect(mocks.confirmDialog).toHaveBeenCalledWith(
-    expect.objectContaining(confirmDialog),
+    expect.objectContaining({
+      ...confirmDialog,
+      onConfirm: onConfirmDialogConfirm,
+      onCancel: onConfirmDialogCancel,
+    }),
     undefined
   );
 });

@@ -1,4 +1,8 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
 import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
@@ -26,6 +30,10 @@ vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
+}));
+vi.mock('./project-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./project-recordings')>()),
+  repairLinkedRecordingLifecycles: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
@@ -165,7 +173,11 @@ it.each([
   expect(deletes).not.toHaveBeenCalled();
 });
 
-async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now: number }) {
+async function runExpiredVideoProjectCleanup(args: {
+  mediaUpdatedAt: number;
+  now: number;
+  trashedAt?: number;
+}) {
   const project = {
     ...createVideoProjectEntryWithMediaClip(),
     lifecycle: createLibraryLifecycle('temporary', 1),
@@ -177,7 +189,10 @@ async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now
     height: 1080,
     id: 'project-asset:project-asset-1',
     kind: 'video' as const,
-    lifecycle: createLibraryLifecycle('temporary', args.mediaUpdatedAt),
+    lifecycle: {
+      ...createLibraryLifecycle('temporary', args.mediaUpdatedAt),
+      ...(args.trashedAt === undefined ? {} : { trashedAt: args.trashedAt }),
+    },
     mimeType: 'video/webm',
     originalFilename: 'project-asset.webm',
     size: 5,
@@ -218,25 +233,25 @@ async function runExpiredVideoProjectCleanup(args: { mediaUpdatedAt: number; now
   await expect(
     cleanupDrafts({ now: args.now, policy: DEFAULT_LOCAL_STORAGE_POLICY })
   ).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [`video-project:${project.id}`],
+    deletedCount: 0,
+    deletedIds: [],
   });
   return { deletes, media, project };
 }
 
-it('keeps a fresh temporary child when its video project has expired', async () => {
+it('keeps a fresh temporary child and its legacy project past the old expiry', async () => {
   const now = 40 * day;
   const { deletes, media, project } = await runExpiredVideoProjectCleanup({
     mediaUpdatedAt: now - day,
     now,
   });
 
-  expect(deletes).toHaveBeenCalledWith('video_projects', project.id);
+  expect(deletes).not.toHaveBeenCalledWith('video_projects', project.id);
   expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
   expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
 });
 
-it('removes recording telemetry and the project thumbnail with an expired recording graph', async () => {
+it('retains recording telemetry and project thumbnail with a legacy project graph', async () => {
   const now = 40 * day;
   const project = createVideoProjectEntry(
     {
@@ -301,11 +316,19 @@ it('removes recording telemetry and the project thumbnail with an expired record
   );
 
   await expect(cleanupDrafts({ now, policy: DEFAULT_LOCAL_STORAGE_POLICY })).resolves.toEqual({
-    deletedCount: 1,
-    deletedIds: [`video-project:${project.id}`],
+    deletedCount: 0,
+    deletedIds: [],
   });
-  expect(deletes).toHaveBeenCalledWith('media_library', media.id);
-  expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
-  expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `video-project:${project.id}`);
+  expect(deletes).not.toHaveBeenCalled();
+});
+
+it('retains independently trashed media and its legacy video project', async () => {
+  const { deletes, media, project } = await runExpiredVideoProjectCleanup({
+    mediaUpdatedAt: 1,
+    now: 40 * day,
+    trashedAt: 2,
+  });
+  expect(deletes).not.toHaveBeenCalledWith('video_projects', project.id);
+  expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
+  expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
 });

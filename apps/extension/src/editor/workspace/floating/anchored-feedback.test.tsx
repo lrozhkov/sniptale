@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { EditorAnchoredAlert, EditorAnchoredConfirmPopover } from './anchored-feedback';
+import {
+  EditorAnchoredAlert,
+  EditorAnchoredConfirmPopover,
+  EditorAnchoredHistoryChoices,
+} from './anchored-feedback';
 
 let host: HTMLDivElement;
 let root: Root;
@@ -82,6 +86,107 @@ it('renders a compact anchored destructive dialog and confirms once while pendin
   expect(confirm?.disabled).toBe(true);
   await act(async () => resolve());
   expect(confirm?.disabled).toBe(false);
+});
+
+it('opens history feedback above a toolbar anchored near the bottom of an HD viewport', () => {
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue({
+    bottom: 688,
+    height: 32,
+    left: 24,
+    right: 56,
+    top: 656,
+    width: 32,
+    x: 24,
+    y: 656,
+    toJSON: () => ({}),
+  });
+  vi.stubGlobal('innerHeight', 720);
+  renderConfirm();
+  const positioner = document.querySelector('[data-ui="test.confirm"]')?.parentElement;
+  expect(positioner?.style.top).toBe('650px');
+  expect(positioner?.getAttribute('style')).toContain('translateY(-100%)');
+});
+
+it('uses a hand cursor and rounded hover surface for both history choices', () => {
+  act(() => {
+    root.render(
+      <EditorAnchoredHistoryChoices
+        anchorEl={anchor}
+        canReturnToStart={false}
+        dataUi="test.history"
+        onClose={vi.fn()}
+        onRestoreOriginal={vi.fn()}
+        onReturnToStart={vi.fn()}
+        restoreDescription="Discard edits"
+        restoreLabel="Restore original"
+        returnDescription="Go to first action"
+        returnLabel="Return to start"
+        title="History"
+      />
+    );
+  });
+
+  for (const button of document.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="test.history"] button'
+  )) {
+    expect(button.className).toContain('cursor-pointer');
+    expect(button.className).toContain('rounded-md');
+  }
+  expect(document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.disabled).toBe(
+    true
+  );
+});
+
+it.each([
+  ['reset', 'en', 'light', 'Reset to original?', 'Discard all edits?'],
+  ['reset', 'ru', 'dark', 'Сбросить?', 'Удалить все изменения?'],
+  ['close', 'en', 'dark', 'Close document?', 'Close this document?'],
+  ['close', 'ru', 'light', 'Закрыть документ?', 'Закрыть этот документ?'],
+])('spaces the %s confirmation in %s with %s theme', (consumer, locale, theme, title, message) => {
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar-root';
+  toolbar.dataset['theme'] = theme;
+  toolbar.append(anchor);
+  document.body.append(toolbar);
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue({
+    bottom: 60,
+    height: 40,
+    left: 12,
+    right: 300,
+    top: 20,
+    width: 288,
+    x: 12,
+    y: 20,
+    toJSON: () => ({}),
+  });
+
+  act(() => {
+    root.render(
+      <EditorAnchoredConfirmPopover
+        anchorEl={anchor}
+        cancelText={locale === 'ru' ? 'Отмена' : 'Cancel'}
+        confirmText={locale === 'ru' ? 'Подтвердить' : 'Confirm'}
+        dataUi={`${consumer}.confirm`}
+        message={message}
+        onCancel={vi.fn()}
+        onConfirm={vi.fn()}
+        title={title}
+      />
+    );
+  });
+
+  const surface = document.querySelector<HTMLElement>(`[data-ui="${consumer}.confirm"]`);
+  const positioner = surface?.parentElement;
+  const dialog = surface?.querySelector<HTMLElement>('[role="alertdialog"]');
+  expect(positioner?.style.top).toBe('66px');
+  expect(dialog?.className).toContain('p-2');
+  expect(dialog?.className).toContain('space-y-4');
+  expect(dialog?.querySelector('p')?.className).toContain('mt-2');
+  expect(dialog?.textContent).toContain(title);
+  expect(dialog?.textContent).toContain(message);
+  expect(surface?.getAttribute('data-theme')).toBe(theme);
+
+  toolbar.remove();
 });
 
 it('dismisses on Escape or an outside pointer without dismissing from its own anchor', () => {

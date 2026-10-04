@@ -60,6 +60,8 @@ export const editorShapeCatalogMessages = defineMessageSource({
     },
   },
   categories: {
+    cursors: { ru: 'Курсоры', en: 'Cursors' },
+    stamps: { ru: 'Штампы и метки', en: 'Stamps and tags' },
     'primary-shortcuts': { ru: 'Быстрый выбор', en: 'Primary shortcuts' },
     'lines-connectors': { ru: 'Линии и соединители', en: 'Lines and connectors' },
     'basic-shapes': { ru: 'Основные фигуры', en: 'Basic shapes' },
@@ -72,6 +74,19 @@ export const editorShapeCatalogMessages = defineMessageSource({
     imported: { ru: 'Импортированная библиотека', en: 'Imported library' },
   },
   labels: {
+    'cursor-pointer': { ru: 'Указатель', en: 'Pointer' },
+    'cursor-hand': { ru: 'Рука', en: 'Hand' },
+    'cursor-move': { ru: 'Перемещение', en: 'Move' },
+    'cursor-text': { ru: 'Текстовый курсор', en: 'Text cursor' },
+    'cursor-resize-horizontal': { ru: 'Размер по горизонтали', en: 'Horizontal resize' },
+    'cursor-resize-vertical': { ru: 'Размер по вертикали', en: 'Vertical resize' },
+    'cursor-resize-diagonal': { ru: 'Размер по диагонали ↗', en: 'Diagonal resize ↗' },
+    'cursor-resize-diagonal-reverse': { ru: 'Размер по диагонали ↘', en: 'Diagonal resize ↘' },
+    'stamp-check': { ru: 'Готово', en: 'Done' },
+    'stamp-error': { ru: 'Ошибка', en: 'Error' },
+    'stamp-warning': { ru: 'Внимание', en: 'Warning' },
+    'stamp-tag': { ru: 'Тег', en: 'Tag' },
+
     line: { ru: 'Линия', en: 'Line' },
     arrow: { ru: 'Стрелка', en: 'Arrow' },
     'double-line-arrow': { ru: 'Двусторонняя стрелка', en: 'Double arrow' },

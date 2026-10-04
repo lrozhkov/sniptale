@@ -1,3 +1,5 @@
+import type { ReviewBeforeAction } from './note-transitions';
+import { createReviewHistoryActions } from './history-actions';
 import { useMemo, useEffect, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import type {
@@ -17,6 +19,7 @@ import type { useReviewExport } from './use-export';
 import { useReviewAudio } from './use-review-audio';
 import type { useReviewEdits } from './use-edits';
 import { useReviewEditorShortcuts } from './use-review-shortcuts';
+import { reviewTimelineNavigationBounds } from './track-projection';
 import { useReviewSelectionLifecycle } from './use-review-selection';
 import type { useReviewZoomEditor } from './zoom-editor';
 
@@ -37,6 +40,7 @@ export function useReviewEditorWiring(args: {
   clearAnnotation: Dispatch<SetStateAction<ReviewAnnotation | null>>;
   time: number;
   timelineDuration: number;
+  beforeAction?: ReviewBeforeAction;
   busy: boolean;
   canStart(): boolean;
   run(action: () => Promise<unknown>): Promise<unknown>;
@@ -89,18 +93,15 @@ export function useReviewEditorWiring(args: {
     edits: args.document.edits,
     selectedOriginalId:
       args.activeSelection.kind === 'original-audio' ? args.activeSelection.id : null,
-    onOriginalSelection: (id) =>
-      args.setActiveSelection(id ? { kind: 'original-audio', id } : { kind: 'none' }),
+    onOriginalSelection: (id) => {
+      if (id) args.setTimelineSelection({ kind: 'point', time: args.time });
+      args.setActiveSelection(id ? { kind: 'original-audio', id } : { kind: 'none' });
+    },
     selectedId: args.activeSelection.kind === 'audio' ? args.activeSelection.id : null,
     onSelectionChange: (value) =>
       args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),
   });
   useOriginalAudioToolLifecycle(args.advanced.ui.mode, args.activeSelection.kind, audio);
-  const flushPendingContent = async () => {
-    await args.advancedState.flush();
-    await canvasComments.flushTexts();
-    await args.session.flush();
-  };
   const removeSelection = useReviewSelectionLifecycle({
     selection: args.activeSelection,
     markers: projected.markers,
@@ -119,23 +120,52 @@ export function useReviewEditorWiring(args: {
     deleteOriginalAudio: audio.removeOriginal,
     clearAnnotation: () => args.clearAnnotation(null),
   });
-  const moveHistory = async (direction: 'undo' | 'redo') => {
-    await flushPendingContent();
-    await args.session.history(direction);
+  const history = createReviewHistoryActions({
+    session: args.session,
+    run: args.run,
+    flushStaged: async () => {
+      await args.advancedState.flush();
+      await canvasComments.flushTexts();
+    },
+    reset: () => resetReviewEditor(args, audio, canvasComments),
+  });
+  useWiredReviewShortcuts(args, audio, comments, history, removeSelection);
+  return {
+    audio,
+    canvasComments,
+    comments,
+    telemetry: args.telemetry ? args.actionsVisible : false,
+    projected,
+    flushPendingContent: history.flush,
+    moveHistory: history.run,
+    removeSelection,
+    exporter: prepareReviewExporter(args.exporter, args.run, history.flush),
   };
+}
+
+/** Keyboard commands use the same note admission and complete tool reset as pointer controls. */
+function useWiredReviewShortcuts(
+  args: Parameters<typeof useReviewEditorWiring>[0],
+  audio: ReturnType<typeof useReviewAudio>,
+  comments: ReturnType<typeof useReviewCommentActions>,
+  history: ReturnType<typeof createReviewHistoryActions>,
+  removeSelection: () => void
+) {
   useReviewEditorShortcuts({
     time: args.time,
+    navigation: reviewTimelineNavigationBounds(args.sourceDuration, args.document.edits),
     seek: args.seek,
     play: args.play,
-    composerAnnotation: args.composer.annotation,
+    composerAnnotation: args.composer.before,
+    beforeAction: args.beforeAction,
     busy: args.busy,
     exporterPhase: args.exporter.phase,
     exporterAvailable: !!args.exporter.index,
     boundaries:
       args.cuts.cutting && args.exporter.index ? args.exporter.index.boundaries : undefined,
     run: args.run,
-    undo: () => moveHistory('undo'),
-    redo: () => moveHistory('redo'),
+    undo: () => history.move('undo'),
+    redo: () => history.move('redo'),
     cancelDrawing: () => {
       selectReviewPointer(args, audio);
       args.setTimelineSelection({ kind: 'point', time: args.time });
@@ -144,23 +174,13 @@ export function useReviewEditorWiring(args: {
     remove: removeSelection,
     addComment: () => comments.add(args.timelineSelection),
     toggleCut: () => {
-      if (audio.originalRangeSelected) return;
+      if (audio.originalRangeSelected && args.activeSelection.kind === 'none') return;
       args.zoom.setDrawing(false);
       audio.setOriginalTool(false);
+      audio.setOriginalRangeSelected(false);
       void args.cuts.toggle('cut');
     },
   });
-  return {
-    audio,
-    canvasComments,
-    comments,
-    telemetry: args.telemetry ? args.actionsVisible : false,
-    projected,
-    flushPendingContent,
-    moveHistory: (direction: 'undo' | 'redo') => void args.run(() => moveHistory(direction)),
-    removeSelection,
-    exporter: prepareReviewExporter(args.exporter, args.run, flushPendingContent),
-  };
 }
 
 /** Pointer selection and Escape share the same reset across the three editing tools. */
@@ -185,4 +205,22 @@ function useOriginalAudioToolLifecycle(
     setOriginalTool(false);
     setOriginalRangeSelected(false);
   }, [mode, selectionKind, setOriginalTool, setOriginalRangeSelected]);
+}
+
+/** Flush staged content before the atomic reset, then restore disposable editor tools. */
+async function resetReviewEditor(
+  args: Parameters<typeof useReviewEditorWiring>[0],
+  audio: ReturnType<typeof useReviewAudio>,
+  canvasComments: ReturnType<typeof useCanvasComments>
+) {
+  args.video.current?.pause();
+  await args.advancedState.flush();
+  await canvasComments.flushTexts();
+  await args.session.reset();
+  args.advancedState.reset();
+  selectReviewPointer(args, audio);
+  args.setActiveSelection({ kind: 'none' });
+  args.clearAnnotation(null);
+  args.setTimelineSelection({ kind: 'point', time: 0 });
+  args.seek(0, false);
 }

@@ -1,7 +1,6 @@
 import type { ContentToolbarDisplayMode } from '../../../../contracts/settings';
 import type { ToolbarMenuState } from '../state/menu';
 import type { ToolbarPageEditingMode } from '../types';
-import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 export interface ToolbarModeButtonsProps {
   isCursorMode: boolean;
@@ -34,14 +33,4 @@ export interface ToolbarModeButtonsProps {
   videoRecordingMode?: boolean;
   videoRecordingModeLocked?: boolean;
   onToggleVideoRecording?: (activationEvent?: Event) => Promise<boolean> | boolean | void;
-  pinToTab?: boolean;
-  pinToTabAvailable?: boolean;
-  pinToTabLocked?: boolean;
-  onPinToTabChange?: (
-    value: boolean,
-    contentIntentSource?: ContentPrivilegedActionIntentSource
-  ) => void;
-  onHide?: () => void;
-  onClearPagePreparation?: () => void;
-  canClearPagePreparation?: boolean;
 }

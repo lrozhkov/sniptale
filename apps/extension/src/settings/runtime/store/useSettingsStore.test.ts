@@ -77,6 +77,7 @@ async function loadStore() {
   module.useSettingsStore.setState({
     settings: settingsFixture,
     isLoading: false,
+    hasLoaded: false,
     error: null,
   });
   return module.useSettingsStore;
@@ -103,6 +104,7 @@ function runUseSettingsStoreLoadSuite() {
     expect(loadSettingsRuntimeStateMock).toHaveBeenCalledTimes(1);
     expect(store.getState().settings).toMatchObject(settingsFixture);
     expect(store.getState().isLoading).toBe(false);
+    expect(store.getState().hasLoaded).toBe(true);
     expect(store.getState().error).toBeNull();
   });
 
@@ -115,6 +117,7 @@ function runUseSettingsStoreLoadSuite() {
     expect(store.getState().error).toContain('Sniptale');
     expect(store.getState().error).not.toContain('load failed');
     expect(store.getState().isLoading).toBe(false);
+    expect(store.getState().hasLoaded).toBe(false);
   });
 }
 

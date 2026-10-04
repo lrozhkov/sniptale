@@ -13,11 +13,22 @@ import {
 } from '../root-codecs/projects';
 import type { AssetRef } from '../../../../composition/persistence/assets';
 const io = vi.hoisted(() => ({
+  db: vi.fn(),
   mutate: vi.fn(),
   put: vi.fn(),
   read: vi.fn(),
   checkpoint: vi.fn(),
+  deleteBeforeCommit: false,
 }));
+vi.mock(
+  '../../../../composition/persistence/infrastructure/indexed-db/core',
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import('../../../../composition/persistence/infrastructure/indexed-db/core')
+    >()),
+    initDB: io.db,
+  })
+);
 vi.mock('../../../../composition/persistence/infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: io.mutate,
 }));
@@ -41,13 +52,22 @@ import {
 } from '../../../../composition/persistence/infrastructure/indexed-db/core';
 beforeEach(() => {
   vi.clearAllMocks();
+  io.deleteBeforeCommit = false;
   io.put.mockResolvedValue({ imported: true, conflicted: false });
-  io.mutate.mockImplementation(async (operation) =>
-    operation({
+  io.mutate.mockImplementation(async (operation) => {
+    const deleted = io.deleteBeforeCommit;
+    return operation({
       get: async () => ({ id: 'guide' }),
-      transaction: () => ({ objectStore: () => ({ put: vi.fn() }), done: Promise.resolve() }),
-    })
-  );
+      transaction: () => ({
+        objectStore: (store: string) => ({
+          get: async (key: string) =>
+            deleted && store === 'media_library' ? undefined : (await io.db())?.get(store, key),
+          put: vi.fn(),
+        }),
+        done: Promise.resolve(),
+      }),
+    });
+  });
 });
 function input() {
   const project = createGuideProject('Old', 'guide', 1);
@@ -74,7 +94,11 @@ function input() {
   const historyBlob = new File([JSON.stringify(history)], 'saved-versions.json', {
     type: 'application/json',
   });
-  io.read.mockResolvedValue(historyBlob);
+  io.read.mockImplementation(async (ref: AssetRef) =>
+    ref.assetId === 'physical-history'
+      ? historyBlob
+      : new File(['data'], 'scenario.png', { type: 'image/png' })
+  );
   const ref = (assetId: string, mimeType: string, size: number): AssetRef => ({
     assetId,
     mimeType,
@@ -155,6 +179,198 @@ function input() {
   };
   return { args, history };
 }
+it('restores a borrowed scenario child onto the already restored library object', async () => {
+  const { args } = input();
+  const metadata = args.envelope.metadata as typeof args.envelope.metadata & {
+    assets: Array<{ entry: Record<string, unknown>; objectId: string }>;
+  };
+  metadata.assets[0]!.entry['galleryAssetId'] = 'source-media';
+  metadata.assets[0]!.entry['borrowedMediaId'] = 'source-media';
+  args.session.rootIdMap['media:library-item:source-media'] = 'shared-media';
+  const sharedRef: AssetRef = {
+    assetId: 'shared-physical',
+    createdAt: 1,
+    mimeType: 'image/png',
+    size: 4,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: 'objects/shared-physical' },
+  };
+  io.db.mockResolvedValue({
+    get: async (store: string) => {
+      if (store === 'media_library')
+        return {
+          id: 'shared-media',
+          kind: 'image',
+          source: { kind: 'stored-asset', assetId: sharedRef.assetId },
+          filename: 'shared.png',
+          originalFilename: 'shared.png',
+          createdAt: 1,
+          updatedAt: 1,
+          size: 4,
+          mimeType: 'image/png',
+          width: 100,
+          height: 50,
+          duration: null,
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+          tags: [],
+        };
+      if (store === 'asset_refs') return sharedRef;
+      return undefined;
+    },
+  });
+
+  await scenarioProjectRootPublisher.publish(args);
+
+  expect(io.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      root: expect.objectContaining({
+        assets: [
+          expect.objectContaining({
+            entry: expect.objectContaining({
+              assetId: 'shared-physical',
+              borrowedMediaId: 'shared-media',
+              galleryAssetId: 'shared-media',
+            }),
+            ref: sharedRef,
+          }),
+        ],
+      }),
+    })
+  );
+});
+
+it('rejects a borrowed source deleted between restore preparation and transaction', async () => {
+  const { args } = input();
+  const metadata = args.envelope.metadata as typeof args.envelope.metadata & {
+    assets: Array<{ entry: Record<string, unknown>; objectId: string }>;
+  };
+  metadata.assets[0]!.entry['borrowedMediaId'] = 'source-media';
+  args.session.rootIdMap['media:library-item:source-media'] = 'shared-media';
+  const sharedRef = {
+    ...args.staged[0]!.ref,
+    assetId: 'shared-physical',
+    location: { kind: 'opfs' as const, objectKey: 'objects/shared-physical' },
+  };
+  io.db.mockResolvedValue({
+    get: async (store: string) =>
+      store === 'media_library'
+        ? {
+            id: 'shared-media',
+            kind: 'image',
+            source: { kind: 'stored-asset', assetId: sharedRef.assetId },
+            filename: 'shared.png',
+            originalFilename: 'shared.png',
+            createdAt: 1,
+            updatedAt: 1,
+            size: 4,
+            mimeType: 'image/png',
+            width: 100,
+            height: 50,
+            duration: null,
+            sourceUrl: null,
+            sourceTitle: null,
+            sourceFavicon: null,
+            tags: [],
+          }
+        : sharedRef,
+  });
+  io.deleteBeforeCommit = true;
+  await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow(
+    'Borrowed scenario source is unavailable'
+  );
+  expect(io.put).not.toHaveBeenCalled();
+});
+it('restores a formerly owned scenario child onto its media root without retaining duplicate bytes', async () => {
+  const { args } = input();
+  args.session.rootIdMap['media:library-item:scenario-asset:logical-image'] = 'restored-media';
+  const sharedRef: AssetRef = {
+    assetId: 'restored-physical',
+    createdAt: 1,
+    mimeType: 'image/png',
+    size: 4,
+    sha256: null,
+    location: { kind: 'opfs', objectKey: 'objects/restored-physical' },
+  };
+  io.db.mockResolvedValue({
+    get: async (store: string) => {
+      if (store === 'media_library')
+        return {
+          id: 'restored-media',
+          kind: 'image',
+          source: { kind: 'stored-asset', assetId: sharedRef.assetId },
+          filename: 'scenario.png',
+          originalFilename: 'scenario.png',
+          createdAt: 1,
+          updatedAt: 1,
+          size: 4,
+          mimeType: 'image/png',
+          width: 100,
+          height: 50,
+          duration: null,
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+          tags: [],
+        };
+      if (store === 'asset_refs') return sharedRef;
+      return undefined;
+    },
+  });
+
+  const result = await scenarioProjectRootPublisher.publish(args);
+  expect(io.put.mock.calls[0]?.[0].root.assets[0]).toMatchObject({
+    entry: {
+      assetId: 'restored-physical',
+      borrowedMediaId: 'restored-media',
+      galleryAssetId: 'restored-media',
+    },
+    ref: sharedRef,
+  });
+  expect(result.retainedAssetIds).toContain('restored-physical');
+  expect(result.retainedAssetIds).not.toContain('physical-image');
+});
+
+it('rejects a scenario object that differs from its matching library root', async () => {
+  const { args, history } = input();
+  args.session.rootIdMap['media:library-item:scenario-asset:logical-image'] = 'restored-media';
+  const sharedRef = { ...args.staged[0]!.ref, assetId: 'different-source' };
+  io.db.mockResolvedValue({
+    get: async (store: string) =>
+      store === 'media_library'
+        ? {
+            id: 'restored-media',
+            kind: 'image',
+            source: { kind: 'stored-asset', assetId: 'different-source' },
+            filename: 'scenario.png',
+            originalFilename: 'scenario.png',
+            createdAt: 1,
+            updatedAt: 1,
+            size: 4,
+            mimeType: 'image/png',
+            width: 100,
+            height: 50,
+            duration: null,
+            sourceUrl: null,
+            sourceTitle: null,
+            sourceFavicon: null,
+            tags: [],
+          }
+        : sharedRef,
+  });
+  io.read.mockImplementation(async (ref: AssetRef) =>
+    ref.assetId === 'physical-history'
+      ? new File([JSON.stringify(history)], 'saved-versions.json', { type: 'application/json' })
+      : new File([ref.assetId === 'different-source' ? 'evil' : 'data'], 'asset.png', {
+          type: 'image/png',
+        })
+  );
+  await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow(
+    'differs from the archive'
+  );
+  expect(io.put).not.toHaveBeenCalled();
+});
 it('duplicates historical image/document identities and leaves consumed JSON for existing staged cleanup', async () => {
   const { args } = input();
   const result = await scenarioProjectRootPublisher.publish(args);
@@ -383,4 +599,95 @@ it('rejects oversized narration before publishing an aggregate', async () => {
   await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow('asset metadata');
   expect(io.put).not.toHaveBeenCalled();
   expect(io.checkpoint).not.toHaveBeenCalled();
+});
+
+it.each(['guide', 'tour'] as const)(
+  'retains restored %s HTML objects and remaps only catalogue identity on duplication',
+  async (mode) => {
+    const { args } = input();
+    const ref: AssetRef = {
+      assetId: 'restored-html',
+      createdAt: 1,
+      location: { kind: 'opfs', objectKey: 'objects/restored-html' },
+      mimeType: 'text/html',
+      sha256: null,
+      size: 4,
+    };
+    const metadata = args.envelope.metadata as unknown as { exports: unknown[] };
+    metadata.exports = [
+      {
+        id: 'saved',
+        projectId: 'guide',
+        filename: 'renamed.html',
+        format: 'html',
+        createdAt: 1,
+        size: 4,
+        html: { mode, objectId: 'html-object' },
+      },
+    ];
+    args.staged.push({ objectId: 'html-object', ref });
+    args.journal.assetRefs.push(ref);
+    const result = await scenarioProjectRootPublisher.publish(args);
+    const root = io.put.mock.calls[0]![0].root;
+    expect(root.exports[0]).toMatchObject({
+      projectId: root.entry.id,
+      filename: 'renamed.html',
+      size: 4,
+      html: { mode, assetId: ref.assetId },
+    });
+    expect(root.exports[0].id).not.toBe('saved');
+    expect(root.exportRefs).toEqual([ref]);
+    expect(result.retainedAssetIds).toContain(ref.assetId);
+  }
+);
+
+it('aborts archive replacement if retained HTML graph cleanup fails after mutation starts', async () => {
+  const { args } = input();
+  args.session.strategy = 'replace';
+  let rootPresent = true;
+  const abort = vi.fn(() => {
+    rootPresent = true;
+  });
+  io.put.mockImplementationOnce(async () => {
+    rootPresent = false;
+    throw new Error('Scenario HTML ownership is invalid.');
+  });
+  io.mutate.mockImplementation(async (effect) =>
+    effect({
+      get: async () => ({ id: 'guide' }),
+      transaction: () => ({
+        abort,
+        objectStore: () => ({ get: vi.fn(), put: vi.fn() }),
+        done: Promise.resolve(),
+      }),
+    })
+  );
+  await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow('ownership is invalid');
+  expect(rootPresent).toBe(true);
+  expect(abort).toHaveBeenCalledOnce();
+  expect(io.checkpoint).not.toHaveBeenCalled();
+});
+
+it('restores a frozen canonical scenario representation without borrowing replaced root bytes', async () => {
+  const { args } = input();
+  const metadata = args.envelope.metadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata))
+    throw new Error('Missing metadata');
+  const assets = metadata['assets'];
+  if (
+    !Array.isArray(assets) ||
+    !assets[0] ||
+    typeof assets[0] !== 'object' ||
+    Array.isArray(assets[0])
+  )
+    throw new Error('Missing assets');
+  const entry = assets[0]['entry'];
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('Missing entry');
+  entry['galleryAssetId'] = 'scenario-asset:logical-image';
+  args.session.rootIdMap['media:library-item:scenario-asset:logical-image'] = 'replaced-root';
+  await scenarioProjectRootPublisher.publish(args);
+  expect(io.put.mock.calls[0]?.[0].root.assets[0]).toMatchObject({
+    entry: { assetId: 'physical-image', galleryAssetId: 'replaced-root' },
+  });
+  expect(io.put.mock.calls[0]?.[0].root.assets[0].entry).not.toHaveProperty('borrowedMediaId');
 });

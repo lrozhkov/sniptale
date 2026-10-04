@@ -119,6 +119,8 @@ function selectToolPresetPayload(
 ): SettingsTransferDomainPayload {
   const source = payload.data as Record<string, SettingsTransferDomainPayload['data']>;
   const data: Record<string, SettingsTransferDomainPayload['data']> = {};
+  if (selected.has('styles.tool-presets.preferences') && source['palette'] !== undefined)
+    data['palette'] = source['palette'];
   for (const family of ['step', 'sceneBackground']) {
     const collection = source[family];
     if (!collection || typeof collection !== 'object' || Array.isArray(collection)) continue;

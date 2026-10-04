@@ -36,13 +36,17 @@ function interactWithDimensionCommand(args: {
   container: HTMLDivElement;
 }) {
   const widthInput = args.container.querySelector('input') as HTMLInputElement | null;
-  const lockButton = args.container.querySelector('button') as HTMLButtonElement | null;
+  const lockButton = args.container.querySelector(
+    'button[aria-pressed]'
+  ) as HTMLButtonElement | null;
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
 
   act(() => {
     descriptor?.set?.call(widthInput, '640');
     widthInput?.dispatchEvent(new Event('input', { bubbles: true }));
     widthInput?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  act(() => {
     widthInput?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     lockButton?.click();
     args.commands[1]?.onClick?.();
@@ -137,16 +141,21 @@ it('maps file compact commands from document action groups', () => {
 it('builds frame-surface commands with explicit icons and routes background actions', () => {
   const params = createInspectorCommandParams();
   const commands = buildFrameSurfaceCommands(params as never);
+  const backgroundModeProps = (
+    (commands[0]!.content as any).props.children.props.children[0] as any
+  ).props;
   const backgroundEditorProps = (
-    (commands[0]!.content as any).props.children.props.children[1] as any
+    (commands[0]!.content as any).props.children.props.children[2] as any
   ).props;
   const backgroundBlurProps = (
-    (commands[0]!.content as any).props.children.props.children[2] as any
+    (commands[0]!.content as any).props.children.props.children[3] as any
   ).props;
   const paddingFieldsProps = ((commands[1]!.content as any).props.children as any).props;
 
   expect(commands.map((command) => command.icon)).toEqual(['color', 'size', undefined]);
+  expect(backgroundModeProps.setBackgroundMode).toEqual(expect.any(Function));
 
+  (backgroundModeProps.setBackgroundMode as (mode: string) => void)('image');
   (backgroundEditorProps.applyGradientPreset as (preset: unknown) => void)({ angle: 180 });
   (backgroundEditorProps.previewFramePatch as (patch: unknown) => void)({
     backgroundMode: 'gradient',
@@ -166,7 +175,7 @@ it('builds frame-surface commands with explicit icons and routes background acti
   commands[2]?.onClick?.();
 
   expect(params.applyGradientPreset).toHaveBeenCalledWith({ angle: 180 });
-  expect(params.setFrameDraft).toHaveBeenCalledTimes(4);
+  expect(params.setFrameDraft).toHaveBeenCalledTimes(5);
   expect(params.onPickBackgroundImage).toHaveBeenCalledTimes(1);
   expect(params.clearBackgroundImage).toHaveBeenCalledTimes(1);
   expect(params.onApplyFrame).toHaveBeenCalledTimes(1);
@@ -195,6 +204,7 @@ it('builds workspace color commands with a separate save-default action', () => 
   expect(workspaceCommands.map((command) => command.id)).toEqual([
     'workspace-background',
     'workspace-presets',
+    'workspace-selection-visibility',
   ]);
   expect(workspaceControl.onPreviewChange).toEqual(expect.any(Function));
 
@@ -225,6 +235,9 @@ it('builds grid commands with commit-only color controls', () => {
       gridSnapEnabled: true,
     },
   } as never);
+  expect(activeGridCommands.slice(0, 2).map((command) => command.title)).toEqual(
+    gridCommands.slice(0, 2).map((command) => command.title)
+  );
   const gridControl = ((gridCommands[2]!.content as any).props.children as any).props;
   const gridSizeControl = ((gridCommands[3]!.content as any).props.children as any).props;
   const gridPaletteButtons = ((gridCommands[4]!.content as any).props.children.props.children ??
@@ -273,7 +286,7 @@ it('builds meta compact commands and leaves selection actions empty', () => {
   });
 
   const optionButtons = Array.from(
-    container.querySelectorAll<HTMLButtonElement>('.sniptale-glass-option-grid button')
+    container.querySelectorAll<HTMLInputElement>('[data-ui^="editor.technical-data.field-"]')
   );
   const addButton = Array.from(container.querySelectorAll('button')).find((button) =>
     button.hasAttribute('disabled')

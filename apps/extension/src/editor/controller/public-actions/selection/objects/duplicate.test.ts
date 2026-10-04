@@ -1,3 +1,9 @@
+// @vitest-environment jsdom
+import { Group, util, type FabricObject } from 'fabric';
+import { buildScenarioEditorCanvasDocument } from '../../../../../features/scenario/capture-step/editor-canvas-document';
+import { normalizeScenarioAnnotationsInCanvasJson } from '../../../../document/scenario-annotation-import';
+import { assertValidEditorDrawingCanvasJson } from '../../../../document/import-boundary';
+import { CUSTOM_JSON_PROPS } from '../../../../document/model/custom-json-props';
 import { expect, it, vi } from 'vitest';
 
 import { createObjectLabel } from '../../../../document/model';
@@ -64,4 +70,61 @@ it('clones the selection, assigns new identity, and selects the clone', async ()
   expect(commitHistory).toHaveBeenCalledOnce();
   expect(syncRuntimeState).toHaveBeenCalledOnce();
   randomUUID.mockRestore();
+});
+
+it.each([false, true])('roundtrips duplicated scenario blur (grouped: %s)', async (grouped) => {
+  const document = buildScenarioEditorCanvasDocument({
+    assetDataUrl: 'data:image/png;base64,doc',
+    sourceWidth: 320,
+    sourceHeight: 180,
+    overlays: [
+      {
+        id: 'blur-original',
+        kind: 'blur-rect',
+        blurSettings: {
+          amount: 9,
+          blurType: 'solid',
+          radius: 8,
+          shadow: 0,
+          showBorder: false,
+          strokeColor: '#112233',
+          strokeStyle: 'solid',
+          strokeWidth: 0,
+        },
+        rect: { x: 12, y: 16, width: 80, height: 40 },
+      },
+    ],
+  });
+  const normalized = normalizeScenarioAnnotationsInCanvasJson(JSON.stringify(document));
+  const [blur] = await util.enlivenObjects<FabricObject>(JSON.parse(normalized).objects);
+  if (!blur) throw new Error('Missing blur fixture');
+  const originalMetadata = blur.sniptaleScenarioBlurJson;
+  const original = grouped ? new Group([blur]) : blur;
+  if (grouped) {
+    original.sniptaleId = 'group-original';
+    original.sniptaleType = 'group';
+  }
+  const add = vi.fn();
+  await duplicateEditorSelection({
+    canvas: {
+      getActiveObjects: () => [original],
+      add,
+      setActiveObject: vi.fn(),
+      requestRenderAll: vi.fn(),
+    } as never,
+    commitHistory: vi.fn(),
+    nextLabelIndex: () => 1,
+    prepareObject: vi.fn(),
+    syncRuntimeState: vi.fn(),
+  });
+  const clone = add.mock.calls[0]![0] as FabricObject;
+  const saved = JSON.stringify({ objects: [clone.toObject([...CUSTOM_JSON_PROPS])] });
+  expect(() => assertValidEditorDrawingCanvasJson(saved)).not.toThrow();
+  const [reopened] = await util.enlivenObjects<FabricObject>(JSON.parse(saved).objects);
+  const copiedBlur = reopened instanceof Group ? reopened.getObjects()[0]! : reopened!;
+  expect(copiedBlur.sniptaleId).not.toBe(blur.sniptaleId);
+  expect(JSON.parse(copiedBlur.sniptaleScenarioBlurJson!)).toMatchObject({
+    id: copiedBlur.sniptaleId,
+  });
+  expect(blur.sniptaleScenarioBlurJson).toBe(originalMetadata);
 });

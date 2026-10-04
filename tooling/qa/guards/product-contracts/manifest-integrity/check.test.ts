@@ -10,10 +10,13 @@ import { collectManifestIntegrityViolations } from './check.mjs';
 const tempDirs: string[] = [];
 const OFFSCREEN_OPTIONS_SOURCE = [
   "const OFFSCREEN_DOCUMENT_REASON = 'USER_MEDIA' satisfies `${chrome.offscreen.Reason}`;",
+  "const OFFSCREEN_DISPLAY_REASON = 'DISPLAY_MEDIA' satisfies `${chrome.offscreen.Reason}`;",
   "const OFFSCREEN_CLIPBOARD_REASON = 'CLIPBOARD' satisfies `${chrome.offscreen.Reason}`;",
   "const PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON = 'LOCAL_STORAGE' satisfies `${chrome.offscreen.Reason}`;",
   'export function createUserMediaOffscreenDocumentOptions() {',
-  '  return { reasons: [OFFSCREEN_DOCUMENT_REASON, OFFSCREEN_CLIPBOARD_REASON] };',
+  '  return { reasons: [',
+  '    OFFSCREEN_DOCUMENT_REASON, OFFSCREEN_CLIPBOARD_REASON, OFFSCREEN_DISPLAY_REASON,',
+  '  ] };',
   '}',
   'export function createPrivacyErasureOffscreenDocumentOptions() {',
   '  return { reasons: [PRIVACY_ERASURE_OFFSCREEN_DOCUMENT_REASON] };',

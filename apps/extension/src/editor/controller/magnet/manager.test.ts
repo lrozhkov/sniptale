@@ -117,6 +117,7 @@ function createManagerHarness(options: {
     getCropGuide: () => state.cropGuide,
     getWorkspace: () => ({
       backgroundColor: '#ffffff',
+      hideSelectionWhileDragging: true,
       gridColor: '#d1d5db',
       gridEnabled: false,
       gridSize: 24,
@@ -239,7 +240,10 @@ function verifyScalingAndRenderPath() {
   manager.afterRender();
 
   expect(scalingTarget.getCoords()[1]?.x).toBe(50);
-  expect(topContext?.stroke).toHaveBeenCalled();
+  expect(
+    manager.getVisualGuides().lines.length + manager.getVisualGuides().points.length
+  ).toBeGreaterThan(0);
+  expect(topContext?.stroke).not.toHaveBeenCalled();
 }
 
 function verifyRenderGuard() {

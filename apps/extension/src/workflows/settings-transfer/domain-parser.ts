@@ -18,6 +18,8 @@ import {
 } from '../../composition/persistence/prompt-templates/guards';
 import { parseStoredQuickActions } from '../../composition/persistence/quick-actions/guards';
 import { parseStoredSettings } from '../../composition/persistence/settings/guards';
+import { parseViewportPresetTransferItems } from '../../features/viewport-presets/parser';
+import { isVoiceInputLanguage, isVoiceInputMode } from '@sniptale/runtime-contracts/voice-input';
 import { SETTINGS_TRANSFER_DOMAIN_IDS } from './registry';
 import { failSettingsTransferDomain, SettingsTransferDomainError } from './domain-error';
 import { parseSettingsTransferStyleDomain } from './style-domain-parser';
@@ -92,6 +94,24 @@ function parseCoreDomain(
         result['popupStartup'] = parsedPopup;
       }
       if (parsed.data.contextMenu !== undefined) {
+        if (
+          !isPlainRecord(parsed.data.contextMenu) ||
+          Object.keys(parsed.data.contextMenu).some(
+            (key) =>
+              key !== 'layout' &&
+              key !== 'enabled' &&
+              key !== 'showScreenshots' &&
+              key !== 'showVideo' &&
+              key !== 'showExport' &&
+              key !== 'showImageEditor' &&
+              key !== 'showVideoEditor' &&
+              key !== 'showGallery' &&
+              key !== 'showPageLinkCopy' &&
+              key !== 'showWindowResize' &&
+              key !== 'showSettings'
+          )
+        )
+          failSettingsTransferDomain(domainId);
         const settings = parseStoredSettings({ contextMenu: parsed.data.contextMenu });
         if (settings.invalidFieldCount > 0 || settings.hasInvalidRoot)
           failSettingsTransferDomain(domainId);
@@ -105,13 +125,37 @@ function parseCoreDomain(
         failSettingsTransferDomain(domainId);
       return json({ items: parsed.actions ?? [] });
     }
-    case 'capture.viewport-presets':
+    case 'capture.viewport-presets': {
+      if (Object.keys(value).some((key) => key !== 'items' && key !== 'defaultId'))
+        failSettingsTransferDomain(domainId);
+      const result: Record<string, unknown> = {};
+      if (value['items'] !== undefined) {
+        const items = parseViewportPresetTransferItems(value['items']);
+        if (!items) failSettingsTransferDomain(domainId);
+        result['items'] = items;
+      }
+      if (value['defaultId'] !== undefined) {
+        const parsed = parseStoredSettings({ defaultViewportPresetId: value['defaultId'] });
+        if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
+          failSettingsTransferDomain(domainId);
+        result['defaultId'] = parsed.value.defaultViewportPresetId;
+      }
+      return json(result);
+    }
+    case 'system.voice': {
+      if (
+        Object.keys(value).some((key) => key !== 'language' && key !== 'mode') ||
+        (value['language'] !== undefined && !isVoiceInputLanguage(value['language'])) ||
+        (value['mode'] !== undefined && !isVoiceInputMode(value['mode']))
+      )
+        failSettingsTransferDomain(domainId);
+      return json(value);
+    }
     case 'capture.image':
     case 'capture.pages':
     case 'capture.after-capture':
     case 'capture.saving':
-    case 'capture.retention':
-    case 'system.voice': {
+    case 'capture.retention': {
       const storageShape = mainSettingsStorageShape(domainId, value);
       const parsed = parseStoredSettings(storageShape);
       if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
@@ -295,8 +339,10 @@ function mainSettingsStorageShape(domainId: string, value: Record<string, unknow
     case 'capture.after-capture':
       return { captureAction: value['action'] };
     case 'capture.saving':
+      if (value['filenameRules'] === null) failSettingsTransferDomain(domainId);
       return {
         presets: value['templates'],
+        filenameRules: value['filenameRules'],
         defaultImagePresetId: value['defaultImagePresetId'],
         defaultVideoPresetId: value['defaultVideoPresetId'],
         defaultExportPresetId: value['defaultExportPresetId'],
@@ -343,6 +389,7 @@ function coreSettingsTransferData(
     case 'capture.saving':
       return {
         ...(source['templates'] === undefined ? {} : { templates: parsed.presets }),
+        ...(source['filenameRules'] === undefined ? {} : { filenameRules: parsed.filenameRules }),
         ...(source['defaultImagePresetId'] === undefined
           ? {}
           : { defaultImagePresetId: parsed.defaultImagePresetId }),

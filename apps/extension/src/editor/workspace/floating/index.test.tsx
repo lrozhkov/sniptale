@@ -65,6 +65,7 @@ vi.mock('../../inspector/sidebar-controller', () => ({
 vi.mock('./document-bar', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./document-bar')>()),
   EditorFloatingDocumentBar: mocks.documentBar,
+  ImageDocumentOperationsProvider: ({ children }: { children: React.ReactNode }) => children,
   EditorFloatingDocumentController: undefined,
 }));
 vi.mock('./left-drawer', () => ({
@@ -225,12 +226,12 @@ it('passes floating layers preference errors to the right stack inline surface',
   );
 });
 
-it('keeps document bar and tool rail mounted for an empty editor', () => {
+it('shows only the image intake surface while the editor has no image', () => {
   const markup = renderToStaticMarkup(<EditorFloatingWorkspace hasImage={false} />);
 
-  expect(markup).toContain('mock.document-bar');
-  expect(markup).toContain('mock.tool-rail');
-  expect(markup).toContain('mock.overlays');
+  expect(markup).not.toContain('mock.document-bar');
+  expect(markup).not.toContain('mock.tool-rail');
+  expect(markup).not.toContain('mock.overlays');
   expect(markup).not.toContain('mock.view-controls');
   expect(markup).not.toContain('mock.right-stack');
   expect(mocks.useToolbarController).toHaveBeenCalledWith(false);

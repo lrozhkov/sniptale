@@ -64,6 +64,40 @@ it('previews cuts, speed and mute in source time, restores audio, and cancels it
   }
 });
 
+it('mutes source playback for recording and restores the authored audio setting', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewPlayback>;
+  let silent = false;
+  function Harness() {
+    hook = useReviewPlayback({
+      duration: 10,
+      boundaries: () => undefined,
+      edits: [],
+      onSeek: vi.fn(),
+      onFailure: vi.fn(),
+      original: { muted: false, volume: 0.75 },
+      silent,
+    });
+    return <video ref={hook.video} />;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    expect(hook.video.current!.muted).toBe(false);
+    silent = true;
+    act(() => root.render(<Harness />));
+    act(() => hook.onTime(2));
+    expect(hook.video.current!.muted).toBe(true);
+    silent = false;
+    act(() => root.render(<Harness />));
+    expect(hook.video.current!.muted).toBe(false);
+    expect(hook.video.current!.volume).toBe(0.75);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
 it.each([2.123456789, 0.12956810631229235])(
   'lands past fractional cut end %s without an endless seek loop',
   (end) => {

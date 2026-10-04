@@ -94,7 +94,9 @@ it('reserves the shared media lease before the picker and releases it on cancell
 it('expires an abandoned picker reservation', () => {
   vi.useFakeTimers();
   reserveDesktopFrame('desktop-request');
-  vi.advanceTimersByTime(30_000);
+  vi.advanceTimersByTime(39_999);
+  expect(inspectOffscreenMediaActivityOwner()).toBe('desktop-screenshot');
+  vi.advanceTimersByTime(1);
   expect(inspectOffscreenMediaActivityOwner()).toBeNull();
 });
 
@@ -236,3 +238,43 @@ it('rejects non-PNG clipboard artifacts', async () => {
   );
   expect(writeBrowserClipboardItemsMock).not.toHaveBeenCalled();
 });
+
+it('owns the picker and keeps its lease through countdown', async () => {
+  vi.useFakeTimers();
+  const surface = installFrameSurface({});
+  reserveDesktopFrame('desktop-request');
+  const capture = captureDesktopFrame({
+    requestId: 'desktop-request',
+    imageFormat: 'png',
+    imageQuality: 90,
+    delaySeconds: 3,
+  });
+  await vi.advanceTimersByTimeAsync(0);
+  expect(acquireDesktopStreamMock).toHaveBeenCalledWith({ controlledCursorCaptureEnabled: true });
+  expect(inspectOffscreenMediaActivityOwner()).toBe('desktop-screenshot');
+  await vi.advanceTimersByTimeAsync(2999);
+  expect(surface.context?.drawImage).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  await expect(capture).resolves.toMatchObject({ result: 'captured' });
+  expect(inspectOffscreenMediaActivityOwner()).toBeNull();
+  expect(surface.track.stop).toHaveBeenCalledOnce();
+  surface.createElement.mockRestore();
+});
+
+it.each(['NotAllowedError', 'NotReadableError'])(
+  'releases the lease after %s and permits another picker',
+  async (name) => {
+    const surface = installFrameSurface({});
+    reserveDesktopFrame('desktop-request');
+    acquireDesktopStreamMock.mockRejectedValueOnce(new DOMException('picker rejected', name));
+    const args = { requestId: 'desktop-request', imageFormat: 'png' as const, imageQuality: 90 };
+    const attempt = captureDesktopFrame(args);
+    if (name === 'NotAllowedError') await expect(attempt).resolves.toEqual({ result: 'cancelled' });
+    else await expect(attempt).rejects.toThrow('picker rejected');
+    expect(inspectOffscreenMediaActivityOwner()).toBeNull();
+    reserveDesktopFrame('desktop-request');
+    await expect(captureDesktopFrame(args)).resolves.toMatchObject({ result: 'captured' });
+    expect(inspectOffscreenMediaActivityOwner()).toBeNull();
+    surface.createElement.mockRestore();
+  }
+);

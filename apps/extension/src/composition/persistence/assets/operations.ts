@@ -1,6 +1,10 @@
 import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { deleteAssetObject } from './opfs-store';
+import { deleteAssetObject, listReadyJournals } from './opfs-store';
+import {
+  runWithDurableAssetLifecycleLock,
+  type DurableAssetLifecyclePermit,
+} from '../infrastructure/mutation-barrier';
 import { parseArchiveRestoreSession, parseBackupAssetOperation } from './guards';
 import type {
   AssetOperation,
@@ -10,6 +14,9 @@ import type {
   ArchiveRestoreSession,
   ArchiveRestoreStrategy,
 } from './contracts';
+import { collectDurableAssetSnapshot } from './retention-authority';
+import { readyJournalClaimsAsset } from './retention-claims';
+export { collectBackupRollbackAssetIds, readyJournalClaimsAsset } from './retention-claims';
 import { mergeArchiveRestoreChildIdMap } from './restore-child-ids';
 
 interface ArchiveRestoreSessionStore {
@@ -36,12 +43,39 @@ export function buildPhysicalDeleteOperation(assetIds: string[]): PhysicalDelete
 }
 
 export async function completePhysicalDeleteOperation(
-  operation: PhysicalDeleteAssetOperation
+  operation: PhysicalDeleteAssetOperation,
+  lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<void> {
-  for (const assetId of operation.assetIds) await deleteAssetObject(assetId);
-  await runWithIndexedDbMutation(async (db) =>
-    db.delete(ASSET_OPERATIONS_STORE, operation.operationId)
-  );
+  await initDB();
+  await runWithDurableAssetLifecycleLock(async () => {
+    const journals = await listReadyJournals();
+    let deferred = false;
+    for (const assetId of operation.assetIds) {
+      const authority = await runWithIndexedDbMutation(async (db) => {
+        const snapshot = await collectDurableAssetSnapshot(db);
+        const ref = snapshot.refs.find((entry) => entry.assetId === assetId);
+        const claimed = snapshot.owners.some((owner) => owner.assetId === assetId);
+        const projected = snapshot.expectedOwners.some((owner) => owner.assetId === assetId);
+        if (!snapshot.authorityValid || Boolean(ref) !== claimed) return 'unknown';
+        if (claimed) return 'adopted';
+        if (projected || snapshot.protectedRollbackAssetIds.has(assetId)) return 'unknown';
+        return 'unowned';
+      });
+      if (authority === 'adopted') continue;
+      if (
+        authority === 'unknown' ||
+        journals.some((journal) => readyJournalClaimsAsset(journal, assetId))
+      ) {
+        deferred = true;
+        continue;
+      }
+      await deleteAssetObject(assetId);
+    }
+    if (!deferred)
+      await runWithIndexedDbMutation((db) =>
+        db.delete(ASSET_OPERATIONS_STORE, operation.operationId)
+      );
+  }, lifecyclePermit);
 }
 
 export async function createBackupRestoreOperation(): Promise<AssetOperation> {

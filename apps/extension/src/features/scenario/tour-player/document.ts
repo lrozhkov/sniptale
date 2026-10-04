@@ -5,7 +5,19 @@ import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-par
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 export interface TourPlayerLabels {
+  musicMute?: string;
+  musicUnmute?: string;
+  musicRetry?: string;
+  musicBlocked?: string;
+  musicError?: string;
   audioBlocked?: string;
+  audioError?: string;
+  narrationReplay?: string;
+  narrationPause?: string;
+  narrationResume?: string;
+  volume?: string;
+  mute?: string;
+  unmute?: string;
   resize?: string;
   expand: string;
   collapse: string;
@@ -18,6 +30,10 @@ export interface TourPlayerLabels {
   empty: string;
   point: string;
   details: string;
+  fullView?: string;
+  authoredView?: string;
+  end?: string;
+  manual?: string;
   play: string;
   pause: string;
   seek: string;
@@ -40,6 +56,12 @@ const audioMimes = new Set([
   'audio/wav',
   'audio/x-wav',
 ]);
+
+/** Fixed executable digest is generated from the bundled player, never from restored metadata. */
+export async function getTourPlayerRuntimeHash(): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(script));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)));
+}
 function escape(value: string): string {
   return value.replace(
     /[&<>"']/gu,
@@ -57,6 +79,7 @@ function selectAssets<T extends { id: string; mime: string }>(
   inputAssets: readonly T[]
 ) {
   const required = new Map<string, 'image' | 'audio'>();
+  if (tour.stage.image) required.set(tour.stage.image.assetId, 'image');
   for (const slide of tour.slides) {
     if (slide.kind === 'image' && slide.requiresTargetReview)
       throw new Error('Tour image targets require review before export.');
@@ -73,6 +96,11 @@ function selectAssets<T extends { id: string; mime: string }>(
     }
     if (slide.kind === 'image' && slide.masks.some((mask) => mask.kind === 'redact'))
       throw new Error('Tour redaction must be rasterized before export.');
+  }
+  if (tour.backgroundMusic) {
+    const id = tour.backgroundMusic.assetId;
+    if (required.get(id) === 'image') throw new Error('Conflicting tour media roles.');
+    required.set(id, 'audio');
   }
   const seen = new Set<string>();
   const assets = inputAssets.flatMap((asset) => {
@@ -101,6 +129,10 @@ async function buildTourPlayerShell(args: {
   const payload = {
     tour: {
       ...viewerTour,
+      stage: {
+        ...tour.stage,
+        ...(tour.stage.image !== undefined ? { image: imageProjection(tour.stage.image) } : {}),
+      },
       slides: tour.slides.map((slide) => {
         if (slide.kind === 'navigation')
           return {
@@ -117,8 +149,7 @@ async function buildTourPlayerShell(args: {
     .replace(/</gu, '\\u003c')
     .replace(/\u2028/gu, '\\u2028')
     .replace(/\u2029/gu, '\\u2029');
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(script));
-  const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  const hash = await getTourPlayerRuntimeHash();
   const policy = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
   const labels = args.labels;
   return [
@@ -133,18 +164,6 @@ async function buildTourPlayerShell(args: {
 </head>
 <body>
 <main id="tour-player">
-<header class="tour-toolbar">
-<button class="tour-button tour-contents-trigger" data-tour-contents
- aria-haspopup="dialog" aria-expanded="false"
- aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">
-<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
-</svg>
-<span>${escape(labels.contents)}</span>
-</button>
-<span class="tour-title" data-tour-title aria-live="polite">
-</span>
-</header>
 <div class="tour-viewport" data-tour-viewport>
 <section class="tour-stage" data-tour-stage>
 <div class="tour-scene" data-tour-scene>
@@ -152,7 +171,7 @@ async function buildTourPlayerShell(args: {
 </section>
 <aside class="tour-hint" data-tour-hint hidden>
 <div class="tour-hint-header">
-<span data-tour-hint-point-count hidden></span>
+<strong class="tour-hint-action-title" data-tour-hint-action-title hidden></strong>
 <button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true">
 <span data-tour-hint-title></span></button>
 <button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">×</button>
@@ -161,12 +180,23 @@ async function buildTourPlayerShell(args: {
 <div class="tour-hint-controls">
 <button class="tour-button" data-tour-hint-previous aria-label="${escape(labels.previous)}">
 ${escape(labels.previous)}</button>
+<span data-tour-hint-point-count hidden></span>
 <span data-tour-hint-count hidden></span>
 <button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">${escape(labels.next)}</button>
 </div>
 </aside>
+<dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
+</dialog>
 </div>
-<footer class="tour-transport">
+<footer class="tour-toolbar">
+<div class="tour-feedback">
+<span class="tour-title" data-tour-title aria-live="polite">
+</span>
+<span class="tour-playback-status" data-tour-status role="status" hidden></span>
+</div>
+<div class="tour-controls">
+<div class="tour-playback" data-tour-playback></div>
+<div class="tour-nav">
 <button class="tour-button tour-icon-button" data-tour-previous
  aria-label="${escape(labels.previous)}" title="${escape(labels.previous)}">
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -181,9 +211,17 @@ ${escape(labels.previous)}</button>
 <path d="m9 18 6-6-6-6"/>
 </svg>
 </button>
+</div>
+<button class="tour-button tour-contents-trigger" data-tour-contents
+ aria-haspopup="dialog" aria-expanded="false"
+ aria-label="${escape(labels.contents)}" title="${escape(labels.contents)}">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+</svg>
+<span>${escape(labels.contents)}</span>
+</button>
+</div>
 </footer>
-<dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
-</dialog>
 </main>
 <script id="tour-data" type="application/json">${json.slice(0, -1)},"assets":[`,
     `]}</script>

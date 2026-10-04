@@ -1,5 +1,6 @@
+import { GalleryLoadingPanel } from './loading';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { AlertTriangle, Database, LoaderCircle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import {
   getControlPrimaryButtonClassName,
   getControlSecondaryButtonClassName,
@@ -127,29 +128,6 @@ function AdmissionPanel(props: {
   );
 }
 
-function CheckingPanel() {
-  return (
-    <main
-      aria-busy="true"
-      className="flex min-h-screen items-center justify-center bg-[var(--sniptale-color-surface-canvas)] p-6"
-    >
-      <section className="max-w-md text-center text-[var(--sniptale-color-text-primary)]">
-        <div
-          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full
-            bg-[var(--sniptale-color-surface-panel)]"
-        >
-          <Database className="h-6 w-6" aria-hidden />
-        </div>
-        <h1 className="text-xl font-semibold">{translate('gallery.recovery.checkingTitle')}</h1>
-        <p className="mt-3 text-sm leading-6 text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.recovery.checkingBody')}
-        </p>
-        <LoaderCircle className="mx-auto mt-5 h-5 w-5 animate-spin" aria-hidden />
-      </section>
-    </main>
-  );
-}
-
 export function GalleryPersistenceAdmission({
   children,
   prepare = prepareDatabaseForRecovery,
@@ -177,7 +155,7 @@ export function GalleryPersistenceAdmission({
   }, [runPreparation]);
 
   if (status?.status === 'ready') return children;
-  if (!status) return <CheckingPanel />;
+  if (!status) return <GalleryLoadingPanel checking />;
   return (
     <>
       <AdmissionPanel

@@ -21,6 +21,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/recordings/backup-restore.ts',
   'apps/extension/src/composition/persistence/video-preview-cache/database.ts',
   'apps/extension/src/composition/persistence/web-snapshots/backup-restore.ts',
+  // Called only from media root publication under its active mutation permit.
+  'apps/extension/src/workflows/media-hub-backup/v6/root-publication/media-owner-release.ts',
 ]);
 const indexedDbMutationPattern =
   /(?:\b(?:db|tx|store|cursor)|\b\w+Store)\.(?:put|delete|clear)\s*\(|\.transaction\([\s\S]{0,180}?["']readwrite["']/m;
@@ -88,6 +90,7 @@ it('keeps the complete extension-page localStorage writer inventory behind the s
     'apps/extension/src/gallery/library/sidebar/disclosure-preferences.ts',
     'apps/extension/src/gallery/state/filter-preferences.ts',
     'apps/extension/src/platform/i18n/locale/state.ts',
+    'apps/extension/src/settings/sections/general/interface-browser/content/context-menu-draft-recovery.ts',
     'apps/extension/src/ui/theme/preference-service.ts',
   ]);
   for (const path of localStorageMutationFiles.filter(

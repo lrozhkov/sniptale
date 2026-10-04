@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppWindow, Copy, Crop, Download, FolderInput, Images, Save } from 'lucide-react';
+import { AppWindow, Copy, Crop, Download, FolderInput, Library, Save } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { CaptureActionType } from '../../../../contracts/settings';
 import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
@@ -40,7 +40,7 @@ function getCaptureActionMenuIcon(captureAction: CaptureActionType) {
     case 'edit':
       return <ImageEditorIcon className="sniptale-popover-icon" />;
     case 'save_to_library':
-      return <Images {...iconProps} />;
+      return <Library {...iconProps} />;
     case 'download_default':
     default:
       return <Download {...iconProps} />;
@@ -82,7 +82,7 @@ export function getCaptureActionIcon(captureAction: CaptureActionType) {
     case 'edit':
       return <ImageEditorIcon />;
     case 'save_to_library':
-      return <Images {...iconProps} />;
+      return <Library {...iconProps} />;
     case 'ask_preset':
       return <FolderInput {...iconProps} />;
     case 'ask_system':

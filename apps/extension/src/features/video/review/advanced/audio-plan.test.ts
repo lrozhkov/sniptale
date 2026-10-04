@@ -1,3 +1,5 @@
+import { projectReviewVoiceover, anchorReviewVoiceover } from '../voiceover-edits';
+import { buildReviewTimeMap } from '../timeline';
 import { describe, expect, it } from 'vitest';
 import {
   buildQuickEditAudioPlan,
@@ -74,7 +76,7 @@ describe('buildQuickEditClipEnvelope', () => {
     ).toEqual([
       [0.5, 0.5],
       [1, 1],
-      [4, 0],
+      [4, 1],
     ]);
   });
 
@@ -101,6 +103,42 @@ describe('buildQuickEditClipEnvelope', () => {
       [6, 0],
     ]);
   });
+
+  it('keeps the authored fade phase across cut slices and speed changes', () => {
+    expect(
+      buildQuickEditClipEnvelope({
+        entry: entry({ fadeIn: 1, fadeOut: 1, fadePhase: { offset: 0, duration: 4 } }),
+        duration: 1,
+        elapsed: 0,
+      })
+    ).toEqual([
+      [0, 0],
+      [1, 1],
+    ]);
+    expect(
+      buildQuickEditClipEnvelope({
+        entry: entry({ fadeIn: 1, fadeOut: 1, fadePhase: { offset: 2, duration: 4 } }),
+        duration: 2,
+        elapsed: 0,
+      })
+    ).toEqual([
+      [0, 1],
+      [1, 1],
+      [2, 0],
+    ]);
+    expect(
+      planQuickEditClipPlayback({
+        entry: entry({
+          duration: 1,
+          sourceOffset: 4,
+          playbackRate: 2,
+          fadePhase: { offset: 1, duration: 4 },
+        }),
+        outputTime: 2.25,
+        audioNow: 10,
+      })
+    ).toMatchObject({ offset: 4.5, duration: 1.5, playbackRate: 2 });
+  });
 });
 
 describe('planQuickEditClipPlayback', () => {
@@ -116,7 +154,7 @@ describe('planQuickEditClipPlayback', () => {
       duration: 3,
       envelope: [
         [100, 1],
-        [103, 0],
+        [103, 1],
       ],
     });
   });
@@ -134,7 +172,7 @@ describe('planQuickEditClipPlayback', () => {
       envelope: [
         [14, 0],
         [15, 1],
-        [18, 0],
+        [18, 1],
       ],
     });
   });
@@ -148,3 +186,54 @@ describe('planQuickEditClipPlayback', () => {
     ).toBeNull();
   });
 });
+
+it.each([0.5, 2])(
+  'schedules own VoiceOver tempo %sx identically for preview/export and seek',
+  (tempo) => {
+    const map = buildReviewTimeMap(24, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 0,
+        end: 8,
+        requestedStart: 0,
+        requestedEnd: 8,
+        rate: 4,
+        audio: 'speed',
+      },
+    ]);
+    const voice = anchorReviewVoiceover(clip({ timelineStart: 0, duration: 4, tempo }), map);
+    const plan = buildQuickEditAudioPlan({
+      voiceover: projectReviewVoiceover([voice], map),
+      music: [clip({ id: 'music' })],
+    });
+    expect(plan[0]).toMatchObject({ duration: 4 / tempo, playbackRate: tempo });
+    expect(plan[1]).toMatchObject({ duration: 4, timelineStart: 2 });
+    expect(plan[1]).not.toHaveProperty('playbackRate');
+    const schedule = planQuickEditClipPlayback({ entry: plan[0]!, outputTime: 0.5, audioNow: 100 });
+    expect(schedule).toMatchObject({
+      when: 100,
+      offset: 0.5 * tempo,
+      duration: 4 - 0.5 * tempo,
+      playbackRate: tempo,
+    });
+  }
+);
+
+it.each([undefined, { offset: 0, duration: 4 }, { offset: 2, duration: 4 }])(
+  'preserves zero-fade gain through the end of native audio or a voiceover slice %j',
+  (fadePhase) => {
+    const duration = fadePhase?.offset ? 2 : 4;
+    for (const elapsed of [0, duration / 2, duration - 0.01]) {
+      const envelope = buildQuickEditClipEnvelope({
+        entry: entry({ lane: 'voiceover', volume: 0.7, ...(fadePhase ? { fadePhase } : {}) }),
+        duration,
+        elapsed,
+      });
+      expect(envelope).toEqual([
+        [elapsed, 0.7],
+        [duration, 0.7],
+      ]);
+    }
+  }
+);

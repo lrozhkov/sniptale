@@ -35,6 +35,8 @@ vi.mock('./selectors', () => ({
   getGalleryCounts: getGalleryCountsMock,
   getGalleryFacets: vi.fn(() => []),
   getGalleryGridMetrics: getGalleryGridMetricsMock,
+  createGalleryGridMetrics: (geometry: object) => (viewport: object) =>
+    getGalleryGridMetricsMock({ ...geometry, ...viewport }),
 }));
 vi.mock('./useGalleryFilterState', () => ({ useGalleryFilterState: useGalleryFilterStateMock }));
 vi.mock('../library/preview/useGalleryPreviewState', () => ({
@@ -146,6 +148,7 @@ function configureGalleryOwnerMocks(
       activeTags: [],
       folderFilter: scope === 'temporary' ? 'recording' : 'all',
       search: '',
+      appliedSearch: '',
       scope,
       selectedIds: new Set(),
       selectionTagDraft: '',
@@ -169,7 +172,7 @@ function configureGalleryOwnerMocks(
   useGalleryStorageWorkflowMock.mockReturnValue({
     actions: {},
     library: { items, refresh: vi.fn() },
-    state: { isBusy: false, isLoading: false },
+    state: { hasLoadedLibrarySnapshot: true, isBusy: false, isLoading: false },
   });
   useGalleryViewportStateMock.mockReturnValue({
     gridViewportRef: { current: null },

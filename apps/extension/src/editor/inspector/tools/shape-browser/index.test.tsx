@@ -75,7 +75,9 @@ describe('editor shape browser', () => {
   it('groups built-in office catalog entries in stable category order', () => {
     const groups = groupShapeBrowserEntries(createBuiltInShapeBrowserEntries());
 
-    expect(groups.slice(0, 8).map((group) => group.category)).toEqual([
+    expect(groups.slice(0, 9).map((group) => group.category)).toEqual([
+      'cursors',
+      'stamps',
       'lines-connectors',
       'basic-shapes',
       'block-arrows',
@@ -88,6 +90,20 @@ describe('editor shape browser', () => {
 });
 
 describe('editor shape browser search and filtering', () => {
+  it('selects a cursor and a stamp from the built-in library', () => {
+    const { onSelect } = renderBrowser();
+    setSearchValue('hand');
+    act(() => getButton('button[data-shape-id="cursor-hand"]').click());
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'cursor-hand', source: 'built-in' })
+    );
+    setSearchValue('штамп');
+    act(() => getButton('button[data-shape-id="stamp-check"]').click());
+    expect(onSelect).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: 'stamp-check', source: 'built-in' })
+    );
+  });
+
   it('searches by localized labels and Russian or English aliases', () => {
     const entries = createBuiltInShapeBrowserEntries();
     renderBrowser();

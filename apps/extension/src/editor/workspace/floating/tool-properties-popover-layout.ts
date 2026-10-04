@@ -1,25 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const VIEWPORT_GAP_PX = 12;
-const MIN_POPOVER_HEIGHT_PX = 168;
-const DEFAULT_POPOVER_LAYOUT = { maxHeight: 384, top: 0 };
+const TOOLBAR_POPOVER_GAP_PX = 6;
+const DEFAULT_POPOVER_LAYOUT = { left: 0, maxHeight: 384, top: 0 };
 
 function resolvePopoverLayout(button: HTMLButtonElement, popover: HTMLDivElement | null) {
   const buttonRect = button.getBoundingClientRect();
-  const viewportMaxHeight = Math.max(
-    MIN_POPOVER_HEIGHT_PX,
-    window.innerHeight - VIEWPORT_GAP_PX * 2
+  const toolbar = button.closest('.sniptale-toolbar-root')?.getBoundingClientRect() ?? buttonRect;
+  const narrow = window.innerWidth < 720;
+  const width = popover?.offsetWidth || 288;
+  const height = Math.min(popover?.scrollHeight ?? 384, window.innerHeight - VIEWPORT_GAP_PX * 2);
+  const preferredLeft = narrow ? toolbar.left : toolbar.right + TOOLBAR_POPOVER_GAP_PX;
+  const left = Math.max(
+    VIEWPORT_GAP_PX,
+    preferredLeft + width <= window.innerWidth - VIEWPORT_GAP_PX
+      ? preferredLeft
+      : toolbar.left - width - TOOLBAR_POPOVER_GAP_PX
   );
-  const measuredHeight = Math.min(popover?.scrollHeight ?? viewportMaxHeight, viewportMaxHeight);
-  const overflowBottom = buttonRect.top + measuredHeight - (window.innerHeight - VIEWPORT_GAP_PX);
-  const top = overflowBottom > 0 ? -Math.min(overflowBottom, buttonRect.top - VIEWPORT_GAP_PX) : 0;
-  const viewportTop = Math.max(VIEWPORT_GAP_PX, buttonRect.top + top);
-  const maxHeight = Math.max(
-    MIN_POPOVER_HEIGHT_PX,
-    window.innerHeight - viewportTop - VIEWPORT_GAP_PX
-  );
+  const top = narrow
+    ? toolbar.bottom + TOOLBAR_POPOVER_GAP_PX
+    : Math.max(
+        VIEWPORT_GAP_PX,
+        Math.min(buttonRect.top, window.innerHeight - height - VIEWPORT_GAP_PX)
+      );
 
-  return { maxHeight, top };
+  return {
+    left: left - buttonRect.left,
+    top: top - buttonRect.top,
+    maxHeight: Math.max(0, window.innerHeight - top - VIEWPORT_GAP_PX),
+  };
 }
 
 export function useToolPropertiesPopoverLayout(active: boolean) {
@@ -49,6 +58,8 @@ export function useToolPropertiesPopoverLayout(active: boolean) {
 
     const observer = new ResizeObserver(() => updateLayout());
     observer.observe(popover);
+    const toolbar = buttonRef.current?.closest('.sniptale-toolbar-root');
+    if (toolbar) observer.observe(toolbar);
     window.addEventListener('resize', updateLayout);
     return () => {
       observer.disconnect();

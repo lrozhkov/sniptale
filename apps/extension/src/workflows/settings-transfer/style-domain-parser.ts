@@ -12,6 +12,7 @@ import {
 } from '../../composition/persistence/drawing-palette/parser';
 import { parseStoredEditorPresetState } from '../../composition/persistence/editor-presets/guards';
 import { parseGradientPresetCatalog } from '../../composition/persistence/gradient-presets/parser';
+import { GRADIENT_PRESET_SURFACES } from '../../composition/persistence/gradient-presets/contracts';
 import { parseStoredHighlighterSettings } from '../../composition/persistence/highlighter/guards';
 import { resolveLoadedHighlighterSettings } from '../../composition/persistence/highlighter/resolved';
 import { resolveStoredStepBadgePresetCatalog } from '../../composition/persistence/step-badge-presets/migration';
@@ -31,16 +32,19 @@ export function parseSettingsTransferStyleDomain(
 ): SettingsTransferJsonValue {
   switch (domainId) {
     case 'styles.video-effects': {
-      if (!Array.isArray(value['items'])) return failSettingsTransferDomain(domainId);
+      if (value['items'] !== undefined && !Array.isArray(value['items']))
+        return failSettingsTransferDomain(domainId);
       const ids = new Set<string>();
-      for (const item of value['items']) {
+      for (const item of (value['items'] as unknown[] | undefined) ?? []) {
         const entry = decodeEffectSettingsEntry(item);
         if (ids.has(entry.packId)) return failSettingsTransferDomain(domainId);
         ids.add(entry.packId);
       }
       return json({
-        items: value['items'],
-        preferences: parseEffectCatalogPreferences(value['preferences']),
+        ...(value['items'] === undefined ? {} : { items: value['items'] }),
+        ...(value['preferences'] === undefined
+          ? {}
+          : { preferences: parseEffectCatalogPreferences(value['preferences']) }),
       });
     }
     case 'styles.borders': {
@@ -68,13 +72,42 @@ export function parseSettingsTransferStyleDomain(
       return json(resolveStoredStepBadgePresetCatalog(parsed.value));
     }
     case 'styles.tags': {
-      const parsed = parseAnnotationTemplateTagState(value);
+      if (
+        (value['schemaVersion'] !== undefined && value['schemaVersion'] === null) ||
+        (value['tags'] !== undefined && !Array.isArray(value['tags'])) ||
+        (value['activeFilterTagIds'] !== undefined && !Array.isArray(value['activeFilterTagIds']))
+      )
+        failSettingsTransferDomain(domainId);
+      const parsed = parseAnnotationTemplateTagState({
+        schemaVersion: value['schemaVersion'] ?? 2,
+        tags: value['tags'] ?? [],
+        activeFilterTagIds: value['activeFilterTagIds'] ?? [],
+      });
       if (isUnsafeAnnotationTemplateTagState(parsed)) failSettingsTransferDomain(domainId);
-      return json(parsed.value);
+      const selectedTagIds = new Set(
+        (Array.isArray(value['tags']) ? value['tags'] : [])
+          .map((tag) => asRecord(tag)['id'])
+          .filter((id): id is string => typeof id === 'string')
+      );
+      return json({
+        ...(value['tags'] === undefined
+          ? {}
+          : { tags: parsed.value.tags.filter((tag) => selectedTagIds.has(tag.id)) }),
+        ...(value['activeFilterTagIds'] === undefined
+          ? {}
+          : { activeFilterTagIds: parsed.value.activeFilterTagIds }),
+        ...(value['schemaVersion'] === undefined
+          ? {}
+          : { schemaVersion: parsed.value.schemaVersion }),
+      });
     }
     case 'styles.tool-presets': {
       const parsed = parseStoredEditorPresetState(value);
-      if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
+      if (
+        parsed.hasInvalidRoot ||
+        parsed.invalidFieldCount > 0 ||
+        (value['palette'] !== undefined && parsed.value.palette === undefined)
+      )
         failSettingsTransferDomain(domainId);
       return json(parsed.value);
     }
@@ -83,22 +116,73 @@ export function parseSettingsTransferStyleDomain(
     case 'styles.gradients': {
       const parsed = parseGradientPresetCatalog(value);
       if (parsed.unsafeForWrite) {
-        return json({ presets: parsePartialGradientPresets(domainId, value['presets']) });
+        return json({
+          ...(value['presets'] === undefined
+            ? {}
+            : { presets: parsePartialGradientPresets(domainId, value['presets']) }),
+          ...parsePartialGradientDefaults(domainId, value),
+        });
       }
+      if (
+        (value['favoriteIdsBySurface'] !== undefined &&
+          (!hasOnlyKnownSurfaceKeys(value['favoriteIdsBySurface'], GRADIENT_PRESET_SURFACES) ||
+            !hasOnlyKnownFavoriteIds(
+              value['favoriteIdsBySurface'],
+              new Set(parsed.catalog.presets.map((preset) => preset.id))
+            ))) ||
+        (value['defaultPresetIdBySurface'] !== undefined &&
+          !hasOnlyKnownSurfaceKeys(value['defaultPresetIdBySurface'], GRADIENT_PRESET_SURFACES))
+      )
+        failSettingsTransferDomain(domainId);
       return json(parsed.catalog);
     }
     case 'styles.surfaces': {
       const parsed = parseStoredSurfaceStylePresetState(normalizeSurfaceCatalogForParsing(value));
       if (!parsed.stored || parsed.catalog.unsafeForWrite) {
-        return json({ presets: parsePartialSurfacePresets(domainId, value['presets']) });
+        return json({
+          ...(value['presets'] === undefined
+            ? {}
+            : { presets: parsePartialSurfacePresets(domainId, value['presets']) }),
+          ...parsePartialSurfaceDefaults(domainId, value),
+        });
       }
+      const presetIds = new Set(parsed.catalog.presets.map((preset) => preset.id));
+      if (
+        (value['favoriteIds'] !== undefined &&
+          !hasOnlyKnownFavoriteIds(value['favoriteIds'], presetIds)) ||
+        (value['favoriteIdsBySurface'] !== undefined &&
+          (!hasOnlyKnownSurfaceKeys(value['favoriteIdsBySurface'], [
+            SURFACE_STYLE_PRESET_SURFACE,
+          ]) ||
+            !hasOnlyKnownFavoriteIds(value['favoriteIdsBySurface'], presetIds))) ||
+        (value['defaultPresetIdBySurface'] !== undefined &&
+          !hasOnlyKnownSurfaceKeys(value['defaultPresetIdBySurface'], [
+            SURFACE_STYLE_PRESET_SURFACE,
+          ]))
+      )
+        failSettingsTransferDomain(domainId);
       return json(parsed.catalog);
     }
   }
   return failSettingsTransferDomain(domainId);
 }
 
-function normalizeSurfaceCatalogForParsing(value: Record<string, unknown>): unknown {
+export function hasOnlyKnownFavoriteIds(value: unknown, ids: ReadonlySet<string>): boolean {
+  if (Array.isArray(value)) return value.every((id) => typeof id === 'string' && ids.has(id));
+  if (!value || typeof value !== 'object') return false;
+  return Object.values(asRecord(value)).every((entry) => hasOnlyKnownFavoriteIds(entry, ids));
+}
+
+function hasOnlyKnownSurfaceKeys(value: unknown, knownSurfaces: readonly string[]): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).every((surface) => knownSurfaces.includes(surface))
+  );
+}
+
+export function normalizeSurfaceCatalogForParsing(value: Record<string, unknown>): unknown {
   if (!('defaultPresetId' in value) && !('favoriteIds' in value) && !('unsafeForWrite' in value)) {
     return value;
   }
@@ -114,6 +198,113 @@ function normalizeSurfaceCatalogForParsing(value: Record<string, unknown>): unkn
     schemaVersion: SURFACE_STYLE_PRESET_SCHEMA_VERSION,
     systemCatalogRevision: value['systemCatalogRevision'],
   };
+}
+
+function parsePartialSurfaceDefaults(
+  domainId: string,
+  value: Record<string, unknown>
+): Record<string, unknown> {
+  const allowed = new Set([
+    'presets',
+    'catalogRevision',
+    'defaultPresetId',
+    'defaultPresetIdBySurface',
+    'favoriteIds',
+    'favoriteIdsBySurface',
+    'schemaVersion',
+    'systemCatalogRevision',
+    'unsafeForWrite',
+  ]);
+  if (Object.keys(value).some((key) => !allowed.has(key))) failSettingsTransferDomain(domainId);
+  const defaults = Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'presets'));
+  if (
+    (defaults['catalogRevision'] !== undefined &&
+      (!Number.isSafeInteger(defaults['catalogRevision']) ||
+        (defaults['catalogRevision'] as number) < 0)) ||
+    (defaults['systemCatalogRevision'] !== undefined &&
+      (!Number.isSafeInteger(defaults['systemCatalogRevision']) ||
+        (defaults['systemCatalogRevision'] as number) < 0)) ||
+    (defaults['defaultPresetId'] !== undefined &&
+      (typeof defaults['defaultPresetId'] !== 'string' ||
+        defaults['defaultPresetId'].length === 0 ||
+        defaults['defaultPresetId'].length > 256)) ||
+    (defaults['favoriteIds'] !== undefined && !isBoundedIdList(defaults['favoriteIds'])) ||
+    (defaults['schemaVersion'] !== undefined &&
+      defaults['schemaVersion'] !== SURFACE_STYLE_PRESET_SCHEMA_VERSION) ||
+    (defaults['defaultPresetIdBySurface'] !== undefined &&
+      !isSingleSurfaceMap(
+        defaults['defaultPresetIdBySurface'],
+        (id) => typeof id === 'string' && id.length > 0 && id.length <= 256
+      )) ||
+    (defaults['favoriteIdsBySurface'] !== undefined &&
+      !isSingleSurfaceMap(defaults['favoriteIdsBySurface'], isBoundedIdList)) ||
+    (defaults['unsafeForWrite'] !== undefined && defaults['unsafeForWrite'] !== false)
+  )
+    failSettingsTransferDomain(domainId);
+  if (defaults['defaultPresetIdBySurface'] !== undefined) {
+    defaults['defaultPresetId'] = asRecord(defaults['defaultPresetIdBySurface'])[
+      SURFACE_STYLE_PRESET_SURFACE
+    ];
+    delete defaults['defaultPresetIdBySurface'];
+  }
+  if (defaults['favoriteIdsBySurface'] !== undefined) {
+    defaults['favoriteIds'] = asRecord(defaults['favoriteIdsBySurface'])[
+      SURFACE_STYLE_PRESET_SURFACE
+    ];
+    delete defaults['favoriteIdsBySurface'];
+  }
+  return defaults;
+}
+
+function isSingleSurfaceMap(value: unknown, valid: (entry: unknown) => boolean): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(
+    ([surface, entry]) => surface === SURFACE_STYLE_PRESET_SURFACE && valid(entry)
+  );
+}
+
+function parsePartialGradientDefaults(
+  domainId: string,
+  value: Record<string, unknown>
+): Record<string, unknown> {
+  const allowed = new Set([
+    'presets',
+    'revision',
+    'favoriteIdsBySurface',
+    'defaultPresetIdBySurface',
+  ]);
+  if (Object.keys(value).some((key) => !allowed.has(key))) failSettingsTransferDomain(domainId);
+  const defaults = Object.fromEntries(Object.entries(value).filter(([key]) => key !== 'presets'));
+  if (
+    (defaults['revision'] !== undefined &&
+      (!Number.isSafeInteger(defaults['revision']) || (defaults['revision'] as number) < 0)) ||
+    (defaults['favoriteIdsBySurface'] !== undefined &&
+      !isSurfaceMap(defaults['favoriteIdsBySurface'], isBoundedIdList)) ||
+    (defaults['defaultPresetIdBySurface'] !== undefined &&
+      !isSurfaceMap(
+        defaults['defaultPresetIdBySurface'],
+        (id) => typeof id === 'string' && id.length > 0 && id.length <= 256
+      ))
+  )
+    failSettingsTransferDomain(domainId);
+  return defaults;
+}
+
+function isSurfaceMap(value: unknown, valid: (entry: unknown) => boolean): boolean {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return Object.entries(value).every(
+    ([surface, entry]) =>
+      GRADIENT_PRESET_SURFACES.some((known) => known === surface) && valid(entry)
+  );
+}
+
+function isBoundedIdList(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= 100 &&
+    value.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 256) &&
+    new Set(value).size === value.length
+  );
 }
 
 function parseManagedStylePresetIdentity(domainId: string, candidate: unknown) {

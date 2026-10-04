@@ -13,6 +13,7 @@ const clampLayout = (layout: QuickEditBackgroundLayout): QuickEditBackgroundLayo
 });
 
 export interface QuickEditBackgroundPatch {
+  zoomBehavior?: QuickEditBackgroundSettings['zoomBehavior'];
   enabled?: boolean;
   type?: 'solid' | 'gradient' | 'image';
   color?: string;
@@ -30,7 +31,9 @@ export function updateQuickEditBackground(
   background: QuickEditBackgroundSettings,
   patch: QuickEditBackgroundPatch
 ): QuickEditBackgroundSettings {
-  if (patch.enabled === false) return { enabled: false };
+  const zoomBehavior = patch.zoomBehavior ?? background.zoomBehavior;
+  const motion = zoomBehavior ? { zoomBehavior } : {};
+  if (patch.enabled === false) return { enabled: false, ...motion };
   const layout = patch.layout
     ? clampLayout(patch.layout)
     : background.enabled
@@ -40,6 +43,7 @@ export function updateQuickEditBackground(
   const active = background.enabled ? background : null;
   if (type === 'solid')
     return {
+      ...motion,
       enabled: true,
       type,
       color: patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR),
@@ -48,17 +52,18 @@ export function updateQuickEditBackground(
   if (type === 'gradient') {
     const gradient =
       patch.gradient ?? (active && active.type === 'gradient' ? active.gradient : null);
-    if (gradient) return { enabled: true, type, gradient, layout };
+    if (gradient) return { enabled: true, type, gradient, layout, ...motion };
     // A paint switch must turn the background on even without stored gradient
     // data: derive a ready two-stop default from the previous paint color.
     const fallbackColor =
       patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR);
     const fallback = createGradientPaint(fallbackColor, () => crypto.randomUUID(), 'linear');
     if (fallback.kind !== 'gradient') return { enabled: false };
-    return { enabled: true, type, gradient: fallback.gradient, layout };
+    return { enabled: true, type, gradient: fallback.gradient, layout, ...motion };
   }
   return {
     enabled: true,
+    ...motion,
     type: 'image',
     assetId: patch.assetId ?? (active && active.type === 'image' ? active.assetId : ''),
     imageFit: patch.imageFit ?? (active && active.type === 'image' ? active.imageFit : 'cover'),

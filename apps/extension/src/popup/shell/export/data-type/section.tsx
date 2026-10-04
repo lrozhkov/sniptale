@@ -193,8 +193,10 @@ function DataTypeFilterBar(props: {
       <button
         type="button"
         onClick={props.onToggleAll}
+        disabled={props.disabled}
         className={[
           'h-8 shrink-0 rounded-[9px] px-1.5 text-[10px] font-medium',
+          'disabled:cursor-not-allowed disabled:opacity-40',
           'text-[var(--sniptale-color-text-primary)] transition-colors',
           'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
           'outline-none focus-visible:outline-none',
@@ -265,7 +267,10 @@ function QuickSelection(props: {
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1">
-      {(['web-copy', 'materials'] as const).map((preset) => (
+      {(props.destination === 'save'
+        ? (['materials'] as const)
+        : (['web-copy', 'materials'] as const)
+      ).map((preset) => (
         <button
           key={preset}
           type="button"
@@ -292,7 +297,9 @@ function QuickSelection(props: {
   );
 }
 
-function WebCopyResourceControls(props: {
+export function WebCopyResourceControls(props: {
+  offlineOnly?: boolean;
+  className?: string;
   disabled: boolean;
   resources: WebCopyResourcePreferences;
 }) {
@@ -314,8 +321,6 @@ function WebCopyResourceControls(props: {
     {
       checked: props.resources.externalAssetRedirectsEnabled,
       description: translate('popup.export.webCopyExternalRedirectsDescription'),
-      disabled: !props.resources.anonymousCrossOriginAssetsEnabled,
-      indent: true,
       label: translate('popup.export.webCopyExternalRedirectsLabel'),
       pending: props.resources.pending === 'external-redirects',
       setChecked: props.resources.setExternalAssetRedirectsEnabled,
@@ -329,34 +334,31 @@ function WebCopyResourceControls(props: {
     },
   ];
   return (
-    <div className="ml-5 pl-3">
-      {items.map((item) => (
-        <label
-          key={item.label}
-          className={['flex items-start gap-2 py-1.5', item.indent ? 'ml-4' : ''].join(' ')}
-        >
-          <input
-            type="checkbox"
-            className={checkboxClassName}
-            checked={item.checked}
-            disabled={
-              props.disabled ||
-              item.disabled === true ||
-              item.pending ||
-              props.resources.pending !== null
-            }
-            onChange={(event) => void item.setChecked(event.currentTarget.checked)}
-          />
-          <span className="min-w-0">
-            <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
-              {item.label}
+    <div className={props.className ?? 'ml-5 pl-3'}>
+      {items
+        .filter(
+          (item) =>
+            !props.offlineOnly || item.setChecked !== props.resources.setExternalLinksEnabled
+        )
+        .map((item) => (
+          <label key={item.label} className="flex items-start gap-2 py-1.5">
+            <input
+              type="checkbox"
+              className={checkboxClassName}
+              checked={item.checked}
+              disabled={props.disabled || item.pending || props.resources.pending !== null}
+              onChange={(event) => void item.setChecked(event.currentTarget.checked)}
+            />
+            <span className="min-w-0">
+              <span className="block text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+                {item.label}
+              </span>
+              <span className="block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
+                {item.description}
+              </span>
             </span>
-            <span className="block text-[10px] leading-4 text-[var(--sniptale-color-text-dim)]">
-              {item.description}
-            </span>
-          </span>
-        </label>
-      ))}
+          </label>
+        ))}
       {props.resources.error ? (
         <div role="status" className="pb-1 text-[10px] text-[var(--sniptale-color-danger)]">
           {translate('popup.export.webCopyResourceSettingsError')}

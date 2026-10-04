@@ -1,5 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
+const readiness = vi.hoisted(() => ({
+  ensureAdmission: vi.fn().mockResolvedValue(undefined),
+  requireAdmission: vi.fn(),
+  ensureAssets: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('./data-readiness', () => ({
+  offscreenDataReadiness: readiness,
+  prepareOffscreenRecordingData: vi.fn().mockResolvedValue(undefined),
+}));
+
 const mocks = vi.hoisted(() => ({
   acquireRasterInput: vi.fn(),
   allowBegin: vi.fn(),
@@ -131,16 +141,19 @@ it('routes a window-only tab start without a viewport frame gate', async () => {
     type: VideoMessageType.OFFSCREEN_START_RECORDING,
   };
   await handleOffscreenRuntimeMessage(message);
-  expect(mocks.start).toHaveBeenCalledWith({
-    captureMode: CaptureMode.TAB,
-    generation: 1,
-    recordingId: 'recording-1',
-    settings: DEFAULT_VIDEO_SETTINGS,
-    streamId: 'stream-1',
-    streamInstanceId: 'instance-1',
-    surface: { height: 720, presetId: 'window-hd', target: 'window', width: 1280 },
-    tabId: 7,
-  });
+  expect(mocks.start).toHaveBeenCalledWith(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 1,
+      recordingId: 'recording-1',
+      settings: DEFAULT_VIDEO_SETTINGS,
+      streamId: 'stream-1',
+      streamInstanceId: 'instance-1',
+      surface: { height: 720, presetId: 'window-hd', target: 'window', width: 1280 },
+      tabId: 7,
+    },
+    expect.any(Function)
+  );
 });
 
 it('routes a TAB recording start without precomputed Region Capture geometry', async () => {
@@ -157,19 +170,36 @@ it('routes a TAB recording start without precomputed Region Capture geometry', a
     viewport: { devicePixelRatio: 1, height: 899, scrollX: 0, scrollY: 0, width: 1440 },
   };
   await handleOffscreenRuntimeMessage(message);
-  expect(mocks.start).toHaveBeenCalledWith({
-    captureMode: CaptureMode.TAB,
-    generation: 1,
-    recordingId: 'recording-1',
-    settings: DEFAULT_VIDEO_SETTINGS,
-    streamId: 'stream-1',
-    streamInstanceId: 'instance-1',
-    tabId: 7,
-    viewport: { devicePixelRatio: 1, height: 899, scrollX: 0, scrollY: 0, width: 1440 },
-  });
+  expect(mocks.start).toHaveBeenCalledWith(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 1,
+      recordingId: 'recording-1',
+      settings: DEFAULT_VIDEO_SETTINGS,
+      streamId: 'stream-1',
+      streamInstanceId: 'instance-1',
+      tabId: 7,
+      viewport: { devicePixelRatio: 1, height: 899, scrollX: 0, scrollY: 0, width: 1440 },
+    },
+    expect.any(Function)
+  );
 });
 
-it('routes camera and desktop utility commands through the offscreen owner', async () => {
+it('routes camera and desktop utilities even while data admission is stalled', async () => {
+  let admit!: () => void;
+  readiness.ensureAdmission.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        admit = resolve;
+      })
+  );
+  const raster = handleOffscreenRuntimeMessage({
+    capabilityToken: 'capability-1',
+    operation: 'prepare',
+    leaseId: 'lease-1',
+    type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+  });
+  expect(mocks.rasterize).not.toHaveBeenCalled();
   await expect(
     handleOffscreenRuntimeMessage({
       capabilityToken: 'capability-1',
@@ -221,6 +251,7 @@ it('routes camera and desktop utility commands through the offscreen owner', asy
       capabilityToken: 'capability-1',
       imageFormat: 'png',
       imageQuality: 1,
+      delaySeconds: 3,
       requestId: 'frame-1',
       streamId: 'stream-1',
       type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
@@ -243,11 +274,18 @@ it('routes camera and desktop utility commands through the offscreen owner', asy
     capabilityToken: 'capability-1',
     imageFormat: 'png',
     imageQuality: 1,
+    delaySeconds: 3,
     requestId: 'frame-1',
     streamId: 'stream-1',
     type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
   });
   expect(mocks.disposeDesktopMedia).toHaveBeenCalledOnce();
+  expect(mocks.rasterize).not.toHaveBeenCalled();
+  admit();
+  await expect(raster).resolves.toEqual({ result: 'prepared', leaseId: 'lease-1' });
+  expect(mocks.acquireRasterInput).not.toHaveBeenCalled();
+  expect(mocks.cleanupRasterJobs).not.toHaveBeenCalled();
+  expect(readiness.ensureAssets).not.toHaveBeenCalled();
 });
 
 it('routes frame raster, settings update, and project export commands', async () => {
@@ -331,4 +369,21 @@ it('opens recording only after the correlated begin authority is accepted', asyn
     throw new Error('stale binding');
   });
   await expect(handleOffscreenRuntimeMessage(message)).rejects.toThrow('stale binding');
+});
+
+it('refuses a terminated data connection without waiting or touching staged input', async () => {
+  readiness.requireAdmission.mockImplementationOnce(() => {
+    throw new Error('Offscreen data is not admitted');
+  });
+  await expect(
+    handleOffscreenRuntimeMessage({
+      type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+      capabilityToken: 'capability-1',
+      reference: { inputSha256: 'a'.repeat(64), jobId: 'job-1', revision: 1 },
+    })
+  ).rejects.toThrow('Offscreen data is not admitted');
+  expect(readiness.ensureAdmission).not.toHaveBeenCalled();
+  expect(mocks.acquireRasterInput).not.toHaveBeenCalled();
+  expect(mocks.deleteRasterJob).not.toHaveBeenCalled();
+  expect(mocks.cleanupRasterJobs).not.toHaveBeenCalled();
 });

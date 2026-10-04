@@ -46,6 +46,11 @@ function ScenarioPreviewStepsGrid(props: {
           {props.title}
         </div>
       </div>
+      {props.exportMode ? (
+        <p className="text-sm text-[var(--sniptale-color-text-secondary)]">
+          {translate('gallery.preview.exportCurrentProjectSteps')}
+        </p>
+      ) : null}
       {props.recentSteps.length === 0 ? (
         <ScenarioPreviewEmptyState exportMode={props.exportMode} />
       ) : (
@@ -59,7 +64,7 @@ function ScenarioPreviewStepsGrid(props: {
   );
 }
 
-export function PreviewScenarioStage(props: { item: GalleryItem }) {
+export function PreviewScenarioStage(props: { item: GalleryItem; trashMode?: boolean }) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [recentSteps, setRecentSteps] = useState<ScenarioPreviewStep[]>([]);
 

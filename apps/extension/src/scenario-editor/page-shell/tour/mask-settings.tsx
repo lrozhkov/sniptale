@@ -1,7 +1,17 @@
-import { useState } from 'react';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { useTourInspectorSections } from './settings-sections';
+import { useState, type ReactNode } from 'react';
 import { createSolidPaint, getRepresentativeColor, type Paint } from '@sniptale/foundation/paint';
-import type { TourMask } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { ScanLine } from 'lucide-react';
+import {
+  resolveTourMask,
+  resolveTourHighlightAnimation,
+  type TourHighlightAnimation,
+  TOUR_MASK_DEFAULTS,
+  type TourMaskDefaults,
+  type TourDocument,
+  type TourMask,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
+import { ScanLine, Palette } from 'lucide-react';
 import { CompactPaintSelector } from '../../../ui/paint-selector';
 import { TourInspectorNumericRow } from './numeric-row';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
@@ -10,43 +20,56 @@ import type { Translate } from '../../../platform/i18n';
 
 /** Each effect retains its parameters; geometry belongs to the selected canvas frame. */
 export function TourMaskSettings({
-  value,
+  value: authored,
+  defaults,
+  presentation = 'all',
+  narration,
+  central = false,
+  title,
   disabled,
   onChange,
   t,
 }: {
   value: TourMask;
+  defaults?: TourMaskDefaults | undefined;
+  presentation?: 'all' | 'sections';
+  narration?: ReactNode;
+  central?: boolean;
+  title?: string;
   disabled: boolean;
   onChange: (value: TourMask) => boolean;
   t: Translate;
 }) {
+  const value = resolveTourMask(authored, defaults);
+  const renderSections = useTourInspectorSections(presentation, t, narration);
   const controls = maskEffectControls(value);
+  const changeStyle = (next: TourMask) => onChange({ ...next, inheritStyle: false });
   const [preview, setPreview] = useState<{ id: string; kind: string; amount: number } | null>(null);
   const amount =
     preview?.id === value.id && preview.kind === value.kind
       ? preview.amount
       : controls.amount?.value;
-  return (
-    <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.tourMask')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourMask')}
-        disabled={disabled}
-        value={value.kind}
-        options={[
-          { value: 'highlight', label: t('scenario.editor.tourHighlight') },
-          { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
-          { value: 'blur', label: t('scenario.editor.tourBlur') },
-          ...(value.kind === 'redact'
-            ? [{ value: 'redact' as const, label: t('scenario.editor.tourRedact') }]
-            : []),
-        ]}
-        onChange={(kind) => onChange({ ...value, kind })}
-      />
-      <p className="text-xs leading-relaxed text-[color:var(--sniptale-color-text-secondary)]">
-        {t('scenario.editor.tourAreaCanvasHint')}
-      </p>
+  const appearance = (
+    <GuideInspectorGroup
+      id={central ? `default-${value.kind}` : 'mask-appearance'}
+      icon={central ? ScanLine : Palette}
+      title={title ?? t('scenario.editor.appearance')}
+    >
+      {!central && value.kind !== 'redact' && (
+        <label className="guide-number-toggle">
+          <ProductToggle
+            size="sm"
+            disabled={disabled}
+            aria-label={t('scenario.editor.tourUseCentralStyle')}
+            checked={authored.inheritStyle === true}
+            onClick={() => onChange({ ...value, inheritStyle: !authored.inheritStyle })}
+          />
+          {t('scenario.editor.tourUseCentralStyle')}
+        </label>
+      )}
       {controls.paint && (
         <CompactPaintSelector
+          triggerVariant="swatch"
           label={t('scenario.editor.color')}
           title={t('scenario.editor.color')}
           value={controls.paint.value}
@@ -62,7 +85,7 @@ export function TourMaskSettings({
             '#ef4444',
             '#8b5cf6',
           ]}
-          onChange={(paint) => onChange(controls.paint!.change(paint))}
+          onChange={(paint) => changeStyle(controls.paint!.change(paint))}
         />
       )}
       {controls.amount && (
@@ -76,12 +99,125 @@ export function TourMaskSettings({
           onPreview={(amount) => setPreview({ id: value.id, kind: value.kind, amount })}
           onChange={(amount) => {
             setPreview(null);
-            onChange(controls.amount!.change(amount));
+            changeStyle(controls.amount!.change(amount));
           }}
+        />
+      )}
+      {value.kind === 'highlight' && (
+        <TourHighlightAnimationFields
+          value={resolveTourHighlightAnimation(authored, defaults)}
+          inherited={!central && authored.highlightAnimation == null}
+          central={central}
+          disabled={disabled}
+          t={t}
+          onChange={(highlightAnimation) => onChange({ ...authored, highlightAnimation })}
         />
       )}
     </GuideInspectorGroup>
   );
+  if (central) return appearance;
+  return renderSections('mask', [
+    {
+      id: 'effect',
+      icon: ScanLine,
+      label: t('scenario.editor.tourEffectType'),
+      categorized: true,
+      content: (
+        <GuideInspectorGroup id="mask" icon={ScanLine} title={t('scenario.editor.tourMask')}>
+          <div className="tour-text-field">
+            <span>{t('scenario.editor.tourMask')}</span>
+            <CompactSelect
+              aria-label={t('scenario.editor.tourMask')}
+              disabled={disabled}
+              value={value.kind}
+              options={[
+                { value: 'highlight', label: t('scenario.editor.tourHighlight') },
+                { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
+                { value: 'blur', label: t('scenario.editor.tourBlur') },
+                ...(value.kind === 'redact'
+                  ? [{ value: 'redact' as const, label: t('scenario.editor.tourRedact') }]
+                  : []),
+              ]}
+              onChange={(kind) => onChange({ ...authored, kind })}
+            />
+          </div>
+          <p className="text-xs leading-relaxed text-[color:var(--sniptale-color-text-secondary)]">
+            {t('scenario.editor.tourAreaCanvasHint')}
+          </p>
+        </GuideInspectorGroup>
+      ),
+    },
+    {
+      id: 'appearance',
+      icon: Palette,
+      label: t('scenario.editor.appearance'),
+      categorized: true,
+      content: appearance,
+    },
+  ]);
+}
+
+/** Central effect categories share the exact controls used for local overrides. */
+export function TourMaskDefaultSettings({
+  tour,
+  disabled,
+  onChange,
+  t,
+}: {
+  tour: TourDocument;
+  disabled: boolean;
+  onChange: (tour: TourDocument) => boolean;
+  t: Translate;
+}) {
+  const defaults = tour.style.maskDefaults ?? TOUR_MASK_DEFAULTS;
+  return (['highlight', 'spotlight', 'blur'] as const).map((kind) => (
+    <TourMaskSettings
+      key={kind}
+      title={t(
+        kind === 'highlight'
+          ? 'scenario.editor.tourHighlight'
+          : kind === 'spotlight'
+            ? 'scenario.editor.tourSpotlight'
+            : 'scenario.editor.tourBlur'
+      )}
+      central
+      defaults={defaults}
+      disabled={disabled}
+      t={t}
+      value={resolveTourMask(
+        {
+          id: 'defaults',
+          kind,
+          rect: { x: 0, y: 0, width: 1, height: 1 },
+          color: '#f97316',
+          opacity: 0.3,
+          inheritStyle: true,
+        },
+        defaults
+      )}
+      onChange={(value) =>
+        onChange({
+          ...tour,
+          style: {
+            ...tour.style,
+            maskDefaults: {
+              highlight: {
+                ...defaults.highlight,
+                paint: value.paint ?? defaults.highlight.paint,
+                opacity: value.opacity,
+                ...(value.highlightAnimation ? { animation: value.highlightAnimation } : {}),
+              },
+              spotlight: {
+                color: value.spotlightColor ?? defaults.spotlight.color,
+                opacity: value.spotlightOpacity ?? defaults.spotlight.opacity,
+              },
+              blur: { radius: value.blurRadius ?? defaults.blur.radius },
+            },
+          },
+        })
+      }
+    />
+  ));
 }
 
 function maskEffectControls(value: TourMask) {
@@ -127,4 +263,87 @@ function maskEffectControls(value: TourMask) {
                 : { ...value, opacity: amount / 100 },
           },
   };
+}
+
+/** Animation inheritance is independent from the mask's paint and opacity inheritance. */
+function TourHighlightAnimationFields({
+  value,
+  inherited,
+  central,
+  disabled,
+  onChange,
+  t,
+}: {
+  value: TourHighlightAnimation;
+  inherited: boolean;
+  central: boolean;
+  disabled: boolean;
+  onChange: (value: TourHighlightAnimation | null) => boolean;
+  t: Translate;
+}) {
+  return (
+    <>
+      {!central && (
+        <label className="guide-number-toggle">
+          <ProductToggle
+            size="sm"
+            disabled={disabled}
+            aria-label={t('scenario.editor.tourUseTourAnimation')}
+            checked={inherited}
+            onClick={() => onChange(inherited ? value : null)}
+          />
+          {t('scenario.editor.tourUseTourAnimation')}
+        </label>
+      )}
+      {(['enter', 'exit'] as const).map((phase) => (
+        <div key={phase}>
+          <div className="tour-text-field">
+            <span>
+              {t(
+                phase === 'enter'
+                  ? 'scenario.editor.tourHighlightEnter'
+                  : 'scenario.editor.tourHighlightExit'
+              )}
+            </span>
+            <CompactSelect
+              aria-label={t(
+                phase === 'enter'
+                  ? 'scenario.editor.tourHighlightEnter'
+                  : 'scenario.editor.tourHighlightExit'
+              )}
+              disabled={disabled}
+              value={value[phase].kind}
+              options={[
+                { value: 'none', label: t('scenario.editor.tourAnimationNone') },
+                { value: 'fade', label: t('scenario.editor.tourAnimationFade') },
+              ]}
+              onChange={(kind) => onChange({ ...value, [phase]: { ...value[phase], kind } })}
+            />
+          </div>
+          {value[phase].kind === 'fade' && (
+            <TourInspectorNumericRow
+              label={t(
+                phase === 'enter'
+                  ? 'scenario.editor.tourHighlightEnterDuration'
+                  : 'scenario.editor.tourHighlightExitDuration'
+              )}
+              value={value[phase].durationMs / 1000}
+              unit="s"
+              min={0.1}
+              max={1}
+              step={0.05}
+              precision={2}
+              disabled={disabled}
+              onChange={(duration) =>
+                onChange({
+                  ...value,
+                  [phase]: { ...value[phase], durationMs: Math.round(duration * 1000) },
+                })
+              }
+            />
+          )}
+        </div>
+      ))}
+    </>
+  );
 }

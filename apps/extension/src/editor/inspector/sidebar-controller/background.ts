@@ -17,7 +17,7 @@ export function buildSidebarBackgroundActions(args: {
       args.setFrameDraft((state) => ({
         ...state,
         backgroundGradientAngle: preset.angle,
-        ...createEditorFrameGradientPatch(state, [preset.from, preset.to]),
+        ...createEditorFrameGradientPatch(state, preset.stops ?? [preset.from, preset.to]),
         backgroundMode: 'gradient',
       }));
     },

@@ -13,6 +13,7 @@ type ReadyWaitArgs = {
   sender: chrome.runtime.MessageSender;
   settledRef: { value: boolean };
   state: OffscreenDocumentState;
+  startupId: string | null;
   timeoutId: ReturnType<typeof setTimeout> | null;
   unsubscribe: () => void;
   unsubscribeAbort: () => void;
@@ -27,6 +28,8 @@ export function waitForOffscreenReadyForState(
     return Promise.resolve();
   }
 
+  const startupId = state.expectedStartupId;
+  const startupSignal = state.startupCancellation.signal;
   return new Promise((resolve, reject) => {
     const settledRef = { value: false };
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -39,6 +42,7 @@ export function waitForOffscreenReadyForState(
         sender,
         settledRef,
         state,
+        startupId,
         timeoutId,
         unsubscribe,
         unsubscribeAbort,
@@ -47,23 +51,26 @@ export function waitForOffscreenReadyForState(
     const unsubscribe = browserRuntime.subscribeToMessages(listener);
     const cancel = () => {
       finalizeWaitForOffscreenReady(timeoutId, unsubscribe, unsubscribeAbort, settledRef, () =>
-        reject(signal?.reason ?? new Error('Offscreen readiness wait cancelled'))
+        reject(
+          startupSignal.reason ?? signal?.reason ?? new Error('Offscreen readiness wait cancelled')
+        )
       );
     };
-    if (signal?.aborted) {
+    if (signal?.aborted || startupSignal.aborted) {
       cancel();
       return;
     }
     if (signal) {
       signal.addEventListener('abort', cancel, { once: true });
-      unsubscribeAbort = () => signal.removeEventListener('abort', cancel);
     }
+    startupSignal.addEventListener('abort', cancel, { once: true });
+    unsubscribeAbort = () => {
+      signal?.removeEventListener('abort', cancel);
+      startupSignal.removeEventListener('abort', cancel);
+    };
     if (timeoutMs !== null) {
       timeoutId = setTimeout(() => {
         finalizeWaitForOffscreenReady(timeoutId, unsubscribe, unsubscribeAbort, settledRef, () => {
-          state.offscreenReady = false;
-          state.startupFailed = true;
-          state.expectedStartupId = null;
           const error = new Error('Timed out while waiting for offscreen ready signal');
           logger.warn(error.message);
           reject(error);
@@ -103,6 +110,16 @@ export function markOffscreenDocumentReadyForState(
 }
 
 function handleOffscreenReadyWaitMessage(args: ReadyWaitArgs): void {
+  if (args.startupId !== args.state.expectedStartupId) {
+    finalizeWaitForOffscreenReady(
+      args.timeoutId,
+      args.unsubscribe,
+      args.unsubscribeAbort,
+      args.settledRef,
+      () => args.reject(new Error('Offscreen startup replaced'))
+    );
+    return;
+  }
   if (!isTrustedOffscreenRuntimeSender(args.sender)) {
     return;
   }
@@ -157,6 +174,7 @@ function rejectTrustedOffscreenReadyError(
       args.state.offscreenReady = false;
       args.state.startupFailed = true;
       args.state.expectedStartupId = null;
+      args.state.startupCancellation.abort(new Error('Offscreen startup failed'));
       logger.warn('Offscreen reported a startup failure', {
         error: args.message.error ?? null,
         phase: args.message.phase,

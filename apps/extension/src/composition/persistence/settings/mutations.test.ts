@@ -55,12 +55,15 @@ describe('settings mutations', () => {
       contextMenu: expect.objectContaining({ showPageLinkCopy: false }),
     });
 
-    expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-      sniptale_settings: expect.objectContaining({
-        captureAction: 'copy',
-        contextMenu: expect.objectContaining({ showPageLinkCopy: false }),
-      }),
-    });
+    expect(browserStorageSyncSetMock).toHaveBeenCalledWith(
+      {
+        sniptale_settings: expect.objectContaining({
+          captureAction: 'copy',
+          contextMenu: expect.objectContaining({ showPageLinkCopy: false }),
+        }),
+      },
+      expect.anything()
+    );
   });
 
   it('resets settings to fresh defaults', async () => {
@@ -69,11 +72,14 @@ describe('settings mutations', () => {
       contextMenu: expect.objectContaining({ showPageLinkCopy: true }),
     });
 
-    expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-      sniptale_settings: expect.objectContaining({
-        captureAction: 'download_default',
-        contextMenu: expect.objectContaining({ showPageLinkCopy: true }),
-      }),
-    });
+    expect(browserStorageSyncSetMock).toHaveBeenCalledWith(
+      {
+        sniptale_settings: expect.objectContaining({
+          captureAction: 'download_default',
+          contextMenu: expect.objectContaining({ showPageLinkCopy: true }),
+        }),
+      },
+      expect.anything()
+    );
   });
 });

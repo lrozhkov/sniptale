@@ -35,6 +35,12 @@ function createRecordingEntry(): MediaLibraryEntry {
     mimeType: 'video/webm',
     originalFilename: 'recording.webm',
     recordingGroup,
+    recordingMetadata: {
+      captureMode: 'TAB',
+      displaySurface: 'browser',
+      actionCount: 2,
+      hasPointer: true,
+    },
     size: 5,
     source: { kind: 'recording', recordingId: 'recording-one' },
     sourceFavicon: recordingGroup.sourceFavicon,
@@ -59,6 +65,7 @@ function createDatabase(entry: MediaLibraryEntry) {
           id: 'recording-one',
           mimeType: 'video/webm',
           recordingGroup,
+          recordingMetadata: entry.recordingMetadata,
           size: 5,
         };
       }
@@ -77,14 +84,14 @@ function createDatabase(entry: MediaLibraryEntry) {
   };
 }
 
-async function loadRecordingMetadata(includeSourceMetadata: boolean) {
+async function loadRecordingMetadata(includeSourceMetadata: boolean, includeTelemetry = true) {
   const entry = createRecordingEntry();
   const { blob: _blob, ...metadata } = entry;
   readFileMock.mockResolvedValue(new File(['media'], 'recording.webm', { type: 'video/webm' }));
   const [root] = await buildMediaRootInventory({
     db: createDatabase(entry),
     items: [{ ...metadata, hasThumbnail: false } satisfies MediaLibraryItem],
-    options: createMediaHubBackupExportOptions({ includeSourceMetadata }),
+    options: createMediaHubBackupExportOptions({ includeSourceMetadata, includeTelemetry }),
     paths: createArchivePathAllocator(),
   });
   return { metadata: (await root!.load()).metadata, summary: root!.summary };
@@ -124,3 +131,18 @@ it('projects nested recording source metadata in both exported metadata copies',
 function emptyReviewTransaction() {
   return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
 }
+
+it('excludes acquisition snapshots from both recording copies when activity is excluded', async () => {
+  const excluded = await loadRecordingMetadata(true, false);
+  expect(excluded.metadata).toMatchObject({
+    entry: expect.not.objectContaining({ recordingMetadata: expect.anything() }),
+    recording: { entry: expect.not.objectContaining({ recordingMetadata: expect.anything() }) },
+  });
+  expect(excluded.summary.telemetryCount).toBe(0);
+  const included = await loadRecordingMetadata(false, true);
+  expect(included.metadata).toMatchObject({
+    entry: { recordingMetadata: { actionCount: 2 } },
+    recording: { entry: { recordingMetadata: { actionCount: 2 } } },
+  });
+  expect(included.summary.telemetryCount).toBe(1);
+});

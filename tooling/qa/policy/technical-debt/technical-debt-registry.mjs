@@ -281,7 +281,11 @@ function validateScc(context) {
     requireSourceLink(
       context,
       scc,
-      scc.reason.startsWith('Allowed composition:') ? 'accepted-architecture' : 'debt',
+      scc.classification === 'tool-noise'
+        ? 'tool-noise'
+        : scc.reason.startsWith('Allowed composition:')
+          ? 'accepted-architecture'
+          : 'debt',
       'scc',
       scc.id,
       { edgeDigest: edgeDigest(scc.edges), id: scc.id, owners: [...scc.owners].sort() },

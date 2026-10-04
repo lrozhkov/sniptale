@@ -4,6 +4,7 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { blobToDataUrl } from '../../../platform/media-utils/data-url';
 import { parseAssetRef, readAssetFile, writeBlobToAsset, type AssetRef } from '../assets';
+
 import type {
   HydratedEditorDocument,
   PersistedEditorAssetPointer,
@@ -11,6 +12,18 @@ import type {
   PersistedEditorDocumentV3,
   PreparedEditorDocument,
 } from './contracts';
+
+export class MissingEditorDocumentAssetError extends Error {
+  override name = 'MissingEditorDocumentAssetError';
+
+  constructor(assetId: string, kind: 'ref' | 'source' = 'ref') {
+    super(
+      kind === 'ref'
+        ? `Editor document asset ref is missing: ${assetId}.`
+        : `Editor document source image is missing: ${assetId}.`
+    );
+  }
+}
 
 const ASSET_URL_PREFIX = 'sniptale-asset:';
 const CANVAS_BINARY_FIELDS = new Set([
@@ -189,15 +202,7 @@ export async function preparePersistedEditorDocument(
       document: {
         version: 3,
         sourceImage,
-        sourceName: document.sourceName,
-        sourceWidth: document.sourceWidth,
-        sourceHeight: document.sourceHeight,
-        canvasWidth: document.canvasWidth,
-        canvasHeight: document.canvasHeight,
-        sourceLeft: document.sourceLeft,
-        sourceTop: document.sourceTop,
-        sourceDisplayWidth: document.sourceDisplayWidth,
-        sourceDisplayHeight: document.sourceDisplayHeight,
+        ...projectEditorImageMetadata(document),
         frame: { ...frame, backgroundImage },
         ...(browserFrame ? { browserFrame } : {}),
         canvasJson: JSON.stringify(canvas),
@@ -260,52 +265,78 @@ export async function hydratePersistedEditorDocument(args: {
   }
   const urls = new Map<string, string>();
   const assetsByRuntimeUrl = new Map<string, AssetRef>();
-  try {
-    for (const asset of args.document.assets) {
-      if (urls.has(asset.assetId)) continue;
-      const ref = refsById.get(asset.assetId);
-      if (!ref) throw new Error(`Editor document asset ref is missing: ${asset.assetId}.`);
-      const file = await readAssetFile(ref, asset.role);
-      const runtimeUrl = URL.createObjectURL(file);
-      urls.set(asset.assetId, runtimeUrl);
-      assetsByRuntimeUrl.set(runtimeUrl, ref);
-    }
-    const sourceImageData = urls.get(args.document.sourceImage.assetId);
-    if (!sourceImageData) throw new Error('Editor document source image is missing.');
-    const backgroundImageData = args.document.frame.backgroundImage
-      ? (urls.get(args.document.frame.backgroundImage.assetId) ?? null)
-      : null;
-    const faviconDataUrl = args.document.browserFrame?.favicon
-      ? (urls.get(args.document.browserFrame.favicon.assetId) ?? null)
-      : null;
-    const parsedCanvas: unknown = JSON.parse(args.document.canvasJson);
-    const canvasJson = JSON.stringify(await hydrateCanvasValue(parsedCanvas, urls));
-    const { backgroundImage: _backgroundImage, ...frame } = args.document.frame;
-    const browserFrame = args.document.browserFrame
-      ? (() => {
-          const { favicon: _favicon, ...metadata } = args.document.browserFrame;
-          return { ...metadata, faviconDataUrl };
-        })()
-      : undefined;
-    return {
-      assetsByRuntimeUrl,
-      document: projectEditorDocumentV2(args.document, {
-        backgroundImageData,
-        browserFrame,
-        canvasJson,
-        frame,
-        sourceImageData,
-      }),
-      release() {
-        for (const url of urls.values()) URL.revokeObjectURL(url);
-        urls.clear();
-        assetsByRuntimeUrl.clear();
-      },
-    };
-  } catch (error) {
-    for (const url of urls.values()) URL.revokeObjectURL(url);
-    throw error;
+  for (const asset of args.document.assets) {
+    if (urls.has(asset.assetId)) continue;
+    const ref = refsById.get(asset.assetId);
+    if (!ref) throw new MissingEditorDocumentAssetError(asset.assetId);
+    const file = await readAssetFile(ref, asset.role);
+    const runtimeUrl = await blobToDataUrl(file);
+    urls.set(asset.assetId, runtimeUrl);
+    assetsByRuntimeUrl.set(runtimeUrl, ref);
   }
+  const sourceImageData = urls.get(args.document.sourceImage.assetId);
+  if (!sourceImageData) {
+    throw new MissingEditorDocumentAssetError(args.document.sourceImage.assetId, 'source');
+  }
+  const backgroundImageData = args.document.frame.backgroundImage
+    ? (urls.get(args.document.frame.backgroundImage.assetId) ?? null)
+    : null;
+  const faviconDataUrl = args.document.browserFrame?.favicon
+    ? (urls.get(args.document.browserFrame.favicon.assetId) ?? null)
+    : null;
+  const parsedCanvas: unknown = JSON.parse(args.document.canvasJson);
+  const canvasJson = JSON.stringify(await hydrateCanvasValue(parsedCanvas, urls));
+  const { backgroundImage: _backgroundImage, ...frame } = args.document.frame;
+  const browserFrame = args.document.browserFrame
+    ? (() => {
+        const { favicon: _favicon, ...metadata } = args.document.browserFrame;
+        return { ...metadata, faviconDataUrl };
+      })()
+    : undefined;
+  return {
+    assetsByRuntimeUrl,
+    document: projectEditorDocumentV2(args.document, {
+      backgroundImageData,
+      browserFrame,
+      canvasJson,
+      frame,
+      sourceImageData,
+    }),
+    release() {
+      urls.clear();
+      assetsByRuntimeUrl.clear();
+    },
+  };
+}
+
+/** Shared scalar metadata only; binary fields and version admission stay at each codec boundary. */
+function projectEditorImageMetadata(
+  document: Pick<
+    EditorDocument,
+    | 'sourceName'
+    | 'displayName'
+    | 'sourceWidth'
+    | 'sourceHeight'
+    | 'canvasWidth'
+    | 'canvasHeight'
+    | 'sourceLeft'
+    | 'sourceTop'
+    | 'sourceDisplayWidth'
+    | 'sourceDisplayHeight'
+  >
+) {
+  return {
+    sourceName: document.sourceName,
+    ...(document.displayName === undefined ? {} : { displayName: document.displayName }),
+    sourceWidth: document.sourceWidth,
+    sourceHeight: document.sourceHeight,
+    canvasWidth: document.canvasWidth,
+    canvasHeight: document.canvasHeight,
+    sourceLeft: document.sourceLeft,
+    sourceTop: document.sourceTop,
+    sourceDisplayWidth: document.sourceDisplayWidth,
+    sourceDisplayHeight: document.sourceDisplayHeight,
+  };
 }
 
 function projectEditorDocumentV2(
@@ -321,15 +352,7 @@ function projectEditorDocumentV2(
   return {
     version: 2,
     sourceImageData: hydrated.sourceImageData,
-    sourceName: document.sourceName,
-    sourceWidth: document.sourceWidth,
-    sourceHeight: document.sourceHeight,
-    canvasWidth: document.canvasWidth,
-    canvasHeight: document.canvasHeight,
-    sourceLeft: document.sourceLeft,
-    sourceTop: document.sourceTop,
-    sourceDisplayWidth: document.sourceDisplayWidth,
-    sourceDisplayHeight: document.sourceDisplayHeight,
+    ...projectEditorImageMetadata(document),
     frame: { ...hydrated.frame, backgroundImageData: hydrated.backgroundImageData },
     ...(hydrated.browserFrame ? { browserFrame: hydrated.browserFrame } : {}),
     canvasJson: hydrated.canvasJson,

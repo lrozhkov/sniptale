@@ -59,6 +59,40 @@ describe('scenario-controller-project-actions', () => {
     expect(applyScenarioResponse).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a failed project switch without applying stale project steps', async () => {
+    const applyScenarioResponse = vi.fn();
+    transportMocks.setScenarioActiveProjectMock.mockResolvedValueOnce({
+      success: false,
+      error: 'Unavailable',
+    });
+
+    await expect(
+      applyScenarioProjectSelection({
+        applyScenarioResponse,
+        currentSession: createScenarioSession(),
+        projectId: 'project-9',
+      })
+    ).rejects.toThrow();
+
+    expect(applyScenarioResponse).not.toHaveBeenCalled();
+    expect(helperMocks.showToastMock).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
+  it('reports a transport rejection and leaves the active project unchanged', async () => {
+    const applyScenarioResponse = vi.fn();
+    transportMocks.setScenarioActiveProjectMock.mockRejectedValueOnce(new Error('Offline'));
+
+    await expect(
+      applyScenarioProjectSelection({
+        applyScenarioResponse,
+        currentSession: createScenarioSession(),
+        projectId: 'project-9',
+      })
+    ).rejects.toThrow();
+    expect(applyScenarioResponse).not.toHaveBeenCalled();
+    expect(helperMocks.showToastMock).toHaveBeenCalledWith(expect.any(String), 'error');
+  });
+
   it('creates projects through transport and surfaces create errors', async () => {
     const applyScenarioResponse = vi.fn();
     const refreshSession = vi.fn(async () => undefined);

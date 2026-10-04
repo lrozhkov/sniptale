@@ -1,5 +1,14 @@
 @import './reader-navigation.css';
 @import './document.css';
+.guide-editor-viewport {
+  width: 100%;
+  height: 100dvh;
+  overflow: auto;
+}
+.guide-editor-viewport > main {
+  min-width: 1280px;
+  min-height: 560px;
+}
 .guide-page {
   height: 100dvh;
   padding: 0.5rem;
@@ -20,6 +29,30 @@
   outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 3px;
 }
+.guide-page
+  :is(
+    [data-ui='shared.ui.compact-inspector.numeric-value-field'],
+    [data-ui='shared.ui.color-selector.trigger'],
+    [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
+  )
+  input:focus-visible {
+  outline: none;
+}
+.guide-page
+  [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
+  input:focus-visible::-webkit-slider-thumb {
+  border-color: var(--sniptale-color-accent);
+}
+.guide-page
+  [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
+  input:focus-visible::-moz-range-thumb {
+  border-color: var(--sniptale-color-accent);
+}
+.guide-page
+  [data-ui='shared.ui.compact-inspector.numeric-value-field'][data-focus-appearance='quiet']
+  > span[aria-hidden='true'] {
+  transition: none;
+}
 .guide-page [hidden] {
   display: none !important;
 }
@@ -27,19 +60,28 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  height: 3.25rem;
-  flex: 0 0 3.25rem;
+  min-height: 3.25rem;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   min-width: 0;
   padding: 0 0.75rem;
   border-bottom: 1px solid var(--sniptale-color-border-soft);
   background: var(--sniptale-color-surface-panel);
 }
 .guide-page-header button {
-  height: 2rem;
-  min-height: 2rem;
-  min-width: 2rem;
-  padding: 0.375rem;
+  width: min(2rem, var(--sniptale-size-toolbar));
+  height: min(2rem, var(--sniptale-size-toolbar));
+  min-width: min(2rem, var(--sniptale-size-toolbar));
+  min-height: min(2rem, var(--sniptale-size-toolbar));
+  padding: 0.25rem;
   border-radius: var(--sniptale-radius-sm);
+}
+.guide-page-header .sniptale-glass-toolbar-button,
+.guide-page-header .sniptale-glass-toolbar-button span {
+  font-family: var(--sniptale-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
 }
 .guide-page-identity {
   flex-shrink: 0;
@@ -52,6 +94,7 @@
 }
 .guide-project-name-measure {
   visibility: hidden;
+  border: 1px solid transparent;
   grid-area: 1 / 1;
   white-space: pre;
   overflow: hidden;
@@ -75,9 +118,29 @@
 .guide-header-actions {
   display: flex;
   align-items: center;
+  flex-wrap: nowrap;
   flex-shrink: 0;
   gap: 0.25rem;
   margin-left: auto;
+}
+.guide-page-header[data-wrapped='true'] {
+  flex-wrap: wrap;
+  padding-block: 0.25rem;
+}
+.guide-page-header[data-wrapped='true'] .guide-header-actions {
+  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-end;
+}
+.guide-page-header button[data-icon-only='true'] {
+  width: 2rem;
+  min-width: 2rem;
+  padding-inline: 0.25rem;
+  gap: 0;
+}
+.guide-page-header button[data-icon-only='true'] > span {
+  display: none;
 }
 .guide-project-name input:hover,
 .guide-project-name input:focus {
@@ -85,18 +148,35 @@
   background: var(--sniptale-color-surface-input);
 }
 .guide-page-feedback {
-  flex-shrink: 0;
-  padding: 0 1.25rem;
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  padding: 0.625rem 1.25rem;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
   font-size: 0.8125rem;
   background: var(--sniptale-color-surface-panel);
 }
-.guide-page-feedback p {
-  margin: 0.35rem 0;
-}
-.guide-page-feedback[data-status='failed'],
-.guide-page-feedback[data-status='conflict'],
-.guide-page-feedback [role='alert'] {
+.guide-feedback-message {
+  flex: 1 1 20rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--sniptale-color-danger);
+}
+.guide-page-feedback p {
+  margin: 0;
+}
+.guide-page-feedback p + p {
+  margin-top: 0.25rem;
+}
+.guide-feedback-context {
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 .guide-workspace {
   flex: 1;
@@ -156,25 +236,89 @@
   flex-direction: column;
   gap: 0.375rem;
 }
-.guide-outline a {
+.guide-outline-row {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  min-height: 2.25rem;
-  padding: 0.375rem 0.5rem;
-  border: 1px solid transparent;
-  border-radius: var(--sniptale-radius-md);
-  color: inherit;
-  text-decoration: none;
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
+  gap: 4px;
+  border-radius: var(--sniptale-radius-sm);
+  transition: background-color var(--sniptale-duration-fast) ease;
 }
-.guide-outline a:hover {
+.guide-outline a {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sniptale-radius-sm);
+  color: var(--sniptale-color-text-secondary);
+  text-decoration: none;
+  font-size: 12px;
+  overflow-wrap: break-word;
+  transition: color var(--sniptale-duration-fast) ease;
+}
+.guide-outline a > span:last-child {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.guide-outline-row:hover,
+.guide-outline-row:focus-within {
+  background: var(--sniptale-color-surface-input);
+}
+.guide-outline-row[data-current='true'] {
   background: var(--sniptale-color-surface-hover);
 }
+.guide-outline-row[data-current='true']:hover {
+  background: color-mix(in srgb, var(--sniptale-color-text-primary) 12%, transparent);
+}
+.guide-outline-row:hover a,
 .guide-outline a[aria-current] {
-  border-color: color-mix(in srgb, var(--sniptale-color-accent) 25%, transparent);
-  background: color-mix(in srgb, var(--sniptale-color-accent) 9%, transparent);
+  color: var(--sniptale-color-text-primary);
+}
+.guide-outline a[aria-current] {
+  font-weight: 600;
+}
+.guide-outline a:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: -2px;
+}
+.guide-outline-row > .guide-item-actions {
+  position: static;
+  z-index: auto;
+  flex: 0 0 28px;
+  width: 28px;
+  opacity: 0;
+  transition: opacity var(--sniptale-duration-fast) ease;
+}
+.guide-outline-row .guide-action-menu-anchor > button {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+}
+.guide-outline-row:hover > .guide-item-actions,
+.guide-outline-row:focus-within > .guide-item-actions,
+.guide-outline-row > .guide-item-actions:has([aria-expanded='true']) {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) {
+  .guide-outline-row > .guide-item-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-outline-row,
+  .guide-outline a,
+  .guide-outline-row > .guide-item-actions {
+    transition: none;
+  }
 }
 .guide-outline-number {
   min-width: 1.5rem;
@@ -257,6 +401,7 @@
   outline: none;
 }
 .guide-page .guide-document textarea {
+  padding-inline-end: 2.25rem;
   border-radius: var(--sniptale-radius-sm);
 }
 .guide-page .guide-document textarea:not(.sniptale-input):not(.sniptale-textarea):focus {
@@ -303,25 +448,6 @@
   color: var(--sniptale-color-text-secondary);
 }
 
-@media (max-width: 600px) {
-  .guide-page-identity h1 {
-    display: none;
-  }
-  .guide-workspace-bar {
-    padding: 0.5rem;
-    gap: 0.25rem;
-  }
-  .guide-workspace-bar button {
-    padding: 0.375rem;
-  }
-  .guide-selection-label {
-    display: none;
-  }
-  .guide-workspace-bar button:last-child {
-    margin-left: auto;
-  }
-}
-
 .guide-history-controls {
   display: flex;
   gap: 0.375rem;
@@ -331,8 +457,8 @@
 }
 .guide-block-actions {
   position: absolute;
-  top: 0.375rem;
-  right: 0.375rem;
+  top: 0;
+  right: 0;
   z-index: 5;
   display: flex;
   justify-content: flex-end;
@@ -350,12 +476,6 @@
   font-weight: 650;
 }
 
-@media (max-width: 1100px) {
-  .guide-inspector-panel > .guide-panel-scroll {
-    display: block;
-  }
-}
-
 .guide-import {
   display: flex;
   flex-direction: column;
@@ -367,26 +487,42 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  width: 100%;
 }
 .guide-import-actions p {
   margin: 0;
   font-size: 0.8125rem;
 }
-.guide-import-submit,
 .guide-import-destination {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1;
+}
+.guide-import-target {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
 }
 .guide-import-submit {
-  justify-content: space-between;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: none;
+}
+.guide-import-count {
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  color: var(--sniptale-color-text-secondary);
 }
 .guide-library-browser {
   flex: 1;
-  display: grid;
-  grid-template-columns: 152px minmax(240px, 0.75fr) minmax(0, 1.25fr);
   min-height: 0;
   gap: 0.75rem;
   padding: 0 0.75rem 0.75rem;
@@ -456,15 +592,6 @@
 .guide-import-file-action:focus-within {
   outline: 1px solid var(--sniptale-color-accent);
 }
-.guide-library-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-content: start;
-  gap: 0.625rem;
-  overflow: auto;
-  min-height: 0;
-  padding: 1px;
-}
 .guide-library-card {
   position: relative;
   display: flex;
@@ -514,7 +641,16 @@
   border-color: var(--sniptale-color-accent);
   color: var(--sniptale-color-accent);
 }
-.guide-library-card-select:hover:not(:disabled),
+.guide-library-card-select:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-library-card-select:active:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 12%,
+    var(--sniptale-color-surface-panel)
+  );
+}
 .guide-library-card-select:focus-visible {
   outline: 1px solid var(--sniptale-color-accent);
   outline-offset: 2px;
@@ -573,28 +709,6 @@
   text-align: center;
   color: var(--sniptale-color-text-secondary);
 }
-@media (max-width: 900px) {
-  .guide-library-browser {
-    grid-template-columns: 120px minmax(180px, 0.8fr) minmax(0, 1.2fr);
-  }
-}
-@media (max-width: 720px) {
-  .guide-library-browser {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(120px, 0.5fr) minmax(220px, 1fr);
-  }
-  .guide-library-browser > .library-navigation {
-    display: flex;
-    max-height: 88px;
-  }
-  .guide-library-preview-raster {
-    min-height: 0;
-  }
-  .guide-library-preview-raster img {
-    height: 100%;
-    max-height: 110px;
-  }
-}
 .guide-image-frame[data-editing='true'] {
   cursor: grab;
   touch-action: none;
@@ -644,7 +758,7 @@
   font-size: 0.75rem;
   color: var(--sniptale-color-text-muted);
 }
-.guide-image-controls label {
+.guide-image-controls label:not(.guide-html-switch) {
   display: grid;
   gap: 0.25rem;
 }
@@ -726,20 +840,8 @@
   padding: 1.25rem 0.75rem;
 }
 .guide-block-actions {
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-block[data-guide-hover] .guide-block-actions,
-.guide-block:focus-within .guide-block-actions,
-.guide-block-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
-}
-@media (hover: none) {
-  .guide-block-actions {
-    opacity: 1;
-    pointer-events: auto;
-  }
 }
 
 .guide-inspector-panel .guide-inspector-title {
@@ -770,7 +872,7 @@
   opacity: 0;
   cursor: ew-resize;
   touch-action: none;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
 }
@@ -813,40 +915,6 @@
   outline: 1px solid var(--guide-border, var(--sniptale-color-border-soft));
   outline-offset: 0;
 }
-@media (max-width: 1199px) {
-  .guide-workspace {
-    position: relative;
-    grid-template-columns: var(--guide-left-width) var(--guide-left-gap) minmax(0, 1fr) 0 0;
-  }
-  .guide-inspector-panel {
-    position: absolute;
-    right: 0;
-    inset-block: 3.75rem 0;
-    width: var(--guide-right-width);
-    z-index: 3;
-    border-left: 1px solid var(--sniptale-color-border-soft);
-  }
-  .guide-panel-divider-right {
-    display: none;
-  }
-}
-
-.guide-page-header .guide-page-feedback {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  min-width: 0;
-  padding: 0;
-  font-size: 0.75rem;
-}
-.guide-page-header .guide-page-feedback[data-quiet='true'] {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-
 .guide-action-menu-anchor {
   display: flex;
   flex: none;
@@ -868,6 +936,88 @@
 .guide-action-menu button:last-child {
   margin-top: 0.25rem;
 }
+/* Insertion actions overlay the boundary; command contrast belongs to application chrome. */
+.guide-action-menu--insert {
+  --guide-insert-surface: rgb(from var(--guide-paper) r g b / 0.94);
+  --guide-insert-hover: color-mix(in srgb, var(--guide-insert-surface) 90%, var(--guide-ink) 10%);
+}
+.guide-action-menu--insert .guide-insert-actions {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.guide-action-menu--insert .guide-insert-actions > button {
+  position: relative;
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--guide-ink) 18%, transparent);
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--guide-insert-surface) !important;
+  color: var(--guide-ink) !important;
+  box-shadow: var(--sniptale-shadow-sm);
+}
+.guide-action-menu--insert .guide-insert-actions > button:is(:hover, :focus-visible),
+.guide-action-menu--insert .guide-insert-actions > button[aria-pressed='true'] {
+  background: var(--guide-insert-hover) !important;
+  color: var(--guide-ink) !important;
+}
+.guide-action-menu--insert .guide-insert-actions > button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 1px;
+}
+.guide-action-menu--insert .guide-insert-actions > button:disabled {
+  opacity: 0.4;
+}
+.guide-action-menu--insert .guide-insert-actions > button > svg {
+  width: 14px;
+  height: 14px;
+}
+.guide-insert-tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 0.375rem);
+  transform: translateX(-50%);
+  display: none;
+  width: max-content;
+  max-width: 8rem;
+  padding: 0.25rem 0.375rem;
+  border-radius: var(--sniptale-radius-sm);
+  text-align: center;
+  font: 0.75rem/1.2 var(--sniptale-font-sans);
+  color: var(--guide-ink);
+  background: var(--guide-insert-surface);
+  box-shadow: var(--sniptale-shadow-sm);
+  pointer-events: none;
+}
+.guide-action-menu--insert[data-tooltip-below='true'] .guide-insert-tooltip {
+  bottom: auto;
+  top: calc(100% + 0.375rem);
+}
+.guide-insert-actions > button:is(:hover, :focus-visible) > .guide-insert-tooltip {
+  display: block;
+}
+.guide-action-menu-anchor[data-insert-open] > button {
+  visibility: hidden;
+  pointer-events: none;
+}
 
 .guide-library-panel > button {
   min-height: 2rem;
@@ -880,13 +1030,18 @@
   top: 0.5rem;
   right: 0.5rem;
   z-index: 4;
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-document > :is(article, section)[data-guide-hover] > .guide-item-actions,
-.guide-item-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
+}
+.guide-document > :is(article, section) > :is(header, h2) {
+  padding-inline-end: 2.5rem;
+}
+.guide-document .guide-block {
+  padding-block-start: 0;
+}
+.guide-document .guide-block-actions {
+  top: 0.375rem;
+  right: 0.375rem;
 }
 .guide-document
   :is(.guide-item-actions, .guide-block-actions, .guide-insertion-chrome, .guide-image-tools) {
@@ -903,17 +1058,42 @@
 .guide-document
   :is(.guide-action-menu-anchor, .guide-image-tools, .guide-insertion-chrome)
   > button {
-  width: 1.5rem;
-  height: 1.5rem;
-  min-width: 1.5rem;
-  min-height: 1.5rem;
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  min-height: 2rem;
   padding: 0;
-  border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: 50%;
-  background: var(--sniptale-color-surface-canvas) !important;
-  color: var(--sniptale-color-text-primary);
+  border: 1px solid var(--guide-border);
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--guide-paper) !important;
+  color: var(--guide-muted) !important;
+}
+/* The boundary hit zone fits existing whitespace; the visible plus adds no surface. */
+.guide-insert-anchor {
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  height: 100%;
+}
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button {
+  width: 1.5rem;
+  height: min(1.5rem, var(--guide-insert-hit-height));
+  min-width: 1.5rem;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent !important;
+  color: var(--guide-muted) !important;
+  box-shadow: none;
+  pointer-events: auto;
+}
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 1px;
 }
 .guide-insertion {
+  --guide-insert-hit-height: 1.5rem;
   position: relative;
   height: 0;
   z-index: 3;
@@ -921,31 +1101,31 @@
 .guide-insertion::before {
   content: '';
   position: absolute;
-  inset: -0.5rem 0 auto;
-  height: 1rem;
-}
-.guide-insertion-item::before {
-  inset-block-start: -0.75rem;
-  height: 1.5rem;
+  top: -1.5rem;
+  left: 0;
+  right: 0;
+  height: var(--guide-insert-hit-height);
 }
 .guide-insertion-chrome {
   position: absolute;
-  top: -1rem;
+  top: -1.5rem;
   left: 50%;
   transform: translateX(-50%);
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-insertion[data-guide-hover] > .guide-insertion-chrome,
-.guide-insertion:focus-within > .guide-insertion-chrome {
+  max-width: 100%;
+  height: var(--guide-insert-hit-height);
   opacity: 1;
   pointer-events: auto;
 }
 .guide-insertion-block {
+  --guide-insert-hit-height: min(2rem, var(--guide-row-gap, var(--guide-gap)));
   position: absolute;
   top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
   left: 0;
   right: 0;
+}
+.guide-insertion-block > .guide-insertion-chrome,
+.guide-insertion-block::before {
+  top: calc(var(--guide-insert-hit-height) * -0.5);
 }
 .guide-insertion-block[data-end='true'] {
   top: auto;
@@ -955,23 +1135,38 @@
   position: relative;
   min-height: 1rem;
 }
+.guide-empty-step > .guide-insertion-block {
+  position: relative;
+  top: auto;
+  bottom: auto;
+}
 .guide-document .guide-image-surface {
   position: relative;
   margin: 0;
 }
-.guide-image-tools {
+.guide-document .guide-image-tools {
   position: absolute;
-  top: 0.375rem;
-  left: 0.5rem;
-  z-index: 2;
-  opacity: 0;
-  pointer-events: none;
-}
-.guide-image-surface[data-guide-hover] > .guide-image-tools,
-.guide-image-surface:focus-within > .guide-image-tools,
-.guide-image-surface[data-editing='true'] > .guide-image-tools {
+  inset-inline-start: 0.375rem;
+  inset-block-start: 0.375rem;
+  z-index: 6;
+  margin: 0;
+  max-width: calc(100% - 0.75rem);
+  padding: 3px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior: contain;
   opacity: 1;
   pointer-events: auto;
+}
+.guide-document .guide-image-frame[data-editing='true'] .guide-image-tools {
+  max-width: calc(100% - 2.75rem);
+}
+.guide-document .guide-image-tools > button {
+  flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
 }
 .guide-number-toggle {
   display: flex;
@@ -1017,17 +1212,14 @@
   border-bottom: 1px solid var(--sniptale-color-border-soft);
 }
 .guide-resource-header-actions {
+  flex: none;
   min-width: 0;
-  margin-left: auto;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
 }
-.guide-resource-drawer-close:has(.guide-import-actions:not([hidden])) strong {
-  flex: 0 1 auto;
-}
-.guide-resource-drawer-close:has(.guide-import-actions:not([hidden])) {
-  height: auto;
-  min-height: 44px;
-  padding-block: 6px;
-  flex-wrap: wrap;
+.guide-resource-header-actions:empty,
+.guide-resource-header-actions:has(.guide-import-actions[hidden]) {
+  display: none;
 }
 .guide-resource-drawer-close strong {
   flex: 1;
@@ -1060,15 +1252,6 @@
 .guide-resource-drawer .guide-resources {
   min-width: 0;
 }
-@media (max-width: 720px) {
-  .guide-resource-drawer-surface.sniptale-modal {
-    width: 100vw !important;
-  }
-  .guide-resource-drawer-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 .guide-panel-heading > :first-child {
   min-width: 0;
   flex: 1;
@@ -1086,37 +1269,15 @@
 .guide-panel-heading h2 {
   flex: 1;
 }
-.guide-page-header button,
-.guide-panel-heading > button {
-  width: min(1.75rem, var(--sniptale-size-toolbar));
-  height: min(1.75rem, var(--sniptale-size-toolbar));
-  min-width: min(1.75rem, var(--sniptale-size-toolbar));
-  min-height: min(1.75rem, var(--sniptale-size-toolbar));
-  padding: 0.25rem;
-}
+
 .guide-collapsed-sections {
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
 }
 .guide-project-name {
-  flex: 0 1 auto;
+  flex: 1;
 }
-@media (max-width: 720px) {
-  .guide-workspace {
-    grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
-  }
-  .guide-library-panel {
-    position: absolute;
-    inset: 0 auto 0 0;
-    width: var(--guide-left-width);
-    z-index: 4;
-  }
-  .guide-panel-divider-left {
-    display: none;
-  }
-}
-
 .guide-left-navigation {
   container: guide-nav / inline-size;
   display: flex;
@@ -1159,9 +1320,6 @@
   }
 }
 
-.guide-project-name:focus-within {
-  flex: 1;
-}
 .guide-page .guide-project-name input:focus-visible {
   outline: none;
 }
@@ -1237,7 +1395,7 @@
   opacity: 0;
   cursor: grab;
   touch-action: none;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
 }
@@ -1294,15 +1452,6 @@ html[data-guide-reordering] .guide-block-grip {
   padding: 0.125rem 0.375rem;
   background: transparent;
   border: 1px solid transparent;
-}
-.guide-note-callout .guide-action-menu-anchor > button {
-  width: 1.5rem;
-  height: 1.5rem;
-  color: color-mix(in srgb, var(--guide-callout-color) 65%, var(--guide-ink));
-  background: color-mix(in srgb, var(--guide-callout-color) 12%, var(--guide-paper)) !important;
-}
-.guide-note-callout .guide-action-menu-anchor > button:hover {
-  background: color-mix(in srgb, var(--guide-callout-color) 20%, var(--guide-paper)) !important;
 }
 
 .guide-numbering-fields {
@@ -1385,11 +1534,6 @@ html[data-guide-reordering] .guide-block-grip {
   justify-content: space-between;
   font-size: 0.75rem;
 }
-.guide-style-accent input {
-  width: 3rem;
-  height: 1.75rem;
-  padding: 0.125rem;
-}
 
 .guide-block-inspector {
   display: grid;
@@ -1397,36 +1541,12 @@ html[data-guide-reordering] .guide-block-grip {
   font-size: 0.8125rem;
 }
 
-.guide-reader {
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  min-width: 0;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  color: var(--sniptale-color-text-primary);
-  background: var(--sniptale-color-surface-canvas);
-}
-.guide-reader > header {
-  flex: 0 0 auto;
-  min-height: 52px;
-  height: auto;
-  flex-wrap: wrap;
-  border-radius: var(--sniptale-radius-lg);
-  background: var(--sniptale-color-surface-panel);
-}
-.guide-reader h1 {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.875rem;
-  font-weight: 600;
+.guide-reader .guide-export-stage {
+  padding: 0.75rem;
 }
 .guide-reader-body {
   flex: 1;
+  min-height: 0;
 }
 .guide-reader-body > .guide-document-scroll {
   border-radius: var(--sniptale-radius-lg);
@@ -1435,32 +1555,20 @@ html[data-guide-reordering] .guide-block-grip {
 .guide-reader-pagination {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.25rem;
   font-size: 0.75rem;
   white-space: nowrap;
 }
-.guide-reader :focus-visible {
-  outline: 1px solid var(--sniptale-color-accent);
-  outline-offset: 1px;
+.guide-reader .guide-reading-options {
+  flex-direction: column;
+  align-items: stretch;
 }
-@media (max-width: 900px) {
-  .guide-reader > header {
-    flex-wrap: wrap;
-    height: auto;
-    min-height: 52px;
-  }
-  .guide-reader h1 {
-    flex-basis: 50%;
-  }
+.guide-reader .guide-reading-options > :last-child {
+  width: 100%;
+  min-width: 0;
 }
-.guide-reader > header > [role='group'] {
-  flex-shrink: 0;
-}
-.guide-reader > header > [role='group'] button {
-  width: auto;
-  min-width: 5.5rem;
-  padding-inline: 0.5rem;
-}
+.guide-export-workspace .guide-read-document > :is(article, section):focus,
 .guide-read-document > :focus {
   outline: none;
 }
@@ -1476,8 +1584,7 @@ html[data-guide-reordering] .guide-block-grip {
   line-height: 1.3;
 }
 
-.guide-labeled-action.sniptale-glass-toolbar-button,
-.guide-reader > header > .sniptale-glass-toolbar-button {
+.guide-labeled-action.sniptale-glass-toolbar-button {
   width: auto;
   flex-shrink: 0;
   gap: 0.375rem;
@@ -1493,19 +1600,23 @@ html[data-guide-reordering] .guide-block-grip {
   width: 100%;
   min-width: 0;
 }
-.guide-page .guide-document .guide-voice-field > textarea,
-.guide-page .guide-voice-field > input {
+.guide-page .guide-voice-field > input,
+.guide-page .guide-inspector-panel .guide-voice-field > textarea {
   padding-right: 4.25rem;
   min-height: 2rem;
 }
 .guide-voice-control {
   position: absolute;
   display: flex;
+  gap: 0.125rem;
   top: min(0.5rem, calc((100% - 1.5rem) / 2));
-  right: 2.125rem;
+  right: 0.375rem;
   z-index: 5;
   opacity: 0;
   pointer-events: none;
+}
+.guide-document .guide-voice-control {
+  right: 1.75rem;
 }
 .guide-voice-field:hover > .guide-voice-control,
 .guide-voice-field:focus-within > .guide-voice-control,
@@ -1521,7 +1632,7 @@ html[data-guide-reordering] .guide-block-grip {
   padding: 0;
   border-radius: 50%;
   border: 1px solid var(--sniptale-color-border-soft);
-  background: var(--sniptale-color-surface-canvas);
+  background: var(--sniptale-color-surface-panel);
 }
 .guide-project-name > .guide-voice-field {
   grid-area: 1 / 1;
@@ -1540,19 +1651,45 @@ html[data-guide-reordering] .guide-block-grip {
   }
 }
 
-.guide-library-preview {
-  padding-top: 2.25rem;
+.guide-library-preview-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
-.guide-library-preview > [data-ui='library-media-player'] {
-  min-height: 160px;
+.guide-library-preview-header > button,
+.guide-library-preview-header > span {
+  flex: none;
+}
+.guide-library-preview-header > span {
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-library-preview-header > strong {
+  flex: 1;
+  min-width: 0;
+}
+.guide-library-preview > strong {
+  flex: none;
+}
+.guide-library-preview-header > strong,
+.guide-library-preview > strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.guide-library-preview > span:not(.guide-library-preview-raster) {
+  flex: none;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-library-preview [data-ui='library-media-player'] {
+  min-height: 180px;
+}
+.guide-library-preview-raster [data-ui='library-media-player'] {
+  min-height: 0;
 }
 .guide-import-actions[hidden] {
   display: none;
-}
-@media (min-width: 1600px) {
-  .guide-library-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
 }
 
 .guide-image-slot {
@@ -1649,12 +1786,13 @@ html[data-guide-width-resizing] * {
 .guide-document
   .guide-block:is([data-kind='text'], [data-kind='heading'], [data-kind='note'])
   .guide-voice-field {
-  position: static;
+  position: relative;
 }
 .guide-document
   .guide-block:is([data-kind='text'], [data-kind='heading'], [data-kind='note'])
   .guide-voice-control {
-  top: 0.375rem;
+  top: min(0.375rem, calc((100% - 1.5rem) / 2));
+  right: 0.375rem;
 }
 .guide-document .guide-block-grip:focus {
   outline: 1px solid var(--sniptale-color-accent);
@@ -1669,29 +1807,7 @@ html[data-guide-width-resizing] * {
   opacity: 0;
 }
 
-.guide-library-grid[data-layout='list'] {
-  grid-template-columns: minmax(0, 1fr);
-}
-.guide-library-grid[data-layout='list'] .guide-library-card {
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
-  padding-right: 32px;
-}
-.guide-library-grid[data-layout='list'] .guide-library-thumbnail {
-  flex: 0 0 72px;
-  width: 72px;
-  height: 45px;
-}
-
 /* Contextual chrome fades in place; intent timing belongs to the central pointer owner. */
-.guide-center-panel {
-  --guide-tool-hover-surface: color-mix(
-    in srgb,
-    var(--sniptale-color-accent) 8%,
-    var(--sniptale-color-surface-canvas)
-  );
-}
 .guide-center-panel
   :is(
     .guide-block-actions,
@@ -1704,6 +1820,16 @@ html[data-guide-width-resizing] * {
     .guide-voice-control
   ) {
   transition: opacity calc(var(--sniptale-duration-fast) / 3) var(--sniptale-ease-standard);
+}
+.guide-center-panel :is(.guide-block-actions, .guide-item-actions, .guide-image-tools) {
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-center-panel .guide-block[data-guide-hover] > .guide-block-actions,
+.guide-center-panel :is(article, section)[data-guide-hover] > .guide-item-actions,
+.guide-center-panel .guide-image-surface[data-guide-hover] .guide-image-tools {
+  opacity: 1;
+  pointer-events: auto;
 }
 .guide-center-panel .guide-voice-field > .guide-voice-control {
   opacity: 0;
@@ -1733,8 +1859,10 @@ html[data-guide-width-resizing] * {
   :is(.guide-block-actions, .guide-item-actions, .guide-image-tools):has([aria-expanded='true']),
 .guide-center-panel [data-voice-visible] > .guide-voice-control,
 .guide-center-panel [data-width-preview] > .guide-block-width,
-.guide-center-panel [data-editing='true'] > .guide-image-tools,
+.guide-center-panel [data-editing='true'] .guide-image-tools,
 .guide-center-panel .guide-item-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
   transition: none;
 }
 .guide-document
@@ -1761,12 +1889,22 @@ html[data-guide-width-resizing] * {
     .guide-insertion-chrome > button,
     .guide-voice-control > button
   ):hover:not(:disabled):not([aria-pressed='true']) {
-  background: var(--guide-tool-hover-surface) !important;
-  border-color: color-mix(
+  background: color-mix(
     in srgb,
-    var(--sniptale-color-accent) 35%,
-    var(--sniptale-color-border-soft)
-  );
+    var(--sniptale-color-text-primary) 10%,
+    var(--sniptale-color-surface-canvas)
+  ) !important;
+  border-color: var(--sniptale-color-text-secondary);
+  color: var(--sniptale-color-text-primary) !important;
+}
+.guide-document
+  :is(.guide-action-menu-anchor > button, .guide-insertion-chrome > button):active:not(:disabled) {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 15%,
+    var(--sniptale-color-surface-canvas)
+  ) !important;
+  color: var(--sniptale-color-text-primary) !important;
 }
 .guide-document
   :is(
@@ -1778,7 +1916,7 @@ html[data-guide-width-resizing] * {
     .guide-insertion-chrome > button,
     .guide-voice-control > button
   ):focus-visible {
-  outline: 1px solid var(--sniptale-color-accent);
+  outline: 2px solid var(--sniptale-color-accent);
   outline-offset: 2px;
 }
 .guide-document
@@ -1796,6 +1934,7 @@ html[data-guide-width-resizing] * {
   height: 14px;
 }
 @media (hover: none) {
+  .guide-center-panel :is(.guide-block-actions, .guide-item-actions, .guide-image-tools),
   .guide-center-panel .guide-voice-field > .guide-voice-control {
     opacity: 1;
     pointer-events: auto;
@@ -1805,8 +1944,8 @@ html[data-guide-width-resizing] * {
 .guide-document .guide-block-height {
   position: absolute;
   z-index: 5;
-  inset-inline-end: -1.75rem;
-  inset-block-end: -1.5rem;
+  inset-inline-start: 0;
+  inset-block-end: -0.75rem;
   width: 1.5rem;
   height: 1.5rem;
   min-width: 1.5rem;
@@ -1814,7 +1953,7 @@ html[data-guide-width-resizing] * {
   padding: 0;
   border: 1px solid var(--sniptale-color-border-soft);
   border-radius: 50%;
-  background: var(--sniptale-color-surface-canvas) !important;
+  background: var(--sniptale-color-surface-panel) !important;
   cursor: ns-resize;
   touch-action: none;
   opacity: 0;
@@ -1868,6 +2007,110 @@ html[data-guide-height-resizing] * {
   transition: none;
 }
 
+/* Paper-derived editing chrome keeps image contrast without opaque theme-colored dots. */
+.guide-page
+  .guide-document
+  :is(
+    .guide-item-actions .guide-action-menu-anchor > button,
+    .guide-block-actions .guide-action-menu-anchor > button,
+    .guide-note-type .guide-action-menu-anchor > button,
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-image-tools > button,
+    .guide-voice-control > button
+  ) {
+  --guide-tool-surface: rgb(from var(--guide-paper) r g b / 0.94);
+  --guide-tool-border: color-mix(in srgb, var(--guide-ink) 18%, transparent);
+  --guide-tool-hover-surface: color-mix(in srgb, var(--guide-ink) 8%, var(--guide-paper));
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  border-radius: var(--sniptale-radius-sm);
+  border: 1px solid var(--guide-tool-border);
+  color: var(--guide-ink) !important;
+  background: var(--guide-tool-surface) !important;
+  box-shadow: var(--sniptale-shadow-sm);
+}
+.guide-page
+  .guide-document
+  :is(
+    .guide-item-actions .guide-action-menu-anchor > button,
+    .guide-block-actions .guide-action-menu-anchor > button,
+    .guide-note-type .guide-action-menu-anchor > button,
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-image-tools > button,
+    .guide-voice-control > button
+  ):not(:hover):not(:active):not([aria-expanded='true']):not([aria-pressed='true']) {
+  background: var(--guide-tool-surface) !important;
+}
+.guide-page
+  .guide-document
+  :is(.guide-item-actions, .guide-block-actions)
+  .guide-action-menu-anchor
+  > button[aria-expanded='true'] {
+  background: var(--guide-tool-hover-surface) !important;
+}
+.guide-page
+  .guide-document
+  :is(.guide-image-tools > button, .guide-voice-control > button)[aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 15%,
+    var(--guide-tool-surface)
+  ) !important;
+}
+.guide-page
+  .guide-document
+  :is(
+    .guide-image-surface .guide-image-tools > button,
+    .guide-voice-field .guide-voice-control > button
+  ):disabled {
+  opacity: 1;
+  border-color: var(--guide-muted);
+  color: var(--guide-muted) !important;
+  background: var(--guide-tool-surface) !important;
+}
+
+.guide-page
+  .guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-action-menu-anchor > button,
+    .guide-image-tools > button,
+    .guide-voice-control > button
+  ):hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--guide-tool-hover-surface) !important;
+  color: var(--guide-ink) !important;
+}
+
+.guide-page .guide-voice-control > button {
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  box-shadow: none;
+}
+.guide-page .guide-voice-control > button:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary-strong);
+}
+.guide-outline-row .guide-item-actions .guide-action-menu-anchor > button {
+  border: 0;
+  background: transparent;
+  color: var(--sniptale-color-text-primary);
+  box-shadow: none;
+}
+.guide-outline-row .guide-item-actions .guide-action-menu-anchor > button:hover:not(:disabled) {
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary-strong);
+}
+
 .guide-block-drop-preview {
   position: fixed;
   z-index: 30;
@@ -1883,4 +2126,394 @@ html[data-guide-height-resizing] * {
   font-size: 0.75rem;
   text-align: center;
   overflow: hidden;
+}
+
+/* Tabs keep their underline while hover remains neutral and visible. */
+.guide-page .guide-left-navigation .guide-section-tab {
+  border-color: transparent;
+  color: var(--sniptale-color-text-muted);
+  background: transparent;
+  transition:
+    background-color var(--sniptale-duration-fast) ease,
+    color var(--sniptale-duration-fast) ease;
+}
+.guide-page .guide-left-navigation .guide-section-tab[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+}
+.guide-page .guide-left-navigation .guide-section-tab:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--sniptale-color-text-primary-strong);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 10%,
+    var(--sniptale-color-surface-canvas)
+  ) !important;
+}
+.guide-page .guide-voice-control > .guide-text-clear {
+  border-color: transparent;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+}
+
+/* Enabled commands are readable before hover; disabled commands remain visibly muted. */
+.guide-page
+  .sniptale-glass-toolbar-button:not(.guide-section-tab):not(.sniptale-btn-utility):not(
+    :disabled
+  ):not([data-active='true']):not(.sniptale-btn-danger):not(
+    :where(
+      .tour-contents-actions > button,
+      .tour-object-item-actions > button,
+      .guide-resource-actions > button
+    )
+  ) {
+  color: var(--sniptale-color-text-primary);
+}
+.guide-page .sniptale-btn-danger:not(:disabled) {
+  color: var(--sniptale-color-text-primary);
+}
+.guide-page .sniptale-btn-danger:hover:not(:disabled) {
+  color: var(--sniptale-color-danger);
+}
+.guide-page button.sniptale-glass-toolbar-button:not(.sniptale-btn-utility):disabled {
+  color: var(--sniptale-color-text-dim);
+  opacity: 0.38;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Stable tab widths let the underline travel without shifting labels. */
+.guide-left-navigation {
+  position: relative;
+  gap: 0;
+}
+.guide-left-navigation::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  bottom: 0;
+  width: calc(50% - 16px);
+  height: 2px;
+  border-radius: 999px;
+  background: var(--sniptale-color-accent);
+  pointer-events: none;
+  transition: left 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.guide-left-navigation:has(> button:nth-child(2)[aria-pressed='true'])::after {
+  left: calc(50% + 8px);
+}
+.guide-page .guide-left-navigation .guide-section-tab {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  color: var(--sniptale-color-text-secondary);
+  font-weight: 400;
+}
+.guide-page .guide-left-navigation .guide-section-tab[aria-pressed='true'] {
+  color: var(--sniptale-color-text-primary);
+  font-weight: 600;
+}
+.guide-page .guide-left-navigation .guide-section-tab svg {
+  color: inherit;
+}
+.guide-left-navigation .guide-section-tab span {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-left-navigation::after {
+    transition: none;
+  }
+}
+@container guide-nav (max-width: 180px) {
+  .guide-left-navigation .guide-section-tab span {
+    display: none;
+  }
+}
+
+.guide-page-header .guide-panel-reopen {
+  width: 2rem;
+  height: 2rem;
+  min-width: 2rem;
+  padding: 0;
+}
+.guide-page-header .guide-panel-reopen svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guide-page .guide-left-navigation .guide-section-tab {
+    transition: none;
+  }
+}
+
+/* Closed insertion glyph follows paper; the portaled actions follow application theme. */
+.guide-document
+  .guide-insertion-chrome
+  .guide-action-menu-anchor
+  > button:is(:hover, :active, :focus-visible):not(:disabled) {
+  background: transparent !important;
+  color: var(--guide-ink) !important;
+}
+.guide-document .guide-insertion-chrome .guide-action-menu-anchor > button:focus-visible {
+  outline-color: var(--sniptale-color-accent);
+}
+.guide-insert-actions > button:first-child > .guide-insert-tooltip {
+  left: 0;
+  transform: none;
+}
+.guide-insert-actions > button:last-child > .guide-insert-tooltip {
+  left: auto;
+  right: 0;
+  transform: none;
+}
+
+.guide-document > .guide-insertion-item:first-of-type > .guide-insertion-chrome {
+  top: -1rem;
+}
+.guide-document > .guide-insertion-item:first-of-type::before {
+  top: -1rem;
+}
+.guide-insert-actions:has(> button:hover) > button:not(:hover) > .guide-insert-tooltip {
+  display: none;
+}
+
+/* Selection owns structural chrome; hover and text focus cannot reveal other objects. */
+.guide-page .guide-document :is(article, section, .guide-block) {
+  --guide-selection-symbol: visible;
+  --guide-selection-visibility: hidden;
+  --guide-selection-opacity: 0;
+  --guide-selection-events: none;
+}
+.guide-page
+  .guide-document
+  :is(article, section, .guide-block)[data-selected='true']:not(
+    :has(.guide-voice-field:focus-within)
+  ) {
+  --guide-selection-symbol: hidden;
+  --guide-selection-visibility: visible;
+  --guide-selection-opacity: 1;
+  --guide-selection-events: auto;
+}
+.guide-page .guide-document :is(article, section, .guide-block)[data-selected='true'] {
+  outline: none;
+  box-shadow: 0 0 12px 3px var(--sniptale-color-accent-soft-strong);
+}
+.guide-page
+  .guide-document[data-selection-input='pointer']
+  :is(article, section, .guide-block):focus-visible {
+  outline: none;
+}
+.guide-page
+  .guide-document[data-selection-input='keyboard']
+  :is(article, section, .guide-block):focus-visible {
+  outline: 2px solid var(--guide-ink);
+  outline-offset: 4px;
+}
+.guide-page
+  .guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-block-height,
+    .guide-block-actions,
+    .guide-item-actions,
+    .guide-image-tools,
+    .guide-note-type .guide-action-menu-anchor
+  ) {
+  visibility: var(--guide-selection-visibility);
+  opacity: var(--guide-selection-opacity);
+  pointer-events: var(--guide-selection-events);
+}
+.guide-page .guide-document .guide-voice-field > .guide-voice-control {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-page
+  .guide-document
+  .guide-voice-field:is(:focus-within, [data-voice-visible])
+  > .guide-voice-control {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.guide-note-type {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+.guide-note-type > * {
+  grid-area: 1 / 1;
+}
+.guide-note-type-symbol {
+  visibility: var(--guide-selection-symbol, visible);
+}
+
+/* The selection glow follows the same rounded content boundary as hover. */
+.guide-page .guide-document .guide-block {
+  border-radius: var(--sniptale-radius-sm);
+}
+.guide-document .guide-insertion {
+  transition: opacity var(--sniptale-duration-normal) ease;
+}
+.guide-document .guide-insertion[data-blocked] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.guide-document .guide-insertion[data-blocked] * {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-document .guide-insertion {
+    transition: none;
+  }
+}
+
+.guide-block:has(.guide-image-surface[data-editing='true'])
+  > :is(.guide-block-actions, .guide-block-grip, .guide-block-width, .guide-block-height) {
+  visibility: hidden;
+  pointer-events: none;
+}
+.guide-image-overview {
+  margin-block: 0.75rem;
+}
+.guide-image-overview-map {
+  position: relative;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--sniptale-color-surface-input);
+  cursor: crosshair;
+  touch-action: none;
+}
+.guide-image-overview-map > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.guide-image-overview-region {
+  position: absolute;
+  border: 1px solid var(--sniptale-color-accent);
+  box-shadow: 0 0 0 500px rgb(0 0 0 / 35%);
+  pointer-events: none;
+}
+/* Geometry controls stay attached to the image, with separate left/right actions. */
+.guide-image-surface[data-editing='true'] {
+  container: guide-framing / inline-size;
+}
+.guide-document .guide-image-surface[data-editing='true'] .guide-image-tools {
+  inset: 0.5rem 0.5rem auto;
+  display: flex;
+  width: auto;
+  max-width: none;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0;
+  pointer-events: none;
+}
+.guide-page .guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button {
+  --guide-tool-surface: var(--sniptale-color-surface-panel);
+  --guide-tool-border: var(--sniptale-color-border-soft);
+  --guide-tool-hover-surface: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 8%,
+    var(--sniptale-color-surface-panel)
+  );
+  width: auto;
+  min-width: 2rem;
+  height: 2rem;
+  min-height: 2rem;
+  padding-inline: 0.5rem;
+  gap: 0.375rem;
+  border: 1px solid var(--sniptale-color-border-soft);
+  background: var(--sniptale-color-surface-panel) !important;
+  color: var(--sniptale-color-text-primary) !important;
+  font-size: 0.75rem;
+  pointer-events: auto;
+}
+.guide-page
+  .guide-document
+  .guide-image-surface[data-editing='true']
+  .guide-image-tools
+  > button[aria-pressed='true'] {
+  border-color: var(--sniptale-color-accent);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 15%,
+    var(--sniptale-color-surface-panel)
+  ) !important;
+}
+.guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button:first-child {
+  margin-inline-end: auto;
+}
+.guide-document
+  .guide-image-surface[data-editing='true']
+  .guide-image-tools
+  > button[data-frame-image]
+  svg {
+  color: var(--sniptale-color-accent);
+}
+@container guide-framing (width < 260px) {
+  .guide-document .guide-image-surface[data-editing='true'] .guide-image-tools > button > span {
+    display: none;
+  }
+}
+@container guide-framing (width < 160px) {
+  .guide-document .guide-image-surface[data-editing='true'] .guide-image-tools {
+    inset: 0.25rem 0.25rem auto;
+    gap: 0.125rem;
+  }
+  .guide-page
+    .guide-document
+    .guide-image-surface[data-editing='true']
+    .guide-image-tools
+    > button {
+    width: 1.5rem;
+    min-width: 1.5rem;
+    height: 1.5rem;
+    min-height: 1.5rem;
+    padding: 0;
+  }
+}
+
+.guide-page
+  .guide-document
+  .guide-image-surface[data-editing='true']
+  .guide-image-tools
+  > button:hover:not(:disabled):not([aria-pressed='true']) {
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-text-primary) 8%,
+    var(--sniptale-color-surface-panel)
+  ) !important;
+  color: var(--sniptale-color-text-primary) !important;
+}
+
+/* Editor insertion menus need breathing room; document/export spacing stays unchanged. */
+.guide-page .guide-document > :is(article, section) {
+  margin-bottom: 2.5rem;
+}
+.guide-page .guide-document > .guide-insertion-item:not(:first-of-type) {
+  --guide-insert-hit-height: 2rem;
+}
+.guide-page .guide-document > .guide-insertion-item:not(:first-of-type) > .guide-insertion-chrome,
+.guide-page .guide-document > .guide-insertion-item:not(:first-of-type)::before {
+  top: -2.25rem;
+}
+
+/* Boundaries are editing aids; selection and keyboard focus keep their existing authority. */
+.guide-page
+  .guide-document[data-show-boundaries]
+  .guide-block:not([data-selected='true']):not(:focus-visible) {
+  outline: 1px solid var(--guide-border, var(--sniptale-color-border-soft));
+  outline-offset: -1px;
 }

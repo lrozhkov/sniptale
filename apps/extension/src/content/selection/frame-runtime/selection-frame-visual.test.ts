@@ -13,4 +13,6 @@ it('uses canonical alpha paint without retired opacity fields', () => {
   expect(visual).not.toHaveProperty('opacity');
   expect(visual).not.toHaveProperty('fillOpacity');
   expect(visual).not.toHaveProperty('strokeOpacity');
+  expect(visual.strokeWidth).toBe(1);
+  expect(visual.strokeStyle).toBe('dashed');
 });

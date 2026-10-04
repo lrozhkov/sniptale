@@ -41,7 +41,7 @@ Treat a Selectel run as complete only when its cleanup receipt covers every atte
 To publish:
 
 1. Create and push a GitHub-verifiable annotated tag matching the package version.
-2. Run **Continuous Deployment** with the tag, matching provenance finalizer run ID, and product-facing release notes.
+2. Run **Publish release** with the tag, matching provenance finalizer run ID, and product-facing release notes.
 3. Rerun with the same inputs after a publication failure.
 
 Set `allow_non_latest_provenance` and `bypass_reason` only when intentionally selecting an older valid provenance result.

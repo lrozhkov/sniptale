@@ -4,9 +4,11 @@ import {
   rebuildEditorControllerFrameDecorations,
 } from '../../browser-frame/document';
 import type { EditorControllerInstance } from '../types';
+import type { BrowserFrameState } from '../../../../features/editor/document/types';
 
 export async function rebuildFrameDecorationsForController(
-  controller: EditorControllerInstance
+  controller: EditorControllerInstance,
+  browserFrame?: BrowserFrameState
 ): Promise<void> {
   await rebuildEditorControllerFrameDecorations({
     canvas: controller.canvas,
@@ -18,6 +20,7 @@ export async function rebuildFrameDecorationsForController(
     },
     isBrowserFrameRenderTokenCurrent: (token) => controller.browserFrameRenderToken === token,
     ensureBrowserFrameOnTop: () => controller.ensureBrowserFrameOnTop(),
+    ...(browserFrame ? { browserFrame } : {}),
   });
 }
 

@@ -47,21 +47,6 @@ async function renderEditorIn(target: HTMLElement | ShadowRoot) {
   return trigger;
 }
 
-async function openPalette(target: HTMLElement | ShadowRoot) {
-  const trigger = target.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.color-selector.palette-trigger"]'
-  );
-  if (!trigger) throw new Error('Expected color selector palette trigger');
-  await act(async () => {
-    trigger.click();
-  });
-  const layer = target.querySelector<HTMLElement>(
-    '[data-ui="shared.ui.color-selector.expanded-layer"]'
-  );
-  if (!layer) throw new Error('Expected portaled color selector layer');
-  return layer;
-}
-
 async function openPicker(target: HTMLElement | ShadowRoot) {
   const trigger = target.querySelector<HTMLButtonElement>(
     '[data-ui="shared.ui.color-selector.picker-trigger"]'
@@ -158,24 +143,24 @@ afterEach(() => {
 });
 
 describe('highlighter preset editor floating-layer lifecycle', () => {
-  it('lets the palette consume Escape before the editor in the document consumer', async () => {
+  it('lets the picker consume Escape before the editor in the document consumer', async () => {
     const trigger = await renderEditorIn(document.body);
     const dialog = document.querySelector<HTMLElement>(
       '.sniptale-highlighter-preset-editor-dialog'
     );
     if (!dialog) throw new Error('Expected editor dialog');
     const sentinel = addUnrelatedFocusable(document.body);
-    const layer = await openPalette(document.body);
+    const layer = await openPicker(document.body);
     expect(layer.getAttribute('data-floating-ui-capture-transient')).toBe('true');
     await expectFocusBridge({ dialog, layer, sentinel, target: document.body });
-    const swatch = layer.querySelector<HTMLButtonElement>('button');
+    const swatch = layer.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.color-selector.picker-palette"] button'
+    );
     if (!swatch) throw new Error('Expected palette swatch');
 
     await pressEscape(swatch);
 
-    expect(
-      document.querySelector('[data-ui="shared.ui.color-selector.expanded-layer"]')
-    ).toBeNull();
+    expect(document.querySelector('[data-ui="shared.ui.color-selector.picker-layer"]')).toBeNull();
     expect(document.querySelector('.sniptale-highlighter-preset-editor-dialog')).not.toBeNull();
 
     const pickerLayer = await openPicker(document.body);
@@ -189,7 +174,7 @@ describe('highlighter preset editor floating-layer lifecycle', () => {
     expect(document.activeElement).toBe(trigger);
   });
 
-  it('uses the ShadowRoot focus chain and includes owned palette controls in the trap', async () => {
+  it('uses the ShadowRoot focus chain and includes owned picker controls in the trap', async () => {
     host = document.createElement('div');
     shadowRoot = host.attachShadow({ mode: 'open' });
     document.body.append(host);
@@ -203,14 +188,16 @@ describe('highlighter preset editor floating-layer lifecycle', () => {
     expect(dialog.contains(shadowRoot.activeElement)).toBe(true);
 
     const sentinel = addUnrelatedFocusable(shadowRoot);
-    const layer = await openPalette(shadowRoot);
+    const layer = await openPicker(shadowRoot);
     expect(layer.getAttribute('data-floating-ui-capture-transient')).toBe('true');
     await expectFocusBridge({ dialog, layer, sentinel, target: shadowRoot });
-    const swatch = layer.querySelector<HTMLButtonElement>('button');
+    const swatch = layer.querySelector<HTMLButtonElement>(
+      '[data-ui="shared.ui.color-selector.picker-palette"] button'
+    );
     if (!swatch) throw new Error('Expected palette swatch');
     await pressEscape(swatch);
     expect(
-      shadowRoot.querySelector('[data-ui="shared.ui.color-selector.expanded-layer"]')
+      shadowRoot.querySelector('[data-ui="shared.ui.color-selector.picker-layer"]')
     ).toBeNull();
     expect(shadowRoot.querySelector('.sniptale-highlighter-preset-editor-dialog')).not.toBeNull();
 

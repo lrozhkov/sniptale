@@ -1,3 +1,5 @@
+import type { FrozenSelectionFrame } from '../../types';
+import { isSelectionModeExtensionUiElement } from '../../runtime/extension-ui';
 import { getContentEventTargetElement } from '../../../../platform/dom-host';
 import { resolveIframeEventTarget } from '../../../../platform/frame';
 import { resolveShieldedPageElement } from '../../../page-element-target';
@@ -35,8 +37,20 @@ function resolveLinkedPreviewImage(target: HTMLElement, event: MouseEvent): HTML
 
 export function resolveSelectionModePointerTarget(
   event: MouseEvent,
-  iframe?: HTMLIFrameElement
+  iframe?: HTMLIFrameElement,
+  frozenFrame?: FrozenSelectionFrame | null
 ): HTMLElement | null {
+  if (frozenFrame) {
+    const target = getContentEventTargetElement(event);
+    if (
+      target &&
+      isSelectionModeExtensionUiElement(target) &&
+      !target.classList.contains('sniptale-selection-frozen-frame')
+    )
+      return target;
+    if (frozenFrame.areaOnly) return document.body;
+    return frozenFrame.geometry.targetAt(event.clientX, event.clientY);
+  }
   const shieldedTarget = resolveShieldedPageElement(event);
   const target =
     (shieldedTarget?.namespaceURI === 'http://www.w3.org/1999/xhtml'

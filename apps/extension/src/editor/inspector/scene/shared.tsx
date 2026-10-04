@@ -1,5 +1,4 @@
 import React from 'react';
-import { ProductGlassRange } from '@sniptale/ui/product-glass-controls';
 
 import {
   INSPECTOR_PRIMARY_BUTTON_CLASS_NAME,
@@ -9,7 +8,7 @@ import {
   INSPECTOR_SECTION_SURFACE_CLASS_NAME,
   INSPECTOR_SECTION_VALUE_CLASS_NAME,
 } from '../chrome';
-import { NumericValueField, OptionRow, cx } from '../../chrome/ui';
+import { NumericRow, OptionRow, cx } from '../../chrome/ui';
 
 export const primaryPanelButtonClassName = INSPECTOR_PRIMARY_BUTTON_CLASS_NAME;
 
@@ -28,32 +27,17 @@ export function EditorInspectorRangeField(props: {
   const step = props.step ?? 1;
 
   return (
-    <div className="grid gap-1.5" data-ui="editor.inspector.range-field">
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className="truncate text-[11px] font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {props.label}
-        </span>
-        <NumericValueField
-          className="!h-7 !w-[4.75rem] !px-1"
-          label={props.label}
-          max={props.max}
-          min={min}
-          onCommitValue={props.onChange}
-          onPreviewValue={props.onChange}
-          step={step}
-          unit={props.unit}
-          value={props.value}
-        />
-      </div>
-      <ProductGlassRange
-        aria-label={props.label}
-        max={props.max}
-        min={min}
-        onChange={(event) => props.onChange(Number(event.currentTarget.value))}
-        step={step}
-        value={props.value}
-      />
-    </div>
+    <NumericRow
+      label={props.label}
+      min={min}
+      max={props.max}
+      step={step}
+      unit={props.unit}
+      value={props.value}
+      onPreviewValue={props.onChange}
+      onCommitValue={props.onChange}
+      scrub={{ min, max: props.max, step }}
+    />
   );
 }
 

@@ -51,7 +51,8 @@ async function click(label: string) {
   await act(async () => button.click());
 }
 async function choose() {
-  await click('My layouts');
+  const trigger = host.querySelector<HTMLButtonElement>('button[aria-haspopup="listbox"]')!;
+  await act(async () => trigger.click());
   const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
     (node) => node.textContent === 'Reusable'
   );

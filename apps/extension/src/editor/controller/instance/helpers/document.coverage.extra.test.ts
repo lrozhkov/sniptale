@@ -86,7 +86,7 @@ function mockApplyDocumentStateTransition() {
     args.applyToolMode();
     args.setOriginalDocument({ id: 'original' });
     args.setHistory({ id: 'history' });
-    await args.rebuildFrameDecorations();
+    await args.rebuildFrameDecorations({ enabled: true } as never);
     args.syncRuntimeState();
   });
 }
@@ -129,8 +129,13 @@ it('applies documents and updates controller-owned state through wrapper closure
   ensureBrowserFrameOnTopForController(controller);
 
   expectControllerDocumentState(controller);
-  expect(controller.rebuildFrameDecorations).toHaveBeenCalledOnce();
-  expect(mocks.rebuildFrameDecorationsMock).toHaveBeenCalledOnce();
+  expect(mocks.rebuildFrameDecorationsMock).toHaveBeenCalledTimes(2);
+  expect(mocks.rebuildFrameDecorationsMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      browserFrame: { enabled: true },
+      browserFrameRenderToken: 1,
+    })
+  );
   expect(mocks.rebuildFrameDecorationsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       browserFrameRenderToken: 1,

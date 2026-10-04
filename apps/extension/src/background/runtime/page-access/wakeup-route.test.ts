@@ -651,7 +651,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
       reason: 'scenario',
       restored: true,
       success: true,
-      toolbarVisible: true,
+      toolbarVisible: false,
     });
 
     expect(pinStorageMocks.readPinToTabSessionStorageState).toHaveBeenCalledWith(7);
@@ -659,7 +659,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
     expect(runtimeState.scenarioSessionService.updateSurfaceState).toHaveBeenCalledWith(7, {
       captureAction: 'scenario',
       screenshotMode: true,
-      toolbarVisible: true,
+      toolbarVisible: false,
     });
     const scenarioUpdateOrder = firstInvocationOrder(
       vi.mocked(runtimeState.scenarioSessionService.updateSurfaceState).mock.invocationCallOrder
@@ -671,7 +671,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
     expect(screenshotModeMocks.enableScreenshotMode).toHaveBeenCalledOnce();
   });
 
-  it('gives forced scenario visibility precedence over a collapsed user pin', async () => {
+  it('preserves collapsed scenario visibility independently of the user pin', async () => {
     const runtimeState = createRuntimeState({ scenarioEnabled: true });
     pinStorageMocks.readPinToTabSessionStorageState.mockResolvedValue(true);
     pinStorageMocks.readPinToTabToolbarVisibilitySessionStorageState.mockResolvedValue(false);
@@ -683,7 +683,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
     await expect(routeWakeup(runtimeState)).resolves.toMatchObject({
       restored: true,
       success: true,
-      toolbarVisible: true,
+      toolbarVisible: false,
     });
 
     expect(screenshotModeMocks.enableScreenshotMode).toHaveBeenCalledWith(
@@ -692,7 +692,7 @@ describe('routeContentRuntimeWakeupMessage scenario restore', () => {
       runtimeState.viewportState,
       runtimeState.viewportOwnerState,
       runtimeState.webSnapshotViewerPorts,
-      { toolbarVisible: true }
+      { toolbarVisible: false }
     );
     expect(screenshotModeMocks.enableScreenshotModeGuarded).not.toHaveBeenCalled();
   });
@@ -714,7 +714,7 @@ describe('routeContentRuntimeWakeupMessage scenario surface restore', () => {
       reason: 'scenario',
       restored: true,
       success: true,
-      toolbarVisible: true,
+      toolbarVisible: false,
     });
 
     expect(pageAccessMocks.ensureActivePageAccessRuntime).toHaveBeenCalledWith(7);

@@ -25,9 +25,11 @@ export function WorkspaceDefaultAction({
   const isDisabled = isPending || matchesDefault;
 
   return (
-    <div className="space-y-2">
+    <div className={variant === 'compact' ? 'contents' : 'space-y-2'}>
       <button
         type="button"
+        aria-label={translate('editor.compact.workspaceMakeDefault')}
+        title={translate('editor.compact.workspaceMakeDefault')}
         disabled={isDisabled}
         onClick={() => {
           void onSaveAsDefault();
@@ -35,7 +37,7 @@ export function WorkspaceDefaultAction({
         className={cx(
           panelButtonClassName,
           'disabled:cursor-not-allowed disabled:opacity-50',
-          variant === 'compact' ? 'w-full' : 'px-3.5'
+          variant === 'compact' ? 'shrink-0 px-2 text-[11px]' : 'px-3.5'
         )}
       >
         {isPending
@@ -43,7 +45,10 @@ export function WorkspaceDefaultAction({
           : translate('editor.compact.workspaceMakeDefault')}
       </button>
       {error ? (
-        <div role="alert" className={workspaceDefaultErrorClassName}>
+        <div
+          role="alert"
+          className={cx(workspaceDefaultErrorClassName, variant === 'compact' && 'col-span-2')}
+        >
           {error}
         </div>
       ) : null}

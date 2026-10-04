@@ -1,4 +1,4 @@
-import { LoaderCircle, Pause, Play, Search, X } from 'lucide-react';
+import { LoaderCircle, Pause, Play, X } from 'lucide-react';
 import {
   useCallback,
   useEffect,
@@ -13,6 +13,8 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
 import { formatPreciseTime } from '../../../../composition/library-preview/time-format';
+
+import type { VideoEditorPreviewZoom } from '../../../contracts/preview-runtime';
 
 function isStageFullscreen(frameRef: RefObject<HTMLElement | null>): boolean {
   return document.fullscreenElement === frameRef.current;
@@ -83,11 +85,11 @@ interface PreviewStageFullscreenTransportProps {
   isPlaying: boolean;
   isPreparing?: boolean | undefined;
   playbackRange: VideoEditorPlaybackRange | null;
-  onClose: () => void;
+  onClose?: (() => void) | undefined;
   onSeek: (time: number) => void;
   onTogglePlay: () => void;
-  zoom?: number;
-  onZoomChange?: (zoom: number) => void;
+  zoom?: VideoEditorPreviewZoom;
+  onZoomChange?: ((zoom: VideoEditorPreviewZoom) => void) | undefined;
 }
 
 export function PreviewStageFullscreenTransport(props: PreviewStageFullscreenTransportProps) {
@@ -100,7 +102,7 @@ export function PreviewStageFullscreenTransport(props: PreviewStageFullscreenTra
   const closeLabel = translate('videoEditor.stage.exitFullscreen');
   return (
     <div
-      className="flex min-h-10 min-w-0 shrink-0 items-center gap-2"
+      className="flex min-h-10 min-w-0 shrink-0 flex-wrap items-center gap-2 px-3 py-2"
       data-ui="video-editor.preview.fullscreen-transport"
     >
       <ContentToolbarButton
@@ -121,6 +123,7 @@ export function PreviewStageFullscreenTransport(props: PreviewStageFullscreenTra
         className="min-w-12 flex-1"
         min={range.start}
         max={range.end}
+        disabled={range.end <= range.start}
         step={0.01}
         value={Math.min(range.end, Math.max(range.start, props.currentTime))}
         aria-label={translate('videoEditor.stage.fullscreenSeek')}
@@ -142,40 +145,45 @@ export function PreviewStageFullscreenTransport(props: PreviewStageFullscreenTra
       >
         {formatPreciseTime(props.currentTime)} / {formatPreciseTime(props.duration)}
       </span>
-      <label className="flex w-40 shrink-0 items-center gap-1.5 text-[11px] tabular-nums">
-        <Search size={14} aria-hidden />
-        <ProductRange
-          className="min-w-0 flex-1"
-          min={1}
-          max={2}
-          step={0.1}
-          value={props.zoom ?? 1}
-          aria-label={translate('videoEditor.sidebar.mediaPreviewZoomLabel')}
-          onChange={(event) => props.onZoomChange?.(Number(event.currentTarget.value))}
-        />
-        <span className="w-8 text-right">{Math.round((props.zoom ?? 1) * 100)}%</span>
-      </label>
-      <ContentToolbarButton
-        onClick={props.onClose}
-        title={closeLabel}
-        aria-label={closeLabel}
-        dataUi="video-editor.preview.fullscreen-transport-action"
+      <div
+        role="group"
+        aria-label={translate('videoEditor.stage.previewZoom')}
+        className="flex shrink-0 items-center gap-1"
       >
-        <X size={16} aria-hidden />
-      </ContentToolbarButton>
+        {(['fit', '75%', '100%'] as const).map((zoom) => (
+          <ContentToolbarButton
+            key={zoom}
+            className="!h-9 !px-2.5 whitespace-nowrap"
+            aria-pressed={(props.zoom ?? 'fit') === zoom}
+            onClick={() => props.onZoomChange?.(zoom)}
+          >
+            {zoom === 'fit' ? translate('videoEditor.stage.previewZoomFit') : zoom}
+          </ContentToolbarButton>
+        ))}
+      </div>
+      {props.onClose ? (
+        <ContentToolbarButton
+          tone="close"
+          onClick={props.onClose}
+          title={closeLabel}
+          aria-label={closeLabel}
+          dataUi="video-editor.preview.fullscreen-transport-action"
+        >
+          <X size={16} aria-hidden />
+        </ContentToolbarButton>
+      ) : null}
     </div>
   );
 }
 
 export function useFullscreenPreviewPan(
   viewport: RefObject<HTMLDivElement | null>,
-  zoom: number,
+  zoomed: boolean,
   fullscreen: boolean
 ) {
   const gesture = useRef<{ id: number; x: number; y: number; left: number; top: number } | null>(
     null
   );
-  const previousZoom = useRef(zoom);
   const [dragging, setDragging] = useState(false);
   const finish = useCallback(() => {
     const active = gesture.current;
@@ -185,18 +193,15 @@ export function useFullscreenPreviewPan(
       viewport.current.releasePointerCapture(active.id);
   }, [viewport]);
   useEffect(() => {
-    if (!fullscreen || zoom === 1) finish();
+    if (!fullscreen || !zoomed) finish();
     return finish;
-  }, [fullscreen, zoom, finish]);
+  }, [fullscreen, zoomed, finish]);
   useLayoutEffect(() => {
-    const node = viewport.current;
-    if (node && fullscreen) {
-      const ratio = zoom / previousZoom.current;
-      node.scrollLeft = (node.scrollLeft + node.clientWidth / 2) * ratio - node.clientWidth / 2;
-      node.scrollTop = (node.scrollTop + node.clientHeight / 2) * ratio - node.clientHeight / 2;
+    if (!zoomed && viewport.current) {
+      viewport.current.scrollLeft = 0;
+      viewport.current.scrollTop = 0;
     }
-    previousZoom.current = zoom;
-  }, [fullscreen, zoom, viewport]);
+  }, [zoomed, viewport]);
   const end = (event: PointerEvent<HTMLDivElement>) => {
     if (gesture.current?.id === event.pointerId) finish();
   };
@@ -204,7 +209,7 @@ export function useFullscreenPreviewPan(
     dragging,
     handlers: {
       onPointerDownCapture: (event: PointerEvent<HTMLDivElement>) => {
-        if (!fullscreen || zoom <= 1 || event.button !== 0 || gesture.current) return;
+        if (!fullscreen || !zoomed || event.button !== 0 || gesture.current) return;
         event.preventDefault();
         event.stopPropagation();
         const node = event.currentTarget;

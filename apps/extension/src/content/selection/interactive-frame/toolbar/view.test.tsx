@@ -61,12 +61,9 @@ it('delegates selected-frame capture visibility to the shared floating state', (
     'className',
     'sniptale-glass-toolbar-divider'
   );
-  expect(button?.nextElementSibling).toBe(deleteButton);
-  expect(deleteButton?.nextElementSibling).toHaveProperty(
-    'className',
-    'sniptale-glass-toolbar-divider'
-  );
-  expect(deleteButton?.nextElementSibling?.nextElementSibling).toBe(closeButton);
+  expect(button?.nextElementSibling).toHaveProperty('className', 'sniptale-glass-toolbar-divider');
+  expect(button?.nextElementSibling?.nextElementSibling).toBe(deleteButton);
+  expect(deleteButton?.nextElementSibling).toBe(closeButton);
   expect(closeButton?.title).toBe(translate('content.interactiveFrame.closeToolbar'));
   act(() => button?.click());
   expect(props.captureVisibility.toggle).toHaveBeenCalledOnce();
@@ -92,6 +89,14 @@ it('delegates selected-frame capture visibility to the shared floating state', (
   );
   expect(addCalloutButton).not.toBeNull();
   expect(addCalloutButton?.getAttribute('data-sniptale-activation-bridge')).toBe('defer');
+  expect(addCalloutButton?.previousElementSibling?.getAttribute('title')).toBe(
+    translate('content.interactiveFrame.calloutEdit')
+  );
+  expect(
+    container.querySelector<HTMLButtonElement>(
+      `button[title="${translate('content.interactiveFrame.editButton')}"]`
+    )
+  ).not.toBeNull();
 
   act(() => root.unmount());
   vi.unstubAllGlobals();

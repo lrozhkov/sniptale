@@ -5,7 +5,8 @@ interface VisualSnapshot {
 }
 export function createTourMotion(
   root: HTMLElement,
-  signal: AbortSignal
+  signal: AbortSignal,
+  changed?: () => void
 ): {
   capture(): VisualSnapshot | null;
   prepare(
@@ -17,6 +18,9 @@ export function createTourMotion(
   ): void;
   ready(): void;
   frame(elapsed: number): void;
+  exit(elapsed: number): void;
+  cancelExit(): void;
+  reflow(viewport: { stageWidth: number; stageHeight: number }): void;
   cancel(options?: { preserveMediaGate?: boolean }): void;
   fail(): void;
 };

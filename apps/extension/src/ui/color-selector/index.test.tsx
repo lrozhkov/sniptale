@@ -102,8 +102,27 @@ async function openPicker() {
 }
 
 async function openPalette() {
-  await clickButton('Grid color');
+  await openPicker();
 }
+
+it('shows an unlabeled palette above the picker controls for drawing tools', async () => {
+  renderSelector({ pickerOnly: true, paletteInPicker: true, recentColors: [], palette: PALETTE });
+  await openPicker();
+  const picker = document.querySelector('[data-ui="shared.ui.color-selector.picker"]');
+  expect(
+    picker?.querySelectorAll('[data-ui="shared.ui.color-selector.picker-palette"] button')
+  ).toHaveLength(10);
+  expect(picker?.textContent).not.toContain('shared.ui.colorSelectorPalette');
+  expect(picker?.textContent).not.toContain('shared.ui.colorSelectorRecentColors');
+});
+
+it('keeps the palette available inside the generic inspector picker', async () => {
+  renderSelector({ palette: PALETTE });
+  await openPicker();
+  expect(
+    document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')
+  ).not.toBeNull();
+});
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -134,7 +153,9 @@ it('renders the compact trigger with the current hex value and ten swatches per 
   await openPalette();
 
   expect(document.body.textContent).toContain('shared.ui.colorSelectorRecentColors');
-  expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
+  expect(
+    document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')
+  ).not.toBeNull();
 
   const swatches = Array.from(document.body.querySelectorAll('button[title]') ?? []).filter(
     (button) => button.getAttribute('title')?.startsWith('Grid color: #')
@@ -150,7 +171,7 @@ it('places the floating palette above content inspector overlays', async () => {
 
   await openPalette();
 
-  const layer = document.body.querySelector('[data-ui="shared.ui.color-selector.expanded-layer"]');
+  const layer = document.body.querySelector('[data-ui="shared.ui.color-selector.picker-layer"]');
   expect(layer?.className).toContain('z-[2147483647]');
 });
 
@@ -163,7 +184,7 @@ it('omits empty recent and palette sections from the expanded body', async () =>
   expect(document.body.textContent).not.toContain('shared.ui.colorSelectorPalette');
 });
 
-it('commits swatch picks immediately from the expanded recent and palette rows', async () => {
+it('commits a recent swatch only after applying the picker', async () => {
   const onChange = vi.fn();
   renderSelector({ onChange });
 
@@ -176,6 +197,8 @@ it('commits swatch picks immediately from the expanded recent and palette rows',
     )?.click();
   });
 
+  expect(onChange).not.toHaveBeenCalled();
+  await clickButton('shared.ui.colorSelectorApply');
   expect(onChange).toHaveBeenCalledWith('#111111');
 });
 
@@ -196,7 +219,8 @@ it('restores recent RGBA and preserves current alpha when choosing a palette col
       ) as HTMLButtonElement | undefined
     )?.click();
   });
-  expect(onChange).toHaveBeenLastCalledWith('#11111180');
+  expect(onChange).not.toHaveBeenCalled();
+  expect(container?.textContent).toContain('#11111180');
 
   await act(async () => {
     (
@@ -205,6 +229,7 @@ it('restores recent RGBA and preserves current alpha when choosing a palette col
       ) as HTMLButtonElement | undefined
     )?.click();
   });
+  await clickButton('shared.ui.colorSelectorApply');
   expect(onChange).toHaveBeenLastCalledWith('#abcdef80');
 });
 
@@ -221,6 +246,8 @@ it('preserves stored palette alpha instead of replacing it with the current alph
     )?.click();
   });
 
+  expect(onChange).not.toHaveBeenCalled();
+  await clickButton('shared.ui.colorSelectorApply');
   expect(onChange).toHaveBeenCalledWith('#abcdef80');
 });
 
@@ -237,6 +264,8 @@ it('does not inherit zero alpha from the semantic transparent value for palette 
     )?.click();
   });
 
+  expect(onChange).not.toHaveBeenCalled();
+  await clickButton('shared.ui.colorSelectorApply');
   expect(onChange).toHaveBeenCalledWith('#abcdef');
 });
 
@@ -291,6 +320,21 @@ it('rolls preview back to the committed value when the picker closes without app
   expect(document.body.textContent).not.toContain('#ABCDEF');
 });
 
+it('returns focus to the color trigger after Apply and Cancel', async () => {
+  renderSelector();
+  const trigger = getButton('shared.ui.colorSelectorChooseColor');
+  expect(trigger).toBeDefined();
+
+  for (const action of ['shared.ui.colorSelectorCancel', 'shared.ui.colorSelectorApply']) {
+    await openPicker();
+    const input = getTextInput('shared.ui.colorSelectorHex');
+    input?.focus();
+    expect(document.activeElement).toBe(input);
+    await clickButton(action);
+    expect(document.activeElement).toBe(trigger);
+  }
+});
+
 it('renders the translated transparent value in the picker trigger', () => {
   renderSelector({ value: 'transparent' });
 
@@ -314,7 +358,7 @@ it('previews transparent from the picker toolbar and commits it only on apply', 
   expect(onChange).toHaveBeenCalledWith('transparent');
 });
 
-it('opens the picker from the color trigger and the palette after the picker is closed', async () => {
+it('reopens the picker with its palette after cancellation', async () => {
   renderSelector();
 
   await openPicker();
@@ -322,8 +366,10 @@ it('opens the picker from the color trigger and the palette after the picker is 
 
   await clickButton('shared.ui.colorSelectorCancel');
   await openPalette();
-  expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
-  expect(getButton('shared.ui.colorSelectorApply')).toBeUndefined();
+  expect(
+    document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')
+  ).not.toBeNull();
+  expect(getButton('shared.ui.colorSelectorApply')).toBeDefined();
 });
 
 it('closes the expanded recent-colors palette on outside click', async () => {
@@ -368,4 +414,25 @@ it('closes the picker on escape and rolls back the draft without committing it',
   expect(getButton('shared.ui.colorSelectorApply')).toBeUndefined();
   expect(onChange).not.toHaveBeenCalled();
   expect(onPreviewReset).toHaveBeenCalledWith('#123456');
+});
+
+it('keeps palette preview cancellation on the existing owner in swatch mode', async () => {
+  const onChange = vi.fn();
+  const onPreviewReset = vi.fn();
+  renderSelector({ triggerVariant: 'swatch', floatingPlacement: 'side', onChange, onPreviewReset });
+  const picker = getButton('shared.ui.colorSelectorChooseColor')!;
+  await act(async () => {
+    picker.focus();
+    picker.click();
+  });
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('button[title="Grid color: #abcdef"]')!.click()
+  );
+  expect(onChange).not.toHaveBeenCalled();
+  await act(async () =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
+  expect(onPreviewReset).toHaveBeenCalledWith('#123456');
+  expect(document.activeElement).toBe(picker);
 });

@@ -1,158 +1,160 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, type PointerEvent, type KeyboardEvent } from 'react';
+import { useCapturedPreview } from './captured-preview';
 import { translate } from '../../platform/i18n';
 import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
 import type { QuickEditSpotlight } from '../../features/video/review/advanced/types';
+import {
+  ReviewFocusFrame,
+  focusCorner,
+  useFocusFrameHover,
+  type FocusCorner,
+} from './focus-area-frame';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
-/** Shared area manipulation for the stage and the inspector; one commit per captured gesture. */
-export function ReviewFocusArea(props: {
+type FocusAreaProps = {
   spotlight: QuickEditSpotlight;
   output: { width: number; height: number };
   video: QuickEditRect;
   disabled?: boolean;
+  /** Inspector framing stays visible; the stage retains interaction-only controls. */
+  alwaysVisible?: boolean;
   onInteract?(): void;
   onPreview?: ((value: QuickEditSpotlight | null) => void) | undefined;
   onChange(value: QuickEditSpotlight): void;
-}) {
-  const { onPreview } = props;
-  const host = useRef<HTMLDivElement>(null);
-  const drag = useRef<{
-    id: number;
-    x: number;
-    y: number;
-    resize: boolean;
-    area: QuickEditSpotlight['area'];
-    pending: QuickEditSpotlight['area'] | null;
-  } | null>(null);
-  const [draft, setDraft] = useState<QuickEditSpotlight['area'] | null>(null);
-  const value = { ...props.spotlight, area: draft ?? props.spotlight.area };
-  const opening = areaRect(value.area, props.video);
-  const preview = useRef(onPreview);
-  useEffect(() => {
-    preview.current = onPreview;
-  });
-  useEffect(
-    () => () => {
-      if (drag.current) preview.current?.(null);
-    },
-    []
-  );
-  const cancel = useCallback(() => {
-    if (drag.current) onPreview?.(null);
-    drag.current = null;
-    setDraft(null);
-  }, [onPreview]);
-  useEffect(() => {
-    if (props.disabled) cancel();
-  }, [props.disabled, cancel]);
+};
+/** Shared source area view; stage and inspector use one Spotlight gesture owner. */
+export function ReviewFocusArea(props: FocusAreaProps) {
+  const gesture = useSpotlightAreaGesture(props);
   return (
     <div
-      ref={host}
+      ref={gesture.host}
       className="pointer-events-none absolute inset-0 z-10"
       data-ui="gallery.videoReview.focusArea"
       style={{ touchAction: 'none' }}
-      onPointerMove={(event) => {
-        const active = drag.current;
-        const bounds = host.current?.getBoundingClientRect();
-        if (!active || active.id !== event.pointerId || !bounds) return;
-        const dx =
-          ((event.clientX - active.x) * props.output.width) / bounds.width / props.video.width;
-        const dy =
-          ((event.clientY - active.y) * props.output.height) / bounds.height / props.video.height;
-        const area = clampQuickEditSpotlightArea(
-          active.resize
-            ? {
-                ...active.area,
-                width: Math.min(1 - active.area.x, active.area.width + dx),
-                height: Math.min(1 - active.area.y, active.area.height + dy),
-              }
-            : { ...active.area, x: active.area.x + dx, y: active.area.y + dy }
-        );
-        drag.current!.pending = area;
-        setDraft(area);
-        onPreview?.({ ...props.spotlight, area });
-      }}
-      onPointerUp={(event) => {
-        if (drag.current?.id !== event.pointerId) return;
-        if (drag.current.pending)
-          props.onChange({ ...props.spotlight, area: drag.current.pending });
-        cancel();
-        if (event.currentTarget.hasPointerCapture(event.pointerId))
-          event.currentTarget.releasePointerCapture(event.pointerId);
-      }}
-      onPointerCancel={cancel}
-      onLostPointerCapture={cancel}
+      {...gesture.planeHandlers}
     >
-      <div
+      <ReviewFocusFrame
+        frameRef={gesture.frame}
+        area={areaRect(gesture.area, props.video)}
+        output={props.output}
+        borderWidth={1}
+        visible={props.alwaysVisible || gesture.visible}
+        pointerInteraction={gesture.pointerInteraction}
         role="group"
         tabIndex={props.disabled ? -1 : 0}
         aria-label={translate('gallery.videoReview.focusSpotlight')}
         title={translate('gallery.videoReview.focusAreaHint')}
-        className="pointer-events-auto absolute cursor-move border border-[var(--sniptale-color-accent)] outline-none
-        focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]"
-        style={{
-          left: `${(opening.x / props.output.width) * 100}%`,
-          top: `${(opening.y / props.output.height) * 100}%`,
-          width: `${(opening.width / props.output.width) * 100}%`,
-          height: `${(opening.height / props.output.height) * 100}%`,
-        }}
-        onPointerDown={(event) => {
-          if (props.disabled || drag.current || event.button !== 0) return;
-          event.preventDefault();
-          event.stopPropagation();
-          event.currentTarget.focus();
-          props.onInteract?.();
-          drag.current = {
-            id: event.pointerId,
-            x: event.clientX,
-            y: event.clientY,
-            area: props.spotlight.area,
-            pending: null,
-            resize: event.target instanceof Element && !!event.target.closest('[data-resize]'),
-          };
-          host.current?.setPointerCapture(event.pointerId);
-          onPreview?.(props.spotlight);
-        }}
-        onBlur={cancel}
-        onKeyDown={(event) => {
-          if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            cancel();
-            return;
-          }
-          if (
-            props.disabled ||
-            !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)
-          )
-            return;
-          event.preventDefault();
-          event.stopPropagation();
-          if (drag.current) return;
-          props.onInteract?.();
-          const step = event.shiftKey ? 0.1 : 0.01;
-          props.onChange({
-            ...props.spotlight,
-            area: clampQuickEditSpotlightArea({
-              ...value.area,
-              x:
-                value.area.x +
-                (event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0),
-              y:
-                value.area.y +
-                (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0),
-            }),
-          });
-        }}
-      >
-        <span
-          data-resize
-          className="absolute -bottom-1 -right-1 h-3 w-3 cursor-se-resize rounded-sm
-        border border-white bg-[var(--sniptale-color-accent)]"
-        />
-      </div>
+        {...gesture.frameHandlers}
+      />
     </div>
   );
+}
+
+type SpotlightCapture = {
+  id: number;
+  x: number;
+  y: number;
+  resize: FocusCorner | null;
+  node: HTMLElement;
+  width: number;
+  height: number;
+  area: QuickEditSpotlight['area'];
+  pending: QuickEditSpotlight['area'] | null;
+};
+
+/** Captured source geometry, preview and commit/cancel stay in this single transient owner. */
+function useSpotlightAreaGesture(props: FocusAreaProps) {
+  const { onPreview } = props;
+  const { frame, hovered, trackPointer, pointerInteraction, keyboardInteraction } =
+    useFocusFrameHover();
+  const host = useRef<HTMLDivElement>(null);
+  const { drag, draft, setDraft, cancel } = useCapturedPreview<
+    SpotlightCapture,
+    QuickEditSpotlight['area']
+  >(props.disabled, () => onPreview?.(null));
+  const value = { ...props.spotlight, area: draft ?? props.spotlight.area };
+  const onPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    trackPointer(event);
+    const active = drag.current;
+    if (!active || active.id !== event.pointerId) return;
+    const dx = (event.clientX - active.x) / active.width;
+    const dy = (event.clientY - active.y) / active.height;
+    const area = clampQuickEditSpotlightArea(
+      active.resize
+        ? resizeSpotlightArea(active.area, active.resize, dx, dy)
+        : { ...active.area, x: active.area.x + dx, y: active.area.y + dy }
+    );
+    drag.current!.pending = area;
+    setDraft(area);
+    onPreview?.({ ...props.spotlight, area });
+  };
+  const onPointerUp = (event: PointerEvent<HTMLDivElement>) => {
+    trackPointer(event);
+    if (drag.current?.id !== event.pointerId) return;
+    if (drag.current.pending) props.onChange({ ...props.spotlight, area: drag.current.pending });
+    cancel();
+  };
+  const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
+    if (props.disabled || drag.current || event.button !== 0) return;
+    const bounds = host.current?.getBoundingClientRect();
+    if (!host.current || !bounds || !(bounds.width > 0 && bounds.height > 0)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.focus();
+    trackPointer(event);
+    props.onInteract?.();
+    drag.current = {
+      id: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      area: props.spotlight.area,
+      pending: null,
+      resize: focusCorner(event.target),
+      node: host.current,
+      width: (bounds.width * props.video.width) / props.output.width,
+      height: (bounds.height * props.video.height) / props.output.height,
+    };
+    setDraft(props.spotlight.area);
+    host.current.setPointerCapture(event.pointerId);
+    onPreview?.(props.spotlight);
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      cancel();
+      return;
+    }
+    const area = moveSpotlightWithKey(value.area, event.key, event.shiftKey);
+    if (props.disabled || !area) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (drag.current) return;
+    keyboardInteraction();
+    props.onInteract?.();
+    props.onChange({ ...props.spotlight, area });
+  };
+  return {
+    host,
+    frame,
+    area: value.area,
+    visible: hovered || !!draft,
+    pointerInteraction,
+    planeHandlers: {
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel: cancel,
+      onLostPointerCapture: cancel,
+    },
+    frameHandlers: {
+      onPointerDown,
+      onKeyDown,
+      onBlur: cancel,
+      onFocus: keyboardInteraction,
+      onPointerEnter: trackPointer,
+      onPointerLeave: trackPointer,
+    },
+  };
 }
 
 function areaRect(area: QuickEditSpotlight['area'], video: QuickEditRect) {
@@ -162,4 +164,36 @@ function areaRect(area: QuickEditSpotlight['area'], video: QuickEditRect) {
     width: area.width * video.width,
     height: area.height * video.height,
   };
+}
+
+/** Opposite edges stay fixed; clamp the moving edge before deriving size. */
+function resizeSpotlightArea(
+  area: QuickEditSpotlight['area'],
+  corner: FocusCorner,
+  dx: number,
+  dy: number
+) {
+  const west = corner.endsWith('w'),
+    north = corner.startsWith('n');
+  const right = area.x + area.width,
+    bottom = area.y + area.height;
+  const x = west ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
+  const y = north ? Math.max(0, Math.min(bottom - 0.01, area.y + dy)) : area.y;
+  return {
+    x,
+    y,
+    width: west ? right - x : Math.max(0.01, Math.min(1, right + dx) - x),
+    height: north ? bottom - y : Math.max(0.01, Math.min(1, bottom + dy) - y),
+  };
+}
+
+/** Keyboard source movement uses the same area bounds as pointer movement. */
+function moveSpotlightWithKey(area: QuickEditSpotlight['area'], key: string, shift: boolean) {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) return null;
+  const step = shift ? 0.1 : 0.01;
+  return clampQuickEditSpotlightArea({
+    ...area,
+    x: area.x + (key === 'ArrowLeft' ? -step : key === 'ArrowRight' ? step : 0),
+    y: area.y + (key === 'ArrowUp' ? -step : key === 'ArrowDown' ? step : 0),
+  });
 }

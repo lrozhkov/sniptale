@@ -10,7 +10,7 @@ export const videoEditorSidebarSelectionStyleMessages = defineMessageSource({
     en: 'Size',
   },
   textPaddingLabel: {
-    ru: 'Паддинг',
+    ru: 'Внутренний отступ',
     en: 'Padding',
   },
   textWeightLabel: {

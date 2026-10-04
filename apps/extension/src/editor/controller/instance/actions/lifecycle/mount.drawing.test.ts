@@ -11,6 +11,8 @@ it('configures canonical drawing selection and transform modifiers', () => {
   expect(canvas.uniScaleKey).toBe('shiftKey');
   expect(canvas.centeredKey).toBe('ctrlKey');
   expect(canvas.enablePointerEvents).toBe(true);
+  expect(canvas.fireMiddleClick).toBe(false);
+  expect(canvas.targetFindTolerance).toBe(5);
   expect(canvas.upperCanvasEl.draggable).toBe(false);
 
   canvas.dispose();

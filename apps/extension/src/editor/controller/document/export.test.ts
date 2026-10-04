@@ -8,6 +8,12 @@ import {
   renderEditorCanvasToDataUrl,
 } from './export';
 import { createFabricCanvasFixture } from '../../testing/fabric-canvas.test-support';
+import { Canvas } from 'fabric';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
+import {
+  getEditorWorkspaceMargin,
+  setEditorEditingSurfaceDimensions,
+} from '../../document/canvas-surface/editing-surface';
 
 const writeMock = vi.fn();
 
@@ -113,10 +119,10 @@ function expectBuiltEditorDocument(document: ReturnType<typeof buildEditorCanvas
       backgroundGradientFrom: '#7c2d12',
       backgroundGradientTo: '#f59e0b',
       backgroundMode: 'gradient',
-      paddingBottom: 128,
-      paddingLeft: 128,
+      paddingBottom: 32,
+      paddingLeft: 32,
       paddingTop: 12,
-      paddingRight: 128,
+      paddingRight: 32,
     }),
     sourceImageData: 'data:image/png;base64,source',
     sourceName: 'source.png',
@@ -214,6 +220,37 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(() => renderEditorCanvasToDataUrl(null, { format: 'png', quality: 100 })).toThrow();
   });
 
+  it('omits crop guides from the rendered image and restores their visibility', () => {
+    const canvas = createExportCanvas();
+    const cropGuide = { sniptaleRole: 'crop-guide', visible: true };
+    const shape = { sniptaleRole: 'drawing', visible: true };
+    canvas.getObjects.mockReturnValue([cropGuide, shape] as never);
+    canvas.toCanvasElement.mockImplementation(() => {
+      expect(cropGuide.visible).toBe(false);
+      expect(shape.visible).toBe(true);
+      return canvas.renderedCanvas;
+    });
+
+    renderEditorCanvasToDataUrl(canvas as never, { format: 'png', quality: 100 });
+
+    expect(cropGuide.visible).toBe(true);
+  });
+
+  it('restores crop guides when raster rendering fails', () => {
+    const canvas = createExportCanvas();
+    const cropGuide = { sniptaleRole: 'crop-guide', visible: true };
+    canvas.getObjects.mockReturnValue([cropGuide] as never);
+    canvas.toCanvasElement.mockImplementation(() => {
+      expect(cropGuide.visible).toBe(false);
+      throw new Error('allocation failed');
+    });
+
+    expect(() =>
+      renderEditorCanvasToDataUrl(canvas as never, { format: 'png', quality: 100 })
+    ).toThrow('allocation failed');
+    expect(cropGuide.visible).toBe(true);
+  });
+
   it('renders without finalizing the active pointer transform', () => {
     const canvas = createExportCanvas();
     const currentTransform = canvas._currentTransform;
@@ -234,6 +271,49 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(canvas.toCanvasElement).toHaveBeenCalledWith(1);
     expect(canvas.toDataUrlMock).toHaveBeenCalledWith('image/jpeg', 0.75);
     expect(canvas.setActiveObject).not.toHaveBeenCalled();
+  });
+
+  it('exports the image rectangle with an adaptive workspace margin', () => {
+    const canvas = new Canvas(document.createElement('canvas'));
+    const documentSize = { width: 4000, height: 3000 };
+    setEditorEditingSurfaceDimensions(canvas, documentSize);
+    const output = document.createElement('canvas');
+    output.toDataURL = vi.fn(() => 'data:image/png;base64,cropped');
+    const render = vi.spyOn(canvas, 'toCanvasElement').mockReturnValue(output);
+
+    expect(renderEditorCanvasToDataUrl(canvas, { format: 'png', quality: 1 })).toBe(
+      'data:image/png;base64,cropped'
+    );
+    expect(render).toHaveBeenCalledWith(1, {
+      left: getEditorWorkspaceMargin(documentSize),
+      top: getEditorWorkspaceMargin(documentSize),
+      width: documentSize.width,
+      height: documentSize.height,
+    });
+  });
+
+  it('renders a bounded virtual canvas directly at the requested preview scale', () => {
+    const element = document.createElement('canvas');
+    const surface = document.createElement('div');
+    const viewport = document.createElement('div');
+    surface.append(element);
+    const canvas = new EditorCanvas(element);
+    canvas.setRenderViewport(viewport, document.createElement('div'));
+    setEditorEditingSurfaceDimensions(canvas, { width: 8000, height: 7000 });
+    const output = document.createElement('canvas');
+    output.width = 2048;
+    output.height = 1792;
+    output.toDataURL = vi.fn(() => 'data:image/png;base64,preview');
+    const render = vi.spyOn(canvas, 'renderDocumentCanvas').mockReturnValue(output);
+
+    expect(
+      renderEditorCanvasToDataUrl(canvas, {
+        format: 'png',
+        quality: 1,
+        outputSize: { width: 2048, height: 1792 },
+      })
+    ).toBe('data:image/png;base64,preview');
+    expect(render).toHaveBeenCalledWith(2048 / 8000);
   });
 
   it('resamples the rendered image to an explicit output size', () => {
@@ -271,4 +351,12 @@ describe('renderEditorCanvasToDataUrl', () => {
     expect(canvas._currentTransform).toBe(currentTransform);
     expect(canvas.renderAll).not.toHaveBeenCalled();
   });
+});
+
+it('serializes the editable caption separately from the source name', () => {
+  const { options } = createEditorCanvasDocumentOptions();
+  const before = buildEditorCanvasDocument(options);
+  const renamed = buildEditorCanvasDocument({ ...options, displayName: 'Renamed image' });
+  expect(renamed).toEqual({ ...before, displayName: 'Renamed image' });
+  expect(renamed.sourceName).toBe(before.sourceName);
 });

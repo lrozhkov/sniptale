@@ -22,6 +22,6 @@ function applyOffscreenDocumentMetadata(): void {
 }
 
 applyOffscreenDocumentMetadata();
-bootstrapOffscreenDocument();
 registerOffscreenRuntimeMessageListener();
 registerOffscreenVoiceInputMessageListener();
+bootstrapOffscreenDocument();

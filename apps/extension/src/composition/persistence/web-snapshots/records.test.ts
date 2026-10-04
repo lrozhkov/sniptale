@@ -5,6 +5,7 @@ import { WEB_SNAPSHOT_PACKAGE_PATHS } from '../../../features/web-snapshot/manif
 import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
 
 const mocks = vi.hoisted(() => ({
+  loadSettings: vi.fn(),
   createJournal: vi.fn(),
   discardPreparedAsset: vi.fn(),
   publishJournal: vi.fn(),
@@ -12,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   recover: vi.fn(),
   writeBlobToAsset: vi.fn(),
   validateScreenshot: vi.fn(),
+}));
+
+vi.mock('../settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../settings')>()),
+  loadSettings: mocks.loadSettings,
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -37,6 +43,7 @@ vi.mock('../../../features/web-snapshot/screenshot-validation', async (importOri
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.loadSettings.mockResolvedValue({ localStoragePolicy: { defaultDestination: 'temporary' } });
   vi.stubGlobal('crypto', { randomUUID: () => 'snapshot-1' });
   mocks.recover.mockResolvedValue(0);
   mocks.discardPreparedAsset.mockResolvedValue(undefined);
@@ -222,3 +229,67 @@ async function createPackageBlob(manifest: WebSnapshotManifest): Promise<Blob> {
 function createManifest(): WebSnapshotManifest {
   return createPagePackageManifestFixture();
 }
+
+it.each(['temporary', 'library'] as const)(
+  'persists the selected web snapshot category in its publication journal: %s',
+  async (webSnapshotDestination) => {
+    mocks.loadSettings.mockResolvedValue({
+      localStoragePolicy: { defaultDestination: 'temporary', webSnapshotDestination },
+    });
+    const { saveWebSnapshotMediaAsset } = await import('./records');
+    await saveWebSnapshotMediaAsset({
+      filename: 'snapshot.zip',
+      manifest: createManifest(),
+      packageBlob: await createPackageBlob(createManifest()),
+      screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    });
+    expect(mocks.createJournal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          mediaEntry: expect.objectContaining({
+            lifecycle: expect.objectContaining({ storageClass: webSnapshotDestination }),
+          }),
+        }),
+      })
+    );
+  }
+);
+
+it('does not stage new objects when storage policy cannot be loaded', async () => {
+  mocks.loadSettings.mockRejectedValueOnce(new Error('policy unavailable'));
+  const { saveWebSnapshotMediaAsset } = await import('./records');
+  await expect(
+    saveWebSnapshotMediaAsset({
+      filename: 'snapshot.zip',
+      manifest: createManifest(),
+      packageBlob: await createPackageBlob(createManifest()),
+      screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    })
+  ).rejects.toThrow('policy unavailable');
+  expect(mocks.writeBlobToAsset).not.toHaveBeenCalled();
+  expect(mocks.createJournal).not.toHaveBeenCalled();
+});
+
+it('keeps an explicit Library import permanent when web captures default to drafts', async () => {
+  mocks.loadSettings.mockResolvedValue({
+    localStoragePolicy: { defaultDestination: 'temporary', webSnapshotDestination: 'temporary' },
+  });
+  const { saveWebSnapshotMediaAsset } = await import('./records');
+  const input = {
+    filename: 'snapshot.zip',
+    manifest: createManifest(),
+    packageBlob: await createPackageBlob(createManifest()),
+    screenshotBlob: new Blob(['png'], { type: 'image/png' }),
+    storageClass: 'library' as const,
+  };
+  await saveWebSnapshotMediaAsset(input);
+  expect(mocks.createJournal).toHaveBeenCalledWith(
+    expect.objectContaining({
+      payload: expect.objectContaining({
+        mediaEntry: expect.objectContaining({
+          lifecycle: expect.objectContaining({ storageClass: 'library' }),
+        }),
+      }),
+    })
+  );
+});

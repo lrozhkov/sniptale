@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createEditorSessionAutosaveService } from '../document/session-autosave';
+import { saveStaleEditorImageCopy } from './save-stale-image-copy';
+import { useEditorStore } from '../state/useEditorStore';
 import { createEditorDocumentFixture } from '../document/page-session/document.test-support';
 
 const mocks = vi.hoisted(() => ({
@@ -39,13 +42,16 @@ vi.mock('../document/page-session', async (importOriginal) => ({
   replaceEditorPageAggregateId: mocks.replaceAggregateId,
 }));
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.useFakeTimers();
+});
 
 afterEach(async () => {
-  const { useEditorStore } = await import('../state/useEditorStore');
   useEditorStore.getState().setSaveErrorMessage(null);
   useEditorStore.getState().setSaveState('idle');
   useEditorStore.getState().setSessionId(null);
+  vi.useRealTimers();
 });
 
 it('keeps restored file URLs alive after save-as-copy and through the next autosave', async () => {
@@ -72,9 +78,8 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
     return { aggregateId: input.aggregateId, revision: input.expectedRevision + 1 };
   });
 
-  const { createEditorSessionAutosaveService } = await import('../document/session-autosave');
-  const { saveStaleEditorImageCopy } = await import('./save-stale-image-copy');
   const autosaveService = createEditorSessionAutosaveService();
+  const renderForExport = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
   await autosaveService.restoreDraft('image-original');
 
   await expect(
@@ -82,7 +87,7 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
       autosaveService,
       controller: {
         exportDocument: vi.fn(() => document),
-        renderForExport: vi.fn(async () => 'data:image/png;base64,cHJldmlldw=='),
+        renderForExport,
       },
       isSourceActive: () => true,
       pageTitle: 'Copy',
@@ -91,8 +96,15 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
   ).resolves.toBe('saved');
 
   expect(mocks.replaceAggregateId).toHaveBeenCalledWith('image-copy');
+  expect(renderForExport).toHaveBeenCalledWith({ format: 'png', quality: 1 });
   expect(releaseDocumentAssets).not.toHaveBeenCalled();
   await expect(autosaveService.persistSnapshot(() => document)).resolves.toBeUndefined();
+  await vi.advanceTimersByTimeAsync(3_001);
+  expect(renderForExport).toHaveBeenCalledTimes(2);
+  expect(renderForExport).toHaveBeenLastCalledWith(
+    { format: 'png', quality: 1, signal: expect.any(AbortSignal) },
+    'committed'
+  );
   expect(mocks.commitWorkspace).toHaveBeenCalledWith(
     expect.objectContaining({ aggregateId: 'image-copy', document })
   );

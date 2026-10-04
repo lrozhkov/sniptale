@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { GalleryKeyboardHelp } from './keyboard-help';
+import type { GalleryDeletionOpening } from '../deletion/types';
+import { useEffect, useRef, useState, type RefObject, type MouseEventHandler } from 'react';
 import {
   AlignJustify,
   Download,
@@ -6,8 +8,8 @@ import {
   Globe2,
   HardDrive,
   Images,
+  Library,
   LayoutGrid,
-  Search,
   Settings2,
   ShieldAlert,
   Trash2,
@@ -21,7 +23,12 @@ import { INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS } from '@sniptale/ui/inspector-she
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import type { GalleryViewMode } from '../types';
 import type { GalleryMainContentProps } from './types';
-import { GallerySelectionBar } from './selection-bar';
+import {
+  GalleryFoundResultsBar,
+  GallerySelectionBar,
+  type GalleryFoundResultsProps,
+} from './selection-bar';
+import { GalleryHeaderSearchField, type GallerySearchNavigation } from './header-search';
 
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -41,7 +48,7 @@ interface GalleryHeaderStorageProps {
   mediaImportTriggerRef: RefObject<HTMLButtonElement | null>;
   webSnapshotImportTriggerRef?: RefObject<HTMLButtonElement | null>;
   isBusy: boolean;
-  onDeleteAll: () => void;
+  onDeleteAll: (opening?: GalleryDeletionOpening) => void;
   onExportBackup: () => void;
   onImportBackupClick: () => void;
   onImportMediaClick: () => void;
@@ -55,7 +62,7 @@ function GalleryStorageMenuAction(props: {
   disabled: boolean;
   icon: typeof Download;
   label: string;
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
 }) {
   const Icon = props.icon;
 
@@ -173,7 +180,8 @@ function GalleryStorageMenu(
       aria-label={translate('gallery.app.storageTools')}
       data-ui="gallery.header.storage-menu"
       className="absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-[10px] border
-        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]
+        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-canvas)]
+        bg-[linear-gradient(var(--sniptale-color-surface-panel),var(--sniptale-color-surface-panel))]
         p-2 shadow-xl"
     >
       <GalleryStorageSummary {...props.presentation} />
@@ -225,7 +233,14 @@ function GalleryStorageMenu(
           disabled={props.isBusy}
           icon={Trash2}
           label={translate('gallery.app.deleteAll')}
-          onClick={() => props.closeAndRun(props.onDeleteAll)}
+          onClick={(event) => {
+            const anchor =
+              event.currentTarget
+                .closest('[data-ui="gallery.header.storage"]')
+                ?.querySelector<HTMLButtonElement>('button') ?? null;
+            const keyboard = event.detail === 0;
+            props.closeAndRun(() => props.onDeleteAll({ anchor, keyboard }));
+          }}
         />
       </div>
       {props.isBusy ? (
@@ -308,50 +323,16 @@ function GalleryHeaderStorage(props: GalleryHeaderStorageProps) {
   );
 }
 
-function GalleryHeaderSearchField(props: {
-  folderFilter: GalleryMainContentProps['folderFilter'];
-  search: string;
-  onSearchChange: GalleryMainContentProps['onSearchChange'];
-}) {
-  return (
-    <label
-      className="flex min-w-0 items-center gap-2.5 border
-        border-[var(--sniptale-color-border-soft)]
-        bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_78%,transparent)]
-        h-8 w-36 shrink-0 rounded-[8px] px-2.5
-        transition-[width,border-color,background-color] duration-200 ease-out
-        focus-within:w-48 focus-within:border-[var(--sniptale-color-border-accent-strong)]
-        motion-reduce:transition-none"
-      data-ui="gallery.header.search"
-    >
-      <Search className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]" />
-      <input
-        aria-label={translate('gallery.app.searchLabel')}
-        value={props.search}
-        onChange={(event) => props.onSearchChange(event.target.value)}
-        placeholder={
-          props.folderFilter === 'scenario'
-            ? translate('gallery.app.scenarioSearchPlaceholder')
-            : translate('gallery.app.searchPlaceholder')
-        }
-        className="w-full bg-transparent text-sm text-[var(--sniptale-color-text-primary)]
-          outline-none placeholder:text-[var(--sniptale-color-text-muted)]
-          focus:placeholder:text-transparent"
-      />
-    </label>
-  );
-}
-
 function GalleryHeaderSortControl(
   props: Pick<GalleryMainContentProps, 'folderFilter' | 'onSortModeChange' | 'sortMode'>
 ) {
   return (
-    <ProductSelect
+    <ProductSelect<GalleryMainContentProps['sortMode']>
       aria-label={translate('gallery.app.sortLabel')}
       value={props.sortMode}
-      onChange={(value) => props.onSortModeChange(value as typeof props.sortMode)}
+      onChange={props.onSortModeChange}
       controlSize="sm"
-      containerClassName="w-[9.5rem] shrink-0"
+      containerClassName="w-[10.5rem] shrink-0"
       className="!h-8 !min-h-8 w-full"
       options={[
         { value: 'newest', label: translate('gallery.app.sortNewest') },
@@ -360,7 +341,8 @@ function GalleryHeaderSortControl(
         { value: 'name-desc', label: translate('gallery.app.sortNameDesc') },
         ...(props.folderFilter === 'scenario'
           ? []
-          : [{ value: 'size-desc', label: translate('gallery.app.sortSizeDesc') }]),
+          : [{ value: 'size-desc' as const, label: translate('gallery.app.sortSizeDesc') }]),
+        { value: 'recently-modified', label: translate('gallery.app.sortRecentlyModified') },
       ]}
     />
   );
@@ -370,7 +352,7 @@ function GalleryViewModeButton(props: {
   active: boolean;
   icon: typeof AlignJustify;
   label: string;
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
 }) {
   const Icon = props.icon;
 
@@ -458,9 +440,14 @@ function GalleryHeaderControls(
     | 'onViewModeChange'
     | 'search'
     | 'sortMode'
+    | 'trashMode'
     | 'viewMode'
   > &
-    GalleryHeaderStorageProps & { stackWhenNarrow: boolean }
+    GalleryHeaderStorageProps & {
+      onSearchCommit: (value: string) => void;
+      searchNavigation?: GallerySearchNavigation;
+      stackWhenNarrow: boolean;
+    }
 ) {
   return (
     <div
@@ -472,17 +459,21 @@ function GalleryHeaderControls(
       data-ui="gallery.header.controls"
     >
       <GalleryHeaderSearchField
+        {...(props.searchNavigation ? { searchNavigation: props.searchNavigation } : {})}
         folderFilter={props.folderFilter}
+        trashMode={Boolean(props.trashMode)}
         search={props.search}
         onSearchChange={props.onSearchChange}
+        onSearchCommit={props.onSearchCommit}
       />
       <GalleryHeaderSortControl
-        folderFilter={props.folderFilter}
+        folderFilter={props.trashMode ? 'all' : props.folderFilter}
         sortMode={props.sortMode}
         onSortModeChange={props.onSortModeChange}
       />
       <GalleryViewModeToggle viewMode={props.viewMode} onViewModeChange={props.onViewModeChange} />
-      <GalleryHeaderStorage {...props} />
+      {!props.trashMode ? <GalleryHeaderStorage {...props} /> : null}
+      <GalleryKeyboardHelp />
     </div>
   );
 }
@@ -535,11 +526,17 @@ export function GalleryHeader(
     | 'selectedSize'
     | 'selectionTagDraft'
     | 'sortMode'
+    | 'trashMode'
     | 'viewMode'
   > &
-    GalleryHeaderStorageProps
+    GalleryHeaderStorageProps & {
+      onSearchCommit: (value: string) => void;
+      searchNavigation?: GallerySearchNavigation;
+      resultActions: GalleryFoundResultsProps & { visible: boolean };
+    }
 ) {
-  const hasSelection = props.selectedItems.length > 0;
+  const hasSelection = !props.trashMode && props.selectedItems.length > 0;
+  const hasWorkspaceActions = hasSelection || (!props.trashMode && props.resultActions.visible);
 
   return (
     <header
@@ -547,7 +544,7 @@ export function GalleryHeader(
         'relative z-30 flex h-12 min-h-12 shrink-0 items-center gap-4',
         'rounded-[var(--sniptale-radius-lg)] border py-1.5',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)] shadow-sm',
-        hasSelection && 'max-2xl:h-[5.25rem] max-2xl:min-h-[5.25rem]'
+        hasWorkspaceActions && 'max-2xl:h-[5.25rem] max-2xl:min-h-[5.25rem]'
       )}
     >
       <div
@@ -559,30 +556,40 @@ export function GalleryHeader(
       >
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="text-[var(--sniptale-color-accent-emphasis)]">
-            <Images className="h-[22px] w-[22px]" aria-hidden="true" />
+            {props.trashMode ? (
+              <Trash2 className="h-[22px] w-[22px]" aria-hidden="true" />
+            ) : (
+              <Library className="h-[22px] w-[22px]" aria-hidden="true" />
+            )}
           </span>
           <h1 className="truncate text-base font-semibold text-[var(--sniptale-color-text-primary)]">
-            {translate('gallery.app.title')}
+            {translate(props.trashMode ? 'gallery.app.trashTitle' : 'gallery.app.title')}
           </h1>
         </div>
       </div>
       <div
         className={cx(
           'flex min-w-0 flex-1 flex-nowrap items-center gap-2 pr-3',
-          hasSelection &&
+          hasWorkspaceActions &&
             'max-2xl:grid max-2xl:h-full max-2xl:grid-cols-1 max-2xl:grid-rows-[2rem_2rem] max-2xl:gap-y-2'
         )}
         data-ui="gallery.header.workspace"
       >
-        <div
-          className={cx(
-            'min-w-0 flex-1',
-            hasSelection && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
-          )}
-        >
-          <GallerySelectionBar {...props} />
-        </div>
-        <GalleryHeaderControls {...props} stackWhenNarrow={hasSelection} />
+        {!props.trashMode ? (
+          <div
+            className={cx(
+              'min-w-0 flex-1',
+              hasWorkspaceActions && 'overflow-visible max-2xl:row-start-2 max-2xl:w-full'
+            )}
+          >
+            {hasSelection ? (
+              <GallerySelectionBar {...props} />
+            ) : props.resultActions.visible ? (
+              <GalleryFoundResultsBar {...props.resultActions} />
+            ) : null}
+          </div>
+        ) : null}
+        <GalleryHeaderControls {...props} stackWhenNarrow={hasWorkspaceActions} />
       </div>
     </header>
   );

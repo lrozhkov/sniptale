@@ -10,11 +10,19 @@ function InspectorActions({ children }: { children: ReactNode }) {
 
 export function InspectorActionButton({
   separated = false,
+  iconOnly = false,
   tone = 'secondary',
   ...props
-}: ProductActionButtonProps & { separated?: boolean }) {
+}: ProductActionButtonProps & { separated?: boolean; iconOnly?: boolean }) {
   const button = (
-    <ProductActionButton {...props} compact tone={tone} data-inspector-action="true" />
+    <ProductActionButton
+      {...props}
+      compact
+      tone={tone}
+      data-inspector-action="true"
+      data-inspector-icon={iconOnly || undefined}
+      data-inspector-tone={tone}
+    />
   );
   return separated ? <InspectorActions>{button}</InspectorActions> : button;
 }

@@ -1,4 +1,5 @@
 import { translate } from '../../../platform/i18n';
+import { normalizeEditorImageSettings } from '../../../features/editor/document/image-types';
 import type {
   EditorLayerEffectCategory,
   EditorRasterEffect,
@@ -17,6 +18,7 @@ import type { useEditorInspectorSidebarDerived } from './derived';
 import type { useEditorInspectorSidebarLocalState } from './local-state';
 import type { EditorInspectorRichShapeState } from '../types';
 import { closeEditorPageDocument } from '../../workflows/close-page-document';
+import { useEditorStore } from '../../state/useEditorStore';
 
 type EditorInspectorLocalState = ReturnType<typeof useEditorInspectorSidebarLocalState>;
 type EditorInspectorDerivedState = ReturnType<typeof useEditorInspectorSidebarDerived>;
@@ -114,7 +116,11 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
   const { selectLayer, setActiveTool, withHistoryMuted } = createSelectionActionHelpers(
     args.controller
   );
-  const runRasterLayerAction = createRasterLayerActionRunner(selectLayer, withHistoryMuted);
+  const runRasterLayerAction = createRasterLayerActionRunner(
+    selectLayer,
+    withHistoryMuted,
+    args.setInspector
+  );
   const openLayerEffects = createOpenLayerEffectsHandler(
     selectLayer,
     withHistoryMuted,
@@ -135,7 +141,16 @@ export function createEditorInspectorControllerActions(args: EditorInspectorCont
       DimensionInput,
       backgroundImageInputRef: args.backgroundImageInputRef,
       importSessionInputRef: args.importSessionInputRef,
-      onApplyFrame: () => args.controller.applyFrameSettings(args.frameDraft),
+      onApplyFrame: () => {
+        args.controller.applyFrameSettings({
+          ...args.frameDraft,
+          sourceImage: {
+            ...normalizeEditorImageSettings(args.frameDraft.sourceImage),
+            opacity: 1,
+          },
+        });
+        useEditorStore.getState().setFreshImageBackgroundPending(false);
+      },
       onExportSession: () => actionRailHandlers.exportSession(),
       onImportSession: () => args.importSessionInputRef.current?.click(),
       onOpenImage: () => args.openImageInputRef.current?.click(),
@@ -216,11 +231,15 @@ function createSelectionActionHelpers(controller: ReturnType<typeof useEditorCon
 
 function createRasterLayerActionRunner(
   selectLayer: ReturnType<typeof useEditorController>['selectLayer'],
-  withHistoryMuted: ReturnType<typeof useEditorController>['withHistoryMuted']
+  withHistoryMuted: ReturnType<typeof useEditorController>['withHistoryMuted'],
+  setInspector: EditorInspectorStoreSlice['setInspector']
 ) {
   return async (layerId: string, action: () => Promise<void>) => {
+    const keepParameters = useEditorStore.getState().inspector === 'layer-effects';
     withHistoryMuted(() => {
       selectLayer(layerId, { focusViewport: false });
+      // Selection enters Select mode; parameter admission keeps its current panel.
+      if (keepParameters) setInspector('layer-effects');
     });
 
     await action();

@@ -4,7 +4,13 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
+import { GuideImageFramingProvider } from './image-framing-session';
+import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { GuideImageControls } from './image-controls';
+import { GuideLayoutAssistance, useGuideImageBounds } from './layout-assistance';
+const requestResource = vi.hoisted(() => vi.fn());
+vi.mock('./resource-drawer', () => ({ useGuideResourceRequest: () => requestResource }));
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -14,6 +20,8 @@ const block = createGuideImageBlock({
 });
 const change = vi.fn();
 const close = vi.fn();
+const edit = vi.fn();
+const startFraming = vi.fn();
 let host: HTMLDivElement;
 let root: Root;
 let decoded: HTMLImageElement[];
@@ -40,37 +48,54 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(url: string | null = 'blob:image', disabled = false, image = block) {
+async function render(
+  url: string | null = 'blob:image',
+  disabled = false,
+  image = block,
+  framing = false,
+  presentation: 'all' | 'sections' = 'all'
+) {
   await act(async () =>
     root.render(
-      <GuideImageControls
-        block={image}
-        url={url}
-        disabled={disabled}
-        onChange={change}
-        onClose={close}
-        t={createTranslator('en')}
-      />
+      <GuideImageFramingProvider
+        value={
+          framing ? { block: image, display: image, change, preview: change, cancel: close } : null
+        }
+      >
+        <GuideImageControls
+          presentation={presentation}
+          onStartFraming={startFraming}
+          stepId="step"
+          onEdit={edit}
+          block={image}
+          url={url}
+          disabled={disabled}
+          onChange={change}
+          onClose={close}
+          t={createTranslator('en')}
+        />
+      </GuideImageFramingProvider>
     )
   );
 }
 async function click(name: string) {
   const button = [...host.querySelectorAll('button')].find(
-    (node) => (node.getAttribute('aria-label') ?? node.textContent) === name
+    (node) =>
+      (node.getAttribute('aria-label') ?? node.getAttribute('title') ?? node.textContent) === name
   );
   if (!button) throw new Error(`Missing ${name}`);
   await act(async () => button.click());
 }
 it('changes fit and resets the frame from the decoded image dimensions', async () => {
-  await render();
+  await render('blob:image', false, block, true);
+  await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   await click('Fill');
   expect(change.mock.calls[0]?.[0].fit).toBe('cover');
   await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
   await click('Reset frame and position');
   expect(change.mock.calls[1]?.[0].frame).toEqual({ width: 1200, height: 900 });
-  await click('Zoom 100%');
   await click('Center image');
-  expect(change).toHaveBeenCalledTimes(4);
+  expect(change).toHaveBeenCalledTimes(3);
 });
 
 it('edits bounded zoom/frame fields and keeps caption and alternative text as plain text', async () => {
@@ -90,8 +115,6 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
       field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     );
   };
-  await update('Zoom, %', '200');
-  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
   await update('Frame width', '500');
   expect(change.mock.calls.at(-1)?.[0].frame.width).toBe(500);
   await update('Frame height', '350');
@@ -100,7 +123,27 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
   expect(change.mock.calls.at(-1)?.[0].caption).toBe('<script>text</script>');
   await update('Alternative text', 'Description');
   expect(change.mock.calls.at(-1)?.[0].alt).toBe('Description');
+  expect(host.textContent).toContain('Describes the image to screen readers');
   expect(host.querySelector('script')).toBeNull();
+});
+
+it('synchronizes visible sliders with zoom and frame values', async () => {
+  await render('blob:image', false, block, true);
+  const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
+  expect(ranges.map((range) => range.getAttribute('aria-label'))).toEqual([
+    'Zoom, %',
+    'Frame width',
+    'Frame height',
+  ]);
+  expect(ranges.map((range) => range.value)).toEqual(['100', '800', '600']);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      ranges[0],
+      '200'
+    );
+    ranges[0]?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
 });
 
 it('discards stale decode callbacks and disables reset until current media is ready', async () => {
@@ -125,13 +168,58 @@ it('keeps geometry disabled after a decode failure or while edits are locked', a
   await click('Reset frame and position');
   expect(change).not.toHaveBeenCalled();
   await render('blob:image', true);
-  await click('Zoom 100%');
-  await click('Center image');
+  await click('Reset frame and position');
   expect(change).not.toHaveBeenCalled();
 });
 
+it('holds inspector geometry when bounds are on until the current image decodes', async () => {
+  function BoundedControls() {
+    const { setCropBounds } = useGuideImageBounds(block);
+    return (
+      <>
+        <button onClick={() => setCropBounds(true)}>Bounds on</button>
+        <GuideImageControls
+          block={block}
+          url="blob:image"
+          disabled={false}
+          onChange={change}
+          onClose={close}
+          t={createTranslator('en')}
+        />
+      </>
+    );
+  }
+  await act(async () =>
+    root.render(
+      <GuideLayoutAssistance>
+        <BoundedControls />
+      </GuideLayoutAssistance>
+    )
+  );
+  await click('Bounds on');
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Frame width"]')?.matches(':disabled')
+  ).toBe(true);
+  const caption = host.querySelector<HTMLInputElement>('.guide-image-description input')!;
+  expect(caption.matches(':disabled')).toBe(false);
+  const htmlToggle = host.querySelector<HTMLButtonElement>('.guide-html-switch button')!;
+  expect(htmlToggle.matches(':disabled')).toBe(false);
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      caption,
+      'Still editable'
+    );
+    caption.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(change.mock.calls.at(-1)?.[0].caption).toBe('Still editable');
+  await act(async () => decoded[0]?.dispatchEvent(new Event('load')));
+  expect(
+    host.querySelector<HTMLInputElement>('input[aria-label="Frame width"]')?.matches(':disabled')
+  ).toBe(false);
+});
+
 it('lets numeric Escape cancel the draft before inspector dismissal', async () => {
-  await render();
+  await render('blob:image', false, block, true);
   const field = host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')!;
   await act(async () => field.focus());
   await act(async () => {
@@ -183,4 +271,158 @@ it('shows saved click and keyboard provenance without inventing missing geometry
   });
   expect(host.textContent).toContain('Keystroke');
   expect(host.textContent).not.toContain('Point:');
+});
+
+it('makes editing and replacing the selected image available from its inspector', async () => {
+  await render();
+  const buttons = [...host.querySelectorAll('button')].map(
+    (button) => button.getAttribute('aria-label') ?? button.textContent?.trim()
+  );
+  expect(buttons).toContain('Edit image');
+  expect(buttons).toContain('Replace image');
+  await click('Edit image');
+  expect(edit).toHaveBeenCalledOnce();
+  await click('Replace image');
+  expect(requestResource).toHaveBeenCalledWith({
+    kind: 'replace-image',
+    stepId: 'step',
+    blockId: block.id,
+  });
+});
+
+it('does not edit an unavailable or disabled image', async () => {
+  await render(null);
+  await click('Edit image');
+  expect(edit).not.toHaveBeenCalled();
+  await render('blob:image', true);
+  await click('Edit image');
+  expect(edit).not.toHaveBeenCalled();
+  await click('Replace image');
+  expect(requestResource).not.toHaveBeenCalled();
+});
+
+it('offers image block placement and preserves image metadata', async () => {
+  await render();
+  await click('Half width');
+  expect(change.mock.calls.at(-1)).toEqual([{ ...block, width: 'half' }, null]);
+  await click('Start a new row');
+  expect(change.mock.calls.at(-1)).toEqual([{ ...block, rowStart: true }, null]);
+});
+
+it('offers framing entry without exposing draft-only geometry outside the session', async () => {
+  await render();
+  expect(host.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Center image"]')).toBeNull();
+  expect(host.querySelector('[aria-label="Image fit"]')).toBeNull();
+  expect(host.textContent).not.toContain('Ctrl');
+  await click('Frame and image');
+  expect(startFraming).toHaveBeenCalledOnce();
+  await render(null);
+  await click('Frame and image');
+  await render('blob:image', true);
+  await click('Frame and image');
+  expect(startFraming).toHaveBeenCalledOnce();
+});
+
+it('keeps every image field and bottom action available across inspector presentations', async () => {
+  const labels = () =>
+    [...host.querySelectorAll<HTMLInputElement>('input[aria-label]')].map((input) =>
+      input.getAttribute('aria-label')
+    );
+  await render();
+  const allLabels = new Set(labels());
+  await render('blob:image', false, block, false, 'sections');
+  const nav = host.querySelector('nav')!;
+  const names = [...nav.querySelectorAll('button')].map((button) =>
+    button.getAttribute('aria-label')!
+  );
+  expect(names).toEqual(['Placement', 'Framing', 'Description', 'HTML images']);
+  const sectionLabels = new Set<string | null>();
+  for (const name of names) {
+    await click(name);
+    for (const label of labels()) sectionLabels.add(label);
+    expect(host.querySelector('[data-inspector-edit-image]')).not.toBeNull();
+  }
+  expect(sectionLabels).toEqual(allLabels);
+  await render('blob:image', false, block, false, 'all');
+  await render('blob:image', false, block, false, 'sections');
+  expect(host.querySelector('nav [aria-pressed="true"]')?.getAttribute('aria-label')).toBe(
+    'HTML images'
+  );
+  expect(change).not.toHaveBeenCalled();
+  await click('Replace image');
+  expect(requestResource).toHaveBeenCalledWith({
+    kind: 'replace-image',
+    stepId: 'step',
+    blockId: block.id,
+  });
+});
+
+it('restricts active framing to its category without dropping the draft fields', async () => {
+  await render('blob:image', false, block, false, 'sections');
+  await click('Description');
+  await render(
+    'blob:image',
+    false,
+    { ...block, contentTransform: { scale: 2, x: 0, y: 0 } },
+    true,
+    'sections'
+  );
+  expect(
+    [...host.querySelectorAll('nav button')].map((button) => button.getAttribute('aria-label'))
+  ).toEqual(['Framing']);
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')?.value).toBe('200');
+  expect(host.querySelector('[data-inspector-edit-image]')).toBeNull();
+  expect(change).not.toHaveBeenCalled();
+});
+
+it('aligns only the caption in both presentations and disables alignment while busy', async () => {
+  for (const presentation of ['all', 'sections'] as const) {
+    await render('blob:image', false, block, false, presentation);
+    if (presentation === 'sections')
+      await act(async () =>
+        host.querySelector<HTMLButtonElement>('nav button[aria-label="Description"]')!.click()
+      );
+    const group = () => host.querySelector('[aria-label="Caption alignment"]')!;
+    expect(group().querySelector('button[title="Center"]')?.getAttribute('aria-pressed')).toBe(
+      'true'
+    );
+    for (const [label, captionAlignment] of [
+      ['Start', 'start'],
+      ['Center', 'center'],
+      ['End', 'end'],
+    ] as const) {
+      await act(async () =>
+        group().querySelector<HTMLButtonElement>(`button[title="${label}"]`)!.click()
+      );
+      expect(change).toHaveBeenLastCalledWith({ ...block, captionAlignment }, null);
+    }
+    change.mockClear();
+    await render('blob:image', true, block, false, presentation);
+    for (const button of group().querySelectorAll<HTMLButtonElement>('button')) {
+      expect(button.matches(':disabled')).toBe(true);
+      await act(async () => button.click());
+    }
+    expect(change).not.toHaveBeenCalled();
+  }
+});
+
+it('retains independent HTML preferences through frame mode and restores inheritance explicitly', async () => {
+  const image: GuideImageBlock = {
+    ...block,
+    htmlExport: { ...DEFAULT_HTML_IMAGES, content: 'frame' },
+  };
+  await render('blob:image', false, image);
+  const viewer = host.querySelector<HTMLButtonElement>('[aria-label="Click to view"]')!;
+  expect(viewer.disabled).toBe(true);
+  expect(viewer.getAttribute('aria-checked')).toBe('false');
+  await click('Saved content');
+  const full = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (option) => option.textContent === 'Full image'
+  )!;
+  await act(async () => full.click());
+  expect(change).toHaveBeenLastCalledWith({ ...image, htmlExport: DEFAULT_HTML_IMAGES }, null);
+  await click('Guide defaults');
+  expect(change).toHaveBeenLastCalledWith({ ...image, htmlExport: undefined }, null);
+  expect(image.htmlExport?.viewer).toBe(true);
 });

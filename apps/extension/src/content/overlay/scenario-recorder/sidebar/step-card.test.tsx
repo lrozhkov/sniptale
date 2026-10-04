@@ -2,7 +2,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ScenarioRecorderSidebarStepCard } from './step-card';
 import type { ScenarioRecorderSidebarStep } from './types';
 
@@ -45,49 +45,42 @@ function createStep(overrides?: Partial<ScenarioRecorderSidebarStep>): ScenarioR
 
 function renderStepCard() {
   const onMoveStep = vi.fn();
-  const setDragStepId = vi.fn();
 
   act(() => {
     root?.render(
       <ScenarioRecorderSidebarStepCard
-        dragStepId="step-1"
         highlightedStepId="step-2"
-        index={0}
+        moveUpIndex={5}
+        moveDownIndex={null}
         onDeleteStep={vi.fn()}
         onInspectStep={vi.fn()}
         onMoveStep={onMoveStep}
         onPreviewOpen={vi.fn()}
-        setDragStepId={setDragStepId}
         step={createStep()}
       />
     );
   });
 
-  return { onMoveStep, setDragStepId };
+  return { onMoveStep };
 }
 
-function dispatchDragFlow(card: HTMLElement | null | undefined): void {
+it('moves by a canonical neighbor index and disables the unavailable direction', () => {
+  const { onMoveStep } = renderStepCard();
+  const card = container?.querySelector<HTMLElement>('[data-ui="content.scenario.sidebar.step"]');
+  expect(card?.draggable).toBe(false);
+  expect(card?.className).toContain('animate-[pulse_1.6s_ease-out_1]');
+  const up = card?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.step-move-up"]'
+  );
+  const down = card?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.scenario.sidebar.step-move-down"]'
+  );
+  expect(up?.disabled).toBe(false);
+  expect(down?.disabled).toBe(true);
   act(() => {
-    card?.dispatchEvent(new DragEvent('dragstart', { bubbles: true }));
-    card?.dispatchEvent(new DragEvent('drop', { bubbles: true }));
-    card?.dispatchEvent(new DragEvent('dragend', { bubbles: true }));
+    up?.click();
+    down?.click();
   });
-}
-
-describe('ScenarioRecorderSidebarStepCard', () => {
-  it('wires drag ownership, drop move, and highlighted class through the thin root facade', () => {
-    const { onMoveStep, setDragStepId } = renderStepCard();
-
-    const card = container?.querySelector<HTMLElement>('[data-ui="content.scenario.sidebar.step"]');
-    expect(card?.className).toContain('animate-[pulse_1.6s_ease-out_1]');
-
-    dispatchDragFlow(card);
-
-    expect(setDragStepId).toHaveBeenNthCalledWith(1, 'step-2');
-    expect(onMoveStep).toHaveBeenCalledWith('step-1', 3);
-    expect(
-      container?.querySelector('[data-ui="content.scenario.sidebar.step-rail"] > div')?.textContent
-    ).toBe('2');
-    expect(setDragStepId).toHaveBeenLastCalledWith(null);
-  });
+  expect(onMoveStep).toHaveBeenCalledExactlyOnceWith('step-2', 5);
+  expect(up?.parentElement?.className).toContain('group-focus-within');
 });

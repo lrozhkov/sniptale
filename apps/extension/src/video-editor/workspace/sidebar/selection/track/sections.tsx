@@ -1,4 +1,3 @@
-import { InspectorDetails } from '../shared/details';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
@@ -24,7 +23,7 @@ export function TrackGeneralFields(props: {
         readOnly={!props.onRenameTrack}
         onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
       />
-      <div className="mt-3 space-y-2">
+      <div className="space-y-2">
         {props.selectedTrack.kind !== VideoTrackKind.AUDIO ? (
           <ToggleField
             checked={props.selectedTrack.visible}
@@ -79,7 +78,7 @@ export function TrackLayoutFields({
   const setHeight = (value: number) =>
     panelPrefs.setTrackHeight(track.id, Math.round(value / 0.25) * 0.25);
   return (
-    <div className="mt-3 space-y-2" data-ui="video-editor.inspector.track-layout">
+    <div className="space-y-2" data-ui="video-editor.inspector.track-layout">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.app.trackOrder')}
@@ -107,7 +106,7 @@ export function TrackLayoutFields({
           </InspectorActionButton>
         </div>
       </div>
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>
+      <>
         <ToggleField
           label={translate('videoEditor.timeline.hideClipNames')}
           checked={panelPrefs.prefs.hiddenClipNamesByTrackId?.[track.id] ?? true}
@@ -127,7 +126,7 @@ export function TrackLayoutFields({
           onPreviewValue={setHeight}
           onCommitValue={setHeight}
         />
-      </InspectorDetails>
+      </>
     </div>
   );
 }

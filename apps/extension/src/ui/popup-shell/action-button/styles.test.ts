@@ -10,7 +10,10 @@ describe('popup-action-button.styles', () => {
     expect(primaryClassName).toContain('border-none');
     expect(primaryClassName).toContain('bg-transparent');
     expect(primaryClassName).toContain('var(--sniptale-color-text-primary-strong)');
-    expect(primaryClassName).toContain('var(--sniptale-color-accent-emphasis)');
+    expect(primaryClassName).not.toContain('hover:text-[var(--sniptale-color-accent-emphasis)]');
+    expect(primaryClassName).not.toContain(
+      'focus-visible:text-[var(--sniptale-color-accent-emphasis)]'
+    );
     expect(primaryClassName).toContain('hover:bg-[');
     expect(galleryClassName).toContain('border-none');
     expect(galleryClassName).toContain('bg-transparent');

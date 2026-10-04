@@ -57,3 +57,18 @@ describe('library lifecycle contracts', () => {
     ).toBeNull();
   });
 });
+
+it('preserves validated trash admission through lifecycle writes and rejects malformed timestamps', () => {
+  const lifecycle = { ...createLibraryLifecycle('temporary', 1), trashedAt: 100 };
+  expect(parseLibraryLifecycle(lifecycle, { storageClass: 'library', updatedAt: 1 })).toEqual(
+    lifecycle
+  );
+  expect(updateLibraryLifecycle(lifecycle, 200).trashedAt).toBe(100);
+  expect(promoteLibraryLifecycle(lifecycle, 200).trashedAt).toBe(100);
+  expect(matchesLibraryLifecycleScope(lifecycle, 'all')).toBe(false);
+  for (const trashedAt of [-1, NaN, Infinity, null, '100']) {
+    expect(
+      parseLibraryLifecycle({ ...lifecycle, trashedAt }, { storageClass: 'library', updatedAt: 1 })
+    ).toBeNull();
+  }
+});

@@ -25,7 +25,9 @@ it('shows the localized bounded blur control and applies its value', () => {
   const numericInput = host.querySelector<HTMLInputElement>(
     `input[aria-label="${label}"][type="text"]`
   )!;
-  const range = host.querySelector<HTMLInputElement>(`input[aria-label="${label}"][type="range"]`)!;
+  const range = host.querySelector<HTMLInputElement>(
+    `input[aria-label="${label} range"][type="range"]`
+  )!;
   expect(numericInput.value).toBe('6');
   expect(range.min).toBe('0');
   expect(range.max).toBe('25');

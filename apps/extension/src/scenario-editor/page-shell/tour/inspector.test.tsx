@@ -11,7 +11,26 @@ import {
 } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createTranslator } from '../../../platform/i18n';
+import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { TourInspector } from './inspector';
+import { getSystemSurfaceStylePresets } from '../../../features/highlighter/surface-style/system-presets';
+vi.mock(
+  '../../../composition/surface-style-preset-resources/use-surface-style-preset-catalog',
+  () => ({
+    useSurfaceStylePresetCatalog: () => ({
+      actions: {},
+      presets: getSystemSurfaceStylePresets().map((preset) => ({
+        ...preset,
+        name: preset.id,
+        enabled: true,
+        customized: false,
+        favorite: false,
+        isDefault: false,
+        order: 0,
+      })),
+    }),
+  })
+);
 import type { TourSelection } from './selection';
 let root: Root;
 let host: HTMLDivElement;
@@ -111,9 +130,9 @@ async function click(label: string) {
 }
 async function choose(label: string, option: string) {
   await click(label);
-  const entry = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
-    (n) => n.textContent?.trim() === option
-  );
+  const entry = [
+    ...document.querySelectorAll<HTMLElement>('[role=option], .guide-action-menu button'),
+  ].find((n) => n.textContent?.trim() === option);
   if (!entry) throw new Error(`Missing option ${option}`);
   await act(async () => entry.click());
 }
@@ -143,12 +162,14 @@ it('edits an image slide and hotspots through canonical commands without changin
   await fill('Action label', 'Open settings');
   await fill('Text', 'Click here');
   await click('Pulse hotspot');
+  expect(host.querySelector('.tour-coordinate-disclosure')).toBeNull();
+  expect(host.querySelector('input[aria-label="X"]')).not.toBeNull();
   await fill('X', '30');
   await fill('Y', '40');
-  await click('Target area');
-  await click('Target area');
-  await choose('Explanations', 'Top captions');
-  await choose('Explanations', 'Use tour default');
+  await click('Auto-zoom area');
+  await click('Auto-zoom area');
+  await choose('Hotspot hint', 'At hotspot');
+  await choose('Hotspot hint', 'Use tour default');
   await choose('On click', 'Open link');
   await fill('Open link', 'javascript:alert(1)');
   expect(host.querySelector('[role=alert]')).not.toBeNull();
@@ -160,20 +181,19 @@ it('edits an image slide and hotspots through canonical commands without changin
   expect(current().hotspots[0]?.point).toEqual({ x: 0.3, y: 0.4 });
   expect(current().image!.source).toEqual(source);
   await click('Back to slide settings');
+  expect(document.activeElement?.textContent).toBe('Open settings');
   await click('Open settings');
   await click('Delete');
   expect(current().hotspots).toHaveLength(0);
 });
 it('edits annotations and masks, keeping their geometry bounded and supports deletion', async () => {
-  await click('Callout');
+  await click('Slide explanation');
   await fill('Text', 'A note');
-  await click('Anchor to a point');
-  await click('Anchor to a point');
-  await fill('X', '20');
-  await choose('Explanations', 'Bottom captions');
+  expect(host.querySelector('[aria-label="X"]')).toBeNull();
+  await choose('Placement on slide', 'Bottom captions');
   expect(current().annotations[0]?.appearance?.presentation).toBe('caption-bottom');
   await click('Back to slide settings');
-  await click('Highlight');
+  await choose('Add', 'Highlight');
   await choose('Highlight', 'Spotlight');
   expect(host.querySelector('[aria-label="X"]')).toBeNull();
   await choose('Highlight', 'Blur');
@@ -186,6 +206,142 @@ it('edits annotations and masks, keeping their geometry bounded and supports del
   await click('Delete');
   expect(current().annotations).toHaveLength(0);
 });
+it('lists mixed objects in stored order and moves them through one mutation', async () => {
+  const slide = current();
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Point',
+      text: '',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: false,
+    },
+  ];
+  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null }];
+  slide.masks = [
+    {
+      id: 'mask',
+      rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+      kind: 'highlight',
+      color: '#f97316',
+      opacity: 0.3,
+    },
+  ];
+  slide.objectOrder = ['mask', 'note', 'point'];
+  draw();
+  const rows = () => [...host.querySelectorAll('.tour-object-item')];
+  const labels = () =>
+    rows().map((row) => row.querySelector('.tour-object-row')!.textContent?.trim());
+  const moves = (row: Element) =>
+    row.querySelectorAll<HTMLButtonElement>('.tour-object-item-actions > button');
+  expect(labels()).toEqual(['Highlight', 'Note', 'Point']);
+  expect(moves(rows()[0]!)[0]!.disabled).toBe(true);
+  expect(moves(rows()[0]!)[1]!.disabled).toBe(false);
+  expect(moves(rows()[2]!)[0]!.disabled).toBe(false);
+  expect(moves(rows()[2]!)[1]!.disabled).toBe(true);
+  await act(async () => moves(rows()[1]!)[0]!.click());
+  expect(current().objectOrder).toEqual(['note', 'mask', 'point']);
+  expect(labels()).toEqual(['Note', 'Highlight', 'Point']);
+  expect(selected?.kind === 'slide' && selected.objectId).toBeNull();
+  await act(async () => moves(rows()[0]!)[1]!.click());
+  expect(current().objectOrder).toEqual(['mask', 'note', 'point']);
+  await act(async () => moves(rows()[1]!)[0]!.click());
+  const before = current().objectOrder;
+  await act(async () => moves(rows()[2]!)[1]!.click());
+  expect(current().objectOrder).toBe(before);
+});
+
+it('derives the object list without a stored order and swaps the actions for one Add menu', async () => {
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelector('[aria-label="Add"]')).toBeNull();
+  await click('Slide explanation');
+  await click('Back to slide settings');
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(0);
+  const objectsGroup = host.querySelector('section[aria-label="Slide objects"]')!;
+  expect(
+    objectsGroup.querySelector('.guide-inspector-group-heading [aria-label="Add"]')
+  ).not.toBeNull();
+  expect(objectsGroup.querySelector('.guide-inspector-group-body [aria-label="Add"]')).toBeNull();
+  const add = host.querySelector<HTMLButtonElement>('[aria-label="Add"]')!;
+  expect(add).not.toBeNull();
+  expect(add.textContent).toBe('');
+  await act(async () => add.click());
+  const option = [...document.querySelectorAll<HTMLElement>('.guide-action-menu button')].find(
+    (node) => node.textContent?.trim() === 'Highlight'
+  )!;
+  await act(async () =>
+    option.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  expect(document.activeElement).toBe(add);
+  await act(async () => add.click());
+  await act(async () =>
+    document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+  );
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  await choose('Add', 'Hotspot');
+  expect(current().hotspots).toHaveLength(1);
+  await click('Back to slide settings');
+  expect(
+    [...host.querySelectorAll('.tour-object-row')].map((row) => row.textContent?.trim())
+  ).toEqual(['Hotspot', 'Slide explanation']);
+});
+
+it('restores empty-state direct actions after the last object is deleted', async () => {
+  await click('Slide explanation');
+  await click('Back to slide settings');
+  await click('Slide explanation');
+  await click('Delete');
+  expect(current().annotations).toHaveLength(0);
+  expect(current().objectOrder).toBeUndefined();
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+  expect(host.querySelector('[aria-label="Add"]')).toBeNull();
+});
+
+it('deletes directly from the object row and removes its ordering entry', async () => {
+  await click('Slide explanation');
+  await click('Back to slide settings');
+  const slide = current();
+  slide.objectOrder = [slide.annotations[0]!.id];
+  draw();
+  const remove = host.querySelector<HTMLButtonElement>('.tour-object-delete')!;
+  expect(remove).not.toBeNull();
+  await act(async () => remove.click());
+  expect(current().annotations).toHaveLength(0);
+  expect(current().objectOrder).toEqual([]);
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+});
+
+it('moves the Add control into the objects heading seam in both presentations', async () => {
+  await click('Slide explanation');
+  await click('Back to slide settings');
+  const group = host.querySelector('section[aria-label="Slide objects"]')!;
+  expect(group.querySelector('.guide-inspector-group-heading [aria-label="Add"]')).not.toBeNull();
+  expect(group.querySelector('.guide-inspector-group-body [aria-label="Add"]')).toBeNull();
+  presentation = 'sections';
+  draw();
+  await click('Slide objects');
+  const heading = () =>
+    host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')!;
+  expect(heading().textContent).toContain('Slide objects');
+  expect(heading().querySelector('[aria-label="Add"]')).not.toBeNull();
+  expect(host.querySelector('.guide-inspector-group-body [aria-label="Add"]')).toBeNull();
+  await choose('Add', 'Hotspot');
+  expect(current().hotspots).toHaveLength(1);
+  await click('Back to slide settings');
+  expect(heading().querySelector('[aria-label="Add"]')).not.toBeNull();
+  await click('Hotspot');
+  await click('Delete');
+  expect(current().hotspots).toHaveLength(0);
+  await click('Slide explanation');
+  await click('Delete');
+  expect(heading().querySelector('[aria-label="Add"]')).toBeNull();
+  expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
+});
+
 it('edits navigation and end screen in independent scopes', async () => {
   selected = { kind: 'slide', slideId: 'nav', objectId: null };
   draw();
@@ -197,7 +353,7 @@ it('edits navigation and end screen in independent scopes', async () => {
   const nav = project.tour!.slides[1]!;
   expect(nav.kind === 'navigation' && nav.buttons[0]?.action.kind).toBe('restart');
   await click('Back to slide settings');
-  await click('1. Start');
+  await click('Start');
   await click('Delete');
   selected = { kind: 'end' };
   draw();
@@ -281,23 +437,6 @@ it('adds only a valid end CTA and removes terminal actions with explicit confirm
   const repaired = project.tour!.slides[1]!;
   expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
 });
-it('exposes global and local text alignment with placement only for callouts', async () => {
-  scope = 'document';
-  draw();
-  await choose('Text alignment', 'Center');
-  await choose('Callout placement', 'Above');
-  expect(project.tour!.style.textAppearance).toMatchObject({
-    alignment: 'center',
-    placement: 'top',
-  });
-  await choose('Explanations', 'Bottom captions');
-  expect(
-    [...host.querySelectorAll('button')].some(
-      (node) => node.getAttribute('aria-label') === 'Callout placement'
-    )
-  ).toBe(false);
-});
-
 it('builds contents without duplicate destinations and reorders buttons atomically', async () => {
   selected = { kind: 'slide', slideId: 'nav', objectId: null };
   draw();
@@ -309,7 +448,11 @@ it('builds contents without duplicate destinations and reorders buttons atomical
   };
   expect(navigation().buttons).toHaveLength(1);
   expect(navigation().buttons[0]?.action).toEqual({ kind: 'slide', slideId: 'image' });
-  await click('Add slide links');
+  expect(
+    [...host.querySelectorAll('button')].some((button) =>
+      button.textContent?.includes('Add slide links')
+    )
+  ).toBe(false);
   expect(navigation().buttons).toHaveLength(1);
   await click('Add button');
   await click('Back to slide settings');
@@ -424,40 +567,46 @@ it('edits navigation composition independently from its text and links', async (
   expect(host.querySelector('[aria-label="Main text"]')).not.toBeNull();
 });
 
-it('creates a local explanation style override from inherited settings', async () => {
-  await click('Hotspot');
-  await fill('Explanation width', '280');
-  await fill('Inner padding', '16');
-  await fill('Corner radius', '20');
-  expect(current().hotspots[0]?.appearance?.surface).toMatchObject({
-    width: 280,
-    padding: 16,
-    radius: 20,
-  });
-  await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.surface-style-selector"] button')!
-      .click()
-  );
-  const css = host.querySelector<HTMLTextAreaElement>(
-    '[data-ui="shared.ui.surface-style-selector"] textarea'
-  )!;
-  await act(async () => {
-    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
-      css,
-      'box-shadow: 0 2px 8px #000000;'
+for (const kind of ['Hotspot', 'Slide explanation']) {
+  it(`selects a visual ${kind} style directly while preserving numeric settings`, async () => {
+    await click(kind);
+    const object = kind === 'Hotspot' ? current().hotspots[0]! : current().annotations[0]!;
+    object.appearance = {
+      ...project.tour!.style.textAppearance,
+      surface: { ...TOUR_HINT_SURFACE, radius: 20 },
+    };
+    draw();
+    await fill('Explanation width', '280');
+    await fill('Inner padding', '16');
+    expect(host.querySelector('input[aria-label="Corner radius"]')).toBeNull();
+    await act(async () =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="shared.ui.surface-style-selector"] button')!
+        .click()
     );
-    css.dispatchEvent(new Event('input', { bubbles: true }));
+    const selector = host.querySelector('[data-ui="shared.ui.surface-style-selector"]')!;
+    const mode = [...selector.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      /^(Surface|Поверхность)$/.test(button.textContent?.trim() ?? '')
+    );
+    if (mode) await act(async () => mode.click());
+    expect(selector.querySelector('textarea')).toBeNull();
+    expect(
+      [...selector.querySelectorAll('button')].some((button) =>
+        /^(Apply|Применить|Duplicate|Дублировать|Copy|Копировать)$/.test(
+          button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
+        )
+      )
+    ).toBe(false);
+    await click('system-surface-soft-elevated');
+    const expected = getSystemSurfaceStylePresets().find(
+      (preset) => preset.id === 'system-surface-soft-elevated'
+    )!.style;
+    const appearance =
+      kind === 'Hotspot' ? current().hotspots[0]!.appearance : current().annotations[0]!.appearance;
+    expect(appearance?.surface).toMatchObject({ ...expected, width: 280, padding: 16, radius: 20 });
+    expect(project.tour!.style.textAppearance.surface).toBeUndefined();
   });
-  const apply = [
-    ...host.querySelectorAll<HTMLButtonElement>(
-      '[data-ui="shared.ui.surface-style-selector"] button'
-    ),
-  ].find((n) => /^(Apply|Применить)$/.test(n.textContent?.trim() ?? ''))!;
-  await act(async () => apply.click());
-  expect(current().hotspots[0]?.appearance?.surface?.surfaceCss).toContain('box-shadow');
-  expect(project.tour!.style.textAppearance.surface).toBeUndefined();
-});
+}
 
 it('shows one section heading in sections mode and moves object actions into it', async () => {
   presentation = 'sections';
@@ -473,17 +622,20 @@ it('shows one section heading in sections mode and moves object actions into it'
   expect(objectsHeading.textContent).toContain('Slide objects');
   expect(host.querySelectorAll('.tour-object-actions > button')).toHaveLength(3);
   await click('Hotspot');
-  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  expect(
+    host.querySelector('[data-ui="shared.categorized-inspector.section-heading"]')
+  ).not.toBeNull();
+  expect(host.querySelector('.guide-inspector-group-heading')).toBeNull();
   await click('Back to slide settings');
   await click('Playback');
-  expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
+  expect(host.querySelector('.guide-inspector-group-heading')).toBeNull();
   presentation = 'all';
   draw();
   expect(host.querySelector('.guide-inspector-group-heading')).not.toBeNull();
   expect(host.querySelectorAll('.guide-inspector-group')).toHaveLength(4);
 });
 
-it('renders tour numeric rows as plain quiet-focus rows with scrub', async () => {
+it('renders tour numeric rows as plain accent-focus rows with scrub', async () => {
   presentation = 'sections';
   draw();
   await click('Slide objects');
@@ -495,7 +647,7 @@ it('renders tour numeric rows as plain quiet-focus rows with scrub', async () =>
   for (const row of rows) {
     expect(row.getAttribute('data-appearance')).toBe('plain');
     const field = row.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')!;
-    expect(field.getAttribute('data-focus-appearance')).toBe('quiet');
+    expect(field.getAttribute('data-focus-appearance')).toBe('accent-box');
     expect(row.querySelector('input[type=range]')).not.toBeNull();
   }
   const zoom = host.querySelector<HTMLInputElement>('input[aria-label="Zoom"]')!;
@@ -515,6 +667,8 @@ it('preserves image categories through All and object drill-down without editing
   expect(host.querySelector('nav')).not.toBeNull();
   expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
   await click('Playback');
+  expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
+  await click('Narration');
   expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
   presentation = 'all';
   draw();
@@ -522,38 +676,106 @@ it('preserves image categories through All and object drill-down without editing
   expect(host.querySelector('input[aria-label="Step title"]')).not.toBeNull();
   presentation = 'sections';
   draw();
-  expect(host.querySelector('button[aria-label="Playback"]')?.getAttribute('aria-pressed')).toBe(
+  expect(host.querySelector('button[aria-label="Narration"]')?.getAttribute('aria-pressed')).toBe(
     'true'
   );
   expect(JSON.stringify(project)).toBe(before);
   await click('Slide objects');
   await click('Hotspot');
-  expect(host.querySelector('nav')).toBeNull();
+  expect(host.querySelector('nav')).not.toBeNull();
   expect(host.querySelector('[data-testid="narration-slot"]')).toBeNull();
+  await click('Narration');
+  expect(host.querySelector('[data-testid="narration-slot"]')).not.toBeNull();
   await click('Back to slide settings');
   expect(
     host.querySelector('button[aria-label="Slide objects"]')?.getAttribute('aria-pressed')
   ).toBe('true');
 });
 
-it('separates document defaults from slide settings and exposes every category', async () => {
+it('offers slide placement only for independently edited slide explanations', async () => {
+  await click('Hotspot');
+  await fill('Text', 'Action details');
+  await click('Hotspot hint');
+  expect(document.body.textContent).not.toContain('Top captions');
+  expect(document.body.textContent).not.toContain('Bottom captions');
+  await click('At hotspot');
+  const hotspot = structuredClone(current().hotspots[0]);
+  await click('Back to slide settings');
+  await choose('Add', 'Slide explanation');
+  await fill('Text', 'Slide context');
+  expect(host.querySelector('[aria-label="X"]')).toBeNull();
+  expect(host.querySelector('[aria-label="On click"]')).toBeNull();
+  await choose('Placement on slide', 'Top captions');
+  expect(current().annotations[0]?.appearance?.presentation).toBe('caption-top');
+  await choose('Placement on slide', 'Bottom captions');
+  expect(current().annotations[0]?.appearance?.presentation).toBe('caption-bottom');
+  expect(current().hotspots[0]).toEqual(hotspot);
+  await click('Placement on slide');
+  expect(document.body.textContent).not.toContain('At hotspot');
+  await click('Bottom captions');
+});
+
+it('groups selected action points and highlights when sections are enabled', async () => {
+  await click('Hotspot');
   presentation = 'sections';
+  draw();
+  expect(host.querySelector('[data-ui="scenario-editor.inspector-categories"]')).not.toBeNull();
+  await click('Back to slide settings');
+  presentation = 'all';
+  draw();
+  await choose('Add', 'Highlight');
+  presentation = 'sections';
+  draw();
+  expect(host.querySelector('[data-ui="scenario-editor.inspector-categories"]')).not.toBeNull();
+});
+
+it('keeps marker and auto-zoom rectangle independent and bounds the rectangle', async () => {
+  await click('Hotspot');
+  await click('Auto-zoom area');
+  const rectangle = structuredClone(current().hotspots[0]!.targetRect);
+  await fill('X', '30');
+  await fill('Y', '40');
+  expect(current().hotspots[0]!.targetRect).toEqual(rectangle);
+  const point = structuredClone(current().hotspots[0]!.point);
+  const area = host.querySelector('section[aria-label="Auto-zoom area"]')!;
+  expect(area.querySelector('label')?.title).toContain('one hotspot');
+  expect(area.querySelector('input[aria-label="X range"]')?.getAttribute('max')).toBe('80');
+  const x = area.querySelector<HTMLInputElement>('input[aria-label="X"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(x, '95');
+    x.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => x.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(current().hotspots[0]!.targetRect?.x).toBe(0.8);
+  expect(current().hotspots[0]!.point).toEqual(point);
+  const width = host.querySelector(
+    'section[aria-label="Auto-zoom area"] input[aria-label="Width range"]'
+  );
+  expect(Number(width?.getAttribute('max'))).toBeCloseTo(20);
+  await click('Auto-zoom area');
+  expect(current().hotspots[0]!.targetRect).toBeNull();
+  expect(current().hotspots[0]!.point).toEqual(point);
+});
+
+it('edits marker defaults and independent local size without changing pulse or source geometry', async () => {
   scope = 'document';
+  presentation = 'sections';
   draw();
-  expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).toBeNull();
-  await click('Explanations');
-  await fill('Explanation width', '300');
-  expect(project.tour!.style.textAppearance.surface?.width).toBe(300);
-  await click('Playback');
-  expect(host.querySelector('[aria-label="Auto Zoom to hotspot"]')).not.toBeNull();
-  await click('Transitions');
-  expect(host.querySelector('section[aria-label="Transitions"]')).not.toBeNull();
+  await click('Hotspot');
+  await fill('Marker size', '40');
+  expect(project.tour!.style.markerAppearance).toEqual({ color: null, pulseColor: null, size: 40 });
   scope = 'selection';
-  selected = { kind: 'slide', slideId: 'nav', objectId: null };
+  presentation = 'all';
   draw();
-  await click('Composition');
-  expect(host.querySelector('input[aria-label="Content width"]')).not.toBeNull();
-  selected = { kind: 'end' };
-  draw();
-  expect(host.querySelector('nav')).toBeNull();
+  await click('Hotspot');
+  const point = structuredClone(current().hotspots[0]!.point);
+  const pulse = current().hotspots[0]!.pulse;
+  await click('Use tour marker style');
+  await fill('Marker size', '50');
+  expect(current().hotspots[0]!.markerAppearance?.size).toBe(50);
+  expect(project.tour!.style.markerAppearance?.size).toBe(40);
+  expect(current().hotspots[0]!.point).toEqual(point);
+  expect(current().hotspots[0]!.pulse).toBe(pulse);
+  await click('Use tour marker style');
+  expect(current().hotspots[0]!.markerAppearance).toBeNull();
 });

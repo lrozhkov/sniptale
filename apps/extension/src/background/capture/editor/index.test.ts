@@ -108,6 +108,7 @@ async function verifySourceTabBootstrapRouting(): Promise<void> {
   expect(browserTabsGetMock).toHaveBeenCalledWith(42);
   expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith({
     dataUrl: 'data:image/png;base64,1',
+    capturedAt: expect.any(Number),
     sourceFaviconUrl: 'https://example.test/favicon.ico',
     url: 'https://example.test/article',
     title: 'Article',
@@ -133,6 +134,7 @@ async function verifySourceContextFallbackRouting(): Promise<void> {
 
   expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith({
     dataUrl: 'data:image/png;base64,2',
+    capturedAt: expect.any(Number),
     sourceFaviconUrl: null,
     url: 'https://fallback.test',
     title: 'Fallback title',
@@ -165,6 +167,7 @@ describe('capture-editor active tab routing', () => {
     });
     expect(persistPendingEditorBootstrapPayloadMock).toHaveBeenCalledWith({
       dataUrl: 'data:image/png;base64,3',
+      capturedAt: expect.any(Number),
       sourceFaviconUrl: 'https://active.test/favicon.ico',
       url: 'https://active.test',
       title: 'Active tab',

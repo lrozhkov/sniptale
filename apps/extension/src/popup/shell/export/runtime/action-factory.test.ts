@@ -56,6 +56,7 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
   await actions.handleCopyJson();
   await actions.handleCopyMarkdown();
   await actions.handleStartExport();
+  await actions.handleStartExport(undefined, { sourceDocumentId: 'document-7' });
   await actions.handleSaveWebSnapshot();
   await actions.handleCancelExport();
   await actions.handleResetExportView();
@@ -68,7 +69,15 @@ it('creates action handlers that delegate to the owner-local action seams', asyn
     deps
   );
   expect(actionMocks.startPopupExportMock).toHaveBeenNthCalledWith(1, state, deps);
-  expect(actionMocks.startPopupExportMock).toHaveBeenNthCalledWith(2, state, deps, 'save');
+  expect(actionMocks.startPopupExportMock).toHaveBeenNthCalledWith(
+    2,
+    state,
+    deps,
+    'export',
+    undefined,
+    { sourceDocumentId: 'document-7' }
+  );
+  expect(actionMocks.startPopupExportMock).toHaveBeenNthCalledWith(3, state, deps, 'save');
   expect(actionMocks.cancelPopupExportMock).toHaveBeenCalledWith(state, deps);
   expect(actionMocks.resetPopupExportViewMock).toHaveBeenCalledWith(state, deps);
 });

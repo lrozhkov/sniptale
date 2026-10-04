@@ -54,7 +54,10 @@ function TypingPreviewSummary({ plan }: { plan: Extract<Preview['plan'], { statu
           </div>
         ))}
       </dl>
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+      <InspectorDetails
+        preferenceId="history-span:videoEditor.sidebar.inspectorMoreDetails"
+        label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+      >
         <dl className="space-y-2">
           {details.slice(2).map(([label, value]) => (
             <div key={label} className="flex justify-between gap-3">

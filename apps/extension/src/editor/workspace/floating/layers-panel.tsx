@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { EditorInspectorLayersPanel } from '../../inspector/layers';
 import { EditorInspectorContent } from '../../inspector/content';
@@ -15,25 +15,12 @@ import {
   type EditorLayersPanelMode,
 } from './layers-panel-navigation';
 
-const LAYERS_PANEL_DEFAULT_HEIGHT = 320;
-const LAYERS_PANEL_MIN_HEIGHT = 248;
-const VIEW_TOOLBAR_TOP_OFFSET = 12;
-const VIEW_TOOLBAR_HEIGHT_GUARD = 44;
-const VIEW_TOOLBAR_POPOVER_GAP = 12;
-const VIEW_TOOLBAR_MAP_POPOVER_HEIGHT_GUARD = 112;
-const VIEW_TOOLBAR_TO_LAYERS_GAP = 12;
-const LAYERS_PANEL_TOP_GUARD =
-  VIEW_TOOLBAR_TOP_OFFSET +
-  VIEW_TOOLBAR_HEIGHT_GUARD +
-  VIEW_TOOLBAR_POPOVER_GAP +
-  VIEW_TOOLBAR_MAP_POPOVER_HEIGHT_GUARD +
-  VIEW_TOOLBAR_TO_LAYERS_GAP;
-const LAYERS_PANEL_BOTTOM_GAP = 12;
-const LAYERS_HEIGHT_RATIO_PRECISION = 10_000;
+import { EditorFloatingLayerEffectsPanel } from './layer-effects-panel';
+import { LAYERS_PANEL_DEFAULT_HEIGHT, useResizableLayersPanelHeight } from './layers-panel-height';
 
 const LAYERS_PANEL_CLASS_NAME = floatingChromeClassNames(
   'relative flex shrink-0 flex-col overflow-hidden',
-  'h-full min-h-[15.5rem] w-full'
+  'h-full min-h-0 w-full'
 );
 
 const LAYERS_PANEL_COLLAPSED_CLASS_NAME = floatingChromeClassNames(
@@ -51,84 +38,6 @@ const LAYERS_RESIZE_HANDLE_CLASS_NAME = [
   'before:-translate-x-1/2 before:rounded-full',
   'before:bg-[color:color-mix(in_srgb,var(--sniptale-color-border-strong)_70%,transparent)]',
 ].join(' ');
-
-function getMaxLayersPanelHeight() {
-  if (typeof window === 'undefined') {
-    return LAYERS_PANEL_DEFAULT_HEIGHT;
-  }
-
-  return Math.max(
-    LAYERS_PANEL_MIN_HEIGHT,
-    window.innerHeight - LAYERS_PANEL_TOP_GUARD - LAYERS_PANEL_BOTTOM_GAP
-  );
-}
-
-function clampLayersPanelHeight(value: number) {
-  return Math.max(LAYERS_PANEL_MIN_HEIGHT, Math.min(getMaxLayersPanelHeight(), value));
-}
-
-function resolveLayersPanelHeight(heightRatio: number | null) {
-  if (heightRatio === null) {
-    return clampLayersPanelHeight(LAYERS_PANEL_DEFAULT_HEIGHT);
-  }
-
-  return clampLayersPanelHeight(getMaxLayersPanelHeight() * heightRatio);
-}
-
-function resolveLayersPanelHeightRatio(height: number) {
-  const preciseRatio = (height / getMaxLayersPanelHeight()) * LAYERS_HEIGHT_RATIO_PRECISION;
-  return Math.round(preciseRatio) / LAYERS_HEIGHT_RATIO_PRECISION;
-}
-
-function useResizableLayersPanelHeight(args: {
-  heightRatio: number | null;
-  onHeightRatioChange: (heightRatio: number | null) => void;
-}) {
-  const { heightRatio, onHeightRatioChange } = args;
-  const [height, setHeight] = useState(() => resolveLayersPanelHeight(heightRatio));
-
-  useEffect(() => {
-    setHeight(resolveLayersPanelHeight(heightRatio));
-  }, [heightRatio]);
-
-  useEffect(() => {
-    const handleResize = () => setHeight(resolveLayersPanelHeight(heightRatio));
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [heightRatio]);
-
-  const startResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const target = event.currentTarget;
-      target.setPointerCapture(event.pointerId);
-      const pointerId = event.pointerId;
-      const startY = event.clientY;
-      const startHeight = height;
-      let nextHeight = startHeight;
-      const handlePointerMove = (moveEvent: PointerEvent) => {
-        nextHeight = clampLayersPanelHeight(startHeight + startY - moveEvent.clientY);
-        setHeight(nextHeight);
-      };
-      const handlePointerUp = () => {
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        window.removeEventListener('pointercancel', handlePointerUp);
-        if (target.hasPointerCapture(pointerId)) {
-          target.releasePointerCapture(pointerId);
-        }
-        onHeightRatioChange(resolveLayersPanelHeightRatio(nextHeight));
-      };
-
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-      window.addEventListener('pointercancel', handlePointerUp);
-    },
-    [height, onHeightRatioChange]
-  );
-
-  return { height, startResize };
-}
 
 function FloatingLayersPreferenceError({ message }: { message: string | null }) {
   if (!message) {
@@ -184,6 +93,15 @@ function EditorFloatingLayersPanelBody(props: {
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
 }) {
+  if (props.documentController.inspector === 'layer-effects') {
+    return (
+      <EditorFloatingLayerEffectsPanel
+        documentController={props.documentController}
+        hasImage={props.hasImage}
+      />
+    );
+  }
+
   if (props.activeMode === 'layers') {
     const layersPanelProps = createEditorInspectorLayersPanelProps(props.documentController);
     return (
@@ -201,7 +119,11 @@ function EditorFloatingLayersPanelBody(props: {
     props.documentController
   );
   return (
-    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]">
+    <div
+      className={[
+        'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]',
+      ].join(' ')}
+    >
       <EditorInspectorContent
         {...contentProps}
         inspector={props.activeMode}
@@ -222,8 +144,23 @@ function EditorFloatingExpandedLayersPanel(props: {
   preferenceError: string | null;
   startResize: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previousInspector = useRef(props.documentController.inspector);
+  useEffect(() => {
+    if (
+      previousInspector.current === 'layer-effects' &&
+      props.documentController.inspector === 'tool'
+    ) {
+      panelRef.current
+        ?.querySelector<HTMLElement>('[data-ui="editor.floating.layers.mode.layers"]')
+        ?.focus();
+    }
+    previousInspector.current = props.documentController.inspector;
+  }, [props.documentController.inspector]);
+
   return (
     <FloatingChromePanel
+      ref={panelRef}
       dataUi="editor.floating.layers-panel"
       className={LAYERS_PANEL_CLASS_NAME}
       style={{ height: props.height }}
@@ -269,6 +206,8 @@ export function EditorFloatingLayersPanel({
   onHeightRatioChange: (heightRatio: number | null) => void;
 }) {
   const { height, startResize } = useResizableLayersPanelHeight({
+    defaultHeight:
+      documentController.inspector === 'layer-effects' ? 520 : LAYERS_PANEL_DEFAULT_HEIGHT,
     heightRatio,
     onHeightRatioChange,
   });
@@ -282,7 +221,7 @@ export function EditorFloatingLayersPanel({
     setInspector: documentController.setInspector,
   });
   const handleSelectMode = (mode: EditorLayersPanelMode) => {
-    if (mode === activeMode) return;
+    if (mode === activeMode && documentController.inspector !== 'layer-effects') return;
     if (mode === 'layers') {
       toolbarActions.activateTool('select');
       return;
@@ -307,7 +246,12 @@ export function EditorFloatingLayersPanel({
       documentController={documentController}
       hasImage={hasImage}
       height={height}
-      onCollapse={onCollapse}
+      onCollapse={() => {
+        if (documentController.inspector === 'canvas-size') toolbarActions.activateTool('select');
+        if (documentController.inspector === 'layer-effects')
+          documentController.setInspector('tool');
+        onCollapse();
+      }}
       onSelectMode={handleSelectMode}
       preferenceError={preferenceError}
       startResize={startResize}

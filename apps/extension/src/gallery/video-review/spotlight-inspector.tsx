@@ -52,7 +52,10 @@ export function ReviewSpotlightInspector(props: {
           onChange={(blur) => onChange({ ...value, blur })}
         />
       )}
-      <ReviewDetails label={translate('gallery.videoReview.preciseArea')}>
+      <ReviewDetails
+        preferenceId="gallery.videoReview.preciseArea"
+        label={translate('gallery.videoReview.preciseArea')}
+      >
         {fields.map(([field, label]) => (
           <ReviewNumberRow
             key={field}

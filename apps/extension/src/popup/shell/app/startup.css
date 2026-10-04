@@ -107,9 +107,63 @@ body {
   width: 19px;
   height: 19px;
   stroke-width: 1.8;
-  transition:
-    color 160ms ease,
-    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: color 160ms ease;
+}
+
+.popup-react-shell__tab-icon {
+  position: relative;
+  width: 19px;
+  height: 19px;
+  transition: transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.popup-react-shell__tab-icon-base,
+.popup-react-shell__tab-icon-accent {
+  position: absolute;
+  inset: 0;
+}
+
+.popup-react-shell__tab-icon-accent {
+  color: var(--sniptale-color-accent, var(--popup-initial-accent));
+  clip-path: inset(0 100% 0 0);
+}
+
+.popup-react-shell__tabs button[data-active='true'] .popup-react-shell__tab-icon-base {
+  color: var(--popup-initial-active-text);
+}
+
+.popup-react-shell__tabs button[data-active='true'] .popup-react-shell__tab-icon-accent {
+  clip-path: inset(0);
+}
+
+.popup-react-shell__tabs[data-animate='true']
+  button[data-active='true'][data-entry-side='left']
+  .popup-react-shell__tab-icon-accent {
+  animation: popup-tab-icon-fill-from-left 280ms ease-out both;
+}
+
+.popup-react-shell__tabs[data-animate='true']
+  button[data-active='true'][data-entry-side='right']
+  .popup-react-shell__tab-icon-accent {
+  animation: popup-tab-icon-fill-from-right 280ms ease-out both;
+}
+
+@keyframes popup-tab-icon-fill-from-left {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0);
+  }
+}
+
+@keyframes popup-tab-icon-fill-from-right {
+  from {
+    clip-path: inset(0 0 0 100%);
+  }
+  to {
+    clip-path: inset(0);
+  }
 }
 
 .popup-react-shell__tab-indicator {
@@ -137,6 +191,17 @@ body {
     opacity 120ms ease;
 }
 
+.popup-react-shell__tabs[data-animate='false'] .popup-react-shell__tab-indicator,
+.popup-react-shell__tabs[data-animate='false'] .popup-react-shell__tab-indicator::after,
+.popup-react-shell__tabs[data-animate='false'] button,
+.popup-react-shell__tabs[data-animate='false'] button svg {
+  transition: none;
+}
+
+.popup-react-shell__tabs[data-animate='false'] .popup-react-shell__tab-icon {
+  transition: none;
+}
+
 .popup-react-shell__tab-indicator::after {
   position: absolute;
   right: 0;
@@ -150,6 +215,24 @@ body {
   transition: opacity 80ms ease 120ms;
 }
 
+.popup-react-shell__menu-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.popup-react-shell__menu-ring circle {
+  fill: none;
+  stroke: var(--sniptale-color-accent, var(--popup-initial-accent));
+  stroke-width: 1.8px;
+  stroke-linecap: round;
+  stroke-dasharray: 102 100;
+}
+
 .popup-react-shell__tab-indicator[data-page='screenshots'] {
   left: calc(10% + 3.2px);
   opacity: 1;
@@ -161,17 +244,42 @@ body {
 }
 
 .popup-react-shell__tab-indicator[data-page='menu'] {
-  bottom: 6px;
+  bottom: 5px;
   left: 50%;
   width: 40px;
   height: 40px;
-  border-width: 1px;
-  border-color: var(--sniptale-color-accent, var(--popup-initial-accent));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--popup-initial-accent) 22%, transparent),
-    0 4px 12px color-mix(in srgb, var(--popup-initial-accent) 14%, transparent);
+  border-width: 0;
+  box-shadow: none;
   opacity: 1;
   transition-delay: 0ms, 80ms, 80ms, 80ms, 160ms, 160ms, 160ms, 0ms;
+}
+
+.popup-react-shell__tab-indicator[data-page='menu'] .popup-react-shell__menu-ring {
+  opacity: 1;
+}
+
+.popup-react-shell__tabs:is([data-menu-entry='left'], [data-menu-entry='right'])
+  .popup-react-shell__tab-indicator[data-page='menu']
+  .popup-react-shell__menu-ring
+  circle {
+  animation: popup-menu-ring-draw 300ms ease-out 80ms both;
+}
+
+.popup-react-shell__tab-indicator[data-entry-side='left'] .popup-react-shell__menu-ring {
+  transform: rotate(90deg) scaleY(-1);
+}
+
+.popup-react-shell__tab-indicator[data-entry-side='right'] .popup-react-shell__menu-ring {
+  transform: rotate(90deg);
+}
+
+@keyframes popup-menu-ring-draw {
+  from {
+    stroke-dasharray: 0 100;
+  }
+  to {
+    stroke-dasharray: 102 100;
+  }
 }
 
 .popup-react-shell__tab-indicator[data-page='menu']::after {
@@ -190,18 +298,35 @@ body {
 }
 
 .popup-react-shell__tabs button[data-active='true'] {
-  color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
+  color: var(--sniptale-color-accent, var(--popup-initial-accent));
   background: transparent;
 }
 
 .popup-react-shell__tabs button:hover,
 .popup-react-shell__tabs button:focus-visible {
   color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
+  background: transparent;
 }
 
-.popup-react-shell__tabs button:hover svg,
-.popup-react-shell__tabs button:focus-visible svg {
-  transform: translateY(-1px) scale(1.06);
+.popup-react-shell__tabs button[data-active='true']:hover,
+.popup-react-shell__tabs button[data-active='true']:focus-visible {
+  color: var(--sniptale-color-accent, var(--popup-initial-accent));
+}
+
+.popup-react-shell__tabs button:hover > svg,
+.popup-react-shell__tabs button:focus-visible > svg,
+.popup-react-shell__tabs button:hover .popup-react-shell__tab-icon,
+.popup-react-shell__tabs button:focus-visible .popup-react-shell__tab-icon {
+  transform: scale(1.16);
+}
+
+.popup-react-shell__tabs button:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent, var(--popup-initial-accent));
+  outline-offset: 1px;
+}
+
+.popup-react-shell__tabs button:active {
+  background: transparent;
 }
 
 .popup-react-shell__tabs button[data-page='menu'] {
@@ -218,38 +343,59 @@ body {
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
 }
 
+.popup-react-shell__tabs button[data-page='menu'] svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
 .popup-react-shell__tabs button[data-page='menu']::after {
   display: none;
 }
 
 .popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
   color: var(--sniptale-color-accent, var(--popup-initial-accent));
+  border-color: transparent;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
 }
 
-.popup-react-shell__tabs[data-animate='true'] button[data-page='menu'][data-active='true'] {
-  animation: popup-menu-accent-arrival 221ms linear both;
+.popup-react-shell__menu-icon-accent {
+  clip-path: inset(100% 0 0 0);
 }
 
-@keyframes popup-menu-accent-arrival {
-  0%,
-  99% {
-    color: var(--sniptale-color-text-primary, var(--popup-initial-active-text));
-  }
+.popup-react-shell__tabs
+  button[data-page='menu'][data-active='true']
+  .popup-react-shell__menu-icon-accent {
+  clip-path: inset(0 0 0 0);
+}
 
-  100% {
-    color: var(--sniptale-color-accent, var(--popup-initial-accent));
+.popup-react-shell__tabs:is([data-menu-entry='left'], [data-menu-entry='right'])
+  button[data-page='menu'][data-active='true']
+  .popup-react-shell__menu-icon-accent {
+  animation: popup-menu-icon-fill 300ms ease-out 110ms both;
+}
+
+@keyframes popup-menu-icon-fill {
+  from {
+    clip-path: inset(100% 0 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .popup-react-shell__tab-indicator,
   .popup-react-shell__tabs button,
-  .popup-react-shell__tabs button svg {
+  .popup-react-shell__tabs button svg,
+  .popup-react-shell__tab-icon {
     transition: none;
   }
-
-  .popup-react-shell__tabs button[data-page='menu'][data-active='true'] {
+  .popup-react-shell__menu-ring circle,
+  .popup-react-shell__tab-icon-accent,
+  .popup-react-shell__tabs
+    button[data-page='menu'][data-active='true']
+    .popup-react-shell__menu-icon-accent {
     animation: none;
   }
 }

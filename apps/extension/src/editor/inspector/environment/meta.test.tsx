@@ -6,6 +6,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const insertMetaStampMock = vi.hoisted(() => vi.fn());
 const useAppLocaleMock = vi.hoisted(() => vi.fn(() => 'en'));
+const { loadPreferenceMock, savePreferenceMock } = vi.hoisted(() => ({
+  loadPreferenceMock: vi.fn(),
+  savePreferenceMock: vi.fn(),
+}));
+
+vi.mock('../../persistence/ui-state/technical-data', () => ({
+  loadEditorTechnicalDataPreference: loadPreferenceMock,
+  saveEditorTechnicalDataPreference: savePreferenceMock,
+}));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
@@ -26,6 +35,8 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeEach(() => {
+  loadPreferenceMock.mockResolvedValue({ kinds: [], layout: 'column' });
+  savePreferenceMock.mockResolvedValue(undefined);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.appendChild(container);
@@ -43,16 +54,16 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderMetaPanel() {
-  act(() => {
+async function renderMetaPanel() {
+  await act(async () => {
     root?.render(<EditorInspectorMetaPanelContent />);
   });
 }
 
 function getOptionButtons() {
   return Array.from(
-    container?.querySelectorAll<HTMLButtonElement>(
-      '[aria-label="editor.compact.technicalDataFields"] > button[aria-pressed]'
+    container?.querySelectorAll<HTMLInputElement>(
+      '[aria-label="editor.compact.technicalDataFields"] input[type="checkbox"]'
     ) ?? []
   );
 }
@@ -69,15 +80,15 @@ function getLayoutToggle() {
   );
 }
 
-function selectTechnicalDataInColumnOrder(options: HTMLButtonElement[]) {
+function selectTechnicalDataInColumnOrder(options: HTMLInputElement[]) {
   options[2]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   options[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   options[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
 
 describe('meta panel content', () => {
-  it('binds locale and dispatches ordered technical-data insertions', () => {
-    renderMetaPanel();
+  it('binds locale and dispatches ordered technical-data insertions', async () => {
+    await renderMetaPanel();
 
     expect(useAppLocaleMock).toHaveBeenCalled();
 
@@ -87,7 +98,7 @@ describe('meta panel content', () => {
     expect(options).toHaveLength(3);
     expect(container?.textContent).not.toContain('editor.compact.technicalDataDescription');
     expect(getExactTextNodeCount('editor.compact.technicalData')).toBe(0);
-    expect(container?.textContent).toContain('editor.compact.technicalDataLayoutColumn');
+    expect(container?.textContent).not.toContain('editor.compact.technicalDataLayoutColumn');
     expect(container?.textContent).toContain('editor.compact.technicalDataPreviewEmpty');
     expect(addButton?.hasAttribute('disabled')).toBe(true);
     expectTechnicalDataRowsToBeFlat(options);
@@ -99,28 +110,26 @@ describe('meta panel content', () => {
     expect(container?.textContent).toContain('editor.compact.dateTime');
     expect(container?.textContent).toContain('editor.compact.browser');
 
-    addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await act(async () => addButton?.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
     expect(insertMetaStampMock).toHaveBeenCalledWith(['url', 'date', 'browser'], 'column');
   });
 
-  it('can insert technical data in a single-row layout', () => {
-    renderMetaPanel();
+  it('can insert technical data in a single-row layout', async () => {
+    await renderMetaPanel();
 
-    const layoutToggle = getLayoutToggle();
     const options = getOptionButtons();
     const addButton = getAddButton();
 
     act(() => {
-      layoutToggle?.click();
       options[0]?.click();
       options[2]?.click();
     });
+    act(() => getLayoutToggle()?.click());
 
     expect(container?.textContent).toContain('editor.compact.technicalDataLayoutRow');
-    expect(container?.textContent).toContain('·');
 
-    act(() => {
+    await act(async () => {
       addButton?.click();
     });
 
@@ -134,9 +143,9 @@ function getExactTextNodeCount(text: string): number {
   ).length;
 }
 
-function expectTechnicalDataRowsToBeFlat(options: HTMLButtonElement[]) {
+function expectTechnicalDataRowsToBeFlat(options: HTMLInputElement[]) {
   for (const option of options) {
-    expect(option.className).not.toContain('border ');
-    expect(option.className).not.toContain('border-[color');
+    expect(option.type).toBe('checkbox');
+    expect(option.closest('label')?.className).toContain('cursor-pointer');
   }
 }

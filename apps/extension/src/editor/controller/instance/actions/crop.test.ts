@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   clearEditorControllerCropSelectionMock: vi.fn(),
   previewEditorCanvasSizeSelectionMock: vi.fn(),
   debugMock: vi.fn(),
+  syncBackground: vi.fn(async () => undefined),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -24,6 +25,11 @@ vi.mock('../../crop-workflow', async (importOriginal) => ({
   clearEditorCanvasSizePreview: mocks.clearEditorCanvasSizePreviewMock,
   clearEditorControllerCropSelection: mocks.clearEditorControllerCropSelectionMock,
   previewEditorCanvasSizeSelection: mocks.previewEditorCanvasSizeSelectionMock,
+}));
+
+vi.mock('../../background', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../background')>()),
+  syncEditorBackgroundLayer: mocks.syncBackground,
 }));
 
 vi.mock('../../viewport', async (importOriginal) => ({
@@ -45,6 +51,12 @@ beforeEach(() => {
 
 function createController() {
   return {
+    getPublicApiAdapter() {
+      return this;
+    },
+    createLayerMutationToken: vi.fn(() => 1),
+    isLayerMutationTokenCurrent: vi.fn(() => true),
+    prepareObject: vi.fn(),
     applyDocument: vi.fn(),
     canvas: { id: 'canvas' },
     canvasDocumentSize: { width: 800, height: 600 },
@@ -80,6 +92,17 @@ function expectSuccessfulCropApply(controller: ReturnType<typeof createControlle
   expect(controller.switchToSelectTool).toHaveBeenCalledOnce();
   expect(controller.applyDocument).not.toHaveBeenCalled();
   expect(controller.rebuildFrameDecorations).toHaveBeenCalledOnce();
+  expect(mocks.syncBackground).toHaveBeenCalledWith(
+    expect.objectContaining({
+      canvas: controller.canvas,
+      canvasSize: { height: 60, width: 100 },
+      createMutationToken: controller.createLayerMutationToken,
+      isMutationTokenCurrent: controller.isLayerMutationTokenCurrent,
+    })
+  );
+  expect(mocks.syncBackground.mock.invocationCallOrder[0]).toBeLessThan(
+    controller.commitHistory.mock.invocationCallOrder[0]!
+  );
   expect(mocks.applyEditorViewportZoomMock).toHaveBeenCalledOnce();
   expect(controller.commitHistory).toHaveBeenCalledOnce();
   expect(mocks.debugMock).toHaveBeenCalledWith('apply:start', { crop: 'selection' });
@@ -169,4 +192,15 @@ it('keeps controller fields untouched when the workflow returns null', async () 
   await applyCropSelectionForController(controller as never);
   expect(controller.cropGuide).toEqual({ id: 'guide' });
   expect(controller.cropSelection).toEqual({ id: 'selection' });
+});
+
+it('does not commit history when resizing the managed background fails', async () => {
+  const controller = createController();
+  mocks.syncBackground.mockRejectedValueOnce(new Error('background unavailable'));
+  mockSuccessfulCropApply();
+  await expect(applyCropSelectionForController(controller as never)).rejects.toThrow(
+    'background unavailable'
+  );
+  expect(controller.commitHistory).not.toHaveBeenCalled();
+  expect(controller.rebuildFrameDecorations).not.toHaveBeenCalled();
 });

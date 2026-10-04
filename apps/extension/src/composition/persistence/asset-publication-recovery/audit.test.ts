@@ -144,7 +144,7 @@ it('audits package and screenshot ownership for a web snapshot independently', a
   ]);
 });
 
-it('reports every domain owner when two domain rows share one immutable asset', async () => {
+it('reports only the missing owner when domains share an immutable asset', async () => {
   mocks.objects.mockResolvedValue(['asset-shared']);
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
@@ -172,12 +172,9 @@ it('reports every domain owner when two domain rows share one immutable asset', 
 
   const report = await auditDurableAssets();
 
-  expect(report.ownerMetadataMismatches).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({ ownerId: 'recording-shared', ownerKind: 'recording' }),
-      expect.objectContaining({ ownerId: 'project-shared', ownerKind: 'project-asset' }),
-    ])
-  );
+  expect(report.ownerMetadataMismatches).toEqual([
+    expect.objectContaining({ ownerId: 'recording-shared', ownerKind: 'recording' }),
+  ]);
 });
 
 it('deletes only objects with no ref, ready journal, or writing marker', async () => {
@@ -413,3 +410,140 @@ function createScenarioAsset(id: string, assetId: string) {
     width: 1,
   };
 }
+
+it('recognizes immutable HTML catalogue bodies as their own required graph edge', async () => {
+  const ref = { ...createRef('html-body'), mimeType: 'text/html', size: 4 };
+  const row = {
+    id: 'saved',
+    projectId: 'project',
+    format: 'html',
+    filename: 'saved.html',
+    createdAt: 1,
+    size: 4,
+    html: { mode: 'tour', assetId: ref.assetId },
+  };
+  const owner = {
+    assetId: ref.assetId,
+    ownerId: row.id,
+    ownerKind: 'scenario-export',
+    role: 'body',
+  };
+  mocks.objects.mockResolvedValue([ref.assetId]);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: async (name: string) =>
+        name === 'asset_refs'
+          ? [ref]
+          : name === 'asset_owners'
+            ? [owner]
+            : name === 'scenario_exports'
+              ? [row]
+              : [],
+    })
+  );
+  const report = await auditDurableAssets();
+  expect(report.authorityValid).toBe(true);
+  expect(report.ownerMetadataMismatches).toEqual([]);
+  expect(report.objectsWithoutAuthority).toEqual([]);
+});
+
+it.each(['owner', 'source'] as const)(
+  'preserves bytes whose %s remains after its ref disappeared',
+  async (authority) => {
+    mocks.objects.mockResolvedValue(['retained']);
+    mocks.journals.mockResolvedValue([]);
+    mocks.writing.mockResolvedValue([]);
+    mocks.runMutation.mockImplementation(async (callback) =>
+      callback({
+        getAll: async (store: string) => {
+          if (authority === 'owner' && store === 'asset_owners')
+            return [{ assetId: 'retained', ownerId: 'r', ownerKind: 'recording', role: 'body' }];
+          if (authority === 'source' && store === 'recordings')
+            return [createRecording('r', 'retained')];
+          return [];
+        },
+      })
+    );
+    await collectOrphanAssetObjects();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  }
+);
+
+it('projects stored Library source ownership independently of project resources', async () => {
+  const { createMediaLibraryEntry } = await import('../projects/index.test-support');
+  const material = createMediaLibraryEntry({
+    id: 'independent-image',
+    source: { kind: 'stored-asset', assetId: 'retained' },
+  });
+  mocks.objects.mockResolvedValue(['retained']);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (callback) =>
+    callback({ getAll: async (store: string) => (store === 'media_library' ? [material] : []) })
+  );
+  const report = await collectOrphanAssetObjects();
+  expect(report.objectsWithoutAuthority).toEqual([]);
+  expect(report.ownerMetadataMismatches).toContainEqual({
+    assetId: 'retained',
+    ownerKind: 'media-library',
+    ownerId: material.id,
+    role: 'source',
+  });
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['image-workspace', { refs: [createRef('pending-shared')] }],
+  ['scenario-project', { children: { assetPuts: [{ assetId: 'pending-shared' }] } }],
+  [
+    'scenario-project',
+    { children: { editorDocumentPuts: [{ assetRefs: [createRef('pending-shared')] }] } },
+  ],
+])(
+  'protects pending shared refs in the %s publication payload before an owner is committed',
+  async (domain, payload) => {
+    mocks.objects.mockResolvedValue(['pending-shared']);
+    mocks.writing.mockResolvedValue([]);
+    mocks.journals.mockResolvedValue([
+      { assetRefs: [], createdAt: 1, domain, journalId: 'pending', payload },
+    ]);
+    await collectOrphanAssetObjects();
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  }
+);
+
+it('preserves old objects named only by unresolved compensation records', async () => {
+  mocks.objects.mockResolvedValue(['rollback-byte']);
+  mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
+  mocks.runMutation.mockImplementation(async (effect) =>
+    effect({
+      getAll: async (store: string) =>
+        store === 'asset_operations'
+          ? [
+              {
+                kind: 'backup-restore',
+                status: 'pending',
+                operationId: 'legacy',
+                createdAt: 1,
+                updatedAt: 1,
+                obsoleteAssetIds: [],
+                compensations: [
+                  {
+                    assetId: 'new-byte',
+                    journalId: 'legacy-ready',
+                    nextMediaId: 'legacy',
+                    nextOwnerId: 'legacy',
+                    previousRecords: { assetRefEntries: [createRef('rollback-byte')] },
+                  },
+                ],
+              },
+            ]
+          : [],
+    })
+  );
+  await collectOrphanAssetObjects();
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});

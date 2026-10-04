@@ -79,6 +79,9 @@ it('returns the keys removed from each browser storage area', async () => {
       'scenarioPresentationSession:session-1': { slideId: 'slide-1' },
     })
     .mockResolvedValue({});
+  deps.browserStorageAreas.sync.get
+    .mockResolvedValueOnce({ sniptale_context_menu_layout_generation_0: 'chunk' })
+    .mockResolvedValue({});
 
   const result = await erasePersistentLocalExtensionData(
     { includeAiProviderSecrets: true, preservePreferences: false },
@@ -110,6 +113,7 @@ it('returns the keys removed from each browser storage area', async () => {
   expect(result.sessionStorageKeysRemoved).toContain(AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY);
   expect(result.sessionStorageKeysRemoved).toContain('scenarioPresentationSession:session-1');
   expect(result.syncStorageKeysRemoved).toContain('sniptale_settings');
+  expect(result.syncStorageKeysRemoved).toContain('sniptale_context_menu_layout_generation_0');
 });
 
 it('keeps offscreen page storage inside the owner barrier and repeats final verification', async () => {

@@ -8,6 +8,7 @@ import { emptyCanvasJson } from '../core/helpers';
 import { MIN_CANVAS_SIZE } from '../../document/model';
 import type { EditorControllerPublicApiAdapter } from './types';
 import { renderEditorControllerForExport } from './document/export';
+import { runEditorDocumentTransition } from '../history/transition-queue';
 
 function normalizeSceneSize(width: number, height: number) {
   return {
@@ -92,7 +93,9 @@ export function resizeEditorControllerImageScene(
   width: number,
   height: number
 ): void {
-  void flattenEditorControllerImageScene(controller, width, height).catch((error) => {
+  void runEditorDocumentTransition(controller.canvas ?? controller.history, () =>
+    flattenEditorControllerImageScene(controller, width, height)
+  ).catch((error) => {
     reportEditorActionFailure('resize-image', error);
   });
 }

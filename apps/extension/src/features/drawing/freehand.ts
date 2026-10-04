@@ -10,6 +10,7 @@ const MIN_WIDTH_RATIO = 0.34;
 const SPEED_TO_THINNESS = 1.35;
 const START_AVERAGE_DISTANCE_PX = 32;
 const EDGE_WIDTH_DISTANCE_PX = 24;
+const CURVE_SAMPLE_STEP_PX = 8;
 const SMOOTHING_STEP_PX = 2;
 const PREVIEW_SMOOTHING_STEP_PX = 4;
 const DEFAULT_SMOOTHING_WEIGHT = 0.25;
@@ -137,15 +138,76 @@ function resample(points: readonly DynamicStrokePoint[], step: number) {
 }
 
 function isSharp(previous: DrawingPoint, current: DrawingPoint, next: DrawingPoint) {
-  const incoming = { x: previous.x - current.x, y: previous.y - current.y };
-  const outgoing = { x: next.x - current.x, y: next.y - current.y };
-  const lengths = Math.hypot(incoming.x, incoming.y) * Math.hypot(outgoing.x, outgoing.y);
-  if (lengths <= 0) return false;
-  return incoming.x * outgoing.x + incoming.y * outgoing.y >= 0;
+  const incomingX = previous.x - current.x;
+  const incomingY = previous.y - current.y;
+  const outgoingX = next.x - current.x;
+  const outgoingY = next.y - current.y;
+  if ((incomingX === 0 && incomingY === 0) || (outgoingX === 0 && outgoingY === 0)) return false;
+  return incomingX * outgoingX + incomingY * outgoingY >= 0;
+}
+
+function curveTangent(
+  points: readonly DynamicStrokePoint[],
+  index: number,
+  segmentLength: number,
+  closed: boolean
+) {
+  const current = points[index]!;
+  const previous = points[index - 1] ?? (closed ? points[points.length - 2] : undefined);
+  const next = points[index + 1] ?? (closed ? points[1] : undefined);
+  if (!previous && next) return { x: next.x - current.x, y: next.y - current.y };
+  if (previous && !next) return { x: current.x - previous.x, y: current.y - previous.y };
+  if (!previous || !next || isSharp(previous, current, next)) return { x: 0, y: 0 };
+  const before = Math.max(distance(previous, current), 0.001);
+  const after = Math.max(distance(current, next), 0.001);
+  return {
+    x: ((current.x - previous.x) / before + (next.x - current.x) / after) * segmentLength * 0.5,
+    y: ((current.y - previous.y) / before + (next.y - current.y) / after) * segmentLength * 0.5,
+  };
+}
+
+function curveSparseSamples(points: readonly DynamicStrokePoint[]) {
+  if (points.length < 3) return points;
+  const closed = points.length >= 4 && distance(points[0]!, points[points.length - 1]!) < 1;
+  const result: DynamicStrokePoint[] = [{ ...points[0]! }];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index]!;
+    const end = points[index + 1]!;
+    const length = distance(start, end);
+    const steps = Math.ceil(length / CURVE_SAMPLE_STEP_PX);
+    if (steps > 1) {
+      const startTangent = curveTangent(points, index, length, closed);
+      const endTangent = curveTangent(points, index + 1, length, closed);
+      for (let step = 1; step < steps; step += 1) {
+        const t = step / steps;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const startWeight = 2 * t3 - 3 * t2 + 1;
+        const endWeight = -2 * t3 + 3 * t2;
+        const startSlope = t3 - 2 * t2 + t;
+        const endSlope = t3 - t2;
+        result.push({
+          x:
+            start.x * startWeight +
+            end.x * endWeight +
+            startTangent.x * startSlope +
+            endTangent.x * endSlope,
+          y:
+            start.y * startWeight +
+            end.y * endWeight +
+            startTangent.y * startSlope +
+            endTangent.y * endSlope,
+          width: start.width + (end.width - start.width) * t,
+        });
+      }
+    }
+    result.push({ ...end });
+  }
+  return result;
 }
 
 function smooth(points: readonly DynamicStrokePoint[], level: number, step: number) {
-  let result = resample(points, step);
+  let result = resample(level > 0 ? curveSparseSamples(points) : points, step);
   const iterations = Math.round(clamp(level, 0, 10) * 3);
   let buffer = result.map((point) => ({ ...point }));
   for (let iteration = 0; iteration < iterations && result.length >= 3; iteration += 1) {

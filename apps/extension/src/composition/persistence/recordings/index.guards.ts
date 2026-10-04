@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { StoredRecordingEntry } from './contracts';
 import type { ParsedStoredEntriesValue } from '../infrastructure/indexed-db/guards/entries';
 import { isNumber, isRecord, isString } from '@sniptale/runtime-contracts/validation/primitives';
@@ -5,6 +6,29 @@ import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 import { parseRecordingGroupMember } from '../../../features/media-hub/recording-groups';
 
 type ParsedRecordingEntriesValue = ParsedStoredEntriesValue<StoredRecordingEntry>;
+
+function parseRecordingMediaMetadata(value: unknown): StoredRecordingEntry['mediaMetadata'] | null {
+  return value === undefined
+    ? undefined
+    : isRecord(value) &&
+        value['kind'] === 'video' &&
+        isNumber(value['width']) &&
+        isNumber(value['height']) &&
+        isNumber(value['duration']) &&
+        Number.isFinite(value['width']) &&
+        Number.isFinite(value['height']) &&
+        Number.isFinite(value['duration']) &&
+        value['width'] > 0 &&
+        value['height'] > 0 &&
+        value['duration'] >= 0
+      ? {
+          duration: value['duration'],
+          height: value['height'],
+          kind: 'video' as const,
+          width: value['width'],
+        }
+      : null;
+}
 
 function parseRecordingEntryValue(value: unknown): StoredRecordingEntry | null {
   if (!isRecord(value)) return null;
@@ -36,28 +60,12 @@ function parseRecordingEntryValue(value: unknown): StoredRecordingEntry | null {
       ? undefined
       : parseRecordingGroupMember(value['recordingGroup']);
   if (recordingGroup === null) return null;
-  const rawMediaMetadata = value['mediaMetadata'];
-  const mediaMetadata =
-    rawMediaMetadata === undefined
+  const recordingMetadata =
+    value['recordingMetadata'] === undefined
       ? undefined
-      : isRecord(rawMediaMetadata) &&
-          rawMediaMetadata['kind'] === 'video' &&
-          isNumber(rawMediaMetadata['width']) &&
-          isNumber(rawMediaMetadata['height']) &&
-          isNumber(rawMediaMetadata['duration']) &&
-          Number.isFinite(rawMediaMetadata['width']) &&
-          Number.isFinite(rawMediaMetadata['height']) &&
-          Number.isFinite(rawMediaMetadata['duration']) &&
-          rawMediaMetadata['width'] > 0 &&
-          rawMediaMetadata['height'] > 0 &&
-          rawMediaMetadata['duration'] >= 0
-        ? {
-            duration: rawMediaMetadata['duration'],
-            height: rawMediaMetadata['height'],
-            kind: 'video' as const,
-            width: rawMediaMetadata['width'],
-          }
-        : null;
+      : parseRecordingMetadata(value['recordingMetadata']);
+  if (recordingMetadata === null) return null;
+  const mediaMetadata = parseRecordingMediaMetadata(value['mediaMetadata']);
   if (mediaMetadata === null) return null;
   return {
     assetId: value['assetId'],
@@ -67,6 +75,7 @@ function parseRecordingEntryValue(value: unknown): StoredRecordingEntry | null {
     mimeType: value['mimeType'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
     ...(recordingGroup === undefined ? {} : { recordingGroup }),
+    ...(recordingMetadata === undefined ? {} : { recordingMetadata }),
     ...(mediaMetadata === undefined ? {} : { mediaMetadata }),
     size: value['size'],
   };

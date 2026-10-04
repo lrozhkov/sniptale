@@ -4,7 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToolbarCaptureActionGroup } from './group';
+import { ToolbarCaptureActions } from '.';
+const historyControlMock = vi.hoisted(() => vi.fn());
 import type { ToolbarMenuState } from '../state/menu';
+import { translate } from '../../../../platform/i18n';
 
 vi.mock('./options', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./options')>()),
@@ -16,7 +19,10 @@ vi.mock('./menu-group', () => ({
 }));
 
 vi.mock('./history', () => ({
-  ToolbarHistoryControls: () => <div data-ui="test.history-controls" />,
+  ToolbarHistoryControls: (props: unknown) => {
+    historyControlMock(props);
+    return <div data-ui="test.history-controls" />;
+  },
 }));
 
 vi.mock('./settings', () => ({
@@ -27,6 +33,10 @@ vi.mock('./use-menus', () => ({
   useToolbarCaptureMenus: () => ({
     activeMenuType: null,
   }),
+}));
+
+vi.mock('./persistence', () => ({
+  useCaptureActionPersistence: () => vi.fn(),
 }));
 
 let container: HTMLDivElement | null = null;
@@ -48,7 +58,18 @@ function createClosedToolbarMenuState(): ToolbarMenuState {
   };
 }
 
-function renderGroup(screenshotMode = true) {
+function renderGroup(
+  screenshotMode = true,
+  canClearPagePreparation = false,
+  isNavigationMode = false,
+  autoBlurEnabled = false,
+  videoRecordingMode = false,
+  throughCapture = false
+) {
+  const onPinToTabChange = vi.fn();
+  const onClose = vi.fn();
+  const onClearPagePreparation = vi.fn();
+  const Capture = throughCapture ? ToolbarCaptureActions : ToolbarCaptureActionGroup;
   if (!container) {
     container = document.createElement('div');
     document.body.append(container);
@@ -57,20 +78,26 @@ function renderGroup(screenshotMode = true) {
 
   act(() => {
     root?.render(
-      <ToolbarCaptureActionGroup
+      <Capture
         screenshotMode={screenshotMode}
+        videoRecordingMode={videoRecordingMode}
+        isNavigationMode={isNavigationMode}
+        autoBlurEnabled={autoBlurEnabled}
+        canClearPagePreparation={canClearPagePreparation}
+        onClearPagePreparation={onClearPagePreparation}
+        resetScope="design-review"
         isLoading={false}
         captureAction="download_default"
         compactMenus={false}
         displayMode="vertical"
         pinToTab={false}
         pinToTabAvailable={true}
-        pinToTabLocked={false}
+        pinToTabLocked={autoBlurEnabled}
         onCompactMenusChange={() => undefined}
         onDisplayModeChange={() => undefined}
-        onPinToTabChange={() => undefined}
+        onPinToTabChange={onPinToTabChange}
         onCaptureActionChange={() => undefined}
-        onClose={() => undefined}
+        onClose={onClose}
         onDisableScreenshotMode={() => undefined}
         timerDelay={0}
         onTimerDelayChange={() => undefined}
@@ -83,6 +110,7 @@ function renderGroup(screenshotMode = true) {
       />
     );
   });
+  return { onClose, onPinToTabChange, onClearPagePreparation };
 }
 
 beforeEach(() => {
@@ -125,5 +153,64 @@ describe('ToolbarCaptureActionGroup', () => {
     ).toContain('sniptale-capture-leading-divider');
     expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).toBeNull();
     expect(container?.querySelector('[data-ui="test.settings-menu"]')).not.toBeNull();
+  });
+
+  it('shows reset beside history when existing changes can be cleared outside screenshot mode', () => {
+    renderGroup(false, true);
+    expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).not.toBeNull();
+  });
+
+  it('keeps the disabled Reset all control visible in ordinary navigation', () => {
+    renderGroup(false, false, true);
+    expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).not.toBeNull();
+  });
+
+  it('leaves recording mode to its drawing-only broom', () => {
+    renderGroup(false, true, false, false, true);
+    expect(container?.querySelector('[data-ui="content.toolbar.history-group"]')).toBeNull();
+  });
+
+  it('places Navigation pin and collapse immediately before settings and blocks unpin during auto-blur', () => {
+    const handlers = renderGroup(true, false, true);
+    const group = container?.querySelector('[data-ui="content.toolbar.settings-group"]');
+    expect(Array.from(group?.children ?? []).map((child) => child.getAttribute('data-ui'))).toEqual(
+      [
+        'content.toolbar.navigation.pin-to-tab',
+        'content.toolbar.navigation.collapse',
+        'test.settings-menu',
+      ]
+    );
+    act(() =>
+      group
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.navigation.pin-to-tab"]')
+        ?.click()
+    );
+    act(() =>
+      group
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.navigation.collapse"]')
+        ?.click()
+    );
+    expect(handlers.onPinToTabChange).toHaveBeenCalledWith(true, undefined);
+    expect(handlers.onClose).toHaveBeenCalledOnce();
+
+    renderGroup(true, false, true, true);
+    const pin = container?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.navigation.pin-to-tab"]'
+    );
+    expect(pin?.disabled).toBe(true);
+    expect(pin?.title).toBe(translate('content.toolbar.pinToTabAutoBlurLockedHint'));
+  });
+});
+
+it('passes actual reset availability, callback and scope through the capture component', () => {
+  const handlers = renderGroup(true, true, false, false, false, true);
+  expect(historyControlMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    canClearPagePreparation: true,
+    onClearPagePreparation: handlers.onClearPagePreparation,
+    resetScope: 'design-review',
+  });
+  renderGroup(true, false, false, false, false, true);
+  expect(historyControlMock.mock.calls.at(-1)?.[0]).toMatchObject({
+    canClearPagePreparation: false,
   });
 });

@@ -3,7 +3,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RefObject } from 'react';
-import { ReviewVoiceoverRecording, useReviewVoiceoverRecording } from './voiceover-recording';
+import { useReviewVoiceoverRecording } from './voiceover-recording';
+import { ReviewVoiceoverRecording } from './voiceover-panel';
 import { importReviewAudio } from '../../workflows/video-review/audio-import';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 
@@ -17,9 +18,25 @@ vi.mock('../../workflows/video-review/audio-import', () => ({
       signal: AbortSignal;
       assertCurrentTarget(): void;
       attach(assetId: string, duration: number): Promise<void>;
+      onPrepared?(prepared: {
+        assetId: string;
+        duration: number;
+        protect(): Promise<void>;
+        cancel(): Promise<void>;
+        publish(): Promise<void>;
+        discard(): Promise<void>;
+      }): void;
     }) => {
       args.signal.throwIfAborted();
       args.assertCurrentTarget();
+      args.onPrepared?.({
+        assetId: 'project-asset:7',
+        duration: 2,
+        protect: async () => undefined,
+        cancel: async () => undefined,
+        publish: async () => undefined,
+        discard: async () => undefined,
+      });
       await args.attach('project-asset:7', 2);
     }
   ),
@@ -73,12 +90,35 @@ const renderRecording = (isOpen: boolean) => {
   return { onClose, onSave };
 };
 
-it('mounts the shared recorder with the remaining timeline as the capture limit', () => {
+it('shows a bottom strip with an optional visible duration cap', () => {
   renderRecording(true);
   const modal = host.querySelector('[role="dialog"]');
   expect(modal).not.toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
   expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
   expect(modal!.textContent).toContain('videoEditor.app.recordAudioStart');
+  expect(modal!.textContent).toContain('gallery.videoReview.voiceoverDurationLimit');
+  const limit = modal!.querySelector<HTMLButtonElement>(
+    '[data-ui="audio-recording.duration-limit"]'
+  )!;
+  expect(limit.getAttribute('role')).toBe('switch');
+  expect(limit.getAttribute('aria-checked')).toBe('true');
+  const duration = modal!.querySelector<HTMLInputElement>('input[type="number"]')!;
+  expect(duration.value).toBe('7');
+  expect(duration.max).toBe('7');
+  act(() => limit.click());
+  expect(limit.getAttribute('aria-checked')).toBe('false');
+  expect(modal!.querySelector('input[type="number"]')).toBeNull();
+  expect(modal!.textContent).toContain('00:07');
+});
+
+it('offers a visible video playback choice before capture and keeps the placement visible', () => {
+  renderRecording(true);
+  const playback = host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.play-video"]');
+  expect(playback?.getAttribute('aria-checked')).toBe('true');
+  expect(host.textContent).toContain('00:03');
+  act(() => playback?.click());
+  expect(playback?.getAttribute('aria-checked')).toBe('false');
 });
 
 it('stays closed when isOpen is false', () => {
@@ -86,11 +126,112 @@ it('stays closed when isOpen is false', () => {
   expect(host.querySelector('[role="dialog"]')).toBeNull();
 });
 
+it('shows recording, pause, resume and take review with the same lower panel', async () => {
+  class Recorder extends EventTarget {
+    static isTypeSupported = () => true;
+    state = 'inactive';
+    mimeType = 'audio/webm';
+    start() {
+      this.state = 'recording';
+    }
+    pause() {
+      this.state = 'paused';
+    }
+    resume() {
+      this.state = 'recording';
+    }
+    stop() {
+      this.state = 'inactive';
+      const data = new Event('dataavailable');
+      Object.defineProperty(data, 'data', { value: new Blob(['voice']) });
+      this.dispatchEvent(data);
+      this.dispatchEvent(new Event('stop'));
+    }
+  }
+  vi.stubGlobal('MediaRecorder', Recorder);
+  vi.stubGlobal('navigator', {
+    mediaDevices: {
+      getUserMedia: async () => ({ getTracks: () => [{ stop: vi.fn() }] }),
+      enumerateDevices: async () => [],
+    },
+  });
+  vi.stubGlobal('URL', { createObjectURL: () => 'blob:voice', revokeObjectURL: vi.fn() });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  renderRecording(true);
+  const input = host.querySelector<HTMLInputElement>('input[type="number"]')!;
+  const setNumber = (node: HTMLInputElement, value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
+      node.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  setNumber(input, '5');
+  const click = async (label: string) => {
+    const button = [...host.querySelectorAll<HTMLButtonElement>('button')].find((item) =>
+      item.textContent?.includes(label)
+    )!;
+    await act(async () => button.click());
+  };
+  await click('videoEditor.app.recordAudioStart');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioPause');
+  await click('videoEditor.app.recordAudioPause');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioResume');
+  await click('videoEditor.app.recordAudioResume');
+  await click('videoEditor.app.recordAudioStop');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioSave');
+  expect(host.textContent).toContain('videoEditor.app.recordAudioAgain');
+  act(() =>
+    root.render(
+      <ReviewVoiceoverRecording
+        isOpen
+        playhead={3}
+        timelineDuration={4}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        onSyncStart={vi.fn(async () => undefined)}
+        onSyncStop={vi.fn()}
+      />
+    )
+  );
+  const again = [...host.querySelectorAll('button')].find((b) =>
+    b.textContent?.includes('recordAudioAgain')
+  )!;
+  expect(again.disabled).toBe(true);
+  const repair = host.querySelector<HTMLInputElement>('input[type="number"]')!;
+  expect(repair.value).toBe('5');
+  expect(repair.max).toBe('1');
+  setNumber(repair, '0.5');
+  expect(again.disabled).toBe(false);
+});
+
 type RecordingApi = ReturnType<typeof useReviewVoiceoverRecording>;
+
+function createRecordingSession() {
+  let content = { audio: { voiceover: [] as { id: string; assetId: string }[] } };
+  const session = {
+    getSnapshot: () => ({
+      snapshot: { workspace: { aggregateId: 'review-1' } },
+      document: { advancedContent: content },
+    }),
+    commit: vi.fn(async (operation: { after: typeof content }) => {
+      content = operation.after;
+    }),
+    commitDurable: vi.fn(async (operation: { after: typeof content }) => {
+      content = operation.after;
+    }),
+  } as unknown as Parameters<typeof useReviewVoiceoverRecording>[0]['session'];
+  return session;
+}
 
 function renderHookHarness(props: {
   guard: () => boolean;
   time?: { current: number };
+  resultDuration?: number;
   flushAdvanced?: () => Promise<void>;
   toOutputTime?: (source: number) => number | null;
 }) {
@@ -101,16 +242,18 @@ function renderHookHarness(props: {
     pause: vi.fn(),
   } as unknown as HTMLVideoElement;
   const video = { current: node } as RefObject<HTMLVideoElement | null>;
-  const audio = { addImported: vi.fn() } as unknown as Parameters<
+  const audio = { addImported: vi.fn(), markImported: vi.fn() } as unknown as Parameters<
     typeof useReviewVoiceoverRecording
   >[0]['audio'];
+  const session = createRecordingSession();
   const Harness = () => {
     latest = useReviewVoiceoverRecording({
       video,
       time: props.time?.current ?? 3,
-      resultDuration: 10,
+      resultDuration: props.resultDuration ?? 10,
       toOutputTime: props.toOutputTime ?? ((source: number) => source),
       audio,
+      session,
       guard: props.guard,
       flushAdvanced: props.flushAdvanced ?? (async () => undefined),
     });
@@ -123,6 +266,7 @@ function renderHookHarness(props: {
     },
     node,
     audio,
+    session,
     Harness,
   };
 }
@@ -146,11 +290,22 @@ it('ignores the record intent while the editor cannot start', () => {
 
 it('syncs playback to the playhead and pauses on stop', async () => {
   const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
   await act(async () => harness.latest.syncStart());
   expect(harness.node.currentTime).toBe(3);
   expect(harness.node.play).toHaveBeenCalledOnce();
   act(() => harness.latest.syncStop());
-  expect(harness.node.pause).toHaveBeenCalledOnce();
+  expect(harness.node.pause).toHaveBeenCalledTimes(2);
+});
+
+it('keeps video paused while recording without video playback', async () => {
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  await act(async () => harness.latest.syncStart(false));
+  expect(harness.node.currentTime).toBe(3);
+  expect(harness.node.play).not.toHaveBeenCalled();
+  await act(async () => harness.latest.syncResume(false));
+  expect(harness.node.play).not.toHaveBeenCalled();
 });
 
 it('rejects sync start when the source playback fails', async () => {
@@ -160,9 +315,10 @@ it('rejects sync start when the source playback fails', async () => {
     pause: vi.fn(),
   } as unknown as HTMLVideoElement;
   let latest!: RecordingApi;
-  const audio = { addImported: vi.fn() } as unknown as Parameters<
+  const audio = { addImported: vi.fn(), markImported: vi.fn() } as unknown as Parameters<
     typeof useReviewVoiceoverRecording
   >[0]['audio'];
+  const session = createRecordingSession();
   let video: RefObject<HTMLVideoElement | null> = {
     current: failing,
   } as RefObject<HTMLVideoElement | null>;
@@ -173,17 +329,19 @@ it('rejects sync start when the source playback fails', async () => {
       resultDuration: 4,
       toOutputTime: (source: number) => source,
       audio,
+      session,
       guard: () => true,
       flushAdvanced: async () => undefined,
     });
     return null;
   };
   act(() => root.render(<Harness />));
+  act(() => latest.open());
   await expect(act(async () => latest.syncStart())).rejects.toThrow('no');
   video = { current: null } as RefObject<HTMLVideoElement | null>;
   act(() => root.render(<Harness />));
   await act(async () => latest.syncStart());
-  expect(latest.recording).toBe(false);
+  expect(latest.recording).toBe(true);
 });
 
 it('skips saving when the session was already aborted', async () => {
@@ -209,14 +367,13 @@ it('places the take at its start plus the trim offset after the transport advanc
       new AbortController().signal
     )
   );
-  expect(harness.audio.addImported).toHaveBeenCalledWith(
+  expect(harness.audio.markImported).toHaveBeenCalledWith(
     expect.objectContaining({
       assetId: 'project-asset:7',
       duration: 2,
       atTime: 4,
       timelineDuration: 10,
     }),
-    'voiceover',
     2,
     'a.webm'
   );
@@ -233,9 +390,35 @@ it('places the take through the output-time map (R03)', async () => {
       new AbortController().signal
     )
   );
-  expect(harness.audio.addImported).toHaveBeenCalledWith(
+  expect(harness.audio.markImported).toHaveBeenCalledWith(
     expect.objectContaining({ atTime: 2, timelineDuration: 10 }),
-    'voiceover',
+    2,
+    'a.webm'
+  );
+});
+
+it('keeps the entry anchor for retry and places trimmed audio in output time across speed edits', async () => {
+  const time = { current: 3 };
+  const harness = renderHookHarness({
+    guard: () => true,
+    time,
+    resultDuration: 6,
+    toOutputTime: (source) => (source - 1) / 2,
+  });
+  act(() => harness.latest.open());
+  time.current = 5;
+  act(() => root.render(<harness.Harness />));
+  await act(async () => harness.latest.syncStart());
+  expect(harness.node.currentTime).toBe(3);
+  await act(async () =>
+    harness.latest.save(
+      new File(['a'], 'a.webm'),
+      { trimStart: 1, trimEnd: 3 },
+      new AbortController().signal
+    )
+  );
+  expect(harness.audio.markImported).toHaveBeenCalledWith(
+    expect.objectContaining({ atTime: 2, timelineDuration: 6 }),
     2,
     'a.webm'
   );
@@ -266,6 +449,82 @@ it('rejects the save when the import fails so the take stays available (V2)', as
     )
   ).rejects.toThrow('quota');
   expect(harness.audio.addImported).not.toHaveBeenCalled();
+});
+
+it('retries an already committed take without attaching a second clip', async () => {
+  const publish = vi.fn(async () => undefined);
+  vi.mocked(importReviewAudio).mockImplementationOnce(async (args) => {
+    args.onPrepared?.({
+      assetId: 'project-asset:7',
+      duration: 2,
+      protect: async () => undefined,
+      cancel: async () => undefined,
+      publish,
+      discard: async () => undefined,
+    });
+    await args.attach('project-asset:7', 2);
+    throw new Error('publication pending');
+  });
+  const harness = renderHookHarness({ guard: () => true });
+  const take = new Blob(['voice']);
+  const importsBefore = vi.mocked(importReviewAudio).mock.calls.length;
+  act(() => harness.latest.open());
+  await expect(
+    act(async () =>
+      harness.latest.save(
+        new File(['voice'], 'voice.webm'),
+        trim,
+        new AbortController().signal,
+        take
+      )
+    )
+  ).rejects.toThrow('publication pending');
+  await act(async () =>
+    harness.latest.save(new File(['voice'], 'voice.webm'), trim, new AbortController().signal, take)
+  );
+  expect(importReviewAudio).toHaveBeenCalledTimes(importsBefore + 1);
+  expect(publish).toHaveBeenCalledOnce();
+  expect(harness.audio.markImported).toHaveBeenCalledOnce();
+});
+
+it('durably commits a recording even when review autosave is disabled', async () => {
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  await act(async () =>
+    harness.latest.save(new File(['voice'], 'voice.webm'), trim, new AbortController().signal)
+  );
+  expect(harness.session.commitDurable).toHaveBeenCalledOnce();
+  expect(harness.session.commit).not.toHaveBeenCalled();
+});
+
+it('does not finish a committed take when publication cannot be resumed', async () => {
+  vi.mocked(importReviewAudio).mockImplementationOnce(async (args) => {
+    await args.attach('project-asset:7', 2);
+    throw new Error('publication journal failed');
+  });
+  const harness = renderHookHarness({ guard: () => true });
+  const take = new Blob(['voice']);
+  act(() => harness.latest.open());
+  await expect(
+    act(async () =>
+      harness.latest.save(
+        new File(['voice'], 'voice.webm'),
+        trim,
+        new AbortController().signal,
+        take
+      )
+    )
+  ).rejects.toThrow('publication journal failed');
+  await expect(
+    act(async () =>
+      harness.latest.save(
+        new File(['voice'], 'voice.webm'),
+        trim,
+        new AbortController().signal,
+        take
+      )
+    )
+  ).rejects.toThrow('publication');
 });
 
 it('does not attach the clip when the import finished after abort (V3)', async () => {
@@ -301,4 +560,98 @@ it('does not attach the clip when the import finished after abort (V3)', async (
   });
   await rejection;
   expect(harness.audio.addImported).not.toHaveBeenCalled();
+});
+
+it('rejects an old review attachment after the voiceover panel closes', async () => {
+  let finish!: () => void;
+  vi.mocked(importReviewAudio).mockImplementationOnce(async (args) => {
+    await new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    args.assertCurrentTarget();
+    await args.attach('project-asset:9', 2);
+  });
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  const pending = harness.latest.save(
+    new File(['voice'], 'voice.webm'),
+    trim,
+    new AbortController().signal
+  );
+  const rejected = expect(pending).rejects.toThrow('Recording review changed');
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  act(() => harness.latest.close());
+  await act(async () => finish());
+  await rejected;
+  expect(harness.audio.markImported).not.toHaveBeenCalled();
+});
+
+it('issues retention after durable attach even if the subsequent publication fails', async () => {
+  const harness = renderHookHarness({ guard: () => true });
+  act(() => harness.latest.open());
+  vi.mocked(importReviewAudio).mockImplementationOnce(async (args) => {
+    await args.attach('project-asset:7', 2);
+    throw new Error('publication failed');
+  });
+  const retained = vi.fn();
+  await expect(
+    harness.latest.save(
+      new File(['voice'], 'voice.webm'),
+      trim,
+      new AbortController().signal,
+      new Blob(['voice']),
+      retained
+    )
+  ).rejects.toThrow('publication failed');
+  expect(retained).toHaveBeenCalledOnce();
+  expect(harness.session.commitDurable).toHaveBeenCalledOnce();
+});
+
+it.each(['positive', 'negative', 'unavailable'] as const)(
+  'uses a confirmed durable read before recovery reload for retention: %s',
+  async (result) => {
+    const harness = renderHookHarness({ guard: () => true });
+    act(() => harness.latest.open());
+    vi.mocked(harness.session.commitDurable).mockRejectedValueOnce(
+      new Error('write result uncertain')
+    );
+    harness.session.hasDurableVoiceoverClip =
+      result === 'unavailable'
+        ? vi.fn(async () => {
+            throw new Error('read failed');
+          })
+        : vi.fn(async () => result === 'positive');
+    harness.session.reload = vi.fn(async () => {
+      throw new Error('reload failed');
+    });
+    const retained = vi.fn();
+    await expect(
+      harness.latest.save(
+        new File(['voice'], 'voice.webm'),
+        trim,
+        new AbortController().signal,
+        new Blob(['voice']),
+        retained
+      )
+    ).rejects.toThrow();
+    expect(retained).toHaveBeenCalledTimes(result === 'positive' ? 1 : 0);
+    expect(harness.session.reload).toHaveBeenCalledTimes(result === 'positive' ? 1 : 0);
+  }
+);
+
+it('shows the chosen cap in the ready transport instead of the full available interval', () => {
+  renderRecording(true);
+  const input = host.querySelector<HTMLInputElement>('input[type="number"]')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '3');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('00:03');
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[data-ui="audio-recording.duration-limit"]')!.click()
+  );
+  expect(host.querySelector('[role="status"]')?.textContent).toContain('00:07');
 });

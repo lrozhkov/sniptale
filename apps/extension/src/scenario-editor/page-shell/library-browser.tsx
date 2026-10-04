@@ -1,3 +1,4 @@
+import { MaterialBrowser } from '@sniptale/ui/material-browser';
 import { LibraryNavigation } from '../../composition/library-preview/navigation';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
@@ -181,6 +182,7 @@ type GuideLibraryBrowserProps = {
   disabled: boolean;
   selectedIds: string[];
   onPreview?: () => void;
+  onClosePreview?: () => void;
   onChoose: (id: string, name: string, kind: 'image' | 'video') => void;
   onDragStart?: (() => void) | undefined;
   previewContent?: ReactNode;
@@ -192,6 +194,7 @@ export function GuideLibraryBrowser({
   selectedIds,
   onChoose,
   onPreview,
+  onClosePreview,
   onDragStart,
   previewContent,
 }: GuideLibraryBrowserProps) {
@@ -201,6 +204,13 @@ export function GuideLibraryBrowser({
   const [category, setCategory] = useState<'all' | 'video' | 'image'>('image');
   const [viewId, setViewId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const cards = useRef(new Map<string, HTMLButtonElement>());
+  const returnFocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (previewId !== null || returnFocus.current === null) return;
+    cards.current.get(returnFocus.current)?.focus({ preventScroll: true });
+    returnFocus.current = null;
+  }, [previewId]);
   const view = catalog.views.find((entry) => entry.id === viewId);
   const normalized = query.trim().toLocaleLowerCase();
   const items = catalog.items.filter(
@@ -212,25 +222,34 @@ export function GuideLibraryBrowser({
       item.filename.toLocaleLowerCase().includes(normalized) &&
       (!view || matchesLibraryFilters(item, view.filters, Date.now()))
   );
-  const preview = catalog.items.find((item) => item.id === previewId);
+  const preview = items.find((item) => item.id === previewId);
   return (
-    <div className="guide-library-browser">
-      <LibraryNavigation
-        t={t}
-        label={t('scenario.editor.guideLibraryNavigation')}
-        category={category}
-        presetId={viewId}
-        savedViews={catalog.views}
-        onCategoryChange={(value) => {
-          setCategory(value);
-          setViewId(null);
-        }}
-        onPresetChange={(id, nextCategory) => {
-          setCategory(nextCategory);
-          setViewId(id);
-        }}
-      />
-      <div className="guide-library-content">
+    <MaterialBrowser
+      className="guide-library-browser"
+      listClassName="guide-library-grid"
+      labels={{
+        list: t('gallery.preview.materialsList'),
+        show: t('gallery.preview.showMaterials'),
+        hide: t('gallery.preview.hideMaterials'),
+      }}
+      navigation={
+        <LibraryNavigation
+          t={t}
+          label={t('scenario.editor.guideLibraryNavigation')}
+          category={category}
+          presetId={viewId}
+          savedViews={catalog.views}
+          onCategoryChange={(value) => {
+            setCategory(value);
+            setViewId(null);
+          }}
+          onPresetChange={(id, nextCategory) => {
+            setCategory(nextCategory);
+            setViewId(id);
+          }}
+        />
+      }
+      search={
         <div className="guide-library-search">
           <label className="sr-only" htmlFor={searchId}>
             {t(
@@ -251,80 +270,110 @@ export function GuideLibraryBrowser({
             onChange={setQuery}
           />
         </div>
-        {catalog.status === 'loading' && !catalog.items.length && (
-          <p role="status">{t('scenario.editor.loading')}</p>
-        )}
-        {catalog.status === 'failed' && (
-          <div role="alert">
-            <p>{t('scenario.editor.guideLibraryLoadFailed')}</p>
-            <ProductActionButton compact tone="secondary" onClick={() => void catalog.reload()}>
-              {t('scenario.editor.guideRetry')}
-            </ProductActionButton>
-          </div>
-        )}
-        <div
-          className="guide-library-grid"
-          data-layout={category === 'video' ? 'list' : 'grid'}
-          aria-label={t(
+      }
+      status={
+        <>
+          {catalog.status === 'loading' && !catalog.items.length && (
+            <p role="status">{t('scenario.editor.loading')}</p>
+          )}
+          {catalog.status === 'failed' && (
+            <div role="alert">
+              <p>{t('scenario.editor.guideLibraryLoadFailed')}</p>
+              <ProductActionButton compact tone="secondary" onClick={() => void catalog.reload()}>
+                {t('scenario.editor.guideRetry')}
+              </ProductActionButton>
+            </div>
+          )}
+        </>
+      }
+      preview={
+        preview ? (
+          <LibraryPreview
+            item={preview}
+            t={t}
+            videoContent={previewContent}
+            onReturn={() => {
+              returnFocus.current = preview.id;
+              setPreviewId(null);
+              onClosePreview?.();
+            }}
+          />
+        ) : undefined
+      }
+    >
+      {items.map((item) => (
+        <LibraryCard
+          key={item.id}
+          cardRef={(node) => {
+            if (node) cards.current.set(item.id, node);
+            else cards.current.delete(item.id);
+          }}
+          item={item}
+          t={t}
+          disabled={disabled}
+          selected={selectedIds.includes(item.id) || preview?.id === item.id}
+          order={selectedIds.indexOf(item.id) + 1}
+          onSelect={() => onChoose(item.id, item.filename, 'image')}
+          onDragStart={onDragStart}
+          onChoose={() => {
+            setPreviewId(item.id);
+            if (item.kind === 'image' || item.kind === 'screenshot') onPreview?.();
+            else onChoose(item.id, item.filename, 'video');
+          }}
+        />
+      ))}
+      {catalog.status === 'ready' && !items.length && (
+        <p>
+          {t(
             category === 'video'
-              ? 'scenario.editor.guideLibraryVideos'
-              : 'scenario.editor.guideLibraryAll'
+              ? 'scenario.editor.guideLibraryVideoEmpty'
+              : 'scenario.editor.guideLibraryEmpty'
           )}
-        >
-          {items.map((item) => (
-            <LibraryCard
-              key={item.id}
-              item={item}
-              t={t}
-              disabled={disabled}
-              selected={
-                selectedIds.includes(item.id) || (category === 'video' && previewId === item.id)
-              }
-              order={selectedIds.indexOf(item.id) + 1}
-              onSelect={() => onChoose(item.id, item.filename, 'image')}
-              onDragStart={onDragStart}
-              onChoose={() => {
-                setPreviewId(item.id);
-                if (item.kind === 'image' || item.kind === 'screenshot') onPreview?.();
-                else onChoose(item.id, item.filename, 'video');
-              }}
-            />
-          ))}
-          {catalog.status === 'ready' && !items.length && (
-            <p>
-              {t(
-                category === 'video'
-                  ? 'scenario.editor.guideLibraryVideoEmpty'
-                  : 'scenario.editor.guideLibraryEmpty'
-              )}
-            </p>
-          )}
-        </div>
-      </div>
-      <aside
-        className="guide-library-preview"
-        aria-label={t('scenario.editor.guideLibraryPreview')}
-      >
-        {preview && preview.kind !== 'image' && preview.kind !== 'screenshot' ? (
-          previewContent
-        ) : preview ? (
+        </p>
+      )}
+    </MaterialBrowser>
+  );
+}
+
+/** Presents the shared return header and the selected media without owning navigation state. */
+function LibraryPreview({
+  item,
+  t,
+  videoContent,
+  onReturn,
+}: {
+  item: MediaLibraryItem;
+  t: Translate;
+  videoContent: ReactNode;
+  onReturn: () => void;
+}) {
+  const image = item.kind === 'image' || item.kind === 'screenshot';
+  return (
+    <aside
+      className="guide-library-preview flex-1"
+      aria-label={t('scenario.editor.guideLibraryPreview')}
+    >
+      <div className="guide-library-preview-header">
+        <ProductActionButton compact tone="secondary" onClick={onReturn}>
+          {t('scenario.editor.guideLibraryBack')}
+        </ProductActionButton>
+        {image && (
           <>
-            <LibraryRaster item={preview} full t={t} />
-            <strong>{preview.filename}</strong>
+            <strong title={item.filename}>{item.filename}</strong>
             <span>
-              {preview.width} × {preview.height}
+              {item.width} × {item.height}
             </span>
           </>
-        ) : (
-          <p>{t('scenario.editor.guideLibraryPreviewHint')}</p>
         )}
-      </aside>
-    </div>
+      </div>
+      {image ? <LibraryRaster item={item} full t={t} /> : videoContent}
+    </aside>
   );
 }
 
 /** One media card owns its selection affordance and native image drag payload. */
 function LibraryCard({
+  cardRef,
   item,
   t,
   disabled,
@@ -334,6 +383,7 @@ function LibraryCard({
   onDragStart,
   onChoose,
 }: {
+  cardRef: (node: HTMLButtonElement | null) => void;
   item: MediaLibraryItem;
   t: Translate;
   disabled: boolean;
@@ -347,6 +397,7 @@ function LibraryCard({
     <div className="guide-library-card-container">
       <button
         type="button"
+        ref={cardRef}
         className="guide-library-card"
         draggable={
           (item.kind === 'image' || item.kind === 'screenshot') && !disabled && Boolean(onDragStart)

@@ -1,3 +1,4 @@
+import { useMaterialDrag } from '../../chrome/material-drag';
 import { formatPreciseTime } from '../../../composition/library-preview/time-format';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
@@ -39,6 +40,15 @@ import type { VideoProject, VideoProjectAsset } from '../../../features/video/pr
 const MATERIAL_ACTION_CLASS_NAME = [
   'w-full min-w-0 justify-start !h-8 !min-h-8 !px-2',
   '!rounded-[var(--sniptale-radius-sm)] [&_svg]:shrink-0',
+].join(' ');
+
+const MATERIAL_ROW_ICON_ACTION_CLASS_NAME = [
+  '!border !border-solid !border-transparent !bg-transparent',
+  '!text-[var(--sniptale-color-text-secondary)]',
+  'hover:!border-[var(--sniptale-color-border-strong)] hover:!bg-transparent',
+  'hover:!text-[var(--sniptale-color-text-primary)]',
+  'focus-visible:!border-[var(--sniptale-color-border-accent-strong)]',
+  'focus-visible:!bg-transparent focus-visible:!text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 const MATERIAL_IMPORT_OPTIONS = [
@@ -225,6 +235,7 @@ function MaterialsFilters(props: {
             }}
           />
           <ProductActionButton
+            className={'sniptale-dismiss-button'}
             compact
             tone="secondary"
             aria-label={translate('videoEditor.sidebar.materialsCloseSearch')}
@@ -334,12 +345,12 @@ function MaterialRow(props: {
       </div>
       <MaterialName {...props} />
       {props.uses.some((use) => use.kind !== 'analysis') && (
-        <div className="relative size-8 shrink-0">
+        <div className="group/show-use relative size-8 shrink-0">
           <CompactSelect
             menuAnchorRef={rowRef}
             dataUi="video-editor.materials.show-use"
             containerClassName="!w-8"
-            className="!size-8 !p-0 [&>span]:hidden [&>svg]:hidden"
+            className={`${MATERIAL_ROW_ICON_ACTION_CLASS_NAME} !size-8 !p-0 [&>span]:hidden [&>svg]:hidden`}
             title={translate('videoEditor.sidebar.materialsShowUses')}
             appearance="plain"
             controlSize="sm"
@@ -373,7 +384,9 @@ function MaterialRow(props: {
           <span
             className={[
               'pointer-events-none absolute inset-0 flex items-center justify-center',
-              'text-[var(--sniptale-color-text-muted)]',
+              'text-[var(--sniptale-color-text-secondary)] transition-colors',
+              'group-hover/show-use:text-[var(--sniptale-color-text-primary)]',
+              'group-focus-within/show-use:text-[var(--sniptale-color-text-primary)]',
             ].join(' ')}
           >
             <LocateFixed size={15} aria-hidden="true" />
@@ -555,6 +568,7 @@ function MaterialName(props: {
   onSelect: () => void;
   onRename: (name: string) => void;
 }) {
+  const materialDrag = useMaterialDrag();
   const [draft, setDraft] = useState<string | null>(null);
   const editingRef = useRef(false);
   const nameRef = useRef<HTMLDivElement>(null);
@@ -593,6 +607,14 @@ function MaterialName(props: {
             tone="toggle"
             active={props.selected}
             className="!min-h-12 w-full min-w-0 flex-1 flex-col !items-start justify-center !gap-0.5 !px-2 text-left"
+            draggable={!props.disabled && !materialDrag.pending}
+            onDragStart={(event) => {
+              if (props.disabled || materialDrag.pending) {
+                event.preventDefault();
+                return;
+              }
+              materialDrag.start(props.asset.id, event.currentTarget, event.dataTransfer);
+            }}
             aria-pressed={props.selected}
             aria-label={props.asset.name}
             aria-describedby={`material-usage-${props.asset.id}`}
@@ -624,10 +646,9 @@ function MaterialName(props: {
         compact
         tone="secondary"
         disabled={props.disabled}
-        className={[
-          '!size-8 !min-h-8 shrink-0 !p-0 opacity-0',
-          'group-hover/material:opacity-100 group-focus-within/material:opacity-100',
-        ].join(' ')}
+        className={[MATERIAL_ROW_ICON_ACTION_CLASS_NAME, '!size-8 !min-h-8 shrink-0 !p-0'].join(
+          ' '
+        )}
         aria-label={`${translate('videoEditor.app.materialsRename')}: ${props.asset.name}`}
         title={translate('videoEditor.app.materialsRename')}
         onClick={() => {

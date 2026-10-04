@@ -12,7 +12,8 @@ const mocks = vi.hoisted(() => ({
   txDelete: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   MEDIA_LIBRARY_STORE: 'media_library',
   THUMBNAILS_STORE: 'thumbnails',
   initDB: mocks.initDB,
@@ -82,7 +83,7 @@ function createDb() {
     put: mocks.put,
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
-      objectStore: vi.fn(() => ({ delete: mocks.txDelete })),
+      objectStore: vi.fn(() => ({ delete: mocks.txDelete, get: mocks.get, put: mocks.put })),
     })),
   };
 }
@@ -149,14 +150,17 @@ it('does not route source cleanup from malformed media records', async () => {
   expect(mocks.txDelete).not.toHaveBeenCalled();
 });
 
-it('normalizes legacy editable image content state and rejects invalid state', () => {
+it.each<MediaLibraryEntry['source']>([
+  { kind: 'screenshot' },
+  { kind: 'stored-asset', assetId: 'scenario-source' },
+])('normalizes editable image content state and rejects invalid state for $kind', (source) => {
   const image = createMediaEntry({
     blob: new Blob(['image'], { type: 'image/png' }),
     height: 100,
     id: 'image-1',
     kind: 'image',
     mimeType: 'image/png',
-    source: { kind: 'screenshot' },
+    source,
     width: 100,
   });
 
@@ -173,4 +177,18 @@ it('normalizes legacy editable image content state and rejects invalid state', (
   expect(
     parseMediaLibraryEntry({ ...image, imageContentState: 'unknown', workspaceRevision: 3 })
   ).toBeNull();
+});
+
+it('returns a valid thumbnail with its original Blob and timestamps', async () => {
+  const thumbnail = {
+    assetId: 'recording:valid',
+    blob: new Blob(['preview'], { type: 'image/png' }),
+    createdAt: 100,
+    updatedAt: 200,
+    width: 1280,
+    height: 720,
+  };
+  mocks.get.mockResolvedValueOnce(thumbnail);
+  await expect(getMediaThumbnail(thumbnail.assetId)).resolves.toEqual(thumbnail);
+  expect(mocks.get).toHaveBeenCalledWith('thumbnails', thumbnail.assetId);
 });

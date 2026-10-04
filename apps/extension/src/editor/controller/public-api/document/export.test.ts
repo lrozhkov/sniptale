@@ -5,6 +5,7 @@ import {
   type EditorDocumentExportControllerApi,
   type EditorDocumentRenderControllerApi,
   exportEditorDocumentViaController,
+  renderEditorControllerForExport,
   renderEditorControllerToDataUrl,
 } from './export';
 import type { SourceState } from '../../../document/model/source-state';
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   getSourceObject: vi.fn(() => 'source-object'),
   loadEditorExportSettings: vi.fn(async () => ({ imageFormat: 'png', imageQuality: 0.9 })),
   renderToDataUrl: vi.fn(() => 'data-url'),
+  renderWithFrameAnnotations: vi.fn(async () => 'rendered-frames'),
   resolveMimeType: vi.fn(() => 'image/png'),
   storeGetState: vi.fn(() => storeState),
   syncSourceState: vi.fn(() => ({ synced: true })),
@@ -50,6 +52,10 @@ vi.mock('../../document/source', async (importOriginal) => ({
 vi.mock('../../../persistence/export-settings', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../persistence/export-settings')>()),
   loadEditorExportSettings: mocks.loadEditorExportSettings,
+}));
+
+vi.mock('./frame-annotation-export', () => ({
+  renderEditorWithFrameAnnotations: mocks.renderWithFrameAnnotations,
 }));
 
 function createSourceState(): SourceState {
@@ -123,5 +129,28 @@ it('renders and copies controller output through export settings', async () => {
   expect(mocks.copyRenderedImage).toHaveBeenCalledWith({
     dataUrl: 'rendered',
     mimeType: 'image/png',
+  });
+});
+
+it('passes the draft policy to frame rendering while finalizing explicit exports by default', async () => {
+  const controller = createController();
+  const renderOptions = { format: 'png' as const, quality: 1 };
+
+  await expect(
+    renderEditorControllerForExport(controller, renderOptions, 'committed')
+  ).resolves.toBe('rendered-frames');
+  expect(mocks.renderWithFrameAnnotations).toHaveBeenLastCalledWith({
+    canvas: controller.canvas,
+    canvasDocumentSize: controller.canvasDocumentSize,
+    draftPolicy: 'committed',
+    renderOptions,
+  });
+
+  await renderEditorControllerForExport(controller, renderOptions);
+  expect(mocks.renderWithFrameAnnotations).toHaveBeenLastCalledWith({
+    canvas: controller.canvas,
+    canvasDocumentSize: controller.canvasDocumentSize,
+    draftPolicy: 'finalize',
+    renderOptions,
   });
 });

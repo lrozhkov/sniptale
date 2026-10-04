@@ -127,6 +127,11 @@ export function useVideoEditorShellController() {
   return createVideoEditorShellController(store);
 }
 
+export function useVideoEditorStartActions() {
+  const commands = useProjectCommandContext();
+  return { onCreate: commands.handleCreateProject, onOpen: commands.handleOpenProject };
+}
+
 export function useVideoEditorOverlaysController() {
   const exportPort = useVideoEditorExportPort((port) => port);
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
@@ -185,6 +190,13 @@ export function useVideoEditorLayoutController() {
   return createWorkspaceLayoutController(workspace);
 }
 
+export function useVideoEditorAutosaveController() {
+  return useVideoEditorProjectLifecyclePort(({ autosaveEnabled, setAutosaveEnabled }) => ({
+    enabled: autosaveEnabled,
+    onChange: setAutosaveEnabled,
+  }));
+}
+
 export function useVideoEditorHeaderController() {
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, renameProject, saveState }) => ({
     project,
@@ -192,7 +204,10 @@ export function useVideoEditorHeaderController() {
     saveState,
   }));
   const openExportDialog = useVideoEditorExportPort((port) => port.openExportDialog);
-  const selectScene = useVideoEditorClipSelectionPort((port) => port.selectScene);
+  const sceneSelection = useVideoEditorClipSelectionPort(({ selectScene, selection }) => ({
+    selectScene,
+    selection,
+  }));
   const libraries = useVideoEditorLibrariesContext();
   const dialogs = useWorkspaceDialogsContext();
   const layout = useWorkspaceLayoutContext();
@@ -208,7 +223,7 @@ export function useVideoEditorHeaderController() {
     {
       libraries,
       saveStateMeta,
-      store: { renameProject: lifecycle.renameProject, openExportDialog, selectScene },
+      store: { renameProject: lifecycle.renameProject, openExportDialog, ...sceneSelection },
       workspace,
     },
     lifecycle.project

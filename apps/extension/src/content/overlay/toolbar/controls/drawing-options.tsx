@@ -1,5 +1,12 @@
 import { ProductToolbarMenu } from '@sniptale/ui/product-menus/toolbar';
-import { useLayoutEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+  type ReactNode,
+} from 'react';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import {
   DRAWING_ARROW_WIDTHS,
@@ -11,13 +18,18 @@ import {
   type DrawingShapeKind,
   type DrawingShapeObject,
 } from '../../../../features/drawing/public';
-import { measureContentDrawingText } from '../../../drawing/text-measurement';
 import { translate } from '../../../../platform/i18n';
+import { getColorAlpha } from '@sniptale/foundation/color';
+import {
+  markerColorAtOpacity,
+  markerColorPatch,
+  markerVisibleColor,
+} from '../../../../ui/drawing-tools/marker-color';
 import {
   ArrowWidthModeOptions,
+  ArrowDrawDirectionOption,
   DrawingColorOptions,
-  DrawingDeleteOption,
-  DrawingDeselectOption,
+  DrawingBlurStrengthOptions,
   DrawingOptionsDivider,
   DrawingShapeOptions,
   DrawingShapeFillOptions,
@@ -25,11 +37,17 @@ import {
   DrawingWidthOptions,
   MarkerOpacityOptions,
 } from '../../../../ui/drawing-tools/options';
-import {
-  resolveUpdatedQuickObject,
-  type DrawingQuickToolUpdate as QuickToolUpdate,
-  type SelectedQuickDrawingObject,
+import { DrawingSelectionActions } from '../../../../ui/drawing-tools/selection-actions';
+import type {
+  DrawingQuickToolUpdate as QuickToolUpdate,
+  SelectedQuickDrawingObject,
 } from '../../../../features/drawing/updates';
+import {
+  changeSelectedQuickObjects,
+  previewSelectedQuickObject,
+  updateQuickToolOption,
+  type ConfigurableDrawingQuickOptionsTool,
+} from './drawing-options-updates';
 import {
   resolveToolbarFloatingMenuStyle,
   resolveToolbarMenuPlacement,
@@ -37,7 +55,6 @@ import {
 } from '../menu/floating.helpers';
 import { getToolbarMenuPosition } from '../menu/position';
 
-type ConfigurableDrawingQuickOptionsTool = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text';
 type DrawingQuickOptionsTool = ConfigurableDrawingQuickOptionsTool | 'blur' | 'selection';
 
 const DRAWING_OPTIONS_DIMENSIONS: Record<
@@ -45,50 +62,81 @@ const DRAWING_OPTIONS_DIMENSIONS: Record<
   Record<DrawingQuickOptionsTool, { height: number; width: number }>
 > = {
   horizontal: {
-    arrow: { height: 48, width: 534 },
-    blur: { height: 48, width: 80 },
-    marker: { height: 48, width: 534 },
-    pencil: { height: 48, width: 314 },
-    shape: { height: 48, width: 668 },
+    arrow: { height: 48, width: 600 },
+    blur: { height: 48, width: 336 },
+    marker: { height: 48, width: 560 },
+    pencil: { height: 48, width: 340 },
+    shape: { height: 48, width: 694 },
     selection: { height: 48, width: 676 },
-    text: { height: 88, width: 676 },
+    text: { height: 48, width: 700 },
   },
   vertical: {
-    arrow: { height: 346, width: 136 },
-    blur: { height: 80, width: 48 },
-    marker: { height: 346, width: 136 },
-    pencil: { height: 266, width: 136 },
-    shape: { height: 482, width: 136 },
-    selection: { height: 482, width: 152 },
-    text: { height: 642, width: 152 },
+    arrow: { height: 290, width: 190 },
+    blur: { height: 174, width: 136 },
+    marker: { height: 250, width: 190 },
+    pencil: { height: 170, width: 190 },
+    shape: { height: 365, width: 190 },
+    selection: { height: 365, width: 190 },
+    text: { height: 420, width: 190 },
   },
 };
 
 function useDrawingOptionsLayout(args: {
   displayMode: 'horizontal' | 'vertical';
+  hasSelection: boolean;
+  panelRef: RefObject<HTMLDivElement | null>;
   tool: DrawingQuickOptionsTool;
   triggerRef: RefObject<HTMLButtonElement | null>;
 }) {
   const [, setViewportRevision] = useState(0);
+  const [measured, setMeasured] = useState<{ width: number; height: number } | null>(null);
   useLayoutEffect(() => {
-    const refresh = () => setViewportRevision((value) => value + 1);
-    refresh();
+    const surface = args.panelRef.current?.closest<HTMLElement>(
+      '[data-ui="content.toolbar.drawing-options.pair"], .sniptale-drawing-options-menu'
+    );
+    const root =
+      surface?.closest<HTMLElement>('[data-ui="content.toolbar.drawing-options.pair"]') ?? surface;
+    const measure = () => {
+      if (!root) return;
+      const width = root.offsetWidth;
+      const height = root.offsetHeight;
+      if (!width || !height) return;
+      setMeasured((current) =>
+        current?.width === width && current.height === height ? current : { width, height }
+      );
+    };
+    const refresh = () => {
+      measure();
+      setViewportRevision((value) => value + 1);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    if (root) observer?.observe(root);
     window.addEventListener('resize', refresh);
     window.addEventListener('scroll', refresh, true);
     return () => {
+      observer?.disconnect();
       window.removeEventListener('resize', refresh);
       window.removeEventListener('scroll', refresh, true);
     };
-  }, []);
+  }, [args.displayMode, args.hasSelection, args.panelRef, args.tool]);
   const dimensions = DRAWING_OPTIONS_DIMENSIONS[args.displayMode][args.tool];
-  const menuWidth = Math.min(dimensions.width, Math.max(0, window.innerWidth - 16));
-  const placement = getToolbarMenuPosition(args.triggerRef.current, dimensions.height);
+  const menuHeight =
+    measured?.height ??
+    dimensions.height + (args.hasSelection && args.displayMode === 'vertical' ? 294 : 0);
+  const menuWidth = Math.min(
+    measured?.width ??
+      dimensions.width + (args.hasSelection && args.displayMode === 'horizontal' ? 294 : 0),
+    Math.max(0, window.innerWidth - 16)
+  );
+  const placement = getToolbarMenuPosition(args.triggerRef.current, menuHeight);
   const positioned = resolveToolbarFloatingMenuStyle({
     anchorEl: args.triggerRef.current,
     displayMode: args.displayMode,
-    menuHeight: dimensions.height,
+    menuHeight,
     menuWidth,
     placement,
+    preferredTop: args.hasSelection ? -16 : 0,
   });
   const fallback: CSSProperties =
     args.displayMode === 'vertical'
@@ -110,20 +158,85 @@ function useDrawingOptionsLayout(args: {
   };
 }
 
-function getDrawingOptionsLayoutClass(displayMode: 'horizontal' | 'vertical'): string {
-  return displayMode === 'vertical'
-    ? 'flex flex-col items-center gap-2'
-    : 'flex flex-row items-center gap-2';
+type DrawingOptionsBodyProps = {
+  children: ReactNode;
+  displayMode: 'horizontal' | 'vertical';
+  panelRef: RefObject<HTMLDivElement | null>;
+  tool: DrawingQuickOptionsTool;
+};
+
+function DrawingOptionsBody(props: DrawingOptionsBodyProps) {
+  return (
+    <div
+      ref={props.panelRef}
+      role="group"
+      aria-label={translate('content.toolbar.drawingOptions')}
+      data-ui={`content.toolbar.drawing-options.${props.tool}`}
+      className={
+        props.displayMode === 'vertical'
+          ? 'flex flex-col items-center gap-2'
+          : 'flex flex-row items-center gap-2'
+      }
+    >
+      {props.children}
+    </div>
+  );
+}
+
+function DrawingOptionsPair(
+  props: DrawingOptionsBodyProps & {
+    controller: ContentDrawingController;
+    layout: ReturnType<typeof useDrawingOptionsLayout>;
+    selectedCount: number;
+    totalCount: number;
+  }
+) {
+  const options = (
+    <DrawingOptionsBody panelRef={props.panelRef} tool={props.tool} displayMode={props.displayMode}>
+      {props.children}
+    </DrawingOptionsBody>
+  );
+  const actions = (
+    <DrawingSelectionActions
+      vertical={props.displayMode === 'vertical'}
+      canReorder={props.selectedCount > 0 && props.totalCount > props.selectedCount}
+      canDuplicate={props.selectedCount > 0}
+      canDelete={props.selectedCount > 0}
+      onMove={(direction) => props.controller.session.moveSelected(direction)}
+      onDuplicate={() => props.controller.session.duplicateSelected()}
+      onDelete={() => props.controller.session.deleteSelected()}
+      onDeselect={() => props.controller.session.select(null)}
+    />
+  );
+  return (
+    <div
+      data-ui="content.toolbar.drawing-options.pair"
+      className={[
+        'absolute flex max-w-[calc(100vw-16px)] items-start gap-2 overflow-x-auto',
+        props.displayMode === 'vertical' ? 'flex-col' : 'flex-row',
+      ].join(' ')}
+      style={props.layout.style}
+    >
+      {Object.entries({ options, actions }).map(([key, content]) => (
+        <ProductToolbarMenu
+          key={key}
+          compact
+          variant="drawing"
+          className="sniptale-drawing-options-popover"
+          style={{ position: 'relative', top: 'auto', left: 'auto', minWidth: 0, zIndex: 'auto' }}
+        >
+          {content}
+        </ProductToolbarMenu>
+      ))}
+    </div>
+  );
 }
 
 function resolveSelectedQuickObject(
   object: DrawingObject | undefined,
   tool: ConfigurableDrawingQuickOptionsTool
 ): SelectedQuickDrawingObject {
-  if (tool === 'pencil' && object?.kind === 'pencil') return object;
-  if (tool === 'marker' && object?.kind === 'marker') return object;
-  if (tool === 'arrow' && object?.kind === 'arrow') return object;
-  if (tool === 'text' && object?.kind === 'text') return object;
+  if (object?.kind === tool) return object;
   if (
     tool === 'shape' &&
     (object?.kind === 'rectangle' ||
@@ -152,68 +265,6 @@ function resolveSelectedShapeKind(selected: SelectedQuickDrawingObject): Drawing
   return resolveSelectedShape(selected)?.kind ?? null;
 }
 
-function replaceSelectedQuickObject(
-  controller: ContentDrawingController,
-  selected: Exclude<SelectedQuickDrawingObject, null>,
-  update: QuickToolUpdate
-) {
-  controller.session.replaceObject(
-    resolveUpdatedQuickObject(selected, update, { measureText: measureContentDrawingText })
-  );
-}
-
-function updateQuickToolOption(args: {
-  controller: ContentDrawingController;
-  selected: SelectedQuickDrawingObject;
-  snapshot: DrawingSessionSnapshot;
-  tool: ConfigurableDrawingQuickOptionsTool;
-  update: QuickToolUpdate;
-}) {
-  const { controller, selected, snapshot, tool, update } = args;
-  if (tool === 'pencil') {
-    controller.session.setDefaults({
-      ...snapshot.defaults,
-      pencil: { ...snapshot.defaults.pencil, ...update },
-    });
-  } else if (tool === 'marker') {
-    controller.session.setDefaults({
-      ...snapshot.defaults,
-      marker: { ...snapshot.defaults.marker, ...update },
-    });
-  } else if (tool === 'shape') {
-    controller.session.setDefaults({
-      ...snapshot.defaults,
-      shape: { ...snapshot.defaults.shape, ...update },
-    });
-  } else if (tool === 'arrow') {
-    controller.session.setDefaults({
-      ...snapshot.defaults,
-      arrow: {
-        ...snapshot.defaults.arrow,
-        color: update.color ?? snapshot.defaults.arrow.color,
-        design: update.design ?? snapshot.defaults.arrow.design,
-        dynamicWidth: update.dynamicWidth ?? snapshot.defaults.arrow.dynamicWidth,
-        width: update.width ?? snapshot.defaults.arrow.width,
-      },
-    });
-  } else {
-    controller.session.setDefaults({
-      ...snapshot.defaults,
-      text: {
-        ...snapshot.defaults.text,
-        backgroundColor:
-          update.backgroundColor === undefined
-            ? snapshot.defaults.text.backgroundColor
-            : update.backgroundColor,
-        color: update.color ?? snapshot.defaults.text.color,
-        fontFamily: update.fontFamily ?? snapshot.defaults.text.fontFamily,
-        fontSize: update.fontSize ?? snapshot.defaults.text.fontSize,
-      },
-    });
-  }
-  if (selected) replaceSelectedQuickObject(controller, selected, update);
-}
-
 export function resolveDrawingQuickOptionsTool(
   snapshot: DrawingSessionSnapshot
 ): DrawingQuickOptionsTool | null {
@@ -234,6 +285,7 @@ export function resolveDrawingQuickOptionsTool(
     return 'shape';
   }
   return snapshot.activeTool === 'pencil' ||
+    snapshot.activeTool === 'blur' ||
     snapshot.activeTool === 'marker' ||
     snapshot.activeTool === 'shape' ||
     snapshot.activeTool === 'arrow' ||
@@ -264,6 +316,19 @@ function isStrokeColorObject(
   return object.kind !== 'blur' && object.kind !== 'text';
 }
 
+function visibleStrokeColor(object: Exclude<DrawingObject, { kind: 'blur' | 'text' }>): string {
+  return object.kind === 'marker' ? markerVisibleColor(object.color, object.opacity) : object.color;
+}
+
+function applyStrokeColor(
+  object: Exclude<DrawingObject, { kind: 'blur' | 'text' }>,
+  color: string
+) {
+  return object.kind === 'marker'
+    ? { ...object, ...markerColorPatch(color) }
+    : { ...object, color };
+}
+
 function ToolbarDrawingSelectionOptions(props: {
   controller: ContentDrawingController;
   displayMode: 'horizontal' | 'vertical';
@@ -278,17 +343,25 @@ function ToolbarDrawingSelectionOptions(props: {
         .map((object) => resolveSelectedQuickObject(object, sharedTool))
         .filter((object): object is Exclude<SelectedQuickDrawingObject, null> => object !== null)
     : [];
-  const update = (next: QuickToolUpdate) => {
-    props.controller.session.replaceObjects(
-      selectedQuick.map((object) =>
-        resolveUpdatedQuickObject(object, next, { measureText: measureContentDrawingText })
-      )
-    );
-  };
+  const update = (next: QuickToolUpdate) =>
+    changeSelectedQuickObjects({
+      controller: props.controller,
+      selected: selectedQuick,
+      update: next,
+      preview: false,
+    });
+  const preview = (next: QuickToolUpdate) =>
+    changeSelectedQuickObjects({
+      controller: props.controller,
+      selected: selectedQuick,
+      update: next,
+      preview: true,
+    });
+  const resetPreview = () => props.controller.session.clearObjectPreview();
   const vertical = props.displayMode === 'vertical';
   const strokeObjects = props.selected.filter(isStrokeColorObject);
   const hasSharedStrokeColor = strokeObjects.length === props.selected.length;
-  const hasProperties = Boolean(sharedTool || hasSharedStrokeColor);
+  const firstStrokeColor = strokeObjects[0] ? visibleStrokeColor(strokeObjects[0]) : null;
   const first = selectedQuick[0] ?? null;
   return (
     <>
@@ -300,6 +373,8 @@ function ToolbarDrawingSelectionOptions(props: {
           selected={first}
           snapshot={props.snapshot}
           update={update}
+          preview={preview}
+          resetPreview={resetPreview}
         />
       ) : sharedTool && sharedTool !== 'text' && first ? (
         <DrawingNonTextToolOptions
@@ -310,30 +385,36 @@ function ToolbarDrawingSelectionOptions(props: {
           snapshot={props.snapshot}
           tool={sharedTool}
           update={update}
+          preview={preview}
+          resetPreview={resetPreview}
         />
       ) : hasSharedStrokeColor ? (
         <DrawingColorOptions
+          allowAlpha
           colors={[...props.controller.getPalette()]}
           floatingBoundaryRef={props.panelRef}
           floatingPlacement={vertical ? 'side' : 'auto'}
           label={translate('content.toolbar.drawingColor')}
           selectedValue={
-            strokeObjects.every((object) => object.color === strokeObjects[0]!.color)
-              ? strokeObjects[0]!.color
+            strokeObjects.every((object) => visibleStrokeColor(object) === firstStrokeColor)
+              ? firstStrokeColor
               : null
           }
           vertical={vertical}
-          value={strokeObjects[0]?.color ?? props.controller.getPalette()[0] ?? '#000000'}
+          value={firstStrokeColor ?? props.controller.getPalette()[0] ?? '#000000'}
           onSelect={(color) =>
             props.controller.session.replaceObjects(
-              strokeObjects.map((object) => ({ ...object, color }))
+              strokeObjects.map((object) => applyStrokeColor(object, color))
             )
           }
+          onPreview={(color) =>
+            props.controller.session.previewObjects(
+              strokeObjects.map((object) => applyStrokeColor(object, color))
+            )
+          }
+          onPreviewReset={resetPreview}
         />
       ) : null}
-      {hasProperties ? <DrawingOptionsDivider vertical={vertical} /> : null}
-      <DrawingDeleteOption onClick={() => props.controller.session.deleteSelected()} />
-      <DrawingDeselectOption onClick={() => props.controller.session.select(null)} />
     </>
   );
 }
@@ -345,6 +426,8 @@ function DrawingTextToolOptions(props: {
   selected: Extract<DrawingObject, { kind: 'text' }> | null;
   snapshot: DrawingSessionSnapshot;
   update: (next: QuickToolUpdate) => void;
+  preview: (next: QuickToolUpdate) => void;
+  resetPreview: () => void;
 }) {
   const defaults = props.snapshot.defaults.text;
   const values = props.selected ?? defaults;
@@ -360,6 +443,10 @@ function DrawingTextToolOptions(props: {
       vertical={props.displayMode === 'vertical'}
       onBackgroundColorChange={(backgroundColor) => props.update({ backgroundColor })}
       onColorChange={(color) => props.update({ color })}
+      onColorPreview={(color) => props.preview({ color })}
+      onColorPreviewReset={props.resetPreview}
+      onBackgroundColorPreview={(backgroundColor) => props.preview({ backgroundColor })}
+      onBackgroundColorPreviewReset={props.resetPreview}
       onFontFamilyChange={(fontFamily) => props.update({ fontFamily })}
       onFontSizeChange={(fontSize) => props.update({ fontSize })}
     />
@@ -387,6 +474,8 @@ function DrawingShapeFillToolOptions(props: {
   snapshot: DrawingSessionSnapshot;
   vertical: boolean;
   update: (next: QuickToolUpdate) => void;
+  preview: (next: QuickToolUpdate) => void;
+  resetPreview: () => void;
 }) {
   return (
     <>
@@ -402,6 +491,8 @@ function DrawingShapeFillToolOptions(props: {
         }
         vertical={props.vertical}
         onChange={(fillColor) => props.update({ fillColor })}
+        onPreview={(fillColor) => props.preview({ fillColor })}
+        onPreviewReset={props.resetPreview}
       />
     </>
   );
@@ -413,22 +504,22 @@ function DrawingMarkerToolOptions(props: {
   vertical: boolean;
   update: (next: QuickToolUpdate) => void;
 }) {
+  const marker =
+    props.selected?.kind === 'marker' ? props.selected : props.snapshot.defaults.marker;
+  const visibleColor = markerVisibleColor(marker.color, marker.opacity);
   return (
     <>
       <DrawingOptionsDivider vertical={props.vertical} />
       <MarkerOpacityOptions
-        value={
-          props.selected?.kind === 'marker'
-            ? props.selected.opacity
-            : props.snapshot.defaults.marker.opacity
-        }
-        onChange={(opacity) => props.update({ opacity })}
+        value={getColorAlpha(visibleColor) ?? 1}
+        onChange={(opacity) => props.update(markerColorAtOpacity(visibleColor, opacity))}
       />
     </>
   );
 }
 
 function DrawingArrowToolOptions(props: {
+  controller: ContentDrawingController;
   selected: SelectedQuickDrawingObject;
   snapshot: DrawingSessionSnapshot;
   vertical: boolean;
@@ -444,6 +535,17 @@ function DrawingArrowToolOptions(props: {
         dynamic={selected?.dynamicWidth ?? defaults.dynamicWidth}
         onChange={props.update}
       />
+      <DrawingOptionsDivider vertical={props.vertical} />
+      <ArrowDrawDirectionOption
+        active={defaults.drawFromTip}
+        dataUi="content.toolbar.drawing-options.arrow.from-tip"
+        onChange={(drawFromTip) =>
+          props.controller.session.setDefaults({
+            ...props.snapshot.defaults,
+            arrow: { ...defaults, drawFromTip },
+          })
+        }
+      />
     </>
   );
 }
@@ -456,9 +558,15 @@ function DrawingNonTextToolOptions(props: {
   snapshot: DrawingSessionSnapshot;
   tool: Exclude<ConfigurableDrawingQuickOptionsTool, 'text'>;
   update: (next: QuickToolUpdate) => void;
+  preview: (next: QuickToolUpdate) => void;
+  resetPreview: () => void;
 }) {
   const { controller, displayMode, panelRef, selected, snapshot, tool, update } = props;
   const values = selected ?? snapshot.defaults[tool];
+  const visibleColor =
+    tool === 'marker'
+      ? markerVisibleColor(values.color, (values as typeof snapshot.defaults.marker).opacity)
+      : values.color;
   const selectedShape = resolveSelectedShape(selected);
   const width = 'width' in values ? values.width : snapshot.defaults.pencil.width;
   const vertical = displayMode === 'vertical';
@@ -474,33 +582,12 @@ function DrawingNonTextToolOptions(props: {
           <DrawingOptionsDivider vertical={vertical} />
         </>
       ) : null}
-      <DrawingColorOptions
-        colors={[...controller.getPalette()]}
-        floatingBoundaryRef={panelRef}
-        floatingPlacement={floatingPlacement}
-        label={translate('content.toolbar.drawingColor')}
-        vertical={vertical}
-        value={values.color}
-        onSelect={(color) => update({ color })}
-      />
-      <DrawingOptionsDivider vertical={vertical} />
       <DrawingWidthOptions
         tool={tool}
         value={width}
         values={resolveDrawingWidthOptions(tool)}
         onChange={(nextWidth) => update({ width: nextWidth })}
       />
-      {tool === 'shape' ? (
-        <DrawingShapeFillToolOptions
-          controller={controller}
-          floatingPlacement={floatingPlacement}
-          panelRef={panelRef}
-          selected={selectedShape}
-          snapshot={snapshot}
-          vertical={vertical}
-          update={update}
-        />
-      ) : null}
       {tool === 'marker' ? (
         <DrawingMarkerToolOptions
           selected={selected}
@@ -511,13 +598,84 @@ function DrawingNonTextToolOptions(props: {
       ) : null}
       {tool === 'arrow' ? (
         <DrawingArrowToolOptions
+          controller={controller}
           selected={selected}
           snapshot={snapshot}
           vertical={vertical}
           update={update}
         />
       ) : null}
+      <DrawingOptionsDivider vertical={vertical} />
+      <DrawingColorOptions
+        allowAlpha
+        colors={[...controller.getPalette()]}
+        floatingBoundaryRef={panelRef}
+        floatingPlacement={floatingPlacement}
+        label={translate('content.toolbar.drawingColor')}
+        vertical={vertical}
+        value={visibleColor}
+        onSelect={(color) => update(tool === 'marker' ? markerColorPatch(color) : { color })}
+        onPreview={(color) =>
+          props.preview(tool === 'marker' ? markerColorPatch(color) : { color })
+        }
+        onPreviewReset={props.resetPreview}
+      />
+      {tool === 'shape' ? (
+        <DrawingShapeFillToolOptions
+          controller={controller}
+          floatingPlacement={floatingPlacement}
+          panelRef={panelRef}
+          selected={selectedShape}
+          snapshot={snapshot}
+          vertical={vertical}
+          update={update}
+          preview={props.preview}
+          resetPreview={props.resetPreview}
+        />
+      ) : null}
     </>
+  );
+}
+
+function DrawingOptionsSurface(
+  props: DrawingOptionsBodyProps & {
+    controller: ContentDrawingController;
+    layout: ReturnType<typeof useDrawingOptionsLayout>;
+    selected: boolean;
+    snapshot: DrawingSessionSnapshot;
+  }
+) {
+  if (props.selected) {
+    return (
+      <DrawingOptionsPair
+        controller={props.controller}
+        displayMode={props.displayMode}
+        layout={props.layout}
+        panelRef={props.panelRef}
+        selectedCount={1}
+        totalCount={props.snapshot.document.objects.length}
+        tool={props.tool}
+      >
+        {props.children}
+      </DrawingOptionsPair>
+    );
+  }
+  return (
+    <ProductToolbarMenu
+      compact
+      variant="drawing"
+      className="sniptale-drawing-options-popover"
+      placement={props.layout.placement}
+      style={props.layout.style}
+    >
+      <DrawingOptionsBody
+        panelRef={props.panelRef}
+        tool={props.tool}
+        displayMode={props.displayMode}
+      >
+        {props.children}
+      </DrawingOptionsBody>
+    </ProductToolbarMenu>
   );
 }
 
@@ -530,7 +688,13 @@ export function ToolbarDrawingOptions(props: {
 }) {
   const { controller, displayMode, snapshot, tool } = props;
   const panelRef = useRef<HTMLDivElement>(null);
-  const layout = useDrawingOptionsLayout({ displayMode, tool, triggerRef: props.triggerRef });
+  const layout = useDrawingOptionsLayout({
+    displayMode,
+    hasSelection: snapshot.selectedObjectIds.length > 0,
+    panelRef,
+    tool,
+    triggerRef: props.triggerRef,
+  });
   const selectedObject = snapshot.document.objects.find(
     (object) => object.id === snapshot.selectedObjectId
   );
@@ -539,97 +703,95 @@ export function ToolbarDrawingOptions(props: {
       snapshot.selectedObjectIds.includes(object.id)
     );
     return (
-      <ProductToolbarMenu
-        compact
-        className="sniptale-drawing-options-popover"
-        placement={layout.placement}
-        style={layout.style}
+      <DrawingOptionsPair
+        controller={controller}
+        displayMode={displayMode}
+        layout={layout}
+        panelRef={panelRef}
+        selectedCount={selected.length}
+        totalCount={snapshot.document.objects.length}
+        tool="selection"
       >
-        <div
-          ref={panelRef}
-          role="group"
-          aria-label={translate('content.toolbar.drawingOptions')}
-          data-ui="content.toolbar.drawing-options.selection"
-          className={getDrawingOptionsLayoutClass(displayMode)}
-        >
-          <ToolbarDrawingSelectionOptions
-            controller={controller}
-            displayMode={displayMode}
-            panelRef={panelRef}
-            selected={selected}
-            snapshot={snapshot}
-          />
-        </div>
-      </ProductToolbarMenu>
+        <ToolbarDrawingSelectionOptions
+          controller={controller}
+          displayMode={displayMode}
+          panelRef={panelRef}
+          selected={selected}
+          snapshot={snapshot}
+        />
+      </DrawingOptionsPair>
     );
   }
   if (tool === 'blur') {
+    const selectedBlur = selectedObject?.kind === 'blur' ? selectedObject : null;
+    const content = (
+      <DrawingBlurStrengthOptions
+        value={selectedBlur?.amount ?? (selectedBlur ? 10 : snapshot.defaults.blur.amount)}
+        onChange={(amount) => {
+          controller.session.setDefaults({ ...snapshot.defaults, blur: { amount } });
+          if (selectedBlur) controller.session.replaceObject({ ...selectedBlur, amount });
+        }}
+      />
+    );
     return (
-      <ProductToolbarMenu
-        compact
-        className="sniptale-drawing-options-popover"
-        placement={layout.placement}
-        style={layout.style}
+      <DrawingOptionsSurface
+        controller={controller}
+        displayMode={displayMode}
+        layout={layout}
+        panelRef={panelRef}
+        selected={selectedBlur !== null}
+        snapshot={snapshot}
+        tool="blur"
       >
-        <div
-          ref={panelRef}
-          role="group"
-          aria-label={translate('content.toolbar.drawingOptions')}
-          data-ui="content.toolbar.drawing-options.blur"
-          className={getDrawingOptionsLayoutClass(displayMode)}
-        >
-          <DrawingDeleteOption onClick={() => controller.session.deleteSelected()} />
-          <DrawingDeselectOption onClick={() => controller.session.select(null)} />
-        </div>
-      </ProductToolbarMenu>
+        {content}
+      </DrawingOptionsSurface>
     );
   }
   const selected = resolveSelectedQuickObject(selectedObject, tool);
   const update = (next: QuickToolUpdate) =>
     updateQuickToolOption({ controller, selected, snapshot, tool, update: next });
+  const preview = (next: QuickToolUpdate) => {
+    if (!selected) return;
+    previewSelectedQuickObject(controller, selected, next);
+  };
+  const resetPreview = () => controller.session.clearObjectPreview();
 
+  const content =
+    tool === 'text' ? (
+      <DrawingTextToolOptions
+        controller={controller}
+        displayMode={displayMode}
+        panelRef={panelRef}
+        selected={selected?.kind === 'text' ? selected : null}
+        snapshot={snapshot}
+        update={update}
+        preview={preview}
+        resetPreview={resetPreview}
+      />
+    ) : (
+      <DrawingNonTextToolOptions
+        controller={controller}
+        displayMode={displayMode}
+        panelRef={panelRef}
+        selected={selected}
+        snapshot={snapshot}
+        tool={tool}
+        update={update}
+        preview={preview}
+        resetPreview={resetPreview}
+      />
+    );
   return (
-    <ProductToolbarMenu
-      compact
-      className="sniptale-drawing-options-popover"
-      placement={layout.placement}
-      style={layout.style}
+    <DrawingOptionsSurface
+      controller={controller}
+      displayMode={displayMode}
+      layout={layout}
+      panelRef={panelRef}
+      selected={selected !== null}
+      snapshot={snapshot}
+      tool={tool}
     >
-      <div
-        ref={panelRef}
-        role="group"
-        aria-label={translate('content.toolbar.drawingOptions')}
-        data-ui={`content.toolbar.drawing-options.${tool}`}
-        className={getDrawingOptionsLayoutClass(displayMode)}
-      >
-        {tool === 'text' ? (
-          <DrawingTextToolOptions
-            controller={controller}
-            displayMode={displayMode}
-            panelRef={panelRef}
-            selected={selected?.kind === 'text' ? selected : null}
-            snapshot={snapshot}
-            update={update}
-          />
-        ) : (
-          <DrawingNonTextToolOptions
-            controller={controller}
-            displayMode={displayMode}
-            panelRef={panelRef}
-            selected={selected}
-            snapshot={snapshot}
-            tool={tool}
-            update={update}
-          />
-        )}
-        {selected ? (
-          <>
-            <DrawingOptionsDivider vertical={displayMode === 'vertical'} />
-            <DrawingDeleteOption onClick={() => controller.session.deleteSelected()} />
-            <DrawingDeselectOption onClick={() => controller.session.select(null)} />
-          </>
-        ) : null}
-      </div>
-    </ProductToolbarMenu>
+      {content}
+    </DrawingOptionsSurface>
   );
 }

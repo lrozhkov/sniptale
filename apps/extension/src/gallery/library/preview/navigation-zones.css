@@ -1,0 +1,20 @@
+.gallery-preview-media [data-ui^='gallery.preview.navigationRail.'] {
+  transition: background-color 150ms;
+}
+
+.gallery-preview-media:has(
+    .gallery-preview-navigation-previous:is(:hover, :focus-visible):not(:disabled)
+  )
+  [data-ui='gallery.preview.navigationRail.previous'],
+.gallery-preview-media:has(
+    .gallery-preview-navigation-next:is(:hover, :focus-visible):not(:disabled)
+  )
+  [data-ui='gallery.preview.navigationRail.next'] {
+  background-color: var(--sniptale-color-surface-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-preview-media [data-ui^='gallery.preview.navigationRail.'] {
+    transition: none;
+  }
+}

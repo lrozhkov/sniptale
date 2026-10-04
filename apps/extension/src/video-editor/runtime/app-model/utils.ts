@@ -66,6 +66,13 @@ export function getSaveStateMeta(saveState: VideoEditorSaveState): SaveStateMeta
     };
   }
 
+  if (saveState === 'conflict')
+    return {
+      label: translate('editor.documentActions.autosaveConflict'),
+      state: 'conflict',
+      className: 'text-[var(--sniptale-color-danger)]',
+    };
+
   if (saveState === 'error') {
     return {
       label: translate('common.states.error'),

@@ -1,96 +1,10 @@
+import { createReviewExportFixture as fixture } from './export-lifecycle.test-support';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';
 import { exportReviewedVideo, type ReviewExportClipPlan } from './export-lifecycle';
-import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import type { PreparedAssetObject } from '../../composition/persistence/assets';
-import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
-import type { ReviewMediaIndex } from './media-index';
-import type { ReviewPacketReceipt } from './packet-export';
-
-function fixture() {
-  const source = { duration: 6, width: 160, height: 90, mimeType: 'video/webm', size: 5 };
-  const snapshot: VideoWorkspaceSnapshot = {
-    workspace: {
-      aggregateId: 'recording:original',
-      sourceAssetId: 'original-asset',
-      formatVersion: 1,
-      source,
-      revision: 2,
-      cursor: 1,
-      advanced: createQuickEditAdvancedState(),
-      createdAt: 1,
-      updatedAt: 2,
-      history: [
-        {
-          id: 'op',
-          at: 2,
-          target: 'edit',
-          before: null,
-          after: { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
-        },
-      ],
-    },
-    draft: null,
-  };
-  const prepared: PreparedAssetObject = {
-    ref: {
-      assetId: 'output',
-      createdAt: 3,
-      mimeType: 'video/webm',
-      size: 4,
-      sha256: null,
-      location: { kind: 'opfs', objectKey: 'objects/output' },
-    },
-  };
-  const writer = {
-    assetId: 'output',
-    append: vi.fn(),
-    writeAt: vi.fn(),
-    abort: vi.fn(),
-    finalize: vi.fn(async () => prepared),
-  };
-  const original = new File(['video'], 'clip.webm');
-  const result = new File(['copy'], 'clip-edited.webm');
-  const deps = {
-    loadVideoReviewSource: vi.fn(async () => ({
-      source,
-      snapshot,
-      filename: 'clip.webm',
-      file: original,
-      telemetry: null,
-    })),
-    assertAssetWriteAdmission: vi.fn(async () => undefined),
-    createSeekableAssetObjectWriter: vi.fn(async () => writer),
-    readAssetFile: vi.fn(async () => result),
-    releaseAssetReadyProtection: vi.fn(async () => undefined),
-    saveRecordingsBatchSafely: vi.fn(async () => undefined),
-    readProjectAsset: vi.fn(async (_assetId: string) => new Blob() as unknown as Blob | null),
-    writeReviewPackets: vi.fn(async () => ({
-      videoPackets: 40,
-      audioPackets: 0,
-      resultDuration: 4,
-      audioRanges: [],
-    })),
-    writeReviewFrames: vi.fn(async (): Promise<ReviewPacketReceipt> => {
-      throw new Error('Unexpected full render in packet-path fixture.');
-    }),
-  } satisfies Parameters<typeof exportReviewedVideo>[1];
-  const controller = new AbortController();
-  const args = {
-    snapshot,
-    index: {
-      duration: 6,
-      boundaries: [0, 2, 4, 6],
-      videoCodec: 'vp8' as const,
-      audioCodec: null,
-      container: 'webm' as const,
-      rotation: 0 as const,
-    } as ReviewMediaIndex,
-    signal: controller.signal,
-  };
-  return { args, deps, writer, controller, original, result };
-}
+import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
 
 it('publishes a new prepared asset once and returns a separate downloadable file and revision receipt', async () => {
   const { args, deps, writer, original, result } = fixture();
@@ -99,13 +13,13 @@ it('publishes a new prepared asset once and returns a separate downloadable file
   expect(exported.receipt).toMatchObject({
     revision: 2,
     resultDuration: 4,
-    filename: 'clip-edited.webm',
+    filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.webm$/),
   });
   expect(deps.writeReviewPackets).toHaveBeenCalledWith(expect.objectContaining({ file: original }));
   expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledOnce();
   expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledWith([
     expect.objectContaining({
-      filename: 'clip-edited.webm',
+      filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.webm$/),
       preparedAsset: expect.objectContaining({
         ref: expect.objectContaining({ assetId: 'output' }),
       }),
@@ -113,6 +27,80 @@ it('publishes a new prepared asset once and returns a separate downloadable file
   ]);
   expect(writer.abort).not.toHaveBeenCalled();
   expect(deps.releaseAssetReadyProtection).toHaveBeenCalledWith(['output']);
+});
+
+it('exports native overlapping voices and uninterrupted music through Speed and a Cut', async () => {
+  const { args, deps } = fixture();
+  const speed = {
+    id: 's',
+    kind: 'speed' as const,
+    start: 1,
+    end: 2,
+    requestedStart: 1,
+    requestedEnd: 2,
+    rate: 2 as const,
+    audio: 'mute' as const,
+  };
+  args.snapshot.workspace.history.push({
+    id: 'speed',
+    at: 3,
+    target: 'edit',
+    before: null,
+    after: speed,
+  });
+  args.snapshot.workspace.cursor = 2;
+  args.index.boundaries = [0, 1, 2, 4, 6];
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
+  const map = buildReviewTimeMap(6, [
+    speed,
+    { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+  ]);
+  const base = {
+    id: 'music',
+    assetId: 'project-asset:m',
+    timelineStart: 0,
+    sourceOffset: 1,
+    duration: 3.5,
+    volume: 1,
+    muted: false,
+    fadeIn: 0.2,
+    fadeOut: 0.3,
+  };
+  advanced.audio.music = [base];
+  advanced.audio.voiceoverSegments = map;
+  advanced.audio.voiceover = [0.8, 0.9].map((timelineStart, index) =>
+    anchorReviewVoiceover({ ...base, id: `v${index}`, timelineStart, duration: 1.3 }, map)
+  );
+  vi.stubGlobal(
+    'OfflineAudioContext',
+    class {
+      async decodeAudioData() {
+        return { duration: 10 };
+      }
+    }
+  );
+  try {
+    await exportReviewedVideo(args, deps);
+    const call = deps.writeReviewPackets.mock.calls[0] as unknown as [
+      { exportAudio: ReviewExportClipPlan },
+    ];
+    const entries = call[0].exportAudio.entries;
+    expect(entries.filter((entry) => entry.lane === 'music')).toMatchObject([
+      { timelineStart: 0, sourceOffset: 1, duration: 3.5, fadeIn: 0.2, fadeOut: 0.3 },
+    ]);
+    const voices = entries.filter((entry) => entry.lane === 'voiceover');
+    expect(voices).toHaveLength(2);
+    voices.forEach((voice, index) => {
+      expect(voice.timelineStart).toBeCloseTo(index === 0 ? 0.8 : 0.9);
+      expect(voice.duration).toBeCloseTo(1.3);
+      expect(voice.playbackRate).toBe(1);
+      expect(voice.sourceOffset).toBe(1);
+    });
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 it('rejects a replaced source before admitting any staging bytes', async () => {
   const { args, deps } = fixture();
@@ -145,7 +133,9 @@ it('downloads only the selected kept fragment without mutating history or publis
     { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
     deps
   );
-  expect(exported.receipt.filename).toBe('clip-fragment-0.000-2.000.webm');
+  expect(exported.receipt.filename).toMatch(
+    /^Sniptale_video-review_.*_fragment-0\.000-2\.000\.webm$/
+  );
   expect(deps.writeReviewPackets).toHaveBeenCalledWith(
     expect.objectContaining({ edits: [expect.objectContaining({ kind: 'cut', start: 2, end: 6 })] })
   );
@@ -276,7 +266,10 @@ it('routes visual changes to the full frame renderer and stages the encoded resu
     expect.objectContaining({ fragmentOffset: 0 })
   );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
-  expect(exported.receipt).toMatchObject({ resultDuration: 4, filename: 'clip-edited.webm' });
+  expect(exported.receipt).toMatchObject({
+    resultDuration: 4,
+    filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.webm$/),
+  });
   expect(writer.abort).not.toHaveBeenCalled();
 });
 
@@ -503,7 +496,9 @@ it('plans exact advanced fragment cuts before selecting the frame renderer', asy
     { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
     deps
   );
-  expect(result.receipt.filename).toBe('clip-fragment-0.100-2.100.webm');
+  expect(result.receipt.filename).toMatch(
+    /^Sniptale_video-review_.*_fragment-0\.100-2\.100\.webm$/
+  );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
   expect(deps.writeReviewFrames).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -564,12 +559,12 @@ it('publishes the chosen container, resolution and matching filename for a conve
     frameRate: 30 as const,
   };
   const result = await exportReviewedVideo({ ...args, renderSettings }, deps);
-  expect(result.receipt.filename).toBe('clip-edited.mp4');
+  expect(result.receipt.filename).toMatch(/^Sniptale_video-review_.*_edited\.mp4$/);
   expect(deps.createSeekableAssetObjectWriter).toHaveBeenCalledWith({ mimeType: 'video/mp4' });
   expect(deps.writeReviewFrames).toHaveBeenCalledWith(expect.objectContaining({ renderSettings }));
   expect(deps.saveRecordingsBatchSafely).toHaveBeenCalledWith([
     expect.objectContaining({
-      filename: 'clip-edited.mp4',
+      filename: expect.stringMatching(/^Sniptale_video-review_.*_edited\.mp4$/),
       mediaMetadata: { kind: 'video', width: 1280, height: 720, duration: 4 },
     }),
   ]);

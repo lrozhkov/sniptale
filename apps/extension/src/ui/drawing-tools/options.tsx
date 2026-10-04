@@ -1,10 +1,12 @@
-import { Ban, Blend, Circle, PaintBucket, Square, Trash2, Triangle, Type, X } from 'lucide-react';
+import { ArrowDownLeft, Blend, Circle, PaintBucket, Square, Triangle, Type } from 'lucide-react';
 import { ProductGlassColorOption } from '@sniptale/ui/product-glass-controls/primitives';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import type { ReactNode, RefObject } from 'react';
+import { getColorAlpha, replaceColorChannels } from '@sniptale/foundation/color';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { CompactColorSelector } from '../color-selector';
 import {
   DRAWING_MARKER_OPACITIES,
+  DRAWING_BLUR_STRENGTHS,
   DRAWING_TEXT_FONT_FAMILIES,
   DRAWING_TEXT_SIZES,
   resolveDrawingTextFontFamily,
@@ -17,17 +19,16 @@ import { translate } from '../../platform/i18n';
 
 type DrawingQuickOptionsTool = 'pencil' | 'marker' | 'shape' | 'arrow' | 'text';
 
-const INACTIVE_OPTION_CLASS =
-  'border-[var(--sniptale-color-border-soft)] bg-transparent ' +
-  'text-[var(--sniptale-color-text-secondary)] hover:bg-[var(--sniptale-color-surface-hover)]';
 const DRAWING_COLOR_PICKER_CLASS = [
   '!h-7 !w-7 shrink-0',
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!h-7",
+  "[&_[data-ui='shared.ui.color-selector.trigger']]:!border",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!gap-0",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!rounded-md",
   "[&_[data-ui='shared.ui.color-selector.trigger']]:!px-[5px]",
   "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!justify-center",
-  "[&_[data-ui='shared.ui.color-selector.picker-trigger']>span:last-child]:hidden",
+  "[&_[data-ui='shared.ui.color-selector.value-trigger']]:hidden",
+  "[&_[data-ui='shared.ui.color-selector.picker-trigger']]:!w-full",
 ].join(' ');
 
 function QuickOptionButton(props: {
@@ -56,42 +57,6 @@ function QuickOptionButton(props: {
   );
 }
 
-export function DrawingDeselectOption(props: { onClick: () => void }) {
-  const label = translate('content.toolbar.drawingDeselect');
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      data-ui="content.toolbar.drawing-options.deselect"
-      className={[
-        'flex h-7 w-7 items-center justify-center rounded-md border transition-colors',
-        INACTIVE_OPTION_CLASS,
-      ].join(' ')}
-      onClick={props.onClick}
-    >
-      <X aria-hidden size={16} />
-    </button>
-  );
-}
-
-export function DrawingDeleteOption(props: { onClick: () => void }) {
-  const label = translate('content.toolbar.drawingDelete');
-  return (
-    <ContentToolbarButton
-      type="button"
-      tone="danger"
-      aria-label={label}
-      title={label}
-      dataUi="content.toolbar.drawing-options.delete"
-      className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
-      onClick={props.onClick}
-    >
-      <Trash2 aria-hidden size={16} />
-    </ContentToolbarButton>
-  );
-}
-
 export function DrawingOptionsDivider(props: { extended?: boolean; vertical: boolean }) {
   return (
     <span
@@ -99,7 +64,7 @@ export function DrawingOptionsDivider(props: { extended?: boolean; vertical: boo
       data-ui="content.toolbar.drawing-options.divider"
       className={[
         'shrink-0 bg-[var(--sniptale-color-border-soft)]',
-        props.vertical ? 'h-px w-full' : props.extended ? 'h-9 w-px' : 'h-5 w-px',
+        props.vertical ? 'h-px w-full' : 'h-5 w-px',
       ].join(' ')}
     />
   );
@@ -129,15 +94,18 @@ export function DrawingWidthOptions(props: {
         label={`${translate('content.toolbar.drawingWidth')}: ${value}px`}
         onClick={() => props.onChange(value)}
       >
-        <span
-          aria-hidden
-          data-ui="drawing-width-preview"
-          className="block rounded-full bg-current"
-          style={{
-            height: `${previewSize}px`,
-            width: circular ? `${previewSize}px` : '16px',
-          }}
-        />
+        <span aria-hidden className="flex h-6 flex-col items-center justify-center gap-0.5">
+          <span
+            aria-hidden
+            data-ui="drawing-width-preview"
+            className="block rounded-full bg-current"
+            style={{
+              height: `${previewSize}px`,
+              width: circular ? `${previewSize}px` : '16px',
+            }}
+          />
+          <span className="text-[9px] font-medium leading-none">{value}</span>
+        </span>
       </QuickOptionButton>
     );
   });
@@ -149,12 +117,50 @@ export function MarkerOpacityOptions(props: { value: number; onChange: (value: n
     return (
       <QuickOptionButton
         key={value}
-        active={props.value === value}
+        active={Math.round(props.value * 100) === percent}
         dataUi={`content.toolbar.drawing-options.marker.opacity-${percent}`}
         label={`${translate('content.toolbar.drawingOpacity')}: ${percent}%`}
         onClick={() => props.onChange(value)}
       >
         <Blend aria-hidden size={17} style={{ opacity: value }} />
+      </QuickOptionButton>
+    );
+  });
+}
+
+const BLUR_STRENGTH_LABELS = [
+  'content.toolbar.drawingBlurWeak',
+  'content.toolbar.drawingBlurMedium',
+  'content.toolbar.drawingBlurStrong',
+] as const;
+const BLUR_PREVIEW_RADII = [0.35, 1.2, 2.6] as const;
+
+export function DrawingBlurStrengthOptions(props: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return DRAWING_BLUR_STRENGTHS.map((amount, index) => {
+    const label = translate(BLUR_STRENGTH_LABELS[index]!);
+    return (
+      <QuickOptionButton
+        key={amount}
+        active={props.value === amount}
+        label={`${translate('content.toolbar.drawingBlurStrength')}: ${label}, ${amount}px`}
+        dataUi={`content.toolbar.drawing-options.blur.amount-${amount}`}
+        onClick={() => props.onChange(amount)}
+      >
+        <svg aria-hidden viewBox="0 0 24 24" width="19" height="19" fill="none">
+          <rect x="2.5" y="2.5" width="19" height="19" rx="2" stroke="currentColor" />
+          <rect
+            x="7"
+            y="7"
+            width="10"
+            height="10"
+            fill="currentColor"
+            data-ui="drawing-blur-preview"
+            style={{ filter: `blur(${BLUR_PREVIEW_RADII[index]}px)` }}
+          />
+        </svg>
       </QuickOptionButton>
     );
   });
@@ -262,6 +268,28 @@ export function ArrowWidthModeOptions(props: {
   });
 }
 
+export function ArrowDrawDirectionOption(props: {
+  active: boolean;
+  dataUi: string;
+  onChange: (value: boolean) => void;
+}) {
+  const label = translate('editor.compact.arrowDrawFromTip');
+  return (
+    <ContentToolbarButton
+      type="button"
+      active={props.active}
+      aria-label={label}
+      aria-pressed={props.active}
+      title={label}
+      dataUi={props.dataUi}
+      className="aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0"
+      onClick={() => props.onChange(!props.active)}
+    >
+      <ArrowDownLeft aria-hidden size={16} />
+    </ContentToolbarButton>
+  );
+}
+
 export function DrawingColorOptions(props: {
   allowAlpha?: boolean;
   colors: readonly string[];
@@ -274,11 +302,15 @@ export function DrawingColorOptions(props: {
   vertical?: boolean;
   value: string;
   onSelect: (color: string) => void;
+  onPreview?: (color: string) => void;
+  onPreviewReset?: (color: string) => void;
 }) {
   const Icon = props.icon;
-  const quickColors = props.colors
-    .filter((color) => color.toLowerCase() !== '#14b8a6' && color.toLowerCase() !== '#ec4899')
-    .slice(0, 8);
+  const quickColors = props.colors.slice(0, 5);
+  const selectedValue = props.selectedValue === undefined ? props.value : props.selectedValue;
+  const previewReset = props.onPreviewReset ?? props.onPreview;
+  const resolveQuickColor = (color: string) =>
+    getColorAlpha(color) === 1 ? (replaceColorChannels(props.value, color) ?? color) : color;
   return (
     <div
       role="group"
@@ -294,81 +326,154 @@ export function DrawingColorOptions(props: {
           className="shrink-0 text-[var(--sniptale-color-text-secondary)]"
         />
       ) : null}
+      <CompactColorSelector
+        allowAlpha={props.allowAlpha ?? false}
+        allowTransparent={false}
+        className={`${DRAWING_COLOR_PICKER_CLASS} [&_[data-ui='shared.ui.color-selector.trigger']]:!border-transparent`}
+        floatingBoundaryRef={props.floatingBoundaryRef}
+        floatingPlacement={props.floatingPlacement}
+        label={props.label}
+        title={props.label}
+        value={props.value}
+        palette={props.colors}
+        paletteInPicker
+        pickerOnly
+        onChange={props.onSelect}
+        {...(props.onPreview ? { onPreviewChange: props.onPreview } : {})}
+        {...(previewReset ? { onPreviewReset: previewReset } : {})}
+      />
       <div
-        className={`grid gap-1.5 ${
-          props.vertical ? 'w-[38px] grid-cols-2' : 'w-[82px] grid-cols-4'
-        }`}
+        className={`grid gap-1.5 ${props.vertical ? 'grid-cols-1' : 'w-[104px] grid-cols-5'}`}
+        data-ui="content.toolbar.drawing-options.quick-colors"
       >
-        {quickColors.map((color) => {
-          const selectedValue =
-            props.selectedValue === undefined ? props.value : props.selectedValue;
-          const active = selectedValue?.toLowerCase() === color.toLowerCase();
+        {quickColors.map((color, index) => {
+          const active = selectedValue?.toLowerCase() === resolveQuickColor(color).toLowerCase();
           return (
             <ProductGlassColorOption
-              key={color}
+              key={index}
               active={active}
               aria-label={`${props.label}: ${color}`}
               aria-pressed={active}
-              onClick={() => props.onSelect(color)}
+              onClick={() => props.onSelect(resolveQuickColor(color))}
               style={{ backgroundColor: color }}
               title={color}
             />
           );
         })}
       </div>
-      <CompactColorSelector
-        allowAlpha={props.allowAlpha ?? false}
-        allowTransparent={false}
-        className={DRAWING_COLOR_PICKER_CLASS}
-        floatingBoundaryRef={props.floatingBoundaryRef}
-        floatingPlacement={props.floatingPlacement}
-        label={props.label}
-        title={props.label}
-        value={props.value}
-        pickerOnly
-        onChange={props.onSelect}
-      />
     </div>
   );
 }
 
-export function DrawingShapeFillOptions(props: {
+type DrawingFillOptionsProps = {
   colors: readonly string[];
   floatingBoundaryRef: RefObject<HTMLElement | null>;
   floatingPlacement: 'auto' | 'side';
   value: string | null;
   vertical: boolean;
   onChange: (color: string | null) => void;
+  onPreview?: (color: string) => void;
+  onPreviewReset?: (color: string) => void;
+};
+
+const DRAWING_FILL_UI = {
+  shape: {
+    group: 'content.toolbar.drawing-options.shape.fill',
+    toggle: 'content.toolbar.drawing-options.shape.fill-toggle',
+    emptyIcon: 'content.toolbar.drawing-options.shape.fill-empty-icon',
+    colors: 'content.toolbar.drawing-options.shape.fill-colors',
+    label: 'content.toolbar.drawingFillColor',
+    enable: 'content.toolbar.drawingEnableFill',
+    disable: 'content.toolbar.drawingDisableFill',
+  },
+  text: {
+    group: 'content.toolbar.drawing-options.text.background-group',
+    toggle: 'content.toolbar.drawing-options.text.background-none',
+    emptyIcon: 'content.toolbar.drawing-options.text.background-empty-icon',
+    colors: 'content.toolbar.drawing-options.text.background-colors',
+    label: 'content.toolbar.drawingTextBackground',
+    enable: 'content.toolbar.drawingTextBackground',
+    disable: 'content.toolbar.drawingNoBackground',
+  },
+} as const;
+
+function DrawingFillToggle(props: {
+  filled: boolean;
+  label: string;
+  dataUi: string;
+  emptyIconUi: string;
+  onClick: () => void;
 }) {
-  const label = translate('content.toolbar.drawingFillColor');
+  return (
+    <ContentToolbarButton
+      type="button"
+      active={props.filled}
+      aria-pressed={props.filled}
+      aria-label={props.label}
+      title={props.label}
+      dataUi={props.dataUi}
+      className={[
+        'aspect-square !h-7 !min-h-7 !w-7 !min-w-7 shrink-0 !rounded-md !p-0',
+        'focus-visible:!outline-solid focus-visible:!outline-2 focus-visible:!outline-offset-2',
+        'focus-visible:!outline-[color:var(--sniptale-color-text-primary)]',
+        props.filled
+          ? '!text-[var(--sniptale-color-accent-emphasis)]'
+          : '!border-transparent !text-[var(--sniptale-color-text-secondary)]',
+      ].join(' ')}
+      onClick={props.onClick}
+    >
+      <PaintBucket aria-hidden data-ui={props.filled ? undefined : props.emptyIconUi} size={19} />
+    </ContentToolbarButton>
+  );
+}
+
+function DrawingFillOptions(props: DrawingFillOptionsProps & { kind: 'shape' | 'text' }) {
+  const ui = DRAWING_FILL_UI[props.kind];
+  const label = translate(ui.label);
+  const filled = props.value !== null;
+  const toggleLabel = translate(filled ? ui.disable : ui.enable);
+  const lastFillColorRef = useRef(props.value ?? props.colors[0] ?? '#000000');
+  useEffect(() => {
+    if (props.value !== null) lastFillColorRef.current = props.value;
+  }, [props.value]);
   return (
     <div
-      data-ui="content.toolbar.drawing-options.shape.fill"
+      data-ui={ui.group}
       className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
     >
-      <QuickOptionButton
-        active={props.value === null}
-        dataUi="content.toolbar.drawing-options.shape.fill-none"
-        label={translate('content.toolbar.drawingNoFill')}
-        onClick={() => props.onChange(null)}
-      >
-        <Ban aria-hidden size={17} />
-      </QuickOptionButton>
-      <DrawingColorOptions
-        allowAlpha
-        colors={props.colors}
-        dataUi="content.toolbar.drawing-options.shape.fill-colors"
-        floatingBoundaryRef={props.floatingBoundaryRef}
-        floatingPlacement={props.floatingPlacement}
-        icon={PaintBucket}
-        label={label}
-        selectedValue={props.value}
-        vertical={props.vertical}
-        value={props.value ?? props.colors[0] ?? '#000000'}
-        onSelect={props.onChange}
+      <DrawingFillToggle
+        filled={filled}
+        label={toggleLabel}
+        dataUi={ui.toggle}
+        emptyIconUi={ui.emptyIcon}
+        onClick={() => props.onChange(filled ? null : lastFillColorRef.current)}
       />
+      {filled ? (
+        <DrawingColorOptions
+          allowAlpha
+          colors={props.colors}
+          dataUi={ui.colors}
+          floatingBoundaryRef={props.floatingBoundaryRef}
+          floatingPlacement={props.floatingPlacement}
+          label={label}
+          selectedValue={props.value}
+          vertical={props.vertical}
+          value={props.value ?? lastFillColorRef.current}
+          onSelect={props.onChange}
+          {...(props.onPreview ? { onPreview: props.onPreview } : {})}
+          {...(props.onPreviewReset ? { onPreviewReset: props.onPreviewReset } : {})}
+        />
+      ) : null}
     </div>
   );
+}
+
+export function DrawingShapeFillOptions(props: DrawingFillOptionsProps) {
+  return <DrawingFillOptions {...props} kind="shape" />;
+}
+
+export function DrawingTextBackgroundOptions(props: DrawingFillOptionsProps) {
+  return <DrawingFillOptions {...props} kind="text" />;
 }
 
 export function DrawingTextOptions(props: {
@@ -382,6 +487,10 @@ export function DrawingTextOptions(props: {
   vertical: boolean;
   onBackgroundColorChange: (color: string | null) => void;
   onColorChange: (color: string) => void;
+  onColorPreview?: (color: string) => void;
+  onColorPreviewReset?: (color: string) => void;
+  onBackgroundColorPreview?: (color: string) => void;
+  onBackgroundColorPreviewReset?: (color: string) => void;
   onFontSizeChange: (fontSize: number) => void;
   onFontFamilyChange: (fontFamily: DrawingFontFamily) => void;
 }) {
@@ -405,42 +514,6 @@ export function DrawingTextOptions(props: {
         </QuickOptionButton>
       ))}
       <DrawingOptionsDivider extended vertical={props.vertical} />
-      <DrawingColorOptions
-        colors={props.colors}
-        floatingBoundaryRef={props.floatingBoundaryRef}
-        floatingPlacement={props.floatingPlacement}
-        icon={Type}
-        label={translate('content.toolbar.drawingTextColor')}
-        vertical={props.vertical}
-        value={props.color}
-        onSelect={props.onColorChange}
-      />
-      <DrawingOptionsDivider extended vertical={props.vertical} />
-      <div
-        data-ui="content.toolbar.drawing-options.text.background-group"
-        className={`flex items-center gap-1.5 ${props.vertical ? 'flex-col' : 'flex-row'}`}
-      >
-        <QuickOptionButton
-          active={props.backgroundColor === null}
-          dataUi="content.toolbar.drawing-options.text.background-none"
-          label={translate('content.toolbar.drawingNoBackground')}
-          onClick={() => props.onBackgroundColorChange(null)}
-        >
-          <Ban aria-hidden size={16} />
-        </QuickOptionButton>
-        <DrawingColorOptions
-          allowAlpha
-          colors={props.colors}
-          floatingBoundaryRef={props.floatingBoundaryRef}
-          floatingPlacement={props.floatingPlacement}
-          icon={PaintBucket}
-          label={translate('content.toolbar.drawingTextBackground')}
-          vertical={props.vertical}
-          value={props.backgroundColor ?? '__transparent__'}
-          onSelect={props.onBackgroundColorChange}
-        />
-      </div>
-      <DrawingOptionsDivider extended vertical={props.vertical} />
       {DRAWING_TEXT_SIZES.map((fontSize) => (
         <QuickOptionButton
           key={fontSize}
@@ -458,6 +531,34 @@ export function DrawingTextOptions(props: {
           </span>
         </QuickOptionButton>
       ))}
+      <DrawingOptionsDivider extended vertical={props.vertical} />
+      <DrawingColorOptions
+        allowAlpha
+        colors={props.colors}
+        floatingBoundaryRef={props.floatingBoundaryRef}
+        floatingPlacement={props.floatingPlacement}
+        icon={Type}
+        label={translate('content.toolbar.drawingTextColor')}
+        vertical={props.vertical}
+        value={props.color}
+        onSelect={props.onColorChange}
+        {...(props.onColorPreview ? { onPreview: props.onColorPreview } : {})}
+        {...(props.onColorPreviewReset ? { onPreviewReset: props.onColorPreviewReset } : {})}
+      />
+      <DrawingOptionsDivider extended vertical={props.vertical} />
+      <DrawingFillOptions
+        kind="text"
+        colors={props.colors}
+        floatingBoundaryRef={props.floatingBoundaryRef}
+        floatingPlacement={props.floatingPlacement}
+        value={props.backgroundColor}
+        vertical={props.vertical}
+        onChange={props.onBackgroundColorChange}
+        {...(props.onBackgroundColorPreview ? { onPreview: props.onBackgroundColorPreview } : {})}
+        {...(props.onBackgroundColorPreviewReset
+          ? { onPreviewReset: props.onBackgroundColorPreviewReset }
+          : {})}
+      />
     </>
   );
 }

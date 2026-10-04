@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   DEFAULT_DRAWING_COLORS,
   type DrawingSession,
+  type DrawingObject,
   type DrawingSessionSnapshot,
 } from '../../features/drawing/public';
 import { resolvePageScrollRoot, type PageScrollRoot } from '../platform/page-scroll';
-import { createPagePreparationDrawingSession } from './history';
+import { createPagePreparationDrawingSession, type DrawingHistoryCommitPort } from './history';
 import { synchronizeContentDrawingPreferences } from './preferences';
+import { createDrawingLayout } from './layout';
 
 export { synchronizeContentDrawingPreferences } from './preferences';
 
@@ -15,19 +17,26 @@ export interface ContentDrawingController {
   getPalette(): readonly string[];
   applyPalette(colors: readonly string[]): void;
   getScrollRoot(): PageScrollRoot;
+  getObjectAnchor?(object: DrawingObject): Element | null;
+  subscribeLayoutChanges?(listener: () => void): () => void;
   prepareActivation(): boolean;
   registerInteractionFinalizer(finalizer: (() => void) | null): void;
   finalizeInteraction(): void;
+  hasPendingTextChange?(): boolean;
+  setPendingTextChange?(pending: boolean): void;
+  subscribePendingTextChange?(listener: () => void): () => void;
 }
 
 export function useDrawingSessionSnapshot(session: DrawingSession): DrawingSessionSnapshot {
-  const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
+  const [, setSnapshot] = useState(() => session.getSnapshot());
   useEffect(() => session.subscribe(() => setSnapshot(session.getSnapshot())), [session]);
-  return snapshot;
+  return session.getSnapshot();
 }
 
-export function useContentDrawingController(): ContentDrawingController {
-  const controller = useMemo(() => createContentDrawingController(), []);
+export function useContentDrawingController(
+  history: DrawingHistoryCommitPort
+): ContentDrawingController {
+  const controller = useMemo(() => createContentDrawingController(history), [history]);
 
   useEffect(() => {
     const unsubscribe = synchronizeContentDrawingPreferences(controller);
@@ -41,13 +50,24 @@ export function useContentDrawingController(): ContentDrawingController {
 }
 
 export function createContentDrawingController(
-  session: DrawingSession = createPagePreparationDrawingSession()
+  source: DrawingSession | DrawingHistoryCommitPort
 ): ContentDrawingController {
   let root: PageScrollRoot = { kind: 'viewport', element: null };
+  const history = 'commitEntry' in source ? source : null;
+  const layout = history ? createDrawingLayout(() => root) : null;
+  const session =
+    'commitEntry' in source
+      ? createPagePreparationDrawingSession(source, layout ?? undefined)
+      : source;
   let palette: readonly string[] = [...DEFAULT_DRAWING_COLORS];
   let finalizer: (() => void) | null = null;
+  let pendingTextChange = false;
+  const pendingTextListeners = new Set<() => void>();
   return {
     session,
+    ...(layout
+      ? { getObjectAnchor: layout.getAnchor, subscribeLayoutChanges: layout.subscribe }
+      : {}),
     getPalette: () => palette,
     applyPalette(colors) {
       palette = [...colors];
@@ -67,6 +87,16 @@ export function createContentDrawingController(
     finalizeInteraction() {
       finalizer?.();
       session.select(null);
+    },
+    hasPendingTextChange: () => pendingTextChange,
+    setPendingTextChange(pending) {
+      if (pendingTextChange === pending) return;
+      pendingTextChange = pending;
+      pendingTextListeners.forEach((listener) => listener());
+    },
+    subscribePendingTextChange(listener) {
+      pendingTextListeners.add(listener);
+      return () => pendingTextListeners.delete(listener);
     },
   };
 }

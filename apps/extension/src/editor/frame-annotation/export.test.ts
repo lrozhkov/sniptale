@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Rect } from 'fabric';
 import { createFrameAnnotationProxy } from './proxy';
 import { createFabricCanvasFixture } from '../testing/fabric-canvas.test-support';
+import { EditorCanvas } from '../document/canvas-surface/render-region';
 import { createDefaultRichShapeObject } from '../../features/editor/document/rich-shape';
 
 const mocks = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ vi.mock('../../platform/media-utils/data-url', () => ({
 vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({ showToast: mocks.showToast }));
 
 import { renderEditorWithFrameAnnotations } from '../controller/public-api/document/frame-annotation-export';
+import { registerFrameAnnotationDraftFlusher } from './draft-coordinator';
 
 function createCanvas() {
   const proxy = createFrameAnnotationProxy({
@@ -67,6 +69,27 @@ it('delegates directly when the Fabric canvas is unavailable', async () => {
   expect(mocks.renderCanvas).toHaveBeenCalledWith(null, { format: 'png', quality: 100 });
 });
 
+it('keeps the active frame draft during presentation rendering and finalizes it for export', async () => {
+  const { canvas } = createCanvas();
+  const flushDraft = vi.fn();
+  const unregister = registerFrameAnnotationDraftFlusher(flushDraft);
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 200, height: 100 },
+    renderOptions: { format: 'png' as const, quality: 100 },
+  };
+
+  try {
+    await renderEditorWithFrameAnnotations({ ...options, draftPolicy: 'committed' });
+    expect(flushDraft).not.toHaveBeenCalled();
+
+    await renderEditorWithFrameAnnotations(options);
+    expect(flushDraft).toHaveBeenCalledTimes(1);
+  } finally {
+    unregister();
+  }
+});
+
 it('renders the Fabric base without proxies and restores proxy visibility after success', async () => {
   const { canvas, proxy } = createCanvas();
   await expect(
@@ -76,7 +99,11 @@ it('renders the Fabric base without proxies and restores proxy visibility after 
       renderOptions: { format: 'png', outputSize: { width: 100, height: 50 }, quality: 100 },
     })
   ).resolves.toBe('data:image/png;base64,final');
-  expect(mocks.renderCanvas).toHaveBeenCalledWith(canvas, { format: 'png', quality: 1 });
+  expect(mocks.renderCanvas).toHaveBeenCalledWith(canvas, {
+    format: 'png',
+    quality: 1,
+    outputSize: { width: 100, height: 50 },
+  });
   expect(proxy.visible).toBe(true);
   expect(mocks.rasterize).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -132,6 +159,33 @@ it('rejects a stale frame projection even if the raster adapter returns it', asy
       renderOptions: { format: 'png', quality: 100 },
     })
   ).rejects.toThrow('Frame annotation raster result is stale');
+});
+
+it('keeps a virtual canvas export current when only scroll and viewport size change', async () => {
+  const { canvas } = createCanvas();
+  Object.setPrototypeOf(canvas, EditorCanvas.prototype);
+  Reflect.set(canvas, 'virtualStage', {});
+  Reflect.set(canvas, 'documentSize', { width: 200, height: 100 });
+  Reflect.set(canvas, 'width', 800);
+  Reflect.set(canvas, 'height', 600);
+  Reflect.set(canvas, 'viewportTransform', [1, 0, 0, 1, 100, 100]);
+  mocks.rasterize.mockImplementationOnce(async (options) => {
+    Reflect.set(canvas, 'width', 900);
+    Reflect.set(canvas, 'height', 650);
+    Reflect.set(canvas, 'viewportTransform', [1, 0, 0, 1, -400, -200]);
+    expect(options.isCurrent()).toBe(true);
+    return {
+      blob: new Blob(['output'], { type: 'image/png' }),
+      metadata: { downscaled: false, outputHeight: 100, outputScale: 1, outputWidth: 200 },
+    };
+  });
+  await expect(
+    renderEditorWithFrameAnnotations({
+      canvas: createFabricCanvasFixture(canvas),
+      canvasDocumentSize: { width: 200, height: 100 },
+      renderOptions: { format: 'png', quality: 100 },
+    })
+  ).resolves.toBe('data:image/png;base64,final');
 });
 
 it('rejects a raster result after an ordinary Fabric layer changes', async () => {
@@ -253,7 +307,7 @@ it('omits a hidden frame annotation from the DOM raster export', async () => {
   expect(proxy.visible).toBe(false);
 });
 
-it('surfaces optimized export as a successful warning', async () => {
+it('keeps downscaled frame export silent', async () => {
   const { canvas } = createCanvas();
   mocks.rasterize.mockResolvedValueOnce({
     blob: new Blob(['output'], { type: 'image/png' }),
@@ -264,7 +318,26 @@ it('surfaces optimized export as a successful warning', async () => {
     canvasDocumentSize: { width: 200, height: 100 },
     renderOptions: { format: 'png', quality: 100 },
   });
-  expect(mocks.showToast).toHaveBeenCalledWith(expect.any(String), 'warning');
+  expect(mocks.showToast).not.toHaveBeenCalled();
+});
+
+it('keeps repeated downscaled autosave presentation renders silent', async () => {
+  const { canvas } = createCanvas();
+  mocks.rasterize.mockResolvedValue({
+    blob: new Blob(['output'], { type: 'image/png' }),
+    metadata: { downscaled: true, outputHeight: 7000, outputScale: 0.875, outputWidth: 8000 },
+  });
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 9000, height: 8000 },
+    draftPolicy: 'committed' as const,
+    renderOptions: { format: 'png' as const, quality: 1 },
+  };
+
+  await renderEditorWithFrameAnnotations(options);
+  await renderEditorWithFrameAnnotations(options);
+
+  expect(mocks.showToast).not.toHaveBeenCalled();
 });
 
 it.each([
@@ -299,4 +372,45 @@ it.each([
   expect(drawImage).toHaveBeenCalledOnce();
   expect(toDataURL).toHaveBeenCalledWith(fixture.mime, fixture.encodedQuality);
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:raster');
+});
+
+it('discards a cancelled raster result and skips a cancelled export waiting in the canvas queue', async () => {
+  const { canvas, proxy } = createCanvas();
+  const output = {
+    blob: new Blob(['output']),
+    metadata: { downscaled: false, outputHeight: 100, outputScale: 1, outputWidth: 200 },
+  };
+  let finish: (value: typeof output) => void = () => undefined;
+  mocks.rasterize.mockImplementationOnce(
+    () =>
+      new Promise<typeof output>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const active = new AbortController();
+  const queued = new AbortController();
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 200, height: 100 },
+    draftPolicy: 'committed' as const,
+  };
+  const rendering = renderEditorWithFrameAnnotations({
+    ...options,
+    renderOptions: { format: 'png', quality: 1, signal: active.signal },
+  });
+  const waiting = renderEditorWithFrameAnnotations({
+    ...options,
+    renderOptions: { format: 'png', quality: 1, signal: queued.signal },
+  });
+  const abortedRendering = expect(rendering).rejects.toMatchObject({ name: 'AbortError' });
+  const abortedWaiting = expect(waiting).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(mocks.rasterize).toHaveBeenCalledOnce());
+  expect(mocks.rasterize).toHaveBeenCalledWith(expect.objectContaining({ signal: active.signal }));
+  active.abort();
+  queued.abort();
+  finish(output);
+  await Promise.all([abortedRendering, abortedWaiting]);
+  expect(mocks.rasterize).toHaveBeenCalledOnce();
+  expect(mocks.blobToDataUrl).not.toHaveBeenCalled();
+  expect(proxy.visible).toBe(true);
 });

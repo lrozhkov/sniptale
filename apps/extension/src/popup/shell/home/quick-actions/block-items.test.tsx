@@ -80,6 +80,10 @@ it('renders enabled items across supported density variants and triggers the act
 
     const button = getContainer()?.querySelector('button');
     expect(button?.title).toBe('display:' + density + ' • Visible page • Ctrl+Shift+K');
+    expect(button?.className).toContain('group');
+    expect(
+      button?.querySelector('[data-testid="dynamic-icon"]')?.parentElement?.className
+    ).toContain('group-hover:scale-110');
     expectDensityMeta(density);
 
     act(() => {
@@ -91,10 +95,7 @@ it('renders enabled items across supported density variants and triggers the act
   expect(onTriggerAction).toHaveBeenNthCalledWith(2, 'compact');
   expect(onTriggerAction).toHaveBeenNthCalledWith(3, 'dense');
   expect(onTriggerAction).toHaveBeenNthCalledWith(4, 'tight');
-  expect(dynamicIconSpy).toHaveBeenLastCalledWith({
-    color: 'var(--sniptale-color-text-secondary)',
-    name: 'Camera',
-  });
+  expect(dynamicIconSpy).toHaveBeenLastCalledWith({ name: 'Camera' });
 });
 
 it('renders disabled items with the disabled title and blocks triggering', async () => {

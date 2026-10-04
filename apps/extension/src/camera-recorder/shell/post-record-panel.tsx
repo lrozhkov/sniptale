@@ -1,4 +1,4 @@
-import { Download, Film, Images, Trash2, X } from 'lucide-react';
+import { Download, Film, Library, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { VideoPostRecordResult } from '@sniptale/runtime-contracts/video/types/types';
 import { translate } from '../../platform/i18n';
@@ -80,7 +80,7 @@ function CameraPostRecordActions(props: {
         onClick={() => props.decide(() => openSavedRecordingInVideoEditor(props.result), true)}
       />
       <CameraWindowButton
-        icon={Images}
+        icon={Library}
         disabled={props.isBusy}
         label={translate('popup.video.postRecordOpenGallery')}
         onClick={() =>

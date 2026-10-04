@@ -1,5 +1,5 @@
-name: Continuous Integration
-run-name: Fast PR Gate
+name: Pull request checks
+run-name: Pull request checks
 
 on:
   pull_request_target:
@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   canonical-proof:
+    name: Checks
     if: >-
       github.event.pull_request.draft == false &&
       !contains(github.event.pull_request.labels.*.name, 'ci-local-proof-bypass')
@@ -36,7 +37,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
-      - name: Require the exact canonical proof graph
+      - name: Verify required results
         env:
           CANONICAL_PROOF_RESULT: ${{ needs.canonical-proof.result }}
         run: test "$CANONICAL_PROOF_RESULT" = success

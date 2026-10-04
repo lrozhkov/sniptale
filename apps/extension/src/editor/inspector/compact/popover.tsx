@@ -45,7 +45,7 @@ function CompactPopoverHeader(
       <button
         type="button"
         onClick={props.onClose}
-        className={COMPACT_POPOVER_CLOSE_BUTTON_CLASSNAME}
+        className={['sniptale-dismiss-button', COMPACT_POPOVER_CLOSE_BUTTON_CLASSNAME].join(' ')}
         aria-label={translate('editor.runtime.closePopoverAria')}
       >
         <X size={16} strokeWidth={2} />

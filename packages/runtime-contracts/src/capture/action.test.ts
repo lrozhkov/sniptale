@@ -49,6 +49,7 @@ it('normalizes desktop and clipboard-only fields', () => {
   ).toEqual({
     ...config,
     screenshotMode: 'desktop',
+    delay: 10,
     afterCapture: 'copy',
     imageFormat: 'png',
   });

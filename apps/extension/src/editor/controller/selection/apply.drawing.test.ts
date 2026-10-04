@@ -23,7 +23,13 @@ import { applySelectionToolSettingsToObjects } from './apply/dispatch';
 
 const settings = {
   ...DEFAULT_EDITOR_TOOL_SETTINGS(DEFAULT_BORDER_PRESET),
-  arrow: { color: '#aa0000', design: 'standard' as const, dynamicWidth: true, width: 7 },
+  arrow: {
+    color: '#aa0000',
+    design: 'standard' as const,
+    drawFromTip: false,
+    dynamicWidth: true,
+    width: 7,
+  },
   marker: { color: '#00aa00', opacity: 0.5, width: 18 },
   pencil: { color: '#0000aa', width: 5 },
   shape: {
@@ -95,8 +101,22 @@ describe('drawing selection settings', () => {
 
     expect(mocks.replaceEditorDrawingFabricGeometry).toHaveBeenCalledWith(
       object,
-      expect.objectContaining(settings[type])
+      expect.objectContaining(
+        type === 'arrow'
+          ? {
+              color: settings.arrow.color,
+              design: settings.arrow.design,
+              dynamicWidth: settings.arrow.dynamicWidth,
+              width: settings.arrow.width,
+            }
+          : settings[type]
+      )
     );
+    if (type === 'arrow') {
+      expect(mocks.replaceEditorDrawingFabricGeometry.mock.lastCall?.[1]).not.toHaveProperty(
+        'drawFromTip'
+      );
+    }
     expect(surface.remove).toHaveBeenCalledWith(object);
     expect(surface.insertAt).toHaveBeenCalledWith(0, expect.any(Rect));
     expect(prepareObject).toHaveBeenCalledOnce();
@@ -136,6 +156,27 @@ describe('drawing selection settings', () => {
 
     expect(surface.remove).not.toHaveBeenCalled();
     expect(mocks.replaceEditorDrawingFabricGeometry).not.toHaveBeenCalled();
+  });
+
+  it('writes the chosen strength into a selected blur drawing', () => {
+    const object = new Rect();
+    const surface = createCanvasWithObject(object);
+    mocks.readEditorDrawingObject.mockReturnValueOnce({
+      id: 'blur-1',
+      kind: 'blur',
+      bounds: { x: 0, y: 0, width: 20, height: 20 },
+      amount: 20,
+    });
+
+    applySelectionToolSettingsToObjects(surface, [object], 'blur', {
+      ...settings,
+      blur: { amount: 2 },
+    });
+
+    expect(JSON.parse(object.sniptaleDrawingJson ?? '{}')).toMatchObject({
+      object: { id: 'blur-1', amount: 2 },
+    });
+    expect(surface.remove).not.toHaveBeenCalled();
   });
 
   it('preserves selected layer indices and interleaving during a mass update', () => {

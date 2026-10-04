@@ -9,8 +9,11 @@ export const MAX_GALLERY_SAVED_VIEW_NAME_LENGTH = 80;
 
 export type GallerySavedViewFolder =
   | 'all'
+  | 'audio'
   | 'recording'
   | 'scenario'
+  | 'video-project'
+  | 'export'
   | 'screenshot'
   | 'web-snapshot';
 export type GallerySavedViewScope = LibraryFilterScope;

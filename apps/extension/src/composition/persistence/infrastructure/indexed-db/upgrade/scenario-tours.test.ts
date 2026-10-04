@@ -24,7 +24,7 @@ it('updates only admission metadata and preserves every beta2 store and media ob
   expect(db.createObjectStore).not.toHaveBeenCalled();
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
   expect(tx.abort).not.toHaveBeenCalled();
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 2 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 3 });
   expect(tx.objectStore.mock.calls.every(([store]) => store === 'schema_contracts')).toBe(true);
   const migration = DATABASE_MIGRATIONS.find((item) => item.fromDatabaseVersion === 2)!;
   expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);
@@ -51,5 +51,5 @@ it('refuses missing stores before publishing the new contract, then permits an i
   expect(put).not.toHaveBeenCalled();
   db.objectStoreNames.contains = () => true;
   handleDatabaseUpgrade(db, 2, 3, tx);
-  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 2 });
+  expect(put).toHaveBeenCalledWith({ domainId: 'scenarioProjects', schemaVersion: 3 });
 });

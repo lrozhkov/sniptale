@@ -166,3 +166,21 @@ describe('content entrypoint styles', () => {
     );
   });
 });
+
+it('registers locally scoped property focus styles in the content bundle', () => {
+  const source = readFileSync(STYLES_SOURCE_PATH, 'utf8');
+  const styles = readFileSync(
+    new URL('../../overlay/design-review/settings/styles.css', import.meta.url),
+    'utf8'
+  );
+  expect(source).toContain(
+    "import designReviewSettingsStyles from '../../overlay/design-review/settings/styles.css?inline'"
+  );
+  expect(source).toContain('        designReviewSettingsStyles,');
+  expect(styles).toContain(
+    "[data-ui='content.design-review.settings'][data-focus-modality='pointer']"
+  );
+  expect(styles).toContain(
+    "[data-ui='content.design-review.settings'][data-focus-modality='keyboard']"
+  );
+});

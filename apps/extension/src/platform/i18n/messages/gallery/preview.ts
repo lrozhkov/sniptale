@@ -5,29 +5,89 @@ import {
 } from '../shared/web-snapshot';
 
 export const galleryPreviewMessages = defineMessageSource({
+  openExport: { ru: 'Просмотреть сохранённый HTML', en: 'View saved HTML' },
+  exportFileUnavailable: {
+    ru: 'HTML-файл этой записи не сохранён в библиотеке. Откройте скачанный файл или создайте новый экспорт из проекта.',
+    en: 'This entry has no HTML file stored in the library. Open the downloaded file or create a new export from the project.',
+  },
+  projectsHeading: { ru: 'Проекты', en: 'Projects' },
+  materialsList: { ru: 'Список материалов', en: 'Materials list' },
+  showMaterials: { ru: 'Показать материалы', en: 'Show materials' },
+  hideMaterials: { ru: 'Скрыть материалы', en: 'Hide materials' },
+  materialsHeading: { ru: 'Готовые материалы', en: 'Ready materials' },
+  folderVideoProject: { ru: 'Видеопроекты', en: 'Video projects' },
+  restoreProjectFirst: {
+    ru: 'Восстановите проект из корзины для редактирования',
+    en: 'Restore this project from Trash Bin to edit it',
+  },
+  editableProject: { ru: 'Можно продолжить редактирование', en: 'Ready to continue editing' },
+  clips: { ru: 'Клипы', en: 'Clips' },
+  tracks: { ru: 'Дорожки', en: 'Tracks' },
+  projectPreviewMissing: { ru: 'Нет изображения для превью', en: 'No image available for preview' },
+  projectUnavailable: {
+    ru: 'Проект недоступен для редактирования',
+    en: 'Project unavailable for editing',
+  },
+  actionRetry: {
+    ru: 'Действие не выполнено. Повторите попытку.',
+    en: 'Action did not complete. Try again.',
+  },
+  copied: { ru: 'Скопировано', en: 'Copied' },
+  downloadStarted: { ru: 'Скачивание начато', en: 'Download started' },
+  copySaved: { ru: 'Копия сохранена', en: 'Copy saved' },
+  origin: { ru: 'Происхождение', en: 'Origin' },
+  capturedImage: { ru: 'Снимок экрана', en: 'Screen capture' },
+  recordedMedia: { ru: 'Запись', en: 'Recording' },
+  projectMedia: { ru: 'Материал проекта', en: 'Project media' },
+  savedMedia: { ru: 'Сохранённый материал', en: 'Saved media' },
+  exportedMedia: { ru: 'Экспорт проекта', en: 'Project export' },
+  exportCurrentProjectSteps: {
+    ru: 'Ниже показаны шаги текущего проекта. Содержимое прежнего экспортированного файла не сохранено.',
+    en: 'These are steps from the current project. The previously exported file is not stored here.',
+  },
+  exportSourceProject: { ru: 'Исходный проект', en: 'Source project' },
+  exportSourceUnavailable: {
+    ru: 'Исходный проект недоступен. Сохранённые сведения об экспорте остаются прежними.',
+    en: 'The source project is unavailable. The saved export details remain unchanged.',
+  },
+  openCurrentProject: { ru: 'Открыть текущий проект', en: 'Open current project' },
+  captureMethod: { ru: 'Способ записи', en: 'Capture method' },
+  captureTab: { ru: 'Вкладка', en: 'Tab' },
+  captureTabCrop: { ru: 'Область вкладки', en: 'Tab area' },
+  captureWindow: { ru: 'Окно', en: 'Window' },
+  captureScreen: { ru: 'Экран', en: 'Screen' },
+  captureDisplay: { ru: 'Экран или окно', en: 'Screen or window' },
+  captureCamera: { ru: 'Камера', en: 'Camera' },
+  recordedActions: { ru: 'Записанные действия', en: 'Recorded actions' },
+  cursorHistory: { ru: 'Движения указателя', en: 'Pointer movements' },
+  available: { ru: 'Сохранены', en: 'Saved' },
+  notRecorded: { ru: 'Нет сохранённых данных', en: 'No saved data' },
+  sourceLoading: { ru: 'Загрузка сведений о записи…', en: 'Loading recording details…' },
+  sourceUnavailable: { ru: 'Сведения о записи недоступны', en: 'Recording details unavailable' },
+  retrySource: { ru: 'Повторить загрузку', en: 'Retry loading' },
   folderAll: {
-    ru: 'Все медиа',
-    en: 'All media',
+    ru: 'Все материалы',
+    en: 'All materials',
   },
   folderScreenshot: {
-    ru: 'Скриншоты',
-    en: 'Screenshots',
+    ru: 'Изображения',
+    en: 'Images',
   },
   folderRecording: {
-    ru: 'Видеозаписи',
-    en: 'Recordings',
+    ru: 'Видео',
+    en: 'Videos',
   },
   folderExport: {
-    ru: 'Экспорты',
-    en: 'Exports',
+    ru: 'Руководства и туры',
+    en: 'Guides and tours',
   },
   folderWebSnapshot: {
     ru: sharedWebSnapshotPluralNameMessage.ru,
     en: sharedWebSnapshotPluralNameMessage.en,
   },
   folderScenario: {
-    ru: 'Сценарии',
-    en: 'Scenarios',
+    ru: 'Проекты сценариев',
+    en: 'Scenario projects',
   },
   kindAudio: {
     ru: 'Аудио',
@@ -125,6 +185,22 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Сбросить масштаб',
     en: 'Reset zoom',
   },
+  lockZoom: {
+    ru: 'Сохранять выбранный масштаб при переключении материалов',
+    en: 'Keep the chosen zoom when switching items',
+  },
+  unlockZoom: {
+    ru: 'Использовать автоматический масштаб для новых материалов',
+    en: 'Use automatic zoom for new items',
+  },
+  zoomLockToggle: {
+    ru: 'Сохранять масштаб при переключении материалов',
+    en: 'Keep zoom when switching items',
+  },
+  zoomSlider: {
+    ru: 'Масштаб изображения',
+    en: 'Image zoom',
+  },
   previous: {
     ru: 'Предыдущее',
     en: 'Previous',
@@ -133,9 +209,52 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Следующее',
     en: 'Next',
   },
+  player: {
+    play: { ru: 'Воспроизвести', en: 'Play' },
+    playVideo: { ru: 'Воспроизвести видео', en: 'Play video' },
+    remaining: { ru: 'Оставшееся время', en: 'Remaining time' },
+    totalDuration: { ru: 'Длительность видео', en: 'Video duration' },
+    pause: { ru: 'Пауза', en: 'Pause' },
+    seek: { ru: 'Позиция воспроизведения', en: 'Playback position' },
+    volume: { ru: 'Громкость', en: 'Volume' },
+    mute: { ru: 'Выключить звук', en: 'Mute' },
+    unmute: { ru: 'Включить звук', en: 'Unmute' },
+    speed: { ru: 'Скорость', en: 'Speed' },
+    scale: { ru: 'Масштаб видео', en: 'Video scale' },
+    fit: { ru: 'Вписать в окно', en: 'Fit to window' },
+    original: { ru: 'Исходный размер (100%)', en: 'Original size (100%)' },
+    fullscreen: { ru: 'Полный экран', en: 'Fullscreen' },
+    exitFullscreen: { ru: 'Выйти из полного экрана', en: 'Exit fullscreen' },
+    failed: {
+      ru: 'Не удалось воспроизвести видео. Откройте его заново или выберите другой файл.',
+      en: 'Unable to play this video. Reopen it or choose another file.',
+    },
+    actionFailed: {
+      ru: 'Не удалось выполнить действие. Повторите попытку.',
+      en: 'Unable to complete the action. Try again.',
+    },
+    frameLoading: { ru: 'Загрузка кадра…', en: 'Loading frame…' },
+    frameFailed: { ru: 'Кадр недоступен', en: 'Frame unavailable' },
+  },
   videoLoading: {
     ru: 'Подготовка видео…',
     en: 'Preparing video…',
+  },
+  mediaLoading: {
+    ru: 'Загрузка материала…',
+    en: 'Loading media…',
+  },
+  mediaMissing: {
+    ru: 'Файл материала не найден. Выберите другой материал или откройте этот снова.',
+    en: 'The media file is missing. Choose another item or reopen this one.',
+  },
+  mediaUnavailable: {
+    ru: 'Не удалось загрузить материал. Выберите другой материал или откройте этот снова.',
+    en: 'Could not load the media. Choose another item or reopen this one.',
+  },
+  mediaInvalid: {
+    ru: 'Не удалось показать материал. Возможно, файл повреждён. Выберите другой материал или откройте этот снова.',
+    en: 'Could not display the media. The file may be damaged. Choose another item or reopen this one.',
   },
   recordingRoleDisplay: {
     ru: 'Экран или окно',
@@ -216,6 +335,22 @@ export const galleryPreviewMessages = defineMessageSource({
   actions: {
     ru: 'Действия',
     en: 'Actions',
+  },
+  usedInProjects: {
+    ru: 'Используется в проектах',
+    en: 'Used in projects',
+  },
+  projectsLoading: {
+    ru: 'Загрузка проектов…',
+    en: 'Loading projects…',
+  },
+  projectsUnavailable: {
+    ru: 'Не удалось загрузить проекты',
+    en: 'Could not load projects',
+  },
+  projectsEmpty: {
+    ru: 'Не используется в проектах',
+    en: 'Not used in any projects',
   },
   fileActions: {
     ru: 'Файл и копии',

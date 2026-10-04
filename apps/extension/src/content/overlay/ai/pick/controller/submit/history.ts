@@ -18,7 +18,7 @@ export function applyAiChangesWithHistory(treeData: ParsedDOMTree, changes: AIEd
   const targets = findAIChangeTargets(treeData, changes);
   const beforeStates = captureDomStateMap(targets);
 
-  pagePreparationHistory.beginTransaction(historyTransactionKey);
+  pagePreparationHistory.beginTransaction(historyTransactionKey, null, 'content-editing');
   try {
     const result = applyAIChanges(treeData, changes);
     pagePreparationHistory.commitTransaction(

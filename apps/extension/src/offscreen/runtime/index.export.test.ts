@@ -185,7 +185,12 @@ it('routes export start, cancel, and capability probe messages', async () => {
   );
   await flushRuntimeRouting();
 
-  expect(startProjectExportMock).toHaveBeenCalledWith('job-1', createProject(), settings);
+  expect(startProjectExportMock).toHaveBeenCalledWith(
+    'job-1',
+    expect.any(Function),
+    settings,
+    expect.any(Function)
+  );
   expect(cancelProjectExportMock).toHaveBeenCalledWith('job-1');
   expect(getProjectExportCapabilitiesMock).toHaveBeenCalledWith(settings);
   expect(keepStartChannelOpen).toBe(true);

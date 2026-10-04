@@ -3,7 +3,7 @@ import { FloatingChromeRoot } from '@sniptale/ui/floating-chrome';
 import type { EditorTool } from '../../../features/editor/document/types';
 import { useEditorInspectorSidebarController } from '../../inspector/sidebar-controller';
 import { useEditorToolbarController } from '../toolbar/use-controller';
-import { EditorFloatingDocumentBar } from './document-bar';
+import { EditorFloatingDocumentBar, ImageDocumentOperationsProvider } from './document-bar';
 import { EditorFloatingLeftDrawer } from './left-drawer';
 import { EditorFloatingWorkspaceOverlays } from './overlays';
 import { EditorFloatingRightStack } from './right-stack';
@@ -13,6 +13,7 @@ import { EditorFloatingToolPropertiesRail } from './tool-properties-rail';
 import { EditorFloatingViewControls } from './view-controls';
 import { getFloatingWorkspaceEdgeInsetStyle, useFloatingWorkspaceEdgeInsets } from './edge-insets';
 import { useFloatingLayersPreferenceState } from './preferences';
+import { installEditorToastHostAdapter } from './toast-host';
 
 function useDismissedLeftDrawer(activeTool: EditorTool) {
   const [dismissedLeftDrawerTool, setDismissedLeftDrawerTool] = useState<EditorTool | null>(null);
@@ -199,6 +200,7 @@ function EditorFloatingRoutedPanels({
 }
 
 export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
+  useEffect(() => installEditorToastHostAdapter(), []);
   const toolbarProps = useEditorToolbarController(hasImage);
   const edgeInsets = useFloatingWorkspaceEdgeInsets(hasImage);
   const {
@@ -242,24 +244,29 @@ export function EditorFloatingWorkspace({ hasImage }: { hasImage: boolean }) {
       onWheel={(event) => event.stopPropagation()}
       style={getFloatingWorkspaceEdgeInsetStyle(edgeInsets)}
     >
-      <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
-      <EditorFloatingToolRail {...railProps} leftDrawerOpen={surfaceRoute.leftDrawer !== null} />
-      <EditorFloatingWorkspaceOverlays documentController={documentController} />
       {hasImage ? (
-        <EditorFloatingLoadedSurfaces
-          collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
-          documentController={documentController}
-          hasImage={hasImage}
-          layersCollapsed={layersCollapsed}
-          layersHeightRatio={layersHeightRatio}
-          layersPreferenceError={layersPreferenceError}
-          onCollapseLayers={() => setLayersCollapsed(true)}
-          onExpandLayers={() => setLayersCollapsed(false)}
-          onLayersHeightRatioChange={setLayersHeightRatio}
-          setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
-          surfaceRoute={surfaceRoute}
-          toolbarProps={toolbarProps}
-        />
+        <ImageDocumentOperationsProvider hasImage={hasImage}>
+          <EditorFloatingDocumentBar {...toolbarProps} documentController={documentController} />
+          <EditorFloatingToolRail
+            {...railProps}
+            leftDrawerOpen={surfaceRoute.leftDrawer !== null}
+          />
+          <EditorFloatingWorkspaceOverlays documentController={documentController} />
+          <EditorFloatingLoadedSurfaces
+            collapsedDrawingOptionsTool={collapsedDrawingOptionsTool}
+            documentController={documentController}
+            hasImage={hasImage}
+            layersCollapsed={layersCollapsed}
+            layersHeightRatio={layersHeightRatio}
+            layersPreferenceError={layersPreferenceError}
+            onCollapseLayers={() => setLayersCollapsed(true)}
+            onExpandLayers={() => setLayersCollapsed(false)}
+            onLayersHeightRatioChange={setLayersHeightRatio}
+            setDismissedLeftDrawerTool={setDismissedLeftDrawerTool}
+            surfaceRoute={surfaceRoute}
+            toolbarProps={toolbarProps}
+          />
+        </ImageDocumentOperationsProvider>
       ) : null}
     </FloatingChromeRoot>
   );

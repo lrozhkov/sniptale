@@ -36,7 +36,10 @@ class MockFabricImage {
   }
 }
 
-vi.mock('fabric', () => ({ FabricImage: { fromURL: mocks.FabricImageFromURLMock } }));
+vi.mock('fabric', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('fabric')>()),
+  FabricImage: { fromURL: mocks.FabricImageFromURLMock },
+}));
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: mocks.translateMock,
@@ -208,7 +211,7 @@ function createReachableObject() {
 }
 
 function registerVisibilityReachabilityTests() {
-  it('keeps frame objects behind content and repositions off-screen objects', () => {
+  it('keeps frame objects behind content and preserves objects in the outer workspace', () => {
     const frameObject = { role: 'frame' };
     const userObject = createReachableObject();
     const canvas = {
@@ -227,11 +230,11 @@ function registerVisibilityReachabilityTests() {
         { height: 200, width: 300 },
         userObject as unknown as never
       )
-    ).toBe(true);
-    expect(userObject.setCoords).toHaveBeenCalledOnce();
+    ).toBe(false);
+    expect(userObject.setCoords).not.toHaveBeenCalled();
 
     mocks.getLayerObjectsMock.mockReturnValue([userObject as unknown as never]);
-    expect(ensureEditorObjectsReachable(canvas as never, { height: 200, width: 300 })).toBe(true);
+    expect(ensureEditorObjectsReachable(canvas as never, { height: 200, width: 300 })).toBe(false);
   });
 }
 

@@ -1,3 +1,5 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
+import type { GalleryPreviewPresentation } from '../types';
 import type { GalleryItem } from '../items';
 
 interface PreviewNavigationProps {
@@ -10,11 +12,19 @@ interface PreviewNavigationProps {
 }
 
 export interface PreviewPanelProps {
+  previewRequestRevision?: number | undefined;
+  onPresented?: ((presentation: GalleryPreviewPresentation) => void) | undefined;
   initialMode?: 'edit';
+  trashMode?: boolean;
+  /** The mounted library list restores focus for previews opened from its material wrappers. */
+  listFocusReturn?: boolean;
+  onRestoreTrash?: () => Promise<boolean>;
+  restoreBusy?: boolean;
   allTags?: string[];
   hasChanges?: boolean;
   item: GalleryItem;
   previewUrl: string | null;
+  previewLoadStatus?: 'loading' | 'ready' | 'missing' | 'error' | undefined;
   inspectorCollapsed: boolean;
   filenameDraft: string;
   tagDraft: string;
@@ -28,13 +38,13 @@ export interface PreviewPanelProps {
   onAddTag: (tag?: string) => void;
   onResetChanges?: () => void;
   onSave?: () => Promise<void>;
-  onDownload: () => Promise<void>;
-  onDownloadOriginal?: () => Promise<void>;
-  onCopy: () => Promise<void>;
+  onDownload: () => Promise<boolean | void>;
+  onDownloadOriginal?: () => Promise<boolean | void>;
+  onCopy: () => Promise<boolean | void>;
   onEdit: () => void;
   onOpenSnapshotScreenshot?: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  onDelete: (opening?: GalleryDeletionOpening) => Promise<void>;
   onPromote?: () => Promise<void>;
   onRestoreOriginal?: () => void;
-  onSaveCopy?: () => Promise<void>;
+  onSaveCopy?: () => Promise<boolean | void>;
 }

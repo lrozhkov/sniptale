@@ -45,9 +45,9 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
   loadSettings: loadSettingsMock,
 }));
 
-vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/foundation/utils/filename')>()),
-  generateFilename: generateFilenameMock,
+vi.mock('../../../workflows/file-naming/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/file-naming/index')>()),
+  createScreenshotFilename: generateFilenameMock,
 }));
 
 vi.mock('../index', async (importOriginal) => ({

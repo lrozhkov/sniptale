@@ -4,6 +4,7 @@ import { applyEditorControllerDocument } from '../../document/lifecycle/apply/ru
 import type { ApplyDocumentOptions } from '../../core/types';
 import type { EditorControllerInstance } from '../types';
 import { syncBackgroundLayerForController } from './document-background';
+import { rebuildFrameDecorationsForController } from './document-frame';
 
 export async function applyDocumentForController(
   controller: EditorControllerInstance,
@@ -17,7 +18,8 @@ export async function applyDocumentForController(
     prepareObject: (object) => controller.prepareObject(object),
     syncBackgroundLayer: (frame, canvasSize) =>
       syncBackgroundLayerForController(controller, frame, canvasSize),
-    rebuildFrameDecorations: () => controller.rebuildFrameDecorations(),
+    rebuildFrameDecorations: (browserFrame) =>
+      rebuildFrameDecorationsForController(controller, browserFrame),
     setCanvasDocumentSize: (size) => {
       controller.canvasDocumentSize = size;
     },

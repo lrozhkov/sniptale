@@ -41,9 +41,7 @@ export function normalizeQuickActionPolicy(action: QuickAction): QuickAction {
   return {
     ...action,
     afterCapture,
-    ...(isDesktopQuickAction(action)
-      ? { viewportPresetId: null, delay: null, exitAfterCapture: false }
-      : {}),
+    ...(isDesktopQuickAction(action) ? { viewportPresetId: null, exitAfterCapture: false } : {}),
     ...(copyToClipboard ? { imageFormat: 'png', imageQuality: null } : {}),
   };
 }

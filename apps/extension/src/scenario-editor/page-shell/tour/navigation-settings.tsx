@@ -32,59 +32,63 @@ export function TourNavigationSettings({
   t: Translate;
 }) {
   const button = slide.buttons.find((entry) => entry.id === objectId);
+  const changeButton = (patch: Partial<TourNavigationSlide['buttons'][number]>) =>
+    onChange({
+      ...slide,
+      buttons: slide.buttons.map((entry) =>
+        entry.id === objectId ? { ...entry, ...patch } : entry
+      ),
+    });
   if (button)
     return (
-      <GuideInspectorGroup icon={List} title={t('scenario.editor.tourButton')}>
+      <GuideInspectorGroup
+        id="button"
+        collapsible={false}
+        icon={List}
+        title={t('scenario.editor.tourButton')}
+      >
         <TourTextField
           label={t('scenario.editor.textLabel')}
           singleLine
           value={button.label}
           disabled={disabled}
-          onChange={(label) =>
-            onChange({
-              ...slide,
-              buttons: slide.buttons.map((entry) =>
-                entry.id === button.id ? { ...entry, label } : entry
-              ),
-            })
-          }
+          onChange={(label) => changeButton({ label })}
         />
         <TourActionField
           value={button.action}
           tour={tour}
           disabled={disabled}
           t={t}
-          onChange={(action) =>
-            onChange({
-              ...slide,
-              buttons: slide.buttons.map((entry) =>
-                entry.id === button.id ? { ...entry, action } : entry
-              ),
-            })
-          }
+          onChange={(action) => changeButton({ action })}
         />
-        <ScenarioInspectorActionButton
-          tone="danger"
-          disabled={disabled}
-          onClick={() => {
-            if (
-              onChange({
-                ...slide,
-                buttons: slide.buttons.filter((entry) => entry.id !== button.id),
-              })
-            )
-              onSelect(null);
-          }}
-        >
-          <Trash2 size={15} />
-          {t('common.actions.delete')}
-        </ScenarioInspectorActionButton>
+        <div className="tour-object-destructive-actions">
+          <ScenarioInspectorActionButton
+            tone="danger"
+            disabled={disabled}
+            onClick={() => {
+              if (
+                onChange({
+                  ...slide,
+                  buttons: slide.buttons.filter((entry) => entry.id !== button.id),
+                })
+              )
+                onSelect(null);
+            }}
+          >
+            <Trash2 size={15} />
+            {t('common.actions.delete')}
+          </ScenarioInspectorActionButton>
+        </div>
       </GuideInspectorGroup>
     );
   return (
     <>
       {section === 'content' && (
-        <GuideInspectorGroup icon={List} title={t('scenario.editor.tourAddNavigation')}>
+        <GuideInspectorGroup
+          id="addNavigation"
+          icon={List}
+          title={t('scenario.editor.tourAddNavigation')}
+        >
           <TourTextField
             label={t('scenario.editor.tourNavigationTitle')}
             singleLine
@@ -99,6 +103,7 @@ export function TourNavigationSettings({
             onChange={(description) => onChange({ ...slide, description })}
           />
           <CompactPaintSelector
+            triggerVariant="swatch"
             label={t('scenario.editor.tourBackground')}
             title={t('scenario.editor.tourBackground')}
             value={slide.background.paint ?? createSolidPaint(slide.background.color)}
@@ -225,6 +230,7 @@ function TourNavigationButtons({
   };
   return (
     <GuideInspectorGroup
+      id="contentsLinks"
       icon={List}
       title={t('scenario.editor.tourContentsLinks')}
       action={
@@ -237,61 +243,89 @@ function TourNavigationButtons({
         />
       }
     >
-      <ScenarioInspectorActionButton
-        disabled={
-          disabled || !destinations.length || slide.buttons.length + destinations.length > 120
-        }
-        onClick={() =>
-          onChange({
-            ...slide,
-            buttons: [
-              ...slide.buttons,
-              ...destinations.map((entry) => ({
-                id: crypto.randomUUID(),
-                label: entry.title || t('scenario.editor.tourUntitled'),
-                action: { kind: 'slide' as const, slideId: entry.id },
-              })),
-            ],
-          })
-        }
-      >
-        {t('scenario.editor.tourBuildContents')}
-        {destinations.length > 0 && ` (${destinations.length})`}
-      </ScenarioInspectorActionButton>
-      <p className="guide-inspector-hint">
-        {t(
-          destinations.length
-            ? 'scenario.editor.tourContentsHelp'
-            : tour.slides.some((entry) => entry.kind === 'image')
-              ? 'scenario.editor.tourContentsComplete'
-              : 'scenario.editor.tourContentsEmpty'
-        )}
-      </p>
-      {slide.buttons.map((entry, index) => (
-        <div key={entry.id} className="tour-slide-row">
-          <button
-            className="tour-slide-select"
-            onClick={() => onSelect(entry.id)}
-            title={entry.label}
-          >
-            {index + 1}. {entry.label || t('scenario.editor.tourButton')}
-          </button>
-          <ContentToolbarButton
-            title={t('scenario.editor.tourMoveButtonUp')}
-            disabled={disabled || index === 0}
-            onClick={() => move(index, -1)}
-          >
-            <ArrowUp size={14} />
-          </ContentToolbarButton>
-          <ContentToolbarButton
-            title={t('scenario.editor.tourMoveButtonDown')}
-            disabled={disabled || index === slide.buttons.length - 1}
-            onClick={() => move(index, 1)}
-          >
-            <ArrowDown size={14} />
-          </ContentToolbarButton>
-        </div>
-      ))}
+      {destinations.length > 0 && (
+        <ScenarioInspectorActionButton
+          className="tour-contents-build"
+          title={`${t('scenario.editor.tourBuildContents')} (${destinations.length})`}
+          disabled={disabled || slide.buttons.length + destinations.length > 120}
+          onClick={() =>
+            onChange({
+              ...slide,
+              buttons: [
+                ...slide.buttons,
+                ...destinations.map((entry) => ({
+                  id: crypto.randomUUID(),
+                  label: entry.title || t('scenario.editor.tourUntitled'),
+                  action: { kind: 'slide' as const, slideId: entry.id },
+                })),
+              ],
+            })
+          }
+        >
+          <Plus size={15} aria-hidden="true" />
+          <span>{t('scenario.editor.tourBuildContents')}</span>
+          <span className="tour-contents-count">({destinations.length})</span>
+        </ScenarioInspectorActionButton>
+      )}
+      {slide.buttons.length === 0 && (
+        <p className="guide-inspector-hint">
+          {t(
+            destinations.length
+              ? 'scenario.editor.tourContentsHelp'
+              : tour.slides.some((entry) => entry.kind === 'image')
+                ? 'scenario.editor.tourContentsComplete'
+                : 'scenario.editor.tourContentsEmpty'
+          )}
+        </p>
+      )}
+      {slide.buttons.length > 0 && (
+        <ol className="tour-contents-list" aria-label={t('scenario.editor.tourContentsLinks')}>
+          {slide.buttons.map((entry, index) => (
+            <li key={entry.id} className="tour-contents-row">
+              <button
+                className="tour-contents-select"
+                data-inspector-object={entry.id}
+                onClick={() => onSelect(entry.id)}
+                title={entry.label}
+              >
+                <span className="tour-contents-number" aria-hidden="true">
+                  {index + 1}
+                </span>
+                <span>{entry.label || t('scenario.editor.tourButton')}</span>
+              </button>
+              <div className="tour-contents-actions">
+                <ContentToolbarButton
+                  title={t('scenario.editor.tourMoveButtonUp')}
+                  disabled={disabled || index === 0}
+                  onClick={() => move(index, -1)}
+                >
+                  <ArrowUp size={14} />
+                </ContentToolbarButton>
+                <ContentToolbarButton
+                  title={t('scenario.editor.tourMoveButtonDown')}
+                  disabled={disabled || index === slide.buttons.length - 1}
+                  onClick={() => move(index, 1)}
+                >
+                  <ArrowDown size={14} />
+                </ContentToolbarButton>
+                <ContentToolbarButton
+                  tone="danger"
+                  title={t('common.actions.delete')}
+                  disabled={disabled}
+                  onClick={() =>
+                    onChange({
+                      ...slide,
+                      buttons: slide.buttons.filter((button) => button.id !== entry.id),
+                    })
+                  }
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </ContentToolbarButton>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
     </GuideInspectorGroup>
   );
 }

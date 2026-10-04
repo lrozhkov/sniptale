@@ -16,6 +16,11 @@ const projectsDbMocks = vi.hoisted(() => ({
   recoverProjectMediaPublicationsMock: vi.fn(),
 }));
 
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
+}));
+
 vi.mock('./asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverProjectMediaPublications: projectsDbMocks.recoverProjectMediaPublicationsMock,
@@ -47,6 +52,7 @@ function createDb() {
       done: Promise.resolve(),
       objectStore: vi.fn(() => ({
         delete: projectsDbMocks.txDeleteMock,
+        index: () => ({ count: async () => 0 }),
         getAll: projectsDbMocks.txGetAllMock,
         get: projectsDbMocks.txGetMock,
         put: projectsDbMocks.txPutMock,
@@ -120,8 +126,18 @@ it('accepts only a null expected workspace revision when creating a project', as
 it('removes project-owned assets that are no longer referenced by the saved project', async () => {
   const { saveVideoProject } = await importProjectsDbModule();
   const project = createVideoProject({ updatedAt: 10 });
-  projectsDbMocks.txGetMock.mockResolvedValue(
-    createVideoProjectEntryWithMediaClip({ updatedAt: 10 })
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === project.id
+      ? createVideoProjectEntryWithMediaClip({ updatedAt: 10 })
+      : key === 'project-asset-1'
+        ? {
+            id: 'project-asset-1',
+            assetId: 'asset-body',
+            createdAt: 1,
+            mimeType: 'video/mp4',
+            size: 10,
+          }
+        : undefined
   );
 
   await saveVideoProject(project, { baseUpdatedAt: 10 });
@@ -129,8 +145,8 @@ it('removes project-owned assets that are no longer referenced by the saved proj
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'project-1' })
   );
-  expect(projectsDbMocks.txDeleteMock).toHaveBeenNthCalledWith(1, 'project-asset-1');
-  expect(projectsDbMocks.txDeleteMock).toHaveBeenNthCalledWith(2, 'project-asset:project-asset-1');
+  expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('project-asset-1');
+  expect(projectsDbMocks.txDeleteMock).toHaveBeenCalledWith('project-asset:project-asset-1');
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',
   ]);

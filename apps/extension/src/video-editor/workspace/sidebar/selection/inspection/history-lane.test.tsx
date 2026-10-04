@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { createVideoProjectCursorTrack } from '../../../../../features/video/project/defaults';
+import { VideoTemporalEasing } from '../../../../../features/video/project/types';
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -16,9 +18,15 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 
+const trackPresentation = vi.hoisted(() => ({ current: null as unknown }));
+vi.mock('../../../surface/track-presentation', () => ({
+  useWorkspaceTrackPresentation: () => trackPresentation.current,
+}));
+
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 beforeEach(() => {
+  trackPresentation.current = null;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -177,4 +185,45 @@ it('changes the preset, timing and behavior defaults through the shared controls
   await click('nav button[aria-label="videoEditor.sidebar.historyKeyboard"]');
   await click('button[aria-label="videoEditor.sidebar.historyShowKeys"]');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ showKeystrokes: true });
+});
+
+it('shows the sole cursor lane display option directly under Rules', () => {
+  const project = createEmptyVideoProject('Cursor display');
+  project.cursorTrack = {
+    ...createVideoProjectCursorTrack(),
+    samples: [
+      {
+        id: 'sample',
+        time: 0,
+        x: 10,
+        y: 10,
+        visible: true,
+        interpolation: VideoTemporalEasing.LINEAR,
+      },
+    ],
+  };
+  const update = vi.fn();
+  trackPresentation.current = {
+    panelPrefs: {
+      prefs: { collapsedCursorLaneVisible: true },
+      setCollapsedCursorLaneVisible: update,
+    },
+  };
+  act(() =>
+    root.render(<InspectHistoryLanePanel project={project} onUpdateActionPresentation={vi.fn()} />)
+  );
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        'nav button[aria-label="videoEditor.sidebar.historyRules"]'
+      )!
+      .click()
+  );
+  const toggle = container.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.timeline.cursorLane"]'
+  )!;
+  expect(toggle).not.toBeNull();
+  expect(toggle.closest('details')).toBeNull();
+  act(() => toggle.click());
+  expect(update).toHaveBeenCalledWith(false);
 });

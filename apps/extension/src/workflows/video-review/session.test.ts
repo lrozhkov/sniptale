@@ -38,6 +38,7 @@ it('serializes draft then Save using the committed draft revision, without an ex
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => ({ ...snapshot, draft })),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
     saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
     commitVideoWorkspace: vi.fn(async () => saved),
     readVideoWorkspace: vi.fn(async () => snapshot),
@@ -64,6 +65,40 @@ it('serializes draft then Save using the committed draft revision, without an ex
   unsubscribe();
 });
 
+it('durably commits an explicit recording save while autosave stays disabled', async () => {
+  const snapshot = initial();
+  const operation = {
+    id: 'voice-1',
+    at: 2,
+    target: 'annotation' as const,
+    before: null,
+    after: annotation,
+  };
+  const buffered = { ...snapshot, workspace: { ...snapshot.workspace, revision: 2 } };
+  const committed = {
+    ...buffered,
+    workspace: { ...buffered.workspace, revision: 3, cursor: 1, history: [operation] },
+  };
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => buffered),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
+    commitVideoWorkspace: vi.fn(async () => committed),
+    readVideoWorkspace: vi.fn(async () => committed),
+    moveVideoWorkspaceHistory: vi.fn(async () => committed),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  session.setAutosaveEnabled(false);
+  await session.saveAdvanced(snapshot.workspace.advanced);
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  await session.commitDurable(operation);
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledOnce();
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledWith(
+    expect.objectContaining({ expectedRevision: 2, operation })
+  );
+  expect(session.getSnapshot()).toMatchObject({ autosaveEnabled: false, dirty: false });
+});
+
 it('keeps recovery and committed state after failed Save and exposes reload explicitly', async () => {
   const snapshot = initial();
   snapshot.draft = {
@@ -75,6 +110,7 @@ it('keeps recovery and committed state after failed Save and exposes reload expl
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
     saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
     commitVideoWorkspace: vi.fn(async () => {
       throw { code: 'conflict' };
@@ -110,6 +146,7 @@ it('saves advanced state through the revisioned queue and reports failures as co
   };
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
     saveVideoWorkspaceAdvanced: vi.fn(async () => saved),
     commitVideoWorkspace: vi.fn(async () => snapshot),
     readVideoWorkspace: vi.fn(async () => snapshot),
@@ -133,6 +170,7 @@ it('propagates an advanced save failure as a session error', async () => {
   const snapshot = initial();
   const deps = {
     saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => structuredClone(snapshot)),
     saveVideoWorkspaceAdvanced: vi.fn(async () => {
       throw { code: 'invalid' };
     }),
@@ -143,4 +181,118 @@ it('propagates an advanced save failure as a session error', async () => {
   const session = createVideoReviewSession(snapshot, deps);
   await expect(session.saveAdvanced({ broken: true })).rejects.toEqual({ code: 'invalid' });
   expect(session.getSnapshot()).toMatchObject({ error: 'invalid', pending: 0 });
+});
+
+it('keeps paused draft, history and advanced edits local, then atomically resumes', async () => {
+  const snapshot = initial();
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(),
+    saveVideoWorkspaceAdvanced: vi.fn(),
+    commitVideoWorkspace: vi.fn(),
+    moveVideoWorkspaceHistory: vi.fn(),
+    readVideoWorkspace: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async (args: { workspace: unknown; draft: unknown }) => {
+      const { parseVideoWorkspace } =
+        await import('../../composition/persistence/review-workspaces/parser');
+      const workspace = parseVideoWorkspace(args.workspace)!;
+      return { workspace: { ...workspace, revision: 2 }, draft: null };
+    }),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  session.setAutosaveEnabled(false);
+  await session.saveDraft(annotation, null);
+  await session.commit(
+    { id: 'paused', at: 2, target: 'annotation', before: null, after: annotation },
+    true
+  );
+  await session.history('undo');
+  expect(session.getSnapshot().document.annotations).toEqual([]);
+  await session.history('redo');
+  await session.saveAdvanced({
+    ...snapshot.workspace.advanced,
+    ui: { ...snapshot.workspace.advanced.ui, mode: 'advanced' },
+  });
+  await session.flush();
+  expect(session.getSnapshot()).toMatchObject({ dirty: true, autosaveEnabled: false });
+  for (const fn of [
+    deps.saveVideoWorkspaceDraft,
+    deps.commitVideoWorkspace,
+    deps.moveVideoWorkspaceHistory,
+    deps.saveVideoWorkspaceAdvanced,
+    deps.saveVideoWorkspaceSnapshot,
+  ])
+    expect(fn).not.toHaveBeenCalled();
+  session.setAutosaveEnabled(true);
+  await session.flush();
+  expect(deps.saveVideoWorkspaceSnapshot).toHaveBeenCalledWith(
+    expect.objectContaining({ expectedRevision: 1, expectedDraftRevision: null, draft: null })
+  );
+  expect(session.getSnapshot()).toMatchObject({ dirty: false, autosaveEnabled: true });
+  expect(session.getSnapshot().document.annotations).toEqual([annotation]);
+});
+
+it.each(['conflict', 'storage'])('retains the paused buffer after %s on resume', async (code) => {
+  const snapshot = initial();
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(),
+    saveVideoWorkspaceAdvanced: vi.fn(),
+    commitVideoWorkspace: vi.fn(),
+    moveVideoWorkspaceHistory: vi.fn(),
+    readVideoWorkspace: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => {
+      throw { code };
+    }),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  session.setAutosaveEnabled(false);
+  await session.saveDraft(annotation, null);
+  session.setAutosaveEnabled(true);
+  await expect(session.flush()).rejects.toThrow();
+  expect(session.getSnapshot()).toMatchObject({
+    dirty: true,
+    error: code,
+    snapshot: { draft: { annotation } },
+  });
+  await session.reload();
+  expect(session.getSnapshot()).toMatchObject({ dirty: false, error: null, snapshot });
+});
+
+it('cancels queued resume when paused again before its write starts', async () => {
+  const snapshot = initial();
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(),
+    saveVideoWorkspaceAdvanced: vi.fn(),
+    commitVideoWorkspace: vi.fn(),
+    moveVideoWorkspaceHistory: vi.fn(),
+    readVideoWorkspace: vi.fn(async () => snapshot),
+    saveVideoWorkspaceSnapshot: vi.fn(),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  session.setAutosaveEnabled(false);
+  await session.saveDraft(annotation, null);
+  session.setAutosaveEnabled(true);
+  session.setAutosaveEnabled(false);
+  await session.flush();
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+  expect(session.getSnapshot().dirty).toBe(true);
+});
+
+it('keeps an existing conflict visible when autosave is toggled without a local buffer', async () => {
+  const snapshot = initial();
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => {
+      throw { code: 'conflict' };
+    }),
+    saveVideoWorkspaceAdvanced: vi.fn(),
+    commitVideoWorkspace: vi.fn(),
+    moveVideoWorkspaceHistory: vi.fn(),
+    readVideoWorkspace: vi.fn(),
+    saveVideoWorkspaceSnapshot: vi.fn(),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  await expect(session.saveDraft(annotation, null)).rejects.toEqual({ code: 'conflict' });
+  session.setAutosaveEnabled(false);
+  session.setAutosaveEnabled(true);
+  expect(session.getSnapshot().error).toBe('conflict');
+  expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
 });

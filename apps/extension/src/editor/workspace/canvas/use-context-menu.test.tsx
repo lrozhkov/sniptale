@@ -124,6 +124,29 @@ it('blocks loaded-image viewport margins while keeping the menu closed', async (
   expect(document.querySelector('[data-ui="editor.canvas.context-menu"]')).toBeNull();
 });
 
+it('opens the editor menu on a frame annotation DOM layer', async () => {
+  const controller = createControllerMock();
+  const emitter = createCanvasContextMenuEmitter();
+  Object.assign(controller, { canvas: emitter.canvas });
+  resetEditorStore({ viewportPreviewOpen: false });
+  await renderCanvasWrapper(controller);
+
+  const frame = document.createElement('div');
+  frame.dataset['frameId'] = 'frame-1';
+  getCanvasViewportZone()?.append(frame);
+  const event = new MouseEvent('contextmenu', {
+    bubbles: true,
+    button: 2,
+    cancelable: true,
+    clientX: 56,
+    clientY: 72,
+  });
+  await act(async () => frame.dispatchEvent(event));
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(document.querySelector('[data-ui="editor.canvas.context-menu"]')).not.toBeNull();
+});
+
 it('opens the no-image menu from the DOM-owned empty canvas state', async () => {
   const controller = createControllerMock();
   resetEditorStore({ imageData: null, viewportPreviewOpen: false });

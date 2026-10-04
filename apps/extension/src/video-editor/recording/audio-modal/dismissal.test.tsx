@@ -15,8 +15,8 @@ afterEach(() => {
   host?.remove();
   vi.unstubAllGlobals();
 });
-it.each(['backdrop', 'Escape'])(
-  'keeps recording dialog open after %s; explicit Cancel closes',
+it.each(['backdrop'])(
+  'keeps empty recording dialog open after %s; explicit Cancel closes',
   (input) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
     host = document.createElement('div');
@@ -107,3 +107,63 @@ it('focuses the recorder, contains Tab and restores the opener when hidden', () 
     opener.remove();
   }
 });
+
+it('closes an empty recorder explicitly through Escape without a loss warning', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  const onClose = vi.fn();
+  act(() => root.render(<AudioRecordingModal isOpen onClose={onClose} onSave={vi.fn()} />));
+  act(() =>
+    host
+      .querySelector('[role="dialog"]')!
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+      )
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(host.querySelector('[role="alertdialog"]')).toBeNull();
+});
+
+it.each([false, true])(
+  'keeps the recorder open for an Escape consumed by its selector (timeline=%s)',
+  (timeline) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    const onClose = vi.fn();
+    act(() =>
+      root.render(
+        <AudioRecordingModal
+          isOpen
+          onClose={onClose}
+          onSave={vi.fn()}
+          timeline={
+            timeline
+              ? { startTime: 0, duration: 10, beforeStart: async () => undefined, onStop: vi.fn() }
+              : undefined
+          }
+        />
+      )
+    );
+    const microphone = host.querySelector<HTMLButtonElement>(
+      '[aria-label="videoEditor.app.recordAudioDevice"]'
+    )!;
+    const consumed = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    consumed.preventDefault();
+    act(() => microphone.dispatchEvent(consumed));
+    expect(onClose).not.toHaveBeenCalled();
+    act(() =>
+      microphone.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+      )
+    );
+    expect(onClose).toHaveBeenCalledOnce();
+  }
+);

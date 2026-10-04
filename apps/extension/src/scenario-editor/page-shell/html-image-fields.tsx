@@ -16,6 +16,7 @@ export function GuideHtmlImageFields({
   onChange: (patch: Partial<GuideHtmlImageSettings>) => void;
   t: Translate;
 }) {
+  const frame = value.content === 'frame';
   return (
     <div className="guide-html-fields">
       <label>
@@ -31,23 +32,27 @@ export function GuideHtmlImageFields({
           onChange={(content) => onChange({ content })}
         />
       </label>
-      <label className="guide-html-switch">
+      <label
+        className="guide-html-switch"
+        title={t(
+          frame ? 'scenario.editor.htmlFrameOptimizeHint' : 'scenario.editor.htmlOptimizeHint'
+        )}
+      >
         <span>{t('scenario.editor.htmlOptimize')}</span>
         <ProductToggle
           size="sm"
-          disabled={disabled}
-          checked={value.optimize}
+          disabled={disabled || frame}
+          checked={frame || value.optimize}
           aria-label={t('scenario.editor.htmlOptimize')}
           onClick={() => onChange({ optimize: !value.optimize })}
         />
       </label>
-      {value.optimize && (
+      {(frame || value.optimize) && (
         <>
-          <p>{t('scenario.editor.htmlOptimizeHint')}</p>
-          <label>
+          <label title={frame ? t('scenario.editor.htmlFrameSizeHint') : undefined}>
             <span>{t('scenario.editor.htmlMaxEdge')}</span>
             <CompactSelect
-              disabled={disabled}
+              disabled={disabled || frame}
               aria-label={t('scenario.editor.htmlMaxEdge')}
               value={String(value.maxEdge)}
               options={htmlImageEdges.map((edge) => ({
@@ -78,17 +83,19 @@ export function GuideHtmlImageFields({
           </label>
         </>
       )}
-      <label className="guide-html-switch">
+      <label
+        className="guide-html-switch"
+        title={t(frame ? 'scenario.editor.htmlFrameViewerHint' : 'scenario.editor.htmlViewerHint')}
+      >
         <span>{t('scenario.editor.htmlViewer')}</span>
         <ProductToggle
           size="sm"
-          disabled={disabled}
-          checked={value.viewer}
+          disabled={disabled || frame}
+          checked={!frame && value.viewer}
           aria-label={t('scenario.editor.htmlViewer')}
           onClick={() => onChange({ viewer: !value.viewer })}
         />
       </label>
-      <p>{t('scenario.editor.htmlViewerHint')}</p>
     </div>
   );
 }

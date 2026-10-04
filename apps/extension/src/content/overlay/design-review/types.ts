@@ -29,7 +29,7 @@ interface DesignReviewCommentViewState {
 export interface DesignReviewActions {
   close: () => void;
   comment: DesignReviewCommentActions;
-  copyElement: () => Promise<void>;
+  copyElement: () => Promise<boolean>;
   copyPath: () => Promise<void>;
   delete: () => void;
   resetValue: (property: PageStyleProperty) => void;

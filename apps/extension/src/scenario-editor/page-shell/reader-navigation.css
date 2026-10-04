@@ -67,6 +67,20 @@
   text-align: center;
   font-weight: 650;
 }
+[data-navigation='top'][data-reading-mode='flow'] .guide-reading-nav a {
+  min-width: 0;
+  max-width: 100%;
+}
+[data-navigation='top'][data-reading-mode='flow'] .guide-reading-title {
+  min-width: 0;
+  max-width: 24ch;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+[data-navigation='top'][data-reading-mode='flow'] .guide-reading-badge {
+  flex-shrink: 0;
+}
 [data-navigation='top'][data-reading-mode='steps'] .guide-reading-title {
   display: none;
 }
@@ -94,12 +108,4 @@
 }
 .guide-reading-options {
   flex-shrink: 0;
-}
-.guide-reader .guide-reading-options button {
-  width: auto;
-  min-height: 2rem;
-  padding-inline: 0.625rem;
-}
-.guide-html-workbench > .guide-reading-options {
-  margin: 0.5rem 0.75rem;
 }

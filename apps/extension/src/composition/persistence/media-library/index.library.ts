@@ -1,38 +1,27 @@
 import {
-  VIDEO_WORKSPACES_STORE,
-  VIDEO_WORKSPACE_DRAFTS_STORE,
-} from '../infrastructure/indexed-db/core.stores';
-import {
-  AGGREGATE_PRESENTATIONS_STORE,
-  ASSET_OPERATIONS_STORE,
-  ASSET_OWNERS_STORE,
-  ASSET_REFS_STORE,
-  IMAGE_WORKSPACES_STORE,
   initDB,
+  ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
 } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import {
-  deleteProjectAsset,
-  deleteProjectExport,
-  getProjectAsset,
-  getProjectExport,
-} from '../projects/index';
-import { deleteRecording, getRecording } from '../recordings/index';
-import { deleteWebSnapshotMediaAsset, getWebSnapshotPackageFile } from '../web-snapshots';
+import { getProjectAsset, getProjectExport } from '../projects/index';
+import { readAssetFile, parseAssetRef } from '../assets';
+import { getRecording } from '../recordings/index';
+import { getWebSnapshotPackageFile } from '../web-snapshots';
 import type { MediaLibraryEntry, MediaLibraryItem, MediaThumbnailEntry } from './contracts';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseMediaLibraryEntry, parseMediaThumbnailEntry } from './read-guards';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
-import { createAggregatePresentationKey } from '../aggregate-presentations';
-import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
-import { removeEditorDocumentOwnership } from '../document-assets';
+import { listMediaAssetProjectUsage } from './usage';
+import type { MediaAssetProjectUsage } from './usage';
+import { deleteMediaAssetWithProjectCascade } from './delete-cascade';
 import {
-  buildPhysicalDeleteOperation,
-  completePhysicalDeleteOperation,
-  listReadyJournals,
-} from '../assets';
+  recoverMediaSourcePublications,
+  mediaHasPendingPublication,
+} from './delete-cascade.sources';
+import { MediaAssetDeletionBlockedError } from './deletion-errors';
+import { listReadyJournals } from '../assets';
 
 export { syncLegacyMediaLibrary } from './index.legacy-sync.ts';
 
@@ -102,6 +91,12 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
     return entry.blob;
   }
 
+  if (entry.source.kind === 'stored-asset') {
+    const db = await initDB();
+    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, entry.source.assetId));
+    return ref ? readAssetFile(ref, entry.filename) : undefined;
+  }
+
   if (entry.source.kind === 'recording') {
     const recording = await getRecording(entry.source.recordingId);
     return recording?.file;
@@ -122,76 +117,64 @@ export async function getMediaAssetBlob(assetId: string): Promise<Blob | undefin
   throw new Error(`Project asset ${entry.source.projectAssetId} ${projectAsset.status}.`);
 }
 
+async function mutateMediaLibraryEntry(
+  assetId: string,
+  mutate: (entry: MediaLibraryEntry) => MediaLibraryEntry
+): Promise<MediaLibraryEntry> {
+  return runWithIndexedDbMutation(async (db) => {
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
+    const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const existing = parseMediaLibraryEntry(await store.get(assetId));
+    if (!existing) throw new Error(`Asset ${assetId} не найден.`);
+    const nextEntry = mutate(existing);
+    if (nextEntry !== existing) await store.put(nextEntry);
+    await tx.done;
+    return nextEntry;
+  });
+}
+
 export async function updateMediaLibraryEntry(
   assetId: string,
   patch: Partial<
     Pick<MediaLibraryEntry, 'filename' | 'tags' | 'sourceUrl' | 'sourceTitle' | 'sourceFavicon'>
   >
 ): Promise<void> {
-  await runWithIndexedDbMutation(async (db) => {
-    const existing = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
-
-    if (!existing) {
-      throw new Error(`Asset ${assetId} не найден.`);
-    }
-
-    const updatedAt = Date.now();
-    await db.put(MEDIA_LIBRARY_STORE, {
-      ...existing,
-      ...patch,
-      ...(patch.sourceUrl === undefined
-        ? {}
-        : { sourceUrl: sanitizeProvenanceUrl(patch.sourceUrl) }),
-      ...(patch.sourceFavicon === undefined
-        ? {}
-        : { sourceFavicon: sanitizeProvenanceUrl(patch.sourceFavicon) }),
-      updatedAt,
-      tags: patch.tags ?? existing.tags,
-    });
-  });
+  await mutateMediaLibraryEntry(assetId, (existing) => ({
+    ...existing,
+    ...patch,
+    ...(patch.sourceUrl === undefined ? {} : { sourceUrl: sanitizeProvenanceUrl(patch.sourceUrl) }),
+    ...(patch.sourceFavicon === undefined
+      ? {}
+      : { sourceFavicon: sanitizeProvenanceUrl(patch.sourceFavicon) }),
+    updatedAt: Date.now(),
+    tags: patch.tags ?? existing.tags,
+  }));
 }
 
 export async function addMediaLibraryEntryTags(
   assetId: string,
   tagsToAdd: string[]
 ): Promise<MediaLibraryEntry> {
-  return runWithIndexedDbMutation(async (db) => {
-    const existing = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, assetId));
-
-    if (!existing) {
-      throw new Error(`Asset ${assetId} не найден.`);
-    }
-
+  return mutateMediaLibraryEntry(assetId, (existing) => {
     const nextTags = Array.from(new Set([...existing.tags, ...tagsToAdd]));
-    if (nextTags.length === existing.tags.length) {
-      return existing;
-    }
-
-    const updatedAt = Date.now();
-    const nextEntry = {
-      ...existing,
-      tags: nextTags,
-      updatedAt,
-    };
-    await db.put(MEDIA_LIBRARY_STORE, nextEntry);
-    return nextEntry;
+    if (nextTags.length === existing.tags.length) return existing;
+    return { ...existing, tags: nextTags, updatedAt: Date.now() };
   });
 }
 
-export async function deleteMediaLibraryAsset(assetId: string): Promise<void> {
-  const pendingWorkspacePublication = (await listReadyJournals()).some(
-    (journal) =>
-      journal.domain === 'image-workspace' &&
-      typeof journal.payload === 'object' &&
-      journal.payload !== null &&
-      !Array.isArray(journal.payload) &&
-      (journal.payload as Record<string, unknown>)['aggregateId'] === assetId
+export async function deleteMediaLibraryAsset(
+  assetId: string,
+  options: { expectedUsage?: readonly MediaAssetProjectUsage[] } = {}
+): Promise<void> {
+  const readyJournals = await listReadyJournals();
+  const pendingWorkspacePublication = readyJournals.some((journal) =>
+    mediaHasPendingPublication(journal, { id: assetId })
   );
   if (pendingWorkspacePublication) {
     throw new MediaLibraryDeleteError(
       assetId,
       'linked-source-cleanup',
-      new Error('Image workspace publication is pending.')
+      new MediaAssetDeletionBlockedError('pending-publication')
     );
   }
   const db = await initDB();
@@ -201,82 +184,25 @@ export async function deleteMediaLibraryAsset(assetId: string): Promise<void> {
     return;
   }
 
-  if (entry.source.kind === 'web-snapshot') {
-    await deleteWebSnapshotMediaAsset({
+  if (readyJournals.some((journal) => mediaHasPendingPublication(journal, entry)))
+    throw new MediaLibraryDeleteError(
       assetId,
-      snapshotId: entry.source.snapshotId,
-    });
-    return;
-  }
+      'linked-source-cleanup',
+      new MediaAssetDeletionBlockedError('pending-publication')
+    );
 
+  const consumers = await listMediaAssetProjectUsage(assetId);
+  if (consumers.length > 0 && !options.expectedUsage) {
+    throw new MediaLibraryDeleteError(
+      assetId,
+      'linked-source-cleanup',
+      new Error('The media asset is still used by projects.')
+    );
+  }
   try {
-    await deleteLinkedMediaSource(entry);
+    await recoverMediaSourcePublications(entry);
+    await deleteMediaAssetWithProjectCascade(assetId, options.expectedUsage ?? []);
   } catch (error) {
     throw new MediaLibraryDeleteError(assetId, 'linked-source-cleanup', error);
-  }
-  await deleteMediaLibraryRows(assetId);
-}
-
-async function deleteLinkedMediaSource(entry: MediaLibraryEntry): Promise<void> {
-  if (entry.source.kind === 'recording') {
-    await deleteRecording(entry.source.recordingId);
-  } else if (entry.source.kind === 'project-export') {
-    await deleteProjectExport(entry.source.exportId);
-  } else if (entry.source.kind === 'project-asset') {
-    await deleteProjectAsset(entry.source.projectAssetId);
-  }
-}
-
-async function deleteMediaLibraryRows(assetId: string): Promise<void> {
-  const physicalDelete = buildPhysicalDeleteOperation([]);
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(
-      [
-        MEDIA_LIBRARY_STORE,
-        VIDEO_WORKSPACES_STORE,
-        VIDEO_WORKSPACE_DRAFTS_STORE,
-        THUMBNAILS_STORE,
-        IMAGE_WORKSPACES_STORE,
-        AGGREGATE_PRESENTATIONS_STORE,
-        ASSET_REFS_STORE,
-        ASSET_OWNERS_STORE,
-        ASSET_OPERATIONS_STORE,
-      ],
-      'readwrite'
-    );
-    try {
-      await tx.objectStore(MEDIA_LIBRARY_STORE).delete(assetId);
-      await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(assetId);
-      await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(assetId);
-      await tx.objectStore(THUMBNAILS_STORE).delete(assetId);
-      const workspace = parseImageWorkspaceEntry(
-        await tx.objectStore(IMAGE_WORKSPACES_STORE).get(assetId)
-      );
-      if (workspace) {
-        await removeEditorDocumentOwnership({
-          document: workspace.document,
-          ownerId: assetId,
-          ownerKind: 'image-workspace',
-          physicalDelete,
-          stores: {
-            owners: tx.objectStore(ASSET_OWNERS_STORE),
-            refs: tx.objectStore(ASSET_REFS_STORE),
-          },
-        });
-      }
-      await tx.objectStore(IMAGE_WORKSPACES_STORE).delete(assetId);
-      await tx
-        .objectStore(AGGREGATE_PRESENTATIONS_STORE)
-        .delete(createAggregatePresentationKey({ id: assetId, kind: 'image' }));
-      if (physicalDelete.assetIds.length > 0) {
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-      }
-      await tx.done;
-    } catch (error) {
-      throw new MediaLibraryDeleteError(assetId, 'media-library-transaction', error);
-    }
-  });
-  if (physicalDelete.assetIds.length > 0) {
-    await completePhysicalDeleteOperation(physicalDelete).catch(() => undefined);
   }
 }

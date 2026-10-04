@@ -1,3 +1,9 @@
+import {
+  planReviewCutTransitions,
+  reviewCutTransitionAt,
+  type ReviewCutTransitionPlan,
+} from '../../features/video/review/cuts';
+import { createReviewTransitionFrames, paintReviewCutTransition } from './cut-transition-frames';
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
 import {
@@ -29,6 +35,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSceneCamera,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
 import {
@@ -44,6 +51,7 @@ import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
 import { retainedAudio, type ReviewPacketReceipt } from './packet-export';
 import { QuickEditExportUnavailable } from './export-unavailable';
 import type { ReviewExportClipPlan } from './audio-render';
+import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
@@ -107,6 +115,7 @@ export async function writeReviewFrames(args: {
   args.signal.addEventListener('abort', dispose, { once: true });
   let output: Output | null = null;
   let source: ReviewRenderSource | null = null;
+  let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
   try {
     source = await openReviewRenderSource(args, input, preparation);
     const receipt: ReviewPacketReceipt = {
@@ -119,6 +128,7 @@ export async function writeReviewFrames(args: {
       videoReencoded: true,
     };
     const clock = { time: 0 };
+    const clipRenderer = createReviewAudioClipRenderer();
     const tracks = createReviewMediaOutput({
       index: args.index,
       container: preparation.container,
@@ -154,6 +164,12 @@ export async function writeReviewFrames(args: {
     const audioOut = tracks.audio;
     await tracks.output.start();
     const frameSink = new VideoSampleSink(source.video);
+    const transitions = planReviewCutTransitions(args.index.duration, args.edits);
+    if (transitions.length)
+      transitionFrames = createReviewTransitionFrames(
+        new VideoSampleSink(source.video),
+        args.signal
+      );
     for (const window of preparation.windows) {
       const segment = window.segment;
       args.signal.throwIfAborted();
@@ -166,6 +182,7 @@ export async function writeReviewFrames(args: {
         audioConfig: source.audioConfig,
         muted: segmentAudioMuted(args.edits, segment, args.exportAudio),
         exportAudio: args.exportAudio,
+        clipRenderer,
         sampleRate: source.sampleRate,
         audioCodec: args.index.audioCodec,
         clock,
@@ -185,6 +202,8 @@ export async function writeReviewFrames(args: {
         context: source.context,
         image: source.image,
         frameSink,
+        transitions,
+        transitionFrames,
         videoOut,
         resultDuration: receipt.resultDuration,
         onProgress: args.onProgress ?? undefined,
@@ -203,6 +222,7 @@ export async function writeReviewFrames(args: {
     await output?.cancel().catch(() => undefined);
     throw error;
   } finally {
+    transitionFrames?.dispose();
     source?.image?.close();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
@@ -226,19 +246,13 @@ function prepareReviewRender(args: {
   edits: readonly ReviewEdit[];
   advanced: QuickEditAdvancedState;
 }): ReviewRenderPreparation {
-  const ordered = [...args.edits].sort((left, right) => left.start - right.start);
-  if (
-    ordered.some(
-      (edit, index) =>
-        !Number.isFinite(edit.start) ||
-        !Number.isFinite(edit.end) ||
-        edit.start < 0 ||
-        edit.end > args.index.duration ||
-        edit.start >= edit.end ||
-        (index > 0 && edit.start < ordered[index - 1]!.end)
-    )
-  )
-    throw new Error('Export requires valid non-overlapping edit ranges.');
+  let validRanges = true;
+  try {
+    buildReviewTimeMap(args.index.duration, args.edits);
+  } catch {
+    validRanges = false;
+  }
+  if (!validRanges) throw new Error('Export requires valid non-overlapping edit ranges.');
   const container = args.renderSettings?.format ?? args.index.container;
   const supported = reviewOutputCodecs(args.index, container);
   const codec = args.renderSettings?.codec ?? supported[0];
@@ -273,7 +287,11 @@ function segmentAudioMuted(
   return (
     !!exportAudio?.originalMuted ||
     edits.some(
-      (edit) => edit.kind === 'speed' && edit.start === segment.sourceStart && edit.audio === 'mute'
+      (edit) =>
+        edit.kind === 'speed' &&
+        edit.start <= segment.sourceStart &&
+        edit.end >= segment.sourceEnd &&
+        edit.audio === 'mute'
     )
   );
 }
@@ -402,6 +420,7 @@ export async function drainSegmentAudio(args: {
   audioConfig: AudioDecoderConfig | null;
   muted: boolean;
   exportAudio: ReviewExportClipPlan | undefined;
+  clipRenderer?: ReviewAudioClipRenderer;
   sampleRate: number;
   audioCodec: 'aac' | 'opus' | null;
   clock: { time: number };
@@ -417,7 +436,8 @@ export async function drainSegmentAudio(args: {
       segment,
       args.muted,
       signal,
-      args.exportAudio
+      args.exportAudio,
+      args.clipRenderer
     )) {
       signal.throwIfAborted();
       await audioOut.source.add(sample);
@@ -464,6 +484,8 @@ export async function renderRenderWindowFrames(args: {
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
   frameSink: VideoSampleSink;
+  transitions?: readonly ReviewCutTransitionPlan[];
+  transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
   resultDuration: number;
   onProgress: ((fraction: number) => void) | undefined;
@@ -508,7 +530,13 @@ export async function renderRenderWindowFrames(args: {
           comment.renderToVideo &&
           isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
       );
-      sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+      const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
+      if (blend) {
+        const frames = await args.transitionFrames?.load(blend.plan);
+        signal.throwIfAborted();
+        if (!frames) throw new QuickEditExportUnavailable(['transition-frames']);
+        paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
+      } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
       drawReviewSceneFrame(context, {
         canvas,
         layout,
@@ -533,7 +561,10 @@ export async function renderRenderWindowFrames(args: {
           scale: args.sceneScale ?? 1,
         })
       );
-      const encoded = new VideoSample(canvas, { timestamp, duration: 1 / fps });
+      const encoded = new VideoSample(canvas, {
+        timestamp,
+        duration: Math.min(1 / fps, window.segment.resultEnd - timestamp),
+      });
       try {
         await videoOut.add(encoded);
       } finally {
@@ -594,6 +625,12 @@ export function drawReviewSceneFrame(
   const { canvas, layout, background, image, sample, comments, sourceTime } = args;
   context.fillStyle = '#000000';
   context.fillRect(0, 0, canvas.width, canvas.height);
+  const motion = computeQuickEditSceneCamera(layout, background);
+  if (motion.scale !== 1) {
+    context.save();
+    context.translate(motion.x, motion.y);
+    context.scale(motion.scale, motion.scale);
+  }
   if (background.enabled) {
     if (background.type === 'solid') {
       context.fillStyle = background.color;
@@ -604,24 +641,21 @@ export function drawReviewSceneFrame(
       drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
     }
   }
+  if (motion.scale !== 1) context.restore();
   context.save();
   context.beginPath();
+  const videoClip = motion.videoClip;
   const clip = background.enabled ? background.layout : null;
   if (clip && clip.cornerRadius > 0) {
     context.roundRect(
-      layout.videoRect.x,
-      layout.videoRect.y,
-      layout.videoRect.width,
-      layout.videoRect.height,
-      Math.min(clip.cornerRadius, Math.min(layout.videoRect.width, layout.videoRect.height) / 2)
+      videoClip.x,
+      videoClip.y,
+      videoClip.width,
+      videoClip.height,
+      Math.min(clip.cornerRadius * motion.scale, Math.min(videoClip.width, videoClip.height) / 2)
     );
   } else {
-    context.rect(
-      layout.videoRect.x,
-      layout.videoRect.y,
-      layout.videoRect.width,
-      layout.videoRect.height
-    );
+    context.rect(videoClip.x, videoClip.y, videoClip.width, videoClip.height);
   }
   context.clip();
   sample.draw(

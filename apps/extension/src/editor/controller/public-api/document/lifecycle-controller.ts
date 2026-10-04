@@ -2,7 +2,7 @@ import type { EditorControllerPublicApiAdapter } from '../types';
 
 export type EditorDocumentOpenLifecycleController = Pick<
   EditorControllerPublicApiAdapter,
-  'applyDocument' | 'scheduleZoomToFit'
+  'applyDocument' | 'canvas' | 'scheduleZoomToFit'
 >;
 
 export type EditorDocumentCloseLifecycleController = Pick<

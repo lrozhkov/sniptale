@@ -8,6 +8,7 @@ import { PREPARATION_SURFACE_RESIZE } from '../../../workflows/page-preparation'
 import type { ContentAppModeState } from '../../../content/overlay/app/mode';
 import { createModeState } from './mode-state.test-support';
 import { PreparationSurface, type PreparationHostPorts } from '.';
+import { pagePreparationHistory } from '../../parser/page-preparation/history';
 
 type PortListener = (command: {
   type: string;
@@ -349,3 +350,25 @@ function renderSurface() {
     root?.render(<PreparationSurface ports={createPorts()} />);
   });
 }
+
+it('binds drawing to preparation history and releases the subscription on teardown', () => {
+  const subscribe = pagePreparationHistory.subscribeToClear.bind(pagePreparationHistory);
+  const unsubscribe = vi.fn();
+  const subscription = vi.spyOn(pagePreparationHistory, 'subscribeToClear');
+  subscription.mockImplementation((listener) => {
+    const stop = subscribe(listener);
+    return () => {
+      unsubscribe();
+      stop();
+    };
+  });
+  try {
+    renderSurface();
+    expect(subscription).toHaveBeenCalledOnce();
+    act(() => root?.unmount());
+    root = null;
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  } finally {
+    subscription.mockRestore();
+  }
+});

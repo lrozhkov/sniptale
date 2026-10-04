@@ -1,6 +1,7 @@
-import { GuideResourceTrigger } from './resource-drawer';
+import { GuideActionMenu } from './action-menu';
+import { GuideResourceTrigger, useGuideResourceRequest } from './resource-drawer';
 import { useEffect, useRef, useState } from 'react';
-import { ImagePlus, Upload } from 'lucide-react';
+import { ImagePlus, Upload, Plus, Image } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { PROJECT_ASSET_IMAGE_MIME_TYPES } from '../../features/media-hub/project-assets';
 import type {
@@ -12,6 +13,7 @@ import type { Translate } from '../../platform/i18n';
 /** Owns one disposable file choice; the page publishes through the existing image importer. */
 export function GuideImageUpload({
   compact = false,
+  menu = false,
   frame,
   placement,
   disabled,
@@ -19,17 +21,20 @@ export function GuideImageUpload({
   t,
 }: {
   compact?: boolean;
+  menu?: boolean;
   frame?: { width: number; height: number };
   placement: GuideImageImportPlacement | TourImageImportPlacement;
   disabled: boolean;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
   t: Translate;
 }) {
+  const request = useGuideResourceRequest();
   const input = useRef<HTMLInputElement>(null);
   const operation = useRef<AbortController | null>(null);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState(false);
   useEffect(() => () => operation.current?.abort(), []);
+  const menuActive = menu && !pending && !failed;
   const upload = async (file: File) => {
     if (disabled || operation.current) return;
     const controller = new AbortController();
@@ -49,6 +54,7 @@ export function GuideImageUpload({
   return (
     <div
       className={compact ? 'guide-image-upload-compact' : 'guide-image-slot'}
+      data-acquisition-menu={menuActive || undefined}
       tabIndex={compact ? undefined : 0}
       aria-label={t('scenario.editor.guideAddImage')}
       aria-busy={pending}
@@ -73,18 +79,41 @@ export function GuideImageUpload({
           if (file) void upload(file);
         }}
       />
-      <ProductActionButton
-        type="button"
-        compact
-        tone="secondary"
-        data-image-upload
-        disabled={disabled || pending}
-        onClick={() => input.current?.click()}
-      >
-        <Upload size={16} aria-hidden="true" />
-        {t('scenario.editor.guideUploadImage')}
-      </ProductActionButton>
-      {<GuideResourceTrigger t={t} target={placement} disabled={disabled || pending} label />}
+      {menuActive ? (
+        <GuideActionMenu
+          label={t('scenario.editor.guideAddImage')}
+          icon={<Plus size={16} aria-hidden="true" />}
+          disabled={disabled || pending}
+          items={[
+            {
+              label: t('scenario.editor.guideUploadImage'),
+              icon: <Upload size={16} />,
+              onSelect: () => input.current?.click(),
+            },
+            {
+              label: t('scenario.editor.guideOpenImageLibrary'),
+              icon: <Image size={16} />,
+              disabled: !request,
+              onSelect: () => request?.(placement),
+            },
+          ]}
+        />
+      ) : (
+        <>
+          <ProductActionButton
+            type="button"
+            compact
+            tone="secondary"
+            data-image-upload
+            disabled={disabled || pending}
+            onClick={() => input.current?.click()}
+          >
+            <Upload size={16} aria-hidden="true" />
+            {t('scenario.editor.guideUploadImage')}
+          </ProductActionButton>
+          {<GuideResourceTrigger t={t} target={placement} disabled={disabled || pending} label />}
+        </>
+      )}
       {!compact && (
         <p className="guide-image-slot-hint">{t('scenario.editor.guideImagePasteHint')}</p>
       )}

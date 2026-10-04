@@ -203,6 +203,17 @@ it('round-trips the focus anchor policy and rejects malformed policy values', ()
     preserveFocusAnchors: true,
   };
   expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  expect(parseReviewOperation({ ...operation, preserveUnderCuts: true }, 12)).toEqual({
+    ...operation,
+    preserveUnderCuts: true,
+  });
+  expect(parseReviewOperation({ ...operation, preserveUnderCuts: false }, 12)).toBeNull();
+  expect(
+    parseReviewOperation(
+      { ...operation, preserveFocusAnchors: undefined, preserveUnderCuts: true },
+      12
+    )
+  ).toBeNull();
   for (const invalid of [false, 'true', 1, null])
     expect(parseReviewOperation({ ...operation, preserveFocusAnchors: invalid }, 12)).toBeNull();
 });
@@ -217,8 +228,54 @@ it('preserves the voiceover anchor policy and rejects invalid policy values', ()
     preserveVoiceoverAnchors: true,
   };
   expect(parseReviewOperation(operation, 12)).toEqual(operation);
+  const normalized = { ...operation, normalizeVoiceoverTempo: true };
+  expect(parseReviewOperation(normalized, 12)).toEqual(normalized);
+  for (const invalid of [false, 'true', 1, null])
+    expect(
+      parseReviewOperation({ ...normalized, normalizeVoiceoverTempo: invalid }, 12)
+    ).toBeNull();
+  expect(
+    parseReviewOperation({ ...normalized, preserveVoiceoverAnchors: undefined }, 12)
+  ).toBeNull();
   for (const invalid of [false, 'true', null])
     expect(
       parseReviewOperation({ ...operation, preserveVoiceoverAnchors: invalid }, 12)
     ).toBeNull();
+});
+
+it('roundtrips per-cut transition intent while keeping legacy cuts unchanged', () => {
+  const cut = { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 };
+  const operation = { id: 'op', at: 1, target: 'edit', before: null, after: cut };
+  expect(parseReviewOperation(operation, source.duration)?.after).toEqual(cut);
+  for (const type of ['dissolve', 'fade-black']) {
+    const after = { ...cut, transition: { type, before: 0.3, after: 0.7 } };
+    expect(parseReviewOperation({ ...operation, after }, source.duration)?.after).toEqual(after);
+    expect(
+      parseReviewOperation({ ...operation, before: after, after: null }, source.duration)?.before
+    ).toEqual(after);
+  }
+});
+
+it('rejects malformed cut transitions without silently dropping authored settings', () => {
+  const cut = { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 };
+  const operation = { id: 'op', at: 1, target: 'edit', before: null };
+  for (const transition of [
+    null,
+    'dissolve',
+    {},
+    { type: 'unknown', before: 0.5, after: 0.5 },
+    { type: 'dissolve', before: -1, after: 1 },
+    { type: 'dissolve', before: NaN, after: 1 },
+    { type: 'dissolve', before: 1, after: Infinity },
+    { type: 'dissolve', before: '1', after: 1 },
+    { type: 'dissolve', before: 0, after: 0 },
+    { type: 'dissolve', before: 30, after: 30.001 },
+  ])
+    expect(
+      parseReviewOperation({ ...operation, after: { ...cut, transition } }, source.duration)
+    ).toBeNull();
+  for (const before of [0, 60]) {
+    const after = { ...cut, transition: { type: 'dissolve', before, after: 60 - before } };
+    expect(parseReviewOperation({ ...operation, after }, source.duration)?.after).toEqual(after);
+  }
 });

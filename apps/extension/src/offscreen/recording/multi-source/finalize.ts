@@ -3,7 +3,10 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
 import { saveRecordingsBatchWithCompletionSafely } from '../../../workflows/media-hub/store';
 import { loadSettings } from '../../../composition/persistence/settings';
-import { DEFAULT_LOCAL_STORAGE_POLICY } from '../../../composition/persistence/library-lifecycle';
+import {
+  DEFAULT_LOCAL_STORAGE_POLICY,
+  resolveInitialStorageClass,
+} from '../../../composition/persistence/library-lifecycle';
 import { updateVideoRecordingCompletionOutbox } from '../../../composition/persistence/recordings/completion-outbox';
 import {
   createVideoProjectFromMultiSourceRecording,
@@ -173,9 +176,10 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
     recordingId: session.recordingId,
   };
   const settings = await loadSettings().catch(() => null);
-  const storageClass =
-    settings?.localStoragePolicy.defaultDestination ??
-    DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination;
+  const storageClass = resolveInitialStorageClass(
+    settings ?? { localStoragePolicy: DEFAULT_LOCAL_STORAGE_POLICY },
+    'recording'
+  );
   await saveRecordingsBatchWithCompletionSafely(
     buildRecordingBatchInputs(session, storageClass),
     completion

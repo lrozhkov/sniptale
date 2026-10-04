@@ -1,3 +1,4 @@
+import { pagePreparationHistory } from '../../../content/parser/page-preparation/history';
 import { useEffect, useMemo, useRef } from 'react';
 import { useAiPickController } from '../../../content/overlay/ai/pick/controller';
 import { preloadAIModal } from '../../../content/overlay/ai/modal/shell/lazy';
@@ -332,7 +333,7 @@ function usePreparationModeState(): ContentAppModeState {
 
 export function PreparationSurface(props: PreparationSurfaceProps) {
   const modeState = usePreparationModeState();
-  const drawingController = useContentDrawingController();
+  const drawingController = useContentDrawingController(pagePreparationHistory);
   const frameManager = usePreparationFrameManager(modeState);
   const controllers = usePreparationControllers(
     modeState,

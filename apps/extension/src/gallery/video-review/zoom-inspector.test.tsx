@@ -203,14 +203,14 @@ it('keeps spotlight settings when the active type is selected again', async () =
       />
     )
   );
-  await act(async () =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.focusType"]')!.click()
-  );
-  await act(async () =>
-    [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
-      .find((node) => node.textContent?.includes('gallery.videoReview.focusSpotlight'))!
-      .click()
-  );
+  const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
+  expect(group.getAttribute('aria-label')).toBe('gallery.videoReview.focusType');
+  expect(group.querySelectorAll('button')).toHaveLength(2);
+  const active = group.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.focusSpotlight"]'
+  )!;
+  expect(active.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => active.click());
   expect(change).not.toHaveBeenCalled();
 });
 
@@ -262,7 +262,7 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
         .click()
     );
   };
-  expect(host.querySelector('details')?.open).toBe(false);
+  expect(host.querySelector<HTMLDetailsElement>('details[data-level="group"]')?.open).toBe(false);
   await choose('focusReveal', 'focusContract', 'zoomTransitionIn');
   expect(spotlight.exitReveal).toBe('fade');
   await choose('focusReveal', 'focusExpand', 'zoomTransitionOut');
@@ -273,13 +273,95 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
   expect(spotlight).toMatchObject({ effect: 'blur', blur: 8, reveal: 'contract' });
 });
 
-it('uses a precise transition slider while preserving longer typed durations', async () => {
+it('bounds the transition slider and typed duration by the other phase', async () => {
   const change = vi.fn();
   renderInspector(change);
   const phase = host.querySelector('fieldset')!;
-  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('3');
+  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('1.7');
+  const duration = phase.querySelector<HTMLInputElement>('input')!;
+  await type(duration, '12');
+  await commit(duration);
+  expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 1.7 } });
+});
+
+it('distinguishes compact nested position from collapsible top-level sections', () => {
+  renderInspector(vi.fn());
+  const nested = host.querySelector('details[data-level="group"]');
+  expect(nested).not.toBeNull();
+  expect(nested?.querySelector('summary h4')?.textContent).toBe(
+    'gallery.videoReview.precisePosition'
+  );
+  const parents = host.querySelectorAll('details[data-level="section"]');
+  expect(parents.length).toBeGreaterThanOrEqual(2);
+  expect([...parents].every((node) => node.hasAttribute('open'))).toBe(true);
+});
+
+it('switches directly between Zoom and Spotlight without resetting the camera', async () => {
+  const change = vi.fn();
+  const render = async (value: QuickEditZoomRegion) =>
+    act(async () =>
+      root.render(
+        <ReviewZoomInspector
+          region={value}
+          onChange={change}
+          onReset={vi.fn()}
+          onDelete={vi.fn()}
+        />
+      )
+    );
+  await render(region);
+  const choose = async (title: string) =>
+    act(async () =>
+      host
+        .querySelector<HTMLButtonElement>(
+          `[data-ui="gallery.videoReview.focusType"] [title="${title}"]`
+        )!
+        .click()
+    );
+  await choose('gallery.videoReview.focusSpotlight');
+  expect(change).toHaveBeenCalledOnce();
+  const patch: QuickEditZoomRegionPatch = change.mock.calls[0]![0];
+  expect(patch.spotlight).toMatchObject({ area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 } });
+  expect(patch).not.toHaveProperty('scale');
+  expect(patch).not.toHaveProperty('centerX');
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  await render({ ...region, spotlight: patch.spotlight! });
+  await choose('gallery.videoReview.zoomRegionLabel');
+  expect(change).toHaveBeenLastCalledWith({ spotlight: null });
+});
+
+it('offers five source seconds on the slider and retains valid longer typed phases', async () => {
+  const change = vi.fn();
+  const long = { ...region, start: 0, end: 10, sourceAnchor: { start: 0, end: 20 } };
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector region={long} onChange={change} onReset={vi.fn()} onDelete={vi.fn()} />
+    )
+  );
+  const phase = host.querySelector('fieldset')!;
+  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('5');
   const duration = phase.querySelector<HTMLInputElement>('input')!;
   await type(duration, '12');
   await commit(duration);
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 12 } });
+  expect(host.textContent).toContain('gallery.videoReview.zoomSourceTimingHint');
+});
+
+it('displays fitted legacy phases without emitting a persistence change on mount', async () => {
+  const change = vi.fn();
+  const legacy = {
+    ...region,
+    enter: { type: 'linear' as const, duration: 4 },
+    exit: { type: 'linear' as const, duration: 2 },
+  };
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector region={legacy} onChange={change} onReset={vi.fn()} onDelete={vi.fn()} />
+    )
+  );
+  const phases = host.querySelectorAll('fieldset');
+  expect(Number(phases[0]!.querySelector<HTMLInputElement>('input')!.value)).toBeCloseTo(1.33);
+  expect(Number(phases[1]!.querySelector<HTMLInputElement>('input')!.value)).toBeCloseTo(0.67);
+  expect(change).not.toHaveBeenCalled();
+  expect(legacy.enter.duration).toBe(4);
 });

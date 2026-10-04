@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { TabRuntimeCapability } from '@sniptale/runtime-contracts/tab-capabilities/types';
+import { CaptureSurfaceError } from '../../capture-surface/types';
 
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
@@ -8,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   claimRelease: vi.fn(),
   classify: vi.fn(),
   getApplied: vi.fn(),
+  hasSessionLease: vi.fn(),
   getAvailabilities: vi.fn(),
   getSession: vi.fn(),
   getTab: vi.fn(),
@@ -16,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   markReleased: vi.fn(),
   nextGeneration: vi.fn(),
   release: vi.fn(),
+  releaseTabOwners: vi.fn(),
   replace: vi.fn(),
   runOperation: vi.fn(async (_tabId: number, operation: () => Promise<void>) => operation()),
   sendTabMessage: vi.fn(),
@@ -35,9 +38,11 @@ vi.mock('../../capture-surface', async (importOriginal) => ({
   getCaptureSurfaceService: () => ({
     apply: mocks.apply,
     getApplied: mocks.getApplied,
+    hasSessionLease: mocks.hasSessionLease,
     getAvailabilities: mocks.getAvailabilities,
     replace: mocks.replace,
     release: mocks.release,
+    releaseTabOwners: mocks.releaseTabOwners,
   }),
 }));
 vi.mock('../../capture-surface/screenshot-session', async (importOriginal) => ({
@@ -93,6 +98,7 @@ beforeEach(() => {
   mocks.claimRelease.mockReturnValue({ generation: 2, sessionId: 'screenshot-session-1' });
   mocks.classify.mockReturnValue(TabRuntimeCapability.Regular);
   mocks.getTab.mockResolvedValue({ id: 7, url: 'https://example.com' });
+  mocks.hasSessionLease.mockReturnValue(false);
   mocks.loadSettings.mockResolvedValue({ viewportPresets: [viewportPreset, windowPreset] });
   mocks.nextGeneration.mockReturnValue({ generation: 2, sessionId: 'screenshot-session-1' });
   mocks.apply.mockResolvedValue({
@@ -105,6 +111,7 @@ beforeEach(() => {
     width: 1280,
   });
   mocks.release.mockResolvedValue(undefined);
+  mocks.releaseTabOwners.mockResolvedValue(undefined);
   mocks.replace.mockResolvedValue({
     generation: 2,
     height: 720,
@@ -181,6 +188,65 @@ it('replaces a previous matching surface transactionally', async () => {
     expect.objectContaining({ generation: 2, presetId: 'viewport-1' })
   );
   expect(mocks.release).not.toHaveBeenCalled();
+});
+
+it('abandons a conflicted screenshot lease before applying a preset after manual resize', async () => {
+  mocks.getSession.mockReturnValue({ activeLeaseGeneration: 1, sessionId: 'screenshot-session-1' });
+  mocks.hasSessionLease.mockReturnValue(true);
+  mocks.getApplied.mockReturnValue(null);
+  const maps = stateMaps();
+
+  await handleApplyViewportPreset(
+    7,
+    'viewport-1',
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState
+  );
+
+  expect(mocks.releaseTabOwners).toHaveBeenCalledWith(7, ['screenshot']);
+  expect(mocks.releaseTabOwners.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.apply.mock.invocationCallOrder[0]!
+  );
+  expect(maps.viewportState.get(7)).toMatchObject({ presetId: 'viewport-1' });
+});
+
+it('retries after a resize that races the window bounds conflict event', async () => {
+  mocks.getApplied.mockReturnValue({
+    generation: 1,
+    height: 720,
+    leaseId: 'lease-1',
+    presetId: 'viewport-1',
+    sessionId: 'screenshot-session-1',
+    target: 'window',
+    width: 1280,
+  });
+  mocks.replace.mockRejectedValueOnce(new CaptureSurfaceError('restore-conflict'));
+  const maps = stateMaps();
+
+  await handleApplyViewportPreset(
+    7,
+    'viewport-1',
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState
+  );
+
+  expect(mocks.releaseTabOwners).toHaveBeenCalledWith(7, ['screenshot']);
+  expect(mocks.apply).toHaveBeenCalledWith(
+    expect.objectContaining({
+      generation: 2,
+      presetId: 'viewport-1',
+      sessionId: 'screenshot-session-1',
+    })
+  );
+  expect(mocks.apply.mock.invocationCallOrder[0]).toBeGreaterThan(
+    mocks.releaseTabOwners.mock.invocationCallOrder[0]!
+  );
 });
 
 it.each([
@@ -362,12 +428,37 @@ it('releases a regular window surface and clears projected state', async () => {
     regular.viewportState,
     regular.viewportOwnerState
   );
-  expect(mocks.release).toHaveBeenCalledOnce();
+  expect(mocks.releaseTabOwners).toHaveBeenCalledWith(7, ['screenshot']);
   expect(mocks.sendTabMessage).toHaveBeenCalledWith(7, {
     type: 'VIEWPORT_CHANGED',
     viewport: null,
   });
   expect(regular.viewportState.get(7)).toBeNull();
+});
+
+it('releases a conflicted screenshot lease even when it is no longer projected as applied', async () => {
+  mocks.getSession.mockReturnValue({ sessionId: 'screenshot-session-1' });
+  mocks.getApplied.mockReturnValue(null);
+  const maps = stateMaps();
+  maps.viewportState.set(7, {
+    presetId: 'viewport-1',
+    target: 'window',
+    width: 1280,
+    height: 720,
+  });
+
+  await handleReleaseViewportPreset(
+    7,
+    3,
+    2,
+    'capability-1',
+    'document-1',
+    maps.viewportState,
+    maps.viewportOwnerState
+  );
+
+  expect(mocks.releaseTabOwners).toHaveBeenCalledWith(7, ['screenshot']);
+  expect(maps.viewportState.get(7)).toBeNull();
 });
 
 it('rejects Current size while the screenshot lease is suspended beneath video', async () => {

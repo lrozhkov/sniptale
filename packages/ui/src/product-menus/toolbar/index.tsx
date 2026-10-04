@@ -10,7 +10,7 @@ export interface ProductToolbarMenuProps {
   style?: CSSProperties;
   compact?: boolean;
   placement?: ProductToolbarMenuPlacement;
-  variant?: 'default' | 'viewport' | 'capture';
+  variant?: 'default' | 'viewport' | 'capture' | 'drawing';
 }
 
 export interface ProductToolbarMenuItemProps {
@@ -69,6 +69,7 @@ export function ProductToolbarMenu({
     placement === 'side' ? 'sniptale-popover-side' : '',
     variant === 'viewport' ? 'sniptale-viewport-menu' : '',
     variant === 'capture' ? 'sniptale-capture-menu' : '',
+    variant === 'drawing' ? 'sniptale-drawing-options-menu' : '',
     className,
   ]
     .filter(Boolean)

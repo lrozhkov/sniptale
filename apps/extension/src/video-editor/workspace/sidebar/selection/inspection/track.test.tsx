@@ -104,7 +104,7 @@ describe('workspace-sidebar/selection/inspect-track', () => {
     );
 
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupInfo');
-    expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupGeneral');
+    expect(markup).toContain('videoEditor.sidebar.inspectorGroupGeneral');
     expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
     expect(markup).toContain('hover:text-[var(--sniptale-color-danger)]');
     expect(markup).toContain('rounded-[12px]');
@@ -185,4 +185,43 @@ describe('workspace-sidebar/selection/inspect-track', () => {
     act(() => root.unmount());
     vi.unstubAllGlobals();
   });
+});
+
+it('keeps assigned effects nested alongside track properties and respects the track lock', () => {
+  const props = createProps(VideoTrackKind.PRIMARY);
+  props.selectedTrack.locked = true;
+  props.project.effectInstances = [
+    {
+      id: 'effect',
+      kind: 'targetEffect',
+      snapshotId: 'missing',
+      enabled: true,
+      controls: {},
+      duration: 2,
+      playbackRate: 1,
+      startTime: 0,
+      target: { kind: 'track', trackId: props.selectedTrack.id },
+    },
+  ];
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  act(() => root.render(<WorkspaceSidebarInspectPanel {...props} />));
+  const effects = container.querySelector<HTMLButtonElement>(
+    'nav button[aria-label="videoEditor.sidebar.inspectorGroupEffects"]'
+  )!;
+  expect(effects).not.toBeNull();
+  act(() => effects.click());
+  const card = container.querySelector('[data-effect-instance="effect"]')!;
+  expect(card.querySelector('details > summary')).not.toBeNull();
+  expect(
+    card.querySelector<HTMLButtonElement>(
+      'button[aria-label="videoEditor.effectsLibrary.deleteInstance"]'
+    )!.disabled
+  ).toBe(true);
+  expect(
+    container.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupGeneral"]')
+  ).not.toBeNull();
+  act(() => root.unmount());
+  vi.unstubAllGlobals();
 });

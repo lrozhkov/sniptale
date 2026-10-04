@@ -1,5 +1,6 @@
+import { assertPortableJson } from '../codec';
 import { parsePortableMediaMetadata } from '../root-codecs/media';
-import { describe, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
 const mocks = vi.hoisted(() => ({ readFile: vi.fn(), sanitizeSnapshot: vi.fn() }));
@@ -140,35 +141,40 @@ it.each([true, false])(
   }
 );
 
-describe('media v6 root inventory', () => {
-  it('excludes drafts by default and places included drafts in readable folders', async () => {
-    const entry = mediaEntry({
-      id: 'draft-image',
-      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
-    });
-    const db = { transaction: emptyReviewTransaction, get: vi.fn(async () => entry) };
-    await expect(
-      buildMediaRootInventory({
-        db,
-        items: [item(entry)],
-        options: createMediaHubBackupExportOptions(),
-        paths: createArchivePathAllocator(),
-      })
-    ).resolves.toEqual([]);
-    const [root] = await buildMediaRootInventory({
+it('excludes drafts by default and places included drafts in readable folders', async () => {
+  const entry = mediaEntry({
+    id: 'draft-image',
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
+  });
+  const db = { transaction: emptyReviewTransaction, get: vi.fn(async () => entry) };
+  await expect(
+    buildMediaRootInventory({
       db,
       items: [item(entry)],
-      options: createMediaHubBackupExportOptions({ includeDrafts: true }),
+      options: createMediaHubBackupExportOptions(),
       paths: createArchivePathAllocator(),
-    });
-    expect(root?.summary.draftCount).toBe(1);
-    await expect(root?.load()).resolves.toMatchObject({
-      objects: [{ ref: { path: 'Drafts/Screenshots/capture.png' } }],
-    });
+    })
+  ).resolves.toEqual([]);
+  const [root] = await buildMediaRootInventory({
+    db,
+    items: [item(entry)],
+    options: createMediaHubBackupExportOptions({ includeDrafts: true }),
+    paths: createArchivePathAllocator(),
   });
+  expect(root?.summary.draftCount).toBe(1);
+  await expect(root?.load()).resolves.toMatchObject({
+    objects: [{ ref: { path: 'Drafts/Screenshots/capture.png' } }],
+  });
+});
 
-  it('exports screenshot, presentation and editor dependencies as separate files', async () => {
-    const entry = mediaEntry();
+it.each<MediaLibraryEntry['source']>([
+  { kind: 'screenshot' },
+  { kind: 'stored-asset', assetId: 'workspace-source' },
+])(
+  'exports $kind image, presentation and editor dependencies as separate files',
+  async (source) => {
+    const entry = mediaEntry({ source });
+    if (source.kind === 'stored-asset') delete entry.blob;
     const document = createPersistedEditorDocumentFixture(
       createEditorDocumentFixture(),
       'workspace-source'
@@ -212,7 +218,10 @@ describe('media v6 root inventory', () => {
       paths: createArchivePathAllocator(),
     });
     expect(roots).toHaveLength(1);
-    expect(roots[0]?.descriptor).toMatchObject({ objectCount: 4, totalBytes: 23 });
+    expect(roots[0]?.descriptor).toMatchObject({
+      objectCount: 4,
+      totalBytes: source.kind === 'stored-asset' ? 24 : 23,
+    });
     const payload = await roots[0]!.load();
     expect(payload.objects).toHaveLength(4);
     expect(payload.objects.map((object) => object.ref.path)).toContain('Screenshots/capture.png');
@@ -228,159 +237,161 @@ describe('media v6 root inventory', () => {
         sourceUrl: null,
       },
     });
-    expect(JSON.stringify(payload.metadata)).not.toContain('assetId');
-    expect(JSON.stringify(payload.metadata)).not.toContain('workspace-source');
+    assertPortableJson(payload.metadata);
+    const portableWorkspace = parsePortableMediaMetadata(payload.metadata).workspace;
+    expect(JSON.stringify(portableWorkspace)).not.toContain('assetId');
+    expect(JSON.stringify(portableWorkspace)).not.toContain('workspace-source');
+  }
+);
+
+it('exports recording bytes through OPFS File and telemetry only when requested', async () => {
+  const entry = mediaEntry({
+    duration: 3,
+    filename: 'recording.webm',
+    height: 720,
+    id: 'recording-media',
+    kind: 'video',
+    mimeType: 'video/webm',
+    size: 5,
+    source: { kind: 'recording', recordingId: 'recording-one' },
+    width: 1280,
   });
-
-  it('exports recording bytes through OPFS File and telemetry only when requested', async () => {
-    const entry = mediaEntry({
-      duration: 3,
-      filename: 'recording.webm',
-      height: 720,
-      id: 'recording-media',
-      kind: 'video',
-      mimeType: 'video/webm',
-      size: 5,
-      source: { kind: 'recording', recordingId: 'recording-one' },
-      width: 1280,
-    });
-    const db = {
-      transaction: emptyReviewTransaction,
-      get: vi.fn(async (store: string) => {
-        if (store === 'media_library') return entry;
-        if (store === 'recordings') {
-          return {
-            assetId: 'recording-asset',
-            createdAt: 1,
-            filename: 'recording.webm',
-            id: 'recording-one',
-            mimeType: 'video/webm',
-            size: 5,
-          };
-        }
-        if (store === 'asset_refs')
-          return { ...ref('recording-asset'), mimeType: 'video/webm', size: 5 };
-        if (store === 'recording_telemetry') {
-          return {
-            actionEvents: [],
-            captureMode: null,
-            createdAt: 1,
-            cursorTrack: null,
-            recordingId: 'recording-one',
-            signals: [],
-            updatedAt: 1,
-            viewport: null,
-          } satisfies RecordingTelemetryEntry;
-        }
-        return undefined;
-      }),
-    };
-    mocks.readFile.mockResolvedValue(new File(['media'], 'recording.webm', { type: 'video/webm' }));
-    const [root] = await buildMediaRootInventory({
-      db,
-      items: [item(entry)],
-      options: createMediaHubBackupExportOptions({ includeTelemetry: true }),
-      paths: createArchivePathAllocator(),
-    });
-    const payload = await root!.load();
-    expect(payload.objects[0]?.ref.path).toBe('Recordings/recording.webm');
-    expect(payload.metadata).toMatchObject({
-      recording: {
-        entry: { id: 'recording-one' },
-        telemetry: { recordingId: 'recording-one' },
-      },
-    });
-    expect(JSON.stringify(payload.metadata)).not.toContain('recording-asset');
+  const db = {
+    transaction: emptyReviewTransaction,
+    get: vi.fn(async (store: string) => {
+      if (store === 'media_library') return entry;
+      if (store === 'recordings') {
+        return {
+          assetId: 'recording-asset',
+          createdAt: 1,
+          filename: 'recording.webm',
+          id: 'recording-one',
+          mimeType: 'video/webm',
+          size: 5,
+        };
+      }
+      if (store === 'asset_refs')
+        return { ...ref('recording-asset'), mimeType: 'video/webm', size: 5 };
+      if (store === 'recording_telemetry') {
+        return {
+          actionEvents: [],
+          captureMode: null,
+          createdAt: 1,
+          cursorTrack: null,
+          recordingId: 'recording-one',
+          signals: [],
+          updatedAt: 1,
+          viewport: null,
+        } satisfies RecordingTelemetryEntry;
+      }
+      return undefined;
+    }),
+  };
+  mocks.readFile.mockResolvedValue(new File(['media'], 'recording.webm', { type: 'video/webm' }));
+  const [root] = await buildMediaRootInventory({
+    db,
+    items: [item(entry)],
+    options: createMediaHubBackupExportOptions({ includeTelemetry: true }),
+    paths: createArchivePathAllocator(),
   });
-
-  it('places durable audio in the readable Audio directory', async () => {
-    const entry = mediaEntry({
-      filename: 'voice note.webm',
-      id: 'audio-media',
-      kind: 'audio',
-      mimeType: 'audio/webm',
-    });
-    const [root] = await buildMediaRootInventory({
-      db: { transaction: emptyReviewTransaction, get: vi.fn(async () => entry) },
-      items: [item(entry)],
-      options: createMediaHubBackupExportOptions(),
-      paths: createArchivePathAllocator(),
-    });
-    await expect(root?.load()).resolves.toMatchObject({
-      objects: [{ ref: { path: 'Audio/voice note.webm' } }],
-    });
+  const payload = await root!.load();
+  expect(payload.objects[0]?.ref.path).toBe('Recordings/recording.webm');
+  expect(payload.metadata).toMatchObject({
+    recording: {
+      entry: { id: 'recording-one' },
+      telemetry: { recordingId: 'recording-one' },
+    },
   });
+  expect(JSON.stringify(payload.metadata)).not.toContain('recording-asset');
+});
 
-  it('uses the sanitized snapshot manifest in outer metadata when provenance is disabled', async () => {
-    const entry = mediaEntry({
-      filename: 'Private title.png',
-      id: 'snapshot',
-      source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
-    });
-    const stored = createCleanupWebSnapshotRecord('snapshot');
-    stored.manifest = createWebSnapshotManifest({
-      id: 'snapshot',
-      source: {
-        faviconUrl: 'https://example.com/favicon.ico?token=secret',
-        title: 'Private title',
-        url: 'https://user:pass@example.com/private?token=secret',
-      },
-    });
-    const sanitizedManifest = {
-      ...stored.manifest,
-      source: { faviconUrl: null, title: null, url: null },
-    };
-    mocks.sanitizeSnapshot.mockResolvedValue({
-      changed: true,
-      manifest: sanitizedManifest,
-      packageBlob: new Blob(['safe-package'], { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE }),
-      size: 12,
-    });
-    mocks.readFile
-      .mockResolvedValueOnce(
-        new File(['package'], 'snapshot.zip', { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE })
-      )
-      .mockResolvedValueOnce(new File(['image'], 'snapshot.png', { type: 'image/png' }));
-    const db = {
-      transaction: emptyReviewTransaction,
-      get: vi.fn(async (store: string) => {
-        if (store === 'media_library') return entry;
-        if (store === 'web_snapshots') return stored;
-        if (store === 'asset_refs') return ref('snapshot-asset');
-        return undefined;
-      }),
-    };
-
-    const [root] = await buildMediaRootInventory({
-      db,
-      items: [item(entry)],
-      options: createMediaHubBackupExportOptions({
-        includeSourceMetadata: false,
-        includeWebSnapshots: true,
-      }),
-      paths: createArchivePathAllocator(),
-    });
-    const payload = await root!.load();
-    const packageObject = payload.objects.find((object) =>
-      object.ref.path.endsWith('.sniptale-page-package.zip')
-    );
-
-    expect(payload.objects.map((object) => object.ref.path)).toEqual([
-      'Web snapshots/Snapshot/snapshot.sniptale-page-package.zip',
-      'Web snapshots/Snapshot/screenshot.png',
-    ]);
-
-    expect(payload.metadata).toMatchObject({
-      entry: { size: 12 },
-      originalObjectId: packageObject?.ref.objectId,
-      webSnapshot: { entry: { manifest: { source: sanitizedManifest.source }, size: 12 } },
-    });
-    expect(JSON.stringify(payload.metadata)).not.toContain('Private title');
-    expect(JSON.stringify(payload.metadata)).not.toContain('token=secret');
-    expect(payload.objects.map((object) => object.ref.path).join('\n')).not.toContain(
-      'Private title'
-    );
+it('places durable audio in the readable Audio directory', async () => {
+  const entry = mediaEntry({
+    filename: 'voice note.webm',
+    id: 'audio-media',
+    kind: 'audio',
+    mimeType: 'audio/webm',
   });
+  const [root] = await buildMediaRootInventory({
+    db: { transaction: emptyReviewTransaction, get: vi.fn(async () => entry) },
+    items: [item(entry)],
+    options: createMediaHubBackupExportOptions(),
+    paths: createArchivePathAllocator(),
+  });
+  await expect(root?.load()).resolves.toMatchObject({
+    objects: [{ ref: { path: 'Audio/voice note.webm' } }],
+  });
+});
+
+it('uses the sanitized snapshot manifest in outer metadata when provenance is disabled', async () => {
+  const entry = mediaEntry({
+    filename: 'Private title.png',
+    id: 'snapshot',
+    source: { kind: 'web-snapshot', snapshotId: 'snapshot' },
+  });
+  const stored = createCleanupWebSnapshotRecord('snapshot');
+  stored.manifest = createWebSnapshotManifest({
+    id: 'snapshot',
+    source: {
+      faviconUrl: 'https://example.com/favicon.ico?token=secret',
+      title: 'Private title',
+      url: 'https://user:pass@example.com/private?token=secret',
+    },
+  });
+  const sanitizedManifest = {
+    ...stored.manifest,
+    source: { faviconUrl: null, title: null, url: null },
+  };
+  mocks.sanitizeSnapshot.mockResolvedValue({
+    changed: true,
+    manifest: sanitizedManifest,
+    packageBlob: new Blob(['safe-package'], { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE }),
+    size: 12,
+  });
+  mocks.readFile
+    .mockResolvedValueOnce(
+      new File(['package'], 'snapshot.zip', { type: PAGE_PACKAGE_ARCHIVE_MIME_TYPE })
+    )
+    .mockResolvedValueOnce(new File(['image'], 'snapshot.png', { type: 'image/png' }));
+  const db = {
+    transaction: emptyReviewTransaction,
+    get: vi.fn(async (store: string) => {
+      if (store === 'media_library') return entry;
+      if (store === 'web_snapshots') return stored;
+      if (store === 'asset_refs') return ref('snapshot-asset');
+      return undefined;
+    }),
+  };
+
+  const [root] = await buildMediaRootInventory({
+    db,
+    items: [item(entry)],
+    options: createMediaHubBackupExportOptions({
+      includeSourceMetadata: false,
+      includeWebSnapshots: true,
+    }),
+    paths: createArchivePathAllocator(),
+  });
+  const payload = await root!.load();
+  const packageObject = payload.objects.find((object) =>
+    object.ref.path.endsWith('.sniptale-page-package.zip')
+  );
+
+  expect(payload.objects.map((object) => object.ref.path)).toEqual([
+    'Web snapshots/Snapshot/snapshot.sniptale-page-package.zip',
+    'Web snapshots/Snapshot/screenshot.png',
+  ]);
+
+  expect(payload.metadata).toMatchObject({
+    entry: { size: 12 },
+    originalObjectId: packageObject?.ref.objectId,
+    webSnapshot: { entry: { manifest: { source: sanitizedManifest.source }, size: 12 } },
+  });
+  expect(JSON.stringify(payload.metadata)).not.toContain('Private title');
+  expect(JSON.stringify(payload.metadata)).not.toContain('token=secret');
+  expect(payload.objects.map((object) => object.ref.path).join('\n')).not.toContain(
+    'Private title'
+  );
 });
 
 function emptyReviewTransaction() {

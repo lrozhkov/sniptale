@@ -96,19 +96,30 @@ function createMatch(overrides: Partial<AutoBlurMatch> = {}): AutoBlurMatch {
 function Harness({
   autoApplyAllowed = true,
   highlighterMode = true,
+  ensurePinned,
+  navigationMode,
 }: {
   autoApplyAllowed?: boolean;
   highlighterMode?: boolean;
+  ensurePinned?: () => Promise<boolean>;
+  navigationMode?: boolean;
 }) {
   latestController = useAutoBlurController({
     autoApplyAllowed,
+    ...(ensurePinned ? { ensurePinned } : {}),
+    ...(navigationMode === undefined ? {} : { navigationMode }),
     frameManager,
     highlighterMode,
   });
   return null;
 }
 
-async function renderHarness(highlighterMode = true, autoApplyAllowed = true) {
+async function renderHarness(
+  highlighterMode = true,
+  autoApplyAllowed = true,
+  ensurePinned?: () => Promise<boolean>,
+  navigationMode?: boolean
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -116,7 +127,14 @@ async function renderHarness(highlighterMode = true, autoApplyAllowed = true) {
   }
 
   await act(async () => {
-    root?.render(<Harness autoApplyAllowed={autoApplyAllowed} highlighterMode={highlighterMode} />);
+    root?.render(
+      <Harness
+        autoApplyAllowed={autoApplyAllowed}
+        highlighterMode={highlighterMode}
+        {...(ensurePinned ? { ensurePinned } : {})}
+        {...(navigationMode === undefined ? {} : { navigationMode })}
+      />
+    );
   });
 }
 
@@ -208,11 +226,11 @@ async function expectModeAvailabilityFlow() {
   await openAndFlushScan();
   expect(latestController?.isOpen).toBe(true);
 
-  await renderHarness(false);
+  await renderHarness(false, true, undefined, true);
 
   expect(latestController?.isOpen).toBe(true);
 
-  await renderHarness(false, false);
+  await renderHarness(false, false, undefined, false);
 
   expect(latestController?.isOpen).toBe(false);
 }
@@ -337,6 +355,42 @@ function registerAutoBlurRunTests() {
     expect(latestController?.isOpen).toBe(false);
   });
 
+  it('requires confirmed pinning before persisting automatic blur', async () => {
+    const pin = createDeferred<boolean>();
+    const ensurePinned = vi.fn(() => pin.promise);
+    await renderHarness(true, true, ensurePinned);
+    act(() => latestController?.openForAutoApply());
+
+    let applyPromise: Promise<void> | undefined;
+    await act(async () => {
+      applyPromise = latestController?.apply(BORDER_SETTINGS);
+      await Promise.resolve();
+    });
+    expect(ensurePinned).toHaveBeenCalledOnce();
+    expect(controllerMocks.saveAutoBlurSettings).not.toHaveBeenCalled();
+
+    await act(async () => {
+      pin.resolve(false);
+      await applyPromise;
+    });
+    expect(latestController?.autoApplyEnabled).toBe(false);
+    expect(latestController?.errorMessage).toBe('content.autoBlur.pinRequiredError');
+    expect(controllerMocks.saveAutoBlurSettings).not.toHaveBeenCalled();
+  });
+
+  it('keeps shared auto-blur settings intact on another unpinned Navigation tab', async () => {
+    controllerMocks.loadAutoBlurSettings.mockResolvedValue({
+      ...controllerMocks.defaultSettings,
+      autoApplyEnabled: true,
+    });
+    await renderHarness(false, false, undefined, true);
+    expect(latestController?.autoApplyEnabled).toBe(true);
+    expect(controllerMocks.saveAutoBlurSettings).not.toHaveBeenCalled();
+
+    act(() => latestController?.openForAutoApply());
+    expect(latestController?.isOpen).toBe(true);
+  });
+
   it('reports a completed automatic pass after its frame sync replaces the manager props', async () => {
     const scan = createDeferred<{ matches: AutoBlurMatch[] }>();
     controllerMocks.loadAutoBlurSettings.mockResolvedValue({
@@ -370,7 +424,7 @@ function registerAutoBlurRunTests() {
     };
     controllerMocks.getLoadedAutoBlurSettingsSnapshot.mockReturnValue(savedSettings);
     controllerMocks.loadAutoBlurSettings.mockResolvedValue(savedSettings);
-    await renderHarness(false, true);
+    await renderHarness(false, true, undefined, true);
 
     act(() => latestController?.openForAutoApply());
     await act(async () => {

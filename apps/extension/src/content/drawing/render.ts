@@ -133,13 +133,11 @@ function tracePolygon(
 function drawFreehand(
   context: CanvasRenderingContext2D,
   object: Extract<DrawingObject, { kind: 'pencil' | 'marker' }>,
-  projection: DrawingViewportProjection,
-  preview: boolean
+  projection: DrawingViewportProjection
 ) {
   const outline = buildDrawingStrokeOutline(object.samples, object.width, {
     dynamicWidth: object.kind === 'pencil',
-    smoothingLevel: preview ? 4 : 10,
-    ...(preview ? { preview: true } : {}),
+    smoothingLevel: 10,
   });
   context.fillStyle = object.color;
   context.globalAlpha *= object.kind === 'marker' ? object.opacity : 1;
@@ -150,13 +148,13 @@ export function renderDrawingObject(
   context: CanvasRenderingContext2D,
   object: DrawingObject,
   projection: DrawingViewportProjection,
-  options: { readonly opacity?: number; readonly preview?: boolean } = {}
+  options: { readonly opacity?: number } = {}
 ): void {
   context.save();
   context.globalAlpha *= options.opacity ?? 1;
   applyDrawingObjectTransform(context, object, projection);
   if (object.kind === 'pencil' || object.kind === 'marker') {
-    drawFreehand(context, object, projection, options.preview === true);
+    drawFreehand(context, object, projection);
   } else if (
     object.kind === 'rectangle' ||
     object.kind === 'triangle' ||

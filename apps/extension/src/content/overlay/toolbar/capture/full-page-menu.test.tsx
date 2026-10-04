@@ -34,7 +34,7 @@ function Harness(props: {
     preloadLazyContent: true,
   });
   return (
-    <>
+    <div className="sniptale-toolbar-root">
       <button data-ui="test.other-menu" onClick={() => menu.toggleMenu('capture')}>
         Other menu
       </button>
@@ -53,7 +53,7 @@ function Harness(props: {
         saving={false}
         toolbarMenuState={menu}
       />
-    </>
+    </div>
   );
 }
 

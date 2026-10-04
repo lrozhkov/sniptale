@@ -91,11 +91,12 @@
   container: guide-step / inline-size;
 }
 .guide-step-blocks {
-  --guide-row-gap: max(var(--guide-gap), 1.5rem);
+  --guide-row-gap: var(--guide-gap);
   --guide-column-gap: max(var(--guide-gap), 3.5rem);
   display: flex;
   flex-direction: column;
   gap: var(--guide-row-gap);
+  padding-block: 1rem;
 }
 .guide-block-row {
   display: flex;
@@ -171,6 +172,10 @@
   font-weight: 700;
   line-height: 1.3;
   overflow-wrap: anywhere;
+}
+.guide-read-document article > header > span:not(.guide-voice-field) {
+  margin-top: 0;
+  min-height: calc(1.65rem * 1.3);
 }
 .guide-read-document h3 {
   font-weight: 650;

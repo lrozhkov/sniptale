@@ -191,6 +191,7 @@ export interface PreviewStageAudioSyncParams {
   audioRefs: PreviewStageAudioRefs;
   currentTime: number;
   isPlaying: boolean;
+  mutePreviewAudio?: boolean;
   project: VideoProject;
   syncedClips: VideoProjectClip[];
 }

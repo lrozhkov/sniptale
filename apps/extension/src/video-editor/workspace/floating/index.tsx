@@ -121,7 +121,12 @@ export function WorkspacePanelCloseButton(props: {
   title: string;
 }) {
   return (
-    <WorkspacePanelButton dataUi={props.dataUi} title={props.title} onClick={props.onClose}>
+    <WorkspacePanelButton
+      tone="close"
+      dataUi={props.dataUi}
+      title={props.title}
+      onClick={props.onClose}
+    >
       <X size={16} aria-hidden="true" />
     </WorkspacePanelButton>
   );

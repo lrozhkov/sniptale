@@ -1,11 +1,29 @@
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioExportEntry } from '@sniptale/runtime-contracts/scenario/types/session';
 import type {
+  GalleryItem,
   GalleryMediaItem,
   GalleryScenarioExportItem,
   GalleryScenarioItem,
   GalleryVideoProjectItem,
 } from '../items';
+import type { GalleryViewMode } from '../types';
+import { getGalleryGridLayout } from '../grid-layout';
+
+export function createGridMetricsFixture(args: {
+  items: GalleryItem[];
+  columnCount: number;
+  gridWidth: number;
+  viewMode: Exclude<GalleryViewMode, 'list'>;
+  startRow?: number;
+}) {
+  return {
+    columnCount: args.columnCount,
+    rowTops: getGalleryGridLayout(args).rowTops,
+    startRow: args.startRow ?? 0,
+    totalRows: Math.ceil(args.items.length / args.columnCount),
+  };
+}
 
 export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): GalleryMediaItem {
   return {
@@ -37,6 +55,7 @@ export function createMediaItem(overrides: Partial<GalleryMediaItem> = {}): Gall
     ...(overrides.workspaceRevision !== undefined
       ? { workspaceRevision: overrides.workspaceRevision }
       : {}),
+    ...(overrides.recordingMetadata ? { recordingMetadata: overrides.recordingMetadata } : {}),
     ...(overrides.recordingGroup ? { recordingGroup: overrides.recordingGroup } : {}),
     ...(overrides.recordingGroupView ? { recordingGroupView: overrides.recordingGroupView } : {}),
     type: overrides.type ?? 'media',
@@ -47,7 +66,7 @@ function createScenarioProjectSummary(
   overrides: Partial<ScenarioProjectSummary> = {}
 ): ScenarioProjectSummary {
   return {
-    availability: 'available' as const,
+    availability: overrides.availability ?? 'available',
     id: overrides.id ?? 'project-1',
     name: overrides.name ?? 'Scenario',
     createdAt: overrides.createdAt ?? 1,
@@ -87,6 +106,8 @@ function createScenarioExportEntry(
   overrides: Partial<ScenarioExportEntry> = {}
 ): ScenarioExportEntry {
   return {
+    ...(overrides.html ? { html: { ...overrides.html } } : {}),
+    ...(overrides.trashState ? { trashState: { ...overrides.trashState } } : {}),
     id: overrides.id ?? 'export-1',
     projectId: overrides.projectId ?? 'project-1',
     format: overrides.format ?? 'html',
@@ -102,6 +123,7 @@ export function createScenarioExportItem(
   const project = createScenarioProjectSummary(overrides.project);
   const exportEntry = createScenarioExportEntry({
     projectId: project.id,
+    ...(overrides.format ? { format: overrides.format } : {}),
     ...overrides.exportEntry,
   });
 

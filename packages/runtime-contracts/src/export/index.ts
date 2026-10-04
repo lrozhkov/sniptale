@@ -1,5 +1,5 @@
 import type { DocumentInlineNode, FieldContentRole } from '../dom-tree';
-import { estimateUtf8Bytes } from '../validation/base64';
+import { estimateUtf8Bytes, truncateUtf8Text } from '../validation/base64';
 import { MAX_PAGE_PACKAGE_TITLE_BYTES } from '../page-package/contracts';
 import type { ExportResourceLimits } from './resource-limits';
 export {
@@ -207,18 +207,6 @@ export function isCanonicalPopupExportJobId(value: unknown): value is string {
     estimateUtf8Bytes(value, MAX_POPUP_EXPORT_JOB_ID_BYTES) <= MAX_POPUP_EXPORT_JOB_ID_BYTES &&
     POPUP_EXPORT_JOB_ID_PATTERN.test(value)
   );
-}
-
-function truncateUtf8Text(value: string, maxBytes: number): string {
-  let bytes = 0;
-  let result = '';
-  for (const character of value) {
-    const characterBytes = estimateUtf8Bytes(character, maxBytes);
-    if (bytes + characterBytes > maxBytes) break;
-    result += character;
-    bytes += characterBytes;
-  }
-  return result;
 }
 
 export function normalizePopupExportTabTitle(value: string): string {

@@ -22,7 +22,7 @@ import { getCaptureActionOptions, getCaptureActionTooltip, ToolbarCaptureButtons
 import type { ToolbarCaptureActionsProps } from '../types';
 import { createBridgedMouseEvent } from '../../../platform/trusted-events/synthetic-mouse';
 import type { ToolbarMenuState } from '../state/menu';
-import { Images } from 'lucide-react';
+import { Library } from 'lucide-react';
 import { ImageEditorIcon, ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 
 let container: HTMLDivElement | null = null;
@@ -102,7 +102,7 @@ function registerCaptureActionOptionTests() {
     const options = getCaptureActionOptions();
     expect(options.every((option) => 'icon' in option)).toBe(true);
     expect(options.find((option) => option.value === 'edit')?.icon.type).toBe(ImageEditorIcon);
-    expect(options.find((option) => option.value === 'save_to_library')?.icon.type).toBe(Images);
+    expect(options.find((option) => option.value === 'save_to_library')?.icon.type).toBe(Library);
     expect(options.find((option) => option.value === 'scenario')?.icon.type).toBe(
       ScenarioEditorIcon
     );

@@ -1,3 +1,4 @@
+import { ReviewInspectorSections } from './inspector-sections';
 import { reviewSelectFieldClassName } from './controls';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
@@ -9,9 +10,13 @@ import type {
   QuickEditZoomRegion,
   QuickEditZoomTransition,
 } from '../../features/video/review/advanced/types';
-import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
-import { Trash2, RotateCcw, Unlink } from 'lucide-react';
+import {
+  fitQuickEditZoomTransitions,
+  type QuickEditZoomRegionPatch,
+} from '../../features/video/review/advanced/zoom';
+import { Trash2, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
 import { SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   ReviewButton,
   ReviewInterval,
@@ -31,15 +36,13 @@ const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeo
 function ZoomTransitionSection(props: {
   label: string;
   value: QuickEditZoomTransition;
+  max: number;
   onChange(next: QuickEditZoomTransition): void;
   children?: ReactNode;
 }) {
   return (
-    <fieldset
-      aria-label={props.label}
-      className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
-    >
-      <legend className="float-left mb-2 w-full text-sm font-semibold">{props.label}</legend>
+    <fieldset aria-label={props.label} className="review-inspector-phase min-w-0 space-y-2">
+      <legend className="float-left mb-2 w-full">{props.label}</legend>
       {props.children}
       <SelectField<QuickEditZoomTransition['type']>
         className={reviewSelectFieldClassName}
@@ -55,8 +58,8 @@ function ZoomTransitionSection(props: {
         label={translate('gallery.videoReview.zoomTransitionDuration')}
         unit="s"
         min={0}
-        max={60}
-        scrubMax={3}
+        max={props.max}
+        scrubMax={Math.min(5, props.max)}
         step={0.1}
         precision={2}
         scrubStep={0.1}
@@ -71,6 +74,7 @@ function ZoomTransitionSection(props: {
 /** Inspector form for the selected zoom region; edits clamp into the persisted contract. */
 export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
+  cutSuppressed?: boolean;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onReset(): void;
   onDelete(): void;
@@ -79,89 +83,84 @@ export function ReviewZoomInspector(props: {
   const { region, onChange } = props;
   return (
     <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
-      <ReviewInterval start={region.start} end={region.end} />
-      <SelectField<'zoom' | 'spotlight'>
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.focusType')}
-        value={region.spotlight ? 'spotlight' : 'zoom'}
-        options={[
-          { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
-          { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
-        ]}
-        onChange={(type) => {
-          if ((type === 'spotlight') === !!region.spotlight) return;
-          onChange({ spotlight: type === 'spotlight' ? createQuickEditSpotlight() : null });
-        }}
+      <ReviewInterval
+        start={region.sourceAnchor?.start ?? region.start}
+        end={region.sourceAnchor?.end ?? region.end}
       />
-      {props.preview}
-      {region.spotlight ? (
-        <ReviewSpotlightInspector
-          value={region.spotlight}
-          onChange={(spotlight) => onChange({ spotlight })}
-        />
-      ) : (
-        <>
-          <ReviewNumberRow
-            label={translate('gallery.videoReview.zoomScale')}
-            unit="x"
-            min={1}
-            max={4}
-            step={0.1}
-            precision={2}
-            scrubStep={0.05}
-            value={region.transform.scale}
-            onChange={(scale) => onChange({ scale })}
-          />
-          <ReviewDetails label={translate('gallery.videoReview.precisePosition')}>
-            <ReviewNumberRow
-              label={translate('gallery.videoReview.zoomFocusX')}
-              unit="%"
-              min={0}
-              max={100}
-              step={1}
-              precision={1}
-              value={region.transform.centerX * 100}
-              onChange={(value) => onChange({ centerX: value / 100 })}
-            />
-            <ReviewNumberRow
-              label={translate('gallery.videoReview.zoomFocusY')}
-              unit="%"
-              min={0}
-              max={100}
-              step={1}
-              precision={1}
-              value={region.transform.centerY * 100}
-              onChange={(value) => onChange({ centerY: value / 100 })}
-            />
-          </ReviewDetails>
-        </>
-      )}
-      <ZoomTransitionSection
-        label={translate('gallery.videoReview.zoomTransitionIn')}
-        value={region.enter}
-        onChange={(enter) => onChange({ enter })}
-      >
-        {region.spotlight ? (
-          <ReviewSpotlightAnimation
-            value={region.spotlight}
-            phase="enter"
-            onChange={(spotlight) => onChange({ spotlight })}
-          />
-        ) : null}
-      </ZoomTransitionSection>
-      <ZoomTransitionSection
-        label={translate('gallery.videoReview.zoomTransitionOut')}
-        value={region.exit}
-        onChange={(exit) => onChange({ exit })}
-      >
-        {region.spotlight ? (
-          <ReviewSpotlightAnimation
-            value={region.spotlight}
-            phase="exit"
-            onChange={(spotlight) => onChange({ spotlight })}
-          />
-        ) : null}
-      </ZoomTransitionSection>
+      {props.cutSuppressed ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.cutOverlapHint')}{' '}
+          {region.sourceAnchor
+            ? `${reviewTimeLabel(region.sourceAnchor.start)} – ${reviewTimeLabel(region.sourceAnchor.end)}`
+            : ''}
+        </p>
+      ) : null}
+      <ReviewInspectorSections
+        sections={[
+          {
+            id: 'framing',
+            label: translate('gallery.videoReview.zoomPreview'),
+            icon: Scan,
+            content: (
+              <>
+                <ReviewFocusType region={region} onChange={onChange} />
+                {props.preview}
+                {region.spotlight ? (
+                  <ReviewSpotlightInspector
+                    value={region.spotlight}
+                    onChange={(spotlight) => onChange({ spotlight })}
+                  />
+                ) : (
+                  <>
+                    <ReviewNumberRow
+                      label={translate('gallery.videoReview.zoomScale')}
+                      unit="x"
+                      min={1}
+                      max={4}
+                      step={0.1}
+                      precision={2}
+                      scrubStep={0.05}
+                      value={region.transform.scale}
+                      onChange={(scale) => onChange({ scale })}
+                    />
+                    <ReviewDetails
+                      preferenceId="gallery.videoReview.precisePosition"
+                      label={translate('gallery.videoReview.precisePosition')}
+                    >
+                      <ReviewNumberRow
+                        label={translate('gallery.videoReview.zoomFocusX')}
+                        unit="%"
+                        min={0}
+                        max={100}
+                        step={1}
+                        precision={1}
+                        value={region.transform.centerX * 100}
+                        onChange={(value) => onChange({ centerX: value / 100 })}
+                      />
+                      <ReviewNumberRow
+                        label={translate('gallery.videoReview.zoomFocusY')}
+                        unit="%"
+                        min={0}
+                        max={100}
+                        step={1}
+                        precision={1}
+                        value={region.transform.centerY * 100}
+                        onChange={(value) => onChange({ centerY: value / 100 })}
+                      />
+                    </ReviewDetails>
+                  </>
+                )}
+              </>
+            ),
+          },
+          {
+            id: 'animation',
+            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+            icon: Waves,
+            content: <ReviewZoomAnimation region={region} onChange={onChange} />,
+          },
+        ]}
+      />
       <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.zoomResetPosition')}
@@ -181,6 +180,56 @@ export function ReviewZoomInspector(props: {
         </ReviewButton>
       </div>
     </div>
+  );
+}
+
+/** Owns the coupled phase controls and their source-clock duration budget. */
+function ReviewZoomAnimation(props: {
+  region: QuickEditZoomRegion;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+}) {
+  const { onChange } = props;
+  const region = fitQuickEditZoomTransitions(props.region);
+  const interval = region.sourceAnchor ?? region;
+  const duration = interval.end - interval.start;
+  return (
+    <>
+      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate(
+          region.sourceAnchor
+            ? 'gallery.videoReview.zoomSourceTimingHint'
+            : 'gallery.videoReview.zoomTimingHint'
+        )}
+      </p>
+      <ZoomTransitionSection
+        label={translate('gallery.videoReview.zoomTransitionIn')}
+        value={region.enter}
+        max={Math.min(60, Math.max(0, duration - region.exit.duration))}
+        onChange={(enter) => onChange({ enter })}
+      >
+        {region.spotlight ? (
+          <ReviewSpotlightAnimation
+            value={region.spotlight}
+            phase="enter"
+            onChange={(spotlight) => onChange({ spotlight })}
+          />
+        ) : null}
+      </ZoomTransitionSection>
+      <ZoomTransitionSection
+        label={translate('gallery.videoReview.zoomTransitionOut')}
+        value={region.exit}
+        max={Math.min(60, Math.max(0, duration - region.enter.duration))}
+        onChange={(exit) => onChange({ exit })}
+      >
+        {region.spotlight ? (
+          <ReviewSpotlightAnimation
+            value={region.spotlight}
+            phase="exit"
+            onChange={(spotlight) => onChange({ spotlight })}
+          />
+        ) : null}
+      </ZoomTransitionSection>
+    </>
   );
 }
 
@@ -211,21 +260,56 @@ export function ReviewZoomLinkInspector(props: {
         data-ui="gallery.videoReview.zoomLinkDuration"
         className="flex min-h-8 w-full items-center justify-between gap-3 py-0.5"
       >
-        <span className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        <span className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
           {translate('gallery.videoReview.zoomLinkDuration')}
         </span>
         <span className="text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
           {reviewTimeLabel(gap)}
         </span>
       </div>
-      <ReviewButton
-        label={translate('gallery.videoReview.zoomLinkRemove')}
-        className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-        onClick={props.onRemove}
-      >
-        <Unlink size={15} aria-hidden="true" />
-        <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
-      </ReviewButton>
+      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <ReviewButton
+          label={translate('gallery.videoReview.zoomLinkRemove')}
+          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+          onClick={props.onRemove}
+        >
+          <Unlink size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
+        </ReviewButton>
+      </div>
+    </div>
+  );
+}
+
+/** Direct Focus type choice preserves the active configuration and camera. */
+function ReviewFocusType({
+  region,
+  onChange,
+}: {
+  region: QuickEditZoomRegion;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.videoReview.focusType')}
+      </span>
+      <SegmentedSwitch<'zoom' | 'spotlight'>
+        dataAttribute={{ 'data-ui': 'gallery.videoReview.focusType' }}
+        ariaLabel={translate('gallery.videoReview.focusType')}
+        density="compact"
+        activeId={region.spotlight ? 'spotlight' : 'zoom'}
+        options={[
+          { id: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
+          { id: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+        ]}
+        onChange={(type) => {
+          if ((type === 'spotlight') === !!region.spotlight) return;
+          onChange({
+            spotlight: type === 'spotlight' ? createQuickEditSpotlight() : null,
+          });
+        }}
+      />
     </div>
   );
 }

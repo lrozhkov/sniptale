@@ -12,8 +12,8 @@ const SELECTION_FRAME_VISUAL: ResolvedBorderPresetVisual = {
   radius: 0,
   shadow: 0,
   strokeColor: DEFAULT_COLOR_INFO_STRONG,
-  strokeStyle: 'solid',
-  strokeWidth: 2,
+  strokeStyle: 'dashed',
+  strokeWidth: 1,
 };
 
 export function getSelectionFrameVisual(): ResolvedBorderPresetVisual {

@@ -65,7 +65,7 @@ function dispatchHostCancelledKeydown(target: EventTarget, init: KeyboardEventIn
 
 function dispatchNativeFollowUp(target: Element): void {
   target.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-  target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
 }
 
 function dispatchPointerUp(target: EventTarget = window): void {
@@ -138,6 +138,33 @@ describe('content UI activation bridge immediate activation', () => {
     dispatchNativeFollowUp(button);
 
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves trusted keyboard activation immediately after a bridged pointer click', () => {
+    const { root } = mountBridgeRoot();
+    const button = document.createElement('button');
+    const onClick = vi.fn();
+    button.addEventListener('click', onClick);
+    root.append(button);
+    dispatchPrimaryPointerDown(button);
+    const keyboardClick = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 0 });
+    button.dispatchEvent(keyboardClick);
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(keyboardClick.defaultPrevented).toBe(false);
+  });
+
+  it('keeps an untrusted zero-detail click suppressed within the pointer duplicate window', () => {
+    const { root } = mountBridgeRoot();
+    const button = document.createElement('button');
+    const onClick = vi.fn();
+    button.addEventListener('click', onClick);
+    root.append(button);
+    dispatchPrimaryPointerDown(button);
+    trustedEventMocks.isTrustedDomEvent.mockReturnValue(false);
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, detail: 0 });
+    button.dispatchEvent(click);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(click.defaultPrevented).toBe(true);
   });
 
   it('delivers menu mousedown actions from pointerdown and suppresses native mousedown duplicates', () => {
@@ -260,7 +287,7 @@ describe('content UI activation bridge deferred activation', () => {
 
     dispatchPrimaryPointerDown(button);
     dispatchPointerUp();
-    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    button.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
     vi.runOnlyPendingTimers();
 
     expect(onClick).toHaveBeenCalledTimes(1);

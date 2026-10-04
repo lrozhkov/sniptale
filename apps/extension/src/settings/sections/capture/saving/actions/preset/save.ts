@@ -42,6 +42,13 @@ export function createSavePresetAction(
       sync.setPresets(previousPresets);
       throw error;
     }
+    toast.success(
+      translate(
+        dialogState.editingPreset
+          ? 'savePresets.messages.presetUpdated'
+          : 'savePresets.messages.presetCreated'
+      )
+    );
     dialogState.closeEditor();
   };
 }

@@ -53,6 +53,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     centered?: boolean;
     label: string;
     disabled: boolean;
+    iconClassName: string;
     icon: ComponentType<{ className?: string }>;
     onClick(): void;
   }) => {
@@ -60,6 +61,7 @@ vi.mock('../../../../ui/popup-shell/action-button', async (importOriginal) => ({
     return (
       <button
         className={props.centered ? 'justify-center' : 'justify-start'}
+        data-icon-class={props.iconClassName}
         disabled={props.disabled}
         onClick={props.onClick}
       >
@@ -75,18 +77,30 @@ afterEach(cleanupRenderedNode);
 
 it('hides tab-only fields for desktop and keeps the capture action available', async () => {
   const onCapture = vi.fn();
+  const onChange = vi.fn();
   await renderNode(
     <ScreenshotSetupPanel
       config={DEFAULT_SCREENSHOT_SETUP_STATE.desktop}
       viewportPresets={[]}
       pending={false}
       disabledReason={null}
-      onChange={vi.fn()}
+      onChange={onChange}
       onCapture={onCapture}
     />
   );
   expect(getContainer()?.textContent).not.toContain('popup.home.captureAreaLabel');
-  expect(getContainer()?.textContent).not.toContain('popup.home.captureCountdownLabel');
+  expect(getContainer()?.textContent).toContain('popup.home.captureCountdownLabel');
+  const countdown = Array.from(getContainer()?.querySelectorAll('select') ?? []).find((select) =>
+    Array.from(select.options).some((option) => option.value === '10')
+  );
+  expect(countdown).toBeDefined();
+  await act(async () => {
+    countdown!.value = '3';
+    countdown!.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(onChange).toHaveBeenCalledWith(
+    expect.objectContaining({ screenshotMode: 'desktop', delay: 3 })
+  );
   const afterCaptureValues = Array.from(getContainer()?.querySelectorAll('option') ?? []).map(
     (option) => option.value
   );
@@ -96,6 +110,18 @@ it('hides tab-only fields for desktop and keeps the capture action available', a
     (button) => button.textContent === 'popup.home.captureButtonLabel'
   );
   expect(captureButton?.className).toContain('justify-start');
+  for (const label of [
+    'popup.home.captureButtonLabel',
+    'popup.home.imageEditorLabel',
+    'popup.home.libraryLabel',
+  ]) {
+    const button = [...(getContainer()?.querySelectorAll('button') ?? [])].find(
+      (candidate) => candidate.textContent === label
+    );
+    expect(button?.dataset['iconClass']).toContain(
+      'group-hover:text-[var(--sniptale-color-accent)]'
+    );
+  }
   expect(
     [...(getContainer()?.querySelectorAll('button') ?? [])]
       .find((button) => button.textContent === 'popup.home.imageEditorLabel')
@@ -148,7 +174,7 @@ it('uses popup folder wording and offers scenario recording for tab captures', a
   ).toBe('popup.image-editor-icon');
   expect(
     getContainer()?.querySelector('[data-option-icon="scenario"] svg')?.getAttribute('class')
-  ).toContain('lucide-scroll-text');
+  ).toContain('lucide-book-open');
 });
 
 it('renders tab settings, applies field changes, and disables a pending capture', async () => {

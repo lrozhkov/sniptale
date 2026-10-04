@@ -61,6 +61,21 @@ it('selects stable slide identities without recording artificial back history', 
   expect(root.dataset['slideId']).toBe('first');
 });
 
+it('keeps fractional seek precision and icon-only accessible transport buttons', async () => {
+  const { root } = await mount();
+  const range = root.querySelector<HTMLInputElement>('[data-tour-seek]')!;
+  expect(range.step).toBe('any');
+  range.value = '1234.5';
+  range.dispatchEvent(new Event('input'));
+  expect(range.valueAsNumber).toBeCloseTo(1234.5, 2);
+  for (const name of ['contents', 'previous', 'next'] as const) {
+    const button = root.querySelector<HTMLButtonElement>(`[data-tour-${name}]`)!;
+    expect(button.textContent).toBe('');
+    expect(button.getAttribute('aria-label')).toBe(labels[name]);
+    expect(button.querySelector('svg')).not.toBeNull();
+  }
+});
+
 it('disposes keyboard, transport and resize activity before remounting the same root', async () => {
   const { player, root } = await mount();
   const next = root.querySelector<HTMLButtonElement>('[data-tour-next]')!;
@@ -465,6 +480,7 @@ it('gates playback on decoded current media, ignores stale loads and permits ret
   pending.at(-1)!.onerror!();
   await tick(0);
   expect(play.textContent).toBe('Retry');
+  expect(root.querySelector<HTMLButtonElement>('[data-tour-full-view]')!.disabled).toBe(true);
   Object.defineProperty(viewport, 'clientWidth', { value: 400, configurable: true });
   window.dispatchEvent(new Event('resize'));
   expect(root.querySelector<HTMLElement>('[data-tour-hint]')!.inert).toBe(true);
@@ -566,8 +582,8 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
   await tick(50);
   expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
-  expect(play.textContent).toBe('Pause');
-  play.click();
+  expect(play.textContent).toBe('Play');
+  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
   await tick(1000);
   expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
   play.click();
@@ -582,7 +598,7 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   expect(root.dataset['slideId']).toBe('third');
   expect(play.textContent).toBe('Play');
 });
-it('seeks a stable paused entrance frame and cancels transient geometry on actual resize', async () => {
+it('keeps a paused entrance at its clock position through actual resize', async () => {
   vi.stubGlobal('matchMedia', () => ({ matches: false }));
   const tick = playbackFrames();
   const { player, root } = await mount();
@@ -602,9 +618,13 @@ it('seeks a stable paused entrance frame and cancels transient geometry on actua
   const viewport = root.querySelector<HTMLElement>('[data-tour-viewport]')!;
   Object.defineProperty(viewport, 'clientWidth', { value: 500, configurable: true });
   window.dispatchEvent(new Event('resize'));
-  expect(scene.inert).toBe(false);
-  expect(scene.style.opacity).toBe('');
-  expect(root.querySelector('.tour-motion-previous')).toBeNull();
+  expect(scene.inert).toBe(true);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('1');
+  await tick(1000);
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('1');
+  seek.value = '50';
+  seek.dispatchEvent(new Event('input', { bubbles: true }));
+  expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
   player.select('second');
   player.select('third');
   await tick(0);

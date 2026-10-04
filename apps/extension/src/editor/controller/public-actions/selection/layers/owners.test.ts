@@ -1,4 +1,6 @@
-import type { Canvas } from 'fabric';
+// @vitest-environment jsdom
+
+import { Rect, type Canvas } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -31,6 +33,7 @@ vi.mock('../../../document/source', async (importOriginal) => ({
 import { renameEditorLayerById } from './rename';
 import { reorderEditorLayer } from './reorder';
 import { selectEditorLayerById } from './select';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 import { resizeEditorLayerById, toggleEditorLayerVisibility } from './source-mutations';
 
 function createSyncOptions() {
@@ -49,7 +52,10 @@ function registerReorderAndSelectTest() {
     const syncRuntimeState = vi.fn();
     const commitHistory = vi.fn();
     mocks.reorderLayerObjectsMock.mockReturnValue(true);
-    mocks.selectLayerObjectMock.mockReturnValue(true);
+    mocks.selectLayerObjectMock
+      .mockReturnValueOnce(null)
+      .mockReturnValueOnce(false)
+      .mockReturnValue(true);
 
     reorderEditorLayer({
       canvas,
@@ -59,18 +65,46 @@ function registerReorderAndSelectTest() {
       syncRuntimeState,
       targetId: 'b',
     });
-    selectEditorLayerById({
+    const selectionOptions = {
       canvas,
       commitHistory,
       ensureObjectReachable: vi.fn(),
       focusObjectInViewport: vi.fn(),
       id: 'a',
       syncRuntimeState,
-    });
+    };
+    expect(selectEditorLayerById(selectionOptions)).toBe(false);
+    expect(selectEditorLayerById(selectionOptions)).toBe(true);
+    expect(selectEditorLayerById(selectionOptions)).toBe(true);
 
     expect(sendFrameObjectsToBack).toHaveBeenCalledOnce();
     expect(commitHistory).toHaveBeenCalledTimes(2);
-    expect(syncRuntimeState).toHaveBeenCalledTimes(2);
+    expect(syncRuntimeState).toHaveBeenCalledTimes(3);
+  });
+
+  it('keeps selected-layer priority aligned with the editor canvas selection', () => {
+    const canvas = new EditorCanvas(document.createElement('canvas'));
+    const object = new Rect({ width: 20, height: 20 });
+    canvas.add(object);
+    canvas.setActiveObject(object);
+    const setPriority = vi.spyOn(canvas, 'setLayerSelectionPriority');
+    mocks.selectLayerObjectMock.mockReturnValue(false);
+    const options = {
+      canvas,
+      commitHistory: vi.fn(),
+      ensureObjectReachable: vi.fn(),
+      focusObjectInViewport: vi.fn(),
+      id: 'a',
+      syncRuntimeState: vi.fn(),
+    };
+
+    selectEditorLayerById(options);
+    expect(setPriority).toHaveBeenCalledWith(object);
+
+    canvas.discardActiveObject();
+    selectEditorLayerById(options);
+    expect(setPriority).toHaveBeenLastCalledWith(null);
+    canvas.dispose();
   });
 }
 

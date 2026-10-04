@@ -33,6 +33,7 @@ export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
   'sniptale:trace:namespaces',
   'sniptale.gallery.filters',
   'sniptale.gallery.facet-disclosures',
+  'sniptale.context-menu.pending-layout',
 ] as const;
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_PREFIXES = [
@@ -56,6 +57,7 @@ const localPreferenceKeys = [
   'sniptale_editor_export_settings',
   'sniptale_editor_workspace_defaults',
   'sniptale_editor_presets',
+  'sniptale_editor_technical_data_preference',
   'sniptale_drawing_palette',
   'sniptale_quick_actions',
   'sniptale_quick_actions_display_mode',
@@ -172,6 +174,6 @@ export function buildBrowserStorageErasurePlan(
     session: [...sessionSensitiveKeys],
     sessionPrefixes: [...sessionSensitiveKeyPrefixes],
     sync: options.preservePreferences ? [] : [...syncPreferenceKeys],
-    syncPrefixes: [],
+    syncPrefixes: options.preservePreferences ? [] : ['sniptale_context_menu_layout_'],
   };
 }

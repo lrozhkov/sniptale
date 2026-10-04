@@ -1,5 +1,5 @@
+import { createScreenshotFilename as generateFilename } from '../../../workflows/file-naming/index';
 import { loadSettings } from '../../../composition/persistence/settings';
-import { generateFilename } from '@sniptale/foundation/utils/filename';
 import { downloadImageInServiceWorker } from '../download/index';
 import { transitionCaptureJob } from '../jobs/state-machine';
 import { readCaptureDeliveryPayload, type CaptureDeliveryPayload } from './payload';
@@ -35,6 +35,6 @@ export async function downloadCapturedImageUseCase(
   ports: DownloadCapturePorts = defaultDownloadCapturePorts
 ): Promise<void> {
   const settings = await ports.loadSettings();
-  const filename = ports.generateFilename(args.mode, settings.imageFormat);
+  const filename = await ports.generateFilename(args.mode, settings.imageFormat, settings);
   await ports.downloadImageInServiceWorker(args.dataUrl, filename, args.captureJobId);
 }

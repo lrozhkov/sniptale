@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import type { LocalStoragePolicy } from '../../../../contracts/settings';
-import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
 import {
   cleanupDrafts,
-  DEFAULT_LOCAL_STORAGE_POLICY,
   getLibraryStorageUsage,
 } from '../../../../composition/persistence/library-lifecycle';
 import { getStorageEstimateInfo } from '../../../../features/media-hub/storage-capacity';
 import { translate } from '../../../../platform/i18n';
+import { useStoragePolicyState } from './use-storage-policy-state';
 
 export type StorageUsageState = {
   available: number;
@@ -18,9 +16,9 @@ export type StorageUsageState = {
 };
 
 export function useStorageDraftsState() {
-  const [policy, setPolicy] = useState<LocalStoragePolicy>(DEFAULT_LOCAL_STORAGE_POLICY);
+  const policyState = useStoragePolicyState();
   const [usage, setUsage] = useState<StorageUsageState | null>(null);
-  const [busy, setBusy] = useState(true);
+  const [cleanupBusy, setCleanupBusy] = useState(false);
 
   const refreshUsage = useCallback(async () => {
     const [breakdown, estimate] = await Promise.all([
@@ -36,29 +34,14 @@ export function useStorageDraftsState() {
   }, []);
 
   useEffect(() => {
-    void Promise.all([loadSettings(), refreshUsage()])
-      .then(([settings]) => setPolicy(settings.localStoragePolicy))
-      .catch(() => showToast(translate('settings.storageDrafts.error'), 'error'))
-      .finally(() => setBusy(false));
+    void refreshUsage().catch(() => showToast(translate('settings.storageDrafts.error'), 'error'));
   }, [refreshUsage]);
-
-  const updatePolicy = useCallback(async (patch: Partial<LocalStoragePolicy>) => {
-    setBusy(true);
-    try {
-      const next = await patchSettings({ localStoragePolicy: patch });
-      setPolicy(next.localStoragePolicy);
-    } catch {
-      showToast(translate('settings.storageDrafts.error'), 'error');
-    } finally {
-      setBusy(false);
-    }
-  }, []);
 
   const runCleanup = useCallback(
     async (includeUnexpired: boolean) => {
-      setBusy(true);
+      setCleanupBusy(true);
       try {
-        const result = await cleanupDrafts({ includeUnexpired, policy });
+        const result = await cleanupDrafts({ includeUnexpired, policy: policyState.policy });
         await refreshUsage();
         const message = translate('settings.storageDrafts.cleanupDone').replace(
           '{count}',
@@ -68,11 +51,16 @@ export function useStorageDraftsState() {
       } catch {
         showToast(translate('settings.storageDrafts.error'), 'error');
       } finally {
-        setBusy(false);
+        setCleanupBusy(false);
       }
     },
-    [policy, refreshUsage]
+    [policyState.policy, refreshUsage]
   );
 
-  return { busy, policy, runCleanup, updatePolicy, usage };
+  return {
+    ...policyState,
+    busy: policyState.busy || cleanupBusy,
+    runCleanup,
+    usage,
+  };
 }

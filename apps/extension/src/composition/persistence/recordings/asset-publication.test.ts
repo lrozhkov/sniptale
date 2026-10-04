@@ -18,6 +18,7 @@ vi.mock('../assets', async (importOriginal) => ({
   recoverStandaloneAssetPublications: mocks.recoverStandalone,
 }));
 
+import { buildRecordingMediaEntry } from '../media-library/entry-mapping';
 import { publishRecordingAssetJournal } from './asset-publication';
 import type { AssetReadyJournal } from '../assets';
 
@@ -58,7 +59,7 @@ function journal(completion: AssetReadyJournal['payload'] extends never ? never 
     createdAt: 2,
     domain: 'recording-assets',
     journalId: 'journal-1',
-    payload: { completion, entries: [entry] },
+    payload: { completion, entries: [entry], expectedAssetIds: { 'recording-1': 'asset-old' } },
   } satisfies AssetReadyJournal;
 }
 
@@ -103,7 +104,8 @@ it('atomically publishes refs, owner, recording mirror, completion, and delete i
     expect.objectContaining({ domain: 'video-recording-completion-outbox' }),
   ]);
   expect(mocks.completeDelete).toHaveBeenCalledWith(
-    expect.objectContaining({ assetIds: ['asset-old'] })
+    expect.objectContaining({ assetIds: ['asset-old'] }),
+    undefined
   );
 });
 
@@ -155,6 +157,9 @@ it('rejects replay when a different completion is already pending', async () => 
   await expect(publishRecordingAssetJournal(journal(completion))).rejects.toThrow(
     'different video recording completion'
   );
+  expect(transaction.abort).toHaveBeenCalledOnce();
+  expect(writes).toEqual([]);
+  expect(mocks.completeDelete).not.toHaveBeenCalled();
 });
 
 function completionOutbox(completion: {
@@ -170,13 +175,42 @@ function completionOutbox(completion: {
   };
 }
 
+it('preserves an adopted recording identity instead of replacing its source bytes', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const transaction = createTransaction(writes, Promise.resolve());
+  const objectStore = transaction.objectStore;
+  transaction.objectStore = (name: string) => ({
+    ...objectStore(name),
+    getAll: vi.fn(async () =>
+      name === 'scenario_assets'
+        ? [
+            {
+              id: 'scenario-child',
+              galleryAssetId: 'recording:recording-1',
+              borrowedMediaId: 'recording:recording-1',
+            },
+          ]
+        : []
+    ),
+  });
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  await expect(publishRecordingAssetJournal(journal())).rejects.toThrow();
+  expect(transaction.abort).toHaveBeenCalledOnce();
+  expect(writes).toEqual([]);
+  expect(mocks.completeDelete).not.toHaveBeenCalled();
+});
+
 function createTransaction(
   writes: Array<[string, 'add' | 'delete' | 'put', unknown]>,
   done: Promise<unknown>,
-  stateManagerValue?: unknown
+  stateManagerValue?: unknown,
+  mediaValue?: unknown
 ) {
   return {
     done,
+    abort: vi.fn(() => writes.splice(0)),
     objectStore(name: string) {
       return {
         add: vi.fn(async (value: unknown) => writes.push([name, 'add', value])),
@@ -188,11 +222,102 @@ function createTransaction(
               ? previous
               : name === 'state_manager'
                 ? stateManagerValue
-                : undefined
+                : name === 'media_library'
+                  ? mediaValue
+                  : undefined
           ),
+        getAll: vi.fn(async (): Promise<unknown[]> => []),
         index: vi.fn(() => ({ count: vi.fn().mockResolvedValue(0) })),
         put: vi.fn(async (value: unknown) => writes.push([name, 'put', value])),
       };
     },
   };
 }
+
+it('preserves Trash admission when a ready recording journal is replayed after a restart', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const media = {
+    ...buildRecordingMediaEntry(entry),
+    lifecycle: {
+      storageClass: 'temporary',
+      savedAt: null,
+      updatedAt: 1,
+      trashedAt: 100,
+    },
+  };
+  const transaction = createTransaction(writes, Promise.resolve(), undefined, media);
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  await publishRecordingAssetJournal(journal());
+  expect(writes).toContainEqual([
+    'media_library',
+    'put',
+    expect.objectContaining({ lifecycle: media.lifecycle }),
+  ]);
+});
+
+it('rejects a journal whose expected recording source has been replaced', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const transaction = createTransaction(writes, Promise.resolve());
+  const getStore = transaction.objectStore;
+  transaction.objectStore = (name: string) => ({
+    ...getStore(name),
+    get: vi.fn(async () =>
+      name === 'recordings' ? { ...previous, assetId: 'later-source' } : undefined
+    ),
+  });
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  const stale = journal();
+  stale.payload = { ...stale.payload, expectedAssetIds: { 'recording-1': 'asset-old' } };
+  await expect(publishRecordingAssetJournal(stale)).rejects.toThrow();
+  expect(writes).toEqual([]);
+});
+
+it('does not republish metadata or recreate a consumed completion on an exact recording replay', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const transaction = createTransaction(writes, Promise.resolve());
+  const getStore = transaction.objectStore;
+  transaction.objectStore = (name: string) => ({
+    ...getStore(name),
+    get: vi.fn(async () => (name === 'recordings' ? entry : undefined)),
+  });
+  mocks.runMutation.mockImplementation(async (callback) =>
+    callback({ transaction: () => transaction })
+  );
+  await publishRecordingAssetJournal(
+    journal({ primaryRecordingId: entry.id, projectId: null, recordingId: 'session' })
+  );
+  expect(writes).toEqual([]);
+});
+
+it('rejects a retained own review before recording replacement or outbox writes', async () => {
+  const writes: Array<[string, 'add' | 'delete' | 'put', unknown]> = [];
+  const transaction = createTransaction(writes, Promise.resolve());
+  const objectStore = transaction.objectStore;
+  const review = { aggregateId: buildRecordingMediaEntry(previous).id };
+  transaction.objectStore = (name) => {
+    const store = objectStore(name);
+    if (name === 'video_workspaces') {
+      store.get.mockResolvedValue(review);
+      store.getAll.mockResolvedValue([review]);
+    }
+    return store;
+  };
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  await expect(
+    publishRecordingAssetJournal(
+      journal({
+        primaryRecordingId: entry.id,
+        projectId: null,
+        recordingId: 'session-1',
+      })
+    )
+  ).rejects.toThrow();
+  expect(writes).toEqual([]);
+  expect(mocks.completeDelete).not.toHaveBeenCalled();
+});

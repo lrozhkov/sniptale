@@ -79,10 +79,10 @@ describe('popup video settings grid', () => {
 
     expect(container?.textContent).toContain('popup.video.countdownFewOption:3');
     clickButtonContaining('popup.video.countdownLabel');
-    clickButtonContaining('popup.video.countdownFewOption:2');
+    clickButtonContaining('popup.video.countdownManyOption:5');
 
     expect(mocks.qualityCardMock).toHaveBeenCalled();
-    expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: 2 });
+    expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: 5 });
     expect(onSettingsChange).not.toHaveBeenCalledWith(
       expect.objectContaining({ autoFadeDelay: 6 })
     );

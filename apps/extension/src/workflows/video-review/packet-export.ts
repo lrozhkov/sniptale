@@ -11,12 +11,16 @@ import {
 } from 'mediabunny';
 import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import type { ReviewEdit } from '../../features/video/review/types';
-import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import {
+  buildReviewTimeMap,
+  reviewVisibleEditBoundaries,
+} from '../../features/video/review/timeline';
 import { isIndependentReviewPacket } from '../../features/video/review/random-access';
 import type { ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
 import type { ReviewExportClipPlan } from './audio-render';
 import { audioPacketDuration, chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
+import { createReviewAudioClipRenderer } from './audio-clip-render';
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 export interface ReviewPacketReceipt {
@@ -43,17 +47,13 @@ export async function writeReviewPackets(args: {
 }): Promise<ReviewPacketReceipt> {
   const { index, signal } = args;
   signal.throwIfAborted();
-  if (
-    args.edits.some(
-      (edit) => !index.boundaries.includes(edit.start) || !index.boundaries.includes(edit.end)
-    )
-  )
+  if (reviewVisibleEditBoundaries(args.edits).some((time) => !index.boundaries.includes(time)))
     throw new Error('Export requires verified cut boundaries.');
   const segments = buildReviewTimeMap(index.duration, args.edits).filter(
     (part) => part.kind !== 'cut'
   );
   if (!segments.length) throw new Error('The edited video is empty.');
-  const speedExists = args.edits.some((edit) => edit.kind === 'speed');
+  const speedExists = segments.some((part) => part.kind === 'speed');
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
   signal.addEventListener('abort', dispose, { once: true });
@@ -83,6 +83,7 @@ export async function writeReviewPackets(args: {
       outputAudioCodec: processedAudio ?? index.audioCodec,
     };
     const clock = { time: 0 };
+    const clipRenderer = createReviewAudioClipRenderer();
     const tracks = createReviewMediaOutput({
       index,
       writer: args.writer,
@@ -113,10 +114,13 @@ export async function writeReviewPackets(args: {
         !!args.exportAudio?.originalMuted ||
         args.edits.some(
           (edit) =>
-            edit.kind === 'speed' && edit.start === segment.sourceStart && edit.audio === 'mute'
+            edit.kind === 'speed' &&
+            edit.start <= segment.sourceStart &&
+            edit.end >= segment.sourceEnd &&
+            edit.audio === 'mute'
         );
       const audioPackets = processedAudio
-        ? renderReviewAudio(audio, segment, muted, signal, args.exportAudio)
+        ? renderReviewAudio(audio, segment, muted, signal, args.exportAudio, clipRenderer)
         : audioSink && index.audioCodec
           ? retainedAudio(audioSink, segment, clock, index.audioCodec, sampleRate, receipt, signal)
           : null;
@@ -170,7 +174,7 @@ async function segmentVideoPackets(
   const start =
     segment.sourceStart === 0
       ? await videoSink.getFirstPacket()
-      : await videoSink.getKeyPacket(segment.sourceStart);
+      : await exactBoundaryPacket(videoSink, segment.sourceStart, signal);
   if (
     !start ||
     (segment.sourceStart !== 0 && start.timestamp !== segment.sourceStart) ||
@@ -183,9 +187,26 @@ async function segmentVideoPackets(
   )
     throw new Error('Export entry point is not independently decodable.');
   const end =
-    segment.sourceEnd === index.duration ? null : await videoSink.getKeyPacket(segment.sourceEnd);
-  if (end && end.timestamp !== segment.sourceEnd) throw new Error('Export boundary changed.');
+    segment.sourceEnd === index.duration
+      ? null
+      : await exactBoundaryPacket(videoSink, segment.sourceEnd, signal);
   return retainedVideo(videoSink, start, end, segment, signal);
+}
+
+/** Timestamp seeks may land before a known WebM keyframe; advance without moving the edit edge. */
+async function exactBoundaryPacket(
+  sink: EncodedPacketSink,
+  time: number,
+  signal: AbortSignal
+): Promise<EncodedPacket> {
+  let packet = (await sink.getKeyPacket(time)) ?? (await sink.getFirstKeyPacket());
+  while (packet && packet.timestamp < time) {
+    signal.throwIfAborted();
+    packet = await sink.getNextKeyPacket(packet);
+  }
+  signal.throwIfAborted();
+  if (!packet || packet.timestamp !== time) throw new Error('Export boundary changed.');
+  return packet;
 }
 
 /** Merge one pending packet per track so muxer buffering stays bounded. */

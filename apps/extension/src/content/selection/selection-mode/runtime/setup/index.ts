@@ -29,7 +29,8 @@ export function createSelectionModeRuntimeSetup(args: SelectionModeRuntimeSetupA
   return {
     ...createSelectionModeHoverFrameHandlers(args.session),
     createDragFrame: args.createDragFrame,
-    getAbsolutePosition,
+    getAbsolutePosition: (element: HTMLElement) =>
+      args.session.frozenFrame?.geometry.getRect(element) ?? getAbsolutePosition(element),
     getMaxSelectionHeight: args.getMaxSelectionHeight,
     getMaxSelectionWidth: args.getMaxSelectionWidth,
     flushFinalFrameUpdate: args.flushFinalFrameUpdate,

@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAudioRecordingController, type AudioRecordingControllerState } from './controller';
+import type { AudioRecordingTimeline } from '../session-types';
 
 const { getUserMediaMock } = vi.hoisted(() => ({
   getUserMediaMock: vi.fn().mockRejectedValue(new Error('denied')),
@@ -18,12 +19,12 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let latestController: AudioRecordingControllerState | null = null;
 
-function ControllerHarness() {
-  latestController = useAudioRecordingController(true);
+function ControllerHarness(props: { timeline?: AudioRecordingTimeline; limit?: number }) {
+  latestController = useAudioRecordingController(true, false, '', props.timeline, props.limit);
   return null;
 }
 
-async function renderHarness() {
+async function renderHarness(props: { timeline?: AudioRecordingTimeline; limit?: number } = {}) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -31,7 +32,7 @@ async function renderHarness() {
   }
 
   await act(async () => {
-    root?.render(<ControllerHarness />);
+    root?.render(<ControllerHarness {...props} />);
   });
 }
 
@@ -78,6 +79,49 @@ describe('audio-recording-modal/controller', () => {
     expect(latestController?.transport.error).toBe('videoEditor.app.recordAudioPermissionDenied');
     expect(latestController?.transport.status).toBe('idle');
   });
+});
+
+it('uses the optional user cap within the required timeline placement bound', async () => {
+  vi.useFakeTimers();
+  try {
+    const stopped = vi.fn();
+    getUserMediaMock.mockResolvedValueOnce({ getTracks: () => [{ stop: stopped }] });
+    class Recorder extends EventTarget {
+      static isTypeSupported = () => true;
+      state = 'inactive';
+      mimeType = 'audio/webm';
+      start() {
+        this.state = 'recording';
+      }
+      stop() {
+        this.state = 'inactive';
+        const data = new Event('dataavailable');
+        Object.defineProperty(data, 'data', { value: new Blob(['audio']) });
+        this.dispatchEvent(data);
+        this.dispatchEvent(new Event('stop'));
+      }
+    }
+    vi.stubGlobal('MediaRecorder', Recorder);
+    vi.stubGlobal('URL', {
+      createObjectURL: () => 'blob:recording-cap',
+      revokeObjectURL: vi.fn(),
+    });
+    const timeline = {
+      startTime: 2,
+      duration: 8,
+      beforeStart: vi.fn(async () => {}),
+      onStop: vi.fn(),
+    };
+    await renderHarness({ timeline, limit: 1 });
+    await act(async () => latestController?.transport.startRecording());
+    await act(async () => vi.advanceTimersByTime(1200));
+    expect(latestController?.transport.status).toBe('recorded');
+    expect(latestController?.save.trimEnd).toBe(1);
+    expect(stopped).toHaveBeenCalledOnce();
+    expect(timeline.onStop).toHaveBeenCalledOnce();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it('keeps full recorded duration available after narrowing the selected interval', async () => {

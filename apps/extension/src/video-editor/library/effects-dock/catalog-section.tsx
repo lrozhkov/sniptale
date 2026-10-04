@@ -103,17 +103,15 @@ export function CatalogSection(
           aria-label={translate('videoEditor.effectsLibrary.effectV1Label')}
           className="flex min-h-0 flex-1 flex-col"
         >
-          {props.catalogs.length > 0 && (
-            <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] p-2">
-              <EffectCatalogControls
-                themes={themes}
-                hideCategories
-                filter={effectiveFilter}
-                onChange={setFilter}
-                disabled={props.disabled}
-              />
-            </div>
-          )}
+          <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] p-2">
+            <EffectCatalogControls
+              themes={themes}
+              hideCategories
+              filter={effectiveFilter}
+              onChange={setFilter}
+              disabled={props.disabled}
+            />
+          </div>
           {props.kind === 'targetEffect' && (
             <label
               className={[
@@ -123,6 +121,7 @@ export function CatalogSection(
             >
               <span>{translate('videoEditor.effectsLibrary.applyTo')}</span>
               <CompactSelect
+                appearance="plain"
                 value={targetScope}
                 containerClassName="min-w-0 flex-1"
                 aria-label={translate('videoEditor.effectsLibrary.applyTo')}

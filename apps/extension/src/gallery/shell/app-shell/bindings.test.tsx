@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createController, createMediaItem } from '../../library/actions/test-support/index';
+import {
+  createController,
+  createMediaItem,
+  createVideoProjectItem,
+} from '../../library/actions/test-support/index';
 import type { UseGalleryAppActionsResult } from '../../library/actions/useGalleryAppActions.types';
 import type { GalleryViewMode } from '../../state/types';
 import { createLocalBackupSummary } from './backup-export.test-support';
@@ -26,6 +30,9 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 type TestLayoutProps = {
+  onPreviewPresented: (
+    presentation: import('../../library/types').GalleryPreviewPresentation
+  ) => void;
   onAddTag: (tag?: string) => void;
   onApplySelectionTag: (tag?: string) => void;
   onBackupExportConfirm: (options: unknown) => void;
@@ -50,8 +57,10 @@ type TestLayoutProps = {
   onPreviewDelete: (item: unknown) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
   onPreviewOpen: (item: unknown, options?: { inspectorCollapsed?: boolean }) => void;
+  onProjectOpen: (item: unknown) => void;
   onPreviewNavigate: (item: unknown) => void;
   onPreviewPromote: (item: unknown) => Promise<void>;
+  onPreviewRestoreTrash: (item: unknown) => Promise<boolean>;
   onPreviewResetChanges: () => void;
   onRemoveTag: (tag: string) => void;
   onResetFilters: () => void;
@@ -120,6 +129,7 @@ function createActions(): UseGalleryAppActionsResult {
       deleteMany: vi.fn(),
       downloadBackup: vi.fn(async () => undefined),
       downloadZip: vi.fn(async () => undefined),
+      restoreTrash: vi.fn(async () => true),
     },
   };
 }
@@ -325,4 +335,77 @@ it('promotes each supported gallery owner and refreshes the active scope', async
   });
   expect(sendRuntimeMessageMock).toHaveBeenCalledTimes(4);
   expect(controller.actions.storage.refresh).toHaveBeenCalledTimes(4);
+});
+
+it('opens active projects but preserves the Trash navigation restriction', () => {
+  const { actions, controller, layoutProps } = renderBindings();
+  const item = createVideoProjectItem();
+  layoutProps.onProjectOpen(item);
+  expect(actions.preview.openInEditor).toHaveBeenCalledWith(item);
+  vi.mocked(actions.preview.openInEditor).mockClear();
+  controller.state.filters.trashMode = true;
+  layoutProps.onProjectOpen(item);
+  expect(actions.preview.openInEditor).not.toHaveBeenCalled();
+});
+
+it('opens trashed material read-only, navigates without saving, and restores only the current item', async () => {
+  const { actions, controller, getState, layoutProps } = renderBindings();
+  const trashedAt = 42;
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt };
+  const first = createMediaItem({ id: 'deleted-1', lifecycle });
+  const next = createMediaItem({ id: 'deleted-2', lifecycle });
+  controller.state.filters.trashMode = true;
+
+  act(() => {
+    layoutProps.onPreviewOpen(first, { inspectorCollapsed: true });
+  });
+  expect(getState().preview.session.item?.id).toBe('deleted-1');
+  expect(getState().preview.session.inspectorCollapsed).toBe(false);
+
+  act(() => {
+    layoutProps.onPreviewNavigate(next);
+    layoutProps.onPreviewDelete(next);
+    layoutProps.onPreviewOpenSnapshotScreenshot();
+    layoutProps.onPreviewResetChanges();
+    layoutProps.onSelectionBackup();
+    layoutProps.onApplySelectionTag('blocked');
+  });
+  await act(async () => {
+    await layoutProps.onPreviewPromote(next);
+  });
+  expect(getState().preview.session.item?.id).toBe('deleted-2');
+  expect(actions.preview.navigate).not.toHaveBeenCalled();
+  expect(actions.selection.deleteMany).toHaveBeenCalledExactlyOnceWith([next], undefined);
+  expect(actions.preview.openSnapshotScreenshotInEditor).not.toHaveBeenCalled();
+  expect(actions.preview.resetChanges).not.toHaveBeenCalled();
+  expect(actions.selection.downloadBackup).not.toHaveBeenCalled();
+  expect(actions.selection.applyTag).not.toHaveBeenCalled();
+  expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+
+  expect(await layoutProps.onPreviewRestoreTrash(first)).toBe(false);
+  expect(await layoutProps.onPreviewRestoreTrash(next)).toBe(true);
+  expect(actions.selection.restoreTrash).toHaveBeenCalledWith([next]);
+
+  act(() => layoutProps.onPreviewClose());
+  expect(getState().preview.session.item).toBeNull();
+  expect(actions.preview.close).not.toHaveBeenCalled();
+});
+
+it('forwards presentation acknowledgements to the resource owner without rewriting the request', () => {
+  const { controller, layoutProps } = renderBindings();
+  const acknowledgePresented = vi.fn();
+  controller.actions.preview.acknowledgePresented = acknowledgePresented;
+  const presentation = { requestRevision: 4, url: null, outcome: 'terminal' as const };
+  layoutProps.onPreviewPresented(presentation);
+  expect(acknowledgePresented).toHaveBeenCalledExactlyOnceWith(presentation);
+});
+
+it('keeps the active preview open when saving it to the library', async () => {
+  const { controller, layoutProps } = renderBindings();
+  const item = createMediaItem({ id: 'media-promoted' });
+  layoutProps.onPreviewOpen(item);
+  sendRuntimeMessageMock.mockResolvedValue({ result: 'promoted', success: true });
+  await act(async () => layoutProps.onPreviewPromote(item));
+  expect(controller.state.preview.session.item?.id).toBe(item.id);
+  expect(controller.actions.storage.refresh).toHaveBeenCalledOnce();
 });

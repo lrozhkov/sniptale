@@ -1,4 +1,4 @@
-import { Palette, Scaling } from 'lucide-react';
+import { Scaling } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { CompactCommandField, type CompactCommand } from '..';
 import type { InspectorCommandParams } from './command-types';
@@ -29,27 +29,6 @@ function buildFrameModeCommands(params: InspectorCommandParams): CompactCommand[
             options={params.frameLayoutModeOptions}
             value={params.frameDraft.layoutMode}
             onChange={(value) => params.setFrameDraft((state) => ({ ...state, layoutMode: value }))}
-          />
-        </CompactCommandField>
-      ),
-    },
-    {
-      id: 'frame-background-mode',
-      title: translate('editor.compact.backgroundType'),
-      trigger: <Palette size={15} strokeWidth={2} />,
-      value: params.backgroundModeLabel,
-      content: (
-        <CompactCommandField
-          label={translate('editor.compact.backgroundType')}
-          value={params.backgroundModeLabel}
-        >
-          <EditorInspectorFrameModeButtons
-            ariaLabel={translate('editor.compact.backgroundType')}
-            options={params.frameBackgroundModeOptions}
-            value={params.frameDraft.backgroundMode}
-            onChange={(value) =>
-              params.setFrameDraft((state) => ({ ...state, backgroundMode: value }))
-            }
           />
         </CompactCommandField>
       ),

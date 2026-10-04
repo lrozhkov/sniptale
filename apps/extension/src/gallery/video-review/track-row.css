@@ -1,0 +1,28 @@
+[data-review-track-muted='true'] [data-ui='gallery.videoReview.trackHeader'] {
+  background-color: var(--sniptale-color-surface-input);
+}
+[data-review-track-muted='true'] [data-track-label] {
+  color: var(--sniptale-color-text-secondary);
+}
+[data-review-track-muted='true']
+  [data-review-track-content]
+  :is(
+    [data-ui='gallery.videoReview.audioLane'],
+    [data-ui='gallery.videoReview.zoomLane'],
+    [role='button'],
+    [data-audio-id]
+  ) {
+  background-color: var(--sniptale-color-surface-input);
+}
+[data-review-track-muted='true'] [data-review-track-content]::after {
+  content: '';
+  position: absolute;
+  inset: 4px 0 0;
+  pointer-events: none;
+  border-radius: var(--sniptale-radius-sm);
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 7px,
+    color-mix(in srgb, var(--sniptale-color-text-dim) 12%, transparent) 7px 8px
+  );
+}

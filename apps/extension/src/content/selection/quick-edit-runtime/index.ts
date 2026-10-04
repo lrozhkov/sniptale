@@ -13,10 +13,15 @@ import type {
 } from './types';
 
 function createQuickEditStateAccessors(props: {
+  finishEditing: (element: HTMLElement) => void;
   editingElements: Map<string, EditableElement>;
 }): QuickEditRuntimeEditingSurface {
   return {
     getEditingElements: () => props.editingElements,
+    finishPendingChanges: () => {
+      for (const editable of [...props.editingElements.values()])
+        props.finishEditing(editable.element);
+    },
   };
 }
 
@@ -68,6 +73,8 @@ function createQuickEditRuntimeParts(props: {
     ...modeToggles,
     disableDocumentMode: documentMode.disable,
     enableDocumentMode: documentMode.enable,
+    hasPendingDocumentModeChanges: documentMode.hasPendingChanges,
+    finishElementEditing: editingActions.finishEditing,
     isDocumentModeEnabled: documentMode.isEnabled,
   };
 }
@@ -143,6 +150,7 @@ export function createQuickEditRuntimeController(
     }),
   });
   const stateAccessors = createQuickEditStateAccessors({
+    finishEditing: modeToggles.finishElementEditing,
     editingElements,
   });
 
@@ -150,6 +158,7 @@ export function createQuickEditRuntimeController(
     documentMode: {
       enable: modeToggles.enableDocumentMode,
       disable: modeToggles.disableDocumentMode,
+      hasPendingChanges: modeToggles.hasPendingDocumentModeChanges,
       isEnabled: modeToggles.isDocumentModeEnabled,
     },
     editing: stateAccessors,

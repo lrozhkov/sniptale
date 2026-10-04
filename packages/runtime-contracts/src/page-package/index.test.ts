@@ -5,6 +5,11 @@ import {
   isPagePackageMimeType,
   isPagePackageWebCopyAssetMimeType,
   normalizePagePackageWarnings,
+  normalizePagePackageOptionalUrl,
+  MAX_PAGE_PACKAGE_URL_BYTES,
+  MAX_PAGE_PACKAGE_WARNING_BYTES,
+  MAX_PAGE_PACKAGE_WARNINGS_BYTES,
+  MAX_PAGE_PACKAGE_WARNINGS,
   PAGE_PACKAGE_EXTENDED_DIAGNOSTIC_ENTRY_PROFILE,
   parsePageCollectionManifest,
   parsePagePackageManifest,
@@ -327,4 +332,38 @@ describe('Page Collection contract', () => {
       })
     ).toBeNull();
   });
+});
+
+it('bounds optional source URLs by UTF-8 bytes without changing accepted values', () => {
+  const url = 'https://example.test/?q=é';
+  expect(normalizePagePackageOptionalUrl(url)).toBe(url);
+  expect(normalizePagePackageOptionalUrl(null)).toBeNull();
+  expect(normalizePagePackageOptionalUrl(undefined)).toBeNull();
+  expect(
+    normalizePagePackageOptionalUrl('é'.repeat(MAX_PAGE_PACKAGE_URL_BYTES / 2))
+  ).not.toBeNull();
+  expect(
+    normalizePagePackageOptionalUrl('é'.repeat(MAX_PAGE_PACKAGE_URL_BYTES / 2 + 1))
+  ).toBeNull();
+});
+
+it('limits warning count and byte budget independently without splitting Unicode', () => {
+  const many = Array.from({ length: MAX_PAGE_PACKAGE_WARNINGS + 1 }, (_, i) => `warning-${i}`);
+  expect(normalizePagePackageWarnings(many)).toEqual(many.slice(0, MAX_PAGE_PACKAGE_WARNINGS));
+  const large = Array.from(
+    { length: MAX_PAGE_PACKAGE_WARNINGS },
+    (_, i) => `${i.toString().padStart(4, '0')}${'🎬'.repeat(MAX_PAGE_PACKAGE_WARNING_BYTES / 4)}`
+  );
+  const retained = normalizePagePackageWarnings(large);
+  expect(retained).toHaveLength(MAX_PAGE_PACKAGE_WARNINGS_BYTES / MAX_PAGE_PACKAGE_WARNING_BYTES);
+  const encoder = new TextEncoder();
+  expect(
+    retained.every(
+      (warning) => encoder.encode(warning).byteLength === MAX_PAGE_PACKAGE_WARNING_BYTES
+    )
+  ).toBe(true);
+  expect(retained.every((warning) => warning.endsWith('🎬'))).toBe(true);
+  expect(retained.reduce((total, warning) => total + encoder.encode(warning).byteLength, 0)).toBe(
+    MAX_PAGE_PACKAGE_WARNINGS_BYTES
+  );
 });

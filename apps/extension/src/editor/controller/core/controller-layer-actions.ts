@@ -6,6 +6,8 @@ import {
   applyLayerEffectForController,
   applyLayerTransformationForController,
   mergeSelectedLayersForController,
+  groupSelectedLayersForController,
+  ungroupSelectedLayersForController,
   previewLayerEffectForController,
   removeLayerEffectForController,
   renameLayerForController,
@@ -50,6 +52,14 @@ export abstract class ImageEditorControllerLayerActions extends ImageEditorContr
 
   async mergeSelectedLayers() {
     await mergeSelectedLayersForController(this.getControllerInstance());
+  }
+
+  groupSelectedLayers() {
+    return groupSelectedLayersForController(this.getControllerInstance());
+  }
+
+  ungroupSelectedLayers() {
+    return ungroupSelectedLayersForController(this.getControllerInstance());
   }
 
   async applyLayerEffect(id: string, effect: EditorRasterEffect) {

@@ -12,6 +12,8 @@ import {
   SCENARIO_VISUAL_VIEWPORTS,
 } from './scenario-editor-visual.helpers';
 import {
+  insertGuideBlock,
+  openGuideImageLibrary,
   verifyImageImport,
   verifySavedVersionHistory,
   verifyResourceRetention,
@@ -50,7 +52,7 @@ test('guide navigation and edits survive a real local save and reopen', async ({
   hostOrigin,
 }) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await verifyStepNavigation(page);
   await verifySaveAndReopen(page);
   await assertVisualAcceptance(page);
@@ -62,7 +64,7 @@ test('workspace navigation preserves field focus and primary actions at enlarged
   hostOrigin,
 }) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1024, height: 640 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await verifyWorkspacePanelsAndFocus(page);
   issues.assertClean();
 });
@@ -72,7 +74,7 @@ test('project copies preserve unsaved content and images after deleting the orig
   hostOrigin,
 }) => {
   const issues = createPageIssueCollector(page);
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
   await verifyIndependentProjectCopy(page);
   issues.assertClean();
 });
@@ -105,7 +107,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     await verifyImageFraming(page, testInfo);
     issues.assertClean();
   });
@@ -122,7 +124,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       width: 1280,
       height: 900,
     });
-    await verifyImageEditorRoundtrip(page, testInfo);
+    await verifyImageEditorRoundtrip(page, testInfo, () =>
+      page.evaluate(() => chrome.downloads.search({}))
+    );
     issues.assertClean();
   });
 }
@@ -143,7 +147,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     await verifyGuideAppearance(page, testInfo);
     issues.assertClean();
   });
@@ -153,7 +157,7 @@ test('panel headers close panels and transparent dividers resize the workspace',
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 900 });
   const header = page.locator('.guide-page-header');
   expect((await header.boundingBox())?.height).toBeLessThanOrEqual(52);
   expect((await page.locator('.guide-project-name').boundingBox())?.width).toBeLessThan(
@@ -183,7 +187,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 768 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     const trigger = page.locator('.guide-page-header .guide-action-menu-anchor button');
     await trigger.focus();
     await page.keyboard.press('ArrowDown');
@@ -195,7 +199,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toBeFocused();
     const box = await menu.boundingBox();
     expect(box?.width).toBeLessThanOrEqual(240);
-    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1024);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1280);
     await testInfo.attach(`project-menu-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
@@ -210,7 +214,7 @@ test('document text fits its content while wrapping and resizing', async ({
   page,
   hostOrigin,
 }, testInfo) => {
-  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1024, height: 768 });
+  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 560 });
   const title = page.locator('article#compare > header :is(input, textarea)');
   await title.fill(
     'A long step title that should wrap naturally across the document without hiding its ending'
@@ -229,7 +233,7 @@ test('document text fits its content while wrapping and resizing', async ({
     contentType: 'image/png',
   });
   const narrowHeight = await body.evaluate((field) => field.clientHeight);
-  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.setViewportSize({ width: 1920, height: 900 });
   await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(narrowHeight);
   await body.fill('Short explanation.');
   await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(50);
@@ -263,7 +267,7 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await expect(miniButton).toHaveCSS('background-color', buttonSurface);
   const insertion = page
     .locator('article#compare [data-insert-before="before"]')
-    .getByRole('button', { name: 'Heading', exact: true });
+    .locator('.guide-insert-anchor > button');
   await expect(insertion).toHaveCount(1);
   await insertion.focus();
   await expect(insertion.locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -271,7 +275,11 @@ test('document tools are contextual and leave image geometry unchanged', async (
     body: await page.screenshot(),
     contentType: 'image/png',
   });
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page
+    .locator('.guide-action-menu--insert')
+    .getByRole('button', { name: 'Heading', exact: true })
+    .click();
 
   const heading = page.locator('article#compare .guide-block-heading');
   await expect(heading).toBeFocused();
@@ -286,12 +294,17 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await expect(heading).toHaveCount(0);
   await page
     .locator('.guide-insertion-item[data-insert-before="compare"]')
-    .getByRole('button', { name: 'Add step', exact: true })
+    .locator('.guide-insert-anchor > button')
     .focus();
-  await page.keyboard.press('Enter');
+  await page.keyboard.press('ArrowDown');
+  await page
+    .locator('.guide-action-menu--insert')
+    .getByRole('button', { name: 'Add step', exact: true })
+    .click();
 
-  const insertedTitle = page.locator('.guide-step-title:focus');
-  await expect(insertedTitle).toHaveCount(1);
+  const inserted = page.locator('article').first();
+  await expect(inserted.locator('.guide-description')).toBeFocused();
+  const insertedTitle = inserted.locator('.guide-step-title');
   await insertedTitle.fill('Inserted before the illustrated step');
   await expect(page.locator('article').first().locator('.guide-step-title')).toHaveValue(
     'Inserted before the illustrated step'
@@ -314,11 +327,7 @@ test('resources open in a wide drawer and return focus to their inspector', asyn
 }, testInfo) => {
   await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
-  const trigger = page
-    .locator('#guide-library-panel')
-    .getByRole('button', { name: 'Image library', exact: true });
-  await expect(trigger).toBeVisible();
-  await trigger.click();
+  const trigger = await openGuideImageLibrary(page);
   const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
   await expect(drawer).toBeVisible();
   expect((await drawer.boundingBox())?.width).toBeGreaterThan(900);
@@ -328,10 +337,10 @@ test('resources open in a wide drawer and return focus to their inspector', asyn
   await expect(drawer.getByRole('navigation', { name: 'Library sections' })).toBeVisible();
   await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
   await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
-  await page.setViewportSize({ width: 640, height: 720 });
+  await page.setViewportSize({ width: 1280, height: 560 });
   const box = await drawer.boundingBox();
   expect(box?.x).toBeGreaterThanOrEqual(0);
-  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(640);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1280);
   await testInfo.attach('resources-drawer-narrow', {
     body: await page.screenshot(),
     contentType: 'image/png',
@@ -377,7 +386,9 @@ test('workspace has three aligned surface headers and restores panels by section
   await expect(center.getByRole('button', { name: 'Outline', exact: true })).toBeVisible();
   await center.getByRole('button', { name: 'Resources', exact: true }).click();
   await expect(
-    page.locator('#guide-library-panel').getByRole('button', { name: 'Image library', exact: true })
+    page.locator(
+      '#guide-library-panel .guide-image-upload-compact .guide-action-menu-anchor > button'
+    )
   ).toBeVisible();
   await expect(center.getByRole('button', { name: 'Resources', exact: true })).toHaveCount(0);
   await page
@@ -422,17 +433,17 @@ test('inline text highlights its own rounded edge and hides empty placeholders o
   ).toBe('1');
 });
 
-test('project title expands within the center and history sits beside the outer menu', async ({
+test('project title uses the center and history sits beside the outer menu', async ({
   page,
   hostOrigin,
 }) => {
-  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 900 });
   const header = page.locator('.guide-page-header');
   const title = header.locator('input');
   const before = (await title.boundingBox())!.width;
   await title.focus();
   expect(await title.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('none');
-  expect((await title.boundingBox())!.width).toBeGreaterThan(before);
+  expect((await title.boundingBox())!.width).toBeCloseTo(before, 0);
   const menu = header.locator('.guide-action-menu-anchor');
   const redo = header.getByRole('button', { name: 'Redo', exact: true });
   expect((await menu.boundingBox())!.x).toBeGreaterThan((await redo.boundingBox())!.x);
@@ -460,11 +471,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     };
     const step = page.locator('article#compare');
     const count = await step.locator('.guide-block').count();
-    const add = step
-      .locator('.guide-insertion-block[data-end="true"]')
-      .getByRole('button', { name: 'Image', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Image');
     const slot = step.locator('[data-kind="image-slot"]');
     await expect(slot.getByRole('button', { name: 'Upload image', exact: true })).toBeFocused();
     const id = await slot.getAttribute('data-block-id');
@@ -555,11 +562,7 @@ test('image drops append, replace and fill slots with one Undo per gesture', asy
   );
   await undo.click();
   await expect(image.locator('img')).toHaveAttribute('src', original!);
-  const add = step
-    .locator('.guide-insertion-block[data-end="true"]')
-    .getByRole('button', { name: 'Image', exact: true });
-  await add.focus();
-  await add.click();
+  await insertGuideBlock(page, step, 'Image');
   const slot = step.locator('[data-kind="image-slot"]');
   const slotId = await slot.getAttribute('data-block-id');
   await resource.dragTo(slot.getByRole('button', { name: 'Upload image', exact: true }));
@@ -601,11 +604,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
     const step = page.locator('article#compare');
     const count = await step.locator('.guide-block').count();
-    const add = step
-      .locator('.guide-insertion-block[data-end="true"]')
-      .getByRole('button', { name: 'Image', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Image');
     const slot = step.locator('[data-kind="image-slot"]');
     const id = await slot.getAttribute('data-block-id');
     const trigger = slot.getByRole('button', { name: 'Image library', exact: true });
@@ -665,9 +664,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   }, testInfo) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1440, height: 1000 });
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
-    const trigger = page
-      .locator('.guide-library-panel')
-      .getByRole('button', { name: 'Image library', exact: true });
+    const trigger = page.locator(
+      '#guide-library-panel .guide-image-upload-compact .guide-action-menu-anchor > button'
+    );
     const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
     const card = drawer.getByRole('button', { name: 'Library screenshot.png', exact: true });
     const dragToDocument = async (target: Locator) => {
@@ -679,7 +678,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const empty = page.locator('article#text-only');
     const initial = await empty.locator('.guide-block').count();
     await empty.scrollIntoViewIfNeeded();
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(empty.locator('.guide-step-title'));
     await expect(drawer).toHaveCount(0);
     await expect(empty.locator('.guide-block')).toHaveCount(initial + 1);
@@ -691,21 +690,17 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const existing = step.locator('[data-block-id="before"]');
     const caption = await existing.locator('figcaption').textContent();
     await existing.scrollIntoViewIfNeeded();
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(existing.locator('img'));
     await expect(drawer).toHaveCount(0);
     await expect(step.locator('.guide-block')).toHaveCount(count);
     await expect(existing.locator('figcaption')).toHaveText(caption ?? '');
     await expect(page.getByRole('status').first()).toHaveText('Saved');
     await undo.click();
-    const add = step
-      .locator('.guide-insertion-block[data-end="true"]')
-      .getByRole('button', { name: 'Image', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Image');
     const slot = step.locator('[data-kind="image-slot"]');
     await slot.scrollIntoViewIfNeeded();
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(slot);
     await expect(drawer).toHaveCount(0);
     await expect(slot).toHaveCount(0);
@@ -714,7 +709,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(slot).toHaveCount(1);
     await undo.click();
     await expect(step.locator('.guide-block')).toHaveCount(count);
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await card.hover();
     const point = await card.boundingBox();
     if (!point) throw new Error('Missing library card');
@@ -733,7 +728,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(drawer).toHaveCount(0);
     await expect(trigger).toBeFocused();
     await expect(step.locator('.guide-block')).toHaveCount(count);
-    await trigger.click();
+    await openGuideImageLibrary(page);
     await dragToDocument(page.locator('.guide-page-header'));
     await expect(drawer).toHaveCount(0);
     await expect(step.locator('.guide-block')).toHaveCount(count);
@@ -747,7 +742,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const step = page.locator('article#compare');
     const first = step.locator('[data-block-id="before"]');
     const second = step.locator('[data-block-id="after"]');
@@ -779,7 +774,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.keyboard.press('Enter');
     await page.keyboard.press('Enter');
     await expect(first).toHaveAttribute('data-width', '50');
-    await page.setViewportSize({ width: 1024, height: 900 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const narrowFirst = await first.boundingBox();
     const narrowSecond = await second.boundingBox();
     expect(
@@ -802,7 +797,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const step = page.locator('article#compare');
     const blocks = step.locator('.guide-block');
     const order = () =>
@@ -885,16 +880,11 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       hostOrigin,
       theme,
       'en',
-      { width: 1920, height: 1080 },
+      { width: 1920, height: 900 },
       'text-only'
     );
     const step = page.locator('article#text-only');
-    const add = step
-      .locator('.guide-insertion-block')
-      .last()
-      .getByRole('button', { name: 'Note', exact: true });
-    await add.focus();
-    await add.click();
+    await insertGuideBlock(page, step, 'Note');
     const block = step
       .locator('.guide-block')
       .filter({ has: page.locator('.guide-note-callout') })
@@ -963,18 +953,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 560 });
     const step = page.locator('article#text-only');
     for (const [command, kind] of [
       ['Text', 'text'],
       ['Heading', 'heading'],
       ['Note', 'note'],
     ] as const) {
-      const add = step
-        .locator('.guide-insertion-block[data-end="true"]')
-        .getByRole('button', { name: command, exact: true });
-      await add.focus();
-      await add.click();
+      await insertGuideBlock(page, step, command);
       const block = step.locator(`.guide-block[data-kind="${kind}"]`).last();
       const field = block.getByRole('textbox').first();
       await field.fill(`Visible ${kind} content`);
@@ -996,7 +982,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       const actionBox = await block.locator('.guide-block-actions button').first().boundingBox();
       if (!widthBox || !actionBox) throw new Error('Missing block controls');
       expect(widthBox.x).toBeGreaterThanOrEqual(box.x + box.width);
-      expect(widthBox.x + widthBox.width).toBeLessThanOrEqual(1024);
+      expect(widthBox.x + widthBox.width).toBeLessThanOrEqual(1280);
       expect(
         Math.abs(widthBox.y + widthBox.height / 2 - handle.y - handle.height / 2)
       ).toBeLessThan(1);
@@ -1005,7 +991,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       ).toBeLessThan(1);
       expect(widthBox.width).toBe(widthBox.height);
       expect(await widthControl.evaluate((node) => getComputedStyle(node).borderRadius)).toBe(
-        '50%'
+        await grip.evaluate((node) => getComputedStyle(node).borderRadius)
       );
       await page.mouse.move((box.x + box.width + widthBox.x) / 2, widthBox.y + widthBox.height / 2);
       expect(await widthControl.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
@@ -1025,12 +1011,12 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
 }
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
-  test(`dictation controls stay outside text and block actions in ${theme}`, async ({
+  test(`dictation controls overlay prose beside block actions in ${theme}`, async ({
     page,
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 900 });
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 560 });
     const field = page.locator('article#compare textarea.guide-description').first();
     await field.focus();
     const wrapper = field.locator('..');
@@ -1047,21 +1033,25 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .querySelector('.guide-block-actions')!
         .getBoundingClientRect();
       return {
-        contentRight: text.right - parseFloat(getComputedStyle(node).paddingRight),
+        paddingRight: parseFloat(getComputedStyle(node).paddingRight),
+        paddingLeft: parseFloat(getComputedStyle(node).paddingLeft),
+        contentTop: text.top,
+        micTop: mic.top,
         micLeft: mic.left,
         micRight: mic.right,
         actionsLeft: actions.left,
       };
     });
-    expect(geometry.contentRight).toBeLessThanOrEqual(geometry.micLeft);
+    expect(geometry.paddingRight).toBe(geometry.paddingLeft);
+    expect(geometry.micTop - geometry.contentTop).toBeLessThanOrEqual(6);
     expect(geometry.micRight).toBeLessThanOrEqual(geometry.actionsLeft);
     await expect(field).toBeFocused();
     await testInfo.attach(`dictation-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.setViewportSize({ width: 1024, height: 640 });
-    // At this width the existing inspector is an overlay; dismiss it before editing.
+    await page.setViewportSize({ width: 1280, height: 560 });
+    // Dismissing the inspector keeps the same overlay geometry at the supported minimum.
     await page.locator('.guide-inspector-panel .guide-panel-heading button').first().click();
     await field.focus();
     await microphone.click({ trial: true, timeout: 5000 });
@@ -1086,10 +1076,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     url.searchParams.set('videoFixture', '1');
     await page.goto(url.toString());
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
-    await page
-      .locator('#guide-library-panel')
-      .getByRole('button', { name: 'Image library', exact: true })
-      .click();
+    await openGuideImageLibrary(page);
     const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
     await expect(drawer.locator('input[type="file"]')).toHaveCount(0);
     await expect(
@@ -1097,15 +1084,15 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     ).toHaveCount(0);
     await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
     await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
-    const widths = await drawer.evaluate((node) => ({
-      grid: node.querySelector('.guide-library-content')!.getBoundingClientRect().width,
-      preview: node.querySelector('.guide-library-preview')!.getBoundingClientRect().width,
-      columns: getComputedStyle(
-        node.querySelector('.guide-library-grid')!
-      ).gridTemplateColumns.split(' ').length,
-    }));
-    expect(widths.preview).toBeGreaterThan(widths.grid);
-    expect(widths.columns).toBe(3);
+    const list = drawer.locator('[data-ui="library-materials-list"]');
+    await expect(list).toHaveAttribute('data-layout', 'strip');
+    const preview = drawer.locator('[data-ui="library-material-preview"]');
+    const listBounds = await list.boundingBox();
+    const previewBounds = await preview.boundingBox();
+    expect(listBounds && previewBounds && previewBounds.y >= listBounds.y + listBounds.height).toBe(
+      true
+    );
+    expect(previewBounds?.height).toBeGreaterThan(listBounds?.height ?? 0);
     await drawer.getByRole('button', { name: 'Video', exact: true }).click();
     await drawer.getByRole('button', { name: 'Library motion.webm', exact: true }).click();
     const video = drawer.locator('video');
@@ -1130,7 +1117,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(
       drawer.getByRole('button', { name: 'Add frame as step', exact: true })
     ).toBeEnabled();
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await drawer
       .getByRole('button', { name: 'Add frame as step', exact: true })
       .click({ trial: true, timeout: 5000 });
@@ -1170,6 +1157,7 @@ test('shared library navigation stays aligned in the built video editor', async 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/video-editor/index.html`);
   await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'en' }));
+  await page.getByRole('button', { name: 'New project', exact: true }).click();
   await expect(page.locator('[data-ui="video-editor.materials.library"]')).toBeVisible();
   await expectLibraryDrawerPlacement(page);
   await page.locator('[data-ui="video-editor.materials.library"]').click();
@@ -1191,8 +1179,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await rightDivider.focus();
     for (let i = 0; i < 15; i++) await page.keyboard.press('ArrowRight');
     await expect(rightDivider).toHaveAttribute('aria-valuenow', '260');
-    await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
-    await page.getByRole('button', { name: 'Оформление сценария', exact: true }).click();
+    await page
+      .locator('.guide-page-header')
+      .getByRole('button', { name: 'Оформление', exact: true })
+      .click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(
       inspector.getByRole('heading', { name: 'Весь сценарий', exact: true })
@@ -1371,3 +1361,130 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     issues.assertClean();
   });
 }
+
+for (const [theme, locale] of [
+  ['light', 'en'],
+  ['dark', 'ru'],
+] as const) {
+  test(`save feedback preserves header geometry and recovers in ${theme} ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
+    const header = page.locator('.guide-page-header');
+    const title = header.locator('.guide-project-name input');
+    const feedback = page.locator('.guide-page-feedback');
+    const autosave = header.locator('[data-ui="autosave-control"] button');
+    const original = await header.boundingBox();
+    await page.evaluate(() => {
+      const put = IDBObjectStore.prototype.put;
+      IDBObjectStore.prototype.put = function (...args) {
+        if (this.name === 'scenario_projects')
+          throw new DOMException('test quota', 'QuotaExceededError');
+        return put.apply(this, args);
+      };
+      window.addEventListener(
+        'b13-restore-store',
+        () => {
+          IDBObjectStore.prototype.put = put;
+        },
+        { once: true }
+      );
+    });
+    try {
+      await title.fill(locale === 'en' ? 'Recoverable guide edits' : 'Восстанавливаемые изменения');
+      await title.press('Tab');
+      await expect(feedback).toBeVisible();
+      await expect(feedback).toHaveAttribute('data-status', 'failed');
+      await expect(feedback.getByRole('alert')).toHaveCount(1);
+      await expect(header.locator('.guide-page-feedback')).toHaveCount(0);
+      await expect(autosave).toHaveAttribute('aria-expanded', 'false');
+      const failed = await header.boundingBox();
+      expect(failed?.y).toBe(original?.y);
+      expect(failed?.height).toBe(original?.height);
+      const retry = feedback.getByRole('button', {
+        name: locale === 'en' ? 'Retry' : 'Повторить',
+        exact: true,
+      });
+      await retry.click();
+      await expect(feedback).toHaveAttribute('data-status', 'failed');
+      await expect(feedback.getByRole('alert')).toHaveCount(1);
+      for (const width of [1280, 1920]) {
+        await page.setViewportSize({ width, height: width === 1920 ? 900 : 560 });
+        const nameBox = await title.boundingBox();
+        const actions = await header.locator('.guide-header-actions').boundingBox();
+        expect(nameBox).not.toBeNull();
+        expect(actions).not.toBeNull();
+        expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(actions!.x + 1);
+        await expect(retry).toBeInViewport();
+        await page.screenshot({ path: `.tmp/backlog7/b13-feedback-${theme}-${width}.png` });
+      }
+    } finally {
+      await page.evaluate(() => window.dispatchEvent(new Event('b13-restore-store')));
+    }
+    await feedback
+      .getByRole('button', { name: locale === 'en' ? 'Retry' : 'Повторить', exact: true })
+      .click();
+    await expect(feedback).toHaveCount(0);
+    await expect(autosave).toHaveAttribute('aria-label', /Saved|Сохранено/u);
+    await page.reload();
+    await expect(title).toHaveValue(
+      locale === 'en' ? 'Recoverable guide edits' : 'Восстанавливаемые изменения'
+    );
+    await expect(feedback).toHaveCount(0);
+  });
+}
+
+test('below HD the editor keeps its layout and scrolls horizontally to controls', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 560 });
+  const viewport = page.locator('.guide-editor-viewport');
+  const surface = page.locator('.guide-page');
+  const inspector = page.locator('#guide-inspector-panel');
+  const widths = async () => ({
+    surface: (await surface.boundingBox())!.width,
+    inspector: (await inspector.boundingBox())!.width,
+    center: (await page.locator('.guide-center-panel').boundingBox())!.width,
+  });
+  const hd = await widths();
+  for (const width of [1281, 1280, 1279, 1024, 800]) {
+    await page.setViewportSize({ width, height: 560 });
+    if (width <= 1280) expect(await widths()).toEqual(hd);
+    else expect((await widths()).surface).toBe(width);
+    await expect(inspector).not.toHaveCSS('position', 'absolute');
+    await expect(page.getByRole('separator', { name: 'Inspector', exact: true })).toBeVisible();
+    await viewport.evaluate((node) => {
+      node.scrollLeft = node.scrollWidth;
+    });
+    const scrollLeft = await viewport.evaluate((node) => node.scrollLeft);
+    if (width < 1280) expect(scrollLeft).toBeGreaterThan(0);
+    else expect(scrollLeft).toBe(0);
+    const showAll = inspector.getByRole('button', { name: 'Show all settings', exact: true });
+    await showAll.click();
+    await inspector.getByRole('button', { name: 'Show settings sections', exact: true }).click();
+    await viewport.evaluate((node) => {
+      node.scrollLeft = 0;
+    });
+    expect(await viewport.evaluate((node) => node.scrollLeft)).toBe(0);
+  }
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+  await page.getByRole('button', { name: 'Delete project', exact: true }).click();
+  const cancel = page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true });
+  await expect(cancel).toBeInViewport();
+  await cancel.click();
+  await page.screenshot({ path: '.tmp/backlog7/b14-minimum-viewport.png', fullPage: false });
+  await page.setViewportSize({ width: 800, height: 560 });
+  await page.getByRole('button', { name: 'Export', exact: true }).click();
+  await expect(page.locator('.guide-export-workspace')).toHaveCSS('min-width', '1280px');
+  await viewport.evaluate((node) => {
+    node.scrollLeft = node.scrollWidth;
+  });
+  await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
+  await expect(page.locator('.guide-print')).toHaveCSS('min-width', '1280px');
+  await page.emulateMedia({ media: 'print' });
+  await expect(viewport).toHaveCSS('overflow', 'visible');
+  await expect(page.locator('.guide-print')).toHaveCSS('min-width', '0px');
+});

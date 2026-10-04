@@ -1,4 +1,6 @@
 import { projectReviewVoiceover } from '../voiceover-edits';
+import { projectReviewFocus } from '../focus-edits';
+import { reviewVisibleEditBoundaries } from '../timeline';
 import type { ReviewDocument } from '../types';
 import type {
   QuickEditAdvancedState,
@@ -68,8 +70,9 @@ export function resolveQuickEditEffectiveState(
   const features = resolveQuickEditEffectiveFeatures(state);
   return {
     ...features,
-    zoomRegions: (features.zoomApplied ? state.zoom.regions : []).filter(
-      (region) => !region.dormant
+    zoomRegions: projectReviewFocus(
+      features.zoomApplied ? state.zoom.regions : [],
+      state.audio.voiceoverSegments
     ),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
@@ -85,6 +88,10 @@ export function resolveQuickEditEffectiveState(
       })),
     music: (features.musicApplied ? state.audio.music : [])
       .filter((clip) => !clip.dormant)
+      .filter((clip) => {
+        const last = state.audio.voiceoverSegments?.at(-1);
+        return !last || clip.timelineStart < last.resultEnd;
+      })
       .map((clip) => ({ ...clip, volume: clip.volume * (state.audio.laneVolumes?.music ?? 1) })),
   };
 }
@@ -92,6 +99,8 @@ export function resolveQuickEditEffectiveState(
 export type QuickEditExportReason =
   | 'canvas'
   | 'precise-edits'
+  | 'cut-transition'
+  | 'transition-frames'
   | 'zoom'
   | 'background'
   | 'comments'
@@ -125,34 +134,39 @@ export function resolveQuickEditExportPlan(args: {
 }): QuickEditExportPlan {
   const preciseEdits =
     args.videoCopyBoundaries !== undefined &&
-    args.document.edits.some((edit) =>
-      [edit.start, edit.end].some(
-        (time) =>
-          !args.videoCopyBoundaries!.some((boundary) => Math.abs(boundary - time) < 0.000001)
-      )
+    reviewVisibleEditBoundaries(args.document.edits).some(
+      (time) => !args.videoCopyBoundaries!.some((boundary) => Math.abs(boundary - time) < 0.000001)
     );
+  const transitions = args.document.edits.some((edit) => edit.kind === 'cut' && edit.transition);
+  const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
+  if (transitions) visual.push('cut-transition');
   if (args.advanced.ui.mode !== 'advanced') {
-    if (preciseEdits)
+    if (visual.length)
       return args.videoRenderAvailable === false
         ? { kind: 'unavailable', reasons: ['video-encoder'] }
-        : { kind: 'ready', video: 'render', audio: 'copy', reasons: ['precise-edits'] };
+        : { kind: 'ready', video: 'render', audio: 'copy', reasons: visual };
     return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
   }
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
+  const effective = resolveQuickEditEffectiveState(args.advanced);
   const audio: QuickEditExportReason[] = [];
-  if (features.voiceoverApplied && args.advanced.audio.voiceover.length > 0)
-    audio.push('voiceover');
-  if (features.musicApplied && args.advanced.audio.music.length > 0) audio.push('music');
+  if (features.voiceoverApplied && effective.voiceover.length > 0) audio.push('voiceover');
+  if (features.musicApplied && effective.music.length > 0) audio.push('music');
   if (
     args.advanced.audio.original.muted ||
     args.advanced.audio.original.volume !== 1 ||
-    args.advanced.audio.original.ranges?.length
+    args.advanced.audio.original.ranges?.some(
+      (range) =>
+        !args.advanced.audio.voiceoverSegments ||
+        args.advanced.audio.voiceoverSegments.some(
+          (part) =>
+            part.kind !== 'cut' && range.start < part.sourceEnd && range.end > part.sourceStart
+        )
+    )
   )
     audio.push('original-audio');
-  const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (args.advanced.canvas) visual.push('canvas');
-  if (features.zoomApplied && args.advanced.zoom.regions.some((region) => !region.dormant))
-    visual.push('zoom');
+  if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
   if (
     features.overlaysVisible &&

@@ -13,6 +13,7 @@ export interface CompactPaintSelectorProps extends Omit<
   'createId'
 > {
   className?: string;
+  triggerVariant?: 'default' | 'swatch';
   disabled?: boolean;
   allowedModes?: readonly ('solid' | GradientType)[];
   label: string;

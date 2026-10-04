@@ -4,11 +4,14 @@ import {
   type SettingsTransferDomainPayload,
 } from '../../contracts/settings-transfer';
 import { SYSTEM_GRADIENT_PRESETS } from '../../composition/persistence/gradient-presets/defaults';
+import { createDefaultGradientPresetCatalog } from '../../composition/persistence/gradient-presets/defaults';
 import { createSurfaceStylePresetCatalog } from '../../composition/persistence/surface-style-presets/catalog';
 import { serializeSurfaceStylePresetCatalog } from '../../composition/persistence/surface-style-presets/parser';
 import { parseSettingsTransferDomains } from './domain-parser';
 import { buildSettingsTransferPackage } from './package';
 import { buildSettingsTransferTree } from './tree';
+import { planSettingsTransfer } from './planner';
+import { assertDurableSettingsTransferCatalogs } from './durable-catalogs';
 
 describe('settings transfer style selection', () => {
   it('keeps a complete surface catalog valid during commit revalidation', () => {
@@ -133,5 +136,147 @@ describe('settings transfer style selection', () => {
     expect(built.package.domains['styles.tool-presets']?.data).toEqual({
       step: { defaultPresetId: 'step-a', presets: [{ id: 'step-a', name: 'Step A' }] },
     });
+  });
+});
+
+describe('settings transfer style catalog validation', () => {
+  it.each([
+    ['styles.surfaces', { defaultPresetIdBySurface: { unknown: 'preset-a' } }],
+    [
+      'styles.surfaces',
+      { favoriteIdsBySurface: { 'highlighter-callout': ['preset-a', 'preset-a'] } },
+    ],
+    ['styles.gradients', { defaultPresetIdBySurface: { unknown: 'preset-a' } }],
+    ['styles.gradients', { favoriteIdsBySurface: { 'highlighter-frame-fill': [42] } }],
+  ])('rejects malformed partial %s defaults before import', (domainId, data) => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        [domainId]: { schemaVersion: 1, data: cloneSettingsTransferJsonValue(data) },
+      })
+    ).toThrow();
+  });
+
+  it.each([{ tags: null }, { activeFilterTagIds: null }, { schemaVersion: null }])(
+    'rejects a present malformed tag field before restore: %j',
+    (data) => {
+      expect(() =>
+        parseSettingsTransferDomains({
+          'styles.tags': { schemaVersion: 1, data: cloneSettingsTransferJsonValue(data) },
+        })
+      ).toThrow();
+    }
+  );
+
+  it('rejects a present malformed editor palette before import', () => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        'styles.tool-presets': { schemaVersion: 1, data: { palette: { sceneBackground: 42 } } },
+      })
+    ).toThrow();
+  });
+
+  it('applies selected serialized surface defaults to the normalized catalog', () => {
+    const stored = serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog());
+    const alternate = stored.presets.find(
+      (preset) =>
+        preset.enabled && preset.id !== stored.defaultPresetIdBySurface['highlighter-callout']
+    );
+    expect(alternate).toBeDefined();
+    const current = parseSettingsTransferDomains({
+      'styles.surfaces': { schemaVersion: 1, data: cloneSettingsTransferJsonValue(stored) },
+    });
+    const imported = parseSettingsTransferDomains({
+      'styles.surfaces': {
+        schemaVersion: 1,
+        data: {
+          defaultPresetIdBySurface: { 'highlighter-callout': alternate!.id },
+          favoriteIdsBySurface: { 'highlighter-callout': [alternate!.id] },
+        },
+      },
+    });
+    const plan = planSettingsTransfer({ current, imported, strategy: 'safe-merge' });
+    const merged = parseSettingsTransferDomains({
+      'styles.surfaces': plan.domains['styles.surfaces']!,
+    });
+    expect(() => assertDurableSettingsTransferCatalogs(merged)).not.toThrow();
+    expect(merged['styles.surfaces']?.data).toMatchObject({
+      defaultPresetId: alternate!.id,
+      favoriteIds: [alternate!.id],
+    });
+  });
+
+  it.each([
+    [
+      'styles.gradients',
+      {
+        ...createDefaultGradientPresetCatalog(),
+        favoriteIdsBySurface: { 'highlighter-frame-fill': ['missing'] },
+      },
+    ],
+    [
+      'styles.surfaces',
+      {
+        ...serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog()),
+        favoriteIdsBySurface: { 'highlighter-callout': ['missing'] },
+      },
+    ],
+  ])('rejects unknown favorites in a complete %s catalog', (domainId, data) => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        [domainId]: { schemaVersion: 1, data: cloneSettingsTransferJsonValue(data) },
+      })
+    ).toThrow();
+  });
+
+  it('accepts an owner-supported legacy gradient catalog without favorites', () => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        'styles.gradients': { schemaVersion: 1, data: { revision: 0, presets: [] } },
+      })
+    ).not.toThrow();
+  });
+
+  it.each([
+    [
+      'styles.gradients',
+      {
+        ...createDefaultGradientPresetCatalog(),
+        favoriteIdsBySurface: { futureSurface: [SYSTEM_GRADIENT_PRESETS[0]!.id] },
+      },
+    ],
+    [
+      'styles.gradients',
+      {
+        ...createDefaultGradientPresetCatalog(),
+        defaultPresetIdBySurface: {
+          'highlighter-frame-fill': SYSTEM_GRADIENT_PRESETS[0]!.id,
+          futureSurface: SYSTEM_GRADIENT_PRESETS[0]!.id,
+        },
+      },
+    ],
+    [
+      'styles.surfaces',
+      {
+        ...serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog()),
+        favoriteIdsBySurface: { futureSurface: [] },
+      },
+    ],
+    [
+      'styles.surfaces',
+      {
+        ...serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog()),
+        defaultPresetIdBySurface: {
+          ...serializeSurfaceStylePresetCatalog(createSurfaceStylePresetCatalog())
+            .defaultPresetIdBySurface,
+          futureSurface: 'system-surface-plain',
+        },
+      },
+    ],
+  ])('rejects unknown surfaces in a complete %s catalog', (domainId, data) => {
+    expect(() =>
+      parseSettingsTransferDomains({
+        [domainId]: { schemaVersion: 1, data: cloneSettingsTransferJsonValue(data) },
+      })
+    ).toThrow();
   });
 });

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   assertAdmission: vi.fn(),
   discard: vi.fn(),
+  initDB: vi.fn(async () => ({ get: vi.fn(async () => undefined) })),
   preparePublication: vi.fn(),
   publishJournal: vi.fn(),
   publishWithRetry: vi.fn(),
@@ -26,6 +27,11 @@ vi.mock('./asset-publication', async (importOriginal) => ({
   publishRecordingAssetJournal: mocks.publishJournal,
   RECORDING_ASSET_PUBLICATION_DOMAIN: 'recording-assets',
   recoverRecordingAssetPublications: mocks.recover,
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: mocks.initDB,
 }));
 
 import { saveRecordingsBatch, saveRecordingsBatchWithCompletion } from './batch';
@@ -68,6 +74,12 @@ describe('recording asset publication', () => {
         id: 'video-1',
         blob: new Blob(['video'], { type: 'video/webm' }),
         filename: '1.webm',
+        recordingMetadata: {
+          captureMode: 'SCREEN',
+          displaySurface: 'window',
+          actionCount: 4,
+          hasPointer: true,
+        },
         mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
       },
       {
@@ -86,6 +98,12 @@ describe('recording asset publication', () => {
       expect.objectContaining({
         assetId: 'asset-video',
         id: 'video-1',
+        recordingMetadata: {
+          captureMode: 'SCREEN',
+          displaySurface: 'window',
+          actionCount: 4,
+          hasPointer: true,
+        },
         mediaMetadata: { duration: 12, height: 1080, kind: 'video', width: 1920 },
         size: 5,
       }),
@@ -94,7 +112,11 @@ describe('recording asset publication', () => {
     expect(mocks.preparePublication).toHaveBeenCalledWith({
       assetRefs: [asset('asset-video').ref, asset('asset-audio', 'audio/webm').ref],
       domain: 'recording-assets',
-      payload: { completion: null, entries },
+      payload: {
+        completion: null,
+        entries,
+        expectedAssetIds: { 'video-1': null, 'audio-1': null },
+      },
     });
     expect(mocks.publishWithRetry).toHaveBeenCalledWith(
       expect.objectContaining({ journalId: 'journal-1' }),
@@ -130,6 +152,7 @@ describe('recording asset publication', () => {
     expect(mocks.assertAdmission).not.toHaveBeenCalled();
     expect(mocks.writeBlob).not.toHaveBeenCalled();
     expect(mocks.recover).not.toHaveBeenCalled();
+    expect(mocks.initDB).not.toHaveBeenCalled();
     expect(mocks.preparePublication).toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({
@@ -201,5 +224,30 @@ describe('recording asset publication', () => {
       ])
     ).rejects.toThrow('media metadata is invalid');
     expect(mocks.recover).not.toHaveBeenCalled();
+    expect(mocks.initDB).not.toHaveBeenCalled();
   });
+});
+
+it('releases supplied staging assets when a mixed batch fails source admission before staging', async () => {
+  mocks.initDB.mockRejectedValueOnce(new Error('source read failed'));
+  await expect(
+    saveRecordingsBatch([
+      { id: 'prepared', filename: 'p.webm', preparedAsset: asset('supplied') },
+      { id: 'blob', filename: 'b.webm', blob: new Blob(['b']) },
+    ])
+  ).rejects.toThrow('source read failed');
+  expect(mocks.discard).toHaveBeenCalledWith('supplied');
+  expect(mocks.preparePublication).not.toHaveBeenCalled();
+});
+
+it('releases every supplied staging object when mixed batch quota admission fails', async () => {
+  mocks.assertAdmission.mockRejectedValueOnce(new Error('quota refused'));
+  await expect(
+    saveRecordingsBatch([
+      { id: 'blob', filename: 'b.webm', blob: new Blob(['b']) },
+      { id: 'prepared', filename: 'p.webm', preparedAsset: asset('supplied') },
+    ])
+  ).rejects.toThrow('quota refused');
+  expect(mocks.discard).toHaveBeenCalledWith('supplied');
+  expect(mocks.writeBlob).not.toHaveBeenCalled();
 });

@@ -44,6 +44,14 @@ it('selects categories and supports roving keyboard navigation', () => {
   const effects = container.querySelector<HTMLButtonElement>('button[aria-label="Effects"]');
   expect(outline?.getAttribute('aria-pressed')).toBe('true');
 
+  act(() => {
+    const hover = new MouseEvent('pointerover', { bubbles: true });
+    Object.defineProperty(hover, 'pointerType', { value: 'mouse' });
+    fill?.dispatchEvent(hover);
+  });
+  expect(outline?.getAttribute('aria-pressed')).toBe('true');
+  expect(fill?.getAttribute('aria-pressed')).toBe('false');
+
   act(() => fill?.click());
   expect(fill?.getAttribute('aria-pressed')).toBe('true');
   expect(container.querySelector('[data-section="fill"]')).not.toBeNull();

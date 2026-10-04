@@ -80,13 +80,21 @@ function duplicateSlide(slide: TourSlide, id: string, nextId: () => string): Tou
   const copy = structuredClone(slide);
   copy.id = id;
   if (copy.timing.autoplayTarget === slide.id) copy.timing.autoplayTarget = id;
+  const objects = new Map<string, string>();
+  const rename = (object: { id: string }) => {
+    const assigned = nextId();
+    objects.set(object.id, assigned);
+    object.id = assigned;
+  };
   for (const object of copy.kind === 'image' ? copy.hotspots : copy.buttons) {
-    object.id = nextId();
+    rename(object);
     if (object.action.kind === 'slide' && object.action.slideId === slide.id)
       object.action.slideId = id;
   }
-  if (copy.kind === 'image')
-    for (const object of [...copy.annotations, ...copy.masks]) object.id = nextId();
+  if (copy.kind !== 'image') return copy;
+  for (const object of [...copy.annotations, ...copy.masks]) rename(object);
+  if (copy.objectOrder)
+    copy.objectOrder = copy.objectOrder.map((objectId) => objects.get(objectId) ?? objectId);
   return copy;
 }
 
@@ -112,6 +120,7 @@ function removeAudioResource(tour: TourDocument, assetId: string): void {
   if (!resources.some((resource) => resource.assetId === assetId))
     throw new Error('Tour audio resource is unavailable.');
   tour.audioResources = resources.filter((resource) => resource.assetId !== assetId);
+  if (tour.backgroundMusic?.assetId === assetId) tour.backgroundMusic = null;
   for (const target of tour.slides.flatMap(getTourNarrationTargets)) {
     if (target.narration?.assetId === assetId) target.narration = null;
   }

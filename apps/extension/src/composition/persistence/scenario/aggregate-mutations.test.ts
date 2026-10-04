@@ -24,6 +24,27 @@ import {
   scenarioAssetPublicationAdapter,
 } from './aggregate-mutations';
 import { deleteOrphanedScenarioAggregateChild, deleteScenarioAggregate } from './aggregate-cleanup';
+import { backfillScenarioLibraryAssets } from './library-publication';
+import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { parseScenarioProjectEntry } from './read-guards';
+
+it('promotes an unchanged legacy scenario without changing its document revision or trash state', async () => {
+  const project = createGuideProject('Legacy scenario');
+  await commitScenarioAggregateMutation(project);
+  const stored = parseScenarioProjectEntry(getStore('scenario_projects').get(project.id));
+  if (!stored) throw new Error('Expected saved scenario');
+  getStore('scenario_projects').set(project.id, {
+    ...stored,
+    lifecycle: { ...createLibraryLifecycle('temporary', 1), trashedAt: 2 },
+  });
+
+  const result = await commitScenarioAggregateMutation(stored.project);
+  const promoted = parseScenarioProjectEntry(getStore('scenario_projects').get(project.id));
+  expect(result.workspaceRevision).toBe(stored.workspaceRevision);
+  expect(promoted?.project).toEqual(stored.project);
+  expect(promoted?.updatedAt).toBe(stored.updatedAt);
+  expect(promoted?.lifecycle).toMatchObject({ storageClass: 'library', trashedAt: 2 });
+});
 
 it('commits root and owned children, preserves document creation, and accepts exact replay', async () => {
   const project = createGuideProject('Aggregate');
@@ -52,6 +73,101 @@ it('commits root and owned children, preserves document creation, and accepts ex
   await expect(
     commitScenarioAggregateMutation(second.project, { expectedRevision: 0 })
   ).resolves.toEqual(second);
+});
+
+it('publishes each scenario source into the library with durable physical ownership', async () => {
+  const project = createGuideProject('Library publication');
+  const image = createAsset(project.id, 'image');
+  const audio = {
+    ...createAsset(project.id, 'audio'),
+    width: 0,
+    height: 0,
+    duration: 3,
+    mimeType: 'audio/webm',
+  };
+  audio.assetRef = { ...audio.assetRef, mimeType: 'audio/webm' };
+  await commitScenarioAggregateMutation(project, { children: { assetPuts: [image, audio] } });
+  for (const asset of [image, audio]) {
+    const libraryId = `scenario-asset:${asset.id}`;
+    expect(getStore('media_library').get(libraryId)).toMatchObject({
+      id: libraryId,
+      source: { kind: 'stored-asset', assetId: asset.assetId },
+      lifecycle: { storageClass: 'library' },
+    });
+    expect(
+      getStore('asset_owners').get(JSON.stringify(['media-library', libraryId, 'source']))
+    ).toMatchObject({
+      assetId: asset.assetId,
+    });
+  }
+  await commitScenarioAggregateMutation(project, {
+    children: { assetDeletes: [image.id, audio.id] },
+  });
+  expect(getStore('scenario_assets').size).toBe(0);
+  expect(getStore('media_library').size).toBe(2);
+  expect(getStore('asset_refs').size).toBe(2);
+});
+
+it('commits a borrowed child with shared ref and no second library row or ready journal', async () => {
+  const sourceProject = createGuideProject('Source');
+  const original = createAsset(sourceProject.id, 'original');
+  await commitScenarioAggregateMutation(sourceProject, { children: { assetPuts: [original] } });
+  const destination = createGuideProject('Destination');
+  const borrowed = {
+    ...original,
+    id: 'borrowed',
+    projectId: destination.id,
+    galleryAssetId: 'scenario-asset:original',
+    borrowedMediaId: 'scenario-asset:original',
+  };
+  const assets = await import('../assets');
+  vi.mocked(assets.createAssetPublicationJournal).mockClear();
+  await commitScenarioAggregateMutation(destination, { children: { assetPuts: [borrowed] } });
+  expect(assets.createAssetPublicationJournal).not.toHaveBeenCalled();
+  expect(getStore('media_library').size).toBe(1);
+  expect(getStore('asset_refs').size).toBe(1);
+  expect(getStore('asset_owners').has(JSON.stringify(['scenario-asset', 'borrowed', 'body']))).toBe(
+    true
+  );
+  await commitScenarioAggregateMutation(sourceProject, {
+    children: { assetDeletes: ['original'] },
+  });
+  expect(getStore('asset_refs').has(original.assetId)).toBe(true);
+  expect(getStore('media_library').has('scenario-asset:original')).toBe(true);
+  expect(await backfillScenarioLibraryAssets()).toBe(0);
+  getStore('media_library').delete('scenario-asset:original');
+  await expect(backfillScenarioLibraryAssets()).rejects.toThrow(
+    'Borrowed scenario source is unavailable'
+  );
+});
+
+it('backfills historical scenario assets once and preserves library edits on rerun', async () => {
+  const asset = createAsset('historical', 'old-image');
+  getStore('scenario_assets').set(asset.id, asset);
+  getStore('asset_refs').set(asset.assetId, asset.assetRef);
+  expect(await backfillScenarioLibraryAssets()).toBe(1);
+  const mediaId = `scenario-asset:${asset.id}`;
+  const entry = getStore('media_library').get(mediaId) as Record<string, unknown>;
+  getStore('media_library').set(mediaId, { ...entry, filename: 'Renamed.png' });
+  expect(await backfillScenarioLibraryAssets()).toBe(0);
+  expect(getStore('media_library').get(mediaId)).toMatchObject({ filename: 'Renamed.png' });
+  expect(getStore('asset_owners').has(JSON.stringify(['media-library', mediaId, 'source']))).toBe(
+    true
+  );
+});
+
+it('does not backfill missing physical refs or overwrite a conflicting library identity', async () => {
+  const asset = createAsset('historical', 'orphan');
+  getStore('scenario_assets').set(asset.id, asset);
+  expect(await backfillScenarioLibraryAssets()).toBe(0);
+  expect(getStore('media_library').size).toBe(0);
+  getStore('asset_refs').set(asset.assetId, asset.assetRef);
+  getStore('media_library').set(`scenario-asset:${asset.id}`, {
+    id: `scenario-asset:${asset.id}`,
+    source: { kind: 'stored-asset', assetId: 'different-object' },
+  });
+  await expect(backfillScenarioLibraryAssets()).rejects.toThrow('occupied');
+  expect(getStore('asset_owners').size).toBe(0);
 });
 
 it('rejects stale roots, foreign puts, collisions, and foreign child deletes', async () => {
@@ -341,7 +457,12 @@ it('retires a superseded ready journal so later scenario mutations can proceed',
   expect(assetMocks.deleteAssetObject).not.toHaveBeenCalledWith('opfs-loser');
   getStore('asset_refs').delete('opfs-loser');
   await expect(scenarioAssetPublicationAdapter.publish(journal!)).resolves.toBeUndefined();
-  expect(assetMocks.deleteAssetObject).toHaveBeenCalledWith('opfs-loser');
+  expect(assetMocks.cancelAssetPublication).toHaveBeenCalledWith(
+    expect.objectContaining({
+      assetRefs: expect.arrayContaining([expect.objectContaining({ assetId: 'opfs-loser' })]),
+    }),
+    undefined
+  );
   await expect(
     commitScenarioAggregateMutation(
       {
@@ -479,6 +600,7 @@ it('keeps graph discovery and failed deletion inside one rollback-capable transa
     objectStore: (name: string) => ({
       delete: stagedDeletes,
       get: async (id: unknown) => getStore(name).get(normalizeKey(id)),
+      getAll: async () => [...getStore(name).values()],
       index: () => ({
         count: async () => 0,
         getAll: async (projectId: string) =>
@@ -597,10 +719,10 @@ it('retains saved-version assets and documents, then prunes only unreachable chi
   expect(getStore('scenario_assets').has('old')).toBe(false);
   expect(getStore('scenario_step_editor_documents').has('old-document')).toBe(false);
   const physical = await import('../assets');
-  expect(physical.completePhysicalDeleteOperation).toHaveBeenCalledWith(
-    expect.objectContaining({
-      assetIds: expect.arrayContaining(['opfs-old']),
-    })
+  expect(getStore('asset_refs').has('opfs-old')).toBe(true);
+  expect(getStore('media_library').has('scenario-asset:old')).toBe(true);
+  expect(physical.completePhysicalDeleteOperation).not.toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: expect.arrayContaining(['opfs-old']) })
   );
 });
 

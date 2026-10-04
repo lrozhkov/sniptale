@@ -51,6 +51,9 @@ it('serializes canonical content safely with local styles, fonts and private ima
   });
   const document = new DOMParser().parseFromString(result.html, 'text/html');
   expect(result.rasters).toHaveLength(1);
+  const opener = document.querySelector('[data-guide-open]')!;
+  expect(opener.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  expect(opener.textContent).not.toContain('+');
   expect(document.querySelectorAll('script')).toHaveLength(1);
   expect(document.querySelector('script')?.textContent).not.toContain(project.name);
   expect(document.querySelector('title')?.textContent).toBe(project.name);
@@ -101,3 +104,194 @@ it('projects grouped step navigation without hiding content from script-free rea
     vi.unstubAllGlobals();
   }
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'exports caption alignment %s for the document and enlarged viewer',
+  async (captionAlignment) => {
+    vi.stubGlobal('crypto', webcrypto);
+    try {
+      const project = createGuideProject('Guide');
+      const step = createGuideStep('Step');
+      const block = {
+        ...createGuideImageBlock({
+          id: 'image',
+          assetId: 'asset',
+          width: 100,
+          height: 50,
+          source: { kind: 'import', filename: 'image.png' },
+        }),
+        caption: 'Caption',
+        captionAlignment,
+      };
+      step.blocks = [block];
+      project.items = [step];
+      const result = await buildGuideHtml(project, createTranslator('en'), 'light', {
+        rasters: [
+          {
+            block,
+            settings: { ...DEFAULT_HTML_IMAGES, viewer: true },
+            width: 100,
+            height: 50,
+            size: 10,
+            mime: 'image/png',
+          },
+        ],
+        blocks: new Map([['image', 0]]),
+      });
+      const doc = new DOMParser().parseFromString(result.html, 'text/html');
+      expect(doc.querySelector<HTMLElement>('article figcaption')?.style.textAlign).toBe(
+        captionAlignment ?? 'center'
+      );
+      expect(doc.querySelector('[data-guide-open]')?.getAttribute('data-caption-alignment')).toBe(
+        captionAlignment ?? 'center'
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it.each(['plain', 'badge'] as const)(
+  'exports saved accent inheritance with %s numbering and links',
+  async (numberStyle) => {
+    vi.stubGlobal('crypto', webcrypto);
+    try {
+      const project = createGuideProject('Saved appearance');
+      project.style = { ...project.style, theme: 'warm', numberStyle, accentColor: '#2367ab' };
+      project.items = ['inherited', 'default', 'override'].map((id) => {
+        const step = createGuideStep(id, id);
+        step.styleOverrides =
+          id === 'inherited' ? {} : { accentColor: id === 'default' ? null : '#ab3267' };
+        step.blocks = [
+          {
+            kind: 'text',
+            id: `${id}-link`,
+            paragraphs: [
+              {
+                runs: [
+                  {
+                    text: 'Read documentation',
+                    bold: false,
+                    italic: false,
+                    href: 'https://example.com/docs',
+                  },
+                ],
+              },
+            ],
+          },
+        ];
+        return step;
+      });
+      const saved = JSON.stringify(project);
+      const loaded = JSON.parse(saved);
+      const result = await buildGuideHtml(loaded, createTranslator('en'), 'dark', {
+        rasters: [],
+        blocks: new Map(),
+      });
+      const doc = new DOMParser().parseFromString(result.html, 'text/html');
+      expect(
+        doc
+          .querySelector<HTMLElement>('.guide-read-document')!
+          .style.getPropertyValue('--guide-accent')
+      ).toBe('#2367ab');
+      const articles = [...doc.querySelectorAll('article')];
+      expect(articles.map((article) => article.style.getPropertyValue('--guide-accent'))).toEqual([
+        '#2367ab',
+        '#98541b',
+        '#ab3267',
+      ]);
+      articles.forEach((article, index) => {
+        expect(article.dataset['numberStyle']).toBe(numberStyle);
+        expect(article.style.getPropertyValue('--guide-number-background')).toBe(
+          numberStyle === 'plain' ? 'transparent' : '#e3d8c5'
+        );
+        expect(article.querySelector('header > span')?.textContent).toBe(String(index + 1));
+        const link = article.querySelector('a')!;
+        expect(link.textContent).toBe('Read documentation');
+        expect(link.getAttribute('href')).toBe('https://example.com/docs');
+        expect(link.getAttribute('target')).toBe('_blank');
+      });
+      expect(JSON.stringify(loaded)).toBe(saved);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it('suppresses inherited and explicit legacy frame viewers while retaining full-image viewing', async () => {
+  vi.stubGlobal('crypto', webcrypto);
+  try {
+    const project = createGuideProject('Guide');
+    project.htmlExport = { ...DEFAULT_HTML_IMAGES, content: 'frame', viewer: true };
+    const image = createGuideImageBlock({
+      id: 'inherited',
+      assetId: 'asset',
+      width: 400,
+      height: 200,
+      source: { kind: 'import', filename: 'image.png' },
+    });
+    const step = createGuideStep('Step');
+    step.blocks = [
+      image,
+      { ...image, id: 'explicit', htmlExport: { ...project.htmlExport } },
+      { ...image, id: 'full', htmlExport: { ...DEFAULT_HTML_IMAGES } },
+      { ...image, id: 'full-no-viewer', htmlExport: { ...DEFAULT_HTML_IMAGES, viewer: false } },
+    ];
+    project.items = [step];
+    const saved = JSON.stringify(project);
+    const result = await buildGuideHtml(project, createTranslator('en'), 'light', {
+      rasters: [
+        {
+          block: image,
+          settings: DEFAULT_HTML_IMAGES,
+          width: 400,
+          height: 200,
+          size: 10,
+          mime: 'image/png',
+        },
+      ],
+      blocks: new Map(step.blocks.map((block) => [block.id, 0])),
+    });
+    const doc = new DOMParser().parseFromString(result.html, 'text/html');
+    for (const id of ['inherited', 'explicit', 'full-no-viewer']) {
+      expect(doc.querySelector(`[data-block-id="${id}"] [data-guide-open]`)).toBeNull();
+    }
+    expect(doc.querySelector('[data-block-id="full"] [data-guide-open]')).not.toBeNull();
+    expect(doc.querySelectorAll('[data-guide-open]')).toHaveLength(1);
+    expect(JSON.stringify(project)).toBe(saved);
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it.each(['en', 'ru'] as const)(
+  'exports named Fit, 100%%, Close and scroll viewport in %s',
+  async (locale) => {
+    vi.stubGlobal('crypto', webcrypto);
+    try {
+      const t = createTranslator(locale);
+      const result = await buildGuideHtml(createGuideProject('Guide'), t, 'light', {
+        rasters: [],
+        blocks: new Map(),
+      });
+      const doc = new DOMParser().parseFromString(result.html, 'text/html');
+      const dialog = doc.querySelector('dialog')!;
+      expect(dialog.getAttribute('data-zoom')).toBe('fit');
+      const fit = dialog.querySelector('[data-fit]')!;
+      expect(fit).not.toBeNull();
+      expect(fit.getAttribute('aria-label')).toBe(t('scenario.editor.htmlFit'));
+      expect(fit.getAttribute('aria-pressed')).toBe('true');
+      const nativeSize = dialog.querySelector('button[data-zoom]')!;
+      expect(nativeSize.getAttribute('aria-label')).toBe('100%');
+      expect(nativeSize.getAttribute('aria-pressed')).toBe('false');
+      const close = dialog.querySelector('[data-close]')!;
+      expect(close.getAttribute('aria-label')).toBe(t('common.actions.close'));
+      expect(close.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      const viewport = dialog.querySelector('[data-viewport]')!;
+      expect(viewport.getAttribute('tabindex')).toBe('0');
+      expect(viewport.getAttribute('aria-label')).toBe(t('scenario.editor.htmlPreview'));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);

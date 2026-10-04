@@ -73,15 +73,6 @@
 /* ========================================
    Close Button
    ======================================== */
-.sniptale-btn-close {
-  color: var(--sniptale-text-muted);
-  margin-left: 4px;
-}
-
-.sniptale-btn-close:hover:not(:disabled) {
-  background: var(--sniptale-danger-bg);
-  color: var(--sniptale-danger-color);
-}
 
 /* ========================================
    Lock Button
@@ -190,11 +181,28 @@
   display: none;
 }
 
-.sniptale-btn:focus-visible {
+.sniptale-btn:focus-visible:not([data-focus-restoration='pointer']) {
   border-color: var(--sniptale-color-border-accent-strong);
   box-shadow:
     var(--sniptale-shadow-sm),
     0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
 }
 
+.sniptale-toolbar-root
+  .sniptale-btn:is(
+    [aria-haspopup='menu'],
+    [data-menu-open],
+    [data-menu-indicator='true']
+  ):focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 2px solid var(--sniptale-color-text-primary);
+  outline-offset: 1px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
 /* Drag handle tooltip removed */
+
+/* Native browser focus paint follows the same per-opening pointer restoration policy. */
+.sniptale-toolbar-root .sniptale-btn[data-focus-restoration='pointer']:focus {
+  outline: none;
+}

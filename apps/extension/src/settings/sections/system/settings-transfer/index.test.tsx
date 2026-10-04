@@ -180,6 +180,31 @@ it('recovers from a file error and surfaces stale review without committing', as
   expect(container.textContent).toContain('settings.settingsTransfer.staleError');
 });
 
+it.each([
+  ['future-format', 'settings.settingsTransfer.futureFileError'],
+  ['invalid-package', 'settings.settingsTransfer.invalidFileError'],
+  ['unsupported-domain', 'settings.settingsTransfer.domainFileError'],
+])('explains a rejected %s package before any import', async (code, messageKey) => {
+  await renderSection();
+  await clickLabel('settings.settingsTransfer.importTab');
+  mocks.send.mockRejectedValueOnce({ code, message: 'capture.unknown' });
+  await selectFile();
+  expect(container.textContent).toContain(messageKey);
+  expect(container.textContent).not.toContain('settings.settingsTransfer.compatibleFile');
+  expect(mocks.send).not.toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'commit-import' })
+  );
+});
+
+it('does not promise restoration when import rollback cannot be verified', async () => {
+  await renderSection();
+  await clickLabel('settings.settingsTransfer.importTab');
+  await selectFile();
+  mocks.send.mockRejectedValueOnce({ code: 'rollback-failed' });
+  await clickLabel('settings.settingsTransfer.apply');
+  expect(container.textContent).toContain('settings.settingsTransfer.rollbackError');
+});
+
 it('surfaces a clipboard adapter failure when the import report cannot be copied', async () => {
   await renderSection();
   await clickLabel('settings.settingsTransfer.importTab');

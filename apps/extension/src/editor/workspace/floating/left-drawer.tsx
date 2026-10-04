@@ -78,6 +78,7 @@ export function EditorFloatingLeftDrawer({
           <div className={LEFT_DRAWER_HEADER_TITLE_CLASS_NAME}>{getToolLabel(mode)}</div>
         </div>
         <EditorIconButton
+          className={'sniptale-dismiss-button'}
           title={translate('common.actions.close')}
           onClick={onClose}
           data-ui="editor.floating.left-drawer.close-button"

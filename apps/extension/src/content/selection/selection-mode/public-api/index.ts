@@ -8,6 +8,7 @@ const logger = createLogger({ namespace: 'ContentSelectionMode' });
 
 type SelectionModeEnableSession = Pick<
   SelectionModeSession,
+  | 'frozenFrame'
   | 'captureAction'
   | 'currentState'
   | 'isActive'
@@ -33,13 +34,16 @@ export function enableSelectionModeApi(args: {
 }) {
   return new Promise<CaptureArea>((resolve, reject) => {
     void (async () => {
-      if (args.session.isActive) {
+      if (args.session.isActive || args.session.resolveCallback) {
         logSelectionModeDiag('enableSelectionModeApi.cleanup-existing-session');
+        const rejectPrevious = args.session.rejectCallback;
         args.cleanup();
+        rejectPrevious?.(new Error('Cancelled by user'));
       }
 
       args.session.resolveCallback = resolve;
       args.session.rejectCallback = reject;
+      args.session.frozenFrame = args.options?.frozenFrame ?? null;
       args.session.captureAction = args.options?.captureAction ?? 'download_default';
       args.session.onCaptureActionChange = args.options?.onCaptureActionChange ?? null;
       args.session.onConfirmEvent = args.options?.onConfirmEvent ?? null;
@@ -48,12 +52,20 @@ export function enableSelectionModeApi(args: {
         args.session.currentState = 'idle';
         enableNavigationLock(true);
         await args.prepareUi();
+        if (args.session.resolveCallback !== resolve) {
+          reject(new Error('Cancelled by user'));
+          return;
+        }
         args.createOverlayContainer();
         args.createHoverElements();
         args.enableCursor();
         args.setupEventListeners();
         args.session.isActive = true;
       } catch (error) {
+        if (args.session.resolveCallback !== resolve) {
+          reject(error);
+          return;
+        }
         disableNavigationLock();
         args.cleanup();
         reject(error);

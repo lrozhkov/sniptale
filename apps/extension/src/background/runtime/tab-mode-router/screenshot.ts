@@ -10,6 +10,7 @@ import {
   handleApplyViewportPreset,
   handleReleaseViewportPreset,
 } from '../tab-mode-router-screenshot';
+import { getCurrentScreenshotViewport } from '../tab-mode-router-screenshot/status';
 import { respondAsyncRoute, respondAsyncSuccess } from '../../routing-contracts/response';
 import type { TabModeContext } from './shared';
 import { isScreenshotModeMessage } from './shared';
@@ -196,7 +197,7 @@ export function routeViewportMessage(message: TabModeMessage, context: TabModeCo
   }
 
   if (message.type === MessageType.GET_VIEWPORT_STATUS) {
-    const viewport = context.viewportState.get(context.resolvedTabId) || null;
+    const viewport = getCurrentScreenshotViewport(context.resolvedTabId, context.viewportState);
     context.sendResponse({ success: true, viewport });
     return true;
   }

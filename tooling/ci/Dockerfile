@@ -29,8 +29,9 @@ RUN rm -f /etc/apt/sources.list.d/debian.sources \
     && rm -rf /var/lib/apt/lists/*
 
 COPY tooling/configs/ci/npm /opt/sniptale-npm
-COPY tooling/configs/ci/toolchain.lock.json tooling/ci/runtime-parity.mjs /opt/sniptale-ci/
+COPY tooling/configs/ci/toolchain.lock.json tooling/ci/runtime-parity.mjs tooling/ci/npm-runtime.mjs /opt/sniptale-ci/
 RUN npm ci --ignore-scripts --prefix /opt/sniptale-npm \
+    && node /opt/sniptale-ci/npm-runtime.mjs /opt/sniptale-npm /opt/sniptale-ci/toolchain.lock.json \
     && ln -sf /opt/sniptale-npm/node_modules/.bin/npm /usr/local/bin/npm \
     && ln -sf /opt/sniptale-npm/node_modules/.bin/npx /usr/local/bin/npx \
     && node /opt/sniptale-ci/runtime-parity.mjs /opt/sniptale-ci/toolchain.lock.json > /tmp/runtime-parity.json \

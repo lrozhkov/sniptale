@@ -2,6 +2,7 @@ import { defineMessageSource } from '../source';
 import { sharedBytesMessages } from './bytes';
 import { sharedDefaultsMessages } from './defaults';
 import { sharedDisplayMediaMessages } from './display-media';
+import { sharedEditorStartMessages } from './editor-start';
 import { sharedMediaHubMessages } from './media-hub';
 import { sharedMediaMetadataMessages } from './media-metadata';
 import { sharedProjectActionsMessages } from './project-actions';
@@ -17,6 +18,7 @@ export const sharedMessages = defineMessageSource({
   webSnapshot: sharedWebSnapshotMessages,
   videoProject: sharedVideoProjectMessages,
   displayMedia: sharedDisplayMediaMessages,
+  editorStart: sharedEditorStartMessages,
   bytes: sharedBytesMessages,
   storage: sharedStorageMessages,
   mediaMetadata: sharedMediaMetadataMessages,

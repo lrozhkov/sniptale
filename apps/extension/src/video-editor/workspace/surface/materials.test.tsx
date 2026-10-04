@@ -14,6 +14,8 @@ import { VideoEditorMaterials } from './materials';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { translate } from '../../../platform/i18n';
 
+const materialDrag = vi.hoisted(() => ({ pending: false, start: vi.fn() }));
+vi.mock('../../chrome/material-drag', () => ({ useMaterialDrag: () => materialDrag }));
 const onOpenLibrary = vi.fn();
 const container = document.createElement('div');
 let root = createRoot(container);
@@ -22,6 +24,8 @@ afterEach(() => {
   root = createRoot(container);
   container.remove();
   vi.unstubAllGlobals();
+  materialDrag.pending = false;
+  materialDrag.start.mockClear();
 });
 
 function renderMaterials() {
@@ -70,6 +74,40 @@ it('opens the selected source without editing the timeline or filling the list w
   expect(onSelect).toHaveBeenCalledWith(asset);
   expect(project.clips).toEqual([]);
   expect(container.textContent).not.toContain(translate('videoEditor.app.materialsAppend'));
+});
+
+it('uses the same quiet, outlined hover and keyboard-focus treatment for material actions', () => {
+  const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
+  project.clips = [createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 0)];
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        onRename={vi.fn()}
+        onShowUse={vi.fn()}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        project={project}
+        selectedAssetId={null}
+        onSelect={onSelect}
+        onImport={onImport}
+      />
+    )
+  );
+  const rename = container.querySelector<HTMLButtonElement>('[data-material-rename]')!;
+  const showUse = container.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.materials.show-use"] button'
+  )!;
+  expect(rename).not.toBeNull();
+  expect(showUse).not.toBeNull();
+  for (const button of [rename, showUse]) {
+    expect(button.className).toContain('!bg-transparent');
+    expect(button.className).toContain('hover:!bg-transparent');
+    expect(button.className).toContain('hover:!border-[var(--sniptale-color-border-strong)]');
+    expect(button.className).toContain(
+      'focus-visible:!border-[var(--sniptale-color-border-accent-strong)]'
+    );
+    expect(button.className).not.toContain('opacity-0');
+  }
 });
 
 it('includes library recordings alongside local video in the Video category', async () => {
@@ -363,4 +401,28 @@ it('filters used materials and searches names without changing the bulk-removal 
   );
   expect(rows()).toEqual(['unused']);
   expect(onSelect).not.toHaveBeenCalled();
+});
+
+it('starts a local material drag from the source button and prevents it while placement is pending', () => {
+  const { asset } = renderMaterials();
+  const button = container.querySelector<HTMLButtonElement>(
+    '[data-material-id] button[aria-pressed]'
+  )!;
+  expect(button.draggable).toBe(true);
+  const transfer = { setData: vi.fn() };
+  const drag = new Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(drag, 'dataTransfer', { value: transfer });
+  act(() => button.dispatchEvent(drag));
+  expect(materialDrag.start).toHaveBeenCalledWith(asset.id, button, transfer);
+  materialDrag.pending = true;
+  renderMaterials();
+  const pendingButton = container.querySelector<HTMLButtonElement>(
+    '[data-material-id] button[aria-pressed]'
+  )!;
+  expect(pendingButton.draggable).toBe(false);
+  const blocked = new Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(blocked, 'dataTransfer', { value: transfer });
+  act(() => pendingButton.dispatchEvent(blocked));
+  expect(blocked.defaultPrevented).toBe(true);
+  expect(materialDrag.start).toHaveBeenCalledTimes(1);
 });

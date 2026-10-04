@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import { MaterialAudioRecordingModal } from '../../composition/audio-recording/dialog';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
 import { translate } from '../../platform/i18n';
 import type { useReviewAudio, ReviewAudioLane } from './use-review-audio';
-import { importReviewAudio, importedAudioClip } from '../../workflows/video-review/audio-import';
+import {
+  importReviewAudio,
+  importedAudioClip,
+  type PreparedReviewAudio,
+} from '../../workflows/video-review/audio-import';
+import type { createVideoReviewSession } from '../../workflows/video-review/session';
+import { saveReviewVoiceoverTake } from './voiceover-save';
 
 /** Owns one recording lifecycle: open/close, playback sync, and the saved clip. */
 export function useReviewVoiceoverRecording(args: {
@@ -13,84 +18,119 @@ export function useReviewVoiceoverRecording(args: {
   resultDuration: number;
   toOutputTime(source: number): number | null;
   audio: ReturnType<typeof useReviewAudio>;
+  session: ReturnType<typeof createVideoReviewSession>;
+  onCutPlacement?: () => void;
   guard(): boolean;
   flushAdvanced(): Promise<void>;
+  onOpenChange?(open: boolean): void;
 }) {
   const [recording, setRecording] = useState(false);
   const [takeStart, setTakeStart] = useState<number | null>(null);
+  const [takeOutputStart, setTakeOutputStart] = useState<number | null>(null);
+  const takeIds = useRef(new WeakMap<Blob, string>());
+  const preparedTakes = useRef(new WeakMap<Blob, PreparedReviewAudio>());
+  const reviewId = useRef<string | null>(null);
+  const playback = useVoiceoverPlayback(args.video, () => takeStart ?? args.time);
   return {
+    video: args.video,
     recording,
     takeStart,
+    takeOutputStart,
     open: () => {
       if (!args.guard()) return;
-      args.video.current?.pause();
+      const outputStart = args.toOutputTime(args.time);
+      if (outputStart === null || args.resultDuration - outputStart <= 0) {
+        args.onCutPlacement?.();
+        return;
+      }
+      playback.open();
+      reviewId.current = args.session.getSnapshot().snapshot.workspace.aggregateId;
+      args.onOpenChange?.(true);
       setTakeStart(args.time);
+      setTakeOutputStart(outputStart);
       setRecording(true);
     },
-    close: () => setRecording(false),
-    syncStart: async () => {
-      const node = args.video.current;
-      if (!node) return;
-      node.currentTime = args.time;
-      await node.play();
+    close: () => {
+      playback.close();
+      reviewId.current = null;
+      args.onOpenChange?.(false);
+      setRecording(false);
     },
-    syncStop: () => args.video.current?.pause(),
+    syncStart: playback.syncStart,
+    syncStop: playback.syncStop,
+    syncPause: playback.syncStop,
+    syncResume: playback.syncResume,
     /** The shared recorder already trims the file, so placement is take start + trim offset. */
-    save: async (file: File, trim: AudioTrimRange, signal: AbortSignal) => {
-      if (signal.aborted) return;
-      const sourceAt = (takeStart ?? args.time) + trim.trimStart;
-      await importReviewAudio({
+    save: (
+      file: File,
+      trim: AudioTrimRange,
+      signal: AbortSignal,
+      take: Blob = file,
+      onRetained?: () => void
+    ) =>
+      saveReviewVoiceoverTake({
         file,
+        trim,
         signal,
-        assertCurrentTarget: () => {
-          if (args.toOutputTime(sourceAt) === null)
-            throw new Error(translate('gallery.videoReview.placementOnCut'));
-        },
-        attach: (assetId, duration) => {
-          const at = args.toOutputTime(sourceAt);
-          if (at === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
-          args.audio.addImported(
-            importedAudioClip(assetId, duration, at, args.resultDuration),
-            'voiceover',
-            duration,
-            file.name
-          );
-          return args.flushAdvanced();
-        },
-      });
-    },
+        take,
+        ...(onRetained ? { onRetained } : {}),
+        outputStart: takeOutputStart ?? args.toOutputTime(takeStart ?? args.time),
+        resultDuration: args.resultDuration,
+        audio: args.audio,
+        session: args.session,
+        takeIds: takeIds.current,
+        preparedTakes: preparedTakes.current,
+        isCurrent: () =>
+          playback.isOpen() &&
+          args.session.getSnapshot().snapshot.workspace.aggregateId === reviewId.current,
+        flushAdvanced: args.flushAdvanced,
+      }),
   };
 }
 
-/**
- * One voiceover take through the shared material recorder; the caller owns clip
- * placement and playback sync. The capture limit is the remaining timeline.
- */
-export function ReviewVoiceoverRecording(props: {
-  isOpen: boolean;
-  playhead: number;
-  timelineDuration: number;
-  onClose(): void;
-  onSyncStart(): Promise<void>;
-  onSyncStop(): void;
-  onSave(file: File, trim: AudioTrimRange, signal: AbortSignal): Promise<void>;
-}) {
-  const remaining = Math.max(0, props.timelineDuration - props.playhead);
-  return (
-    <MaterialAudioRecordingModal
-      isOpen={props.isOpen}
-      title={translate('gallery.videoReview.recordVoiceover')}
-      captureLimitSeconds={remaining}
-      timeline={{
-        startTime: props.playhead,
-        duration: remaining,
-        beforeStart: props.onSyncStart,
-        onStop: props.onSyncStop,
-      }}
-      onClose={props.onClose}
-      onSave={props.onSave}
-    />
-  );
+/** Owns delayed playback completion and cancellation across recording generations. */
+function useVoiceoverPlayback(video: RefObject<HTMLVideoElement | null>, startTime: () => number) {
+  const generation = useRef(0);
+  const openRef = useRef(false);
+  const shouldPlay = useRef(false);
+  const stop = () => {
+    shouldPlay.current = false;
+    video.current?.pause();
+  };
+  return {
+    isOpen: () => openRef.current,
+    open: () => {
+      video.current?.pause();
+      generation.current += 1;
+      openRef.current = true;
+      shouldPlay.current = false;
+    },
+    close: () => {
+      generation.current += 1;
+      openRef.current = false;
+      stop();
+    },
+    syncStart: async (playVideo = true) => {
+      const node = video.current;
+      if (!node || !openRef.current) return;
+      const currentGeneration = generation.current;
+      node.currentTime = startTime();
+      shouldPlay.current = playVideo;
+      if (playVideo) {
+        await node.play();
+        if (currentGeneration !== generation.current && !shouldPlay.current) node.pause();
+      }
+    },
+    syncStop: stop,
+    syncResume: async (playVideo = true) => {
+      if (!openRef.current || !playVideo) return;
+      const currentGeneration = generation.current;
+      shouldPlay.current = true;
+      const node = video.current;
+      await node?.play();
+      if (currentGeneration !== generation.current && !shouldPlay.current) node?.pause();
+    },
+  };
 }
 
 /** Wires music import and voiceover recording to the review audio model. */
@@ -105,6 +145,8 @@ export function useReviewEditorAudio(args: {
   run(action: () => Promise<unknown>): Promise<unknown>;
   flushAdvanced(): Promise<void>;
   audio: ReturnType<typeof useReviewAudio>;
+  session: ReturnType<typeof createVideoReviewSession>;
+  onOpenChange?(open: boolean): void;
 }) {
   const guard = () => !args.busy && args.canStart();
   const onImportAudioFile = (
@@ -145,6 +187,9 @@ export function useReviewEditorAudio(args: {
     resultDuration: args.resultDuration,
     toOutputTime: args.toOutputTime,
     audio: args.audio,
+    session: args.session,
+    ...(args.onOpenChange ? { onOpenChange: args.onOpenChange } : {}),
+    onCutPlacement: args.onCutPlacement,
     guard,
     flushAdvanced: args.flushAdvanced,
   });

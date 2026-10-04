@@ -1,3 +1,4 @@
+import { type FilenameSession } from '../../../workflows/file-naming/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   CaptureMode,
@@ -33,6 +34,7 @@ function stopSidecarStreams(recorders: RecordingSidecarRecorder[]): void {
 }
 
 export async function initializeSidecarRecorders(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   captureMode?: CaptureMode;
   coordinator: RecordingStagingCoordinator;

@@ -94,7 +94,7 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
   }
 });
 
-it('edits selected speed properties and blocks unavailable editing tools', () => {
+it('sets speed creation defaults without a toolbar delete action', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -104,10 +104,8 @@ it('edits selected speed properties and blocks unavailable editing tools', () =>
     busy: false,
     rate: 2,
     audio: 'speed' as const,
-    selected: true,
     onPointer: vi.fn(),
     onToggle: vi.fn(),
-    onRemove: vi.fn(),
     onRate: vi.fn(),
     onAudio: vi.fn(),
   };
@@ -132,16 +130,13 @@ it('edits selected speed properties and blocks unavailable editing tools', () =>
     act(() => audio!.click());
     act(() => document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click());
     expect(props.onAudio).toHaveBeenCalledWith('mute');
-    act(() => button('gallery.videoReview.removeEdit').click());
-    expect(props.onRemove).toHaveBeenCalledOnce();
+    expect(button('gallery.videoReview.removeEdit')).toBeNull();
     act(() => root.render(<ReviewTimelineTools {...props} busy />));
     expect(rate!.disabled).toBe(true);
     expect(audio!.disabled).toBe(true);
     act(() => button('gallery.videoReview.cutMode').click());
     expect(props.onToggle).toHaveBeenCalledTimes(2);
-    act(() =>
-      root.render(<ReviewTimelineTools {...props} mode={null} available={false} selected={false} />)
-    );
+    act(() => root.render(<ReviewTimelineTools {...props} mode={null} available={false} />));
     expect(host.querySelector('select')).toBeNull();
     expect(button('gallery.videoReview.speedMode').disabled).toBe(true);
   } finally {
@@ -189,7 +184,7 @@ it('offers independent initial downloads and shows actionable processing failure
   }
 });
 
-it('opens export settings below download without losing export actions and closes them again', () => {
+it('shows expanded export settings before both destination actions', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   const root = createRoot(host);
@@ -219,20 +214,20 @@ it('opens export settings below download without losing export actions and close
         />
       )
     );
-    expect(host.querySelector('input')).toBeNull();
-    const toggle = button('gallery.videoReview.exportSettings');
-    act(() => toggle.click());
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
     const settings = host.querySelector('input')!;
+    expect(settings).not.toBeNull();
     expect(
-      button('gallery.videoReview.downloadVideo').compareDocumentPosition(settings) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+      host.querySelector(`[aria-label="${translate('gallery.videoReview.exportSettings')}"]`)
+    ).toBeNull();
+    for (const destination of [
+      'gallery.videoReview.exportVideo',
+      'gallery.videoReview.downloadVideo',
+    ] as const)
+      expect(
+        settings.compareDocumentPosition(button(destination)) & Node.DOCUMENT_POSITION_FOLLOWING
+      ).toBeTruthy();
     act(() => button('gallery.videoReview.downloadVideo').click());
     expect(onDownload).toHaveBeenCalledOnce();
-    act(() => toggle.click());
-    expect(toggle.getAttribute('aria-expanded')).toBe('false');
-    expect(host.querySelector('input')).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { disableAiPickModeIfLoaded } from '../../ai/pick/runtime/lazy';
 import type { InteractiveFrameComponent } from '../../../selection/frame-runtime/roots/component';
 import type { ContentAppViewModel } from './types';
@@ -47,10 +48,23 @@ export function useContentAppViewModel(params: {
     modeFlags,
     visibilityState,
   });
+  const { setPinToTab } = modeState;
+  const ensurePinned = useCallback(
+    (source?: Parameters<typeof modeState.setPinToTab>[1]) => setPinToTab(true, source),
+    [setPinToTab]
+  );
   const autoBlurController = useAutoBlurController({
-    autoApplyAllowed: modeState.pinToTab || controllers.scenarioController.scenarioEnabled,
+    autoApplyAllowed: modeState.pinToTabConfirmed,
+    ensurePinned,
     frameManager,
     highlighterMode: modeState.highlighterMode,
+    navigationMode:
+      !modeState.aiPickMode &&
+      !modeState.designReviewMode &&
+      !modeState.drawingMode &&
+      !modeState.highlighterMode &&
+      !modeState.quickEditMode &&
+      !modeState.videoRecordingMode,
   });
 
   useContentRuntimeBridge(runtimeBridgeParams, disableAiPickModeDeferred);

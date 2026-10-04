@@ -1,265 +1,123 @@
 import { PRODUCT_BRAND_NAME } from '@sniptale/ui/branding';
 import { translate } from '../../../platform/i18n';
+import { contextMenuSectionTitle } from '../../../platform/i18n/context-menu-section-title';
 import { getQuickActionDisplayName } from '../../../features/quick-actions-presets/catalog';
 import { getViewportPresetDisplayName } from '../../../features/viewport-presets/display-name';
 import {
-  type ContextMenuSettings,
-  type QuickAction,
-  type ViewportPreset,
-} from '../../../contracts/settings';
+  isContextMenuCommandAvailable,
+  parseContextMenuTree,
+  resolveContextMenuTree,
+  type ContextMenuTreeNode,
+} from '../../../contracts/settings/context-menu-layout';
+import type { ContextMenuSettings, QuickAction, ViewportPreset } from '../../../contracts/settings';
 import {
-  buildContextMenuQuickActionId,
-  buildContextMenuWindowResizePresetId,
   CONTEXT_MENU_EXPORT_COPY_JSON_ID,
   CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
-  CONTEXT_MENU_EXPORT_ID,
-  CONTEXT_MENU_EXPORT_SEPARATOR_ID,
   CONTEXT_MENU_EXPORT_START_ID,
   CONTEXT_MENU_GALLERY_ID,
   CONTEXT_MENU_IMAGE_EDITOR_ID,
   CONTEXT_MENU_ROOT_ID,
-  CONTEXT_MENU_SCREENSHOTS_ID,
   CONTEXT_MENU_SCREENSHOTS_PREPARE_ID,
-  CONTEXT_MENU_SCREENSHOTS_SEPARATOR_ID,
   CONTEXT_MENU_SETTINGS_ID,
-  CONTEXT_MENU_SETTINGS_SEPARATOR_ID,
   CONTEXT_MENU_VIDEO_AREA_ID,
   CONTEXT_MENU_VIDEO_EDITOR_ID,
-  CONTEXT_MENU_VIDEO_ID,
   CONTEXT_MENU_VIDEO_PRESET_ID,
   CONTEXT_MENU_VIDEO_TAB_ID,
   CONTEXT_MENU_VIDEO_WINDOW_ID,
-  CONTEXT_MENU_WINDOW_RESIZE_ID,
+  buildContextMenuQuickActionId,
+  buildContextMenuWindowResizePresetId,
 } from './constants';
-import { buildPageLinkCopyDescriptors } from './page-link/descriptors';
+import {
+  CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID,
+  CONTEXT_MENU_PAGE_LINK_PLAIN_ID,
+  CONTEXT_MENU_PAGE_LINK_RICH_ID,
+} from './page-link/constants';
 import type { ContextMenuDescriptor } from './types';
 
-function createDescriptor(
-  id: string,
-  title?: string,
-  parentId?: string,
-  type?: chrome.contextMenus.CreateProperties['type']
-): ContextMenuDescriptor {
-  return {
-    id,
-    ...(parentId ? { parentId } : {}),
-    ...(title ? { title } : {}),
-    ...(type ? { type } : {}),
+function commandTitle(
+  command: string,
+  quickActions: QuickAction[],
+  presets: readonly ViewportPreset[]
+): string | null {
+  const staticTitles: Record<string, string> = {
+    [CONTEXT_MENU_SCREENSHOTS_PREPARE_ID]: translate('popup.home.screenshotPrepLabel'),
+    [CONTEXT_MENU_VIDEO_TAB_ID]: translate('popup.video.modeTabLabel'),
+    [CONTEXT_MENU_VIDEO_AREA_ID]: translate('popup.video.modeAreaLabel'),
+    [CONTEXT_MENU_VIDEO_PRESET_ID]: translate('popup.video.modePresetLabel'),
+    [CONTEXT_MENU_VIDEO_WINDOW_ID]: translate('popup.video.modeScreenLabel'),
+    [CONTEXT_MENU_EXPORT_START_ID]: translate('popup.export.exportButton'),
+    [CONTEXT_MENU_EXPORT_COPY_JSON_ID]: translate('popup.export.copyJsonButton'),
+    [CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID]: translate('popup.export.copyMarkdownButton'),
+    [CONTEXT_MENU_PAGE_LINK_RICH_ID]: translate('popup.common.pageLinkCopyRichLabel'),
+    [CONTEXT_MENU_PAGE_LINK_MARKDOWN_ID]: translate('popup.common.pageLinkCopyMarkdownLabel'),
+    [CONTEXT_MENU_PAGE_LINK_PLAIN_ID]: translate('popup.common.pageLinkCopyPlainLabel'),
+    [CONTEXT_MENU_IMAGE_EDITOR_ID]: translate('popup.home.imageEditorLabel'),
+    [CONTEXT_MENU_VIDEO_EDITOR_ID]: translate('popup.video.videoEditorLabel'),
+    [CONTEXT_MENU_GALLERY_ID]: translate('popup.home.galleryLabel'),
+    [CONTEXT_MENU_SETTINGS_ID]: translate('popup.common.footerSettings'),
   };
+  if (command in staticTitles) return staticTitles[command] ?? null;
+  const action = quickActions.find((item) => buildContextMenuQuickActionId(item.id) === command);
+  if (action) return getQuickActionDisplayName(action);
+  const preset = presets.find((item) => buildContextMenuWindowResizePresetId(item.id) === command);
+  if (preset) return `${getViewportPresetDisplayName(preset)} · ${preset.width} × ${preset.height}`;
+  return null;
 }
 
-function getEnabledContextMenuQuickActions(actions: QuickAction[]): QuickAction[] {
-  return actions.filter((action) => action.status);
-}
-
-function buildScreenshotsDescriptors(quickActions: QuickAction[]): ContextMenuDescriptor[] {
-  const descriptors = [
-    createDescriptor(
-      CONTEXT_MENU_SCREENSHOTS_ID,
-      translate('popup.tabs.home'),
-      CONTEXT_MENU_ROOT_ID
-    ),
-    createDescriptor(
-      CONTEXT_MENU_SCREENSHOTS_PREPARE_ID,
-      translate('popup.home.screenshotPrepLabel'),
-      CONTEXT_MENU_SCREENSHOTS_ID
-    ),
-  ];
-  const enabledQuickActions = getEnabledContextMenuQuickActions(quickActions);
-
-  if (enabledQuickActions.length === 0) {
-    return descriptors;
-  }
-
-  return [
-    ...descriptors,
-    createDescriptor(
-      CONTEXT_MENU_SCREENSHOTS_SEPARATOR_ID,
-      undefined,
-      CONTEXT_MENU_SCREENSHOTS_ID,
-      'separator' as chrome.contextMenus.CreateProperties['type']
-    ),
-    ...enabledQuickActions.map((action) =>
-      createDescriptor(
-        buildContextMenuQuickActionId(action.id),
-        getQuickActionDisplayName(action),
-        CONTEXT_MENU_SCREENSHOTS_ID
-      )
-    ),
-  ];
-}
-
-function buildVideoDescriptors(): ContextMenuDescriptor[] {
-  return [
-    createDescriptor(CONTEXT_MENU_VIDEO_ID, translate('popup.tabs.video'), CONTEXT_MENU_ROOT_ID),
-    createDescriptor(
-      CONTEXT_MENU_VIDEO_TAB_ID,
-      translate('popup.video.modeTabLabel'),
-      CONTEXT_MENU_VIDEO_ID
-    ),
-    createDescriptor(
-      CONTEXT_MENU_VIDEO_AREA_ID,
-      translate('popup.video.modeAreaLabel'),
-      CONTEXT_MENU_VIDEO_ID
-    ),
-    createDescriptor(
-      CONTEXT_MENU_VIDEO_PRESET_ID,
-      translate('popup.video.modePresetLabel'),
-      CONTEXT_MENU_VIDEO_ID
-    ),
-    createDescriptor(
-      CONTEXT_MENU_VIDEO_WINDOW_ID,
-      translate('popup.video.modeScreenLabel'),
-      CONTEXT_MENU_VIDEO_ID
-    ),
-  ];
-}
-
-function buildExportDescriptors(): ContextMenuDescriptor[] {
-  return [
-    createDescriptor(CONTEXT_MENU_EXPORT_ID, translate('popup.tabs.export'), CONTEXT_MENU_ROOT_ID),
-    createDescriptor(
-      CONTEXT_MENU_EXPORT_START_ID,
-      translate('popup.export.exportButton'),
-      CONTEXT_MENU_EXPORT_ID
-    ),
-    createDescriptor(
-      CONTEXT_MENU_EXPORT_SEPARATOR_ID,
-      undefined,
-      CONTEXT_MENU_EXPORT_ID,
-      'separator' as chrome.contextMenus.CreateProperties['type']
-    ),
-    createDescriptor(
-      CONTEXT_MENU_EXPORT_COPY_JSON_ID,
-      translate('popup.export.copyJsonButton'),
-      CONTEXT_MENU_EXPORT_ID
-    ),
-    createDescriptor(
-      CONTEXT_MENU_EXPORT_COPY_MARKDOWN_ID,
-      translate('popup.export.copyMarkdownButton'),
-      CONTEXT_MENU_EXPORT_ID
-    ),
-  ];
-}
-
-function buildRootLeafDescriptors(settings: ContextMenuSettings): ContextMenuDescriptor[] {
-  const descriptors: ContextMenuDescriptor[] = [];
-
-  if (settings.showImageEditor) {
-    descriptors.push(
-      createDescriptor(
-        CONTEXT_MENU_IMAGE_EDITOR_ID,
-        translate('popup.home.imageEditorLabel'),
-        CONTEXT_MENU_ROOT_ID
-      )
-    );
-  }
-
-  if (settings.showVideoEditor) {
-    descriptors.push(
-      createDescriptor(
-        CONTEXT_MENU_VIDEO_EDITOR_ID,
-        translate('popup.video.videoEditorLabel'),
-        CONTEXT_MENU_ROOT_ID
-      )
-    );
-  }
-
-  if (settings.showGallery) {
-    descriptors.push(
-      createDescriptor(
-        CONTEXT_MENU_GALLERY_ID,
-        translate('popup.home.galleryLabel'),
-        CONTEXT_MENU_ROOT_ID
-      )
-    );
-  }
-
-  return descriptors;
-}
-
-function buildWindowResizeDescriptors(presets: readonly ViewportPreset[]): ContextMenuDescriptor[] {
-  const windowPresets = presets
-    .filter((preset) => preset.enabled && preset.target === 'window')
-    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
-  if (windowPresets.length === 0) return [];
-
-  return [
-    createDescriptor(
-      CONTEXT_MENU_WINDOW_RESIZE_ID,
-      translate('settings.appearance.contextMenuWindowResizeMenuLabel'),
-      CONTEXT_MENU_ROOT_ID
-    ),
-    ...windowPresets.map((preset) =>
-      createDescriptor(
-        buildContextMenuWindowResizePresetId(preset.id),
-        `${getViewportPresetDisplayName(preset)} · ${preset.width} × ${preset.height}`,
-        CONTEXT_MENU_WINDOW_RESIZE_ID
-      )
-    ),
-  ];
-}
-
-function buildSettingsDescriptors(hasPrimaryItems: boolean): ContextMenuDescriptor[] {
-  const descriptors: ContextMenuDescriptor[] = [];
-
-  if (hasPrimaryItems) {
-    descriptors.push(
-      createDescriptor(
-        CONTEXT_MENU_SETTINGS_SEPARATOR_ID,
-        undefined,
-        CONTEXT_MENU_ROOT_ID,
-        'separator' as chrome.contextMenus.CreateProperties['type']
-      )
-    );
-  }
-
-  descriptors.push(
-    createDescriptor(
-      CONTEXT_MENU_SETTINGS_ID,
-      translate('popup.common.footerSettings'),
-      CONTEXT_MENU_ROOT_ID
-    )
-  );
-
-  return descriptors;
-}
-
+/** Emit each configured command once, in saved order, under its configured parent. */
 export function buildContextMenuDescriptors(args: {
   quickActions: QuickAction[];
   settings: ContextMenuSettings;
   viewportPresets: readonly ViewportPreset[];
 }): ContextMenuDescriptor[] {
-  const descriptors = [createDescriptor(CONTEXT_MENU_ROOT_ID, PRODUCT_BRAND_NAME)];
-  const primaryDescriptors: ContextMenuDescriptor[] = [];
-
-  if (args.settings.showScreenshots) {
-    primaryDescriptors.push(...buildScreenshotsDescriptors(args.quickActions));
-  }
-
-  if (args.settings.showVideo) {
-    primaryDescriptors.push(...buildVideoDescriptors());
-  }
-
-  if (args.settings.showExport) {
-    primaryDescriptors.push(...buildExportDescriptors());
-  }
-
-  primaryDescriptors.push(...buildRootLeafDescriptors(args.settings));
-
-  if (args.settings.showPageLinkCopy) {
-    primaryDescriptors.push(...buildPageLinkCopyDescriptors());
-  }
-
-  if (args.settings.showWindowResize) {
-    primaryDescriptors.push(...buildWindowResizeDescriptors(args.viewportPresets));
-  }
-
-  descriptors.push(...primaryDescriptors);
-
-  if (args.settings.showSettings) {
-    descriptors.push(...buildSettingsDescriptors(primaryDescriptors.length > 0));
-  }
-
+  const descriptors: ContextMenuDescriptor[] = [
+    { id: CONTEXT_MENU_ROOT_ID, title: PRODUCT_BRAND_NAME },
+  ];
+  const seen = new Set<string>();
+  const tree = resolveContextMenuTree(args.settings, args.quickActions, args.viewportPresets);
+  const legacy = !parseContextMenuTree(args.settings.layout);
+  const appendCommand = (
+    node: { command: string; enabled: boolean; title?: string | undefined },
+    parentId: string
+  ): boolean => {
+    const available =
+      isContextMenuCommandAvailable(node.command, args.quickActions, args.viewportPresets) ||
+      (legacy &&
+        (args.quickActions.some(
+          (action) => action.status && buildContextMenuQuickActionId(action.id) === node.command
+        ) ||
+          args.viewportPresets.some(
+            (preset) =>
+              preset.enabled &&
+              preset.target === 'window' &&
+              buildContextMenuWindowResizePresetId(preset.id) === node.command
+          )));
+    if (!node.enabled || seen.has(node.command) || !available) return false;
+    const title = node.title ?? commandTitle(node.command, args.quickActions, args.viewportPresets);
+    if (!title) return false;
+    seen.add(node.command);
+    descriptors.push({ id: node.command, parentId, title });
+    return true;
+  };
+  const appendNode = (node: ContextMenuTreeNode, parentId: string): boolean => {
+    if (node.type === 'command') {
+      return appendCommand(node, parentId);
+    }
+    if (!node.enabled) return false;
+    const sectionId = `sniptale.section.${node.id}`;
+    const parentIndex = descriptors.length;
+    descriptors.push({
+      id: sectionId,
+      parentId,
+      title: contextMenuSectionTitle(node.id, node.title),
+    });
+    for (const child of node.children) appendNode(child, sectionId);
+    if (descriptors.length === parentIndex + 1) {
+      descriptors.pop();
+      return false;
+    }
+    return true;
+  };
+  for (const node of tree.nodes) appendNode(node, CONTEXT_MENU_ROOT_ID);
   return descriptors;
 }

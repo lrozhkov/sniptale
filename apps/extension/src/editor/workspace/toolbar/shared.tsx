@@ -67,8 +67,8 @@ export function EditorToolbarUndoSection(props: {
         <Redo2 size={18} strokeWidth={2} />
       </SelectionAwareToolbarButton>
       <SelectionAwareToolbarButton
-        title={translate('editor.toolbar.resetOriginal')}
-        disabled={!props.hasImage}
+        title={translate('editor.toolbar.resetOriginalTooltip')}
+        disabled={!props.hasImage || !props.history.canUndo}
         onAction={() => controller.resetToOriginal()}
         onBeforeSelectionAwareAction={props.onBeforeSelectionAwareAction}
         trackerLabel="toolbar-reset-to-original"

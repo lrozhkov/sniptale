@@ -141,6 +141,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     currentTime: transient.currentTime,
     effectRuntimeFeedback,
     isPlaying: params.isPlaying,
+    mutePreviewAudio: params.mutePreviewAudio ?? false,
     onPresentationTime: presentation.present,
     playbackRange: params.playbackRange,
     previewExactFrameCache,

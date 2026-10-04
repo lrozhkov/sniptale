@@ -1,5 +1,6 @@
+import { ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowUpRight, FileStack, X } from 'lucide-react';
+import { ArrowUpRight, X } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { openScenarioEditorPage } from '../../../platform/navigation/extension-pages/index';
 import { listScenarioPreviewSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
@@ -10,6 +11,7 @@ import type {
 } from '../../../features/scenario/contracts/types/project';
 import { formatDate } from '../ui';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
+import { ScenarioViewingActions } from './scenario-viewing-actions';
 
 interface GalleryScenarioPreviewPanelProps {
   project: ScenarioProjectSummary;
@@ -39,7 +41,7 @@ function ScenarioPreviewEmptyState() {
         bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_82%,transparent)]
         text-center text-[var(--sniptale-color-text-secondary)]"
     >
-      <FileStack className="mb-4 h-8 w-8 text-[var(--sniptale-color-accent-emphasis)]" />
+      <ScenarioEditorIcon className="mb-4 h-8 w-8 text-[var(--sniptale-color-accent-emphasis)]" />
       <div className="text-lg font-semibold text-[var(--sniptale-color-text-primary)]">
         {translate('gallery.app.scenarioProjectsTitle')}
       </div>
@@ -116,11 +118,8 @@ function ScenarioPreviewSidebarHeader(props: {
       <button
         type="button"
         onClick={props.onClose}
-        className="rounded-full border border-[var(--sniptale-color-border-soft)]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_86%,transparent)]
-          p-2 text-[var(--sniptale-color-text-muted)] transition
-          hover:border-[var(--sniptale-color-border-strong)]
-          hover:text-[var(--sniptale-color-text-primary)]"
+        className="sniptale-dismiss-button rounded-full border
+          p-2  transition"
       >
         <X className="h-4 w-4" />
       </button>
@@ -171,6 +170,7 @@ function ScenarioPreviewSidebar(props: {
           value={formatDate(props.project.createdAt)}
         />
         <ScenarioPreviewEditorButton projectId={props.project.id} disabled={!props.canEdit} />
+        {props.canEdit && <ScenarioViewingActions projectId={props.project.id} />}
       </div>
     </aside>
   );

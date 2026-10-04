@@ -99,7 +99,7 @@ describe('utils object helpers', () => {
     expect(isUserObject(browserFrameObject as never)).toBe(true);
     expect(isUserObject(cropGuideObject as never)).toBe(false);
     expect(isUserObject(frameObject as never)).toBe(false);
-    expect(isEditableObject(browserFrameObject as never)).toBe(true);
+    expect(isEditableObject(browserFrameObject as never)).toBe(false);
     expect(isEditableObject(annotationObject as never)).toBe(true);
     expect(isSourceObject(sourceObject as never)).toBe(true);
   });

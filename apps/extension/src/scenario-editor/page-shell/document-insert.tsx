@@ -1,7 +1,35 @@
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { FileText, Heading, Image, ListPlus, MessageSquare, CornerDownLeft } from 'lucide-react';
+import { createContext, useContext, type ReactNode } from 'react';
+import {
+  FileText,
+  Heading,
+  Image,
+  ListPlus,
+  MessageSquare,
+  CornerDownLeft,
+  Ellipsis,
+} from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
+import { GuideInsertActions } from './insert-actions';
+
+const InsertionAvailability = createContext<{ blocked: boolean; breaks: readonly string[] }>({
+  blocked: false,
+  breaks: [],
+});
+/** Editor selection and measured rows jointly determine available insertion commands. */
+export function GuideInsertScope({
+  value,
+  breaks = [],
+  children,
+}: {
+  value: boolean;
+  breaks?: readonly string[];
+  children: ReactNode;
+}) {
+  return (
+    <InsertionAvailability value={{ blocked: value, breaks }}>{children}</InsertionAvailability>
+  );
+}
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
@@ -23,6 +51,7 @@ export function GuideDocumentInsert({
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
 }) {
+  const { blocked, breaks } = useContext(InsertionAvailability);
   const before = target.kind === 'item' ? target.beforeItemId : target.beforeBlockId;
   const items =
     target.kind === 'item'
@@ -77,44 +106,46 @@ export function GuideDocumentInsert({
               ...(before === undefined ? {} : { beforeBlockId: before }),
             }),
         }));
+  const rowStartItem =
+    target.kind === 'block' &&
+    target.beforeBlockId &&
+    rowStart !== undefined &&
+    breaks.includes(target.beforeBlockId)
+      ? {
+          label: t(
+            rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
+          ),
+          icon: <CornerDownLeft size={15} aria-hidden="true" />,
+          pressed: rowStart,
+          onSelect: () =>
+            onOperate({
+              kind: 'set-row-start',
+              itemId: target.itemId,
+              blockId: target.beforeBlockId!,
+              rowStart: !rowStart,
+            }),
+        }
+      : null;
   return (
     <div
       className={`guide-insertion guide-insertion-${target.kind}`}
       data-end={end}
+      data-blocked={blocked || undefined}
+      inert={blocked}
+      aria-hidden={blocked || undefined}
       data-insert-before={before ?? 'end'}
     >
       <div className="guide-insertion-chrome">
-        {target.kind === 'block' && target.beforeBlockId && rowStart !== undefined && (
-          <ContentToolbarButton
-            title={t(
-              rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
-            )}
-            aria-pressed={rowStart}
-            disabled={disabled}
-            onClick={() =>
-              onOperate({
-                kind: 'set-row-start',
-                itemId: target.itemId,
-                blockId: target.beforeBlockId!,
-                rowStart: !rowStart,
-              })
-            }
-          >
-            <CornerDownLeft size={15} aria-hidden="true" />
-          </ContentToolbarButton>
-        )}
-        {items.map((item) => (
-          <ContentToolbarButton
-            key={item.label}
-            type="button"
-            title={item.label}
-            aria-label={item.label}
-            disabled={disabled}
-            onClick={item.onSelect}
-          >
-            {item.icon}
-          </ContentToolbarButton>
-        ))}
+        <GuideInsertActions
+          icon={<Ellipsis size={16} aria-hidden="true" />}
+          label={t(
+            target.kind === 'item'
+              ? 'scenario.editor.guideInsertItem'
+              : 'scenario.editor.guideAddBlock'
+          )}
+          items={rowStartItem ? [...items, rowStartItem] : items}
+          disabled={disabled || blocked}
+        />
       </div>
     </div>
   );

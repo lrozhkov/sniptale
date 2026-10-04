@@ -40,7 +40,11 @@ export function TourNavigationLayoutSettings({
     { value: 'end', Icon: ArrowDown, label: t('scenario.editor.tourPositionBottom') },
   ] as const;
   return (
-    <GuideInspectorGroup icon={LayoutPanelTop} title={t('scenario.editor.tourComposition')}>
+    <GuideInspectorGroup
+      id="composition"
+      icon={LayoutPanelTop}
+      title={t('scenario.editor.tourComposition')}
+    >
       {(
         [
           { key: 'align', label: t('scenario.editor.tourAlignment'), values: alignments },

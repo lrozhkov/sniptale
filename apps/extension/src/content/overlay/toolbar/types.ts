@@ -1,3 +1,4 @@
+import type { PagePreparationResetScope } from '../../parser/page-preparation/history';
 import type { CaptureActionType, ContentToolbarDisplayMode } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ToolbarMenuState } from './state/menu';
@@ -60,14 +61,39 @@ export type ToolbarViewportSelection = {
   height: number;
 } | null;
 
+/** Disposable size selection for one mounted screenshot controller. */
+export interface ScreenshotWindowSizeControls {
+  onlyDuringCapture: boolean;
+  busy: boolean;
+  selection: ToolbarViewportSelection;
+  select: (
+    selection: ToolbarViewportSelection,
+    intent?: ContentPrivilegedActionIntentSource | null | undefined
+  ) => Promise<void>;
+  setOnlyDuringCapture: (
+    value: boolean,
+    current: ToolbarViewportSelection,
+    intent?: ContentPrivilegedActionIntentSource | null | undefined
+  ) => Promise<void>;
+}
+
 export type ToolbarPageEditingMode = 'block-selection' | 'direct-text' | 'ai';
 
 export interface ToolbarCaptureActionsProps {
+  windowSize?: ScreenshotWindowSizeControls;
   screenshotMode: boolean;
+  videoRecordingMode?: boolean;
+  isNavigationMode?: boolean;
+  autoBlurEnabled?: boolean;
+  canClearPagePreparation?: boolean;
+  resetScope?: PagePreparationResetScope;
+  onClearPagePreparation?: () => void;
   isLoading: boolean;
   captureAction: CaptureActionType;
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement?: boolean;
+  onFreePlacementChange?: ((value: boolean) => void) | undefined;
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
@@ -96,6 +122,7 @@ export interface ToolbarCaptureActionsProps {
 export interface ToolbarAutoBlurProps {
   autoApplyAllowed: boolean;
   autoApplyEnabled: boolean;
+  pinToTabAvailable?: boolean;
   isApplying: boolean;
   onApplyOnce: () => Promise<void>;
   onOpenAutoApplySettings: () => void;
@@ -123,6 +150,7 @@ export interface ToolbarFutureFrameStepBadgeActions {
 }
 
 export interface ToolbarProps {
+  windowSize?: ScreenshotWindowSizeControls;
   captureAction?: CaptureActionType;
   onCaptureActionChange?: (action: CaptureActionType) => void;
   onToggleScreenshotMode: (enabled: boolean) => void;
@@ -166,6 +194,7 @@ export interface ToolbarProps {
   onClearHighlights: () => void;
   onClearPagePreparation?: () => void;
   canClearPagePreparation?: boolean;
+  resetScope?: PagePreparationResetScope;
   autoBlur?: ToolbarAutoBlurProps;
   onToggleNavigationLock?: (enabled: boolean) => void;
   timerDelay: number;

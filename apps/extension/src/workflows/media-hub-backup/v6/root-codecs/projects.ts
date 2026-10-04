@@ -27,6 +27,7 @@ import {
 } from '../../../../composition/persistence/review-workspaces/backup-restore';
 import { assertExactPortableVideoProjectAssetInventory } from './video-project-asset-inventory';
 import { assertUniquePortableScenarioChildIdentities } from './scenario-project-identities';
+import { parseScenarioExportEntry } from '../../../../composition/persistence/scenario/read-guards';
 
 /** Portable image keys add eight bytes per image; array separators add one per version. */
 export const MAX_PORTABLE_SCENARIO_HISTORY_BYTES =
@@ -39,10 +40,13 @@ interface PortableProjectAsset {
   entry: Omit<StoredProjectAssetEntry, 'assetId'>;
   filename: string;
   objectId: string;
+  publishToLibrary?: boolean;
+  libraryMediaId?: string;
   videoReview?: PortableVideoReview;
 }
 
 interface PortableProjectExport {
+  libraryMediaId?: string;
   entry: Omit<StoredProjectExportEntry, 'assetId'>;
   objectId: string;
   thumbnail?: PortableMediaThumbnail;
@@ -93,7 +97,9 @@ export interface PortableScenarioProjectMetadata {
   };
   historyObjectId?: string;
   exportThumbnails: Array<{ exportId: string; thumbnail: PortableMediaThumbnail }>;
-  exports: ScenarioExportEntry[];
+  exports: Array<
+    Omit<ScenarioExportEntry, 'html'> & { html?: { mode: 'guide' | 'tour'; objectId: string } }
+  >;
   presentation?: PortableAggregatePresentation;
   stepDocuments: PortableScenarioStepDocument[];
   thumbnail?: PortableMediaThumbnail;
@@ -193,6 +199,10 @@ function isPortableProjectAsset(value: unknown): value is PortableProjectAsset {
     !('assetId' in value['entry']) &&
     typeof value['entry']['id'] === 'string' &&
     typeof value['filename'] === 'string' &&
+    (value['publishToLibrary'] === undefined || typeof value['publishToLibrary'] === 'boolean') &&
+    (value['libraryMediaId'] === undefined ||
+      (value['libraryMediaId'] === `project-asset:${value['entry']['id']}` &&
+        value['publishToLibrary'] !== false)) &&
     typeof value['objectId'] === 'string'
   );
 }
@@ -204,6 +214,8 @@ function isPortableProjectExport(value: unknown): value is PortableProjectExport
     !('assetId' in value['entry']) &&
     typeof value['entry']['id'] === 'string' &&
     typeof value['objectId'] === 'string' &&
+    (value['libraryMediaId'] === undefined ||
+      value['libraryMediaId'] === `export:${value['entry']['id']}`) &&
     (value['thumbnail'] === undefined || isPortableThumbnail(value['thumbnail']))
   );
 }
@@ -283,6 +295,26 @@ function isPortableScenarioHistory(
   );
 }
 
+function isPortableScenarioExport(
+  value: unknown
+): value is PortableScenarioProjectMetadata['exports'][number] {
+  if (!isRecord(value) || !parseScenarioExportEntry({ ...value, html: undefined })) return false;
+  const html = value['html'];
+  return (
+    html === undefined ||
+    (value['format'] === 'html' &&
+      typeof value['size'] === 'number' &&
+      Number.isSafeInteger(value['size']) &&
+      value['size'] > 0 &&
+      isRecord(html) &&
+      (html['mode'] === 'guide' || html['mode'] === 'tour') &&
+      !('assetId' in html) &&
+      typeof html['objectId'] === 'string' &&
+      html['objectId'].length > 0 &&
+      html['objectId'].length <= 160)
+  );
+}
+
 function isPortableScenarioProjectMetadata(
   value: unknown
 ): value is PortableScenarioProjectMetadata {
@@ -299,7 +331,7 @@ function isPortableScenarioProjectMetadata(
     Array.isArray(value['assets']) &&
     value['assets'].every(isPortableScenarioAsset) &&
     Array.isArray(value['exports']) &&
-    value['exports'].every(isRecord) &&
+    value['exports'].every(isPortableScenarioExport) &&
     Array.isArray(value['exportThumbnails']) &&
     value['exportThumbnails'].every(
       (item) =>

@@ -1,3 +1,4 @@
+import { createFilenameSession } from '../../../workflows/file-naming/index';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type {
   CaptureMode,
@@ -133,6 +134,10 @@ async function startRecordingInternal(
     return;
   }
 
+  const filenameSession = {
+    ...(await createFilenameSession(recordingId)),
+    title: params.sourceContext?.title ?? prepared.sourceLabel ?? undefined,
+  };
   const coordinator = await createRecordingStagingCoordinator();
   if (!isStillStarting(recordingId)) {
     await coordinator.abort();
@@ -141,12 +146,14 @@ async function startRecordingInternal(
   }
   recordingContext.bindStagingCoordinator(coordinator);
   await initializeSidecarRecorders({
+    filenameSession,
     baseRecordingId: recordingId,
     coordinator,
     settings: params.settings,
     ...(params.captureMode === undefined ? {} : { captureMode: params.captureMode }),
   });
   await finalizeRecordingBootstrap({
+    filenameSession,
     resolvedRecordingId: recordingId,
     settings: params.settings,
     cursorCaptureMode: prepared.cursorCaptureMode,

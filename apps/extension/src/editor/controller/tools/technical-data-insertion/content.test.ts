@@ -23,3 +23,16 @@ it('builds ordered column and row technical data text', () => {
     })
   ).toContain(' · ');
 });
+
+it('uses the available capture time instead of the insertion time', () => {
+  const text = buildTechnicalDataText({
+    kinds: ['date'],
+    layout: 'column',
+    locale: 'en',
+    sourceTitle: '',
+    sourceUrl: '',
+    capturedAt: new Date('2020-03-04T10:20:00.000Z').getTime(),
+  });
+
+  expect(text).toContain('2020');
+});

@@ -72,7 +72,11 @@ export function GuideTemplateControls({
   };
   const content = classifyGuideStepContent(step);
   return (
-    <GuideInspectorGroup icon={LayoutTemplate} title={t('scenario.editor.stepTemplates')}>
+    <GuideInspectorGroup
+      id="stepTemplates"
+      icon={LayoutTemplate}
+      title={t('scenario.editor.stepTemplates')}
+    >
       <div className="guide-template-controls">
         <GuideTemplatePicker
           entries={entries}
@@ -86,6 +90,7 @@ export function GuideTemplateControls({
           t={t}
         />
         <ProductActionButton
+          className="scenario-inspector-action"
           hidden={saving}
           tone="secondary"
           compact

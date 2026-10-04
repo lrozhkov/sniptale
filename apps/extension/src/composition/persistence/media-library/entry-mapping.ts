@@ -77,6 +77,7 @@ export function buildRecordingMediaEntry(entry: RecordingMediaEntryInput): Media
     tags: [],
     lifecycle: entry.lifecycle ?? createLibraryLifecycle('library', entry.createdAt),
     ...(entry.recordingGroup ? { recordingGroup: entry.recordingGroup } : {}),
+    ...(entry.recordingMetadata ? { recordingMetadata: entry.recordingMetadata } : {}),
   };
 }
 
@@ -98,6 +99,7 @@ export function buildProjectExportMediaEntry(entry: StoredProjectExportEntry): M
     width: entry.width,
     height: entry.height,
     duration: entry.duration,
+    ...(entry.recordingMetadata ? { recordingMetadata: entry.recordingMetadata } : {}),
     sourceUrl: null,
     sourceTitle: null,
     sourceFavicon: null,

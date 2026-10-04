@@ -8,11 +8,19 @@ import type { CompactSelectOption } from '../../chrome/ui';
 export interface EditorInspectorFramePanelProps {
   scenePresetHeader: EditorInspectorPresetHeaderState | null;
   frameDraft: EditorFrameSettings;
+  lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   backgroundPreviewStyle: React.CSSProperties;
   framePaddingSummary: string;
   frameLayoutModeOptions: CompactSelectOption<EditorFrameSettings['layoutMode']>[];
   frameBackgroundModeOptions: CompactSelectOption<EditorFrameSettings['backgroundMode']>[];
-  gradientPresets: Array<{ id: string; label: string; from: string; to: string; angle: number }>;
+  gradientPresets: Array<{
+    id: string;
+    label: string;
+    from: string;
+    to: string;
+    angle: number;
+    stops?: Array<{ color: string; offset: number }>;
+  }>;
   frameBackgroundPalette: readonly string[];
   frameBackgroundImageFitOptions: CompactSelectOption<EditorFrameSettings['backgroundImageFit']>[];
   lineStyleOptions?: CompactSelectOption<EditorImageSettings['strokeStyle']>[] | undefined;
@@ -28,6 +36,7 @@ export interface EditorInspectorFramePanelProps {
     from: string;
     to: string;
     angle: number;
+    stops?: Array<{ color: string; offset: number }>;
   }) => void;
   previewFramePatch: (patch: Partial<EditorFrameSettings>) => void;
   applyFramePatch: (patch: Partial<EditorFrameSettings>) => void;

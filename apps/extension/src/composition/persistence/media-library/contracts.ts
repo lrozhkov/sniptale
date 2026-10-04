@@ -1,3 +1,4 @@
+import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import type { MediaAssetKind } from '../../../features/media-hub/media-types';
 import type { LibraryLifecycle, LibraryStorageClass } from '../library-lifecycle/contracts';
@@ -9,6 +10,7 @@ export type ImageContentState = 'edited' | 'original';
 
 export type MediaAssetSource =
   | { kind: 'screenshot' }
+  | { kind: 'stored-asset'; assetId: string }
   | { kind: 'recording'; recordingId: string }
   | {
       kind: 'project-export';
@@ -19,6 +21,8 @@ export type MediaAssetSource =
   | { kind: 'web-snapshot'; snapshotId: string };
 
 export interface MediaLibraryEntry {
+  /** Frozen acquisition facts; never describes the processed output file. */
+  recordingMetadata?: RecordingMetadata;
   id: string;
   kind: MediaAssetKind;
   source: MediaAssetSource;
@@ -74,6 +78,7 @@ export interface SaveScreenshotMediaAssetInput {
 }
 
 export interface SaveWebSnapshotMediaAssetInput {
+  storageClass?: LibraryStorageClass;
   id?: string;
   createdAt?: number;
   filename: string;

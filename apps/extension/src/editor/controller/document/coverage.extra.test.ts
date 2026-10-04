@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const storeState = {
   activeTool: 'select',
+  pageTitle: 'Stored title',
   browserFrame: { title: 'Stored title', url: 'https://stored.example' },
   frame: {
     ...DEFAULT_EDITOR_FRAME_SETTINGS,
@@ -22,8 +23,10 @@ const storeState = {
   },
   setBrowserFrame: vi.fn(),
   setImageData: vi.fn(),
+  setFreshImageBackgroundPending: vi.fn(),
   setInspector: vi.fn(),
   setPageTitle: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
   toolSettings: {
     step: { alphabet: 'latin', color: '#ff671d', sizeLevel: 3, type: 'number', value: '9' },
   },
@@ -147,8 +150,14 @@ function registerPreparedStateApplyTest() {
     expect(storeState.updateFrame).toHaveBeenCalledWith(options.prepared.frame);
     expect(storeState.setBrowserFrame).toHaveBeenCalledWith(options.prepared.browserFrame);
     expect(storeState.updateStepSettings).toHaveBeenCalledWith({ value: '1' });
-    expect(options.setOriginalDocument).toHaveBeenCalledWith(options.prepared.normalizedDocument);
-    expect(options.setHistory).toHaveBeenCalledWith(options.prepared.normalizedDocument);
+    expect(options.setOriginalDocument).toHaveBeenCalledWith({
+      ...options.prepared.normalizedDocument,
+      displayName: 'Stored title',
+    });
+    expect(options.setHistory).toHaveBeenCalledWith({
+      ...options.prepared.normalizedDocument,
+      displayName: 'Stored title',
+    });
     expect(options.setCropState).toHaveBeenCalledWith(null, null);
     expect(options.setActiveTool).toHaveBeenCalledWith('select');
     expect(options.applyToolMode).toHaveBeenCalledOnce();

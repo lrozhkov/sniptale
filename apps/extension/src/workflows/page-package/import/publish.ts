@@ -56,6 +56,7 @@ export async function importWebSnapshotPackage(
   const result = await saveWebSnapshotMediaAssetSafely(
     {
       id: localId,
+      storageClass: 'library',
       createdAt: Date.parse(pagePackage.manifest.capturedAt),
       filename: packageFile.name,
       manifest: pagePackage.manifest,

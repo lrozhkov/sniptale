@@ -24,6 +24,11 @@ const projectsDbMocks = vi.hoisted(() => ({
   recoverProjectMediaPublicationsMock: vi.fn(),
 }));
 
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  completePhysicalDeleteOperation: vi.fn(async () => undefined),
+}));
+
 vi.mock('./asset-publication', async (importOriginal) => ({
   ...(await importOriginal()),
   recoverProjectMediaPublications: projectsDbMocks.recoverProjectMediaPublicationsMock,
@@ -69,6 +74,7 @@ function createDb() {
       done: Promise.resolve(),
       objectStore: vi.fn(() => ({
         delete: projectsDbMocks.txDeleteMock,
+        index: () => ({ count: async () => 0 }),
         get: projectsDbMocks.txGetMock,
         getAll: projectsDbMocks.txGetAllMock,
         put: projectsDbMocks.txPutMock,
@@ -119,7 +125,13 @@ it('deletes removed project-owned assets while saving the next project snapshot'
     assets: [existingProject.assets[0]!],
   };
 
-  projectsDbMocks.txGetMock.mockResolvedValue(createVideoProjectEntry(existingProject));
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === existingProject.id
+      ? createVideoProjectEntry(existingProject)
+      : key === 'asset-b'
+        ? { id: 'asset-b', assetId: 'asset-b-bytes', createdAt: 1, mimeType: 'video/mp4', size: 10 }
+        : undefined
+  );
   vi.spyOn(Date, 'now').mockReturnValue(1000);
 
   await saveVideoProject(nextProject);
@@ -135,6 +147,71 @@ it('deletes removed project-owned assets while saving the next project snapshot'
   expect(projectsDbMocks.publishMediaHubLibraryChangedMock).toHaveBeenCalledWith('update', [
     'video-project:project-1',
   ]);
+});
+
+it('saves a linked recording and its library media when a video project uses it', async () => {
+  const { saveVideoProject } = await import('./index');
+  const lifecycle = { storageClass: 'temporary' as const, savedAt: null, updatedAt: 1 };
+  const recording = {
+    assetId: 'recording-object-1',
+    createdAt: 1,
+    filename: 'recording.webm',
+    id: 'recording-1',
+    lifecycle,
+    mimeType: 'video/webm',
+    size: 20,
+  };
+  const media = createMediaLibraryEntry({
+    id: 'recording:recording-1',
+    kind: 'recording',
+    lifecycle,
+    source: { kind: 'recording', recordingId: 'recording-1' },
+  });
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === recording.id ? recording : key === media.id ? media : undefined
+  );
+
+  await saveVideoProject(createVideoProject({ baseRecordingId: recording.id }), {
+    storageClass: 'temporary',
+  });
+
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: recording.id,
+      lifecycle: expect.objectContaining({ storageClass: 'library', savedAt: expect.any(Number) }),
+    })
+  );
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: media.id,
+      lifecycle: expect.objectContaining({ storageClass: 'library', savedAt: expect.any(Number) }),
+    })
+  );
+});
+
+it('does not announce a saved project when linked recording promotion fails', async () => {
+  const { saveVideoProject } = await import('./index');
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === 'recording-1'
+      ? {
+          assetId: 'recording-object-1',
+          createdAt: 1,
+          filename: 'recording.webm',
+          id: 'recording-1',
+          lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+          mimeType: 'video/webm',
+          size: 20,
+        }
+      : undefined
+  );
+  projectsDbMocks.txPutMock
+    .mockResolvedValueOnce(undefined)
+    .mockRejectedValueOnce(new Error('recording write failed'));
+
+  await expect(
+    saveVideoProject(createVideoProject({ baseRecordingId: 'recording-1' }))
+  ).rejects.toThrow('recording write failed');
+  expect(projectsDbMocks.publishMediaHubLibraryChangedMock).not.toHaveBeenCalled();
 });
 
 it('preserves removed project-owned assets while another project references them', async () => {
@@ -158,24 +235,49 @@ it('preserves removed project-owned assets while another project references them
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-shared');
 });
 
-it('preserves a removed project asset that was saved independently to the library', async () => {
-  const { saveVideoProject } = await import('./index');
-  const savedAsset = createProjectOwnedVideoAsset('asset-saved');
-  const existingProject = createVideoProject({ assets: [savedAsset] });
-  projectsDbMocks.txGetMock
-    .mockResolvedValueOnce(createVideoProjectEntry(existingProject))
-    .mockResolvedValueOnce(
-      createMediaLibraryEntry({
-        id: 'project-asset:asset-saved',
-        source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
-      })
+it.each(['library', 'temporary'] as const)(
+  'preserves a published %s project asset when detached',
+  async (storageClass) => {
+    const { saveVideoProject } = await import('./index');
+    const savedAsset = createProjectOwnedVideoAsset('asset-saved');
+    const existingProject = createVideoProject({ assets: [savedAsset] });
+    projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+      key === 'project-1'
+        ? createVideoProjectEntry(existingProject)
+        : key === 'project-asset:asset-saved'
+          ? createMediaLibraryEntry({
+              id: 'project-asset:asset-saved',
+              source: { kind: 'project-asset', projectAssetId: 'asset-saved' },
+              lifecycle: {
+                storageClass,
+                savedAt: storageClass === 'library' ? 1 : null,
+                updatedAt: 1,
+              },
+            })
+          : undefined
     );
 
-  await saveVideoProject({ ...existingProject, assets: [] });
+    await saveVideoProject({ ...existingProject, assets: [] });
 
-  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-saved');
-  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-saved');
-});
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('asset-saved');
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-saved');
+    if (storageClass === 'temporary') {
+      expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: 'project-asset:asset-saved',
+          lifecycle: expect.objectContaining({
+            storageClass: 'library',
+            savedAt: expect.any(Number),
+          }),
+        })
+      );
+    } else {
+      expect(projectsDbMocks.txPutMock).not.toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'project-asset:asset-saved' })
+      );
+    }
+  }
+);
 
 it('preserves newer persisted project-owned assets for legacy unguarded saves', async () => {
   const { saveVideoProject } = await import('./index');
@@ -326,7 +428,18 @@ it('uses now as createdAt fallback and ignores externally owned assets while sav
     ],
   });
 
-  projectsDbMocks.txGetMock.mockResolvedValue(undefined);
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === 'recording-1'
+      ? {
+          id: key,
+          assetId: 'recording-object',
+          filename: 'clip.webm',
+          mimeType: 'video/webm',
+          size: 20,
+          createdAt: 1,
+        }
+      : undefined
+  );
   vi.spyOn(Date, 'now').mockReturnValue(2000);
   Reflect.deleteProperty(project, 'createdAt');
 
@@ -358,4 +471,88 @@ it('retains a temporary project in the library with its next revisioned workspac
       workspaceRevision: 8,
     })
   );
+});
+
+it.each([
+  { parentSaved: false, mirrorSaved: false, sibling: 'temporary' },
+  { parentSaved: false, mirrorSaved: false, sibling: 'library' },
+  { parentSaved: true, mirrorSaved: false, sibling: 'temporary' },
+  { parentSaved: false, mirrorSaved: true, sibling: 'temporary' },
+])(
+  'promotes project media while preserving independent Trash admission: %j',
+  async ({ parentSaved, mirrorSaved, sibling }) => {
+    const { saveVideoProject } = await import('./index');
+    const lifecycle = (library: boolean) => ({
+      storageClass: library ? ('library' as const) : ('temporary' as const),
+      savedAt: library ? 100 : null,
+      updatedAt: 100,
+    });
+    const project = createVideoProject({ assets: [createProjectOwnedVideoAsset('asset-1')] });
+    const existing = createVideoProjectEntry(project, { lifecycle: lifecycle(parentSaved) });
+    const media = createMediaLibraryEntry({
+      id: 'project-asset:asset-1',
+      lifecycle: { ...lifecycle(mirrorSaved), trashedAt: 500 },
+    });
+    projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+      id === project.id ? existing : id === media.id ? media : undefined
+    );
+    projectsDbMocks.txGetAllMock.mockResolvedValue([
+      existing,
+      createVideoProjectEntry(
+        { id: 'sibling', assets: project.assets },
+        {
+          lifecycle: lifecycle(sibling === 'library'),
+        }
+      ),
+    ]);
+    vi.spyOn(Date, 'now').mockReturnValue(1000);
+
+    await saveVideoProject(project);
+
+    expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: media.id,
+        source: media.source,
+        lifecycle: {
+          storageClass: 'library',
+          savedAt: mirrorSaved ? 100 : 1000,
+          updatedAt: mirrorSaved ? 100 : 1000,
+          trashedAt: 500,
+        },
+      })
+    );
+    expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+  }
+);
+
+it('does not manufacture a missing media mirror while saving a project with a retained source', async () => {
+  const { saveVideoProject } = await import('./index');
+  const project = createVideoProject({ assets: [createProjectOwnedVideoAsset('asset-1')] });
+  const existing = createVideoProjectEntry(project, {
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 100 },
+  });
+  projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+    id === project.id ? existing : undefined
+  );
+  projectsDbMocks.txGetAllMock.mockResolvedValue([existing]);
+
+  await saveVideoProject(project);
+
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledTimes(1);
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({ id: project.id })
+  );
+  expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+});
+
+it('refuses a newly inserted source deleted before the placement could be saved', async () => {
+  const { saveVideoProject } = await import('./index');
+  const existing = createVideoProject();
+  const imported = createProjectOwnedVideoAsset('deleted-acquisition');
+  const linked = { ...imported, source: { ...imported.source, originMediaId: 'deleted-original' } };
+  projectsDbMocks.txGetMock.mockImplementation(async (key: string) =>
+    key === existing.id ? createVideoProjectEntry(existing) : undefined
+  );
+  await expect(saveVideoProject({ ...existing, assets: [linked] })).rejects.toThrow();
+  expect(projectsDbMocks.txPutMock).not.toHaveBeenCalled();
 });

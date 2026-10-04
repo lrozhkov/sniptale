@@ -172,7 +172,11 @@ describe('capture commands', () => {
     await runExtensionCommand(command, state, tab);
 
     expect(mocks.loadScreenshotCaptureRuntimeContext).toHaveBeenCalledWith(
-      expect.objectContaining({ afterCapture, screenshotMode: mode })
+      expect.objectContaining({
+        afterCapture,
+        screenshotMode: mode,
+        delay: mode === 'desktop' ? 3 : null,
+      })
     );
     expect(mocks.handleQuickAction).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -181,9 +185,7 @@ describe('capture commands', () => {
         tabId: 42,
       })
     );
-    expect(mocks.selectAndCaptureDesktopQuickAction).toHaveBeenCalledTimes(
-      mode === 'desktop' ? 1 : 0
-    );
+    expect(mocks.selectAndCaptureDesktopQuickAction).not.toHaveBeenCalled();
   });
 });
 

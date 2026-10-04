@@ -1,5 +1,13 @@
+import type { ReviewInspectorNavigation } from './inspector-navigation';
+import type { ReviewBeforeAction } from './note-transitions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ReviewInspectorPresentation } from './inspector-sections';
+import '../../ui/compact-inspector-controls/inspector-surface.css';
+import './inspector.css';
 import './inspector-navigation.css';
 import {
+  List,
+  PanelLeft,
   ChevronsDownUp,
   ChevronsUpDown,
   Pencil,
@@ -10,7 +18,7 @@ import {
   FileDown,
   X,
 } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
@@ -19,11 +27,11 @@ import {
   reviewTimeLabel,
   reviewIconButtonClassName,
   reviewTextButtonClassName,
-  reviewDeleteButtonClassName,
 } from './controls';
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   filename: string;
   annotations: readonly ReviewAnnotation[];
   selectedId: string | null;
@@ -34,6 +42,8 @@ export function ReviewInspector(props: {
   recovery?: ReactNode;
   scene?: ReactNode;
   selectionLabel?: string | undefined;
+  selectionHasSections?: boolean;
+  selectionPreferenceScope?: string;
   onBack(): void;
   onClose?(): void;
   rangeSelected?: boolean;
@@ -47,54 +57,33 @@ export function ReviewInspector(props: {
   actions?: ReactNode;
   composer?: ReactNode;
   editingId?: string | undefined;
-  contextKey?: string;
+  navigation: ReviewInspectorNavigation;
   settingsAvailable?: boolean;
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  const contextKey = props.contextKey ?? 'comments';
-  type Section = 'scene' | 'selected' | 'comments';
-  const contextSection: Section = contextKey.startsWith('comments')
-    ? 'comments'
-    : props.selectionLabel
-      ? 'selected'
-      : props.settingsAvailable
-        ? 'scene'
-        : 'comments';
-  const [section, setSection] = useState<Section>(contextSection);
-  const scroll = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (scroll.current) scroll.current.scrollTop = 0;
-  }, [contextKey, section]);
-  const previousSettings = useRef(props.settingsAvailable);
-  useEffect(() => {
-    const modeChanged = previousSettings.current !== props.settingsAvailable;
-    previousSettings.current = props.settingsAvailable;
-    setSection((current) =>
-      !modeChanged && contextSection === 'scene' && current === 'comments'
-        ? current
-        : contextSection
-    );
-  }, [contextKey, contextSection, props.settingsAvailable]);
-  const shown =
-    section === 'selected' && !props.selectionLabel
-      ? props.settingsAvailable
-        ? 'scene'
-        : 'comments'
-      : section === 'scene' && !props.settingsAvailable
-        ? 'comments'
-        : section;
+  type Section = 'scene' | 'selected' | 'comments' | 'export';
+  const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
-      className={`flex min-h-0 flex-col gap-2 overflow-hidden border-l
+      className={`sniptale-inspector-surface flex min-h-0 flex-col gap-2 overflow-hidden border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
           props.fullHeight
             ? 'min-[800px]:col-start-2 min-[800px]:row-start-1 min-[800px]:row-span-2'
             : ''
         }`}
     >
-      <ReviewInspectorHeader {...props} />
+      <ReviewInspectorHeader
+        {...props}
+        presentation={presentation}
+        section={shown}
+        onTogglePresentation={() =>
+          (props.beforeAction ?? ((action) => action()))(() =>
+            setPresentation((mode) => (mode === 'all' ? 'sections' : 'all'))
+          )
+        }
+      />
       <div className="shrink-0">
         <p
           className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
@@ -103,34 +92,13 @@ export function ReviewInspector(props: {
           {props.filename}
         </p>
       </div>
-      {props.saveStatus === 'failed' ? (
-        <div
-          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-muted)]"
-          role="status"
-        >
-          <span>{translate('gallery.videoReview.saveFailed')}</span>
-          {props.saveStatus === 'failed' ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.retry')}
-              disabled={props.busy}
-              onClick={props.onRetry}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      {props.message ? (
-        <p role="status" className="text-sm">
-          {props.message}
-        </p>
-      ) : null}
-      {props.recovery}
-      {props.settingsAvailable || props.selectionLabel ? (
+      <ReviewInspectorStatus {...props} />
+      {props.settingsAvailable || props.selectionLabel || props.actions ? (
         <div
           className="review-inspector-navigation shrink-0"
           data-ui="gallery.videoReview.inspectorNavigation"
         >
           <SegmentedSwitch<Section>
-            wrap
             density="compact"
             activeId={shown}
             ariaLabel={translate('gallery.videoReview.inspector')}
@@ -139,22 +107,43 @@ export function ReviewInspector(props: {
               ...(props.settingsAvailable
                 ? [{ id: 'scene' as const, label: translate('gallery.videoReview.scene') }]
                 : []),
-              ...(props.selectionLabel
+              ...(context === 'selected' && props.selectionLabel
                 ? [{ id: 'selected' as const, label: props.selectionLabel }]
+                : []),
+              ...(context === 'export' && props.actions
+                ? [
+                    {
+                      id: 'export' as const,
+                      label: translate('gallery.videoReview.exportSection'),
+                    },
+                  ]
                 : []),
             ]}
             onChange={setSection}
           />
         </div>
       ) : null}
-      <div ref={scroll} className="min-h-0 flex-1 space-y-3 overflow-y-auto">
-        {shown === 'scene' ? (
-          props.scene
-        ) : shown === 'selected' ? (
-          props.children
-        ) : (
-          <ReviewNotes {...props} />
-        )}
+      <div
+        ref={scroll}
+        className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
+      >
+        <ReviewInspectorPresentation
+          value={presentation}
+          section={shown}
+          selectionScope={props.selectionPreferenceScope}
+        >
+          {shown === 'export' ? (
+            <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
+              {props.actions}
+            </section>
+          ) : shown === 'scene' ? (
+            props.scene
+          ) : shown === 'selected' ? (
+            props.children
+          ) : (
+            <ReviewNotes {...props} />
+          )}
+        </ReviewInspectorPresentation>
       </div>
       <ReviewInspectorFooter {...props} showReports={shown === 'comments'} />
     </aside>
@@ -174,10 +163,12 @@ function ReviewAnnotationList(props: {
   onDelete(value: ReviewAnnotation): void;
 }) {
   return (
-    <ol className="space-y-2">
+    <ol className="review-inspector-list space-y-2">
       {props.annotations.map((annotation) => (
         <li
           key={annotation.id}
+          data-selected={props.selectedId === annotation.id}
+          data-editing={props.editingId === annotation.id}
           className={`group relative rounded-lg ${props.editingId === annotation.id ? '' : 'border p-3'}
               ${
                 props.selectedId === annotation.id
@@ -194,6 +185,7 @@ function ReviewAnnotationList(props: {
               <button
                 type="button"
                 className="block w-full text-left"
+                aria-pressed={props.selectedId === annotation.id}
                 onClick={() => props.onSelect(annotation)}
               >
                 <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
@@ -205,7 +197,7 @@ function ReviewAnnotationList(props: {
                   {annotation.text}
                 </span>
               </button>
-              <div className="mt-2 flex justify-end gap-1">
+              <div className="review-inspector-row-actions flex justify-end gap-1">
                 <ReviewButton
                   label={translate('gallery.videoReview.editComment')}
                   disabled={props.busy}
@@ -214,14 +206,17 @@ function ReviewAnnotationList(props: {
                 >
                   <Pencil size={16} />
                 </ReviewButton>
-                <ReviewButton
-                  label={translate('gallery.videoReview.deleteComment')}
-                  disabled={props.busy}
-                  className={`${reviewDeleteButtonClassName} !w-8`}
-                  onClick={() => props.onDelete(annotation)}
-                >
-                  <Trash2 size={16} />
-                </ReviewButton>
+                {props.selectedId === annotation.id ? (
+                  <ReviewButton
+                    label={translate('gallery.videoReview.deleteSelected')}
+                    disabled={props.busy}
+                    className={reviewIconButtonClassName}
+                    data-note-delete
+                    onClick={() => props.onDelete(annotation)}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </ReviewButton>
+                ) : null}
               </div>
             </>
           )}
@@ -231,7 +226,7 @@ function ReviewAnnotationList(props: {
   );
 }
 
-/** Reports remain above the export divider; all footer commands have readable labels. */
+/** Comment reports retain their own commands; export belongs to the inspector section. */
 function ReviewInspectorFooter(
   props: Parameters<typeof ReviewInspector>[0] & { showReports: boolean }
 ) {
@@ -259,12 +254,6 @@ function ReviewInspectorFooter(
           </ReviewButton>
         </div>
       ) : null}
-      <div
-        data-ui="gallery.videoReview.exportFooter"
-        className="border-t border-[var(--sniptale-color-border-soft)] pt-2"
-      >
-        {props.actions}
-      </div>
     </div>
   );
 }
@@ -321,40 +310,106 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 }
 
 /** Header exits share the flush owner; Back restores the viewer, Close dismisses it. */
-function ReviewInspectorHeader(props: Parameters<typeof ReviewInspector>[0]) {
+function ReviewInspectorHeader(
+  props: Parameters<typeof ReviewInspector>[0] & {
+    presentation: 'all' | 'sections';
+    section: 'scene' | 'selected' | 'comments' | 'export';
+    onTogglePresentation(): void;
+  }
+) {
   return (
     <header className="flex shrink-0 items-center gap-1">
-      <ReviewButton
-        label={translate('gallery.videoReview.back')}
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        size="compact"
+        title={translate('gallery.videoReview.back')}
         disabled={props.busy}
         onClick={props.onBack}
-        className={reviewIconButtonClassName}
       >
         <ArrowLeft size={16} aria-hidden="true" />
-      </ReviewButton>
+      </ContentToolbarButton>
       <h2 className="min-w-0 flex-1 text-sm font-semibold">
         {translate('gallery.videoReview.editorTitle')}
       </h2>
-      <ReviewButton
-        label={translate(
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        size="compact"
+        title={translate(
           props.fullHeight
             ? 'videoEditor.app.panelRestoreHeight'
             : 'videoEditor.app.panelFullHeight'
         )}
         aria-pressed={!!props.fullHeight}
-        className={reviewIconButtonClassName}
         onClick={props.onToggleHeight}
       >
         {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
-      </ReviewButton>
-      <ReviewButton
-        label={translate('common.actions.close')}
+      </ContentToolbarButton>
+      {props.section === 'scene' ||
+      (props.section === 'selected' && props.selectionHasSections === true) ? (
+        <ContentToolbarButton
+          type="button"
+          tone="utility"
+          size="compact"
+          title={translate(
+            props.presentation === 'all'
+              ? 'scenario.editor.inspectorShowSections'
+              : 'scenario.editor.inspectorShowAll'
+          )}
+          dataUi="gallery.videoReview.inspectorPresentation"
+          onClick={props.onTogglePresentation}
+        >
+          {props.presentation === 'all' ? (
+            <List size={16} aria-hidden="true" />
+          ) : (
+            <PanelLeft size={16} aria-hidden="true" />
+          )}
+        </ContentToolbarButton>
+      ) : null}
+
+      <ContentToolbarButton
+        type="button"
+        tone="close"
+        size="compact"
+        title={translate('common.actions.close')}
         disabled={props.busy}
         onClick={props.onClose ?? props.onBack}
-        className={reviewIconButtonClassName}
       >
         <X size={16} aria-hidden="true" />
-      </ReviewButton>
+      </ContentToolbarButton>
     </header>
+  );
+}
+
+/** Save recovery and feedback stay visible above the inspector's scrollable settings. */
+function ReviewInspectorStatus(
+  props: Pick<
+    Parameters<typeof ReviewInspector>[0],
+    'saveStatus' | 'busy' | 'onRetry' | 'message' | 'recovery'
+  >
+) {
+  return (
+    <>
+      {props.saveStatus === 'failed' ? (
+        <div
+          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-text-muted)]"
+          role="status"
+        >
+          <span>{translate('gallery.videoReview.saveFailed')}</span>
+          <ReviewButton
+            label={translate('gallery.videoReview.retry')}
+            disabled={props.busy}
+            onClick={props.onRetry}
+          />
+        </div>
+      ) : null}
+      {props.message ? (
+        <p role="status" className="text-sm">
+          {props.message}
+        </p>
+      ) : null}
+      {props.recovery}
+    </>
   );
 }

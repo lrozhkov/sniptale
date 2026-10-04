@@ -20,6 +20,11 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideDetailsGroup: { ru: 'Детали', en: 'Details' },
   guidePlacementGroup: { ru: 'Размещение', en: 'Placement' },
   guideDescriptionGroup: { ru: 'Описание', en: 'Description' },
+  guideImageBlock: { en: 'Image block', ru: 'Блок изображения' },
+  guideSelectionHelp: {
+    en: 'Click to select. Click selected text or press Enter to edit. Enter or Escape finishes editing. Shift+Enter adds a line break.',
+    ru: 'Клик выбирает объект. Клик по выбранному тексту или Enter включает редактирование. Enter или Escape завершает ввод. Shift+Enter переносит строку.',
+  },
   guideSelectForSettings: {
     ru: 'Выберите шаг или элемент на холсте.',
     en: 'Select a step or element on the canvas.',
@@ -34,6 +39,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Выберите видео из библиотеки или откройте файл. Найдите нужный момент и добавьте кадр.',
     en: 'Choose a library video or open a file. Find the moment you need and add its frame.',
   },
+  guideVideoEditDetails: { ru: 'Параметры шага', en: 'Edit step details' },
+  guideVideoTextStep: { ru: 'Добавить шаг без кадра', en: 'Add step without frame' },
+  guideVideoTextAdded: { ru: 'Шаг добавлен.', en: 'Step added.' },
+  guideVideoTextFailed: { ru: 'Не удалось добавить шаг.', en: 'Could not add step.' },
   guideVideoFrameStep: { ru: 'Добавить кадр как шаг', en: 'Add frame as step' },
   guideUseVideoFrame: { ru: 'Использовать этот кадр', en: 'Use this frame' },
   guideVideoFramePending: { ru: 'Добавляем кадр…', en: 'Adding frame…' },
@@ -207,9 +216,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     en: 'Images could not be prepared. Return to editing and check them.',
   },
   guidePrintHint: {
-    ru: 'В окне печати выберите принтер или «Сохранить как PDF».',
-    en: 'Choose a printer or “Save as PDF” in the print dialog.',
+    ru: 'Здесь показан непрерывный документ. Нажмите «Печать / PDF», чтобы проверить разбиение на страницы в окне печати, затем выберите принтер или «Сохранить как PDF».',
+    en: 'This view shows a continuous document. Choose “Print / PDF” to check page breaks in the print dialog, then select a printer or “Save as PDF”.',
   },
+  guideExportFormat: { ru: 'Формат экспорта', en: 'Export format' },
   guideReaderOpen: { ru: 'Экспорт', en: 'Export' },
   guideReaderBack: { ru: 'Вернуться к редактированию', en: 'Back to editing' },
   guideNavigationPosition: { ru: 'Навигация по шагам', en: 'Step navigation' },
@@ -254,8 +264,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideEditImageFrame: { ru: 'Рамка и изображение', en: 'Frame and image' },
   guideImageDone: { ru: 'Готово', en: 'Done' },
   guideImageGestureHint: {
-    ru: 'Перетаскивайте изображение или угол рамки. Стрелки — перемещение; Ctrl + колесо — масштаб. Escape отменяет текущий жест.',
-    en: 'Drag the image or frame corner. Arrow keys move; Ctrl + wheel zooms. Escape cancels the current gesture.',
+    ru: 'Ctrl + колесо — масштаб. «Готово» применяет изменения, Escape отменяет кадрирование.',
+    en: 'Drag to move; Ctrl + wheel to zoom. Done applies changes; Escape cancels framing.',
   },
   guideImageFit: { ru: 'Размещение изображения', en: 'Image fitting' },
   guideImageContain: { ru: 'Вписать', en: 'Fit' },
@@ -265,6 +275,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideImageHeight: { ru: 'Высота рамки', en: 'Frame height' },
   guideImageCaption: { ru: 'Подпись', en: 'Caption' },
   guideImageAlt: { ru: 'Описание для чтения с экрана', en: 'Alternative text' },
+  guideImageAltHint: {
+    ru: 'Описывает изображение для программ чтения с экрана и сохраняется при экспорте.',
+    en: 'Describes the image to screen readers and is included in exports.',
+  },
   guideImageResetZoom: { ru: 'Масштаб 100%', en: 'Zoom 100%' },
   guideImageCenter: { ru: 'По центру', en: 'Center image' },
 
@@ -273,6 +287,7 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideLibraryScreenshots: { ru: 'Скриншоты', en: 'Screenshots' },
   guideLibraryImages: { ru: 'Изображения', en: 'Images' },
   guideLibraryNavigation: { ru: 'Разделы библиотеки', en: 'Library sections' },
+  guideLibraryBack: { ru: 'К списку материалов', en: 'Back to materials' },
   guideLibraryPreview: { ru: 'Предпросмотр', en: 'Preview' },
   guideLibraryPreviewHint: {
     ru: 'Выберите изображение для просмотра.',
@@ -302,6 +317,22 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideImportAsSteps: { ru: 'Каждое в отдельный шаг', en: 'Each as a separate step' },
   guideImportAsBlocks: { ru: 'Блоками в выбранный шаг', en: 'As blocks in selected step' },
   guideImportSelected: { ru: 'Импортировать выбранное', en: 'Import selected' },
+  guideImportSelectedCount: { ru: 'Выбрано: {count}', en: 'Selected: {count}' },
+  guideImportStepsHint: {
+    ru: 'Новые шаги в порядке выбора материалов',
+    en: 'New steps in selection order',
+  },
+  guideImportStepTarget: { ru: 'Добавить в шаг «{name}»', en: 'Add to step “{name}”' },
+  guideImportReplaceTarget: {
+    ru: 'Заменить изображение в шаге «{name}»',
+    en: 'Replace image in step “{name}”',
+  },
+  guideImportTourSlides: {
+    ru: 'Новые слайды в порядке выбора материалов',
+    en: 'New slides in selection order',
+  },
+  guideImportTourImage: { ru: 'Заменить изображение слайда', en: 'Replace slide image' },
+  guideImportTourBackground: { ru: 'Заменить фон слайда', en: 'Replace slide background' },
   guideImportProgress: { ru: 'Подготовка изображений', en: 'Preparing images' },
   guideImportCancel: { ru: 'Отменить подготовку', en: 'Cancel preparation' },
   guideImportFailed: {
@@ -317,6 +348,7 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideAddSection: { ru: 'Добавить раздел', en: 'Add section' },
   guideSectionTitle: { ru: 'Заголовок раздела', en: 'Section title' },
   guideShowNumber: { ru: 'Показывать номер шага', en: 'Show step number' },
+  guideSectionActions: { ru: 'Действия с разделом', en: 'Section actions' },
   guideStepActions: { ru: 'Действия с шагом', en: 'Step actions' },
   guideBlockActions: { ru: 'Действия с блоком', en: 'Block actions' },
   guideMoveUp: { ru: 'Выше', en: 'Move up' },
@@ -381,51 +413,22 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   },
   guideDuplicate: { ru: 'Создать копию', en: 'Duplicate project' },
   guideCopyName: { ru: '{name} — копия', en: '{name} — copy' },
-  guideCopyFailed: {
-    ru: 'Не удалось создать копию. Проверьте доступное место и повторите. Исходные правки остались в редакторе.',
-    en: 'Could not create a copy. Check available space and retry. Your original edits remain in the editor.',
-  },
   guideDelete: { ru: 'Удалить проект', en: 'Delete project' },
   guideDeleteMessage: {
     ru: 'Удалить этот проект и его изображения? Это действие нельзя отменить.',
     en: 'Delete this project and its images? This action cannot be undone.',
   },
-  guideDeleteFailed: {
-    ru: 'Не удалось удалить проект. Повторите попытку.',
-    en: 'Could not delete the project. Try again.',
-  },
-  guideReload: { ru: 'Перезагрузить проект', en: 'Reload project' },
-  guideReloadMessage: {
-    ru: 'Заменить текущие правки сохранённой версией? Несохранённые изменения будут потеряны. Чтобы оставить их, сначала создайте копию.',
-    en: 'Replace your current edits with the saved version? Unsaved changes will be lost. Duplicate the project first to keep them.',
-  },
   guideStepTitle: { ru: 'Заголовок шага', en: 'Step title' },
   guideInsertItem: { ru: 'Добавить шаг или раздел', en: 'Insert step or section' },
   guideAddStep: { ru: 'Добавить шаг', en: 'Add step' },
-  guideSaving: { ru: 'Сохранение…', en: 'Saving…' },
-  guideSaved: { ru: 'Сохранено', en: 'Saved' },
-  guideDirty: { ru: 'Есть несохранённые изменения', en: 'Unsaved changes' },
-  guideConflict: {
-    ru: 'Проект изменён в другой вкладке. Ваши правки сохранены в редакторе; запись остановлена, чтобы не перезаписать изменения.',
-    en: 'This project changed in another tab. Your edits remain in the editor; saving is stopped to avoid overwriting changes.',
-  },
-  guideFailed: {
-    ru: 'Не удалось сохранить. Изменения остались в редакторе. Повторите сохранение.',
-    en: 'Could not save. Your edits remain in the editor. Try saving again.',
-  },
-  guideUnavailable: {
-    ru: 'Этот сценарий недоступен в текущем редакторе. Вернитесь в библиотеку или повторите загрузку.',
-    en: 'This guide is unavailable in this editor. Return to the library or retry loading.',
-  },
-  guideMissing: { ru: 'Сценарий не найден.', en: 'Guide not found.' },
-  guideRetry: { ru: 'Повторить загрузку', en: 'Retry loading' },
   guideEmpty: {
     ru: 'Создайте инструкцию и добавьте первый шаг.',
     en: 'Create a guide and add its first step.',
   },
+  previewTitle: { ru: 'Просмотр', en: 'Preview' },
   documentTitle: {
-    ru: 'Sniptale — Редактор сценариев',
-    en: 'Sniptale — Scenario editor',
+    ru: 'Редактор сценариев',
+    en: 'Scenario editor',
   },
   exportDocumentLabel: { ru: 'Документ экспорта сценария', en: 'Scenario export document' },
   title: {

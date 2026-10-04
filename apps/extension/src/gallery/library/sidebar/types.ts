@@ -1,3 +1,4 @@
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   FolderFilter,
@@ -6,14 +7,36 @@ import type {
   GalleryFacetFilters,
   GalleryFolderCounts,
   GalleryScope,
+  GalleryTrashSummary,
 } from '../types';
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
+import type { LocalStoragePolicy } from '../../../contracts/settings';
+
+export interface GalleryTrashRetentionProps {
+  status: 'loading' | 'ready' | 'unavailable';
+  policy: Pick<LocalStoragePolicy, 'trashCleanupEnabled' | 'trashRetentionDays'> | null;
+  saving: boolean;
+  feedback: 'error' | null;
+  onChange(patch: { trashCleanupEnabled?: boolean; trashRetentionDays?: number }): void;
+  onRetry(): void;
+}
 
 export interface GallerySidebarProps {
+  trashSummary?: GalleryTrashSummary;
+  trashMode?: boolean;
+  busy?: boolean;
+  selectedCount?: number;
+  onClearSelection: () => void;
+  onTrashModeChange?: (value: boolean) => void;
+  onRestoreTrash?: () => void;
+  onDeleteTrash?: (opening: GalleryDeletionOpening) => void;
+  onEmptyTrash?: (opening: GalleryDeletionOpening) => void;
   activeSavedView?: GallerySavedView | null;
   activeTags: string[];
   allTags: string[];
   counts: GalleryFolderCounts;
+  countsKnown: boolean;
+  countsLoading?: boolean;
   facetFilters: GalleryFacetFilters;
   facets: GalleryFacetDefinition[];
   filteredItemCount: number;

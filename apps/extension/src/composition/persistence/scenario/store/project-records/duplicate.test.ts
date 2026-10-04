@@ -1,3 +1,4 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createGuideImageBlock,
@@ -15,8 +16,15 @@ const io = vi.hoisted(() => ({
   write: vi.fn(),
   discard: vi.fn(),
   event: vi.fn(),
+  media: vi.fn(),
+  db: vi.fn(),
 }));
 vi.mock('../../projects/assets', () => ({ getScenarioAsset: io.asset }));
+vi.mock('../../../media-library', () => ({ getMediaLibraryEntry: io.media }));
+vi.mock('../../../infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<typeof import('../../../infrastructure/indexed-db/core')>()),
+  initDB: io.db,
+}));
 vi.mock('../../editor-documents', () => ({
   getScenarioStepEditorDocumentForTransfer: io.document,
 }));
@@ -69,6 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   io.commit.mockImplementation(async (project) => ({ project, workspaceRevision: 0 }));
   io.discard.mockResolvedValue(undefined);
+  io.media.mockResolvedValue(undefined);
   io.write.mockImplementation(async (blob: Blob) => ({
     ref: {
       assetId: 'new-physical',
@@ -152,6 +161,79 @@ it('copies repeated images and annotation documents once with independent logica
   expect(io.discard).not.toHaveBeenCalled();
 });
 
+it('shares an immutable source across a duplicate without copying its bytes', async () => {
+  const ref = {
+    assetId: 'source-physical',
+    createdAt: 100,
+    location: { kind: 'opfs' as const, objectKey: 'objects/source-physical' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 5,
+  };
+  io.media.mockResolvedValue({
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    workspaceRevision: 0,
+    imageContentState: 'original',
+  });
+  io.db.mockResolvedValue({ get: async () => ref });
+  await duplicateScenarioProjectRecord(sourceProject(), 'Shared copy');
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts?.[0]).toMatchObject({
+    assetId: ref.assetId,
+    assetRef: ref,
+    borrowedMediaId: 'scenario-asset:source-image',
+    galleryAssetId: 'scenario-asset:source-image',
+  });
+});
+
+it('shares source bytes under a new Library identity when the presentation has been edited', async () => {
+  const ref = {
+    assetId: 'source-physical',
+    createdAt: 100,
+    location: { kind: 'opfs' as const, objectKey: 'objects/source-physical' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 5,
+  };
+  io.media.mockResolvedValue({
+    source: { kind: 'stored-asset', assetId: 'source-physical' },
+    workspaceRevision: 1,
+    imageContentState: 'edited',
+  });
+  io.db.mockResolvedValue({ get: async () => ref });
+  await duplicateScenarioProjectRecord(sourceProject(), 'Edited copy');
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts?.[0]).toMatchObject({
+    assetId: 'source-physical',
+    assetRef: ref,
+    borrowedMediaId: 'scenario-asset:source-image',
+    independentLibraryIdentity: true,
+    galleryAssetId: null,
+  });
+});
+
+it('does not discard a reused source when a copy fails before publication', async () => {
+  const ref = {
+    assetId: 'source-physical',
+    createdAt: 100,
+    location: { kind: 'opfs' as const, objectKey: 'objects/source-physical' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: 5,
+  };
+  io.media.mockResolvedValue({
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    workspaceRevision: 1,
+  });
+  io.db.mockResolvedValue({ get: async () => ref });
+  io.document.mockResolvedValue(undefined);
+  await expect(duplicateScenarioProjectRecord(sourceProject(), 'Failed copy')).rejects.toThrow(
+    'annotation document'
+  );
+  expect(io.discard).not.toHaveBeenCalled();
+  expect(io.commit).not.toHaveBeenCalled();
+});
+
 it('copies a text-only guide without reading or staging media', async () => {
   const source = createGuideProject('Text', 'text', 100);
   source.items = [createGuideStep('Instructions', 'step')];
@@ -216,6 +298,17 @@ it('fails cleanly when image preparation hits quota before any publication', asy
 
 it('saves a selected template step with independently owned media and resolved appearance', async () => {
   const { saveScenarioStepTemplate } = await import('./templates');
+  const original = await io.document('source-document');
+  if (!original) throw new Error('Expected annotation fixture.');
+  const annotatedDocument = createScenarioCaptureEditorDocument({
+    dataUrl: 'data:image/png;base64,aW1hZ2U=',
+    sourceWidth: 100,
+    sourceHeight: 80,
+    overlays: [
+      { id: 'capture-frame', kind: 'focus-rect', rect: { x: 1, y: 2, width: 30, height: 20 } },
+    ],
+  });
+  io.document.mockResolvedValue({ ...original, document: annotatedDocument });
   const source = sourceProject();
   const selected = source.items[1];
   if (selected?.kind !== 'step') throw new Error('Expected step fixture.');
@@ -234,7 +327,9 @@ it('saves a selected template step with independently owned media and resolved a
       storageClass: 'library',
       children: expect.objectContaining({
         assetPuts: [expect.objectContaining({ projectId: template.id })],
-        editorDocumentPuts: [expect.objectContaining({ projectId: template.id })],
+        editorDocumentPuts: [
+          expect.objectContaining({ projectId: template.id, document: annotatedDocument }),
+        ],
       }),
     })
   );
@@ -288,6 +383,8 @@ it('copies tour images once across representations and independently copies narr
   slide.hotspots[0]!.narration = { ...slide.narration, trigger: 'activation' };
   source.tour.audioResources = [{ assetId: 'detached-audio', duration: 3, name: 'Unused.wav' }];
   source.tour.slides = [slide];
+  source.tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'source-audio', duration: 3 });
+  source.tour.stage.image = structuredClone(slide.image);
   const image = await io.asset('source-image');
   io.asset.mockImplementation(async (id) =>
     id === 'source-audio' || id === 'detached-audio'
@@ -310,7 +407,12 @@ it('copies tour images once across representations and independently copies narr
   const copied = result.tour?.slides[0];
   if (copied?.kind !== 'image') throw new Error('Expected tour image');
   expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);
+  expect(result.tour?.stage.image).toEqual(copied.image);
+  expect(result.tour?.stage.image?.editDocumentId).not.toBe('source-document');
+  expect(source.tour.stage.image?.assetId).toBe('source-image');
   expect(copied.narration?.assetId).not.toBe('source-audio');
+  expect(result.tour?.backgroundMusic?.assetId).toBe(copied.narration?.assetId);
+  expect(source.tour.backgroundMusic.assetId).toBe('source-audio');
   expect(copied.hotspots[0]?.action).toEqual({ kind: 'slide', slideId: copied.id });
   expect(copied.hotspots[0]!.narration?.assetId).toBe(copied.narration?.assetId);
   expect(copied.hotspots[0]!.narration?.trigger).toBe('activation');

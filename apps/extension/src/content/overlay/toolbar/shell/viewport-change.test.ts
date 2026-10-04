@@ -59,13 +59,15 @@ describe('toolbar viewport change action', () => {
         success: true,
         enabled: true,
         surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_A,
-        viewport: { width: 800, height: 600 },
+        viewport: { presetId: 'viewport-800', width: 800, height: 600 },
       });
     await handleToolbarViewportChange(
       { height: 600, presetId: 'viewport-800', target: 'window', width: 800 },
       setCurrentViewport
     );
-    expect(setCurrentViewport).toHaveBeenCalledWith({ width: 800, height: 600 });
+    expect(setCurrentViewport).toHaveBeenCalledWith(
+      expect.objectContaining({ width: 800, height: 600 })
+    );
 
     expect(viewportChangeMocks.showToast).not.toHaveBeenCalled();
   });
@@ -99,20 +101,62 @@ describe('toolbar viewport change action', () => {
     expect(consoleError).toHaveBeenCalledTimes(2);
   });
 
-  it('resets the toolbar selection when another surface owns the window size', async () => {
+  it('refreshes the actual selection when another surface owns the window size', async () => {
     const setCurrentViewport = vi.fn();
-    viewportChangeMocks.sendRuntimeMessage.mockResolvedValueOnce({
-      success: false,
-      error: 'surface-busy',
-    });
+    viewportChangeMocks.sendRuntimeMessage
+      .mockResolvedValueOnce({ success: false, error: 'surface-busy' })
+      .mockResolvedValueOnce({
+        success: true,
+        enabled: true,
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_A,
+        viewport: { width: 800, height: 600 },
+      });
 
     await handleToolbarViewportChange(
       { height: 1080, presetId: 'window-full-hd', target: 'window', width: 1920 },
       setCurrentViewport
     );
 
-    expect(setCurrentViewport).toHaveBeenLastCalledWith(null);
-    expect(viewportChangeMocks.sendRuntimeMessage).toHaveBeenCalledOnce();
+    expect(setCurrentViewport).toHaveBeenLastCalledWith({ width: 800, height: 600 });
+    expect(viewportChangeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a natively confirmed selection when the follow-up status read fails', async () => {
+    const setCurrentViewport = vi.fn();
+    viewportChangeMocks.sendRuntimeMessage
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({ success: false, error: 'unavailable' });
+
+    await expect(
+      handleToolbarViewportChange(
+        { height: 720, presetId: 'viewport-1280', target: 'window', width: 1280 },
+        setCurrentViewport
+      )
+    ).resolves.toBe(true);
+    expect(setCurrentViewport).toHaveBeenCalledWith({ width: 1280, height: 720 });
+    expect(viewportChangeMocks.showToast).not.toHaveBeenCalled();
+  });
+
+  it('keeps the actual background size when it differs from the requested preset', async () => {
+    const setCurrentViewport = vi.fn();
+    viewportChangeMocks.sendRuntimeMessage
+      .mockResolvedValueOnce({ success: true })
+      .mockResolvedValueOnce({
+        success: true,
+        enabled: true,
+        surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_A,
+        viewport: { presetId: 'viewport-1024', width: 1024, height: 768 },
+      });
+
+    await expect(
+      handleToolbarViewportChange(
+        { height: 600, presetId: 'viewport-800', target: 'window', width: 800 },
+        setCurrentViewport
+      )
+    ).resolves.toBe(false);
+    expect(setCurrentViewport).toHaveBeenCalledWith(
+      expect.objectContaining({ presetId: 'viewport-1024' })
+    );
   });
 
   it('refreshes an expired background capability and retries the mutation once', async () => {
@@ -130,7 +174,7 @@ describe('toolbar viewport change action', () => {
         success: true,
         enabled: true,
         surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
-        viewport: { width: 1024, height: 768 },
+        viewport: { presetId: 'viewport-1024', width: 1024, height: 768 },
       });
 
     await handleToolbarViewportChange(
@@ -151,7 +195,9 @@ describe('toolbar viewport change action', () => {
       surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
     });
     expect(viewportChangeMocks.sendRuntimeMessage).toHaveBeenCalledTimes(4);
-    expect(setCurrentViewport).toHaveBeenLastCalledWith({ width: 1024, height: 768 });
+    expect(setCurrentViewport).toHaveBeenLastCalledWith(
+      expect.objectContaining({ width: 1024, height: 768 })
+    );
   });
 
   it('recovers a missing worker session only through the trusted selection event', async () => {
@@ -170,7 +216,7 @@ describe('toolbar viewport change action', () => {
         surfaceCapabilityToken: SURFACE_BINDING_FIXTURE_B,
         surfaceLeaseGeneration: 1,
         surfaceOperationGeneration: 1,
-        viewport: { height: 720, width: 1280 },
+        viewport: { presetId: 'viewport-1280', height: 720, width: 1280 },
       });
 
     await handleToolbarViewportChange(

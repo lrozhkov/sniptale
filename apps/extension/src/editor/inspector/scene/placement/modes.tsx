@@ -1,7 +1,11 @@
 import React from 'react';
-import { ProductGlassChip, ProductGlassOptionGrid } from '@sniptale/ui/product-glass-controls';
+import { SegmentedRow } from '../../../../ui/compact-inspector-controls';
 
 import type { CompactSelectOption } from '../../../chrome/ui';
+
+function resolveModeColumns(count: number): 2 | 3 | 4 | 5 {
+  return Math.min(5, Math.max(2, count)) as 2 | 3 | 4 | 5;
+}
 
 export function EditorInspectorFrameModeButtons<T extends string>(props: {
   ariaLabel?: string;
@@ -10,18 +14,12 @@ export function EditorInspectorFrameModeButtons<T extends string>(props: {
   onChange: (next: T) => void;
 }): React.ReactElement {
   return (
-    <ProductGlassOptionGrid aria-label={props.ariaLabel} role="group">
-      {props.options.map((option) => (
-        <ProductGlassChip
-          active={option.value === props.value}
-          aria-pressed={option.value === props.value}
-          key={option.value}
-          onClick={() => props.onChange(option.value)}
-          type="button"
-        >
-          {option.label}
-        </ProductGlassChip>
-      ))}
-    </ProductGlassOptionGrid>
+    <SegmentedRow
+      ariaLabel={props.ariaLabel ?? ''}
+      columns={resolveModeColumns(props.options.length)}
+      options={props.options}
+      value={props.value}
+      onChange={props.onChange}
+    />
   );
 }

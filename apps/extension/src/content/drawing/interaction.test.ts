@@ -83,6 +83,21 @@ it.each(['pencil', 'marker'] as const)('commits a new %s stroke without selectin
   expect(session.getSnapshot().selectedObjectId).toBeNull();
 });
 
+it('captures the arrow drawing direction when the gesture begins', () => {
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const defaults = session.getSnapshot().defaults;
+  session.setDefaults({ ...defaults, arrow: { ...defaults.arrow, drawFromTip: true } });
+  session.setActiveTool('arrow');
+
+  const started = beginDrawingPointer({
+    point: { x: 10, y: 20 },
+    snapshot: session.getSnapshot(),
+    timestamp: 0,
+  });
+
+  expect(started.draft).toMatchObject({ kind: 'create', arrowFromTip: true });
+});
+
 it('uses canonical Shift add, Ctrl toggle, and empty-space marquee selection starts', () => {
   const session = createDrawingSession({ onDocumentCommit: () => true });
   session.commitObject({

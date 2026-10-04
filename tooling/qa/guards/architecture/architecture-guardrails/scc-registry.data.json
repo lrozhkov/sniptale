@@ -1,1 +1,15 @@
-[]
+[
+  {
+    "owners": ["apps/extension/src/editor/document", "apps/extension/src/editor/frame-annotation"],
+    "edges": [
+      ["apps/extension/src/editor/document", "apps/extension/src/editor/frame-annotation"],
+      ["apps/extension/src/editor/frame-annotation", "apps/extension/src/editor/document"]
+    ],
+    "id": "editor-document-annotation-import",
+    "owner": "apps/extension/src/editor",
+    "classification": "accepted-architecture",
+    "reason": "Allowed composition: document import composes the frame-annotation validator; the validator reads immutable document serialization keys. These exact two owner edges have no module cycle, controller back-dependency, persistence authority or runtime authority cycle.",
+    "removalCondition": "Remove when either exact owner edge disappears; reassess any added edge, module cycle or changed state/runtime authority before retaining this composition.",
+    "debtId": "accepted.scc.editor-document-annotation-import"
+  }
+]

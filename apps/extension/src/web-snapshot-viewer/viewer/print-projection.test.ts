@@ -315,3 +315,122 @@ it('prints the complete original screenshot as one scalable image without raster
   expect(print).toHaveBeenCalledOnce();
   expect(document.querySelector('iframe')).toBeNull();
 });
+
+it.each([
+  { layout: 'positioned viewport', position: 'absolute', documentHeight: 768, capturedPage: true },
+  { layout: 'long document', position: 'absolute', documentHeight: 2400, capturedPage: false },
+  { layout: 'normal flow', position: 'static', documentHeight: 768, capturedPage: false },
+])(
+  'preserves the appropriate pagination for $layout',
+  async ({ position, documentHeight, capturedPage }) => {
+    const projection = printWebSnapshotProjection({
+      documentUrl: null,
+      hostDocument: document,
+      html: '',
+      viewport: { deviceScaleFactor: 1, height: 768, width: 1024 },
+    });
+    const frame = document.querySelector<HTMLIFrameElement>('iframe');
+    const target = frame?.contentDocument;
+    const targetWindow = frame?.contentWindow;
+    if (!frame || !target || !targetWindow) throw new Error('Expected print frame.');
+    const style = target.createElement('style');
+    style.textContent = 'html,body{height:100%}@media screen{.dialog{color:red}}';
+    target.head.append(style);
+    const dialog = target.createElement('div');
+    dialog.className = 'dialog';
+    dialog.style.cssText = `position:${position};left:200px;top:100px;width:600px`;
+    const scroller = appendLargeScroller(dialog);
+    target.body.append(dialog);
+    Object.defineProperties(target.documentElement, {
+      scrollHeight: { configurable: true, value: documentHeight },
+      scrollWidth: { configurable: true, value: 1024 },
+    });
+    let policy = '';
+    let frozenCss = '';
+    const print = vi.fn(() => {
+      targetWindow.dispatchEvent(new Event('beforeprint'));
+      policy = target.querySelector('[data-sniptale-print-policy]')?.textContent ?? '';
+      frozenCss = target.querySelector('[data-sniptale-print-frozen-styles]')?.textContent ?? '';
+    });
+    Object.defineProperties(targetWindow, {
+      focus: { configurable: true, value: vi.fn() },
+      matchMedia: { configurable: true, value: () => ({ matches: true }) },
+      print: { configurable: true, value: print },
+      requestAnimationFrame: {
+        configurable: true,
+        value: (callback: FrameRequestCallback) => {
+          callback(0);
+          return 1;
+        },
+      },
+    });
+    frame.dispatchEvent(new Event('load'));
+    await projection;
+
+    if (capturedPage) {
+      expect(policy).toContain('@page{size:1024px 768px;margin:0}');
+      expect(policy).not.toContain('height:auto');
+      expect(frozenCss).toContain('color: red');
+      expect(frozenCss).not.toContain('@media screen');
+      expect(dialog.style.position).toBe('absolute');
+      expect(dialog.style.left).toBe('200px');
+      expect(scroller.style.height).toBe('300px');
+      expect(scroller.style.overflow).toBe('auto');
+    } else {
+      expect(policy).not.toContain('@page');
+      expect(scroller.style.height).toBe('600px');
+      expect(scroller.style.overflow).toBe('visible');
+    }
+    expect(print).toHaveBeenCalledOnce();
+    expect(document.querySelector('iframe')).toBeNull();
+  }
+);
+
+it('keeps inactive stylesheet media out of the captured viewport projection', () => {
+  const active = document.createElement('style');
+  active.media = 'screen';
+  active.textContent = '.active { color: red; }';
+  const inactive = document.createElement('style');
+  inactive.media = '(max-width: 1px)';
+  inactive.textContent = '.inactive { display: none; }';
+  document.head.append(active, inactive);
+  vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === 'screen' }));
+
+  freezeSnapshotMediaQueries(document, window);
+
+  const css = document.head.textContent;
+  expect(css).toContain('.active');
+  expect(css).not.toContain('.inactive');
+});
+
+it('removes the projection and propagates a print failure', async () => {
+  const projection = printWebSnapshotProjection({
+    documentUrl: null,
+    hostDocument: document,
+    html: '',
+    viewport: null,
+  });
+  const frame = document.querySelector<HTMLIFrameElement>('iframe');
+  const targetWindow = frame?.contentWindow;
+  if (!frame || !targetWindow) throw new Error('Expected print frame.');
+  Object.defineProperties(targetWindow, {
+    focus: { configurable: true, value: vi.fn() },
+    print: {
+      configurable: true,
+      value: () => {
+        throw new Error('Print unavailable');
+      },
+    },
+    requestAnimationFrame: {
+      configurable: true,
+      value: (callback: FrameRequestCallback) => {
+        callback(0);
+        return 1;
+      },
+    },
+  });
+  frame.dispatchEvent(new Event('load'));
+
+  await expect(projection).rejects.toThrow('Print unavailable');
+  expect(document.querySelector('iframe')).toBeNull();
+});

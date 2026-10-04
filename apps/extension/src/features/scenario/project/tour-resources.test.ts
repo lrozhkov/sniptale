@@ -1,3 +1,4 @@
+import { createTourBackgroundMusic } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { expect, it } from 'vitest';
 import {
   createGuideImageBlock,
@@ -6,7 +7,11 @@ import {
   createTourDocument,
   createTourImageSlide,
 } from './factories';
-import { getScenarioResourceReferences, remapTourIdentities } from './tour-resources';
+import {
+  getTourImages,
+  getScenarioResourceReferences,
+  remapTourIdentities,
+} from './tour-resources';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
 
 it('retains shared guide images, tour backgrounds, annotation documents and audio', () => {
@@ -124,6 +129,64 @@ it('retains detached audio materials and audio bound only to objects', () => {
   expect([...getScenarioResourceReferences(project).assets]).toEqual(['detached', 'object-audio']);
 });
 
+it('orders narration targets by the stored mixed object order', async () => {
+  const { getTourNarrationTargets } = await import('./tour-resources');
+  const slide = createTourImageSlide('slide');
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Point',
+      text: '',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: false,
+    },
+  ];
+  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null }];
+  slide.masks = [
+    {
+      id: 'mask',
+      rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 },
+      kind: 'highlight',
+      color: '#f97316',
+      opacity: 0.3,
+    },
+  ];
+  const ids = (value: typeof slide) =>
+    getTourNarrationTargets(value).map((target) => ('id' in target ? target.id : null));
+  expect(ids(slide)).toEqual(['slide', 'point', 'note', 'mask']);
+  slide.objectOrder = ['mask', 'note', 'point'];
+  expect(ids(slide)).toEqual(['slide', 'mask', 'note', 'point']);
+});
+
+it('remaps stored object order ids together with object identities', () => {
+  const tour = createTourDocument('tour');
+  const slide = createTourImageSlide('first');
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Point',
+      text: '',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: false,
+    },
+  ];
+  slide.annotations = [{ id: 'note', text: 'Note', anchor: null, appearance: null }];
+  slide.objectOrder = ['note', 'point'];
+  tour.slides = [slide];
+  let index = 0;
+  remapTourIdentities(tour, () => `new-${++index}`, new Map());
+  expect(slide.objectOrder).toEqual(['new-4', 'new-3']);
+  expect(slide.hotspots[0]?.id).toBe('new-3');
+  expect(slide.annotations[0]?.id).toBe('new-4');
+  expect(parseTourDocument(tour).status).toBe('ok');
+});
+
 it('projects ordered entry cues and only the explicitly activated object', async () => {
   const { getTourNarrationCues } = await import('./tour-resources');
   const slide = createTourImageSlide('slide');
@@ -161,4 +224,38 @@ it('projects ordered entry cues and only the explicitly activated object', async
     getTourNarrationCues(slide, { kind: 'activation', objectId: 'detail' }).map((c) => c.objectId)
   ).toEqual(['detail']);
   expect(getTourNarrationCues(slide, { kind: 'activation', objectId: 'missing' })).toEqual([]);
+});
+
+it('includes the mutable stage occurrence and retains shared slide references independently', () => {
+  const project = createGuideProject('Project');
+  const tour = (project.tour = createTourDocument());
+  const slide = createTourImageSlide();
+  const image = {
+    assetId: 'shared',
+    editDocumentId: 'edit',
+    galleryAssetId: null,
+    width: 10,
+    height: 10,
+    alt: '',
+    source: { kind: 'import' as const, filename: 'a.png' },
+  };
+  tour.stage.image = { ...image };
+  slide.image = { ...image };
+  tour.slides = [slide];
+  expect(getTourImages(tour)).toHaveLength(2);
+  expect(getTourImages(tour)).toContain(tour.stage.image);
+  expect(getTourImages(tour).find((entry) => entry === tour.stage.image)).toBe(tour.stage.image);
+  tour.stage.image = null;
+  expect([...getScenarioResourceReferences(project).assets]).toEqual(['shared']);
+  expect([...getScenarioResourceReferences(project).documents]).toEqual(['edit']);
+  tour.stage.image = { ...image, assetId: 'stage-only' };
+  expect(getScenarioResourceReferences(project).assets.has('stage-only')).toBe(true);
+});
+
+it('retains a music-only asset without materializing a resource catalog on read', () => {
+  const project = createGuideProject('Music');
+  project.tour = createTourDocument();
+  project.tour.backgroundMusic = createTourBackgroundMusic({ assetId: 'music', duration: 4 });
+  expect([...getScenarioResourceReferences(project).assets]).toEqual(['music']);
+  expect(project.tour.audioResources).toBeUndefined();
 });

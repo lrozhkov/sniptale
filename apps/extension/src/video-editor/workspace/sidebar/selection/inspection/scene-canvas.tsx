@@ -75,7 +75,10 @@ export function SceneCanvasFields(props: {
           if (next) onResizeProject(next.width, next.height);
         }}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.canvasExactSize')}>
+      <InspectorDetails
+        preferenceId="scene-canvas:videoEditor.sidebar.canvasExactSize"
+        label={translate('videoEditor.sidebar.canvasExactSize')}
+      >
         <NumberInput
           label={translate('videoEditor.sidebar.canvasWidthLabel')}
           value={width}

@@ -114,6 +114,7 @@ function createScenarioProps(): ContentAppLayoutProps['scenario'] {
       applyCaptureAction: vi.fn(async () => undefined),
       createProject: vi.fn(async () => undefined),
       deleteRecentStep: vi.fn(async () => undefined),
+      finishRecording: vi.fn(async () => undefined),
       handleScreenshotModeDisabled: vi.fn(async () => undefined),
       moveRecentStep: vi.fn(async () => undefined),
       openEditor: vi.fn(async () => undefined),

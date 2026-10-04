@@ -1,3 +1,6 @@
+/** Commands move the existing history cursor without appending an operation. */
+export type ReviewHistoryDirection = 'undo' | 'redo' | 'start';
+
 import type { Paint } from '@sniptale/foundation/paint';
 import type { ReviewSpeedRate } from './speed';
 
@@ -38,8 +41,18 @@ interface ReviewEditRange {
   end: number;
 }
 
+/** Authored result-time portions around a cut; effective bounds never retime the montage. */
+export interface ReviewCutTransition {
+  type: 'dissolve' | 'fade-black';
+  before: number;
+  after: number;
+}
+
 export type ReviewEdit = ReviewEditRange &
-  ({ kind: 'cut' } | { kind: 'speed'; rate: ReviewSpeedRate; audio: 'speed' | 'mute' });
+  (
+    | { kind: 'cut'; transition?: ReviewCutTransition }
+    | { kind: 'speed'; rate: ReviewSpeedRate; audio: 'speed' | 'mute' }
+  );
 
 export interface ReviewDocument {
   annotations: ReviewAnnotation[];
@@ -88,8 +101,12 @@ export type ReviewOperation = { id: string; at: number } & (
       after: ReviewEdit | null;
       /** Commit-time policy; absent on historical operations with fixed result-time focus. */
       preserveFocusAnchors?: true;
+      /** New non-destructive policy; absent historical operations keep their recorded replay behavior. */
+      preserveUnderCuts?: true;
       /** Preserves whole voiceover records in source coordinates; playback alone is projected. */
       preserveVoiceoverAnchors?: true;
+      /** New Speed commands restore native sample timing before applying their absolute rate. */
+      normalizeVoiceoverTempo?: true;
     }
   | {
       target: 'canvasComment';

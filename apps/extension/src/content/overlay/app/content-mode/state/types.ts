@@ -44,6 +44,7 @@ export type ContentAppVisibilityState = {
   navigationLockEnabled: boolean;
   pinToTab: boolean;
   pinToTabAvailable: boolean;
+  pinToTabConfirmed: boolean;
   pendingAutoStartCapture: PendingAutoStartCapture | null;
   quickActionToastCountdown: number | null;
   saveDialogState: { dataUrl: string; filename: string } | null;
@@ -54,7 +55,10 @@ export type ContentAppVisibilityState = {
   setIsToolbarVisible: (visible: boolean) => void;
   setNavigationLockEnabled: (enabled: boolean) => void;
   setPinnedToolbarVisible: (visible: boolean) => void;
-  setPinToTab: (value: boolean, contentIntentSource?: ContentPrivilegedActionIntentSource) => void;
+  setPinToTab: (
+    value: boolean,
+    contentIntentSource?: ContentPrivilegedActionIntentSource
+  ) => Promise<boolean>;
   setSaveDialogState: (state: { dataUrl: string; filename: string } | null) => void;
   setSessionActivePresetId: (presetId: string | null) => void;
 };

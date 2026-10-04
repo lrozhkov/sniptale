@@ -48,29 +48,39 @@ export async function saveScreenshotMediaAsset(
       [MEDIA_LIBRARY_STORE, IMAGE_WORKSPACES_STORE, AGGREGATE_PRESENTATIONS_STORE],
       'readwrite'
     );
-    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
-    const workspaceStore = tx.objectStore(IMAGE_WORKSPACES_STORE);
-    const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
-    const occupiedRoot: unknown = await mediaStore.get(assetId);
-    const occupiedWorkspace: unknown = await workspaceStore.get(assetId);
-    const occupiedPresentation: unknown = await presentationStore.get(['image', assetId]);
-    if (
-      occupiedRoot !== undefined ||
-      occupiedWorkspace !== undefined ||
-      occupiedPresentation !== undefined
-    ) {
-      throw new ImageAggregateCollisionError(assetId);
+    try {
+      const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const workspaceStore = tx.objectStore(IMAGE_WORKSPACES_STORE);
+      const presentationStore = tx.objectStore(AGGREGATE_PRESENTATIONS_STORE);
+      const occupiedRoot: unknown = await mediaStore.get(assetId);
+      const occupiedWorkspace: unknown = await workspaceStore.get(assetId);
+      const occupiedPresentation: unknown = await presentationStore.get(['image', assetId]);
+      if (
+        occupiedRoot !== undefined ||
+        occupiedWorkspace !== undefined ||
+        occupiedPresentation !== undefined
+      ) {
+        throw new ImageAggregateCollisionError(assetId);
+      }
+      await mediaStore.put(entry);
+      await presentationStore.put({
+        aggregateId: assetId,
+        aggregateKind: 'image',
+        presentationRevision: 0,
+        previewBlob: input.blob,
+        thumbnailBlob,
+        updatedAt: now,
+      });
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* The transaction may already have aborted. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
     }
-    await mediaStore.put(entry);
-    await presentationStore.put({
-      aggregateId: assetId,
-      aggregateKind: 'image',
-      presentationRevision: 0,
-      previewBlob: input.blob,
-      thumbnailBlob,
-      updatedAt: now,
-    });
-    await tx.done;
 
     return entry;
   });

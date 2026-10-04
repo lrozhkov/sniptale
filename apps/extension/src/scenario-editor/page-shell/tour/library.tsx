@@ -1,3 +1,4 @@
+import { GuideActionMenu } from '../action-menu';
 import { TourAudioResources } from './audio-materials';
 import { TourNarrationAcquisition } from './narration-acquisition';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
@@ -6,7 +7,10 @@ import { useState, type PointerEvent } from 'react';
 import { useTourSlideReorder } from './slide-reorder';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
-import { getTourIncomingReferences } from '../../../features/scenario/project/public';
+import {
+  getTourAudioResources,
+  getTourIncomingReferences,
+} from '../../../features/scenario/project/public';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -21,6 +25,9 @@ import {
   GripVertical,
   Flag,
   BookOpen,
+  MoreHorizontal,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideImageUpload } from '../image-upload';
@@ -76,11 +83,16 @@ export function TourLibraryPanel(
               onClick={() => panels.openLeft(id)}
             >
               <Icon size={16} />
-              {panels.leftSection === id && <span>{label}</span>}
+              <span>{label}</span>
             </ContentToolbarButton>
           ))}
         </div>
-        <ContentToolbarButton title={t('scenario.editor.close')} onClick={panels.toggleLeft}>
+        <ContentToolbarButton
+          tone="close"
+          size="compact"
+          title={t('scenario.editor.close')}
+          onClick={panels.toggleLeft}
+        >
           <X size={16} />
         </ContentToolbarButton>
       </div>
@@ -89,7 +101,28 @@ export function TourLibraryPanel(
           <TourSlideList {...props} />
         ) : (
           <>
-            <TourResources {...props} />
+            <section
+              className="guide-image-resources"
+              aria-label={t('scenario.editor.guideLibraryImages')}
+            >
+              <h3>
+                <Image size={15} aria-hidden="true" />
+                <span>{t('scenario.editor.guideLibraryImages')}</span>
+              </h3>
+              <GuideImageUpload
+                compact
+                menu={
+                  project.tour?.slides.some((slide) =>
+                    Boolean(slide.kind === 'image' ? slide.image : slide.background.image)
+                  ) ?? false
+                }
+                placement={{ kind: 'tour-slides' }}
+                disabled={importDisabled}
+                onUpload={props.onUpload}
+                t={t}
+              />
+              <TourResources {...props} />
+            </section>
             {panels.leftOpen && project.tour && (
               <TourAudioResources
                 tour={project.tour}
@@ -101,62 +134,52 @@ export function TourLibraryPanel(
                   state.select(selection);
                   panels.openRight('selection');
                 }}
-              />
+              >
+                {props.onImportNarration && (
+                  <TourNarrationAcquisition
+                    key={`${project.id}:resources`}
+                    menu={getTourAudioResources(project.tour).length > 0}
+                    destination={{ slideId: null, objectId: null, expectedNarration: null }}
+                    disabled={importDisabled}
+                    onImport={props.onImportNarration}
+                    t={t}
+                  />
+                )}
+              </TourAudioResources>
             )}
           </>
         )}
       </div>
-      <footer className="guide-resource-footer">
-        {panels.leftSection === 'resources' ? (
-          <>
-            <GuideImageUpload
-              compact
-              placement={{ kind: 'tour-slides' }}
-              disabled={importDisabled}
-              onUpload={props.onUpload}
-              t={t}
-            />
-            {panels.leftOpen && props.onImportNarration && project.tour && (
-              <TourNarrationAcquisition
-                key={`${project.id}:resources`}
-                destination={{ slideId: null, objectId: null, expectedNarration: null }}
-                disabled={importDisabled}
-                onImport={props.onImportNarration}
-                t={t}
-              />
-            )}
-          </>
-        ) : (
-          <>
-            <div className="tour-list-actions">
-              <ContentToolbarButton
-                disabled={disabled}
-                title={t('scenario.editor.tourAddImageSlide')}
-                onClick={() => state.add('image')}
-              >
-                <Plus size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.tourAddImageSlide')}</span>
-              </ContentToolbarButton>
-              <ContentToolbarButton
-                disabled={disabled}
-                title={t('scenario.editor.tourAddNavigation')}
-                onClick={() => state.add('navigation')}
-              >
-                <ListPlus size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.tourAddNavigation')}</span>
-              </ContentToolbarButton>
-              <ContentToolbarButton
-                disabled={disabled || !project.items.length}
-                title={t('scenario.editor.tourGenerate')}
-                onClick={props.onGenerate}
-              >
-                <BookOpen size={16} aria-hidden="true" />
-                <span>{t('scenario.editor.tourGenerate')}</span>
-              </ContentToolbarButton>
-            </div>
-          </>
-        )}
-      </footer>
+      {panels.leftSection === 'structure' && (
+        <footer className="guide-resource-footer">
+          <div className="tour-list-actions">
+            <ContentToolbarButton
+              disabled={disabled}
+              title={t('scenario.editor.tourAddImageSlide')}
+              onClick={() => state.add('image')}
+            >
+              <Plus size={16} aria-hidden="true" />
+              <span>{t('scenario.editor.tourAddImageSlide')}</span>
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              disabled={disabled}
+              title={t('scenario.editor.tourAddNavigation')}
+              onClick={() => state.add('navigation')}
+            >
+              <ListPlus size={16} aria-hidden="true" />
+              <span>{t('scenario.editor.tourAddNavigation')}</span>
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              disabled={disabled || !project.items.length}
+              title={t('scenario.editor.tourGenerate')}
+              onClick={props.onGenerate}
+            >
+              <BookOpen size={16} aria-hidden="true" />
+              <span>{t('scenario.editor.tourGenerate')}</span>
+            </ContentToolbarButton>
+          </div>
+        </footer>
+      )}
     </FloatingChromePanel>
   );
 }
@@ -228,35 +251,22 @@ function TourSlideList({
                   {slide.title || t('scenario.editor.tourUntitled')}
                 </span>
               </button>
-              <div className="tour-slide-actions">
-                <ContentToolbarButton
-                  className="tour-slide-action"
-                  disabled={disabled}
-                  title={t('scenario.editor.tourDuplicate')}
-                  onClick={() => {
-                    const newId = crypto.randomUUID();
-                    if (state.command({ kind: 'duplicate-slide', slideId: slide.id, newId }))
-                      onSelect(newId);
-                  }}
-                >
-                  <Copy size={14} />
-                </ContentToolbarButton>
-                <ContentToolbarButton
-                  className="tour-slide-action"
-                  disabled={disabled}
-                  title={t('common.actions.delete')}
-                  onClick={() => remove(slide.id)}
-                >
-                  <Trash2 size={14} />
-                </ContentToolbarButton>
-              </div>
+              <TourSlideActions
+                slides={project.tour!.slides}
+                index={index}
+                disabled={disabled}
+                command={state.command}
+                onSelect={onSelect}
+                onRemove={remove}
+                t={t}
+              />
             </div>
           </div>
         );
       })}
       {project.tour && (
         <button
-          className="tour-object-row"
+          className="tour-end-row"
           aria-current={state.selection?.kind === 'end' ? 'step' : undefined}
           onClick={() => {
             state.select({ kind: 'end' });
@@ -292,6 +302,75 @@ function TourSlideList({
 }
 
 /** Keeps pointer and keyboard reordering on the same canonical move command. */
+/** The row menu shares canonical commands with drag and keyboard movement. */
+function TourSlideActions({
+  slides,
+  index,
+  disabled,
+  command,
+  onSelect,
+  onRemove,
+  t,
+}: {
+  slides: TourSlide[];
+  index: number;
+  disabled: boolean;
+  command: ReturnType<typeof useTourSelection>['command'];
+  onSelect: (id: string) => void;
+  onRemove: (id: string) => void;
+  t: Translate;
+}) {
+  const slideId = slides[index]!.id;
+  return (
+    <div className="tour-slide-actions">
+      <GuideActionMenu
+        label={t('scenario.editor.tourSlideActions')}
+        icon={<MoreHorizontal size={16} aria-hidden="true" />}
+        tone="utility"
+        disabled={disabled}
+        items={[
+          {
+            label: t('scenario.editor.guideMoveUp'),
+            icon: <ArrowUp size={15} />,
+            disabled: index === 0,
+            onSelect: () =>
+              command({
+                kind: 'move-slide',
+                slideId: slideId,
+                beforeId: slides[index - 1]!.id,
+              }),
+          },
+          {
+            label: t('scenario.editor.guideMoveDown'),
+            icon: <ArrowDown size={15} />,
+            disabled: index === slides.length - 1,
+            onSelect: () =>
+              command({
+                kind: 'move-slide',
+                slideId: slideId,
+                ...(slides[index + 2] ? { beforeId: slides[index + 2]!.id } : {}),
+              }),
+          },
+          {
+            label: t('scenario.editor.tourDuplicate'),
+            icon: <Copy size={15} />,
+            onSelect: () => {
+              const newId = crypto.randomUUID();
+              if (command({ kind: 'duplicate-slide', slideId: slideId, newId })) onSelect(newId);
+            },
+          },
+          {
+            label: t('common.actions.delete'),
+            icon: <Trash2 size={15} />,
+            danger: true,
+            onSelect: () => onRemove(slideId),
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
 function TourSlideMoveHandle({
   slideId,
   index,
@@ -312,6 +391,7 @@ function TourSlideMoveHandle({
   return (
     <ContentToolbarButton
       className="tour-slide-grip"
+      tone="utility"
       onPointerDown={(event) => onPointerStart(event, slideId)}
       disabled={disabled}
       title={t('scenario.editor.tourMoveSlide')}

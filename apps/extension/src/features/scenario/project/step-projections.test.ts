@@ -149,3 +149,22 @@ it('projects every image beyond six steps without sharing mutable geometry', () 
   preview[7]!.images[1]!.frame.width = 10;
   expect(extra.frame.width).toBe(90);
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'projects caption alignment %s without changing legacy metadata or placement',
+  (captionAlignment) => {
+    const project = createGuideProject('Captions');
+    const step = captureStep('caption');
+    const image = step.blocks[0];
+    if (image?.kind !== 'image') throw new Error('Expected image');
+    if (captionAlignment !== undefined) image.captionAlignment = captionAlignment;
+    project.items = [step];
+    const original = structuredClone(project);
+    const projected = buildGuidePreviewSteps({ project })[0]!.images[0]!;
+    expect(projected.captionAlignment).toBe(captionAlignment);
+    expect(Object.hasOwn(projected, 'captionAlignment')).toBe(captionAlignment !== undefined);
+    expect(projected.frame).toEqual(image.frame);
+    expect(projected.contentTransform).toEqual(image.contentTransform);
+    expect(project).toEqual(original);
+  }
+);

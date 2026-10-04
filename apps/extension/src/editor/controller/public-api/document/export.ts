@@ -14,7 +14,10 @@ import type {
 import type { EditorDocument } from '../../../../features/editor/document/types';
 import { loadEditorExportSettings } from '../../../persistence/export-settings';
 import type { Canvas } from 'fabric';
-import { renderEditorWithFrameAnnotations } from './frame-annotation-export';
+import {
+  renderEditorWithFrameAnnotations,
+  type FrameAnnotationDraftRenderPolicy,
+} from './frame-annotation-export';
 import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft-coordinator';
 
 import type { SourceState } from '../../../document/model/source-state';
@@ -61,6 +64,7 @@ export function exportEditorDocumentViaController(
     canvasDocumentSize: controller.canvasDocumentSize,
     frame: useEditorStore.getState().frame,
     browserFrame: useEditorStore.getState().browserFrame,
+    displayName: useEditorStore.getState().pageTitle,
   });
 }
 
@@ -73,11 +77,13 @@ export function renderEditorControllerToDataUrl(
 
 export async function renderEditorControllerForExport(
   controller: EditorDocumentRenderControllerApi,
-  options: EditorRenderToDataUrlOptions
+  options: EditorRenderToDataUrlOptions,
+  draftPolicy: FrameAnnotationDraftRenderPolicy = 'finalize'
 ): Promise<string> {
   return renderEditorWithFrameAnnotations({
     canvas: controller.canvas,
     canvasDocumentSize: controller.canvasDocumentSize,
+    draftPolicy,
     renderOptions: options,
   });
 }

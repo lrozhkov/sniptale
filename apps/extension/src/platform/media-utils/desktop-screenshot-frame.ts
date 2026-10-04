@@ -26,10 +26,12 @@ export async function captureDesktopScreenshotFrame(args: {
   streamId: string;
   imageFormat: ScreenshotImageFormat;
   imageQuality: number;
+  delaySeconds?: number;
 }): Promise<{ dataUrl: string; width: number; height: number }> {
   return captureDesktopStreamFrame({
     acquireStream: () => acquireStream(args.streamId),
     imageFormat: args.imageFormat,
     imageQuality: args.imageQuality,
+    delaySeconds: args.delaySeconds ?? 0,
   });
 }

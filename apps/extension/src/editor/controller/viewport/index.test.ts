@@ -10,6 +10,8 @@ import {
   getEditorViewportMetrics,
   restoreEditorViewportAnchor,
 } from './';
+import { getEditorEditingSurfaceSize } from '../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 const DEFAULT_CANVAS_SIZE = { width: 200, height: 100 };
 const DEFAULT_SOURCE = { displayHeight: 100, displayWidth: 200, name: 'image.png' } as never;
@@ -225,6 +227,21 @@ it('captures and restores viewport anchor', () => {
   expect(onSynced).toHaveBeenCalledOnce();
 });
 
+it('preserves a viewport center anchored in the workspace beyond the image', () => {
+  const { stageElement, viewportElement } = createViewportFixture();
+  viewportElement.scrollLeft = 600;
+  viewportElement.scrollTop = 300;
+  const anchor = captureEditorViewportAnchor({
+    canvas: {} as never,
+    viewportElement,
+    stageElement,
+    canvasDocumentSize: DEFAULT_CANVAS_SIZE,
+    zoomLevel: 1,
+  });
+  expect(anchor?.relativeX).toBeGreaterThan(1);
+  expect(anchor?.relativeY).toBeGreaterThan(1);
+});
+
 it('guards null anchors', () => {
   const { stageElement, viewportElement } = createViewportFixture();
 
@@ -258,8 +275,33 @@ it('applies viewport zoom to the fabric canvas and guards null canvases', () => 
   applyEditorViewportZoom(canvas as never, { width: 400, height: 200 }, 1.5);
   applyEditorViewportZoom(null, { width: 400, height: 200 }, 1.5);
 
-  expect(canvas.setDimensions).toHaveBeenCalledWith({ height: 300, width: 600 }, { cssOnly: true });
+  const surface = getEditorEditingSurfaceSize({ width: 400, height: 200 });
+  expect(canvas.setDimensions).toHaveBeenCalledWith(
+    { height: Math.round(surface.height * 1.5), width: Math.round(surface.width * 1.5) },
+    { cssOnly: true }
+  );
   expect(canvas.calcOffset).toHaveBeenCalledOnce();
+});
+
+it('zooms a virtual canvas without growing its backing to the scrollable surface', () => {
+  const surface = document.createElement('div');
+  const viewport = document.createElement('div');
+  const element = document.createElement('canvas');
+  surface.append(element);
+  Object.defineProperties(viewport, {
+    clientWidth: { value: 400 },
+    clientHeight: { value: 300 },
+  });
+  const canvas = new EditorCanvas(element);
+  canvas.setRenderViewport(viewport, document.createElement('div'));
+  canvas.setDocumentGeometry({ width: 100, height: 80 }, 2048);
+
+  applyEditorViewportZoom(canvas, { width: 100, height: 80 }, 0.5);
+
+  expect(canvas.getWidth()).toBe(404);
+  expect(canvas.getHeight()).toBe(304);
+  expect(canvas.getZoom()).toBe(0.5);
+  expect(surface.style.width).toBe('2098px');
 });
 
 it('keeps logical viewport metrics stable when browser page zoom changes', () => {
@@ -301,5 +343,9 @@ it('keeps logical viewport metrics stable when browser page zoom changes', () =>
   };
   applyEditorViewportZoom(canvas as never, { width: 200, height: 100 }, 1, 1);
 
-  expect(canvas.setDimensions).toHaveBeenCalledWith({ height: 200, width: 400 }, { cssOnly: true });
+  const surface = getEditorEditingSurfaceSize({ width: 200, height: 100 });
+  expect(canvas.setDimensions).toHaveBeenCalledWith(
+    { height: surface.height * 2, width: surface.width * 2 },
+    { cssOnly: true }
+  );
 });

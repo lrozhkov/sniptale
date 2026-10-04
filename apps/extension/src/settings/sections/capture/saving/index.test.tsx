@@ -29,7 +29,12 @@ vi.mock('./state/controller', () => ({
   useSavePresetsSection: () => useSavePresetsSectionSpy(),
 }));
 
+vi.mock('./filename-rules', () => ({
+  FilenameRulesSettings: () => <div data-testid="filename-rules" />,
+}));
+
 import { SavePresetsSection } from '.';
+import { translate } from '../../../../platform/i18n';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -72,6 +77,33 @@ it('keeps storage management on its own subpage', async () => {
 
   expect(savePresetsSectionContentSpy).not.toHaveBeenCalled();
   expect(storageDraftsSectionSpy).toHaveBeenCalledWith({ view: 'storage' });
+});
+
+it('places Drafts immediately after Files and isolates its controls', async () => {
+  useSavePresetsSectionSpy.mockReturnValue(createSectionState());
+  await renderSection('files');
+
+  expect(
+    Array.from(container?.querySelectorAll('nav button') ?? []).map((button) => button.textContent)
+  ).toEqual([
+    translate('settings.navigation.views.settings'),
+    translate('settings.navigation.views.files'),
+    translate('settings.navigation.views.drafts'),
+    translate('settings.navigation.views.storage'),
+    translate('settings.navigation.views.folderTemplates'),
+  ]);
+  expect(savePresetsSectionContentSpy).toHaveBeenCalledWith(
+    expect.objectContaining({ view: 'files' })
+  );
+  expect(container?.querySelector('[data-testid="filename-rules"]')).toBeTruthy();
+  expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeNull();
+  await renderSection('drafts');
+  expect(storageDraftsSectionSpy).toHaveBeenCalledWith({ view: 'drafts' });
+  expect(container?.querySelector('[data-testid="filename-rules"]')).toBeNull();
+  expect(savePresetsSectionContentSpy).toHaveBeenCalledTimes(1);
+  await renderSection('settings');
+  expect(container?.querySelector('[data-testid="filename-rules"]')).toBeNull();
+  expect(container?.querySelector('[data-testid="storage-drafts-section"]')).toBeNull();
 });
 
 afterEach(() => {

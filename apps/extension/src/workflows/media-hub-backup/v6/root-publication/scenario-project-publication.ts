@@ -2,12 +2,27 @@ import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-pa
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   buildPhysicalDeleteOperation,
+  parseAssetRef,
   readAssetFile,
+  type AssetRef,
   type ArchiveRestoreSession,
 } from '../../../../composition/persistence/assets';
-import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
+import {
+  parseMediaLibraryEntry,
+  parseMediaThumbnailEntry,
+} from '../../../../composition/persistence/media-library/read-guards';
+import {
+  ASSET_REFS_STORE,
+  MEDIA_LIBRARY_STORE,
+  PROJECT_ASSETS_STORE,
+  STORE_NAME,
+  initDB,
+} from '../../../../composition/persistence/infrastructure/indexed-db/core';
+import { parseProjectAssetEntry } from '../../../../composition/persistence/projects/read-guards';
+import { parseRecordingEntry } from '../../../../composition/persistence/recordings/index.guards';
 import type { putScenarioProjectBackupRestore } from '../../../../composition/persistence/scenario/backup-restore';
 import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
+import { scenarioLibraryMediaId } from '../../../../composition/persistence/scenario/library-publication';
 import {
   parseScenarioAssetEntry,
   parseScenarioExportEntry,
@@ -179,40 +194,106 @@ async function prepareScenarioEntry(args: {
   return entry;
 }
 
-function prepareScenarioAssets(args: {
+async function prepareScenarioAssets(args: {
   assetIds: ReadonlyMap<string, string>;
   metadata: PortableScenarioProjectMetadata;
   objects: ReadonlyMap<string, StagedArchiveObject>;
   rootIdMap: Readonly<Record<string, string>>;
   targetProjectId: string;
 }) {
-  return args.metadata.assets.map((item) => {
-    const object = required(args.objects, item.objectId);
-    const galleryAssetId = item.entry.galleryAssetId
-      ? (args.rootIdMap[`media:library-item:${item.entry.galleryAssetId}`] ?? null)
-      : null;
-    const entry = parseScenarioAssetEntry({
-      ...item.entry,
-      assetId: object.ref.assetId,
-      galleryAssetId,
-      id: args.assetIds.get(item.entry.id),
-      mimeType: object.ref.mimeType,
-      projectId: args.targetProjectId,
-      size: object.ref.size,
-    });
-    if (!entry) throw new Error('Restored scenario asset metadata is invalid.');
-    return { entry, ref: object.ref };
-  });
+  return Promise.all(
+    args.metadata.assets.map(async (item) => {
+      const object = required(args.objects, item.objectId);
+      const galleryAssetId = item.entry.galleryAssetId
+        ? (args.rootIdMap[`media:library-item:${item.entry.galleryAssetId}`] ?? null)
+        : null;
+      const borrowedMediaId = item.entry.borrowedMediaId
+        ? args.rootIdMap[`media:library-item:${item.entry.borrowedMediaId}`]
+        : undefined;
+      if (item.entry.borrowedMediaId && !borrowedMediaId)
+        throw new Error('Restored borrowed scenario media is unavailable.');
+      const ownedMediaId =
+        item.entry.borrowedMediaId || item.entry.galleryAssetId
+          ? undefined
+          : args.rootIdMap[`media:library-item:${scenarioLibraryMediaId(item.entry.id)}`];
+      const sourceMediaId = borrowedMediaId ?? ownedMediaId;
+      let ref = object.ref;
+      if (sourceMediaId) {
+        const db = await initDB();
+        const media = parseMediaLibraryEntry(await db.get(MEDIA_LIBRARY_STORE, sourceMediaId));
+        if (!media) throw new Error('Restored borrowed scenario media is unavailable.');
+        let sourceAssetId: string | null = null;
+        if (media.source.kind === 'stored-asset') sourceAssetId = media.source.assetId;
+        else if (media.source.kind === 'project-asset')
+          sourceAssetId =
+            parseProjectAssetEntry(await db.get(PROJECT_ASSETS_STORE, media.source.projectAssetId))
+              ?.assetId ?? null;
+        else if (media.source.kind === 'recording')
+          sourceAssetId =
+            parseRecordingEntry(await db.get(STORE_NAME, media.source.recordingId))?.assetId ??
+            null;
+        if (!sourceAssetId) throw new Error('Restored borrowed scenario source is unavailable.');
+        const sharedRef = parseAssetRef(await db.get(ASSET_REFS_STORE, sourceAssetId));
+        if (
+          !sharedRef ||
+          sharedRef.mimeType !== object.ref.mimeType ||
+          sharedRef.size !== object.ref.size
+        )
+          throw new Error('Restored borrowed scenario source differs from the archive.');
+        await assertMatchingArchiveAsset(object.ref, sharedRef);
+        ref = sharedRef;
+      }
+      const entry = parseScenarioAssetEntry({
+        ...item.entry,
+        assetId: ref.assetId,
+        galleryAssetId: sourceMediaId ?? galleryAssetId,
+        ...(sourceMediaId ? { borrowedMediaId: sourceMediaId } : {}),
+        id: args.assetIds.get(item.entry.id),
+        mimeType: ref.mimeType,
+        projectId: args.targetProjectId,
+        size: ref.size,
+      });
+      if (!entry) throw new Error('Restored scenario asset metadata is invalid.');
+      return { entry, ref };
+    })
+  );
+}
+
+async function assertMatchingArchiveAsset(staged: AssetRef, shared: AssetRef) {
+  const [stagedFile, sharedFile] = await Promise.all([
+    readAssetFile(staged, 'scenario-asset'),
+    readAssetFile(shared, 'library-asset'),
+  ]);
+  if (stagedFile.size !== sharedFile.size) {
+    throw new Error('Restored scenario source differs from the archive.');
+  }
+  const chunkSize = 1024 * 1024;
+  for (let offset = 0; offset < stagedFile.size; offset += chunkSize) {
+    const [stagedBytes, sharedBytes] = await Promise.all([
+      stagedFile.slice(offset, offset + chunkSize).arrayBuffer(),
+      sharedFile.slice(offset, offset + chunkSize).arrayBuffer(),
+    ]);
+    const a = new Uint8Array(stagedBytes);
+    const b = new Uint8Array(sharedBytes);
+    if (a.length !== b.length || a.some((byte, index) => byte !== b[index])) {
+      throw new Error('Restored scenario source differs from the archive.');
+    }
+  }
 }
 
 function prepareScenarioExports(
   metadata: PortableScenarioProjectMetadata,
   exportIds: ReadonlyMap<string, string>,
-  targetProjectId: string
+  targetProjectId: string,
+  objects: ReadonlyMap<string, StagedArchiveObject>
 ) {
   return metadata.exports.map((item) => {
+    const ref = item.html ? required(objects, item.html.objectId).ref : undefined;
+    if (ref && (ref.size !== item.size || !/^text\/html(?:;charset=utf-8)?$/iu.test(ref.mimeType)))
+      throw new Error('Restored HTML export body differs from its catalogue.');
     const entry = parseScenarioExportEntry({
       ...item,
+      ...(item.html && ref ? { html: { mode: item.html.mode, assetId: ref.assetId } } : {}),
       id: exportIds.get(item.id),
       projectId: targetProjectId,
     });
@@ -224,12 +305,16 @@ function prepareScenarioExports(
 function prepareScenarioStepDocuments(args: {
   metadata: PortableScenarioProjectMetadata;
   objects: ReadonlyMap<string, StagedArchiveObject>;
+  sharedAssetRefs: ReadonlyMap<string, AssetRef>;
   stepIds: ReadonlyMap<string, string>;
   targetProjectId: string;
 }) {
   return args.metadata.stepDocuments.map((item) => {
     const refsByObjectId = new Map(
-      item.document.assets.map(({ objectId }) => [objectId, required(args.objects, objectId).ref])
+      item.document.assets.map(({ objectId }) => [
+        objectId,
+        args.sharedAssetRefs.get(objectId) ?? required(args.objects, objectId).ref,
+      ])
     );
     const document = decodePortableEditorDocument({
       assetsByObjectId: new Map([...refsByObjectId].map(([id, ref]) => [id, ref.assetId])),
@@ -321,13 +406,19 @@ export async function prepareScenarioProjectPublication(args: {
     rootIdMap: args.session.rootIdMap,
     stepIds,
   });
-  const assets = prepareScenarioAssets({
+  const assets = await prepareScenarioAssets({
     ...shared,
     assetIds,
     rootIdMap: args.session.rootIdMap,
   });
-  const exports = prepareScenarioExports(args.metadata, exportIds, targetProjectId);
-  const stepDocuments = prepareScenarioStepDocuments({ ...shared, stepIds });
+  const sharedAssetRefs = new Map(
+    args.metadata.assets.map((asset, index) => [asset.objectId, assets[index]!.ref])
+  );
+  const exports = prepareScenarioExports(args.metadata, exportIds, targetProjectId, objects);
+  const exportRefs = args.metadata.exports.flatMap((entry) =>
+    entry.html ? [required(objects, entry.html.objectId).ref] : []
+  );
+  const stepDocuments = prepareScenarioStepDocuments({ ...shared, sharedAssetRefs, stepIds });
   const sidecars = await prepareScenarioSidecars({ ...shared, exportIds });
   return {
     assetIds,
@@ -338,6 +429,7 @@ export async function prepareScenarioProjectPublication(args: {
       entry,
       exportThumbnails: sidecars.exportThumbnails,
       exports,
+      exportRefs,
       stepDocuments,
       ...(sidecars.thumbnail ? { thumbnail: sidecars.thumbnail } : {}),
       ...(sidecars.presentation ? { presentation: sidecars.presentation } : {}),

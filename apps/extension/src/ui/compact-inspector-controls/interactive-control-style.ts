@@ -121,3 +121,20 @@ export const COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME = [
   'bg-[var(--sniptale-field-bg-active)]',
   'shadow-[var(--sniptale-field-shadow-active)]',
 ].join(' ');
+
+/** Shared chrome for directly editable inspector values (numeric and color). */
+export const COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME = [
+  'h-[var(--sniptale-compact-control-height,32px)]',
+  'rounded-[7px] px-2 transition-[border-color,background-color]',
+  'border border-transparent bg-transparent',
+].join(' ');
+
+export const COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME = [
+  'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
+  'focus-within:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_70%,transparent)]',
+].join(' ');
+
+export const COMPACT_INLINE_VALUE_INPUT_CLASS_NAME = [
+  'h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-right',
+  'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold text-inherit outline-none',
+].join(' ');

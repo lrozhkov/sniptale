@@ -10,6 +10,7 @@ import {
   renderEditorControllerForExport,
   renderEditorControllerToDataUrl,
   resetEditorControllerToOriginal,
+  restoreEditorControllerOriginalDocument,
   undoEditorControllerSnapshot,
 } from './document';
 import {
@@ -66,6 +67,7 @@ export {
   renderEditorControllerToDataUrl,
   reorderEditorControllerLayer,
   resetEditorControllerToOriginal,
+  restoreEditorControllerOriginalDocument,
   resizeEditorControllerCanvas,
   resizeEditorControllerImageScene,
   resizeEditorControllerLayer,

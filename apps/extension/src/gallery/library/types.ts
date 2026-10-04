@@ -7,19 +7,41 @@ import type { GalleryItem } from './items';
 
 export type FolderFilter =
   | 'all'
+  | 'audio'
   | 'screenshot'
   | 'recording'
   | 'export'
   | 'web-snapshot'
+  | 'video-project'
   | 'scenario';
 
-export type GalleryFolderCounts = Record<Exclude<FolderFilter, 'web-snapshot'>, number> & {
+export type GalleryFolderCounts = Record<
+  Exclude<FolderFilter, 'web-snapshot' | 'video-project'>,
+  number
+> & {
   'web-snapshot'?: number;
+  'video-project'?: number;
 };
 
-export type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size-desc';
+export type SortMode =
+  | 'newest'
+  | 'oldest'
+  | 'name-asc'
+  | 'name-desc'
+  | 'size-desc'
+  | 'recently-modified';
 export type GalleryScope = LibraryFilterScope;
 export type GalleryViewMode = 'list' | 'compact-grid' | 'large-grid';
+
+export type GalleryTrashSize =
+  | { status: 'loading' }
+  | { status: 'ready'; bytes: number }
+  | { status: 'unavailable' };
+
+export interface GalleryTrashSummary {
+  count: number;
+  size: GalleryTrashSize;
+}
 
 export type GalleryFacetFilterId = LibraryFacetId;
 
@@ -41,13 +63,24 @@ export interface GalleryFacetDefinition {
 
 export interface GalleryGridMetrics {
   columnCount: number;
+  rowTops: number[];
+  rowBottoms?: number[];
   startRow: number;
   totalRows: number;
 }
 
 export interface GalleryPreviewSessionState {
+  requestRevision?: number | undefined;
   initialMode?: 'edit';
   inspectorCollapsed: boolean;
   item: GalleryItem | null;
   url: string | null;
+  loadStatus?: 'loading' | 'ready' | 'missing' | 'error' | undefined;
+}
+
+/** Confirms that the requested frame or its terminal feedback replaced the previous frame. */
+export interface GalleryPreviewPresentation {
+  requestRevision: number;
+  url: string | null;
+  outcome: 'presented' | 'terminal';
 }

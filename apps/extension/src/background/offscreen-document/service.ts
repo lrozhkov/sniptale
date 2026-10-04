@@ -9,7 +9,11 @@ import {
   createPrivacyErasureOffscreenDocumentOptions,
   createUserMediaOffscreenDocumentOptions,
 } from './create-options';
-import { createInitialOffscreenDocumentState, type OffscreenDocumentState } from './state';
+import {
+  createInitialOffscreenDocumentState,
+  replaceOffscreenStartup,
+  type OffscreenDocumentState,
+} from './state';
 import { markOffscreenDocumentReadyForState, waitForOffscreenReadyForState } from './readiness';
 import {
   createOffscreenDocumentUrl,
@@ -27,7 +31,7 @@ function resetClosedOffscreenState(state: OffscreenDocumentState): void {
   state.offscreenCreated = false;
   state.offscreenReady = false;
   state.startupFailed = false;
-  state.expectedStartupId = null;
+  replaceOffscreenStartup(state, null);
 }
 
 async function closeOffscreenDocumentForState(
@@ -49,7 +53,9 @@ async function closeOffscreenDocumentForState(
   }
 }
 
-async function probeExistingOffscreenDocument(offscreenStartupId: string): Promise<boolean> {
+async function probeExistingOffscreenDocument(
+  offscreenStartupId: string
+): Promise<'ready' | 'failed'> {
   const challenge = createOffscreenStartupId();
   const probe = getBackgroundRuntimeMessaging().sendRuntimeMessage(
     attachOffscreenCommandCapability({
@@ -68,12 +74,15 @@ async function probeExistingOffscreenDocument(offscreenStartupId: string): Promi
 
   try {
     const response = await Promise.race([probe, timeout]);
-    return (
-      response.success === true &&
-      response.challenge === challenge &&
-      response.offscreenStartupId === offscreenStartupId &&
-      response.state === 'ready'
-    );
+    if (
+      response.success !== true ||
+      response.challenge !== challenge ||
+      response.offscreenStartupId !== offscreenStartupId ||
+      (response.state !== 'ready' && response.state !== 'failed')
+    ) {
+      throw new Error('Existing offscreen document readiness is unverified');
+    }
+    return response.state;
   } finally {
     if (timeoutId !== undefined) {
       clearTimeout(timeoutId);
@@ -122,11 +131,11 @@ async function runOffscreenDocumentCreation(
     state.offscreenCreated = true;
     state.offscreenReady = false;
     state.startupFailed = false;
-    state.expectedStartupId = null;
+    replaceOffscreenStartup(state, null);
     const existingStartupId = resolveExistingOffscreenStartupId(existingContexts);
     if (existingStartupId) {
       try {
-        if (await probeExistingOffscreenDocument(existingStartupId)) {
+        if ((await probeExistingOffscreenDocument(existingStartupId)) === 'ready') {
           state.expectedStartupId = existingStartupId;
           state.offscreenReady = true;
           logger.debug('Reusing verified ready offscreen document', {
@@ -134,16 +143,20 @@ async function runOffscreenDocumentCreation(
           });
           return false;
         }
+        await closeOffscreenDocumentForState(state, 'runtime failure');
       } catch (error) {
+        state.offscreenCreated = false;
         logger.warn('Failed to verify existing offscreen document readiness', error);
+        throw error;
       }
+    } else {
+      state.offscreenCreated = false;
+      throw new Error('Existing offscreen document readiness is unverified');
     }
-
-    await closeOffscreenDocumentForState(state, 'runtime failure');
   }
 
   const offscreenStartupId = createOffscreenStartupId();
-  state.expectedStartupId = offscreenStartupId;
+  replaceOffscreenStartup(state, offscreenStartupId);
   state.offscreenReady = false;
   await browserOffscreen.createDocument(
     createUserMediaOffscreenDocumentOptions(
@@ -182,7 +195,7 @@ function ensureOffscreenDocumentForState(
     (error: unknown) => {
       if (!state.offscreenCreated) {
         state.offscreenReady = false;
-        state.expectedStartupId = null;
+        replaceOffscreenStartup(state, null);
       }
       if (state.creationPromise === coordinatedCreation) {
         state.creationPromise = null;
@@ -208,7 +221,7 @@ async function ensurePrivacyErasureOffscreenDocumentForState(
 
   const offscreenStartupId = createOffscreenStartupId();
   const offscreenUrl = browserRuntime.getURL('apps/extension/src/offscreen/offscreen.html');
-  state.expectedStartupId = offscreenStartupId;
+  replaceOffscreenStartup(state, offscreenStartupId);
   state.offscreenReady = false;
   await browserOffscreen.createDocument(
     createPrivacyErasureOffscreenDocumentOptions(

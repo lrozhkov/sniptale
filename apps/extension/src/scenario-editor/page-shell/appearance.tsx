@@ -116,12 +116,15 @@ export function GuideAppearance({
               </ContentToolbarButton>
             </div>
           )}
-          <GuideStyleFields
-            style={resolveGuideStyle(project.style, item.styleOverrides)}
-            disabled={disabled}
-            t={t}
-            onChange={customize}
-          />
+          <InspectorCategorizedContent flatten={false}>
+            <GuideStyleFields
+              nested
+              style={resolveGuideStyle(project.style, item.styleOverrides)}
+              disabled={disabled}
+              t={t}
+              onChange={customize}
+            />
+          </InspectorCategorizedContent>
         </>
       )}
     </>
@@ -144,6 +147,7 @@ export function GuideAppearance({
         sections.map(({ id }) => <div key={id}>{renderSection(id)}</div>)
       ) : (
         <CategorizedInspector
+          dataUi="scenario-editor.inspector-categories"
           ariaLabel={t('scenario.editor.guideStepSettings')}
           initialSection={activeSection}
           onSectionChange={setActiveSection}

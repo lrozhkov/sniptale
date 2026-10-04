@@ -10,13 +10,16 @@ import {
 } from './store-state';
 import type {
   PageDomMutationBatch,
+  PagePreparationChangeScope,
   PagePreparationHistoryDomEffect,
   PagePreparationHistoryEntry,
   PagePreparationSessionSnapshot,
 } from './types';
 import { clearHistoryDomLocators } from './dom-locators';
+import { applyScopedSnapshotDelta } from './snapshot-delta';
 
 type HistoryEntryArgs = {
+  scope?: PagePreparationChangeScope;
   after?: PagePreparationSessionSnapshot | null;
   before?: PagePreparationSessionSnapshot | null;
   domBatch?: PageDomMutationBatch | null;
@@ -34,14 +37,18 @@ function createEntryFromArgs(
   }
 
   return {
+    scope: args.scope ?? 'annotation',
     after,
-    before,
+    before: applyScopedSnapshotDelta(after, before, after, args.scope ?? 'annotation'),
     domBatch: normalizeHistoryDomBatch(args.domBatch),
     domEffect: normalizeHistoryDomEffect(args.domEffect),
   };
 }
 
-function beginDeferredCommitBoundary(state: HistoryStoreRuntimeState): number | null {
+function beginDeferredCommitBoundary(
+  state: HistoryStoreRuntimeState,
+  scope: PagePreparationChangeScope
+): number | null {
   if (state.isApplying) {
     return null;
   }
@@ -55,6 +62,7 @@ function beginDeferredCommitBoundary(state: HistoryStoreRuntimeState): number | 
   state.deferredCommits.set(state.deferredCommitId, {
     before,
     id: state.deferredCommitId,
+    scope,
   });
   notifyHistoryReachabilityChanged(state);
   return state.deferredCommitId;
@@ -76,7 +84,8 @@ function commitTransactionEntry(args: {
 
   return {
     after,
-    before: transaction.before,
+    before: applyScopedSnapshotDelta(after, transaction.before, after, transaction.scope),
+    scope: transaction.scope,
     domBatch: normalizeHistoryDomBatch(args.domBatch ?? transaction.domBatch),
     domEffect: normalizeHistoryDomEffect(args.domEffect),
   };
@@ -103,7 +112,8 @@ function finalizeDeferredEntry(args: {
 
   return {
     after,
-    before: deferred.before,
+    before: applyScopedSnapshotDelta(after, deferred.before, after, deferred.scope),
+    scope: deferred.scope,
     domBatch: normalizeHistoryDomBatch(args.domBatch),
     domEffect: normalizeHistoryDomEffect(args.domEffect),
   };
@@ -112,7 +122,8 @@ function finalizeDeferredEntry(args: {
 function beginHistoryTransaction(
   state: HistoryStoreRuntimeState,
   key: string,
-  domBatch: PageDomMutationBatch | null = null
+  domBatch: PageDomMutationBatch | null = null,
+  scope: PagePreparationChangeScope = 'annotation'
 ): boolean {
   if (state.isApplying || state.transactions.has(key)) {
     return false;
@@ -123,7 +134,7 @@ function beginHistoryTransaction(
     return false;
   }
 
-  state.transactions.set(key, { before, domBatch });
+  state.transactions.set(key, { before, domBatch, scope });
   notifyHistoryReachabilityChanged(state);
   publishHistoryState(state);
   return true;
@@ -168,8 +179,16 @@ function commitHistoryTransaction(
 
 function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
   return {
-    beginDeferredCommit(): number | null {
-      return beginDeferredCommitBoundary(state);
+    flushDeferredCommits(): void {
+      for (const id of [...state.deferredCommits.keys()]) {
+        const entry = finalizeDeferredEntry({ id, state });
+        if (entry) {
+          if (!pushHistoryEntry(state, entry)) notifyHistoryReachabilityChanged(state);
+        }
+      }
+    },
+    beginDeferredCommit(scope: PagePreparationChangeScope = 'annotation'): number | null {
+      return beginDeferredCommitBoundary(state, scope);
     },
     cancelDeferredCommit(id: number): void {
       if (state.deferredCommits.delete(id)) notifyHistoryReachabilityChanged(state);
@@ -191,8 +210,12 @@ function createDeferredCommitApi(state: HistoryStoreRuntimeState) {
 
 function createTransactionCommitApi(state: HistoryStoreRuntimeState) {
   return {
-    beginTransaction(key: string, domBatch: PageDomMutationBatch | null = null): boolean {
-      return beginHistoryTransaction(state, key, domBatch);
+    beginTransaction(
+      key: string,
+      domBatch: PageDomMutationBatch | null = null,
+      scope: PagePreparationChangeScope = 'annotation'
+    ): boolean {
+      return beginHistoryTransaction(state, key, domBatch, scope);
     },
     cancelTransaction(key: string): void {
       cancelHistoryTransaction(state, key);

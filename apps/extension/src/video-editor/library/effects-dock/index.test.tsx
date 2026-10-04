@@ -436,3 +436,38 @@ it('rejects a stale drop for an individually disabled effect', async () => {
   expect(operations.run).not.toHaveBeenCalled();
   expect(onApplyEffectDocument).not.toHaveBeenCalled();
 });
+
+it.each(['targetEffect', 'transition'] as const)(
+  'keeps %s search available without imported or selected effects',
+  (kind) => {
+    renderDock({ kind, catalogs: [] });
+    const search = container!.querySelector<HTMLButtonElement>(
+      `button[title="${translate('videoEditor.effectsLibrary.searchPlaceholder')}"]`
+    );
+    expect(search).not.toBeNull();
+    expect(search!.disabled).toBe(false);
+    act(() => search!.click());
+    const input = container!.querySelector<HTMLInputElement>(
+      `input[aria-label="${translate('videoEditor.effectsLibrary.searchPlaceholder')}"]`
+    );
+    expect(input).not.toBeNull();
+    expect(document.activeElement).toBe(input);
+    act(() => input!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    expect(document.activeElement).toBe(search);
+  }
+);
+
+it('uses a plain Apply to field while keeping its target selection operable', async () => {
+  renderDock({ kind: 'targetEffect', selectedTrackId: 'track' });
+  const select = container!.querySelector<HTMLButtonElement>(
+    `button[aria-label="${translate('videoEditor.effectsLibrary.applyTo')}"]`
+  )!;
+  expect(select.className).toContain('border-transparent bg-transparent');
+  act(() => select.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((node) =>
+    node.textContent?.includes(translate('videoEditor.effectsLibrary.wholeVideo'))
+  )!;
+  expect(option).toBeDefined();
+  await act(async () => option.click());
+  expect(select.textContent).toContain(translate('videoEditor.effectsLibrary.wholeVideo'));
+});

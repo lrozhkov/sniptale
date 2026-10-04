@@ -80,7 +80,7 @@ function materialSlide(
         id: nextId(),
         text,
         anchor: null,
-        appearance: { presentation: 'caption-bottom', alignment: 'start', placement: 'auto' },
+        appearance: null,
       });
   }
   return slide;

@@ -13,9 +13,9 @@ vi.mock('../../../composition/persistence/settings', async (importOriginal) => (
   loadSettings: loadSettingsMock,
 }));
 
-vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('@sniptale/foundation/utils/filename')>()),
-  generateFilename: generateFilenameMock,
+vi.mock('../../../workflows/file-naming/index', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../workflows/file-naming/index')>()),
+  createScreenshotFilename: generateFilenameMock,
 }));
 
 vi.mock('./index', () => ({
@@ -39,7 +39,11 @@ describe('capture-download-flow', () => {
     await downloadVisibleCapture('data:image/png;base64,visible', 'capture-job-visible');
 
     expect(loadSettingsMock).toHaveBeenCalledOnce();
-    expect(generateFilenameMock).toHaveBeenCalledWith('visible', 'png');
+    expect(generateFilenameMock).toHaveBeenCalledWith(
+      'visible',
+      'png',
+      expect.objectContaining({ imageFormat: 'png' })
+    );
     expect(downloadImageInServiceWorkerMock).toHaveBeenCalledWith(
       'data:image/png;base64,visible',
       'visible.png',
@@ -54,7 +58,11 @@ describe('capture-download-flow', () => {
 
     await downloadFullPageCapture('data:image/jpeg;base64,full', 'capture-job-1');
 
-    expect(generateFilenameMock).toHaveBeenCalledWith('full', 'jpeg');
+    expect(generateFilenameMock).toHaveBeenCalledWith(
+      'full',
+      'jpeg',
+      expect.objectContaining({ imageFormat: 'jpeg' })
+    );
     expect(downloadImageInServiceWorkerMock).toHaveBeenCalledWith(
       'data:image/jpeg;base64,full',
       'full.jpeg',

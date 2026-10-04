@@ -1,3 +1,5 @@
+import { translate } from '../../../../platform/i18n';
+import { createScreenshotFilename as generateFilename } from '../../../../workflows/file-naming/index';
 import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { ScenarioRuntimeCapturePayload } from '../../../../contracts/messaging/contracts/types';
@@ -14,11 +16,9 @@ import {
   DEFAULT_BORDER_PRESET,
   getLoadedHighlighterSettingsSnapshot,
 } from '../../../../composition/persistence/highlighter';
-import { buildScreenshotFilename as generateFilename } from '@sniptale/foundation/utils/screenshot-filename';
 import {
   buildScenarioPageDescriptor,
   buildScenarioTargetDescriptor,
-  describeScenarioTarget,
 } from '../../scenario-recorder/runtime';
 import { saveScenarioCaptureStep } from '../runtime/transport/steps';
 import type { ScenarioControllerResponse } from '../types';
@@ -119,7 +119,17 @@ function buildScenarioCapturePayload(params: {
   const targetDescriptor = target
     ? buildScenarioTargetDescriptorForSource(target, framePadding, sourceAdapter)
     : null;
-  const targetTitle = describeScenarioTarget(targetDescriptor);
+  const contextTitle = [
+    targetDescriptor?.ariaLabel,
+    targetDescriptor?.text,
+    targetDescriptor?.title,
+    page.title,
+  ]
+    .map((value) => value?.replace(/\s+/gu, ' ').trim() ?? '')
+    .find((value) => value.length > 0);
+  const targetTitle = contextTitle
+    ? Array.from(contextTitle).slice(0, 80).join('')
+    : translate('scenario.content.capturedStepTitle');
 
   return {
     captureSurface,
@@ -132,7 +142,7 @@ function buildScenarioCapturePayload(params: {
       sourceAdapter,
       sourceKind,
     }),
-    ...(targetTitle === '' ? {} : { title: targetTitle }),
+    title: targetTitle,
     ...(page.title ? { body: page.title } : {}),
   };
 }
@@ -220,7 +230,7 @@ async function saveScenarioSelectionCapture(params: {
 
   const response = await saveScenarioCaptureStep({
     dataUrl: params.dataUrl,
-    filename: generateFilename(params.captureSurface),
+    filename: await generateFilename(params.captureSurface),
     scenarioCapture: payload,
   });
 

@@ -265,10 +265,13 @@ async function verifiesTrustedBackgroundSenderVariantsCanInvokeOffscreenHandlers
     desktopMediaRequestGeneration: 'generation-1',
     desktopMediaRequestId: 'request-1',
   });
-  expect(startRecordingMock).toHaveBeenCalledWith({
-    settings: {},
-    streamId: 'stream-background',
-  });
+  expect(startRecordingMock).toHaveBeenCalledWith(
+    {
+      settings: {},
+      streamId: 'stream-background',
+    },
+    expect.any(Function)
+  );
   expect(desktopMediaResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   expect(startRecordingResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 }

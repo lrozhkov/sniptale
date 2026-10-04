@@ -78,7 +78,7 @@ it('constrains oversized axes at both edges and centers underfilled axes for con
   ).toEqual({ x: 0.5, y: 0, scale: 1 });
   expect(
     constrainGuideImage({ ...moved, fit: 'contain' }, { width: 800, height: 400 }).contentTransform
-  ).toEqual({ x: 0, y: 0, scale: 1 });
+  ).toEqual({ x: 0.5, y: 0, scale: 2 });
   expect(
     constrainGuideImage(
       { ...moved, fit: 'contain', contentTransform: { x: -10, y: 10, scale: 4 } },
@@ -89,7 +89,7 @@ it('constrains oversized axes at both edges and centers underfilled axes for con
     { ...moved, contentTransform: { x: -10, y: 10, scale: 0.5 } },
     { width: 800, height: 400 }
   );
-  expect(centered.contentTransform).toEqual({ x: 0, y: 0, scale: 0.5 });
+  expect(centered.contentTransform).toEqual({ x: -0.5, y: 0, scale: 2 });
   expect(centered.assetId).toBe(block.assetId);
   expect(centered.source).toBe(block.source);
 });

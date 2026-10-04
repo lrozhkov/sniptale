@@ -162,6 +162,7 @@ function selectEditorInspectorContentSizing(props: EditorInspectorContentProps) 
 function selectEditorInspectorContentFrame(props: EditorInspectorContentProps) {
   return {
     frameDraft: props.frameDraft,
+    lastFillModeRef: props.lastFillModeRef,
     framePaddingSummary: props.framePaddingSummary,
     layoutModeLabel: props.layoutModeLabel,
     backgroundModeLabel: props.backgroundModeLabel,

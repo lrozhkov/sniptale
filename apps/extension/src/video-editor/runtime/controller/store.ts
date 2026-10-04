@@ -56,6 +56,7 @@ function selectPlaybackPort(state: VideoEditorState): PlaybackPort {
 function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort {
   return {
     applyTypingCompression: state.applyTypingCompression,
+    placeMaterial: state.placeMaterial,
     appendMaterial: state.appendMaterial,
     insertMaterial: state.insertMaterial,
     overlayMaterial: state.overlayMaterial,
@@ -202,6 +203,8 @@ function selectProjectLifecyclePort(state: VideoEditorState): ProjectLifecyclePo
     project: state.project,
     recordingId: state.recordingId,
     renameProject: state.renameProject,
+    autosaveEnabled: state.autosaveEnabled,
+    setAutosaveEnabled: state.setAutosaveEnabled,
     saveState: state.saveState,
     setError: state.setError,
     setProject: state.setProject,

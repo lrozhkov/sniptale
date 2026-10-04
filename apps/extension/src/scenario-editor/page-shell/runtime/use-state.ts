@@ -1,4 +1,4 @@
-import { getTourImages } from '../../../features/scenario/project/public';
+import { getTourImages, getTourNarrationTargets } from '../../../features/scenario/project/public';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -20,6 +20,7 @@ import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driv
 import { useGuideHistory } from './history';
 import { useGuideAutosave } from './autosave';
 import { useGuideResourceSession } from './resource-session';
+import { openExistingScenarioProject } from './open-existing';
 
 import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
 import { applyTourImageEdit } from '../../../workflows/scenario-capture-edit/tour-edits';
@@ -36,7 +37,7 @@ type GuidePageStatus =
   | 'conflict'
   | 'dirty';
 
-type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit' | 'template';
+type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit' | 'template' | 'reload';
 
 type GuideCommitCommand =
   | {
@@ -64,6 +65,7 @@ type TourImageEditCommand = {
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
   const enterResourceSession = useGuideResourceSession();
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
   const [status, setStatus] = useState<GuidePageStatus>('loading');
   const [actionError, setActionError] = useState<GuideActionError | null>(null);
   const saved = useRef<GuideProject | null>(null);
@@ -80,25 +82,41 @@ export function useGuidePageState() {
   const { clearSelection, ...selection } = useGuideSelection(project);
   const generation = useRef(0);
   const requestedId = useRef(readScenarioEditorProjectId(window.location.search));
+  const loadContext = useRef({ project, status });
+  loadContext.current = { project, status };
   const load = useCallback(async () => {
     const turn = ++generation.current;
+    const retained = loadContext.current;
+    const rejectLoad = () => {
+      if (turn !== generation.current) return;
+      setStatus(retained.project ? retained.status : 'unavailable');
+      if (retained.project) setActionError('reload');
+    };
     if (!requestedId.current) {
       setStatus('empty');
       return;
     }
     setStatus('loading');
     try {
-      if (!(await enterResourceSession(requestedId.current))) return;
+      if (!(await enterResourceSession(requestedId.current))) {
+        rejectLoad();
+        return;
+      }
+      if (turn !== generation.current) return;
       const history = await getScenarioSavedVersions(requestedId.current);
       const [current, ...previous] = history?.versions ?? [];
       const loaded = current?.project ?? null;
       if (turn !== generation.current) return;
+      if (!loaded && retained.project) {
+        rejectLoad();
+        return;
+      }
       setActionError(null);
       saved.current = loaded ?? null;
       reset(loaded, previous.map((version) => version.project).reverse());
       setStatus(loaded ? 'ready' : 'missing');
     } catch {
-      if (turn === generation.current) setStatus('unavailable');
+      rejectLoad();
     }
   }, [reset, enterResourceSession]);
   useEffect(() => {
@@ -113,37 +131,98 @@ export function useGuidePageState() {
     commit(committed, reversible);
     setStatus('saved');
   };
-  const openProject = async (committed: GuideProject | null) => {
+  const openProject = async (committed: GuideProject | null, previous: GuideProject[] = []) => {
     if (!(await enterResourceSession(committed?.id ?? null))) return;
     requestedId.current = committed?.id ?? null;
     saved.current = committed;
-    reset(committed);
+    reset(committed, previous);
     setStatus(committed ? 'saved' : 'empty');
     clearSelection();
     replaceScenarioEditorSelectionInUrl({ projectId: committed?.id ?? null });
   };
-  const create = (name: string) =>
-    mutate(
-      () => createScenarioProjectRecord(name),
-      openProject,
-      () => setStatus('failed')
-    );
-  const { save } = useGuideAutosave({
+  const autosave = useGuideAutosave({
     project,
+    enabled: autosaveEnabled,
     dirty: status === 'dirty',
     conflict: status === 'conflict',
-    protectUnsaved: status === 'dirty' || status === 'failed' || status === 'conflict',
+    protectUnsaved:
+      status === 'dirty' ||
+      status === 'failed' ||
+      status === 'conflict' ||
+      (status === 'loading' && project !== saved.current),
     saved,
     busy,
     autosaving,
     generation,
-    onStatus: setStatus,
+    onStatus: (next) => {
+      setStatus(next);
+      if (next === 'saved') setActionError((current) => (current === 'reload' ? null : current));
+    },
     onPublish: publish,
   });
   const rejectAction = (action: Exclude<GuideActionError, 'structure'>) => {
     setStatus(status);
     setActionError(action);
   };
+  const commitChange = createGuideCommitDispatcher({
+    project,
+    saved,
+    status,
+    mutate,
+    setStatus,
+    acceptProject,
+    rejectAction,
+  });
+
+  return {
+    autosaveEnabled,
+    setAutosaveEnabled,
+    commitChange,
+    editingLocked: status === 'loading' || (status === 'saving' && !autosaving.current),
+    mutationPending: busy.current,
+    project,
+    status,
+    actionError,
+    images: useGuideMedia(project),
+    ...selection,
+    openExisting: (id: string) =>
+      openExistingScenarioProject(id, enterResourceSession, openProject),
+    ...editing,
+    ...autosave,
+    ...createGuideProjectCommands({
+      project,
+      status,
+      mutate,
+      openProject,
+      setStatus,
+      rejectAction,
+    }),
+    reload: load,
+  };
+}
+
+/** Binds project lifecycle commands to the existing mutation admission and rejection policy. */
+function createGuideProjectCommands({
+  project,
+  status,
+  mutate,
+  openProject,
+  setStatus,
+  rejectAction,
+}: {
+  project: GuideProject | null;
+  status: GuidePageStatus;
+  mutate: ReturnType<typeof createGuideMutationRunner>;
+  openProject: (project: GuideProject | null) => Promise<void>;
+  setStatus: (status: GuidePageStatus) => void;
+  rejectAction: (action: Exclude<GuideActionError, 'structure'>) => void;
+}) {
+  const create = (name: string) =>
+    mutate(
+      () => createScenarioProjectRecord(name),
+      openProject,
+      () => setStatus('failed')
+    );
   const duplicate = async (name: string) => {
     if (!project) return;
     await mutate(
@@ -168,38 +247,16 @@ export function useGuidePageState() {
       () => rejectAction('delete')
     );
   };
-  const commitChange = createGuideCommitDispatcher({
-    project,
-    saved,
-    status,
-    mutate,
-    setStatus,
-    acceptProject,
-    rejectAction,
-  });
-
-  return {
-    commitChange,
-    saveTemplate,
-    editingLocked: status === 'loading' || (status === 'saving' && !autosaving.current),
-    mutationPending: busy.current,
-    project,
-    status,
-    actionError,
-    images: useGuideImages(project),
-    ...selection,
-    create,
-    ...editing,
-    save,
-    duplicate,
-    remove,
-    reload: load,
-  };
+  return { create, duplicate, saveTemplate, remove };
 }
 
-/** Owns display URL acquisition and release independently from the editable project lifecycle. */
-function useGuideImages(project: GuideProject | null) {
-  const [images, setImages] = useState<Record<string, string | null>>({});
+/** Owns image and attached audio URLs; the existing images map is the player media input. */
+function useGuideMedia(project: GuideProject | null) {
+  const [media, setMedia] = useState<{
+    identity: string | null;
+    images: Record<string, string | null>;
+  }>({ identity: null, images: {} });
+  const projectId = project?.id ?? null;
   const assetKey = JSON.stringify([
     ...new Set([
       ...(project?.items.flatMap((item) =>
@@ -208,12 +265,25 @@ function useGuideImages(project: GuideProject | null) {
           : []
       ) ?? []),
       ...(project?.tour ? getTourImages(project.tour).map((image) => image.assetId) : []),
+      ...(project?.tour?.backgroundMusic ? [project.tour.backgroundMusic.assetId] : []),
+      ...(project?.tour?.slides.flatMap((slide) =>
+        getTourNarrationTargets(slide).flatMap((target) =>
+          target.narration ? [target.narration.assetId] : []
+        )
+      ) ?? []),
     ]),
   ]);
+  const identity = JSON.stringify([projectId, assetKey]);
   useEffect(() => {
     let active = true;
     const urls: string[] = [];
-    setImages({});
+    setMedia({ identity, images: {} });
+    const publish = (id: string, url: string | null) =>
+      setMedia((current) =>
+        current.identity === identity
+          ? { identity, images: { ...current.images, [id]: url } }
+          : current
+      );
     const parsedIds: unknown = JSON.parse(assetKey);
     const ids = Array.isArray(parsedIds)
       ? parsedIds.filter((id): id is string => typeof id === 'string')
@@ -223,20 +293,20 @@ function useGuideImages(project: GuideProject | null) {
         const blob = await getScenarioAssetBlob(id).catch(() => undefined);
         if (!active) return;
         if (!blob) {
-          setImages((current) => ({ ...current, [id]: null }));
+          publish(id, null);
           return;
         }
         const url = URL.createObjectURL(blob);
         urls.push(url);
-        setImages((current) => ({ ...current, [id]: url }));
+        publish(id, url);
       })
     );
     return () => {
       active = false;
       urls.forEach((url) => URL.revokeObjectURL(url));
     };
-  }, [assetKey]);
-  return images;
+  }, [assetKey, identity]);
+  return media.identity === identity ? media.images : {};
 }
 
 /** Keeps item selection addressable when structural edits or undo remove the focused item. */

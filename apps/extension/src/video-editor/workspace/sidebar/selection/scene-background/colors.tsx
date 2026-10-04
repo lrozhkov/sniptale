@@ -77,6 +77,7 @@ export function SceneBackgroundColorEditor(props: SceneBackgroundFieldProps) {
         </div>
       )}
       <CompactPaintSelector
+        triggerVariant="swatch"
         label={label}
         title={label}
         value={value}

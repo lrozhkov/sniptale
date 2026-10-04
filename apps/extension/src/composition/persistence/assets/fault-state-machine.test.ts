@@ -39,6 +39,21 @@ vi.mock('./opfs-store', async (importOriginal) => ({
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: vi.fn(async (effect) =>
     effect({
+      get: async (_store: string, assetId: string) =>
+        storage.refs.has(assetId) ? createRef(assetId) : undefined,
+      getAll: async (store: string) =>
+        store === 'asset_operations'
+          ? [...storage.operations.values()]
+          : store === 'asset_refs'
+            ? [...storage.refs].map(createRef)
+            : store === 'asset_owners'
+              ? [...storage.owners].map(([ownerId, assetId]) => ({
+                  assetId,
+                  ownerId,
+                  ownerKind: 'recording',
+                  role: 'body',
+                }))
+              : [],
       delete: async (_store: string, operationId: string) => {
         if (storage.deleteOperationFailures > 0) {
           storage.deleteOperationFailures -= 1;
@@ -48,6 +63,11 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
       },
     })
   ),
+}));
+
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: vi.fn(async () => undefined),
 }));
 
 import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from './operations';

@@ -47,7 +47,11 @@ export function createViewerPackageFileExtractor(args: {
 }): (path: string) => Promise<Blob> {
   const entriesByPath = new Map(
     args.manifest.entries
-      .filter((entry) => getViewerPackageFileKind(entry) !== null)
+      .filter(
+        (entry) =>
+          getViewerPackageFileKind(entry) !== null ||
+          (entry.component === 'webCopy' && entry.path.startsWith('assets/'))
+      )
       .map((entry) => [entry.path, entry])
   );
 

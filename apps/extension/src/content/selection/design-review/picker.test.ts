@@ -227,7 +227,9 @@ it('keeps the inspector open when text selection starts inside and releases outs
   popover.append(textarea);
   contentRoot.append(popover);
   const selected = makeVisible(document.createElement('button'));
-  const outside = makeVisible(document.createElement('article'));
+  const outside = makeVisible(document.createElement('button'));
+  const onPageClick = vi.fn();
+  outside.addEventListener('click', onPageClick);
   document.body.append(selected, outside);
   const onInspectorDismissRequested = vi.fn(() => true);
   startPicker({ onInspectorDismissRequested });
@@ -237,9 +239,12 @@ it('keeps the inspector open when text selection starts inside and releases outs
     new MouseEvent('pointerdown', { bubbles: true, cancelable: true, composed: true })
   );
   outside.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, cancelable: true }));
-  outside.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  const gestureClick = new MouseEvent('click', { bubbles: true, cancelable: true });
+  outside.dispatchEvent(gestureClick);
 
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(gestureClick.defaultPrevented).toBe(true);
+  expect(onPageClick).not.toHaveBeenCalled();
   expectFrameSummary('button');
 
   outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
@@ -289,6 +294,8 @@ it('keeps portaled settings controls owned by the inspector inside its dismissal
   popover.append(owner);
   const portaledControl = document.createElement('button');
   portaledControl.setAttribute(FLOATING_INTERACTION_OWNED_BY_ATTRIBUTE, 'review-color');
+  const onControlClick = vi.fn();
+  portaledControl.addEventListener('click', onControlClick);
   contentRoot.append(popover, portaledControl);
   const selected = makeVisible(document.createElement('button'));
   document.body.append(selected);
@@ -301,6 +308,7 @@ it('keeps portaled settings controls owned by the inspector inside its dismissal
   );
 
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(onControlClick).toHaveBeenCalledOnce();
 });
 
 it('selects the visible label proxy for an opacity-hidden checkbox menu trigger', () => {
@@ -331,6 +339,9 @@ it('selects the visible label proxy for an opacity-hidden checkbox menu trigger'
 });
 
 it('programmatically selects the same visible label proxy as pointer navigation', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  initializeContentUiRoots(host.attachShadow({ mode: 'open' }));
   const input = makeVisible(document.createElement('input'));
   input.id = 'programmatic-language-toggle';
   input.style.opacity = '0';
@@ -339,8 +350,10 @@ it('programmatically selects the same visible label proxy as pointer navigation'
   document.body.append(input, label);
   const onSelection = vi.fn();
   const runtime = startPicker({ onSelection });
+  runtime.setMeasurementsExpanded(true);
 
   expect(runtime.selectElement(input)).toBe(true);
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).not.toBeNull();
   expect(onSelection.mock.calls[0]?.[0].snapshot.element).toBe(label);
 });
 
@@ -607,4 +620,93 @@ it('restores inaccessible iframe preview after dismissal and keeps the pin when 
   expect(onInspectorDismissRequested).toHaveBeenCalledTimes(2);
   expect(onSelection).toHaveBeenCalledOnce();
   expectFrameSummary('iframe');
+});
+
+it('pins measurements to selection across page hover and owned UI', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  const shadow = host.attachShadow({ mode: 'open' });
+  const { appContainer } = initializeContentUiRoots(shadow);
+  const control = document.createElement('button');
+  appContainer.append(control);
+  const selected = makeVisible(document.createElement('section'));
+  const hovered = makeVisible(document.createElement('button'));
+  const neighbor = makeVisible(document.createElement('div'));
+  Object.defineProperty(neighbor, 'getBoundingClientRect', {
+    configurable: true,
+    value: () => new DOMRect(150, 30, 50, 32),
+  });
+  document.body.append(selected, hovered, neighbor);
+  const onSelection = vi.fn();
+  const runtime = startPicker({ onSelection });
+  runtime.selectElement(selected);
+  runtime.setMeasurementsEnabled(true);
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).not.toBeNull();
+  hovered.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  expectFrameSummary('section');
+  expect(onSelection).toHaveBeenCalledTimes(1);
+  expect(
+    queryContentUiElement('[data-ui="content.design-review.measurements"]')?.textContent
+  ).toContain('34 px');
+  const layer = queryContentUiElement('[data-ui="content.design-review.measurements"]');
+  control.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, composed: true }));
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBe(layer);
+  runtime.setMeasurementsEnabled(false);
+  hovered.dispatchEvent(new MouseEvent('mousemove', { bubbles: true }));
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBeNull();
+});
+
+it.each(['popover', 'feedback-panel'])(
+  'keeps measurement projection stable through %s control and comment interactions',
+  (surface) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const contentRoot = host.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(contentRoot);
+    const panel = document.createElement('aside');
+    panel.dataset['ui'] = `content.design-review.${surface}`;
+    const control = document.createElement('button');
+    const comment = document.createElement('textarea');
+    panel.append(control, comment);
+    contentRoot.append(panel);
+    const selected = makeVisible(document.createElement('button'));
+    document.body.append(selected);
+    const onSelection = vi.fn();
+    const onDismiss = vi.fn(() => true);
+    const onPageClick = vi.fn();
+    selected.addEventListener('click', onPageClick);
+    const picker = startPicker({ onSelection, onInspectorDismissRequested: onDismiss });
+    picker.setMeasurementsEnabled(true);
+    picker.setMeasurementsExpanded(true);
+    expect(picker.selectElement(selected)).toBe(true);
+    const projection = queryContentUiElement('[data-ui="content.design-review.measurements"]');
+    expect(projection).not.toBeNull();
+    const rulers = [...projection!.children];
+    for (const input of [control, comment]) {
+      input.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, composed: true }));
+      input.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
+      input.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+      expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBe(
+        projection
+      );
+      expect([...projection!.children]).toEqual(rulers);
+    }
+    expect(onSelection).toHaveBeenCalledOnce();
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(onPageClick).not.toHaveBeenCalled();
+  }
+);
+
+it('projects additional-only measurements for inaccessible iframe selection and clears on dismissal', () => {
+  const host = document.createElement('div');
+  document.body.append(host);
+  initializeContentUiRoots(host.attachShadow({ mode: 'open' }));
+  const iframe = makeVisible(document.createElement('iframe'));
+  document.body.append(iframe);
+  const runtime = startPicker();
+  runtime.setMeasurementsExpanded(true);
+  inaccessibleIframeMocks.onSelect?.(iframe);
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).not.toBeNull();
+  inaccessibleIframeMocks.onSelect?.(iframe);
+  expect(queryContentUiElement('[data-ui="content.design-review.measurements"]')).toBeNull();
 });

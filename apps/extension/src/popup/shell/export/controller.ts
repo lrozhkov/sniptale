@@ -9,6 +9,7 @@ import { usePopupExportTabSelection } from './selection/tabs/state';
 type UsePopupExportControllerParams = {
   activeTabCapabilities: ActiveTabCapabilities;
   isActive: boolean;
+  initialTabId?: number;
   pageAccess: PopupPageAccessRuntime;
 };
 
@@ -20,12 +21,14 @@ export type PopupExportController = {
 export function usePopupExportController({
   activeTabCapabilities,
   isActive,
+  initialTabId,
   pageAccess,
 }: UsePopupExportControllerParams) {
   const tabSelection = usePopupExportTabSelection({
     activeTabCapabilities,
     isActive,
     pageAccessStatus: pageAccess.status,
+    ...(initialTabId !== undefined ? { initialTabId } : {}),
   });
   const state = usePopupExportState(activeTabCapabilities, tabSelection, pageAccess.disabledReason);
   const actions = usePopupExportRuntime({

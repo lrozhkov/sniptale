@@ -2,7 +2,7 @@ import { insertEditorControllerImage, insertEditorControllerTechnicalData } from
 import type {
   EditorTechnicalDataKind,
   EditorTechnicalDataLayout,
-} from '../../tools/technical-data';
+} from '../../../../features/editor/document/technical-data';
 import type { EditorControllerInstance } from '../types';
 
 export async function insertImageForController(

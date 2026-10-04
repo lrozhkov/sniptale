@@ -94,6 +94,7 @@ function startBlur(
   const drawing: Extract<DrawingObject, { kind: 'blur' }> = {
     id: `drawing-${crypto.randomUUID()}`,
     kind: 'blur',
+    amount: useEditorStore.getState().toolSettings.blur.amount,
     bounds: { x: point.x, y: point.y, width: 1, height: 1 },
   };
   const object = createEditorDrawingBlurObject({
@@ -113,7 +114,7 @@ function startDrawing(
   const tool = bindings.getActiveTool();
   if (tool === 'select') return false;
   if (event.transform && isEditorDrawingSelection(event.transform.target)) return false;
-  if (cropDown(bindings, canvas, tool, event)) return true;
+  if (tool === 'crop') return cropDown(bindings, canvas, tool, event);
   const point = canvas.getScenePoint(event.e);
   const pointerId = readEditorDrawingPointerId(event.e);
   if (tool === 'step') {
@@ -143,6 +144,15 @@ function startDrawing(
   );
   if (!drawing || drawing.kind === 'blur') return false;
   addDrawingDraft(bindings, drawing, point, pointerId);
+  if (drawing.kind === 'arrow') {
+    const session = bindings.getDrawSession();
+    if (session) {
+      bindings.setDrawSession({
+        ...session,
+        arrowDrawFromTip: useEditorStore.getState().toolSettings.arrow.drawFromTip,
+      });
+    }
+  }
   return true;
 }
 
@@ -205,7 +215,7 @@ export function createEditorDrawingEventHandlers(
           selectionModifierGesture
         );
       }
-      if ('button' in event.e && event.e.button === 2) return;
+      if ('button' in event.e && event.e.button !== 0) return;
       if (!canvas || !bindings.getSource()) return;
       if (bindings.getActiveTool() === 'text' && isTextTarget(event.target)) {
         const point = canvas.getScenePoint(event.e);
@@ -216,7 +226,7 @@ export function createEditorDrawingEventHandlers(
       textTargetCandidate = null;
       if (startDrawing(bindings, canvas, event)) {
         canvas.skipTargetFind = true;
-        canvas.setCursor('crosshair');
+        canvas.setCursor(canvas.defaultCursor);
       }
     },
     handleMouseMove: (event) => {

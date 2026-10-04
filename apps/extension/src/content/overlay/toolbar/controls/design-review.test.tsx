@@ -13,6 +13,11 @@ vi.mock('../design-review/export-menu', () => ({
   AnnotationExportMenu: () => <div data-ui="test.design-review-export" />,
 }));
 
+import {
+  enableDesignReviewMode,
+  disableDesignReviewMode,
+  getDesignReviewModeState,
+} from '../../../selection/design-review';
 import { ToolbarDesignReviewControls } from './design-review';
 import type { ToolbarMenuState } from '../state/menu';
 
@@ -43,7 +48,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  act(() => root.unmount());
+  act(() => {
+    disableDesignReviewMode();
+    root.unmount();
+  });
   container.remove();
   vi.unstubAllGlobals();
 });
@@ -72,4 +80,50 @@ it('renders the active panel toggle beside the Design Review export command', ()
 
   act(() => toggle?.click());
   expect(onTogglePanel).toHaveBeenCalledOnce();
+});
+
+it('toggles rulers through the mode owner and reflects reset on exit', () => {
+  act(() => {
+    enableDesignReviewMode();
+    root.render(
+      <ToolbarDesignReviewControls
+        compactMenus={false}
+        displayMode="vertical"
+        panelOpen={false}
+        toolbarMenuState={createClosedToolbarMenuState()}
+        onTogglePanel={vi.fn()}
+      />
+    );
+  });
+  const toggle = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.design-review-measurements-button"]'
+  )!;
+  const details = container.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.design-review-measurement-details-button"]'
+  )!;
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  expect(details.disabled).toBe(false);
+  act(() => toggle.click());
+  expect(toggle.getAttribute('aria-pressed')).toBe('true');
+  expect(toggle.title).toBe('content.designReview.hideDistances');
+  expect(getDesignReviewModeState().measurementsEnabled).toBe(true);
+  expect(details.disabled).toBe(false);
+  act(() => details.click());
+  expect(details.getAttribute('aria-pressed')).toBe('true');
+  expect(getDesignReviewModeState().measurementsExpanded).toBe(true);
+  act(() => toggle.click());
+  expect(details.disabled).toBe(false);
+  expect(details.getAttribute('aria-pressed')).toBe('true');
+  expect(getDesignReviewModeState()).toMatchObject({
+    measurementsEnabled: false,
+    measurementsExpanded: true,
+  });
+  act(() => details.click());
+  expect(details.getAttribute('aria-pressed')).toBe('false');
+  act(() => toggle.click());
+  act(() => disableDesignReviewMode());
+  expect(toggle.disabled).toBe(true);
+  expect(toggle.getAttribute('aria-pressed')).toBe('false');
+  act(() => toggle.click());
+  expect(getDesignReviewModeState().measurementsEnabled).toBe(false);
 });

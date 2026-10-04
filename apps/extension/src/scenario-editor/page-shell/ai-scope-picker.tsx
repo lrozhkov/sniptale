@@ -166,6 +166,7 @@ function GuideAiStepSelection({
           />
           {query && (
             <ContentToolbarButton
+              tone="close"
               title={t('aiModal.clearSearchLabel')}
               disabled={pending}
               onClick={() => setQuery('')}

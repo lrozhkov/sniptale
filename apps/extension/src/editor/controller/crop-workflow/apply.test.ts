@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { useEditorStore } from '../../state/useEditorStore';
 
 const mocks = vi.hoisted(() => ({
   clearEditorCropGuideMock: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('../transient', async (importOriginal) => ({
 import { applyEditorControllerCropSelection } from './';
 
 beforeEach(() => {
+  useEditorStore.getState().setCanvasCropMode('crop');
   vi.clearAllMocks();
   mocks.clearEditorCropGuideMock.mockReturnValue({ cropGuide: null, cropSelection: null });
   mocks.normalizeEditorCropSelectionMock.mockReturnValue({
@@ -32,6 +34,62 @@ beforeEach(() => {
     width: 100,
     height: 60,
   });
+});
+
+it('expands the canvas around the original and shifts objects without rescaling', async () => {
+  useEditorStore.getState().setCanvasCropMode('expand');
+  const context = createApplyCropContext();
+  try {
+    await applyEditorControllerCropSelection({
+      canvas: context.canvas as never,
+      cropGuide: context.cropGuide as never,
+      cropSelection: { left: -40, top: -20, width: 380, height: 260 },
+      canvasDocumentSize: { width: 300, height: 200 },
+      source: createSourceState() as never,
+      setCanvasDocumentSize: context.setCanvasDocumentSize,
+      setCropState: context.setCropState,
+      setSource: context.setSource,
+      syncViewportTransform: context.syncViewportTransform,
+      switchToSelectTool: context.switchToSelectTool,
+      rebuildFrameDecorations: context.rebuildFrameDecorations,
+      commitHistory: context.commitHistory,
+      logCrop: context.logCrop,
+    });
+    expect(context.setCanvasDocumentSize).toHaveBeenCalledWith({ width: 380, height: 260 });
+    const [sourceObject, shapeObject] = context.canvas.getObjects();
+    expect(sourceObject).toMatchObject({ left: 55, top: 47, scaleX: 1, scaleY: 1 });
+    expect(shapeObject).toMatchObject({ left: 85, top: 90, scaleX: 1.4, scaleY: 0.75 });
+    expect(context.commitHistory).toHaveBeenCalledOnce();
+  } finally {
+    useEditorStore.getState().setCanvasCropMode('crop');
+  }
+});
+
+it('applies a free selection beyond the old image without pulling the image back inside', async () => {
+  useEditorStore.getState().setCanvasCropMode('expand');
+  const context = createApplyCropContext();
+  try {
+    await applyEditorControllerCropSelection({
+      canvas: context.canvas as never,
+      cropGuide: context.cropGuide as never,
+      cropSelection: { left: 350, top: 250, width: 120, height: 90 },
+      canvasDocumentSize: { width: 300, height: 200 },
+      source: createSourceState() as never,
+      setCanvasDocumentSize: context.setCanvasDocumentSize,
+      setCropState: context.setCropState,
+      setSource: context.setSource,
+      syncViewportTransform: context.syncViewportTransform,
+      switchToSelectTool: context.switchToSelectTool,
+      rebuildFrameDecorations: context.rebuildFrameDecorations,
+      commitHistory: context.commitHistory,
+      logCrop: context.logCrop,
+    });
+    expect(context.setCanvasDocumentSize).toHaveBeenCalledWith({ width: 120, height: 90 });
+    const [sourceObject] = context.canvas.getObjects();
+    expect(sourceObject).toMatchObject({ left: -335, top: -223, scaleX: 1, scaleY: 1 });
+  } finally {
+    useEditorStore.getState().setCanvasCropMode('crop');
+  }
 });
 
 function createLayerObject(
@@ -73,6 +131,7 @@ function createCropCanvas({ includeSource = true }: { includeSource?: boolean } 
   return {
     discardActiveObject: vi.fn(),
     getObjects: vi.fn(() => objects),
+    getZoom: vi.fn(() => 1),
     remove: vi.fn(),
     setActiveObject: vi.fn(),
     setDimensions: vi.fn(),

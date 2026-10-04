@@ -1,3 +1,9 @@
+import type {
+  GallerySelectionRange,
+  GalleryToggleSelectionOptions,
+} from '../library/keyboard/selection-range';
+import type { GalleryDeletionRequest } from '../library/deletion/types';
+import type { GalleryPreviewPresentation } from '../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type {
   MediaHubBackupExportOptions,
@@ -21,6 +27,7 @@ import type {
   GalleryFacetFilterId,
   GalleryFacetFilters,
   GalleryScope,
+  GalleryTrashSummary,
   GalleryPreviewSessionState,
   SortMode,
 } from '../library/types';
@@ -68,10 +75,12 @@ interface GalleryPreviewDraftState {
 }
 
 interface GalleryAppFilterState {
+  trashMode?: boolean;
   activeSavedView: GallerySavedView | null;
   folderFilter: FolderFilter;
   sortMode: SortMode;
   search: string;
+  appliedSearch: string;
   scope: GalleryScope;
   activeTags: string[];
   facetFilters: GalleryFacetFilters;
@@ -101,17 +110,22 @@ interface GalleryAppStorageState {
   pendingWebSnapshotImport: PendingWebSnapshotImportState | null;
   pendingExport: PendingExportState | null;
   confirmDialog: GalleryConfirmDialogState | null;
+  deletionRequest: GalleryDeletionRequest | null;
   banner: string | null;
+  hasLoadedLibrarySnapshot: boolean;
   isLoading: boolean;
   isBusy: boolean;
 }
 
 interface GalleryAppDerivedState {
+  /** Whether current committed filters or category justify result selection actions. */
+  hasResultContext: boolean;
   allItems: GalleryItem[];
   allTags: string[];
   counts: GalleryFolderCounts;
   facets: GalleryFacetDefinition[];
   filteredItems: GalleryItem[];
+  trashSummary: GalleryTrashSummary;
   activeStorageBarClass: string;
   visibleItems: GalleryItem[];
   gridWidth: number;
@@ -141,6 +155,7 @@ interface GalleryAppStorageActions {
 }
 
 interface GalleryAppFilterActions {
+  setTrashMode?: (value: boolean) => void;
   createSavedView: (name: string) => Promise<GallerySavedView>;
   deleteSavedView: (id: string) => Promise<void>;
   moveSavedView: (id: string, direction: 'down' | 'up') => Promise<void>;
@@ -150,6 +165,7 @@ interface GalleryAppFilterActions {
   setFolderFilter: Dispatch<SetStateAction<FolderFilter>>;
   setSortMode: Dispatch<SetStateAction<SortMode>>;
   setSearch: Dispatch<SetStateAction<string>>;
+  commitSearch: (value: string) => void;
   setScope: Dispatch<SetStateAction<GalleryScope>>;
   setActiveTags: Dispatch<SetStateAction<string[]>>;
   setFacetFilter: (id: GalleryFacetFilterId, values: string[]) => void;
@@ -159,10 +175,12 @@ interface GalleryAppFilterActions {
 interface GalleryAppSelectionActions {
   setSelectedIds: Dispatch<SetStateAction<Set<string>>>;
   setSelectionTagDraft: Dispatch<SetStateAction<string>>;
-  toggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  toggleSelection: (assetId: string, options?: GalleryToggleSelectionOptions) => void;
+  selectRange: (range: GallerySelectionRange) => ReadonlySet<string>;
 }
 
 interface GalleryAppPreviewActions {
+  acknowledgePresented?: (presentation: GalleryPreviewPresentation) => void;
   setPreview: Dispatch<SetStateAction<GalleryPreviewSessionState>>;
   setFilenameDraft: Dispatch<SetStateAction<string>>;
   setTagDraft: Dispatch<SetStateAction<string>>;
@@ -180,6 +198,7 @@ interface GalleryAppSurfaceActions {
   setPendingWebSnapshotImport: Dispatch<SetStateAction<PendingWebSnapshotImportState | null>>;
   setPendingExport: Dispatch<SetStateAction<PendingExportState | null>>;
   setConfirmDialog: Dispatch<SetStateAction<GalleryConfirmDialogState | null>>;
+  setDeletionRequest: Dispatch<SetStateAction<GalleryDeletionRequest | null>>;
   setBanner: Dispatch<SetStateAction<string | null>>;
 }
 

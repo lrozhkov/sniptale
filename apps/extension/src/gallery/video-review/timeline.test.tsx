@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewAnchor } from '../../features/video/review/types';
 import { ReviewTimeline } from './timeline';
+import { useReviewTimelineGeometry } from './timeline-geometry';
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -20,6 +21,7 @@ beforeEach(() => {
     'ResizeObserver',
     class {
       observe() {}
+      unobserve() {}
       disconnect() {}
     }
   );
@@ -61,6 +63,59 @@ it('shows hundredths in playback time with correct minute rollover', () => {
   );
 });
 
+it('keeps the transport icon-only and stable while its accessible Play/Pause action changes', () => {
+  const { host, props } = renderTimeline();
+  const play = host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.play"]')!;
+  expect(play.title).toBe('gallery.videoReview.play');
+  expect(play.textContent).toBe('');
+  expect(play.querySelector('svg.lucide-play')).not.toBeNull();
+  expect(play.getAttribute('data-review-toolbar-button')).toBeNull();
+  act(() => play.click());
+  expect(props.onPlay).toHaveBeenCalledOnce();
+  renderTimeline({ playing: true });
+  const pause = host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.pause"]')!;
+  expect(pause.title).toBe('gallery.videoReview.pause');
+  expect(pause.textContent).toBe('');
+  expect(pause.querySelector('svg.lucide-pause')).not.toBeNull();
+  expect(pause.className).toBe(play.className);
+});
+
+it('navigates to kept source endpoints without changing selection or playback and reveals them when zoomed', () => {
+  const selection: ReviewAnchor = { kind: 'range', start: 3, end: 5 };
+  const edits = [
+    { id: 'head', kind: 'cut' as const, start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
+    { id: 'tail', kind: 'cut' as const, start: 8, end: 10, requestedStart: 8, requestedEnd: 10 },
+  ];
+  const { host, props } = renderTimeline({
+    duration: 10,
+    time: 2,
+    edits,
+    selection,
+  });
+  const start = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.timelineStart"]'
+  )!;
+  const end = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.timelineEnd"]'
+  )!;
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  expect(start.disabled).toBe(true);
+  expect(end.disabled).toBe(false);
+  expect(end.title).toBe('gallery.videoReview.timelineEnd');
+  changeZoom(host, '50');
+  act(() => end.click());
+  expect(props.onSeek).toHaveBeenCalledExactlyOnceWith(8, false);
+  expect(viewport.scrollLeft).toBeGreaterThan(0);
+  expect(props.onSelect).not.toHaveBeenCalled();
+  expect(props.onPlay).not.toHaveBeenCalled();
+  renderTimeline({ duration: 10, time: 8, edits, selection });
+  expect(end.disabled).toBe(true);
+  act(() => start.click());
+  expect(viewport.scrollLeft).toBe(0);
+});
+
 function planeWithMetrics(host: HTMLDivElement) {
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
@@ -77,8 +132,12 @@ function planeWithMetrics(host: HTMLDivElement) {
 
 function dispatchPlane(plane: HTMLElement, events: PlaneEvent[]) {
   for (const event of events) {
+    const target =
+      event.type === 'pointerdown' && plane.dataset['ui'] === 'gallery.videoReview.timePlane'
+        ? (plane.querySelector('[data-ui="gallery.videoReview.sourceLane"]') ?? plane)
+        : plane;
     act(() =>
-      plane.dispatchEvent(
+      target.dispatchEvent(
         new MouseEvent(event.type, {
           bubbles: true,
           button: event.button ?? 0,
@@ -88,6 +147,75 @@ function dispatchPlane(plane: HTMLElement, events: PlaneEvent[]) {
     );
   }
 }
+
+function hoverAt(target: Element, x: number) {
+  act(() => target.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: x })));
+}
+
+it('clears hover feedback on pointer leave and leaves disabled seeking neutral', () => {
+  const { host } = renderTimeline({ busy: true });
+  const plane = planeWithMetrics(host);
+  hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 100);
+  expect(plane.style.cursor).toBe('default');
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
+  act(() => plane.dispatchEvent(new MouseEvent('pointerleave', { bubbles: true })));
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
+});
+
+it('keeps a usable ruler width while track labels and viewport are temporarily unmeasurable', () => {
+  let measure = () => {};
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: ResizeObserverCallback) {
+        measure = () => callback([], this as ResizeObserver);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  const { host } = renderTimeline();
+  host.querySelector('[data-track-label]')?.remove();
+  host.querySelector('[data-track-controls]')?.remove();
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(0);
+  act(() => measure());
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  expect(plane.style.getPropertyValue('--review-track-gutter')).toBe('120px');
+  expect(plane.querySelector('[data-ui="gallery.videoReview.ruler"]')).not.toBeNull();
+});
+
+it('does not observe geometry before the viewport mounts', () => {
+  function DetachedGeometry() {
+    useReviewTimelineGeometry(false, false, 0);
+    return null;
+  }
+  act(() => environment.root!.render(<DetachedGeometry />));
+  expect(environment.host!.childElementCount).toBe(0);
+});
+
+it('previews the boundary that basic cut drawing will select', () => {
+  const { host } = renderTimeline({ snapRangePreview: true, boundaries: [0, 1, 2, 3, 4] });
+  const plane = planeWithMetrics(host);
+  hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 137);
+  const guide = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.hoverTime"]')!;
+  expect(guide.dataset['snapped']).toBe('true');
+  expect(guide.textContent).toBe('1.0');
+  expect(guide.style.left).toBe(
+    `${100 + Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'))}px`
+  );
+});
+
+it('keeps the seek cursor during plane capture from an audio lane', () => {
+  const { host } = renderTimeline({ audioTrack: <div data-ui="gallery.videoReview.audioLane" /> });
+  const plane = planeWithMetrics(host);
+  const audio = host.querySelector('[data-ui="gallery.videoReview.audioLane"]')!;
+  act(() => audio.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100 })));
+  hoverAt(plane, 200);
+  expect(plane.style.cursor).toBe('default');
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')?.textContent).toBe('2.0');
+  dispatchPlane(plane, [{ type: 'pointerup', x: 200 }]);
+});
 
 it('keeps original time coordinates through zoom and preserves separate comment navigation', () => {
   const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 2 } };
@@ -334,7 +462,11 @@ it('keeps the whole playhead inside the plane at the final frame', () => {
   const { host } = renderTimeline({ time: 4 });
   const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
   const playhead = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
-  expect(Number.parseFloat(playhead.style.left)).toBeLessThan(Number.parseFloat(plane.style.width));
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  expect(plane.style.width).toBe('100%');
+  expect(Number.parseFloat(playhead.style.left)).toBeLessThan(viewport.clientWidth);
   expect(playhead.style.clipPath).toBeTruthy();
 });
 
@@ -346,7 +478,7 @@ function changeZoom(host: HTMLElement, value: string) {
   });
 }
 
-it('clears object selection on empty-plane seek, leaving interactive action clicks alone', () => {
+it('clears object selection on empty source-lane seek, leaving interactive action clicks alone', () => {
   const clear = vi.fn();
   const { host } = renderTimeline({ onClearSelection: clear });
   const plane = planeWithMetrics(host);
@@ -394,8 +526,10 @@ it.each(['zoomLane', 'audioLane'])('seeks without selecting a range on an idle %
 it('routes focus drawing to its own tool and cancels without committing', () => {
   const onFocusRangeCommit = vi.fn();
   const onRangeCommit = vi.fn();
+  const onFocusRangePreview = vi.fn();
   const { host, props } = renderTimeline({
     onFocusRangeCommit,
+    onFocusRangePreview,
     onRangeCommit,
     zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
   });
@@ -408,10 +542,123 @@ it('routes focus drawing to its own tool and cancels without committing', () => 
   ]);
   expect(onFocusRangeCommit).toHaveBeenCalledExactlyOnceWith({ kind: 'range', start: 1, end: 2.5 });
   expect(onRangeCommit).not.toHaveBeenCalled();
-  expect(props.onSelect).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  expect(onFocusRangePreview).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  expect(onFocusRangePreview).toHaveBeenLastCalledWith(null);
+  expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
   dispatchPlane(lane, [{ type: 'pointerdown', x: 250 }]);
   dispatchPlane(plane, [{ type: 'pointermove', x: 100 }]);
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   dispatchPlane(plane, [{ type: 'pointerup', x: 100 }]);
   expect(onFocusRangeCommit).toHaveBeenCalledTimes(1);
+  expect(onFocusRangePreview).toHaveBeenLastCalledWith(null);
+});
+
+it('fits the time plane to live CSS width without a resize-observer frame of overflow', () => {
+  const { host } = renderTimeline();
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  expect(plane.style.width).toBe('100%');
+  expect(viewport.style.overflowX).toBe('hidden');
+});
+
+it('keeps export navigation last and available while timeline edits are busy', async () => {
+  const onOpenExport = vi.fn();
+  renderTimeline({ busy: true, onOpenExport });
+  const buttons = environment.host!.querySelectorAll<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.toolbar"] button'
+  );
+  const opener = buttons[buttons.length - 1]!;
+  expect(opener.getAttribute('aria-label')).toBe('gallery.videoReview.exportSection');
+  expect(opener.getAttribute('title')).toBe('gallery.videoReview.exportSection');
+  expect(opener.previousElementSibling?.getAttribute('data-ui')).toBe(
+    'gallery.videoReview.toolbar.separator'
+  );
+  expect(opener.disabled).toBe(false);
+  await act(async () => opener.click());
+  expect(onOpenExport).toHaveBeenCalledOnce();
+});
+
+it('cancels focus capture and preview when the drawing capability changes', () => {
+  const preview = vi.fn(),
+    commit = vi.fn();
+  const { host, props } = renderTimeline({
+    onFocusRangeCommit: commit,
+    onFocusRangePreview: preview,
+    zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
+  });
+  const plane = planeWithMetrics(host);
+  const focus = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
+  dispatchPlane(focus, [
+    { type: 'pointerdown', x: 100 },
+    { type: 'pointermove', x: 250 },
+  ]);
+  expect(preview).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 2.5 });
+  renderTimeline({ ...props, onFocusRangeCommit: undefined, originalRangeTool: true });
+  dispatchPlane(plane, [{ type: 'pointerup', x: 250 }]);
+  expect(preview).toHaveBeenLastCalledWith(null);
+  expect(commit).not.toHaveBeenCalled();
+  expect(plane.releasePointerCapture).toHaveBeenCalled();
+});
+
+it('centers the source playhead through repeated zoom changes without seeking or selecting', () => {
+  const { host, props } = renderTimeline({ duration: 10, time: 7 });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+  const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+  const width = viewport.clientWidth - gutter;
+  for (const slider of [25, 50, 75, 40, 0]) {
+    changeZoom(host, String(slider));
+    const zoom = 2 ** (slider / 25);
+    const expected = Math.max(0, Math.min(width * (zoom - 1), width * zoom * 0.7 - width / 2));
+    expect(viewport.scrollLeft).toBeCloseTo(expected);
+  }
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(props.onSelect).not.toHaveBeenCalled();
+});
+
+it.each([0, 1, 5, 9, 10])(
+  'centers or clamps selected source anchor %s even with playhead at start',
+  (anchor) => {
+    const { host, props } = renderTimeline({ duration: 10, time: 0, zoomAnchor: anchor });
+    const viewport = host.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.timelineViewport"]'
+    )!;
+    const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+    const width =
+      viewport.clientWidth -
+      Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+    for (const value of [25, 50, 75]) {
+      changeZoom(host, String(value));
+      const zoom = 2 ** (value / 25);
+      expect(viewport.scrollLeft).toBeCloseTo(
+        Math.max(0, Math.min(width * (zoom - 1), (anchor / 10) * width * zoom - width / 2))
+      );
+    }
+    expect(props.onSeek).not.toHaveBeenCalled();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  }
+);
+
+it('defers zoom and its scroll change until the existing before-action gate accepts', () => {
+  let accept: (() => void) | undefined;
+  const { host, props } = renderTimeline({
+    duration: 10,
+    time: 7,
+    beforeAction: (action) => {
+      accept = action;
+    },
+  });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  changeZoom(host, '50');
+  expect(viewport.scrollLeft).toBe(0);
+  expect(accept).toBeDefined();
+  act(() => accept?.());
+  expect(viewport.scrollLeft).toBeGreaterThan(0);
+  expect(props.onSeek).not.toHaveBeenCalled();
 });

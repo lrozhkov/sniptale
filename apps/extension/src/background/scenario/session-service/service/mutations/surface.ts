@@ -2,10 +2,12 @@ import type { ScenarioRecorderSurfaceState } from '@sniptale/runtime-contracts/s
 
 export function updateScenarioRecorderSurfaceState(
   surface: ScenarioRecorderSurfaceState,
-  surfaceState: ScenarioRecorderSurfaceState
+  surfaceState: Partial<ScenarioRecorderSurfaceState>
 ): ScenarioRecorderSurfaceState {
-  surface.screenshotMode = surfaceState.screenshotMode;
-  surface.toolbarVisible = surfaceState.toolbarVisible;
-  surface.captureAction = surfaceState.captureAction;
+  if (surfaceState.screenshotMode !== undefined)
+    surface.screenshotMode = surfaceState.screenshotMode;
+  if (surfaceState.toolbarVisible !== undefined)
+    surface.toolbarVisible = surfaceState.toolbarVisible;
+  if (surfaceState.captureAction !== undefined) surface.captureAction = surfaceState.captureAction;
   return surface;
 }

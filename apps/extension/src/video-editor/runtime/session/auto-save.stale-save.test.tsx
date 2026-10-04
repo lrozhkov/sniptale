@@ -63,7 +63,8 @@ afterEach(() => {
 it('rejects a stale autosave without rebasing it onto the latest persisted project', async () => {
   const useVideoEditorAutoSave = await importAutoSaveHook();
   const project = createEmptyVideoProject('Autosave stale retry');
-  const setSaveState = vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void>();
+  const setSaveState =
+    vi.fn<(state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle' | 'conflict') => void>();
 
   saveVideoProject.mockRejectedValueOnce(createStaleSaveError());
   getVideoProject.mockResolvedValue({
@@ -82,7 +83,7 @@ it('rejects a stale autosave without rebasing it onto the latest persisted proje
   expect(saveVideoProject).toHaveBeenCalledWith(editedProject, {
     expectedWorkspaceRevision: 4,
   });
-  expect(setSaveState).toHaveBeenCalledWith('error');
+  expect(setSaveState).toHaveBeenCalledWith('conflict');
 });
 
 function createStaleSaveError(): Error {
@@ -93,7 +94,7 @@ function createStaleSaveError(): Error {
 
 function renderAutosaveHarness(
   project: ReturnType<typeof createEmptyVideoProject>,
-  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void,
+  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle' | 'conflict') => void,
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave']
 ) {
   act(() => {
@@ -109,7 +110,7 @@ function renderAutosaveHarness(
 
 function AutosaveHarness(props: {
   project: ReturnType<typeof createEmptyVideoProject>;
-  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle') => void;
+  setSaveState: (state: 'saved' | 'dirty' | 'saving' | 'error' | 'idle' | 'conflict') => void;
   useVideoEditorAutoSave: (typeof import('./auto-save'))['useVideoEditorAutoSave'];
 }) {
   props.useVideoEditorAutoSave(

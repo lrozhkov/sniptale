@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Mic, FolderOpen, Unlink } from 'lucide-react';
+import { Mic, Unlink } from 'lucide-react';
 import type {
   TourAudioResource,
   TourNarration,
@@ -15,7 +14,7 @@ import { GuideInspectorGroup } from '../inspector';
 import { TourTextField } from './fields';
 import { TourNarrationPreview } from './narration-preview';
 import { TourNarrationAcquisition } from './narration-acquisition';
-import { TourAudioPicker, materialNarration } from './audio-materials';
+import { materialNarration } from './audio-materials';
 import type { Translate } from '../../../platform/i18n';
 
 type ImportInput = Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>;
@@ -39,7 +38,6 @@ export function TourNarrationSettings({
   onChange: (slide: TourSlide, group?: string | null) => boolean;
   t: Translate;
 }) {
-  const [choosing, setChoosing] = useState(false);
   const target = getTourNarrationTarget(slide, objectId);
   if (!target) return null;
   const narration = target.narration ?? null;
@@ -60,7 +58,7 @@ export function TourNarrationSettings({
     objectId ? 'scenario.editor.tourObjectNarration' : 'scenario.editor.tourSlideNarration'
   );
   return (
-    <GuideInspectorGroup icon={Mic} title={title}>
+    <GuideInspectorGroup id="narration" icon={Mic} title={title}>
       {narration && (
         <>
           <div className="tour-audio-binding">
@@ -86,33 +84,15 @@ export function TourNarrationSettings({
         disabled={importDisabled}
         onImport={onImport}
         t={t}
-      >
-        <ScenarioInspectorActionButton
-          disabled={disabled || !resources.length}
-          aria-expanded={choosing}
-          onClick={() => setChoosing(!choosing)}
-        >
-          <FolderOpen size={15} />
-          {t('scenario.editor.tourAudioChoose')}
-        </ScenarioInspectorActionButton>
-      </TourNarrationAcquisition>
-      {choosing && (
-        <TourAudioPicker
-          resources={resources}
-          disabled={disabled}
-          t={t}
-          onChoose={(resource) => {
+        catalog={{
+          resources,
+          disabled,
+          onChoose: (resource) => {
             const voice = materialNarration(resource);
-            const value = objectId
-              ? {
-                  ...voice,
-                  trigger,
-                }
-              : voice;
-            if (update(value)) setChoosing(false);
-          }}
-        />
-      )}
+            return update(objectId ? { ...voice, trigger } : voice);
+          },
+        }}
+      />
       {!narration && <p className="guide-inspector-hint">{t('scenario.editor.tourAudioHint')}</p>}
       {narration && (
         <>

@@ -1,3 +1,4 @@
+import type { ScreenshotWindowSizeControls } from '../types';
 import React from 'react';
 
 import { ViewportSelector, type ViewportSelectorRef } from '../../viewport-selector';
@@ -147,6 +148,7 @@ export function ToolbarTimerMenu(props: ToolbarTimerMenuProps) {
 }
 
 type ToolbarViewportMenuProps = {
+  windowSize?: ScreenshotWindowSizeControls;
   compactMenus: boolean;
   displayMode: 'horizontal' | 'vertical';
   screenshotMode: boolean;
@@ -180,6 +182,7 @@ export function ToolbarViewportMenu(props: ToolbarViewportMenuProps) {
       <ViewportSelector
         ref={viewportSelectorRef as React.Ref<ViewportSelectorRef>}
         compactMenus={props.compactMenus}
+        {...(props.windowSize ? { windowSize: props.windowSize } : {})}
         currentViewport={currentViewport}
         displayMode={props.displayMode}
         onViewportChange={onViewportChange}

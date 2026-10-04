@@ -34,7 +34,7 @@ describe('editor toolbar ownership seam', () => {
     await act(async () => {
       queryButtonByTitle(translate('editor.toolbar.zoomIn')).click();
       queryButtonByTitle(translate('editor.toolbar.zoomOut')).click();
-      queryButtonByTitle(translate('editor.toolbar.resetOriginal')).click();
+      queryButtonByTitle(translate('editor.toolbar.resetOriginalTooltip')).click();
       queryZoomToggleButton(125).click();
     });
 

@@ -24,6 +24,8 @@ import {
 } from './camera-peer';
 import { activateVideoRecordingSurface, startSavedTabVideoRecording } from './start';
 import { runVideoRecordingSurfaceCommand } from './commands';
+import type { VideoRecordingStartFailureCode } from '@sniptale/runtime-contracts/video/types/messages.surface';
+import { VideoRecordingStartFailure } from '../manager/start-failure';
 
 const logger = createLogger({ namespace: 'VideoRecordingContentSurface' });
 
@@ -44,6 +46,12 @@ export function routeVideoRecordingSurfaceMessage(args: {
   void handleSurfaceMessage(args)
     .then(args.sendResponse)
     .catch((error) => {
+      if (args.message.type === VideoMessageType.START_SAVED_TAB_VIDEO_RECORDING) {
+        const failureCode = classifyStartFailure(error);
+        logger.warn('Saved tab recording start was rejected', { code: failureCode });
+        args.sendResponse({ success: false, failureCode });
+        return;
+      }
       const commandKind =
         args.message.type === VideoMessageType.VIDEO_RECORDING_SURFACE_COMMAND
           ? `:${args.message.command.kind}`
@@ -56,6 +64,17 @@ export function routeVideoRecordingSurfaceMessage(args: {
     });
 }
 
+function classifyStartFailure(error: unknown): VideoRecordingStartFailureCode {
+  if (error instanceof VideoRecordingStartFailure) return error.code;
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('Page access is required')) return 'permission-required';
+  if (message.includes('Unauthorized recording surface sender') || message.includes('stale')) {
+    return 'stale-context';
+  }
+  if (message.includes('Saved viewport preset is unavailable')) return 'invalid-source';
+  return 'internal-error';
+}
+
 async function handleSurfaceMessage(args: {
   message: SurfaceRouteMessage;
   resolvedTabId: number;
@@ -66,7 +85,7 @@ async function handleSurfaceMessage(args: {
     case 'ACTIVATE_VIDEO_RECORDING_SURFACE':
       return activateVideoRecordingSurface(resolvedTabId);
     case 'START_SAVED_TAB_VIDEO_RECORDING':
-      return startSavedTabVideoRecording(resolvedTabId, args.sender?.url);
+      return startSavedTabVideoRecording(resolvedTabId, args.sender?.url, args.sender?.documentId);
     case 'RELEASE_VIDEO_RECORDING_SURFACE': {
       const lease = await ensureVideoRecordingSurfaceLeaseHydrated();
       if (

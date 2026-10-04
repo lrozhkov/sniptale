@@ -1,4 +1,14 @@
-import { ArrowDown, ArrowUp, ChevronsDown, ChevronsUp, Copy, Layers3, Trash2 } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsDown,
+  ChevronsUp,
+  Copy,
+  Group,
+  Layers3,
+  Trash2,
+  Ungroup,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { EditorLayerItem } from '../../../features/editor/document/types';
 import { translate } from '../../../platform/i18n';
@@ -8,6 +18,8 @@ import {
   canDeleteLayerSelection,
   canDuplicateLayerSelection,
   canMergeLayerSelection,
+  canGroupLayerSelection,
+  canUngroupLayerSelection,
   canReorderLayerSelection,
   getLayerActionTitle,
 } from './helpers';
@@ -63,12 +75,22 @@ function buildMassActions(
   controller: ReturnType<typeof useEditorController>,
   layers: EditorLayerItem[]
 ): LayerSelectionAction[] {
+  const ungroup = canUngroupLayerSelection(layers);
   return [
     {
       enabled: canMergeLayerSelection(layers),
       icon: Layers3,
       label: translate('editor.toolbar.mergeLayers'),
       onClick: () => void controller.mergeSelectedLayers(),
+    },
+    {
+      enabled: ungroup || canGroupLayerSelection(layers),
+      icon: ungroup ? Ungroup : Group,
+      label: translate(ungroup ? 'editor.toolbar.ungroupLayers' : 'editor.toolbar.groupLayers'),
+      onClick: () => {
+        if (ungroup) controller.ungroupSelectedLayers();
+        else controller.groupSelectedLayers();
+      },
     },
     {
       enabled: canDuplicateLayerSelection(layers),
@@ -90,9 +112,11 @@ function LayerSelectionActionGroup(props: {
   actions: LayerSelectionAction[];
   className: string;
   dataUi: string;
+  children?: React.ReactNode;
 }) {
   return (
     <div data-ui={props.dataUi} className={props.className}>
+      {props.children}
       {props.actions.map((action) => (
         <EditorIconButton
           key={action.label}

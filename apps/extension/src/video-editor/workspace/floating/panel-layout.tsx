@@ -7,7 +7,8 @@ import { startWindowPointerSession } from '../../interaction/pointer-session';
 
 type PanelSide = 'materials' | 'inspector';
 const PANEL_WIDTHS = {
-  materials: { min: 200 },
+  // Header: 140px navigation + 68px actions + 8px gap + 24px side padding.
+  materials: { min: 240 },
   inspector: { min: 280 },
 };
 

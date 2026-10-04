@@ -1,7 +1,8 @@
-import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
+import { ActiveSelection, Group, type Canvas, type FabricObject } from 'fabric';
 
 import { convertBackgroundDuplicateToAnnotation } from '../../../background';
 import { createObjectLabel, CUSTOM_JSON_PROPS, isSourceObject } from '../../../../document/model';
+import { parseScenarioBlurMetadata } from '../../../../document/scenario-blur-metadata';
 import { getMutableEditorSelection } from './active-selection';
 import {
   commitFrameAnnotationProxy,
@@ -12,6 +13,30 @@ import {
   translateEditorDrawingObject,
   writeEditorDrawingObject,
 } from '../../../../drawing/object/metadata';
+
+function refreshScenarioBlurIdentity(object: FabricObject): void {
+  const metadata = parseScenarioBlurMetadata(object.sniptaleScenarioBlurJson);
+  if (metadata) {
+    object.sniptaleScenarioBlurJson = JSON.stringify({
+      version: 1,
+      ...metadata,
+      id: object.sniptaleId,
+    });
+  }
+}
+
+function refreshGroupedChildIds(object: FabricObject): void {
+  if (!(object instanceof Group) || object.sniptaleType !== 'group') return;
+  for (const child of object.getObjects()) {
+    if (child.sniptaleId) {
+      child.sniptaleId = crypto.randomUUID();
+      refreshScenarioBlurIdentity(child);
+      const drawing = readEditorDrawingObject(child);
+      if (drawing) writeEditorDrawingObject(child, { ...drawing, id: child.sniptaleId });
+    }
+    refreshGroupedChildIds(child);
+  }
+}
 
 async function cloneEditorSelectionObject(args: {
   object: FabricObject;
@@ -25,6 +50,8 @@ async function cloneEditorSelectionObject(args: {
     top: (clone.top ?? 0) + 24,
   });
   clone.sniptaleId = crypto.randomUUID();
+  refreshScenarioBlurIdentity(clone);
+  refreshGroupedChildIds(clone);
   const drawing = readEditorDrawingObject(clone);
   if (drawing) {
     writeEditorDrawingObject(

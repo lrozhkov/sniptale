@@ -38,6 +38,14 @@ const activeWriterLockReleases = new Map<string, () => Promise<void>>();
 const activePublicationTransitionLeases = new Map<string, PersistenceMutationTransitionLease>();
 const readyProtectedAssetIds = new Set<string>();
 
+export class MissingAssetObjectError extends Error {
+  override name = 'MissingAssetObjectError';
+
+  constructor(assetId: string) {
+    super(`Asset object is missing: ${assetId}.`);
+  }
+}
+
 function defaultCreateId(): string {
   if (typeof crypto.randomUUID !== 'function') throw new Error('Secure asset IDs are unavailable.');
   return crypto.randomUUID();
@@ -470,9 +478,11 @@ export async function listReadyJournals(
   const journals: AssetReadyJournal[] = [];
   for await (const [, handle] of ready.entries()) {
     if (handle.kind !== 'file') continue;
-    const parsed = parseAssetReadyJournal(
-      JSON.parse(await (await (handle as FileSystemFileHandle).getFile()).text()) as unknown
-    );
+    const file = await (handle as FileSystemFileHandle).getFile();
+    // A newly created handle remains empty until its writable stream commits on close.
+    // Page termination can leave that uncommitted handle behind; it owns no ready metadata.
+    if (file.size === 0) continue;
+    const parsed = parseAssetReadyJournal(JSON.parse(await file.text()) as unknown);
     if (parsed) journals.push(parsed);
   }
   return journals.sort((left, right) => left.createdAt - right.createdAt);
@@ -484,7 +494,7 @@ export async function readAssetFile(
   options: AssetOpfsOptions = {}
 ): Promise<File> {
   const objects = await getAssetDirectory(options, OBJECTS_DIRECTORY_NAME, false);
-  if (!objects) throw new Error(`Asset object is missing: ${ref.assetId}.`);
+  if (!objects) throw new MissingAssetObjectError(ref.assetId);
   const handle = await objects.getFileHandle(ref.assetId);
   const source = await handle.getFile();
   if (source.size !== ref.size) throw new Error(`Asset object size mismatch: ${ref.assetId}.`);

@@ -1,3 +1,4 @@
+import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   MediaAssetKind,
   MediaAssetSource,
@@ -60,7 +61,8 @@ function parseImageContentState(
   workspaceRevision: number
 ): ImageContentState | null | undefined {
   const isEditableImage =
-    (kind === 'image' || kind === 'screenshot') && source.kind === 'screenshot';
+    (kind === 'image' || kind === 'screenshot') &&
+    (source.kind === 'screenshot' || source.kind === 'stored-asset');
   if (!isEditableImage) return value === undefined ? undefined : null;
   if (value === undefined) return workspaceRevision === 0 ? 'original' : 'edited';
   return value === 'edited' || value === 'original' ? value : null;
@@ -89,6 +91,10 @@ function parseMediaAssetSource(value: unknown): MediaAssetSource | null {
   switch (value['kind']) {
     case 'screenshot':
       return { kind: 'screenshot' };
+    case 'stored-asset':
+      return isString(value['assetId']) && value['assetId'].length > 0
+        ? { kind: 'stored-asset', assetId: value['assetId'] }
+        : null;
     case 'recording':
       return isString(value['recordingId'])
         ? { kind: 'recording', recordingId: value['recordingId'] }
@@ -141,6 +147,11 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     return null;
   }
 
+  const recordingMetadata =
+    value['recordingMetadata'] === undefined
+      ? undefined
+      : parseRecordingMetadata(value['recordingMetadata']);
+  if (recordingMetadata === null) return null;
   const kind = parseMediaAssetKind(value['kind']);
   const source = parseMediaAssetSource(value['source']);
   const workspaceRevision = parseWorkspaceRevision(value['workspaceRevision']);
@@ -189,6 +200,7 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     ...(recordingGroup === undefined ? {} : { recordingGroup }),
     updatedAt: value['updatedAt'],
     width: value['width'],
+    ...(recordingMetadata === undefined ? {} : { recordingMetadata }),
     workspaceRevision,
     ...(value['blob'] === undefined ? {} : { blob: value['blob'] }),
   };

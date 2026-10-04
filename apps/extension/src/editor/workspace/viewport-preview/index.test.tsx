@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     navigateFromClientPoint: vi.fn(),
     previewCanvasRef: { current: null },
     previewSize: { height: 64, width: 96 },
+    contentRect: { left: 0, top: 8, width: 96, height: 48 },
     previewSurfaceRef: { current: null },
     viewportCenter: { x: 0.5, y: 0.5 },
     viewportFrame: { height: 20, left: 5, top: 4, width: 30 },

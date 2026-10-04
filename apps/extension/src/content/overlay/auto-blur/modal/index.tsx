@@ -15,6 +15,7 @@ import { resolveEnabledBorderPreset } from '../../../../features/highlighter/pre
 import { projectBorderPresetToAppliedSettings } from '@sniptale/runtime-contracts/highlighter/border-preset';
 import type { HighlighterSettings } from '../../../../features/highlighter/contracts';
 import { AutoBlurAutoApplyCategories } from './auto-apply-categories';
+import { createTrustedContentActionIntentSource } from '../../../application/privileged-action-intent';
 
 function AutoBlurModalState(props: { status: AutoBlurController['status'] }) {
   if (props.status === 'loading') {
@@ -132,13 +133,19 @@ export function AutoBlurModal(props: { controller: AutoBlurController }) {
           {translate('content.autoBlur.cancel')}
         </ProductActionButton>
         <ProductActionButton
-          onClick={() =>
-            void props.controller.apply(
-              projectBorderPresetToAppliedSettings(
-                resolveEnabledBorderPreset(catalog, props.controller.blurSettings.borderPresetId)
-              )
-            )
-          }
+          onClick={(event) => {
+            const borderSettings = projectBorderPresetToAppliedSettings(
+              resolveEnabledBorderPreset(catalog, props.controller.blurSettings.borderPresetId)
+            );
+            if (autoApplyMode) {
+              void props.controller.apply(
+                borderSettings,
+                createTrustedContentActionIntentSource(event.nativeEvent) ?? undefined
+              );
+            } else {
+              void props.controller.apply(borderSettings);
+            }
+          }}
           disabled={applyDisabled}
         >
           {translate('content.autoBlur.apply')}

@@ -14,6 +14,7 @@ import {
 import { ImageEditorControllerLayerActions } from './controller-layer-actions';
 import type { OpenImageOptions } from './types';
 import { renderEditorControllerForExport } from '../public-api';
+import { runEditorDocumentTransition } from '../history/transition-queue';
 
 export abstract class ImageEditorControllerLifecycleActions extends ImageEditorControllerLayerActions {
   protected abstract getDocumentCommandService(): EditorDocumentCommandService;
@@ -27,16 +28,17 @@ export abstract class ImageEditorControllerLifecycleActions extends ImageEditorC
   }
 
   async openImage(dataUrl: string, name: string | null = null, options: OpenImageOptions = {}) {
-    await this.getDocumentCommandService().openImage(
-      this.getControllerInstance(),
-      dataUrl,
-      name,
-      options
+    const controller = this.getControllerInstance();
+    await runEditorDocumentTransition(controller.canvas ?? controller.history ?? controller, () =>
+      this.getDocumentCommandService().openImage(controller, dataUrl, name, options)
     );
   }
 
   async loadDocument(document: EditorDocument) {
-    await this.getDocumentCommandService().loadDocument(this.getControllerInstance(), document);
+    const controller = this.getControllerInstance();
+    await runEditorDocumentTransition(controller.canvas ?? controller.history ?? controller, () =>
+      this.getDocumentCommandService().loadDocument(controller, document)
+    );
   }
 
   closeDocument() {
@@ -56,8 +58,11 @@ export abstract class ImageEditorControllerLifecycleActions extends ImageEditorC
     return this.getDocumentCommandService().renderToDataUrl(this.getControllerInstance(), options);
   }
 
-  async renderForExport(options: EditorRenderToDataUrlOptions) {
-    return renderEditorControllerForExport(this.getControllerInstance(), options);
+  async renderForExport(
+    options: EditorRenderToDataUrlOptions,
+    draftPolicy: 'finalize' | 'committed' = 'finalize'
+  ) {
+    return renderEditorControllerForExport(this.getControllerInstance(), options, draftPolicy);
   }
 
   async copyRenderedImage(options?: EditorRenderedImageOptions) {

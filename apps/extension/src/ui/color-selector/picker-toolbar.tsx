@@ -4,7 +4,8 @@ import { translate } from '../../platform/i18n';
 import { CompactRange } from '../compact-inspector-controls/primitives';
 
 const ICON_ACTION_CLASS_NAME = [
-  'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border-none px-0',
+  'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-[var(--sniptale-radius-sm)] border-none px-0',
+  'cursor-pointer disabled:cursor-not-allowed disabled:opacity-50',
   'bg-transparent text-[var(--sniptale-color-text-muted-strong)] shadow-none outline-none transition',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_72%,transparent)]',
   'hover:text-[var(--sniptale-color-text-primary)] active:translate-y-px',
@@ -23,7 +24,8 @@ function TransparentPreviewButton(props: { onClick: () => void; resolvedColor: s
       data-ui="shared.ui.color-selector.transparent"
       onClick={props.onClick}
       className={[
-        'relative inline-flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border',
+        'relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden',
+        'rounded-[var(--sniptale-radius-sm)] border',
         'border-[color:var(--sniptale-color-border-soft)] bg-transparent shadow-none outline-none transition',
         'hover:border-[color:var(--sniptale-color-border-strong)] hover:brightness-105',
         'focus-visible:outline-none',
@@ -103,7 +105,7 @@ export function PickerToolbar(props: {
         max={359}
         value={Math.round(props.hue)}
         onChange={(event) => props.onHueChange(event.target.value)}
-        className="sniptale-color-selector-hue-range h-9 w-full"
+        className="sniptale-color-selector-hue-range h-7! w-full"
       />
       {props.eyedropperAvailable ? (
         <EyedropperActionButton

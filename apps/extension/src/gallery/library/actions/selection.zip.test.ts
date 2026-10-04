@@ -104,7 +104,7 @@ describe('gallery selected export modes', () => {
         },
       }),
       expect.objectContaining({
-        filename: expect.stringMatching(/^media-hub-selection-backup-.*\.zip$/),
+        filename: expect.stringMatching(/^Sniptale_media-hub-selection-backup_.*\.zip$/),
       })
     );
     expect(createDirectFileSinkMock).not.toHaveBeenCalled();
@@ -169,7 +169,7 @@ describe('gallery selected export modes', () => {
     expect(exportMediaHubBackupMock).not.toHaveBeenCalled();
     expect(createDirectFileSinkMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        filename: expect.stringMatching(/^media-hub-assets-.*\.zip$/),
+        filename: expect.stringMatching(/^Sniptale_media-hub-assets_.*\.zip$/),
         mimeType: 'application/zip',
       })
     );

@@ -91,3 +91,22 @@ describe('updateQuickEditBackground', () => {
     });
   });
 });
+
+it('preserves background motion across paint, layout, disable and re-enable changes', () => {
+  let background = updateQuickEditBackground(
+    { enabled: false },
+    { enabled: true, zoomBehavior: 'follow-video' }
+  );
+  for (const patch of [
+    { type: 'gradient' as const },
+    { layout: { padding: 80, cornerRadius: 10 } },
+    { enabled: false },
+    { type: 'image' as const, assetId: 'image' },
+  ]) {
+    background = updateQuickEditBackground(background, patch);
+    expect(background.zoomBehavior).toBe('follow-video');
+  }
+  expect(updateQuickEditBackground(background, { zoomBehavior: 'fixed' }).zoomBehavior).toBe(
+    'fixed'
+  );
+});

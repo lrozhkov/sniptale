@@ -97,6 +97,7 @@ function createPopoversProps(args: {
     setIsCalloutEditing: vi.fn(),
     setTempFrame: args.setTempFrame ?? vi.fn(),
     closePopover: vi.fn(),
+    clearSelection: vi.fn(),
     onUpdate: args.onUpdate ?? vi.fn(),
   };
 }
@@ -133,6 +134,23 @@ function renderPopovers(
 }
 
 describe('InteractiveFramePopovers', () => {
+  it('dismisses selected frame highlight when its settings popover closes, then allows reopening', () => {
+    const frame = createFrame('frame-1', '#f97316');
+    const props = createPopoversProps({ currentFrame: frame, frame });
+    renderNode(<InteractiveFramePopovers {...props} />);
+
+    const close = frameSettingsPopoverMock.mock.calls.at(-1)?.[0]?.['onClose'] as () => void;
+    act(() => close());
+    expect(props.closePopover).toHaveBeenCalledOnce();
+    expect(props.clearSelection).toHaveBeenCalledOnce();
+
+    frameSettingsPopoverMock.mockClear();
+    act(() => root?.render(<InteractiveFramePopovers {...props} isSelected={false} />));
+    const closeQuick = frameSettingsPopoverMock.mock.calls.at(-1)?.[0]?.['onClose'] as () => void;
+    act(() => closeQuick());
+    expect(props.clearSelection).toHaveBeenCalledOnce();
+  });
+
   it('binds frame-settings popover state to the current editing frame', () => {
     const frame = createFrame('frame-1', '#2563eb');
     const currentFrame = createFrame('frame-1', '#f97316');

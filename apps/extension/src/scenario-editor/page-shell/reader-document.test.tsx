@@ -175,3 +175,91 @@ it('retains local boundaries even when their empty leading block is omitted from
   ]);
   expect(document.querySelectorAll('[data-block-id="empty"]')).toHaveLength(0);
 });
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'projects caption alignment %s into reader and print content',
+  (captionAlignment) => {
+    const project = createGuideProject('Guide');
+    const step = createGuideStep('Step');
+    const image = createGuideImageBlock({
+      id: 'image',
+      assetId: 'asset',
+      width: 100,
+      height: 50,
+      source: { kind: 'import', filename: 'image.png' },
+    });
+    step.blocks = [{ ...image, caption: 'Caption', captionAlignment }];
+    project.items = [step];
+    const markup = renderToStaticMarkup(
+      <GuideReadDocument
+        project={project}
+        images={{ asset: 'blob:image' }}
+        t={createTranslator('en')}
+      />
+    );
+    const doc = new DOMParser().parseFromString(markup, 'text/html');
+    expect(doc.querySelector('figcaption')?.style.textAlign).toBe(captionAlignment ?? 'center');
+  }
+);
+
+it.each([
+  ['paper', '#b94719'],
+  ['warm', '#98541b'],
+  ['graphite', '#ffad70'],
+] as const)(
+  'resolves saved accents for linked plain numbers in the %s reader',
+  (theme, fallback) => {
+    const project = createGuideProject('Saved appearance');
+    project.style = { ...project.style, theme, numberStyle: 'plain', accentColor: '#2367ab' };
+    project.items = ['inherited', 'default', 'override'].map((id) => {
+      const step = createGuideStep(id, id);
+      step.styleOverrides =
+        id === 'inherited' ? {} : { accentColor: id === 'default' ? null : '#ab3267' };
+      step.blocks = [
+        {
+          kind: 'text',
+          id: `${id}-link`,
+          paragraphs: [
+            {
+              runs: [
+                {
+                  text: 'Read documentation',
+                  bold: false,
+                  italic: false,
+                  href: 'https://example.com/docs',
+                },
+              ],
+            },
+          ],
+        },
+      ];
+      return step;
+    });
+    const saved = JSON.stringify(project);
+    const loaded = JSON.parse(saved);
+    const markup = renderToStaticMarkup(
+      <GuideReadDocument project={loaded} images={{}} t={createTranslator('en')} />
+    );
+    const doc = new DOMParser().parseFromString(markup, 'text/html');
+    expect(
+      doc
+        .querySelector<HTMLElement>('.guide-read-document')!
+        .style.getPropertyValue('--guide-accent')
+    ).toBe('#2367ab');
+    const articles = [...doc.querySelectorAll('article')];
+    expect(articles.map((article) => article.style.getPropertyValue('--guide-accent'))).toEqual([
+      '#2367ab',
+      fallback,
+      '#ab3267',
+    ]);
+    articles.forEach((article, index) => {
+      expect(article.dataset['numberStyle']).toBe('plain');
+      expect(article.querySelector('header > span')?.textContent).toBe(String(index + 1));
+      const link = article.querySelector('a')!;
+      expect(link.textContent).toBe('Read documentation');
+      expect(link.getAttribute('href')).toBe('https://example.com/docs');
+      expect(link.getAttribute('rel')).toBe('noopener noreferrer');
+    });
+    expect(JSON.stringify(loaded)).toBe(saved);
+  }
+);

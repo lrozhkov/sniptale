@@ -103,6 +103,10 @@ export const runtimeActionExportMessageContracts = {
       'runtime START_PAGE_PACKAGE_JOB message',
       createMessageGuard({
         type: MessageType.START_PAGE_PACKAGE_JOB,
+        optional: {
+          downloadFormat: (value) => value === 'html',
+          sourceDocumentId: isString,
+        },
         required: {
           includeWebCopy: (value) => typeof value === 'boolean',
           intent: (value) => value === 'export' || value === 'save',
@@ -226,6 +230,10 @@ export const runtimeActionExportMessageContracts = {
       'runtime CONSUME_POPUP_EXPORT_LAUNCH_INTENT response',
       createRuntimeResponseGuard({
         required: { page: isNullable(isPopupExportLaunchPage) },
+        optional: {
+          startExport: (value) => typeof value === 'boolean',
+          sourceDocumentId: isString,
+        },
       })
     ),
   },

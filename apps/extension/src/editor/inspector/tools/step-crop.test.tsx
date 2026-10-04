@@ -142,6 +142,8 @@ describe('renderCropControlsSection', () => {
       waitingSections[1]?.props.children
     ) as React.ReactElement<any>[];
 
+    expect(readySections[1]?.props.className).toContain('grid-cols-[auto_minmax(0,1fr)]');
+    expect(buttons[0]?.props.className).toContain('!w-auto');
     buttons[0]?.props.onClick();
     buttons[1]?.props.onClick();
     await Promise.resolve();
@@ -149,7 +151,7 @@ describe('renderCropControlsSection', () => {
 
     expect(readySections[0]?.props.value).toBe(translate('editor.compact.cropAreaReady'));
     expect(waitingSections[0]?.props.value).toBe(translate('editor.compact.cropAreaWaiting'));
-    expect(waitingButtons[0]?.props.disabled).toBe(true);
+    expect(waitingButtons[1]?.props.disabled).toBe(true);
     expect(controller.applyCropSelection).toHaveBeenCalledTimes(1);
     expect(controller.cancelCropMode).toHaveBeenCalledTimes(1);
   });

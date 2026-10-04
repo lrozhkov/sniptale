@@ -5,6 +5,12 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolbarShellContent } from './view';
+import { installContentUiActivationBridge } from '../../../runtime/ui-activation-bridge';
+
+vi.mock('../../../platform/trusted-events', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/trusted-events')>()),
+  isTrustedPointerEvent: vi.fn(() => true),
+}));
 
 const { useContentUiScaleMock } = vi.hoisted(() => ({
   useContentUiScaleMock: vi.fn(() => 1),
@@ -27,7 +33,12 @@ vi.mock('../controls/secondary', () => ({
 function renderToolbarShell(
   positionReady: boolean,
   activeMenuType: string | null = null,
-  uiScale = 1
+  uiScale = 1,
+  docking?: {
+    isDragging: boolean;
+    freePlacement: boolean;
+    dockPreview: 'top' | 'bottom' | 'left' | 'right' | null;
+  }
 ) {
   useContentUiScaleMock.mockReturnValue(uiScale);
   return renderToStaticMarkup(
@@ -38,6 +49,7 @@ function renderToolbarShell(
           derivedState: {
             toolbarRef: { current: null },
             isDragging: false,
+            ...docking,
             displayMode: 'horizontal',
             position: { x: 24, y: 12 },
             positionReady,
@@ -54,6 +66,92 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
+  it.each([false, true])('keeps pointer focus cleared with activation bridge=%s', (bridged) => {
+    const host = document.createElement('div');
+    document.body.append(host);
+    const shadow = host.attachShadow({ mode: 'open' });
+    const container = document.createElement('div');
+    shadow.append(container);
+    const root = createRoot(container);
+    const disposeBridge = bridged ? installContentUiActivationBridge(shadow) : () => {};
+    act(() => {
+      root.render(
+        <ToolbarShellContent
+          toolbarProps={{} as never}
+          viewModel={
+            {
+              derivedState: {
+                toolbarRef: { current: null },
+                isDragging: false,
+                displayMode: 'horizontal',
+                position: { x: 24, y: 12 },
+                positionReady: true,
+                handleMouseDown: vi.fn(),
+              },
+              toolbarMenuState: { activeMenuType: null },
+            } as never
+          }
+          onHoverCapture={vi.fn()}
+          onViewportChange={vi.fn()}
+        />
+      );
+    });
+
+    const toolbar = container.querySelector('[data-ui="content.toolbar.root"]');
+    const click = vi.fn();
+    for (const id of [
+      'settings-button',
+      'timer-button',
+      'viewport-button',
+      'capture-action-button',
+      'mode-selector-button',
+      'page-editing-mode.direct-text',
+    ]) {
+      const button = document.createElement('button');
+      button.className = 'sniptale-btn';
+      button.dataset['ui'] = `content.toolbar.${id}`;
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      button.append(icon);
+      button.addEventListener('click', click);
+      toolbar?.append(button);
+      button.focus();
+      expect(shadow.activeElement).toBe(button);
+      const press = new MouseEvent(bridged ? 'pointerdown' : 'mousedown', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        button: 0,
+      });
+      act(() => icon.dispatchEvent(press));
+      expect(shadow.activeElement).not.toBe(button);
+      if (!bridged) {
+        expect(press.defaultPrevented).toBe(true);
+        act(() => button.click());
+      }
+    }
+    expect(click).toHaveBeenCalledTimes(6);
+
+    const input = document.createElement('input');
+    toolbar?.append(input);
+    input.focus();
+    act(() => input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 })));
+    expect(shadow.activeElement).toBe(input);
+
+    const button = toolbar?.querySelector<HTMLButtonElement>('button');
+    button?.focus();
+    act(() => button?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 2 })));
+    expect(shadow.activeElement).toBe(button);
+
+    // Keyboard activation has no mousedown and must retain the focused button.
+    act(() => button?.click());
+    expect(shadow.activeElement).toBe(button);
+    expect(click).toHaveBeenCalledTimes(7);
+
+    disposeBridge();
+    act(() => root.unmount());
+    host.remove();
+  });
+
   it('starts toolbar dragging from pointerdown', () => {
     const container = document.createElement('div');
     const root = createRoot(container);
@@ -126,3 +224,30 @@ describe('ToolbarShellContent', () => {
     expect(markup).toContain('data-menu-open="true"');
   });
 });
+
+it.each(['top', 'bottom', 'left', 'right', null] as const)(
+  'shows four pointer-transparent guides and the %s preview during docking',
+  (dockPreview) => {
+    const markup = renderToolbarShell(true, null, 0.5, {
+      isDragging: true,
+      freePlacement: false,
+      dockPreview,
+    });
+    const dom = new DOMParser().parseFromString(markup, 'text/html');
+    const guides = dom.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-guides"]')!;
+    expect(guides.style.pointerEvents).toBe('none');
+    expect(guides.children).toHaveLength(4);
+    expect(guides.querySelectorAll('[data-active="true"]')).toHaveLength(dockPreview ? 1 : 0);
+    expect(
+      guides.querySelector<HTMLElement>('[data-ui="content.toolbar.dock-zone.top"]')?.style.height
+    ).toBe('32px');
+    expect(
+      renderToolbarShell(true, null, 1, {
+        isDragging: true,
+        freePlacement: true,
+        dockPreview: null,
+      })
+    ).not.toContain('content.toolbar.dock-guides');
+    expect(renderToolbarShell(true)).not.toContain('content.toolbar.dock-guides');
+  }
+);

@@ -13,10 +13,14 @@ type ToolbarSettingsMenuProps = {
   pinToTab: boolean;
   pinToTabAvailable: boolean;
   pinToTabLocked: boolean;
+  autoBlurEnabled?: boolean;
   sidebarVisible?: boolean;
   screenshotMode: boolean;
   showPinItem?: boolean;
+  showHideItem?: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement?: boolean;
+  onFreePlacementChange?: ((value: boolean) => void) | undefined;
   toolbarMenuState: ToolbarMenuState;
   onClose: () => void;
   onCompactMenusChange: (compactMenus: boolean) => void;
@@ -93,14 +97,18 @@ function renderToolbarSettingsDropdown(args: {
       onClose={() => args.props.toolbarMenuState.closeMenu('settings')}
       onCompactMenusChange={args.props.onCompactMenusChange}
       onDisplayModeChange={args.props.onDisplayModeChange}
+      freePlacement={args.props.freePlacement ?? true}
+      onFreePlacementChange={args.props.onFreePlacementChange}
       onDisableScreenshotMode={args.props.onDisableScreenshotMode}
       onHide={args.props.onClose}
       onPinToTabChange={args.props.onPinToTabChange}
       pinToTab={args.props.pinToTab}
       pinToTabAvailable={args.props.pinToTabAvailable}
       pinToTabLocked={args.props.pinToTabLocked}
+      autoBlurEnabled={args.props.autoBlurEnabled ?? false}
       screenshotMode={args.props.screenshotMode}
       {...(args.props.showPinItem === undefined ? {} : { showPinItem: args.props.showPinItem })}
+      {...(args.props.showHideItem === undefined ? {} : { showHideItem: args.props.showHideItem })}
       triggerRef={args.triggerRef}
       viewportRightInset={args.props.sidebarVisible ? 348 : 0}
     />

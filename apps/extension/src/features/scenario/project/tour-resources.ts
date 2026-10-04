@@ -5,13 +5,16 @@ import type {
   TourImage,
   TourSlide,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { getTourSlideObjects } from '@sniptale/runtime-contracts/scenario/types/tour';
 
-/** Includes navigation backgrounds; occurrence identity stays independent of shared media. */
+/** Includes stage and navigation backgrounds; occurrence identity stays independent of shared media. */
 export function getTourImages(tour: TourDocument): TourImage[] {
-  return tour.slides.flatMap((slide) => {
+  const images = tour.slides.flatMap((slide) => {
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
     return image ? [image] : [];
   });
+  if (tour.stage.image) images.push(tour.stage.image);
+  return images;
 }
 
 /** Logical resources of both representations; persistence owns byte acquisition and lifetime. */
@@ -43,13 +46,21 @@ export function remapTourIdentities(
     if (slide.timing.autoplayTarget)
       slide.timing.autoplayTarget = slides.get(slide.timing.autoplayTarget)!;
     const actions = slide.kind === 'image' ? slide.hotspots : slide.buttons;
+    const objects = new Map<string, string>();
+    const rename = (object: { id: string }) => {
+      const assigned = nextId();
+      objects.set(object.id, assigned);
+      object.id = assigned;
+    };
     for (const object of actions) {
-      object.id = nextId();
+      rename(object);
       if (object.action.kind === 'slide')
         object.action.slideId = slides.get(object.action.slideId)!;
     }
     if (slide.kind !== 'image') continue;
-    for (const object of [...slide.annotations, ...slide.masks]) object.id = nextId();
+    for (const object of [...slide.annotations, ...slide.masks]) rename(object);
+    if (slide.objectOrder)
+      slide.objectOrder = slide.objectOrder.map((objectId) => objects.get(objectId) ?? objectId);
     if (slide.origin) {
       slide.origin = {
         stepId: guideIds.get(slide.origin.stepId) ?? slide.origin.stepId,
@@ -59,12 +70,12 @@ export function remapTourIdentities(
   }
 }
 
-/** Slide first, followed by authored objects; returned targets belong to the supplied document. */
+/** Slide first, followed by authored objects in display order; targets belong to the supplied document. */
 export function getTourNarrationTargets(slide: TourSlide) {
   return [
     slide,
     ...(slide.kind === 'image'
-      ? [...slide.hotspots, ...slide.annotations, ...slide.masks]
+      ? getTourSlideObjects(slide).map((entry) => entry.object)
       : slide.buttons),
   ];
 }
@@ -91,6 +102,13 @@ export function getTourAudioResources(tour: TourDocument): TourAudioResource[] {
           name: voice.assetId,
         });
     }
+  const music = tour.backgroundMusic;
+  if (music && !resources.has(music.assetId))
+    resources.set(music.assetId, {
+      assetId: music.assetId,
+      duration: music.duration,
+      name: music.assetId,
+    });
   return [...resources.values()];
 }
 

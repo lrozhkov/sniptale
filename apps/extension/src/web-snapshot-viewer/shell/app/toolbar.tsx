@@ -12,6 +12,8 @@ import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 import { WebSnapshotViewerModeSwitch, type WebSnapshotViewerMode } from './view-mode';
 import { WebSnapshotZoomControls, type ViewerZoomControls } from './viewport-zoom';
 
+import { useViewerHtmlExport } from './asset-actions';
+
 const toolbarButtonClassName = [
   'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-md',
   'text-[var(--sniptale-color-text-muted)] transition',
@@ -34,6 +36,41 @@ function formatArchiveMegabytes(size: number, locale: AppLocale): string {
   )} ${translate('shared.bytes.mb', locale)}`;
 }
 
+function HtmlExportAction(props: { loaded: LoadedWebSnapshotPackage; locale: AppLocale }) {
+  const { download, state } = useViewerHtmlExport(props.loaded);
+  const label = translate('webSnapshotViewer.app.exportHtml', props.locale);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label={label}
+        aria-busy={state === 'pending'}
+        className={`${toolbarButtonClassName} gap-1 border-l border-[var(--sniptale-color-border-soft)] px-2`}
+        disabled={state === 'pending'}
+        onClick={() => {
+          void download();
+        }}
+        title={translate('webSnapshotViewer.app.exportHtmlDescription', props.locale)}
+      >
+        {state === 'pending' ? (
+          <LoaderCircle aria-hidden="true" className="animate-spin" size={14} />
+        ) : (
+          <FileDown aria-hidden="true" size={14} />
+        )}
+        <span className="text-[10px] font-bold tracking-wide">HTML</span>
+      </button>
+      {state === 'error' ? (
+        <span
+          role="alert"
+          className="order-last basis-full whitespace-normal px-2 py-1 text-xs text-[var(--sniptale-color-danger)]"
+        >
+          {translate('webSnapshotViewer.app.exportHtmlFailed', props.locale)}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 function ViewerToolbarActions(props: {
   loaded: LoadedWebSnapshotPackage;
   locale: AppLocale;
@@ -53,7 +90,8 @@ function ViewerToolbarActions(props: {
 
   return (
     <div
-      className="flex shrink-0 items-center rounded-md border border-[var(--sniptale-color-border-soft)]"
+      className="flex max-w-full shrink-0 flex-wrap items-center rounded-md border
+        border-[var(--sniptale-color-border-soft)]"
       role="group"
       aria-label={translate('webSnapshotViewer.app.exportActions', props.locale)}
     >
@@ -69,6 +107,7 @@ function ViewerToolbarActions(props: {
           {showsScreenshot ? 'PNG' : 'ZIP'}
         </span>
       </a>
+      {showsScreenshot ? null : <HtmlExportAction loaded={props.loaded} locale={props.locale} />}
       <button
         type="button"
         aria-label={pdfLabel}

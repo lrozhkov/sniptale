@@ -28,8 +28,8 @@ it('projects the hover stroke outside the padded content box', () => {
   showQuickEditHoverOverlay(state, target);
 
   expect(state.hoverOverlay?.style.boxSizing).toBe('content-box');
-  expect(state.hoverOverlay?.style.left).toBe('6px');
-  expect(state.hoverOverlay?.style.top).toBe('2px');
+  expect(state.hoverOverlay?.style.left).toBe('8px');
+  expect(state.hoverOverlay?.style.top).toBe('4px');
   expect(state.hoverOverlay?.style.width).toBe('70px');
   expect(state.hoverOverlay?.style.height).toBe('70px');
 

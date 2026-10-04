@@ -1,3 +1,4 @@
+import { parseFilenameRules } from '../../../features/file-naming/rules';
 import { parseStoredHighlighterSettings } from '../highlighter/guards';
 import { resolveLoadedHighlighterSettings } from '../highlighter/resolved';
 import { serializeHighlighterSettings } from '../highlighter/mutation-write';
@@ -19,6 +20,11 @@ import type { SurfaceStylePresetCatalog } from '../surface-style-presets/contrac
 import { browserStorage } from '../infrastructure/browser-storage';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { loadSettings } from '../settings';
+import { parseContextMenuTree } from '../../../contracts/settings/context-menu-layout';
+import {
+  parseContextMenuLayoutChunkManifest,
+  prepareContextMenuSettingsSyncWrite,
+} from '../settings/context-menu-layout-chunks';
 import { parsePagePackageCaptureTimingPolicy } from '@sniptale/runtime-contracts/page-package';
 import { parseExportResourceLimits } from '@sniptale/runtime-contracts/export';
 
@@ -67,6 +73,27 @@ export async function applySettingsTransferDomains(args: {
     currentVideo,
     domains: args.domains,
   });
+  const previousStoredSettings = beforeSync['sniptale_settings'];
+  const previousManifest =
+    previousStoredSettings &&
+    typeof previousStoredSettings === 'object' &&
+    !Array.isArray(previousStoredSettings)
+      ? parseContextMenuLayoutChunkManifest(
+          (previousStoredSettings as Record<string, unknown>)['contextMenuLayoutChunks']
+        )
+      : null;
+  const settingsWrite =
+    syncWrites['sniptale_settings'] === undefined
+      ? null
+      : await prepareContextMenuSettingsSyncWrite(
+          syncWrites['sniptale_settings'] as NormalizedSettings,
+          previousManifest,
+          previousManifest ? parseContextMenuTree(currentSettings.contextMenu.layout) : null
+        );
+  if (settingsWrite) {
+    syncWrites['sniptale_settings'] = settingsWrite.settingsValue;
+    Object.assign(syncWrites, settingsWrite.chunkValues);
+  }
   const importedProviders = readImportedProviders(args.domains);
   const providerPlan = importedProviders
     ? await prepareAIProviderTransferMutation({
@@ -81,21 +108,21 @@ export async function applySettingsTransferDomains(args: {
     : null;
   let effectsCommitted = false;
 
-  let syncCommitted = false;
+  let syncAttempted = false;
   let providerCommitted = false;
-  let localCommitted = false;
+  let localAttempted = false;
   try {
     if (Object.keys(syncWrites).length > 0) {
+      syncAttempted = true;
       await browserStorage.sync.set(syncWrites, args.permit);
-      syncCommitted = true;
     }
     if (providerPlan) {
       await providerPlan.commit();
       providerCommitted = true;
     }
     if (Object.keys(localWrites).length > 0) {
+      localAttempted = true;
       await browserStorage.local.set(localWrites, args.permit);
-      localCommitted = true;
     }
     if (effectPlan) {
       effectsCommitted = true;
@@ -113,14 +140,25 @@ export async function applySettingsTransferDomains(args: {
       }
     };
     if (effectsCommitted && effectPlan) await compensate(() => effectPlan.rollback());
-    if (localCommitted)
+    if (localAttempted)
       await compensate(() => restoreArea('local', beforeLocal, LOCAL_KEYS, args.permit));
     if (providerCommitted && providerPlan) await compensate(() => providerPlan.rollback());
-    if (syncCommitted)
-      await compensate(() => restoreArea('sync', beforeSync, SYNC_KEYS, args.permit));
+    if (syncAttempted)
+      await compensate(() =>
+        restoreArea(
+          'sync',
+          beforeSync,
+          [...SYNC_KEYS, ...(settingsWrite?.newChunkKeys ?? [])],
+          args.permit
+        )
+      );
     if (rollbackFailed) throw new SettingsTransferRollbackError('Settings import rollback failed');
     throw error;
   }
+  if (settingsWrite?.retiredChunkKeys.length)
+    await browserStorage.sync
+      .remove(settingsWrite.retiredChunkKeys, args.permit)
+      .catch(() => undefined);
 }
 
 function buildWrites(args: {
@@ -207,6 +245,11 @@ function applySettingsWrites(context: WriteBuildContext): void {
     nextSettings.captureAction = afterCapture['action'] as NormalizedSettings['captureAction'];
   const saving = data('capture.saving');
   if (saving) {
+    if (saving['filenameRules'] !== undefined) {
+      const rules = parseFilenameRules(saving['filenameRules']);
+      if (!rules) throw new Error('Imported filename rules are invalid');
+      nextSettings.filenameRules = rules;
+    }
     if (saving['templates'] !== undefined)
       nextSettings.presets = saving['templates'] as NonNullable<NormalizedSettings['presets']>;
     for (const key of [
@@ -225,9 +268,13 @@ function applySettingsWrites(context: WriteBuildContext): void {
   const voice = data('system.voice');
   if (voice) {
     nextSettings.voiceInput = {
-      language: voice['language'] as NonNullable<NormalizedSettings['voiceInput']>['language'],
-      mode: voice['mode'] as NonNullable<NormalizedSettings['voiceInput']>['mode'],
-      microphoneDeviceId: null,
+      language: (voice['language'] ?? nextSettings.voiceInput?.language ?? 'ru-RU') as NonNullable<
+        NormalizedSettings['voiceInput']
+      >['language'],
+      mode: (voice['mode'] ?? nextSettings.voiceInput?.mode ?? 'local-first') as NonNullable<
+        NormalizedSettings['voiceInput']
+      >['mode'],
+      microphoneDeviceId: nextSettings.voiceInput?.microphoneDeviceId ?? null,
     };
   }
   if (preferences || viewports || image || pages || afterCapture || saving || retention || voice)

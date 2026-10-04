@@ -213,6 +213,14 @@ export const contentToolbarCaptureMessages = defineMessageSource({
     ru: 'Размер окна',
     en: 'Window size',
   },
+  viewportDuringCapture: {
+    en: 'Only during capture',
+    ru: 'Только во время снимка',
+  },
+  viewportContinuously: {
+    en: 'Keep size while tools are open',
+    ru: 'Постоянно, пока открыты инструменты',
+  },
   viewportNativeLabel: {
     ru: 'Текущий размер',
     en: 'Current size',
@@ -220,41 +228,5 @@ export const contentToolbarCaptureMessages = defineMessageSource({
   viewportNativeHint: {
     ru: 'Использовать текущий размер окна для снимков',
     en: 'Use the current window size for screenshots',
-  },
-  localHtmlSaveLabel: {
-    ru: 'Сохранить подготовленную HTML-страницу',
-    en: 'Save prepared HTML page',
-  },
-  localHtmlSavePickerDescription: {
-    ru: 'HTML-документ',
-    en: 'HTML document',
-  },
-  localHtmlSaveSaving: {
-    ru: 'Сохранение подготовленной HTML-страницы...',
-    en: 'Saving prepared HTML page...',
-  },
-  localHtmlSaveSaved: {
-    ru: 'Подготовленная HTML-страница сохранена',
-    en: 'Prepared HTML page saved',
-  },
-  localHtmlSaveSavedWithWarnings: {
-    ru: 'Подготовленная HTML-страница сохранена с предупреждениями',
-    en: 'Prepared HTML page saved with warnings',
-  },
-  localHtmlSaveError: {
-    ru: 'Не удалось сохранить подготовленную HTML-страницу.',
-    en: 'Failed to save the prepared HTML page.',
-  },
-  localHtmlSavePermissionDenied: {
-    ru: 'Нет разрешения на запись в выбранный HTML-файл.',
-    en: 'No write permission for the selected HTML file.',
-  },
-  localHtmlSaveUnsupported: {
-    ru: 'Сохранение доступно только для локальных HTML-файлов с выбором файла.',
-    en: 'Saving is available only for local HTML files with a file picker.',
-  },
-  localHtmlSaveBlockedHistory: {
-    ru: 'Сохранение недоступно, пока изменение страницы ещё не завершено.',
-    en: 'Saving is unavailable until the current page edit is finished.',
   },
 });

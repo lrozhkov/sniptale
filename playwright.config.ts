@@ -1,6 +1,7 @@
 import path from 'node:path';
 
 import { defineConfig } from '@playwright/test';
+import { resolveBrowserViewport } from './tooling/test/e2e/support/browser-viewport';
 
 const headless = process.env.PLAYWRIGHT_HEADLESS !== '0';
 const browserPath = process.env.PLAYWRIGHT_BROWSERS_PATH ?? path.resolve('.playwright-browsers');
@@ -23,6 +24,8 @@ export default defineConfig({
     timeout: 10_000,
   },
   use: {
+    viewport: resolveBrowserViewport(),
+    deviceScaleFactor: 1,
     headless,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',

@@ -27,7 +27,7 @@ export interface CaptureSurfaceJournalEntry {
   target: 'window';
   prior: CaptureSurfaceSnapshot;
   applied: CaptureSurfaceSnapshot;
-  /** Owned intermediate window while the video raster correction is prepared. */
+  /** Owned intermediate window during normalization or video raster correction. */
   alignmentFrom?: CaptureSurfaceSnapshot;
   phase: CaptureSurfaceJournalPhase;
   parentLeaseId: string | null;

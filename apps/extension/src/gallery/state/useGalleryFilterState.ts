@@ -12,14 +12,17 @@ import {
   type GalleryFilterPreferences,
 } from './filter-preferences';
 import { useGallerySavedViewState } from './useGallerySavedViewState';
+import { useGallerySearchState } from './useGallerySearchState';
 
 const GALLERY_FOLDERS = new Set<FolderFilter>([
   'all',
   'screenshot',
   'recording',
+  'audio',
   'export',
   'web-snapshot',
   'scenario',
+  'video-project',
 ]);
 
 const EMPTY_FACET_FILTERS: GalleryFacetFilters = {
@@ -34,14 +37,14 @@ const EMPTY_FACET_FILTERS: GalleryFacetFilters = {
 
 function getUrlFolderFilter(): FolderFilter | null {
   const params = new URLSearchParams(window.location.search);
-  if (params.has('recordingId')) return 'all';
+  if (params.has('recordingId') || params.has('mediaId')) return 'all';
   const folder = params.get('folder');
   return GALLERY_FOLDERS.has(folder as FolderFilter) ? (folder as FolderFilter) : null;
 }
 
 function getUrlScope(): GalleryScope | null {
   const params = new URLSearchParams(window.location.search);
-  if (params.has('recordingId')) return 'all';
+  if (params.has('recordingId') || params.has('mediaId')) return 'all';
   const scope = params.get('scope');
   return scope === 'temporary' || scope === 'library' ? scope : null;
 }
@@ -55,7 +58,11 @@ function getInitialFilterPreferences(): GalleryFilterPreferences {
     folderFilter: 'all',
     scope: 'all',
   } satisfies GalleryFilterPreferences;
-  if (new URLSearchParams(window.location.search).has('recordingId')) return defaults;
+  if (
+    new URLSearchParams(window.location.search).has('recordingId') ||
+    new URLSearchParams(window.location.search).has('mediaId')
+  )
+    return defaults;
   const base = stored ?? defaults;
   return {
     ...base,
@@ -72,9 +79,17 @@ export function useGalleryFilterState() {
   const [filterPreferences, setFilterPreferences] = useState(getInitialFilterPreferences);
   const filterPreferencesRef = useRef(filterPreferences);
   const [sortMode, setSortMode] = useState<SortMode>('newest');
-  const [search, setSearch] = useState('');
+  const searchState = useGallerySearchState();
+  const { switchTrashMode: switchSearchTrashMode } = searchState.actions;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionTagDraft, setSelectionTagDraft] = useState('');
+  const switchTrashMode = useCallback(
+    (value: boolean) => {
+      switchSearchTrashMode(value);
+      setSelectedIds(new Set());
+    },
+    [switchSearchTrashMode]
+  );
   const updateFilterPreferences = useCallback(
     (update: (value: GalleryFilterPreferences) => GalleryFilterPreferences) => {
       const next = update(filterPreferencesRef.current);
@@ -129,7 +144,9 @@ export function useGalleryFilterState() {
           }));
         }
       },
-      setSearch,
+      setTrashMode: switchTrashMode,
+      setSearch: searchState.actions.setSearch,
+      commitSearch: searchState.actions.commitSearch,
       setScope,
       setSelectedIds,
       setSelectionTagDraft,
@@ -140,7 +157,9 @@ export function useGalleryFilterState() {
       activeTags: filterPreferences.activeTags,
       facetFilters: filterPreferences.facetFilters,
       folderFilter: filterPreferences.folderFilter,
-      search,
+      search: searchState.state.search,
+      appliedSearch: searchState.state.appliedSearch,
+      trashMode: searchState.state.trashMode,
       scope: filterPreferences.scope,
       selectedIds,
       selectionTagDraft,

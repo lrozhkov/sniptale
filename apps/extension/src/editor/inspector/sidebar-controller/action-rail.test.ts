@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SESSION_EXPORT_FILENAME } from '@sniptale/ui/branding';
 import type { Settings } from '../../../contracts/settings';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
@@ -187,17 +186,17 @@ function runExportAndSaveSuite() {
     const clickSpy = vi.spyOn(link, 'click').mockImplementation(() => {});
     const createElementSpy = vi.spyOn(document, 'createElement').mockReturnValue(link);
 
-    handlers.exportSession();
+    await handlers.exportSession();
     await handlers.saveRenderedImage();
 
-    expect(link.download).toBe(SESSION_EXPORT_FILENAME);
+    expect(link.download).toMatch(/^Sniptale_editor-session_.*\.json$/);
     expect(link.href).toBe('blob:session-export');
     expect(clickSpy).toHaveBeenCalledOnce();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:session-export');
     expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
       actionType: 'download_default',
       dataUrl: 'data:image/png;base64,rendered',
-      filename: 'edited-file.png',
+      filename: expect.stringMatching(/^Sniptale_screenshot_.*_edited\.webp$/),
       presetId: 'preset-1',
       type: MessageType.EXECUTE_SAVE,
     });
@@ -224,7 +223,7 @@ function runExportAndSaveSuite() {
     expect(mocks.sendRuntimeMessageMock).toHaveBeenCalledWith({
       actionType: 'download_default',
       dataUrl: 'data:image/png;base64,rendered',
-      filename: 'edited-file.png',
+      filename: expect.stringMatching(/^Sniptale_screenshot_.*_edited\.webp$/),
       type: MessageType.EXECUTE_SAVE,
     });
   });

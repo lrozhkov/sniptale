@@ -1,3 +1,4 @@
+import { MaterialDragProvider } from '../../chrome/material-drag';
 import { EffectDocumentDragProvider } from '../../chrome/effect-document-drag';
 import { InspectorSectionMemoryProvider } from '../sidebar/selection/grouped-inspector/presentation';
 import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
@@ -78,39 +79,41 @@ export function VideoEditorWorkspaceMain({
           style={workspaceStyle}
           ref={panelSizes.containerRef}
         >
-          <EffectDocumentDragProvider>
-            <WorkspaceTrackPresentation>
-              <VideoProjectStorageStatus />
-              <VideoEditorWorkspaceCanvas
-                inspectorPanel={inspector}
-                onMaterialsOpenChange={toggleMaterials}
-                inspectorFullHeight={inspectorFullHeight}
-                materialsPanel={{
-                  resize: panelSizes.materials,
-                  fullHeight: materialsFullHeight,
-                  onToggle: () => setMaterialsFullHeight((current) => !current),
-                }}
-                materialsOpen={materialsOpen}
-                inspector={
-                  <VideoEditorFloatingInspectorStack
-                    onClose={inspector.onToggle}
-                    resize={panelSizes.inspector}
-                    fullHeight={inspectorFullHeight}
-                    onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
-                  />
-                }
-                activeInsertKind={activeInsertKind}
-                effectBundles={effectBundles}
-                effectOperations={effectOperations}
-                effectsLibraryDockOpen={effectsLibraryDockOpen}
-                effectKind={effectKind}
-                previewHeightStyle={previewHeightStyle}
-                onClearActiveInsertKind={() => setActiveInsertKind(null)}
-                onEffectsLibraryDockOpenChange={changeEffectsOpen}
-              />
-              <VideoEditorWorkspaceOverlays />
-            </WorkspaceTrackPresentation>
-          </EffectDocumentDragProvider>
+          <MaterialDragProvider>
+            <EffectDocumentDragProvider>
+              <WorkspaceTrackPresentation>
+                <VideoProjectStorageStatus />
+                <VideoEditorWorkspaceCanvas
+                  inspectorPanel={inspector}
+                  onMaterialsOpenChange={toggleMaterials}
+                  inspectorFullHeight={inspectorFullHeight}
+                  materialsPanel={{
+                    resize: panelSizes.materials,
+                    fullHeight: materialsFullHeight,
+                    onToggle: () => setMaterialsFullHeight((current) => !current),
+                  }}
+                  materialsOpen={materialsOpen}
+                  inspector={
+                    <VideoEditorFloatingInspectorStack
+                      onClose={inspector.onToggle}
+                      resize={panelSizes.inspector}
+                      fullHeight={inspectorFullHeight}
+                      onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
+                    />
+                  }
+                  activeInsertKind={activeInsertKind}
+                  effectBundles={effectBundles}
+                  effectOperations={effectOperations}
+                  effectsLibraryDockOpen={effectsLibraryDockOpen}
+                  effectKind={effectKind}
+                  previewHeightStyle={previewHeightStyle}
+                  onClearActiveInsertKind={() => setActiveInsertKind(null)}
+                  onEffectsLibraryDockOpenChange={changeEffectsOpen}
+                />
+                <VideoEditorWorkspaceOverlays />
+              </WorkspaceTrackPresentation>
+            </EffectDocumentDragProvider>
+          </MaterialDragProvider>
         </div>
       </InspectorGroupFocusContext.Provider>
     </InspectorSectionMemoryProvider>
@@ -193,13 +196,18 @@ function VideoEditorWorkspaceLibraryPanel(): React.JSX.Element | null {
 }
 
 function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
+  const [playVideo, setPlayVideo] = useState(true);
   const layout = useVideoEditorLayoutController();
   const sidebar = useVideoEditorSidebarController();
   const runtime = useContext(RuntimePlaybackContext);
   const ranges = useContext(WorkspacePlaybackRangeContext);
   const setCurrentTime = useVideoEditorPlaybackPort((port) => port.setCurrentTime);
+  const playbackRunning = useVideoEditorPlaybackPort((port) => port.isPlaying);
   const current = useRef({ open: layout.audioRecordingDialogOpen });
   current.current = { open: layout.audioRecordingDialogOpen };
+  const generation = useRef(0);
+  const selectedPlayback = useRef(playVideo);
+  selectedPlayback.current = playVideo;
   const target = layout.audioRecordingTarget;
   const runtimeRef = useRef(runtime);
   runtimeRef.current = runtime;
@@ -207,6 +215,7 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
   rangesRef.current = ranges;
   useEffect(() => {
     if (!layout.audioRecordingDialogOpen || !runtimeRef.current) return;
+    generation.current += 1;
     const runtime = runtimeRef.current;
     const ranges = rangesRef.current;
     const previousRange = ranges?.playbackRange ?? null;
@@ -216,52 +225,78 @@ function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
       runtime.seekTo(target.startTime);
     }
     return () => {
+      generation.current += 1;
       runtimeRef.current?.pausePlayback();
       if (target) rangesRef.current?.setPlaybackRange(previousRange);
     };
   }, [layout.audioRecordingDialogOpen, target]);
-  const timeline = useMemo(
-    () =>
-      target && runtime
-        ? {
-            startTime: target.startTime,
-            duration: target.endTime - target.startTime,
-            beforeStart: async () => {
-              const project = getCurrentVideoEditorProjectSnapshot();
-              if (
-                !project ||
-                project.id !== target.projectId ||
-                !isAudioRecordingRangeAvailable(
-                  project,
-                  target.trackId,
-                  target.startTime,
-                  target.endTime
-                )
-              )
-                throw new Error('Recording destination unavailable');
-              runtime.pausePlayback();
-              setCurrentTime(target.startTime);
-              await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-              if (!current.current.open) throw new Error('Recording cancelled');
-              const started = await runtime.setPlaybackPlaying(true);
-              if (started === false || !current.current.open)
-                throw new Error('Playback unavailable');
-            },
-            onStop: () => {
-              runtime.pausePlayback();
-            },
-          }
-        : undefined,
-    [target, runtime, setCurrentTime]
-  );
+  const timeline = useMemo(() => {
+    if (!target || !runtime) return undefined;
+    const startPreviewPlayback = async (startedGeneration: number) => {
+      if (!current.current.open || startedGeneration !== generation.current)
+        throw new Error('Recording cancelled');
+      if (playVideo) {
+        const started = await runtime.setPlaybackPlaying(true);
+        if (
+          started === false ||
+          !current.current.open ||
+          startedGeneration !== generation.current
+        ) {
+          if (started === false || !current.current.open || !selectedPlayback.current)
+            runtime.pausePlayback();
+          throw new Error('Playback unavailable');
+        }
+      }
+    };
+    return {
+      startTime: target.startTime,
+      duration: target.endTime - target.startTime,
+      beforeStart: async () => {
+        const startedGeneration = generation.current;
+        const project = getCurrentVideoEditorProjectSnapshot();
+        if (
+          !project ||
+          project.id !== target.projectId ||
+          !isAudioRecordingRangeAvailable(project, target.trackId, target.startTime, target.endTime)
+        )
+          throw new Error('Recording destination unavailable');
+        runtime.pausePlayback();
+        setCurrentTime(target.startTime);
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        await startPreviewPlayback(startedGeneration);
+      },
+      onStop: () => {
+        runtime.pausePlayback();
+      },
+      onPause: () => {
+        runtime.pausePlayback();
+      },
+      onResume: async () => {
+        await startPreviewPlayback(generation.current);
+      },
+    };
+  }, [target, runtime, setCurrentTime, playVideo]);
   if (!sidebar) return null;
   return (
     <AudioRecordingModal
       timeline={timeline}
+      playVideo={playVideo}
+      playbackRunning={playbackRunning}
+      onPlayVideoChange={setPlayVideo}
       isOpen={layout.audioRecordingDialogOpen}
-      onClose={layout.closeAudioRecordingDialog}
-      onSave={(file, trim) =>
-        sidebar.projectActions.onImportRecordedAudio(file, trim, layout.audioRecordingTarget)
+      onClose={() => {
+        generation.current += 1;
+        runtime?.pausePlayback();
+        layout.closeAudioRecordingDialog();
+      }}
+      onSave={(file, trim, signal, take) =>
+        sidebar.projectActions.onImportRecordedAudio(
+          file,
+          trim,
+          layout.audioRecordingTarget,
+          signal,
+          take
+        )
       }
     />
   );

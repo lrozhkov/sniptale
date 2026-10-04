@@ -125,6 +125,6 @@ it('keeps the drawing cursor owned by the active tool mode', () => {
     hasCropGuide: false,
   });
 
-  expect(canvas.defaultCursor).toBe('crosshair');
+  expect(canvas.defaultCursor).toMatch(/^url\(.+\) 4 20, crosshair$/);
   expect(canvas.selection).toBe(false);
 });

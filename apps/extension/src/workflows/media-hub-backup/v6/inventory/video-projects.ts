@@ -1,3 +1,4 @@
+import { projectRecordingMetadataPrivacy } from '../privacy';
 import {
   readVideoReviewForBackup,
   type VideoReviewBackupDatabase,
@@ -42,6 +43,7 @@ import {
 } from './helpers';
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { buildPortableAggregatePresentation } from './presentation';
+import { isRecord } from '../../../../composition/persistence/infrastructure/indexed-db/read-primitives';
 
 interface VideoInventoryDatabase extends InventoryDatabase, VideoReviewBackupDatabase {}
 
@@ -60,6 +62,13 @@ function readSelectedVideoProjects(
 ): VideoProjectEntry[] {
   return rows
     .flatMap((raw) => {
+      if (options.scope === 'selected') {
+        const selectedIds = options.selected?.videoProjectIds ?? [];
+        if (selectedIds.length === 0) return [];
+        if (isRecord(raw) && typeof raw['id'] === 'string' && !selectedIds.includes(raw['id'])) {
+          return [];
+        }
+      }
       const result = parseVideoProjectEntryResult(raw);
       if (result.status === 'unsupported') {
         throw new UnsupportedEngine1VideoProjectError(result.metadata);
@@ -104,12 +113,15 @@ async function buildProjectAssets(
           sourceAssetId: asset.assetId,
         })
       : undefined;
-    if (videoReview) {
+    if (videoReview && !media) {
       for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
     }
     output.push({
       entry: portable,
-      ...(videoReview
+      ...(media
+        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
+        : { publishToLibrary: false }),
+      ...(videoReview && !media
         ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
         : {}),
       filename,
@@ -129,20 +141,30 @@ async function buildProjectAssets(
   return output;
 }
 
-async function buildProjectExports(
-  db: VideoInventoryDatabase,
-  entry: VideoProjectEntry,
-  collector: ReturnType<typeof createObjectCollector>,
-  referencedIds: Set<string>
-) {
+async function buildProjectExports({
+  db,
+  entry,
+  collector,
+  referencedIds,
+  options,
+}: {
+  db: VideoInventoryDatabase;
+  entry: VideoProjectEntry;
+  collector: ReturnType<typeof createObjectCollector>;
+  referencedIds: Set<string>;
+  options: MediaHubBackupExportOptions;
+}) {
   const output = [];
   const exports = (await db.getAllFromIndex(PROJECT_EXPORTS_STORE, 'projectId', entry.id))
     .map(parseProjectExportEntry)
     .filter((value): value is NonNullable<typeof value> => value !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const exportEntry of exports) {
+    const media = parseMediaLibraryEntry(
+      await db.get(MEDIA_LIBRARY_STORE, `export:${exportEntry.id}`)
+    );
     const file = await readInventoryAssetFile(db, exportEntry.assetId, exportEntry.filename);
-    const { assetId: _assetId, ...portable } = exportEntry;
+    const { assetId: _assetId, recordingMetadata, ...portable } = exportEntry;
     const thumbnail = parseMediaThumbnailEntry(
       await db.get(THUMBNAILS_STORE, `export:${exportEntry.id}`)
     );
@@ -153,12 +175,13 @@ async function buildProjectExports(
           sourceAssetId: exportEntry.assetId,
         })
       : undefined;
-    if (videoReview) {
+    if (videoReview && !media) {
       for (const id of collectReviewAssetReferences(videoReview.workspace)) referencedIds.add(id);
     }
     output.push({
-      entry: portable,
-      ...(videoReview
+      entry: { ...portable, ...projectRecordingMetadataPrivacy(recordingMetadata, options) },
+      ...(media ? { libraryMediaId: `export:${exportEntry.id}` } : {}),
+      ...(videoReview && !media
         ? { videoReview: videoReview && encodePortableReviewAssetRefs(videoReview) }
         : {}),
       objectId: collector.addObject(
@@ -234,6 +257,9 @@ async function buildReviewReferencedAssets(
     const { assetId: _assetId, ...portable } = asset;
     output.push({
       entry: portable,
+      ...(media
+        ? { libraryMediaId: createProjectAssetMediaId(asset.id) }
+        : { publishToLibrary: false }),
       filename,
       objectId: collector.addObject(
         file,
@@ -256,6 +282,7 @@ async function buildVideoProjectRoot(args: {
   entry: VideoProjectEntry;
   index: number;
   paths: ArchivePathAllocator;
+  options: MediaHubBackupExportOptions;
 }): Promise<MediaHubBackupRootInventoryItem> {
   await verifyVideoProjectEffectSnapshotIntegrity(args.entry.project);
   const collector = createObjectCollector(
@@ -264,7 +291,13 @@ async function buildVideoProjectRoot(args: {
   );
   const referencedIds = new Set<string>();
   const sourceAssets = await buildProjectAssets(args.db, args.entry, collector, referencedIds);
-  const projectExports = await buildProjectExports(args.db, args.entry, collector, referencedIds);
+  const projectExports = await buildProjectExports({
+    db: args.db,
+    entry: args.entry,
+    collector,
+    referencedIds,
+    options: args.options,
+  });
   const projectAssets = [
     ...sourceAssets,
     ...(await buildReviewReferencedAssets(
@@ -326,7 +359,7 @@ async function buildVideoProjectRoot(args: {
       draftCount: args.entry.lifecycle?.storageClass === 'temporary' ? 1 : 0,
       recordingCount: projectExports.length,
       sourceMetadataCount: 0,
-      telemetryCount: 0,
+      telemetryCount: projectExports.filter((item) => item.entry.recordingMetadata).length,
       thumbnailCount:
         projectExports.filter((item) => item.thumbnail).length +
         (projectThumbnail ? 1 : 0) +

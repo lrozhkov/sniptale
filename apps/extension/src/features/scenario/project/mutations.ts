@@ -40,7 +40,13 @@ export type GuideStructureOperation =
       | { itemId: string; blockId?: string; beforeItemId?: never }
       | { itemId?: never; blockId?: never; beforeItemId?: string }
     ))
-  | { kind: 'add-step'; beforeItemId?: string }
+  | {
+      kind: 'add-step';
+      beforeItemId?: string;
+      layout?: GuideStep['layout'];
+      title?: string;
+      description?: string;
+    }
   | { kind: 'add-section'; beforeItemId?: string }
   | { kind: 'merge-next'; itemId: string }
   | { kind: 'split-step'; itemId: string; blockId: string };
@@ -72,9 +78,19 @@ export function applyGuideStructureOperation(
     case 'place-image':
       placeImage(next, operation);
       break;
-    case 'add-step':
-      next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, createGuideStep());
+    case 'add-step': {
+      const step = createGuideStep(operation.title ?? '');
+      step.layout = operation.layout ?? step.layout;
+      step.blocks = [
+        {
+          kind: 'text',
+          id: crypto.randomUUID(),
+          paragraphs: createGuideParagraphs(operation.description ?? ''),
+        },
+      ];
+      next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, step);
       break;
+    }
     case 'add-section':
       next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, {
         kind: 'section',
@@ -288,6 +304,7 @@ function placeImage(
     throw new Error('Guide image target is unavailable.');
   delete copy.width;
   delete copy.rowStart;
+  delete copy.captionAlignment;
   step.blocks[index] = {
     ...copy,
     id: target.id,
@@ -297,6 +314,7 @@ function placeImage(
     fit: target.fit,
     alt: target.alt,
     caption: target.caption,
+    ...(target.captionAlignment === undefined ? {} : { captionAlignment: target.captionAlignment }),
     contentTransform: { x: 0, y: 0, scale: 1 },
   };
 }

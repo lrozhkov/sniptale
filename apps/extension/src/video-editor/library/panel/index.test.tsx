@@ -34,7 +34,7 @@ it('opens the media library as a modal drawer with a dismissible dimmed remainde
   const modal = drawer?.closest('.sniptale-modal');
   expect(drawer).not.toBeNull();
   expect(modal?.className).toContain('!bottom-0');
-  expect((modal as HTMLElement | null)?.style.width).toContain('1600px');
+  expect((modal as HTMLElement | null)?.style.width).toContain('80vw');
   expect(drawer?.getAttribute('aria-modal')).toBe('true');
   expect(container?.querySelector('.sniptale-modal-backdrop')).not.toBeNull();
   expect(container?.querySelector('.sniptale-modal-accent-sm')).toBeNull();

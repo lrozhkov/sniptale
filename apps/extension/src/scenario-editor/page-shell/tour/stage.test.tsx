@@ -47,12 +47,13 @@ function fixture() {
     },
   ];
   tour.slides = [slide, createTourImageSlide('second')];
+  const images: Record<string, string> = {
+    image:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=',
+  };
   return {
     tour,
-    images: {
-      image:
-        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=',
-    },
+    images,
     selection: { kind: 'slide' as const, slideId: 'first', objectId: null },
     onSelectObject: vi.fn(),
     onMoveObject: vi.fn(),
@@ -112,22 +113,33 @@ it('mounts the caption disclosure control in the editor scaffold', () => {
   props.tour.style.textAppearance.presentation = 'caption-bottom';
   const slide = props.tour.slides[0]!;
   if (slide.kind !== 'image') throw new Error('Expected image');
-  slide.hotspots[0]!.text = 'A'.repeat(170);
+  slide.hotspots = [];
+  slide.annotations = [{ id: 'point', text: 'A'.repeat(170), anchor: null, appearance: null }];
   const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
   act(() => root.render(<TourStage {...props} selection={selection} />));
   const toggle = shadow().querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
-  expect(toggle.hidden).toBe(false);
-  act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click());
-  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(10));
-  act(() => toggle.click());
-  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(true);
+  const body = shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!;
+  const hint = shadow().querySelector<HTMLElement>('[data-tour-hint]')!;
+  Object.defineProperty(body, 'scrollHeight', { get: () => 80 });
   act(() =>
     root.render(<TourStage {...props} selection={selection} tour={structuredClone(props.tour)} />)
   );
-  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(true);
-  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(10));
+  expect(toggle.hidden).toBe(false);
+  expect(hint.dataset['collapsed']).toBe('true');
+  expect(body.textContent).toBe('A'.repeat(170));
+  expect(body.style.maxHeight).toBe('24px');
+  act(() => body.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(Number.parseFloat(body.style.maxHeight)).toBeGreaterThan(24);
   act(() => toggle.click());
-  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(false);
+  act(() =>
+    root.render(<TourStage {...props} selection={selection} tour={structuredClone(props.tour)} />)
+  );
+  expect(hint.dataset['collapsed']).toBe('true');
+  expect(body.hidden).toBe(false);
+  expect(body.textContent).toBe('A'.repeat(170));
+  act(() => toggle.click());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
 });
 
 it('resizes a selected mask on canvas with live geometry, one commit and Escape rollback', () => {
@@ -182,6 +194,64 @@ it('resizes a selected mask on canvas with live geometry, one commit and Escape 
   });
   expect(props.onMoveObject).not.toHaveBeenCalled();
 });
+
+it.each(['blur', 'highlight'] as const)(
+  'shows %s mask handles without a frame and gives the selected mask pointer priority',
+  (kind) => {
+    const props = fixture();
+    const slide = props.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image');
+    slide.hotspots.push({
+      ...slide.hotspots[0]!,
+      id: 'inactive',
+      point: { x: 0.7, y: 0.5 },
+      action: { kind: 'none' },
+    });
+    slide.masks = [
+      {
+        id: 'mask',
+        kind,
+        color: '#f97316',
+        opacity: 0.3,
+        rect: { x: 0.2, y: 0.4, width: 0.3, height: 0.2 },
+      },
+    ];
+    act(() =>
+      root.render(
+        <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'mask' }} />
+      )
+    );
+    const plane = shadow().querySelector<HTMLElement>('.tour-image-plane')!;
+    const mask = shadow().querySelector<HTMLElement>('.tour-mask')!;
+    expect(plane.style.zIndex).toBe('4');
+    expect(plane.style.pointerEvents).toBe('none');
+    expect(shadow().querySelector('style:last-of-type')!.textContent).not.toMatch(
+      /\.tour-mask\[data-selected=['"]?true['"]?\]\s*\{[^}]*outline:/
+    );
+    expect(mask.querySelectorAll('.tour-resize-handle')).toHaveLength(8);
+    expect(mask.querySelector<HTMLButtonElement>('[data-edge=se]')!.disabled).toBe(false);
+    const pointer = (name: string, x: number) => {
+      const event = new MouseEvent(name, { bubbles: true, button: 0, clientX: x });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      act(() => mask.dispatchEvent(event));
+    };
+    pointer('pointerdown', 0);
+    pointer('pointermove', 108);
+    expect(props.onMoveObject).not.toHaveBeenCalled();
+    pointer('pointerup', 108);
+    expect(props.onMoveObject).toHaveBeenCalledExactlyOnceWith('mask', { x: 0.5, y: 0.4 });
+    expect(props.onSelectObject).toHaveBeenCalledWith('mask');
+    expect(props.onSelectObject).not.toHaveBeenCalledWith('point');
+    expect(props.onSelectObject).not.toHaveBeenCalledWith('inactive');
+    act(() =>
+      root.render(
+        <TourStage {...props} selection={{ kind: 'slide', slideId: 'first', objectId: 'point' }} />
+      )
+    );
+    expect(plane.style.zIndex).toBe('');
+    expect(plane.style.pointerEvents).toBe('');
+  }
+);
 
 it('renders independent neutral spotlight and visual blur; locked resize stays inert', () => {
   const props = fixture();

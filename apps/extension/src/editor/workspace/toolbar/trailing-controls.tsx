@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../platform/i18n';
 import { useEditorController } from '../../application/controller-context';
 import { useEditorEmbedContext } from '../../application/embed-context/context';
@@ -31,8 +32,9 @@ function EditorToolbarScenarioApplyAction(props: {
 
   return (
     <>
-      <button
+      <ContentToolbarButton
         type="button"
+        tone="outline"
         onClick={() =>
           fireAndReportEditorAction('toolbar-apply-to-scenario', async () => {
             props.onBeforeSelectionAwareAction();
@@ -40,12 +42,10 @@ function EditorToolbarScenarioApplyAction(props: {
             await props.onApply?.();
           })
         }
-        className="mr-3 inline-flex rounded-full border border-[var(--sniptale-color-border-accent-strong)]
-          bg-[var(--sniptale-color-accent-soft)] px-3 py-2 text-xs font-semibold
-          text-[var(--sniptale-color-text-primary)]"
+        className="mr-3"
       >
         {translate('editor.documentActions.applyToScenario')}
-      </button>
+      </ContentToolbarButton>
       <EditorToolbarDivider />
     </>
   );

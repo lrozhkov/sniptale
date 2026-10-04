@@ -53,6 +53,7 @@ function buildCompactFrameParams(
 ): BuildEditorInspectorCompactCommandGroupsParams['frame'] {
   return {
     frameDraft: params.frameDraft,
+    lastFillModeRef: params.lastFillModeRef,
     framePaddingSummary: params.framePaddingSummary,
     layoutModeLabel: params.layoutModeLabel,
     backgroundModeLabel: params.backgroundModeLabel,

@@ -45,7 +45,7 @@ beforeEach(() => {
 
 it('keeps recording and export precedence ahead of persisted startup', async () => {
   mocks.startup.mockResolvedValue({ selection: 'tools', lastPage: 'menu' });
-  mocks.exportIntent.mockResolvedValue('export');
+  mocks.exportIntent.mockResolvedValue({ tabId: 7, startExport: false });
   mocks.recording.mockResolvedValue({ state: { status: VideoRecordingStatus.RECORDING } });
   expect(await resolvePopupStartupRoute()).toMatchObject({ page: 'video' });
 });
@@ -100,4 +100,50 @@ it('restores unified Export for both fixed and remember-last startup choices', a
     lastExportDestination: 'save',
   });
   expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'save' });
+});
+
+it.each([false, true])(
+  'preserves export launch mode %s without overriding saved artifact preferences',
+  async (startExport) => {
+    mocks.startup.mockResolvedValue({ selection: 'export:library', lastPage: 'export' });
+    mocks.exportIntent.mockResolvedValue({
+      tabId: 7,
+      startExport,
+      ...(startExport ? { sourceDocumentId: 'document-7' } : {}),
+    });
+    expect(await resolvePopupStartupRoute()).toEqual({
+      page: 'export',
+      destination: 'export',
+      launch: {
+        tabId: 7,
+        startExport,
+        ...(startExport ? { sourceDocumentId: 'document-7' } : {}),
+      },
+    });
+  }
+);
+
+it.each(['export:html', 'remember-last'] as const)(
+  'opens HTML for %s without an export launch',
+  async (selection) => {
+    mocks.startup.mockResolvedValue({
+      selection,
+      lastPage: 'export',
+      lastExportDestination: 'html',
+    });
+    expect(await resolvePopupStartupRoute()).toEqual({ page: 'export', destination: 'html' });
+  }
+);
+
+it('retains active recording and explicit launch precedence over HTML startup', async () => {
+  mocks.startup.mockResolvedValue({ selection: 'export:html', lastPage: 'export' });
+  mocks.recording.mockResolvedValue({ state: { status: VideoRecordingStatus.RECORDING } });
+  expect(await resolvePopupStartupRoute()).toMatchObject({ page: 'video' });
+  mocks.recording.mockResolvedValue({ state: { status: VideoRecordingStatus.IDLE } });
+  mocks.exportIntent.mockResolvedValue({ tabId: 7, startExport: false });
+  expect(await resolvePopupStartupRoute()).toEqual({
+    page: 'export',
+    destination: 'export',
+    launch: { tabId: 7, startExport: false },
+  });
 });

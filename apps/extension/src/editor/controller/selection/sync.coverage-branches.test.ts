@@ -96,13 +96,15 @@ describe('editor-controller selection sync drawing dispatch', () => {
     expect(mocks.updateSelectionDrawingToolSettings).toHaveBeenCalledWith(type, expected);
   });
 
-  it('ignores blur and objects without shared drawing metadata', () => {
+  it('syncs legacy blur strength and ignores objects without shared drawing metadata', () => {
     mocks.readEditorDrawingObject.mockReturnValueOnce({ kind: 'blur' }).mockReturnValueOnce(null);
 
     syncSelectionToolSettingsFromObject({} as never, 'blur');
     syncSelectionToolSettingsFromObject({} as never, 'pencil');
 
-    expect(mocks.updateSelectionDrawingToolSettings).not.toHaveBeenCalled();
+    expect(mocks.updateSelectionDrawingToolSettings).toHaveBeenCalledExactlyOnceWith('blur', {
+      amount: 10,
+    });
   });
 
   it('keeps retained step and rich-shape owners', () => {

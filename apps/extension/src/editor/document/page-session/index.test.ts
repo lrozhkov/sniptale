@@ -110,9 +110,109 @@ describe('stable editor aggregate identity', () => {
 });
 
 describe('editor aggregate restore', () => {
+  it('keeps a damaged workspace blocked even when the immutable original exists', async () => {
+    mocks.getEntry.mockResolvedValue({
+      id: 'image-1',
+      kind: 'image',
+      workspaceRevision: 3,
+      blob: new Blob(['original'], { type: 'image/png' }),
+    });
+    mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
+    mocks.restore.mockRejectedValue(Object.assign(new Error('gone'), { name: 'NotFoundError' }));
+    const { resolveEditorPageRestoreSource } = await import('./');
+
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: null }, 'image-1', {
+        restoreDraft: mocks.restore,
+      })
+    ).rejects.toMatchObject({ name: 'MissingEditorDraftAssetError' });
+    expect(mocks.getEntry).not.toHaveBeenCalled();
+    expect(mocks.getBlob).not.toHaveBeenCalled();
+  });
+  it('classifies absent OPFS objects and broken draft refs as missing local files', async () => {
+    const { MissingAssetObjectError } = await import('../../../composition/persistence/assets');
+    const { MissingEditorDocumentAssetError } =
+      await import('../../../composition/persistence/document-assets');
+    const { resolveEditorPageRestoreSource } = await import('./');
+    const restore = { restoreDraft: mocks.restore };
+    for (const error of [
+      new MissingAssetObjectError('asset-1'),
+      new MissingEditorDocumentAssetError('asset-1'),
+    ]) {
+      mocks.restore.mockRejectedValueOnce(error);
+      await expect(
+        resolveEditorPageRestoreSource(
+          { assetId: 'image-1', bootstrapId: null },
+          'image-1',
+          restore
+        )
+      ).rejects.toMatchObject({ name: 'MissingEditorDraftAssetError' });
+    }
+    expect(mocks.getBlob).not.toHaveBeenCalled();
+  });
+
+  it('does not overwrite a draft when one of its stored files is missing', async () => {
+    mocks.restore.mockRejectedValue(Object.assign(new Error('gone'), { name: 'NotFoundError' }));
+    const { resolveEditorPageRestoreSource } = await import('./');
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: null }, 'image-1', {
+        restoreDraft: mocks.restore,
+      })
+    ).rejects.toMatchObject({ name: 'MissingEditorDraftAssetError' });
+    expect(mocks.getBlob).not.toHaveBeenCalled();
+    expect(mocks.bootstrap).not.toHaveBeenCalled();
+  });
+  it('classifies a missing stored original without replacing or deleting its library entry', async () => {
+    mocks.restore.mockResolvedValue(undefined);
+    mocks.bootstrap.mockResolvedValue(null);
+    mocks.getEntry.mockResolvedValue({ filename: 'original.png' });
+    mocks.getBlob.mockRejectedValue(Object.assign(new Error('gone'), { name: 'NotFoundError' }));
+    const { resolveEditorPageRestoreSource } = await import('./');
+
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: null }, 'image-1', {
+        restoreDraft: mocks.restore,
+      })
+    ).rejects.toMatchObject({ name: 'MissingEditorOriginalError' });
+  });
+  it('classifies a missing OPFS objects directory for an original', async () => {
+    const { MissingAssetObjectError } = await import('../../../composition/persistence/assets');
+    mocks.restore.mockResolvedValue(undefined);
+    mocks.bootstrap.mockResolvedValue(null);
+    mocks.getEntry.mockResolvedValue({ filename: 'original.png' });
+    mocks.getBlob.mockRejectedValue(new MissingAssetObjectError('asset-1'));
+    const { resolveEditorPageRestoreSource } = await import('./');
+
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: null }, 'image-1', {
+        restoreDraft: mocks.restore,
+      })
+    ).rejects.toMatchObject({ name: 'MissingEditorOriginalError' });
+  });
+  it('does not label a library metadata failure as a missing image file', async () => {
+    mocks.restore.mockResolvedValue(undefined);
+    mocks.bootstrap.mockResolvedValue(null);
+    mocks.getBlob.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+    mocks.getEntry.mockRejectedValue(
+      Object.assign(new Error('store unavailable'), { name: 'NotFoundError' })
+    );
+    const { resolveEditorPageRestoreSource } = await import('./');
+
+    await expect(
+      resolveEditorPageRestoreSource({ assetId: 'image-1', bootstrapId: null }, 'image-1', {
+        restoreDraft: mocks.restore,
+      })
+    ).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
   it('prefers the workspace for the aggregate', async () => {
-    const entry = { aggregateId: 'image-1', document: createEditorDocumentFixture(), revision: 2 };
+    const entry = {
+      aggregateId: 'image-1',
+      createdAt: 200,
+      document: createEditorDocumentFixture(),
+      revision: 2,
+    };
     mocks.restore.mockResolvedValue(entry);
+    mocks.getEntry.mockResolvedValue({ createdAt: 100 });
     const { resolveEditorPageRestoreSource } = await import('./');
     const isCurrent = vi.fn(() => true);
     await expect(
@@ -122,29 +222,42 @@ describe('editor aggregate restore', () => {
         { restoreDraft: mocks.restore },
         isCurrent
       )
-    ).resolves.toEqual({ kind: 'draft', entry });
+    ).resolves.toEqual({ kind: 'draft', entry, capturedAt: 100 });
     expect(mocks.restore).toHaveBeenCalledWith('image-1', isCurrent);
     expect(mocks.bootstrap).not.toHaveBeenCalled();
   });
 
   it('falls back to bootstrap and then immutable original', async () => {
     mocks.restore.mockResolvedValue(undefined);
-    mocks.bootstrap.mockResolvedValueOnce({ dataUrl: 'data:image/png;base64,YQ==' });
+    mocks.bootstrap.mockResolvedValueOnce({
+      dataUrl: 'data:image/png;base64,YQ==',
+      capturedAt: 300,
+    });
+    mocks.getEntry.mockResolvedValueOnce({ createdAt: 250 });
     const { resolveEditorPageRestoreSource } = await import('./');
     await expect(
       resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: 'boot' }, 'image-2', {
         restoreDraft: mocks.restore,
       })
-    ).resolves.toEqual({ kind: 'bootstrap', payload: { dataUrl: 'data:image/png;base64,YQ==' } });
+    ).resolves.toEqual({
+      kind: 'bootstrap',
+      payload: { dataUrl: 'data:image/png;base64,YQ==', capturedAt: 300 },
+      capturedAt: 250,
+    });
 
     mocks.bootstrap.mockResolvedValueOnce(null);
     mocks.getBlob.mockResolvedValue(new Blob(['original'], { type: 'image/png' }));
-    mocks.getEntry.mockResolvedValue({ filename: 'original.png' });
+    mocks.getEntry.mockResolvedValue({ filename: 'original.png', createdAt: 150 });
     mocks.toDataUrl.mockResolvedValue('data:image/png;base64,b3JpZ2luYWw=');
     await expect(
       resolveEditorPageRestoreSource({ assetId: 'image-2', bootstrapId: null }, 'image-2', {
         restoreDraft: mocks.restore,
       })
-    ).resolves.toMatchObject({ kind: 'asset', assetId: 'image-2', filename: 'original.png' });
+    ).resolves.toMatchObject({
+      kind: 'asset',
+      assetId: 'image-2',
+      filename: 'original.png',
+      capturedAt: 150,
+    });
   });
 });

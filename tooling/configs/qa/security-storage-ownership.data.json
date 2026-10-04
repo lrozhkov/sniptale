@@ -241,6 +241,32 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/scenario/export-artifacts.ts",
+      "owner": "scenario-html-exports",
+      "justification": "Retains the exact user-requested standalone guide or tour HTML as one immutable local OPFS body with a catalogue identity.",
+      "reviewNote": "Native file commit precedes advisory local retention. Atomic ready-journal publication owns catalogue/ref/body edge; replay cannot undo rename or Trash. Explicit scenario backup carries exact immutable bytes, including visible authored content and resources; metadata privacy projections do not rewrite the saved file. No sync, network, diagnostics or traces. Catalogue/root deletion and replacement release graph ownership with durable physical cleanup; verified local-data erasure removes the existing OPFS and IndexedDB stores. Restored HTML is hostile and opens only through the opaque sandbox with trusted bundled executable digest and restrictive CSP admission.",
+      "storageWrites": [
+        {
+          "sink": "exports.put",
+          "keys": [
+            "SCENARIO_EXPORTS_STORE"
+          ]
+        },
+        {
+          "sink": "tx.objectStore(ASSET_REFS_STORE).put",
+          "keys": [
+            "ASSET_REFS_STORE"
+          ]
+        },
+        {
+          "sink": "tx.objectStore(ASSET_OWNERS_STORE).put",
+          "keys": [
+            "ASSET_OWNERS_STORE"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { DrawingObject } from '../../features/drawing/public';
-import { assertValidEditorDrawingCanvasJson, parseEditorDrawingMetadata } from './import-boundary';
+import {
+  assertValidEditorDrawingCanvasJson,
+  parseEditorDrawingMetadata,
+  serializeEditorDrawingMetadata,
+} from './import-boundary';
 
 const objects: readonly DrawingObject[] = [
   { id: 'p', kind: 'pencil', color: '#111', width: 4, samples: [{ x: 1, y: 2, t: 3 }] },
@@ -54,6 +58,19 @@ function fabricObject(object: DrawingObject) {
 }
 
 describe('editor drawing import boundary', () => {
+  it('accepts saved blur strength and rejects malformed strength', () => {
+    const blur = objects[4]!;
+    if (blur.kind !== 'blur') throw new Error('Expected blur fixture');
+    expect(
+      parseEditorDrawingMetadata(fabricObject({ ...blur, amount: 20 }).sniptaleDrawingJson)
+    ).toMatchObject({ amount: 20 });
+    for (const amount of [-1, 26, '20', null]) {
+      expect(
+        parseEditorDrawingMetadata(JSON.stringify({ version: 1, object: { ...blur, amount } }))
+      ).toBeNull();
+    }
+    expect(parseEditorDrawingMetadata(fabricObject(blur).sniptaleDrawingJson)).toEqual(blur);
+  });
   it('accepts every current shared drawing kind and parses its metadata', () => {
     expect(() =>
       assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: objects.map(fabricObject) }))
@@ -178,4 +195,12 @@ describe('editor drawing import boundary', () => {
       assertValidEditorDrawingCanvasJson(JSON.stringify({ objects: [nested(41)] }))
     ).toThrow('Invalid editor canvas object tree');
   });
+});
+
+it('round trips every admitted drawing kind through the document metadata serializer', () => {
+  for (const object of objects) {
+    const serialized = serializeEditorDrawingMetadata(object);
+    expect(JSON.parse(serialized)).toEqual({ version: 1, object });
+    expect(parseEditorDrawingMetadata(serialized)).toEqual(object);
+  }
 });

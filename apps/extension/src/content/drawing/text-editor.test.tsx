@@ -3,7 +3,9 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { DrawingTextEditor, type DrawingTextDraft } from './text-editor';
+import { DrawingTextEditor, useDrawingTextEditor, type DrawingTextDraft } from './text-editor';
+import { createContentDrawingController } from './controller';
+import { createDrawingSession } from '../../features/drawing/public';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -14,6 +16,58 @@ afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it('publishes a changed text draft before it enters shared Drawing history', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const controller = createContentDrawingController(session);
+  const listener = vi.fn();
+  const unsubscribe = controller.subscribePendingTextChange?.(listener);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let editor: ReturnType<typeof useDrawingTextEditor>;
+  function Harness() {
+    editor = useDrawingTextEditor(controller);
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor!.setDraft({ id: null, point: { x: 0, y: 0 }, value: '' }));
+  expect(controller.hasPendingTextChange?.()).toBe(false);
+  act(() => editor!.setDraft({ id: null, point: { x: 0, y: 0 }, value: 'Draft' }));
+  expect(controller.hasPendingTextChange?.()).toBe(true);
+  expect(session.getSnapshot().document.objects).toHaveLength(0);
+  expect(listener).toHaveBeenCalledOnce();
+  act(() => editor!.cancel());
+  expect(controller.hasPendingTextChange?.()).toBe(false);
+  act(() => editor!.setDraft({ id: null, point: { x: 0, y: 0 }, value: 'Draft' }));
+  act(() => editor!.finalize());
+  expect(controller.hasPendingTextChange?.()).toBe(false);
+  expect(session.getSnapshot().document.objects.at(-1)).toMatchObject({ text: 'Draft' });
+  unsubscribe?.();
+  act(() => root.unmount());
+});
+
+it('retains a text draft when shared Drawing history rejects its commit', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const session = createDrawingSession({ onDocumentCommit: () => false });
+  const controller = createContentDrawingController(session);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  let editor: ReturnType<typeof useDrawingTextEditor>;
+  function Harness() {
+    editor = useDrawingTextEditor(controller);
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor!.setDraft({ id: null, point: { x: 0, y: 0 }, value: 'Keep me' }));
+  act(() => editor!.finalize());
+  expect(editor!.draft?.value).toBe('Keep me');
+  expect(controller.hasPendingTextChange?.()).toBe(true);
+  expect(session.getSnapshot().document.objects).toHaveLength(0);
+  act(() => root.unmount());
 });
 
 it('keeps the first line visible while Shift+Enter creates an empty trailing line', () => {

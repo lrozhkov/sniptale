@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
 import type { VideoEditorLibraryPanelProps } from '../../library/contracts/panel';
 import { createHeaderController, createPreviewController } from './main.test-support';
+import { RuntimePlaybackContext } from '../../runtime/controller/composition/contexts';
 
 const audioRecordingModalSpy = vi.fn();
 const libraryPanelSpy = vi.fn<(props: VideoEditorLibraryPanelProps) => void>();
@@ -442,12 +443,128 @@ it('binds the recording modal save to the captured track destination', async () 
   const props = audioRecordingModalSpy.mock.lastCall![0];
   const file = new File(['voice'], 'voice.webm');
   const trim = { trimStart: 1, trimEnd: 4 };
-  await props.onSave(file, trim);
+  const signal = new AbortController().signal;
+  await props.onSave(file, trim, signal);
   expect(
     (
       controller.sidebar as unknown as {
         projectActions: ReturnType<typeof createSidebarProjectActions>;
       }
     ).projectActions.onImportRecordedAudio
-  ).toHaveBeenCalledWith(file, trim, target);
+  ).toHaveBeenCalledWith(file, trim, target, signal, undefined);
+});
+
+it('pauses and resumes full-editor preview with the voiceover microphone', async () => {
+  const controller = createWorkspaceController();
+  controller.layout.audioRecordingDialogOpen = true;
+  controller.layout.audioRecordingTarget = {
+    projectId: 'project-1',
+    trackId: 'voice',
+    startTime: 2,
+    endTime: 8,
+  } as never;
+  hookMocks.controller = controller;
+  const pausePlayback = vi.fn();
+  const setPlaybackPlaying = vi.fn(async () => true);
+  renderToStaticMarkup(
+    <RuntimePlaybackContext.Provider
+      value={{ pausePlayback, setPlaybackPlaying, seekTo: vi.fn() } as never}
+    >
+      <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+    </RuntimePlaybackContext.Provider>
+  );
+  const timeline = audioRecordingModalSpy.mock.lastCall![0].timeline;
+  timeline.onPause();
+  expect(pausePlayback).toHaveBeenCalledOnce();
+  await timeline.onResume();
+  expect(setPlaybackPlaying).toHaveBeenCalledWith(true);
+  setPlaybackPlaying.mockResolvedValueOnce(false);
+  await expect(timeline.onResume()).rejects.toThrow('Playback unavailable');
+  expect(pausePlayback).toHaveBeenCalledTimes(2);
+});
+
+it('keeps video stopped when the full-editor recording choice is off', async () => {
+  const controller = createWorkspaceController();
+  controller.layout.audioRecordingDialogOpen = true;
+  controller.layout.audioRecordingTarget = {
+    projectId: 'project-1',
+    trackId: 'voice',
+    startTime: 2,
+    endTime: 8,
+  } as never;
+  hookMocks.controller = controller;
+  const setPlaybackPlaying = vi.fn(async () => true);
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    await act(async () =>
+      root.render(
+        <RuntimePlaybackContext.Provider
+          value={
+            {
+              pausePlayback: vi.fn(),
+              setPlaybackPlaying,
+              seekTo: vi.fn(),
+            } as never
+          }
+        >
+          <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+        </RuntimePlaybackContext.Provider>
+      )
+    );
+    const modal = audioRecordingModalSpy.mock.lastCall![0];
+    expect(modal.playVideo).toBe(true);
+    await act(async () => modal.onPlayVideoChange(false));
+    const muted = audioRecordingModalSpy.mock.lastCall![0];
+    expect(muted.playVideo).toBe(false);
+    await muted.timeline.onResume();
+    expect(setPlaybackPlaying).not.toHaveBeenCalled();
+    expect(previewSpy.mock.lastCall![0].mutePreviewAudio).toBe(true);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+it('does not pause a new recording session when an old playback start resolves', async () => {
+  const controller = createWorkspaceController();
+  controller.layout.audioRecordingDialogOpen = true;
+  controller.layout.audioRecordingTarget = {
+    projectId: 'project-1',
+    trackId: 'voice',
+    startTime: 2,
+    endTime: 8,
+  } as never;
+  hookMocks.controller = controller;
+  let finishStart!: (started: boolean) => void;
+  const setPlaybackPlaying = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finishStart = resolve;
+      })
+  );
+  const pausePlayback = vi.fn();
+  const root = createRoot(document.createElement('div'));
+  const render = () =>
+    root.render(
+      <RuntimePlaybackContext.Provider
+        value={{ pausePlayback, setPlaybackPlaying, seekTo: vi.fn() } as never}
+      >
+        <VideoEditorWorkspaceMain previewHeightStyle={{}} />
+      </RuntimePlaybackContext.Provider>
+    );
+  try {
+    await act(async () => render());
+    const pending = audioRecordingModalSpy.mock.lastCall![0].timeline.onResume();
+    const rejected = expect(pending).rejects.toThrow('Playback unavailable');
+    controller.layout.audioRecordingDialogOpen = false;
+    await act(async () => render());
+    controller.layout.audioRecordingDialogOpen = true;
+    await act(async () => render());
+    const pauses = pausePlayback.mock.calls.length;
+    finishStart(true);
+    await rejected;
+    expect(pausePlayback).toHaveBeenCalledTimes(pauses);
+  } finally {
+    await act(async () => root.unmount());
+  }
 });

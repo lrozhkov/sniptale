@@ -38,16 +38,18 @@ export function BoxSection({ actions, disabled, state }: SectionProps) {
 
 function FrameSizeFields({ actions, disabled, state }: SectionProps) {
   return (
-    <div className="grid grid-cols-[repeat(2,minmax(0,1fr))] gap-x-3 gap-y-2">
+    <div className="grid grid-cols-1 gap-y-2">
       <NumericField
         disabled={disabled}
         label={translate('content.designReview.width')}
+        stacked
         {...fieldState(state, actions, 'width')}
         onChange={(value) => actions.updateValue('width', value)}
       />
       <NumericField
         disabled={disabled}
         label={translate('content.designReview.height')}
+        stacked
         {...fieldState(state, actions, 'height')}
         onChange={(value) => actions.updateValue('height', value)}
       />

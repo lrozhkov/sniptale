@@ -1,10 +1,13 @@
+import { isGalleryListInteractionEnabled } from './list-interaction';
+import { useGalleryDeleteShortcut } from '../../library/deletion/use-gallery-delete-shortcut';
+import { GalleryDeletionMenu } from '../../library/deletion/menu';
+import { getGalleryDeletionContextKey } from '../../library/deletion/types';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import { BackupExportModalContent } from '../../library/modals/backup-export-content';
 import { ImportConflictModalContent } from '../../library/modals/import-conflict-content';
 import { MediaImportConflictModalContent } from '../../library/modals/media-import-conflict-content';
 import { WebSnapshotImportModalContent } from '../../library/modals/web-snapshot-import-content';
 import { PreviewPanel } from '../../library/preview';
-import { isGalleryMediaItem } from '../../library/items';
 import type { GalleryAppLayoutProps } from './types';
 
 const galleryConfirmDialogClassName = [
@@ -120,6 +123,7 @@ type GalleryPreviewOverlayProps = Pick<
   GalleryAppLayoutProps,
   | 'onAddTag'
   | 'onFilenameChange'
+  | 'onPreviewPresented'
   | 'onPreviewClose'
   | 'onPreviewInspectorToggle'
   | 'onPreviewNavigate'
@@ -131,6 +135,7 @@ type GalleryPreviewOverlayProps = Pick<
   | 'onPreviewOpenSnapshotScreenshot'
   | 'onPreviewPromote'
   | 'onPreviewResetChanges'
+  | 'onPreviewRestoreTrash'
   | 'onPreviewRestoreOriginal'
   | 'onPreviewSaveCopy'
   | 'onRemoveTag'
@@ -152,11 +157,7 @@ function buildPreviewNavigationProps(
   props: GalleryPreviewOverlayProps,
   previewItem: NonNullable<GalleryPreviewOverlayProps['state']['preview']['session']['item']>
 ) {
-  if (!isGalleryMediaItem(previewItem)) {
-    return {};
-  }
-
-  const items = props.state.derived.filteredItems.filter(isGalleryMediaItem);
+  const items = props.state.derived.filteredItems;
   const index = items.findIndex((item) => item.id === previewItem.id);
   if (index < 0 || items.length < 2) {
     return {};
@@ -186,15 +187,28 @@ function renderPreviewOverlayPanel(
 ) {
   return (
     <PreviewPanel
-      key={previewItem.id}
-      {...(props.state.preview.session.initialMode
+      listFocusReturn
+      trashMode={Boolean(
+        props.state.filters.trashMode || previewItem.lifecycle?.trashedAt !== undefined
+      )}
+      restoreBusy={props.state.storage.isBusy}
+      {...(props.state.preview.session.initialMode && previewItem.lifecycle?.trashedAt === undefined
         ? { initialMode: props.state.preview.session.initialMode }
+        : {})}
+      {...(props.onPreviewRestoreTrash && previewItem.lifecycle?.trashedAt !== undefined
+        ? {
+            onRestoreTrash: () =>
+              props.onPreviewRestoreTrash?.(previewItem) ?? Promise.resolve(false),
+          }
         : {})}
       {...buildPreviewTagProps(props)}
       {...(props.state.preview.draft.hasChanges ? { hasChanges: true } : {})}
       {...buildPreviewNavigationProps(props, previewItem)}
       item={previewItem}
       previewUrl={props.state.preview.session.url}
+      previewLoadStatus={props.state.preview.session.loadStatus}
+      previewRequestRevision={props.state.preview.session.requestRevision}
+      onPresented={props.onPreviewPresented}
       inspectorCollapsed={props.state.preview.session.inspectorCollapsed}
       filenameDraft={props.state.preview.draft.filename}
       tagDraft={props.state.preview.draft.tagInput}
@@ -211,7 +225,7 @@ function renderPreviewOverlayPanel(
       onCopy={async () => props.onPreviewCopy()}
       onEdit={() => props.onPreviewEdit(previewItem)}
       onOpenSnapshotScreenshot={async () => props.onPreviewOpenSnapshotScreenshot()}
-      onDelete={async () => props.onPreviewDelete(previewItem)}
+      onDelete={async (opening) => props.onPreviewDelete(previewItem, opening)}
       onRestoreOriginal={props.onPreviewRestoreOriginal}
       onSaveCopy={async () => props.onPreviewSaveCopy()}
       {...(props.onPreviewPromote
@@ -227,9 +241,25 @@ function GalleryPreviewOverlay(props: GalleryPreviewOverlayProps) {
 }
 
 export function GalleryOverlays(props: GalleryAppLayoutProps) {
+  useGalleryDeleteShortcut({
+    enabled: isGalleryListInteractionEnabled(props.state),
+    selectedItems: props.state.selection.selectedItems,
+    gridRef: props.gridViewportRef,
+    onDelete: props.onDeleteMany,
+  });
   return (
     <>
       <GalleryConfirmOverlay {...props} />
+      {props.state.storage.deletionRequest ? (
+        <GalleryDeletionMenu
+          request={props.state.storage.deletionRequest}
+          contextKey={getGalleryDeletionContextKey(
+            props.state.selection.selectedItems,
+            props.state.preview.session.item
+          )}
+          onClose={props.onDeletionRequestClose}
+        />
+      ) : null}
       <GalleryBackupExportOverlay {...props} />
       <GalleryImportOverlay {...props} />
       <GalleryMediaImportOverlay {...props} />

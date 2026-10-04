@@ -2,7 +2,7 @@
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useEditorStore } from '../../state/useEditorStore';
 import { useEditorInspectorStoreSlice } from './store';
 
@@ -51,4 +51,46 @@ describe('useEditorInspectorStoreSlice', () => {
     );
     expect('workspaceDefaults' in (getSlice() as Record<string, unknown>)).toBe(false);
   });
+});
+
+it('ignores navigation while updating document dimensions and source metadata', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const initial = useEditorStore.getState();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const render = vi.fn();
+  function Inspector() {
+    const state = useEditorInspectorStoreSlice();
+    render(state.viewport);
+    return null;
+  }
+  try {
+    act(() => root.render(<Inspector />));
+    render.mockClear();
+    act(() =>
+      useEditorStore.getState().updateViewport({ scrollLeft: 100, scrollTop: 50, zoomPercent: 140 })
+    );
+    expect(render).not.toHaveBeenCalled();
+    act(() =>
+      useEditorStore.getState().updateViewport({
+        canvasWidth: 2000,
+        canvasHeight: 1000,
+        sourceWidth: 1200,
+        sourceHeight: 800,
+        sourceName: 'changed',
+      })
+    );
+    expect(render).toHaveBeenCalledOnce();
+    expect(render.mock.calls[0]?.[0]).toEqual({
+      canvasWidth: 2000,
+      canvasHeight: 1000,
+      sourceWidth: 1200,
+      sourceHeight: 800,
+      sourceName: 'changed',
+    });
+  } finally {
+    act(() => root.unmount());
+    useEditorStore.setState(initial, true);
+    vi.unstubAllGlobals();
+  }
 });

@@ -1,6 +1,8 @@
+import type { FrozenSelectionFrame } from '../types';
 import type { ResizeDirection } from '../ui';
 
 export interface SelectionModeInteractionState {
+  frozenFrame?: FrozenSelectionFrame | null;
   aspectRatio: number | null;
   currentSelection: { x: number; y: number; width: number; height: number };
   currentState: 'idle' | 'hover' | 'drag' | 'confirmed';

@@ -1,11 +1,12 @@
 {
   "name": "@sniptale/ui",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
   "type": "module",
   "exports": {
+    "./autosave-control": "./src/autosave-control/index.tsx",
     "./annotatable-image-surface": "./src/annotatable-image-surface/index.tsx",
     "./audio-amplitude-bars": "./src/audio-amplitude-bars/index.tsx",
     "./branding": "./src/branding/index.ts",
@@ -57,6 +58,7 @@
     "./highlighter-style/types": "./src/highlighter-style/types.ts",
     "./inspector-shell": "./src/inspector-shell/index.tsx",
     "./loading-delay": "./src/loading-delay/index.tsx",
+    "./material-browser": "./src/material-browser/index.tsx",
     "./product-feedback/confirm-dialog": "./src/product-feedback/confirm-dialog/index.tsx",
     "./product-feedback/toast-service": "./src/product-feedback/toast-service/index.ts",
     "./product-feedback/toast": "./src/product-feedback/toast/index.tsx",
@@ -129,8 +131,8 @@
     "./voice-input/use-push-to-talk": "./src/voice-input/use-push-to-talk.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.4.2",
-    "@sniptale/runtime-contracts": "0.4.2",
+    "@sniptale/foundation": "0.5.0",
+    "@sniptale/runtime-contracts": "0.5.0",
     "lucide-react": "^1.33.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

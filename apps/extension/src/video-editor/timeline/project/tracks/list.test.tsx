@@ -161,6 +161,38 @@ it('never creates a version-specific rail for effect instances', () => {
   expect(container?.textContent).toContain(project.tracks[0]!.name);
 });
 
+it('shows a balanced and keyboard-visible disclosure for whole-video effects', () => {
+  const project = createEmptyVideoProject('Whole-video FX');
+  project.effectInstances = [
+    {
+      ...createEffectInstance(),
+      kind: 'targetEffect',
+      target: { kind: 'video-group' },
+    },
+  ];
+  const render = (collapsed: boolean) =>
+    renderTrackList(project, {
+      showTelemetryLane: false,
+      collapsedFxByTrackId: { 'video-group': collapsed },
+    });
+  const prefs = render(false);
+  const button = () =>
+    container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.video-fx"]')!;
+  expect(button().getAttribute('aria-expanded')).toBe('true');
+  expect(button().querySelector('.lucide-chevron-down')).not.toBeNull();
+  expect(button().parentElement?.style.height).toBe('24px');
+  expect(button().className).toContain('hover:bg-[var(--sniptale-color-surface-hover)]');
+  expect(button().className).toContain('focus-visible:outline-2');
+  button().focus();
+  act(() => button().click());
+  expect(prefs.setFxCollapsed).toHaveBeenCalledWith('video-group', true);
+  expect(document.activeElement).toBe(button());
+  render(true);
+  expect(button().getAttribute('aria-expanded')).toBe('false');
+  expect(button().querySelector('.lucide-chevron-right')).not.toBeNull();
+  expect(button().parentElement?.style.height).toBe('24px');
+});
+
 it('keeps track names and state controls readable in compact mode', () => {
   const project = createEmptyVideoProject('Compact rows');
 
@@ -225,12 +257,16 @@ function renderTrackList(
     onAddMotionRegion?: () => void;
     onSelectMotionLane?: () => void;
     motionLaneSelected?: boolean;
+    collapsedFxByTrackId?: Record<string, boolean>;
   }
 ) {
   const trackPanelPrefs = createTrackPanelPrefs({
     compactRows: options.compactRows ?? false,
     hideTrackNames: options.hideTrackNames ?? false,
   });
+  if (options.collapsedFxByTrackId) {
+    trackPanelPrefs.prefs.collapsedFxByTrackId = options.collapsedFxByTrackId;
+  }
   act(() => {
     root?.render(
       <ProjectTimelineTrackList
@@ -243,6 +279,7 @@ function renderTrackList(
         showTelemetryLane={options.showTelemetryLane}
         trackLayoutModel={buildTimelineTrackLayoutModel({
           project,
+          collapsedFxByTrackId: options.collapsedFxByTrackId,
           trackHeightByTrackId: {},
           tracks: project.tracks,
         })}
@@ -272,7 +309,7 @@ function createTrackPanelPrefs(options: { compactRows: boolean; hideTrackNames: 
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
     setHideTrackNames: vi.fn(),
-    setFxCollapsed: () => undefined,
+    setFxCollapsed: vi.fn(),
     setClipNamesHidden: vi.fn(),
     setTrackHeight: vi.fn(),
   };

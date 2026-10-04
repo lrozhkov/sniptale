@@ -8,7 +8,7 @@ import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { TourInspectorNumericRow } from './numeric-row';
 import type { Translate } from '../../../platform/i18n';
 
-/** Same surface/preset editor as callouts; composition stays bounded by tour-owned numeric controls. */
+/** Shares callout presets through direct selection; sizing remains owned by the tour. */
 export function TourHintStyle({
   value,
   onChange,
@@ -30,11 +30,14 @@ export function TourHintStyle({
         fieldLabel={t('scenario.editor.tourHintStyle')}
         onChange={(style) => onChange({ ...value, surface: { ...surface, ...style } })}
         palette={['#ffffff', '#111827', '#f97316', '#2563eb', '#16a34a', '#8b5cf6']}
-        presentation="management"
+        presentation="selection"
         presets={resources.presets.filter((preset) => preset.enabled)}
         value={{ fillPaint: surface.fillPaint, surfaceCss: surface.surfaceCss }}
       />
       <ColorField
+        triggerVariant="swatch"
+        floatingPlacement="side"
+        layout="stacked"
         label={t('scenario.editor.tourTextColor')}
         title={t('scenario.editor.tourTextColor')}
         value={surface.textColor}
@@ -48,7 +51,6 @@ export function TourHintStyle({
         [
           { key: 'width', label: t('scenario.editor.tourHintWidth'), min: 200, max: 640 },
           { key: 'padding', label: t('scenario.editor.tourHintPadding'), min: 8, max: 24 },
-          { key: 'radius', label: t('scenario.editor.tourHintRadius'), min: 0, max: 32 },
         ] as const
       ).map(({ key, ...props }) => (
         <TourInspectorNumericRow

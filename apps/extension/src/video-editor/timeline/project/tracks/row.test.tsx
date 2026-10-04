@@ -190,9 +190,12 @@ it('keeps FX disclosure below the unchanged track header and omits it without ef
   expect(button()).toBeNull();
   render(1, false);
   expect(button()?.closest('[data-selected]')).toBeNull();
-  expect(button()?.className).toContain('!h-full');
+  expect(button()?.className).toContain('!h-5');
+  expect(button()?.className).toContain('hover:!bg-[var(--sniptale-color-surface-hover)]');
+  expect(button()?.className).toContain('focus-visible:!outline-2');
   expect(container!.querySelector('[data-selected]')?.className).not.toContain('!gap-1');
   expect(button()?.getAttribute('aria-expanded')).toBe('true');
+  expect(button()?.querySelector('.lucide-chevron-down')).not.toBeNull();
   expect(button()?.textContent).not.toContain('FX ·');
   expect(button()?.hasAttribute('aria-pressed')).toBe(false);
   expect(button()?.getAttribute('data-active')).not.toBe('true');
@@ -203,6 +206,7 @@ it('keeps FX disclosure below the unchanged track header and omits it without ef
   expect(document.activeElement).toBe(button());
   render(1, true);
   expect(button()?.getAttribute('aria-expanded')).toBe('false');
+  expect(button()?.querySelector('.lucide-chevron-right')).not.toBeNull();
   expect(document.activeElement).toBe(button());
   render(0, true);
   expect(button()).toBeNull();

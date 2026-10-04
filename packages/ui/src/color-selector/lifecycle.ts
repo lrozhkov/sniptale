@@ -49,24 +49,29 @@ function useOutsideDismiss(args: {
 }
 
 function useEscapeDismiss(args: {
+  rootRef: RefObject<HTMLDivElement | null>;
   expanded: boolean;
   onPickerOutsideDismiss: () => void;
   pickerOpen: boolean;
   setExpanded: Dispatch<SetStateAction<boolean>>;
 }) {
-  const { expanded, onPickerOutsideDismiss, pickerOpen, setExpanded } = args;
+  const { expanded, onPickerOutsideDismiss, pickerOpen, rootRef, setExpanded } = args;
 
   useEffect(() => {
     if (!expanded && !pickerOpen) {
       return;
     }
 
+    const trigger = pickerOpen
+      ? rootRef.current?.querySelector<HTMLButtonElement>('button')
+      : rootRef.current?.querySelector<HTMLButtonElement>('button[aria-expanded]');
     const handleDocumentKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopImmediatePropagation();
         if (pickerOpen) onPickerOutsideDismiss();
         else setExpanded(false);
+        trigger?.focus({ preventScroll: true });
       }
     };
 
@@ -74,7 +79,7 @@ function useEscapeDismiss(args: {
     return () => {
       document.removeEventListener('keydown', handleDocumentKeyDown, true);
     };
-  }, [expanded, onPickerOutsideDismiss, pickerOpen, setExpanded]);
+  }, [expanded, onPickerOutsideDismiss, pickerOpen, rootRef, setExpanded]);
 }
 
 export function useColorSelectorLifecycle(args: {
@@ -93,6 +98,7 @@ export function useColorSelectorLifecycle(args: {
     expanded,
     eyedropperActiveRef,
     layerRef,
+    onPickerOutsideDismiss,
     pickerOpen,
     rootRef,
     setDraftColor,
@@ -103,17 +109,37 @@ export function useColorSelectorLifecycle(args: {
     eyedropperActiveRef,
     expanded,
     layerRef,
-    onPickerOutsideDismiss: args.onPickerOutsideDismiss,
+    onPickerOutsideDismiss,
     pickerOpen,
     rootRef,
     setExpanded,
   });
   useEscapeDismiss({
+    rootRef,
     expanded,
-    onPickerOutsideDismiss: args.onPickerOutsideDismiss,
+    onPickerOutsideDismiss,
     pickerOpen,
     setExpanded,
   });
+
+  useEffect(() => {
+    const anchor = rootRef.current;
+    if ((!expanded && !pickerOpen) || !anchor || typeof IntersectionObserver === 'undefined')
+      return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (
+        !entry ||
+        entry.isIntersecting ||
+        eyedropperActiveRef.current ||
+        isEyedropperSessionActive()
+      )
+        return;
+      if (pickerOpen) onPickerOutsideDismiss();
+      else setExpanded(false);
+    });
+    observer.observe(anchor);
+    return () => observer.disconnect();
+  }, [expanded, pickerOpen, rootRef, eyedropperActiveRef, onPickerOutsideDismiss, setExpanded]);
 
   const previousCommittedColorRef = useRef(committedColor);
 

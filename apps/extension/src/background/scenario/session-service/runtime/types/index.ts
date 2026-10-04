@@ -48,7 +48,7 @@ export type ScenarioSessionServiceRuntime = ScenarioSessionServiceCore & {
   syncProjectRevision(tabId: number, options?: { hasActiveProject?: boolean }): number;
   updateSurfaceState(
     tabId: number,
-    surfaceState: ScenarioRecorderSurfaceState
+    surfaceState: Partial<ScenarioRecorderSurfaceState>
   ): Promise<ScenarioRecorderSurfaceState>;
   bumpProjectRevision(tabId: number): Promise<number>;
 };

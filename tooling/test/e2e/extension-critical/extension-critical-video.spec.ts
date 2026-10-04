@@ -1,8 +1,23 @@
+import { recordedAudioResources } from '../support/quick-editor-media-fixture';
+import { createHash } from 'node:crypto';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { test } from '../support/extension-fixture';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+} from '../../../../apps/extension/src/features/video/project/factories/creation';
+import {
+  createAudioClipFromAsset,
+  createVideoClipFromAsset,
+} from '../../../../apps/extension/src/features/video/project/factories/clip';
+import {
+  VideoProjectAssetType,
+  VideoTrackKind,
+} from '../../../../apps/extension/src/features/video/project/types';
 import {
   applyHarnessBootstrap,
   countRuntimeMessagesByType,
@@ -49,6 +64,220 @@ async function openVideoEditorHarness(page: Page, hostOrigin: string) {
   });
   await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}`, {
     waitUntil: 'domcontentloaded',
+  });
+}
+
+test('timeline clip hover remains attached while crossing artwork and trim handles at HD', async ({
+  page,
+  hostOrigin,
+}) => {
+  const project = createEmptyVideoProject('Hover');
+  project.duration = 10;
+  const audioTrack = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
+  project.tracks.push(audioTrack);
+  const videoAsset = createVideoProjectAsset(
+    'Video',
+    VideoProjectAssetType.VIDEO,
+    { kind: 'project-asset', projectAssetId: 'hover-video' },
+    {
+      width: 1280,
+      height: 720,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  const audioAsset = createVideoProjectAsset(
+    'Audio',
+    VideoProjectAssetType.AUDIO,
+    { kind: 'project-asset', projectAssetId: 'hover-audio' },
+    {
+      width: 0,
+      height: 0,
+      duration: 4,
+      mimeType: 'audio/webm',
+      size: 1,
+      hasAudio: true,
+      audioPeaks: null,
+    }
+  );
+  project.assets.push(videoAsset, audioAsset);
+  const videoClip = createVideoClipFromAsset(
+    project.tracks[0]!.id,
+    videoAsset,
+    project.width,
+    project.height
+  );
+  const audioClip = createAudioClipFromAsset(audioTrack.id, audioAsset);
+  project.clips.push(videoClip, audioClip);
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: { runtimeFallback: 'typed-success' },
+    videoProjects: [project],
+  });
+  await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`);
+  for (const clip of [videoClip, audioClip]) {
+    const locator = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
+    await expect(locator).toBeVisible();
+    const bounds = await locator.boundingBox();
+    if (!bounds) throw new Error('Missing clip geometry');
+    await page.mouse.move(bounds.x - 12, bounds.y + bounds.height / 2);
+    await page.evaluate((clipId) => {
+      const element = document.querySelector(`[data-project-timeline-clip="${clipId}"]`);
+      if (!element) throw new Error('Missing clip');
+      const trace: string[] = [];
+      element.addEventListener('pointerenter', () => trace.push('enter'));
+      element.addEventListener('pointerleave', () => trace.push('leave'));
+      new MutationObserver(() => {
+        trace.push(
+          element.classList.contains('video-editor-timeline-item-hovered') ? 'highlight' : 'clear'
+        );
+      }).observe(element, { attributes: true, attributeFilter: ['class'] });
+      (window as Window & { __clipHoverTrace?: string[] }).__clipHoverTrace = trace;
+    }, clip.id);
+    for (const fraction of [0.02, 0.25, 0.5, 0.75, 0.98]) {
+      await page.mouse.move(bounds.x + bounds.width * fraction, bounds.y + bounds.height / 2, {
+        steps: 5,
+      });
+      await expect(locator).toHaveClass(/video-editor-timeline-item-hovered/);
+    }
+    const trace = await page.evaluate(
+      () => (window as Window & { __clipHoverTrace?: string[] }).__clipHoverTrace
+    );
+    expect(trace).toEqual(['enter', 'highlight']);
+    expect(
+      await locator.evaluate((element) => getComputedStyle(element, '::after').transitionDuration)
+    ).toBe('0s');
+  }
+  const zoom = page.locator('[data-ui="video-editor.timeline.toolbar"] input[type="range"]');
+  await zoom.focus();
+  await zoom.press('Home');
+  for (const clip of [videoClip, audioClip]) {
+    const locator = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
+    const bounds = await locator.boundingBox();
+    if (!bounds) throw new Error('Missing compact clip geometry');
+    await page.mouse.move(bounds.x - 8, bounds.y + bounds.height / 2);
+    for (const fraction of [0.1, 0.5, 0.9]) {
+      await page.mouse.move(bounds.x + bounds.width * fraction, bounds.y + bounds.height / 2);
+      await expect(locator).toHaveClass(/video-editor-timeline-item-hovered/);
+    }
+  }
+});
+
+for (const locale of ['ru', 'en'] as const) {
+  test(`left library panel controls stay separate at minimum HD width in ${locale}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const project = createEmptyVideoProject('Narrow panel');
+    project.duration = 10;
+    const track = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
+    project.tracks.push(track);
+    const videoAsset = createVideoProjectAsset(
+      'Video',
+      VideoProjectAssetType.VIDEO,
+      { kind: 'project-asset', projectAssetId: 'panel-video' },
+      {
+        width: 1280,
+        height: 720,
+        duration: 4,
+        mimeType: 'video/webm',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    const asset = createVideoProjectAsset(
+      'Audio',
+      VideoProjectAssetType.AUDIO,
+      { kind: 'project-asset', projectAssetId: 'panel-audio' },
+      {
+        width: 0,
+        height: 0,
+        duration: 4,
+        mimeType: 'audio/webm',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    project.assets.push(videoAsset, asset);
+    project.clips.push(
+      createVideoClipFromAsset(project.tracks[0]!.id, videoAsset, project.width, project.height)
+    );
+    project.clips.push(createAudioClipFromAsset(track.id, asset));
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [project],
+      storage: {
+        'sniptale-locale-preference': locale,
+        'sniptale-theme-preference': 'light',
+      },
+    });
+    await page.addInitScript((value) => {
+      localStorage.setItem('sniptale-locale-preference', value);
+    }, locale);
+    await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`);
+    await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(2);
+    const panel = page.locator('[data-ui="video-editor.library.panel"]');
+    if (!(await panel.isVisible())) {
+      await page.locator('[data-ui="video-editor.viewer.open-materials"]').click();
+    }
+    await expect(panel).toBeVisible();
+    const resize = page.locator('[data-ui="video-editor.materials.resize"]');
+    await resize.focus();
+    for (let index = 0; index < 10; index += 1) await resize.press('ArrowLeft');
+    await expect(resize).toHaveAttribute('aria-valuenow', '240');
+    const actions = ['materials', 'annotations', 'effects', 'transitions'].map(
+      (section) => `[data-ui="video-editor.library-tab.${section}"]`
+    );
+    actions.push('[data-ui="video-editor.materials.dock-toggle"]');
+    actions.push('[data-ui="video-editor.materials.close"]');
+    const bounds = await Promise.all(
+      actions.map((selector) => panel.locator(selector).boundingBox())
+    );
+    const panelBounds = await panel.boundingBox();
+    expect(panelBounds).not.toBeNull();
+    for (let index = 0; index < bounds.length; index += 1) {
+      const current = bounds[index];
+      if (!current || !panelBounds) throw new Error('Missing left panel control geometry');
+      expect(current.x).toBeGreaterThanOrEqual(panelBounds.x);
+      expect(current.x + current.width).toBeLessThanOrEqual(panelBounds.x + panelBounds.width);
+      if (index > 0) {
+        const previous = bounds[index - 1]!;
+        expect(current.x).toBeGreaterThanOrEqual(previous.x + previous.width);
+      }
+    }
+    const dock = panel.locator('[data-ui="video-editor.materials.dock-toggle"]');
+    await dock.click();
+    await expect(dock).toHaveAttribute('aria-pressed', 'true');
+    await page.reload();
+    await expect(page.locator('[data-ui="video-editor.materials.resize"]')).toHaveAttribute(
+      'aria-valuenow',
+      '240'
+    );
+    await page.evaluate(() => {
+      document.body.style.zoom = '1.25';
+    });
+    const scaledBounds = await Promise.all(
+      actions.map((selector) => panel.locator(selector).boundingBox())
+    );
+    for (let index = 1; index < scaledBounds.length; index += 1) {
+      const previous = scaledBounds[index - 1];
+      const current = scaledBounds[index];
+      if (!previous || !current) throw new Error('Missing zoomed panel control geometry');
+      expect(current.x).toBeGreaterThanOrEqual(previous.x + previous.width);
+    }
+    await panel.locator('[data-ui="video-editor.materials.close"]').click();
+    await expect(panel).toHaveCount(0);
+    await page.locator('[data-ui="video-editor.viewer.open-materials"]').click();
+    await expect(page.locator('[data-ui="video-editor.materials.resize"]')).toHaveAttribute(
+      'aria-valuenow',
+      '240'
+    );
   });
 }
 
@@ -484,4 +713,264 @@ async function expectProductionProjectInLibrary(page: Page) {
       )
     )
     .toBe('library');
+}
+
+for (const variant of [
+  { locale: 'ru' as const, theme: 'light' as const },
+  { locale: 'en' as const, theme: 'dark' as const },
+]) {
+  test(`full editor voiceover playback choice at HD in ${variant.locale}/${variant.theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const project = createEmptyVideoProject('Voiceover');
+    project.duration = 12;
+    const track = createVideoProjectTrack('Voice', 2, VideoTrackKind.AUDIO);
+    project.tracks.push(track);
+    const asset = createVideoProjectAsset(
+      'Guide',
+      VideoProjectAssetType.AUDIO,
+      { kind: 'project-asset', projectAssetId: 'guide-audio' },
+      {
+        width: 0,
+        height: 0,
+        duration: 2,
+        mimeType: 'audio/webm',
+        size: 1,
+        hasAudio: true,
+        audioPeaks: null,
+      }
+    );
+    project.assets.push(asset);
+    project.clips.push(createAudioClipFromAsset(track.id, asset, 0));
+    project.clips.push(createAudioClipFromAsset(track.id, asset, 6));
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.addInitScript(
+      ({ bootstrap, seedKey }) => {
+        const seeded = sessionStorage.getItem(seedKey) === 'true';
+        window.__sniptaleHarnessBootstrap = {
+          ...bootstrap,
+          videoProjects: seeded ? [] : bootstrap.videoProjects,
+        };
+        sessionStorage.setItem(seedKey, 'true');
+      },
+      {
+        seedKey: `voiceover-seed-${project.id}`,
+        bootstrap: {
+          preserveMediaLibrary: true,
+          apiBehavior: { runtimeFallback: 'typed-success' as const },
+          videoProjects: [project],
+          storage: {
+            'sniptale-locale-preference': variant.locale,
+            'sniptale-theme-preference': variant.theme,
+          },
+        },
+      }
+    );
+    await page.emulateMedia({ colorScheme: variant.theme });
+    await page.addInitScript(({ locale, theme }) => {
+      localStorage.setItem('sniptale-locale-preference', locale);
+      localStorage.setItem('sniptale-theme-preference', theme);
+    }, variant);
+    await page.goto(
+      `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${variant.theme}`
+    );
+    await page.locator('[data-ui="video-editor.timeline.record-range"]').first().click();
+    const strip = page.locator('[data-ui="video-editor.audio-recording.strip"]');
+    await expect(strip).toBeVisible();
+    const playVideo = strip.getByRole('switch', {
+      name: translate('videoEditor.app.recordAudioPlayVideo', variant.locale),
+    });
+    await expect(playVideo).toBeChecked();
+    await playVideo.uncheck();
+    await expect(playVideo).not.toBeChecked();
+    const numericLimit = strip.getByRole('spinbutton', {
+      name: translate('gallery.videoReview.voiceoverDurationLimit', variant.locale),
+    });
+    await expect(numericLimit).toBeVisible();
+
+    expect(Number(await numericLimit.inputValue())).toBeGreaterThan(0);
+    expect((await numericLimit.inputValue()).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(3);
+    const exactMaximum = await numericLimit.getAttribute('max');
+    await numericLimit.focus();
+    await numericLimit.blur();
+    await expect(numericLimit).toHaveAttribute('max', exactMaximum!);
+    const microphone = strip.getByRole('button', {
+      name: translate('videoEditor.app.recordAudioDevice', variant.locale),
+      exact: true,
+    });
+    await expect(microphone).toBeVisible();
+    const setup = strip.locator('[data-ui="audio-recording.setup"]');
+    const microphoneBox = (await microphone.boundingBox())!;
+    const setupBox = (await setup.boundingBox())!;
+    expect(microphoneBox.width).toBeGreaterThan(setupBox.width * 0.95);
+    expect((await numericLimit.boundingBox())!.y).toBeGreaterThan(
+      microphoneBox.y + microphoneBox.height
+    );
+    await microphone.click();
+    await expect(page.getByRole('listbox')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await expect(strip).toBeVisible();
+    await expect(microphone).toBeFocused();
+
+    const startCapture = strip.getByRole('button', {
+      name: translate('videoEditor.app.recordAudioStart', variant.locale),
+      exact: true,
+    });
+    await numericLimit.fill('');
+    await expect(startCapture).toBeDisabled();
+    await expect(strip.getByRole('alert')).toBeVisible();
+    await numericLimit.fill('999999');
+    await expect(startCapture).toBeDisabled();
+    await numericLimit.fill('1');
+    await expect(startCapture).toBeEnabled();
+    await expect(numericLimit).toBeInViewport();
+    await expect(startCapture).toBeInViewport();
+    await page.screenshot({
+      path: testInfo.outputPath(`full-voiceover-ready-${variant.locale}-${variant.theme}.png`),
+    });
+
+    for (const failure of ['NotAllowedError', 'NotFoundError']) {
+      await page.evaluate((name) => {
+        Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
+          configurable: true,
+          value: async () => [],
+        });
+        navigator.mediaDevices.dispatchEvent(new Event('devicechange'));
+        Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+          configurable: true,
+          value: async () => {
+            throw new DOMException('Test microphone failure', name);
+          },
+        });
+      }, failure);
+      await startCapture.click();
+      await expect(strip.getByRole('alert')).toBeVisible();
+      await expect(startCapture).toBeEnabled();
+      await expect(numericLimit).toBeEnabled();
+      await expect(microphone).toBeEnabled();
+    }
+
+    await numericLimit.fill('3');
+    await page.evaluate(() => {
+      const audio = new AudioContext();
+      const oscillator = audio.createOscillator();
+      const destination = audio.createMediaStreamDestination();
+      oscillator.connect(destination);
+      oscillator.start();
+      Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+        configurable: true,
+        value: async () => destination.stream,
+      });
+    });
+    await startCapture.click();
+    await expect(
+      strip.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioPause', variant.locale),
+        exact: true,
+      })
+    ).toBeVisible();
+    await expect(strip.locator('[data-ui="video-editor.audio-recording.limit"]')).toContainText(
+      '00:02'
+    );
+    await expect
+      .poll(async () => Number(await strip.getByRole('meter').getAttribute('aria-valuenow')))
+      .toBeGreaterThan(5);
+    const closeRecorder = strip.getByRole('button', {
+      name: translate('common.actions.close', variant.locale),
+      exact: true,
+    });
+    await closeRecorder.click();
+    const confirmation = page.getByRole('alertdialog');
+    await expect(confirmation).toBeVisible();
+    await expect(
+      confirmation.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioKeep', variant.locale),
+        exact: true,
+      })
+    ).toBeFocused();
+    await page.screenshot({
+      path: testInfo.outputPath(`full-voiceover-discard-${variant.locale}-${variant.theme}.png`),
+    });
+    await page.keyboard.press('Space');
+    await expect(confirmation).toHaveCount(0);
+    await expect(closeRecorder).toBeFocused();
+    await expect(
+      strip.getByRole('button', {
+        name: translate('videoEditor.app.recordAudioResume', variant.locale),
+        exact: true,
+      })
+    ).toBeVisible();
+    await closeRecorder.click();
+    await page.keyboard.press('Escape');
+    await expect(confirmation).toHaveCount(0);
+    await strip
+      .getByRole('button', {
+        name: translate('videoEditor.app.recordAudioStop', variant.locale),
+        exact: true,
+      })
+      .click();
+    const insert = strip.getByRole('button', {
+      name: translate('videoEditor.app.recordAudioInsert', variant.locale),
+      exact: true,
+    });
+    await expect(insert).toBeVisible();
+    await expect(closeRecorder).toBeVisible();
+    await expect(strip.locator('header')).toContainText('00:02');
+    expect(await strip.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true
+    );
+    await expect(insert).toBeInViewport();
+    expect((await insert.boundingBox())!.y).toBeGreaterThan(
+      (await strip.locator('[data-ui="video-editor.audio-recording.playback"]').boundingBox())!.y
+    );
+    await page.screenshot({
+      path: testInfo.outputPath(`full-voiceover-take-${variant.locale}.png`),
+    });
+    const original = await strip.locator('audio').evaluate(async (audio) => {
+      const bytes = await (await fetch(audio.src)).arrayBuffer();
+      const context = new AudioContext();
+      try {
+        const decoded = await context.decodeAudioData(bytes.slice(0));
+        return {
+          hash: Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
+            .map((value) => value.toString(16).padStart(2, '0'))
+            .join(''),
+          duration: decoded.duration,
+        };
+      } finally {
+        await context.close();
+      }
+    });
+    const originalDownload = page.waitForEvent('download');
+    await strip
+      .getByRole('button', {
+        name: translate('videoEditor.app.recordAudioDownloadOriginal', variant.locale),
+        exact: true,
+      })
+      .click();
+    const originalFile = await originalDownload;
+    expect(
+      createHash('sha256')
+        .update(await readFile(await originalFile.path()))
+        .digest('hex')
+    ).toBe(original.hash);
+    expect(original.duration).toBeGreaterThan(0);
+    const previousAudio = await recordedAudioResources(page);
+    await insert.focus();
+    await page.keyboard.press('Enter');
+    await expect(strip).toHaveCount(0);
+    await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
+    await page.reload();
+    await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
+    const retained = await recordedAudioResources(
+      page,
+      previousAudio.map((item) => item.key)
+    );
+    expect(retained).toHaveLength(1);
+    expect(retained[0]!.duration).toBeGreaterThan(0);
+    expect(retained[0]!.samples).toBeGreaterThan(0);
+    expect(retained[0]!.peak).toBeGreaterThan(0.01);
+  });
 }

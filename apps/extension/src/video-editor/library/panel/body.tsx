@@ -6,10 +6,10 @@ import type { VideoEditorLibraryPanelBodyProps } from '../contracts/panel';
 
 export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyProps) {
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<'all' | 'video' | 'image'>('video');
+  const [category, setCategory] = useState<'all' | 'video' | 'image' | 'audio'>('video');
   const [presetId, setPresetId] = useState<string | null>(null);
   const savedViews = props.savedViews.filter((view) =>
-    ['all', 'recording', 'screenshot'].includes(view.folderFilter)
+    ['all', 'recording', 'screenshot', 'audio'].includes(view.folderFilter)
   );
   const preset = savedViews.find((view) => view.id === presetId);
   const normalizedQuery = useDeferredValue(query).trim().toLocaleLowerCase();
@@ -21,8 +21,15 @@ export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyPr
         const isVideo =
           ['recording', 'video', 'export'].includes(item.kind) &&
           item.mimeType.startsWith('video/');
+        const isAudio = item.kind === 'audio' && item.mimeType.startsWith('audio/');
         const eligible =
-          category === 'all' ? isImage || isVideo : category === 'image' ? isImage : isVideo;
+          category === 'all'
+            ? isImage || isVideo || isAudio
+            : category === 'image'
+              ? isImage
+              : category === 'audio'
+                ? isAudio
+                : isVideo;
         return (
           eligible &&
           item.filename.toLocaleLowerCase().includes(normalizedQuery) &&
@@ -33,16 +40,18 @@ export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyPr
   );
   const thumbnailItems = useMemo(
     () =>
-      items.map((item) => ({
-        createdAt: item.createdAt,
-        id: item.id,
-        mimeType: item.mimeType,
-        sourceMediaId: item.id,
-        thumbnailId: item.id,
-        ...(item.workspaceRevision === undefined
-          ? {}
-          : { workspaceRevision: item.workspaceRevision }),
-      })),
+      items
+        .filter((item) => item.kind !== 'audio')
+        .map((item) => ({
+          createdAt: item.createdAt,
+          id: item.id,
+          mimeType: item.mimeType,
+          sourceMediaId: item.id,
+          thumbnailId: item.id,
+          ...(item.workspaceRevision === undefined
+            ? {}
+            : { workspaceRevision: item.workspaceRevision }),
+        })),
     [items]
   );
   const thumbnails = useLibraryThumbnails(thumbnailItems);

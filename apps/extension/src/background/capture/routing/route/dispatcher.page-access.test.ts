@@ -122,6 +122,7 @@ it('resolves encoding policy without page access before the popup opens the desk
     captureMode: 'desktop',
     imageFormat: 'webp',
     imageQuality: 72,
+    delaySeconds: 3,
   });
 
   expect(
@@ -137,6 +138,7 @@ it('resolves encoding policy without page access before the popup opens the desk
     result: 'ready',
     imageFormat: 'webp',
     imageQuality: 72,
+    delaySeconds: 3,
     requestId: 'request-1',
     reservationToken: 'reservation-1',
   });

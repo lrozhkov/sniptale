@@ -11,6 +11,8 @@ export interface ProductConfirmDialogProps {
   title: ReactNode;
   message: ReactNode;
   confirmText: ReactNode;
+  /** Prevents confirmation while keeping cancellation available. */
+  confirmDisabled?: boolean;
   cancelText: ReactNode;
   onConfirm?: () => void | Promise<void>;
   onCancel?: () => void;
@@ -31,6 +33,7 @@ function getProductConfirmDialogClassName(dialogClassName: string) {
 function renderConfirmDialogActions(props: {
   cancelText: ReactNode;
   confirmText: ReactNode;
+  confirmDisabled?: boolean;
   isLoading: boolean;
   onCancel?: () => void;
   onConfirm?: () => void;
@@ -49,7 +52,7 @@ function renderConfirmDialogActions(props: {
         tone="danger"
         compact
         onClick={props.onConfirm}
-        disabled={props.isLoading}
+        disabled={props.isLoading || props.confirmDisabled}
       >
         {props.confirmText}
       </ProductActionButton>
@@ -93,6 +96,7 @@ async function runConfirmDialogAction(props: {
 }
 
 function useConfirmDialogHandlers(props: {
+  confirmDisabled: boolean;
   isLoading?: boolean;
   isOpen: boolean;
   onCancel?: () => void;
@@ -118,7 +122,7 @@ function useConfirmDialogHandlers(props: {
   };
 
   const handleConfirm = async () => {
-    if (!props.onConfirm || resolvedIsLoading) {
+    if (!props.onConfirm || resolvedIsLoading || props.confirmDisabled) {
       return;
     }
 
@@ -135,6 +139,7 @@ function useConfirmDialogHandlers(props: {
 function renderProductConfirmDialogModal(props: {
   cancelText: ReactNode;
   confirmText: ReactNode;
+  confirmDisabled?: boolean;
   dialogClassName: string;
   backdropClassName?: string;
   handleCancel: () => void;
@@ -172,6 +177,7 @@ function renderProductConfirmDialogModal(props: {
       {renderConfirmDialogActions({
         cancelText: props.cancelText,
         confirmText: props.confirmText,
+        confirmDisabled: props.confirmDisabled ?? false,
         isLoading: props.isLoading,
         onCancel: props.handleCancel,
         onConfirm: () => {
@@ -230,6 +236,7 @@ export function ProductConfirmDialog({
   title,
   message,
   confirmText,
+  confirmDisabled = false,
   cancelText,
   onConfirm,
   onCancel,
@@ -242,6 +249,7 @@ export function ProductConfirmDialog({
   const resolvedDialogClassName = getProductConfirmDialogClassName(dialogClassName);
   const { handleCancel, handleConfirm, resolvedIsLoading } = useConfirmDialogHandlers({
     isOpen,
+    confirmDisabled,
     ...(isLoading === undefined ? {} : { isLoading }),
     ...(onCancel === undefined ? {} : { onCancel }),
     ...(onConfirm === undefined ? {} : { onConfirm }),
@@ -259,6 +267,7 @@ export function ProductConfirmDialog({
       {renderProductConfirmDialogModal({
         cancelText,
         confirmText,
+        confirmDisabled,
         dialogClassName: resolvedDialogClassName,
         handleCancel,
         handleConfirm,

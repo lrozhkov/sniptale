@@ -1,3 +1,4 @@
+import { createTourNarrationControls } from './transport.js';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { TOUR_NAVIGATION_LAYOUT } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { measureHintPages } from './hints.js';
@@ -14,6 +15,7 @@ export function renderTourNavigationScene({
   actionButton,
   authoring,
   page,
+  selectedObjectId,
   onPage,
 }) {
   const { panel, content, layout, padding, gap, available, textPages, text } = prepareComposition({
@@ -36,7 +38,12 @@ export function renderTourNavigationScene({
   );
   const pageSize = Math.min(12, rowCount * columns);
   const count = Math.max(textPages.length, Math.ceil(slide.buttons.length / pageSize));
-  const current = Math.min(page, Math.max(0, count - 1));
+  const selectedIndex = slide.buttons.findIndex((button) => button.id === selectedObjectId);
+  const current =
+    selectedIndex >= 0
+      ? Math.floor(selectedIndex / pageSize)
+      : Math.min(page, Math.max(0, count - 1));
+  if (text) text.textContent = textPages[Math.min(current, textPages.length - 1)];
   const buttons = element('div', 'tour-navigation-buttons');
   // Column choice changes count and block width, never the width of one button.
   const referenceColumnWidth = Math.max(0, (contentWidth - gap * 2) / 3);
@@ -51,14 +58,12 @@ export function renderTourNavigationScene({
   for (const button of slide.buttons.slice(buttonPage * pageSize, (buttonPage + 1) * pageSize)) {
     const node = actionButton(button.label, button.action, 'tour-button', button.id);
     node.style.height = `${rowHeight}px`;
-    if (!authoring && button.narration?.trigger === 'activation') {
+    if (!authoring && button.narration) {
       const group = element('div', 'tour-navigation-audio');
       group.style.display = 'flex';
       group.style.gap = '4px';
       node.style.flex = '1';
-      const voice = element('button', 'tour-button', labels.play);
-      voice.type = 'button';
-      voice.dataset.tourNarration = button.id;
+      const voice = createTourNarrationControls(root.ownerDocument, labels, button.id);
       group.append(node, voice);
       buttons.append(group);
     } else buttons.append(node);
@@ -75,7 +80,7 @@ export function renderTourNavigationScene({
     pager.append(previous, element('span', '', `${current + 1} / ${count}`), next);
     content.append(pager);
   }
-  return { panel, hints: [] };
+  return { panel, hints: [], page: current };
 }
 
 /** Scene sizing and visible text are measured before allocating the button page. */
@@ -94,7 +99,8 @@ function prepareComposition({ root, slide, stageWidth, stageHeight, media, eleme
   panel.style.alignItems = { start: 'flex-start', center: 'center', end: 'flex-end' }[layout.align];
   if (slide.background.image) {
     const image = element('img', 'tour-navigation-image');
-    image.src = media.get(slide.background.image.assetId);
+    const source = media.get(slide.background.image.assetId);
+    if (source) image.src = source;
     image.alt = slide.background.image.alt;
     panel.append(image);
   }

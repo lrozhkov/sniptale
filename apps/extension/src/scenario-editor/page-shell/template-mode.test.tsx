@@ -67,7 +67,6 @@ it('shows the template context and keeps block editing without step insertion, r
           onUploadImage={async () => false}
           framedImageId={null}
           onFrameImage={vi.fn()}
-          onSelect={vi.fn()}
           onSelectBlock={vi.fn()}
           t={t}
         />

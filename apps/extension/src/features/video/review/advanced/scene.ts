@@ -1,3 +1,4 @@
+import { fitQuickEditZoomTransitions } from './zoom';
 import { fitVideoRect } from '../geometry';
 import type {
   QuickEditBackgroundSettings,
@@ -145,24 +146,6 @@ function cameraProgress(
   return easing((timelineTime - region.start) / transition.duration, transition.type);
 }
 
-/**
- * Over-long enter/exit pairs normalize proportionally into the region so the
- * camera always reaches its target; only evaluation changes, never the stored
- * region. Returns the effective transition durations for this region length.
- */
-function normalizeQuickEditZoomTransitions(region: QuickEditZoomRegion): {
-  enter: number;
-  exit: number;
-} {
-  const enter = region.enter.type === 'none' ? 0 : region.enter.duration;
-  const exit = region.exit.type === 'none' ? 0 : region.exit.duration;
-  const sum = enter + exit;
-  const available = Math.max(0, region.end - region.start);
-  if (sum <= available || sum <= 0) return { enter, exit };
-  const factor = available / sum;
-  return { enter: enter * factor, exit: exit * factor };
-}
-
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
 /** Translation in units of the unscaled video; clamping prevents empty camera edges. */
@@ -225,12 +208,7 @@ export function sampleQuickEditFocusAtTime(
       return { from: region, to: next, progress, phase: 'link' };
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
-    const normalized = normalizeQuickEditZoomTransitions(region);
-    const scaled: QuickEditZoomRegion = {
-      ...region,
-      enter: { ...region.enter, duration: normalized.enter },
-      exit: { ...region.exit, duration: normalized.exit },
-    };
+    const scaled = fitQuickEditZoomTransitions(region, region.end - region.start);
     const entering = linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter');
     const exiting = linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit');
     return {
@@ -255,4 +233,36 @@ export function evaluateQuickEditCameraAtTime(
     sample.to.transform,
     sample.progress
   );
+}
+
+/** Shared camera bounds: following backgrounds and rounded video edges move together. */
+export function computeQuickEditSceneCamera(
+  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect },
+  background: QuickEditBackgroundSettings
+) {
+  const follows = background.enabled && background.zoomBehavior === 'follow-video';
+  const scale = follows ? layout.videoTransform.width / layout.videoRect.width : 1;
+  return {
+    scale,
+    x: follows ? layout.videoTransform.x - scale * layout.videoRect.x : 0,
+    y: follows ? layout.videoTransform.y - scale * layout.videoRect.y : 0,
+    videoClip: follows ? layout.videoTransform : layout.videoRect,
+  };
+}
+
+/** Visible video crop in normalized source coordinates, shared by Area paint and hit-testing. */
+export function computeQuickEditVisibleSourceRect(
+  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect },
+  background: QuickEditBackgroundSettings,
+  output: { width: number; height: number }
+): QuickEditRect {
+  const clip = computeQuickEditSceneCamera(layout, background).videoClip;
+  const left = Math.max(0, clip.x);
+  const top = Math.max(0, clip.y);
+  return {
+    x: (left - layout.videoTransform.x) / layout.videoTransform.width,
+    y: (top - layout.videoTransform.y) / layout.videoTransform.height,
+    width: (Math.min(output.width, clip.x + clip.width) - left) / layout.videoTransform.width,
+    height: (Math.min(output.height, clip.y + clip.height) - top) / layout.videoTransform.height,
+  };
 }

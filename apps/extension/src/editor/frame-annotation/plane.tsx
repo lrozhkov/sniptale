@@ -11,6 +11,8 @@ import type { EditorFrameAnnotationPlaneController } from './types';
 import { FrameProjection } from './projection';
 import type { ProjectionSettingsMenu } from './projection-settings';
 import { useEditorFrameCoordinateSpace, useProjectionRect } from './projection-space';
+import { EditorCropOverlay } from './crop-overlay';
+import { getEditorDocumentClientRect } from '../document/canvas-surface/editing-surface';
 
 type FrameSettingsSession = {
   anchor: HTMLButtonElement;
@@ -31,6 +33,30 @@ function useLockedSettingsSessionCleanup(args: {
   }, [projected, session, setSession]);
 }
 
+function FrameEffectSurfaces(props: {
+  documentSize: { width: number; height: number };
+  projection: ReturnType<typeof useFrameAnnotationInteraction>['projection'];
+}) {
+  const { documentSize, projection } = props;
+  return (
+    <>
+      {projection.distortionScale > 0 ? (
+        <FrameAnnotationDistortionFilter scale={projection.distortionScale} />
+      ) : null}
+      {projection.focusFrames.length > 0 ? (
+        <FrameAnnotationFocusSurface
+          blurAmount={projection.focusBlurAmount}
+          edgeOverscan={1 / Math.max(0.01, projection.scale)}
+          frames={projection.focusFrames}
+          height={documentSize.height}
+          opacity={projection.focusOpacity}
+          width={documentSize.width}
+        />
+      ) : null}
+    </>
+  );
+}
+
 export function EditorFrameAnnotationPlane(props: {
   activeTool: EditorTool;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -45,8 +71,13 @@ export function EditorFrameAnnotationPlane(props: {
   const [controlsRoot, setControlsRoot] = React.useState<HTMLDivElement | null>(null);
   const canvasRect = useProjectionRect(props.canvasRef);
   const planeRect = useProjectionRect(planeRef);
+  const documentRect = getEditorDocumentClientRect(
+    props.canvasRef.current,
+    documentSize,
+    props.controller.canvas
+  );
   const coordinateSpace = useEditorFrameCoordinateSpace({
-    canvasRect,
+    canvasRect: documentRect,
     scale: interaction.projection.scale,
     viewport: documentSize,
   });
@@ -74,31 +105,25 @@ export function EditorFrameAnnotationPlane(props: {
       <div
         ref={setSceneRoot}
         data-ui="editor.frame-annotation-scene"
+        inert={props.activeTool === 'crop'}
         style={{
           height: documentSize.height,
           width: documentSize.width,
           position: 'absolute',
-          left: (canvasRect?.left ?? 0) - (planeRect?.left ?? 0),
-          top: (canvasRect?.top ?? 0) - (planeRect?.top ?? 0),
+          left: (documentRect?.left ?? canvasRect?.left ?? 0) - (planeRect?.left ?? 0),
+          top: (documentRect?.top ?? canvasRect?.top ?? 0) - (planeRect?.top ?? 0),
           transform: `scale(${interaction.projection.scale})`,
           transformOrigin: 'top left',
           pointerEvents: 'none',
           overflow: 'visible',
         }}
       >
-        {interaction.projection.distortionScale > 0 ? (
-          <FrameAnnotationDistortionFilter scale={interaction.projection.distortionScale} />
-        ) : null}
-        {interaction.projection.focusFrames.length > 0 ? (
-          <FrameAnnotationFocusSurface
-            blurAmount={interaction.projection.focusBlurAmount}
-            edgeOverscan={1 / Math.max(0.01, interaction.projection.scale)}
-            frames={interaction.projection.focusFrames}
-            height={documentSize.height}
-            opacity={interaction.projection.focusOpacity}
-            width={documentSize.width}
-          />
-        ) : null}
+        <FrameEffectSurfaces documentSize={documentSize} projection={interaction.projection} />
+        <EditorCropOverlay
+          activeTool={props.activeTool}
+          canvas={props.controller.canvas}
+          documentSize={documentSize}
+        />
         {interaction.projection.projected.map((entry) => (
           <FrameProjection
             key={entry.snapshot.id}
@@ -111,6 +136,7 @@ export function EditorFrameAnnotationPlane(props: {
               entry.object?.sniptaleLocked !== true &&
               (props.activeTool === 'frame-annotation' || props.activeTool === 'select')
             }
+            showVisualOverlays={props.activeTool === 'crop'}
             scale={interaction.projection.scale}
             snapshot={entry.snapshot}
             settingsAnchor={

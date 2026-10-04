@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { GalleryThumbnails, Paintbrush, TvMinimalPlay, Upload } from 'lucide-react';
 import { popupTabsMessages } from '../../../platform/i18n/messages/popup/tabs';
 import { commonMessages } from '../../../platform/i18n/messages/common';
@@ -30,6 +30,15 @@ function ShellIcon({ path }: { path: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+      <path
+        className="popup-react-shell__menu-icon-accent"
+        d={path}
+        fill="none"
+        stroke="var(--sniptale-color-accent, var(--popup-initial-accent))"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -42,7 +51,6 @@ export function PopupApp() {
   const route = usePopupRouteController();
   const Route = route.Route;
   const [locale, setLocale] = useState<AppLocale>(readInitialLocale);
-  const palette = useRouteFirstPalette();
   usePopupStartupReconciliation(setLocale);
 
   return (
@@ -73,49 +81,8 @@ export function PopupApp() {
           <PopupRouteSkeleton />
         )}
       </main>
-      {palette.open && palette.Component ? (
-        <palette.Component
-          page={route.page}
-          onClose={() => palette.setOpen(false)}
-          onNavigate={(target) => void route.navigate(target)}
-        />
-      ) : null}
     </div>
   );
-}
-
-type PaletteComponent = ComponentType<{
-  page: PopupPage | null;
-  onClose: () => void;
-  onNavigate: (page: PopupPage) => void;
-}>;
-
-function useRouteFirstPalette() {
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [Palette, setPalette] = useState<PaletteComponent | null>(null);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        !event.defaultPrevented &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.altKey &&
-        !event.shiftKey &&
-        event.key.toLowerCase() === 'k'
-      ) {
-        event.preventDefault();
-        setPaletteOpen((open) => !open);
-        if (!Palette) {
-          void import('../command-palette/route-first').then((module) =>
-            setPalette(() => module.RouteFirstPopupCommandPalette)
-          );
-        }
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [Palette]);
-  return { Component: Palette, open: paletteOpen, setOpen: setPaletteOpen };
 }
 
 function PopupNavigation({
@@ -125,23 +92,45 @@ function PopupNavigation({
   locale: AppLocale;
   route: ReturnType<typeof usePopupRouteController>;
 }) {
+  const previousPage = useRef<PopupPage | null>(route.page);
+  const [entrySide, setEntrySide] = useState<'left' | 'right' | 'none'>('none');
+  useLayoutEffect(() => {
+    if (route.page && previousPage.current && route.page !== previousPage.current) {
+      setEntrySide(
+        pages.findIndex(({ page }) => page === previousPage.current) <
+          pages.findIndex(({ page }) => page === route.page)
+          ? 'left'
+          : 'right'
+      );
+    } else if (!route.page) {
+      setEntrySide('none');
+    }
+    previousPage.current = route.page;
+  }, [route.page]);
   return (
     <nav
       className="popup-react-shell__tabs"
       data-animate={route.hasCommittedNavigation ? 'true' : 'false'}
+      data-menu-entry={route.page === 'menu' ? entrySide : 'none'}
       data-ui="popup.app.tabs"
     >
       <span
         aria-hidden="true"
         className="popup-react-shell__tab-indicator"
         data-page={route.page ?? 'none'}
-      />
+        data-entry-side={entrySide}
+      >
+        <svg aria-hidden="true" className="popup-react-shell__menu-ring" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="19" pathLength="100" />
+        </svg>
+      </span>
       {pages.map(({ page: candidate, icon }) => (
         <button
           key={candidate}
           type="button"
           data-page={candidate}
           data-active={route.page === candidate ? 'true' : 'false'}
+          data-entry-side={route.page === candidate ? entrySide : 'none'}
           aria-busy={route.pendingPage === candidate || undefined}
           onFocus={() => preload(candidate)}
           onPointerEnter={() => preload(candidate)}
@@ -150,7 +139,14 @@ function PopupNavigation({
           title={popupTabsMessages[candidate][locale]}
           aria-label={popupTabsMessages[candidate][locale]}
         >
-          {icon}
+          {candidate === 'menu' ? (
+            icon
+          ) : (
+            <span aria-hidden="true" className="popup-react-shell__tab-icon">
+              <span className="popup-react-shell__tab-icon-base">{icon}</span>
+              <span className="popup-react-shell__tab-icon-accent">{icon}</span>
+            </span>
+          )}
         </button>
       ))}
     </nav>

@@ -1,7 +1,7 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ProductModalHeader } from '@sniptale/ui/product-modal';
-import { Mic, Save, Square } from 'lucide-react';
+import { Download, Mic, Pause, Play, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
@@ -80,6 +80,8 @@ export function AudioRecordingTransport(props: {
   error: string | null;
   onStartRecording: () => void;
   onStopRecording: () => void;
+  onPauseRecording?: () => void;
+  onResumeRecording?: () => Promise<void>;
   status: AudioRecordingStatus;
 }) {
   if (props.status === 'recorded') return <RecordedAudioSummary {...props} />;
@@ -103,12 +105,27 @@ export function AudioRecordingTransport(props: {
               {props.durationLabel}
             </p>
           </div>
-          {props.status === 'recording' ? (
-            <RecordingActionButton
-              icon={<Square size={16} strokeWidth={2.1} />}
-              label={translate('videoEditor.app.recordAudioStop')}
-              onClick={props.onStopRecording}
-            />
+          {props.status === 'recording' || props.status === 'paused' ? (
+            <div className="flex flex-wrap gap-2">
+              {props.status === 'recording' ? (
+                <RecordingActionButton
+                  icon={<Pause size={16} strokeWidth={2.1} />}
+                  label={translate('videoEditor.app.recordAudioPause')}
+                  onClick={props.onPauseRecording ?? (() => undefined)}
+                />
+              ) : (
+                <RecordingActionButton
+                  icon={<Play size={16} strokeWidth={2.1} />}
+                  label={translate('videoEditor.app.recordAudioResume')}
+                  onClick={() => void props.onResumeRecording?.()}
+                />
+              )}
+              <RecordingActionButton
+                icon={<Square size={16} strokeWidth={2.1} />}
+                label={translate('videoEditor.app.recordAudioStop')}
+                onClick={props.onStopRecording}
+              />
+            </div>
           ) : (
             <RecordingActionButton
               icon={<Mic size={16} strokeWidth={2.1} />}
@@ -153,11 +170,29 @@ function RecordedAudioSummary(props: {
   );
 }
 
+/** Shared recording setup composition; runtime owners retain session and playback effects. */
+export function RecordingSetup(props: {
+  device: ReactNode;
+  playback?: ReactNode;
+  duration?: ReactNode;
+}) {
+  return (
+    <div className="grid min-w-0 gap-3" data-ui="audio-recording.setup">
+      {props.device}
+      <div className="grid min-w-0 gap-x-6 gap-y-2 sm:grid-cols-2">
+        {props.playback}
+        {props.duration}
+      </div>
+    </div>
+  );
+}
+
 export function AudioRecordingDeviceSelect(props: {
   value: string;
   onChange: (value: string) => void;
   disabled: boolean;
 }) {
+  const labelId = useId();
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   useEffect(() => {
     let active = true;
@@ -177,16 +212,42 @@ export function AudioRecordingDeviceSelect(props: {
     };
   }, []);
   return (
-    <CompactSelect
-      {...props}
-      aria-label={translate('videoEditor.app.recordAudioDevice')}
-      options={[
-        { value: '', label: translate('videoEditor.app.recordAudioDefaultDevice') },
-        ...devices.map((device, index) => ({
-          value: device.deviceId,
-          label: device.label || `${translate('videoEditor.app.recordAudioDevice')} ${index + 1}`,
-        })),
-      ]}
-    />
+    <div className="grid min-w-0 gap-1.5">
+      <label
+        htmlFor={labelId}
+        className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]"
+      >
+        {translate('videoEditor.app.recordAudioDevice')}
+      </label>
+      <ProductSelect
+        id={labelId}
+        {...props}
+        aria-label={translate('videoEditor.app.recordAudioDevice')}
+        options={[
+          { value: '', label: translate('videoEditor.app.recordAudioDefaultDevice') },
+          ...devices.map((device, index) => ({
+            value: device.deviceId,
+            label: device.label || `${translate('videoEditor.app.recordAudioDevice')} ${index + 1}`,
+          })),
+        ]}
+      />
+    </div>
+  );
+}
+
+/** Preserve the whole original take independently of the selected trim or attachment destination. */
+export function AudioRecordingDownloadButton(props: {
+  disabled: boolean;
+  onDownload: () => Promise<void>;
+}) {
+  return (
+    <ProductActionButton
+      tone="secondary"
+      disabled={props.disabled}
+      onClick={() => void props.onDownload()}
+    >
+      <Download size={16} aria-hidden="true" />
+      {translate('videoEditor.app.recordAudioDownloadOriginal')}
+    </ProductActionButton>
   );
 }

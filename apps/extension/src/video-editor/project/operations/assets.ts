@@ -1,7 +1,6 @@
+import type { ProjectAssetPublicationOptions } from '../../../composition/persistence/projects/index';
 import { getRecording } from '../../../composition/persistence/recordings/index';
-import { deleteProjectAsset } from '../../../composition/persistence/projects/index';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
-import { createLogger } from '@sniptale/platform/observability/logger';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import {
   getMediaAssetBlob,
@@ -19,8 +18,6 @@ import {
 } from '../../../features/video/project/types';
 import { loadAudioMetadata, loadImageMetadata, loadVideoMetadata } from '../media-metadata';
 import { assertImportableProjectAssetFile } from './import-validation';
-
-const logger = createLogger({ namespace: 'VideoEditorRecordingAssets' });
 
 type ImportableProjectAssetType =
   | typeof VideoProjectAssetType.IMAGE
@@ -54,17 +51,13 @@ async function buildProjectRecordingAsset(
   filename: string
 ): Promise<VideoProjectAsset> {
   const metadata = await loadVideoMetadata(blob);
-  const projectAssetId = crypto.randomUUID();
-
-  await saveProjectAssetSafely(projectAssetId, blob, metadata.mimeType, filename);
 
   return createVideoProjectAsset(
     filename,
     VideoProjectAssetType.RECORDING,
     {
-      kind: 'project-asset',
-      projectAssetId,
-      originRecordingId: sourceRecordingId,
+      kind: 'recording',
+      recordingId: sourceRecordingId,
     },
     {
       width: metadata.width,
@@ -78,55 +71,42 @@ async function buildProjectRecordingAsset(
   );
 }
 
-/** Acquires the complete recording material before the caller publishes it to its project. */
+async function validateRecordingReference(asset: VideoProjectAsset): Promise<VideoProjectAsset> {
+  if (asset.source.kind === 'recording' && !(await getRecording(asset.source.recordingId))) {
+    throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+  }
+  return asset;
+}
+
+/** Resolves recording references and metadata before the caller publishes them to its project. */
 export async function ensureRecordingAssets(
   project: VideoProject,
   sourceRecordingId: string
 ): Promise<VideoProjectAsset[]> {
-  const acquired: VideoProjectAsset[] = [];
-  try {
-    acquired.push(
-      findExistingRecordingAsset(project, sourceRecordingId) ??
-        (await importRecordingProjectAsset(sourceRecordingId))
-    );
-    const webcamId = buildWebcamRecordingId(sourceRecordingId);
-    const existingCamera = findExistingRecordingAsset(project, webcamId);
-    if (existingCamera) acquired.push(existingCamera);
-    else {
-      const camera = await getRecording(webcamId);
-      if (camera) {
-        acquired.push(await buildProjectRecordingAsset(webcamId, camera.file, camera.filename));
-      } else {
-        const unavailable = await getMediaLibraryEntry(createRecordingMediaId(webcamId));
-        if (
-          unavailable?.source.kind === 'recording' &&
-          unavailable.source.recordingId === webcamId
-        ) {
-          throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
-        }
+  const existingPrimary = findExistingRecordingAsset(project, sourceRecordingId);
+  const acquired = [
+    existingPrimary
+      ? await validateRecordingReference(existingPrimary)
+      : await importRecordingProjectAsset(sourceRecordingId),
+  ];
+  const webcamId = buildWebcamRecordingId(sourceRecordingId);
+  const existingCamera = findExistingRecordingAsset(project, webcamId);
+  if (existingCamera) acquired.push(await validateRecordingReference(existingCamera));
+  else {
+    const camera = await getRecording(webcamId);
+    if (camera) {
+      acquired.push(await buildProjectRecordingAsset(webcamId, camera.file, camera.filename));
+    } else {
+      const unavailable = await getMediaLibraryEntry(createRecordingMediaId(webcamId));
+      if (unavailable?.source.kind === 'recording' && unavailable.source.recordingId === webcamId) {
+        throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
       }
     }
-    return acquired.map((asset, index) => ({
-      ...asset,
-      recordingPart: { recordingId: sourceRecordingId, role: index === 0 ? 'primary' : 'camera' },
-    }));
-  } catch (error) {
-    await Promise.all(
-      acquired.map(async (asset) => {
-        if (
-          project.assets.some(({ id }) => id === asset.id) ||
-          asset.source.kind !== 'project-asset'
-        )
-          return;
-        try {
-          await deleteProjectAsset(asset.source.projectAssetId);
-        } catch (cleanupError) {
-          logger.warn('Failed to clean up an uncommitted recording copy', cleanupError);
-        }
-      })
-    );
-    throw error;
   }
+  return acquired.map((asset, index) => ({
+    ...asset,
+    recordingPart: { recordingId: sourceRecordingId, role: index === 0 ? 'primary' : 'camera' },
+  }));
 }
 
 export async function importRecordingProjectAsset(
@@ -140,35 +120,73 @@ export async function importRecordingProjectAsset(
   return buildProjectRecordingAsset(sourceRecordingId, entry.file, entry.filename);
 }
 
-/** Copies library media into the project, preserving recording telemetry provenance. */
+/** References Library media; freezes derived presentations as private project resources. */
 export async function ensureLibraryMediaAssets(
   project: VideoProject,
   mediaId: string
 ): Promise<VideoProjectAsset[]> {
   const existing = project.assets.find(
-    (asset) => asset.source.kind === 'project-asset' && asset.source.originMediaId === mediaId
+    (asset) =>
+      (asset.source.kind === 'project-asset' && asset.source.originMediaId === mediaId) ||
+      (asset.source.kind === 'library-asset' && asset.source.mediaId === mediaId)
   );
   if (existing) return [existing];
 
   const entry = await getMediaLibraryEntry(mediaId);
   if (!entry) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
   const assetType = getLibraryImportType(entry);
-  if (entry.source.kind === 'recording') {
+  if (entry.source.kind === 'recording' && assetType !== VideoProjectAssetType.AUDIO) {
     return ensureRecordingAssets(project, entry.source.recordingId);
+  }
+  if (
+    (entry.source.kind === 'project-asset' || entry.source.kind === 'stored-asset') &&
+    entry.imageContentState !== 'edited'
+  ) {
+    return [await referenceLibraryAsset(entry, assetType)];
   }
 
   const blob = await readLibraryImportBlob(entry, assetType);
   if (!blob) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
   const file = new File([blob], entry.filename, { type: blob.type });
-  const asset = await importProjectAsset(file, assetType);
+  const asset = await importProjectAsset(file, assetType, {
+    publishToLibrary: false,
+    originMediaId: mediaId,
+  });
   if (asset.source.kind === 'project-asset') {
     asset.source.originMediaId = mediaId;
   }
   return [asset];
 }
 
+async function referenceLibraryAsset(
+  entry: MediaLibraryEntry,
+  assetType: ImportableProjectAssetType
+): Promise<VideoProjectAsset> {
+  const blob = await getMediaAssetBlob(entry.id);
+  if (!blob) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+  const metadata =
+    assetType === VideoProjectAssetType.IMAGE
+      ? { ...(await loadImageMetadata(blob)), duration: null, hasAudio: false, audioPeaks: null }
+      : assetType === VideoProjectAssetType.AUDIO
+        ? { ...(await loadAudioMetadata(blob)), width: 0, height: 0, hasAudio: true }
+        : await loadVideoMetadata(blob);
+  return createVideoProjectAsset(
+    entry.filename,
+    assetType,
+    entry.source.kind === 'project-asset'
+      ? {
+          kind: 'project-asset',
+          projectAssetId: entry.source.projectAssetId,
+          originMediaId: entry.id,
+        }
+      : { kind: 'library-asset', mediaId: entry.id },
+    metadata
+  );
+}
+
 function getLibraryImportType(entry: MediaLibraryEntry): ImportableProjectAssetType {
   if (entry.source.kind !== 'web-snapshot') {
+    if (entry.kind === 'audio') return VideoProjectAssetType.AUDIO;
     if (entry.kind === 'image' || entry.kind === 'screenshot') return VideoProjectAssetType.IMAGE;
     if (entry.kind === 'video' || entry.kind === 'recording' || entry.kind === 'export') {
       return VideoProjectAssetType.VIDEO;
@@ -181,18 +199,32 @@ async function readLibraryImportBlob(
   entry: MediaLibraryEntry,
   assetType: ImportableProjectAssetType
 ): Promise<Blob | undefined> {
-  if (assetType !== VideoProjectAssetType.IMAGE) return getMediaAssetBlob(entry.id);
+  if (
+    assetType !== VideoProjectAssetType.IMAGE ||
+    ((entry.workspaceRevision ?? 0) === 0 && entry.imageContentState !== 'edited')
+  )
+    return getMediaAssetBlob(entry.id);
   const presentation = await getAggregatePresentation({ id: entry.id, kind: 'image' });
   return presentation?.presentationRevision === (entry.workspaceRevision ?? 0)
     ? presentation.previewBlob
     : undefined;
 }
 
-async function buildImportedImageAsset(file: File): Promise<VideoProjectAsset> {
+async function buildImportedImageAsset(
+  file: File,
+  options: ProjectAssetPublicationOptions
+): Promise<VideoProjectAsset> {
   const metadata = await loadImageMetadata(file);
   const projectAssetId = crypto.randomUUID();
 
-  await saveProjectAssetSafely(projectAssetId, file, metadata.mimeType, file.name);
+  await saveProjectAssetSafely(
+    projectAssetId,
+    file,
+    metadata.mimeType,
+    file.name,
+    undefined,
+    options
+  );
 
   return createVideoProjectAsset(
     file.name,
@@ -213,11 +245,21 @@ async function buildImportedImageAsset(file: File): Promise<VideoProjectAsset> {
   );
 }
 
-async function buildImportedVideoAsset(file: File): Promise<VideoProjectAsset> {
+async function buildImportedVideoAsset(
+  file: File,
+  options: ProjectAssetPublicationOptions
+): Promise<VideoProjectAsset> {
   const metadata = await loadVideoMetadata(file);
   const projectAssetId = crypto.randomUUID();
 
-  await saveProjectAssetSafely(projectAssetId, file, metadata.mimeType, file.name);
+  await saveProjectAssetSafely(
+    projectAssetId,
+    file,
+    metadata.mimeType,
+    file.name,
+    undefined,
+    options
+  );
 
   return createVideoProjectAsset(
     file.name,
@@ -238,11 +280,21 @@ async function buildImportedVideoAsset(file: File): Promise<VideoProjectAsset> {
   );
 }
 
-async function buildImportedAudioAsset(file: File): Promise<VideoProjectAsset> {
+async function buildImportedAudioAsset(
+  file: File,
+  options: ProjectAssetPublicationOptions
+): Promise<VideoProjectAsset> {
   const metadata = await loadAudioMetadata(file);
   const projectAssetId = crypto.randomUUID();
 
-  await saveProjectAssetSafely(projectAssetId, file, metadata.mimeType, file.name);
+  await saveProjectAssetSafely(
+    projectAssetId,
+    file,
+    metadata.mimeType,
+    file.name,
+    undefined,
+    options
+  );
 
   return createVideoProjectAsset(
     file.name,
@@ -268,17 +320,18 @@ async function buildImportedAudioAsset(file: File): Promise<VideoProjectAsset> {
  */
 export async function importProjectAsset(
   file: File,
-  assetType: ImportableProjectAssetType
+  assetType: ImportableProjectAssetType,
+  options: ProjectAssetPublicationOptions = {}
 ): Promise<VideoProjectAsset> {
   await assertImportableProjectAssetFile(file, assetType);
 
   if (assetType === VideoProjectAssetType.AUDIO) {
-    return buildImportedAudioAsset(file);
+    return buildImportedAudioAsset(file, options);
   }
 
   if (assetType === VideoProjectAssetType.IMAGE) {
-    return buildImportedImageAsset(file);
+    return buildImportedImageAsset(file, options);
   }
 
-  return buildImportedVideoAsset(file);
+  return buildImportedVideoAsset(file, options);
 }

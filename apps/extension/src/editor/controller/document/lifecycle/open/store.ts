@@ -8,7 +8,9 @@ export function syncOpenedDocumentState(options: {
 }): void {
   const store = useEditorStore.getState();
 
+  store.setShowOutsideCanvas(false);
   store.setInspector('file');
+  store.setFreshImageBackgroundPending(true);
   store.setImageData(options.dataUrl);
   store.setPageTitle(options.pageTitle);
   store.setBrowserFrame({
@@ -21,6 +23,8 @@ export function syncOpenedDocumentState(options: {
 export function syncLoadedDocumentState(sourceImageData: string): void {
   const store = useEditorStore.getState();
 
+  store.setShowOutsideCanvas(false);
   store.setInspector('file');
+  store.setFreshImageBackgroundPending(false);
   store.setImageData(sourceImageData);
 }

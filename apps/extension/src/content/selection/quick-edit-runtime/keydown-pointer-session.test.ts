@@ -156,6 +156,35 @@ describe('quick edit keydown, pointer, and session flows', () => {
     expect(options.finishEditing).toHaveBeenCalledWith(element);
   });
 
+  it('commits the previous block before activating the next block on primary mousedown', () => {
+    const previous = document.createElement('p');
+    const next = document.createElement('p');
+    mocks.quickEditTargetMock.mockReturnValue(next);
+    mocks.textTargetMock.mockReturnValue(true);
+    const options = createPointerOptions();
+
+    handleQuickEditOutsideClick(new MouseEvent('mousedown', { button: 0 }), options, [previous]);
+
+    expect(options.finishEditing).toHaveBeenCalledWith(previous);
+    expect(options.makeElementEditable).toHaveBeenCalledWith(next);
+    expect(options.finishEditing.mock.invocationCallOrder[0]).toBeLessThan(
+      options.makeElementEditable.mock.invocationCallOrder[0]
+    );
+    expect(options.hideHoverOverlay).toHaveBeenCalledOnce();
+  });
+
+  it('does not activate another block on a secondary pointer button', () => {
+    mocks.quickEditTargetMock.mockReturnValue(document.createElement('p'));
+    mocks.textTargetMock.mockReturnValue(true);
+    const options = createPointerOptions();
+
+    handleQuickEditOutsideClick(new MouseEvent('mousedown', { button: 2 }), options, [
+      document.createElement('p'),
+    ]);
+
+    expect(options.makeElementEditable).not.toHaveBeenCalled();
+  });
+
   it('activates and clears editable element session state', () => {
     const element = document.createElement('div');
     document.body.appendChild(element);

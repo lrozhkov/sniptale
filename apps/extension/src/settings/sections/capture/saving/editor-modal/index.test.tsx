@@ -167,7 +167,7 @@ async function submitModalForm() {
   });
 }
 
-it('submits trimmed and sanitized values, then closes the modal', async () => {
+it('submits trimmed and sanitized values; the persistence action owns dismissal', async () => {
   const onClose = vi.fn();
   const onSave = vi.fn().mockResolvedValue(undefined);
 
@@ -187,7 +187,7 @@ it('submits trimmed and sanitized values, then closes the modal', async () => {
   await submitModalForm();
 
   expect(onSave).toHaveBeenCalledWith('Screens', 'reports/daily-shots', false);
-  expect(onClose).toHaveBeenCalledOnce();
+  expect(onClose).not.toHaveBeenCalled();
 });
 
 it('updates its local state when the edited preset changes', async () => {
@@ -234,6 +234,41 @@ it('logs save failures and keeps the modal open', async () => {
 
   expect(loggerErrorMock).toHaveBeenCalledWith('Save preset failed', expect.any(Error));
   expect(onClose).not.toHaveBeenCalled();
+  expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
+    'savePresets.editor.saveFailed'
+  );
+});
+
+it('blocks duplicate saves and dismissal while pending, then permits retry', async () => {
+  let rejectFirst: ((error: Error) => void) | undefined;
+  const onSave = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectFirst = reject;
+        })
+    )
+    .mockResolvedValue(undefined);
+  const onClose = vi.fn();
+  await renderModal({ onClose, onSave, preset: createPreset() });
+  const form = container?.querySelector('form') as HTMLFormElement;
+  await act(async () => {
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+  });
+  expect(onSave).toHaveBeenCalledTimes(1);
+  await act(async () => {
+    const closeButton = container?.querySelector('header button') as HTMLButtonElement;
+    closeButton.click();
+  });
+  expect(onClose).not.toHaveBeenCalled();
+  await act(async () => {
+    if (rejectFirst) rejectFirst(new Error('offline'));
+  });
+  expect(container?.querySelector('[role="alert"]')).toBeTruthy();
+  await submitModalForm();
+  expect(onSave).toHaveBeenCalledTimes(2);
 });
 
 it('renders create-mode actions without passing a preset into the footer branch', async () => {

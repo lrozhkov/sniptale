@@ -32,7 +32,7 @@ function createHandlers() {
   };
 }
 
-function renderList() {
+function renderList(overrides: Partial<React.ComponentProps<typeof PresetsList>> = {}) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -55,6 +55,7 @@ function renderList() {
         onSavePreset={handlers.onSavePreset}
         onToggleEnabled={handlers.onToggleEnabled}
         presets={[createPreset()]}
+        {...overrides}
       />
     );
   });
@@ -105,6 +106,33 @@ afterEach(() => {
 });
 
 describe('save-presets list', () => {
+  it('distinguishes loading and search results, and disables reorder while filtered', () => {
+    const onMoveBefore = vi.fn(async () => undefined);
+    renderList({
+      isLoading: true,
+      onMoveBefore,
+      presets: [createPreset({ name: 'Images', path: 'Captures/Images' })],
+    });
+    expect(container?.querySelector('[data-testid="settings-card-loading"]')).toBeTruthy();
+    expect(container?.querySelector('button')?.disabled).toBe(true);
+
+    renderList({
+      isLoading: false,
+      onMoveBefore,
+      presets: [createPreset({ name: 'Images', path: 'Captures/Images' })],
+      defaultImagePresetId: 'preset-1',
+    });
+    expect(container?.textContent).toContain(translate('savePresets.section.imageDefault'));
+    const search = container?.querySelector('input[type="search"]') as HTMLInputElement;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(search, 'missing');
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      search.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(container?.textContent).toContain(translate('savePresets.section.noMatches'));
+    expect(container?.querySelector('[data-settings-collection-root]')).toBeNull();
+  });
   it('routes row actions through the list body helpers', () => {
     const handlers = renderList();
 

@@ -6,10 +6,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageSurface } from './image-surface';
-vi.mock('./image-dimensions', () => {
-  const dimensions = { width: 800, height: 600 };
-  return { useImageDimensions: () => dimensions };
-});
+const decoded = vi.hoisted(() => ({
+  value: { width: 800, height: 600 } as { width: number; height: number } | null,
+}));
+vi.mock('./image-dimensions', () => ({ useImageDimensions: () => decoded.value }));
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -26,6 +26,7 @@ const originalHas = HTMLElement.prototype.hasPointerCapture;
 const originalRelease = HTMLElement.prototype.releasePointerCapture;
 beforeEach(() => {
   vi.clearAllMocks();
+  decoded.value = { width: 800, height: 600 };
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   HTMLElement.prototype.setPointerCapture = vi.fn();
   HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
@@ -88,6 +89,7 @@ async function pointer(element: Element, type: string, x: number, y: number) {
 it('commits one normalized pan only on pointer release and keeps annotation identity', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -105,6 +107,7 @@ it('commits one normalized pan only on pointer release and keeps annotation iden
 it('cancels a draft on Escape and restores trigger focus without undo work', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -118,6 +121,7 @@ it('cancels a draft on Escape and restores trigger focus without undo work', asy
 it('cancels on pointercancel and when saving disables an active gesture', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 20, 30);
@@ -132,6 +136,7 @@ it('cancels on pointercancel and when saving disables an active gesture', async 
 it('resizes through the corner and provides arrow key equivalents', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   frame();
   const resize = host.querySelector('.guide-image-resize');
   if (!resize) throw new Error('Missing handle');
@@ -151,6 +156,7 @@ it('resizes through the corner and provides arrow key equivalents', async () => 
 it('leaves ordinary wheel scrolling alone and batches explicit modifier zoom', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   vi.useFakeTimers();
   const normal = new WheelEvent('wheel', { deltaY: 40, bubbles: true, cancelable: true });
@@ -172,6 +178,7 @@ it('leaves ordinary wheel scrolling alone and batches explicit modifier zoom', a
 it('keeps pointer preview across equivalent canonical rerenders and preserves concurrent caption edits', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -190,6 +197,7 @@ it('keeps pointer preview across equivalent canonical rerenders and preserves co
 it('keeps pending wheel zoom across canonical rerenders without reverting newer text', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   vi.useFakeTimers();
   await act(async () =>
@@ -214,6 +222,7 @@ it('keeps pending wheel zoom across canonical rerenders without reverting newer 
 it('commits pending zoom before an immediate pan without snapping back or a delayed extra commit', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   vi.useFakeTimers();
   await act(async () =>
@@ -242,6 +251,7 @@ it('commits pending zoom before an immediate pan without snapping back or a dela
 it('cancels active geometry on image replacement and cancels pending wheel on unmount', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -266,6 +276,7 @@ it('cancels active geometry on image replacement and cancels pending wheel on un
 it('does not record a pointer move that returns to its original position', async () => {
   await render();
   await click('Frame and image');
+  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 40, 30);
@@ -277,7 +288,6 @@ it('does not record a pointer move that returns to its original position', async
 it('crop magnet prevents blank edges for pan and keyboard while disabling restores free movement', async () => {
   await render();
   await click('Frame and image');
-  await click('Keep image inside frame');
   const element = frame();
   await pointer(element, 'pointerdown', 0, 0);
   await pointer(element, 'pointermove', 400, -300);
@@ -294,3 +304,99 @@ it('crop magnet prevents blank edges for pan and keyboard while disabling restor
   await click('Keep image inside frame');
   expect(change.mock.calls[0]?.[0].contentTransform).toEqual({ x: 0, y: 0, scale: 1 });
 });
+
+it('defaults new images to bounded framing and retains the current image opt-out', async () => {
+  await render(false, { ...block, frame: { width: 400, height: 400 } });
+  await click('Frame and image');
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="Keep image inside frame"]')!;
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  await click('Keep image inside frame');
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  await render(false, { ...block, id: 'other', assetId: 'other-asset' });
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  await render(false, block);
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  await click('Keep image inside frame');
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+});
+
+it('holds image geometry while bounds are enabled and dimensions are loading', async () => {
+  await render();
+  await click('Frame and image');
+  decoded.value = null;
+  await render();
+  const element = frame();
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 400, -300);
+  await pointer(element, 'pointerup', 400, -300);
+  expect(change).not.toHaveBeenCalled();
+  expect(host.querySelector('img')?.style.translate).toBe('0% 0%');
+});
+
+it('commits a constrained extreme resize with the fit shown in preview', async () => {
+  await render();
+  await click('Frame and image');
+  frame();
+  const resize = host.querySelector('.guide-image-resize')!;
+  await pointer(resize, 'pointerdown', 0, 0);
+  await pointer(resize, 'pointermove', -399.5, 0);
+  expect(host.querySelector('img')?.style.objectFit).toBe('cover');
+  await pointer(resize, 'pointerup', -399.5, 0);
+  expect(change.mock.calls.at(-1)?.[0]).toMatchObject({
+    fit: 'cover',
+    frame: { width: 1, height: 600 },
+  });
+});
+
+it('keeps the image toolbar inside the viewport and isolates it from pan and arrow gestures', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  const toolbar = element.querySelector('.guide-image-tools')!;
+  expect(toolbar).not.toBeNull();
+  const command = toolbar.querySelector('button')!;
+  await pointer(command, 'pointerdown', 5, 5);
+  await pointer(element, 'pointermove', 40, 30);
+  await pointer(element, 'pointerup', 40, 30);
+  await act(async () =>
+    command.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(change).not.toHaveBeenCalled();
+  expect(HTMLElement.prototype.setPointerCapture).not.toHaveBeenCalled();
+  await act(async () =>
+    command.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(host.querySelector('.guide-image-surface')?.getAttribute('data-editing')).toBe('false');
+  expect(document.activeElement).toBe(host.querySelector('[data-frame-image]'));
+});
+
+it('includes a pending wheel draft when Done is clicked before its idle timer', async () => {
+  vi.useFakeTimers();
+  await render();
+  await click('Frame and image');
+  await act(async () =>
+    frame().dispatchEvent(
+      new WheelEvent('wheel', {
+        ctrlKey: true,
+        deltaY: -100,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(change).not.toHaveBeenCalled();
+  await click('Done');
+  expect(change).toHaveBeenCalledTimes(1);
+  expect(change.mock.calls[0]?.[0].contentTransform.scale).toBeGreaterThan(1);
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(change).toHaveBeenCalledTimes(1);
+});
+
+it.each([undefined, 'start', 'center', 'end'] as const)(
+  'renders caption alignment %s without changing the image frame',
+  async (captionAlignment) => {
+    await render(false, { ...block, caption: 'Caption', captionAlignment });
+    expect(host.querySelector('figcaption')?.style.textAlign).toBe(captionAlignment ?? 'center');
+    expect(change).not.toHaveBeenCalled();
+  }
+);

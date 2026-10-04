@@ -7,7 +7,8 @@ const dbMocks = vi.hoisted(() => ({
   putMock: vi.fn(),
 }));
 
-vi.mock('../infrastructure/indexed-db/core', () => ({
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   MEDIA_LIBRARY_STORE: 'media_library',
   THUMBNAILS_STORE: 'thumbnails',
   initDB: dbMocks.initDBMock,
@@ -35,6 +36,13 @@ beforeEach(() => {
   dbMocks.initDBMock.mockResolvedValue({
     get: dbMocks.getMock,
     put: dbMocks.putMock,
+    transaction: () => ({
+      done: Promise.resolve(),
+      objectStore: () => ({
+        get: dbMocks.getMock,
+        put: (entry: unknown) => dbMocks.putMock('media_library', entry),
+      }),
+    }),
   });
 });
 

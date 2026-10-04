@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sniptale",
-  "version": "0.4.2",
-  "version_name": "0.4.2 alpha",
+  "version": "0.5.0",
+  "version_name": "0.5.0 alpha",
   "minimum_chrome_version": "148",
   "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
   "default_locale": "en",
@@ -106,7 +106,7 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self';",
-    "sandbox": "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; media-src data:; connect-src 'none'; worker-src blob:; child-src blob:; object-src 'none';"
+    "sandbox": "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; font-src data:; media-src data:; connect-src 'none'; worker-src blob:; child-src blob:; object-src 'none';"
   },
   "sandbox": {
     "pages": [

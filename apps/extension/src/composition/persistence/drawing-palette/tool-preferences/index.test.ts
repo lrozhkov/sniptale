@@ -17,6 +17,7 @@ const customized = {
   arrow: {
     color: '#445566',
     design: 'freehand' as const,
+    drawFromTip: true,
     dynamicWidth: false,
     width: 24,
   },
@@ -48,6 +49,70 @@ it('restores every tool parameter but has no active-tool field', async () => {
   const restored = await loadDrawingToolPreferences(fallback);
   expect(restored).toEqual(customized);
   expect(restored).not.toHaveProperty('activeTool');
+});
+
+it('round trips alpha colors for every drawing tool and preserves opaque legacy defaults', async () => {
+  const translucent = {
+    ...customized,
+    pencil: { ...customized.pencil, color: '#12345600' },
+    marker: { ...customized.marker, color: '#abcdef80' },
+    shape: { ...customized.shape, color: '#1122337f' },
+    arrow: { ...customized.arrow, color: '#445566cc' },
+    text: { ...customized.text, color: '#01020340' },
+  };
+  const set = vi.spyOn(browserStorage.local, 'set').mockResolvedValue(undefined);
+  await expect(saveDrawingToolPreferences(translucent, fallback)).resolves.toBe('applied');
+  expect(set).toHaveBeenCalledWith(
+    expect.objectContaining({
+      [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: { schemaVersion: 1, defaults: translucent },
+    }),
+    expect.anything()
+  );
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: { schemaVersion: 1, defaults: translucent },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toEqual(translucent);
+  await expect(loadDrawingToolPreferences(customized)).resolves.toEqual(translucent);
+});
+
+it('loads legacy preferences without blur and validates persisted blur levels', async () => {
+  const { blur: _blur, ...legacy } = customized;
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: { schemaVersion: 1, defaults: legacy },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toMatchObject({
+    ...legacy,
+    blur: { amount: 20 },
+  });
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: {
+      schemaVersion: 1,
+      defaults: { ...customized, blur: { amount: 99 } },
+    },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toEqual(fallback);
+});
+
+it('loads older arrow preferences without a direction field and rejects malformed direction', async () => {
+  const oldArrow = { ...customized.arrow };
+  delete (oldArrow as { drawFromTip?: boolean }).drawFromTip;
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: {
+      schemaVersion: 1,
+      defaults: { ...customized, arrow: oldArrow },
+    },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toMatchObject({
+    arrow: { drawFromTip: false },
+  });
+
+  vi.spyOn(browserStorage.local, 'get').mockResolvedValue({
+    [DRAWING_TOOL_PREFERENCES_STORAGE_KEY]: {
+      schemaVersion: 1,
+      defaults: { ...customized, arrow: { ...customized.arrow, drawFromTip: 'yes' } },
+    },
+  });
+  await expect(loadDrawingToolPreferences(fallback)).resolves.toEqual(fallback);
 });
 
 it('normalizes the removed parallelogram creation preference without losing other settings', async () => {

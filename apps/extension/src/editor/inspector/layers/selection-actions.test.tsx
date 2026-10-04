@@ -9,9 +9,11 @@ const controllerMocks = vi.hoisted(() => ({
   bringSelectionToFront: vi.fn(),
   deleteSelection: vi.fn(),
   duplicateSelection: vi.fn(),
+  groupSelectedLayers: vi.fn(),
   mergeSelectedLayers: vi.fn(),
   sendBackwardSelection: vi.fn(),
   sendSelectionToBack: vi.fn(),
+  ungroupSelectedLayers: vi.fn(),
 }));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
@@ -95,8 +97,8 @@ describe('LayerSelectionActions layout', () => {
   it('renders reorder and mass-action groups in the confirmed order', () => {
     renderSelectionActions({
       layers: [
-        { id: 'layer-1', immutable: false, selected: true, type: 'rectangle' },
-        { id: 'layer-2', immutable: false, selected: true, type: 'ellipse' },
+        { id: 'layer-1', immutable: false, selected: true, type: 'shape' },
+        { id: 'layer-2', immutable: false, selected: true, type: 'shape' },
       ],
       selectedObjectCount: 2,
     });
@@ -110,7 +112,13 @@ describe('LayerSelectionActions layout', () => {
       'editor.layers.selection-actions.mass-group',
     ]);
     expect(groups[0]?.querySelectorAll('button')).toHaveLength(4);
-    expect(groups[1]?.querySelectorAll('button')).toHaveLength(3);
+    expect(groups[1]?.querySelectorAll('button')).toHaveLength(4);
+    expect(groups[1]?.querySelectorAll('button')[0]?.getAttribute('title')).toBe(
+      'editor.toolbar.mergeLayers'
+    );
+    expect(groups[1]?.querySelectorAll('button')[1]?.getAttribute('title')).toBe(
+      'editor.toolbar.groupLayers'
+    );
   });
 });
 
@@ -118,8 +126,8 @@ describe('LayerSelectionActions behavior routing', () => {
   it('routes every action through the controller', () => {
     renderSelectionActions({
       layers: [
-        { id: 'layer-1', immutable: false, selected: true, type: 'rectangle' },
-        { id: 'layer-2', immutable: false, selected: true, type: 'ellipse' },
+        { id: 'layer-1', immutable: false, selected: true, type: 'shape' },
+        { id: 'layer-2', immutable: false, selected: true, type: 'shape' },
       ],
       selectedObjectCount: 2,
     });
@@ -130,6 +138,7 @@ describe('LayerSelectionActions behavior routing', () => {
       getButton('editor.toolbar.lowerSelection').click();
       getButton('editor.toolbar.backLayer').click();
       getButton('editor.toolbar.mergeLayers').click();
+      getButton('editor.toolbar.groupLayers').click();
       getButton('editor.toolbar.duplicateLayer').click();
       getButton('editor.toolbar.deleteLayer').click();
     });
@@ -139,9 +148,22 @@ describe('LayerSelectionActions behavior routing', () => {
     expect(controllerMocks.sendBackwardSelection).toHaveBeenCalledOnce();
     expect(controllerMocks.sendSelectionToBack).toHaveBeenCalledOnce();
     expect(controllerMocks.mergeSelectedLayers).toHaveBeenCalledOnce();
+    expect(controllerMocks.groupSelectedLayers).toHaveBeenCalledOnce();
     expect(controllerMocks.duplicateSelection).toHaveBeenCalledOnce();
     expect(controllerMocks.deleteSelection).toHaveBeenCalledOnce();
     expect(getButton('editor.toolbar.deleteLayer').getAttribute('data-danger')).toBe('true');
+  });
+
+  it('offers ungroup for one selected group', () => {
+    renderSelectionActions({
+      layers: [{ id: 'group-1', selected: true, type: 'group' }],
+      selectedObjectCount: 1,
+    });
+
+    act(() => getButton('editor.toolbar.ungroupLayers').click());
+
+    expect(controllerMocks.ungroupSelectedLayers).toHaveBeenCalledOnce();
+    expect(getButton('editor.toolbar.ungroupLayers').disabled).toBe(false);
   });
 });
 

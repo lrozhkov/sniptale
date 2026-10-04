@@ -390,6 +390,31 @@ describe('pagePreparationHistory store', () => {
     expect(onHistoryReachabilityChanged).toHaveBeenLastCalledWith(['frame-a', 'frame-c']);
   });
   it('tracks commit, undo, redo, and clears redo after a new branch', verifyCommitUndoRedoOrder);
+  it('detects changed open snapshots and flushes deferred frame work once', () => {
+    const bridge = createSnapshotBridge();
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(false);
+    const id = bridge.store.beginDeferredCommit();
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(false);
+    bridge.setCurrentSnapshot(createSnapshot('b'));
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(true);
+    bridge.store.flushDeferredCommits();
+    expect(bridge.store.getState().canUndo).toBe(true);
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(false);
+    bridge.store.finalizeDeferredCommit(id!);
+    bridge.store.undo();
+    expect(bridge.getCurrentSnapshot().frameSession.frames[0]?.id).toBe('frame-a');
+    expect(bridge.store.getState().canUndo).toBe(false);
+  });
+  it('distinguishes an unchanged open editor from an applied pending edit', () => {
+    const bridge = createSnapshotBridge();
+    bridge.store.beginTransaction('design-review');
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(false);
+    bridge.setCurrentSnapshot(createSnapshot('b'));
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(true);
+    bridge.store.commitTransaction('design-review');
+    expect(bridge.store.hasPendingSnapshotChanges()).toBe(false);
+    expect(bridge.store.getState().canUndo).toBe(true);
+  });
   it('does not record nested commits while an undo or redo apply is in progress', verifyApplyGuard);
   it(
     'groups DOM mutations into a single transaction and replays them on undo and redo',

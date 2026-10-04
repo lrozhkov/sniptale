@@ -1,5 +1,5 @@
 import type { DEFAULT_BORDER_PRESET } from '../../composition/persistence/highlighter';
-import type { EditorWorkspaceDefaults } from '../persistence/workspace';
+import type { EditorWorkspaceDefaults } from '../../features/editor/document/types';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
@@ -55,14 +55,19 @@ export interface EditorRichShapeToolSelection {
 interface EditorUiState {
   activeTool: EditorTool;
   inspector: EditorInspector;
+  freshImageBackgroundPending: boolean;
   inspectorCollapsed: boolean;
   layerEffectsCategory: EditorLayerEffectCategory;
   viewportPreviewOpen: boolean;
   viewportPreviewAutomationBlockedInSession: boolean;
+  showOutsideCanvas: boolean;
+  canvasCropMode: 'crop' | 'expand';
   saveErrorMessage: string | null;
   saveState: 'idle' | 'saving' | 'saved' | 'error';
   sessionId: string | null;
+  capturedAt: number | null;
   toolSettings: EditorToolSettings;
+  technicalDataTextSettings: DrawingToolDefaults['text'];
   selectionToolSettings: EditorToolSettings;
   imageData: string | null;
   pageTitle: string;
@@ -81,19 +86,25 @@ interface EditorDocumentState {
   workspace: EditorWorkspaceSettings;
   workspaceDefaults: EditorWorkspaceDefaults;
   workspaceBackgroundEdited: boolean;
+  workspaceSelectionVisibilityEdited: boolean;
 }
 
 interface EditorUiActions {
   setActiveTool: (tool: EditorTool) => void;
   syncActiveTool: (tool: EditorTool) => void;
   setInspector: (inspector: EditorInspector) => void;
+  setFreshImageBackgroundPending: (pending: boolean) => void;
   setLayerEffectsCategory: (category: EditorLayerEffectCategory) => void;
   setInspectorCollapsed: (collapsed: boolean) => void;
   setViewportPreviewOpenFromUser: (open: boolean) => void;
   setViewportPreviewOpenFromSync: (open: boolean) => void;
+  setShowOutsideCanvas: (show: boolean) => void;
+  setCanvasCropMode: (mode: 'crop' | 'expand') => void;
   setSaveErrorMessage: (message: string | null) => void;
   setSaveState: (saveState: EditorState['saveState']) => void;
   setSessionId: (sessionId: string | null) => void;
+  setCapturedAt: (capturedAt: number | null) => void;
+  updateTechnicalDataTextSettings: (patch: Partial<DrawingToolDefaults['text']>) => void;
   setImageData: (imageData: string | null) => void;
   setPageTitle: (pageTitle: string) => void;
   setRichShapeToolSelection: (selection: EditorRichShapeToolSelection | null) => void;

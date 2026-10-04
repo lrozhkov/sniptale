@@ -110,7 +110,8 @@ export interface ContentToolbarButtonProps extends ButtonHTMLAttributes<HTMLButt
   children: ReactNode;
   active?: boolean;
   menuIndicator?: boolean;
-  tone?: 'default' | 'danger' | 'close';
+  tone?: 'default' | 'danger' | 'close' | 'utility' | 'outline';
+  size?: 'default' | 'compact';
   dataUi?: string;
 }
 
@@ -122,6 +123,7 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
       active = false,
       menuIndicator = false,
       tone = 'default',
+      size = 'default',
       dataUi,
       title,
       'aria-label': ariaLabel,
@@ -129,7 +131,8 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
     },
     ref
   ) {
-    const dataActive = active ? 'true' : undefined;
+    const selected = active || props['aria-pressed'] === true || props['aria-pressed'] === 'true';
+    const dataActive = selected ? 'true' : undefined;
     const resolvedAriaLabel = ariaLabel ?? (typeof title === 'string' ? title : undefined);
 
     return (
@@ -144,11 +147,18 @@ export const ContentToolbarButton = forwardRef<HTMLButtonElement, ContentToolbar
         className={cx(
           'sniptale-glass-toolbar-button',
           'sniptale-btn',
-          active && 'sniptale-glass-toolbar-button--active',
+          selected &&
+            tone !== 'utility' &&
+            tone !== 'outline' &&
+            tone !== 'close' &&
+            'sniptale-glass-toolbar-button--active',
           tone === 'danger' && 'sniptale-glass-toolbar-button--danger',
           tone === 'danger' && 'sniptale-btn-danger',
           tone === 'close' && 'sniptale-btn-close',
           tone === 'default' && 'sniptale-toggle',
+          (tone === 'utility' || tone === 'close') && 'sniptale-btn-utility',
+          tone === 'outline' && 'sniptale-btn-outline',
+          size === 'compact' && 'sniptale-btn-compact',
           className
         )}
       >

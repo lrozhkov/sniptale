@@ -12,6 +12,7 @@ export function renderCompactWorkspaceColorField(params: InspectorCommandParams)
       value={params.workspace.backgroundColor}
       recentColors={params.recentColors}
       palette={params.workspaceBackgroundPalette}
+      paletteInPicker
       onChange={params.applyWorkspaceColor}
       onPreviewChange={(color) => params.updateWorkspace({ backgroundColor: color })}
       onPreviewReset={(color) => params.updateWorkspace({ backgroundColor: color })}
@@ -43,9 +44,11 @@ export function renderCompactWorkspaceDefaultAction(params: InspectorCommandPara
 
 export function CompactWorkspaceColorPanel({ params }: { params: InspectorCommandParams }) {
   return (
-    <div className="space-y-4">
+    <div
+      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2"
+      data-ui="editor.workspace.background-default-row"
+    >
       {renderCompactWorkspaceColorField(params)}
-      {renderCompactWorkspacePaletteGrid(params)}
       {renderCompactWorkspaceDefaultAction(params)}
     </div>
   );

@@ -27,7 +27,7 @@ import { resizeDrawingBox } from './box-resize';
 import type { DrawingViewportProjection } from './render';
 
 export type PointerDraft =
-  | { kind: 'create'; start: DrawingPoint; object: DrawingObject }
+  | { kind: 'create'; start: DrawingPoint; object: DrawingObject; arrowFromTip: boolean }
   | { kind: 'move'; start: DrawingPoint; original: DrawingObject; object: DrawingObject }
   | {
       kind: 'move-selection';
@@ -514,7 +514,16 @@ export function beginDrawingPointer(args: {
     return { draft: null, selection: [], text: { id: null, point, value: '' } };
   }
   const object = createDrawingObject(snapshot.activeTool, point, timestamp, snapshot.defaults);
-  return { draft: object ? { kind: 'create', start: point, object } : null };
+  return {
+    draft: object
+      ? {
+          kind: 'create',
+          start: point,
+          object,
+          arrowFromTip: object.kind === 'arrow' && snapshot.defaults.arrow.drawFromTip,
+        }
+      : null,
+  };
 }
 
 export function commitDrawingPointerDraft(

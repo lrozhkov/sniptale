@@ -55,9 +55,8 @@ async function releaseRegularSurface(tabId: number, leaseGeneration: number): Pr
   const session = getScreenshotSurfaceSession(tabId);
   if (!session) return;
   const service = getCaptureSurfaceService();
-  while (true) {
-    const applied = service.getApplied(tabId);
-    if (!applied) return;
+  const applied = service.getApplied(tabId);
+  if (applied) {
     if (applied.sessionId !== session.sessionId) {
       throw new CaptureSurfaceError(
         'surface-busy',
@@ -67,8 +66,8 @@ async function releaseRegularSurface(tabId: number, leaseGeneration: number): Pr
     if (applied.generation !== leaseGeneration) {
       throw new CaptureSurfaceError('stale-generation');
     }
-    await service.release(applied);
   }
+  await service.releaseTabOwners(tabId, ['screenshot']);
 }
 
 async function applyRegularPreset(
@@ -86,12 +85,21 @@ async function applyRegularPreset(
     presetId,
     context: 'screenshot',
   } as const;
+  if (!current && session.generation > 0 && service.hasSessionLease(session.sessionId)) {
+    await service.releaseTabOwners(tabId, ['screenshot']);
+  }
   let applied;
   if (current?.sessionId !== session.sessionId) {
     applied = await service.apply(request);
   } else {
     await requireEnabledPreset(presetId);
-    applied = await service.replace(request);
+    try {
+      applied = await service.replace(request);
+    } catch (error) {
+      if (!(error instanceof CaptureSurfaceError) || error.code !== 'restore-conflict') throw error;
+      await service.releaseTabOwners(tabId, ['screenshot']);
+      applied = await service.apply(request);
+    }
   }
   return {
     presetId: applied.presetId,

@@ -567,6 +567,26 @@ describe('InteractiveFrame toolbar and size interactions', () => {
     }).toEqual(before);
   });
 
+  it('removes selection when the settings popover is hidden and restores it on reopening', () => {
+    const { frame } = renderFrame();
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+
+    act(() => findToolbarButton(/Border|Рамка/).click());
+    expect(queryContentUiElement('.sniptale-frame-settings-popover')).not.toBeNull();
+
+    act(() => findToolbarButton(/Border|Рамка/).click());
+    expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
+    expect(queryContentUiElement('.sniptale-frame-settings-popover')).toBeNull();
+
+    act(() => useFrameUIStore.getState().selectFrame(frame.id));
+    act(() => findToolbarButton(/Border|Рамка/).click());
+    expect(useFrameUIStore.getState().selectedFrameId).toBe(frame.id);
+    expect(queryContentUiElement('.sniptale-frame-settings-popover')).not.toBeNull();
+
+    act(() => findToolbarButton(/Border|Рамка/).click());
+    expect(useFrameUIStore.getState().selectedFrameId).toBeNull();
+  });
+
   it('switches the frame effect from the shared settings menu without closing it', () => {
     const { frame, onUpdate } = renderFrame();
     act(() => useFrameUIStore.getState().selectFrame(frame.id));

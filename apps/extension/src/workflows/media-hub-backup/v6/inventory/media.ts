@@ -1,3 +1,4 @@
+import { projectRecordingMetadataPrivacy } from '../privacy';
 import {
   readVideoReviewForBackup,
   type VideoReviewBackupDatabase,
@@ -83,11 +84,6 @@ async function readRefFile(
 }
 
 function selected(item: MediaLibraryItem, options: MediaHubBackupExportOptions): boolean {
-  if (
-    (item.source.kind === 'project-asset' || item.source.kind === 'project-export') &&
-    !item.mimeType.startsWith('video/')
-  )
-    return false;
   if (item.source.kind === 'web-snapshot' && !options.includeWebSnapshots) return false;
   const explicitlySelected = Boolean(options.selected?.mediaAssetIds.includes(item.id));
   if (item.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
@@ -187,9 +183,10 @@ async function buildRecordingSource(args: {
     stored.mimeType,
     mediaObjectDirectory(args.entry, args.options)
   );
-  const { assetId: _assetId, ...portableRecordingBase } = stored;
+  const { assetId: _assetId, recordingMetadata, ...portableRecordingBase } = stored;
   const portableRecording = {
     ...portableRecordingBase,
+    ...projectRecordingMetadataPrivacy(recordingMetadata, args.options),
     ...(stored.recordingGroup
       ? {
           recordingGroup: projectRecordingGroupMemberPrivacy(stored.recordingGroup, args.options),
@@ -309,11 +306,22 @@ async function buildMediaSource(args: {
   if (entry.source.kind === 'web-snapshot') {
     return buildWebSnapshotSource({ ...args, entry, snapshotId: entry.source.snapshotId });
   }
+  if (entry.source.kind === 'stored-asset') {
+    const file = await readRefFile(args.db, entry.source.assetId, entry.filename);
+    return {
+      originalObjectId: args.collector.add(
+        file,
+        entry.filename,
+        entry.mimeType,
+        mediaObjectDirectory(entry, args.options)
+      ),
+    };
+  }
   const child =
     entry.source.kind === 'project-asset'
       ? parseProjectAssetEntry(await args.db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId))
       : parseProjectExportEntry(await args.db.get(PROJECT_EXPORTS_STORE, entry.source.exportId));
-  if (!child || !entry.mimeType.startsWith('video/'))
+  if (!child || (entry.source.kind === 'project-export' && !entry.mimeType.startsWith('video/')))
     throw new Error('Project video source is missing.');
   const file = await readRefFile(args.db, child.assetId, entry.filename);
   const storedReview = await readVideoReviewForBackup({
@@ -343,7 +351,11 @@ async function buildMediaSource(args: {
   }
   const exportEntry = parseProjectExportEntry(child);
   if (!exportEntry) throw new Error('Project video export is invalid.');
-  const { assetId: _exportLocalId, ...projectExport } = exportEntry;
+  const { assetId: _exportLocalId, recordingMetadata, ...portableExport } = exportEntry;
+  const projectExport = {
+    ...portableExport,
+    ...projectRecordingMetadataPrivacy(recordingMetadata, args.options),
+  };
   return { originalObjectId, projectExport, ...(videoReview ? { videoReview, reviewAssets } : {}) };
 }
 
@@ -364,6 +376,7 @@ async function buildReviewAssets(
     assets.push({
       entry: portable,
       filename,
+      ...(media ? { libraryMediaId: reference } : { publishToLibrary: false }),
       objectId: collector.add(file, filename, entry.mimeType),
     });
   }
@@ -427,7 +440,11 @@ function buildRootSummary(args: {
       Boolean(args.entry.sourceFavicon || args.entry.sourceTitle || args.entry.sourceUrl)
         ? 1
         : 0,
-    telemetryCount: args.source.recording?.telemetry ? 1 : 0,
+    telemetryCount:
+      args.source.recording?.telemetry ||
+      (args.options.includeTelemetry && args.entry.recordingMetadata)
+        ? 1
+        : 0,
     thumbnailCount:
       (args.thumbnail ? 1 : 0) +
       (args.presentation ? 1 + (args.presentation.previewObjectId ? 1 : 0) : 0),
@@ -447,7 +464,8 @@ async function buildMediaRoot(args: {
   const collector = createMediaObjectCollector(args.rootIndex, args.paths);
   const source = await buildMediaSource({ collector, db: args.db, entry, options: args.options });
   const isImageAggregate =
-    entry.source.kind === 'screenshot' && (entry.kind === 'image' || entry.kind === 'screenshot');
+    (entry.source.kind === 'screenshot' || entry.source.kind === 'stored-asset') &&
+    (entry.kind === 'image' || entry.kind === 'screenshot');
   const thumbnail = await buildThumbnail({ collector, db: args.db, entry, isImageAggregate });
   const workspace = await buildWorkspace({
     collector,
@@ -474,10 +492,13 @@ async function buildMediaRoot(args: {
         }
       : entryWithoutBlob;
   const metadata: PortableMediaMetadata = {
-    entry: projectMediaEntryPrivacy(
-      { ...portableEntry, size: collector.sizeOf(source.originalObjectId) },
-      args.options
-    ),
+    entry: {
+      ...projectMediaEntryPrivacy(
+        { ...portableEntry, size: collector.sizeOf(source.originalObjectId) },
+        args.options
+      ),
+      source: entry.source.kind === 'stored-asset' ? { kind: 'stored-asset' } : entry.source,
+    },
     originalObjectId: source.originalObjectId,
     ...(presentation ? { presentation } : {}),
     ...(source.recording ? { recording: source.recording } : {}),

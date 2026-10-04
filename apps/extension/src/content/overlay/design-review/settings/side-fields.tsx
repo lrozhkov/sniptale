@@ -1,5 +1,4 @@
 import { Link2, Unlink2 } from 'lucide-react';
-import { ProductGlassIconButton } from '@sniptale/ui/product-glass-controls';
 import type { PageStyleProperty } from '@sniptale/runtime-contracts/page-style';
 import { translate } from '../../../../platform/i18n';
 import type { DesignReviewActions, DesignReviewViewState } from '../types';
@@ -18,10 +17,7 @@ const SIDE_LABEL_KEYS = [
   'content.designReview.sideLeft',
 ] as const;
 
-const COMPACT_VALUES_CLASS_NAME = [
-  'w-[4.75rem] min-w-0 rounded-[9px]',
-  'border border-[var(--sniptale-color-border-soft)] p-0.5',
-].join(' ');
+const COMPACT_VALUES_CLASS_NAME = ['w-full min-w-0'].join(' ');
 
 const AXIS_GROUP_CLASS_NAME = [
   'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 rounded-[9px]',
@@ -62,11 +58,18 @@ function LinkToggle(props: {
     props.linked ? 'content.designReview.unlinkedSides' : 'content.designReview.linkedSides'
   );
   return (
-    <ProductGlassIconButton
-      active={props.linked}
+    <button
+      type="button"
       aria-label={title}
       aria-pressed={props.linked}
-      className="h-7 w-7 shrink-0"
+      className={[
+        'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border-0 bg-transparent',
+        'hover:brightness-110 disabled:opacity-50 focus:outline-none',
+        'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+        props.linked
+          ? 'text-[var(--sniptale-color-accent)]'
+          : 'text-[var(--sniptale-color-text-secondary)]',
+      ].join(' ')}
       data-side-link={props.name}
       disabled={props.disabled}
       onClick={props.onClick}
@@ -77,7 +80,7 @@ function LinkToggle(props: {
       ) : (
         <Unlink2 aria-hidden="true" size={14} />
       )}
-    </ProductGlassIconButton>
+    </button>
   );
 }
 
@@ -98,7 +101,6 @@ function SideValueControl(props: {
         disabled={props.disabled}
         fallbackValue={props.state.defaultValues[props.property]}
         kind={resolveSideValueKind(props.property)}
-        showUnit={!props.compact}
         value={propertyValue(props.state, props.property)}
         onChange={props.onChange}
       />
@@ -212,26 +214,26 @@ export function LinkedSideFields(props: {
       data-ui="content.design-review.side-field"
       data-side-field-label={props.label}
     >
-      <div className="flex min-w-0 items-center gap-2">
-        <div className="min-w-0 flex-1">
+      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-x-1.5 gap-y-1">
+        <div className="min-w-0">
           <SideFieldLabel label={props.label} modifiedCount={linking.model.modifiedCount} />
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {!expanded ? (
+        <LinkToggle
+          disabled={props.disabled}
+          linked={linking.model.linked}
+          name="all"
+          onClick={linking.toggleAll}
+        />
+        {!expanded ? (
+          <div className="col-span-2 min-w-0">
             <CompactSideValues
               disabled={props.disabled}
               properties={props.properties}
               state={props.state}
               onSideChange={linking.updateSide}
             />
-          ) : null}
-          <LinkToggle
-            disabled={props.disabled}
-            linked={linking.model.linked}
-            name="all"
-            onClick={linking.toggleAll}
-          />
-        </div>
+          </div>
+        ) : null}
       </div>
       {expanded ? (
         <div className="grid w-full gap-1.5" data-ui="content.design-review.side-values-expanded">

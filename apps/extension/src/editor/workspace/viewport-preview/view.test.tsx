@@ -18,6 +18,7 @@ function createProps(overrides: Partial<ComponentProps<typeof EditorViewportPrev
     onPointerUp: vi.fn(),
     previewCanvasRef: null,
     previewSize: { height: 64, width: 96 },
+    contentRect: { left: 0, top: 8, width: 96, height: 48 },
     previewSurfaceRef: null,
     surfaceClassName: 'surface-class',
     viewportFrame: { height: 20, left: 10, top: 5, width: 30 },

@@ -61,6 +61,7 @@ export function renderEditorInspectorSizeSection({
 interface RenderFrameSectionParams {
   scenePresetHeader: EditorInspectorPresetHeaderState | null;
   frameDraft: EditorFrameSettings;
+  lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   framePaddingSummary: string;
   backgroundPreviewStyle: React.CSSProperties;
   frameLayoutModeOptions: CompactSelectOption<EditorFrameSettings['layoutMode']>[];
@@ -85,6 +86,7 @@ export function renderEditorInspectorFrameSection(props: RenderFrameSectionParam
     <EditorInspectorFramePanel
       scenePresetHeader={props.scenePresetHeader}
       frameDraft={props.frameDraft}
+      lastFillModeRef={props.lastFillModeRef}
       backgroundPreviewStyle={props.backgroundPreviewStyle}
       framePaddingSummary={props.framePaddingSummary}
       frameLayoutModeOptions={props.frameLayoutModeOptions}

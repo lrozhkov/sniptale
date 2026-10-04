@@ -3,7 +3,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createGalleryState, createMediaItem } from '../../library/actions/test-support/index';
+import {
+  createGalleryState,
+  createMediaItem,
+  createScenarioItem,
+  createScenarioExportItem,
+} from '../../library/actions/test-support/index';
 import { createLocalBackupSummary } from './backup-export.test-support';
 
 const {
@@ -11,11 +16,13 @@ const {
   importConflictPropsMock,
   mediaImportConflictPropsMock,
   previewPanelPropsMock,
+  previewPanelReal,
 } = vi.hoisted(() => ({
   confirmDialogPropsMock: vi.fn(),
   importConflictPropsMock: vi.fn(),
   mediaImportConflictPropsMock: vi.fn(),
   previewPanelPropsMock: vi.fn(),
+  previewPanelReal: { enabled: false },
 }));
 
 vi.mock('@sniptale/ui/product-feedback/confirm-dialog', async (importOriginal) => ({
@@ -44,12 +51,16 @@ vi.mock('../../library/modals/media-import-conflict-content', () => ({
   },
 }));
 
-vi.mock('../../library/preview', () => ({
-  PreviewPanel: (props: unknown) => {
-    previewPanelPropsMock(props);
-    return <div data-ui="test.preview-panel" />;
-  },
-}));
+vi.mock('../../library/preview', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../library/preview')>();
+  return {
+    PreviewPanel: (props: Parameters<typeof actual.PreviewPanel>[0]) => {
+      previewPanelPropsMock(props);
+      if (previewPanelReal.enabled) return <actual.PreviewPanel {...props} />;
+      return <div data-ui="test.preview-panel" />;
+    },
+  };
+});
 
 import { GalleryOverlays } from './overlays';
 
@@ -73,6 +84,7 @@ function createLayoutProps() {
     onBannerDismiss: vi.fn(),
     onClearSelection: vi.fn(),
     onConfirmDialogClose: vi.fn(),
+    onDeletionRequestClose: vi.fn(),
     onDeleteMany: vi.fn(),
     onExportBackup: vi.fn(),
     onFilenameChange: vi.fn(),
@@ -86,6 +98,7 @@ function createLayoutProps() {
     onPendingImportClose: vi.fn(),
     onPendingMediaImportClose: vi.fn(),
     onMediaImportConfirm: vi.fn(),
+    onPreviewPresented: vi.fn(),
     onPreviewClose: vi.fn(),
     onPreviewInspectorToggle: vi.fn(),
     onPreviewCopy: vi.fn(),
@@ -97,12 +110,14 @@ function createLayoutProps() {
     onPreviewNavigate: vi.fn(),
     onPreviewOpenSnapshotScreenshot: vi.fn(),
     onPreviewResetChanges: vi.fn(),
+    onPreviewRestoreTrash: vi.fn(async () => true),
     onPreviewRestoreOriginal: vi.fn(),
     onPreviewSaveCopy: vi.fn(),
     onRemoveTag: vi.fn(),
     onResetFilters: vi.fn(),
     onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),
     onSelectionZip: vi.fn(),
@@ -110,6 +125,7 @@ function createLayoutProps() {
     onViewModeChange: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
     state: createGalleryState(),
     viewMode: 'compact-grid' as const,
   };
@@ -174,6 +190,8 @@ type PreviewOverlayProps = {
   onDelete: () => Promise<void>;
   onDownload: () => Promise<void>;
   onEdit: () => void;
+  onRestoreTrash?: () => Promise<boolean>;
+  trashMode?: boolean;
   onFilenameChange: (value: string) => void;
   onInspectorToggle: () => void;
   onRemoveTag: (tag: string) => void;
@@ -201,10 +219,86 @@ async function invokePreviewCallbacks(previewProps: PreviewOverlayProps) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  previewPanelReal.enabled = false;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('keeps the real zoom toolbar mounted while navigating to a loading image', () => {
+  previewPanelReal.enabled = true;
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+  vi.stubGlobal(
+    'Image',
+    class {
+      naturalWidth = 1600;
+      naturalHeight = 900;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      set src(_value: string) {
+        this.onload?.();
+      }
+    }
+  );
+  const first = createMediaItem({ id: 'zoom-first', kind: 'image', mimeType: 'image/png' });
+  const second = createMediaItem({ id: 'zoom-second', kind: 'image', mimeType: 'image/png' });
+  const props = createLayoutProps();
+  props.state = createGalleryState({
+    previewItem: first,
+    previewUrl: 'blob:first',
+    filteredItems: [first, second],
+  });
+  props.state.preview.session.loadStatus = 'ready';
+  props.state.preview.session.requestRevision = 1;
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  expect(props.onPreviewPresented).toHaveBeenCalledWith({
+    requestRevision: 1,
+    url: 'blob:first',
+    outcome: 'presented',
+  });
+  const image = container?.querySelector('img');
+  if (image) {
+    Object.defineProperties(image, {
+      naturalWidth: { configurable: true, value: 1600 },
+      naturalHeight: { configurable: true, value: 900 },
+    });
+    act(() => image.dispatchEvent(new Event('load')));
+  }
+  const toolbar = container?.querySelector<HTMLInputElement>(
+    '[data-ui="gallery.preview.zoomSlider"]'
+  );
+  expect(toolbar).not.toBeNull();
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(toolbar, '1.5');
+    toolbar?.dispatchEvent(new Event('input', { bubbles: true }));
+    toolbar?.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const lock = toolbar
+    ?.closest('[data-ui="gallery.preview.zoomSliderPanel"]')
+    ?.querySelector<HTMLButtonElement>('[aria-pressed]');
+  expect(lock?.disabled).toBe(false);
+  act(() => lock?.click());
+  expect(lock?.getAttribute('aria-pressed')).toBe('true');
+
+  props.state = createGalleryState({
+    previewItem: second,
+    previewUrl: null,
+    filteredItems: [first, second],
+  });
+  props.state.preview.session.loadStatus = 'loading';
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  expect(container?.querySelector('[data-ui="gallery.preview.zoomSlider"]')).toBe(toolbar);
+  expect(toolbar?.value).toBe('1.5');
+  expect(toolbar?.disabled).toBe(true);
+  expect(lock?.disabled).toBe(true);
+  expect(lock?.getAttribute('aria-pressed')).toBe('true');
 });
 
 afterEach(() => {
@@ -314,7 +408,24 @@ it('wires preview overlay callbacks to the parent app-shell actions', async () =
   expect(props.onPreviewDownload).toHaveBeenCalledTimes(1);
   expect(props.onPreviewCopy).toHaveBeenCalledTimes(1);
   expect(props.onPreviewEdit).toHaveBeenCalledWith(props.state.preview.session.item);
-  expect(props.onPreviewDelete).toHaveBeenCalledWith(props.state.preview.session.item);
+  expect(props.onPreviewDelete).toHaveBeenCalledWith(props.state.preview.session.item, undefined);
+});
+
+it('passes the selected media load outcome to the keyed preview panel', () => {
+  const props = createOpenOverlayProps();
+  props.state.preview.session.loadStatus = 'missing';
+  props.state.preview.session.url = null;
+
+  act(() => root?.render(<GalleryOverlays {...props} />));
+
+  const previewProps = previewPanelPropsMock.mock.lastCall?.[0] as {
+    item: { id: string };
+    previewLoadStatus?: string;
+    previewUrl: string | null;
+  };
+  expect(previewProps.item.id).toBe(props.state.preview.session.item?.id);
+  expect(previewProps.previewLoadStatus).toBe('missing');
+  expect(previewProps.previewUrl).toBeNull();
 });
 
 it('omits optional preview props when the preview draft has no reset state or tag catalog', () => {
@@ -373,4 +484,67 @@ it('builds bounded previous and next navigation from the filtered media list', (
   });
   expect(props.onPreviewNavigate).toHaveBeenNthCalledWith(1, items[0]);
   expect(props.onPreviewNavigate).toHaveBeenNthCalledWith(2, items[2]);
+});
+
+it('preserves confirmed async results through preview callbacks', async () => {
+  const props = createOpenOverlayProps();
+  props.onPreviewCopy = vi.fn().mockResolvedValue(true);
+  props.onPreviewDownload = vi.fn().mockResolvedValue(false);
+  act(() => {
+    root?.render(<GalleryOverlays {...props} />);
+  });
+  const preview = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
+  await expect(preview.onCopy()).resolves.toBe(true);
+  await expect(preview.onDownload()).resolves.toBe(false);
+});
+
+it('marks a trashed preview read-only and wires its single restore action', async () => {
+  const props = createLayoutProps();
+  const lifecycle = { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 3 };
+  const item = createMediaItem({ id: 'deleted', lifecycle });
+  props.state = createGalleryState({
+    filters: { ...props.state.filters, trashMode: true },
+    previewItem: item,
+  });
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  const preview = previewPanelPropsMock.mock.lastCall?.[0] as PreviewOverlayProps;
+  expect(preview.trashMode).toBe(true);
+  expect(previewPanelPropsMock.mock.lastCall?.[0].listFocusReturn).toBe(true);
+  expect(await preview.onRestoreTrash?.()).toBe(true);
+  expect(props.onPreviewRestoreTrash).toHaveBeenCalledWith(item);
+});
+
+it('keeps scenarios and their exports in the complete filtered navigation order', () => {
+  const props = createLayoutProps();
+  const items = [
+    createMediaItem({ id: 'before' }),
+    createScenarioItem({ id: 'scenario:first', filename: 'First scenario' }),
+    createScenarioItem({ id: 'scenario:second', filename: 'Second scenario' }),
+    createScenarioExportItem({ id: 'scenario-export:html' }),
+    createMediaItem({ id: 'after' }),
+  ];
+  for (let index = 0; index < items.length; index++) {
+    props.state = createGalleryState({ filteredItems: items, previewItem: items[index]! });
+    act(() => root?.render(<GalleryOverlays {...props} />));
+    const navigation = (previewPanelPropsMock.mock.lastCall![0] as PreviewOverlayProps).navigation;
+    expect(navigation).toMatchObject({
+      current: index + 1,
+      total: items.length,
+      hasPrevious: index > 0,
+      hasNext: index < items.length - 1,
+    });
+    vi.mocked(props.onPreviewNavigate).mockClear();
+    act(() => {
+      navigation?.onPrevious();
+      navigation?.onNext();
+    });
+    expect(vi.mocked(props.onPreviewNavigate).mock.calls.map(([item]) => item)).toEqual(
+      [items[index - 1], items[index + 1]].filter(Boolean)
+    );
+  }
+  props.state = createGalleryState({ filteredItems: [items[1]!], previewItem: items[1]! });
+  act(() => root?.render(<GalleryOverlays {...props} />));
+  expect(
+    (previewPanelPropsMock.mock.lastCall![0] as PreviewOverlayProps).navigation
+  ).toBeUndefined();
 });

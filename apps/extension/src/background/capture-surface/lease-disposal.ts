@@ -29,11 +29,6 @@ export class CaptureSurfaceLeaseDisposal {
     const current = await getWindowSnapshot(state.entry.windowId);
     if (captureSurfaceSnapshotsEqual(state.entry.applied, current)) {
       await restoreCaptureSurfaceSnapshot(state);
-    } else if (!captureSurfaceSnapshotsEqual(state.prior, current)) {
-      state.entry.phase = 'conflict';
-      state.entry.updatedAt = this.registry.nextTimestamp();
-      await this.registry.persist();
-      throw new CaptureSurfaceError('restore-conflict');
     }
     this.registry.remove(state);
     await this.registry.persist();

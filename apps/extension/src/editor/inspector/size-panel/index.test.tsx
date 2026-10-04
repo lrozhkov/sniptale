@@ -41,7 +41,7 @@ afterEach(() => {
 });
 
 describe('EditorInspectorSizePanel', () => {
-  it('renders compact size controls with inline aspect action and apply button', () => {
+  it('renders inline size controls with an icon aspect action and apply button', () => {
     const onApply = vi.fn();
     const onToggleLock = vi.fn();
 
@@ -83,6 +83,7 @@ describe('EditorInspectorSizePanel', () => {
       null
     );
     expect(rowChildren[1]?.getAttribute('title')).toBe('editor.compact.keepAspectRatio');
+    expect(rowChildren[1]?.textContent).toBe('');
     expect(
       rowChildren[2]?.querySelector('[aria-label="editor.compact.heightDimension"]')
     ).not.toBeNull();

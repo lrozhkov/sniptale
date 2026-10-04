@@ -65,6 +65,37 @@ const ref = {
 };
 
 describe('scenario project backup restore adapter', () => {
+  it('restores a legacy temporary scenario as permanent without changing its content or trash marker', async () => {
+    const target = stores();
+    const entry = {
+      ...projectEntry(),
+      lifecycle: {
+        savedAt: null,
+        storageClass: 'temporary' as const,
+        trashedAt: 50,
+        updatedAt: 1,
+      },
+    };
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+
+    await putScenarioProjectBackupRestore({
+      operation: operation(),
+      root: { assets: [], entry, exportThumbnails: [], exports: [], stepDocuments: [] },
+      stores: target,
+      tx: restoreTransaction(target),
+      strategy: 'duplicate',
+    });
+
+    expect(target.projects.put).toHaveBeenCalledWith({
+      ...entry,
+      lifecycle: {
+        savedAt: 999,
+        storageClass: 'library',
+        trashedAt: 50,
+        updatedAt: 999,
+      },
+    });
+  });
   it('publishes prepared scenario assets and metadata through caller stores', async () => {
     const target = stores();
     await expect(
@@ -93,6 +124,7 @@ describe('scenario project backup restore adapter', () => {
           stepDocuments: [],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'replace',
       })
     ).resolves.toEqual({ conflicted: false, imported: true });
@@ -139,6 +171,7 @@ describe('scenario project backup restore adapter', () => {
           stepDocuments: [],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'replace',
       })
     ).rejects.toThrow('belongs to another root');
@@ -177,6 +210,7 @@ describe('scenario project backup restore adapter', () => {
           stepDocuments: [],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'replace',
       })
     ).rejects.toThrow('Scenario export belongs to another root');
@@ -203,6 +237,7 @@ describe('scenario project backup restore adapter', () => {
           stepDocuments: [{ entry: document, refs: [ref] }],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'replace',
       })
     ).rejects.toThrow('Scenario editor document belongs to another root');
@@ -242,6 +277,7 @@ describe('scenario project backup restore adapter', () => {
           stepDocuments: [],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'skip',
       })
     ).resolves.toEqual({ conflicted: true, imported: false });
@@ -264,6 +300,7 @@ describe('scenario project backup restore atomic publication', () => {
           stepDocuments: [],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'duplicate',
       })
     ).rejects.toThrow('conflict changed after preflight');
@@ -290,6 +327,7 @@ describe('scenario project backup restore atomic publication', () => {
           stepDocuments: [{ entry: document, refs: [] }],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'replace',
       })
     ).rejects.toThrow('Scenario editor asset ref is missing: source.');
@@ -340,6 +378,7 @@ describe('scenario project backup restore atomic publication', () => {
         thumbnail,
       },
       stores: target,
+      tx: restoreTransaction(target),
       strategy: 'replace',
     });
 
@@ -395,6 +434,7 @@ describe('scenario project backup restore atomic publication', () => {
           stepDocuments: [],
         },
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'replace',
       })
     ).resolves.toEqual({ conflicted: true, imported: true });
@@ -424,6 +464,7 @@ it.each([2, 3, 99])(
         operation: operation(),
         root,
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'skip',
       })
     ).resolves.toEqual({ conflicted: true, imported: false });
@@ -433,9 +474,265 @@ it.each([2, 3, 99])(
         operation: operation(),
         root,
         stores: target,
+        tx: restoreTransaction(target),
         strategy: 'duplicate',
       })
     ).rejects.toThrow('conflict changed after preflight');
     expect(target.projects.put).not.toHaveBeenCalled();
   }
 );
+
+it('restores an export catalogue with its independent Trash marker intact', async () => {
+  const target = stores();
+  const entry: ScenarioExportEntry = {
+    id: 'export',
+    projectId: 'project',
+    format: 'html',
+    filename: 'guide.html',
+    createdAt: 1,
+    size: 42,
+    trashState: { updatedAt: 2, trashedAt: 3 },
+  };
+  await putScenarioProjectBackupRestore({
+    operation: operation(),
+    root: {
+      assets: [],
+      entry: projectEntry(),
+      exportThumbnails: [],
+      exports: [entry],
+      stepDocuments: [],
+    },
+    stores: target,
+    tx: restoreTransaction(target),
+    strategy: 'replace',
+  });
+  expect(target.exports.put).toHaveBeenCalledWith(entry);
+});
+
+it('publishes a restored HTML body edge and queues only the replaced catalogue body for deletion', async () => {
+  const target = stores();
+  const old = {
+    id: 'old-export',
+    projectId: 'project',
+    filename: 'old.html',
+    format: 'html' as const,
+    createdAt: 1,
+    size: 4,
+    html: { mode: 'guide' as const, assetId: 'old-body' },
+  };
+  target.projects.get = vi.fn(async () => projectEntry());
+  target.exports.index = vi.fn(() => ({ getAll: vi.fn(async () => [old]) }));
+  target.owners.get = vi.fn(async () => ({
+    ownerKind: 'scenario-export',
+    ownerId: old.id,
+    role: 'body',
+    assetId: 'old-body',
+  }));
+  const htmlRef = {
+    ...ref,
+    assetId: 'restored-body',
+    location: { kind: 'opfs' as const, objectKey: 'objects/restored-body' },
+    mimeType: 'text/html',
+    size: 4,
+  };
+  const restored = {
+    ...old,
+    id: 'restored-export',
+    filename: 'renamed.html',
+    html: { mode: 'tour' as const, assetId: htmlRef.assetId },
+  };
+  const deletion = operation();
+  await putScenarioProjectBackupRestore({
+    stores: target,
+    tx: restoreTransaction(target),
+    strategy: 'replace',
+    operation: deletion,
+    root: {
+      entry: projectEntry(),
+      assets: [],
+      exports: [restored],
+      exportRefs: [htmlRef],
+      exportThumbnails: [],
+      stepDocuments: [],
+    },
+  });
+  expect(target.owners.delete).toHaveBeenCalledWith(['scenario-export', old.id, 'body']);
+  expect(deletion.assetIds).toEqual(['old-body']);
+  expect(target.refs.put).toHaveBeenCalledWith(htmlRef);
+  expect(target.owners.put).toHaveBeenCalledWith({
+    ownerKind: 'scenario-export',
+    ownerId: restored.id,
+    role: 'body',
+    assetId: htmlRef.assetId,
+  });
+  expect(target.exports.put).toHaveBeenCalledWith(restored);
+});
+
+function restoreTransaction(target: ScenarioBackupRestoreStores) {
+  const graph = { get: async () => undefined, getAll: async () => [], put: async () => undefined };
+  const stores = {
+    scenario_assets: target.assets,
+    scenario_exports: target.exports,
+    scenario_projects: target.projects,
+    scenario_step_editor_documents: target.stepDocuments,
+    asset_owners: target.owners,
+    asset_refs: target.refs,
+    media_library: graph,
+    recordings: graph,
+    project_assets: graph,
+    video_projects: graph,
+  };
+  return { objectStore: (name: keyof typeof stores) => stores[name] } as unknown as Parameters<
+    typeof putScenarioProjectBackupRestore
+  >[0]['tx'];
+}
+
+it.each(['document', 'asset', 'export'] as const)(
+  'refuses malformed existing %s before replacing the scenario',
+  async (kind) => {
+    const target = stores();
+    target.projects.get = vi.fn(async () => projectEntry());
+    const childStore =
+      kind === 'document'
+        ? target.stepDocuments
+        : kind === 'asset'
+          ? target.assets
+          : target.exports;
+    childStore.index = vi.fn(() => ({
+      getAll: vi.fn(async () => [{ id: 'broken', stepId: 'broken', projectId: 'project' }]),
+    }));
+    await expect(
+      putScenarioProjectBackupRestore({
+        operation: operation(),
+        root: {
+          assets: [],
+          entry: projectEntry(),
+          exports: [],
+          exportThumbnails: [],
+          stepDocuments: [],
+        },
+        stores: target,
+        tx: restoreTransaction(target),
+        strategy: 'replace',
+      })
+    ).rejects.toThrow();
+    expect(target.projects.delete).not.toHaveBeenCalled();
+    expect(target.owners.delete).not.toHaveBeenCalled();
+  }
+);
+
+it.each([false, true])(
+  'retains canonical byte collision refusal for borrowed=%s resources',
+  async (borrowed) => {
+    const target = stores();
+    const { createMediaLibraryEntry } = await import('../projects/index.test-support');
+    const media = createMediaLibraryEntry({
+      id: 'scenario-asset:child',
+      source: { kind: 'stored-asset', assetId: 'independent-bytes' },
+    });
+    const base = restoreTransaction(target);
+    const tx = {
+      objectStore: (name: Parameters<typeof base.objectStore>[0]) =>
+        name === 'media_library' ? { get: async () => media } : base.objectStore(name),
+    } as unknown as Parameters<typeof putScenarioProjectBackupRestore>[0]['tx'];
+    await expect(
+      putScenarioProjectBackupRestore({
+        operation: operation(),
+        strategy: 'replace',
+        stores: target,
+        tx,
+        root: {
+          entry: projectEntry(),
+          assets: [
+            {
+              ref,
+              entry: {
+                id: 'child',
+                projectId: 'project',
+                assetId: ref.assetId,
+                galleryAssetId: borrowed ? media.id : null,
+                ...(borrowed ? { borrowedMediaId: media.id } : {}),
+                mimeType: ref.mimeType,
+                size: ref.size,
+                width: 1,
+                height: 1,
+                createdAt: 1,
+              },
+            },
+          ],
+          exports: [],
+          exportThumbnails: [],
+          stepDocuments: [],
+        },
+      })
+    ).rejects.toThrow('Scenario replacement cannot overwrite an independent Library identity');
+    expect(target.projects.put).not.toHaveBeenCalled();
+    expect(target.assets.put).not.toHaveBeenCalled();
+    expect(target.owners.put).not.toHaveBeenCalled();
+  }
+);
+
+it('pins a restored scenario source only after accepting its parent', async () => {
+  const { createGuideStep, createGuideImageBlock } =
+    await import('../../../features/scenario/project/factories');
+  const { createMediaLibraryEntry } = await import('../projects/index.test-support');
+  const entry = projectEntry();
+  const step = createGuideStep('Imported');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'block',
+      assetId: 'child',
+      width: 1,
+      height: 1,
+      source: { kind: 'import', filename: 'image.png' },
+    }),
+  ];
+  entry.project.items = [step];
+  const asset = {
+    id: 'child',
+    projectId: entry.id,
+    assetId: 'local',
+    galleryAssetId: 'original',
+    mimeType: 'image/png',
+    width: 1,
+    height: 1,
+    size: 1,
+    createdAt: 1,
+  };
+  const media = createMediaLibraryEntry({
+    id: 'original',
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  for (const strategy of ['skip', 'replace'] as const) {
+    const target = stores();
+    target.projects.get = vi.fn(async () => entry);
+    target.assets.get = vi.fn(async () => asset);
+    const base = restoreTransaction(target);
+    const put = vi.fn();
+    const tx = {
+      objectStore: (name: Parameters<typeof base.objectStore>[0]) =>
+        name === 'media_library' ? { get: async () => media, put } : base.objectStore(name),
+    } as typeof base;
+    await putScenarioProjectBackupRestore({
+      stores: target,
+      tx,
+      strategy,
+      operation: operation(),
+      root: {
+        entry,
+        assets: [{ entry: asset, ref }],
+        exports: [],
+        exportThumbnails: [],
+        stepDocuments: [],
+      },
+    });
+    if (strategy === 'skip') expect(put).not.toHaveBeenCalled();
+    else
+      expect(put).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: media.id,
+          lifecycle: expect.objectContaining({ storageClass: 'library' }),
+        })
+      );
+  }
+});

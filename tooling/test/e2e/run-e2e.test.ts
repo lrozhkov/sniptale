@@ -24,9 +24,12 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
   expect(parseE2eOptions(['--suite', 'critical', '--headed'])).toMatchObject({
     headed: true,
     specs: [
+      'tooling/test/e2e/extension-critical/extension-critical-frozen-selection.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-scenario-viewing.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-popup.spec.ts',
@@ -132,9 +135,12 @@ it('records Playwright result after a green E2E build', () => {
     scope: 'runtime-smoke',
     suite: 'critical',
     targetFiles: [
+      'tooling/test/e2e/extension-critical/extension-critical-frozen-selection.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-scenario-viewing.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+      'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',
       'tooling/test/e2e/extension-critical/extension-critical-popup.spec.ts',

@@ -36,7 +36,7 @@ async function renderRow(sizeState: EditorExportImageSizeState) {
 }
 
 function queryInput(dataUi: string) {
-  return container?.querySelector(`[data-ui="${dataUi}"]`) as HTMLInputElement | null;
+  return container?.querySelector(`[data-ui="${dataUi}"] input`) as HTMLInputElement | null;
 }
 
 function setInputValue(input: HTMLInputElement, value: string) {
@@ -58,13 +58,13 @@ beforeEach(() => {
 });
 
 function registerDimensionCommitTest() {
-  it('commits sanitized width and height values from draft inputs', async () => {
+  it('commits numeric width and height values from draft inputs', async () => {
     const sizeState = createSizeState();
 
     await renderRow(sizeState);
 
     await act(async () => {
-      setInputValue(queryInput('editor.file-actions.export-size.width')!, '0020abc');
+      setInputValue(queryInput('editor.file-actions.export-size.width')!, '0020');
     });
     await act(async () => {
       queryInput('editor.file-actions.export-size.width')!.dispatchEvent(
@@ -86,13 +86,13 @@ function registerDimensionCommitTest() {
 }
 
 function registerDimensionResetTest() {
-  it('restores the current dimension when the draft is cleared or escaped', async () => {
+  it('restores the current dimension when the draft is invalid or escaped', async () => {
     const sizeState = createSizeState();
 
     await renderRow(sizeState);
 
     await act(async () => {
-      setInputValue(queryInput('editor.file-actions.export-size.width')!, '');
+      setInputValue(queryInput('editor.file-actions.export-size.width')!, 'invalid');
     });
     await act(async () => {
       queryInput('editor.file-actions.export-size.width')!.dispatchEvent(

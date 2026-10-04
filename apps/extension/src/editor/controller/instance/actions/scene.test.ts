@@ -99,10 +99,10 @@ function invokeSceneSyncCallbacks() {
 
   expect(zoomToFitOptions).toMatchObject({ canvasDocumentSize: { width: 800, height: 600 } });
   expect(setZoomOptions).toMatchObject({ zoomLevel: 0.8 });
+  zoomToFitOptions?.setZoomLevel(0.8);
   zoomToFitOptions?.syncViewportState();
-  zoomToFitOptions?.syncRuntimeState();
+  setZoomOptions?.setZoomLevel(1.75);
   setZoomOptions?.syncViewportState();
-  setZoomOptions?.syncRuntimeState();
   navigateViewportOptions?.syncViewportState();
 }
 
@@ -123,7 +123,7 @@ function expectSceneNavigationRouted(controller: SceneControllerStub) {
     })
   );
   expect(controller.syncViewportState).toHaveBeenCalledTimes(3);
-  expect(controller.syncRuntimeState).toHaveBeenCalledTimes(2);
+  expect(controller.syncRuntimeState).not.toHaveBeenCalled();
 }
 
 async function runSceneMutationFlow(

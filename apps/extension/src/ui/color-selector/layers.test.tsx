@@ -105,23 +105,16 @@ it('renders picker and palette content in floating layers under the trigger', ()
   ) as HTMLDivElement | null;
   expect(pickerLayer?.className).toContain('fixed');
   expect(pickerLayer?.dataset['floatingUiRoot']).toBe('true');
-  expect(pickerLayer?.style.width).toBe('224px');
+  expect(pickerLayer?.style.width).toBe('280px');
   expect(container!.querySelector('[data-ui="shared.ui.color-selector.picker"]')).toBeNull();
   expect(document.body.querySelector('[data-ui="shared.ui.color-selector.picker"]')).not.toBeNull();
 
-  act(() => {
-    getButton('shared.ui.colorSelectorChooseColor')?.click();
-  });
-  act(() => {
-    getButton('Цвет')?.click();
-  });
-  const expandedLayer = document.body.querySelector(
-    '[data-ui="shared.ui.color-selector.expanded-layer"]'
-  ) as HTMLDivElement | null;
-  expect(expandedLayer?.className).toContain('fixed');
-  expect(expandedLayer?.dataset['floatingUiRoot']).toBe('true');
-  expect(expandedLayer?.style.width).toBe('224px');
-  expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
+  expect(
+    pickerLayer?.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')
+  ).not.toBeNull();
+  expect(
+    document.body.querySelector('[data-ui="shared.ui.color-selector.palette-trigger"]')
+  ).toBeNull();
 });
 
 it('disables both color actions and closes an open layer when the field becomes linked', () => {
@@ -199,13 +192,13 @@ it('keeps color layers pointer-interactive and anchored to owning scroll parents
     '[data-ui="shared.ui.color-selector.picker-layer"]'
   )!;
   expect(pickerLayer.style.pointerEvents).toBe('auto');
-  expect(pickerLayer.style.top).toBe('78px');
+  expect(pickerLayer.style.top).toBe('76px');
 
   anchorTop = 110;
   act(() => {
     scroller.dispatchEvent(new Event('scroll'));
   });
-  expect(pickerLayer.style.top).toBe('156px');
+  expect(pickerLayer.style.top).toBe('154px');
 });
 
 it('places a side picker outside its owning panel boundary', () => {
@@ -260,7 +253,7 @@ it('places a side picker outside its owning panel boundary', () => {
   const pickerLayer = document.body.querySelector<HTMLElement>(
     '[data-ui="shared.ui.color-selector.picker-layer"]'
   )!;
-  expect(pickerLayer.style.left).toBe('310px');
+  expect(pickerLayer.style.left).toBe('308px');
   expect(pickerLayer.style.top).toBe('160px');
   expect(pickerLayer.style.transform).toBe('');
 });

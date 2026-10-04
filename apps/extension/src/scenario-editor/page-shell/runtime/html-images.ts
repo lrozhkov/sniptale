@@ -25,15 +25,29 @@ export interface HtmlRaster {
   mime: string;
 }
 
+/** Missing media is recoverable by replacing/removing its occurrence, never by omitting pixels. */
+export class MissingGuideHtmlImageError extends Error {
+  constructor(readonly blockId: string) {
+    super('Missing export image.');
+    this.name = 'MissingGuideHtmlImageError';
+  }
+}
+
 /** Sequential native rendering retains at most one source and output bitmap. */
 export async function prepareHtmlImage(
   block: GuideImageBlock,
   settings: GuideHtmlImageSettings,
-  signal: AbortSignal
+  signal: AbortSignal,
+  readAsset = getScenarioAssetBlob
 ) {
-  const source = await getScenarioAssetBlob(block.assetId);
+  const source = await readAsset(block.assetId).catch((error: unknown) => {
+    signal.throwIfAborted();
+    if (error instanceof DOMException && error.name === 'NotFoundError')
+      throw new MissingGuideHtmlImageError(block.id);
+    throw error;
+  });
   signal.throwIfAborted();
-  if (!source) throw new Error('Missing export image.');
+  if (!source) throw new MissingGuideHtmlImageError(block.id);
   await assertImportableProjectImage(source);
   const blob =
     settings.content === 'frame' ? await renderGuideImageFrame(source, block, signal) : source;
@@ -41,17 +55,18 @@ export async function prepareHtmlImage(
   let canvas: OffscreenCanvas | undefined;
   try {
     signal.throwIfAborted();
-    const ratio = settings.optimize
-      ? Math.min(
-          1,
-          settings.maxEdge / Math.max(bitmap.width, bitmap.height),
-          Math.sqrt(16_000_000 / (bitmap.width * bitmap.height))
-        )
-      : 1;
+    const ratio =
+      settings.content === 'full' && settings.optimize
+        ? Math.min(
+            1,
+            settings.maxEdge / Math.max(bitmap.width, bitmap.height),
+            Math.sqrt(16_000_000 / (bitmap.width * bitmap.height))
+          )
+        : 1;
     const width = Math.max(1, Math.floor(bitmap.width * ratio));
     const height = Math.max(1, Math.floor(bitmap.height * ratio));
     let output = blob;
-    if (settings.optimize) {
+    if (settings.content === 'frame' || settings.optimize) {
       canvas = new OffscreenCanvas(width, height);
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Image rendering unavailable.');
@@ -75,7 +90,11 @@ export async function prepareHtmlImage(
 }
 
 /** Measurement keeps metadata only; payloads are prepared again when the file is streamed. */
-export async function measureHtmlImages(project: GuideProject, signal: AbortSignal) {
+export async function measureHtmlImages(
+  project: GuideProject,
+  signal: AbortSignal,
+  readAsset = getScenarioAssetBlob
+) {
   const rasters: HtmlRaster[] = [];
   const indices = new Map<string, number>();
   const blocks = new Map<string, number>();
@@ -85,7 +104,7 @@ export async function measureHtmlImages(project: GuideProject, signal: AbortSign
     let index = indices.get(key);
     if (index === undefined) {
       index = rasters.length;
-      const { blob, ...metadata } = await prepareHtmlImage(block, settings, signal);
+      const { blob, ...metadata } = await prepareHtmlImage(block, settings, signal, readAsset);
       void blob;
       rasters.push({ block, settings, ...metadata });
       indices.set(key, index);

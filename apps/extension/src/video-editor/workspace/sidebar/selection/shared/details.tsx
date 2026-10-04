@@ -1,16 +1,32 @@
+import { useInspectorDisclosure } from '../../../../../composition/inspector-disclosures/state';
 import type { ReactNode } from 'react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 
-export function InspectorDetails(props: { label: string; children: ReactNode }) {
+/** Native disclosure keeps editing controls mounted while its contents are collapsed. */
+export function InspectorDetails(props: {
+  label: string;
+  preferenceId: string;
+  children: ReactNode;
+  icon?: LucideIcon;
+  initiallyOpen?: boolean;
+  level?: 'section' | 'group';
+}) {
+  const [open, setOpen] = useInspectorDisclosure(props.preferenceId, props.initiallyOpen ?? false);
+  const Icon = props.icon;
+  const Heading = props.level === 'section' ? 'h3' : 'h4';
   return (
     <details
-      className="group/inspector-details border-t
-      border-[var(--sniptale-color-border-subtle)] pt-2 text-xs"
+      data-ui="video-editor.inspector.disclosure"
+      data-level={props.level ?? 'group'}
+      open={open}
+      onToggle={(event) => {
+        if (event.currentTarget.open !== open) setOpen(event.currentTarget.open);
+      }}
     >
-      <summary
-        className="cursor-pointer py-1 text-[var(--sniptale-color-text-secondary)]
-        focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
-      >
-        {props.label}
+      <summary>
+        {Icon ? <Icon size={16} aria-hidden="true" /> : null}
+        <Heading>{props.label}</Heading>
+        <ChevronDown size={props.level === 'section' ? 16 : 14} aria-hidden="true" />
       </summary>
       <div className="space-y-2 pt-2">{props.children}</div>
     </details>

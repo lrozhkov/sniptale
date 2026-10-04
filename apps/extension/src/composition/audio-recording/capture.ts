@@ -5,17 +5,25 @@ import type {
 } from './session-types';
 
 function startRecordingDurationTimer(
-  timerRef: AudioRecordingRefs['timerRef'],
+  refs: AudioRecordingRefs,
   setDurationSeconds: AudioRecordingState['setDurationSeconds'],
-  startedAt: number,
   recorder: MediaRecorder,
   limit?: number
 ) {
-  timerRef.current = window.setInterval(() => {
-    const elapsed = (performance.now() - startedAt) / 1000;
+  refs.timerRef.current = window.setInterval(() => {
+    const elapsed = recordingElapsed(refs);
     setDurationSeconds(Math.min(elapsed, limit ?? Infinity));
     if (limit !== undefined && elapsed >= limit && recorder.state === 'recording') recorder.stop();
   }, 150);
+}
+
+export function recordingElapsed(refs: AudioRecordingRefs): number {
+  const clock = refs.clockRef.current;
+  if (!clock) return 0;
+  return Math.max(
+    0,
+    ((clock.pausedAt ?? performance.now()) - clock.startedAt - clock.pausedTotal) / 1000
+  );
 }
 
 function bindRecorderDataEvents(
@@ -39,7 +47,7 @@ function bindRecorderStopEvent(args: {
   sessionId: number;
   sessionRef: AudioRecordingRefs['sessionRef'];
   state: AudioRecordingState;
-  startedAt: number;
+  refs: AudioRecordingRefs;
   stopStream: () => void;
   timeline?: RecordingSessionArgs['timeline'];
 }) {
@@ -54,7 +62,7 @@ function bindRecorderStopEvent(args: {
     });
     const elapsedSeconds = Math.min(
       args.timeline?.duration ?? Infinity,
-      Math.max(0.1, (performance.now() - args.startedAt) / 1000)
+      Math.max(0.1, recordingElapsed(args.refs))
     );
     args.state.setAudioBlob(blob);
     args.state.setAudioUrl(URL.createObjectURL(blob));
@@ -78,7 +86,7 @@ function beginRecordedSessionState(state: AudioRecordingState) {
 export async function beginRecordingSession(args: RecordingSessionArgs) {
   const sessionId = args.refs.sessionRef.current;
 
-  let microphoneReady = false;
+  let stage: 'permission' | 'playback' | 'recorder' = 'permission';
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: args.deviceId ? { deviceId: { exact: args.deviceId } } : true,
@@ -89,22 +97,28 @@ export async function beginRecordingSession(args: RecordingSessionArgs) {
     }
 
     args.refs.streamRef.current = stream;
-    microphoneReady = true;
+    stage = 'playback';
     await args.timeline?.beforeStart();
     if (sessionId !== args.refs.sessionRef.current) {
       stream.getTracks().forEach((track) => track.stop());
       return;
     }
+    stage = 'recorder';
     const recorder = createRecorder(stream, args.mimeType);
     const startedAt = performance.now();
+    args.refs.clockRef.current = {
+      startedAt,
+      pausedAt: null,
+      pausedTotal: 0,
+      limit: args.timeline?.duration,
+    };
     args.refs.chunksRef.current = [];
     args.refs.streamRef.current = stream;
     args.refs.mediaRecorderRef.current = recorder;
     beginRecordedSessionState(args.state);
     startRecordingDurationTimer(
-      args.refs.timerRef,
+      args.refs,
       args.state.setDurationSeconds,
-      startedAt,
       recorder,
       args.timeline?.duration
     );
@@ -117,7 +131,7 @@ export async function beginRecordingSession(args: RecordingSessionArgs) {
       recorder,
       sessionId,
       sessionRef: args.refs.sessionRef,
-      startedAt,
+      refs: args.refs,
       state: args.state,
       stopStream: args.stopStream,
     });
@@ -126,6 +140,12 @@ export async function beginRecordingSession(args: RecordingSessionArgs) {
     if (sessionId !== args.refs.sessionRef.current) return;
     args.timeline?.onStop();
     args.resetSession();
-    args.state.setError(microphoneReady ? args.errors.startFailed : args.errors.permissionDenied);
+    args.state.setError(
+      stage === 'permission'
+        ? args.errors.permissionDenied
+        : stage === 'playback'
+          ? args.errors.playFailed
+          : args.errors.startFailed
+    );
   }
 }

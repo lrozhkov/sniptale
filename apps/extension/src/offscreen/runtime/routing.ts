@@ -1,3 +1,4 @@
+import { offscreenDataReadiness, prepareOffscreenRecordingData } from './data-readiness';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { ResponseSender } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -200,6 +201,7 @@ export async function handleOffscreenRuntimeMessage(
   | { challenge: string; offscreenStartupId: string; state: 'failed' | 'ready' }
   | { leaseId: string; result: 'leased'; url: string }
   | { result: 'confirmed' | 'released' | 'stale' }
+  | { result: 'prepared'; leaseId: string }
   | 'accepted'
   | 'applied'
   | 'copied'
@@ -207,6 +209,7 @@ export async function handleOffscreenRuntimeMessage(
 > {
   switch (message.type) {
     case MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE:
+      await offscreenDataReadiness.ensureAssets();
       return createPagePackageDownloadLease(message);
     case MessageType.OFFSCREEN_CONFIRM_PAGE_PACKAGE_DOWNLOAD_LEASE:
       return confirmPagePackageDownloadLease(message);
@@ -232,6 +235,12 @@ export async function handleOffscreenRuntimeMessage(
       handlePageStoragePrivacyErasure(message, sendResponse);
       return;
     case MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE: {
+      if (message.operation === 'prepare') {
+        await offscreenDataReadiness.ensureAdmission();
+        return { result: 'prepared', leaseId: message.leaseId };
+      }
+      // The caller now holds a shared transition; cold admission would wait on that caller.
+      offscreenDataReadiness.requireAdmission();
       try {
         await cleanupFrameAnnotationRasterJobs();
         const input = await acquireFrameAnnotationRasterInput(message.reference);
@@ -263,7 +272,7 @@ export async function handleOffscreenRuntimeMessage(
       disposeMultiSourceDesktopMedia();
       return;
     case VideoMessageType.OFFSCREEN_START_RECORDING:
-      await startRecording(buildStartRecordingArgs(message));
+      await startRecording(buildStartRecordingArgs(message), prepareOffscreenRecordingData);
       return;
     case VideoMessageType.OFFSCREEN_BEGIN_RECORDING:
       assertRecordingBegin(message);

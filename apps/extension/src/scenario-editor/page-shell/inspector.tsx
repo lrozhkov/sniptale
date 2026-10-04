@@ -1,5 +1,6 @@
-import { createContext, useContext, type ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
+import { createContext, useContext, useId, type ReactNode } from 'react';
+import { ChevronDown, type LucideIcon } from 'lucide-react';
 import { NumericValueField } from '../../ui/compact-inspector-controls/numeric';
 import './inspector.css';
 
@@ -28,26 +29,60 @@ export function InspectorCategorizedContent({
 /** Consistent section hierarchy for document, step and block properties. */
 export function GuideInspectorGroup({
   title,
+  id,
   icon: Icon,
   action,
+  collapsible = true,
+  level = 'section',
   children,
 }: {
   title: string;
+  id: string;
   icon: LucideIcon;
   action?: ReactNode;
+  collapsible?: boolean;
+  level?: 'section' | 'group';
   children: ReactNode;
 }) {
   const categorized = useContext(InspectorCategorizedContentContext);
+  const Heading = level === 'group' ? 'h4' : 'h3';
+  const [expanded, setExpanded] = useInspectorDisclosure(id, true);
+  const bodyId = useId();
   return (
-    <section className="guide-inspector-group" aria-label={title}>
+    <section className="guide-inspector-group" data-level={level} aria-label={title}>
       {!categorized && (
         <div className="guide-inspector-group-heading">
-          <Icon size={15} aria-hidden="true" />
-          <h3>{title}</h3>
+          <Heading>
+            {collapsible ? (
+              <button
+                type="button"
+                className="guide-inspector-disclosure"
+                aria-expanded={expanded}
+                aria-controls={bodyId}
+                onClick={() => setExpanded(!expanded)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span>{title}</span>
+                <ChevronDown size={16} aria-hidden="true" />
+              </button>
+            ) : (
+              <span className="guide-inspector-static-heading">
+                <Icon size={16} aria-hidden="true" />
+                <span>{title}</span>
+              </span>
+            )}
+          </Heading>
           {action}
         </div>
       )}
-      <div className="guide-inspector-group-body">{children}</div>
+      <div
+        id={bodyId}
+        className="guide-inspector-group-body"
+        data-compact-select-menu-bounds=""
+        hidden={collapsible && !categorized && !expanded}
+      >
+        {children}
+      </div>
     </section>
   );
 }
@@ -81,7 +116,7 @@ export function GuideInspectorNumber({
         step={step}
         precision={0}
         disabled={disabled}
-        focusAppearance="quiet"
+        focusAppearance="accent-box"
         normalizeValue={Math.round}
         onPreviewValue={() => {}}
         onCommitValue={onChange}

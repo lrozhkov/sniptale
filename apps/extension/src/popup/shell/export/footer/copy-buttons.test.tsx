@@ -58,6 +58,12 @@ describe('ExportFooterCopyButtons', () => {
     expect(buttons).toHaveLength(2);
     expect(buttons?.[0]?.getAttribute('title')).toBe('Copy JSON current tab');
     expect(buttons?.[1]?.getAttribute('title')).toBe('Copy Markdown current tab');
+    expect(buttons?.[0]?.querySelector('svg')?.getAttribute('class')).toContain(
+      'group-hover:text-[var(--sniptale-color-accent)]'
+    );
+    expect(buttons?.[1]?.querySelector('svg')?.getAttribute('class')).toContain(
+      'group-hover:text-[var(--sniptale-color-accent)]'
+    );
 
     await act(async () => {
       buttons?.[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

@@ -12,6 +12,7 @@ export {
 export {
   redoEditorControllerSnapshot,
   resetEditorControllerToOriginal,
+  restoreEditorControllerOriginalDocument,
   undoEditorControllerSnapshot,
 } from './history';
 export {

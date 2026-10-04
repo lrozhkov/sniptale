@@ -1,0 +1,3269 @@
+"use strict";
+(() => {
+  // packages/runtime-contracts/src/scenario/types/tour.ts
+  var TOUR_HINT_SURFACE = {
+    fillPaint: { kind: "solid", color: "#ffffff" },
+    surfaceCss: "",
+    textColor: "#111827",
+    width: 340,
+    padding: 12,
+    radius: 14
+  };
+  function resolveTourTextAppearance(kind, value, defaults) {
+    const appearance = value ?? defaults;
+    return {
+      ...appearance,
+      calloutGap: appearance.calloutGap ?? defaults.calloutGap ?? 30,
+      ...appearance.surface ?? defaults.surface ? { surface: appearance.surface ?? defaults.surface } : {},
+      presentation: kind === "hotspot" ? "callout" : appearance.presentation === "caption-top" ? "caption-top" : "caption-bottom"
+    };
+  }
+  var TOUR_MARKER_DEFAULTS = {
+    color: null,
+    pulseColor: null,
+    size: 30
+  };
+  function resolveTourMarkerAppearance(style, hotspot) {
+    return { ...hotspot?.markerAppearance ?? style.markerAppearance ?? TOUR_MARKER_DEFAULTS };
+  }
+  var TOUR_MASK_DEFAULTS = {
+    highlight: { paint: { kind: "solid", color: "#f97316" }, opacity: 0.3 },
+    spotlight: { color: "#111827", opacity: 0.6 },
+    blur: { radius: 12 }
+  };
+  function resolveTourMask(mask, defaults = TOUR_MASK_DEFAULTS) {
+    if (!mask.inheritStyle || mask.kind === "redact") return mask;
+    return {
+      ...mask,
+      paint: defaults.highlight.paint,
+      opacity: defaults.highlight.opacity,
+      spotlightColor: defaults.spotlight.color,
+      spotlightOpacity: defaults.spotlight.opacity,
+      blurRadius: defaults.blur.radius
+    };
+  }
+  function tourTextDefaults(style, kind) {
+    return kind === "hotspot" ? style.hotspotAppearance ?? style.textAppearance : style.textAppearance;
+  }
+  function getTourSlideObjects(slide) {
+    const grouped = [
+      ...slide.hotspots.map((object) => ({ type: "hotspot", object })),
+      ...slide.annotations.map((object) => ({ type: "annotation", object })),
+      ...slide.masks.map((object) => ({ type: "mask", object }))
+    ];
+    if (!slide.objectOrder) return grouped;
+    const pending = new Map(grouped.map((entry) => [entry.object.id, entry]));
+    const ordered = slide.objectOrder.flatMap((objectId) => {
+      const entry = pending.get(objectId);
+      if (!entry) return [];
+      pending.delete(objectId);
+      return [entry];
+    });
+    return [...ordered, ...pending.values()];
+  }
+  var TOUR_NAVIGATION_LAYOUT = {
+    width: 64,
+    align: "center",
+    vertical: "center",
+    padding: 6,
+    gap: 12,
+    columns: 1
+  };
+
+  // packages/foundation/src/paint/contracts.ts
+  var PAINT_INTERPOLATION_SPACES = ["srgb", "srgb-linear", "oklab", "oklch"];
+  var MIN_GRADIENT_STOPS = 2;
+  var MAX_GRADIENT_STOPS = 16;
+
+  // packages/foundation/src/color/index.ts
+  var TRANSPARENT_COLOR = "transparent";
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+  function byte(value) {
+    return Math.round(clamp(value, 0, 255));
+  }
+  function unit(value) {
+    return clamp(value, 0, 1);
+  }
+  function parseHex(value) {
+    const match = value.match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i);
+    if (!match?.[1]) return null;
+    const raw = match[1];
+    const expanded = raw.length <= 4 ? [...raw].map((digit) => digit + digit).join("") : raw;
+    const hasAlpha = expanded.length === 8;
+    return {
+      red: Number.parseInt(expanded.slice(0, 2), 16),
+      green: Number.parseInt(expanded.slice(2, 4), 16),
+      blue: Number.parseInt(expanded.slice(4, 6), 16),
+      alpha: hasAlpha ? Number.parseInt(expanded.slice(6, 8), 16) / 255 : 1
+    };
+  }
+  function parseRgbChannel(value) {
+    const trimmed = value.trim();
+    const parsed = Number.parseFloat(trimmed);
+    if (!Number.isFinite(parsed)) return null;
+    return trimmed.endsWith("%") ? byte(parsed / 100 * 255) : byte(parsed);
+  }
+  function parseAlpha(value) {
+    if (value === void 0) return 1;
+    const trimmed = value.trim();
+    const parsed = Number.parseFloat(trimmed);
+    if (!Number.isFinite(parsed)) return null;
+    return unit(trimmed.endsWith("%") ? parsed / 100 : parsed);
+  }
+  function splitFunctionalChannels(body) {
+    return body.replaceAll("/", ",").split(/[\s,]+/u).filter(Boolean);
+  }
+  function parseRgb(value) {
+    const match = value.match(/^rgba?\((.*)\)$/i);
+    if (!match?.[1]) return null;
+    const channels = splitFunctionalChannels(match[1]);
+    if (channels.length < 3 || channels.length > 4) return null;
+    const red = parseRgbChannel(channels[0] ?? "");
+    const green = parseRgbChannel(channels[1] ?? "");
+    const blue = parseRgbChannel(channels[2] ?? "");
+    const alpha = parseAlpha(channels[3]);
+    return red === null || green === null || blue === null || alpha === null ? null : { red, green, blue, alpha };
+  }
+  function hueToRgb(p, q, hue) {
+    let normalized = hue;
+    if (normalized < 0) normalized += 1;
+    if (normalized > 1) normalized -= 1;
+    if (normalized < 1 / 6) return p + (q - p) * 6 * normalized;
+    if (normalized < 1 / 2) return q;
+    if (normalized < 2 / 3) return p + (q - p) * (2 / 3 - normalized) * 6;
+    return p;
+  }
+  function parsePercent(value) {
+    if (!value.trim().endsWith("%")) return null;
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? unit(parsed / 100) : null;
+  }
+  function parseHsl(value) {
+    const match = value.match(/^hsla?\((.*)\)$/i);
+    if (!match?.[1]) return null;
+    const channels = splitFunctionalChannels(match[1]);
+    if (channels.length < 3 || channels.length > 4) return null;
+    const hue = Number.parseFloat(channels[0] ?? "");
+    const saturation = parsePercent(channels[1] ?? "");
+    const lightness = parsePercent(channels[2] ?? "");
+    const alpha = parseAlpha(channels[3]);
+    if (!Number.isFinite(hue) || saturation === null || lightness === null || alpha === null) {
+      return null;
+    }
+    const normalizedHue = (hue % 360 + 360) % 360 / 360;
+    if (saturation === 0) {
+      const channel = byte(lightness * 255);
+      return { red: channel, green: channel, blue: channel, alpha };
+    }
+    const q = lightness < 0.5 ? lightness * (1 + saturation) : lightness + saturation - lightness * saturation;
+    const p = 2 * lightness - q;
+    return {
+      red: byte(hueToRgb(p, q, normalizedHue + 1 / 3) * 255),
+      green: byte(hueToRgb(p, q, normalizedHue) * 255),
+      blue: byte(hueToRgb(p, q, normalizedHue - 1 / 3) * 255),
+      alpha
+    };
+  }
+  function parseColor(value) {
+    const trimmed = value.trim();
+    if (trimmed.toLowerCase() === TRANSPARENT_COLOR) {
+      return { red: 0, green: 0, blue: 0, alpha: 0 };
+    }
+    return parseHex(trimmed) ?? parseRgb(trimmed) ?? parseHsl(trimmed);
+  }
+
+  // packages/foundation/src/paint/normalize.ts
+  var HEX_BYTE = (value) => Math.round(Math.min(255, Math.max(0, value))).toString(16).padStart(2, "0");
+  var clamp2 = (value, min, max) => Math.min(max, Math.max(min, value));
+  var finite = (value) => typeof value === "number" && Number.isFinite(value);
+  var record = (value) => typeof value === "object" && value !== null && !Array.isArray(value);
+  function normalizePaintColor(value) {
+    const parsed = parseColor(value);
+    return parsed ? `#${HEX_BYTE(parsed.red)}${HEX_BYTE(parsed.green)}${HEX_BYTE(parsed.blue)}${HEX_BYTE(parsed.alpha * 255)}` : null;
+  }
+  function normalizeAngle(value) {
+    return (value % 360 + 360) % 360;
+  }
+  function parseStops(value) {
+    if (!Array.isArray(value) || value.length < MIN_GRADIENT_STOPS || value.length > MAX_GRADIENT_STOPS) {
+      return null;
+    }
+    const ids = /* @__PURE__ */ new Set();
+    const stops = [];
+    for (const [sourceIndex, item] of value.entries()) {
+      if (!record(item) || typeof item["id"] !== "string" || item["id"].length === 0 || ids.has(item["id"]) || typeof item["color"] !== "string" || !finite(item["position"]) || item["midpoint"] !== void 0 && !finite(item["midpoint"])) {
+        return null;
+      }
+      const color = normalizePaintColor(item["color"]);
+      if (!color) return null;
+      ids.add(item["id"]);
+      stops.push({
+        id: item["id"],
+        color,
+        position: clamp2(item["position"], 0, 1),
+        midpoint: clamp2(item["midpoint"] ?? 0.5, 0.01, 0.99),
+        sourceIndex
+      });
+    }
+    stops.sort(
+      (left, right) => left.position - right.position || left.sourceIndex - right.sourceIndex
+    );
+    return stops.map(({ sourceIndex: _sourceIndex, ...stop }) => stop);
+  }
+  var isInterpolationSpace = (value) => typeof value === "string" && PAINT_INTERPOLATION_SPACES.some((candidate) => candidate === value);
+  function parseGradient(value) {
+    if (!record(value) || typeof value["type"] !== "string" || !["linear", "radial", "conic"].includes(value["type"]))
+      return null;
+    const stops = parseStops(value["stops"]);
+    const repeat = record(value["repeat"]) ? value["repeat"] : null;
+    const interpolation2 = isInterpolationSpace(value["interpolation"]) ? value["interpolation"] : null;
+    if (!stops || !repeat || typeof repeat["enabled"] !== "boolean" || !finite(repeat["span"]) || !interpolation2) {
+      return null;
+    }
+    const base = {
+      stops,
+      interpolation: interpolation2,
+      repeat: { enabled: repeat["enabled"], span: clamp2(repeat["span"], 0.01, 1) }
+    };
+    if (value["type"] === "linear" && finite(value["angle"])) {
+      return { ...base, type: "linear", angle: normalizeAngle(value["angle"]) };
+    }
+    const center = record(value["center"]) ? value["center"] : null;
+    if (!center || !finite(center["x"]) || !finite(center["y"])) return null;
+    const normalizedCenter = { x: clamp2(center["x"], 0, 1), y: clamp2(center["y"], 0, 1) };
+    if (value["type"] === "conic" && finite(value["startAngle"])) {
+      return {
+        ...base,
+        type: "conic",
+        center: normalizedCenter,
+        startAngle: normalizeAngle(value["startAngle"])
+      };
+    }
+    const radius = record(value["radius"]) ? value["radius"] : null;
+    if (value["type"] !== "radial" || !radius || !finite(radius["x"]) || !finite(radius["y"]))
+      return null;
+    return {
+      ...base,
+      type: "radial",
+      center: normalizedCenter,
+      radius: { x: clamp2(radius["x"], 0.01, 1), y: clamp2(radius["y"], 0.01, 1) }
+    };
+  }
+  function parsePaint(value) {
+    if (!record(value) || value["kind"] !== "solid" && value["kind"] !== "gradient") return null;
+    if (value["kind"] === "solid") {
+      const color = typeof value["color"] === "string" ? normalizePaintColor(value["color"]) : null;
+      return color ? { kind: "solid", color } : null;
+    }
+    const gradient = parseGradient(value["gradient"]);
+    return gradient ? { kind: "gradient", gradient } : null;
+  }
+
+  // packages/foundation/src/paint/css.ts
+  var percent = (value) => `${Number((value * 100).toFixed(3))}%`;
+  var interpolation = (gradient) => gradient.interpolation === "srgb" ? "" : ` in ${gradient.interpolation}`;
+  function colorStops(gradient) {
+    const span = gradient.repeat.enabled ? gradient.repeat.span : 1;
+    return gradient.stops.flatMap((stop, index) => {
+      const current = `${stop.color} ${percent(stop.position * span)}`;
+      const next = gradient.stops[index + 1];
+      if (!next || stop.midpoint === 0.5) return [current];
+      const hint = stop.position + (next.position - stop.position) * stop.midpoint;
+      return [current, percent(hint * span)];
+    }).join(", ");
+  }
+  function serializePaintToCss(paint) {
+    const canonical = parsePaint(paint);
+    if (!canonical) return "transparent";
+    if (canonical.kind === "solid") return canonical.color;
+    const gradient = canonical.gradient;
+    const prefix = gradient.repeat.enabled ? "repeating-" : "";
+    const stops = colorStops(gradient);
+    if (gradient.type === "linear") {
+      return `${prefix}linear-gradient(${gradient.angle}deg${interpolation(gradient)}, ${stops})`;
+    }
+    const center = `${percent(gradient.center.x)} ${percent(gradient.center.y)}`;
+    if (gradient.type === "radial") {
+      const radius = `${percent(gradient.radius.x)} ${percent(gradient.radius.y)}`;
+      return `${prefix}radial-gradient(ellipse ${radius} at ${center}${interpolation(gradient)}, ${stops})`;
+    }
+    return `${prefix}conic-gradient(from ${gradient.startAngle}deg at ${center}${interpolation(gradient)}, ${stops})`;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/camera.js
+  var clamp3 = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+  function resolveTourCamera(slide, viewport, autoZoom) {
+    if (!slide.image || viewport.stageWidth <= 0 || viewport.stageHeight <= 0) return null;
+    const { stageWidth, stageHeight } = viewport;
+    const scale = (slide.fit === "cover" ? Math.max : Math.min)(
+      stageWidth / slide.image.width,
+      stageHeight / slide.image.height
+    );
+    const baseWidth = slide.image.width * scale;
+    const baseHeight = slide.image.height * scale;
+    const minimumZoom = Math.min(stageWidth / baseWidth, stageHeight / baseHeight);
+    const automatic = tourCameraEnabled(slide, autoZoom) && slide.camera.mode !== "manual";
+    const camera = slide.camera.mode === "manual" ? slide.camera : automatic ? autoCamera(
+      slide.hotspots[0],
+      baseWidth,
+      baseHeight,
+      stageWidth,
+      stageHeight,
+      minimumZoom,
+      slide.camera.targetZoom
+    ) : { zoom: 1, center: { x: 0.5, y: 0.5 } };
+    const zoom = clamp3(camera.zoom, automatic ? minimumZoom : 1, 8);
+    const width = baseWidth * zoom;
+    const height = baseHeight * zoom;
+    const center = {
+      x: boundedCenter(camera.center.x, width, stageWidth),
+      y: boundedCenter(camera.center.y, height, stageHeight)
+    };
+    return {
+      x: stageWidth / 2 - center.x * width,
+      y: stageHeight / 2 - center.y * height,
+      width,
+      height,
+      zoom,
+      center
+    };
+  }
+  function boundedCenter(center, imageSize, viewportSize) {
+    if (imageSize <= viewportSize) return 0.5;
+    const half = viewportSize / (2 * imageSize);
+    return clamp3(center, half, 1 - half);
+  }
+  function autoCamera(hotspot, width, height, stageWidth, stageHeight, minimumZoom, targetZoom) {
+    const rect = hotspot.targetRect;
+    const left = Math.min(hotspot.point.x, rect?.x ?? hotspot.point.x);
+    const top = Math.min(hotspot.point.y, rect?.y ?? hotspot.point.y);
+    const right = Math.max(hotspot.point.x, rect ? rect.x + rect.width : hotspot.point.x);
+    const bottom = Math.max(hotspot.point.y, rect ? rect.y + rect.height : hotspot.point.y);
+    const contextWidth = Math.max(0.2, (right - left) * 1.5);
+    const contextHeight = Math.max(0.2, (bottom - top) * 1.5);
+    return {
+      zoom: targetZoom ?? clamp3(
+        Math.min(stageWidth / (width * contextWidth), stageHeight / (height * contextHeight)),
+        minimumZoom,
+        4
+      ),
+      center: { x: (left + right) / 2, y: (top + bottom) / 2 }
+    };
+  }
+  function resolveTourEditingCamera(slide, viewport) {
+    return resolveTourCamera({ ...slide, camera: { ...slide.camera, mode: "off" } }, viewport, false);
+  }
+  function tourCameraEnabled(slide, autoZoom) {
+    if (slide?.kind !== "image" || !slide.image) return false;
+    if (slide.camera.mode === "manual") return true;
+    return !slide.requiresTargetReview && slide.hotspots.length === 1 && (slide.camera.mode === "auto" || slide.camera.mode === "inherit" && autoZoom);
+  }
+
+  // apps/extension/src/features/scenario/project/tour-resources.ts
+  function getTourNarrationTargets(slide) {
+    return [
+      slide,
+      ...slide.kind === "image" ? getTourSlideObjects(slide).map((entry) => entry.object) : slide.buttons
+    ];
+  }
+  function getTourNarrationCues(slide, event) {
+    return getTourNarrationTargets(slide).flatMap((target) => {
+      const narration = target.narration;
+      if (!narration) return [];
+      const objectId = target === slide ? null : target.id;
+      const trigger = "trigger" in narration ? narration.trigger : "enter";
+      if (event.kind !== trigger || event.kind === "activation" && event.objectId !== objectId)
+        return [];
+      return [{ slideId: slide.id, objectId, narration }];
+    });
+  }
+
+  // apps/extension/src/features/scenario/tour-player/timing.js
+  function tourSlideDuration(tour, slide) {
+    const texts = slide.kind === "image" ? [
+      slide.title,
+      ...slide.hotspots.flatMap((point) => [point.label, point.text]),
+      ...slide.annotations.map((note) => note.text)
+    ] : [slide.title, slide.description, ...slide.buttons.map((button) => button.label)];
+    const characters = texts.join(" ").trim().length;
+    const readingSeconds = characters ? 1 + characters / 15 : 0;
+    const narrationSeconds = getTourNarrationCues(slide, { kind: "enter" }).reduce(
+      (sum, cue) => sum + cue.narration.trimEnd - cue.narration.trimStart,
+      0
+    );
+    const hold = slide.timing.mode === "manual" ? Math.max(slide.timing.holdSeconds, slide.timing.truncateNarration ? 0 : narrationSeconds) : Math.max(tour.playback.minimumHoldSeconds, readingSeconds, narrationSeconds);
+    return hold * 1e3;
+  }
+  function tourAutoplayDestination(tour, index) {
+    const slide = tour.slides[index];
+    if (!slide) return null;
+    if (slide.timing.autoplayTarget) {
+      const target = tour.slides.findIndex((entry) => entry.id === slide.timing.autoplayTarget);
+      return target < 0 ? null : target;
+    }
+    const actions = (slide.kind === "image" ? slide.hotspots : slide.buttons).map((entry) => entry.action).filter((action) => action.kind !== "none");
+    if (actions.some((action) => action.kind === "url")) return null;
+    const destinations = new Set(actions.map((action) => actionDestination(action, tour, index)));
+    if (!destinations.size) return index + 1;
+    return destinations.size === 1 ? [...destinations][0] : null;
+  }
+  function actionDestination(action, tour, index) {
+    let target = null;
+    if (action.kind === "next") target = index + 1;
+    else if (action.kind === "previous") target = index - 1;
+    else if (action.kind === "restart") target = 0;
+    else if (action.kind === "end") target = tour.slides.length;
+    else if (action.kind === "slide")
+      target = tour.slides.findIndex((slide) => slide.id === action.slideId);
+    return target !== null && target >= 0 && target <= tour.slides.length ? target : null;
+  }
+  function tourLinearTimeline(tour, reducedMotion = false) {
+    if (tour.playback.loop || !tour.slides.length) return null;
+    const offsets = [];
+    let duration = 0;
+    for (const [index, slide] of tour.slides.entries()) {
+      if (tourAutoplayDestination(tour, index) !== index + 1) return null;
+      const objects = slide.kind === "image" ? slide.hotspots : slide.buttons;
+      if (objects.some(
+        ({ action }) => action.kind !== "none" && actionDestination(action, tour, index) !== index + 1
+      ))
+        return null;
+      offsets.push(duration);
+      duration += tourEntranceTiming(tour, slide, reducedMotion).total + tourSlideDuration(tour, slide);
+    }
+    return { offsets, duration };
+  }
+  function tourEntranceTiming(tour, slide, reducedMotion = false) {
+    const switchMs = reducedMotion || tour.transition.kind === "none" ? 0 : tour.transition.durationMs;
+    const travelMs = !reducedMotion && slide?.kind === "image" && slide.hotspots.length === 1 ? tour.transition.hotspotTravelMs : 0;
+    const camera = !reducedMotion && tourCameraEnabled(slide, tour.playback.autoZoom);
+    const cameraStartMs = camera ? switchMs + (slide.camera.delayMs ?? 300) : 0;
+    const cameraMs = camera ? slide.camera.durationMs ?? 700 : 0;
+    return {
+      switchMs,
+      travelMs,
+      cameraStartMs,
+      cameraMs,
+      total: Math.max(switchMs + travelMs, cameraStartMs + cameraMs)
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/motion.js
+  var bounded = (value) => Math.max(0, Math.min(1, value));
+  var ease = (value) => value * value * (3 - 2 * value);
+  var between = (from, to, progress) => from + (to - from) * progress;
+  function createTourMotion(root2, signal) {
+    const scene = root2.querySelector("[data-tour-scene]");
+    const stage = root2.querySelector("[data-tour-stage]");
+    const hint = root2.querySelector("[data-tour-hint]");
+    let current = null;
+    function frame(elapsed) {
+      if (!current?.ready || signal.aborted) return;
+      current.elapsed = elapsed;
+      if (elapsed >= current.phases.total) {
+        settleMotion(current, scene, hint, stage);
+        return;
+      }
+      scene.inert = true;
+      hint.inert = true;
+      hint.style.visibility = "hidden";
+      if (current.previous) stage.append(current.previous.pixels);
+      stage.dataset.motion = "running";
+      applyMotionFrame(current, scene, stage, elapsed);
+    }
+    function cancel({ preserveMediaGate = false } = {}) {
+      const gate = preserveMediaGate && ["loading", "error"].includes(stage.dataset.motion) ? stage.dataset.motion : null;
+      if (current) settleMotion(current, scene, hint, stage);
+      current = null;
+      scene.inert = false;
+      hint.inert = false;
+      hint.style.visibility = "";
+      stage.dataset.motion = gate ?? "settled";
+      if (gate) {
+        scene.inert = true;
+        hint.inert = true;
+        hint.style.visibility = "hidden";
+      }
+    }
+    signal.addEventListener("abort", cancel, { once: true });
+    return {
+      capture() {
+        const travelling = current?.marker?.isConnected ? pointOf(current.marker) : null;
+        cancel();
+        if (!root2.dataset.slideId) return null;
+        const points = scene.querySelectorAll(".tour-hotspot");
+        const point = travelling ?? (points.length === 1 ? pointOf(points[0]) : null);
+        const pixels = scene.cloneNode(true);
+        pixels.removeAttribute("data-tour-scene");
+        pixels.classList.add("tour-motion-previous");
+        pixels.inert = true;
+        pixels.setAttribute("aria-hidden", "true");
+        pixels.querySelectorAll("a").forEach((node) => node.removeAttribute("href"));
+        return { pixels, point };
+      },
+      prepare(previous, slide, tour, viewport, reducedMotion) {
+        cancel();
+        if (signal.aborted) return;
+        current = prepareMotion(scene, previous, slide, tour, viewport, reducedMotion);
+        current.ready = false;
+        scene.inert = true;
+        hint.inert = true;
+        hint.style.visibility = "hidden";
+        scene.style.opacity = "0";
+        if (previous) stage.append(previous.pixels);
+        stage.dataset.motion = "loading";
+      },
+      ready() {
+        if (current) current.ready = true;
+        else cancel();
+      },
+      frame,
+      reflow(viewport) {
+        if (signal.aborted) return;
+        if (!current) return cancel({ preserveMediaGate: true });
+        const { ready, elapsed, previous, context } = current;
+        settleMotion(current, scene, hint, stage);
+        resizeSnapshot(previous, current.viewport, viewport);
+        current = prepareMotion(
+          scene,
+          previous,
+          context.slide,
+          context.tour,
+          viewport,
+          context.reducedMotion
+        );
+        current.ready = ready;
+        current.elapsed = elapsed;
+        if (ready) return frame(elapsed);
+        scene.inert = true;
+        hint.inert = true;
+        hint.style.visibility = "hidden";
+        scene.style.opacity = "0";
+        if (previous) stage.append(previous.pixels);
+        stage.dataset.motion = "loading";
+      },
+      fail() {
+        cancel();
+        scene.inert = true;
+        hint.inert = true;
+        hint.style.visibility = "hidden";
+        stage.dataset.motion = "error";
+      },
+      cancel
+    };
+  }
+  function pointOf(node) {
+    if (!node || node.hidden) return null;
+    return { x: parseFloat(node.style.left), y: parseFloat(node.style.top) };
+  }
+  function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
+    const phases = tourEntranceTiming(tour, slide, reducedMotion);
+    const image = slide?.kind === "image" && slide.image ? slide : null;
+    const final = image ? resolveTourCamera(image, viewport, tour.playback.autoZoom) : null;
+    const base = tourCameraEnabled(image, tour.playback.autoZoom) ? resolveTourEditingCamera(image, viewport) : final;
+    const targets = scene.querySelectorAll(".tour-hotspot");
+    const target = targets.length === 1 && !targets[0].hidden ? targets[0] : null;
+    const marker = target ? target.cloneNode(true) : null;
+    if (marker) {
+      if (previous?.point)
+        previous.pixels.querySelectorAll(".tour-hotspot").forEach((node) => node.remove());
+      marker.classList.add("tour-motion-hotspot");
+      marker.removeAttribute("href");
+      marker.tabIndex = -1;
+      marker.inert = true;
+      marker.setAttribute("aria-hidden", "true");
+    }
+    return {
+      context: { slide, tour, reducedMotion },
+      elapsed: 0,
+      previous,
+      phases,
+      kind: tour.transition.kind,
+      viewport,
+      plane: scene.querySelector(".tour-image-plane"),
+      base,
+      final,
+      target,
+      targets,
+      marker,
+      image
+    };
+  }
+  function resizeSnapshot(previous, from, to) {
+    if (!previous) return;
+    const scale = previous.scale ?? 1;
+    previous.pixels.style.width = `${from.stageWidth / scale}px`;
+    previous.pixels.style.height = `${from.stageHeight / scale}px`;
+    previous.pixels.style.transformOrigin = "top left";
+    const ratio = to.stageWidth / from.stageWidth;
+    previous.scale = scale * ratio;
+    previous.pixels.style.transform = `scale(${previous.scale})`;
+    if (previous.point) previous.point = { x: previous.point.x * ratio, y: previous.point.y * ratio };
+  }
+  function applyMotionFrame(state, scene, stage, elapsed) {
+    const switching = state.phases.switchMs ? bounded(elapsed / state.phases.switchMs) : 1;
+    const travelling = elapsed < state.phases.switchMs ? 0 : state.phases.travelMs ? ease(bounded((elapsed - state.phases.switchMs) / state.phases.travelMs)) : 1;
+    scene.style.opacity = state.previous ? "1" : String(switching);
+    if (state.previous) state.previous.pixels.style.opacity = String(1 - switching);
+    if (state.kind === "slide") {
+      scene.style.transform = `translateX(${(1 - switching) * state.viewport.stageWidth * 0.08}px)`;
+      if (state.previous) {
+        const offset = -switching * state.viewport.stageWidth * 0.08;
+        state.previous.pixels.style.transform = `translateX(${offset}px) scale(${state.previous.scale ?? 1})`;
+      }
+    }
+    let box = state.final;
+    if (state.plane && state.base && state.final) {
+      const progress = state.phases.cameraMs ? ease(bounded((elapsed - state.phases.cameraStartMs) / state.phases.cameraMs)) : 1;
+      box = {
+        x: between(state.base.x, state.final.x, progress),
+        y: between(state.base.y, state.final.y, progress),
+        width: between(state.base.width, state.final.width, progress),
+        height: between(state.base.height, state.final.height, progress)
+      };
+      const scale = box.width / state.final.width;
+      const offsetX = box.x - state.final.x * scale;
+      const offsetY = box.y - state.final.y * scale;
+      state.plane.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+    }
+    if (!state.target)
+      state.targets.forEach((node) => {
+        node.style.visibility = "hidden";
+      });
+    if (state.target && state.marker) {
+      state.target.style.visibility = "hidden";
+      const point = state.image?.hotspots[0]?.point;
+      const destination = box && point ? { x: box.x + point.x * box.width, y: box.y + point.y * box.height } : pointOf(state.target);
+      const origin = state.previous?.point ?? destination;
+      state.marker.style.left = `${between(origin.x, destination.x, travelling)}px`;
+      state.marker.style.top = `${between(origin.y, destination.y, travelling)}px`;
+      state.marker.style.opacity = state.previous?.point ? "1" : String(travelling);
+      stage.append(state.marker);
+    }
+  }
+  function settleMotion(state, scene, hint, stage) {
+    state.previous?.pixels.remove();
+    state.marker?.remove();
+    state.targets.forEach((node) => {
+      node.style.visibility = "";
+    });
+    if (state.plane) state.plane.style.transform = "";
+    scene.style.opacity = "";
+    scene.style.transform = "";
+    scene.inert = false;
+    hint.inert = false;
+    hint.style.visibility = "";
+    stage.dataset.motion = "settled";
+  }
+
+  // apps/extension/src/features/scenario/tour-player/authoring.js
+  function bindTourObjectDrag(node, object, box, callbacks, lifetime) {
+    node.dataset.tourObjectId = object.id;
+    node.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0 || lifetime.aborted || callbacks.canEdit?.() === false) return;
+      event.preventDefault();
+      event.stopPropagation();
+      node.focus({ preventScroll: true });
+      const document = node.ownerDocument;
+      const scene = node.closest(".tour-scene");
+      const pointerId = event.pointerId;
+      const start = { x: event.clientX, y: event.clientY };
+      const original = { left: node.style.left, top: node.style.top };
+      let point = object.point;
+      let moved = false;
+      const gesture = new AbortController();
+      const cleanup = () => {
+        gesture.abort();
+        lifetime.removeEventListener("abort", cancel);
+        if (node.hasPointerCapture?.(pointerId)) node.releasePointerCapture(pointerId);
+        if (scene) delete scene.dataset.dragging;
+      };
+      const cancel = () => {
+        if (gesture.signal.aborted) return;
+        node.style.left = original.left;
+        node.style.top = original.top;
+        cleanup();
+      };
+      const move = (next) => {
+        if (next.pointerId !== pointerId) return;
+        if (callbacks.canEdit?.() === false) return cancel();
+        const dx = next.clientX - start.x;
+        const dy = next.clientY - start.y;
+        if (!moved && Math.hypot(dx, dy) < 3) return;
+        moved = true;
+        point = {
+          x: Math.max(0, Math.min(object.maxX ?? 1, object.point.x + dx / box.width)),
+          y: Math.max(0, Math.min(object.maxY ?? 1, object.point.y + dy / box.height))
+        };
+        point = object.constrainPoint?.(point) ?? point;
+        node.style.left = `${box.x + point.x * box.width}px`;
+        node.style.top = `${box.y + point.y * box.height}px`;
+        if (scene) scene.dataset.dragging = "true";
+      };
+      node.addEventListener("pointermove", move, { signal: gesture.signal });
+      node.addEventListener(
+        "pointerup",
+        (next) => {
+          if (next.pointerId !== pointerId) return;
+          if (callbacks.canEdit?.() === false) return cancel();
+          cleanup();
+          if (moved) callbacks.onMoveObject(object.id, point);
+          callbacks.onSelectObject(object.id);
+        },
+        { signal: gesture.signal }
+      );
+      node.addEventListener("pointercancel", cancel, { signal: gesture.signal });
+      node.addEventListener("lostpointercapture", cancel, { signal: gesture.signal });
+      document.addEventListener(
+        "keydown",
+        (key) => {
+          if (key.key !== "Escape") return;
+          key.preventDefault();
+          key.stopPropagation();
+          cancel();
+        },
+        { capture: true, signal: gesture.signal }
+      );
+      lifetime.addEventListener("abort", cancel, { once: true });
+      node.setPointerCapture?.(pointerId);
+    });
+  }
+
+  // apps/extension/src/features/scenario/tour-player/authoring-rect.js
+  function resizeTourRect(rect, edge, dx, dy, aspect = null) {
+    const min = 1e-3;
+    let left = rect.x, top = rect.y;
+    let right = rect.x + rect.width, bottom = rect.y + rect.height;
+    if (edge.includes("w")) left = Math.max(0, Math.min(right - min, left + dx));
+    if (edge.includes("e")) right = Math.min(1, Math.max(left + min, right + dx));
+    if (edge.includes("n")) top = Math.max(0, Math.min(bottom - min, top + dy));
+    if (edge.includes("s")) bottom = Math.min(1, Math.max(top + min, bottom + dy));
+    const resized = { x: left, y: top, width: right - left, height: bottom - top };
+    return aspect ? constrainRectAspect(rect, resized, edge, aspect) : resized;
+  }
+  function bindTourRectResize(node, object, box, callbacks, lifetime, label) {
+    const project = (rect) => Object.assign(node.style, {
+      left: `${box.x + rect.x * box.width}px`,
+      top: `${box.y + rect.y * box.height}px`,
+      width: `${rect.width * box.width}px`,
+      height: `${rect.height * box.height}px`
+    });
+    for (const edge of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
+      const handle = node.ownerDocument.createElement("button");
+      handle.type = "button";
+      handle.className = "tour-resize-handle";
+      handle.dataset.edge = edge;
+      handle.setAttribute("aria-label", label);
+      handle.addEventListener("click", (event) => event.stopPropagation());
+      handle.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (lifetime.aborted || callbacks.canEdit?.() === false) return;
+        const step = event.shiftKey ? 10 : 1;
+        const dx = (event.key === "ArrowRight" ? step : event.key === "ArrowLeft" ? -step : 0) / box.width;
+        const dy = (event.key === "ArrowDown" ? step : event.key === "ArrowUp" ? -step : 0) / box.height;
+        const next = resizeTourRect(object.rect, edge, dx, dy, object.aspect);
+        callbacks.onResizeObject?.(object.id, object.constrainRect?.(next) ?? next);
+      });
+      handle.addEventListener("pointerdown", (event) => {
+        event.stopPropagation();
+        if (event.button !== 0 || lifetime.aborted || callbacks.canEdit?.() === false) return;
+        event.preventDefault();
+        const pointerId = event.pointerId;
+        const gesture = new AbortController();
+        const scene = node.closest(".tour-scene");
+        let rect = object.rect;
+        let moved = false;
+        const cleanup = () => {
+          gesture.abort();
+          lifetime.removeEventListener("abort", cancel);
+          if (handle.hasPointerCapture?.(pointerId)) handle.releasePointerCapture(pointerId);
+          if (scene) delete scene.dataset.resizing;
+        };
+        const cancel = () => {
+          project(object.rect);
+          cleanup();
+        };
+        handle.addEventListener(
+          "pointermove",
+          (next) => {
+            if (next.pointerId !== pointerId) return;
+            if (callbacks.canEdit?.() === false || !node.isConnected) return cancel();
+            const dx = next.clientX - event.clientX, dy = next.clientY - event.clientY;
+            if (!moved && Math.hypot(dx, dy) < 3) return;
+            moved = true;
+            rect = resizeTourRect(object.rect, edge, dx / box.width, dy / box.height, object.aspect);
+            rect = object.constrainRect?.(rect) ?? rect;
+            project(rect);
+            if (scene) scene.dataset.resizing = edge;
+          },
+          { signal: gesture.signal }
+        );
+        handle.addEventListener(
+          "pointerup",
+          (next) => {
+            if (next.pointerId !== pointerId) return;
+            if (callbacks.canEdit?.() === false || !node.isConnected) return cancel();
+            cleanup();
+            if (moved) callbacks.onResizeObject?.(object.id, rect);
+          },
+          { signal: gesture.signal }
+        );
+        handle.addEventListener("pointercancel", cancel, { signal: gesture.signal });
+        handle.addEventListener("lostpointercapture", cancel, { signal: gesture.signal });
+        node.ownerDocument.addEventListener(
+          "keydown",
+          (key) => {
+            if (key.key !== "Escape") return;
+            key.preventDefault();
+            key.stopPropagation();
+            cancel();
+          },
+          { capture: true, signal: gesture.signal }
+        );
+        lifetime.addEventListener("abort", cancel, { once: true });
+        handle.setPointerCapture?.(pointerId);
+      });
+      node.append(handle);
+    }
+  }
+  function constrainRectAspect(original, resized, edge, aspect) {
+    const horizontal = edge.includes("w") ? -1 : edge.includes("e") ? 1 : 0;
+    const vertical = edge.includes("n") ? -1 : edge.includes("s") ? 1 : 0;
+    const anchorX = original.x + original.width * (1 - horizontal) / 2;
+    const anchorY = original.y + original.height * (1 - vertical) / 2;
+    const maxWidth = horizontal ? horizontal > 0 ? 1 - anchorX : anchorX : 2 * Math.min(anchorX, 1 - anchorX);
+    const maxHeight = vertical ? vertical > 0 ? 1 - anchorY : anchorY : 2 * Math.min(anchorY, 1 - anchorY);
+    const fromHeight = !horizontal || vertical && Math.abs(resized.height - original.height) * aspect > Math.abs(resized.width - original.width);
+    const width = Math.min(
+      maxWidth,
+      maxHeight * aspect,
+      Math.max(1e-3, fromHeight ? resized.height * aspect : resized.width)
+    );
+    const height = width / aspect;
+    return {
+      x: anchorX - width * (1 - horizontal) / 2,
+      y: anchorY - height * (1 - vertical) / 2,
+      width,
+      height
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/camera-frame.js
+  function renderTourCameraFrame(slide, viewport, imageBox, { element, labels, authoring, signal }) {
+    const target = resolveTourCamera(slide, viewport, false);
+    if (!target) return null;
+    const rect = frameForProjection(target, imageBox, viewport);
+    const stageBox = { x: 0, y: 0, width: viewport.stageWidth, height: viewport.stageHeight };
+    const constrainRect = (next) => {
+      const camera = cameraForFrame(next, imageBox, viewport);
+      const projected = resolveTourCamera(
+        { ...slide, camera: { ...slide.camera, ...camera, mode: "manual" } },
+        viewport,
+        false
+      );
+      return frameForProjection(projected, imageBox, viewport);
+    };
+    const frame = element("div", "tour-mask tour-camera-frame");
+    frame.tabIndex = 0;
+    frame.setAttribute("role", "group");
+    frame.setAttribute("aria-label", labels.resize ?? labels.details);
+    frame.dataset.selected = "true";
+    Object.assign(frame.style, {
+      left: `${rect.x * stageBox.width}px`,
+      top: `${rect.y * stageBox.height}px`,
+      width: `${rect.width * stageBox.width}px`,
+      height: `${rect.height * stageBox.height}px`,
+      pointerEvents: "auto"
+    });
+    const change = (next) => authoring.onFrameCamera?.(cameraForFrame(next, imageBox, viewport));
+    frame.addEventListener("keydown", (event) => {
+      if (event.target !== frame || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key))
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (signal.aborted || authoring.canEdit?.() === false) return;
+      const step = event.shiftKey ? 10 : 1;
+      const dx = (event.key === "ArrowRight" ? step : event.key === "ArrowLeft" ? -step : 0) / stageBox.width;
+      const dy = (event.key === "ArrowDown" ? step : event.key === "ArrowUp" ? -step : 0) / stageBox.height;
+      change(constrainRect({ ...rect, x: rect.x + dx, y: rect.y + dy }));
+    });
+    const callbacks = {
+      canEdit: authoring.canEdit,
+      onSelectObject: () => {
+      },
+      onMoveObject: (_id, point) => change({ ...rect, ...point }),
+      onResizeObject: (_id, next) => change(next)
+    };
+    bindTourObjectDrag(
+      frame,
+      {
+        id: "camera-frame",
+        point: rect,
+        maxX: 1 - rect.width,
+        maxY: 1 - rect.height,
+        constrainPoint: (point) => {
+          const next = constrainRect({ ...rect, ...point });
+          return { x: next.x, y: next.y };
+        }
+      },
+      stageBox,
+      callbacks,
+      signal
+    );
+    bindTourRectResize(
+      frame,
+      { id: "camera-frame", rect, aspect: 1, constrainRect },
+      stageBox,
+      callbacks,
+      signal,
+      labels.resize ?? labels.details
+    );
+    delete frame.dataset.tourObjectId;
+    return frame;
+  }
+  function frameForProjection(target, base, viewport) {
+    const scale = base.width / target.width;
+    return {
+      x: (base.x - target.x * scale) / viewport.stageWidth,
+      y: (base.y - target.y * scale) / viewport.stageHeight,
+      width: scale,
+      height: scale
+    };
+  }
+  function cameraForFrame(rect, base, viewport) {
+    const clamp4 = (value) => Math.max(0, Math.min(1, value));
+    return {
+      center: {
+        x: clamp4(((rect.x + rect.width / 2) * viewport.stageWidth - base.x) / base.width),
+        y: clamp4(((rect.y + rect.height / 2) * viewport.stageHeight - base.y) / base.height)
+      },
+      zoom: Math.max(1, Math.min(8, 1 / rect.width))
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/image-mask.js
+  function renderTourMask(mask, imageBox, sourceWidth, { element, labels, authoring, signal }) {
+    const box = element("div", `tour-mask tour-mask-${mask.kind}`);
+    Object.assign(box.style, {
+      left: `${imageBox.x + mask.rect.x * imageBox.width}px`,
+      top: `${imageBox.y + mask.rect.y * imageBox.height}px`,
+      width: `${mask.rect.width * imageBox.width}px`,
+      height: `${mask.rect.height * imageBox.height}px`
+    });
+    const effect = element("div", "tour-mask-effect");
+    if (mask.kind === "blur") {
+      effect.style.backdropFilter = `blur(${(mask.blurRadius ?? 12) * imageBox.width / sourceWidth}px)`;
+    } else if (mask.kind === "spotlight") {
+      effect.style.boxShadow = `0 0 0 100vmax ${mask.spotlightColor ?? "#111827"}`;
+      effect.style.opacity = String(mask.spotlightOpacity ?? 0.6);
+    } else {
+      effect.style.background = mask.kind === "highlight" && mask.paint ? serializePaintToCss(mask.paint) : mask.color;
+      effect.style.opacity = String(mask.kind === "redact" ? 1 : mask.opacity);
+    }
+    box.append(effect);
+    if (!authoring && mask.narration?.trigger === "activation") {
+      box.tabIndex = 0;
+      box.setAttribute("role", "button");
+      box.setAttribute("aria-label", labels.play);
+      box.dataset.tourNarration = mask.id;
+      box.style.pointerEvents = "auto";
+      box.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          box.click();
+        }
+      });
+    }
+    if (authoring) {
+      box.tabIndex = 0;
+      box.setAttribute("role", "group");
+      box.setAttribute("aria-label", labels.details);
+      box.style.pointerEvents = "auto";
+      box.addEventListener("click", () => authoring.onSelectObject(mask.id));
+      box.addEventListener("keydown", (event) => {
+        if (event.target !== box || !["Enter", " "].includes(event.key)) return;
+        event.preventDefault();
+        authoring.onSelectObject(mask.id);
+      });
+      bindTourObjectDrag(
+        box,
+        { id: mask.id, point: mask.rect, maxX: 1 - mask.rect.width, maxY: 1 - mask.rect.height },
+        imageBox,
+        authoring,
+        signal
+      );
+      bindTourRectResize(box, mask, imageBox, authoring, signal, labels.resize ?? labels.details);
+    }
+    return box;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/image-scene.js
+  function projectImagePoint(box, point) {
+    return { x: box.x + point.x * box.width, y: box.y + point.y * box.height };
+  }
+  function renderTourImage(slide, { stageWidth, stageHeight }, {
+    scene,
+    element,
+    labels,
+    media,
+    actionButton,
+    hintController,
+    onAction,
+    authoring,
+    signal,
+    autoZoom,
+    maskDefaults,
+    style
+  }) {
+    if (!slide.image) {
+      scene.append(element("p", "tour-empty", labels.empty));
+      return null;
+    }
+    const imageBox = authoring ? resolveTourEditingCamera(slide, { stageWidth, stageHeight }) : resolveTourCamera(slide, { stageWidth, stageHeight }, autoZoom);
+    if (!imageBox) return null;
+    const plane = element("div", "tour-image-plane");
+    scene.append(plane);
+    const image = element("img", "tour-image");
+    const source = media.get(slide.image.assetId);
+    if (source) image.src = source;
+    image.alt = slide.image.alt;
+    Object.assign(image.style, {
+      left: `${imageBox.x}px`,
+      top: `${imageBox.y}px`,
+      width: `${imageBox.width}px`,
+      height: `${imageBox.height}px`
+    });
+    plane.append(image);
+    for (const mask of slide.masks)
+      plane.append(
+        renderTourMask(resolveTourMask(mask, maskDefaults), imageBox, slide.image.width, {
+          element,
+          labels,
+          authoring,
+          signal
+        })
+      );
+    const explanations = getTourSlideObjects(slide).flatMap(
+      (entry) => entry.type === "mask" ? [] : [entry.object.id]
+    );
+    slide.hotspots.forEach((hotspot) => {
+      const number = explanations.indexOf(hotspot.id);
+      const button = actionButton(
+        "",
+        hotspot.action.kind === "url" ? hotspot.action : { kind: "none" },
+        "tour-hotspot",
+        hotspot.id
+      );
+      const point = projectImagePoint(imageBox, hotspot.point);
+      button.style.left = `${point.x}px`;
+      button.style.top = `${point.y}px`;
+      const marker = resolveTourMarkerAppearance(style, hotspot);
+      button.style.setProperty("--tour-marker-color", marker.color ?? "transparent");
+      button.style.setProperty("--tour-marker-pulse-color", marker.pulseColor ?? style.accent);
+      if (hotspot.markerAppearance || style.markerAppearance)
+        button.style.setProperty("--tour-marker-size", `${marker.size}px`);
+      button.dataset.pulse = String(hotspot.pulse);
+      button.hidden = point.x < 0 || point.y < 0 || point.x > stageWidth || point.y > stageHeight;
+      button.title = hotspot.label;
+      button.setAttribute("aria-label", hotspot.label || `${labels.point} ${number + 1}`);
+      button.addEventListener("pointerenter", () => {
+        hintController.select(number);
+      });
+      button.addEventListener("focus", () => {
+        hintController.select(number);
+      });
+      button.addEventListener("click", () => {
+        if (authoring) return;
+        if (hintController.activeIndex !== number) {
+          hintController.select(number);
+        } else if (hotspot.action.kind !== "url") onAction(hotspot.action);
+      });
+      if (authoring)
+        bindTourObjectDrag(
+          button,
+          { id: hotspot.id, point: hotspot.point },
+          imageBox,
+          authoring,
+          signal
+        );
+      scene.append(button);
+    });
+    if (authoring?.cameraFrame && slide.camera.mode === "manual") {
+      const frame = renderTourCameraFrame(slide, { stageWidth, stageHeight }, imageBox, {
+        element,
+        labels,
+        authoring,
+        signal
+      });
+      if (frame) scene.append(frame);
+    }
+    return imageBox;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/transport.js
+  var SVG = "http://www.w3.org/2000/svg";
+  var FACES = {
+    manual: {
+      fill: "none",
+      d: "M8 13V6a2 2 0 0 1 4 0v5-7a2 2 0 0 1 4 0v8-5a2 2 0 0 1 4 0v8c0 5-3 7-7 7-3 0-5-2-7-5l-3-4a2 2 0 0 1 3-2l2 2"
+    },
+    play: { fill: "currentColor", d: "M8 5v14l11-7z" },
+    pause: { fill: "currentColor", d: "M7 5h4v14H7zm6 0h4v14h-4z" },
+    retry: { fill: "none", d: "M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6" },
+    contents: { fill: "none", d: "M3 4h18v16H3zM14 4v16M17 8h1M17 12h1M17 16h1" },
+    previous: { fill: "none", d: "m15 18-6-6 6-6" },
+    next: { fill: "none", d: "m9 18 6-6-6-6" }
+  };
+  function createTourTransport(root2, labels, signal, onToggle, onSeek, onManual) {
+    const document = root2.ownerDocument;
+    for (const name of ["contents", "previous", "next"]) {
+      const control = root2.querySelector(`[data-tour-${name}]`);
+      if (!control) continue;
+      control.replaceChildren(createIcon(document, FACES[name]));
+      control.classList.add("tour-icon-button");
+      control.setAttribute("aria-label", labels[name]);
+      control.title = labels[name];
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tour-button tour-icon-button";
+    button.dataset.tourPlay = "";
+    button.addEventListener("click", onToggle, { signal });
+    const manual = document.createElement("button");
+    manual.type = "button";
+    manual.className = "tour-button tour-icon-button";
+    manual.dataset.tourManual = "";
+    manual.title = labels.manual ?? "Manual navigation";
+    manual.setAttribute("aria-label", manual.title);
+    manual.append(createIcon(document, FACES.manual));
+    manual.addEventListener("click", onManual, { signal });
+    const label = document.createElement("span");
+    label.className = "tour-playback-label";
+    const time = document.createElement("span");
+    time.className = "tour-time";
+    time.dataset.tourTime = "";
+    const range = document.createElement("input");
+    range.type = "range";
+    range.min = "0";
+    range.step = "any";
+    range.className = "tour-scrub";
+    range.dataset.tourSeek = "";
+    range.setAttribute("aria-label", labels.seek);
+    range.addEventListener("input", () => onSeek(Number(range.value)), { signal });
+    const status = root2.querySelector("[data-tour-status]");
+    const playback = root2.querySelector("[data-tour-playback]");
+    playback.append(manual, button, time, range);
+    signal.addEventListener("abort", () => playback.replaceChildren(), { once: true });
+    return ({ elapsed, duration, playing, state, mode }) => {
+      root2.dataset.tourMode = mode;
+      manual.setAttribute("aria-pressed", String(mode === "manual"));
+      manual.disabled = state === "empty";
+      const face = transportFace(state, playing);
+      const text = state === "error" || state === "audio-error" ? labels.retry : playing ? labels.pause : labels.play;
+      if (button.dataset.tourFace !== face) {
+        button.dataset.tourFace = face;
+        button.replaceChildren(createIcon(document, FACES[face]), label);
+      }
+      label.textContent = text;
+      button.setAttribute("aria-label", text);
+      button.title = text;
+      button.disabled = state === "empty";
+      button.setAttribute("aria-pressed", String(playing));
+      range.max = String(duration);
+      range.value = String(elapsed);
+      range.style.setProperty(
+        "--tour-scrub-fill",
+        `${duration > 0 ? Math.min(100, Math.max(0, elapsed / duration * 100)) : 0}%`
+      );
+      range.disabled = state === "empty";
+      const value = `${formatTime(elapsed)} / ${formatTime(duration)}`;
+      range.setAttribute("aria-valuetext", value);
+      time.textContent = value;
+      status.textContent = state === "blocked" ? labels.audioBlocked ?? labels.play : state === "loading" ? labels.loading : state === "audio-error" ? labels.audioError ?? labels.mediaError : state === "error" ? labels.mediaError : state === "choice" ? labels.choose : "";
+      status.hidden = !status.textContent;
+    };
+  }
+  function transportFace(state, playing) {
+    if (state === "error" || state === "audio-error") return "retry";
+    return playing ? "pause" : "play";
+  }
+  function createIcon(document, face) {
+    const svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("width", "16");
+    svg.setAttribute("height", "16");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", face.fill);
+    svg.setAttribute("aria-hidden", "true");
+    if (face.fill === "none") {
+      svg.setAttribute("stroke", "currentColor");
+      svg.setAttribute("stroke-width", "2");
+    }
+    const path = document.createElementNS(SVG, "path");
+    path.setAttribute("d", face.d);
+    svg.append(path);
+    return svg;
+  }
+  function formatTime(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1e3);
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  }
+  function createTourNarrationButton(document, label) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tour-button tour-icon-button";
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.append(createIcon(document, FACES.play));
+    return button;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/caption.js
+  function normalizeCaptionText(value) {
+    return String(value ?? "").toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, " ").trim();
+  }
+  function createTourCaption(hint, text, labels, redraw, signal) {
+    const toggle = hint.querySelector("[data-tour-hint-toggle]");
+    const title = hint.querySelector("[data-tour-hint-title]");
+    const close = hint.querySelector("[data-tour-hint-close]");
+    let currentId = null;
+    let collapsed = true;
+    let enabled = false;
+    let long = false;
+    let annotation = false;
+    toggle.addEventListener(
+      "click",
+      () => {
+        if (!enabled || !long) return;
+        collapsed = !collapsed;
+        redraw();
+      },
+      { signal }
+    );
+    hint.addEventListener(
+      "click",
+      (event) => {
+        if (!enabled || !long || !collapsed || event.defaultPrevented) return;
+        const target = event.target;
+        if (!(target instanceof hint.ownerDocument.defaultView.Element) || target.closest(
+          'button,a,input,select,textarea,label,[role="button"],[role="link"],[contenteditable]'
+        ))
+          return;
+        collapsed = false;
+        redraw();
+      },
+      { signal }
+    );
+    return {
+      reset() {
+        currentId = null;
+        collapsed = true;
+      },
+      prepare(current, presentation) {
+        if (current.id !== currentId) {
+          currentId = current.id;
+          collapsed = true;
+        }
+        enabled = presentation !== "callout";
+        annotation = !current.point;
+        hint.dataset.collapsed = "false";
+        toggle.hidden = !enabled;
+        close.hidden = enabled;
+        text.hidden = false;
+        title.textContent = captionTitle(current, labels.details);
+        toggle.title = title.textContent;
+      },
+      finish() {
+        if (!enabled) return;
+        const voice = hint.querySelector("[data-tour-narration]:not([hidden])");
+        hint.hidden = annotation && !text.textContent.trim() && !voice;
+        const metrics = globalThis.getComputedStyle(text);
+        const lineHeight = parseFloat(metrics.lineHeight) || (parseFloat(metrics.fontSize) || 14) * 1.5;
+        long = text.scrollHeight > lineHeight + 1;
+        title.hidden = !long;
+        toggle.hidden = !long;
+        hint.dataset.captionLong = String(long);
+        hint.dataset.collapsed = String(long && collapsed);
+        if (long && collapsed) text.style.maxHeight = `${lineHeight}px`;
+        text.style.overflowY = long && !collapsed ? "auto" : "hidden";
+        toggle.setAttribute("aria-expanded", String(!long || !collapsed));
+        const action = long && collapsed ? labels.expand : labels.collapse;
+        toggle.setAttribute("aria-label", `${action}: ${title.textContent}`);
+      }
+    };
+  }
+  function captionTitle(current, fallback) {
+    const label = normalizeCaptionText(current.label);
+    const body = normalizeCaptionText(current.text);
+    const repeatsBody = body && (label === body || body.startsWith(`${label} `));
+    return (label && body && !repeatsBody ? current.label : "") || fallback;
+  }
+
+  // packages/platform/src/security/css-safety.ts
+  var CSS_HEX_ESCAPE_PATTERN = /^[0-9a-fA-F]{1,6}[ \n\t]?/u;
+  var MAX_CSS_CODE_POINT = 1114111;
+  function preprocessCssInput(value) {
+    return value.replace(/\r\n?/g, "\n").replace(/\f/g, "\n").replace(/\0/g, "\uFFFD");
+  }
+  function readCssEscape(value, index) {
+    const afterSlash = value.slice(index + 1);
+    if (afterSlash.startsWith("\n")) {
+      return { nextIndex: Math.min(index + 2, value.length), value: "" };
+    }
+    const hexMatch = CSS_HEX_ESCAPE_PATTERN.exec(afterSlash);
+    if (hexMatch) {
+      const hexValue = hexMatch[0].trim();
+      const codePoint = Number.parseInt(hexValue, 16);
+      return {
+        nextIndex: index + 1 + hexMatch[0].length,
+        value: Number.isFinite(codePoint) && codePoint <= MAX_CSS_CODE_POINT ? String.fromCodePoint(codePoint) : ""
+      };
+    }
+    return {
+      nextIndex: Math.min(index + 2, value.length),
+      value: value[index + 1] ?? ""
+    };
+  }
+  function normalizeCssForFetchDetection(value) {
+    const source = preprocessCssInput(value);
+    let normalized = "";
+    let quote = null;
+    for (let index = 0; index < source.length; ) {
+      const char = source[index] ?? "";
+      const nextChar = source[index + 1] ?? "";
+      if (quote) {
+        if (char === "\\") {
+          index = readCssEscape(source, index).nextIndex;
+          continue;
+        }
+        if (char === "\n") {
+          quote = null;
+          normalized += " ";
+          index += 1;
+          continue;
+        }
+        if (char === quote) {
+          quote = null;
+        }
+        index += 1;
+        continue;
+      }
+      if (char === "/" && nextChar === "*") {
+        index += 2;
+        while (index < source.length && source.slice(index, index + 2) !== "*/") {
+          index += 1;
+        }
+        index = Math.min(index + 2, source.length);
+        continue;
+      }
+      if (char === '"' || char === "'") {
+        quote = char;
+        normalized += " ";
+        index += 1;
+        continue;
+      }
+      if (char === "\\") {
+        const escaped = readCssEscape(source, index);
+        normalized += escaped.value;
+        index = escaped.nextIndex;
+        continue;
+      }
+      normalized += char;
+      index += 1;
+    }
+    return normalized.toLowerCase();
+  }
+  function startsCssKeyword(value, index, keyword) {
+    if (index + keyword.length > value.length) {
+      return false;
+    }
+    for (let offset = 0; offset < keyword.length; offset += 1) {
+      if ((value[index + offset] ?? "").toLowerCase() !== keyword[offset]) {
+        return false;
+      }
+    }
+    return true;
+  }
+  function startsCssUrlFunction(value, index) {
+    if (!startsCssKeyword(value, index, "url")) {
+      return false;
+    }
+    let cursor = index + "url".length;
+    while (/\s/u.test(value[cursor] ?? "")) {
+      cursor += 1;
+    }
+    return value[cursor] === "(";
+  }
+  function startsCssProtocol(value, index, protocol) {
+    if (!startsCssKeyword(value, index, protocol)) {
+      return false;
+    }
+    let cursor = index + protocol.length;
+    while (/\s/u.test(value[cursor] ?? "")) {
+      cursor += 1;
+    }
+    return value[cursor] === ":";
+  }
+  function startsCssFunction(value, index, functionName) {
+    if (!startsCssKeyword(value, index, functionName)) {
+      return false;
+    }
+    let cursor = index + functionName.length;
+    while (/\s/u.test(value[cursor] ?? "")) {
+      cursor += 1;
+    }
+    return value[cursor] === "(";
+  }
+  function containsUnsafeCssSyntax(value) {
+    const normalized = normalizeCssForFetchDetection(value);
+    for (let index = 0; index < normalized.length; index += 1) {
+      if (normalized.startsWith("@import", index) || startsCssUrlFunction(normalized, index) || startsCssFunction(normalized, index, "expression") || startsCssFunction(normalized, index, "image") || startsCssFunction(normalized, index, "image-set") || startsCssFunction(normalized, index, "-webkit-image-set") || startsCssFunction(normalized, index, "src") || startsCssFunction(normalized, index, "var") || startsCssProtocol(normalized, index, "javascript") || startsCssProtocol(normalized, index, "data")) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // apps/extension/src/features/highlighter/surface-style/surface-css.ts
+  var MAX_SURFACE_CSS_LENGTH = 4e3;
+  var MAX_SURFACE_DECLARATIONS = 32;
+  var ALLOWED_PROPERTIES = /* @__PURE__ */ new Set([
+    "backdrop-filter",
+    "background",
+    "background-color",
+    "background-image",
+    "background-position",
+    "background-repeat",
+    "background-size",
+    "box-shadow",
+    "color",
+    "filter",
+    "opacity",
+    "outline-color",
+    "outline-offset",
+    "outline-style",
+    "outline-width",
+    "text-shadow"
+  ]);
+  var BACKGROUND_LONGHANDS = /* @__PURE__ */ new Set([
+    "background-color",
+    "background-image",
+    "background-position",
+    "background-repeat",
+    "background-size"
+  ]);
+  var UNSAFE_FUNCTIONS = [
+    "url",
+    "var",
+    "image",
+    "image-set",
+    "cross-fade",
+    "element",
+    "paint",
+    "attr",
+    "expression"
+  ];
+  function hasUnsafeSyntax(value) {
+    const lower = value.toLowerCase();
+    if (containsUnsafeCssSyntax(value)) return true;
+    if (["{", "}", "@", "!", "<", ">", "\\"].some((token) => lower.includes(token))) return true;
+    return UNSAFE_FUNCTIONS.some((name) => {
+      let index = lower.indexOf(name);
+      while (index >= 0) {
+        let cursor = index + name.length;
+        while (lower[cursor] === " " || lower[cursor] === "	" || lower[cursor] === "\n") cursor += 1;
+        if (lower[cursor] === "(") return true;
+        index = lower.indexOf(name, index + 1);
+      }
+      return false;
+    });
+  }
+  function isBoundedDecimal(value) {
+    const [integer, fraction, extra] = value.split(".");
+    if (extra !== void 0 || !integer || ![...integer].every((character) => character >= "0" && character <= "9")) {
+      return false;
+    }
+    return fraction === void 0 || fraction.length >= 1 && fraction.length <= 3 && [...fraction].every((character) => character >= "0" && character <= "9");
+  }
+  function isPropertyName(value) {
+    if (value.startsWith("--") || value.length === 0) return false;
+    if (value[0] < "a" || value[0] > "z") return false;
+    return [...value.slice(1)].every(
+      (character) => character >= "a" && character <= "z" || character >= "0" && character <= "9" || character === "-"
+    );
+  }
+  function splitDeclarations(value) {
+    const declarations = [];
+    let current = "";
+    let depth = 0;
+    let quote = "";
+    for (let index = 0; index < value.length; index += 1) {
+      const character = value[index];
+      if (quote) {
+        if (character === "\\") {
+          current += character + (value[index + 1] ?? "");
+          index += 1;
+          continue;
+        }
+        if (character === quote) quote = "";
+        current += character;
+        continue;
+      }
+      if (character === '"' || character === "'") {
+        quote = character;
+        current += character;
+        continue;
+      }
+      if (character === "(") depth += 1;
+      if (character === ")") depth -= 1;
+      if (depth < 0) return null;
+      if (character === ";" && depth === 0) {
+        if (current.trim()) declarations.push(current.trim());
+        current = "";
+      } else current += character;
+    }
+    if (quote || depth !== 0) return null;
+    if (current.trim()) declarations.push(current.trim());
+    return declarations;
+  }
+  function findTopLevelColon(value) {
+    let depth = 0;
+    for (let index = 0; index < value.length; index += 1) {
+      if (value[index] === "(") depth += 1;
+      else if (value[index] === ")") depth -= 1;
+      else if (value[index] === ":" && depth === 0) return index;
+    }
+    return -1;
+  }
+  function normalizeDecimal(value) {
+    return Number(value.toFixed(3)).toString();
+  }
+  function canonicalizeBackdropFilter(value) {
+    if (value === "none") return value;
+    const functions = [];
+    const seen = /* @__PURE__ */ new Set();
+    let rest = value.trim();
+    while (rest) {
+      const match = /^(blur|saturate|brightness|contrast)\(([^()]*)\)(?:\s+|$)/u.exec(rest);
+      if (!match || functions.length === 4 || seen.has(match[1])) return null;
+      const name = match[1];
+      const raw = match[2].trim();
+      if (name === "blur") {
+        if (!raw.endsWith("px") || !isBoundedDecimal(raw.slice(0, -2))) return null;
+        const numeric = Number(raw.slice(0, -2));
+        if (!Number.isFinite(numeric) || numeric < 0 || numeric > 40) return null;
+        functions.push(`blur(${normalizeDecimal(numeric)}px)`);
+      } else {
+        const percentage = raw.endsWith("%");
+        const numericText = percentage ? raw.slice(0, -1) : raw;
+        if (!isBoundedDecimal(numericText)) return null;
+        const numeric = Number(numericText);
+        const normalized = percentage ? numeric / 100 : numeric;
+        if (!Number.isFinite(normalized) || normalized < 0 || normalized > 3) return null;
+        functions.push(`${name}(${normalizeDecimal(normalized)})`);
+      }
+      seen.add(name);
+      rest = rest.slice(match[0].length).trim();
+    }
+    return functions.length > 0 ? functions.join(" ") : null;
+  }
+  function canonicalizeValue(property, value) {
+    const trimmed = value.trim().replace(/\s+/gu, " ");
+    if (!trimmed || hasUnsafeSyntax(trimmed) || trimmed.includes(";")) return null;
+    if (property === "backdrop-filter") return canonicalizeBackdropFilter(trimmed.toLowerCase());
+    return trimmed;
+  }
+  function canonicalizeSurfaceCss(value) {
+    if (value.length > MAX_SURFACE_CSS_LENGTH || hasUnsafeSyntax(value)) return null;
+    const declarations = splitDeclarations(value);
+    if (!declarations || declarations.length > MAX_SURFACE_DECLARATIONS) return null;
+    const canonical = /* @__PURE__ */ new Map();
+    for (const declaration of declarations) {
+      const colon = findTopLevelColon(declaration);
+      if (colon <= 0 || findTopLevelColon(declaration.slice(colon + 1)) >= 0) return null;
+      const property = declaration.slice(0, colon).trim().toLowerCase();
+      if (!isPropertyName(property) || !ALLOWED_PROPERTIES.has(property) || canonical.has(property)) {
+        return null;
+      }
+      const normalized = canonicalizeValue(property, declaration.slice(colon + 1));
+      if (normalized === null) return null;
+      canonical.set(property, normalized);
+    }
+    if (canonical.has("background")) {
+      for (const longhand of BACKGROUND_LONGHANDS) if (canonical.has(longhand)) return null;
+    }
+    return [...canonical.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([property, declaration]) => `${property}: ${declaration};`).join("\n");
+  }
+  function projectCanonicalSurfaceCss(value) {
+    const canonical = canonicalizeSurfaceCss(value);
+    if (canonical === null) return null;
+    const projection = {};
+    for (const declaration of splitDeclarations(canonical) ?? []) {
+      const colon = findTopLevelColon(declaration);
+      const property = declaration.slice(0, colon).trim();
+      const reactProperty = property.replace(
+        /-([a-z])/gu,
+        (_match, letter) => letter.toUpperCase()
+      );
+      projection[reactProperty] = declaration.slice(colon + 1).trim();
+    }
+    return projection;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/hint-style.js
+  function applyTourHintSurface(hint, authored) {
+    const surface = authored ?? TOUR_HINT_SURFACE;
+    hint.removeAttribute("style");
+    Object.assign(hint.style, {
+      background: serializePaintToCss(surface.fillPaint),
+      color: surface.textColor,
+      padding: `${surface.padding}px`,
+      borderRadius: `${surface.radius}px`,
+      ...projectCanonicalSurfaceCss(surface.surfaceCss) ?? {}
+    });
+    return surface;
+  }
+  function sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight }) {
+    const caption = appearance.presentation !== "callout";
+    const inset = caption ? 0 : 16;
+    const maximumHeight = Math.max(1, Math.min(240, stageHeight - inset));
+    const width = caption ? stageWidth : Math.min(stageWidth - inset, surface.width);
+    hint.style.width = `${Math.max(1, width)}px`;
+    hint.style.maxWidth = `${Math.max(1, stageWidth - inset)}px`;
+    hint.style.maxHeight = `${maximumHeight}px`;
+    if (caption)
+      hint.style.borderRadius = appearance.presentation === "caption-top" ? `0 0 ${surface.radius}px ${surface.radius}px` : "0 0 0 0";
+    const header = hint.querySelector(".tour-hint-header");
+    const controls = hint.querySelector(".tour-hint-controls");
+    const chromeHeight = caption ? Math.max(28, controls.offsetHeight) + Math.max(0, ...Array.from(header.children, (node) => node.offsetHeight)) : header.offsetHeight + controls.offsetHeight;
+    const textHeight = maximumHeight - chromeHeight - surface.padding * 2 - (caption ? 16 : 18);
+    hintText.style.maxHeight = `${Math.max(1, textHeight)}px`;
+  }
+  function updateTourHintNavigation(hint, {
+    index,
+    count,
+    page,
+    pages,
+    pointLabel,
+    position = { index, count },
+    previousAvailable = false,
+    nextAvailable = false
+  }) {
+    const pageCount = hint.querySelector("[data-tour-hint-count]");
+    const pointCount = hint.querySelector("[data-tour-hint-point-count]");
+    pageCount.textContent = `${page + 1} / ${pages}`;
+    pageCount.hidden = pages < 2;
+    const label = `${position.index + 1} / ${position.count}`;
+    pointCount.textContent = label;
+    pointCount.setAttribute("aria-label", `${pointLabel} ${label}`);
+    pointCount.hidden = position.count < 2 && hint.dataset.presentation !== "callout";
+    hint.querySelector("[data-tour-hint-previous]").disabled = index === 0 && page === 0 && !previousAvailable;
+    hint.querySelector("[data-tour-hint-next]").disabled = index === count - 1 && page === pages - 1 && !nextAvailable;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/hints.js
+  function measureHintPages(hintText, fullText) {
+    const characters = globalThis.Intl?.Segmenter ? [...new Intl.Segmenter(void 0, { granularity: "grapheme" }).segment(fullText)].map(
+      (part) => part.segment
+    ) : Array.from(fullText);
+    const pages = [];
+    let offset = 0;
+    while (offset < characters.length) {
+      let low = 1;
+      let high = characters.length - offset;
+      let best = 1;
+      while (low <= high) {
+        const middle = Math.floor((low + high) / 2);
+        hintText.textContent = characters.slice(offset, offset + middle).join("");
+        if (!hintText.clientHeight ? middle <= 160 : hintText.scrollHeight <= hintText.clientHeight + 1) {
+          best = middle;
+          low = middle + 1;
+        } else high = middle - 1;
+      }
+      if (offset + best < characters.length) {
+        const candidate = characters.slice(offset, offset + best);
+        const boundary = candidate.findLastIndex((character) => /\s/u.test(character));
+        if (boundary >= best / 2) best = boundary + 1;
+      }
+      pages.push(characters.slice(offset, offset + best).join(""));
+      offset += best;
+    }
+    if (!pages.length) pages.push("");
+    return pages;
+  }
+  function createTourHints(root2, defaultStyle, { onClose, focusTrigger, signal, keyboardScope, hideVoice, labels, navigation, boundary }) {
+    const query = (name) => root2.querySelector(`[data-tour-${name}]`);
+    const viewport = query("viewport");
+    const hint = query("hint");
+    const hintText = query("hint-text");
+    const actionTitle = query("hint-action-title");
+    const hintPrevious = query("hint-previous");
+    const hintNext = query("hint-next");
+    const hintClose = query("hint-close");
+    const voice = createTourVoiceButton(hintClose, labels, signal);
+    let activeHint = 0;
+    let activeHintId = null;
+    let textPage = 0;
+    let pages = [];
+    let hints = [];
+    let dismissed = false;
+    let restoringFocus = false;
+    const caption = createTourCaption(hint, hintText, labels, paginate, signal);
+    let geometry = { stageWidth: 640, stageHeight: 360, imageBox: null };
+    function paginate() {
+      const { stageWidth, stageHeight } = geometry;
+      const current = dismissed ? null : hints[activeHint];
+      if (!current) {
+        hint.hidden = true;
+        return;
+      }
+      voice.hidden = Boolean(hideVoice) || current.narration?.trigger !== "activation";
+      voice.dataset.tourNarration = current.id;
+      activeHintId = current.id;
+      hint.hidden = false;
+      const defaultAppearance = tourTextDefaults(
+        defaultStyle,
+        current.point ? "hotspot" : "annotation"
+      );
+      const appearance = resolveTourTextAppearance(
+        current.point ? "hotspot" : "annotation",
+        current.appearance,
+        defaultAppearance
+      );
+      hint.dataset.presentation = appearance.presentation;
+      caption.prepare(current, appearance.presentation);
+      const copy = setTourHintCopy(actionTitle, current, labels);
+      const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
+      hint.style.textAlign = appearance.alignment;
+      sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
+      pages = navigation || appearance.presentation !== "callout" ? [copy.text] : measureHintPages(hintText, copy.text);
+      textPage = Math.min(textPage, pages.length - 1);
+      hintText.textContent = pages[textPage];
+      updateTourHintNavigation(hint, {
+        index: activeHint,
+        count: hints.length,
+        page: textPage,
+        pages: pages.length,
+        pointLabel: labels.point,
+        position: boundary?.position(activeHint),
+        previousAvailable: boundary?.canMove(-1),
+        nextAvailable: boundary?.canMove(1)
+      });
+      if (navigation) {
+        hintPrevious.disabled = !navigation.canMove(-1);
+        hintNext.disabled = !navigation.canMove(1);
+      }
+      caption.finish();
+      hintText.hidden = hintText.hidden || copy.hideBody;
+      const position = positionHint({ hint, viewport, geometry, current, appearance });
+      hint.style.left = `${position.left}px`;
+      const bottomCaption = appearance.presentation === "caption-bottom";
+      hint.style.top = bottomCaption ? "auto" : `${position.top}px`;
+      hint.style.bottom = bottomCaption ? `${position.bottom}px` : "";
+    }
+    function changeHint(direction) {
+      if (navigation) {
+        navigation.move(direction);
+        return;
+      }
+      if (direction > 0 && textPage + 1 < pages.length) textPage += 1;
+      else if (direction < 0 && textPage > 0) textPage -= 1;
+      else if (activeHint + direction >= 0 && activeHint + direction < hints.length) {
+        activeHint += direction;
+        textPage = direction < 0 ? Number.MAX_SAFE_INTEGER : 0;
+      } else if (boundary?.canMove(direction)) {
+        boundary.move(direction);
+        return;
+      }
+      paginate();
+    }
+    hintPrevious.addEventListener("click", () => changeHint(-1), { signal });
+    hintNext.addEventListener("click", () => changeHint(1), { signal });
+    function dismiss() {
+      if (hint.hidden) return;
+      dismissed = true;
+      hint.hidden = true;
+      onClose();
+      restoringFocus = true;
+      try {
+        focusTrigger(activeHint);
+      } finally {
+        restoringFocus = false;
+      }
+    }
+    bindTourHintDismissal(root2, hint, signal, keyboardScope, dismiss);
+    return {
+      setDefaultAppearance(value) {
+        defaultStyle = value;
+      },
+      get activeIndex() {
+        return activeHint;
+      },
+      reset(sameScene = false) {
+        if (sameScene && hint.dataset.presentation !== "callout") return;
+        caption.reset();
+        activeHintId = null;
+        activeHint = 0;
+        textPage = 0;
+        dismissed = false;
+      },
+      select(index, lastPage = false) {
+        if (restoringFocus) return;
+        if (lastPage || hints[index]?.id !== activeHintId || hint.dataset.presentation === "callout")
+          textPage = lastPage ? Number.MAX_SAFE_INTEGER : 0;
+        activeHint = index;
+        dismissed = false;
+        paginate();
+      },
+      show(items, dimensions) {
+        hints = items;
+        activeHint = Math.min(activeHint, Math.max(0, items.length - 1));
+        geometry = dimensions;
+        paginate();
+      }
+    };
+  }
+  function createTourVoiceButton(close, labels, signal) {
+    const voice = createTourNarrationButton(close.ownerDocument, labels.play);
+    close.before(voice);
+    signal.addEventListener("abort", () => voice.remove(), { once: true });
+    return voice;
+  }
+  function setTourHintCopy(actionTitle, current, labels) {
+    const hotspot = Boolean(current.point);
+    actionTitle.hidden = !hotspot;
+    actionTitle.textContent = hotspot ? current.label || labels.point : "";
+    return {
+      text: hotspot ? current.text || "" : current.text || current.label || "",
+      hideBody: hotspot && !current.text?.trim()
+    };
+  }
+  function positionHint({ hint, viewport, geometry, current, appearance }) {
+    const gap = appearance.calloutGap ?? 30;
+    const { stageWidth: hintWidth, stageHeight: hintHeight, imageBox } = geometry;
+    const offsetX = ((viewport.clientWidth || hintWidth) - hintWidth) / 2;
+    const offsetY = ((viewport.clientHeight || hintHeight) - hintHeight) / 2;
+    const anchor = current.point;
+    const point = anchor && imageBox ? { x: imageBox.x + anchor.x * imageBox.width, y: imageBox.y + anchor.y * imageBox.height } : { x: hintWidth / 2, y: hintHeight / 2 };
+    if (appearance.presentation !== "callout")
+      return {
+        left: offsetX,
+        bottom: offsetY,
+        top: offsetY + (appearance.presentation === "caption-top" ? 0 : Math.max(0, hintHeight - hint.offsetHeight))
+      };
+    let left = (hintWidth - hint.offsetWidth) / 2;
+    let top = appearance.presentation === "caption-top" ? 8 : hintHeight - hint.offsetHeight - 8;
+    if (appearance.presentation === "callout") {
+      let placement = appearance.placement ?? "auto";
+      const x = point.x;
+      const y = point.y;
+      if (placement === "auto") {
+        placement = x + gap + hint.offsetWidth <= hintWidth - 8 ? "right" : x - gap - hint.offsetWidth >= 8 ? "left" : y + gap + hint.offsetHeight <= hintHeight - 8 ? "bottom" : "top";
+      }
+      left = x + gap;
+      top = y - hint.offsetHeight / 2;
+      if (placement === "left") left = x - hint.offsetWidth - gap;
+      if (placement === "top" || placement === "bottom") {
+        left = x - hint.offsetWidth / 2;
+        top = placement === "top" ? y - hint.offsetHeight - gap : y + gap;
+      }
+    }
+    return {
+      left: offsetX + Math.max(8, Math.min(hintWidth - hint.offsetWidth - 8, left)),
+      top: offsetY + Math.max(8, Math.min(hintHeight - hint.offsetHeight - 8, top))
+    };
+  }
+  function bindTourHintDismissal(root2, hint, signal, keyboardScope, dismiss) {
+    hint.querySelector("[data-tour-hint-close]").addEventListener("click", dismiss, { signal });
+    root2.ownerDocument.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key !== "Escape" || event.defaultPrevented || keyboardScope && !event.composedPath().includes(keyboardScope) || root2.querySelector("[data-tour-navigation]").open || hint.hidden)
+          return;
+        event.preventDefault();
+        dismiss();
+      },
+      { signal }
+    );
+  }
+
+  // apps/extension/src/features/scenario/tour-player/navigation-scene.js
+  function renderTourNavigationScene({
+    root: root2,
+    slide,
+    stageWidth,
+    stageHeight,
+    labels,
+    media,
+    element,
+    actionButton,
+    authoring,
+    page,
+    selectedObjectId,
+    onPage
+  }) {
+    const { panel, content, layout, padding, gap, available, textPages, text } = prepareComposition({
+      root: root2,
+      slide,
+      stageWidth,
+      stageHeight,
+      media,
+      element,
+      page
+    });
+    const fontSize = parseFloat(globalThis.getComputedStyle(root2).fontSize) || 16;
+    const contentWidth = (stageWidth - padding * 2) * layout.width / 100;
+    const columns = Math.max(1, Math.min(layout.columns, Math.floor(contentWidth / (fontSize * 8))));
+    const used = content.getBoundingClientRect().height || (slide.title ? 38 : 0) + (text ? 48 : 0);
+    const rowHeight = Math.min(48, Math.max(28, available * 0.18));
+    const rowCount = Math.max(
+      1,
+      Math.floor((available - used - rowHeight - gap * 3) / (rowHeight + gap))
+    );
+    const pageSize = Math.min(12, rowCount * columns);
+    const count = Math.max(textPages.length, Math.ceil(slide.buttons.length / pageSize));
+    const selectedIndex = slide.buttons.findIndex((button) => button.id === selectedObjectId);
+    const current = selectedIndex >= 0 ? Math.floor(selectedIndex / pageSize) : Math.min(page, Math.max(0, count - 1));
+    if (text) text.textContent = textPages[Math.min(current, textPages.length - 1)];
+    const buttons = element("div", "tour-navigation-buttons");
+    const referenceColumnWidth = Math.max(0, (contentWidth - gap * 2) / 3);
+    const gridWidth = referenceColumnWidth * columns + gap * (columns - 1);
+    buttons.style.gridTemplateColumns = `repeat(${columns}, ${referenceColumnWidth}px)`;
+    buttons.style.width = `${gridWidth}px`;
+    buttons.style.alignSelf = { start: "flex-start", center: "center", end: "flex-end" }[layout.align];
+    buttons.style.gap = `${gap}px`;
+    const buttonPage = Math.min(current, Math.max(0, Math.ceil(slide.buttons.length / pageSize) - 1));
+    for (const button of slide.buttons.slice(buttonPage * pageSize, (buttonPage + 1) * pageSize)) {
+      const node = actionButton(button.label, button.action, "tour-button", button.id);
+      node.style.height = `${rowHeight}px`;
+      if (!authoring && button.narration?.trigger === "activation") {
+        const group = element("div", "tour-navigation-audio");
+        group.style.display = "flex";
+        group.style.gap = "4px";
+        node.style.flex = "1";
+        const voice = createTourNarrationButton(root2.ownerDocument, labels.play);
+        voice.dataset.tourNarration = button.id;
+        group.append(node, voice);
+        buttons.append(group);
+      } else buttons.append(node);
+    }
+    if (slide.buttons.length) content.append(buttons);
+    if (count > 1) {
+      const pager = element("div", "tour-navigation-pager");
+      const previous = actionButton(labels.previous, { kind: "none" }, "tour-button");
+      const next = actionButton(labels.next, { kind: "none" }, "tour-button");
+      previous.disabled = current === 0;
+      next.disabled = current === count - 1;
+      previous.addEventListener("click", () => onPage(current - 1));
+      next.addEventListener("click", () => onPage(current + 1));
+      pager.append(previous, element("span", "", `${current + 1} / ${count}`), next);
+      content.append(pager);
+    }
+    return { panel, hints: [], page: current };
+  }
+  function prepareComposition({ root: root2, slide, stageWidth, stageHeight, media, element, page }) {
+    const layout = slide.layout ?? TOUR_NAVIGATION_LAYOUT;
+    const panel = element("section", "tour-navigation-scene");
+    panel.style.background = slide.background.paint ? serializePaintToCss(slide.background.paint) : slide.background.color;
+    const padding = Math.min(stageWidth, stageHeight) * layout.padding / 100;
+    const gap = layout.gap * Math.min(1, stageWidth / 640);
+    panel.style.padding = `${padding}px`;
+    panel.style.justifyContent = { start: "flex-start", center: "center", end: "flex-end" }[layout.vertical];
+    panel.style.alignItems = { start: "flex-start", center: "center", end: "flex-end" }[layout.align];
+    if (slide.background.image) {
+      const image = element("img", "tour-navigation-image");
+      const source = media.get(slide.background.image.assetId);
+      if (source) image.src = source;
+      image.alt = slide.background.image.alt;
+      panel.append(image);
+    }
+    const content = element("div", "tour-navigation-content");
+    content.style.width = `${layout.width}%`;
+    content.style.textAlign = { start: "left", center: "center", end: "right" }[layout.align];
+    content.style.gap = `${gap}px`;
+    panel.append(content);
+    root2.querySelector("[data-tour-scene]").append(panel);
+    const available = Math.max(1, stageHeight - padding * 2);
+    if (slide.title) {
+      const heading = element("h1", "", slide.title);
+      heading.title = slide.title;
+      heading.style.maxHeight = `${available * 0.22}px`;
+      content.append(heading);
+    }
+    let textPages = [""];
+    let text = null;
+    if (slide.description) {
+      text = element("p", "tour-navigation-text");
+      text.style.maxHeight = `${available * 0.3}px`;
+      content.append(text);
+      textPages = measureHintPages(text, slide.description);
+      if (textPages.length > 1) text.style.height = text.style.maxHeight;
+      text.textContent = textPages[Math.min(page, textPages.length - 1)];
+    }
+    return { panel, content, layout, padding, gap, available, textPages, text };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/navigation.js
+  function createTourNavigation({
+    root: root2,
+    labels,
+    media,
+    element,
+    actionButton,
+    redraw,
+    authoring
+  }) {
+    let navigationPage = 0;
+    let composition = null;
+    function render(slide, stageWidth, stageHeight, selectedObjectId) {
+      const reveal = authoring && (composition?.slide !== slide || composition?.stageWidth !== stageWidth || composition?.stageHeight !== stageHeight || composition?.selectedObjectId !== selectedObjectId);
+      composition = { slide, stageWidth, stageHeight, selectedObjectId };
+      const rendered = renderTourNavigationScene({
+        root: root2,
+        slide,
+        stageWidth,
+        stageHeight,
+        labels,
+        media,
+        element,
+        actionButton,
+        authoring,
+        page: navigationPage,
+        selectedObjectId: reveal ? selectedObjectId : null,
+        onPage: (page) => {
+          navigationPage = page;
+          redraw();
+        }
+      });
+      navigationPage = rendered.page;
+      return rendered;
+    }
+    function openContents(slides, index, onSelect) {
+      const navigation = root2.querySelector("[data-tour-navigation]");
+      const trigger = root2.querySelector("[data-tour-contents]");
+      if (navigation.open) {
+        closeContents(false);
+        return;
+      }
+      navigation.replaceChildren();
+      const list = element("div", "tour-contents-list");
+      let current = null;
+      slides.forEach((slide, number) => {
+        const button = actionButton(`${number + 1}. ${slide.title}`, { kind: "none" }, "tour-button");
+        button.title = slide.title;
+        if (number === index) {
+          button.setAttribute("aria-current", "step");
+          current = button;
+        }
+        button.addEventListener("click", () => {
+          onSelect(number);
+          closeContents(true);
+        });
+        list.append(button);
+      });
+      const header = element("div", "tour-contents-header");
+      const heading = element("h2", "tour-contents-title");
+      heading.textContent = labels.contents;
+      const close = actionButton(labels.close, { kind: "none" }, "tour-button");
+      close.addEventListener("click", () => closeContents(true));
+      header.append(heading, close);
+      navigation.append(header, list);
+      navigation.setAttribute("open", "");
+      trigger.setAttribute("aria-expanded", "true");
+      current?.scrollIntoView?.({ block: "nearest" });
+      (current ?? close).focus({ preventScroll: true });
+      root2.ownerDocument.addEventListener("keydown", onContentsKey, true);
+      root2.ownerDocument.addEventListener("pointerdown", onContentsPointerDown, true);
+    }
+    function closeContents(restoreFocus) {
+      const navigation = root2.querySelector("[data-tour-navigation]");
+      if (!navigation.open) return;
+      const trigger = root2.querySelector("[data-tour-contents]");
+      root2.ownerDocument.removeEventListener("keydown", onContentsKey, true);
+      root2.ownerDocument.removeEventListener("pointerdown", onContentsPointerDown, true);
+      navigation.removeAttribute("open");
+      trigger?.setAttribute("aria-expanded", "false");
+      if (restoreFocus) trigger?.focus({ preventScroll: true });
+    }
+    function onContentsKey(event) {
+      const navigation = root2.querySelector("[data-tour-navigation]");
+      if (!navigation.open || event.defaultPrevented) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        closeContents(true);
+      } else if (event.key === "Tab") {
+        const buttons = [...navigation.querySelectorAll("button")];
+        const active = navigation.getRootNode().activeElement;
+        const next = buttons.indexOf(active) + (event.shiftKey ? -1 : 1);
+        if (next < 0 || next >= buttons.length) {
+          event.preventDefault();
+          buttons[event.shiftKey ? buttons.length - 1 : 0]?.focus();
+        }
+      }
+    }
+    function onContentsPointerDown(event) {
+      const navigation = root2.querySelector("[data-tour-navigation]");
+      if (!navigation.open || !(event.target instanceof globalThis.Element)) return;
+      if (event.composedPath().some(
+        (node) => node === navigation || node instanceof globalThis.Element && node.matches("[data-tour-contents]")
+      ))
+        return;
+      closeContents(false);
+    }
+    return {
+      render,
+      openContents,
+      closeContents: () => closeContents(false),
+      reset() {
+        navigationPage = 0;
+        composition = null;
+      }
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/scene.js
+  function slideExplanations(slide) {
+    return getTourSlideObjects(slide).filter((entry) => entry.type !== "mask").map((entry) => entry.object);
+  }
+  function scenePolicy(root2, options) {
+    const authoring = options.authoring ?? null;
+    const preview = Boolean(options.preview);
+    return {
+      authoring,
+      // Editor preview never creates an executable link; denied actions stay plain buttons.
+      linkedUrls: !authoring && !preview,
+      keyboardScope: authoring || preview ? root2 : null,
+      hideVoice: Boolean(authoring)
+    };
+  }
+  function createSceneHints(root2, input, policy, signal, getHints, boundary) {
+    const scene = root2.querySelector("[data-tour-scene]");
+    return createTourHints(root2, input.tour.style, {
+      signal,
+      keyboardScope: policy.keyboardScope,
+      hideVoice: policy.hideVoice,
+      navigation: policy.authoring?.navigation,
+      boundary: policy.authoring ? null : boundary,
+      onClose: () => {
+      },
+      labels: input.labels,
+      focusTrigger: (activeIndex) => {
+        const object = getHints()[activeIndex];
+        const trigger = (object ? scene.querySelector(`[data-tour-object-id="${object.id}"]`) : null) ?? scene.querySelector(".tour-details") ?? root2.querySelector("[data-tour-contents]");
+        trigger.focus();
+      }
+    });
+  }
+  function createTourScene(root2, input, onAction, signal, options = {}, boundary) {
+    const policy = scenePolicy(root2, options);
+    const { authoring } = policy;
+    let { tour } = input;
+    const { assets, labels } = input;
+    const media = new Map(assets.map((asset) => [asset.id, asset.src]));
+    const query = (name) => root2.querySelector(`[data-tour-${name}]`);
+    const viewport = query("viewport");
+    const stage = query("stage");
+    const scene = query("scene");
+    const motion = authoring ? null : createTourMotion(root2, signal);
+    const reducedMotion = () => Boolean(globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches);
+    let current = null;
+    let ended = false;
+    let selectedObjectId = null;
+    let lastFontSize = "";
+    let stageWidth = 640;
+    let stageHeight = 360;
+    let hints = [];
+    const { element, actionButton } = sceneElements(root2.ownerDocument, onAction, policy);
+    const hintController = createSceneHints(root2, input, policy, signal, () => hints, boundary);
+    const navigationController = createTourNavigation({
+      root: root2,
+      labels,
+      media,
+      element,
+      actionButton,
+      redraw: render,
+      authoring
+    });
+    function render() {
+      if (signal.aborted) return;
+      const focused = root2.getRootNode().activeElement;
+      scene.replaceChildren();
+      let imageBox = null;
+      hints = [];
+      const slide = ended ? endSlide(tour, labels) : current;
+      if (slide?.kind === "image") {
+        imageBox = renderTourImage(
+          slide,
+          { stageWidth, stageHeight },
+          {
+            scene,
+            element,
+            labels,
+            media,
+            actionButton,
+            hintController,
+            onAction,
+            authoring,
+            signal,
+            autoZoom: tour.playback.autoZoom,
+            maskDefaults: tour.style.maskDefaults,
+            style: tour.style
+          }
+        );
+        hints = slide.image ? slideExplanations(slide) : [];
+      } else if (slide) {
+        const rendered = navigationController.render(
+          slide,
+          stageWidth,
+          stageHeight,
+          selectedObjectId
+        );
+        scene.append(rendered.panel);
+        hints = rendered.hints;
+      } else scene.append(element("p", "tour-empty", labels.empty));
+      hintController.show(hints, { stageWidth, stageHeight, imageBox });
+      markTourSelection(scene, selectedObjectId, focused);
+    }
+    function resize() {
+      if (signal.aborted) return;
+      const {
+        width: nextWidth,
+        height: nextHeight,
+        fontSize
+      } = measureScene(root2, viewport, tour.stage.aspect);
+      if (nextWidth === stageWidth && nextHeight === stageHeight && fontSize === lastFontSize && stage.style.width)
+        return;
+      lastFontSize = fontSize;
+      stageWidth = nextWidth;
+      stageHeight = nextHeight;
+      root2.style.setProperty("--tour-frame-width", `${stageWidth}px`);
+      viewport.style.width = `${stageWidth}px`;
+      viewport.style.height = `${stageHeight}px`;
+      stage.style.width = `${stageWidth}px`;
+      stage.style.height = `${stageHeight}px`;
+      render();
+      motion?.reflow({ stageWidth, stageHeight });
+    }
+    applySceneStyle(root2, stage, tour, media);
+    return {
+      update(next) {
+        tour = next.tour;
+        media.clear();
+        for (const asset of next.assets) media.set(asset.id, asset.src);
+        hintController.setDefaultAppearance(tour.style);
+        applySceneStyle(root2, stage, tour, media);
+      },
+      selectObject(id) {
+        selectedObjectId = id;
+        if (authoring && current?.kind === "navigation") render();
+        markTourSelection(scene, selectedObjectId);
+        const hintIndex = current?.kind === "image" ? slideExplanations(current).findIndex((item) => item.id === id) : -1;
+        if (hintIndex >= 0) hintController.select(hintIndex);
+      },
+      resize,
+      motion,
+      openContents: navigationController.openContents,
+      closeContents: navigationController.closeContents,
+      show(slide, isEnd, hintEdge = 0) {
+        if (signal.aborted) return;
+        const previous = motion?.capture() ?? null;
+        hintController.reset(current?.id === slide?.id && ended === isEnd);
+        current = slide;
+        ended = isEnd;
+        navigationController.reset();
+        render();
+        if (hintEdge)
+          hintController.select(hintEdge < 0 ? Math.max(0, hints.length - 1) : 0, hintEdge < 0);
+        motion?.prepare(
+          previous,
+          ended ? null : slide,
+          tour,
+          { stageWidth, stageHeight },
+          reducedMotion()
+        );
+      }
+    };
+  }
+  function endSlide(tour, labels) {
+    const end = tour.endScreen;
+    return {
+      kind: "navigation",
+      title: end.title,
+      description: end.description,
+      background: { color: tour.stage.background, image: null },
+      buttons: [
+        ...end.button ? [{ label: end.button.label, action: { kind: "url", url: end.button.url } }] : [],
+        ...end.restart ? [{ label: labels.restart, action: { kind: "restart" } }] : []
+      ]
+    };
+  }
+  function sceneElements(document, onAction, policy) {
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== void 0) node.textContent = text;
+      return node;
+    }
+    function actionButton(label, action, className, objectId = null) {
+      const linked = policy.linkedUrls && action.kind === "url";
+      const node = element(linked ? "a" : "button", className, label);
+      if (linked) {
+        node.href = action.url;
+        node.target = "_blank";
+        node.rel = "noopener noreferrer";
+      } else {
+        node.type = "button";
+        node.addEventListener(
+          "click",
+          () => policy.authoring ? policy.authoring.onSelectObject(objectId) : onAction(action)
+        );
+      }
+      if (objectId) node.dataset.tourObjectId = objectId;
+      node.title = label;
+      return node;
+    }
+    return { element, actionButton };
+  }
+  function applySceneStyle(root2, stage, tour, media) {
+    root2.style.setProperty("--tour-accent", tour.style.accent);
+    root2.style.setProperty("--tour-text", tour.style.text);
+    root2.style.setProperty("--tour-surface", tour.style.surface);
+    stage.style.background = tour.stage.paint ? serializePaintToCss(tour.stage.paint) : tour.stage.background;
+    const source = tour.stage.image && media.get(tour.stage.image.assetId);
+    if (source) {
+      const underlay = stage.style.backgroundImage;
+      stage.style.backgroundImage = `url("${source}")${underlay && underlay !== "none" ? `, ${underlay}` : ""}`;
+      stage.style.backgroundPosition = "center";
+      stage.style.backgroundRepeat = "no-repeat";
+      stage.style.backgroundSize = underlay && underlay !== "none" ? `${tour.stage.imageFit ?? "cover"}, auto` : tour.stage.imageFit ?? "cover";
+    }
+  }
+  function measureScene(root2, viewport, aspect) {
+    const [width, height] = aspect.split(":").map(Number);
+    const spacing = globalThis.getComputedStyle(viewport);
+    const horizontal = (parseFloat(spacing.marginLeft) || 0) + (parseFloat(spacing.marginRight) || 0);
+    const vertical = (parseFloat(spacing.marginTop) || 0) + (parseFloat(spacing.marginBottom) || 0);
+    const toolbarHeight = root2.querySelector(".tour-toolbar")?.offsetHeight || 0;
+    const availableWidth = Math.max(
+      1,
+      (root2.clientWidth || viewport.clientWidth || 640) - horizontal
+    );
+    const availableHeight = Math.max(
+      1,
+      (root2.clientHeight || viewport.clientHeight || 360) - toolbarHeight - vertical
+    );
+    const stageWidth = Math.min(availableWidth, availableHeight * width / height);
+    return {
+      width: stageWidth,
+      height: stageWidth * height / width,
+      fontSize: globalThis.getComputedStyle(root2).fontSize
+    };
+  }
+  function markTourSelection(scene, selectedObjectId, focused) {
+    for (const node of scene.querySelectorAll("[data-tour-object-id]"))
+      node.dataset.selected = String(node.dataset.tourObjectId === selectedObjectId);
+    const selectedMask = scene.querySelector(
+      ".tour-mask[data-selected=true]:not(.tour-camera-frame)"
+    );
+    const imagePlane = scene.querySelector(".tour-image-plane");
+    if (imagePlane) {
+      imagePlane.style.zIndex = selectedMask ? "4" : "";
+      imagePlane.style.pointerEvents = selectedMask ? "none" : "";
+    }
+    if (focused?.matches(".tour-navigation-buttons [data-tour-object-id]")) {
+      const buttons = [...scene.querySelectorAll(".tour-navigation-buttons [data-tour-object-id]")];
+      const replacement = buttons.find((node) => node.dataset.tourObjectId === focused.dataset.tourObjectId) ?? buttons.find((node) => node.dataset.tourObjectId === selectedObjectId);
+      replacement?.focus({ preventScroll: true });
+      return;
+    }
+    if (focused?.classList.contains("tour-camera-frame")) {
+      scene.querySelector(".tour-camera-frame")?.focus({ preventScroll: true });
+      return;
+    }
+    if (!focused?.classList.contains("tour-resize-handle")) return;
+    const objectId = focused.parentElement?.dataset.tourObjectId;
+    const handle = [
+      ...scene.querySelectorAll(".tour-mask[data-selected=true] .tour-resize-handle")
+    ].find(
+      (node) => node.dataset.edge === focused.dataset.edge && node.parentElement.dataset.tourObjectId === objectId
+    );
+    handle?.focus({ preventScroll: true });
+  }
+
+  // apps/extension/src/features/scenario/tour-player/audio.js
+  function createTourAudio(root2, signal, failed) {
+    const audio = root2.ownerDocument.createElement("audio");
+    audio.hidden = true;
+    audio.preload = "auto";
+    root2.append(audio);
+    let slide = null, assets = [], cues = [], current = null, activation = false;
+    let pending = false, generation = 0, frame = 0;
+    let context = null, gain = null;
+    function pause() {
+      generation++;
+      pending = false;
+      if (current) audio.pause();
+      globalThis.cancelAnimationFrame(frame);
+    }
+    function stop() {
+      pause();
+      current = null;
+      activation = false;
+      if (audio.getAttribute("src")) {
+        audio.removeAttribute("src");
+        audio.load();
+      }
+    }
+    function select(cue, time) {
+      if (current !== cue) {
+        pause();
+        current = cue;
+        const source = assets.find((asset) => asset.id === cue.narration.assetId)?.src;
+        if (!source) {
+          failed("audio-error");
+          return false;
+        }
+        audio.src = source;
+      }
+      if (Math.abs(audio.currentTime - time) > 0.15 || audio.currentTime < cue.narration.trimStart)
+        audio.currentTime = time;
+      audio.volume = Math.min(1, cue.narration.gain);
+      if (gain) gain.gain.value = cue.narration.gain > 1 ? cue.narration.gain : 1;
+      return true;
+    }
+    async function play() {
+      if (pending || !audio.paused || !current) return;
+      pending = true;
+      const token = ++generation;
+      try {
+        if (current.narration.gain > 1 && !context) {
+          context = new globalThis.AudioContext();
+          gain = context.createGain();
+          context.createMediaElementSource(audio).connect(gain);
+          gain.connect(context.destination);
+          gain.gain.value = current.narration.gain;
+        }
+        if (context) await context.resume();
+        if (token !== generation || signal.aborted) return;
+        await audio.play();
+        if (token !== generation || signal.aborted) return;
+        if (activation) monitor();
+      } catch (error) {
+        if (token === generation && !signal.aborted) {
+          pause();
+          failed(error?.name === "NotAllowedError" ? "blocked" : "audio-error");
+        }
+      } finally {
+        if (token === generation) pending = false;
+      }
+    }
+    function monitor() {
+      if (!activation || !current || signal.aborted) return;
+      if (audio.currentTime >= current.narration.trimEnd) {
+        pause();
+        return;
+      }
+      frame = globalThis.requestAnimationFrame(monitor);
+    }
+    audio.addEventListener(
+      "error",
+      () => {
+        if (current) {
+          pause();
+          failed("audio-error");
+        }
+      },
+      { signal }
+    );
+    signal.addEventListener(
+      "abort",
+      () => {
+        stop();
+        audio.remove();
+        void context?.close().catch(() => {
+        });
+      },
+      { once: true }
+    );
+    return {
+      show(nextSlide, nextAssets) {
+        stop();
+        slide = nextSlide;
+        assets = nextAssets;
+        cues = slide ? getTourNarrationCues(slide, { kind: "enter" }) : [];
+      },
+      sync(seconds, playing) {
+        if (activation) return;
+        let offset = 0;
+        const cue = cues.find((entry) => {
+          const duration = entry.narration.trimEnd - entry.narration.trimStart;
+          if (seconds < offset + duration) return true;
+          offset += duration;
+          return false;
+        });
+        if (!cue) {
+          if (current) stop();
+          return;
+        }
+        if (!select(cue, cue.narration.trimStart + Math.max(0, seconds - offset))) return;
+        if (playing) void play();
+        else if (!audio.paused || pending) pause();
+      },
+      activate(id) {
+        const cue = slide && getTourNarrationCues(slide, { kind: "activation", objectId: id })[0];
+        if (!cue) return;
+        activation = true;
+        if (select(cue, cue.narration.trimStart)) void play();
+      },
+      stop
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/clock.js
+  function createTourClock({ now, requestFrame, cancelFrame, onChange, onComplete }) {
+    let duration = 0;
+    let elapsed = 0;
+    let started = 0;
+    let running = false;
+    let disposed = false;
+    let frame = null;
+    let generation = 0;
+    const value = () => Math.min(duration, elapsed + (running ? Math.max(0, now() - started) : 0));
+    function cancel() {
+      generation += 1;
+      if (frame !== null) cancelFrame(frame);
+      frame = null;
+    }
+    function schedule() {
+      const token = generation;
+      frame = requestFrame(() => {
+        if (disposed || !running || token !== generation) return;
+        frame = null;
+        const current = value();
+        if (current >= duration) {
+          elapsed = duration;
+          running = false;
+          onChange(elapsed, false);
+          if (!disposed && token === generation) onComplete();
+        } else {
+          onChange(current, true);
+          if (!disposed && running && token === generation) schedule();
+        }
+      });
+    }
+    return {
+      reset(nextDuration) {
+        if (disposed) return;
+        cancel();
+        duration = Math.max(0, nextDuration);
+        elapsed = 0;
+        running = false;
+        onChange(0, false);
+      },
+      play() {
+        if (disposed || running) return;
+        cancel();
+        running = true;
+        started = now();
+        const token = generation;
+        onChange(elapsed, true);
+        if (running && !disposed && token === generation) schedule();
+      },
+      pause() {
+        if (disposed) return;
+        elapsed = value();
+        running = false;
+        cancel();
+        onChange(elapsed, false);
+      },
+      seek(nextElapsed) {
+        if (disposed) return;
+        const resume = running;
+        cancel();
+        elapsed = Math.min(duration, Math.max(0, nextElapsed));
+        started = now();
+        const token = generation;
+        onChange(elapsed, running);
+        if (resume && running && !disposed && token === generation) schedule();
+      },
+      get elapsed() {
+        return value();
+      },
+      dispose() {
+        if (disposed) return;
+        disposed = true;
+        running = false;
+        cancel();
+      }
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/media.js
+  function waitForTourImage(source, signal) {
+    if (!source) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const image = new globalThis.Image();
+      let finished = false;
+      const timeout = setTimeout(() => finish(new Error("Tour image load timed out.")), 15e3);
+      function finish(error) {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
+        signal.removeEventListener("abort", abort);
+        image.onload = null;
+        image.onerror = null;
+        if (error) reject(error);
+        else resolve();
+      }
+      function abort() {
+        finish(new DOMException("Aborted", "AbortError"));
+        image.src = "";
+      }
+      image.onerror = () => finish(new Error("Tour image could not be decoded."));
+      image.onload = () => {
+        if (image.decode) image.decode().then(() => finish(), finish);
+        else finish();
+      };
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) abort();
+      else image.src = source;
+    });
+  }
+
+  // apps/extension/src/features/scenario/tour-player/playback-session.js
+  function createTourPlaybackSession({ signal, motion, hidden, autoplay, changed, complete }) {
+    let mode = autoplay ? "playback" : "manual";
+    let wanted = autoplay && !hidden();
+    let running = false;
+    let state = "empty";
+    let generation = 0;
+    let loading = null;
+    let spec = null;
+    let autoEntrance = false;
+    const clock = createTourClock({
+      now: () => performance.now(),
+      requestFrame: (callback) => globalThis.requestAnimationFrame(callback),
+      cancelFrame: (id) => globalThis.cancelAnimationFrame(id),
+      onChange(elapsed, active) {
+        running = active;
+        if (autoEntrance && !wanted && spec && elapsed >= spec.entrance) {
+          autoEntrance = false;
+          clock.pause();
+          clock.seek(spec.entrance);
+          return;
+        }
+        motion.frame(elapsed);
+        changed(elapsed, wanted || running, state, mode, wanted);
+      },
+      onComplete() {
+        if (wanted) complete();
+      }
+    });
+    function load(next) {
+      loading?.abort();
+      const token = ++generation;
+      spec = next;
+      autoEntrance = true;
+      state = "loading";
+      clock.reset(spec.duration);
+      loading = new AbortController();
+      const ready = spec.required && !spec.source ? Promise.reject(new Error("Missing image.")) : waitForTourImage(spec.source, loading.signal);
+      ready.then(() => {
+        if (signal.aborted || token !== generation) return;
+        state = "ready";
+        motion.ready();
+        clock.seek(clock.elapsed);
+        if (hidden()) {
+          pause();
+          return;
+        }
+        if (wanted || autoEntrance && spec.entrance > clock.elapsed) clock.play();
+      }).catch(() => {
+        if (signal.aborted || token !== generation) return;
+        state = "error";
+        motion.fail();
+        pause();
+      });
+    }
+    function pause() {
+      wanted = false;
+      autoEntrance = false;
+      clock.pause();
+    }
+    signal.addEventListener(
+      "abort",
+      () => {
+        generation += 1;
+        loading?.abort();
+        clock.dispose();
+        motion.cancel();
+      },
+      { once: true }
+    );
+    return {
+      load,
+      pause,
+      get mode() {
+        return mode;
+      },
+      setManual() {
+        mode = "manual";
+        pause();
+      },
+      get elapsed() {
+        return clock.elapsed;
+      },
+      get playing() {
+        return wanted || running;
+      },
+      get continuous() {
+        return wanted;
+      },
+      get state() {
+        return state;
+      },
+      play() {
+        mode = "playback";
+        wanted = true;
+        if (state === "error" && spec) load(spec);
+        else {
+          if (clock.elapsed >= (spec?.duration ?? 0)) clock.seek(0);
+          if (state === "ready") clock.play();
+          else changed(clock.elapsed, true, state, mode, wanted);
+        }
+      },
+      seek(elapsed) {
+        pause();
+        clock.seek(elapsed);
+      },
+      clear() {
+        generation += 1;
+        loading?.abort();
+        wanted = false;
+        autoEntrance = false;
+        state = "empty";
+        clock.reset(0);
+        motion.cancel();
+      }
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/playback.js
+  function syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state }) {
+    if (audioState) return;
+    audio.sync(
+      Math.max(0, elapsed - entrance) / 1e3,
+      playing && state === "ready" && elapsed >= entrance && !audioState
+    );
+  }
+  function createTourPlayback(root2, input, { signal, motion, navigate, chrome }) {
+    let tour = input.tour;
+    let index = 0;
+    let ended = false;
+    let duration = 0;
+    let entrance = 0;
+    let assets = input.assets;
+    let timeline = null;
+    let choice = false;
+    const visited = /* @__PURE__ */ new Set();
+    const motionPreference = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)");
+    const reduced = () => Boolean(motionPreference?.matches);
+    const update = createTourTransport(root2, input.labels, signal, toggle, seek, manual);
+    const playbackView = (elapsed, state) => ({
+      elapsed: ended ? timeline?.duration ?? duration : (timeline?.offsets[index] ?? 0) + elapsed,
+      duration: timeline?.duration ?? duration,
+      state: audioState ?? (choice ? "choice" : ended && state !== "loading" ? "ended" : state)
+    });
+    let audioState = null;
+    const audio = createTourAudio(root2, signal, (state) => {
+      audioState = state;
+      session.pause();
+    });
+    const session = createTourPlaybackSession({
+      signal,
+      motion,
+      hidden: () => root2.ownerDocument.hidden,
+      autoplay: tour.playback.autoplay,
+      changed(elapsed, playing, state, mode, continuous) {
+        syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state });
+        const view = playbackView(elapsed, state);
+        update({ ...view, playing: continuous, mode });
+        chrome?.update({ playing: continuous, state: view.state });
+      },
+      complete: advance
+    });
+    function advance() {
+      if (ended) {
+        session.pause();
+        return;
+      }
+      const target = nextUnvisitedDestination(tour, index, visited);
+      if (target === null) {
+        choice = true;
+        session.pause();
+        return;
+      }
+      if (target === tour.slides.length && !tour.endScreen.enabled) {
+        session.pause();
+        return;
+      }
+      navigate(target);
+    }
+    function toggle() {
+      audio.stop();
+      audioState = null;
+      if (session.continuous) {
+        session.pause();
+        return;
+      }
+      visited.clear();
+      if (tour.slides[index]) visited.add(tour.slides[index].id);
+      choice = false;
+      if (ended) navigate(0, true);
+      session.play();
+    }
+    function manual() {
+      audio.stop();
+      visited.clear();
+      session.setManual();
+    }
+    function seek(value) {
+      audio.stop();
+      audioState = null;
+      session.pause();
+      const target = resolveTourSeek(timeline, index, value);
+      if (target.index !== index || ended) navigate(target.index);
+      session.seek(target.elapsed);
+    }
+    function show(nextTour, nextIndex, isEnd, nextAssets) {
+      assets = nextAssets;
+      tour = nextTour;
+      index = nextIndex;
+      ended = isEnd;
+      choice = false;
+      const slide = tour.slides[index];
+      audioState = null;
+      audio.show(ended ? null : slide, assets);
+      timeline = tourLinearTimeline(tour, reduced());
+      entrance = tourEntranceTiming(tour, ended ? null : slide, reduced()).total;
+      duration = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
+      if (!slide) {
+        session.clear();
+        return;
+      }
+      if (ended) session.pause();
+      visited.add(slide.id);
+      const image = ended ? null : slide.kind === "image" ? slide.image : slide.background.image;
+      session.load({
+        duration,
+        entrance,
+        source: assets.find((asset) => asset.id === image?.assetId)?.src,
+        required: Boolean(image)
+      });
+    }
+    bindMotionPreference(
+      motionPreference,
+      signal,
+      session,
+      motion,
+      () => entrance,
+      () => show(tour, index, ended, assets)
+    );
+    const pause = () => {
+      audio.stop();
+      session.pause();
+    };
+    bindPlaybackLifetime(root2, signal, pause);
+    bindNarrationActivation(root2, signal, (id) => {
+      audioState = null;
+      session.pause();
+      audio.activate(id);
+    });
+    return {
+      show,
+      pause,
+      get mode() {
+        return session.mode;
+      },
+      interact() {
+        visited.clear();
+        pause();
+      }
+    };
+  }
+  function resolveTourSeek(timeline, index, value) {
+    if (!timeline) return { index, elapsed: value };
+    const target = Math.max(
+      0,
+      timeline.offsets.findLastIndex((offset) => offset <= value)
+    );
+    return { index: target, elapsed: value - timeline.offsets[target] };
+  }
+  function bindPlaybackLifetime(root2, signal, pause) {
+    root2.ownerDocument.addEventListener(
+      "visibilitychange",
+      () => {
+        if (root2.ownerDocument.hidden) pause();
+      },
+      { signal }
+    );
+    root2.addEventListener(
+      "click",
+      (event) => {
+        if (event.target instanceof globalThis.Element && event.target.closest("a")) pause();
+      },
+      { signal, capture: true }
+    );
+  }
+  function bindNarrationActivation(root2, signal, activate) {
+    root2.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target instanceof globalThis.Element ? event.target.closest("[data-tour-narration]") : null;
+        if (!target) return;
+        activate(target.dataset.tourNarration);
+      },
+      { signal }
+    );
+  }
+  function bindMotionPreference(preference, signal, session, motion, getEntrance, reload) {
+    preference?.addEventListener?.(
+      "change",
+      () => {
+        if (signal.aborted) return;
+        const holdElapsed = Math.max(0, session.elapsed - getEntrance());
+        const resume = session.continuous;
+        motion.cancel({ preserveMediaGate: true });
+        reload();
+        session.seek(getEntrance() + holdElapsed);
+        if (resume) session.play();
+      },
+      { signal }
+    );
+  }
+  function nextUnvisitedDestination(tour, index, visited) {
+    const target = tourAutoplayDestination(tour, index);
+    if (target === tour.slides.length && tour.playback.loop) return 0;
+    if (target === null || !tour.playback.loop && visited.has(tour.slides[target]?.id)) return null;
+    return target;
+  }
+
+  // apps/extension/src/features/scenario/tour-player/chrome.js
+  var HIDE_DELAY_MS = 2e3;
+  function createTourChrome(root2, signal) {
+    const document = root2.ownerDocument;
+    let timer = 0;
+    let playing = false;
+    let state = "ready";
+    const navigationOpen = () => root2.querySelector("[data-tour-navigation]")?.open === true;
+    const interactive = () => playing && state === "ready" && !navigationOpen() && !document.hidden;
+    const cancel = () => {
+      globalThis.clearTimeout(timer);
+      timer = 0;
+    };
+    const schedule = () => {
+      timer = globalThis.setTimeout(() => {
+        timer = 0;
+        root2.dataset.tourChromeHidden = "true";
+      }, HIDE_DELAY_MS);
+    };
+    const evaluate = () => {
+      cancel();
+      root2.dataset.tourPlaying = String(playing);
+      if (!interactive()) {
+        root2.dataset.tourChromeHidden = "false";
+        return;
+      }
+      schedule();
+    };
+    const activity = () => {
+      root2.dataset.tourChromeHidden = "false";
+      cancel();
+      if (interactive()) schedule();
+    };
+    for (const type of ["pointermove", "pointerdown", "touchstart", "focusin"])
+      root2.addEventListener(type, activity, { signal, passive: true });
+    document.addEventListener("keydown", activity, { signal });
+    document.addEventListener("visibilitychange", evaluate, { signal });
+    signal.addEventListener("abort", cancel, { once: true });
+    return {
+      update(next) {
+        const changed = next.playing !== playing || next.state !== state;
+        playing = Boolean(next.playing);
+        state = next.state;
+        if (changed) evaluate();
+      }
+    };
+  }
+
+  // apps/extension/src/features/scenario/tour-player/controller.js
+  function createTourPlayer(root2, input, options = {}) {
+    let { tour } = input;
+    const { labels } = input;
+    const lifetime = new AbortController();
+    delete root2.dataset.slideId;
+    const query = (name) => root2.querySelector(`[data-tour-${name}]`);
+    const scene = query("scene");
+    const updatePosition = createTourPosition(root2, labels);
+    let index = Math.max(
+      0,
+      tour.slides.findIndex((slide) => slide.id === options.initialSlideId)
+    );
+    let ended = false;
+    const history = [];
+    const authoringNavigation = options.authoring?.navigation;
+    const view = createTourScene(root2, input, act, lifetime.signal, options, {
+      canMove: (direction) => index + direction >= 0 && index + direction < tour.slides.length + Number(tour.endScreen.enabled),
+      move: (direction) => {
+        playback?.interact();
+        go(index + direction, true, direction);
+      },
+      position: (hintIndex) => explanationPosition(tour, index, hintIndex)
+    });
+    const chrome = options.authoring ? null : createTourChrome(root2, lifetime.signal);
+    const playback = options.authoring ? null : createTourPlayback(root2, input, {
+      signal: lifetime.signal,
+      motion: view.motion,
+      navigate: (target, restart = false) => {
+        if (restart) history.length = 0;
+        go(target, !restart);
+      },
+      chrome
+    });
+    function act(action) {
+      if (options.authoring || options.preview && action.kind === "url") return;
+      if (action.kind !== "none") playback?.interact();
+      if (action.kind === "restart") history.length = 0;
+      const target = actionSlideIndex(action, tour.slides, index);
+      if (target !== null) go(target, action.kind !== "restart");
+    }
+    function go(target, recordHistory = true, hintEdge = 0) {
+      if (lifetime.signal.aborted || target < 0 || target > tour.slides.length || target === tour.slides.length && !tour.endScreen.enabled)
+        return;
+      if (recordHistory && (target !== index || ended)) {
+        history.push(index);
+        if (history.length > 1e3) history.shift();
+      }
+      ended = target === tour.slides.length && tour.endScreen.enabled;
+      index = Math.min(target, Math.max(0, tour.slides.length - 1));
+      render(hintEdge);
+    }
+    function back() {
+      const target = history.pop();
+      navigationInput.manualGo(target ?? Math.max(0, index - 1), false);
+    }
+    function render(hintEdge = 0) {
+      if (lifetime.signal.aborted) return;
+      const slide = tour.slides[index];
+      updatePosition(tour, index, ended, history.length);
+      navigationInput.updateControls();
+      view.show(slide, ended, hintEdge);
+      playback?.show(tour, index, ended, input.assets);
+      root2.dataset.slideId = ended ? "end" : slide?.id ?? "";
+    }
+    const navigationInput = mountTourNavigationInput(root2, options, lifetime.signal, {
+      move: go,
+      back,
+      index: () => index,
+      slides: () => tour.slides,
+      interact: () => playback?.interact(),
+      space: (next) => {
+        if (playback?.mode === "manual") next();
+        else playback?.pause();
+      },
+      openContents: (select) => {
+        playback?.pause();
+        view.openContents(tour.slides, index, select);
+      }
+    });
+    observeViewport(root2, view.resize, lifetime.signal);
+    view.resize();
+    render();
+    return {
+      update(nextInput) {
+        if (lifetime.signal.aborted) return;
+        const previousId = tour.slides[index]?.id;
+        input = nextInput;
+        tour = nextInput.tour;
+        index = Math.max(
+          0,
+          tour.slides.findIndex((slide) => slide.id === previousId)
+        );
+        if (!tour.endScreen.enabled) ended = false;
+        view.update(nextInput);
+        view.resize();
+        render();
+      },
+      selectObject(id) {
+        view.selectObject(id);
+        navigationInput.updateControls();
+      },
+      selectEnd() {
+        if (lifetime.signal.aborted) return;
+        if (options.authoring) {
+          ended = true;
+          render();
+        } else navigationInput.manualGo(tour.slides.length, false);
+      },
+      select(slideId) {
+        if (lifetime.signal.aborted) return;
+        const target = tour.slides.findIndex((slide) => slide.id === slideId);
+        if (target >= 0 && (target !== index || ended)) {
+          if (authoringNavigation) go(target, false);
+          else navigationInput.manualGo(target, false);
+        }
+      },
+      dispose() {
+        if (lifetime.signal.aborted) return;
+        lifetime.abort();
+        view.closeContents();
+        scene.replaceChildren();
+      }
+    };
+  }
+  function createTourPosition(root2, labels) {
+    const query = (name) => root2.querySelector(`[data-tour-${name}]`);
+    const title = query("title");
+    const counter = query("counter");
+    const previous = query("previous");
+    const next = query("next");
+    return (tour, index, ended, historyLength) => {
+      const slide = tour.slides[index];
+      title.textContent = ended ? tour.endScreen.title : slide?.title ?? "";
+      counter.textContent = ended ? labels.finished : `${tour.slides.length ? index + 1 : 0} / ${tour.slides.length}`;
+      previous.disabled = !ended && index === 0 && historyLength === 0;
+      next.disabled = ended || !tour.slides.length || index === tour.slides.length - 1 && !tour.endScreen.enabled;
+    };
+  }
+  function handleTourKeyboard(event, navigationOpen, actions) {
+    if (event.defaultPrevented || navigationOpen || event.target instanceof globalThis.Element && event.target.closest("input,textarea,select,[contenteditable]"))
+      return;
+    if (event.key === " " && (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.isComposing || isTourNativeControl(event)))
+      return;
+    const action = Object.hasOwn(actions, event.key) ? actions[event.key] : null;
+    if (!action) return;
+    event.preventDefault();
+    if (event.key !== " " || !event.repeat) action();
+  }
+  function observeViewport(viewport, resize, signal) {
+    const observer = globalThis.ResizeObserver ? new globalThis.ResizeObserver(resize) : null;
+    if (observer) {
+      observer.observe(viewport);
+      const toolbar = viewport.querySelector(".tour-toolbar");
+      if (toolbar) observer.observe(toolbar);
+      signal.addEventListener("abort", () => observer.disconnect(), { once: true });
+    } else globalThis.addEventListener("resize", resize, { signal });
+  }
+  function isTourNativeControl(event) {
+    return event.composedPath().some(
+      (node) => node instanceof globalThis.Element && node.matches(
+        'input,textarea,select,button,a,[contenteditable],[role="button"],[role="slider"],[role="combobox"],[role="menuitem"],[role="listbox"],[role="switch"]'
+      )
+    );
+  }
+  function bindTourKeyboard(root2, navigation, options, signal, actions) {
+    if (options.authoring) return;
+    const document = root2.ownerDocument;
+    if (!root2.hasAttribute("tabindex")) root2.tabIndex = -1;
+    root2.addEventListener(
+      "pointerdown",
+      (event) => {
+        if (!isTourNativeControl(event)) root2.focus({ preventScroll: true });
+      },
+      { signal }
+    );
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key === " " && !event.composedPath().includes(root2)) {
+          const standalone = root2.getRootNode() === document && document.querySelectorAll("[data-tour-mode]").length === 1 && (event.target === document || event.target === document.body);
+          if (!standalone) return;
+        }
+        handleTourKeyboard(
+          event,
+          navigation.open || Boolean(options.authoring) || options.preview && event.key !== " ",
+          actions
+        );
+      },
+      { signal }
+    );
+  }
+  function mountTourNavigationInput(root2, options, signal, actions) {
+    const authoring = options.authoring?.navigation;
+    const query = (name) => root2.querySelector(`[data-tour-${name}]`);
+    function manualGo(target, recordHistory = true) {
+      if (authoring) {
+        const slide = actions.slides()[target];
+        if (slide) authoring.selectSlide(slide.id);
+        return;
+      }
+      actions.interact();
+      actions.move(target, recordHistory);
+    }
+    query("previous").addEventListener(
+      "click",
+      () => {
+        if (authoring) authoring.move(-1);
+        else actions.back();
+      },
+      { signal }
+    );
+    function next() {
+      if (query("next").disabled) return;
+      if (authoring) authoring.move(1);
+      else manualGo(actions.index() + 1);
+    }
+    query("next").addEventListener("click", next, { signal });
+    query("contents").addEventListener("click", () => actions.openContents(manualGo), { signal });
+    bindTourKeyboard(root2, query("navigation"), options, signal, {
+      ArrowRight: next,
+      " ": () => actions.space(next),
+      ArrowLeft: actions.back,
+      Home: () => manualGo(0),
+      End: () => manualGo(actions.slides().length - 1)
+    });
+    return {
+      manualGo,
+      updateControls() {
+        if (!authoring) return;
+        query("previous").disabled = !authoring.canMove(-1);
+        query("next").disabled = !authoring.canMove(1);
+      }
+    };
+  }
+  function explanationPosition(tour, slideIndex, hintIndex) {
+    const counts = tour.slides.map(
+      (slide) => slide.kind === "image" && slide.image ? Math.max(1, getTourSlideObjects(slide).filter((entry) => entry.type !== "mask").length) : 1
+    );
+    return {
+      index: counts.slice(0, slideIndex).reduce((sum, count) => sum + count, 0) + hintIndex,
+      count: counts.reduce((sum, count) => sum + count, Number(tour.endScreen.enabled))
+    };
+  }
+  function actionSlideIndex(action, slides, index) {
+    switch (action.kind) {
+      case "next":
+        return index + 1;
+      case "previous":
+        return index - 1;
+      case "restart":
+        return 0;
+      case "end":
+        return slides.length;
+      case "slide":
+        return slides.findIndex((slide) => slide.id === action.slideId);
+      default:
+        return null;
+    }
+  }
+
+  // apps/extension/src/features/scenario/tour-player/runtime.js
+  var data = globalThis.document.getElementById("tour-data");
+  var root = globalThis.document.getElementById("tour-player");
+  if (!data || !root) throw new Error("Missing tour player document");
+  createTourPlayer(root, JSON.parse(data.textContent));
+})();

@@ -59,7 +59,15 @@ function Workspace() {
       disabled={false}
       onSelect={() => {}}
       onAddStep={() => {}}
-      itemActions={null}
+      itemActions={
+        <GuideStyleFields
+          key={block ? 'block' : 'step'}
+          style={project.style}
+          disabled={false}
+          onChange={() => {}}
+          t={t}
+        />
+      }
       t={t}
       inspectedBlockKind={block ? 'text' : undefined}
     >
@@ -74,7 +82,7 @@ async function click(label: string) {
   if (!button) throw new Error(`Missing ${label}`);
   await act(async () => button.click());
 }
-it('keeps document entry separate and only shows presentation controls for the step', async () => {
+it('keeps document entry separate and shows presentation controls for the step and text selection', async () => {
   await act(async () => root.render(<Workspace />));
   expect(host.querySelector('.guide-inspector-scope')).toBeNull();
   await click('Select step');
@@ -84,15 +92,56 @@ it('keeps document entry separate and only shows presentation controls for the s
   await click('Show all settings');
   expect(
     panel.querySelector('[aria-label="Show settings sections"]')?.getAttribute('aria-pressed')
-  ).toBe('true');
+  ).toBeNull();
   await click('Select block');
   expect(panel.querySelector('h2')?.textContent).toBe('Text');
-  expect(panel.querySelector('[aria-label="Show settings sections"]')).toBeNull();
+  expect(panel.querySelector('[aria-label="Show settings sections"]')).not.toBeNull();
   await click('Document entry');
   expect(panel.querySelector('h2')?.textContent).toBe(t('scenario.editor.guideEntireDocument'));
   expect(panel.querySelector('[aria-label="Show all settings"]')).toBeNull();
   await click('Select step');
   expect(panel.querySelector('[aria-label="Show settings sections"]')).not.toBeNull();
+});
+it('keeps structure and resources selection explicit in the shared left panel', async () => {
+  await act(async () => root.render(<Workspace />));
+  const tabs = host.querySelectorAll<HTMLButtonElement>(
+    '.guide-left-navigation .guide-section-tab'
+  );
+  expect([...tabs].map((tab) => [tab.title, tab.getAttribute('aria-pressed')])).toEqual([
+    ['Outline', 'true'],
+    ['Resources', 'false'],
+  ]);
+  await act(async () => tabs[1]?.click());
+  expect([...tabs].map((tab) => tab.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+});
+
+it('preserves placement, text size and alignment order and active state', async () => {
+  const block = { id: 'text', kind: 'text' as const, paragraphs: [] };
+  await act(async () =>
+    root.render(
+      <GuideBlockInspector
+        item={step}
+        block={block}
+        disabled={false}
+        onChange={() => {}}
+        onClose={() => {}}
+        t={t}
+      />
+    )
+  );
+  const placement = host.querySelector<HTMLElement>('[aria-label="Block width"]')!;
+  expect([...placement.querySelectorAll('button')].map((button) => button.textContent)).toEqual([
+    '1:1',
+    '1:2',
+    '1:3',
+    '1:4',
+  ]);
+  expect(placement.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+  for (const label of ['Text size', 'Text alignment']) {
+    const group = host.querySelector<HTMLElement>(`[role="group"][aria-label="${label}"]`)!;
+    expect(group.querySelectorAll('button')).toHaveLength(3);
+    expect(group.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(1);
+  }
 });
 it('labels text reset separately and restores inherited formatting without altering content', async () => {
   const block = {
@@ -138,4 +187,55 @@ it('disables the shared color picker and reset while edits are locked', async ()
     await act(async () => button.click());
   }
   expect(change).not.toHaveBeenCalled();
+});
+
+it.each(['ru', 'en'] as const)(
+  'collapses groups without losing drafts or activating their actions in %s',
+  async (locale) => {
+    const translate = createTranslator(locale);
+    const { GuideInspectorGroup } = await import('./inspector');
+    const { Type } = await import('lucide-react');
+    const action = vi.fn();
+    const label = translate('scenario.editor.guideStyleGroup');
+    await act(async () =>
+      root.render(
+        <GuideInspectorGroup
+          id="inspector-consistency"
+          title={label}
+          icon={Type}
+          action={<button onClick={action}>Reset</button>}
+        >
+          <input aria-label="Draft" defaultValue="Unsaved text" />
+        </GuideInspectorGroup>
+      )
+    );
+    const draft = host.querySelector('input')!;
+    draft.value = 'Edited draft';
+    const toggle = host.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+    const body = host.querySelector<HTMLElement>('.guide-inspector-group-body')!;
+    expect(toggle.textContent).toBe(label);
+    expect(toggle.getAttribute('aria-controls')).toBe(body.id);
+    await act(async () => toggle.click());
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(body.hidden).toBe(true);
+    expect(host.querySelector('input')).toBe(draft);
+    await click('Reset');
+    expect(action).toHaveBeenCalledOnce();
+    expect(body.hidden).toBe(true);
+    await act(async () => toggle.click());
+    expect(body.hidden).toBe(false);
+    expect(draft.value).toBe('Edited draft');
+  }
+);
+
+it('remembers disclosure choices by element type after another selection', async () => {
+  await act(async () => root.render(<Workspace />));
+  await click('Select step');
+  const toggle = () => host.querySelector<HTMLButtonElement>('.guide-inspector-disclosure')!;
+  await act(async () => toggle().click());
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
+  await click('Select block');
+  expect(toggle().getAttribute('aria-expanded')).toBe('true');
+  await click('Select step');
+  expect(toggle().getAttribute('aria-expanded')).toBe('false');
 });

@@ -115,7 +115,7 @@ function registerContentBodyBranchTest() {
       contentIndexMocks.controller
     );
     expect(contentIndexMocks.contentSection).not.toHaveBeenCalled();
-    expect(container?.innerHTML).toContain('space-y-5');
+    expect(container?.innerHTML).toContain('sniptale-inspector-surface');
   });
 }
 

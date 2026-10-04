@@ -3,11 +3,13 @@ import type { EditorTool, EditorWorkspaceSettings } from '../../../features/edit
 import { AligningGuidelines, type EditorMagnetTransformEvent } from './aligning-guidelines';
 import { DEFAULT_EDITOR_MAGNET_OPTIONS } from './options';
 import { collectMagnetTargets, isMagnetTarget } from './targets';
+import { projectMagnetGuides, type MagnetGuideProjection } from './guide-projection';
 
 export interface EditorMagnetManager {
   clearGuides(): void;
   dispose(): void;
   hasActiveGuides(): boolean;
+  getVisualGuides(): MagnetGuideProjection;
   snapRect(input: {
     excludeId?: string;
     rect: { x: number; y: number; width: number; height: number };
@@ -49,6 +51,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
       return;
     }
 
+    this.updateScreenMargin();
     super.moving(event);
   }
 
@@ -58,6 +61,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
       return;
     }
 
+    this.updateScreenMargin();
     super.scalingOrResizing(event);
   }
 
@@ -71,7 +75,7 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
       return;
     }
 
-    super.afterRender();
+    // The viewport chrome projects guides into a sharp screen-space SVG layer.
   }
 
   beforeRender() {
@@ -89,6 +93,17 @@ class EditorWorkspaceMagnetManager extends AligningGuidelines implements EditorM
 
   hasActiveGuides(): boolean {
     return this.verticalLines.size > 0 || this.horizontalLines.size > 0 || this.onlyDrawPoint;
+  }
+
+  getVisualGuides() {
+    return projectMagnetGuides(this.verticalLines, this.horizontalLines, this.onlyDrawPoint);
+  }
+
+  private updateScreenMargin(): void {
+    const logicalWidth = this.managerOptions.getCanvasDocumentSize().width;
+    const screenWidth = this.canvas.upperCanvasEl?.getBoundingClientRect?.().width;
+    if (logicalWidth > 0 && screenWidth && screenWidth > 0)
+      this.margin = 6 / (screenWidth / logicalWidth);
   }
 
   snapRect(input: {

@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useEditorStore } from '../../state/useEditorStore';
 import { EditorFloatingLayersPanel } from './layers-panel';
 
 const mocks = vi.hoisted(() => ({
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   layers: vi.fn(() => <div data-ui="mock.layers" />),
   layersProps: vi.fn(() => ({ layers: [] })),
   onExpand: vi.fn(),
+  onCollapse: vi.fn(),
 }));
 
 vi.mock('../../application/controller-context', () => ({
@@ -37,6 +39,8 @@ vi.mock('../../inspector/sidebar-expanded-content/helpers', () => ({
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+let toolbar: HTMLDivElement | null = null;
+const initialViewport = useEditorStore.getState().viewport;
 
 const onHeightRatioChangeMock = vi.fn();
 
@@ -65,7 +69,7 @@ function renderPanel(
         hasImage
         heightRatio={options.heightRatio ?? null}
         preferenceError={options.preferenceError ?? null}
-        onCollapse={vi.fn()}
+        onCollapse={mocks.onCollapse}
         onExpand={mocks.onExpand}
         onHeightRatioChange={onHeightRatioChangeMock}
       />
@@ -94,7 +98,37 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  toolbar?.remove();
+  toolbar = null;
+  useEditorStore.setState({ viewport: initialViewport });
   vi.unstubAllGlobals();
+});
+
+it('stops at the map navigator boundary whether the navigator is open or closed', () => {
+  toolbar = document.createElement('div');
+  toolbar.dataset['ui'] = 'editor.floating.view-controls';
+  toolbar.getBoundingClientRect = vi.fn(() => ({ width: 240, bottom: 55 }) as DOMRect);
+  document.body.appendChild(toolbar);
+  useEditorStore.setState({
+    viewport: { ...initialViewport, canvasWidth: 1920, canvasHeight: 1080 },
+  });
+
+  renderPanel({ heightRatio: 1 });
+  const panel = container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]');
+  expect(panel?.style.height).toBe('495px');
+
+  const openMap = document.createElement('div');
+  openMap.dataset['ui'] = 'editor.floating.view-controls.popover.map';
+  toolbar.appendChild(openMap);
+  act(() => window.dispatchEvent(new Event('resize')));
+  expect(panel?.style.height).toBe('495px');
+
+  act(() => {
+    useEditorStore.setState({
+      viewport: { ...initialViewport, canvasWidth: 1080, canvasHeight: 1920 },
+    });
+  });
+  expect(panel?.style.height).toBe('479px');
 });
 
 it('renders resizable expanded layers panel with the current layers content', () => {
@@ -139,7 +173,7 @@ it('restores the expanded layers panel from a relative viewport height', () => {
   expect(panel?.style.height).toBe('258px');
 });
 
-it('moves collapsed layers to the bottom-right toolbar with insert image action', () => {
+it('moves collapsed layers to the bottom-right toolbar without insert image action', () => {
   renderPanel({ collapsed: true });
 
   const toolbar = container?.querySelector<HTMLElement>(
@@ -148,7 +182,7 @@ it('moves collapsed layers to the bottom-right toolbar with insert image action'
   expect(toolbar).not.toBeNull();
   expect(toolbar?.parentElement?.className).toContain('pointer-events-auto');
   expect(toolbar?.querySelector('[role="toolbar"]')?.className).toContain('flex-row');
-  expect(container?.querySelector('[data-ui="mock.insert-image"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="mock.insert-image"]')).toBeNull();
   expect(container?.querySelectorAll('[data-ui^="editor.floating.layers.mode."]')).toHaveLength(6);
 });
 
@@ -189,7 +223,9 @@ it('expands when the already selected collapsed mode is clicked', () => {
 it('renders only the selected settings body instead of the layers list', () => {
   renderPanel({ inspector: 'browser-frame' });
 
-  expect(container?.querySelector('[data-ui="mock.settings-content"]')).not.toBeNull();
+  const settings = container?.querySelector('[data-ui="mock.settings-content"]');
+  expect(settings).not.toBeNull();
+  expect(settings?.parentElement?.className).toContain('overflow-y-auto');
   expect(container?.querySelector('[data-ui="mock.layers"]')).toBeNull();
   expect(mocks.content).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -229,3 +265,51 @@ it('renders preference save errors inline for collapsed layers controls', () => 
     container?.querySelector('[data-ui="editor.floating.layers.preference-error"]')?.textContent
   ).toBe('Could not save collapsed state');
 });
+
+it('replaces the list with inline effects and returns through the layers navigation', () => {
+  renderPanel({ inspector: 'layer-effects' });
+  expect(
+    container?.querySelector<HTMLElement>('[data-ui="editor.floating.layers-panel"]')?.style.height
+  ).toBe('516px');
+  expect(container?.querySelector('[data-ui="mock.layers"]')).toBeNull();
+  expect(
+    container?.querySelector(
+      '[data-ui="editor.floating.layers-panel"] [data-ui="editor.floating.layer-effects-panel"]'
+    )
+  ).not.toBeNull();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layer-effects-panel.back"]')
+      ?.click()
+  );
+  expect(mocks.setInspector).toHaveBeenCalledWith('tool');
+  mocks.setInspector.mockClear();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.mode.layers"]')
+      ?.click()
+  );
+  expect(mocks.setInspector).toHaveBeenCalledWith('tool');
+});
+
+it.each(['canvas-size', 'frame', 'tool'])(
+  'cancels crop only when collapsing the canvas-size panel, from %s',
+  (inspector) => {
+    renderPanel({ inspector });
+    act(() => {
+      container
+        ?.querySelector<HTMLButtonElement>('[data-ui="editor.floating.layers.collapse-button"]')
+        ?.click();
+    });
+    expect(mocks.onCollapse).toHaveBeenCalledOnce();
+    expect(mocks.editorController.cancelCropMode).toHaveBeenCalledTimes(
+      inspector === 'canvas-size' ? 1 : 0
+    );
+    if (inspector === 'canvas-size') {
+      expect(mocks.setActiveTool).toHaveBeenCalledWith('select');
+      expect(mocks.setInspector).toHaveBeenCalledWith('tool');
+    } else {
+      expect(mocks.setActiveTool).not.toHaveBeenCalled();
+    }
+  }
+);

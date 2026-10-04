@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -11,6 +12,7 @@ import { createTranslator } from '../../platform/i18n';
 import { GuideReader } from './reader';
 
 const io = vi.hoisted(() => ({
+  html: vi.fn(),
   load: vi.fn(),
   previous: vi.fn(),
   asset: vi.fn(),
@@ -22,6 +24,7 @@ const io = vi.hoisted(() => ({
   select: vi.fn(),
   mount: vi.fn(),
 }));
+vi.mock('./runtime/html-export', () => ({ exportGuideHtml: io.html }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
@@ -42,6 +45,7 @@ vi.mock('../../composition/persistence/scenario/store/project-records/assets', (
   getScenarioAssetBlob: io.asset,
 }));
 vi.mock('../../composition/persistence/scenario/store/public', () => ({
+  getScenarioAssetBlob: io.asset,
   createScenarioProjectRecord: io.create,
   duplicateScenarioProjectRecord: io.duplicate,
   deleteScenarioProjectRecord: io.remove,
@@ -85,7 +89,6 @@ it('navigates bounded reading pages without changing the canonical document', as
     await act(async () =>
       root.render(
         <GuideReader
-          onChange={() => {}}
           project={project}
           images={{}}
           initialId="step"
@@ -97,6 +100,14 @@ it('navigates bounded reading pages without changing the canonical document', as
     expect(document.activeElement).toBe(button('Back to editing'));
     expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(3);
     await act(async () => button('Step by step').click());
+    const reader = host.querySelector('.guide-reader');
+    io.html.mockResolvedValue('saved');
+    await act(async () => button('Save standalone HTML').click());
+    expect(io.html).toHaveBeenLastCalledWith(
+      expect.objectContaining({ reading: { mode: 'steps', navigation: 'top' } })
+    );
+    expect(host.querySelector('.guide-reader')).toBe(reader);
+    expect(host.querySelector('.guide-html-workbench')).toBeNull();
     expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(2);
     expect(button('Next step').disabled).toBe(false);
     await act(async () => button('Next step').click());
@@ -125,7 +136,6 @@ it('navigates bounded reading pages without changing the canonical document', as
     await act(async () =>
       root.render(
         <GuideReader
-          onChange={() => {}}
           project={createGuideProject('Empty')}
           images={{}}
           initialId={null}
@@ -209,10 +219,10 @@ it('keeps export activation available during a pending autosave', async () => {
         'Edited guide'
       );
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      await vi.advanceTimersByTimeAsync(400);
+      await vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS);
     });
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(400);
+      await vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS);
     });
     expect(io.save).toHaveBeenCalledOnce();
     const exportButton = host.querySelector<HTMLButtonElement>('button[aria-label="Export"]')!;

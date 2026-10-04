@@ -1,6 +1,6 @@
 import { expect, test as browserTest, type Page } from '@playwright/test';
 import { BlobReader, ZipReader } from '@zip.js/zip.js';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
@@ -34,6 +34,7 @@ import {
   SETTINGS_QUICK_ACTIONS_LABEL,
   SETTINGS_SAVE_LABEL,
   POPUP_HARNESS_PATH,
+  VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
 const EDITOR_FRAME_BACKGROUND_TYPE_LABEL = translate('editor.scene.backgroundTypeSection', 'ru');
@@ -868,19 +869,80 @@ test('editor exact browser-frame harness stays visually stable', async ({ page, 
       });
     })
     .toBe(true);
+  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
   await page.evaluate(() => {
     window.__sniptaleEditorHarness?.setZoomLevel(1244 / 1920);
   });
   await expect
     .poll(async () => {
-      return sceneSurface.evaluate((element) => Math.round(element.getBoundingClientRect().width));
+      return sceneSurface.evaluate((element) => {
+        const workspaceWidth = element.getBoundingClientRect().width;
+        const imageWidthPercent = Number.parseFloat(
+          element.style.getPropertyValue('--editor-workspace-image-width')
+        );
+        return Math.round((workspaceWidth * imageWidthPercent) / 100);
+      });
     })
     .toBe(1244);
   await page.evaluate(() => {
     window.__sniptaleEditorHarness?.clearSelection();
   });
 
-  await expect(sceneSurface).toHaveScreenshot('editor-browser-frame-exact.png');
+  const imageBounds = await sceneSurface.evaluate((element) => {
+    const workspace = element.getBoundingClientRect();
+    const percent = (name: string) => Number.parseFloat(element.style.getPropertyValue(name)) / 100;
+    return {
+      x: workspace.x + workspace.width * percent('--editor-workspace-image-left'),
+      y: workspace.y + workspace.height * percent('--editor-workspace-image-top') - 1,
+      width: Math.round(workspace.width * percent('--editor-workspace-image-width')),
+      height: Math.round(workspace.height * percent('--editor-workspace-image-height')) + 1,
+    };
+  });
+  expect(await page.screenshot({ clip: imageBounds })).toMatchSnapshot(
+    'editor-browser-frame-exact.png'
+  );
+});
+
+test('editor layers stop below the map navigator with a matching toolbar gap', async ({
+  page,
+  hostOrigin,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await applyHarnessBootstrap(page, {
+    apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    editorBootstrapPayload: createExactBrowserFrameHarnessPayload(),
+  });
+  await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
+  const resizeHandle = page.locator('[data-ui="editor.floating.layers.resize-handle"]');
+  await expect(resizeHandle).toBeVisible();
+  await resizeHandle.evaluate((handle) => {
+    handle.setPointerCapture = () => undefined;
+    handle.hasPointerCapture = () => false;
+    handle.dispatchEvent(
+      new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, clientY: 400 })
+    );
+    window.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, clientY: 0 }));
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
+  });
+
+  const layersPanel = page.locator('[data-ui="editor.floating.layers-panel"]');
+  await expect
+    .poll(async () =>
+      Number.parseFloat(await layersPanel.evaluate((element) => element.style.height))
+    )
+    .toBeGreaterThan(400);
+  const closedTop = (await layersPanel.boundingBox())!.y;
+  await page.locator('[data-ui="editor.floating.view-controls.map"]').click();
+  const mapPopover = page.locator('[data-ui="editor.floating.view-controls.popover.map"]');
+  await expect(mapPopover).toBeVisible();
+  const toolbar = (await page.locator('[data-ui="editor.floating.view-controls"]').boundingBox())!;
+  const map = (await mapPopover.boundingBox())!;
+  const openTop = (await layersPanel.boundingBox())!.y;
+  expect(Math.abs(openTop - closedTop)).toBeLessThanOrEqual(1);
+  const topGap = map.y - (toolbar.y + toolbar.height);
+  const bottomGap = openTop - (map.y + map.height);
+  expect(Math.abs(topGap - bottomGap)).toBeLessThanOrEqual(1);
 });
 
 test('editor frame utility opens from the floating layers navigation', async ({
@@ -890,3 +952,951 @@ test('editor frame utility opens from the floating layers navigation', async ({
   await openEditorHarness(page, hostOrigin);
   await openEditorFrameUtility(page);
 });
+
+browserTest(
+  'gallery lower filter toggles preserve page, sidebar and list scroll at HD',
+  async ({ page }) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript(() => {
+        localStorage.setItem(
+          'sniptale.gallery.facet-disclosures',
+          JSON.stringify(['status', 'tags', 'source', 'format'])
+        );
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const body = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (char) =>
+          char.charCodeAt(0)
+        );
+        window.__sniptaleHarnessBootstrap = {
+          storage: { 'sniptale-locale-preference': 'ru' },
+          mediaLibrary: Array.from({ length: 45 }, (_, index) => ({
+            entry: {
+              id: `filter-${index}`,
+              kind: 'screenshot',
+              source: { kind: 'screenshot' },
+              filename: index === 44 ? 'last.zip' : `image.a${String(index).padStart(2, '0')}`,
+              originalFilename: 'filter-file.png',
+              createdAt: 1,
+              updatedAt: 1,
+              size: body.byteLength,
+              mimeType: 'image/png',
+              width: 1,
+              height: 1,
+              duration: null,
+              sourceUrl: `https://source${String(index).padStart(2, '0')}.example.test`,
+              sourceTitle: null,
+              sourceFavicon: null,
+              tags: [`tag-${index}`],
+              lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+              blob: new Blob([body], { type: 'image/png' }),
+            },
+          })),
+        };
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.addStyleTag({
+        content: await readFile('apps/extension/src/gallery/shell/app-shell/startup.css', 'utf8'),
+      });
+      const title = translate('gallery.app.facetTitle.format', 'ru');
+      const section = page
+        .locator('details')
+        .filter({ has: page.locator('summary', { hasText: title }) });
+      const list = section.locator('.max-h-56');
+      const sidebar = page.locator('[data-ui="gallery.sidebar.scroll"]');
+      const shell = page.locator('[data-ui="gallery.sidebar.shell"]');
+      await expect(section.getByText('ZIP', { exact: true })).toBeAttached();
+      await sidebar.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await list.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      const positions = async () => ({
+        page: await page.evaluate(() => window.scrollY),
+        body: await page.evaluate(() => document.body.scrollTop),
+        document: await page.evaluate(() => document.documentElement.scrollTop),
+        sidebar: await sidebar.evaluate((element) => element.scrollTop),
+        list: await list.evaluate((element) => element.scrollTop),
+        shell: (await shell.boundingBox())!.y,
+        stage: await page.locator('[data-ui="gallery.content.surface"]').boundingBox(),
+      });
+      const before = await positions();
+      expect(
+        await page.locator('[data-ui="gallery.content.surface"] article').count()
+      ).toBeGreaterThan(1);
+      await section.getByText('ZIP', { exact: true }).click();
+      await expect(section.getByRole('checkbox', { name: 'ZIP', exact: false })).toBeChecked();
+      await expect(page.locator('[data-ui="gallery.content.surface"] article')).toHaveCount(1);
+      await expect(
+        page
+          .locator('[data-ui="gallery.content.surface"] article')
+          .getByRole('button', { name: 'last.zip', exact: true })
+          .first()
+      ).toBeAttached();
+      expect(await positions()).toEqual(before);
+      const checkbox = section.getByRole('checkbox', { name: 'ZIP', exact: false });
+      await expect(checkbox).toBeFocused();
+      await checkbox.focus();
+      await page.keyboard.press('Space');
+      await expect(checkbox).not.toBeChecked();
+      expect(
+        await page.locator('[data-ui="gallery.content.surface"] article').count()
+      ).toBeGreaterThan(1);
+      await expect(checkbox).toBeFocused();
+      expect(await positions()).toEqual(before);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+);
+
+browserTest(
+  'gallery keyboard navigation materializes offscreen cards and returns from preview at HD',
+  async ({ page }) => {
+    const host = await startHostServer();
+    try {
+      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.addInitScript(() => {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 1;
+        const body = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (char) =>
+          char.charCodeAt(0)
+        );
+        window.__sniptaleHarnessBootstrap = {
+          storage: { 'sniptale-locale-preference': 'ru' },
+          mediaLibrary: Array.from({ length: 67 }, (_, index) => ({
+            entry: {
+              id: `keyboard-${index}`,
+              kind: 'screenshot',
+              source: { kind: 'screenshot' },
+              filename: `keyboard-${String(index).padStart(2, '0')}.png`,
+              originalFilename: 'keyboard.png',
+              createdAt: 100 - index,
+              updatedAt: 100 - index,
+              size: body.byteLength,
+              mimeType: 'image/png',
+              width: 1,
+              height: 1,
+              duration: null,
+              sourceUrl: null,
+              sourceTitle: null,
+              sourceFavicon: null,
+              tags: [],
+              lifecycle: {
+                savedAt: 1,
+                storageClass: 'library',
+                updatedAt: 1,
+                ...(index >= 64 ? { trashedAt: Date.now() } : {}),
+              },
+              blob: new Blob([body], { type: 'image/png' }),
+            },
+          })),
+        };
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.addStyleTag({
+        content: await readFile('apps/extension/src/gallery/shell/app-shell/startup.css', 'utf8'),
+      });
+      const grid = page.locator('[data-ui="gallery.content.surface"]');
+      const card = (id: number) => grid.locator(`[data-gallery-keyboard-id="keyboard-${id}"]`);
+      for (const mode of [
+        'gallery.app.viewModeCompactGrid',
+        'gallery.app.viewModeLargeGrid',
+        'gallery.app.viewModeList',
+      ] as const) {
+        await page.getByRole('button', { name: translate(mode, 'ru'), exact: true }).click();
+        await expect(card(0)).toBeAttached();
+        await card(0).focus();
+        await page.keyboard.press('End');
+        await expect(card(63)).toBeFocused();
+        expect(await grid.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+        const bounds = (await card(63).boundingBox())!;
+        const viewport = (await grid.boundingBox())!;
+        expect(bounds.y).toBeGreaterThanOrEqual(viewport.y);
+        expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.y + viewport.height + 1);
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        await page.keyboard.press('Enter');
+        await expect(page.getByRole('dialog')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.getByRole('dialog')).toHaveCount(0);
+        await expect(card(63)).toBeFocused();
+        await page.keyboard.press('Home');
+        await expect(card(0)).toBeFocused();
+        expect(await page.evaluate(() => window.scrollY)).toBe(0);
+        await page.keyboard.press('Space');
+        await expect(page.locator('[data-ui="gallery.selection.toolbar"]')).toBeVisible();
+        await page.keyboard.press('Escape');
+        await expect(page.locator('[data-ui="gallery.selection.toolbar"]')).toHaveCount(0);
+      }
+      await page
+        .getByRole('button', { name: translate('gallery.keyboard.title', 'ru'), exact: true })
+        .click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(
+        page.getByRole('button', { name: translate('gallery.keyboard.title', 'ru'), exact: true })
+      ).toBeFocused();
+      await page.locator('[data-ui="gallery.sidebar.footer"]').getByRole('button').click();
+      await expect(card(64)).toBeAttached();
+      await card(64).focus();
+      await page.keyboard.press('Enter');
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.locator('[data-ui="gallery.preview.restore"]').click();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(card(64)).toHaveCount(0);
+      await expect(card(65)).toBeFocused();
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1280);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  }
+);
+
+async function bootstrapPreviewGeometry(
+  page: Page,
+  variant: { locale: 'ru' | 'en'; theme: 'light' | 'dark' }
+) {
+  await page.addInitScript(({ locale, theme }) => {
+    localStorage.setItem('sniptale-locale-preference', locale);
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 1;
+    const body = Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]!), (char) =>
+      char.charCodeAt(0)
+    );
+    window.__sniptaleHarnessBootstrap = {
+      storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+      mediaLibrary: [false, true].map((draft) => ({
+        entry: {
+          id: draft ? 'geometry-draft' : 'geometry-saved',
+          kind: 'screenshot',
+          source: { kind: 'screenshot' },
+          filename: draft ? 'geometry-draft.png' : 'geometry-saved.png',
+          originalFilename: 'geometry.png',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          size: body.byteLength,
+          mimeType: 'image/png',
+          width: 1,
+          height: 1,
+          duration: null,
+          sourceUrl: null,
+          sourceTitle: null,
+          sourceFavicon: null,
+          tags: [],
+          lifecycle: {
+            savedAt: draft ? null : 1,
+            storageClass: draft ? 'temporary' : 'library',
+            updatedAt: Date.now(),
+          },
+          blob: new Blob([body], { type: 'image/png' }),
+        },
+      })),
+    };
+  }, variant);
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery preview geometry (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        for (const size of [
+          { width: 1280, height: 720 },
+          { width: 1920, height: 1080 },
+        ]) {
+          await page.setViewportSize(size);
+          await page
+            .getByRole('button', { name: 'geometry-saved.png', exact: true })
+            .first()
+            .focus();
+          await page.keyboard.press('Enter');
+          const surface = page.locator('[data-ui="gallery.preview.surface"]');
+          const close = surface.getByRole('button', {
+            name: label('common.actions.close'),
+            exact: true,
+          });
+          const position = await close.boundingBox();
+          expect(position).not.toBeNull();
+          for (const collapsed of [true, false, true, false]) {
+            const toggle = surface.getByRole('button', {
+              name: label(
+                collapsed ? 'gallery.preview.hideInspector' : 'gallery.preview.showInspector'
+              ),
+              exact: true,
+            });
+            await toggle.focus();
+            await page.keyboard.press('Enter');
+            await expect(
+              surface.getByRole('button', {
+                name: label(
+                  collapsed ? 'gallery.preview.showInspector' : 'gallery.preview.hideInspector'
+                ),
+                exact: true,
+              })
+            ).toBeFocused();
+            const current = await close.boundingBox();
+            expect(current?.x).toBeCloseTo(position!.x, 1);
+            expect(current?.y).toBeCloseTo(position!.y, 1);
+          }
+          await page.screenshot({
+            path: `.tmp/backlog5-wave1/geometry-${variant.locale}-${variant.theme}-${size.width}.png`,
+          });
+          await close.click();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+
+  browserTest(
+    `gallery lifecycle actions fill row (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        for (const draft of [false, true, false]) {
+          await page
+            .getByRole('button', {
+              name: draft ? 'geometry-draft.png' : 'geometry-saved.png',
+              exact: true,
+            })
+            .first()
+            .focus();
+          await page.keyboard.press('Enter');
+          const row = page.locator('[data-ui="gallery.preview.lifecycle-actions"]');
+          await row.scrollIntoViewIfNeeded();
+          const bounds = (await row.boundingBox())!;
+          const buttons = row.getByRole('button');
+          expect(await buttons.count()).toBe(draft ? 2 : 1);
+          const first = (await buttons.first().boundingBox())!;
+          const last = (await buttons.last().boundingBox())!;
+          expect(first.x).toBeCloseTo(bounds.x, 1);
+          expect(last.x + last.width).toBeCloseTo(bounds.x + bounds.width, 1);
+          if (draft) expect(first.width).toBeCloseTo(last.width, 1);
+          expect(first.y + first.height).toBeLessThanOrEqual(720);
+          const scroll = page.locator('[data-ui="gallery.preview.inspectorContent"]');
+          for (const button of await buttons.all()) {
+            const before = await scroll.evaluate((node) => ({
+              height: node.scrollHeight,
+              top: node.scrollTop,
+              client: node.clientHeight,
+            }));
+            const bounds = (await button.boundingBox())!;
+            await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+            const idleColor = await button.evaluate(
+              (node) => getComputedStyle(node).backgroundColor
+            );
+            await page.mouse.down();
+            await button.evaluate(async (node) => {
+              await Promise.all(node.getAnimations().map((animation) => animation.finished));
+            });
+            expect(
+              await button.evaluate((node) => getComputedStyle(node).backgroundColor)
+            ).not.toBe(idleColor);
+            const pressed = (await button.boundingBox())!;
+            expect(await scroll.evaluate((node) => node.scrollHeight)).toBe(before.height);
+            expect(pressed.y).toBeCloseTo(bounds.y, 1);
+            expect(await scroll.evaluate((node) => node.scrollTop)).toBe(before.top);
+            await page.mouse.move(0, 0);
+            await page.mouse.up();
+            await expect(row).toBeVisible();
+            expect(await buttons.count()).toBe(draft ? 2 : 1);
+          }
+          await page
+            .getByRole('dialog')
+            .getByRole('button', {
+              name: translate('common.actions.close', variant.locale),
+              exact: true,
+            })
+            .click();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery sidebar compact rhythm (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        const sidebar = page.locator('[data-ui="gallery.sidebar.panel"]');
+        const footer = sidebar.locator('[data-ui="gallery.sidebar.footer"] button');
+        await expect(footer).toContainText('0');
+        const status = sidebar
+          .locator('summary')
+          .filter({ hasText: translate('gallery.app.facetTitle.status', variant.locale) })
+          .first();
+        await status.hover();
+        const gaps = await status.evaluate((summary) => {
+          const details = summary.parentElement!;
+          const group = details.parentElement!;
+          return {
+            first:
+              summary.getBoundingClientRect().top -
+              group.getBoundingClientRect().top -
+              Number.parseFloat(getComputedStyle(group).borderTopWidth),
+            normal: summary.getBoundingClientRect().top - details.getBoundingClientRect().top,
+          };
+        });
+        expect(gaps.first).toBeCloseTo(gaps.normal, 1);
+        expect((await footer.boundingBox())!.height).toBeLessThanOrEqual(40);
+        expect(await sidebar.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+        await footer.focus();
+        await page.keyboard.press('Enter');
+        await expect(footer).toContainText(
+          translate('gallery.app.returnToLibrary', variant.locale)
+        );
+        await page.keyboard.press('Enter');
+        await expect(footer).toContainText(translate('gallery.app.trashTitle', variant.locale));
+        await page.screenshot({
+          path: `.tmp/backlog5-wave3/sidebar-${variant.locale}-${variant.theme}.png`,
+        });
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery scenario cards prioritize name and date (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const name = 'A very long scenario project name '.repeat(4);
+      const createdAt = Date.UTC(2026, 9, 2, 10, 0);
+      const scenario = {
+        ...createGuideProject(name),
+        id: 'card-scenario',
+        createdAt,
+        updatedAt: createdAt,
+      };
+      const video = createVideoProject({
+        id: 'card-video',
+        createdAt,
+        updatedAt: createdAt,
+        name: 'Video comparator',
+      });
+      try {
+        await applyHarnessBootstrap(page, {
+          preserveMediaLibrary: true,
+          storage: {
+            'sniptale-locale-preference': variant.locale,
+            'sniptale-theme-preference': variant.theme,
+          },
+        });
+        await page.addInitScript(
+          (locale) => localStorage.setItem('sniptale-locale-preference', locale),
+          variant.locale
+        );
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedDraftProjectEntries(page, video, scenario, createdAt);
+        await page.reload();
+        const card = page.locator('[data-gallery-keyboard-id="scenario:card-scenario"]');
+        const comparator = page.locator('[data-gallery-keyboard-id="video-project:card-video"]');
+        for (const key of [
+          'gallery.app.viewModeCompactGrid',
+          'gallery.app.viewModeLargeGrid',
+        ] as const) {
+          await page
+            .getByRole('button', { name: translate(key, variant.locale), exact: true })
+            .click();
+          await expect(card).toBeVisible();
+          await expect(card).not.toContainText(
+            translate('gallery.preview.editableProject', variant.locale)
+          );
+          await expect(card).not.toContainText(
+            translate('gallery.preview.projectPreviewMissing', variant.locale)
+          );
+          await expect(card).toContainText('2026');
+          await expect(card.getByRole('button', { name, exact: true }).last()).toHaveAttribute(
+            'title',
+            name
+          );
+          expect(await card.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+          const bounds = (await card.boundingBox())!;
+          const other = (await comparator.boundingBox())!;
+          expect(bounds.height).toBeCloseTo(other.height, 1);
+          expect(bounds.width).toBeCloseTo(other.width, 1);
+          const open = card.getByRole('button', {
+            name: translate('gallery.preview.openInEditor', variant.locale),
+            exact: true,
+          });
+          await expect(open).toBeEnabled();
+          await page.screenshot({ path: `.tmp/backlog5-wave3/cards-${variant.locale}-${key}.png` });
+        }
+        await card
+          .getByRole('button', {
+            name: translate('gallery.app.selectItem', variant.locale),
+            exact: true,
+          })
+          .click();
+        await expect(
+          card.getByRole('button', {
+            name: translate('gallery.app.selectItem', variant.locale),
+            exact: true,
+          })
+        ).toHaveAttribute('aria-pressed', 'true');
+        await card
+          .getByRole('button', {
+            name: translate('gallery.preview.openInEditor', variant.locale),
+            exact: true,
+          })
+          .click();
+        await expect
+          .poll(() =>
+            page.evaluate(
+              () =>
+                window.__sniptaleHarness
+                  ?.getCreatedTabs()
+                  .some((tab) => tab.url.includes('card-scenario')) ?? false
+            )
+          )
+          .toBe(true);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery deletion choice stages (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.getByRole('button', { name: 'geometry-saved.png', exact: true }).first().focus();
+        await page.keyboard.press('Enter');
+        const trigger = page
+          .locator('[data-ui="gallery.preview.lifecycle-actions"]')
+          .getByRole('button', { name: label('common.actions.delete'), exact: true });
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          await trigger.scrollIntoViewIfNeeded();
+          await trigger.focus();
+          await page.keyboard.press('Enter');
+          const choice = page.locator('[data-ui="gallery.deletion.menu"]');
+          await expect(choice).toBeVisible();
+          await expect(choice.getByRole('status')).toHaveCount(0);
+          await expect(
+            choice.getByRole('menuitem', { name: label('gallery.app.moveToTrash'), exact: true })
+          ).toBeFocused();
+          const permanent = choice.getByRole('menuitem', {
+            name: label('gallery.app.permanentDelete'),
+            exact: true,
+          });
+          await expect(permanent).not.toHaveAttribute('aria-describedby');
+          await permanent.click();
+          await expect(choice.getByRole('status')).toContainText(
+            label('gallery.app.permanentDeleteConfirm')
+          );
+          await expect(
+            choice.getByRole('menuitem', {
+              name: label('gallery.app.confirmPermanentDelete'),
+              exact: true,
+            })
+          ).toBeVisible();
+          const bounds = (await choice.boundingBox())!;
+          expect(bounds.y).toBeGreaterThanOrEqual(0);
+          expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+          await page.keyboard.press('Escape');
+          await expect(choice).toHaveCount(0);
+          await expect(trigger).toBeFocused();
+          await expect(page.locator('[data-ui="gallery.preview.surface"]')).toBeVisible();
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  browserTest(
+    `gallery audio thumbnails stay informative (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.addInitScript(() => {
+          const bootstrap = window.__sniptaleHarnessBootstrap!;
+          const original = bootstrap.mediaLibrary![0]!.entry;
+          const samples = 8000;
+          const buffer = new ArrayBuffer(44 + samples * 2);
+          const view = new DataView(buffer);
+          const word = (at: number, value: string) => {
+            for (let index = 0; index < value.length; index++)
+              view.setUint8(at + index, value.charCodeAt(index));
+          };
+          word(0, 'RIFF');
+          view.setUint32(4, buffer.byteLength - 8, true);
+          word(8, 'WAVE');
+          word(12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true);
+          view.setUint16(22, 1, true);
+          view.setUint32(24, samples, true);
+          view.setUint32(28, samples * 2, true);
+          view.setUint16(32, 2, true);
+          view.setUint16(34, 16, true);
+          word(36, 'data');
+          view.setUint32(40, samples * 2, true);
+          bootstrap.mediaLibrary = [1, 2].map((id) => ({
+            entry: {
+              ...original,
+              id: `audio-${id}`,
+              kind: 'audio',
+              filename: `${id} A long narration identifying the recording.wav`,
+              source: { kind: 'stored-asset', assetId: `audio-${id}` },
+              width: null,
+              height: null,
+              duration: id === 1 ? 1 : null,
+              mimeType: 'audio/wav',
+              size: buffer.byteLength,
+              blob: new Blob([buffer], { type: 'audio/wav' }),
+            },
+          }));
+        });
+        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        for (const mode of [
+          'gallery.app.viewModeCompactGrid',
+          'gallery.app.viewModeLargeGrid',
+          'gallery.app.viewModeList',
+        ] as const) {
+          await page
+            .getByRole('button', { name: translate(mode, variant.locale), exact: true })
+            .click();
+          const previews = page.locator('[data-ui="gallery.thumb.audio"]');
+          await expect(previews).toHaveCount(2);
+          await expect(previews.filter({ hasText: '1 A long narration' })).toContainText('00:01');
+          await expect(previews.filter({ hasText: '2 A long narration' })).not.toContainText(
+            '00:01'
+          );
+          for (const preview of await previews.all()) {
+            expect(
+              await preview.evaluate((node) => {
+                const box = node.getBoundingClientRect();
+                const viewport =
+                  node.closest('[data-ui="gallery.grid.thumbnail-viewport"]') ??
+                  node.closest('[role="cell"]');
+                const bounds = viewport!.getBoundingClientRect();
+                return (
+                  box.left >= bounds.left &&
+                  box.right <= bounds.right &&
+                  box.top >= bounds.top &&
+                  box.bottom <= bounds.bottom
+                );
+              })
+            ).toBe(true);
+          }
+        }
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light', viewport: { width: 1280, height: 560 } },
+  { locale: 'en', theme: 'dark', viewport: { width: 1920, height: 900 } },
+] as const) {
+  browserTest(
+    `gallery navigates mixed scenarios and synchronizes inspector (${variant.locale}, ${variant.theme})`,
+    async ({ page }) => {
+      const host = await startHostServer();
+      const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+      const now = Date.now() + 100;
+      const first = {
+        ...createGuideProject('Navigation scenario one'),
+        id: 'nav-one',
+        createdAt: now,
+        updatedAt: now,
+      };
+      const second = {
+        ...createGuideProject('Navigation scenario two'),
+        id: 'nav-two',
+        createdAt: now + 1,
+        updatedAt: now + 1,
+      };
+      const video = createVideoProject({
+        id: 'nav-video',
+        name: 'Navigation video project',
+        createdAt: now + 2,
+        updatedAt: now + 2,
+      });
+      const names: Record<string, string> = {
+        'scenario:nav-one': first.name,
+        'scenario:nav-two': second.name,
+        'video-project:nav-video': video.name,
+        'geometry-saved': 'geometry-saved.png',
+        'geometry-draft': 'geometry-draft.png',
+      };
+      try {
+        await bootstrapPreviewGeometry(page, variant);
+        await page.addInitScript(() => {
+          window.__sniptaleHarnessBootstrap!.preserveMediaLibrary = true;
+        });
+        await page.setViewportSize(variant.viewport);
+        await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+        await page.locator('[data-ui="gallery.page.root"]').waitFor();
+        await seedDraftProjectEntries(page, video, first, now);
+        await seedDraftProjectEntries(page, video, second, now + 1);
+        await page.reload();
+        const cards = page.locator('[data-gallery-keyboard-id]');
+        await expect(cards).toHaveCount(5);
+        const order = await cards.evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('data-gallery-keyboard-id')!)
+        );
+        await cards.first().focus();
+        await page.keyboard.press('Enter');
+        const dialog = page.getByRole('dialog');
+        const previous = dialog.locator('[data-ui="gallery.preview.navigationZone.previous"]');
+        const next = dialog.locator('[data-ui="gallery.preview.navigationZone.next"]');
+        for (let index = 0; index < order.length; index++) {
+          await expect(dialog).toHaveAttribute('aria-label', names[order[index]!]!);
+          await expect(
+            dialog.locator('[data-ui="gallery.preview.inspectorContent"] input').first()
+          ).toHaveValue(names[order[index]!]!);
+          if (index === 0) await expect(previous).toBeDisabled();
+          if (index < order.length - 1) {
+            await dialog
+              .getByRole('button', { name: label('gallery.preview.hideInspector'), exact: true })
+              .click();
+            await next.click();
+            await expect(dialog).toHaveAttribute('aria-label', names[order[index + 1]!]!);
+            await expect(dialog.locator('[data-ui="gallery.preview.inspector"]')).toHaveCount(0);
+            await dialog
+              .getByRole('button', { name: label('gallery.preview.showInspector'), exact: true })
+              .click();
+          }
+        }
+        await expect(next).toBeDisabled();
+        for (let index = order.length - 2; index >= 0; index--) {
+          await previous.click();
+          await expect(dialog).toHaveAttribute('aria-label', names[order[index]!]!);
+          await expect(
+            dialog.locator('[data-ui="gallery.preview.inspectorContent"] input').first()
+          ).toHaveValue(names[order[index]!]!);
+        }
+        const idleShadow = await next.evaluate((node) => getComputedStyle(node).boxShadow);
+        for (const direction of ['next', 'previous'] as const) {
+          const zone = direction === 'next' ? next : previous;
+          if (direction === 'previous') await next.click();
+          await zone.click();
+          const pointerStyle = await zone.evaluate((node) => ({
+            focusVisible: node.matches(':focus-visible'),
+            shadow: getComputedStyle(node).boxShadow,
+          }));
+          expect(pointerStyle.focusVisible).toBe(false);
+          await page.keyboard.press(direction === 'next' ? 'ArrowRight' : 'ArrowLeft');
+          await expect(dialog).toHaveAttribute(
+            'aria-label',
+            names[order[direction === 'next' ? 2 : 1]!]!
+          );
+          await expect(zone).toBeEnabled();
+          expect.soft(await zone.evaluate((node) => node.matches(':focus-visible'))).toBe(false);
+          expect
+            .soft(await zone.evaluate((node) => getComputedStyle(node).boxShadow))
+            .toBe(pointerStyle.shadow);
+        }
+        for (let tab = 0; tab < 40; tab++) {
+          await page.keyboard.press('Tab');
+          if (await next.evaluate((node) => node === document.activeElement)) break;
+        }
+        await expect(next).toBeFocused();
+        expect(await next.evaluate((node) => node.matches(':focus-visible'))).toBe(true);
+        const keyboardRing = await next.evaluate((node) => getComputedStyle(node).boxShadow);
+        expect(keyboardRing).not.toBe(idleShadow);
+        expect(keyboardRing).not.toBe('none');
+        await dialog
+          .getByRole('button', { name: label('common.actions.close'), exact: true })
+          .click();
+        await page.locator('[data-ui="gallery.header.search"] input').fill(first.name);
+        await expect(cards).toHaveCount(1);
+        await cards.first().focus();
+        await page.keyboard.press('Enter');
+        await expect(dialog).toHaveAttribute('aria-label', first.name);
+        await expect(next).toHaveCount(0);
+        await expect(previous).toHaveCount(0);
+      } finally {
+        await new Promise<void>((resolve, reject) =>
+          host.server.close((error) => (error ? reject(error) : resolve()))
+        );
+      }
+    }
+  );
+}
+
+for (const variant of [
+  { locale: 'ru', theme: 'light' },
+  { locale: 'en', theme: 'dark' },
+] as const) {
+  test(`video shared material browser grid strip and scrolling (${variant.locale})`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    const project = createVideoProject({
+      id: `material-browser-${variant.locale}`,
+      name: 'Materials',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    await applyHarnessBootstrap(page, {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [project],
+      storage: { 'sniptale-locale-preference': variant.locale },
+    });
+    await page.addInitScript(({ locale }) => {
+      localStorage.setItem('sniptale-locale-preference', locale);
+      window.__sniptaleHarnessBootstrap = {
+        ...window.__sniptaleHarnessBootstrap,
+        mediaLibrary: Array.from({ length: 30 }, (_, index) => ({
+          entry: {
+            id: `library-recording-${index}`,
+            kind: 'recording',
+            source: { kind: 'recording', recordingId: `library-recording-${index}` },
+            filename: `Source-${index}.webm`,
+            originalFilename: `Source-${index}.webm`,
+            createdAt: 1,
+            updatedAt: 1,
+            size: 0,
+            mimeType: 'video/webm',
+            width: 640,
+            height: 360,
+            duration: 3,
+            sourceUrl: null,
+            sourceTitle: null,
+            sourceFavicon: null,
+            tags: [],
+            hasThumbnail: false,
+          },
+        })),
+      };
+    }, variant);
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(
+      `${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=${variant.theme}`
+    );
+    const trigger = page.locator('[data-ui="video-editor.materials.library"]');
+    await trigger.click();
+    const drawer = page.locator('[data-ui="video-editor.library.drawer"]');
+    const list = drawer.locator('[data-ui="library-materials-list"]');
+    await expect(list).toHaveAttribute('data-layout', 'grid');
+    await expect(drawer.locator('[data-ui="video-editor.library.media-preview"]')).toHaveCount(0);
+    await expect(
+      drawer
+        .getByRole('button', {
+          name: translate('gallery.preview.folderAll', variant.locale),
+          exact: true,
+        })
+        .locator('svg')
+    ).toBeVisible();
+    const allMaterials = drawer.getByRole('button', {
+      name: translate('gallery.preview.folderAll', variant.locale),
+      exact: true,
+    });
+    await allMaterials.hover();
+    await expect(allMaterials.locator('svg')).toBeVisible();
+    await allMaterials.focus();
+    await page.keyboard.press('Space');
+    await expect(allMaterials).toHaveAttribute('aria-pressed', 'true');
+    await expect(allMaterials.locator('svg')).toBeVisible();
+    const scrolling = await list.evaluate((node) => ({
+      height: node.clientHeight,
+      scroll: node.scrollHeight,
+    }));
+    expect(scrolling.scroll).toBeGreaterThan(scrolling.height);
+    const last = list.getByRole('button', { name: /Source-29/ });
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeInViewport();
+    await last.click();
+    await expect(list).toHaveAttribute('data-layout', 'strip');
+    const preview = drawer.locator('[data-ui="video-editor.library.media-preview"]');
+    await expect(preview).toBeVisible();
+    const previewBounds = (await preview.boundingBox())!;
+    expect(previewBounds.width).toBeGreaterThan(750);
+    expect((await list.boundingBox())!.height).toBeLessThanOrEqual(180);
+    expect(await list.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
+    await list.evaluate((node) => {
+      node.scrollLeft = 660;
+    });
+    const scrollLeft = await list.evaluate((node) => node.scrollLeft);
+    const hide = drawer.getByRole('button', {
+      name: translate('gallery.preview.hideMaterials', variant.locale),
+      exact: true,
+    });
+    await hide.focus();
+    await page.keyboard.press('Enter');
+    await expect(list).toBeHidden();
+    await expect(preview).toBeVisible();
+    await page.keyboard.press('Space');
+    await expect(list).toBeVisible();
+    expect(await list.evaluate((node) => node.scrollLeft)).toBe(scrollLeft);
+    for (const width of [1280, 2560]) {
+      await page.setViewportSize({ width, height: 720 });
+      const bounds = (await drawer.boundingBox())!;
+      expect(bounds.width).toBeGreaterThanOrEqual(width * 0.75);
+      expect(bounds.width).toBeLessThanOrEqual(width - 24);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(720);
+    }
+    await page.keyboard.press('Escape');
+    await expect(drawer).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+}

@@ -81,9 +81,11 @@ describe('editor-color-control', () => {
     expect(container?.textContent).not.toContain('shared.ui.colorSelectorTransparent');
     expect(container?.textContent).not.toContain('Grid color');
 
-    await clickButton('Grid color');
+    await clickButton('shared.ui.colorSelectorChooseColor');
 
     expect(document.body.textContent).toContain('shared.ui.colorSelectorRecentColors');
-    expect(document.body.textContent).toContain('shared.ui.colorSelectorPalette');
+    expect(
+      document.querySelector('[data-ui="shared.ui.color-selector.picker-palette"]')
+    ).not.toBeNull();
   });
 });

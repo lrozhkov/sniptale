@@ -8,8 +8,8 @@ import type { EditorTextInlineStyleCommand } from '../text-formatting';
 type TransformOrigin = Pick<import('fabric').Transform, 'originX' | 'originY'>;
 
 export interface EditorControllerEventHandlers {
-  handleCanvasBeforeRender: () => void;
-  handleCanvasAfterRender: () => void;
+  handleCanvasBeforeRender: (event: { ctx: CanvasRenderingContext2D }) => void;
+  handleCanvasAfterRender: (event: { ctx: CanvasRenderingContext2D }) => void;
   handleSelectionChange: (event?: {
     deselected?: FabricObject[];
     selected?: FabricObject[];
@@ -34,10 +34,11 @@ export interface EditorControllerEventHandlers {
   handleWindowKeyUp: (event: KeyboardEvent) => void;
   handleWindowBlur: () => void;
   handleViewportMouseDown: (event: MouseEvent) => void;
+  handleViewportContextMenu: (event: MouseEvent) => void;
   handleViewportWheel: (event: WheelEvent) => void;
   handleViewportScroll: () => void;
   handleWindowMouseMove: (event: MouseEvent) => void;
-  handleWindowMouseUp: () => void;
+  handleWindowMouseUp: (event: MouseEvent) => void;
   handleWindowPointerMove: (event: PointerEvent) => void;
   handleWindowPointerUp: (event: PointerEvent) => void;
 }

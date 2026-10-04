@@ -1,5 +1,5 @@
 import type { Canvas, FabricObject } from 'fabric';
-import type { EditorDocument } from '../../../../features/editor/document/types';
+import type { BrowserFrameState, EditorDocument } from '../../../../features/editor/document/types';
 import type { PreparedAppliedDocument } from '..';
 
 export type AppliedDocumentCanvasLoadCallbacks = {
@@ -8,12 +8,13 @@ export type AppliedDocumentCanvasLoadCallbacks = {
     frame: EditorDocument['frame'],
     canvasSize: { width: number; height: number }
   ) => Promise<void>;
-  rebuildFrameDecorations: () => Promise<void>;
+  rebuildFrameDecorations: (browserFrame: BrowserFrameState) => Promise<void>;
 };
 
 export type LoadPreparedDocumentOptions = {
   canvas: Canvas;
   prepared: PreparedAppliedDocument;
   zoomLevel: number;
+  preserveViewport?: boolean;
   viewportDevicePixelRatioBaseline?: number;
 };

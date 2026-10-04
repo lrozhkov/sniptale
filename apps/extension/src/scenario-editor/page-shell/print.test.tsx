@@ -136,7 +136,6 @@ it('cancels pending preparation when leaving and restores reader focus and item'
     await act(async () =>
       s.root.render(
         <GuideReader
-          onChange={() => {}}
           project={s.project}
           images={{ asset: 'blob:image' }}
           initialId="last"
@@ -148,12 +147,74 @@ it('cancels pending preparation when leaving and restores reader focus and item'
     await act(async () => button(s.host, 'Step by step').click());
     await act(async () => button(s.host, 'Print / PDF').click());
     expect(s.host.querySelectorAll('article')).toHaveLength(2);
+    await act(async () => button(s.host, 'Letter').click());
+    await act(async () => button(s.host, 'Landscape').click());
     await act(async () => button(s.host, 'Print / PDF').click());
     await act(async () => button(s.host, 'Back to export').click());
     await act(async () => resolve?.());
     expect(print).not.toHaveBeenCalled();
     expect(s.host.querySelector('article')?.id).toBe('last');
     expect(document.activeElement).toBe(button(s.host, 'Print / PDF'));
+    await act(async () => button(s.host, 'Print / PDF').click());
+    expect(s.host.querySelector('style')?.textContent).toContain('letter landscape');
+  } finally {
+    await s.close();
+  }
+});
+
+it('keeps step grouping disposable and retains it when reopening print', async () => {
+  const s = setup();
+  const original = structuredClone(s.project);
+  const onClose = vi.fn();
+  try {
+    await act(async () =>
+      s.root.render(
+        <GuidePrint project={s.project} images={{ asset: 'blob:image' }} t={t} onClose={onClose} />
+      )
+    );
+    const toggle = () =>
+      s.host.querySelector<HTMLButtonElement>('[role="switch"][aria-label="Keep steps together"]')!;
+    await act(async () => toggle().click());
+    expect(s.host.querySelector('main')?.dataset['keepSteps']).toBe('true');
+    await act(async () => button(s.host, 'Each step on a new page').click());
+    expect(toggle()).toBeNull();
+    await act(async () => button(s.host, 'Back to export').click());
+    expect(onClose).toHaveBeenCalledWith(
+      expect.objectContaining({ keepStepsTogether: true, pagination: 'step' })
+    );
+    await act(async () => s.root.render(null));
+    await act(async () =>
+      s.root.render(
+        <GuidePrint
+          project={s.project}
+          initialSettings={{ ...s.project.print, keepStepsTogether: true }}
+          images={{ asset: 'blob:image' }}
+          t={t}
+          onClose={onClose}
+        />
+      )
+    );
+    expect(toggle().getAttribute('aria-checked')).toBe('true');
+    expect(s.project).toEqual(original);
+  } finally {
+    await s.close();
+  }
+});
+
+it('retains caption alignment in the print projection', async () => {
+  const s = setup();
+  const step = s.project.items[0];
+  if (step?.kind !== 'step' || step.blocks[0]?.kind !== 'image')
+    throw new Error('Missing image fixture');
+  step.blocks[0].caption = 'Caption';
+  step.blocks[0].captionAlignment = 'end';
+  try {
+    await act(async () =>
+      s.root.render(
+        <GuidePrint project={s.project} images={{ asset: 'blob:image' }} t={t} onClose={vi.fn()} />
+      )
+    );
+    expect(s.host.querySelector('figcaption')?.style.textAlign).toBe('end');
   } finally {
     await s.close();
   }

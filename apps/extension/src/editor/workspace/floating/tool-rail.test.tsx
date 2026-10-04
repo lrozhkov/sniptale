@@ -9,6 +9,7 @@ import {
   setFrameAnnotationCreationDefaults,
 } from '../../frame-annotation/creation-defaults';
 import { translate } from '../../../platform/i18n';
+import type { FrameAnnotationStyleSettings } from '../../../composition/frame-annotation-controls/contracts';
 import type { EditorToolbarContentProps } from '../toolbar/types';
 import { EditorFloatingToolRail } from './tool-rail';
 
@@ -18,10 +19,33 @@ const controller = vi.hoisted(() => ({
   resetToOriginal: vi.fn(async () => undefined),
   undo: vi.fn(async () => undefined),
 }));
+const restoreOriginalEditorImage = vi.hoisted(() => vi.fn(async () => undefined));
+
+vi.mock('../../workflows/restore-original-image', () => ({ restoreOriginalEditorImage }));
 
 vi.mock('../../application/controller-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/controller-context')>()),
   useEditorController: () => controller,
+}));
+vi.mock('./document-autosave-status', () => ({
+  DocumentAutosaveStatus: () => <button data-ui="autosave-control">Autosave</button>,
+}));
+vi.mock('../../../composition/frame-annotation-controls/frame/popover', () => ({
+  FrameAnnotationCreationFramePopover: ({
+    isOpen,
+    onChange,
+    settings,
+  }: {
+    isOpen: boolean;
+    onChange: (settings: FrameAnnotationStyleSettings) => void;
+    settings: FrameAnnotationStyleSettings;
+  }) =>
+    isOpen ? (
+      <button
+        data-ui="frame-annotation.creation.frame-popover"
+        onClick={() => onChange({ ...settings, effectMode: 'focus' })}
+      />
+    ) : null,
 }));
 
 let container: HTMLDivElement | null = null;
@@ -197,6 +221,30 @@ it('activates the frame group from its persistent frame button', () => {
   expect(props.onActivateTool).toHaveBeenCalledWith('frame-annotation');
 });
 
+it('opens the frame settings menu while another tool is selected', async () => {
+  const props = createProps();
+  renderToolRail(props);
+
+  await act(async () => {
+    getContentFrameButton('future-frame-style.menu').click();
+    await Promise.resolve();
+  });
+
+  expect(getContentFrameButton('future-frame-style.menu').getAttribute('aria-expanded')).toBe(
+    'true'
+  );
+  expect(
+    document.querySelector('[data-ui="frame-annotation.creation.frame-popover"]')
+  ).not.toBeNull();
+  act(() => {
+    document
+      .querySelector<HTMLButtonElement>('[data-ui="frame-annotation.creation.frame-popover"]')
+      ?.click();
+  });
+  expect(getFrameAnnotationCreationDefaults().effectMode).toBe('focus');
+  expect(props.onActivateTool).not.toHaveBeenCalled();
+});
+
 it('describes drawing modifiers and toggles options on a repeated active-tool click', () => {
   const onToggleActiveToolOptions = vi.fn();
   renderToolRail({
@@ -217,6 +265,20 @@ it('describes drawing modifiers and toggles options on a repeated active-tool cl
   expect(onToggleActiveToolOptions).toHaveBeenCalledWith('shape');
 });
 
+it('toggles blur options on a repeated click without reactivating the tool', () => {
+  const onToggleActiveToolOptions = vi.fn();
+  const props = createProps({
+    activeTool: 'blur',
+    isToolButtonActive: (tool) => tool === 'blur',
+  });
+  renderToolRail({ ...props, onToggleActiveToolOptions });
+
+  act(() => getToolButton('blur').click());
+
+  expect(onToggleActiveToolOptions).toHaveBeenCalledWith('blur');
+  expect(props.onActivateTool).not.toHaveBeenCalled();
+});
+
 it('uses a top-centered horizontal rail and a separate horizontal history panel', () => {
   renderToolRail(createProps());
 
@@ -228,23 +290,45 @@ it('uses a top-centered horizontal rail and a separate horizontal history panel'
   expect(stack?.className).toContain('left-1/2');
   expect(stack?.className).toContain('top-3');
   expect(stack?.className).toContain('-translate-x-1/2');
+  expect(stack?.className).not.toContain('max-[1439px]:!top-[4.75rem]');
   expect(rail?.className).toContain('flex-row');
   expect(rail?.getAttribute('aria-label')).toBe(translate('shared.ui.commandPaletteToolsSection'));
   const history = queryUi('editor.floating.tool-rail.history');
   expect(history?.className).toContain('flex-row');
-  expect(history?.className).toContain('min-[721px]:absolute');
-  expect(history?.className).toContain('min-[721px]:left-[calc(100%+0.75rem)]');
+  expect(history?.className).toContain('absolute');
+  expect(history?.className).toContain('left-[calc(100%+0.75rem)]');
   expect(stack?.firstElementChild).toBe(rail);
   expect(history?.parentElement).toBe(stack);
 });
 
-it('wraps the mobile rail instead of clipping hidden tools beyond the viewport', () => {
+it('centers the expanded frame toolbar at HD width while keeping history in the lower-left corner', () => {
+  renderToolRail(
+    createProps({
+      activeTool: 'frame-annotation',
+      isToolButtonActive: (tool) => tool === 'frame-annotation',
+    })
+  );
+
+  const stack = queryUi('editor.floating.tool-rail.stack');
+  const rail = queryUi('editor.floating.tool-rail');
+  const history = queryUi('editor.floating.tool-rail.history');
+  expect(queryUi('content.toolbar.future-frame-callout')).not.toBeNull();
+  expect(stack?.className).toContain('max-[1439px]:justify-center');
+  expect(stack?.className).toContain('max-[1439px]:!translate-none');
+  expect(rail?.className).not.toContain('max-[1439px]:-translate-x-24');
+  expect(history?.className).toContain('max-[1439px]:!fixed');
+  expect(history?.className).toContain('max-[1439px]:!left-3');
+  expect(history?.className).toContain('max-[1439px]:!top-auto');
+  expect(history?.className).toContain('max-[1439px]:!bottom-');
+});
+
+it('keeps the tool rail in one row for page-level horizontal scrolling', () => {
   renderToolRail(createProps());
 
   const rail = container?.querySelector<HTMLElement>('[data-ui="editor.floating.tool-rail"]');
   const divider = queryUi('editor.floating.tool-rail.divider.before-frame');
 
-  expect(rail?.className).toContain('max-[720px]:flex-wrap');
+  expect(rail?.className).not.toContain('max-[720px]:flex-wrap');
   expect(rail?.className).toContain('overflow-visible');
   expect(divider).not.toBeNull();
   expect(divider?.className).not.toContain('max-[720px]:hidden');
@@ -261,7 +345,7 @@ it('stays centered when the left drawer opens', () => {
   expect(stack?.className).not.toContain('left-[23.75rem]');
 });
 
-it('routes undo and redo, then confirms irreversible reset before clearing history', async () => {
+it('routes undo and redo, then returns to the first retained history step from one menu', async () => {
   const onBeforeSelectionAwareAction = vi.fn();
   renderToolRail(
     createProps({
@@ -284,37 +368,67 @@ it('routes undo and redo, then confirms irreversible reset before clearing histo
   });
 
   expect(controller.resetToOriginal).not.toHaveBeenCalled();
-  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
-  expect(document.body.textContent).toContain(translate('editor.toolbar.resetOriginalMessage'));
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(document.body.textContent).toContain(translate('editor.toolbar.historyStartDescription'));
 
-  await act(async () => getDialogButton(translate('editor.toolbar.resetOriginal')).click());
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.click()
+  );
 
   expect(onBeforeSelectionAwareAction).toHaveBeenCalledTimes(3);
   expect(controller.clearSelection).toHaveBeenCalledTimes(3);
   expect(controller.undo).toHaveBeenCalledOnce();
   expect(controller.redo).toHaveBeenCalledOnce();
   expect(controller.resetToOriginal).toHaveBeenCalledOnce();
-  expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });
 
-it('cancels reset without mutating the document', () => {
+it('confirms original restoration separately and can return to the menu', async () => {
   renderToolRail(createProps({ history: { canRedo: false, canUndo: true, index: 1, size: 2 } }));
 
   act(() => getHistoryButton('reset').click());
+  act(() => document.querySelector<HTMLButtonElement>('[data-history-original="true"]')?.click());
+  expect(document.querySelector('[role="alertdialog"]')).not.toBeNull();
   act(() => getDialogButton(translate('common.actions.cancel')).click());
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  act(() => document.querySelector<HTMLButtonElement>('[data-history-original="true"]')?.click());
+  await act(async () => getDialogButton(translate('editor.toolbar.restoreOriginal')).click());
 
-  expect(controller.clearSelection).not.toHaveBeenCalled();
+  expect(controller.clearSelection).toHaveBeenCalledOnce();
   expect(controller.resetToOriginal).not.toHaveBeenCalled();
+  expect(restoreOriginalEditorImage).toHaveBeenCalledOnce();
   expect(document.querySelector('[role="alertdialog"]')).toBeNull();
 });
 
-it('disables reset at the original history index and keeps the warning tooltip available', () => {
+it('allows original restoration when the retained history is already at its first step', () => {
   renderToolRail(createProps({ history: { canRedo: true, canUndo: false, index: 0, size: 2 } }));
 
   const reset = getHistoryButton('reset');
-  expect(reset.disabled).toBe(true);
+  expect(reset.disabled).toBe(false);
   expect(reset.title).toBe(translate('editor.toolbar.resetOriginalTooltip'));
   expect(reset.getAttribute('aria-label')).toBe(translate('editor.toolbar.resetOriginalTooltip'));
+  act(() => reset.click());
+  expect(document.querySelector<HTMLButtonElement>('[data-history-start="true"]')?.disabled).toBe(
+    true
+  );
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-history-original="true"]')?.disabled
+  ).toBe(false);
+});
+
+it('closes the history choices when its single toolbar button is clicked again', () => {
+  renderToolRail(createProps({ history: { canRedo: false, canUndo: false, index: 0, size: 1 } }));
+
+  const reset = getHistoryButton('reset');
+  act(() => reset.click());
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(reset.getAttribute('aria-expanded')).toBe('true');
+
+  act(() => reset.click());
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(reset.getAttribute('aria-expanded')).toBe('false');
+  expect(getHistoryButton('undo').disabled).toBe(true);
+  expect(getHistoryButton('redo').disabled).toBe(true);
 });
 
 it('keeps document-required controls disabled before an image is loaded', () => {
@@ -322,6 +436,7 @@ it('keeps document-required controls disabled before an image is loaded', () => 
   renderToolRail(props);
 
   expect(getToolButton('text').disabled).toBe(true);
+  expect(getHistoryButton('reset').disabled).toBe(true);
   const frame = getContentFrameButton('future-frame-style');
   expect(frame.disabled).toBe(true);
   act(() => frame.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));

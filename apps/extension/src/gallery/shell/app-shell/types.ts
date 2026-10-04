@@ -1,3 +1,9 @@
+import type {
+  GallerySelectionRange,
+  GalleryToggleSelectionOptions,
+} from '../../library/keyboard/selection-range';
+import type { GalleryDeletionOpening } from '../../library/deletion/types';
+import type { GalleryPreviewPresentation } from '../../library/types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import type { MediaHubImportConflictStrategy } from '../../../workflows/media-hub-backup/index';
 import type {
@@ -18,6 +24,9 @@ import type { MediaFileImportConflictStrategy } from '../../library/import-types
 import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views';
 
 export interface GalleryAppLayoutProps {
+  onTrashModeChange?: (value: boolean) => void;
+  onRestoreTrash?: () => void;
+  onPreviewRestoreTrash?: (item: GalleryItem) => Promise<boolean>;
   gridViewportRef: RefObject<HTMLDivElement | null>;
   importInputRef: RefObject<HTMLInputElement | null>;
   importTriggerRef: RefObject<HTMLButtonElement | null>;
@@ -37,6 +46,7 @@ export interface GalleryAppLayoutProps {
   onActiveImportCancel: () => void;
   onActiveImportDismiss: () => void;
   onConfirmDialogClose: () => void;
+  onDeletionRequestClose: () => void;
   onPendingImportClose: () => void;
   onPendingMediaImportClose: () => void;
   onPendingWebSnapshotImportClose?: () => void;
@@ -48,6 +58,7 @@ export interface GalleryAppLayoutProps {
     options: MediaHubBackupExportOptions
   ) => Promise<MediaHubLocalBackupSummary>;
   onImport: (strategy: MediaHubImportConflictStrategy) => void;
+  onPreviewPresented?: ((presentation: GalleryPreviewPresentation) => void) | undefined;
   onPreviewClose: () => void;
   onPreviewInspectorToggle: () => void;
   onFilenameChange: Dispatch<SetStateAction<string>>;
@@ -56,15 +67,15 @@ export interface GalleryAppLayoutProps {
   onAddTag: (tag?: string) => void;
   onPreviewResetChanges?: () => void;
   onSaveMetadata?: () => void;
-  onPreviewDownload: () => void;
-  onPreviewDownloadOriginal: () => void;
-  onPreviewCopy: () => void;
+  onPreviewDownload: () => Promise<boolean>;
+  onPreviewDownloadOriginal: () => Promise<boolean>;
+  onPreviewCopy: () => Promise<boolean>;
   onPreviewEdit: (item: GalleryItem) => void;
   onPreviewOpenSnapshotScreenshot: () => void;
-  onPreviewDelete: (item: GalleryItem) => void;
+  onPreviewDelete: (item: GalleryItem, opening?: GalleryDeletionOpening) => void;
   onPreviewPromote?: (item: GalleryItem) => Promise<void>;
   onPreviewRestoreOriginal: () => void;
-  onPreviewSaveCopy: () => void;
+  onPreviewSaveCopy: () => Promise<boolean>;
   onScenarioPreviewClose?: () => void;
   onFolderFilterChange: Dispatch<SetStateAction<FolderFilter>>;
   onScopeChange?: Dispatch<SetStateAction<GalleryScope>>;
@@ -82,6 +93,7 @@ export interface GalleryAppLayoutProps {
   onImportMediaClick: () => void;
   onImportWebSnapshotClick?: () => void;
   onSearchChange: Dispatch<SetStateAction<string>>;
+  onSearchCommit: (value: string) => void;
   onSortModeChange: Dispatch<SetStateAction<SortMode>>;
   onViewModeChange: Dispatch<SetStateAction<GalleryViewMode>>;
   onBannerDismiss: () => void;
@@ -89,10 +101,12 @@ export interface GalleryAppLayoutProps {
   onApplySelectionTag: (tag?: string) => void;
   onSelectionBackup: () => void;
   onSelectionZip: () => void;
-  onDeleteMany: (items: GalleryItem[]) => void;
+  onDeleteMany: (items: GalleryItem[], opening?: GalleryDeletionOpening) => void;
   onClearSelection: () => void;
-  onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  onToggleSelection: (assetId: string, options?: GalleryToggleSelectionOptions) => void;
+  onSelectRange: (range: GallerySelectionRange) => ReadonlySet<string>;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;
+  onProjectOpen?: (item: GalleryItem) => void;
   onRecordingGroupOpen?: (item: GalleryItem) => void;
   onPreviewNavigate: (item: GalleryItem) => void;
   onScenarioPreviewOpen?: (projectId: string) => void;

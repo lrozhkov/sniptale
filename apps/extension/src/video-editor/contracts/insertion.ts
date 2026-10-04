@@ -17,7 +17,14 @@ export type VideoEditorMaterialPlacementResult =
   | { status: 'placed'; clipId: string }
   | {
       status: 'rejected';
-      reason: 'no-project' | 'missing-material' | 'locked-track' | 'invalid-cut' | 'invalid-range';
+      reason:
+        | 'no-project'
+        | 'missing-material'
+        | 'locked-track'
+        | 'invalid-cut'
+        | 'invalid-range'
+        | 'invalid-target'
+        | 'occupied-target';
     };
 
 type VideoEditorImportHandler = (
@@ -41,4 +48,11 @@ export interface VideoEditorAudioRecordingTarget {
   trackId: string;
   startTime: number;
   endTime: number;
+}
+
+/** Exact material destination; the command never redirects an incompatible or occupied target. */
+export interface VideoEditorMaterialTarget {
+  trackId: string;
+  startTime: number;
+  timelineLaneId: string;
 }

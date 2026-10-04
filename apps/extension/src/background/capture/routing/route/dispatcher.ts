@@ -41,7 +41,12 @@ export function routeCaptureMessage(routeArgs: RouteCaptureMessageArgs): boolean
       return routeQuickActionMessage(commandContext);
     case MessageType.DOWNLOAD_BROWSER_ANNOTATIONS:
     case MessageType.OPEN_EXPORT_MODAL:
-      return routeToolbarAnnotationExportMessage({ message, resolvedTabId, sendResponse });
+      return routeToolbarAnnotationExportMessage({
+        message,
+        resolvedTabId,
+        sender: commandArgs.sender,
+        sendResponse,
+      });
     case MessageType.EXECUTE_SAVE:
       return handleExecuteSave(message, resolvedTabId, sendResponse);
     case MessageType.OPEN_EDITOR_WITH_IMAGE:

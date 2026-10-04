@@ -1,28 +1,32 @@
-import type { GuideStyle } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type {
+  GuideStyle,
+  GuideHtmlImageSettings,
+} from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { Layers } from 'lucide-react';
 import type { Translate } from '../../platform/i18n';
 import { GuideStyleFields } from './style-controls';
+import { GuideHtmlImageFields } from './html-image-fields';
+import { GuideInspectorGroup } from './inspector';
+import { Images } from 'lucide-react';
 
 /** Document defaults use the same canonical updater and history as selected-item edits. */
 export function GuideDefaultAppearance({
   style,
+  htmlImages,
+  onHtmlImagesChange,
   disabled,
   onApply,
   t,
 }: {
   style: GuideStyle;
+  htmlImages: GuideHtmlImageSettings;
+  onHtmlImagesChange: (patch: Partial<GuideHtmlImageSettings>) => void;
   disabled: boolean;
   onApply: (style: GuideStyle, resetSteps: boolean) => void;
   t: Translate;
 }) {
   return (
     <div className="guide-default-appearance">
-      <div className="guide-inspector-context">
-        <Layers size={16} aria-hidden="true" />
-        <strong>{t('scenario.editor.guideEntireDocument')}</strong>
-      </div>
-      <p className="guide-inspector-hint">{t('scenario.editor.guideDefaultScopeHint')}</p>
       <GuideStyleFields
         style={style}
         disabled={disabled}
@@ -40,6 +44,14 @@ export function GuideDefaultAppearance({
         </ProductActionButton>
         <p className="guide-inspector-hint">{t('scenario.editor.guideApplyAllHint')}</p>
       </div>
+      <GuideInspectorGroup id="htmlImages" icon={Images} title={t('scenario.editor.htmlImages')}>
+        <GuideHtmlImageFields
+          value={htmlImages}
+          disabled={disabled}
+          onChange={onHtmlImagesChange}
+          t={t}
+        />
+      </GuideInspectorGroup>
     </div>
   );
 }

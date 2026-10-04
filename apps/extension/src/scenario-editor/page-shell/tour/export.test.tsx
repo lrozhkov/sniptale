@@ -12,54 +12,89 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.resetAllMocks();
 });
-it('sends the exact prepared Blob to the isolated preview and saves the same artifact', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const create = vi.fn(() => 'blob:prepared');
-  const revoke = vi.fn();
-  vi.stubGlobal(
-    'URL',
-    class extends URL {
-      static createObjectURL = create;
-      static revokeObjectURL = revoke;
-    }
-  );
-  const artifact = {
-    blob: new Blob(['exact']),
-    filename: 'tour.html',
-    projectId: 'project',
-    mediaCount: 1,
-  };
-  io.prepare.mockResolvedValue(artifact);
-  io.save.mockResolvedValue('saved');
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  const t = createTranslator('en');
-  await act(async () =>
-    root.render(<TourHtmlExport project={createGuideProject('Guide')} t={t} onClose={() => {}} />)
-  );
-  const button = (key: 'tourHtmlPrepare' | 'htmlSave') =>
-    [...host.querySelectorAll<HTMLButtonElement>('button')].find(
-      (node) => node.title === t(`scenario.editor.${key}`)
-    )!;
-  expect(button('htmlSave').disabled).toBe(true);
-  await act(async () => button('tourHtmlPrepare').click());
-  const frame = host.querySelector('iframe')!;
-  expect(frame.getAttribute('src')).toContain('/tour-preview-sandbox/index.html#');
-  const post = vi.spyOn(frame.contentWindow!, 'postMessage');
-  act(() => frame.dispatchEvent(new Event('load')));
-  expect(post).toHaveBeenCalledWith(
-    expect.objectContaining({ kind: 'tour-preview', blob: artifact.blob }),
-    '*'
-  );
-  expect(frame.getAttribute('sandbox')).toContain('allow-scripts');
-  expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin');
-  await act(async () => button('htmlSave').click());
-  expect(io.save.mock.calls[0]![0]).toBe(artifact);
-  await act(async () => root.unmount());
-  expect(revoke).not.toHaveBeenCalled();
-  host.remove();
-});
+it.each(['ru', 'en'] as const)(
+  'passes localized player controls into the exact prepared %s artifact',
+  async (locale) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const create = vi.fn(() => 'blob:prepared');
+    const revoke = vi.fn();
+    vi.stubGlobal(
+      'URL',
+      class extends URL {
+        static createObjectURL = create;
+        static revokeObjectURL = revoke;
+      }
+    );
+    const artifact = {
+      blob: new Blob(['exact']),
+      filename: 'tour.html',
+      projectId: 'project',
+      mediaCount: 1,
+    };
+    io.prepare.mockResolvedValue(artifact);
+    io.save.mockResolvedValue('saved');
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const t = createTranslator(locale);
+    await act(async () =>
+      root.render(<TourHtmlExport project={createGuideProject('Guide')} t={t} onClose={() => {}} />)
+    );
+    const main = host.querySelector('main.guide-export-workspace.tour-export')!;
+    expect(main.querySelector('.guide-page-header')).toBeNull();
+    const stage = main.querySelector('.guide-export-stage')!;
+    const inspector = main.querySelector('.guide-export-inspector')!;
+    expect(stage.querySelector('iframe')).toBeNull();
+    const back = inspector.querySelector<HTMLButtonElement>('.guide-export-heading button')!;
+    expect(back.title).toBe(t('scenario.editor.guideReaderBack'));
+    expect(document.activeElement).toBe(back);
+    expect(
+      [...inspector.querySelectorAll<HTMLButtonElement>('.guide-export-actions button')].map(
+        (node) => node.title
+      )
+    ).toEqual([t('scenario.editor.tourHtmlPrepare'), t('scenario.editor.htmlSave')]);
+    const button = (key: 'tourHtmlPrepare' | 'htmlSave') =>
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (node) => node.title === t(`scenario.editor.${key}`)
+      )!;
+    expect(button('htmlSave').disabled).toBe(true);
+    await act(async () => button('tourHtmlPrepare').click());
+    expect(io.prepare.mock.calls[0]![0].labels).toMatchObject({
+      musicMute: locale === 'ru' ? 'Выключить музыку' : 'Mute music',
+      musicUnmute: locale === 'ru' ? 'Включить музыку' : 'Unmute music',
+      musicRetry: locale === 'ru' ? 'Повторить музыку' : 'Retry music',
+      musicBlocked:
+        locale === 'ru' ? 'Воспроизведение музыки заблокировано.' : 'Music playback was blocked.',
+      musicError:
+        locale === 'ru' ? 'Не удалось воспроизвести музыку.' : 'Music could not be played.',
+      narrationReplay: locale === 'ru' ? 'Повторить озвучку' : 'Replay narration',
+      narrationPause: locale === 'ru' ? 'Приостановить озвучку' : 'Pause narration',
+      narrationResume: locale === 'ru' ? 'Продолжить озвучку' : 'Resume narration',
+      volume: locale === 'ru' ? 'Громкость' : 'Volume',
+      mute: locale === 'ru' ? 'Выключить звук' : 'Mute',
+      unmute: locale === 'ru' ? 'Включить звук' : 'Unmute',
+      manual: t('scenario.editor.tourManual'),
+      fullView: locale === 'ru' ? 'Слайд целиком' : 'Full slide',
+      authoredView: locale === 'ru' ? 'Авторский вид' : 'Authored view',
+      end: t('scenario.editor.tourEnd'),
+    });
+    const frame = host.querySelector('iframe')!;
+    expect(frame.getAttribute('src')).toContain('/tour-preview-sandbox/index.html#');
+    const post = vi.spyOn(frame.contentWindow!, 'postMessage');
+    act(() => frame.dispatchEvent(new Event('load')));
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'tour-preview', blob: artifact.blob }),
+      '*'
+    );
+    expect(frame.getAttribute('sandbox')).toContain('allow-scripts');
+    expect(frame.getAttribute('sandbox')).not.toContain('allow-same-origin');
+    await act(async () => button('htmlSave').click());
+    expect(io.save.mock.calls[0]![0]).toBe(artifact);
+    await act(async () => root.unmount());
+    expect(revoke).not.toHaveBeenCalled();
+    host.remove();
+  }
+);
 it('rejects duplicate jobs and discards preparation after project replacement', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const create = vi.fn();

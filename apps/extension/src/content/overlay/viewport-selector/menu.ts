@@ -62,6 +62,7 @@ export function useViewportSelectorMenu(props: {
   };
 
   const handleSelectNative = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled) return;
     onViewportChange(null, event.nativeEvent);
     setShowMenu(false);
   };
@@ -70,6 +71,7 @@ export function useViewportSelectorMenu(props: {
     preset: ViewportPreset,
     event: React.MouseEvent<HTMLButtonElement>
   ) => {
+    if (disabled) return;
     onViewportChange(
       {
         presetId: preset.id,

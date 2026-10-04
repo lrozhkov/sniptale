@@ -7,6 +7,7 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
+import { useGuideMenuHover } from './menu-hover';
 
 type GuideMenuItem = {
   label: string;
@@ -14,7 +15,37 @@ type GuideMenuItem = {
   onSelect: () => void;
   danger?: boolean;
   disabled?: boolean;
+  pressed?: boolean;
 };
+
+function GuideMenuItems({
+  label,
+  items,
+  close,
+}: {
+  label: string;
+  items: GuideMenuItem[];
+  close: () => void;
+}) {
+  return (
+    <ProductDropdownMenu role="group" aria-label={label}>
+      {items.map((item) => (
+        <ProductDropdownItem
+          key={item.label}
+          danger={item.danger ?? false}
+          disabled={item.disabled ?? false}
+          onClick={() => {
+            close();
+            item.onSelect();
+          }}
+        >
+          {item.icon}
+          <span>{item.label}</span>
+        </ProductDropdownItem>
+      ))}
+    </ProductDropdownMenu>
+  );
+}
 
 /** Owns a compact command disclosure with shared placement, dismissal and theme surfaces. */
 export function GuideActionMenu({
@@ -22,16 +53,21 @@ export function GuideActionMenu({
   icon,
   items,
   disabled = false,
+  tone = 'default',
+  openOnHover = false,
 }: {
   label: string;
   icon: ReactNode;
   items: GuideMenuItem[];
   disabled?: boolean;
+  tone?: 'default' | 'utility';
+  openOnHover?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const focusMenu = useRef(false);
   const id = useId();
   const theme = useResolvedPortalTheme(containerRef.current);
   const { portalStyle } = useGlassSelectOverlay({
@@ -42,12 +78,16 @@ export function GuideActionMenu({
     menuRef,
     menuWidth: 232,
   });
+  const hover = useGuideMenuHover(openOnHover, disabled, menuRef, setOpen);
   const close = () => {
+    hover.cancel();
     setOpen(false);
     trigger.current?.focus();
   };
   useEffect(() => {
-    if (open) menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    if (open && focusMenu.current)
+      menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    focusMenu.current = false;
   }, [open]);
   useEffect(() => {
     if (disabled) setOpen(false);
@@ -56,6 +96,7 @@ export function GuideActionMenu({
     <div
       ref={containerRef}
       className="guide-action-menu-anchor"
+      onMouseLeave={hover.leave}
       onBlurCapture={(event) => {
         if (!open) return;
         const next = event.relatedTarget;
@@ -69,15 +110,29 @@ export function GuideActionMenu({
     >
       <ContentToolbarButton
         ref={trigger}
+        tone={tone}
         type="button"
         title={label}
         aria-expanded={open}
         aria-controls={id}
         disabled={disabled}
-        onClick={() => setOpen((value) => !value)}
+        onMouseEnter={hover.enter}
+        onClick={() => {
+          focusMenu.current = true;
+          if (open && openOnHover) {
+            menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+            return;
+          }
+          setOpen((value) => (openOnHover ? true : !value));
+        }}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return;
           event.preventDefault();
+          if (open) {
+            menuRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+            return;
+          }
+          focusMenu.current = true;
           setOpen(true);
         }}
       >
@@ -91,6 +146,8 @@ export function GuideActionMenu({
             data-theme={theme ?? undefined}
             className="sniptale-ai-modal-root guide-action-menu"
             style={portalStyle}
+            onMouseEnter={hover.cancel}
+            onMouseLeave={hover.leave}
             onKeyDown={(event) => {
               if (event.key === 'Escape') {
                 event.preventDefault();
@@ -111,22 +168,7 @@ export function GuideActionMenu({
               }
             }}
           >
-            <ProductDropdownMenu role="group" aria-label={label}>
-              {items.map((item) => (
-                <ProductDropdownItem
-                  key={item.label}
-                  danger={item.danger ?? false}
-                  disabled={item.disabled ?? false}
-                  onClick={() => {
-                    close();
-                    item.onSelect();
-                  }}
-                >
-                  {item.icon}
-                  <span>{item.label}</span>
-                </ProductDropdownItem>
-              ))}
-            </ProductDropdownMenu>
+            <GuideMenuItems label={label} items={items} close={close} />
           </div>,
           resolveThemeSafePortalTarget(containerRef.current)
         )}

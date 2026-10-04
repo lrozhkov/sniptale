@@ -6,6 +6,7 @@ export function createCropDrawWorkflowState(
   canvas: Canvas,
   completion: Extract<ReturnType<typeof completeEditorDrawSession>, { kind: 'crop' }>
 ): DrawWorkflowState {
+  canvas.skipTargetFind = false;
   canvas.setActiveObject(completion.cropGuide);
   canvas.requestRenderAll();
 

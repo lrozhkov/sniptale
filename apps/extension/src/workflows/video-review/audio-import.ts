@@ -5,6 +5,7 @@ import {
 } from '../../composition/persistence/projects';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
 import { createQuickEditAudioClip } from '../../features/video/review/advanced/audio';
+import { withVoiceoverAttachmentLock } from '../../composition/persistence/projects/voiceover-publication-lock';
 
 const IMPORTED_AUDIO_MAX_SECONDS = 3600;
 const IMPORTED_AUDIO_MIN_SECONDS = 0.05;
@@ -45,9 +46,11 @@ async function decodeAudioDuration(blob: Blob): Promise<number> {
   }
 }
 
-interface PreparedReviewAudio {
+export interface PreparedReviewAudio {
   assetId: string;
   duration: number;
+  protect(): Promise<void>;
+  cancel(): Promise<void>;
   /** Publishes the staged asset into the media library after a durable attach. */
   publish(): Promise<void>;
   /** Discards the staged asset; a failed publication keeps its recovery journal. */
@@ -57,7 +60,8 @@ interface PreparedReviewAudio {
 /** Admission and staging before any publication: type, size, duration, then bytes. */
 export async function prepareReviewAudio(
   file: File,
-  signal: AbortSignal
+  signal: AbortSignal,
+  requiredReview?: { aggregateId: string; clipId: string }
 ): Promise<PreparedReviewAudio> {
   if (file.type && !file.type.startsWith('audio/')) throw new UnsupportedAudioFileError('type');
   if (file.size > IMPORTED_AUDIO_MAX_BYTES) throw new UnsupportedAudioFileError('size');
@@ -67,11 +71,16 @@ export async function prepareReviewAudio(
   const prepared: PreparedProjectAsset = await prepareProjectAsset(
     file,
     file.type.startsWith('audio/') ? file.type : 'audio/mpeg',
-    file.name
+    file.name,
+    undefined,
+    undefined,
+    requiredReview
   );
   return {
     assetId: `project-asset:${prepared.id}`,
     duration,
+    protect: prepared.protect,
+    cancel: prepared.cancel,
     publish: async () => {
       await prepared.publish();
       publishMediaHubLibraryChanged('create', [`project-asset:${prepared.id}`]);
@@ -90,20 +99,38 @@ export async function importReviewAudio(args: {
   signal: AbortSignal;
   attach(assetId: string, duration: number): Promise<void>;
   assertCurrentTarget(): void;
+  hasDurableReference?(assetId: string): boolean | Promise<boolean>;
+  onPrepared?(prepared: PreparedReviewAudio): void;
+  requiredReview?: { aggregateId: string; clipId: string };
 }): Promise<void> {
-  const prepared = await prepareReviewAudio(args.file, args.signal);
-  let attached = false;
-  try {
-    args.signal.throwIfAborted();
-    args.assertCurrentTarget();
-    await args.attach(prepared.assetId, prepared.duration);
-    // Ownership transfers to the durable reference; a publish failure keeps the
-    // staged bytes for recovery instead of deleting referenced material.
-    attached = true;
-    await prepared.publish();
-  } finally {
-    if (!attached) await prepared.discard();
-  }
+  const prepared = await prepareReviewAudio(args.file, args.signal, args.requiredReview);
+  return withVoiceoverAttachmentLock(prepared.assetId, async () => {
+    let attached = false;
+    try {
+      args.onPrepared?.(prepared);
+      args.signal.throwIfAborted();
+      args.assertCurrentTarget();
+      await prepared.protect();
+      args.signal.throwIfAborted();
+      args.assertCurrentTarget();
+      await args.attach(prepared.assetId, prepared.duration);
+      // Ownership transfers to the durable reference; a publish failure keeps the
+      // staged bytes for recovery instead of deleting referenced material.
+      attached = true;
+      await prepared.publish();
+    } finally {
+      if (!attached) {
+        let durable = false;
+        try {
+          durable = (await args.hasDurableReference?.(prepared.assetId)) ?? false;
+        } catch {
+          // An unavailable durability check must keep the journal and staged bytes.
+          durable = true;
+        }
+        if (!durable) await prepared.cancel();
+      }
+    }
+  });
 }
 
 /** Places an imported clip at the target time, bounded by the timeline end. */

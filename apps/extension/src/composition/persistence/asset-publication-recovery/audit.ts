@@ -1,39 +1,23 @@
+import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
+import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   deleteAssetObject,
+  buildPhysicalDeleteOperation,
+  completePhysicalDeleteOperation,
   listAssetObjectIds,
   listReadyJournals,
+  readyJournalClaimsAsset,
   listWritingAssetIds,
-  parseBackupAssetOperation,
-  parsePhysicalDeleteAssetOperation,
-  parseAssetOwner,
-  parseAssetRef,
-  parseArchiveRestoreSession,
   runWithAssetObjectLockIfAvailable,
-  type AssetOperation,
   type AssetOwner,
   type AssetRef,
   type ArchiveRestoreSession,
 } from '../assets';
 import {
-  ASSET_OWNERS_STORE,
-  ASSET_OPERATIONS_STORE,
-  ASSET_REFS_STORE,
-  PROJECT_ASSETS_STORE,
-  PROJECT_EXPORTS_STORE,
-  SCENARIO_ASSETS_STORE,
-  IMAGE_WORKSPACES_STORE,
-  SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
-  STORE_NAME,
-  WEB_SNAPSHOTS_STORE,
-} from '../infrastructure/indexed-db/core';
-import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
-import { parseProjectAssetEntry, parseProjectExportEntry } from '../projects/read-guards';
-import { parseRecordingEntry } from '../recordings/index.guards';
-import { parseScenarioAssetEntry } from '../scenario/read-guards';
-import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
-import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents';
-import { parseStoredWebSnapshotRecord } from '../web-snapshots';
+  runWithDurableAssetLifecycleLock,
+  tryRunWithDurableAssetLifecycleLock,
+} from '../infrastructure/mutation-barrier';
+import { collectDurableAssetSnapshot } from '../assets/retention-authority';
 
 interface DurableAssetAuditReport {
   authorityValid: boolean;
@@ -58,10 +42,6 @@ export async function auditDurableAssets(): Promise<DurableAssetAuditReport> {
   const objectIdSet = new Set(objectIds);
   const ownedAssetIds = new Set(snapshot.owners.map((owner) => owner.assetId));
   const actualOwnersByKey = new Map(snapshot.owners.map((owner) => [ownerKey(owner), owner]));
-  const expectedAssetUse = new Map<string, number>();
-  for (const owner of snapshot.expectedOwners) {
-    expectedAssetUse.set(owner.assetId, (expectedAssetUse.get(owner.assetId) ?? 0) + 1);
-  }
   const ownerMetadataMismatches = new Map<string, AssetOwner>();
   for (const owner of snapshot.owners) {
     if (snapshot.expectedOwnerAssets.get(ownerKey(owner)) !== owner.assetId) {
@@ -70,11 +50,13 @@ export async function auditDurableAssets(): Promise<DurableAssetAuditReport> {
   }
   for (const expected of snapshot.expectedOwners) {
     const actual = actualOwnersByKey.get(ownerKey(expected));
-    if (actual?.assetId !== expected.assetId || (expectedAssetUse.get(expected.assetId) ?? 0) > 1) {
+    if (actual?.assetId !== expected.assetId) {
       ownerMetadataMismatches.set(`${ownerKey(expected)}\u0000${expected.assetId}`, expected);
     }
   }
   const protectedIds = new Set([
+    ...snapshot.owners.map((owner) => owner.assetId),
+    ...snapshot.expectedOwners.map((owner) => owner.assetId),
     ...snapshot.protectedRollbackAssetIds,
     ...writingIds,
     ...readyJournals.flatMap((journal) => journal.assetRefs.map((ref) => ref.assetId)),
@@ -83,7 +65,11 @@ export async function auditDurableAssets(): Promise<DurableAssetAuditReport> {
     authorityValid: snapshot.authorityValid,
     embeddedBinaryMetadata: snapshot.embeddedBinaryMetadata,
     objectsWithoutAuthority: objectIds.filter(
-      (assetId) => snapshot.authorityValid && !refsById.has(assetId) && !protectedIds.has(assetId)
+      (assetId) =>
+        snapshot.authorityValid &&
+        !refsById.has(assetId) &&
+        !protectedIds.has(assetId) &&
+        !readyJournals.some((journal) => readyJournalClaimsAsset(journal, assetId))
     ),
     ownersWithoutRefs: snapshot.owners.filter((owner) => !refsById.has(owner.assetId)),
     ownerMetadataMismatches: [...ownerMetadataMismatches.values()],
@@ -121,6 +107,8 @@ async function isStillOrphanAssetObject(assetId: string): Promise<boolean> {
   if (
     !snapshot.authorityValid ||
     snapshot.refs.some((ref) => ref.assetId === assetId) ||
+    snapshot.owners.some((owner) => owner.assetId === assetId) ||
+    snapshot.expectedOwners.some((owner) => owner.assetId === assetId) ||
     snapshot.protectedRollbackAssetIds.has(assetId)
   )
     return false;
@@ -130,218 +118,34 @@ async function isStillOrphanAssetObject(assetId: string): Promise<boolean> {
   ]);
   return (
     !writingIds.includes(assetId) &&
-    !readyJournals.some((journal) => journal.assetRefs.some((ref) => ref.assetId === assetId))
+    !readyJournals.some((journal) => readyJournalClaimsAsset(journal, assetId))
   );
-}
-
-async function collectDurableAssetSnapshot(): Promise<{
-  authorityValid: boolean;
-  archiveSessions: ArchiveRestoreSession[];
-  embeddedBinaryMetadata: string[];
-  expectedOwnerAssets: Map<string, string>;
-  expectedOwners: AssetOwner[];
-  owners: AssetOwner[];
-  operationIds: Set<string>;
-  protectedRollbackAssetIds: Set<string>;
-  refs: AssetRef[];
-}> {
-  const [
-    rawRefs,
-    rawOwners,
-    rawOperations,
-    rawRecordings,
-    rawProjectAssets,
-    rawProjectExports,
-    rawScenarioAssets,
-    rawImageWorkspaces,
-    rawScenarioDocuments,
-    rawWebSnapshots,
-  ] = await runWithIndexedDbMutation(async (db) =>
-    Promise.all([
-      db.getAll(ASSET_REFS_STORE),
-      db.getAll(ASSET_OWNERS_STORE),
-      db.getAll(ASSET_OPERATIONS_STORE),
-      db.getAll(STORE_NAME),
-      db.getAll(PROJECT_ASSETS_STORE),
-      db.getAll(PROJECT_EXPORTS_STORE),
-      db.getAll(SCENARIO_ASSETS_STORE),
-      db.getAll(IMAGE_WORKSPACES_STORE),
-      db.getAll(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
-      db.getAll(WEB_SNAPSHOTS_STORE),
-    ])
-  );
-  const refsResult = parseRows(rawRefs, parseAssetRef);
-  const ownersResult = parseRows(rawOwners, parseAssetOwner);
-  const operationsResult = parseAssetOperations(rawOperations);
-  const recordingsResult = parseRows(rawRecordings, parseRecordingEntry);
-  const projectAssetsResult = parseRows(rawProjectAssets, parseProjectAssetEntry);
-  const projectExportsResult = parseRows(rawProjectExports, parseProjectExportEntry);
-  const scenarioAssetsResult = parseRows(rawScenarioAssets, parseScenarioAssetEntry);
-  const imageWorkspacesResult = parseRows(rawImageWorkspaces, parseImageWorkspaceEntry);
-  const scenarioDocumentsResult = parseRows(
-    rawScenarioDocuments,
-    parseScenarioStepEditorDocumentEntry
-  );
-  const webSnapshotsResult = parseRows(rawWebSnapshots, parseStoredWebSnapshotRecord);
-  const refs = refsResult.entries;
-  const owners = ownersResult.entries;
-  const expectedOwnerAssets = new Map<string, string>();
-  const expectedOwners: AssetOwner[] = [];
-  for (const entry of recordingsResult.entries) {
-    expectedOwners.push(createExpectedOwner('recording', entry.id, entry.assetId));
-  }
-  for (const entry of projectAssetsResult.entries) {
-    expectedOwners.push(createExpectedOwner('project-asset', entry.id, entry.assetId));
-  }
-  for (const entry of projectExportsResult.entries) {
-    expectedOwners.push(createExpectedOwner('project-export', entry.id, entry.assetId));
-  }
-  for (const entry of scenarioAssetsResult.entries) {
-    expectedOwners.push(createExpectedOwner('scenario-asset', entry.id, entry.assetId));
-  }
-  for (const entry of imageWorkspacesResult.entries) {
-    for (const asset of entry.document.assets) {
-      expectedOwners.push({
-        assetId: asset.assetId,
-        ownerId: entry.aggregateId,
-        ownerKind: 'image-workspace',
-        role: asset.role,
-      });
-    }
-  }
-  for (const entry of scenarioDocumentsResult.entries) {
-    for (const asset of entry.document.assets) {
-      expectedOwners.push({
-        assetId: asset.assetId,
-        ownerId: entry.stepId,
-        ownerKind: 'scenario-editor-document',
-        role: asset.role,
-      });
-    }
-  }
-  for (const entry of webSnapshotsResult.entries) {
-    expectedOwners.push({
-      assetId: entry.packageAssetId,
-      ownerId: entry.id,
-      ownerKind: 'web-snapshot',
-      role: 'package',
-    });
-    expectedOwners.push({
-      assetId: entry.screenshotAssetId,
-      ownerId: entry.id,
-      ownerKind: 'web-snapshot',
-      role: 'screenshot',
-    });
-  }
-  for (const owner of expectedOwners) {
-    expectedOwnerAssets.set(ownerKey(owner), owner.assetId);
-  }
-  return {
-    authorityValid: [
-      refsResult,
-      ownersResult,
-      operationsResult,
-      recordingsResult,
-      projectAssetsResult,
-      projectExportsResult,
-      scenarioAssetsResult,
-      imageWorkspacesResult,
-      scenarioDocumentsResult,
-      webSnapshotsResult,
-    ].every((result) => result.valid),
-    archiveSessions: operationsResult.archiveSessions,
-    embeddedBinaryMetadata: [
-      ...findEmbeddedBinaryRows(rawImageWorkspaces, 'image-workspace'),
-      ...findEmbeddedBinaryRows(rawScenarioDocuments, 'scenario-editor-document'),
-    ],
-    expectedOwnerAssets,
-    expectedOwners,
-    owners,
-    operationIds: new Set([
-      ...operationsResult.archiveSessions.map((operation) => operation.operationId),
-      ...operationsResult.backupOperations.map((operation) => operation.operationId),
-    ]),
-    protectedRollbackAssetIds: new Set(
-      operationsResult.backupOperations
-        .filter((operation) => operation.status !== 'committed')
-        .flatMap((operation) => operation.obsoleteAssetIds)
-    ),
-    refs,
-  };
-}
-
-function findEmbeddedBinaryRows(raw: unknown, owner: string): string[] {
-  if (!Array.isArray(raw)) return [];
-  const findings: string[] = [];
-  const visit = (value: unknown, path: string, depth: number): void => {
-    if (depth > 64) return;
-    if (
-      typeof value === 'string' &&
-      (/^data:[^,]*;base64,/i.test(value) || value.startsWith('blob:'))
-    ) {
-      findings.push(path);
-      return;
-    }
-    if (value instanceof Blob) {
-      findings.push(path);
-      return;
-    }
-    if (Array.isArray(value)) {
-      value.forEach((item, index) => visit(item, `${path}[${index}]`, depth + 1));
-      return;
-    }
-    if (typeof value === 'object' && value !== null) {
-      for (const [key, child] of Object.entries(value)) {
-        visit(child, `${path}.${key}`, depth + 1);
-      }
-    }
-  };
-  raw.forEach((row, index) => visit(row, `${owner}[${index}]`, 0));
-  return findings;
-}
-
-function parseAssetOperations(raw: unknown): {
-  backupOperations: AssetOperation[];
-  archiveSessions: ArchiveRestoreSession[];
-  valid: boolean;
-} {
-  if (!Array.isArray(raw)) return { archiveSessions: [], backupOperations: [], valid: false };
-  const parsed = raw.map((value) => ({
-    archive: parseArchiveRestoreSession(value),
-    backup: parseBackupAssetOperation(value),
-    physicalDelete: parsePhysicalDeleteAssetOperation(value),
-  }));
-  return {
-    archiveSessions: parsed.flatMap(({ archive }) => (archive ? [archive] : [])),
-    backupOperations: parsed.flatMap(({ backup }) => (backup ? [backup] : [])),
-    valid: parsed.every(
-      ({ archive, backup, physicalDelete }) =>
-        archive !== null || backup !== null || physicalDelete !== null
-    ),
-  };
-}
-
-function parseRows<T>(
-  raw: unknown,
-  parse: (value: unknown) => T | null
-): { entries: T[]; valid: boolean } {
-  if (!Array.isArray(raw)) return { entries: [], valid: false };
-  const parsed = raw.map(parse);
-  return { entries: parsed.filter(isPresent), valid: parsed.every(isPresent) };
 }
 
 function ownerKey(owner: AssetOwner): string {
-  return ownerKeyParts(owner.ownerKind, owner.ownerId, owner.role);
+  return `${owner.ownerKind}\u0000${owner.ownerId}\u0000${owner.role}`;
 }
 
-function ownerKeyParts(ownerKind: string, ownerId: string, role: string): string {
-  return `${ownerKind}\u0000${ownerId}\u0000${role}`;
-}
-
-function createExpectedOwner(ownerKind: string, ownerId: string, assetId: string): AssetOwner {
-  return { assetId, ownerId, ownerKind, role: 'body' };
-}
-
-function isPresent<T>(value: T | null): value is T {
-  return value !== null;
+/** Candidate discovery is advisory; each deletion revalidates authority under the lifecycle lock. */
+export async function collectOrphanAssetObjectsDuringIdle(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  await initDB();
+  const report = await auditDurableAssets();
+  if (!report.authorityValid || signal.aborted) return;
+  // One finite pass per Gallery refresh. The next refresh can retry busy or remaining candidates.
+  for (const assetId of report.objectsWithoutAuthority.slice(0, 32)) {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (signal.aborted) return;
+    await tryRunWithDurableAssetLifecycleLock(async (permit) => {
+      if (signal.aborted) return;
+      await runWithAssetObjectLockIfAvailable(assetId, async () => {
+        if (signal.aborted || !(await isStillOrphanAssetObject(assetId))) return;
+        if (signal.aborted) return;
+        const operation = buildPhysicalDeleteOperation([assetId]);
+        await runWithIndexedDbMutation((db) => db.put(ASSET_OPERATIONS_STORE, operation));
+        // Once durable intent commits, finish its physical step or leave the intent for replay.
+        await completePhysicalDeleteOperation(operation, permit);
+      });
+    });
+  }
 }

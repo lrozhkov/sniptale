@@ -6,6 +6,7 @@ export type {
 } from './contracts';
 export {
   hydratePersistedEditorDocument,
+  MissingEditorDocumentAssetError,
   materializePersistedEditorDocumentForLegacyTransfer,
   preparePersistedEditorDocument,
 } from './codec';

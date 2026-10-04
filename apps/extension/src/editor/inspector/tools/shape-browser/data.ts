@@ -8,6 +8,8 @@ import { translate } from '../../../../platform/i18n';
 import type { ShapeBrowserCategory, ShapeBrowserEntry, ShapeBrowserSourceFilter } from './types';
 
 export const SHAPE_BROWSER_CATEGORY_ORDER: readonly ShapeBrowserCategory[] = [
+  EDITOR_BUILT_IN_SHAPE_CATEGORY.CURSORS,
+  EDITOR_BUILT_IN_SHAPE_CATEGORY.STAMPS,
   EDITOR_BUILT_IN_SHAPE_CATEGORY.LINES,
   EDITOR_BUILT_IN_SHAPE_CATEGORY.BASIC,
   EDITOR_BUILT_IN_SHAPE_CATEGORY.BLOCK_ARROWS,

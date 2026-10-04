@@ -29,14 +29,12 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
               mode: null,
               rate: 2,
               audio: 'speed',
-              selected: false,
               exporter: { index: null, phase: 'idle' },
               setCutting: vi.fn(),
               toggle: vi.fn(),
               canApply: vi.fn(() => true),
               changeRate: vi.fn(),
               changeAudio: vi.fn(),
-              remove: vi.fn(),
             }}
           />
           <ReviewTrackControls {...controls} />
@@ -79,6 +77,58 @@ it('moves the mode switch between the labelled toolbar and first compact lane co
     expect(host.querySelector('[data-ui="gallery.videoReview.trackControls"]')).toBeNull();
     expect(setTrackVisibility).not.toHaveBeenCalled();
     expect(host.querySelector('[data-ui="gallery.videoReview.editingTools"]')).not.toBeNull();
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps all compact lane switches quiet while preserving active and focus states', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.zoom = true;
+  advanced.ui.tracks.audio = true;
+  const setTrackVisibility = vi.fn();
+  try {
+    await act(async () =>
+      root.render(
+        <ReviewTrackControls
+          advanced={advanced}
+          busy={false}
+          setMode={vi.fn()}
+          setTrackVisibility={setTrackVisibility}
+          telemetryAvailable
+        />
+      )
+    );
+    for (const [label, track] of [
+      ['zoomTrack', 'zoom'],
+      ['audioTrack', 'audio'],
+    ] as const) {
+      const button = host.querySelector<HTMLButtonElement>(
+        `[aria-label="${translate(`gallery.videoReview.${label}`)}"]`
+      )!;
+      expect(button.className).not.toContain('enabled:hover:!border-');
+      expect(button.className).toContain('enabled:hover:!text-');
+      expect(button.className).toContain('focus-visible:ring-2');
+      expect(button.getAttribute('aria-pressed')).toBe('true');
+      await act(async () => button.click());
+      expect(setTrackVisibility).toHaveBeenCalledWith(track, false);
+    }
+    const mode = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.advancedEditing')}"]`
+    )!;
+    expect(mode.className).not.toContain('enabled:hover:!border-');
+    const history = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.telemetry')}"]`
+    )!;
+    expect(history.className).not.toContain('enabled:hover:!border-');
+    expect(history.className).toContain('focus-visible:ring-2');
+    await act(async () => history.click());
+    expect(setTrackVisibility).toHaveBeenLastCalledWith('actions', false);
   } finally {
     await act(async () => root.unmount());
     vi.unstubAllGlobals();

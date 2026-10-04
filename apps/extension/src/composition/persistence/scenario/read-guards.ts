@@ -71,6 +71,9 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
     !isString(value['id']) ||
     !isString(value['projectId']) ||
     !isNullableString(value['galleryAssetId']) ||
+    (value['borrowedMediaId'] !== undefined &&
+      (!isString(value['borrowedMediaId']) ||
+        value['borrowedMediaId'] !== value['galleryAssetId'])) ||
     !isString(value['mimeType']) ||
     !isNonNegativeNumber(value['width']) ||
     !isNonNegativeNumber(value['height']) ||
@@ -85,6 +88,9 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
     assetId: value['assetId'],
     createdAt: value['createdAt'],
     galleryAssetId: value['galleryAssetId'],
+    ...(typeof value['borrowedMediaId'] === 'string'
+      ? { borrowedMediaId: value['borrowedMediaId'] }
+      : {}),
     ...(typeof value['duration'] === 'number' ? { duration: value['duration'] } : {}),
     height: value['height'],
     id: value['id'],
@@ -126,6 +132,15 @@ export function parsePendingScenarioAssetEntry(value: unknown): PendingScenarioA
   };
 }
 
+function parseScenarioExportTrashState(value: unknown) {
+  if (!isRecord(value) || !isNonNegativeNumber(value['updatedAt'])) return null;
+  if (value['trashedAt'] !== undefined && !isNonNegativeNumber(value['trashedAt'])) return null;
+  return {
+    updatedAt: value['updatedAt'],
+    ...(isNonNegativeNumber(value['trashedAt']) ? { trashedAt: value['trashedAt'] } : {}),
+  };
+}
+
 export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | null {
   if (!isRecord(value)) {
     return null;
@@ -142,7 +157,29 @@ export function parseScenarioExportEntry(value: unknown): ScenarioExportEntry | 
     return null;
   }
 
+  const trashState = parseScenarioExportTrashState(value['trashState']);
+  if (value['trashState'] !== undefined && !trashState) return null;
+  const html = value['html'];
+  if (
+    html !== undefined &&
+    (value['format'] !== 'html' ||
+      !isRecord(html) ||
+      (html['mode'] !== 'guide' && html['mode'] !== 'tour') ||
+      !isString(html['assetId']) ||
+      !html['assetId'] ||
+      html['assetId'].length > 160 ||
+      !Number.isSafeInteger(value['size']) ||
+      value['size'] <= 0)
+  )
+    return null;
+
   return {
+    ...(isRecord(html) &&
+    (html['mode'] === 'guide' || html['mode'] === 'tour') &&
+    isString(html['assetId'])
+      ? { html: { mode: html['mode'], assetId: html['assetId'] } }
+      : {}),
+    ...(trashState ? { trashState } : {}),
     createdAt: value['createdAt'],
     filename: value['filename'],
     format: value['format'],

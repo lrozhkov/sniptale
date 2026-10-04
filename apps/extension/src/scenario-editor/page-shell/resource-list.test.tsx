@@ -73,6 +73,9 @@ it('groups asset uses and navigates to each occurrence without duplicating rows'
   await render();
   expect(host.querySelectorAll('.guide-resource-row')).toHaveLength(1);
   await click('Used in 2 places');
+  expect(host.querySelector('[aria-label="Used in 2 places"]')?.getAttribute('aria-expanded')).toBe(
+    'true'
+  );
   await click('Second · 2');
   expect(select).toHaveBeenLastCalledWith('second');
   await click('First');
@@ -99,6 +102,7 @@ it('opens the full image and restores trigger focus on Escape', async () => {
   const trigger = host.querySelector<HTMLButtonElement>('[aria-label="Preview image"]')!;
   trigger.focus();
   await click('Preview image');
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
   const dialog = document.querySelector('#guide-resource-preview')!;
   expect(dialog.getAttribute('role')).toBe('dialog');
   expect(dialog.querySelector('img')?.src).toBe('blob:asset');
@@ -109,4 +113,5 @@ it('opens the full image and restores trigger focus on Escape', async () => {
   );
   expect(document.querySelector('#guide-resource-preview')).toBeNull();
   expect(document.activeElement).toBe(trigger);
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
 });

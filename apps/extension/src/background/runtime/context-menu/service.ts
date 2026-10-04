@@ -21,6 +21,7 @@ import {
   showBackgroundContextMenuError,
   type BackgroundContextMenuActionDeps,
 } from './actions';
+import type { ContextMenuDescriptor } from './types';
 
 const logger = createLogger({ namespace: 'BackgroundContextMenu' });
 
@@ -28,6 +29,7 @@ type ContextMenuDeps = BackgroundContextMenuActionDeps;
 let contextMenuRebuildQueue: Promise<void> = Promise.resolve();
 let contextMenuVisibilityApplyQueue: Promise<void> = Promise.resolve();
 let contextMenuVisibilityGeneration = 0;
+let createdDescriptors: ContextMenuDescriptor[] = [];
 
 function getContextMenuUpdateEntries(
   updates: Record<string, BrowserContextMenuUpdateProperties>
@@ -49,6 +51,9 @@ async function runBackgroundContextMenuRebuild(): Promise<void> {
   const [settings, quickActions] = await Promise.all([loadSettings(), getQuickActions()]);
   const contextMenuSettings = settings.contextMenu;
 
+  ++contextMenuVisibilityGeneration;
+  await contextMenuVisibilityApplyQueue.catch(() => undefined);
+  createdDescriptors = [];
   await browserContextMenus.removeAll();
 
   if (
@@ -79,10 +84,12 @@ async function runBackgroundContextMenuRebuild(): Promise<void> {
     };
 
     await browserContextMenus.create(createProperties);
+    createdDescriptors.push(descriptor);
   }
 }
 
 function rebuildBackgroundContextMenus(): Promise<void> {
+  ++contextMenuVisibilityGeneration;
   const nextRebuild = contextMenuRebuildQueue
     .catch(() => undefined)
     .then(() => runBackgroundContextMenuRebuild());
@@ -120,15 +127,8 @@ function applyContextMenuVisibility(
 
 async function refreshContextMenuVisibility(tab?: chrome.tabs.Tab): Promise<void> {
   const generation = ++contextMenuVisibilityGeneration;
-  const settings = await loadSettings();
-
-  if (generation !== contextMenuVisibilityGeneration) {
-    return;
-  }
-
-  const contextMenuSettings = settings.contextMenu;
-
-  if (!contextMenuSettings.enabled) {
+  await contextMenuRebuildQueue.catch(() => undefined);
+  if (generation !== contextMenuVisibilityGeneration || createdDescriptors.length === 0) {
     return;
   }
 
@@ -139,20 +139,25 @@ async function refreshContextMenuVisibility(tab?: chrome.tabs.Tab): Promise<void
   }
 
   const updates = resolveContextMenuDynamicState({
+    descriptors: createdDescriptors,
     hasVideoPreset,
-    settings: contextMenuSettings,
     ...(tab ? { tab } : {}),
   });
-
-  await applyContextMenuVisibility(generation, updates);
+  const createdIds = new Set(createdDescriptors.map((descriptor) => descriptor.id));
+  const currentUpdates = Object.fromEntries(
+    Object.entries(updates).filter(([id]) => createdIds.has(id))
+  );
+  await applyContextMenuVisibility(generation, currentUpdates);
 }
 
 function shouldRebuildContextMenus(
   changes: Record<string, chrome.storage.StorageChange>,
   areaName: chrome.storage.AreaName
 ): boolean {
-  if (areaName === 'sync' && changes['sniptale_settings']) {
-    return true;
+  if (areaName === 'sync') {
+    return Object.keys(changes).some(
+      (key) => key === 'sniptale_settings' || key.startsWith('sniptale_context_menu_layout_')
+    );
   }
 
   return areaName === 'local' && Boolean(changes['sniptale_quick_actions']);

@@ -180,12 +180,10 @@ export function getExportOptionActive(key: ExportOptionKey, props: ExportOptionT
 }
 
 export function toggleExportOption(key: ExportOptionKey, props: ExportOptionToggleProps) {
+  if (props.disabled) return;
   switch (key) {
     case 'webCopy':
-      props.setIncludeWebCopy((value) => {
-        if (!value) props.setIncludeFullPageScreenshot(true);
-        return !value;
-      });
+      setExportOptionActive('webCopy', !props.includeWebCopy, props);
       return;
     case 'annotations':
       props.setIncludeAnnotations((value) => !value);
@@ -224,6 +222,7 @@ export function setExportOptionActive(
   nextValue: boolean,
   props: ExportOptionToggleProps
 ) {
+  if (props.disabled) return;
   switch (key) {
     case 'webCopy':
       if (nextValue) props.setIncludeFullPageScreenshot(true);

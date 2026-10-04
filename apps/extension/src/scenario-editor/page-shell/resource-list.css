@@ -4,10 +4,13 @@
   min-width: 0;
 }
 .guide-resource-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 4px;
   min-width: 0;
+  padding: 4px;
+  border-radius: var(--sniptale-radius-sm);
 }
 .guide-resource-main {
   display: flex;
@@ -18,12 +21,12 @@
   border: 0;
   border-radius: var(--sniptale-radius-sm);
   background: transparent;
-  padding: 4px;
+  padding: 4px 0;
   color: var(--sniptale-color-text-primary);
   text-align: left;
   cursor: pointer;
 }
-.guide-resource-main:hover {
+.guide-resource-row:is(:hover, :focus-within) {
   background: var(--sniptale-color-surface-hover);
 }
 .guide-resource-main:focus-visible {
@@ -52,9 +55,11 @@
 .guide-resource-name {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  font: 500 12px / 18px var(--sniptale-font-sans);
 }
 .guide-resource-full-preview {
   display: flex;
@@ -81,4 +86,210 @@
 .guide-image-upload-compact > [role='status'] {
   margin: 0;
   font-size: 12px;
+}
+
+/* Resource acquisition lives with its media list, not in an unrelated footer. */
+.guide-library-panel .guide-image-resources,
+.guide-library-panel .tour-audio-resources {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+}
+.guide-library-panel .tour-audio-resources {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font: 600 13px / 20px var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-primary);
+}
+.guide-library-panel :is(.guide-image-upload-compact, .tour-audio-acquisition) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.guide-library-panel :is(.guide-image-upload-compact, .tour-audio-acquisition) > button {
+  width: 100%;
+  height: auto;
+  min-height: 32px;
+  padding: 6px 8px;
+  justify-content: flex-start;
+  gap: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  white-space: normal;
+  text-align: start;
+}
+.guide-library-panel
+  :is(.guide-image-upload-compact, .tour-audio-acquisition)
+  > button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sniptale-color-surface-hover);
+  color: var(--sniptale-color-text-primary-strong);
+}
+.guide-library-panel .guide-inspector-hint {
+  margin: 0;
+  font: 400 12px / 1.5 var(--sniptale-font-sans);
+  color: var(--sniptale-color-text-secondary);
+}
+
+.guide-library-panel
+  :is(.guide-image-resources, .tour-audio-resources):has([data-acquisition-menu]) {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+.guide-library-panel
+  :is(.guide-image-resources, .tour-audio-resources)
+  > :not(h3):not([data-acquisition-menu]) {
+  grid-column: 1 / -1;
+}
+.guide-library-panel [data-acquisition-menu] .guide-action-menu-anchor > button {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-library-panel
+  [data-acquisition-menu]
+  .guide-action-menu-anchor
+  > button:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+}
+.guide-library-panel .guide-resource-actions {
+  flex-wrap: nowrap;
+}
+.guide-library-panel .guide-resource-actions button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-library-panel .guide-resource-actions button:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--sniptale-color-text-primary-strong);
+}
+.guide-library-panel .tour-audio-resource {
+  gap: 4px;
+  padding: 4px;
+  background: transparent;
+  border-radius: var(--sniptale-radius-sm);
+}
+.guide-library-panel .tour-audio-resource:is(:hover, :focus-within) {
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-library-panel .tour-audio-resource > .tour-audio-name {
+  gap: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+}
+.guide-library-panel .tour-audio-label > small {
+  display: block;
+  color: var(--sniptale-color-text-secondary);
+  font: 400 11px / 16px var(--sniptale-font-sans);
+}
+.guide-library-panel .tour-audio-resource > [data-tour-narration-preview] {
+  grid-column: 1 / -1;
+}
+
+.guide-library-panel .tour-audio-name > .guide-resource-thumb {
+  flex: none;
+}
+.guide-library-panel .tour-audio-name > .tour-audio-label {
+  white-space: normal;
+}
+
+.guide-library-panel {
+  container: scenario-library / inline-size;
+}
+.guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 > svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+.guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@container scenario-library (max-width: 240px) {
+  .guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 > svg {
+    display: none;
+  }
+  .guide-library-panel .tour-audio-resource {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .guide-library-panel .tour-audio-resource-actions {
+    justify-self: end;
+  }
+  .guide-library-panel .guide-resource-thumb {
+    width: 32px;
+    height: 28px;
+  }
+  .guide-library-panel :is(.guide-image-resources, .tour-audio-resources) h3 {
+    gap: 4px;
+    font-size: 12px;
+  }
+}
+
+.guide-page .guide-library-panel .guide-resource-actions {
+  align-items: center;
+  gap: 4px;
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-page .guide-library-panel .guide-resource-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  color: var(--sniptale-color-text-secondary);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  transition: none;
+}
+.guide-page
+  .guide-library-panel
+  .guide-resource-actions
+  button:is(:hover, :focus-visible):not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+  background: transparent;
+}
+.guide-page .guide-library-panel .guide-resource-actions button[aria-expanded='true'] {
+  color: var(--sniptale-color-text-primary-strong);
+  background: transparent;
+  box-shadow: none;
+}
+.guide-resource-full-preview [data-ui='library-media-player'] {
+  min-width: 0;
+}
+
+.guide-page .guide-library-panel .guide-resource-actions button > svg {
+  width: 16px;
+  height: 16px;
 }

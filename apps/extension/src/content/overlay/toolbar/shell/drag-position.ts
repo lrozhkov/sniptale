@@ -1,6 +1,7 @@
-import { useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
+import { useCallback, useState, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import type {
   ContentToolbarDisplayMode,
+  ContentToolbarDockEdge,
   ContentToolbarPosition,
 } from '../../../../contracts/settings';
 import {
@@ -12,12 +13,13 @@ import {
 } from './drag-position.effects';
 import { useToolbarDragController } from './drag-position.controller';
 import { useContentUiScale } from '../../../platform/dom-host';
-
-const DEFAULT_TOOLBAR_TOP = 5;
+import { getToolbarDockDisplayMode } from './docking';
 
 export type ToolbarDragPositionState = {
   compactMenus: boolean;
   displayMode: ContentToolbarDisplayMode;
+  freePlacement: boolean;
+  dockPreview: ContentToolbarDockEdge | null;
   handleMouseDown: (event: {
     clientX: number;
     clientY: number;
@@ -28,101 +30,92 @@ export type ToolbarDragPositionState = {
   positionReady: boolean;
   setCompactMenus: Dispatch<SetStateAction<boolean>>;
   setDisplayMode: Dispatch<SetStateAction<ContentToolbarDisplayMode>>;
+  setFreePlacement: Dispatch<SetStateAction<boolean>>;
   toolbarRef: RefObject<HTMLDivElement | null>;
 };
-
-function useToolbarPreferenceLifecycle(args: {
-  compactMenus: boolean;
-  currentViewport: { width: number; height: number } | null;
-  displayMode: ContentToolbarDisplayMode;
-  isDragging: boolean;
-  position: ContentToolbarPosition;
-  preferencesReady: boolean;
-  savedPosition: ContentToolbarPosition | null;
-  setIsDragging: Dispatch<SetStateAction<boolean>>;
-  setPosition: Dispatch<SetStateAction<ContentToolbarPosition>>;
-  toolbarRef: RefObject<HTMLDivElement | null>;
-  dragOffset: RefObject<ContentToolbarPosition>;
-  uiScale: number;
-}) {
-  const isInitialized = useToolbarPositionInitialization({
-    preferencesReady: args.preferencesReady,
-    savedPosition: args.savedPosition,
-    setPosition: args.setPosition,
-    toolbarRef: args.toolbarRef,
-    uiScale: args.uiScale,
-  });
-
-  useToolbarViewportClamping({
-    currentViewport: args.currentViewport,
-    displayMode: args.displayMode,
-    isInitialized,
-    setPosition: args.setPosition,
-    toolbarRef: args.toolbarRef,
-    uiScale: args.uiScale,
-  });
-  useToolbarPreferencePersistence({
-    compactMenus: args.compactMenus,
-    displayMode: args.displayMode,
-    isInitialized,
-    position: args.position,
-    preferencesReady: args.preferencesReady,
-  });
-  useToolbarDragListeners({
-    dragOffset: args.dragOffset,
-    isDragging: args.isDragging,
-    setPosition: args.setPosition,
-    stopDragging: () => args.setIsDragging(false),
-    toolbarRef: args.toolbarRef,
-    uiScale: args.uiScale,
-  });
-
-  return isInitialized;
-}
 
 export function useToolbarDragPosition(
   currentViewport: { width: number; height: number } | null
 ): ToolbarDragPositionState {
-  const [position, setPosition] = useState<ContentToolbarPosition>({
-    x: 0,
-    y: DEFAULT_TOOLBAR_TOP,
-  });
+  const [position, setPosition] = useState<ContentToolbarPosition>({ x: 0, y: 8 });
+  const [dockPreview, setDockPreview] = useState<ContentToolbarDockEdge | null>(null);
   const uiScale = useContentUiScale();
   const { dragOffset, handleMouseDown, isDragging, setIsDragging, toolbarRef } =
     useToolbarDragController(position, uiScale);
+  const preferences = useToolbarPreferencesState();
   const {
     compactMenus,
-    displayMode,
+    freePlacement,
+    dockEdge,
     preferencesReady,
     savedPosition,
-    setCompactMenus,
-    setDisplayMode,
-  } = useToolbarPreferencesState();
+    setDisplayMode: setPreferredDisplayMode,
+    setFreePlacement: setFreePlacementPreference,
+  } = preferences;
+  const displayMode = freePlacement ? preferences.displayMode : getToolbarDockDisplayMode(dockEdge);
+  const dockLayout = freePlacement || isDragging ? {} : { dockEdge };
+  const stopDragging = useCallback(() => setIsDragging(false), [setIsDragging]);
+  const setFreePlacement = useCallback<Dispatch<SetStateAction<boolean>>>(
+    (value) => {
+      const next = typeof value === 'function' ? value(freePlacement) : value;
+      // Enter free placement without rotating the toolbar away from its current dock orientation.
+      if (next && !freePlacement) setPreferredDisplayMode(displayMode);
+      setFreePlacementPreference(next);
+    },
+    [freePlacement, displayMode, setPreferredDisplayMode, setFreePlacementPreference]
+  );
 
-  const positionReady = useToolbarPreferenceLifecycle({
-    compactMenus,
-    currentViewport,
-    displayMode,
-    dragOffset,
-    isDragging,
-    position,
+  const positionReady = useToolbarPositionInitialization({
     preferencesReady,
     savedPosition,
-    setIsDragging,
     setPosition,
     toolbarRef,
     uiScale,
+    ...dockLayout,
+  });
+  useToolbarViewportClamping({
+    currentViewport,
+    displayMode,
+    isInitialized: positionReady,
+    setPosition,
+    toolbarRef,
+    uiScale,
+    ...dockLayout,
+  });
+  useToolbarPreferencePersistence({
+    compactMenus,
+    displayMode,
+    freePlacement,
+    dockEdge,
+    isDragging,
+    isInitialized: positionReady,
+    position,
+    preferencesReady,
+  });
+  useToolbarDragListeners({
+    dragOffset,
+    isDragging,
+    freePlacement,
+    setPosition,
+    stopDragging,
+    toolbarRef,
+    uiScale,
+    setPreviewEdge: setDockPreview,
+    setDockEdge: preferences.setDockEdge,
   });
 
   return {
     compactMenus,
     displayMode,
+    freePlacement,
+    dockPreview,
     handleMouseDown,
     isDragging,
     position,
     positionReady,
-    setCompactMenus,
-    setDisplayMode,
+    setCompactMenus: preferences.setCompactMenus,
+    setDisplayMode: preferences.setDisplayMode,
+    setFreePlacement,
     toolbarRef,
   };
 }

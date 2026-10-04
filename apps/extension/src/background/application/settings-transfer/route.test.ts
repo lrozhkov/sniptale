@@ -63,6 +63,22 @@ it.each([
   );
 });
 
+it('returns the rejected section ID without exposing parser details', async () => {
+  mocks.execute.mockRejectedValue(
+    new SettingsTransferDomainError('capture.unknown', 'internal parser detail')
+  );
+  const respond = vi.fn();
+  routeSettingsTransferMessage(message(), respond);
+  await vi.waitFor(() =>
+    expect(respond).toHaveBeenCalledWith({
+      success: false,
+      operation: 'read-export-tree',
+      errorCode: 'unsupported-domain',
+      error: 'capture.unknown',
+    })
+  );
+});
+
 function message() {
   return {
     type: MessageType.SETTINGS_TRANSFER,

@@ -1,3 +1,4 @@
+import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import type { CaptureActionType } from '../../../contracts/settings';
 import type { ContentPrivilegedActionIntentSource } from '../../application/privileged-action-intent';
 import type { ScreenshotStartContext } from '../screenshot/types';
@@ -44,6 +45,7 @@ export type ContentAppScenarioActions = {
   applyCaptureAction: (actionType: CaptureActionType) => Promise<void>;
   createProject: (name: string) => Promise<void>;
   deleteRecentStep: (stepId: string) => Promise<void>;
+  finishRecording: () => Promise<void>;
   handleScreenshotModeDisabled: () => Promise<void>;
   moveRecentStep: (stepId: string, toIndex: number) => Promise<void>;
   openEditor: (stepId?: string | null) => Promise<void>;
@@ -88,6 +90,7 @@ export type ContentAppLayoutToolbarProps = {
   aiController: ContentAppAiController;
   autoBlurController: AutoBlurController;
   captureAction: CaptureActionType;
+  windowSize?: ScreenshotWindowSizeControls;
   currentViewport: { width: number; height: number } | null;
   drawingController?: ContentDrawingController;
   frameCount: number;

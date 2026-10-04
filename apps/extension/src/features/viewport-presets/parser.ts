@@ -95,6 +95,15 @@ function parsePreset(value: unknown): ParsedPresetEntry | null {
   return null;
 }
 
+/** Strict item validation for selective settings transfer before merging with the local catalog. */
+export function parseViewportPresetTransferItems(value: unknown): ViewportPreset[] | null {
+  if (!Array.isArray(value)) return null;
+  const parsed = value.map(parsePreset);
+  if (parsed.some((entry) => entry === null)) return null;
+  const presets = parsed.map((entry) => entry!.preset);
+  return new Set(presets.map((preset) => preset.id)).size === presets.length ? presets : null;
+}
+
 function hasExactSystemKeys(
   keys: readonly SystemViewportPresetKey[],
   expected: ReadonlySet<SystemViewportPresetKey>

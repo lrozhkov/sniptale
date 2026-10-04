@@ -1,5 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
+import {
+  createProjectAssetEntry,
+  createVideoProjectEntryWithMediaClip,
+} from '../projects/index.test-support';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
 import { createGuideProject } from '../../../features/scenario/project/factories';
 
@@ -34,6 +42,10 @@ vi.mock('../scenario/aggregate-mutations', async (importOriginal) => ({
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
+}));
+vi.mock('./project-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./project-recordings')>()),
+  repairLinkedRecordingLifecycles: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../assets', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets')>()),
@@ -155,7 +167,7 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
       ]),
     ],
     ['recordings', new Map([[recording.id, recording]])],
-    ['project_assets', new Map([['asset-1', { id: 'asset-1' }]])],
+    ['project_assets', new Map([['asset-1', createProjectAssetEntry({ id: 'asset-1' })]])],
     ['video_projects', new Map()],
   ]);
   persistenceMocks.runWithIndexedDbMutation.mockImplementation(async (effect) =>
@@ -189,13 +201,14 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
   }
   expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
   expect(deletes).toHaveBeenCalledWith('project_assets', 'asset-1');
+  expect(deletes).toHaveBeenCalledWith('asset_refs', createProjectAssetEntry().assetId);
   expect(deletes).toHaveBeenCalledWith('image_workspaces', recordingMedia.id);
   expect(deletes).toHaveBeenCalledWith('image_workspaces', projectAssetMedia.id);
   expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', recordingMedia.id]);
   expect(deletes).toHaveBeenCalledWith('aggregate_presentations', ['image', projectAssetMedia.id]);
 });
 
-it('commits expired linked and standalone draft cleanup through current transactional rows', async () => {
+it('retains legacy project graphs and linked media when clearing drafts', async () => {
   const lifecycle = createLibraryLifecycle('temporary', 1);
   const projectWithAsset = createVideoProjectEntryWithMediaClip();
   const sharedAsset = {
@@ -388,32 +401,229 @@ it('commits expired linked and standalone draft cleanup through current transact
     })
   );
 
-  persistenceMocks.completePhysicalDeleteOperation.mockRejectedValueOnce(
-    new Error('OPFS delete unavailable')
-  );
   await expect(
     cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
-  ).resolves.toEqual({
-    deletedCount: 2,
-    deletedIds: [`video-project:${project.id}`, `scenario:${scenario.id}`],
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(deletes).not.toHaveBeenCalled();
+  expect(valuesByStore.get('video_projects')?.has(project.id)).toBe(true);
+  expect(valuesByStore.get('scenario_projects')?.has(scenario.id)).toBe(true);
+  expect(valuesByStore.get('project_assets')?.has('project-asset-1')).toBe(true);
+  expect(valuesByStore.get('media_library')?.has(projectAssetMedia.id)).toBe(true);
+  expect(valuesByStore.get('scenario_assets')?.has(scenarioAsset.id)).toBe(true);
+  expect(valuesByStore.get('scenario_exports')?.has(scenarioExport.id)).toBe(true);
+  expect(valuesByStore.get('scenario_step_editor_documents')?.has(scenarioDocument.stepId)).toBe(
+    true
+  );
+  expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
+});
+
+it('preserves trashed roots even when explicitly clearing every draft', async () => {
+  const lifecycle = { ...createLibraryLifecycle('temporary', 1), trashedAt: 2 };
+  persistenceMocks.listMediaLibrary.mockResolvedValue([{ id: 'image-1', lifecycle }]);
+  persistenceMocks.listVideoProjectEntries.mockResolvedValue([
+    { ...createVideoProjectEntryWithMediaClip(), lifecycle },
+  ]);
+  persistenceMocks.listScenarioProjectEntries.mockResolvedValue([{ id: 'scenario-1', lifecycle }]);
+  await expect(
+    cleanupDrafts({
+      policy: DEFAULT_LOCAL_STORAGE_POLICY,
+      includeUnexpired: true,
+      now: 1_000_000,
+    })
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+  expect(persistenceMocks.completePhysicalDeleteOperation).not.toHaveBeenCalled();
+});
+
+it('rechecks a draft project trashed after the candidate snapshot before deleting its graph', async () => {
+  const entry = {
+    ...createVideoProjectEntryWithMediaClip(),
+    lifecycle: createLibraryLifecycle('temporary', 1),
+  };
+  persistenceMocks.listVideoProjectEntries.mockResolvedValue([entry]);
+  const remove = vi.fn();
+  persistenceMocks.runWithIndexedDbMutation.mockImplementationOnce(async (operation) =>
+    operation({
+      transaction: () => ({
+        done: Promise.resolve(),
+        objectStore: () => ({
+          get: async () => ({ ...entry, lifecycle: { ...entry.lifecycle, trashedAt: 2 } }),
+          delete: remove,
+        }),
+      }),
+    })
+  );
+  await expect(
+    cleanupDrafts({
+      policy: DEFAULT_LOCAL_STORAGE_POLICY,
+      includeUnexpired: true,
+      now: 1_000_000,
+    })
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(remove).not.toHaveBeenCalled();
+});
+
+it.each(['scenario-snapshot', 'video-snapshot', 'review-audio'] as const)(
+  'retains a temporary material used by %s during transaction revalidation',
+  async (use) => {
+    const source = createProjectAssetEntry();
+    const media = {
+      createdAt: 1,
+      updatedAt: 1,
+      id: `project-asset:${source.id}`,
+      kind: 'image',
+      source: { kind: 'project-asset', projectAssetId: source.id },
+      filename: 'image.png',
+      originalFilename: 'image.png',
+      size: 5,
+      mimeType: 'image/png',
+      width: 1,
+      height: 1,
+      duration: null,
+      sourceUrl: null,
+      sourceTitle: null,
+      sourceFavicon: null,
+      tags: [],
+      lifecycle: createLibraryLifecycle('temporary', 1),
+    };
+    persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+    const video = createVideoProjectEntryWithMediaClip();
+    video.project.assets[0]!.source = {
+      kind: 'project-asset',
+      projectAssetId: 'private-copy',
+      originMediaId: media.id,
+    };
+    const scenario = {
+      id: 'child',
+      projectId: 'scenario',
+      assetId: 'private-image',
+      galleryAssetId: media.id,
+      mimeType: 'image/png',
+      width: 1,
+      height: 1,
+      size: 5,
+      createdAt: 1,
+    };
+    const advanced = createQuickEditAdvancedState();
+    advanced.audio.music.push({
+      id: 'music',
+      assetId: media.id,
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    });
+    const review = {
+      aggregateId: 'another-media',
+      formatVersion: 1,
+      sourceAssetId: 'another-object',
+      source: { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' },
+      revision: 1,
+      cursor: 0,
+      history: [],
+      advanced,
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const deletes = vi.fn();
+    persistenceMocks.runWithIndexedDbMutation.mockReset().mockImplementation(async (operation) =>
+      operation({
+        transaction: () => ({
+          done: Promise.resolve(),
+          objectStore: (store: string) => ({
+            get: async () =>
+              store === 'media_library' ? media : store === 'project_assets' ? source : undefined,
+            getAll: async () =>
+              store === 'video_projects' && use === 'video-snapshot'
+                ? [video]
+                : store === 'scenario_assets' && use === 'scenario-snapshot'
+                  ? [scenario]
+                  : store === 'video_workspaces' && use === 'review-audio'
+                    ? [review]
+                    : [],
+            delete: deletes,
+            put: vi.fn(),
+            index: () => ({ count: async () => 0 }),
+          }),
+        }),
+      })
+    );
+    expect(
+      await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY })
+    ).toEqual({ deletedCount: 0, deletedIds: [] });
+    expect(deletes).not.toHaveBeenCalled();
+  }
+);
+
+it('reclaims private auxiliary bytes when their standalone temporary review root expires', async () => {
+  const { createMediaLibraryEntry } = await import('../projects/index.test-support');
+  const media = createMediaLibraryEntry({
+    id: 'expired',
+    source: { kind: 'screenshot' },
+    lifecycle: createLibraryLifecycle('temporary', 1),
   });
-  expect(deletes).toHaveBeenCalledWith('project_assets', 'project-asset-1');
-  expect(deletes).toHaveBeenCalledWith('media_library', projectAssetMedia.id);
-  expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-shared');
-  expect(deletes).not.toHaveBeenCalledWith('media_library', sharedProjectAssetMedia.id);
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `video-project:${project.id}`);
-  expect(deletes).toHaveBeenCalledWith('scenario_assets', scenarioAsset.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_assets', malformedScenarioAsset.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_exports', scenarioExport.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_exports', malformedScenarioExport.id);
-  expect(deletes).toHaveBeenCalledWith('scenario_step_editor_documents', scenarioDocument.stepId);
-  expect(deletes).toHaveBeenCalledWith(
-    'scenario_step_editor_documents',
-    malformedScenarioDocument.stepId
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.music.push({
+    id: 'music',
+    assetId: 'project-asset:private-music',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  });
+  const review = {
+    aggregateId: media.id,
+    formatVersion: 1,
+    sourceAssetId: 'source',
+    source: { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' },
+    revision: 1,
+    cursor: 0,
+    history: [],
+    advanced,
+    createdAt: 1,
+    updatedAt: 1,
+  };
+  const rows = new Map<string, Map<string, unknown>>([
+    ['media_library', new Map([[media.id, media]])],
+    ['video_workspaces', new Map([[media.id, review]])],
+    [
+      'project_assets',
+      new Map([
+        [
+          'private-music',
+          createProjectAssetEntry({
+            id: 'private-music',
+            assetId: 'private-body',
+            mimeType: 'audio/mpeg',
+            size: 3,
+          }),
+        ],
+      ]),
+    ],
+    ['asset_refs', new Map([['private-body', { assetId: 'private-body' }]])],
+  ]);
+  persistenceMocks.listMediaLibrary.mockResolvedValue([media]);
+  persistenceMocks.runWithIndexedDbMutation.mockReset().mockImplementation(async (operation) =>
+    operation({
+      transaction: () => ({
+        done: Promise.resolve(),
+        objectStore: (name: string) => ({
+          get: async (key: string) => rows.get(name)?.get(key),
+          getAll: async () => [...(rows.get(name)?.values() ?? [])],
+          delete: async (key: string) => rows.get(name)?.delete(key),
+          put: vi.fn(),
+          index: () => ({ count: async () => 0 }),
+        }),
+      }),
+    })
   );
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `scenario:${scenario.id}`);
-  expect(deletes).toHaveBeenCalledWith('thumbnails', `scenario-export:${scenarioExport.id}`);
-  expect(persistenceMocks.completePhysicalDeleteOperation).toHaveBeenCalledWith(
-    expect.objectContaining({ assetIds: [scenarioAsset.assetId], status: 'pending' })
-  );
+  await cleanupDrafts({ includeUnexpired: true, now: 2, policy: DEFAULT_LOCAL_STORAGE_POLICY });
+  expect(rows.get('project_assets')?.has('private-music')).toBe(false);
+  expect(rows.get('asset_refs')?.has('private-body')).toBe(false);
 });

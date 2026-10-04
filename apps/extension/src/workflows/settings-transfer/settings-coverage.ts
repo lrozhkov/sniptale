@@ -1,8 +1,8 @@
 import type { SettingsSectionId } from '../../platform/navigation/extension-pages/settings-route/codec';
 
 export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
-  // Durable effect bundles are covered by Media Hub backup, not the settings preference format.
-  'video-effects': ['action/status'],
+  // The package includes explicitly selected effect catalogs and their preferences.
+  'video-effects': ['styles.video-effects', 'action/status'],
   // Step templates are scenario media aggregates covered by Media Hub backup.
   'scenario-layouts': ['action/status'],
   'interface-browser': ['interface.preferences'],
@@ -53,15 +53,21 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  transferable(
+    'capture/saving/filename-rules.tsx',
+    ['updateSettings'],
+    ['capture.saving.filenameRules']
+  ),
   excluded(
     'styles/scenario-layouts/controller.ts',
     ['saveScenarioStepTemplate', 'deleteScenarioProjectRecord'],
     'action/status'
   ),
-  excluded(
+  excluded('styles/video-effects/controller.ts', ['deleteEffectBundle'], 'action/status'),
+  transferable(
     'styles/video-effects/controller.ts',
-    ['deleteEffectBundle', 'setEffectDocumentEnabled'],
-    'action/status'
+    ['setEffectDocumentEnabled'],
+    ['styles.video-effects']
   ),
   transferable('ai/connections/controller/chrome-ai.ts', ['saveChromeAiEnabled'], ['ai.chrome']),
   transferable(
@@ -121,8 +127,8 @@ export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   ),
   transferable('capture/screen-sizes/sync.ts', ['updateSettings'], ['capture.viewport-presets']),
   transferable(
-    'capture/storage-drafts/use-storage-drafts-state.ts',
-    ['patchSettings'],
+    'capture/storage-drafts/use-storage-policy-state.ts',
+    ['patchLocalStoragePolicy'],
     ['capture.retention']
   ),
   excluded(

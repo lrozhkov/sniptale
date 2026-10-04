@@ -10,9 +10,10 @@ function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number)
     return { left: 0, pointerEvents: 'none', position: 'fixed', top: 0, visibility: 'hidden' };
   }
   const margin = 12;
-  const gap = 8;
+  const gap = 6;
   const resolvedWidth = Math.min(width, window.innerWidth - margin * 2);
   const anchor = anchorEl.getBoundingClientRect();
+  const toolbarBottom = anchorEl.closest('.sniptale-toolbar-root')?.getBoundingClientRect().bottom;
   const left = Math.max(
     margin,
     Math.min(
@@ -20,10 +21,12 @@ function useAnchoredPopoverPosition(anchorEl: HTMLElement | null, width: number)
       window.innerWidth - resolvedWidth - margin
     )
   );
+  const above = anchor.top > window.innerHeight / 2;
   return {
     left,
     position: 'fixed',
-    top: anchor.bottom + gap,
+    top: above ? anchor.top - gap : Math.max(anchor.bottom, toolbarBottom ?? anchor.bottom) + gap,
+    ...(above ? { transform: 'translateY(-100%)' } : {}),
     width: resolvedWidth,
     zIndex: 2147483647,
   };
@@ -121,13 +124,13 @@ export function EditorAnchoredConfirmPopover(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !w-[320px]"
+      className="sniptale-content-popover--compact !rounded-none !w-[320px]"
       dataUi={props.dataUi}
       isOpen
       popoverRef={popoverRef}
       style={style}
     >
-      <div role="alertdialog" aria-labelledby={`${props.dataUi}.title`} className="space-y-3 p-1">
+      <div role="alertdialog" aria-labelledby={`${props.dataUi}.title`} className="space-y-4 p-2">
         <div>
           <div
             id={`${props.dataUi}.title`}
@@ -135,7 +138,7 @@ export function EditorAnchoredConfirmPopover(props: {
           >
             {props.title}
           </div>
-          <p className="mt-1 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+          <p className="mt-2 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
             {props.message}
           </p>
         </div>
@@ -158,6 +161,85 @@ export function EditorAnchoredConfirmPopover(props: {
   );
 }
 
+export function EditorAnchoredHistoryChoices(props: {
+  anchorEl: HTMLElement | null;
+  canReturnToStart: boolean;
+  dataUi: string;
+  onClose: () => void;
+  onRestoreOriginal: () => void;
+  onReturnToStart: () => void;
+  restoreDescription: string;
+  restoreLabel: string;
+  returnDescription: string;
+  returnLabel: string;
+  title: string;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const style = useAnchoredPopoverPosition(props.anchorEl, 320);
+  useAnchoredDialogLifecycle({
+    anchorEl: props.anchorEl,
+    initialFocusSelector: props.canReturnToStart
+      ? '[data-history-start="true"]'
+      : '[data-history-original="true"]',
+    onClose: props.onClose,
+    popoverRef,
+  });
+  const rowClass = [
+    'w-full cursor-pointer rounded-md px-3 py-2 text-left',
+    'hover:bg-[var(--sniptale-color-surface-hover)]',
+    'focus-visible:outline focus-visible:outline-2',
+    'focus-visible:outline-[var(--sniptale-color-accent)]',
+    'disabled:cursor-not-allowed disabled:opacity-50',
+  ].join(' ');
+  return (
+    <ContentPopoverAdapter
+      anchorEl={props.anchorEl}
+      className="sniptale-content-popover--compact !rounded-none !w-[320px]"
+      dataUi={props.dataUi}
+      isOpen
+      popoverRef={popoverRef}
+      style={style}
+    >
+      <div role="dialog" aria-labelledby={`${props.dataUi}.title`} className="p-1">
+        <div
+          id={`${props.dataUi}.title`}
+          className="px-3 py-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]"
+        >
+          {props.title}
+        </div>
+        <button
+          type="button"
+          className={rowClass}
+          data-history-start="true"
+          disabled={!props.canReturnToStart}
+          onClick={props.onReturnToStart}
+        >
+          <span className="block text-sm text-[var(--sniptale-color-text-primary)]">
+            {props.returnLabel}
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+            {props.returnDescription}
+          </span>
+        </button>
+        <div className="mx-3 my-1 border-t border-[var(--sniptale-color-border)]" />
+        <button
+          type="button"
+          className={rowClass}
+          data-history-original="true"
+          onClick={props.onRestoreOriginal}
+        >
+          <span className="block text-sm text-[var(--sniptale-color-danger)]">
+            {props.restoreLabel}
+          </span>
+          <span className="mt-0.5 block text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+            {props.restoreDescription}
+          </span>
+        </button>
+      </div>
+    </ContentPopoverAdapter>
+  );
+}
+
 export function EditorAnchoredAlert(props: {
   anchorEl: HTMLElement | null;
   children: ReactNode;
@@ -166,7 +248,7 @@ export function EditorAnchoredAlert(props: {
   return (
     <ContentPopoverAdapter
       anchorEl={props.anchorEl}
-      className="sniptale-content-popover--compact !w-[min(300px,calc(100vw-24px))]"
+      className="sniptale-content-popover--compact !rounded-none !w-[min(300px,calc(100vw-24px))]"
       dataUi={props.dataUi}
       isOpen
       style={useAnchoredPopoverPosition(props.anchorEl, 300)}

@@ -1,3 +1,4 @@
+import { parseScenarioBlurMetadata } from '../../../../document/scenario-blur-metadata';
 import type { BlurSettings } from '../../../../../features/highlighter/contracts';
 
 import type { SourceState } from '../../../../document/model/source-state';
@@ -5,6 +6,9 @@ import { applyBlurBorderMetadata } from '../border';
 import type { BlurRuntimeObject } from '../types';
 
 export function applyBlurMetadata(object: BlurRuntimeObject, settings: BlurSettings): void {
+  const scenario = parseScenarioBlurMetadata(object.sniptaleScenarioBlurJson);
+  if (scenario)
+    object.sniptaleScenarioBlurJson = JSON.stringify({ version: 1, id: scenario.id, settings });
   object.sniptaleBlurAmount = settings.amount;
   object.sniptaleBlurType = settings.blurType;
   object.sniptaleBlurShowBorder = settings.showBorder ?? (settings.strokeWidth ?? 0) > 0;

@@ -22,6 +22,13 @@ describe('shared drawing creation', () => {
     expect(createDrawingObject('text', start, 10, defaults)).toBeNull();
   });
 
+  it('creates blur with the selected strength, strong by default', () => {
+    expect(createDrawingObject('blur', start, 10, defaults)).toMatchObject({ amount: 20 });
+    expect(
+      createDrawingObject('blur', start, 10, { ...defaults, blur: { amount: 2 } })
+    ).toMatchObject({ amount: 2 });
+  });
+
   it('keeps shape-only aspect locking without changing the pointer-down origin', () => {
     const shape = createDrawingObject('shape', start, 10, defaults)!;
     expect(
@@ -100,5 +107,50 @@ describe('shared drawing creation', () => {
         timestamp: 20,
       })
     ).toMatchObject({ end: start });
+  });
+
+  it('keeps an arrow free near horizontal unless Shift is held', () => {
+    const arrow = createDrawingObject('arrow', start, 10, defaults)!;
+    const point = { x: 200, y: 84 };
+    expect(
+      updateCreatedDrawingObject({
+        arrowFreeAngle: true,
+        modifiers: { ctrlKey: false, shiftKey: false },
+        object: arrow,
+        point,
+        start,
+        timestamp: 20,
+      })
+    ).toMatchObject({ end: point });
+    expect(
+      updateCreatedDrawingObject({
+        arrowFreeAngle: true,
+        modifiers: { ctrlKey: false, shiftKey: true },
+        object: arrow,
+        point,
+        start,
+        timestamp: 20,
+      })
+    ).not.toMatchObject({ end: point });
+  });
+
+  it('anchors the arrowhead at pointer down when drawing from its tip', () => {
+    const arrow = createDrawingObject('arrow', start, 10, {
+      ...defaults,
+      arrow: { ...defaults.arrow, drawFromTip: true },
+    })!;
+    const point = { x: 184, y: 115 };
+    expect(arrow).not.toHaveProperty('drawFromTip');
+    expect(
+      updateCreatedDrawingObject({
+        arrowFreeAngle: true,
+        arrowFromTip: true,
+        modifiers: { ctrlKey: false, shiftKey: false },
+        object: arrow,
+        point,
+        start,
+        timestamp: 20,
+      })
+    ).toMatchObject({ start: point, end: start });
   });
 });

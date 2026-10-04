@@ -1,17 +1,31 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const {
+  cancelPutMock,
+  cancelCompleteMock,
   deleteReadyJournalMock,
+  initDBMock,
   listReadyJournalsMock,
   releaseTransitionsMock,
   writeReadyJournalMock,
 } = vi.hoisted(() => ({
+  cancelPutMock: vi.fn(),
+  cancelCompleteMock: vi.fn(),
   deleteReadyJournalMock: vi.fn(),
+  initDBMock: vi.fn(async () => undefined),
   listReadyJournalsMock: vi.fn(),
   releaseTransitionsMock: vi.fn(),
   writeReadyJournalMock: vi.fn(),
 }));
 
+vi.mock('../infrastructure/indexed-db/mutation', () => ({
+  runWithIndexedDbMutation: async (callback: (db: unknown) => Promise<unknown>) =>
+    callback({ put: cancelPutMock }),
+}));
+vi.mock('./operations', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./operations')>()),
+  completePhysicalDeleteOperation: cancelCompleteMock,
+}));
 vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteReadyJournal: deleteReadyJournalMock,
@@ -20,7 +34,17 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   writeReadyJournal: writeReadyJournalMock,
 }));
 
-import { createAssetPublicationJournal, publishReadyJournalWithRetry } from './publication';
+vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: initDBMock,
+}));
+
+import {
+  createAssetPublicationJournal,
+  publishReadyJournalWithRetry,
+  SupersededAssetPublicationError,
+  UnresolvedAssetPublicationError,
+} from './publication';
 import { recoverStandaloneAssetPublications } from './recovery';
 import type { AssetReadyJournal } from './contracts';
 import {
@@ -128,6 +152,34 @@ it('keeps ready durable after bounded immediate retries are exhausted', async ()
   expect(releaseTransitionsMock).toHaveBeenCalledWith(['asset-1']);
 });
 
+it('releases staged publication transitions when database admission rejects', async () => {
+  const journal = createJournal();
+  const admissionError = new Error('IndexedDB admission blocked');
+  initDBMock.mockRejectedValueOnce(admissionError);
+  const publish = vi.fn();
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toBe(admissionError);
+
+  expect(publish).not.toHaveBeenCalled();
+  expect(releaseTransitionsMock).toHaveBeenCalledWith(['asset-1']);
+});
+
+it('combines admission rejection with a transition-release failure', async () => {
+  const journal = createJournal();
+  const admissionError = new Error('IndexedDB admission blocked');
+  const releaseError = new Error('transition release failed');
+  initDBMock.mockRejectedValueOnce(admissionError);
+  releaseTransitionsMock.mockRejectedValueOnce(releaseError);
+  const publish = vi.fn();
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toMatchObject({
+    cause: admissionError,
+    errors: [admissionError, releaseError],
+    message: 'Asset publication failed and persistence admission could not be released.',
+  });
+  expect(publish).not.toHaveBeenCalled();
+});
+
 it('surfaces both publication and transition-release failures', async () => {
   const journal = createJournal();
   const publicationError = new Error('transaction failed');
@@ -184,9 +236,19 @@ it('replays only standalone journals with a registered domain adapter', async ()
   ).resolves.toBe(1);
 
   expect(publish).toHaveBeenCalledOnce();
-  expect(publish).toHaveBeenCalledWith(standalone);
+  expect(publish).toHaveBeenCalledWith(standalone, expect.any(Object));
   expect(deleteReadyJournalMock).toHaveBeenCalledWith('journal-1');
   expect(deleteReadyJournalMock).not.toHaveBeenCalledWith('workflow');
+});
+
+it('retains a deferred journal until its attachment can be decided', async () => {
+  const journal = createJournal();
+  listReadyJournalsMock.mockResolvedValue([journal]);
+  const publish = vi.fn().mockResolvedValue('defer');
+  await expect(
+    recoverStandaloneAssetPublications([{ domain: journal.domain, publish }])
+  ).resolves.toBe(0);
+  expect(deleteReadyJournalMock).not.toHaveBeenCalled();
 });
 
 it('keeps privacy erasure ordered after an admitted standalone recovery', async () => {
@@ -247,4 +309,35 @@ it('reuses an outer transition admission when erasure is already queued', async 
   await erasure;
 
   expect(erase).toHaveBeenCalledOnce();
+});
+
+it('journals superseded source cancellation before dropping ready protection', async () => {
+  const stale = new SupersededAssetPublicationError();
+  const publish = vi.fn(async () => {
+    throw stale;
+  });
+  await expect(publishReadyJournalWithRetry(createJournal(), publish)).rejects.toBe(stale);
+  expect(publish).toHaveBeenCalledOnce();
+  expect(cancelPutMock).toHaveBeenCalledWith(
+    'asset_operations',
+    expect.objectContaining({ assetIds: [ref.assetId] })
+  );
+  expect(cancelPutMock.mock.invocationCallOrder[0]).toBeLessThan(
+    deleteReadyJournalMock.mock.invocationCallOrder[0]!
+  );
+  expect(cancelCompleteMock).toHaveBeenCalledWith(
+    expect.objectContaining({ assetIds: [ref.assetId] }),
+    expect.any(Object)
+  );
+});
+it('defers ambiguous legacy source replacement and continues recovery', async () => {
+  listReadyJournalsMock.mockResolvedValue([createJournal()]);
+  const publish = vi.fn(async () => {
+    throw new UnresolvedAssetPublicationError();
+  });
+  await expect(
+    recoverStandaloneAssetPublications([{ domain: 'recording-assets', publish }])
+  ).resolves.toBe(0);
+  expect(deleteReadyJournalMock).not.toHaveBeenCalled();
+  expect(cancelPutMock).not.toHaveBeenCalled();
 });

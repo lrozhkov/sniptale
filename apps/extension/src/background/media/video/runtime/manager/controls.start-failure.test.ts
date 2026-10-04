@@ -177,7 +177,9 @@ function expectRuntimeStateReset(): void {
 async function verifyStartFailureBroadcast(): Promise<void> {
   await notifyRecordingStartFailed('permission denied');
 
-  expect(loggerErrorMock).toHaveBeenCalledWith('Recording start failed', 'permission denied');
+  expect(loggerErrorMock).toHaveBeenCalledWith('Recording start failed', {
+    code: 'internal-error',
+  });
   expect(cancelVideoSourceReadyWaitMock).toHaveBeenCalledWith(
     'recording-1',
     expect.objectContaining({ message: 'permission denied' })

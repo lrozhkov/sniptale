@@ -1,6 +1,10 @@
 import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  TOUR_LIMITS,
+  TOUR_HINT_SURFACE,
+  resolveTourTextAppearance,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useEffect, useState } from 'react';
 import type {
   TourAction,
@@ -11,6 +15,7 @@ import type {
 import { GuideVoiceField } from '../voice-field';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { TourInspectorNumericRow } from './numeric-row';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import type { Translate } from '../../../platform/i18n';
 
@@ -77,6 +82,7 @@ export function TourPointFields({
 
 export function TourTextPresentation({
   inherit = true,
+  kind,
   value,
   defaults,
   disabled,
@@ -84,29 +90,69 @@ export function TourTextPresentation({
   t,
 }: {
   inherit?: boolean;
+  kind?: 'hotspot' | 'annotation';
   value: TourTextAppearance | null;
   defaults: TourTextAppearance;
   disabled: boolean;
   onChange: (value: TourTextAppearance | null) => void;
   t: Translate;
 }) {
+  const effective = kind ? resolveTourTextAppearance(kind, value, defaults) : (value ?? defaults);
+  const presentationLabel = t(
+    kind === 'annotation'
+      ? 'scenario.editor.tourSlidePlacement'
+      : kind === 'hotspot'
+        ? 'scenario.editor.tourHotspotHint'
+        : 'scenario.editor.tourTextPresentation'
+  );
   return (
     <div className="tour-text-field">
-      <span>{t('scenario.editor.tourTextPresentation')}</span>
+      {inherit && (
+        <label className="guide-number-toggle">
+          <ProductToggle
+            size="sm"
+            disabled={disabled}
+            aria-label={t('scenario.editor.tourUseCentralStyle')}
+            checked={value === null}
+            onClick={() =>
+              onChange(
+                value ? null : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE }
+              )
+            }
+          />
+          {t('scenario.editor.tourUseCentralStyle')}
+        </label>
+      )}
+      <span>{presentationLabel}</span>
       <CompactSelect
-        aria-label={t('scenario.editor.tourTextPresentation')}
+        aria-label={presentationLabel}
         disabled={disabled}
-        value={value?.presentation ?? 'inherit'}
+        value={value ? effective.presentation : 'inherit'}
         options={[
           ...(inherit
             ? [{ value: 'inherit' as const, label: t('scenario.editor.tourInherited') }]
             : []),
-          { value: 'callout', label: t('scenario.editor.tourCallout') },
-          { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
-          { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
+          ...(kind !== 'annotation'
+            ? [
+                {
+                  value: 'callout' as const,
+                  label: t('scenario.editor.tourCallout'),
+                },
+              ]
+            : []),
+          ...(kind !== 'hotspot'
+            ? [
+                { value: 'caption-top' as const, label: t('scenario.editor.tourCaptionTop') },
+                { value: 'caption-bottom' as const, label: t('scenario.editor.tourCaptionBottom') },
+              ]
+            : []),
         ]}
         onChange={(presentation) =>
-          onChange(presentation === 'inherit' ? null : { ...(value ?? defaults), presentation })
+          onChange(
+            presentation === 'inherit'
+              ? null
+              : { ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE, presentation }
+          )
         }
       />
       {value && (
@@ -121,10 +167,25 @@ export function TourTextPresentation({
               { value: 'center', label: t('scenario.editor.tourAlignCenter') },
               { value: 'end', label: t('scenario.editor.tourAlignEnd') },
             ]}
-            onChange={(alignment) => onChange({ ...value, alignment })}
+            onChange={(alignment) =>
+              onChange({ ...effective, surface: effective.surface ?? TOUR_HINT_SURFACE, alignment })
+            }
           />
-          {value.presentation === 'callout' && (
+          {effective.presentation === 'callout' && (
             <>
+              {kind === 'hotspot' && (
+                <div title={t('scenario.editor.tourCalloutGapHint')}>
+                  <TourInspectorNumericRow
+                    label={t('scenario.editor.tourCalloutGap')}
+                    value={effective.calloutGap ?? 30}
+                    min={0}
+                    max={120}
+                    unit="px"
+                    disabled={disabled}
+                    onChange={(calloutGap) => onChange({ ...effective, calloutGap })}
+                  />
+                </div>
+              )}
               <span>{t('scenario.editor.tourTextPlacement')}</span>
               <CompactSelect
                 aria-label={t('scenario.editor.tourTextPlacement')}
@@ -137,18 +198,19 @@ export function TourTextPresentation({
                   { value: 'left', label: t('scenario.editor.tourPlacementLeft') },
                   { value: 'right', label: t('scenario.editor.tourPlacementRight') },
                 ]}
-                onChange={(placement) => onChange({ ...value, placement })}
+                onChange={(placement) =>
+                  onChange({
+                    ...effective,
+                    surface: effective.surface ?? TOUR_HINT_SURFACE,
+                    placement,
+                  })
+                }
               />
             </>
           )}
         </>
       )}
-      <TourHintStyle
-        value={{ ...(value ?? defaults), surface: value?.surface ?? defaults.surface }}
-        disabled={disabled}
-        onChange={onChange}
-        t={t}
-      />
+      <TourHintStyle value={effective} disabled={disabled} onChange={onChange} t={t} />
     </div>
   );
 }
@@ -191,7 +253,7 @@ export function TourActionField({
     if (kind === 'url') setInvalid(!onChange({ kind: 'url', url }));
   };
   return (
-    <div className="tour-text-field">
+    <div className="tour-text-field tour-action-field">
       <span>{t('scenario.editor.tourAction')}</span>
       <CompactSelect
         aria-label={t('scenario.editor.tourAction')}

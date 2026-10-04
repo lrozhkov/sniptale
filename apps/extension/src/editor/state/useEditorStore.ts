@@ -11,7 +11,7 @@ import {
   DEFAULT_EDITOR_WORKSPACE_SETTINGS,
 } from '../../features/editor/document/constants';
 import { DEFAULT_BORDER_PRESET } from '../../composition/persistence/highlighter';
-import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../persistence/workspace';
+import { DEFAULT_EDITOR_WORKSPACE_DEFAULTS } from '../../features/editor/document/constants';
 import { createEditorStoreActions } from './actions';
 import type { EditorState } from './types';
 
@@ -55,14 +55,19 @@ const initialViewport: EditorViewportState = {
 export const useEditorStore = create<EditorState>()((set) => ({
   activeTool: 'select',
   inspector: 'file',
+  freshImageBackgroundPending: false,
   inspectorCollapsed: false,
   layerEffectsCategory: 'adjustments',
   viewportPreviewOpen: false,
   viewportPreviewAutomationBlockedInSession: false,
+  showOutsideCanvas: false,
+  canvasCropMode: 'crop',
   saveErrorMessage: null,
   saveState: 'idle',
   sessionId: null,
+  capturedAt: null,
   toolSettings: initialToolSettings,
+  technicalDataTextSettings: { ...initialToolSettings.text, fontFamily: 'sans' },
   selectionToolSettings: initialToolSettings,
   imageData: null,
   pageTitle: '',
@@ -78,6 +83,7 @@ export const useEditorStore = create<EditorState>()((set) => ({
   workspace: DEFAULT_EDITOR_WORKSPACE_SETTINGS,
   workspaceDefaults: DEFAULT_EDITOR_WORKSPACE_DEFAULTS,
   workspaceBackgroundEdited: false,
+  workspaceSelectionVisibilityEdited: false,
   ...createEditorStoreActions(set, {
     initialSelection,
     initialHistory,

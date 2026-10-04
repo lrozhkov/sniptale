@@ -70,11 +70,14 @@ it('does not start cleanup until atomic output consumption has finished', async 
       })
   );
 
+  const abort = new AbortController();
   const result = rasterizeFrameAnnotations({
     input,
+    signal: abort.signal,
     transport: { sendRuntimeMessage: mocks.send },
   });
   await vi.waitFor(() => expect(mocks.consume).toHaveBeenCalledWith(reference));
+  abort.abort();
   expect(mocks.deleteJob).not.toHaveBeenCalled();
 
   resolveConsume({
@@ -144,9 +147,9 @@ it('drops a cancelled job without consuming output', async () => {
       transport: { sendRuntimeMessage: mocks.send },
     })
   ).rejects.toThrow();
-  expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: 'prepare' }));
+  expect(mocks.send).not.toHaveBeenCalled();
   expect(mocks.consume).not.toHaveBeenCalled();
-  expect(mocks.deleteJob).toHaveBeenCalledWith('job-1');
+  expect(mocks.deleteJob).not.toHaveBeenCalled();
 });
 
 it('does not leave a failed export pending when cancellation messaging stalls', async () => {
@@ -297,4 +300,74 @@ it('does not acquire a raster lease or stage input if client database admission 
   expect(mocks.send).not.toHaveBeenCalled();
   expect(mocks.stage).not.toHaveBeenCalled();
   expect(mocks.deleteJob).not.toHaveBeenCalled();
+});
+
+it.each(['prepare', 'rasterize'] as const)(
+  'sends correlated cancellation before the pending %s response settles',
+  async (phase) => {
+    const abort = new AbortController();
+    let settle: () => void = () => undefined;
+    mocks.send.mockImplementation((message: { leaseId?: string; operation?: string }) => {
+      if (message.operation === phase)
+        return new Promise((resolve) => {
+          settle = () => resolve({ success: true, result: message.leaseId ?? 'completed' });
+        });
+      return Promise.resolve({ success: true, result: message.leaseId ?? 'cancelled' });
+    });
+    const pending = rasterizeFrameAnnotations({
+      input,
+      signal: abort.signal,
+      transport: { sendRuntimeMessage: mocks.send },
+    });
+    const result = pending.catch((error: unknown) => error);
+    await vi.waitFor(() =>
+      expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: phase }))
+    );
+    const leaseId = mocks.send.mock.calls.find(([message]) => message.operation === 'prepare')?.[0]
+      .leaseId;
+    abort.abort();
+    try {
+      expect(mocks.send).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'cancel', leaseId })
+      );
+    } finally {
+      settle();
+      await result;
+    }
+    expect(mocks.consume).not.toHaveBeenCalled();
+    if (phase === 'prepare') {
+      expect(mocks.stage).not.toHaveBeenCalled();
+      expect(mocks.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'confirm' })
+      );
+    } else {
+      expect(mocks.deleteJob).toHaveBeenCalledWith('job-1');
+    }
+  }
+);
+
+it('waits for an admitted staging write to settle before cleaning up after abort', async () => {
+  const abort = new AbortController();
+  let finishStage: () => void = () => undefined;
+  mocks.stage.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finishStage = () => resolve(reference);
+      })
+  );
+  const work = rasterizeFrameAnnotations({
+    input,
+    signal: abort.signal,
+    transport: { sendRuntimeMessage: mocks.send },
+  });
+  const result = expect(work).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(mocks.stage).toHaveBeenCalledOnce());
+  abort.abort();
+  expect(mocks.send).toHaveBeenCalledWith(expect.objectContaining({ operation: 'cancel' }));
+  expect(mocks.deleteJob).not.toHaveBeenCalled();
+  finishStage();
+  await result;
+  expect(mocks.deleteJob).toHaveBeenCalledWith('job-1');
+  expect(mocks.send).not.toHaveBeenCalledWith(expect.objectContaining({ operation: 'rasterize' }));
+  expect(mocks.consume).not.toHaveBeenCalled();
 });

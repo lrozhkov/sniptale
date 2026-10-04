@@ -1,5 +1,5 @@
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { EditorFloatingConfirmDialog } from './confirm-dialog';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate, useAppLocale } from '../../../platform/i18n';
 import { EditorInspectorCompactToolbar } from '../../inspector/compact';
@@ -43,7 +43,7 @@ const INSPECTOR_COLLAPSED_HEADER_CLASS_NAME = [
 ].join(' ');
 
 const INSPECTOR_SCROLL_CLASS_NAME =
-  'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-4 [scrollbar-gutter:stable_both-edges]';
+  'min-h-0 flex-1 overflow-x-hidden overflow-y-auto p-3 [scrollbar-gutter:stable]';
 
 const LAYERS_PANEL_CLASS_NAME = floatingChromeClassNames(
   'absolute bottom-3 right-3 z-40 flex h-[15.5rem] min-h-14 flex-col',
@@ -110,29 +110,6 @@ function EditorFloatingInspectorHeader({
   );
 }
 
-function EditorFloatingInspectorConfirmDialog({
-  documentController,
-}: {
-  documentController: EditorFloatingDocumentController;
-}) {
-  const confirmDialog = documentController.confirmDialog;
-
-  if (!confirmDialog) {
-    return null;
-  }
-
-  return (
-    <ProductConfirmDialog
-      title={confirmDialog.title}
-      message={confirmDialog.message}
-      confirmText={confirmDialog.confirmText}
-      cancelText={confirmDialog.cancelText}
-      onConfirm={documentController.onConfirmDialogConfirm}
-      onCancel={documentController.onConfirmDialogCancel}
-    />
-  );
-}
-
 export function EditorFloatingInspector(props: EditorFloatingInspectorProps) {
   useAppLocale();
   const controller = props.documentController;
@@ -164,7 +141,7 @@ export function EditorFloatingInspector(props: EditorFloatingInspectorProps) {
             collapsed
           />
         ) : (
-          <div className={INSPECTOR_SCROLL_CLASS_NAME}>
+          <div className={INSPECTOR_SCROLL_CLASS_NAME} data-ui="editor.inspector.content">
             <EditorInspectorContent {...visibleContentProps} confirmDialog={null} />
           </div>
         )}
@@ -175,7 +152,7 @@ export function EditorFloatingInspector(props: EditorFloatingInspectorProps) {
       >
         <EditorInspectorLayersPanel {...layersPanelProps} maxExpandedHeightRatio={1} />
       </FloatingChromePanel>
-      <EditorFloatingInspectorConfirmDialog documentController={controller} />
+      <EditorFloatingConfirmDialog documentController={controller} />
     </>
   );
 }

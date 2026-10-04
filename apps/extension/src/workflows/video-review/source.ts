@@ -62,7 +62,7 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
   if (!original) throw new Error('Video source is unavailable.');
   const { source, provenance } = await inspectVideo(original.file, signal);
   const telemetry =
-    media.source.kind === 'recording'
+    media.source.kind === 'recording' && !media.recordingMetadata
       ? await getRecordingTelemetry(media.source.recordingId)
       : undefined;
   signal.throwIfAborted();
@@ -75,5 +75,6 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
     ...(provenance ? { provenance } : {}),
     snapshot,
     telemetry: telemetry ?? null,
+    ...(media.recordingMetadata ? { recordingMetadata: media.recordingMetadata } : {}),
   };
 }

@@ -1,11 +1,18 @@
 import { getProjectAsset } from '../../../composition/persistence/projects/index';
 import { getRecording } from '../../../composition/persistence/recordings/index';
+import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index';
 import { getScenarioAsset } from '../../../composition/persistence/scenario/projects';
 import type { getAssetById } from '../../../features/video/project/timeline';
 
 type BlobAssetSource = NonNullable<ReturnType<typeof getAssetById>>['source'];
 
 export async function loadBlobForSource(source: BlobAssetSource): Promise<Blob> {
+  if (source.kind === 'library-asset') {
+    const blob = await getMediaAssetBlob(source.mediaId);
+    if (!blob) throw new Error(`Library asset ${source.mediaId} not found.`);
+    return blob;
+  }
+
   if (source.kind === 'recording') {
     const entry = await getRecording(source.recordingId);
     if (!entry) {

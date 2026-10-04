@@ -13,7 +13,7 @@ export interface ZoomContext {
   zoomLevel: number;
   devicePixelRatioBaseline?: number;
   syncViewportState: () => void;
-  syncRuntimeState: () => void;
+  setZoomLevel: (zoomLevel: number) => void;
 }
 
 export function getDevicePixelRatioBaselineOptions(devicePixelRatioBaseline?: number) {

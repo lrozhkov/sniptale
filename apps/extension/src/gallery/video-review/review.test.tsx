@@ -109,7 +109,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     expect(
       host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.addComment"]')
         ?.disabled
-    ).toBe(true);
+    ).toBe(false);
     expect(host.querySelector('input[type="number"]')).toBeNull();
     const stage = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.stage"]')!;
     vi.spyOn(stage, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 640, 360));
@@ -162,7 +162,12 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     clipboard.mockRejectedValueOnce(new Error('denied'));
     await click('copyReport');
     expect(host.textContent).toContain('gallery.videoReview.reportFailed');
-    await click('deleteComment');
+    await act(async () =>
+      Array.from(host.querySelectorAll<HTMLButtonElement>('ol li button'))
+        .find((button) => button.textContent?.includes('Edited note'))!
+        .click()
+    );
+    await click('deleteSelected');
     expect(host.textContent).not.toContain('Edited note');
     await click('undo');
     expect(host.textContent).toContain('Edited note');
@@ -200,7 +205,9 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     expect(host.textContent).toContain('gallery.videoReview.saveFailed');
     await click('back');
     expect(back).toHaveBeenCalledOnce();
-    expect(fixture.snapshot.draft?.annotation.text).toBe('Keep this text');
+    expect(fixture.snapshot.draft).toBeNull();
+    expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');
+    expect(host.textContent).toContain('Keep this text');
   } finally {
     await fixture.cleanup();
   }
@@ -242,14 +249,17 @@ async function dragTimePlane(host: HTMLElement, start: number, end?: number) {
   const pointer = (type: string, x: number) => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, button: 0 });
     Object.defineProperty(event, 'pointerId', { value: 1 });
-    plane.dispatchEvent(event);
+    (type === 'pointerdown'
+      ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+      : plane
+    ).dispatchEvent(event);
   };
   await act(async () => pointer('pointerdown', start));
   if (end !== undefined) await act(async () => pointer('pointermove', end));
   await act(async () => pointer('pointerup', end ?? start));
 }
 
-it('selects a range by dragging anywhere on the time plane and clears it outside', async () => {
+it('selects a range by dragging on the source lane and clears it outside', async () => {
   const fixture = createEditorFixture(integration);
   const { root, host } = fixture;
   let selected: ReviewAnchor = { kind: 'point', time: 0 };
@@ -291,7 +301,10 @@ it('selects a range by dragging anywhere on the time plane and clears it outside
       ['pointermove', 200],
     ] as const)
       await act(async () =>
-        plane.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
+        (kind === 'pointerdown'
+          ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+          : plane
+        ).dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
       );
     expect(selected).toEqual({ kind: 'range', start: 1, end: 2 });
     await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
@@ -335,7 +348,10 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
       ['pointermove', 300],
     ] as const)
       await act(async () =>
-        plane.dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
+        (kind === 'pointerdown'
+          ? host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!
+          : plane
+        ).dispatchEvent(new MouseEvent(kind, { bubbles: true, clientX: x }))
       );
     await key('Escape');
     expect(video.currentTime).toBe(1.4);
@@ -379,11 +395,11 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
     await click('undo');
     await click('redo');
     const cut = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.cutLabel 0.0 – 1.0"]'
+      '[aria-label^="gallery.videoReview.cutLabel · 0.0 – 1.0"]'
     )!;
     await act(async () => cut.click());
     expect(video.currentTime).toBe(0);
-    await click('removeEdit');
+    await click('deleteSelected');
     expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
     await click('undo');
     await click('cutMode');
@@ -410,11 +426,21 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
     );
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).not.toBeNull();
+    // Advanced mode may commit its enabled-only state before the later Add gesture.
+    await act(async () =>
+      vi.waitFor(() => {
+        expect(advancedContentAt(fixture.snapshot).zoom.enabled).toBe(true);
+        expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(0);
+      })
+    );
     await click('zoomAdd');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions).toHaveLength(1);
-    expect(advancedContentAt(fixture.snapshot, 0).zoom.enabled).toBe(true);
-    expect(advancedContentAt(fixture.snapshot, 0).zoom.regions[0]).toMatchObject({
+    await act(async () =>
+      vi.waitFor(() => expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(1), {
+        timeout: 3000,
+      })
+    );
+    expect(advancedContentAt(fixture.snapshot).zoom.enabled).toBe(true);
+    expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
       start: 0,
       end: 2,
       transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
@@ -429,12 +455,20 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
       scale.dispatchEvent(new Event('input', { bubbles: true }));
       scale.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     });
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(advancedContentAt(fixture.snapshot, 1).zoom.regions[0]!.transform.scale).toBe(2);
+    await act(async () =>
+      vi.waitFor(
+        () => expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2),
+        { timeout: 3000 }
+      )
+    );
     // Basic mode suppresses the lane and its effect while preserving the stored region.
     await click('advancedEditing');
     expect(document.querySelector('[data-ui="gallery.videoReview.zoomLane"]')).toBeNull();
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    await act(async () =>
+      vi.waitFor(() => expect(fixture.snapshot.workspace.advanced.ui.mode).toBe('basic'), {
+        timeout: 3000,
+      })
+    );
     expect(advancedContentAt(fixture.snapshot).zoom.regions[0]!.transform.scale).toBe(2);
   } finally {
     await fixture.cleanup();
@@ -616,7 +650,7 @@ it('reveals the three audio lanes and persists the original audio gate', async (
     expect(lanes).toHaveLength(3);
     expect(host.querySelector('[data-ui="gallery.videoReview.audioTrack"]')).not.toBeNull();
     const mute = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.audioEnabled"]'
+      '[aria-label="gallery.videoReview.muteSourceAudio"]'
     )!;
     await act(async () => mute.click());
     await act(async () => new Promise((resolve) => setTimeout(resolve, 300)));
@@ -655,7 +689,7 @@ it('imports a file dropped on the music lane at the drop point', async () => {
   }
 });
 
-it('opens the shared voiceover recorder from the audio lane', async () => {
+it('isolates quick-review controls while the lower voiceover strip is open and restores them on close', async () => {
   const fixture = createEditorFixture(integration);
   const { host, root, click, back } = fixture;
   try {
@@ -665,12 +699,13 @@ it('opens the shared voiceover recorder from the audio lane', async () => {
     const modal = host.querySelector('[role="dialog"]');
     expect(modal).not.toBeNull();
     expect(modal!.textContent).toContain('gallery.videoReview.recordVoiceover');
+    expect(host.querySelector('[data-ui="gallery.videoReview.voiceoverStrip"]')).not.toBeNull();
+    expect(host.querySelector('[inert]')).not.toBeNull();
     await act(async () =>
-      modal!
-        .querySelector<HTMLButtonElement>('sniptale-modal-close, [title="common.actions.close"]')!
-        .click()
+      modal!.querySelector<HTMLButtonElement>('[aria-label="common.actions.close"]')!.click()
     );
     expect(host.querySelector('[role="dialog"]')).toBeNull();
+    expect(host.querySelector('[inert]')).toBeNull();
   } finally {
     await fixture.cleanup();
   }

@@ -1,5 +1,6 @@
 import { expect, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
+import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
 
 async function geometry(block: Locator) {
@@ -20,11 +21,15 @@ for (const theme of ['light', 'dark'] as const) {
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
-    const reopenUrl = page.url();
+    const reopenUrl = new URL(page.url());
+    reopenUrl.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+    reopenUrl.searchParams.set('theme', theme);
+    reopenUrl.searchParams.set('locale', 'en');
     const block = page.locator('article#compare .guide-block[data-kind="image"]').first();
     const id = await block.getAttribute('data-block-id');
     const button = block.locator('.guide-block-width');
     await block.scrollIntoViewIfNeeded();
+    await block.locator('img').click();
     await block.hover();
     await expect(button).toHaveCSS('opacity', '1');
     const rect = await button.boundingBox();
@@ -64,7 +69,7 @@ for (const theme of ['light', 'dark'] as const) {
       body: await page.pdf({ preferCSSPageSize: true }),
       contentType: 'application/pdf',
     });
-    await page.goto(reopenUrl);
+    await page.goto(reopenUrl.toString());
     await expect(page.locator(`.guide-document [data-block-id="${id}"]`)).toHaveAttribute(
       'data-width',
       '63'
@@ -89,10 +94,7 @@ for (const theme of ['light', 'dark'] as const) {
       });
     });
     await page.getByRole('button', { name: 'Save standalone HTML', exact: true }).click();
-    await page.getByRole('button', { name: 'Calculate size', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save HTML', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Save HTML', exact: true }).click();
-    await expect(page.locator('.guide-html-settings > [role=status]')).toHaveText('HTML saved');
+    await expect(page.locator('.guide-html-export [role=status]')).toHaveText('HTML saved');
     const html = await page.evaluate(() => {
       const value: unknown = Reflect.get(window, 'widthExportHtml');
       if (typeof value !== 'string') throw new Error('Missing HTML');

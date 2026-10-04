@@ -39,7 +39,11 @@ export function ImportFilePicker(props: {
         type="file"
         disabled={props.disabled}
         accept=".json,.sniptale-settings.json"
-        onChange={(event) => acceptFile(event.currentTarget.files?.[0])}
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = '';
+          acceptFile(file);
+        }}
       />
       <p className="text-sm text-[var(--sniptale-color-text-muted)]">
         {translate('settings.settingsTransfer.dropFile')}

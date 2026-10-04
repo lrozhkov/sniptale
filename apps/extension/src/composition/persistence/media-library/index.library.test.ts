@@ -6,6 +6,7 @@ import { createVideoProject } from '../projects/index.test-support';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
 
 const dbMocks = vi.hoisted(() => ({
+  backfillScenarioLibraryAssetsMock: vi.fn(async () => 0),
   deleteProjectAssetMock: vi.fn(),
   deleteProjectExportMock: vi.fn(),
   deleteRecordingMock: vi.fn(),
@@ -19,11 +20,18 @@ const dbMocks = vi.hoisted(() => ({
   listAllProjectExportsMock: vi.fn(),
   listProjectAssetsMock: vi.fn(),
   listVideoProjectReadResultsMock: vi.fn(),
+  listMediaAssetProjectUsageMock: vi.fn(async () => []),
   listRecordingsMock: vi.fn(),
   objectStoreDeleteMock: vi.fn(),
   putMock: vi.fn(),
   txDeleteMock: vi.fn(),
   txPutMock: vi.fn(),
+}));
+vi.mock('../scenario/library-publication', () => ({
+  backfillScenarioLibraryAssets: dbMocks.backfillScenarioLibraryAssetsMock,
+}));
+vi.mock('./usage', () => ({
+  listMediaAssetProjectUsage: dbMocks.listMediaAssetProjectUsageMock,
 }));
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
@@ -131,6 +139,7 @@ function createDb() {
     transaction: vi.fn(() => ({
       done: Promise.resolve(),
       objectStore: vi.fn((storeName: string) => ({
+        getAll: dbMocks.getAllMock,
         delete: storeName === 'thumbnails' ? dbMocks.objectStoreDeleteMock : dbMocks.txDeleteMock,
         put: dbMocks.txPutMock,
       })),
@@ -193,7 +202,7 @@ function installLegacyMediaLibrarySourceMocks() {
 }
 
 function expectLegacyMediaLibrarySyncWrites() {
-  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'recording:rec-1', filename: 'renamed.webm' })
   );
@@ -220,7 +229,7 @@ function expectLegacyMediaLibrarySyncWrites() {
       lifecycle: createLibraryLifecycle('library', 420),
     })
   );
-  expect(dbMocks.txPutMock).toHaveBeenCalledWith(
+  expect(dbMocks.txPutMock).not.toHaveBeenCalledWith(
     expect.objectContaining({
       id: 'project-asset:asset-3',
       lifecycle: createLibraryLifecycle('library', 400),
@@ -239,8 +248,8 @@ async function verifySyncLegacyMediaLibraryFlow() {
   await syncLegacyMediaLibrary();
 
   expectLegacyMediaLibrarySyncWrites();
-  expect(dbMocks.txDeleteMock).toHaveBeenCalledWith('export:stale-export');
-  expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('export:stale-export');
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalledWith('export:stale-export');
   expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-1');
   expect(dbMocks.txDeleteMock).not.toHaveBeenCalledWith('project-asset:asset-2');
 }

@@ -46,6 +46,7 @@ export function ReviewSpotlightPreview(props: {
       />
       <ReviewSpotlightOverlay output={props.output} frame={mask} />
       <ReviewFocusArea
+        alwaysVisible
         spotlight={props.spotlight}
         output={props.output}
         video={props.layout.videoRect}

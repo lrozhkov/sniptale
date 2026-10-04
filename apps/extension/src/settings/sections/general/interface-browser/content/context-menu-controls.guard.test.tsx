@@ -40,6 +40,12 @@ function createAppearanceState(
       showVideoEditor: true,
     },
     contextMenuOptions: buildAppearanceContextMenuOptions('ru'),
+    contextMenuCatalogStatus: 'ready',
+    contextMenuSettingsStatus: 'ready',
+    contextMenuQuickActions: [],
+    contextMenuViewportPresets: [],
+    retryContextMenuCatalog: vi.fn(),
+    retryContextMenuSettings: vi.fn(),
     languagePreference: 'ru',
     locale: 'ru',
     localeOptions: [{ label: 'Русский', value: 'ru' }],
@@ -62,7 +68,7 @@ function createAppearanceState(
   };
 }
 
-it('keeps item mutations guarded when the context menu owner is disabled', async () => {
+it('keeps the global menu disabled while allowing a saved tree draft', async () => {
   const updateContextMenu = vi.fn().mockResolvedValue(undefined);
   const state = createAppearanceState(updateContextMenu);
   container = document.createElement('div');
@@ -71,9 +77,7 @@ it('keeps item mutations guarded when the context menu owner is disabled', async
 
   await act(async () => root?.render(<ContextMenuControls state={state} />));
 
-  const item = container?.querySelector<HTMLButtonElement>('button[aria-label="Снимки"]');
-  expect(item?.disabled).toBe(true);
-  item?.click();
+  expect(container?.querySelector('[role="tree"]')).toBeTruthy();
   expect(updateContextMenu).not.toHaveBeenCalled();
 
   const ownerToggle = container?.querySelector<HTMLButtonElement>(

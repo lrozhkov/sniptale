@@ -30,11 +30,12 @@ This index lists current active documents and their authority.
 - [Repository overview](architecture/repository-overview.md) is the canonical source map.
 - [Code organization](architecture/code-organization.md) owns source placement, dependencies, and public surfaces.
 - [Runtime contexts](architecture/runtime-contexts.md) documents machine-owned runtime entrypoints and owns coordination boundaries.
+- [Scenario viewing from Library](architecture/scenario-library-viewing.md) records the pre-implementation viewer, content-source and opening-flow decision for guides and tours.
 - [Shared topology](architecture/shared-topology.md) owns package and app-core residency.
 - [Storage state authority](architecture/storage-state-authority.md) owns state classes and mutation rules.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md), [video editor layering](architecture/video-editor-layering.md), and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
-- Repository-local `DESIGN.md` owns UX, accessibility, theme, and interaction requirements.
+- Repository-local `DESIGN.md` owns UX, accessibility, theme, restrained accent use, screen composition, and interaction requirements.
 
 ## Implementation, operation, and release
 

@@ -75,3 +75,18 @@ it('fails closed for pruning without locks and rejects extension session admissi
   vi.stubGlobal('chrome', {});
   await expect(acquireScenarioResourceSession('guide')).rejects.toThrow('unavailable');
 });
+
+it('admits one deletion across multiple closed scenario projects', async () => {
+  const mutate = vi.fn(async () => 7);
+  expect(await tryScenarioResourceCleanup(['first', 'second', 'first'], mutate)).toBe(7);
+  expect(mutate).toHaveBeenCalledOnce();
+});
+
+it('retains every project when one member of a multi-project deletion is open', async () => {
+  const session = await acquireScenarioResourceSession('second');
+  const mutate = vi.fn(async () => 7);
+  expect(await tryScenarioResourceCleanup(['first', 'second'], mutate)).toBeUndefined();
+  expect(mutate).not.toHaveBeenCalled();
+  await session.release();
+  expect(await tryScenarioResourceCleanup(['second', 'first'], mutate)).toBe(7);
+});

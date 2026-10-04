@@ -13,6 +13,7 @@ export interface VideoEditorSessionActions {
   syncProjectRevision: (expectedProject: VideoProject, persistedUpdatedAt: number) => void;
   setReady: (ready: boolean) => void;
   setError: (error: string | null) => void;
+  setAutosaveEnabled: (enabled: boolean) => void;
   setSaveState: (state: VideoEditorSaveState) => void;
   setCurrentTime: (time: number) => void;
   setPlaying: (playing: boolean) => void;

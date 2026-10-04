@@ -25,9 +25,13 @@ const FORM_ATTRIBUTE_NAMES = ['action', 'method', 'target'] as const;
 export const WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE = 'data-sniptale-external-href';
 
 interface WebSnapshotHtmlSanitizeOptions {
+  /** Restore validated, user-activated anchors only in downloaded standalone HTML. */
+  allowStandaloneNavigation?: boolean;
   allowedObjectUrls?: readonly string[];
   offlineOnly?: boolean;
   removeForms?: boolean;
+  /** Freeze SVG mutations when a document is exported outside the viewer navigation sandbox. */
+  removeSvgAnimations?: boolean;
 }
 
 const WEB_SNAPSHOT_XHTML_DECLARATION = '<?xml version="1.0" encoding="UTF-8"?>';
@@ -186,10 +190,16 @@ function sanitizeElementAttributes(
   const externalHref = options.offlineOnly
     ? resolveOfflineExternalAnchorHref(element, baseUrl)
     : null;
+  const standaloneHref = options.allowStandaloneNavigation
+    ? resolveStandaloneAnchorHref(element, baseUrl)
+    : null;
 
   // Never trust a page-authored capability attribute. Viewer navigation is projected only from
   // the real href after URL validation below.
   element.removeAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE);
+  if (options.allowStandaloneNavigation && element.tagName.toLowerCase() === 'a') {
+    element.removeAttribute('download');
+  }
 
   for (const attribute of Array.from(element.attributes)) {
     const normalizedName = attribute.name.toLowerCase();
@@ -228,8 +238,31 @@ function sanitizeElementAttributes(
     }
   }
 
-  if (externalHref !== null) {
+  if (standaloneHref !== null) {
+    element.setAttribute('href', standaloneHref);
+    if (standaloneHref.startsWith('#')) {
+      element.removeAttribute('target');
+    } else {
+      element.setAttribute('target', '_blank');
+      element.setAttribute('rel', 'noopener noreferrer');
+    }
+  } else if (externalHref !== null && !options.allowStandaloneNavigation) {
     element.setAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE, externalHref);
+  }
+}
+
+function resolveStandaloneAnchorHref(element: Element, baseUrl: string | null): string | null {
+  if (element.tagName.toLowerCase() !== 'a') return null;
+  const href = (
+    element.getAttribute('href') ?? element.getAttribute(WEB_SNAPSHOT_EXTERNAL_LINK_ATTRIBUTE)
+  )?.trim();
+  if (!href) return null;
+  if (href.startsWith('#')) return href;
+  if (!baseUrl) return null;
+  try {
+    return createSafeExternalHref(new URL(href, baseUrl).toString());
+  } catch {
+    return null;
   }
 }
 
@@ -361,8 +394,18 @@ function sanitizeWebSnapshotDocument(
   options: WebSnapshotHtmlSanitizeOptions = {}
 ): void {
   for (const root of collectWebSnapshotQueryRoots(document)) {
+    if (options.allowStandaloneNavigation) {
+      for (const base of root.querySelectorAll('base')) base.remove();
+    }
     for (const element of root.querySelectorAll(EXECUTABLE_ELEMENT_SELECTORS.join(','))) {
       element.remove();
+    }
+    if (options.removeSvgAnimations) {
+      for (const animation of root.querySelectorAll(
+        'animate, animateMotion, animateTransform, set, discard'
+      )) {
+        animation.remove();
+      }
     }
     if (options.removeForms) removeFormElements(root);
     else disableFormSubmissions(root);

@@ -1,5 +1,4 @@
 import {
-  BrushCleaning,
   Droplet,
   Highlighter,
   MousePointer2,
@@ -100,6 +99,7 @@ function DrawingToolControl(props: {
   const label = translate(props.label);
   const modifierHint = props.modifierHint ? translate(props.modifierHint) : null;
   const title = modifierHint ? `${label}\n${modifierHint}` : label;
+  const disclosureAvailable = props.tool !== 'select' && props.optionsTool === props.tool;
   return (
     <div className="relative flex">
       <ContentToolbarButton
@@ -107,9 +107,12 @@ function DrawingToolControl(props: {
         type="button"
         active={props.active}
         aria-pressed={props.active}
+        aria-expanded={disclosureAvailable ? props.showOptions : undefined}
         aria-label={label}
         aria-describedby={modifierHint ? modifierHintId : undefined}
         title={title}
+        menuIndicator={disclosureAvailable}
+        data-menu-open={disclosureAvailable ? String(props.showOptions) : undefined}
         dataUi={`content.toolbar.drawing.${props.tool}`}
         onClick={() => {
           if (props.active && props.tool !== 'select') {
@@ -203,27 +206,14 @@ export function ToolbarDrawingControls(props: {
         ))}
         {props.owner?.renderTrailingControls?.(snapshot)}
       </ContentToolbarGroup>
-      {props.owner?.showActions === false ? null : (
+      {props.owner?.showActions === false || !props.owner?.renderActions ? null : (
         <>
           <ContentToolbarDivider dataUi="content.toolbar.drawing-actions-divider" />
           <ContentToolbarGroup
             aria-label={translate('content.toolbar.drawingActions')}
             dataUi="content.toolbar.drawing-actions-group"
           >
-            {props.owner?.renderActions ? (
-              props.owner.renderActions(snapshot)
-            ) : (
-              <ContentToolbarButton
-                type="button"
-                tone="danger"
-                disabled={snapshot.document.objects.length === 0}
-                aria-label={translate('content.toolbar.drawingClear')}
-                title={translate('content.toolbar.drawingClear')}
-                onClick={() => controller.session.clear()}
-              >
-                <BrushCleaning size={18} strokeWidth={2} />
-              </ContentToolbarButton>
-            )}
+            {props.owner.renderActions(snapshot)}
           </ContentToolbarGroup>
         </>
       )}

@@ -30,6 +30,8 @@ import type { PreparedScenarioAssetEntry, ScenarioStepEditorDocumentEntry } from
 import { commitScenarioAggregateMutation } from '../aggregate-mutations';
 import { rejectScenarioMutationBeforeHandoff } from '../asset-staging';
 import { createScenarioAssetEntryFromBlob } from './capture-step/asset-entry';
+import { createBorrowedScenarioImageAsset, readBorrowableLibraryImage } from './borrowed-asset';
+import type { AssetRef } from '../../assets';
 
 const videoFrameImportSchema = z
   .object({
@@ -73,11 +75,21 @@ export async function importScenarioImages(args: {
         releases.push(input.workspace.releaseDocumentAssets);
       args.signal.throwIfAborted();
       await assertImportableProjectImage(input.blob);
-      const { assetEntry } = await createScenarioAssetEntryFromBlob({
-        blob: input.blob,
-        projectId: project.id,
-        galleryAssetId: input.mediaId,
-      });
+      const assetEntry =
+        input.borrowedRef && input.mediaId
+          ? await createBorrowedScenarioImageAsset({
+              blob: input.blob,
+              ref: input.borrowedRef,
+              mediaId: input.mediaId,
+              projectId: project.id,
+            })
+          : (
+              await createScenarioAssetEntryFromBlob({
+                blob: input.blob,
+                projectId: project.id,
+                galleryAssetId: input.mediaId,
+              })
+            ).assetEntry;
       assets.push(assetEntry);
       args.signal.throwIfAborted();
       const documentId = input.workspace ? crypto.randomUUID() : null;
@@ -135,6 +147,9 @@ export async function importScenarioImages(args: {
                 frame: replacement.frame,
                 fit: replacement.fit,
                 caption: replacement.caption,
+                ...(replacement.captionAlignment === undefined
+                  ? {}
+                  : { captionAlignment: replacement.captionAlignment }),
                 alt: replacement.alt,
               }
             : current
@@ -178,6 +193,7 @@ async function readImportSource(source: GuideImageImportSource): Promise<{
   blob: Blob;
   name: string;
   mediaId: string | null;
+  borrowedRef?: AssetRef;
   workspace?: ImageWorkspaceEntry;
   source?: GuideImageSource;
   description?: string;
@@ -201,13 +217,6 @@ async function readImportSource(source: GuideImageImportSource): Promise<{
   ) {
     throw new Error('The selected library image is unavailable.');
   }
-  const presentation = await getAggregatePresentation({ id: entry.id, kind: 'image' });
-  if (
-    !presentation?.previewBlob ||
-    presentation.presentationRevision !== (entry.workspaceRevision ?? 0)
-  ) {
-    throw new Error('The library image preview is unavailable.');
-  }
   const workspace = await recoverAndGetImageWorkspace(entry.id);
   if (
     (workspace && workspace.revision !== (entry.workspaceRevision ?? 0)) ||
@@ -215,6 +224,24 @@ async function readImportSource(source: GuideImageImportSource): Promise<{
   ) {
     workspace?.releaseDocumentAssets?.();
     throw new Error('The library image changed during import.');
+  }
+  if (!workspace) {
+    const borrowed = await readBorrowableLibraryImage(entry);
+    if (borrowed)
+      return {
+        blob: borrowed.blob,
+        borrowedRef: borrowed.ref,
+        name: entry.filename,
+        mediaId: entry.id,
+      };
+  }
+  const presentation = await getAggregatePresentation({ id: entry.id, kind: 'image' });
+  if (
+    !presentation?.previewBlob ||
+    presentation.presentationRevision !== (entry.workspaceRevision ?? 0)
+  ) {
+    workspace?.releaseDocumentAssets?.();
+    throw new Error('The library image preview is unavailable.');
   }
   return {
     blob: presentation.previewBlob,

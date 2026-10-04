@@ -1,8 +1,14 @@
 import { ActiveSelection, type Canvas, type FabricObject } from 'fabric';
 import type { EditorObjectType } from '../../../../features/editor/document/types';
 import type { EditorToolSettings } from '../../../../features/editor/document/tool-settings-types';
-import { readEditorDrawingObject } from '../../../drawing/object/metadata';
+import {
+  readEditorDrawingObject,
+  writeEditorDrawingObject,
+} from '../../../drawing/object/metadata';
+import { refreshEditorDrawingBlurObject } from '../../../drawing/object/blur';
 import { replaceEditorDrawingFabricGeometry } from '../../../drawing/object/vector';
+import { parseScenarioBlurMetadata } from '../../../document/scenario-blur-metadata';
+import { updateBlurObject } from '../../../objects/annotation/blur/object';
 import { applyStepSettings } from './annotation';
 import { applyImageLayerSettings } from './image';
 
@@ -15,7 +21,13 @@ function applyDrawingSettings(object: FabricObject, settings: EditorToolSettings
   } else if (drawing.kind === 'marker') {
     nextDrawing = { ...drawing, ...settings.marker };
   } else if (drawing.kind === 'arrow') {
-    nextDrawing = { ...drawing, ...settings.arrow };
+    nextDrawing = {
+      ...drawing,
+      color: settings.arrow.color,
+      design: settings.arrow.design,
+      dynamicWidth: settings.arrow.dynamicWidth,
+      width: settings.arrow.width,
+    };
   } else if (drawing.kind === 'text') {
     nextDrawing = { ...drawing, ...settings.text };
   } else {
@@ -73,6 +85,7 @@ export function applySelectionToolSettingsToObjects(
     case 'transparent-base':
     case 'browser-frame':
     case 'frame-annotation':
+    case 'group':
       return;
     case 'source-image':
     case 'image':
@@ -85,8 +98,24 @@ export function applySelectionToolSettingsToObjects(
     case 'shape':
     case 'arrow':
     case 'text':
-    case 'blur':
       replaceDrawingObjectsOnCanvas(canvas, objects, selectionToolSettings, prepareObject);
+      return;
+    case 'blur':
+      objects.forEach((object) => {
+        const drawing = readEditorDrawingObject(object);
+        if (drawing?.kind !== 'blur') {
+          const scenarioBlur = parseScenarioBlurMetadata(object.sniptaleScenarioBlurJson);
+          if (scenarioBlur) {
+            updateBlurObject(object, {
+              settings: { ...scenarioBlur.settings, amount: selectionToolSettings.blur.amount },
+            });
+          }
+          return;
+        }
+        writeEditorDrawingObject(object, { ...drawing, amount: selectionToolSettings.blur.amount });
+        refreshEditorDrawingBlurObject(object);
+      });
+      canvas.requestRenderAll();
       return;
     case 'step':
       applyStepSettings(objects, selectionToolSettings.step);

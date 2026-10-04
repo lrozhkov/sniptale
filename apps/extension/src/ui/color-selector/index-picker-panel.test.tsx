@@ -112,14 +112,14 @@ it('cycles the visible field group through HEX, RGB, and HSL from the label-row 
   renderSelector();
   await clickButton('shared.ui.colorSelectorChooseColor');
 
-  expect(getModeCycleButton()?.textContent).toBe('');
+  expect(getModeCycleButton()?.textContent).toBe(getModeCycleButton()?.getAttribute('aria-label'));
   expect(getTextInput('shared.ui.colorSelectorHex')).toBeDefined();
   expect(getTextInput('shared.ui.colorSelectorRed')).toBeUndefined();
   expect(getTextInput('shared.ui.colorSelectorHue')).toBeUndefined();
 
   await cycleMode();
 
-  expect(getModeCycleButton()?.textContent).toBe('');
+  expect(getModeCycleButton()?.textContent).toBe(getModeCycleButton()?.getAttribute('aria-label'));
   expect(getTextInput('shared.ui.colorSelectorHex')).toBeUndefined();
   expect(getTextInput('shared.ui.colorSelectorRed')).toBeDefined();
   expect(getTextInput('shared.ui.colorSelectorHue')).toBeUndefined();
@@ -144,6 +144,7 @@ it('places the compact opacity control after the active color-format fields', as
   )?.parentElement;
   const opacity = document.body.querySelector('[data-ui="shared.ui.color-selector.opacity"]');
   const opacityField = opacity?.querySelector<HTMLInputElement>('input[type="text"]');
+  const footer = getButton('shared.ui.colorSelectorApply')?.parentElement;
 
   expect(formatFields?.compareDocumentPosition(opacity!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   expect(opacityField?.type).toBe('text');
@@ -153,9 +154,11 @@ it('places the compact opacity control after the active color-format fields', as
     opacity?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
   ).not.toBeNull();
   expect(opacity?.querySelector('.sniptale-color-selector-alpha-range')).toBeNull();
+  expect(opacity?.compareDocumentPosition(footer!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(footer?.className).not.toContain('sticky');
 });
 
-it('keeps the hover-highlight target on the label row instead of a visible mode button', async () => {
+it('labels the compact format switch and retains its hover and keyboard target', async () => {
   renderSelector();
   await clickButton('shared.ui.colorSelectorChooseColor');
 
@@ -164,7 +167,7 @@ it('keeps the hover-highlight target on the label row instead of a visible mode 
     '[data-ui="shared.ui.color-selector.mode-label-row"]'
   );
 
-  expect(modeCycleButton?.textContent).toBe('');
+  expect(modeCycleButton?.textContent).toBe('shared.ui.colorSelectorHex');
   expect(modeCycleButton?.className).toContain('hover:bg-');
   expect(labelRow?.textContent).toContain('shared.ui.colorSelectorHex');
 });

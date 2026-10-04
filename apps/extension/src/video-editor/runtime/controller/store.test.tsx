@@ -68,6 +68,8 @@ const expectedKeys = {
     'undoProject',
   ],
   lifecycle: [
+    'autosaveEnabled',
+    'setAutosaveEnabled',
     'error',
     'isReady',
     'project',
@@ -107,6 +109,7 @@ const expectedKeys = {
     'selection',
   ],
   timeline: [
+    'placeMaterial',
     'appendMaterial',
     'insertMaterial',
     'overlayMaterial',

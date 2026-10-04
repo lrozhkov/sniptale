@@ -78,7 +78,7 @@ export function buildBrowserFrameDetailCommands(params: InspectorCommandParams):
       action: 'compact-browser-frame-url',
       commandId: 'browser-frame-url',
       icon: 'link',
-      label: translate('editor.compact.urlMockup'),
+      label: translate('editor.compact.pageUrl'),
       placeholder: translate('editor.compact.urlPlaceholder'),
       trigger: 'URL',
       value: params.browserFrame.url,

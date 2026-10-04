@@ -13,10 +13,12 @@ export interface QuickEditRuntimeModeSurface {
 interface QuickEditRuntimeDocumentModeSurface {
   enable: () => void;
   disable: () => void;
+  hasPendingChanges: () => boolean;
   isEnabled: () => boolean;
 }
 
 export interface QuickEditRuntimeEditingSurface {
+  finishPendingChanges: () => void;
   getEditingElements: () => Map<string, EditableElement>;
 }
 

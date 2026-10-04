@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type MouseEvent,
   type MouseEventHandler,
   type RefObject,
   type SetStateAction,
@@ -15,6 +16,8 @@ import {
 } from './overlays';
 import { ScenarioRecorderSidebarSurface } from './surface';
 import type { ScenarioRecorderSidebarStep } from './types';
+import type { ScenarioSidebarControlsProps } from './controls';
+import { useScenarioRecorderSidebarTransientState } from './transient';
 
 function runStepHighlight(args: {
   latestStepId: string;
@@ -77,24 +80,33 @@ function useHighlightedRecentStep(args: {
   return { highlightedStepId, stepsContainerRef };
 }
 
-export function ScenarioRecorderSidebar(props: {
-  dragging: boolean;
-  highlightToken?: number;
-  forcedHighlightStepId?: string | null;
-  forcedHighlightVersion?: number;
-  onDeleteStep: (stepId: string) => void;
-  onFinish: () => void;
-  onMoveStep: (stepId: string, toIndex: number) => void;
-  onOpenEditor: (stepId?: string | null) => void;
-  onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
-  projectName: string | null;
-  position: { x: number; y: number };
-  recentSteps: ScenarioRecorderSidebarStep[];
-  sidebarRef: RefObject<HTMLElement | null>;
-  uiScale?: number;
-}) {
-  const sidebarState = useScenarioRecorderSidebarState();
-  const [deleteStepId, setDeleteStepId] = useState<string | null>(null);
+export function ScenarioRecorderSidebar(
+  props: ScenarioSidebarControlsProps & {
+    dragging: boolean;
+    highlightToken?: number;
+    forcedHighlightStepId?: string | null;
+    forcedHighlightVersion?: number;
+    onDeleteStep: (stepId: string) => void;
+    onFinish: () => void;
+    onCollapse: (event: MouseEvent<HTMLButtonElement>) => void;
+    onCaptureVisible: (event: MouseEvent<HTMLButtonElement>) => Promise<void>;
+    captureBusy: boolean;
+    finishBusy: boolean;
+    onMoveStep: (stepId: string, toIndex: number) => void;
+    onSidebarHeaderMouseDown: MouseEventHandler<HTMLDivElement>;
+    pendingProjectSelection: boolean;
+    projectName: string | null;
+    position: { x: number; y: number };
+    recentSteps: ScenarioRecorderSidebarStep[];
+    sidebarRef: RefObject<HTMLElement | null>;
+    uiScale?: number;
+  }
+) {
+  const sidebarState = useScenarioRecorderSidebarTransientState(
+    props.projectId,
+    props.pendingProjectSelection,
+    props.sidebarRef
+  );
   const { highlightedStepId, stepsContainerRef } = useHighlightedRecentStep({
     recentSteps: props.recentSteps,
     ...(props.highlightToken === undefined ? {} : { highlightToken: props.highlightToken }),
@@ -108,35 +120,31 @@ export function ScenarioRecorderSidebar(props: {
   return (
     <>
       <ScenarioRecorderSidebarSurface
-        dragging={props.dragging}
-        dragStepId={sidebarState.dragStepId}
+        {...props}
         highlightedStepId={highlightedStepId}
-        onDeleteStep={setDeleteStepId}
-        onInspectStep={sidebarState.setInspectedStep}
-        onMoveStep={props.onMoveStep}
-        onOpenEditor={() => props.onOpenEditor()}
-        onPreviewOpen={sidebarState.setPreviewStep}
-        onSidebarHeaderMouseDown={props.onSidebarHeaderMouseDown}
-        position={props.position}
-        projectName={props.projectName}
-        recentSteps={props.recentSteps}
-        setDragStepId={sidebarState.setDragStepId}
-        sidebarRef={props.sidebarRef}
-        {...(props.uiScale === undefined ? {} : { uiScale: props.uiScale })}
+        onDeleteStep={sidebarState.openDeleteStep}
+        onInspectStep={sidebarState.openInspectedStep}
+        onPreviewOpen={sidebarState.openPreviewStep}
+        onProjectMenuToggle={() => sidebarState.setProjectMenuOpen((open) => !open)}
+        onProjectMenuClose={sidebarState.closeProjectMenu}
+        projectMenuOpen={sidebarState.projectMenuOpen}
         stepsContainerRef={stepsContainerRef}
       />
       {renderScenarioRecorderSidebarOverlays(sidebarState)}
       <ProductConfirmDialog
-        isOpen={deleteStepId !== null}
+        isOpen={sidebarState.deleteStepId !== null}
         title={translate('scenario.content.deleteStep')}
         message={translate('scenario.content.deleteStepMessage')}
         confirmText={translate('common.actions.delete')}
         cancelText={translate('common.actions.cancel')}
-        onCancel={() => setDeleteStepId(null)}
+        onCancel={() => sidebarState.setDeleteStepId(null)}
         onConfirm={() => {
-          if (deleteStepId && props.recentSteps.some((step) => step.id === deleteStepId))
-            props.onDeleteStep(deleteStepId);
-          setDeleteStepId(null);
+          if (
+            sidebarState.deleteStepId &&
+            props.recentSteps.some((step) => step.id === sidebarState.deleteStepId)
+          )
+            props.onDeleteStep(sidebarState.deleteStepId);
+          sidebarState.setDeleteStepId(null);
         }}
         backdropClassName="!z-[2147483648]"
       />
@@ -145,7 +153,7 @@ export function ScenarioRecorderSidebar(props: {
 }
 
 function renderScenarioRecorderSidebarOverlays(
-  sidebarState: ReturnType<typeof useScenarioRecorderSidebarState>
+  sidebarState: ReturnType<typeof useScenarioRecorderSidebarTransientState>
 ) {
   return (
     <>
@@ -159,21 +167,4 @@ function renderScenarioRecorderSidebarOverlays(
       />
     </>
   );
-}
-
-function useScenarioRecorderSidebarState() {
-  const [dragStepId, setDragStepId] = useState<string | null>(null);
-  const [inspectedStep, setInspectedStep] = useState<ScenarioRecorderSidebarStep | null>(null);
-  const [previewStep, setPreviewStep] = useState<ScenarioRecorderSidebarStep | null>(null);
-
-  return {
-    closeInspectedStep: () => setInspectedStep(null),
-    closePreviewStep: () => setPreviewStep(null),
-    dragStepId,
-    inspectedStep,
-    previewStep,
-    setDragStepId,
-    setInspectedStep,
-    setPreviewStep,
-  };
 }

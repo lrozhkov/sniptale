@@ -5,20 +5,46 @@ function getSelectedLayers(layers: EditorLayerItem[]) {
   return layers.filter((layer) => layer.selected);
 }
 
-function canMutateSelectedLayers(layers: EditorLayerItem[]) {
-  const selectedLayers = getSelectedLayers(layers);
-  return (
-    selectedLayers.length > 0 && selectedLayers.every((layer) => !layer.locked && !layer.immutable)
-  );
-}
+const groupableLayerTypes = new Set<EditorLayerItem['type']>([
+  'pencil',
+  'marker',
+  'shape',
+  'blur',
+  'arrow',
+  'text',
+  'image',
+  'step',
+  'group',
+]);
 
 export function canReorderLayerSelection(layers: EditorLayerItem[]) {
-  return canMutateSelectedLayers(layers);
+  const selectedLayers = getSelectedLayers(layers);
+  return (
+    selectedLayers.length > 0 &&
+    selectedLayers.every((layer) => layer.reorderable || (!layer.locked && !layer.immutable))
+  );
 }
 
 export function canMergeLayerSelection(layers: EditorLayerItem[]) {
   const selectedLayers = getSelectedLayers(layers);
   return selectedLayers.length >= 2 && selectedLayers.every((layer) => !layer.locked);
+}
+
+export function canGroupLayerSelection(layers: EditorLayerItem[]) {
+  const selectedLayers = getSelectedLayers(layers);
+  return (
+    selectedLayers.length >= 2 &&
+    selectedLayers.every(
+      (layer) => !layer.locked && !layer.immutable && groupableLayerTypes.has(layer.type)
+    )
+  );
+}
+
+export function canUngroupLayerSelection(layers: EditorLayerItem[]) {
+  const selectedLayers = getSelectedLayers(layers);
+  return (
+    selectedLayers.length === 1 && selectedLayers[0]?.type === 'group' && !selectedLayers[0].locked
+  );
 }
 
 export function canDuplicateLayerSelection(layers: EditorLayerItem[]) {

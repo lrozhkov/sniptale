@@ -15,7 +15,7 @@ export function setEditorZoom(context: ZoomContext, value: number): number {
     zoomLevel,
     devicePixelRatioBaseline,
     syncViewportState,
-    syncRuntimeState,
+    setZoomLevel,
   } = context;
   if (!canvas) {
     return zoomLevel;
@@ -30,6 +30,7 @@ export function setEditorZoom(context: ZoomContext, value: number): number {
     ...getDevicePixelRatioBaselineOptions(devicePixelRatioBaseline),
   });
   const nextZoomLevel = clamp(value, 0.2, 4);
+  setZoomLevel(nextZoomLevel);
   applyEditorViewportZoom(canvas, canvasDocumentSize, nextZoomLevel, devicePixelRatioBaseline);
   restoreEditorViewportAnchor({
     canvas,
@@ -42,7 +43,6 @@ export function setEditorZoom(context: ZoomContext, value: number): number {
     ...getDevicePixelRatioBaselineOptions(devicePixelRatioBaseline),
   });
   canvas.requestRenderAll();
-  syncRuntimeState();
   return nextZoomLevel;
 }
 
@@ -55,13 +55,14 @@ export function setEditorZoomCentered(context: ZoomContext, value: number): numb
     zoomLevel,
     devicePixelRatioBaseline,
     syncViewportState,
-    syncRuntimeState,
+    setZoomLevel,
   } = context;
   if (!canvas) {
     return zoomLevel;
   }
 
   const nextZoomLevel = clamp(value, 0.2, 4);
+  setZoomLevel(nextZoomLevel);
   applyEditorViewportZoom(canvas, canvasDocumentSize, nextZoomLevel, devicePixelRatioBaseline);
   restoreEditorViewportAnchor({
     canvas,
@@ -74,6 +75,5 @@ export function setEditorZoomCentered(context: ZoomContext, value: number): numb
     ...getDevicePixelRatioBaselineOptions(devicePixelRatioBaseline),
   });
   canvas.requestRenderAll();
-  syncRuntimeState();
   return nextZoomLevel;
 }

@@ -17,7 +17,7 @@ it('accepts only one bound parent file and releases its child URL on exit', asyn
   const blob = new Blob(['<!doctype html>'], { type: 'text/html' });
   const send = (data: unknown, source: Window | null = window, origin = location.origin) =>
     window.dispatchEvent(new MessageEvent('message', { source, origin, data }));
-  const message = { kind: 'tour-preview', nonce, blob };
+  const message = { kind: 'tour-preview', mode: 'tour', nonce, blob };
   send(message, null);
   send(message, window, 'https://untrusted.example');
   send({ ...message, nonce: 'other' });

@@ -167,3 +167,29 @@ it('uses precise layout sliders without limiting typed high-resolution values', 
   await act(async () => padding.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(change).toHaveBeenLastCalledWith({ layout: { padding: 512, cornerRadius: 12 } });
 });
+
+it('offers the fixed legacy default and commits following motion from the background inspector', async () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ enabled: true, type: 'solid', color: '#000000ff', layout }}
+        onChange={change}
+      />
+    )
+  );
+  const select = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.backgroundZoom"]'
+  )!;
+  expect(select.textContent).toContain('gallery.videoReview.backgroundZoomFixed');
+  await act(async () => select.click());
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (item) => item.textContent === 'gallery.videoReview.backgroundZoomFollow'
+  )!;
+  await act(async () => option.click());
+  expect(change).toHaveBeenLastCalledWith({ zoomBehavior: 'follow-video' });
+  act(() =>
+    root.render(<ReviewBackgroundInspector background={{ enabled: false }} onChange={change} />)
+  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.backgroundZoom"]')).toBeNull();
+});

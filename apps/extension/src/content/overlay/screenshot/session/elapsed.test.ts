@@ -295,3 +295,42 @@ describe('screenshot-controller-action-elapsed', () => {
     expectStaleCountdownCaptureDoesNotShowFeedback
   );
 });
+
+it.each(['visible', 'full', 'selection'] as const)(
+  'restores temporary size after %s success or cancellation/failure',
+  async (type) => {
+    const restore = vi.fn().mockResolvedValue(undefined);
+    const prepareWindowSize = vi.fn().mockResolvedValue(restore);
+    const args = createArgs({ params: createParams({ prepareWindowSize }) });
+    const capture = type === 'selection' ? runSelectionScreenshotMock : runViewportScreenshotMock;
+    capture.mockImplementationOnce(async () => {
+      expect(prepareWindowSize).toHaveBeenCalledOnce();
+      expect(restore).not.toHaveBeenCalled();
+    });
+    await executeCountdownScreenshot(type, args, 1);
+    expect(restore).toHaveBeenCalledOnce();
+    expect(restore.mock.invocationCallOrder[0]).toBeLessThan(
+      restoreVisibleUiStateMock.mock.invocationCallOrder[0]!
+    );
+    capture.mockRejectedValueOnce(new Error('cancelled'));
+    await executeCountdownScreenshot(type, args, 1);
+    expect(restore).toHaveBeenCalledTimes(2);
+  }
+);
+it('does not capture when temporary sizing fails', async () => {
+  const args = createArgs({
+    params: createParams({ prepareWindowSize: vi.fn().mockRejectedValue(new Error('resize')) }),
+  });
+  await executeCountdownScreenshot('visible', args, 1);
+  expect(runViewportScreenshotMock).not.toHaveBeenCalled();
+  expect(showScreenshotErrorMock).toHaveBeenCalled();
+});
+
+it('freezes area selection only when invoked by the elapsed countdown', async () => {
+  const args = createArgs();
+  await executeCountdownScreenshot('selection', args, 1);
+  expect(runSelectionScreenshotMock).toHaveBeenCalledWith(
+    args.runtime,
+    expect.objectContaining({ freezeSelection: true, runToken: 1 })
+  );
+});

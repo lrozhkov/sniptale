@@ -1,4 +1,6 @@
+import { applyLocalReviewChange, type LocalReviewChange } from './local-session';
 import {
+  saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
   readVideoWorkspace,
@@ -6,13 +8,18 @@ import {
   saveVideoWorkspaceDraft,
 } from '../../composition/persistence/review-workspaces/store';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
-import type { ReviewAnnotation, ReviewOperation } from '../../features/video/review/types';
+import type {
+  ReviewAnnotation,
+  ReviewHistoryDirection,
+  ReviewOperation,
+} from '../../features/video/review/types';
 import {
   replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../features/video/review/document';
 
 const persistence = {
+  saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
   moveVideoWorkspaceHistory,
   readVideoWorkspace,
@@ -47,10 +54,14 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   let state = {
     snapshot: structuredClone(initial),
     document: project(initial),
+    autosaveEnabled: true,
+    dirty: false,
     pending: 0,
     error: null as Failure | null,
   };
+  let durable = structuredClone(initial);
   let queue: Promise<void> = Promise.resolve();
+  let failedHistory = false;
   const listeners = new Set<() => void>();
   const emit = () => {
     for (const listener of listeners) listener();
@@ -60,15 +71,40 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     expectedRevision: state.snapshot.workspace.revision,
     expectedSourceAssetId: state.snapshot.workspace.sourceAssetId,
   });
-  function enqueue(action: () => Promise<VideoWorkspaceSnapshot>) {
+  async function persistBuffer() {
+    if (!state.dirty) return state.snapshot;
+    const snapshot = await deps.saveVideoWorkspaceSnapshot({
+      aggregateId: durable.workspace.aggregateId,
+      expectedRevision: durable.workspace.revision,
+      expectedSourceAssetId: durable.workspace.sourceAssetId,
+      expectedDraftRevision: durable.draft?.revision ?? null,
+      workspace: state.snapshot.workspace,
+      draft: state.snapshot.draft,
+    });
+    durable = snapshot;
+    state = { ...state, snapshot, dirty: false };
+    return snapshot;
+  }
+  function enqueue(action: () => Promise<VideoWorkspaceSnapshot>, local?: LocalReviewChange) {
     state = { ...state, pending: state.pending + 1 };
     emit();
     const task = queue.then(async () => {
       try {
+        if (local && (!state.autosaveEnabled || (state.dirty && local.kind !== 'reset'))) {
+          const snapshot = applyLocalReviewChange(state.snapshot, local);
+          state = { ...state, snapshot, document: project(snapshot), dirty: true };
+          if (!state.autosaveEnabled) return snapshot;
+          const committed = await persistBuffer();
+          state = { ...state, snapshot: committed, document: project(committed), error: null };
+          return committed;
+        }
         const snapshot = await action();
-        state = { ...state, snapshot, document: project(snapshot), error: null };
+        if (!local && state.dirty && !state.autosaveEnabled) return snapshot;
+        durable = snapshot;
+        state = { ...state, snapshot, document: project(snapshot), dirty: false, error: null };
         return snapshot;
       } catch (error) {
+        failedHistory = local?.kind === 'history';
         state = { ...state, error: failureCode(error) };
         throw error;
       } finally {
@@ -84,6 +120,24 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   }
   return {
     getSnapshot: () => state,
+    async hasDurableVoiceoverClip(clipId: string, assetId: string) {
+      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
+      return (
+        !!saved &&
+        project(saved).advancedContent.audio.voiceover.some(
+          (clip) => clip.id === clipId && clip.assetId === assetId
+        )
+      );
+    },
+    setAutosaveEnabled(enabled: boolean) {
+      state = { ...state, autosaveEnabled: enabled };
+      emit();
+      if (enabled && state.dirty)
+        void enqueue(async () => {
+          if (!state.autosaveEnabled) return state.snapshot;
+          return persistBuffer();
+        }).catch(() => undefined);
+    },
     subscribe(listener: () => void) {
       listeners.add(listener);
       return () => {
@@ -92,47 +146,87 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     },
     saveAdvanced(advanced: unknown) {
       const captured = structuredClone(advanced);
-      return enqueue(() =>
-        deps.saveVideoWorkspaceAdvanced({
-          ...identity(),
-          advanced: captured,
-        })
+      return enqueue(
+        () =>
+          deps.saveVideoWorkspaceAdvanced({
+            ...identity(),
+            advanced: captured,
+          }),
+        { kind: 'advanced', advanced: captured }
       );
     },
     saveDraft(annotation: ReviewAnnotation | null, before: ReviewAnnotation | null) {
       const captured = structuredClone({ annotation, before });
-      return enqueue(() =>
-        deps.saveVideoWorkspaceDraft({
-          ...identity(),
-          ...captured,
-          expectedDraftRevision: state.snapshot.draft?.revision ?? null,
-        })
+      return enqueue(
+        () =>
+          deps.saveVideoWorkspaceDraft({
+            ...identity(),
+            ...captured,
+            expectedDraftRevision: state.snapshot.draft?.revision ?? null,
+          }),
+        { kind: 'draft', ...captured }
       );
     },
     commit(operation: ReviewOperation, consumeDraft = false) {
       const captured = structuredClone(operation);
-      return enqueue(() => {
-        if (consumeDraft && !state.snapshot.draft) throw new Error('Review draft is unavailable.');
-        return deps.commitVideoWorkspace({
-          ...identity(),
-          operation: captured,
-          ...(consumeDraft ? { consumeDraftRevision: state.snapshot.draft!.revision } : {}),
-        });
+      return enqueue(
+        () => {
+          if (consumeDraft && !state.snapshot.draft)
+            throw new Error('Review draft is unavailable.');
+          return deps.commitVideoWorkspace({
+            ...identity(),
+            operation: captured,
+            ...(consumeDraft ? { consumeDraftRevision: state.snapshot.draft!.revision } : {}),
+          });
+        },
+        { kind: 'commit', operation: captured, consumeDraft }
+      );
+    },
+    /** Explicit Save persists buffered edits and this operation even with autosave disabled. */
+    commitDurable(operation: ReviewOperation) {
+      const captured = structuredClone(operation);
+      return enqueue(async () => {
+        await persistBuffer();
+        return deps.commitVideoWorkspace({ ...identity(), operation: captured });
       });
     },
-    history(direction: 'undo' | 'redo') {
-      return enqueue(() => deps.moveVideoWorkspaceHistory({ ...identity(), direction }));
+    /** Clears authored content atomically while preserving source identity and UI preferences. */
+    reset() {
+      return enqueue(
+        async () => {
+          const next = applyLocalReviewChange(state.snapshot, { kind: 'reset' });
+          return deps.saveVideoWorkspaceSnapshot({
+            aggregateId: durable.workspace.aggregateId,
+            expectedRevision: durable.workspace.revision,
+            expectedSourceAssetId: durable.workspace.sourceAssetId,
+            expectedDraftRevision: durable.draft?.revision ?? null,
+            workspace: next.workspace,
+            draft: next.draft,
+          });
+        },
+        { kind: 'reset' }
+      );
+    },
+    history(direction: ReviewHistoryDirection) {
+      return enqueue(() => deps.moveVideoWorkspaceHistory({ ...identity(), direction }), {
+        kind: 'history',
+        direction,
+      });
     },
     reload() {
       return enqueue(async () => {
         const snapshot = await deps.readVideoWorkspace(initial.workspace.aggregateId);
         if (!snapshot) throw new Error('Review session is unavailable.');
+        state = { ...state, dirty: false };
         return snapshot;
       });
     },
-    async flush() {
+    async flush(options?: { retryHistory: true }) {
+      const hadPending = state.pending > 0;
       await queue;
-      if (state.error) throw new Error(`Review ${state.error}.`);
+      // Only a completed history failure may be retried; pending/content failures stay strict.
+      if (state.error && !(options?.retryHistory && failedHistory && !hadPending))
+        throw new Error(`Review ${state.error}.`);
     },
   };
 }

@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { GuideImageResources } from './resources';
 import { createPortal } from 'react-dom';
-import { Image, X } from 'lucide-react';
+import { Image, ImageUp, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import {
@@ -32,7 +32,10 @@ export function GuideResourceDrawer({
   t,
   ...props
 }: ResourceDrawerProps &
-  Pick<ComponentProps<typeof GuideImageResources>, 'onImport' | 'disabled' | 'selectedStepId'>) {
+  Pick<
+    ComponentProps<typeof GuideImageResources>,
+    'onImport' | 'onAddTextStep' | 'disabled' | 'selectedStepId' | 'steps'
+  >) {
   const [target, setTarget] = useState<ResourceTarget | null>(null);
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -100,6 +103,10 @@ export function GuideResourceDrawer({
   );
 }
 
+export function useGuideResourceRequest() {
+  return useContext(ResourceRequest);
+}
+
 /** Opens the single runtime-local drawer with an optional exact image destination. */
 export function GuideResourceTrigger({
   t,
@@ -114,7 +121,7 @@ export function GuideResourceTrigger({
   label?: boolean;
   title?: string;
 }) {
-  const request = useContext(ResourceRequest);
+  const request = useGuideResourceRequest();
   const buttonProps = {
     type: 'button' as const,
     title: title ?? t('scenario.editor.guideOpenImageLibrary'),
@@ -122,7 +129,8 @@ export function GuideResourceTrigger({
     'aria-controls': 'guide-resource-drawer',
     onClick: () => request?.(target ?? { kind: 'steps' }),
   };
-  const icon = <Image size={16} aria-hidden="true" />;
+  const Icon = target?.kind === 'replace-image' ? ImageUp : Image;
+  const icon = <Icon size={16} aria-hidden="true" />;
   return label ? (
     <ProductActionButton {...buttonProps} tone="secondary" compact>
       {icon}
@@ -159,8 +167,8 @@ export function GuideResourceDialog({
   return (
     <ProductModal
       onClose={onClose}
-      width="min(1800px, calc(100vw - 24px))"
-      maxWidth="100vw"
+      width="max(960px, 80vw)"
+      maxWidth="calc(100vw - 24px)"
       maxHeight="100dvh"
       role="presentation"
       dialogClassName="guide-resource-drawer-surface"
@@ -207,8 +215,8 @@ export function GuideResourceDialog({
         <div className="guide-resource-drawer-close">
           <Image size={16} aria-hidden="true" />
           <strong>{title ?? props.t('scenario.editor.guideOpenImageLibrary')}</strong>
-          {toolbarRef && <div className="guide-resource-header-actions" ref={toolbarRef} />}
           <ContentToolbarButton
+            tone="close"
             type="button"
             title={props.t('scenario.editor.close')}
             onClick={onClose}
@@ -216,6 +224,7 @@ export function GuideResourceDialog({
             <X size={16} aria-hidden="true" />
           </ContentToolbarButton>
         </div>
+        {toolbarRef && <div className="guide-resource-header-actions" ref={toolbarRef} />}
         <div className="guide-resource-drawer-body">
           <div>{props.children}</div>
         </div>

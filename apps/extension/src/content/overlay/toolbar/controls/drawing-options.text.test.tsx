@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createDrawingSession, DEFAULT_DRAWING_COLORS } from '../../../../features/drawing/public';
+import {
+  createDrawingSession,
+  DEFAULT_DRAWING_COLORS,
+  type DrawingDocumentCommit,
+} from '../../../../features/drawing/public';
 import type { ContentDrawingController } from '../../../drawing/controller';
 import { ToolbarDrawingControls } from './drawing';
 
@@ -21,7 +25,8 @@ afterEach(() => {
 it('recomputes a selected text frame immediately when its typography changes', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
-  const session = createDrawingSession({ onDocumentCommit: () => true });
+  const commits = vi.fn<(commit: DrawingDocumentCommit) => boolean>(() => true);
+  const session = createDrawingSession({ onDocumentCommit: commits });
   session.commitObject({
     backgroundColor: '#fef08a',
     bounds: { x: 20, y: 30, width: 180, height: 12 },
@@ -48,6 +53,8 @@ it('recomputes a selected text frame immediately when its typography changes', (
   act(() =>
     root.render(<ToolbarDrawingControls controller={controller} displayMode="horizontal" />)
   );
+  expect(host.querySelectorAll('.sniptale-drawing-options-menu')).toHaveLength(2);
+  expect(host.querySelector('[data-ui="drawing.selection.actions"]')?.className).toContain('h-7');
   const getText = () => {
     const object = session.getSnapshot().document.objects[0];
     if (object?.kind !== 'text') throw new Error('Expected selected text object');
@@ -73,6 +80,36 @@ it('recomputes a selected text frame immediately when its typography changes', (
   );
   expect(getText()).toMatchObject({ fontFamily: 'serif', fontSize: 36 });
   expect(getText().bounds.height).toBeGreaterThan(serifHeight);
+  const fillToggle = () =>
+    host.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+    )!;
+  act(() => fillToggle().click());
+  expect(getText().backgroundColor).toBeNull();
+  expect(fillToggle().getAttribute('aria-pressed')).toBe('false');
+  expect(fillToggle().disabled).toBe(false);
+  act(() => fillToggle().click());
+  expect(getText().backgroundColor).toBe('#fef08a');
+  act(() => fillToggle().click());
+  const offCommit = commits.mock.lastCall![0];
+  const reopened = createDrawingSession({
+    initialDocument: structuredClone(offCommit.after),
+    onDocumentCommit: () => true,
+  });
+  expect(reopened.getSnapshot().document.objects[0]).toMatchObject({ backgroundColor: null });
+  act(() => {
+    offCommit.replay(offCommit.before);
+    session.select('selected-text');
+  });
+  expect(getText().backgroundColor).toBe('#fef08a');
+  expect(fillToggle().classList.contains('sniptale-glass-toolbar-button--active')).toBe(true);
+  act(() => {
+    offCommit.replay(offCommit.after);
+    session.select('selected-text');
+  });
+  expect(getText().backgroundColor).toBeNull();
+  expect(fillToggle().getAttribute('aria-pressed')).toBe('false');
+  reopened.dispose();
   act(() => root.unmount());
 });
 
@@ -100,6 +137,13 @@ it('applies an alpha channel from the text background color picker', () => {
   const backgroundGroup = host.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.text.background-group"]'
   )!;
+  act(() =>
+    backgroundGroup
+      .querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+      )
+      ?.click()
+  );
   act(() => backgroundGroup.querySelector<HTMLButtonElement>('button[title="#ef4444"]')?.click());
   act(() =>
     backgroundGroup

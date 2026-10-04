@@ -33,6 +33,7 @@ export function createEditorPageEmbedProviderValue(
 export function startScenarioEditorEmbed(args: {
   controller: ImageEditorController;
   setPageTitle: (title: string) => void;
+  runOpen?: (action: () => Promise<void>) => Promise<void>;
 }): () => void {
   const sessionId = readEditorEmbedSession(window.location.search);
   if (!sessionId || window.parent === window) return () => undefined;
@@ -50,7 +51,7 @@ export function startScenarioEditorEmbed(args: {
       return;
     initialized = true;
     const payload = event.data.payload;
-    void (async () => {
+    const open = async () => {
       await waitForEditorControllerCanvas(args.controller);
       if (!active) return;
       args.setPageTitle(payload.title ?? '');
@@ -60,7 +61,8 @@ export function startScenarioEditorEmbed(args: {
           pageTitle: payload.title ?? '',
           browserFrameUrl: payload.url ?? '',
         });
-    })().catch(() => {
+    };
+    void (args.runOpen ? args.runOpen(open) : open()).catch(() => {
       if (active)
         window.parent.postMessage(
           createScenarioEditorEmbedErrorMessage(sessionId),

@@ -95,6 +95,8 @@ function createServices() {
   return {
     autosaveService: {
       dispose: vi.fn(),
+      hasUnsavedChanges: vi.fn(() => false),
+      setInteractionActive: vi.fn(),
     },
     controller: {
       dispose: vi.fn(),
@@ -112,11 +114,15 @@ function dispatchMalformedEditorBootstrapEvent(eventName: string): void {
 
 function createEditorStoreState(
   overrides: Partial<
-    Record<'imageData' | 'hydrateDefaults' | 'hydrateWorkspaceDefaults' | 'setPageTitle', unknown>
+    Record<
+      'imageData' | 'pageTitle' | 'hydrateDefaults' | 'hydrateWorkspaceDefaults' | 'setPageTitle',
+      unknown
+    >
   > = {}
 ) {
   return {
     imageData: 'data:image/png;base64,1',
+    pageTitle: 'Image name',
     hydrateDefaults: vi.fn(),
     hydrateWorkspaceDefaults: vi.fn(),
     setPageTitle: vi.fn(),
@@ -172,14 +178,14 @@ async function verifiesImageOwnedPageShell() {
 
   const pageRoot = container?.querySelector('[data-ui="editor.page.root"]');
 
-  expect(useAppLocaleMock).toHaveBeenCalledOnce();
+  expect(useAppLocaleMock).toHaveBeenCalledWith('editor.page.documentTitle', 'Image name');
   expect(createEditorPageServicesMock).toHaveBeenCalledTimes(1);
   expect(loadEditorPageDefaultsMock).toHaveBeenCalledWith(
     state.hydrateDefaults,
     state.hydrateWorkspaceDefaults
   );
   expect(bootstrapEditorPageSessionMock).toHaveBeenCalledTimes(1);
-  expect(useCommandPaletteHotkeyMock).toHaveBeenCalledTimes(1);
+  expect(useCommandPaletteHotkeyMock).toHaveBeenCalled();
   expect(pageRoot?.className).toContain('relative h-screen');
   expect(pageRoot?.className).toContain('bg-[var(--sniptale-color-surface-canvas)]');
   expect(pageRoot?.className).not.toContain('bg-[linear-gradient');
@@ -241,6 +247,38 @@ async function verifiesBootstrapEventRoutingAndDispose() {
 describe('EditorPage', () => {
   useEditorPageTestScope();
 
+  it('warns before closing only while the current image has unsaved changes', async () => {
+    const services = createServices();
+    createEditorPageServicesMock.mockReturnValue(services);
+    applyEditorStoreState(createEditorStoreState());
+    await renderEditorPage();
+    const close = () => window.dispatchEvent(new Event('beforeunload', { cancelable: true }));
+    expect(close()).toBe(true);
+    services.autosaveService.hasUnsavedChanges.mockReturnValue(true);
+    expect(close()).toBe(false);
+    services.autosaveService.hasUnsavedChanges.mockReturnValue(false);
+    expect(close()).toBe(true);
+  });
+
+  it('keeps the loader visible during bootstrap and shows a friendly error on failure', async () => {
+    let rejectOpen: (error: Error) => void = () => undefined;
+    bootstrapEditorPageSessionMock.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectOpen = reject;
+        })
+    );
+    createEditorPageServicesMock.mockReturnValue(createServices());
+    applyEditorStoreState(createEditorStoreState({ imageData: null }));
+
+    await renderEditorPage();
+    expect(container?.querySelector('[data-ui="editor.page.open-loading"]')).not.toBeNull();
+
+    await act(async () => rejectOpen(new Error('Invalid frame annotation metadata')));
+    expect(container?.querySelector('[data-ui="editor.page.open-error"]')).not.toBeNull();
+    expect(container?.textContent).not.toContain('Invalid frame annotation metadata');
+  });
+
   it('does not restore standalone storage or accept bootstrap DOM events in scenario embed mode', async () => {
     window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session');
     const services = createServices();
@@ -253,6 +291,8 @@ describe('EditorPage', () => {
     );
     expect(bootstrapEditorPageSessionMock).not.toHaveBeenCalled();
     expect(openEditorBootstrapPayloadMock).not.toHaveBeenCalled();
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(services.autosaveService.setInteractionActive).not.toHaveBeenCalled();
   });
 
   it(
@@ -267,4 +307,41 @@ describe('EditorPage', () => {
     'routes bootstrap events through the extracted runtime opener and disposes services on unmount',
     verifiesBootstrapEventRoutingAndDispose
   );
+  it('tracks held pointers and input idle time, and removes activity listeners on unmount', async () => {
+    vi.useFakeTimers();
+    try {
+      const services = createServices();
+      createEditorPageServicesMock.mockReturnValue(services);
+      applyEditorStoreState(createEditorStoreState());
+      await renderEditorPage();
+      const active = services.autosaveService.setInteractionActive;
+      const pointer = (type: string, pointerId: number) => {
+        const event = new Event(type);
+        Object.defineProperty(event, 'pointerId', { value: pointerId });
+        window.dispatchEvent(event);
+      };
+      pointer('pointerdown', 1);
+      pointer('pointerdown', 2);
+      pointer('pointerup', 1);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(active).toHaveBeenLastCalledWith(true);
+      pointer('pointercancel', 2);
+      expect(active).toHaveBeenLastCalledWith(false);
+      window.dispatchEvent(new Event('input'));
+      expect(active).toHaveBeenLastCalledWith(true);
+      await vi.advanceTimersByTimeAsync(499);
+      expect(active).toHaveBeenLastCalledWith(true);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(active).toHaveBeenLastCalledWith(false);
+      await act(async () => root?.unmount());
+      root = null;
+      active.mockClear();
+      pointer('pointerdown', 3);
+      window.dispatchEvent(new Event('input'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(active).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

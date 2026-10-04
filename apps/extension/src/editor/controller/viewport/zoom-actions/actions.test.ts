@@ -41,6 +41,7 @@ function createContext() {
     devicePixelRatioBaseline: 1,
     stageElement: document.createElement('div'),
     syncRuntimeState: vi.fn(),
+    setZoomLevel: vi.fn(),
     syncViewportState: vi.fn(),
     viewportElement: document.createElement('div'),
     zoomLevel: 1,
@@ -48,7 +49,7 @@ function createContext() {
 }
 
 function registerFitActionTest() {
-  it('fits zoom from advisory viewport area and syncs runtime state immediately', () => {
+  it('fits zoom from advisory viewport area and syncs viewport state immediately', () => {
     vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((callback) => {
       callback(0);
       return 1;
@@ -62,7 +63,8 @@ function registerFitActionTest() {
       0.667,
       1
     );
-    expect(context.syncRuntimeState).toHaveBeenCalledOnce();
+    expect(context.setZoomLevel).toHaveBeenCalledWith(0.667);
+    expect(context.syncRuntimeState).not.toHaveBeenCalled();
     expect(context.syncViewportState).toHaveBeenCalledOnce();
   });
 }

@@ -1,5 +1,5 @@
 export const COMPACT_POPOVER_SURFACE_CLASSNAME = [
-  'rounded-[16px] border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_86%,transparent)]',
+  'rounded-none border border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_86%,transparent)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_97%,transparent)] p-4',
   [
     'shadow-[0_18px_40px_-24px_color-mix(in_srgb,var(--sniptale-color-shadow-strong)_34%,transparent),',

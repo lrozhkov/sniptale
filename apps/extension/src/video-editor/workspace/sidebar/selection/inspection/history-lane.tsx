@@ -7,7 +7,6 @@ import {
   ActionKeyStyleFields,
 } from '../effect-controls/action-style-fields';
 import { CursorSkinFields } from '../effect-controls/cursor-fields';
-import { InspectorDetails } from '../shared/details';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
 import { getVideoProjectActionPresentation } from '../../../../../features/video/project/action-presentation';
@@ -155,13 +154,11 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
                   formatValue={(value) => `${value.toFixed(2)} s`}
                 />
                 {props.project.cursorTrack?.samples.length && trackPresentation ? (
-                  <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>
-                    <ToggleField
-                      label={translate('videoEditor.timeline.cursorLane')}
-                      checked={trackPresentation.panelPrefs.prefs.collapsedCursorLaneVisible}
-                      onChange={trackPresentation.panelPrefs.setCollapsedCursorLaneVisible}
-                    />
-                  </InspectorDetails>
+                  <ToggleField
+                    label={translate('videoEditor.timeline.cursorLane')}
+                    checked={trackPresentation.panelPrefs.prefs.collapsedCursorLaneVisible}
+                    onChange={trackPresentation.panelPrefs.setCollapsedCursorLaneVisible}
+                  />
                 ) : null}
               </>
             ),

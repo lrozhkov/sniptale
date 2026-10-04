@@ -20,7 +20,15 @@ import {
   type VideoProjectClip,
   type VideoProjectTrack,
 } from '../../../../features/video/project/types';
-import type { VideoEditorMaterialSourceRange } from '../../../contracts/insertion';
+import {
+  getVideoProjectTrackLogicalLaneIds,
+  resolveClipLogicalLaneId,
+} from '../../../../features/video/project/timeline/logical-lanes';
+import type {
+  VideoEditorMaterialTarget,
+  VideoEditorMaterialPlacementResult,
+  VideoEditorMaterialSourceRange,
+} from '../../../contracts/insertion';
 import type { AddAssetClipResult } from '../asset-shared';
 
 /** Only timed media has an In/Out interval; a selection must contain at least one frame. */
@@ -68,7 +76,7 @@ function resolveMaterialTrack(params: {
   claimed: Set<string>;
   asset: VideoProjectAsset;
   kind: VideoTrackKind;
-  mode: 'append' | 'overlay';
+  mode: 'append' | 'overlay' | 'drop';
   primary: boolean;
   preferredTrackId?: string | null;
 }) {
@@ -93,7 +101,7 @@ function resolveMaterialTrack(params: {
     (primary && !camera && kind === VideoTrackKind.PRIMARY
       ? (available.find((track) => track.isRoot) ?? available[0])
       : (previous ?? available.find((track) => !track.isRoot)));
-  if (mode === 'append' && existing) {
+  if ((mode === 'append' || (mode === 'drop' && preferred)) && existing) {
     claimed.add(existing.id);
     return existing;
   }
@@ -151,13 +159,14 @@ export function buildMaterialPlacement(
   project: VideoProject,
   asset: VideoProjectAsset,
   time: number,
-  mode: 'append' | 'overlay',
+  mode: 'append' | 'overlay' | 'drop',
   sourceRange?: VideoEditorMaterialSourceRange,
-  preferredTrackId?: string | null
+  preferredTrackId?: string | null,
+  timelineLaneId?: string
 ): AddAssetClipResult {
   const range = sourceRange ?? {
     start: 0,
-    end: Math.max(0.1, asset.metadata.duration ?? DEFAULT_IMAGE_CLIP_DURATION),
+    end: getMaterialDuration(asset),
   };
   const parts = getMaterialParts(project, asset).filter(
     (part) => part.id === asset.id || (part.metadata.duration ?? 0) > range.start
@@ -199,7 +208,9 @@ export function buildMaterialPlacement(
         groupId,
         range: partRange,
       });
-      clips.push(clip);
+      clips.push(
+        track.id === preferredTrackId && timelineLaneId ? { ...clip, timelineLaneId } : clip
+      );
       selectedClipId ??= clip.id;
       selectedTrackId ??= track.id;
     }
@@ -209,4 +220,44 @@ export function buildMaterialPlacement(
     selectedClipId,
     selectedTrackId,
   };
+}
+
+/** Still images use the editor default; timed materials retain their source duration. */
+export function getMaterialDuration(asset: VideoProjectAsset): number {
+  return asset.type === VideoProjectAssetType.IMAGE
+    ? DEFAULT_IMAGE_CLIP_DURATION
+    : (asset.metadata.duration ?? DEFAULT_IMAGE_CLIP_DURATION);
+}
+
+/** Shared preview/commit admission for an exact material drop; never edits the project. */
+export function getMaterialDropError(
+  project: VideoProject,
+  assetId: string,
+  target: VideoEditorMaterialTarget
+): Extract<VideoEditorMaterialPlacementResult, { status: 'rejected' }>['reason'] | null {
+  const asset = project.assets.find((item) => item.id === assetId);
+  if (!asset) return 'missing-material';
+  const duration = getMaterialDuration(asset);
+  if (!Number.isFinite(duration) || duration <= 0) return 'invalid-range';
+  const track = project.tracks.find((item) => item.id === target.trackId);
+  if (!track || !Number.isFinite(target.startTime) || target.startTime < 0) return 'invalid-target';
+  if (track.locked) return 'locked-track';
+  const kind =
+    asset.type === VideoProjectAssetType.AUDIO ? VideoTrackKind.AUDIO : VideoTrackKind.PRIMARY;
+  const camera = kind === VideoTrackKind.PRIMARY && asset.recordingPart?.role === 'camera';
+  if (
+    track.kind !== kind ||
+    (track.role === VideoProjectTrackRole.CAMERA) !== camera ||
+    !getVideoProjectTrackLogicalLaneIds(project, track.id).includes(target.timelineLaneId)
+  )
+    return 'invalid-target';
+  return project.clips.some(
+    (clip) =>
+      clip.trackId === track.id &&
+      resolveClipLogicalLaneId(clip) === target.timelineLaneId &&
+      clip.startTime < target.startTime + duration - 0.0001 &&
+      clip.startTime + clip.duration > target.startTime + 0.0001
+  )
+    ? 'occupied-target'
+    : null;
 }

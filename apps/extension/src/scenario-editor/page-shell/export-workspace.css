@@ -1,0 +1,245 @@
+@layer theme, base, components, utilities;
+
+.guide-export-workspace {
+  height: 100dvh;
+  min-height: 0;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(16rem, 26%, 21rem);
+  gap: 0.5rem;
+  padding: 0.5rem;
+  overflow: hidden;
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-canvas);
+  font-family: var(--sniptale-font-sans);
+}
+.guide-export-workspace *,
+.guide-export-workspace *::before,
+.guide-export-workspace *::after {
+  box-sizing: border-box;
+}
+.guide-export-workspace :is(button, a, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+.guide-export-workspace [hidden] {
+  display: none !important;
+}
+.guide-export-stage,
+.guide-export-inspector {
+  min-width: 0;
+  min-height: 0;
+  border-radius: var(--sniptale-radius-lg);
+  background: var(--sniptale-color-surface-panel);
+}
+.guide-export-stage {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.guide-export-inspector {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.guide-export-inspector-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0.75rem;
+}
+.guide-export-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: none;
+  padding: 12px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-export-heading .guide-labeled-action {
+  flex: none;
+  width: auto;
+}
+.guide-export-heading h1 {
+  flex: 1 1 8rem;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: break-word;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.guide-export-heading output {
+  flex: none;
+  margin-inline-start: auto;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-export-inspector-body > .guide-inspector-group:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+.guide-export-inspector .guide-inspector-group-body > .guide-labeled-action {
+  width: 100%;
+  justify-content: flex-start;
+}
+.guide-export-actions {
+  flex: none;
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-export-status {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--sniptale-color-text-secondary);
+  overflow-wrap: anywhere;
+}
+.guide-export-status[data-tone='error'] {
+  color: var(--sniptale-color-danger);
+}
+.guide-export-actions > button {
+  width: 100%;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+}
+.guide-export-actions .guide-html-export {
+  display: grid;
+  gap: 0.5rem;
+}
+.guide-export-actions .guide-html-export > button {
+  width: 100%;
+  justify-content: center;
+}
+/* Output settings use the same compact value hierarchy as editing inspectors. */
+.guide-export-controls {
+  --sniptale-compact-font-size: 12px;
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+}
+.guide-export-controls :is(.guide-html-fields, .tour-export-field) > label > span,
+.guide-export-controls .tour-export-field > span,
+.guide-export-controls .guide-html-switch > span {
+  color: var(--sniptale-color-text-secondary);
+  font-weight: 500;
+}
+.guide-export-controls [data-ui='shared.ui.compact-select'] > button {
+  min-height: 32px;
+  height: auto;
+  padding: 5px 8px;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+}
+.guide-export-controls [data-ui='shared.ui.compact-select'] .truncate {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.guide-export-controls
+  [data-ui='shared.ui.compact-select']
+  > button:is([aria-expanded='true'], :focus-visible):hover {
+  border-color: var(--sniptale-color-border-accent-strong);
+}
+.guide-export-controls [role='group'] {
+  border-color: var(--sniptale-color-border-soft);
+  background: transparent;
+}
+.guide-export-controls [role='group'] > span[aria-hidden='true'] {
+  background: var(--sniptale-color-surface-hover);
+  border: none;
+  box-shadow: none;
+}
+.guide-export-controls [role='group'] button > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.guide-export-controls .guide-labeled-action {
+  min-height: 32px;
+  height: auto;
+  padding: 5px 8px;
+  border-radius: var(--sniptale-radius-sm);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  font: 500 12px / 1.5 var(--sniptale-font-sans);
+  white-space: normal;
+}
+.guide-export-controls .guide-labeled-action:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+  border-color: var(--sniptale-color-border-soft);
+}
+.guide-export-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.guide-export-controls .guide-html-entry {
+  margin-block: 2px;
+  padding: 2px;
+}
+.guide-export-controls .guide-html-thumbnail:hover {
+  background: var(--sniptale-color-surface-hover);
+}
+.guide-export-controls .guide-html-entry > .guide-labeled-action {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-color: transparent;
+}
+@layer utilities {
+  .guide-export-controls [role='group'] > button {
+    height: auto !important;
+    min-height: 32px !important;
+    padding: 5px 8px;
+    border-color: transparent;
+    box-shadow: none;
+    font: 500 12px / 1.5 var(--sniptale-font-sans);
+    color: var(--sniptale-color-text-secondary);
+  }
+  .guide-export-controls [role='group'] > button[aria-pressed='true'] {
+    color: var(--sniptale-color-text-primary);
+    background: transparent;
+  }
+  .guide-export-controls [role='group'] > button:hover:not(:disabled) {
+    color: var(--sniptale-color-text-primary-strong);
+    background: transparent;
+  }
+  .guide-export-controls [role='group'] > button:focus-visible {
+    outline: 2px solid var(--sniptale-color-accent);
+    outline-offset: -2px;
+  }
+}
+
+.guide-export-controls
+  [data-ui='shared.ui.compact-select']
+  > button:not(:hover):not(:focus-visible):not([aria-expanded='true']) {
+  border-color: transparent;
+}
+
+.guide-export-formats {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.guide-export-formats > legend {
+  margin: 0;
+  padding: 0 0 8px;
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+}
+.guide-reader .guide-export-formats > button,
+.guide-reader .guide-export-formats .guide-html-export > button,
+.guide-export-heading .guide-labeled-action {
+  min-height: 40px;
+  height: auto;
+  justify-content: flex-start;
+  padding: 8px 12px;
+  white-space: normal;
+  color: var(--sniptale-color-text-primary);
+}

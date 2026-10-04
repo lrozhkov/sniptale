@@ -46,7 +46,6 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
           compact
           tone="danger"
           separated
-          className="mt-3"
           onClick={() => props.onUpdateMotionRegion(destination.id, { incomingConnection: null })}
         >
           {translate('videoEditor.timeline.disconnectFraming')}
@@ -116,7 +115,6 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
         tone="danger"
         separated
         onClick={() => props.onDeleteMotionRegion(motionRegion.id)}
-        className="mt-3"
       >
         {translate('common.actions.delete')}
       </InspectorActionButton>

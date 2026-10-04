@@ -5,18 +5,43 @@ const ease = (value) => value * value * (3 - 2 * value);
 const between = (from, to, progress) => from + (to - from) * progress;
 
 /** Visual snapshots only. The playback clock supplies every frame and owns elapsed time. */
-export function createTourMotion(root, signal) {
+export function createTourMotion(root, signal, changed = () => {}) {
   const scene = root.querySelector('[data-tour-scene]');
   const stage = root.querySelector('[data-tour-stage]');
   const hint = root.querySelector('[data-tour-hint]');
   let current = null;
-  function cancel({ preserveMediaGate = false } = {}) {
+  let highlightPhase = { kind: 'settled', elapsed: 0, reduced: false };
+  const highlights = () => projectHighlightPhase(scene, highlightPhase);
+  function frame(elapsed) {
+    if (!current?.ready || signal.aborted) return;
+    current.elapsed = elapsed;
+    if (highlightPhase.kind !== 'exit')
+      highlightPhase = { ...highlightPhase, kind: 'enter', elapsed };
+    highlights();
+    if (elapsed >= current.phases.total) {
+      const wasSettled = stage.dataset.motion === 'settled';
+      settleMotion(current, scene, hint, stage);
+      if (!wasSettled) changed();
+      return;
+    }
+    scene.inert = true;
+    hint.inert = true;
+    hint.style.visibility = 'hidden';
+    if (current.previous) stage.append(current.previous.pixels);
+    const wasRunning = stage.dataset.motion === 'running';
+    stage.dataset.motion = 'running';
+    applyMotionFrame(current, scene, stage, elapsed);
+    if (!wasRunning) changed();
+  }
+  function cancel({ preserveMediaGate = false, preserveHighlight = false } = {}) {
     const gate =
       preserveMediaGate && ['loading', 'error'].includes(stage.dataset.motion)
         ? stage.dataset.motion
         : null;
     if (current) settleMotion(current, scene, hint, stage);
     current = null;
+    if (!preserveHighlight) highlightPhase = { ...highlightPhase, kind: 'settled', elapsed: 0 };
+    highlights();
     scene.inert = false;
     hint.inert = false;
     hint.style.visibility = '';
@@ -26,12 +51,13 @@ export function createTourMotion(root, signal) {
       hint.inert = true;
       hint.style.visibility = 'hidden';
     }
+    changed();
   }
   signal.addEventListener('abort', cancel, { once: true });
   return {
     capture() {
       const travelling = current?.marker?.isConnected ? pointOf(current.marker) : null;
-      cancel();
+      cancel({ preserveHighlight: true });
       if (!root.dataset.slideId) return null;
       const points = scene.querySelectorAll('.tour-hotspot');
       const point = travelling ?? (points.length === 1 ? pointOf(points[0]) : null);
@@ -47,6 +73,8 @@ export function createTourMotion(root, signal) {
       cancel();
       if (signal.aborted) return;
       current = prepareMotion(scene, previous, slide, tour, viewport, reducedMotion);
+      highlightPhase = { kind: 'enter', elapsed: 0, reduced: reducedMotion };
+      highlights();
       current.ready = false;
       scene.inert = true;
       hint.inert = true;
@@ -54,23 +82,46 @@ export function createTourMotion(root, signal) {
       scene.style.opacity = '0';
       if (previous) stage.append(previous.pixels);
       stage.dataset.motion = 'loading';
+      changed();
     },
     ready() {
       if (current) current.ready = true;
       else cancel();
     },
-    frame(elapsed) {
-      if (!current?.ready || signal.aborted) return;
-      if (elapsed >= current.phases.total) {
-        settleMotion(current, scene, hint, stage);
-        return;
-      }
+    frame,
+    exit(elapsed) {
+      if (signal.aborted) return;
+      highlightPhase = { ...highlightPhase, kind: 'exit', elapsed };
+      highlights();
+    },
+    cancelExit() {
+      highlightPhase = { ...highlightPhase, kind: 'settled', elapsed: 0 };
+      highlights();
+    },
+    reflow(viewport) {
+      if (signal.aborted) return;
+      if (!current) return cancel({ preserveMediaGate: true, preserveHighlight: true });
+      const { ready, elapsed, previous, context } = current;
+      settleMotion(current, scene, hint, stage);
+      resizeSnapshot(previous, current.viewport, viewport);
+      current = prepareMotion(
+        scene,
+        previous,
+        context.slide,
+        context.tour,
+        viewport,
+        context.reducedMotion
+      );
+      current.ready = ready;
+      current.elapsed = elapsed;
+      if (ready) return frame(elapsed);
       scene.inert = true;
       hint.inert = true;
       hint.style.visibility = 'hidden';
-      if (current.previous) stage.append(current.previous.pixels);
-      stage.dataset.motion = 'running';
-      applyMotionFrame(current, scene, stage, elapsed);
+      scene.style.opacity = '0';
+      if (previous) stage.append(previous.pixels);
+      stage.dataset.motion = 'loading';
+      changed();
     },
     fail() {
       cancel();
@@ -78,9 +129,28 @@ export function createTourMotion(root, signal) {
       hint.inert = true;
       hint.style.visibility = 'hidden';
       stage.dataset.motion = 'error';
+      changed();
     },
     cancel,
   };
+}
+
+/** Effect alpha multiplies immutable rendered base alpha, including baked-redaction zero. */
+function projectHighlightPhase(scene, phase) {
+  for (const effect of scene.querySelectorAll('[data-tour-highlight]')) {
+    const base = Number(effect.dataset.baseOpacity);
+    const duration = Number(phase.kind === 'exit' ? effect.dataset.exitMs : effect.dataset.enterMs);
+    const progress = duration > 0 ? ease(bounded(phase.elapsed / duration)) : 1;
+    const factor =
+      phase.reduced || phase.kind === 'settled'
+        ? 1
+        : phase.kind === 'exit'
+          ? duration > 0
+            ? 1 - progress
+            : 1
+          : progress;
+    effect.style.opacity = String(base * factor);
+  }
 }
 
 function pointOf(node) {
@@ -96,15 +166,19 @@ function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
     : final;
   const targets = scene.querySelectorAll('.tour-hotspot');
   const target = targets.length === 1 && !targets[0].hidden ? targets[0] : null;
-  const marker = target ? scene.ownerDocument.createElement('div') : null;
+  const marker = target ? target.cloneNode(true) : null;
   if (marker) {
     if (previous?.point)
       previous.pixels.querySelectorAll('.tour-hotspot').forEach((node) => node.remove());
-    marker.className = 'tour-hotspot tour-motion-hotspot';
-    marker.textContent = target.textContent;
+    marker.classList.add('tour-motion-hotspot');
+    marker.removeAttribute('href');
+    marker.tabIndex = -1;
+    marker.inert = true;
     marker.setAttribute('aria-hidden', 'true');
   }
   return {
+    context: { slide, tour, reducedMotion },
+    elapsed: 0,
     previous,
     phases,
     kind: tour.transition.kind,
@@ -118,6 +192,18 @@ function prepareMotion(scene, previous, slide, tour, viewport, reducedMotion) {
     image,
   };
 }
+/** Frozen outgoing pixels retain their geometry while the live scene is rebuilt. */
+function resizeSnapshot(previous, from, to) {
+  if (!previous) return;
+  const scale = previous.scale ?? 1;
+  previous.pixels.style.width = `${from.stageWidth / scale}px`;
+  previous.pixels.style.height = `${from.stageHeight / scale}px`;
+  previous.pixels.style.transformOrigin = 'top left';
+  const ratio = to.stageWidth / from.stageWidth;
+  previous.scale = scale * ratio;
+  previous.pixels.style.transform = `scale(${previous.scale})`;
+  if (previous.point) previous.point = { x: previous.point.x * ratio, y: previous.point.y * ratio };
+}
 function applyMotionFrame(state, scene, stage, elapsed) {
   const switching = state.phases.switchMs ? bounded(elapsed / state.phases.switchMs) : 1;
   const travelling =
@@ -130,8 +216,10 @@ function applyMotionFrame(state, scene, stage, elapsed) {
   if (state.previous) state.previous.pixels.style.opacity = String(1 - switching);
   if (state.kind === 'slide') {
     scene.style.transform = `translateX(${(1 - switching) * state.viewport.stageWidth * 0.08}px)`;
-    if (state.previous)
-      state.previous.pixels.style.transform = `translateX(${-switching * state.viewport.stageWidth * 0.08}px)`;
+    if (state.previous) {
+      const offset = -switching * state.viewport.stageWidth * 0.08;
+      state.previous.pixels.style.transform = `translateX(${offset}px) scale(${state.previous.scale ?? 1})`;
+    }
   }
   let box = state.final;
   if (state.plane && state.base && state.final) {

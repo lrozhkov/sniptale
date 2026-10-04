@@ -9,6 +9,10 @@ export const sharedUiMessages = defineMessageSource({
     ru: 'Выбор цвета',
     en: 'Choose color',
   },
+  colorSelectorInvalid: {
+    ru: 'Неверный цвет',
+    en: 'Invalid color',
+  },
   colorSelectorRecentColors: {
     ru: 'Недавние',
     en: 'Recent',

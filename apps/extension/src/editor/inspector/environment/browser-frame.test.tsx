@@ -118,6 +118,8 @@ it('reads the browser-frame URL placeholder from the shared i18n seam and forwar
   expect(
     container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.text-field"]')
   ).toHaveLength(2);
+  expect(titleInput?.getAttribute('aria-label')).toBe('editor.compact.browserTabTitle');
+  expect(urlInput?.getAttribute('aria-label')).toBe('editor.compact.pageUrl');
 
   await act(async () => {
     updateInputValue(titleInput, 'Updated title');

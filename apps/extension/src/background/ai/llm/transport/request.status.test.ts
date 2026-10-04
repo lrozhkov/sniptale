@@ -173,3 +173,28 @@ it('maps aborted transport requests onto the translated timeout error', async ()
 
   await rejection;
 });
+
+it.each([
+  [401, 'text/html', 'background.runtime.llmInvalidApiKey'],
+  [429, 'text/plain', 'background.runtime.llmRateLimitExceeded'],
+  [500, 'text/html', 'background.runtime.llmServerError'],
+] as const)(
+  'preserves HTTP %i errors when the provider body is not JSON',
+  async (status, contentType, key) => {
+    const { requestMultimodalChatCompletion } = await import('./request');
+    fetchMock.mockResolvedValueOnce(
+      new Response('upstream token=never-expose', {
+        headers: { 'Content-Type': contentType },
+        status,
+      })
+    );
+    await expect(
+      requestMultimodalChatCompletion({
+        ...createMultimodalRequestArgs(),
+        systemPrompt: 'Return JSON',
+      })
+    ).rejects.toThrow(translate(key));
+    expect(JSON.stringify(loggerDebugMock.mock.calls)).not.toContain('never-expose');
+    expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain('never-expose');
+  }
+);

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { collectBrowserAdapterViolations, runBrowserAdapterCheck } from './check.mjs';
 import { filterAstGrepAuditFiles } from '../../../../audits/ast-grep/ast-grep.mjs';
+import { isBrowserAdapterAllowedPath } from '../../../../policy/browser-adapters/browser-adapters.mjs';
 import {
   createBrowserAdapterTempRoot as createTempRoot,
   createBrowserGlobalOwnerFixtures,
@@ -9,6 +10,17 @@ import {
   writeBrowserAdapterFixture as writeFile,
   writeExtendedRuntimeFixtures,
 } from './test-support';
+
+it('recognizes the exact native page-toolbar harness without allowing adjacent helpers', () => {
+  expect(
+    isBrowserAdapterAllowedPath(
+      'tooling/test/e2e/extension-critical/extension-critical-page-toolbar.helpers.ts'
+    )
+  ).toBe(true);
+  expect(
+    isBrowserAdapterAllowedPath('tooling/test/e2e/extension-critical/unreviewed.helpers.ts')
+  ).toBe(false);
+});
 
 function expectBrowserGlobalViolations(root: string, files: string[]) {
   expect(collectBrowserAdapterViolations(files, { root })).toEqual([

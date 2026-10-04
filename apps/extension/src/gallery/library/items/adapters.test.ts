@@ -1,5 +1,6 @@
+import { createScenarioItem } from '../test-support/items';
 import { expect, it } from 'vitest';
-import { createGalleryItems } from './adapters';
+import { createGalleryItems, createScenarioExportGalleryItem } from './adapters';
 import { isGalleryMediaItem, isGallerySelectableItem, isGalleryVideoProjectItem } from './types';
 import { createLibraryLifecycle } from '../../../composition/persistence/library-lifecycle';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
@@ -26,6 +27,68 @@ function createMediaLibraryItem(overrides: Partial<MediaLibraryItem> = {}): Medi
     ...overrides,
   };
 }
+
+it('keeps stored scenario images on the media thumbnail path without an aggregate revision', () => {
+  const [item] = createGalleryItems({
+    mediaItems: [
+      createMediaLibraryItem({
+        id: 'scenario-image-1',
+        source: { kind: 'stored-asset', assetId: 'scenario-image-1' },
+        hasThumbnail: true,
+        workspaceRevision: 0,
+      }),
+    ],
+    scenarioExportsByProjectId: new Map(),
+    scenarioProjects: [],
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+
+  expect(item?.hasThumbnail).toBe(true);
+  expect(item?.presentationRevision).toBeUndefined();
+});
+
+it('reconstructs each saved export under its own source project after a library reload', () => {
+  const projects = ['first', 'second'].map((id, index) => ({
+    availability: 'available' as const,
+    id,
+    name: `Project ${index + 1}`,
+    createdAt: index + 1,
+    updatedAt: index + 1,
+  }));
+  const entries = new Map(
+    projects.map((project) => [
+      project.id,
+      [
+        {
+          id: `export-${project.id}`,
+          projectId: project.id,
+          format: 'html' as const,
+          filename: `${project.id}.html`,
+          createdAt: 10,
+          size: 100,
+        },
+      ],
+    ])
+  );
+  const items = createGalleryItems({
+    mediaItems: [],
+    scenarioExportsByProjectId: entries,
+    scenarioProjects: projects,
+    thumbnailIds: new Set(),
+    videoProjects: [],
+  });
+  const exports = items.filter((item) => item.type === 'scenario-export');
+  expect(exports).toHaveLength(2);
+  expect(
+    exports.map((item) => [item.exportEntry.id, item.exportEntry.projectId, item.project.id])
+  ).toEqual(
+    expect.arrayContaining([
+      ['export-first', 'first', 'first'],
+      ['export-second', 'second', 'second'],
+    ])
+  );
+});
 
 it('creates a mixed gallery list with scenario and export items sorted by freshness', () => {
   const scenarioProject = {
@@ -271,4 +334,48 @@ it('keeps single recording metadata without presenting it as a recording group',
     }),
   ]);
   expect(items[0]).not.toHaveProperty('recordingGroupView');
+});
+
+it.each(['image', 'video', 'audio'] as const)(
+  'keeps available project %s assets in the gallery',
+  (kind) => {
+    const media = createMediaLibraryItem({
+      id: `project-asset:${kind}`,
+      kind,
+      source: { kind: 'project-asset', projectAssetId: kind },
+    });
+    const items = createGalleryItems({
+      mediaItems: [media],
+      scenarioExportsByProjectId: new Map(),
+      scenarioProjects: [],
+      thumbnailIds: new Set(),
+      videoProjects: [],
+    });
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ id: media.id, kind, source: media.source });
+  }
+);
+
+it('makes catalogue selection and Trash independent of its source project', () => {
+  const project = {
+    ...createScenarioItem().project,
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 2, trashedAt: 3 },
+  };
+  const entry = {
+    id: 'export',
+    projectId: project.id,
+    filename: 'guide.html',
+    format: 'html' as const,
+    createdAt: 1,
+    size: 42,
+  };
+  const active = createScenarioExportGalleryItem(project, entry);
+  expect(isGallerySelectableItem(active)).toBe(true);
+  expect(active.lifecycle?.trashedAt).toBeUndefined();
+  expect(active.lifecycle?.updatedAt).toBe(1);
+  const trashed = createScenarioExportGalleryItem(project, {
+    ...entry,
+    trashState: { updatedAt: 4, trashedAt: 5 },
+  });
+  expect(trashed.lifecycle).toMatchObject({ updatedAt: 4, trashedAt: 5 });
 });

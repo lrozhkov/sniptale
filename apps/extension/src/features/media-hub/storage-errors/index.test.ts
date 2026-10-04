@@ -177,3 +177,21 @@ describe('storage-errors headroom presentation', () => {
     expect(createMediaHubStorageHeadroomError(new Error('network'))).toBeNull();
   });
 });
+
+it('identifies owned normalized errors and rejects a forged marker', async () => {
+  const storageErrors = await importStorageErrorsModule();
+  const normalized = await storageErrors
+    .withMediaHubWriteGuard('delete', async () => {
+      throw new DOMException('quota exceeded', 'QuotaExceededError');
+    })
+    .catch((error: unknown) => error);
+  expect(storageErrors.isMediaHubStorageError(normalized)).toBe(true);
+  expect(
+    storageErrors.isMediaHubStorageError({
+      isMediaHubStorageError: true,
+      kind: 'quota',
+      message: 'raw',
+    })
+  ).toBe(false);
+  expect(storageErrors.isMediaHubStorageError(new Error('raw'))).toBe(false);
+});

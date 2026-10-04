@@ -170,7 +170,7 @@ function renderPixelateFields(
 
 function renderReadyMessage() {
   return (
-    <p className="text-sm text-[color:var(--sniptale-color-text-secondary)]">
+    <p className="text-xs text-[color:var(--sniptale-color-text-secondary)]">
       {translate('editor.toolbar.layerEffectsReadyToApply')}
     </p>
   );

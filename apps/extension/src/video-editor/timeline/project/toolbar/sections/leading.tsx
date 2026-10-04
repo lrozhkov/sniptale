@@ -8,6 +8,7 @@ import { toolbarButtonClassName } from './constants/button';
 import type { ProjectTimelineToolbarProps } from '../types';
 import { ProjectTimelineAddControls } from './add-controls';
 import { ProjectTimelineClipActions } from './clip-actions';
+import { ToolbarSeparator } from '../separator';
 
 export function ProjectTimelineToolbarLeadingControls({
   historyActions,
@@ -74,12 +75,8 @@ export function ProjectTimelineToolbarLeadingControls({
         </ContentToolbarButton>
       ) : null}
       <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
-      <div
-        className={[
-          'flex shrink-0 items-center gap-[var(--timeline-control-gap)] border-l',
-          'border-[color:var(--sniptale-color-border-soft)] pl-1',
-        ].join(' ')}
-      >
+      <ToolbarSeparator />
+      <div className="flex shrink-0 items-center gap-[var(--timeline-control-gap)]">
         <ProjectTimelineClipActions
           canDeleteSelectedClip={canDeleteSelectedClip}
           canEditSelectedClip={canEditSelectedClip}

@@ -36,11 +36,44 @@ import { projectVideoRecordingSurfaceSnapshot } from './snapshot-projection';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { translate } from '../../../../platform/i18n';
+import {
+  isVideoRecordingStartFailureCode,
+  type VideoRecordingStartFailureCode,
+} from '@sniptale/runtime-contracts/video/types/messages.surface';
 
 const logger = createLogger({ namespace: 'VideoRecordingSurfaceController' });
 
 function recordingActionError(): string {
   return translate('content.toolbar.videoRecordingActionFailed');
+}
+
+function recordingStartError(code: VideoRecordingStartFailureCode): string {
+  switch (code) {
+    case 'permission-required':
+      return translate('content.toolbar.videoRecordingStartPermissionRequired');
+    case 'stale-context':
+      return translate('content.toolbar.videoRecordingStartStaleContext');
+    case 'invalid-source':
+      return translate('content.toolbar.videoRecordingStartInvalidSource');
+    case 'viewport-too-large':
+      return translate('content.toolbar.videoRecordingStartViewportTooLarge');
+    case 'viewport-verification-failed':
+      return translate('content.toolbar.videoRecordingStartViewportVerificationFailed');
+    case 'already-active':
+    case 'duplicate-preparing':
+      return translate('content.toolbar.videoRecordingStartAlreadyActive');
+    case 'cancelled':
+      return translate('content.toolbar.videoRecordingStartCancelled');
+    case 'internal-error':
+      return recordingActionError();
+  }
+}
+
+function classifyRecordingStartError(error: unknown): VideoRecordingStartFailureCode {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('Page access is required')) return 'permission-required';
+  if (message.includes('Unauthorized content action capability')) return 'stale-context';
+  return 'internal-error';
 }
 
 type ApplySurfaceSnapshot = (snapshot: VideoRecordingSurfaceSnapshot, token?: string) => void;
@@ -193,15 +226,28 @@ function useSurfaceStart(
         const response = await startSavedTabVideoRecording(event);
         if (attempt !== startAttemptRef.current) return;
         if (!response?.success || !response.snapshot) {
-          logger.warn('Saved tab recording start was rejected', response?.error);
-          dispatch({ type: 'failed', error: recordingActionError() });
+          const code = isVideoRecordingStartFailureCode(response?.failureCode)
+            ? response.failureCode
+            : classifyRecordingStartError(response?.error);
+          logger.warn('Saved tab recording start was rejected', { code });
+          if (
+            response?.snapshot &&
+            response.surfaceToken &&
+            (code === 'already-active' || code === 'duplicate-preparing')
+          ) {
+            applySnapshot(response.snapshot, response.surfaceToken);
+            dispatch({ type: 'command-failed', error: recordingStartError(code) });
+          } else {
+            dispatch({ type: 'failed', error: recordingStartError(code) });
+          }
           return;
         }
         applySnapshot(response.snapshot, response.surfaceToken);
       } catch (error) {
         if (attempt !== startAttemptRef.current) return;
-        logger.warn('Saved tab recording start failed', error);
-        dispatch({ type: 'failed', error: recordingActionError() });
+        const code = classifyRecordingStartError(error);
+        logger.warn('Saved tab recording start failed', { code });
+        dispatch({ type: 'failed', error: recordingStartError(code) });
       }
     },
     [applySnapshot, dispatch]

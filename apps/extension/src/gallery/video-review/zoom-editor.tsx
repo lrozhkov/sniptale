@@ -5,8 +5,14 @@ import type {
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import {
+  projectReviewFocus,
+  reviewFocusSourceRange,
+} from '../../features/video/review/focus-edits';
+import type { ReviewTimeSegment } from '../../features/video/review/timeline';
+import {
   availableQuickEditZoomRange,
   createQuickEditZoomRegion,
+  fitQuickEditZoomTransitions,
   insertQuickEditZoomRegion,
   moveQuickEditZoomRegion,
   trimQuickEditZoomRegion,
@@ -15,6 +21,14 @@ import {
 } from '../../features/video/review/advanced/zoom';
 
 type ZoomState = QuickEditAdvancedState['zoom'];
+
+function sourceAnchorPatch(
+  range: Pick<QuickEditZoomRegion, 'start' | 'end'>,
+  timeMap?: readonly ReviewTimeSegment[]
+): Pick<QuickEditZoomRegion, 'sourceAnchor'> {
+  const anchor = timeMap ? reviewFocusSourceRange(range, timeMap) : null;
+  return anchor ? { sourceAnchor: anchor } : {};
+}
 
 /** A revived placement must fit among active neighbors or it stays dormant. */
 function fitsActiveWindow(zoom: ZoomState, id: string, start: number, end: number) {
@@ -29,10 +43,14 @@ function applyZoomChange(
   timelineDuration: number,
   zoom: ZoomState,
   id: string,
-  patch: QuickEditZoomRegionPatch
+  patch: QuickEditZoomRegionPatch,
+  timeMap?: readonly ReviewTimeSegment[]
 ): ZoomState {
   const originalRegion = zoom.regions.find((region) => region.id === id);
   if (!originalRegion) return zoom;
+  // Property edits keep an active source placement; cut-hidden result caches are not neighbors.
+  if (!originalRegion.dormant && patch.start === undefined && patch.end === undefined)
+    return { ...zoom, regions: updateQuickEditZoomRegion(zoom.regions, id, patch) };
   let regions = zoom.regions;
   if (patch.start !== undefined) {
     const start = patch.start;
@@ -64,6 +82,13 @@ function applyZoomChange(
       return { ...region, end: range.end, dormant: false };
     });
   }
+  if (patch.start !== undefined || patch.end !== undefined) {
+    regions = regions.map((region) =>
+      region.id === id
+        ? fitQuickEditZoomTransitions({ ...region, ...sourceAnchorPatch(region, timeMap) })
+        : region
+    );
+  }
   const { start: _startPatch, end: _endPatch, ...rest } = patch;
   // Any user-authored edit proves result-time intent and revives a dormant
   // placement, unless its stored interval collides with an active neighbor.
@@ -76,13 +101,47 @@ function applyZoomChange(
   return { ...zoom, regions };
 }
 
+/** Source-intent commits validate current neighbors before projecting the visible result cache. */
+function applySourceZoomCommit(
+  zoom: ZoomState,
+  id: string,
+  sourceAnchor: NonNullable<QuickEditZoomRegion['sourceAnchor']>,
+  timeMap: readonly ReviewTimeSegment[]
+): ZoomState {
+  const region = zoom.regions.find((item) => item.id === id);
+  const { start, end } = sourceAnchor;
+  if (
+    !region ||
+    !Number.isFinite(start) ||
+    !Number.isFinite(end) ||
+    start < 0 ||
+    end <= start ||
+    end > (timeMap.at(-1)?.sourceEnd ?? 0)
+  )
+    return zoom;
+  const collision = zoom.regions.some((other) => {
+    if (other.id === id || other.dormant) return false;
+    const anchor = other.sourceAnchor ?? reviewFocusSourceRange(other, timeMap);
+    return !!anchor && start < anchor.end && end > anchor.start;
+  });
+  if (collision) return zoom;
+  const authored = fitQuickEditZoomTransitions({ ...region, sourceAnchor, dormant: false });
+  const visible = projectReviewFocus([authored], timeMap);
+  const updated = {
+    ...authored,
+    ...(visible.length ? { start: visible[0]!.start, end: visible.at(-1)!.end } : {}),
+  };
+  return { ...zoom, regions: zoom.regions.map((item) => (item.id === id ? updated : item)) };
+}
+
 /** Drag commits follow the same revival rules as inspector changes. */
 function applyZoomCommit(
   timelineDuration: number,
   zoom: ZoomState,
   id: string,
   range: { start: number; end: number },
-  edge: 'start' | 'end' | 'move'
+  edge: 'start' | 'end' | 'move',
+  timeMap?: readonly ReviewTimeSegment[]
 ): ZoomState {
   const region = zoom.regions.find((item) => item.id === id);
   if (!region) return zoom;
@@ -97,7 +156,14 @@ function applyZoomCommit(
     return {
       ...zoom,
       regions: zoom.regions.map((item) =>
-        item.id === id ? { ...item, ...moved, dormant: false } : item
+        item.id === id
+          ? fitQuickEditZoomTransitions({
+              ...item,
+              ...moved,
+              dormant: false,
+              ...sourceAnchorPatch(moved, timeMap),
+            })
+          : item
       ),
     };
   }
@@ -112,22 +178,75 @@ function applyZoomCommit(
   return {
     ...zoom,
     regions: zoom.regions.map((item) =>
-      item.id === id ? { ...item, start: trimmed.start, end: trimmed.end, dormant: false } : item
+      item.id === id
+        ? fitQuickEditZoomTransitions({
+            ...item,
+            start: trimmed.start,
+            end: trimmed.end,
+            dormant: false,
+            ...sourceAnchorPatch(trimmed, timeMap),
+          })
+        : item
     ),
   };
 }
 
-/** One zoom-editing workflow owner: region selection, updates, and the stage focus overlay. */
-export function useReviewZoomEditor(args: {
+type ZoomEditorArgs = {
   setZoom(update: (zoom: ZoomState) => ZoomState): void;
   zoom: ZoomState;
   timelineDuration: number;
+  timeMap?: readonly ReviewTimeSegment[];
   selection?: string | null;
   onSelectionChange?(id: string | null): void;
   /** Transient gap-link selection; lives beside the region selection, never persisted. */
   linkSelection?: string | null;
   onLinkSelectionChange?(id: string | null): void;
-}) {
+};
+
+/** Create or select the region at the playhead without changing hook-owned selection state. */
+function addZoomAt(args: ZoomEditorArgs, at: number, timelineDuration: number): string | null {
+  const part = args.timeMap?.find(
+    (segment) => segment.kind !== 'cut' && at >= segment.resultStart && at < segment.resultEnd
+  );
+  if (args.timeMap && !part) return null;
+  const sourceAt = part ? part.sourceStart + (at - part.resultStart) * part.rate : at;
+  const sourceRegions = args.timeMap
+    ? args.zoom.regions.map((region) => ({
+        ...region,
+        ...(region.sourceAnchor ?? reviewFocusSourceRange(region, args.timeMap!) ?? region),
+      }))
+    : args.zoom.regions;
+  const range = availableQuickEditZoomRange({
+    regions: sourceRegions,
+    at: sourceAt,
+    timelineDuration: args.timeMap?.at(-1)?.sourceEnd ?? timelineDuration,
+  });
+  if (!range) {
+    return (
+      args.zoom.regions.find((region) => !region.dormant && at >= region.start && at < region.end)
+        ?.id ?? null
+    );
+  }
+  const region = createQuickEditZoomRegion({
+    id: `zoom-${crypto.randomUUID()}`,
+    at: range.start,
+    duration: range.end - range.start,
+    endMax: range.end,
+  });
+  const authored = args.timeMap ? { ...region, sourceAnchor: range } : region;
+  const visible = projectReviewFocus([authored], args.timeMap);
+  if (!visible.length) return null;
+  const anchored = { ...authored, start: visible[0]!.start, end: visible.at(-1)!.end };
+  args.setZoom((zoom) => ({
+    ...zoom,
+    enabled: true,
+    regions: insertQuickEditZoomRegion(zoom.regions, anchored),
+  }));
+  return region.id;
+}
+
+/** One zoom-editing workflow owner: region selection, updates, and the stage focus overlay. */
+export function useReviewZoomEditor(args: ZoomEditorArgs) {
   const [draft, setDraft] = useState<{
     id: string;
     patch: QuickEditZoomRegionPatch;
@@ -149,34 +268,9 @@ export function useReviewZoomEditor(args: {
     if (args.linkSelection === undefined) setLocalLinkSelection(id);
     args.onLinkSelectionChange?.(id);
   };
-  // A revived placement must fit among active neighbors or it stays dormant.
   const add = (at: number, timelineDuration: number) => {
-    const range = availableQuickEditZoomRange({
-      regions: args.zoom.regions,
-      at,
-      timelineDuration,
-    });
-    if (!range) {
-      // Occupied playhead: point the editor at the existing region instead of
-      // inserting an overlapping one; EOF refuses silently.
-      const existing = args.zoom.regions.find(
-        (region) => !region.dormant && at >= region.start && at < region.end
-      );
-      if (existing) setSelection(existing.id);
-      return;
-    }
-    const region = createQuickEditZoomRegion({
-      id: `zoom-${crypto.randomUUID()}`,
-      at: range.start,
-      duration: range.end - range.start,
-      endMax: range.end,
-    });
-    args.setZoom((zoom) => ({
-      ...zoom,
-      enabled: true,
-      regions: insertQuickEditZoomRegion(zoom.regions, region),
-    }));
-    setSelection(region.id);
+    const id = addZoomAt(args, at, timelineDuration);
+    if (id) setSelection(id);
   };
   const remove = (id: string) => {
     args.setZoom((zoom) => ({
@@ -201,7 +295,7 @@ export function useReviewZoomEditor(args: {
     });
   const change = (id: string, patch: QuickEditZoomRegionPatch) => {
     setDraft(null);
-    args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch));
+    args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch, args.timeMap));
   };
   const preview = (id: string, patch: QuickEditZoomRegionPatch | null) =>
     setDraft(
@@ -219,8 +313,14 @@ export function useReviewZoomEditor(args: {
   const commitDrag = (
     id: string,
     range: { start: number; end: number },
-    edge: 'start' | 'end' | 'move'
-  ) => args.setZoom((zoom) => applyZoomCommit(args.timelineDuration, zoom, id, range, edge));
+    edge: 'start' | 'end' | 'move',
+    sourceAnchor?: QuickEditZoomRegion['sourceAnchor']
+  ) =>
+    args.setZoom((zoom) =>
+      sourceAnchor && args.timeMap
+        ? applySourceZoomCommit(zoom, id, sourceAnchor, args.timeMap)
+        : applyZoomCommit(args.timelineDuration, zoom, id, range, edge, args.timeMap)
+    );
   const selected = (zoom: ZoomState): QuickEditZoomRegion | null =>
     zoom.regions.find((item) => item.id === selection) ?? null;
   return {
@@ -237,7 +337,11 @@ export function useReviewZoomEditor(args: {
         !fitsActiveWindow(args.zoom, region.id, region.start, region.end)
       )
         return null;
-      const created = { ...region, id: `zoom-${crypto.randomUUID()}` };
+      const created = fitQuickEditZoomTransitions({
+        ...region,
+        id: `zoom-${crypto.randomUUID()}`,
+        ...sourceAnchorPatch(region, args.timeMap),
+      });
       args.setZoom((zoom) => ({
         ...zoom,
         enabled: true,

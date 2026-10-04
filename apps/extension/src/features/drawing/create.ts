@@ -18,9 +18,18 @@ export function createDrawingObject(
     case 'shape':
       return { id, bounds, ...defaults.shape };
     case 'arrow':
-      return { id, kind: 'arrow', start: point, end: point, ...defaults.arrow };
+      return {
+        id,
+        kind: 'arrow',
+        start: point,
+        end: point,
+        color: defaults.arrow.color,
+        design: defaults.arrow.design,
+        dynamicWidth: defaults.arrow.dynamicWidth,
+        width: defaults.arrow.width,
+      };
     case 'blur':
-      return { id, kind: 'blur', bounds };
+      return { id, kind: 'blur', bounds, amount: defaults.blur.amount };
     case 'select':
     case 'text':
       return null;

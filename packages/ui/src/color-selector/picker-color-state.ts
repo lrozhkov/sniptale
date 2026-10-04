@@ -15,11 +15,11 @@ export function usePickerColorState(color: string) {
   );
   const stickyHueRef = useRef(draftState.hsvColor.hue);
   const alphaRef = useRef(getColorAlpha(draftState.resolvedColor) ?? 1);
-  const externalColorRef = useRef(color);
+  const synchronizedColorRef = useRef(color);
 
   useEffect(() => {
-    if (externalColorRef.current === color) return;
-    externalColorRef.current = color;
+    if (synchronizedColorRef.current === color) return;
+    synchronizedColorRef.current = color;
     const next = buildPickerDraftState(resolvePickerColor(color));
     stickyHueRef.current = next.hsvColor.hue;
     alphaRef.current = getColorAlpha(next.resolvedColor) ?? 1;
@@ -40,6 +40,8 @@ export function usePickerColorState(color: string) {
         setColorAlpha(hsvToHex(normalizedHsvColor), alphaRef.current) ??
         hsvToHex(normalizedHsvColor);
       alphaRef.current = getColorAlpha(resolvedColor) ?? alphaRef.current;
+      // Keep the pointer's HSV coordinates when the parent echoes a lossy RGB color (notably black).
+      synchronizedColorRef.current = resolvedColor;
       setDraftState({ hsvColor: normalizedHsvColor, resolvedColor });
       return resolvedColor;
     },

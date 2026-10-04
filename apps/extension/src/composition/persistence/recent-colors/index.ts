@@ -6,7 +6,7 @@ let recentColorsWriteQueue: Promise<string[]> = Promise.resolve([]);
 
 function normalizeRecentColor(value: string): string | null {
   const normalized = value.trim().toLowerCase();
-  return /^#[0-9a-f]{6}$/.test(normalized) ? normalized : null;
+  return /^#(?:[0-9a-f]{6}|[0-9a-f]{8})$/.test(normalized) ? normalized : null;
 }
 
 export async function loadRecentColors(limit = 10): Promise<string[]> {
@@ -20,6 +20,17 @@ export async function loadRecentColors(limit = 10): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+export function subscribeRecentColors(listener: (colors: string[]) => void): () => void {
+  if (!browserStorage.canObserveChanges()) return () => undefined;
+  return browserStorage.subscribeToChanges((changes, areaName) => {
+    if (areaName !== 'local' || !(EDITOR_RECENT_COLORS_KEY in changes)) return;
+    const parsed = parseStoredStringList(changes[EDITOR_RECENT_COLORS_KEY]?.newValue, 10);
+    listener(
+      parsed.value.map(normalizeRecentColor).filter((color): color is string => color !== null)
+    );
+  });
 }
 
 export async function pushRecentColor(color: string, limit = 10): Promise<string[]> {

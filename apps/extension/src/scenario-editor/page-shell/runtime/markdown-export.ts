@@ -1,9 +1,6 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import { renderGuideImageFrame } from './image-frame';
-import {
-  createArchiveWriter,
-  createDirectFileSink,
-  sanitizeArchivePathSegment,
-} from '../../../composition/archive-transfer';
+import { createArchiveWriter, createDirectFileSink } from '../../../composition/archive-transfer';
 import {
   getScenarioAssetBlob,
   saveScenarioExportRecord,
@@ -18,7 +15,12 @@ export async function exportGuideMarkdown(args: {
   t: Translate;
   signal: AbortSignal;
 }): Promise<'saved' | 'history-failed'> {
-  const filename = `${sanitizeArchivePathSegment(args.project.name)}.zip`;
+  const filename = await createOutputFilename({
+    category: 'documents',
+    type: 'guide',
+    title: args.project.name,
+    extension: 'zip',
+  });
   const sink = await createDirectFileSink({
     filename,
     extension: '.zip',

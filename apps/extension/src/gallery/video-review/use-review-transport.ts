@@ -18,12 +18,14 @@ export function useReviewTransport(args: {
   onSeek(value: number): void;
   boundaries(): readonly number[] | undefined;
   onTransportFailure(): void;
+  silent?: boolean;
 }) {
   const { session, source } = args.resource;
   const { video, time, onTime, playing, setPlaying, seek, play } = useReviewPlayback({
     duration: source.duration,
     edits: args.edits,
     original: args.originalAudio,
+    silent: args.silent ?? false,
     boundaries: args.boundaries,
     onSeek: args.onSeek,
     onFailure: args.onTransportFailure,
@@ -31,7 +33,8 @@ export function useReviewTransport(args: {
   const timeline = useReviewTimeMap(source, args.edits, time);
   useReviewEditorAudioRuntime({
     video,
-    playing,
+    playing: playing && !args.silent,
+    silent: args.silent ?? false,
     outputTime: timeline.sceneOutputTime,
     originalAudio: args.originalAudio,
     voiceover: args.voiceover,

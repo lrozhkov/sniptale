@@ -1,3 +1,4 @@
+import { useEffectPresetEditing, useEffectPresetMatchingControls } from './editing';
 import { readEffectPresentationDocument } from '../../../../../features/video/project/effect-bundle/presentation-document';
 import type { InspectorGroupDefinition } from '../grouped-inspector/types';
 import { EffectVisualPresets } from './presets';
@@ -76,6 +77,9 @@ export function createEffectInstanceGroup(
 export function createEffectInstanceGroups(
   args: Parameters<typeof createEffectInstanceGroup>[0]
 ): InspectorGroupDefinition<string>[] {
+  if (!args.instanceId || args.target.kind !== 'scene') {
+    return [createEffectInstanceGroup(args)];
+  }
   const groups: InspectorGroupDefinition<string>[] = [
     createEffectInstanceGroup({ ...args, separateParameters: true }),
   ];
@@ -140,22 +144,11 @@ type EffectInstanceCardProps = EffectInstanceGroupActions & {
 
 function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
   const { instance } = props;
+  const matchingControls = useEffectPresetMatchingControls(instance.id, instance.controls);
   const snapshot = props.project.effectSnapshots?.find(({ id }) => id === instance.snapshotId);
   const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
-  return (
-    <section
-      className="space-y-3 border-b border-[var(--sniptale-color-border-soft)] pb-3 last:border-b-0"
-      data-effect-instance={instance.id}
-    >
-      {!props.hideTitle ? (
-        <div>
-          <p className="break-words text-[13px] font-semibold">
-            {validation?.document
-              ? readLocaleText(validation.document.label)
-              : translate('videoEditor.effectsLibrary.unavailableEffect')}
-          </p>
-        </div>
-      ) : null}
+  const content = (
+    <>
       <ToggleField
         checked={instance.enabled}
         disabled={props.disabled ?? false}
@@ -170,12 +163,44 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
           sourceSha256={snapshot.sha256}
           catalogPackId={instance.catalogPackId}
           controls={instance.controls}
+          matchingControls={matchingControls}
           disabled={props.disabled ?? false}
           onChange={(controls) => props.onUpdateEffectInstance(instance.id, { controls })}
         />
       )}
       <EffectInstanceControls {...props} validation={validation} />
       <EffectInstanceActions {...props} />
+    </>
+  );
+  if (props.hideTitle && instance.target.kind === 'scene') {
+    return (
+      <section className="space-y-3" data-effect-instance={instance.id}>
+        {content}
+      </section>
+    );
+  }
+  return (
+    <section className="space-y-3" data-effect-instance={instance.id}>
+      <InspectorDetails
+        initiallyOpen
+        preferenceId={`effect-instance:${instance.target.kind}:${snapshot?.documentId ?? 'unavailable'}:${(
+          props.project.effectInstances ?? []
+        )
+          .filter(
+            (item) =>
+              sameTarget(item.target, instance.target) &&
+              props.project.effectSnapshots?.find((snapshot) => snapshot.id === item.snapshotId)
+                ?.documentId === snapshot?.documentId
+          )
+          .findIndex((item) => item.id === instance.id)}`}
+        label={
+          validation?.document
+            ? readLocaleText(validation.document.label)
+            : translate('videoEditor.effectsLibrary.unavailableEffect')
+        }
+      >
+        {content}
+      </InspectorDetails>
     </section>
   );
 }
@@ -268,6 +293,7 @@ function EffectInstanceControls(
   const renderControl = (control: ControlDefinition) => (
     <EffectControl
       control={control}
+      controls={props.instance.controls}
       documentId={document.id}
       disabled={props.disabled ?? false}
       instanceId={props.instance.id}
@@ -283,8 +309,12 @@ function EffectInstanceControls(
           (section) => props.parameterSection === undefined || section.id === props.parameterSection
         )
         .map((section, index) =>
-          section.advanced ? (
-            <InspectorDetails key={index} label={section.label}>
+          section.advanced && props.parameterSection === undefined ? (
+            <InspectorDetails
+              preferenceId={`effect-section:${section.id}`}
+              key={index}
+              label={section.label}
+            >
               {section.controls.map(renderControl)}
             </InspectorDetails>
           ) : (
@@ -303,7 +333,11 @@ function EffectInstanceControls(
           const point = props.instance.sceneAnchors?.[handle.id];
           if (!point) return null;
           return (
-            <InspectorDetails key={handle.id} label={readLocaleText(handle.label)}>
+            <InspectorDetails
+              preferenceId={`effect-handle:${handle.id}`}
+              key={handle.id}
+              label={readLocaleText(handle.label)}
+            >
               {(['x', 'y'] as const).map((axis) => (
                 <NumberInput
                   key={axis}
@@ -397,11 +431,13 @@ function EffectInstanceActions(props: EffectInstanceCardProps): React.JSX.Elemen
 function EffectControl(props: {
   documentId: string;
   control: ControlDefinition;
+  controls: Readonly<Record<string, number | string>>;
   disabled: boolean;
   instanceId: string;
   onUpdate(instanceId: string, patch: VideoProjectEffectInstancePatch): void;
   value: number | string;
 }): React.JSX.Element {
+  const editing = useEffectPresetEditing(props.instanceId, props.controls);
   const label = readLocaleText(props.control.label) || props.control.id;
   const update = (value: number | string) =>
     props.onUpdate(props.instanceId, { controls: { [props.control.id]: value } });
@@ -423,6 +459,8 @@ function EffectControl(props: {
         label={label}
         value={typeof props.value === 'number' ? props.value : props.control.defaultValue}
         onChange={update}
+        onPreview={editing.begin}
+        onCommit={editing.finish}
         {...(props.control.min === undefined ? {} : { min: props.control.min })}
         {...(props.control.max === undefined ? {} : { max: props.control.max })}
         {...(props.control.step === undefined ? {} : { step: props.control.step })}

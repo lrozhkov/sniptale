@@ -110,6 +110,7 @@ function createTabSelectionState(args: {
 
 function useTabSelectionBaseState(args: {
   activeTabCapabilities: ActiveTabCapabilities;
+  initialTabId?: number;
   isActive: boolean;
   pageAccessStatus: PageAccessStatus | null;
 }) {
@@ -123,6 +124,7 @@ function useTabSelectionBaseState(args: {
   const hasResolvedQueryRef = useRef(false);
   useAvailableTabQuery({
     activeTabCapabilities: args.activeTabCapabilities,
+    ...(args.initialTabId !== undefined ? { initialTabId: args.initialTabId } : {}),
     fingerprintRef,
     hasHydratedSelectionRef,
     hasResolvedQueryRef,
@@ -188,6 +190,7 @@ function useTabSelectionDerivedState(args: {
 
 function useTabSelectionController(args: {
   activeTabCapabilities: ActiveTabCapabilities;
+  initialTabId?: number;
   isActive: boolean;
   pageAccessStatus: PageAccessStatus | null;
 }) {
@@ -229,6 +232,7 @@ function useTabSelectionController(args: {
 
 export function usePopupExportTabSelection(args: {
   activeTabCapabilities: ActiveTabCapabilities;
+  initialTabId?: number;
   isActive: boolean;
   pageAccessStatus?: PageAccessStatus | null;
 }): PopupExportTabSelectionState {

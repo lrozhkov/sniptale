@@ -27,12 +27,14 @@ export async function importReviewBackgroundImage(args: {
   let attached = false;
   try {
     signal.throwIfAborted();
+    await prepared.protect();
+    signal.throwIfAborted();
     await args.attach(`project-asset:${prepared.id}`);
     attached = true;
     await prepared.publish();
     publishMediaHubLibraryChanged('create', [`project-asset:${prepared.id}`]);
   } finally {
     // Once referenced, a failed publication retains the existing recovery journal.
-    if (!attached) await prepared.discard();
+    if (!attached) await prepared.cancel();
   }
 }

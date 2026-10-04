@@ -153,19 +153,22 @@ export function FrameAnnotationToolbarActionButtons(props: {
           <Pencil size={18} />
         </ProductGlassToolbarButton>
       ) : null}
-      <ProductGlassToolbarDivider />
       {props.onCaptureVisibilityChange ? (
-        <ProductGlassToolbarButton
-          active={props.captureHidden === true}
-          aria-pressed={props.captureHidden === true}
-          data-ui="content.interactive-frame.capture-visibility"
-          onClick={props.onCaptureVisibilityChange}
-          onMouseDown={props.onMouseDown}
-          title={props.captureVisibilityTitle}
-        >
-          {props.captureHidden ? <EyeOff size={18} /> : <Eye size={18} />}
-        </ProductGlassToolbarButton>
+        <>
+          <ProductGlassToolbarDivider />
+          <ProductGlassToolbarButton
+            active={props.captureHidden === true}
+            aria-pressed={props.captureHidden === true}
+            data-ui="content.interactive-frame.capture-visibility"
+            onClick={props.onCaptureVisibilityChange}
+            onMouseDown={props.onMouseDown}
+            title={props.captureVisibilityTitle}
+          >
+            {props.captureHidden ? <EyeOff size={18} /> : <Eye size={18} />}
+          </ProductGlassToolbarButton>
+        </>
       ) : null}
+      <ProductGlassToolbarDivider />
       <ProductGlassToolbarButton
         danger
         onClick={props.onDelete}
@@ -174,8 +177,8 @@ export function FrameAnnotationToolbarActionButtons(props: {
       >
         <Trash2 size={18} />
       </ProductGlassToolbarButton>
-      <ProductGlassToolbarDivider />
       <ProductGlassToolbarButton
+        className={'sniptale-dismiss-button'}
         onClick={props.onClose}
         onMouseDown={props.onMouseDown}
         title={labels.get('close')}
@@ -261,6 +264,7 @@ export function FrameAnnotationFloatingToolbar(props: {
           }}
           onMouseDown={stopMouseDown}
         />
+        {props.trailingSlot}
         <FrameAnnotationToolbarActionButtons
           canDecrease={props.canDecrease !== false}
           onClose={command('close')}
@@ -271,7 +275,6 @@ export function FrameAnnotationFloatingToolbar(props: {
           onMouseDown={stopMouseDown}
           {...(props.showEdit === undefined ? {} : { showEdit: props.showEdit })}
         />
-        {props.trailingSlot}
       </ProductGlassToolbar>
       {effectMenuOpen ? (
         <div style={{ position: 'absolute', left: 0, top: 'calc(100% + 6px)', zIndex: 2 }}>

@@ -1,3 +1,8 @@
+import type {
+  GallerySelectionRange,
+  GalleryToggleSelectionOptions,
+} from '../keyboard/selection-range';
+import type { GalleryDeletionOpening } from '../deletion/types';
 import type { Dispatch, ReactNode, RefObject, SetStateAction } from 'react';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
@@ -10,6 +15,11 @@ import type {
 import type { GalleryItem } from '../items';
 
 export interface GalleryMainContentProps {
+  trashMode?: boolean;
+  keyboardEnabled: boolean;
+  navigationContext: string;
+  previewOpen: boolean;
+  trashItemCount?: number;
   allTags?: string[];
   banner: string | null;
   children?: ReactNode;
@@ -20,6 +30,7 @@ export interface GalleryMainContentProps {
   gridWidth: number;
   gridViewportRef: RefObject<HTMLDivElement | null>;
   isLoading: boolean;
+  libraryEmpty: boolean;
   search: string;
   scope: GalleryScope;
   selectedIds: Set<string>;
@@ -32,8 +43,9 @@ export interface GalleryMainContentProps {
   onApplySelectionTag: (tag?: string) => void;
   onBannerDismiss: () => void;
   onClearSelection: () => void;
-  onDeleteMany: (items: GalleryItem[]) => void;
+  onDeleteMany: (items: GalleryItem[], opening?: GalleryDeletionOpening) => void;
   onPreviewOpen: (item: GalleryItem, options?: { inspectorCollapsed?: boolean }) => void;
+  onProjectOpen?: (item: GalleryItem) => void;
   onRecordingGroupOpen?: (item: GalleryItem) => void;
   onScenarioPreviewOpen?: (projectId: string) => void;
   onSearchChange: Dispatch<SetStateAction<string>>;
@@ -42,6 +54,7 @@ export interface GalleryMainContentProps {
   onSelectionBackup: () => void;
   onSelectionZip: () => void;
   onSortModeChange: Dispatch<SetStateAction<SortMode>>;
-  onToggleSelection: (assetId: string, options?: { shiftKey?: boolean }) => void;
+  onToggleSelection: (assetId: string, options?: GalleryToggleSelectionOptions) => void;
+  onSelectRange: (range: GallerySelectionRange) => ReadonlySet<string>;
   onViewModeChange: Dispatch<SetStateAction<GalleryViewMode>>;
 }

@@ -6,7 +6,6 @@ import {
   useVideoEditorHistoryController,
 } from '../../runtime/controller/composition/hooks';
 import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
-import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
 const DOCUMENT_BAR_CLASS_NAME = 'flex min-w-0 flex-1 items-center justify-start gap-2';
 
@@ -52,26 +51,6 @@ function VideoEditorProjectTitle({
   );
 }
 
-function VideoEditorSaveStateBadge({
-  saveStateMeta,
-}: Pick<VideoEditorDocumentBarProps['header'], 'saveStateMeta'>) {
-  if (saveStateMeta.state !== 'error') return null;
-  return (
-    <span role="alert">
-      <ValueBadge className={saveStateMeta.className}>
-        {translate('videoEditor.app.saveChangesFailed')}
-        <button
-          type="button"
-          className="ml-2 font-semibold underline underline-offset-2"
-          onClick={requestVideoEditorSaveRetry}
-        >
-          {translate('common.actions.retry')}
-        </button>
-      </ValueBadge>
-    </span>
-  );
-}
-
 export function VideoEditorFloatingDocumentBar({ children }: { children?: ReactNode } = {}) {
   const header = useVideoEditorHeaderController();
   const history = useVideoEditorHistoryController();
@@ -85,7 +64,6 @@ export function VideoEditorFloatingDocumentBar({ children }: { children?: ReactN
           onRenameProject={header.onRenameProject}
         />
       )}
-      <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
       {history.error && (
         <span role="alert">
           <ValueBadge className="text-[var(--sniptale-color-danger)]">

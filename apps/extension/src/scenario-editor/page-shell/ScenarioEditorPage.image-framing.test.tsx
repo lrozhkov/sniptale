@@ -23,6 +23,7 @@ const io = vi.hoisted(() => ({
   tourEdit: vi.fn(),
   narration: vi.fn(),
 }));
+vi.mock('./image-dimensions', () => ({ useImageDimensions: () => ({ width: 800, height: 600 }) }));
 vi.mock('../../workflows/scenario-capture-edit/tour-edits', () => ({
   applyTourImageEdit: io.tourEdit,
 }));
@@ -79,11 +80,13 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   useAppLocale: () => 'en',
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
+import { GUIDE_AUTOSAVE_IDLE_MS } from './runtime/autosave';
 import { ScenarioEditorPage } from './ScenarioEditorPage';
 
 let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
+  vi.useFakeTimers();
   vi.clearAllMocks();
   io.previous.mockReturnValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -107,6 +110,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   container.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function render() {
@@ -131,9 +135,36 @@ async function editField(selector: string, value: string) {
   });
 }
 async function settleAutosave() {
-  await act(async () => new Promise((resolve) => setTimeout(resolve, 900)));
+  await act(async () => vi.advanceTimersByTimeAsync(GUIDE_AUTOSAVE_IDLE_MS));
 }
-it('moves framing into one contextual inspector and keeps it bound through canonical edits', async () => {
+it('selects an image by pointer without entering framing or changing the document', async () => {
+  const project = createGuideProject('Images', 'guide', 100);
+  const step = createGuideStep('Image step', 'images');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'one',
+      assetId: 'asset',
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: 'one.png' },
+    }),
+  ];
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  await render();
+  const block = container.querySelector<HTMLElement>('[data-block-id="one"]')!;
+  await act(async () =>
+    block
+      .querySelector('figure')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+  );
+  expect(container.querySelector('#guide-inspector-panel .guide-image-controls')).not.toBeNull();
+  expect(block.getAttribute('data-selected')).toBe('true');
+  expect(block.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
+  expect(io.save).not.toHaveBeenCalled();
+});
+
+it('keeps one framing draft bound to its inspector and discards it on selection change', async () => {
   const project = createGuideProject('Images', 'guide', 100);
   const step = createGuideStep('Image step', 'images');
   step.blocks = ['one', 'two'].map((id) =>
@@ -163,28 +194,35 @@ it('moves framing into one contextual inspector and keeps it bound through canon
   expect(inspector.hasAttribute('hidden')).toBe(false);
   expect(first.querySelector('.guide-image-controls')).toBeNull();
   expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
-  await editField('#guide-inspector-panel .guide-image-description input', 'Current caption');
-  expect(first.querySelector('figcaption')?.textContent).toBe('Current caption');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  expect(first.querySelector('img')?.style.scale).toBe('2');
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await settleAutosave();
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await click('Frame and image', second);
   expect(first.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
-  expect(inspector.querySelector<HTMLInputElement>('.guide-image-description input')?.value).toBe(
-    ''
-  );
+  expect(first.querySelector('img')?.style.scale).toBe('1');
+  expect(second.querySelector('img')?.style.scale).toBe('1');
   await click('Close', inspector);
   expect(inspector.hasAttribute('hidden')).toBe(true);
   await click('Inspector');
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await act(async () =>
     inspector
-      .querySelector('.guide-image-description input')
+      .querySelector('.guide-image-overview-map')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
+  expect(inspector.querySelector('.guide-image-controls')).not.toBeNull();
+  expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
+  await click('Description', inspector.querySelector('nav')!);
+  await act(async () =>
+    inspector
+      .querySelector('.guide-image-description input')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
   expect(inspector.querySelector('.guide-image-controls')).toBeNull();
-  expect(document.activeElement).toBe(second.querySelector('[data-frame-image]'));
+  expect(document.activeElement).toBe(container.querySelector('article#images'));
   await click('Frame and image', second);
   const other = container.querySelector<HTMLElement>('article#other')!;
   await act(async () => other.focus());
@@ -226,7 +264,7 @@ it('selects text and note settings from focus, preserves edits and returns to st
   );
   await click('Step settings', inspector);
   expect(inspector.textContent).toContain('Step layout');
-  expect(document.activeElement).toBe(container.querySelector('.guide-step-title'));
+  expect(document.activeElement).toBe(container.querySelector('article#blocks'));
   await act(async () => text.focus());
   const outline = container.querySelector<HTMLAnchorElement>('.guide-outline a')!;
   await act(async () => outline.click());
@@ -240,6 +278,44 @@ it('selects text and note settings from focus, preserves edits and returns to st
   expect(container.querySelector('[data-block-id="text"]')).not.toBeNull();
   expect(inspector.textContent).toContain('Step layout');
 });
+
+for (const selector of ['.guide-image-slot', '.guide-image-slot button']) {
+  it(`selects the empty image slot from ${selector} focus without changing the previous block`, async () => {
+    const project = createGuideProject('Slots', 'guide', 100);
+    const step = createGuideStep('Step', 'slots');
+    step.blocks = [
+      { kind: 'text', id: 'text', paragraphs: [] },
+      {
+        kind: 'image-slot',
+        id: 'slot',
+        frame: { width: 960, height: 540 },
+        fit: 'contain',
+        alt: '',
+        caption: '',
+      },
+    ];
+    project.items = [step];
+    io.load.mockResolvedValue(project);
+    await render();
+    await act(async () =>
+      container.querySelector<HTMLTextAreaElement>('[data-block-id="text"] textarea')!.focus()
+    );
+    await act(async () => container.querySelector<HTMLElement>(selector)!.focus());
+    const inspector = container.querySelector('#guide-inspector-panel')!;
+    await click('Half width', inspector);
+    expect(container.querySelector('[data-block-id="slot"]')?.getAttribute('data-width')).toBe(
+      '50'
+    );
+    expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe(
+      '100'
+    );
+    expect(inspector.querySelector('.guide-image-controls')).toBeNull();
+    await click('Undo');
+    expect(container.querySelector('[data-block-id="slot"]')?.getAttribute('data-width')).toBe(
+      '100'
+    );
+  });
+}
 
 it('opens the selected tour image and restores its selection and focus after Apply', async () => {
   const project = createGuideProject('Tour', 'guide', 100);
@@ -335,8 +411,8 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   const mode = container.querySelector<HTMLButtonElement>('[aria-label="Camera mode"]');
   expect(mode?.disabled).toBe(false);
   await click('Resources');
-  const upload = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
-    (node) => node.textContent === 'Upload image'
+  const upload = container.querySelector<HTMLButtonElement>(
+    '.guide-image-resources button[title="Image"]'
   );
   expect(upload?.disabled).toBe(true);
   await choose('Camera mode', 'Manual');
@@ -354,11 +430,16 @@ it('imports narration from the mounted tour inspector through the source-bound p
   io.narration.mockResolvedValue({ ...project, updatedAt: 101 });
   await render();
   await click('Interactive tour');
-  await act(async () => container.querySelector<HTMLButtonElement>('.tour-slide-select')?.click());
-  await click('Inspector');
-  const showAll = container.querySelector<HTMLButtonElement>('button[title="Show all settings"]');
-  if (showAll) await act(async () => showAll.click());
-  const input = container.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
+  const selectedSlide = container.querySelector<HTMLButtonElement>('.tour-slide-select');
+  expect(selectedSlide).not.toBeNull();
+  await act(async () => selectedSlide!.click());
+  const inspector = container.querySelector<HTMLElement>('#guide-inspector-panel');
+  expect(inspector).not.toBeNull();
+  expect(inspector!.hidden).toBe(false);
+  const showAll = inspector!.querySelector<HTMLButtonElement>('button[title="Show all settings"]');
+  expect(showAll).not.toBeNull();
+  await act(async () => showAll!.click());
+  const input = inspector!.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
   expect(input).not.toBeNull();
   const blob = new File(['voice'], 'narration.wav', { type: 'audio/wav' });
   Object.defineProperty(input, 'files', { value: [blob] });
@@ -384,7 +465,7 @@ it('switches representations directly from the header and keeps only the active 
   expect(choices().map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
   expect(choices()[0]?.querySelector('span')).not.toBeNull();
   expect(choices()[1]?.querySelector('span')).toBeNull();
-  expect(container.querySelector('.guide-header-actions')?.firstElementChild?.className).toBe(
+  expect(container.querySelector('.guide-page-header')?.firstElementChild?.className).toBe(
     'tour-representation-switch'
   );
   await act(async () => choices()[0]?.click());
@@ -396,6 +477,48 @@ it('switches representations directly from the header and keeps only the active 
   await act(async () => choices()[0]?.click());
   expect(choices()[0]?.getAttribute('aria-pressed')).toBe('true');
   expect(container.querySelector('.guide-document-scroll')).not.toBeNull();
+});
+
+it('places tour controls after the title and representation switch only in tour mode', async () => {
+  const project = createGuideProject('Tour header', 'guide', 100);
+  const slide = createTourImageSlide('first');
+  slide.image = {
+    assetId: 'image',
+    width: 100,
+    height: 100,
+    alt: '',
+    galleryAssetId: null,
+    editDocumentId: null,
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  project.tour = { ...createTourDocument(), slides: [slide] };
+  io.load.mockResolvedValue(project);
+  io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:guide-image');
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  await render();
+  expect(container.querySelector('.tour-header-controls')).toBeNull();
+  await click('Interactive tour');
+  const header = container.querySelector('.guide-page-header')!;
+  const title = header.querySelector('.guide-project-name')!;
+  const controls = header.querySelector('.tour-header-controls')!;
+  const representation = header.querySelector('.tour-representation-switch')!;
+  expect(controls).not.toBeNull();
+  expect(title.compareDocumentPosition(controls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(
+    representation.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  const actions = [...controls.querySelectorAll('button')].map((button) => button.title);
+  expect(actions).toContain('Preview');
+  expect(actions).toContain('Edit image');
+  expect(actions).not.toContain('Editing');
+  await click('Guide');
+  expect(container.querySelector('.tour-header-controls')).toBeNull();
 });
 
 it('opens standalone tour export and returns to the selected slide', async () => {
@@ -410,8 +533,247 @@ it('opens standalone tour export and returns to the selected slide', async () =>
   expect(container.querySelector('.tour-export')).not.toBeNull();
   expect(container.textContent).toContain('Prepare and preview');
   await act(async () =>
-    container.querySelector<HTMLButtonElement>('.tour-export header button')?.click()
+    container.querySelector<HTMLButtonElement>('.tour-export .guide-export-heading button')?.click()
   );
   expect(container.querySelector('.tour-export')).toBeNull();
   expect(container.querySelector('.tour-slide-list')?.textContent).toContain('Export slide');
+});
+
+it('uses the project name in the tab and distinguishes reader preview', async () => {
+  await render();
+  expect(document.title).toBe('Local guide');
+  await editField('.guide-project-name input', 'Renamed guide');
+  expect(document.title).toBe('Renamed guide');
+  await click('Export');
+  expect(document.title).toBe('Renamed guide · Просмотр');
+  await click('Back to editing');
+  expect(document.title).toBe('Renamed guide');
+});
+
+it.each(['text', 'heading', 'note', 'image-slot'] as const)(
+  'clears selected %s on Escape and keeps step settings on repeated Escape',
+  async (kind) => {
+    const project = createGuideProject('Selection', 'guide', 100);
+    const step = createGuideStep('Step', 'step');
+    step.blocks =
+      kind === 'text'
+        ? [{ id: 'block', kind, paragraphs: [] }]
+        : kind === 'heading'
+          ? [{ id: 'block', kind, text: 'Heading' }]
+          : kind === 'note'
+            ? [{ id: 'block', kind, tone: 'info', paragraphs: [] }]
+            : [
+                {
+                  id: 'block',
+                  kind,
+                  alt: '',
+                  caption: '',
+                  frame: { width: 960, height: 540 },
+                  fit: 'contain',
+                },
+              ];
+    project.items = [step];
+    io.load.mockResolvedValue(project);
+    await render();
+    const block = container.querySelector<HTMLElement>('[data-block-id="block"]')!;
+    await act(async () =>
+      block.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))
+    );
+    expect(block.getAttribute('data-selected')).toBe('true');
+    expect(document.activeElement).toBe(block);
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('false');
+    await act(async () =>
+      block.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('true');
+    await act(async () =>
+      container
+        .querySelector('article')!
+        .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(container.querySelector('article')?.getAttribute('data-selected')).toBe('true');
+    expect(block.getAttribute('data-selected')).toBe('false');
+    expect(document.activeElement).toBe(container.querySelector('article'));
+    expect(container.querySelector('.guide-document')?.getAttribute('data-selection-input')).toBe(
+      'pointer'
+    );
+    expect(container.querySelector('#guide-inspector-panel')?.textContent).not.toContain(
+      'Entire guide'
+    );
+    expect(io.save).not.toHaveBeenCalled();
+  }
+);
+
+it('keeps the moved block selected and focused across steps and undo', async () => {
+  const project = createGuideProject('Transfer', 'guide', 100);
+  const source = createGuideStep('Source', 'source');
+  source.blocks = [{ id: 'moving', kind: 'text', paragraphs: [] }];
+  project.items = [source, createGuideStep('Destination', 'destination')];
+  io.load.mockResolvedValue(project);
+  await render();
+  const pane = container.querySelector('.guide-document-scroll')!;
+  vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 500, 600));
+  for (const [index, article] of [...container.querySelectorAll('article')].entries()) {
+    const rect = new DOMRect(0, index * 200, 100, 100);
+    vi.spyOn(article, 'getBoundingClientRect').mockReturnValue(rect);
+    vi.spyOn(article.querySelector('.guide-step-blocks')!, 'getBoundingClientRect').mockReturnValue(
+      rect
+    );
+  }
+  const block = container.querySelector<HTMLElement>('[data-block-id="moving"]')!;
+  vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100));
+  const grip = block.querySelector('button.guide-block-grip')!;
+  Object.assign(grip, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  for (const [type, x, y] of [
+    ['pointerdown', 10, 10],
+    ['pointermove', 50, 250],
+    ['pointerup', 50, 250],
+  ] as const) {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: x,
+      clientY: y,
+    });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () => (type === 'pointerdown' ? grip : window).dispatchEvent(event));
+  }
+  const moved = container.querySelector<HTMLElement>('[data-block-id="moving"]')!;
+  expect(moved.closest('article')?.id).toBe('destination');
+  expect(moved.getAttribute('data-selected')).toBe('true');
+  expect(document.activeElement).toBe(moved);
+  await click('Undo');
+  const restored = container.querySelector<HTMLElement>('[data-block-id="moving"]')!;
+  expect(restored.closest('article')?.id).toBe('source');
+  expect(restored.getAttribute('data-selected')).toBe('true');
+  expect(document.activeElement).toBe(restored);
+});
+
+it('keeps a framing session out of autosave and commits all geometry once on Done', async () => {
+  const project = createGuideProject('Framing', 'guide', 100);
+  const step = createGuideStep('Image', 'images');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'one',
+      assetId: 'asset',
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: 'one.png' },
+    }),
+  ];
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:guide-image');
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  await render();
+  const image = container.querySelector('[data-block-id="one"]')!;
+  await act(async () =>
+    image
+      .querySelector('figure')!
+      .dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+  );
+  const inspector = container.querySelector('#guide-inspector-panel')!;
+  expect(inspector.querySelector('input[aria-label="Zoom, %"]')).toBeNull();
+  await click('Framing', inspector.querySelector('nav')!);
+  await click('Frame and image', inspector);
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '300');
+  await settleAutosave();
+  expect(io.save).not.toHaveBeenCalled();
+  expect(image.querySelector('img')?.style.scale).toBe('3');
+  await click('Show all settings', inspector);
+  expect(image.querySelector('img')?.style.scale).toBe('3');
+  await click('Show settings sections', inspector);
+  expect(inspector.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')?.value).toBe(
+    '300'
+  );
+  await settleAutosave();
+  expect(io.save).not.toHaveBeenCalled();
+  await click('Done', image);
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledTimes(1);
+  await click('Undo');
+  expect(image.querySelector('img')?.style.scale).toBe('1');
+  await settleAutosave();
+  io.save.mockClear();
+  await click('Frame and image', image);
+  await editField('#guide-inspector-panel input[type="range"][aria-label="Zoom, %"]', '200');
+  await click('Cancel', image);
+  await settleAutosave();
+  expect(image.querySelector('img')?.style.scale).toBe('1');
+  expect(io.save).not.toHaveBeenCalled();
+});
+
+it('detaches old media URLs before revocation across undo, redo and a delayed asset read', async () => {
+  const project = createGuideProject('Images', 'guide', 100);
+  const step = createGuideStep('Images', 'images');
+  const blocks = ['edited', 'original'].map((assetId, index) =>
+    createGuideImageBlock({
+      id: `image-${index}`,
+      assetId,
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: `${assetId}.png` },
+    })
+  );
+  step.blocks = blocks;
+  project.items = [step];
+  const previous = {
+    ...project,
+    updatedAt: 90,
+    items: [{ ...step, blocks: blocks.map((block) => ({ ...block, assetId: 'original' })) }],
+  };
+  io.load.mockResolvedValue(project);
+  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
+  const blob = new Blob(['image'], { type: 'image/png' });
+  io.asset.mockResolvedValue(blob);
+  const sources = () =>
+    [...container.querySelectorAll('article img')].map((image) => image.getAttribute('src'));
+  const attachedAtRevocation: string[] = [];
+  let sequence = 0;
+  const createUrl = vi.fn(() => `blob:media-${++sequence}`);
+  const revokeUrl = vi.fn((url: string) => {
+    if (sources().includes(url)) attachedAtRevocation.push(url);
+  });
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = createUrl;
+      static revokeObjectURL = revokeUrl;
+    }
+  );
+  await render();
+  expect(sources()).toHaveLength(2);
+  let finishStale!: (blob: Blob) => void;
+  io.asset.mockImplementationOnce(
+    () =>
+      new Promise<Blob>((resolve) => {
+        finishStale = resolve;
+      })
+  );
+  await click('Undo');
+  expect(container.querySelectorAll('article img')).toHaveLength(0);
+  await click('Redo');
+  const restoredSources = sources();
+  expect(restoredSources).toHaveLength(2);
+  const allocated = createUrl.mock.calls.length;
+  await act(async () => finishStale(blob));
+  expect(createUrl).toHaveBeenCalledTimes(allocated);
+  expect(sources()).toEqual(restoredSources);
+  await act(async () => root.render(null));
+  expect(attachedAtRevocation).toEqual([]);
+  expect(revokeUrl.mock.calls.map(([url]) => url).sort()).toEqual(
+    createUrl.mock.results.map((result) => result.value).sort()
+  );
 });

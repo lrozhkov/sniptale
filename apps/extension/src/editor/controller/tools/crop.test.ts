@@ -2,6 +2,7 @@
 
 import { Point, Rect } from 'fabric';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isEditorHiddenEdgeControl } from '../document/interaction-border-controls';
 
 import {
   applyCropGuideSelection,
@@ -12,6 +13,10 @@ import {
   getActiveEditorCropRect,
   isEditorCropGuide,
   normalizeEditorCropSelection,
+  normalizeEditorFreeCanvasSelection,
+  clampEditorFreeCanvasSelectionPosition,
+  getEditorFreeCanvasBounds,
+  clampEditorCropSelectionPosition,
 } from './crop';
 
 class ImageMock {
@@ -41,6 +46,49 @@ beforeEach(() => {
 });
 
 function runEditorControllerCropGuideSuite() {
+  it('allows a free canvas rectangle anywhere relative to the original image', () => {
+    expect(
+      normalizeEditorFreeCanvasSelection(
+        { left: -30, top: -20, width: 180, height: 120 },
+        { width: 100, height: 80 }
+      )
+    ).toEqual({ left: -30, top: -20, width: 180, height: 120 });
+    expect(
+      normalizeEditorFreeCanvasSelection(
+        { left: 110, top: 115, width: 20, height: 20 },
+        { width: 100, height: 80 }
+      )
+    ).toEqual({ left: 110, top: 115, width: 20, height: 20 });
+    const workspace = getEditorFreeCanvasBounds({ width: 100, height: 80 }, 0.5);
+    const stretched = normalizeEditorFreeCanvasSelection(
+      { left: workspace.left - 50, top: workspace.top - 20, width: 300, height: 200 },
+      { width: 100, height: 80 },
+      0.5
+    );
+    expect(stretched.left).toBe(workspace.left);
+    expect(stretched.top).toBe(workspace.top);
+    expect(stretched.left + stretched.width).toBe(workspace.left + 250);
+    expect(
+      clampEditorFreeCanvasSelectionPosition(
+        { left: workspace.right + 10, top: workspace.bottom + 10, width: 80, height: 60 },
+        { width: 100, height: 80 },
+        0.5
+      )
+    ).toEqual({
+      left: workspace.right - 80,
+      top: workspace.bottom - 60,
+      width: 80,
+      height: 60,
+    });
+  });
+  it('keeps crop dimensions while clamping a moved guide to canvas edges', () => {
+    expect(
+      clampEditorCropSelectionPosition(
+        { left: 180, top: 90, width: 80, height: 50 },
+        { width: 200, height: 100 }
+      )
+    ).toEqual({ left: 120, top: 50, width: 80, height: 50 });
+  });
   it('creates and normalizes crop guides', () => {
     const rect = createCropGuideRect(new Point(10, 20));
     const setControlsVisibility = vi.fn();
@@ -49,6 +97,10 @@ function runEditorControllerCropGuideSuite() {
     expect(rect.left).toBe(10);
     expect(rect.top).toBe(20);
     expect(rect.sniptaleRole).toBe('crop-guide');
+    expect(rect.strokeWidth).toBe(0);
+    expect(rect.hasBorders).toBe(false);
+    expect(isEditorHiddenEdgeControl(rect.controls['mr'])).toBe(true);
+    expect(rect.cornerColor).toBe(rect.borderColor);
     expect(isEditorCropGuide(rect)).toBe(true);
     expect(isEditorCropGuide(new Rect())).toBe(false);
     rect.set({ width: 20, height: 10, scaleX: 2, scaleY: 3 });
@@ -68,7 +120,17 @@ function runEditorControllerCropGuideSuite() {
     applyCropGuideSelection(rect, { height: 0, left: 3, top: 4, width: 0 }, 'preview');
     expect(rect.sniptaleCropGuideMode).toBe('preview');
     expect(rect.selectable).toBe(true);
-    expect(setControlsVisibility).toHaveBeenCalledWith({ mtr: false });
+    expect(setControlsVisibility).toHaveBeenCalledWith({
+      bl: true,
+      br: true,
+      mb: true,
+      ml: true,
+      mr: true,
+      mt: true,
+      mtr: false,
+      tl: true,
+      tr: true,
+    });
     configureCropGuideForEditing(rect);
     expect(
       normalizeEditorCropSelection(
@@ -81,6 +143,12 @@ function runEditorControllerCropGuideSuite() {
       width: 300,
       height: 1,
     });
+    expect(
+      normalizeEditorCropSelection(
+        { left: -30, top: 10, width: 130, height: 40 },
+        { width: 300, height: 200 }
+      )
+    ).toEqual({ left: 0, top: 10, width: 100, height: 40 });
   });
 }
 

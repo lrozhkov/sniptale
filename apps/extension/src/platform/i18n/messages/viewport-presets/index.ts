@@ -171,8 +171,8 @@ export const viewportPresetsMessages = defineMessageSource({
       en: 'Restore the window to its normal state first.',
     },
     busy: {
-      ru: 'Другая операция уже управляет размером этого окна.',
-      en: 'Another operation is already controlling this window size.',
+      ru: 'Размер окна занят текущим снимком или записью. Завершите операцию и выберите размер снова.',
+      en: 'A capture or recording is using this window size. Finish it, then select the size again.',
     },
     disabled: {
       ru: 'Шаблон выключен в настройках.',

@@ -45,8 +45,6 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
   ).not.toBeNull();
   expect([...host.children].map((element) => element.getAttribute('data-ui'))).toEqual([
     'content.toolbar.drawing-tools-group',
-    'content.toolbar.drawing-actions-divider',
-    'content.toolbar.drawing-actions-group',
   ]);
   const panel = host.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.pencil"]'
@@ -97,13 +95,7 @@ it('keeps pencil quick options beside its icon without extending the toolbar flo
   expect(host.querySelector('[aria-label="content.toolbar.drawingUndo"]')).toBeNull();
   expect(host.querySelector('[aria-label="content.toolbar.drawingRedo"]')).toBeNull();
   expect(host.querySelector('[aria-label="content.toolbar.drawingDelete"]')).toBeNull();
-  expect(host.querySelector('[aria-label="content.toolbar.drawingClear"]')).not.toBeNull();
-  expect(host.querySelector('[aria-label="content.toolbar.drawingClear"]')?.className).toContain(
-    'sniptale-btn-danger'
-  );
-  expect(
-    host.querySelector('[aria-label="content.toolbar.drawingClear"] .lucide-brush-cleaning')
-  ).not.toBeNull();
+  expect(host.querySelector('[aria-label="content.toolbar.drawingClear"]')).toBeNull();
   act(() => root.unmount());
 });
 
@@ -130,10 +122,14 @@ it('toggles options on repeated active-tool clicks but keeps Selection options v
     '[data-ui="content.toolbar.drawing.pencil"]'
   );
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.pencil"]')).not.toBeNull();
+  expect(pencil?.dataset['menuIndicator']).toBe('true');
+  expect(pencil?.getAttribute('aria-expanded')).toBe('true');
   act(() => pencil?.click());
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.pencil"]')).toBeNull();
+  expect(pencil?.getAttribute('aria-expanded')).toBe('false');
   act(() => pencil?.click());
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.pencil"]')).not.toBeNull();
+  expect(pencil?.getAttribute('aria-expanded')).toBe('true');
 
   act(() =>
     host.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing.arrow"]')?.click()
@@ -201,7 +197,7 @@ it('commits an arbitrary pencil color through the shared application picker', as
   act(() => root.unmount());
 });
 
-it('shows persistent arrow color, size, and shaft profile controls', () => {
+it('shows persistent arrow color, size, shaft profile, and gesture direction controls', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
@@ -241,7 +237,11 @@ it('shows persistent arrow color, size, and shaft profile controls', () => {
   const freehand = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.arrow.freehand"]'
   );
+  const fromTip = host.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.drawing-options.arrow.from-tip"]'
+  );
   expect(freehand).not.toBeNull();
+  expect(fromTip?.getAttribute('aria-pressed')).toBe('false');
   const blue = panel?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]');
   act(() => width24?.click());
   act(() => uniform?.click());
@@ -249,9 +249,13 @@ it('shows persistent arrow color, size, and shaft profile controls', () => {
   expect(session.getSnapshot().defaults.arrow).toEqual({
     color: '#60a5fa',
     design: 'standard',
+    drawFromTip: false,
     dynamicWidth: false,
     width: 24,
   });
+  act(() => fromTip?.click());
+  expect(session.getSnapshot().defaults.arrow.drawFromTip).toBe(true);
+  expect(fromTip?.getAttribute('aria-pressed')).toBe('true');
   act(() => freehand?.click());
   expect(session.getSnapshot().defaults.arrow.design).toBe('freehand');
   expect(freehand?.getAttribute('aria-pressed')).toBe('true');
@@ -288,17 +292,28 @@ it('shows compact two-row text and background palettes with text-size controls',
   const textPalette = panel?.querySelector<HTMLElement>(
     '[aria-label="content.toolbar.drawingTextColor"]'
   );
-  const backgroundPalette = panel?.querySelector<HTMLElement>(
-    '[aria-label="content.toolbar.drawingTextBackground"]'
-  );
-  expect(textPalette?.querySelector('.grid.grid-cols-4')).not.toBeNull();
-  expect(backgroundPalette?.querySelector('.grid.grid-cols-4')).not.toBeNull();
-  expect(textPalette?.querySelectorAll('button[title^="#"]')).toHaveLength(8);
+  expect(textPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
+  expect(
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+  ).toBeNull();
+  expect(textPalette?.querySelectorAll('.grid.grid-cols-5 button[title^="#"]')).toHaveLength(5);
   expect(textPalette?.querySelector('button[title="#14b8a6"]')).toBeNull();
   expect(textPalette?.querySelector('button[title="#ec4899"]')).toBeNull();
-  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
+  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(1);
   expect(textPalette?.getAttribute('role')).toBe('group');
+
+  const backgroundToggle = panel?.querySelector<HTMLButtonElement>(
+    '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+  );
+  expect(backgroundToggle?.getAttribute('aria-pressed')).toBe('false');
+  act(() => backgroundToggle?.click());
+  expect(session.getSnapshot().defaults.text.backgroundColor).toBe(DEFAULT_DRAWING_COLORS[0]);
+  const backgroundPalette = panel?.querySelector<HTMLElement>(
+    '[data-ui="content.toolbar.drawing-options.text.background-colors"]'
+  );
+  expect(backgroundPalette?.querySelector('.grid.grid-cols-5')).not.toBeNull();
   expect(backgroundPalette?.getAttribute('role')).toBe('group');
+  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
 
   act(() =>
     panel
@@ -307,7 +322,7 @@ it('shows compact two-row text and background palettes with text-size controls',
       )
       ?.click()
   );
-  act(() => textPalette?.querySelector<HTMLButtonElement>('button[title="#ffffff"]')?.click());
+  act(() => textPalette?.querySelector<HTMLButtonElement>('button[title="#22c55e"]')?.click());
   act(() =>
     backgroundPalette?.querySelector<HTMLButtonElement>('button[title="#60a5fa"]')?.click()
   );
@@ -318,24 +333,30 @@ it('shows compact two-row text and background palettes with text-size controls',
   );
   expect(session.getSnapshot().defaults.text).toEqual({
     backgroundColor: '#60a5fa',
-    color: '#ffffff',
+    color: '#22c55e',
     fontFamily: 'serif',
     fontSize: 36,
   });
   const selectedTextColor =
-    textPalette?.querySelector<HTMLButtonElement>('button[title="#ffffff"]');
+    textPalette?.querySelector<HTMLButtonElement>('button[title="#22c55e"]');
   expect(selectedTextColor?.getAttribute('aria-label')).toBe(
-    'content.toolbar.drawingTextColor: #ffffff'
+    'content.toolbar.drawingTextColor: #22c55e'
   );
   expect(selectedTextColor?.getAttribute('aria-pressed')).toBe('true');
-  act(() =>
-    panel
-      ?.querySelector<HTMLButtonElement>(
-        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
-      )
-      ?.click()
-  );
+  act(() => backgroundToggle?.click());
   expect(session.getSnapshot().defaults.text.backgroundColor).toBeNull();
+  expect(
+    panel?.querySelector('[data-ui="content.toolbar.drawing-options.text.background-colors"]')
+  ).toBeNull();
+  act(() => backgroundToggle?.click());
+  expect(session.getSnapshot().defaults.text.backgroundColor).toBe('#60a5fa');
+  act(() => root.render(<ToolbarDrawingControls controller={controller} displayMode="vertical" />));
+  const verticalPalette = host.querySelector<HTMLElement>(
+    '[aria-label="content.toolbar.drawingTextColor"]'
+  );
+  expect(verticalPalette?.classList.contains('flex-col')).toBe(true);
+  expect(verticalPalette?.querySelector('.grid.grid-cols-1')).not.toBeNull();
+  expect(verticalPalette?.querySelectorAll('.grid.grid-cols-1 button[title^="#"]')).toHaveLength(5);
   act(() => root.unmount());
 });
 
@@ -369,83 +390,6 @@ it('places Text immediately after Marker in the drawing toolbar', () => {
     'content.toolbar.drawing.marker',
     'content.toolbar.drawing.text',
   ]);
-  act(() => root.unmount());
-});
-
-it('uses one Shapes panel for outline, width, and alpha-aware fill controls', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  const session = createDrawingSession({ onDocumentCommit: () => true });
-  const controller: ContentDrawingController = {
-    session,
-    applyPalette: vi.fn(),
-    finalizeInteraction: vi.fn(),
-    getPalette: () => DEFAULT_DRAWING_COLORS,
-    getScrollRoot: () => ({ kind: 'viewport', element: null }),
-    prepareActivation: () => true,
-    registerInteractionFinalizer: vi.fn(),
-  };
-  const host = document.createElement('div');
-  document.body.append(host);
-  const root = createRoot(host);
-  act(() =>
-    root.render(<ToolbarDrawingControls controller={controller} displayMode="horizontal" />)
-  );
-
-  expect(host.querySelector('[data-ui="content.toolbar.drawing.rectangle"]')).toBeNull();
-  expect(host.querySelector('[data-ui="content.toolbar.drawing.ellipse"]')).toBeNull();
-  const shape = host.querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing.shape"]');
-  act(() => shape?.click());
-  const panel = host.querySelector<HTMLElement>(
-    '[data-ui="content.toolbar.drawing-options.shape"]'
-  );
-  expect(panel?.classList).toContain('flex');
-  expect(
-    panel?.querySelectorAll('[data-ui^="content.toolbar.drawing-options.shape.kind-"]')
-  ).toHaveLength(3);
-  expect(
-    panel
-      ?.querySelector('[data-ui="content.toolbar.drawing-options.shape.fill-none"]')
-      ?.getAttribute('aria-pressed')
-  ).toBe('true');
-  expect(
-    panel?.querySelectorAll(
-      '[data-ui="content.toolbar.drawing-options.shape.fill-colors"] [aria-pressed="true"]'
-    )
-  ).toHaveLength(0);
-  expect(panel?.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(2);
-
-  const triangle = host.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.shape.kind-triangle"]'
-  );
-  const width8 = host.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.shape.width-8"]'
-  );
-  const shapePreviewSizes = [2, 4, 8].map(
-    (value) =>
-      panel?.querySelector<HTMLElement>(
-        `[data-ui="content.toolbar.drawing-options.shape.width-${value}"] [data-ui="drawing-width-preview"]`
-      )?.style.height
-  );
-  expect(shapePreviewSizes).toEqual(['2px', '6px', '10px']);
-  const blue = host.querySelector<HTMLButtonElement>('button[title="#60a5fa"]');
-  act(() => triangle?.click());
-  act(() => width8?.click());
-  act(() => blue?.click());
-  expect(session.getSnapshot().defaults.shape).toEqual({
-    color: '#60a5fa',
-    fillColor: null,
-    kind: 'triangle',
-    width: 8,
-  });
-  const fillPickerTrigger = panel?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.shape.fill"] ' +
-      '[data-ui="shared.ui.color-selector.picker-trigger"]'
-  );
-  await act(async () => fillPickerTrigger?.click());
-  expect(
-    document.body.querySelector('input[aria-label="shared.ui.colorSelectorAlpha"]')
-  ).not.toBeNull();
-  expect(host.querySelector('[data-ui="content.toolbar.drawing-options.shape"]')).not.toBeNull();
   act(() => root.unmount());
 });
 
@@ -484,15 +428,16 @@ it('reuses the Shapes panel to change the kind of a selected outline object', ()
   expect(
     panel?.closest('.relative')?.querySelector('[data-ui="content.toolbar.drawing.shape"]')
   ).toBeNull();
-  const deselect = panel?.querySelector<HTMLButtonElement>(
+  const deselect = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.deselect"]'
   );
-  const deleteSelected = panel?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.delete"]'
+  const deleteSelected = host.querySelector<HTMLButtonElement>(
+    '[data-ui="drawing.selection.actions.delete"]'
   );
   expect(deleteSelected).not.toBeNull();
   expect(deleteSelected?.className).toContain('sniptale-btn-danger');
-  expect(deleteSelected?.nextElementSibling).toBe(deselect);
+  expect(panel?.contains(deleteSelected ?? null)).toBe(false);
+  expect(deselect?.parentElement?.lastElementChild).toBe(deselect);
   act(() => deselect?.click());
   expect(session.getSnapshot().selectedObjectId).toBeNull();
   act(() => session.select('selected-shape'));
@@ -500,16 +445,14 @@ it('reuses the Shapes panel to change the kind of a selected outline object', ()
     host.querySelector('[data-ui="content.toolbar.drawing-options.shape.kind-parallelogram"]')
   ).toBeNull();
   act(() =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing-options.delete"]')
-      ?.click()
+    host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.delete"]')?.click()
   );
   expect(session.getSnapshot().document.objects).toHaveLength(0);
   expect(session.getSnapshot().selectedObjectId).toBeNull();
   act(() => root.unmount());
 });
 
-it('shows only deselect and delete actions for a selected blur object', () => {
+it('shows strength choices and actions for a selected blur object', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const session = createDrawingSession({ onDocumentCommit: () => true });
   const controller: ContentDrawingController = {
@@ -539,22 +482,43 @@ it('shows only deselect and delete actions for a selected blur object', () => {
   expect(
     panel?.closest('.relative')?.querySelector('[data-ui="content.toolbar.drawing.select"]')
   ).not.toBeNull();
-  expect(panel?.children).toHaveLength(2);
-  const deselect = panel?.querySelector<HTMLButtonElement>(
+  expect(
+    panel?.querySelectorAll('[data-ui^="content.toolbar.drawing-options.blur.amount-"]')
+  ).toHaveLength(3);
+  expect(
+    panel?.querySelector<HTMLButtonElement>(
+      '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
+    )?.className
+  ).toContain('aspect-square');
+  expect(
+    panel
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
+      )
+      ?.querySelector('[data-ui="drawing-blur-preview"]')
+  ).not.toBeNull();
+  act(() =>
+    panel
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.blur.amount-6"]'
+      )
+      ?.click()
+  );
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({ amount: 6 });
+  const deselect = host.querySelector<HTMLButtonElement>(
     '[data-ui="content.toolbar.drawing-options.deselect"]'
   );
-  const deleteSelected = panel?.querySelector<HTMLButtonElement>(
-    '[data-ui="content.toolbar.drawing-options.delete"]'
+  const deleteSelected = host.querySelector<HTMLButtonElement>(
+    '[data-ui="drawing.selection.actions.delete"]'
   );
-  expect(deleteSelected?.nextElementSibling).toBe(deselect);
+  expect(deleteSelected).not.toBeNull();
+  expect(deselect?.parentElement?.lastElementChild).toBe(deselect);
   expect(session.getSnapshot().selectedObjectId).toBe('selected-blur');
   act(() => deselect?.click());
   expect(session.getSnapshot().selectedObjectId).toBeNull();
   act(() => session.select('selected-blur'));
   act(() =>
-    host
-      .querySelector<HTMLButtonElement>('[data-ui="content.toolbar.drawing-options.delete"]')
-      ?.click()
+    host.querySelector<HTMLButtonElement>('[data-ui="drawing.selection.actions.delete"]')?.click()
   );
   expect(session.getSnapshot().document.objects).toHaveLength(0);
   act(() => root.unmount());
@@ -663,7 +627,7 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   expect(panel?.classList).toContain('flex-col');
   const markerColorGroup = panel?.querySelector('[aria-label="content.toolbar.drawingColor"]');
   expect(markerColorGroup?.classList).toContain('flex-col');
-  expect(markerColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-2');
+  expect(markerColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-1');
   const verticalDivider = panel?.querySelector<HTMLElement>(
     '[data-ui="content.toolbar.drawing-options.divider"]'
   );
@@ -687,8 +651,8 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
   act(() => opacity30?.click());
   act(() => green?.click());
   expect(session.getSnapshot().defaults.marker).toMatchObject({
-    color: '#22c55e',
-    opacity: 0.3,
+    color: '#22c55e4d',
+    opacity: 1,
     width: 44,
   });
   expect(host.querySelector('[data-ui="content.toolbar.drawing-options.marker"]')).not.toBeNull();
@@ -704,12 +668,20 @@ it('switches the persistent quick panel to marker colors, sizes, and opacity ico
     '[aria-label="content.toolbar.drawingTextColor"]'
   );
   expect(textColorGroup?.classList).toContain('flex-col');
-  expect(textColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-2');
+  expect(textColorGroup?.querySelector('.grid')?.classList).toContain('grid-cols-1');
   const textBackgroundGroup = textPanel?.querySelector(
     '[data-ui="content.toolbar.drawing-options.text.background-group"]'
   );
   expect(textBackgroundGroup?.classList).toContain('flex-col');
-  expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-2');
+  expect(textBackgroundGroup?.querySelector('.grid')).toBeNull();
+  act(() =>
+    textBackgroundGroup
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="content.toolbar.drawing-options.text.background-none"]'
+      )
+      ?.click()
+  );
+  expect(textBackgroundGroup?.querySelector('.grid')?.classList).toContain('grid-cols-1');
   act(() => root.unmount());
 });
 
@@ -735,6 +707,17 @@ it('keeps Drawing options inside right and bottom viewport edges under page zoom
         y,
         toJSON: () => ({}),
       };
+    }
+  );
+  // jsdom has no layout; provide the dimensions read by the real menu measurement effect.
+  vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('sniptale-drawing-options-menu') ? 190 : 0;
+    }
+  );
+  vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(
+    function (this: HTMLElement) {
+      return this.classList.contains('sniptale-drawing-options-menu') ? 170 : 0;
     }
   );
   const session = createDrawingSession({ onDocumentCommit: () => true });

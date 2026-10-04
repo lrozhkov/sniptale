@@ -35,6 +35,7 @@ export interface InteractiveFramePopoversProps {
   setTempFrame: React.Dispatch<React.SetStateAction<FrameData>>;
   stageCalloutFrame?: (update: FrameData | ((frame: FrameData) => FrameData)) => FrameData;
   closePopover: () => void;
+  clearSelection: () => void;
   handleEffectModeSelect?: (mode: EffectMode) => void;
   onUpdate: (frame: FrameData) => void;
 }
@@ -77,10 +78,15 @@ function applyFrameSettingsPreviewPatch(
   };
 }
 
+function dismissSettingsPopover(props: InteractiveFramePopoversProps) {
+  props.closePopover();
+  if (props.isSelected) props.clearSelection();
+}
+
 function createFrameSettingsProps(props: InteractiveFramePopoversProps) {
   return {
     isOpen: props.isPopoverOpen,
-    onClose: props.closePopover,
+    onClose: () => dismissSettingsPopover(props),
     ...(props.handleEffectModeSelect === undefined
       ? {}
       : { onEffectModeChange: props.handleEffectModeSelect }),
@@ -114,7 +120,7 @@ function createStepBadgeProps(props: InteractiveFramePopoversProps) {
   const borderSettings = props.currentFrame.borderSettings ?? props.frame.borderSettings;
   return {
     isOpen: props.isStepBadgePopoverOpen && !!stepBadge?.enabled,
-    onClose: props.closePopover,
+    onClose: () => dismissSettingsPopover(props),
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     anchorEl: props.stepBadgePopoverAnchorRef.current,
@@ -140,7 +146,7 @@ function createCalloutSettingsProps(props: InteractiveFramePopoversProps) {
   return {
     isOpen: props.isCalloutPopoverOpen && !!callout?.enabled,
     calloutIndex: activeCalloutIndex,
-    onClose: props.closePopover,
+    onClose: () => dismissSettingsPopover(props),
     frameId: props.frame.id,
     frameRect: props.currentFrame,
     frameColors: getCalloutFrameColors(borderSettings),

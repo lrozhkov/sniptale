@@ -8,7 +8,9 @@ const mocks = vi.hoisted(() => ({
   nudgeSelectionMock: vi.fn(() => true),
   reorderEditorLayerMock: vi.fn(),
   resizeEditorLayerWithRasterizeMock: vi.fn(),
-  selectEditorLayerByIdMock: vi.fn(),
+  selectEditorLayerByIdMock: vi
+    .fn<typeof import('../public-actions').selectEditorLayerById>()
+    .mockReturnValue(true),
   toggleEditorLayerLockStateMock: vi.fn(),
   toggleEditorLayerVisibilityMock: vi.fn(),
 }));
@@ -56,6 +58,7 @@ function createController() {
     prepareObject: vi.fn(),
     sendFrameObjectsToBack: vi.fn(),
     setLastLayerSelectionAnchorId: vi.fn(),
+    switchToSelectTool: vi.fn(),
     setSource: vi.fn(),
     source: { id: 'source' },
     syncRuntimeState: vi.fn(),

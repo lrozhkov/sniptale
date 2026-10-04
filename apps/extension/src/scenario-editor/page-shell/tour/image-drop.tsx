@@ -166,6 +166,7 @@ function placeLocalResource(
   text: string,
   placement: TourImageImportPlacement
 ): GuideProject {
+  if (placement.kind === 'tour-stage-background') throw new Error('Unsupported stage drop');
   if (text.length > 1024 || !project.tour) throw new Error('Invalid tour resource');
   const value: unknown = JSON.parse(text);
   const parsed = resource.parse(value);

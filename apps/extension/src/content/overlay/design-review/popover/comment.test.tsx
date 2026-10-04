@@ -193,6 +193,32 @@ it('binds the comment draft, marker number, blur commit, and IME lifecycle actio
   expect(actions.commit).toHaveBeenCalledOnce();
 });
 
+it('keeps a neutral field surface while action buttons are pressed and focus changes', () => {
+  renderField();
+  const field = host.querySelector<HTMLElement>(
+    '[data-ui="content.design-review.comment"] textarea'
+  )?.parentElement;
+  if (!field) throw new Error('Expected comment field');
+  expect(field.dataset['focusModality']).toBe('pointer');
+  expect(field.className).toContain('border-[color:var(--sniptale-color-border-strong)]');
+  expect(field.className).not.toContain('active:bg-');
+  expect(field.className).toContain('has-[textarea:focus]:ring-1');
+  expect(field.className).not.toContain('focus-within:');
+
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Tab' }));
+  });
+  expect(field.dataset['focusModality']).toBe('keyboard');
+  expect(field.className).toContain('has-[textarea:focus]:ring-1');
+  expect(field.className).not.toContain('focus-within:ring-2');
+
+  act(() => {
+    field.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+  });
+  expect(field.dataset['focusModality']).toBe('pointer');
+  expect(field.className).not.toContain('focus-within:ring-2');
+});
+
 it('grows from two lines with the draft and caps long comments inside the composer', () => {
   const { actions } = renderField(createState({ draft: '' }));
   const textarea = document.querySelector<HTMLTextAreaElement>('textarea');

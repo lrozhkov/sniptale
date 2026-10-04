@@ -125,6 +125,7 @@ function createScenarioController() {
     captureAction: 'download_default' as const,
     createProject: vi.fn(async () => undefined),
     deleteRecentStep: vi.fn(async () => undefined),
+    finishRecording: vi.fn(async () => undefined),
     handleScreenshotModeDisabled: vi.fn(async () => undefined),
     moveRecentStep: vi.fn(async () => undefined),
     openEditor: vi.fn(async () => undefined),
@@ -156,6 +157,7 @@ function createScenarioProps() {
       applyCaptureAction: controller.applyCaptureAction,
       createProject: controller.createProject,
       deleteRecentStep: controller.deleteRecentStep,
+      finishRecording: controller.finishRecording,
       handleScreenshotModeDisabled: controller.handleScreenshotModeDisabled,
       moveRecentStep: controller.moveRecentStep,
       openEditor: controller.openEditor,
@@ -265,7 +267,8 @@ function useContentAppLayoutTestScope() {
 async function verifiesLayoutComposition() {
   const props = createProps();
   props.scenario.state.scenarioEnabled = true;
-  props.scenario.state.sidebarVisible = true;
+  props.scenario.state.captureAction = 'scenario';
+  props.scenario.state.sidebarVisible = false;
   await renderLayout(props);
 
   const toolbarCall = contentToolbarShellMock.mock.calls[0];
@@ -284,6 +287,11 @@ async function verifiesLayoutComposition() {
   expect(toolbarCall?.[0]).toHaveProperty('designReview.panel.open', false);
   expect(sidebarCall?.[0]).toEqual({
     isCompletelyHidden: props.toolbar.isCompletelyHidden,
+    isToolbarVisible: props.toolbar.isToolbarVisible,
+    captureSuspended: props.dialogs.countdown !== null,
+    handleTakeScreenshot: props.toolbar.handleTakeScreenshot,
+    byClickDisabled: false,
+    keepPinnedForAutoBlur: false,
     modeController: props.toolbar.modeController,
     scenario: props.scenario,
     setPinToTab: props.toolbar.setPinToTab,
@@ -298,6 +306,27 @@ async function verifiesSidebarSlotSkipsHiddenStates() {
   expect(contentScenarioRecorderSidebarMock).not.toHaveBeenCalled();
 }
 
+async function verifiesSidebarOwnerSurvivesToolbarCollapse() {
+  const props = createProps();
+  props.scenario.state.captureAction = 'scenario';
+  props.scenario.state.scenarioEnabled = true;
+  props.scenario.state.sidebarVisible = false;
+  await renderLayout(props);
+  const initialRenderCount = contentScenarioRecorderSidebarMock.mock.calls.length;
+  expect(initialRenderCount).toBeGreaterThan(0);
+
+  props.toolbar.isToolbarVisible = false;
+  await renderLayout(props);
+  expect(contentScenarioRecorderSidebarMock.mock.calls.length).toBeGreaterThan(initialRenderCount);
+  expect(contentScenarioRecorderSidebarMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ isToolbarVisible: false })
+  );
+
+  props.scenario.state.captureAction = 'download_default';
+  await renderLayout(props);
+  expect(container?.querySelector('[data-ui="content.layout.sidebar"]')).toBeNull();
+}
+
 describe('ContentAppLayout', () => {
   useContentAppLayoutTestScope();
 
@@ -308,6 +337,10 @@ describe('ContentAppLayout', () => {
   it(
     'skips rendering the lazy sidebar slot while scenario sidebar visibility is inactive',
     verifiesSidebarSlotSkipsHiddenStates
+  );
+  it(
+    'retains the sidebar position owner while the toolbar is collapsed',
+    verifiesSidebarOwnerSurvivesToolbarCollapse
   );
   it('keeps the embedded camera visible while the video toolbar is collapsed', async () => {
     const props = createProps();

@@ -9,18 +9,19 @@ import { EditorFloatingViewControls } from './view-controls';
 
 const mocks = vi.hoisted(() => ({
   gridCommands: vi.fn<() => CompactCommand[]>(() => [
-    { id: 'grid-toggle', title: 'Grid', trigger: 'G', onClick: vi.fn() },
+    { id: 'grid-toggle', title: 'Grid', trigger: 'G', active: false, onClick: vi.fn() },
   ]),
   onApply: vi.fn(async () => undefined),
   saveWorkspaceColorAsDefault: vi.fn(),
   updateWorkspace: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
   viewportPreview: vi.fn(() => <div data-ui="mock.viewport-preview" />),
   zoomIn: vi.fn(),
   zoomOut: vi.fn(),
   zoomToFit: vi.fn(),
   resetZoom: vi.fn(),
   embed: { mode: 'scenario' as 'scenario' | 'standalone', onApply: vi.fn(async () => undefined) },
-  store: { magnetEnabled: false },
+  store: { magnetEnabled: false, showOutsideCanvas: false },
 }));
 
 vi.mock('../../application/controller-context', () => ({
@@ -39,11 +40,18 @@ vi.mock('../../application/embed-context/context', () => ({
 }));
 vi.mock('../../state/useEditorStore', () => ({
   useEditorStore: (
-    selector: (state: { updateWorkspace: unknown; workspace: unknown }) => unknown
+    selector: (state: {
+      updateWorkspace: unknown;
+      workspace: unknown;
+      showOutsideCanvas: boolean;
+      setShowOutsideCanvas: unknown;
+    }) => unknown
   ) =>
     selector({
       updateWorkspace: mocks.updateWorkspace,
       workspace: { magnetEnabled: mocks.store.magnetEnabled },
+      showOutsideCanvas: mocks.store.showOutsideCanvas,
+      setShowOutsideCanvas: mocks.setShowOutsideCanvas,
     }),
 }));
 vi.mock('../../inspector/compact/inspector/workspace-sections', () => ({
@@ -78,7 +86,7 @@ function renderControls(
             workspace: {
               backgroundColor: '#f2f4f7',
               gridColor: '#94a3b8',
-              gridEnabled: false,
+              gridEnabled: overrides.gridEnabled ?? false,
               gridSize: 24,
               gridSnapEnabled: false,
               magnetEnabled: false,
@@ -113,6 +121,7 @@ beforeEach(() => {
   mocks.embed.mode = 'scenario';
   mocks.embed.onApply = mocks.onApply;
   mocks.store.magnetEnabled = false;
+  mocks.store.showOutsideCanvas = false;
 });
 
 afterEach(() => {
@@ -123,7 +132,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('opens compact workspace and map popovers below the top-right toolbar', () => {
+it('opens combined workspace and grid settings and the map below the top-right toolbar', () => {
   renderControls();
 
   click('editor.floating.view-controls.workspace');
@@ -131,9 +140,20 @@ it('opens compact workspace and map popovers below the top-right toolbar', () =>
     container?.querySelector('[data-ui="editor.floating.view-controls.stack"]')?.className
   ).toContain('z-50');
   expect(
+    container?.querySelector('[data-ui="editor.floating.view-controls.stack"]')?.className
+  ).not.toContain('max-[720px]:top-[4.75rem]');
+  expect(
     container?.querySelector('[data-ui="editor.floating.view-controls.popover.workspace"]')
   ).not.toBeNull();
   expect(container?.textContent).toContain('#F2F4F7');
+  expect(container?.textContent).toContain('Grid');
+  const workspacePopover = container?.querySelector(
+    '[data-ui="editor.floating.view-controls.popover.workspace"]'
+  );
+  expect(
+    workspacePopover?.querySelector('[data-ui="shared.ui.color-selector.picker-trigger"]')
+  ).not.toBeNull();
+  expect(workspacePopover?.querySelector('.sniptale-glass-color-palette')).toBeNull();
 
   click('editor.floating.view-controls.map');
   expect(container?.querySelector('[data-ui="mock.viewport-preview"]')).not.toBeNull();
@@ -160,6 +180,35 @@ it('routes direct view toolbar actions through existing controller and store han
   ).toBeNull();
 });
 
+it('places the outside-shapes toggle before magnet with the same active treatment', () => {
+  renderControls();
+  const outside = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
+  );
+  const magnet = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.view-controls.magnet"]'
+  );
+  expect(outside?.getAttribute('aria-pressed')).toBe('false');
+  expect(outside?.className).not.toContain('sniptale-glass-toolbar-button--active');
+  expect(outside?.nextElementSibling).toBe(magnet);
+  expect(outside?.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  click('editor.floating.view-controls.show-outside-canvas');
+  expect(mocks.setShowOutsideCanvas).toHaveBeenCalledWith(true);
+
+  act(() => root?.unmount());
+  root = null;
+  container?.remove();
+  mocks.store.showOutsideCanvas = true;
+  renderControls();
+  const enabled = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
+  );
+  expect(enabled?.getAttribute('aria-pressed')).toBe('true');
+  expect(enabled?.className).toContain('sniptale-glass-toolbar-button--active');
+  click('editor.floating.view-controls.show-outside-canvas');
+  expect(mocks.setShowOutsideCanvas).toHaveBeenLastCalledWith(false);
+});
+
 it('uses the zoom percent button as fit-to-window at 100 percent', () => {
   renderControls(true, { zoomPercent: 100 });
 
@@ -171,6 +220,12 @@ it('uses the zoom percent button as fit-to-window at 100 percent', () => {
 
 it('disables document-required controls without an image and dismisses transient popovers outside', () => {
   renderControls(false);
+
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      '[data-ui="editor.floating.view-controls.show-outside-canvas"]'
+    )?.disabled
+  ).toBe(true);
 
   expect(
     container?.querySelector<HTMLButtonElement>(
@@ -218,7 +273,7 @@ it('keeps the map popover open on outside clicks until the map button toggles it
   ).toBeNull();
 });
 
-it('keeps inside clicks open, toggles active popovers closed, and omits scenario action outside embeds', () => {
+it('keeps inside clicks open, toggles combined settings closed, and omits scenario action outside embeds', () => {
   mocks.embed.mode = 'standalone';
   mocks.store.magnetEnabled = true;
   mocks.gridCommands.mockReturnValueOnce([
@@ -233,16 +288,16 @@ it('keeps inside clicks open, toggles active popovers closed, and omits scenario
       ),
     },
   ] satisfies CompactCommand[]);
-  renderControls(true);
+  renderControls(true, { gridEnabled: true });
 
   expect(container?.textContent).not.toContain('applyToScenario');
   expect(
     container?.querySelector('[data-ui="editor.floating.view-controls.magnet"]')
   ).not.toBeNull();
 
-  click('editor.floating.view-controls.grid');
+  click('editor.floating.view-controls.workspace');
   const popover = container?.querySelector(
-    '[data-ui="editor.floating.view-controls.popover.grid"]'
+    '[data-ui="editor.floating.view-controls.popover.workspace"]'
   );
   expect(popover).not.toBeNull();
   expect(popover?.textContent).toContain('Grid size row');
@@ -251,26 +306,36 @@ it('keeps inside clicks open, toggles active popovers closed, and omits scenario
     popover?.dispatchEvent(new Event('pointerdown', { bubbles: true }));
   });
   expect(
-    container?.querySelector('[data-ui="editor.floating.view-controls.popover.grid"]')
+    container?.querySelector('[data-ui="editor.floating.view-controls.popover.workspace"]')
   ).not.toBeNull();
 
-  click('editor.floating.view-controls.grid');
+  click('editor.floating.view-controls.workspace');
   expect(
-    container?.querySelector('[data-ui="editor.floating.view-controls.popover.grid"]')
+    container?.querySelector('[data-ui="editor.floating.view-controls.popover.workspace"]')
   ).toBeNull();
 });
 
-it('does not render the grid popover just because grid mode is enabled', () => {
+it('does not render the combined panel just because grid mode is enabled', () => {
   renderControls(true, { gridEnabled: true } as Partial<
     ComponentProps<typeof EditorFloatingViewControls>
   >);
 
   expect(
-    container?.querySelector('[data-ui="editor.floating.view-controls.popover.grid"]')
+    container?.querySelector('[data-ui="editor.floating.view-controls.popover.workspace"]')
   ).toBeNull();
+  expect(container?.querySelector('[data-ui="editor.floating.view-controls.grid"]')).toBeNull();
+});
+
+it('restores focus to the combined launcher when Escape closes the panel', () => {
+  renderControls();
+  click('editor.floating.view-controls.workspace');
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  });
   expect(
-    container
-      ?.querySelector('[data-ui="editor.floating.view-controls.grid"]')
-      ?.getAttribute('data-active')
-  ).toBe('true');
+    container?.querySelector('[data-ui="editor.floating.view-controls.popover.workspace"]')
+  ).toBeNull();
+  expect(document.activeElement).toBe(
+    container?.querySelector('[data-ui="editor.floating.view-controls.workspace"]')
+  );
 });

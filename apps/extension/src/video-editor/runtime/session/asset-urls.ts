@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getProjectAsset } from '../../../composition/persistence/projects/index';
 import { getRecording } from '../../../composition/persistence/recordings/index';
+import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index';
 import { getScenarioAsset } from '../../../composition/persistence/scenario/projects';
 import type { VideoProject } from '../../../features/video/project/types/index';
 
@@ -16,6 +17,7 @@ interface LoadedVideoEditorAssetUrl extends VideoEditorAssetUrlEntry {
 type VideoEditorAssetUrlCache = Record<string, VideoEditorAssetUrlEntry>;
 
 function getVideoEditorAssetSourceFingerprint(asset: VideoProject['assets'][number]): string {
+  if (asset.source.kind === 'library-asset') return `library-asset:${asset.source.mediaId}`;
   if (asset.source.kind === 'recording') {
     return `recording:${asset.source.recordingId}`;
   }
@@ -31,6 +33,11 @@ async function loadVideoEditorAssetUrl(
   asset: VideoProject['assets'][number]
 ): Promise<LoadedVideoEditorAssetUrl | null> {
   const sourceFingerprint = getVideoEditorAssetSourceFingerprint(asset);
+
+  if (asset.source.kind === 'library-asset') {
+    const blob = await getMediaAssetBlob(asset.source.mediaId);
+    return blob ? { assetId: asset.id, sourceFingerprint, url: URL.createObjectURL(blob) } : null;
+  }
 
   if (asset.source.kind === 'recording') {
     const entry = await getRecording(asset.source.recordingId);

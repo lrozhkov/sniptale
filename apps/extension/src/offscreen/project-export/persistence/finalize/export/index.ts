@@ -1,3 +1,11 @@
+import { getMediaLibraryEntry } from '../../../../../composition/persistence/media-library';
+import { createRecordingMediaId } from '../../../../../features/media-hub/media-id';
+import { getRecordingTelemetry } from '../../../../../composition/persistence/recordings/telemetry';
+import { summarizeRecordingMetadata } from '../../../../../features/media-hub/recording-metadata';
+import {
+  createOutputFilename,
+  createFilenameSession,
+} from '../../../../../workflows/file-naming/index';
 import {
   deleteProjectExportSafely,
   saveProjectExportSafely,
@@ -6,7 +14,6 @@ import { type VideoProjectExportSettings } from '../../../../../features/video/p
 import { type VideoProject } from '../../../../../features/video/project/types/model';
 import { buildProjectExportEntry } from '../../entry';
 import { getExportFormatDescriptor } from '../../format';
-import { buildExportFilename } from './filename';
 import { buildSubtitleSidecarFiles } from './subtitle-sidecar';
 import { downloadProjectExport, downloadExportSidecar } from './runtime/index';
 import { notifyProjectExportCompleted } from './runtime/notify';
@@ -32,21 +39,34 @@ function assertFinalizationNotCancelled(options: FinalizeExportOptions = {}): vo
   }
 }
 
+async function readPrimaryRecordingMetadata(project: VideoProject) {
+  const recordingId =
+    project.source.kind === 'recording' ? project.source.recordingId : project.baseRecordingId;
+  if (!recordingId) return undefined;
+  const media = await getMediaLibraryEntry(createRecordingMediaId(recordingId));
+  if (media?.recordingMetadata) return media.recordingMetadata;
+  const telemetry = await getRecordingTelemetry(recordingId);
+  return telemetry ? summarizeRecordingMetadata(telemetry) : undefined;
+}
+
 async function saveProjectExportAndAcceptCompletion(
   args: SaveCompletedProjectExportArgs
 ): Promise<void> {
   let projectExportSaved = false;
   try {
     assertFinalizationNotCancelled(args.options);
-    await saveProjectExportSafely(
-      buildProjectExportEntry({
+    const recordingMetadata = await readPrimaryRecordingMetadata(args.project);
+    assertFinalizationNotCancelled(args.options);
+    await saveProjectExportSafely({
+      ...buildProjectExportEntry({
         blob: args.blob,
         exportId: args.exportId,
         filename: args.filename,
         project: args.project,
         settings: args.settings,
-      })
-    );
+      }),
+      ...(recordingMetadata ? { recordingMetadata } : {}),
+    });
     projectExportSaved = true;
     assertFinalizationNotCancelled(args.options);
     await acceptProjectExportCompletion(args);
@@ -86,15 +106,17 @@ export async function finalizeExport(
 ): Promise<void> {
   assertFinalizationNotCancelled(options);
   const descriptor = getExportFormatDescriptor(settings.format);
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-  const filename = buildExportFilename({
-    extension: descriptor.extension,
-    projectName: project.name || 'project-export',
-    timestamp,
-  });
-  const subtitleSidecarFiles = buildSubtitleSidecarFiles(project, settings, filename);
   const exportId = crypto.randomUUID();
-
+  const filename = await createOutputFilename(
+    {
+      category: 'recordings',
+      type: 'video-export',
+      title: project.name,
+      extension: descriptor.extension,
+    },
+    await createFilenameSession(exportId)
+  );
+  const subtitleSidecarFiles = buildSubtitleSidecarFiles(project, settings, filename);
   await saveProjectExportAndAcceptCompletion({
     blob,
     exportId,

@@ -217,3 +217,29 @@ it.each([
   expect(mocks.mutate).not.toHaveBeenCalled();
   expect(mocks.checkpoint).not.toHaveBeenCalled();
 });
+
+it.each(['false', null, 0])(
+  'rejects malformed publication intent before writing: %j',
+  async (publishToLibrary) => {
+    const asset = { ...portableProjectAsset('project-asset-1'), publishToLibrary };
+    await expect(
+      videoProjectRootPublisher.publish(
+        publishArgs(portableMetadataWithProjectAssets(['project-asset-1'], [asset]))
+      )
+    ).rejects.toThrow('Portable video project children are invalid.');
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['wrong', false, null])(
+  'rejects a malformed published Library binding: %j',
+  async (libraryMediaId) => {
+    const asset = { ...portableProjectAsset('project-asset-1'), libraryMediaId };
+    await expect(
+      videoProjectRootPublisher.publish(
+        publishArgs(portableMetadataWithProjectAssets(['project-asset-1'], [asset]))
+      )
+    ).rejects.toThrow('Portable video project children are invalid.');
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  }
+);

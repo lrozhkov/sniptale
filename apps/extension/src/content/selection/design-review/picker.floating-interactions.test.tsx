@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CompactSelect } from '../../../ui/compact-inspector-controls';
+import { CompactColorSelector } from '../../../ui/color-selector';
 import { initializeContentUiRoots } from '../../platform/dom-host';
 import { installContentUiActivationBridge } from '../../runtime/ui-activation-bridge';
 
@@ -68,7 +69,10 @@ it('keeps a real CompactSelect option inside the Design Review inspector boundar
     onInspectorDismissRequested,
     onSelection: vi.fn(),
   });
+  pickerRuntime.setMeasurementsExpanded(true);
   expect(pickerRuntime.selectElement(selected)).toBe(true);
+  const projection = contentRoot.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(projection).not.toBeNull();
 
   reactRoot = createRoot(mount);
   act(() => {
@@ -106,4 +110,73 @@ it('keeps a real CompactSelect option inside the Design Review inspector boundar
 
   expect(onChange).toHaveBeenCalledWith('inline');
   expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(contentRoot.querySelector('[data-ui="content.design-review.measurements"]')).toBe(
+    projection
+  );
+});
+
+it('keeps a color picker Apply click inside the selected element inspector', async () => {
+  const contentHost = document.createElement('div');
+  const contentRoot = contentHost.attachShadow({ mode: 'open' });
+  document.body.append(contentHost);
+  initializeContentUiRoots(contentRoot);
+  installContentUiActivationBridge(contentRoot);
+
+  const popover = document.createElement('aside');
+  popover.dataset['ui'] = 'content.design-review.popover';
+  const mount = document.createElement('div');
+  popover.append(mount);
+  contentRoot.append(popover);
+
+  const selected = makeVisible(document.createElement('button'));
+  document.body.append(selected);
+  const onInspectorDismissRequested = vi.fn(() => true);
+  const onChange = vi.fn();
+  pickerRuntime = startDesignReviewPicker({
+    onDisableRequested: vi.fn(),
+    onInspectorDismissRequested,
+    onSelection: vi.fn(),
+  });
+  pickerRuntime.setMeasurementsExpanded(true);
+  expect(pickerRuntime.selectElement(selected)).toBe(true);
+  const projection = contentRoot.querySelector('[data-ui="content.design-review.measurements"]');
+  expect(projection).not.toBeNull();
+
+  reactRoot = createRoot(mount);
+  act(() => {
+    reactRoot?.render(
+      <CompactColorSelector
+        label="Background"
+        title="Background"
+        value="#ffffff"
+        onChange={onChange}
+      />
+    );
+  });
+  const trigger = contentRoot.querySelector<HTMLButtonElement>(
+    '[data-ui="shared.ui.color-selector.picker-trigger"]'
+  );
+  act(() => trigger?.click());
+  const hex = contentRoot.querySelector<HTMLInputElement>('input[aria-label="HEX"]');
+  expect(hex).not.toBeNull();
+  act(() => {
+    if (!hex) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(hex, '#123456');
+    hex.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+  });
+  const apply = [...contentRoot.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'Применить'
+  );
+  expect(apply?.disabled).toBe(false);
+  await act(async () => {
+    apply?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, composed: true }));
+    apply?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, composed: true }));
+    apply?.click();
+    await Promise.resolve();
+  });
+  expect(onInspectorDismissRequested).not.toHaveBeenCalled();
+  expect(contentRoot.querySelector('[data-ui="content.design-review.measurements"]')).toBe(
+    projection
+  );
+  expect(onChange).toHaveBeenCalledWith('#123456');
 });

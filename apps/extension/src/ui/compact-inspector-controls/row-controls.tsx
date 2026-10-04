@@ -58,7 +58,7 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
     >
       <span
         className={[
-          'min-w-0 truncate text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+          'shrink-0 text-[length:var(--sniptale-compact-font-size,12px)] font-medium',
           'text-[color:var(--sniptale-color-text-secondary)]',
         ].join(' ')}
         title={getNodeTitle(props.label)}
@@ -67,8 +67,8 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
       </span>
       <span
         className={[
-          'shrink-0 text-right text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
-          'text-[color:var(--sniptale-color-text-muted)]',
+          'min-w-0 truncate text-right text-[length:var(--sniptale-compact-font-size,12px)] font-medium',
+          'text-[color:var(--sniptale-color-text-primary)]',
         ].join(' ')}
         title={getNodeTitle(props.value)}
       >

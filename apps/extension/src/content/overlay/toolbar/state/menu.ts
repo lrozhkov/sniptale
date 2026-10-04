@@ -1,11 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useRef, useState, useLayoutEffect } from 'react';
+import { createToolbarMenuFocusOwner } from './menu-focus';
 
 export type ToolbarPopoverMenu =
   | 'auto-blur'
@@ -20,8 +14,7 @@ export type ToolbarPopoverMenu =
   | 'recording-camera'
   | 'recording-microphone'
   | 'recording-spotlight'
-  | 'scenario-mode'
-  | 'scenario-project'
+  | 'reset-confirm'
   | 'settings'
   | 'timer'
   | 'viewport';
@@ -53,24 +46,27 @@ export function registerToolbarMenuEscapeOwner(owner: () => void): () => void {
   };
 }
 
-function setMenuOpen(
-  setActiveMenuType: Dispatch<SetStateAction<ToolbarPopoverMenu | null>>,
-  menu: ToolbarPopoverMenu,
-  next: boolean
-) {
-  setActiveMenuType((current) => {
-    if (next) {
-      return menu;
-    }
-
-    return current === menu ? null : current;
-  });
-}
-
 export function useToolbarMenuState(): ToolbarMenuState {
-  const [activeMenuType, setActiveMenuType] = useState<ToolbarPopoverMenu | null>(null);
+  const [activeMenuType, setMenuState] = useState<ToolbarPopoverMenu | null>(null);
   const activeMenuTypeRef = useRef(activeMenuType);
-  activeMenuTypeRef.current = activeMenuType;
+  const focusOwnerRef = useRef<ReturnType<typeof createToolbarMenuFocusOwner> | null>(null);
+  if (!focusOwnerRef.current) focusOwnerRef.current = createToolbarMenuFocusOwner();
+  const focusOwner = focusOwnerRef.current;
+  const pendingRestore = useRef<ReturnType<typeof focusOwner.snapshot>>(null);
+  const setActiveMenuType = useCallback(
+    (next: ToolbarPopoverMenu | null) => {
+      activeMenuTypeRef.current = next;
+      focusOwner.setMenu(next);
+      setMenuState(next);
+    },
+    [focusOwner]
+  );
+  useEffect(() => focusOwner.bind(), [focusOwner]);
+  useLayoutEffect(() => {
+    const snapshot = pendingRestore.current;
+    pendingRestore.current = null;
+    focusOwner.restore(snapshot);
+  });
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -82,35 +78,54 @@ export function useToolbarMenuState(): ToolbarMenuState {
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
-      if (escapeOwner) {
-        escapeOwner();
-      } else {
-        setActiveMenuType(null);
-      }
+      const snapshot = focusOwner.snapshot();
+      if (escapeOwner) escapeOwner();
+      if (activeMenuTypeRef.current === menu) setActiveMenuType(null);
+      pendingRestore.current = snapshot;
     };
 
     window.addEventListener('keydown', handleEscape, { capture: true });
     return () => window.removeEventListener('keydown', handleEscape, { capture: true });
-  }, []);
+  }, [focusOwner, setActiveMenuType]);
 
-  const closeMenu = useCallback((menu: ToolbarPopoverMenu) => {
-    setMenuOpen(setActiveMenuType, menu, false);
-  }, []);
-  const closeMenus = useCallback((except: ToolbarPopoverMenu | null = null) => {
-    setActiveMenuType(except);
-  }, []);
-  const toggleMenu = useCallback((menu: ToolbarPopoverMenu) => {
-    setActiveMenuType((current) => (current === menu ? null : menu));
-  }, []);
-  const setShowCaptureMenu = useCallback((next: boolean) => {
-    setMenuOpen(setActiveMenuType, 'capture', next);
-  }, []);
-  const setShowTimerMenu = useCallback((next: boolean) => {
-    setMenuOpen(setActiveMenuType, 'timer', next);
-  }, []);
-  const setViewportMenuOpen = useCallback((next: boolean) => {
-    setMenuOpen(setActiveMenuType, 'viewport', next);
-  }, []);
+  const closeMenu = useCallback(
+    (menu: ToolbarPopoverMenu) => {
+      if (activeMenuTypeRef.current === menu) setActiveMenuType(null);
+    },
+    [setActiveMenuType]
+  );
+  const closeMenus = useCallback(
+    (except: ToolbarPopoverMenu | null = null) => {
+      setActiveMenuType(except);
+    },
+    [setActiveMenuType]
+  );
+  const toggleMenu = useCallback(
+    (menu: ToolbarPopoverMenu) => {
+      setActiveMenuType(activeMenuTypeRef.current === menu ? null : menu);
+    },
+    [setActiveMenuType]
+  );
+  const setShowCaptureMenu = useCallback(
+    (next: boolean) => {
+      if (next || activeMenuTypeRef.current === 'capture')
+        setActiveMenuType(next ? 'capture' : null);
+    },
+    [setActiveMenuType]
+  );
+  const setShowTimerMenu = useCallback(
+    (next: boolean) => {
+      if (next || activeMenuTypeRef.current === 'timer') setActiveMenuType(next ? 'timer' : null);
+    },
+    [setActiveMenuType]
+  );
+  const setViewportMenuOpen = useCallback(
+    (next: boolean) => {
+      if (next || activeMenuTypeRef.current === 'viewport')
+        setActiveMenuType(next ? 'viewport' : null);
+    },
+    [setActiveMenuType]
+  );
 
   return {
     activeMenuType,

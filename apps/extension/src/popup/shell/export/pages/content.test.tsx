@@ -32,7 +32,10 @@ import { createPopupExportControllerFixture } from './controller.test-support';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-async function renderContent(controller: ReturnType<typeof createPopupExportControllerFixture>) {
+async function renderContent(
+  controller: ReturnType<typeof createPopupExportControllerFixture>,
+  destination: 'export' | 'save' = 'export'
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -43,7 +46,7 @@ async function renderContent(controller: ReturnType<typeof createPopupExportCont
     root?.render(
       <ExportPageContent
         controller={controller}
-        destination="export"
+        destination={destination}
         onDestinationChange={vi.fn()}
         webCopyResources={{
           anonymousCrossOriginAssetsEnabled: true,
@@ -141,7 +144,7 @@ it('keeps the progress surface visible when export ends in an error before a res
   expect(sectionMocks.exportProgressSectionMock).toHaveBeenCalledTimes(1);
 });
 
-it('renders the ready state with selection props and disabled state', async () => {
+it('renders the ready state with selection props and disabled state while preferences load', async () => {
   await renderContent(
     createPopupExportControllerFixture({
       derived: { exportDisabledReason: 'blocked' },
@@ -174,3 +177,24 @@ it('renders the ready state with selection props and disabled state', async () =
     })
   );
 });
+
+it.each(['export', 'save'] as const)(
+  'keeps %s package settings enabled with no selected pages',
+  async (destination) => {
+    const controller = createPopupExportControllerFixture({
+      derived: { canExport: false, exportDisabledReason: 'no page selected' },
+      tabs: { selectedCount: 0, selectedTabIds: [] },
+    });
+    await renderContent(controller, destination);
+
+    expect(sectionMocks.exportReadySectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destination,
+        disabled: false,
+        hasLoadedPreferences: true,
+        selectedCount: 0,
+      })
+    );
+    expect(controller.state.derived.canExport).toBe(false);
+  }
+);

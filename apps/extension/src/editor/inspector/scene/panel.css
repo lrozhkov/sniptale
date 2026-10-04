@@ -1,0 +1,8 @@
+[data-ui='editor.inspector.content']:has([data-ui='editor.frame-panel']) {
+  padding: 0;
+  scrollbar-gutter: stable;
+}
+
+[data-ui='editor.frame.padding-fields'] [data-padding-link] {
+  border: 0;
+}

@@ -6,7 +6,7 @@ import { reviewOutputCodecs } from '../../workflows/video-review/render-settings
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
-import { useMemo, useState, useId, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
@@ -15,15 +15,7 @@ import {
   isReviewSpeedRate,
   type ReviewSpeedRate,
 } from '../../features/video/review/speed';
-import {
-  Scissors,
-  Download,
-  FileVideo,
-  Gauge,
-  MousePointer2,
-  Trash2,
-  Settings2,
-} from 'lucide-react';
+import { Scissors, Download, FileVideo, Gauge, MousePointer2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { QuickEditExportReason } from '../../features/video/review/advanced/effective';
 import {
@@ -36,6 +28,8 @@ import {
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   canvas: 'gallery.videoReview.canvas',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
+  'cut-transition': 'gallery.videoReview.cutTransition',
+  'transition-frames': 'gallery.videoReview.cutTransitionFramesUnavailable',
   zoom: 'gallery.videoReview.exportBlockerZoom',
   background: 'gallery.videoReview.exportBlockerBackground',
   comments: 'gallery.videoReview.exportBlockerComments',
@@ -58,10 +52,8 @@ export function ReviewTimelineTools(props: {
   busy: boolean;
   rate: number;
   audio: 'speed' | 'mute';
-  selected: boolean;
   onPointer(): void;
   onToggle(kind: 'cut' | 'speed'): void;
-  onRemove(): void;
   onRate(value: ReviewSpeedRate): void;
   onAudio(value: 'speed' | 'mute'): void;
 }) {
@@ -98,17 +90,6 @@ export function ReviewTimelineTools(props: {
         <Gauge size={16} />
       </ReviewButton>
       {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
-      {props.selected ? (
-        <ReviewButton
-          label={translate('gallery.videoReview.removeEdit')}
-          toolbarLabel={translate('gallery.videoReview.removeEdit')}
-          className={plain}
-          disabled={props.busy}
-          onClick={props.onRemove}
-        >
-          <Trash2 size={15} />
-        </ReviewButton>
-      ) : null}
     </>
   );
 }
@@ -183,7 +164,7 @@ export function ReviewSpeedOptions(props: {
   );
 }
 
-/** Export is a footer action; editing tools live above the timeline. */
+/** Export settings and destination actions share one inspector scroll body. */
 export function ReviewEditActions(props: {
   available: boolean;
   hasEdits: boolean;
@@ -199,18 +180,12 @@ export function ReviewEditActions(props: {
   onCancel(): void;
   onDownload(): void;
 }) {
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsId = useId();
   const running = props.phase !== 'idle';
   const blocked = !!props.advancedBlockers?.length;
   return (
     <div className="space-y-2">
-      <div
-        className={
-          'sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 ' +
-          'bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]'
-        }
-      >
+      {props.settings}
+      <div className="grid grid-cols-1 gap-1 border-t border-[var(--sniptale-color-border-soft)] pt-2">
         <ReviewButton
           label={translate('gallery.videoReview.exportVideo')}
           className={`${reviewTextButtonClassName}
@@ -221,21 +196,9 @@ export function ReviewEditActions(props: {
           <FileVideo size={15} />
           <span>{translate('gallery.videoReview.exportVideo')}</span>
         </ReviewButton>
-        {props.settings ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.exportSettings')}
-            className={plain}
-            aria-expanded={settingsOpen}
-            aria-controls={settingsId}
-            aria-pressed={settingsOpen}
-            onClick={() => setSettingsOpen(!settingsOpen)}
-          >
-            <Settings2 size={16} />
-          </ReviewButton>
-        ) : null}
         <ReviewButton
           label={translate('gallery.videoReview.downloadVideo')}
-          className={`${reviewTextButtonClassName} col-span-2 !w-full justify-start`}
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
           disabled={
             running ||
             props.busy ||
@@ -248,7 +211,6 @@ export function ReviewEditActions(props: {
           <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
       </div>
-      {props.settings && settingsOpen ? <div id={settingsId}>{props.settings}</div> : null}
       {running ? (
         <div className="flex items-center justify-between gap-2 text-xs" role="status">
           <span>
@@ -344,7 +306,7 @@ export function ReviewRenderOptions({
   const format = settings.format ?? exporter.index.container;
   const codecs = reviewOutputCodecs(exporter.index, format);
   return (
-    <div className="min-w-0 max-w-full pt-2 text-xs" data-ui="gallery.videoReview.exportSettings">
+    <div className="min-w-0 max-w-full text-xs" data-ui="gallery.videoReview.exportSettings">
       <fieldset disabled={busy} className="min-w-0 space-y-2 pb-2">
         <SelectField
           className={reviewSelectFieldClassName}

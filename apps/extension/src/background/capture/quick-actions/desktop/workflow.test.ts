@@ -145,11 +145,16 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
-it('requires a prepared popup selection', async () => {
-  await expect(runDesktopQuickAction({ context: createContext(), tabId: 7 })).rejects.toThrow(
-    'selection is required'
+it('captures and delivers without requiring the popup to supply a frame', async () => {
+  await expect(
+    runDesktopQuickAction({ context: { ...createContext(), delaySeconds: 3 }, tabId: 7 })
+  ).resolves.toEqual({ result: 'accepted' });
+  expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME, delaySeconds: 3 })
   );
-  expect(mocks.createJob).not.toHaveBeenCalled();
+  expect(mocks.chooseSource).not.toHaveBeenCalled();
+  expect(mocks.createJob).toHaveBeenCalledOnce();
+  expect(mocks.releasePermit).toHaveBeenCalledOnce();
 });
 
 it('fails closed when privacy erasure owns the media mutation exclusion', async () => {
@@ -189,13 +194,12 @@ it('releases the mutation permit when offscreen reservation fails', async () => 
 });
 
 it('selects a desktop source and captures its frame through the reserved offscreen owner', async () => {
-  const context = createContext('edit');
+  const context = { ...createContext('edit'), delaySeconds: 5 };
 
   await expect(
     selectAndCaptureDesktopQuickAction({
       context,
       tabId: 84,
-      targetTab: { id: 84 } as chrome.tabs.Tab,
     })
   ).resolves.toEqual({
     dataUrl: 'data:image/webp;base64,AA==',
@@ -206,19 +210,21 @@ it('selects a desktop source and captures its frame through the reserved offscre
     width: 1200,
   });
 
-  expect(mocks.chooseSource).toHaveBeenCalledWith({ id: 84 });
+  expect(mocks.chooseSource).not.toHaveBeenCalled();
   expect(mocks.sendRuntimeMessage).toHaveBeenCalledWith(
     expect.objectContaining({
       imageFormat: 'webp',
       imageQuality: 80,
-      streamId: 'stream-1',
+      delaySeconds: 5,
       type: MessageType.OFFSCREEN_CAPTURE_DESKTOP_FRAME,
     })
   );
 });
 
 it('retains a cancelled selection for the quick-action cleanup transaction', async () => {
-  mocks.chooseSource.mockResolvedValueOnce({ status: 'cancelled' });
+  mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ success: true, result: 'accepted' })
+    .mockResolvedValueOnce({ success: true, result: 'cancelled' });
 
   await expect(
     selectAndCaptureDesktopQuickAction({ context: createContext('edit'), tabId: 85 })
@@ -232,7 +238,9 @@ it('retains a cancelled selection for the quick-action cleanup transaction', asy
 });
 
 it('cancels both reservations when source selection fails', async () => {
-  mocks.chooseSource.mockResolvedValueOnce({ status: 'failed', error: 'Picker unavailable' });
+  mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ success: true, result: 'accepted' })
+    .mockResolvedValueOnce({ success: false, error: 'Picker unavailable' });
 
   await expect(
     selectAndCaptureDesktopQuickAction({ context: createContext('edit'), tabId: 86 })
@@ -318,4 +326,92 @@ it('marks the created capture job failed when a downstream sink rejects', async 
   expect(mocks.transitionJob).toHaveBeenCalledWith('job-1', 'failed', {
     error: 'download failed',
   });
+});
+
+it.each([3, 5, 10])(
+  'keeps a late picker selection deliverable through a %s-second countdown',
+  async (delaySeconds) => {
+    vi.useFakeTimers();
+    const context = { ...createContext(), delaySeconds };
+    const preparation = await reserveDesktopQuickAction({ context, tabId: 94 });
+    await vi.advanceTimersByTimeAsync(29_000);
+    await vi.advanceTimersByTimeAsync(delaySeconds * 1000);
+    expect(mocks.releasePermit).not.toHaveBeenCalled();
+    await expect(
+      runDesktopQuickAction({
+        context,
+        tabId: 94,
+        desktopSelection: {
+          ...preparation,
+          status: 'selected',
+          dataUrl: createDataUrl(),
+          width: 1200,
+          height: 800,
+        },
+      })
+    ).resolves.toEqual({ result: 'accepted' });
+    expect(mocks.releasePermit).toHaveBeenCalledOnce();
+  }
+);
+
+it('expires an abandoned preparation after its bounded countdown allowance', async () => {
+  vi.useFakeTimers();
+  await reserveDesktopQuickAction({ context: { ...createContext(), delaySeconds: 10 }, tabId: 95 });
+  await vi.advanceTimersByTimeAsync(39_999);
+  expect(mocks.releasePermit).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(mocks.releasePermit).toHaveBeenCalledOnce();
+  expect(mocks.sendRuntimeMessage).toHaveBeenLastCalledWith(
+    expect.objectContaining({ type: MessageType.OFFSCREEN_CANCEL_DESKTOP_FRAME })
+  );
+});
+
+it.each(['cancelled', 'failed'])(
+  'allows immediate retry after background picker %s',
+  async (result) => {
+    const context = { ...createContext(), delaySeconds: 3 };
+    mocks.sendRuntimeMessage
+      .mockResolvedValueOnce({ success: true, result: 'accepted' })
+      .mockResolvedValueOnce(
+        result === 'cancelled'
+          ? { success: true, result }
+          : { success: false, error: 'acquisition failed' }
+      );
+    const attempt = runDesktopQuickAction({ context, tabId: 97 });
+    if (result === 'cancelled') await expect(attempt).resolves.toEqual({ result });
+    else await expect(attempt).rejects.toThrow('acquisition failed');
+    expect(mocks.releasePermit).toHaveBeenCalledOnce();
+    await expect(runDesktopQuickAction({ context, tabId: 97 })).resolves.toEqual({
+      result: 'accepted',
+    });
+    expect(mocks.releasePermit).toHaveBeenCalledTimes(2);
+  }
+);
+
+it('retains an in-flight background capture beyond the popup preparation deadline', async () => {
+  vi.useFakeTimers();
+  let complete: ((value: unknown) => void) | undefined;
+  mocks.sendRuntimeMessage
+    .mockResolvedValueOnce({ success: true, result: 'accepted' })
+    .mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = resolve;
+        })
+    );
+  const context = { ...createContext(), delaySeconds: 3 };
+  const capture = runDesktopQuickAction({ context, tabId: 98 });
+  await vi.advanceTimersByTimeAsync(0);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(mocks.releasePermit).not.toHaveBeenCalled();
+  await expect(reserveDesktopQuickAction({ context, tabId: 98 })).rejects.toThrow('already open');
+  complete?.({
+    success: true,
+    result: 'captured',
+    dataUrl: createDataUrl(),
+    width: 1200,
+    height: 800,
+  });
+  await expect(capture).resolves.toEqual({ result: 'accepted' });
+  expect(mocks.releasePermit).toHaveBeenCalledOnce();
 });

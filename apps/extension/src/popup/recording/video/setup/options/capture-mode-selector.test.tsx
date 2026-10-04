@@ -14,6 +14,7 @@ vi.mock('../primitives', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../primitives')>()),
   ModeIconButton: (props: {
     disabled: boolean;
+    disabledReason?: string | null;
     hint: string;
     label: string;
     onClick: () => void;
@@ -68,6 +69,30 @@ function createCapabilities(): ActiveTabCapabilities {
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.modeIconButton.mockReset();
+});
+
+it('keeps the normal video mode description when a capability is unavailable', () => {
+  const capabilities = createCapabilities();
+  capabilities.videoByMode[CaptureMode.TAB] = {
+    supported: false,
+    reason: 'Unavailable on extension pages',
+  };
+  renderNode(
+    <CaptureModeSelector
+      captureMode={CaptureMode.TAB}
+      activeTabCapabilities={capabilities}
+      onCaptureModeChange={vi.fn()}
+    />
+  );
+
+  expect(mocks.modeIconButton).toHaveBeenCalledWith(
+    expect.objectContaining({
+      label: 't:popup.video.modeTabLabel',
+      hint: 't:popup.video.modeTabHint',
+      disabled: true,
+      disabledReason: 'Unavailable on extension pages',
+    })
+  );
 });
 
 afterEach(() => {

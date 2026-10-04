@@ -58,6 +58,7 @@ export async function persistEditorBootstrapPayload(
     await db.put(EDITOR_BOOTSTRAP_STORE_NAME, {
       id,
       dataUrl: payload.dataUrl,
+      ...(payload.capturedAt === undefined ? {} : { capturedAt: payload.capturedAt }),
       document: payload.document ?? null,
       sourceFaviconUrl: payload.sourceFaviconUrl ?? null,
       url: payload.url ?? '',
@@ -97,6 +98,7 @@ export async function consumePersistedEditorBootstrapPayload(
 
     return {
       dataUrl: entry.dataUrl,
+      ...(entry.capturedAt === undefined ? {} : { capturedAt: entry.capturedAt }),
       ...(typeof entry.document === 'undefined' ? {} : { document: entry.document }),
       ...(typeof entry.sourceFaviconUrl === 'undefined'
         ? {}

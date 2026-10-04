@@ -244,7 +244,7 @@ it('places compact quick choices beside the filter and applies them to the full 
   const setIncludeWebCopy = vi.fn();
   const setIncludeFullPageScreenshot = vi.fn();
   const props = await renderSection({
-    destination: 'save',
+    destination: 'export',
     setIncludeFullPageScreenshot,
     packagePreferences: {
       ...createProps().packagePreferences,
@@ -263,11 +263,41 @@ it('places compact quick choices beside the filter and applies them to the full 
   expect(quickSelection?.querySelectorAll('button')).toHaveLength(3);
 
   await act(async () => findButton('t:popup.export.packagePresetMaterials').click());
-  expect(setIncludeWebCopy).not.toHaveBeenCalled();
+  expect(setIncludeWebCopy).toHaveBeenCalledWith(false);
   expect(setIncludeFullPageScreenshot).toHaveBeenCalledWith(true);
   expect(props.setIncludeFiles).toHaveBeenCalledWith(true);
   expect(props.setIncludeImages).toHaveBeenCalledWith(true);
   expect(props.setIncludeBasicLogs).not.toHaveBeenCalled();
+});
+
+it('hides the redundant Web copy preset in Library mode and keeps data selection working', async () => {
+  const setIncludeJson = vi.fn();
+  const setIncludeWebCopy = vi.fn();
+  await renderSection({
+    destination: 'save',
+    packagePreferences: {
+      ...createProps().packagePreferences,
+      includeWebCopy: true,
+      setIncludeWebCopy,
+    },
+    setIncludeJson,
+  });
+
+  expect(
+    Array.from(container?.querySelectorAll('button') ?? []).some(
+      (button) => button.textContent === 't:popup.export.packagePresetWebCopy'
+    )
+  ).toBe(false);
+  await act(async () => findButton('t:popup.export.packagePresetMaterials').click());
+  expect(setIncludeJson).toHaveBeenCalledWith(true);
+  expect(setIncludeWebCopy).not.toHaveBeenCalled();
+  setIncludeJson.mockClear();
+  const jsonRow = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+    label.textContent?.includes('t:popup.export.includeJsonLabel')
+  );
+  expect(jsonRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(false);
+  await act(async () => jsonRow?.querySelector<HTMLInputElement>('input')?.click());
+  expect(setIncludeJson).toHaveBeenCalledWith(expect.any(Function));
 });
 
 it('clears optional Library contents without disabling the mandatory Web copy', async () => {
@@ -331,7 +361,7 @@ it('clears Web copy and its full-page screenshot together in Download mode', asy
   expect(setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
 });
 
-it('clears selected options and forwards row toggles in disabled presentation', async () => {
+it('keeps bulk and row toggles disabled while export is pending', async () => {
   const setIncludeJson = vi.fn<SectionProps['setIncludeJson']>();
   const props = await renderSection({
     disabled: true,
@@ -357,9 +387,10 @@ it('clears selected options and forwards row toggles in disabled presentation', 
   );
   expect(checkboxes.every((checkbox) => checkbox.disabled)).toBe(true);
 
+  expect(findButton('t:popup.export.clearAllTabsButton').disabled).toBe(true);
   await act(async () => findButton('t:popup.export.clearAllTabsButton').click());
-  expect(setIncludeJson).toHaveBeenCalledWith(false);
-  expect(props.setIncludeFullPageScreenshot).toHaveBeenCalledWith(false);
+  expect(setIncludeJson).not.toHaveBeenCalled();
+  expect(props.setIncludeFullPageScreenshot).not.toHaveBeenCalled();
 
   setIncludeJson.mockClear();
   checkboxes[0]?.dispatchEvent(new Event('change', { bubbles: true }));
@@ -427,7 +458,7 @@ it('renders Web Copy inside the data grid and nests resource controls only while
     ).find((checkbox) => checkbox.parentElement?.textContent?.includes('packageWebCopyLabel'));
     webCopyCheckbox?.click();
   });
-  expect(setIncludeWebCopy).toHaveBeenCalledWith(expect.any(Function));
+  expect(setIncludeWebCopy).toHaveBeenCalledWith(false);
 });
 
 it('keeps redirect capture subordinate to external resource capture', async () => {
@@ -448,8 +479,39 @@ it('keeps redirect capture subordinate to external resource capture', async () =
     label.textContent?.includes('t:popup.export.webCopyExternalRedirectsLabel')
   );
   expect(redirectRow?.querySelector<HTMLInputElement>('input')?.checked).toBe(true);
-  expect(redirectRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
+  expect(redirectRow?.querySelector<HTMLInputElement>('input')?.disabled).toBe(false);
 });
+
+it.each(['export', 'save'] as const)(
+  'keeps redirect preference independently operable in %s mode',
+  async (destination) => {
+    const setExternalAssetRedirectsEnabled = vi.fn();
+    const setAnonymousCrossOriginAssetsEnabled = vi.fn();
+    await renderSection({
+      destination,
+      packagePreferences: {
+        ...createProps().packagePreferences,
+        includeWebCopy: true,
+      },
+      webCopyResources: {
+        ...createProps().webCopyResources,
+        anonymousCrossOriginAssetsEnabled: false,
+        externalAssetRedirectsEnabled: true,
+        setExternalAssetRedirectsEnabled,
+        setAnonymousCrossOriginAssetsEnabled,
+      },
+    });
+    const redirectRow = Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+      label.textContent?.includes('t:popup.export.webCopyExternalRedirectsLabel')
+    );
+    const redirect = redirectRow?.querySelector<HTMLInputElement>('input');
+    expect(redirect?.checked).toBe(true);
+    expect(redirect?.disabled).toBe(false);
+    await act(async () => redirect?.click());
+    expect(setExternalAssetRedirectsEnabled).toHaveBeenCalledWith(false);
+    expect(setAnonymousCrossOriginAssetsEnabled).not.toHaveBeenCalled();
+  }
+);
 
 it('does not add a separate private-data warning marker to the compact summary', async () => {
   await renderSection({ includePageDiagnostics: true, isOpen: false });

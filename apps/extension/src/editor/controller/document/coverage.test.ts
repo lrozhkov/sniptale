@@ -3,13 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultEditorPresetStorageState } from '../../../composition/persistence/editor-presets';
 const storeState = {
   activeTool: 'select',
+  pageTitle: 'Stored title',
   browserFrame: { title: 'Stored title', url: 'https://stored.example' },
   frame: { padding: 12 },
   resetDocumentState: vi.fn(),
   setBrowserFrame: vi.fn(),
   setImageData: vi.fn(),
   setInspector: vi.fn(),
+  setFreshImageBackgroundPending: vi.fn(),
   setPageTitle: vi.fn(),
+  setShowOutsideCanvas: vi.fn(),
   toolSettings: {
     step: { alphabet: 'latin', color: '#ff671d', sizeLevel: 3, type: 'number', value: '1' },
   },

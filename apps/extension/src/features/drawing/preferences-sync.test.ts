@@ -90,3 +90,28 @@ it('reports rejected and thrown saves once per unresolved failure episode', asyn
   expect(harness.reportSaveFailure).toHaveBeenCalledOnce();
   stop();
 });
+
+it('rebases and persists a blur strength edit until storage acknowledges it', async () => {
+  const defaults = createDefaultDrawingToolDefaults();
+  const harness = createHarness(async () => defaults);
+  let acknowledge: ((value: 'applied') => void) | undefined;
+  harness.save.mockReturnValueOnce(
+    new Promise((resolve) => {
+      acknowledge = resolve;
+    })
+  );
+  const stop = synchronizeDrawingToolPreferences(harness.port);
+  await vi.waitFor(() => expect(harness.defaults.blur.amount).toBe(20));
+
+  const weak = { ...defaults, blur: { amount: 2 } };
+  harness.setLocal(weak);
+  await vi.waitFor(() =>
+    expect(harness.save).toHaveBeenCalledWith({ blur: { amount: 2 } }, defaults)
+  );
+  harness.emitAuthoritative(defaults);
+  expect(harness.defaults.blur.amount).toBe(2);
+  harness.emitAuthoritative(weak);
+  expect(harness.defaults.blur.amount).toBe(2);
+  acknowledge?.('applied');
+  stop();
+});

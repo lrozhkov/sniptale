@@ -77,6 +77,7 @@ function rotateWithDrawingModifiers(
   y: number
 ): boolean {
   const { target } = transform;
+  target.canvas?.setCursor('grabbing');
   const previousAngle = target.snapAngle;
   const previousThreshold = target.snapThreshold;
   target.snapAngle = event.ctrlKey ? 0 : event.shiftKey ? 15 : 45;
@@ -97,8 +98,12 @@ export function createDrawingRotationControl(): Control {
     actionName: 'rotate',
     cursorStyle: 'grab',
     cursorStyleHandler: controlsUtils.rotationStyleHandler,
-    offsetX: 14,
-    offsetY: -14,
+    mouseDownHandler: (_event, transform) => {
+      if (!transform.target.lockRotation) transform.target.canvas?.setCursor('grabbing');
+      return true;
+    },
+    offsetX: 20,
+    offsetY: -20,
     render: renderDrawingRotationHandle as Control['render'],
     sizeX: 22,
     sizeY: 22,

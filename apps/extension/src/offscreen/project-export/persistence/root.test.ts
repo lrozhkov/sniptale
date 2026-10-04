@@ -112,7 +112,7 @@ function expectCompletedExportMessage(jobId: string, format: VideoExportFormat) 
     jobId,
     projectId: 'project-1',
     exportId: 'export-uuid',
-    filename: `Demo_Project-2026-03-22T10-11-12.${format === VideoExportFormat.MP4 ? 'mp4' : 'webm'}`,
+    filename: `Sniptale_video-export_2026-03-22_13-11-12-345.${format === VideoExportFormat.MP4 ? 'mp4' : 'webm'}`,
     format,
   });
 }
@@ -130,7 +130,7 @@ async function verifiesFinalizeExportPersistence() {
     id: 'export-uuid',
     projectId: 'project-1',
     blob,
-    filename: 'Demo_Project-2026-03-22T10-11-12.mp4',
+    filename: 'Sniptale_video-export_2026-03-22_13-11-12-345.mp4',
     createdAt: Date.now(),
     duration: 42,
     width: 1920,
@@ -143,7 +143,7 @@ async function verifiesFinalizeExportPersistence() {
   expect(sendRuntimeMessage).toHaveBeenNthCalledWith(2, {
     type: VideoMessageType.DOWNLOAD_PROJECT_EXPORT,
     exportId: 'export-uuid',
-    filename: 'Demo_Project-2026-03-22T10-11-12.mp4',
+    filename: 'Sniptale_video-export_2026-03-22_13-11-12-345.mp4',
   });
 }
 

@@ -11,6 +11,7 @@ interface VideoEditorTimelineState extends VideoEditorProjectSliceState {
   recordingId: string | null;
   isReady: boolean;
   error: string | null;
+  autosaveEnabled: boolean;
   saveState: VideoEditorSaveState;
   isPlaying: boolean;
   pixelsPerSecond: number;

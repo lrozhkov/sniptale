@@ -1,4 +1,5 @@
 export const scenarioEditorExportMessages = {
+  guidePrintKeepSteps: { ru: 'Не разрывать шаги', en: 'Keep steps together' },
   exportArchiveDescription: {
     ru: 'Архив презентации сценария Sniptale',
     en: 'Sniptale scenario deck archive',

@@ -13,6 +13,10 @@ export const contentAutoBlurMessages = defineMessageSource({
     ru: 'Не удалось применить автоматическое размытие',
     en: 'Failed to apply automatic blur',
   },
+  pinRequiredError: {
+    ru: 'Не удалось закрепить панель. Разрешите расширению доступ ко всем сайтам и повторите попытку.',
+    en: 'Could not pin the toolbar. Allow the extension on all sites and try again.',
+  },
   loading: {
     ru: 'Поиск сущностей',
     en: 'Scanning entities',
@@ -186,12 +190,12 @@ export const contentAutoBlurMessages = defineMessageSource({
     en: 'Disable auto-blur',
   },
   autoApplyEnableHint: {
-    ru: 'Автоматически размывать найденные данные перед каждым снимком',
-    en: 'Automatically blur detected data before every screenshot',
+    ru: 'Автоматически размывать данные перед снимком и закрепить панель во вкладке',
+    en: 'Automatically blur data before capture and pin the toolbar to this tab',
   },
   autoApplyBlockedHint: {
-    ru: 'Сначала закрепите панель во вкладке или включите сценарий',
-    en: 'Pin the toolbar to this tab or turn on scenario mode first',
+    ru: 'Разрешите расширению доступ ко всем сайтам для закрепления панели',
+    en: 'Allow the extension on all sites so the toolbar can be pinned',
   },
   applyOnce: {
     ru: 'Размыть данные сейчас',

@@ -14,6 +14,7 @@ const {
   useSettingsStoreMock,
   loadPopupStartupStateMock,
   savePopupStartupSelectionMock,
+  getQuickActionsMock,
 } = vi.hoisted(() => ({
   getCurrentLocaleMock: vi.fn(() => 'ru'),
   getStoredLocalePreferenceMock: vi.fn<() => 'ru' | 'en' | null>(() => 'ru'),
@@ -24,6 +25,11 @@ const {
   useSettingsStoreMock: vi.fn(),
   loadPopupStartupStateMock: vi.fn(),
   savePopupStartupSelectionMock: vi.fn(),
+  getQuickActionsMock: vi.fn(),
+}));
+
+vi.mock('../../../../composition/persistence/quick-actions', () => ({
+  getQuickActions: getQuickActionsMock,
 }));
 
 vi.mock(
@@ -104,12 +110,16 @@ function resetAppearanceSectionMocks(): void {
       },
     },
     updateSettings: vi.fn().mockResolvedValue(undefined),
+    hasLoaded: true,
+    error: null,
+    loadSettings: vi.fn().mockResolvedValue(undefined),
   });
 }
 
 beforeEach(resetAppearanceSectionMocks);
 
 beforeEach(() => {
+  getQuickActionsMock.mockResolvedValue([]);
   setAppThemePreferenceMock.mockResolvedValue('dark');
   setLocalePreferenceMock.mockResolvedValue(undefined);
   loadPopupStartupStateMock.mockResolvedValue({ selection: 'remember-last', lastPage: 'home' });
@@ -117,6 +127,35 @@ beforeEach(() => {
     selection: 'remember-last',
     lastPage: 'home',
   });
+});
+
+it('loads the command catalog and retries a failed inventory read without losing the editor state', async () => {
+  getQuickActionsMock
+    .mockRejectedValueOnce(new Error('storage unavailable'))
+    .mockResolvedValueOnce([{ id: 'capture-1', status: true }]);
+  await renderHarness();
+  expect(latestState?.contextMenuCatalogStatus).toBe('failed');
+  await act(async () => latestState?.retryContextMenuCatalog());
+  expect(latestState?.contextMenuCatalogStatus).toBe('ready');
+  expect(latestState?.contextMenuQuickActions).toEqual([{ id: 'capture-1', status: true }]);
+});
+
+it('reports settings hydration and retries a failed settings read', async () => {
+  const loadedStore = useSettingsStoreMock();
+  useSettingsStoreMock.mockReturnValue({ ...loadedStore, hasLoaded: false, error: null });
+  await renderHarness();
+  expect(latestState?.contextMenuSettingsStatus).toBe('loading');
+
+  const failedStore = { ...loadedStore, hasLoaded: false, error: 'Storage unavailable' };
+  useSettingsStoreMock.mockReturnValue(failedStore);
+  await renderHarness();
+  expect(latestState?.contextMenuSettingsStatus).toBe('failed');
+  await act(async () => latestState?.retryContextMenuSettings());
+  expect(failedStore.loadSettings).toHaveBeenCalledOnce();
+
+  useSettingsStoreMock.mockReturnValue(loadedStore);
+  await renderHarness();
+  expect(latestState?.contextMenuSettingsStatus).toBe('ready');
 });
 
 afterEach(() => {
@@ -175,14 +214,18 @@ it('loads and persists the popup startup destination', async () => {
     'tools',
     'export:download',
     'export:library',
+    'export:html',
   ]);
 
   await act(async () => {
-    await latestState?.popupStartup.updateSelection('tools');
+    await latestState?.popupStartup.updateSelection('export:html');
   });
 
-  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('tools');
-  expect(latestState?.popupStartup.selection).toBe('tools');
+  expect(
+    latestState?.popupStartup.options.find((option) => option.value === 'export:html')?.label
+  ).toBe('Экспорт в HTML');
+  expect(savePopupStartupSelectionMock).toHaveBeenCalledWith('export:html');
+  expect(latestState?.popupStartup.selection).toBe('export:html');
 });
 
 it('keeps the default startup destination when preference loading fails', async () => {

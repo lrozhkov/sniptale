@@ -58,3 +58,36 @@ describe('ContentToolbar', () => {
     expect(markup).toContain('sniptale-btn-close');
   });
 });
+
+it.each([true, 'true'] as const)(
+  'uses the selected visual contract for aria-pressed=%s',
+  (pressed) => {
+    const markup = renderToStaticMarkup(
+      <ContentToolbarButton aria-pressed={pressed}>Left</ContentToolbarButton>
+    );
+    expect(markup).toContain('data-active="true"');
+    expect(markup).toContain('sniptale-glass-toolbar-button--active');
+  }
+);
+
+it('keeps utility layout state accessible without applying selection or destructive chrome', () => {
+  const markup = renderToStaticMarkup(
+    <ContentToolbarButton
+      tone="utility"
+      size="compact"
+      aria-pressed
+      disabled
+      title="Restore height"
+    >
+      Height
+    </ContentToolbarButton>
+  );
+  expect(markup).toContain('aria-pressed="true"');
+  expect(markup).toContain('aria-label="Restore height"');
+  expect(markup).toContain('disabled=""');
+  expect(markup).toContain('sniptale-btn-utility');
+  expect(markup).toContain('sniptale-btn-compact');
+  expect(markup).not.toContain('sniptale-glass-toolbar-button--active');
+  expect(markup).not.toContain('sniptale-toggle');
+  expect(markup).not.toContain('sniptale-btn-close');
+});

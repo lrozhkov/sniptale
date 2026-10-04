@@ -40,15 +40,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     options: effectiveOptions,
     paths,
   });
-  const coveredProjectMediaIds = new Set<string>();
-  for (const root of videoProjects) {
-    const { metadata } = await root.load();
-    const project = parsePortableVideoProjectMetadata(metadata);
-    for (const asset of project.projectAssets)
-      coveredProjectMediaIds.add(`project-asset:${asset.entry.id}`);
-    for (const item of project.projectExports)
-      coveredProjectMediaIds.add(`export:${item.entry.id}`);
-  }
+  const coveredProjectMediaIds = await coveredProjectMedia(videoProjects);
   const media = await buildMediaRootInventory({
     coveredProjectMediaIds,
     db,
@@ -65,7 +57,10 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
       `Selected project requires an excluded draft media item: ${missingDependency}.`
     );
   }
-  const effects = await buildEffectBundleRootInventory(db, paths);
+  const effects =
+    options.scope === 'all' || videoProjects.length > 0
+      ? await buildEffectBundleRootInventory(db, paths)
+      : [];
 
   const scenarioProjects = await buildScenarioProjectRootInventory({
     db,
@@ -90,4 +85,22 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     },
     roots: [...media, ...effects, ...scenarioProjects, ...videoProjects],
   });
+}
+
+async function coveredProjectMedia(
+  videoProjects: Awaited<ReturnType<typeof buildVideoProjectRootInventory>>
+): Promise<Set<string>> {
+  const coveredProjectMediaIds = new Set<string>();
+  for (const root of videoProjects) {
+    const { metadata } = await root.load();
+    const project = parsePortableVideoProjectMetadata(metadata);
+    for (const asset of project.projectAssets) {
+      if (!asset.libraryMediaId && asset.publishToLibrary !== false)
+        coveredProjectMediaIds.add(`project-asset:${asset.entry.id}`);
+    }
+    for (const item of project.projectExports) {
+      if (!item.libraryMediaId) coveredProjectMediaIds.add(`export:${item.entry.id}`);
+    }
+  }
+  return coveredProjectMediaIds;
 }

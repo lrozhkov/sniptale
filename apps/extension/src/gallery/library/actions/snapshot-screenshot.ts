@@ -35,6 +35,7 @@ export async function openSnapshotScreenshotInEditor(
     await validateWebSnapshotScreenshotBlob(screenshotBlob);
     const bootstrapId = await persistPendingEditorBootstrapPayload({
       dataUrl: await blobToDataUrl(screenshotBlob),
+      capturedAt: previewItem.createdAt,
       sourceFaviconUrl: previewItem.sourceFavicon,
       title: previewItem.sourceTitle ?? previewItem.filename,
       url: previewItem.sourceUrl ?? '',

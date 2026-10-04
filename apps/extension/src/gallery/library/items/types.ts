@@ -1,3 +1,4 @@
+import type { RecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   ImageContentState,
   MediaAssetKind,
@@ -34,6 +35,7 @@ interface GalleryItemBase {
 }
 
 export interface GalleryMediaItem extends GalleryItemBase {
+  recordingMetadata?: RecordingMetadata;
   duration: number | null;
   entityId?: string;
   height: number | null;
@@ -113,10 +115,13 @@ export function isGalleryVideoProjectAvailable(item: GalleryItem): boolean {
   return !isGalleryVideoProjectItem(item) || item.unavailableReason === null;
 }
 
-export function isGallerySelectableItem(
-  item: GalleryItem
-): item is GalleryMediaItem | GalleryScenarioItem | GalleryVideoProjectItem {
-  return item.type === 'media' || item.type === 'scenario' || item.type === 'video-project';
+export function isGallerySelectableItem(item: GalleryItem): boolean {
+  return (
+    item.type === 'media' ||
+    item.type === 'scenario' ||
+    item.type === 'scenario-export' ||
+    item.type === 'video-project'
+  );
 }
 
 export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem {
@@ -131,4 +136,11 @@ export function createGalleryMediaItem(item: MediaLibraryItem): GalleryMediaItem
     expiresAt: null,
     type: 'media',
   };
+}
+
+/** Project availability is shared by gallery cards, details and editor actions. */
+export function canOpenGalleryProject(item: GalleryItem): boolean {
+  if (item.lifecycle?.trashedAt !== undefined) return false;
+  if (item.type === 'scenario') return item.project.availability === 'available';
+  return item.type === 'video-project' && item.unavailableReason === null;
 }

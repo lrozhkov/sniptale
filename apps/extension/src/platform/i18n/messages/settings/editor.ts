@@ -21,6 +21,10 @@ export const settingsEditorMessages = defineMessageSource({
     ru: 'Цвета из этой палитры используются в инструментах и фоне сцены.',
     en: 'These palette colors are used by tools and the scene background.',
   },
+  drawingQuickColorsDescription: {
+    ru: 'Первые пять цветов — постоянный быстрый набор для рисования. Меняйте их цвета и порядок здесь. Все десять цветов доступны в палитре выбора цвета.',
+    en: 'The first five colors are your fixed drawing shortcuts. Change their colors and order here. All ten colors are available in the color picker palette.',
+  },
   createInEditorHint: {
     ru: 'Новые шаблоны создаются прямо в инспекторе редактора через кнопку сохранения.',
     en: 'Create new presets directly from the editor inspector with the save button.',

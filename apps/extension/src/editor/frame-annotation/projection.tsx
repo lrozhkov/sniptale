@@ -7,30 +7,37 @@ import {
   type FrameAnnotationSnapshotV1,
 } from '../../features/highlighter/frame-annotation';
 import { FrameAnnotationBlurSurface } from '../../features/highlighter/frame-annotation/effect-surface';
-import { FrameAnnotationFloatingToolbar } from '../../features/highlighter/frame-annotation/floating-toolbar';
+import {
+  FrameAnnotationFloatingToolbar,
+  FrameAnnotationToolbarAddCalloutButton,
+} from '../../features/highlighter/frame-annotation/floating-toolbar';
 import type { FrameAnnotationCommandId } from '../../features/highlighter/frame-annotation/commands';
 import type { FrameAnnotationCoordinateSpace } from '../../features/highlighter/frame-annotation/coordinate-space';
 import { FrameAnnotationResizeHandleLayer } from '../../features/highlighter/frame-annotation/interaction/resize-handles';
 import type { ResizeDirection } from '../../features/highlighter/contracts';
 import { FrameStepBadgeInteractiveSurface } from '../../features/highlighter/frame-annotation/step-badge/interactive-surface';
+import { FrameProjectionReadOnlyOverlays } from './projection-read-only';
 import { MIN_FRAME_SIZE } from './interaction-controller';
 import { EditorFrameCallout, resolveCalloutCenter } from './callout-projection';
 import {
+  appendFrameCallout,
+  canAppendFrameCallout,
   getFrameCallout,
   getFrameCalloutKey,
   getFrameCallouts,
+  MAX_FRAME_CALLOUTS,
 } from '../../features/highlighter/frame-annotation/callout/collection';
+import { createDefaultFrameCallout } from '../../features/highlighter/frame-annotation/defaults';
+import { translate } from '../../platform/i18n';
 import { FrameProjectionSettings, type ProjectionSettingsMenu } from './projection-settings';
-import {
-  resolveFrameAnnotationToolbarPlacement,
-  type FrameAnnotationToolbarBounds,
-} from './toolbar-placement';
+import { resolveFrameAnnotationToolbarPlacement } from './toolbar-placement';
 import { getRepresentativeColor } from '@sniptale/foundation/paint';
 
 export function FrameProjection(props: {
   coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsRoot: HTMLDivElement | null;
   interactive: boolean;
+  showVisualOverlays?: boolean;
   object: FabricObject | null;
   sceneRoot: HTMLDivElement | null;
   selected: boolean;
@@ -60,20 +67,11 @@ export function FrameProjection(props: {
   onOpenSettings: (menu: Exclude<ProjectionSettingsMenu, null>, anchor: HTMLButtonElement) => void;
 }) {
   const [activeCalloutIndex, setActiveCalloutIndex] = React.useState(0);
-  const [calloutBounds, setCalloutBounds] = React.useState<FrameAnnotationToolbarBounds | null>(
-    null
-  );
-  const handleCalloutBoundsChange = React.useCallback(
-    (next: FrameAnnotationToolbarBounds | null) =>
-      setCalloutBounds((current) => (sameBounds(current, next) ? current : next)),
-    []
-  );
   React.useEffect(() => {
-    if (!getFrameCallouts(props.snapshot).some((callout) => callout.enabled))
-      setCalloutBounds(null);
     if (!getFrameCallout(props.snapshot, activeCalloutIndex)) setActiveCalloutIndex(0);
   }, [activeCalloutIndex, props.snapshot]);
-  const toolbarSelected = props.selected && props.object?.sniptaleLocked !== true;
+  const toolbarSelected =
+    props.interactive && props.selected && props.object?.sniptaleLocked !== true;
   const editingSelected = toolbarSelected && props.settingsMenu === null;
   const scene = resolveFrameAnnotationVisualScene({
     frame: props.snapshot,
@@ -100,19 +98,34 @@ export function FrameProjection(props: {
           activeCalloutIndex={activeCalloutIndex}
           frameRect={frameRect}
           scene={scene}
-          onCalloutBoundsChange={handleCalloutBoundsChange}
           setActiveCalloutIndex={setActiveCalloutIndex}
+        />
+      ) : props.showVisualOverlays ? (
+        <FrameProjectionReadOnlyOverlays
+          coordinateSpace={props.coordinateSpace}
+          controlsRoot={props.controlsRoot}
+          scene={scene}
+          sceneRoot={props.sceneRoot}
+          snapshot={props.snapshot}
         />
       ) : null}
       {toolbarSelected && props.controlsRoot ? (
         <FrameProjectionToolbar
-          coordinateSpace={props.coordinateSpace}
-          calloutBounds={calloutBounds}
           controlsRoot={props.controlsRoot}
-          open={props.onOpenSettings}
+          open={(menu, anchor) => {
+            if (menu === 'callout') setActiveCalloutIndex(0);
+            props.onOpenSettings(menu, anchor);
+          }}
           scene={scene}
           snapshot={props.snapshot}
           onCommand={props.onCommand}
+          onAddCallout={(anchor) => {
+            const next = appendFrameCallout(props.snapshot, createDefaultFrameCallout());
+            if (!next) return;
+            setActiveCalloutIndex(next.calloutIndex);
+            props.onSnapshotChange(next.frame);
+            props.onOpenSettings('callout', anchor);
+          }}
         />
       ) : null}
       {props.interactive && props.controlsRoot ? (
@@ -177,7 +190,6 @@ function FrameProjectionOverlays(
     activeCalloutIndex: number;
     frameRect: { x: number; y: number; width: number; height: number };
     scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
-    onCalloutBoundsChange: (bounds: FrameAnnotationToolbarBounds | null) => void;
     setActiveCalloutIndex: React.Dispatch<React.SetStateAction<number>>;
   }
 ) {
@@ -239,7 +251,6 @@ function FrameCalloutOverlay(props: FrameProjectionOverlayProps) {
           props.setActiveCalloutIndex(calloutIndex);
           props.onOpenSettings('callout', anchor);
         }}
-        onOccupiedBoundsChange={props.onCalloutBoundsChange}
         {...(props.projectMoveRect ? { projectMoveRect: props.projectMoveRect } : {})}
       />
     ) : null
@@ -267,7 +278,7 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
       }}
       settings={settings}
       settingsAnchorRef={anchorRef}
-      showSettingsHandle={!props.selected || props.settingsMenu === 'step'}
+      showSettingsHandle
       surfacePortalTarget={props.sceneRoot}
       {...(props.snapshot.borderSettings?.fillPaint
         ? { fillColor: getRepresentativeColor(props.snapshot.borderSettings.fillPaint) }
@@ -279,56 +290,63 @@ function FrameStepBadgeOverlay(props: FrameProjectionOverlayProps) {
   );
 }
 
-function sameBounds(
-  first: FrameAnnotationToolbarBounds | null,
-  second: FrameAnnotationToolbarBounds | null
-): boolean {
-  return (
-    first === second ||
-    (first !== null &&
-      second !== null &&
-      first.bottom === second.bottom &&
-      first.left === second.left &&
-      first.right === second.right &&
-      first.top === second.top)
-  );
-}
-
 function FrameProjectionToolbar(props: {
-  calloutBounds: FrameAnnotationToolbarBounds | null;
-  coordinateSpace: FrameAnnotationCoordinateSpace;
   controlsRoot: HTMLDivElement;
   open: (menu: Exclude<ProjectionSettingsMenu, null>, anchor: HTMLButtonElement) => void;
   scene: ReturnType<typeof resolveFrameAnnotationVisualScene>;
   snapshot: FrameAnnotationSnapshotV1;
   onCommand: (command: FrameAnnotationCommandId) => void;
+  onAddCallout: (anchor: HTMLButtonElement) => void;
 }) {
   const toolbarRef = React.useRef<HTMLDivElement | null>(null);
   const [, refreshPlacement] = React.useReducer((value) => value + 1, 0);
   React.useLayoutEffect(() => {
     refreshPlacement();
-    if (typeof ResizeObserver === 'undefined' || !toolbarRef.current) return;
+    const onViewportChange = () => refreshPlacement();
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, true);
+    const chromeRoot = document.querySelector('[data-ui="editor.floating-workspace"]');
+    const chromeObserver = new MutationObserver(onViewportChange);
+    if (chromeRoot) chromeObserver.observe(chromeRoot, { childList: true, subtree: true });
+    if (typeof ResizeObserver === 'undefined')
+      return () => {
+        chromeObserver.disconnect();
+        window.removeEventListener('resize', onViewportChange);
+        window.removeEventListener('scroll', onViewportChange, true);
+      };
     const observer = new ResizeObserver(() => refreshPlacement());
-    observer.observe(toolbarRef.current);
-    return () => observer.disconnect();
+    const elements = [
+      toolbarRef.current,
+      document.querySelector('[data-ui="editor.floating.tool-rail.stack"]'),
+      document.querySelector('[data-ui="editor.floating.document-bar"]'),
+      document.querySelector('[data-ui="editor.floating.tool-properties"]'),
+    ];
+    for (const element of elements) if (element) observer.observe(element);
+    return () => {
+      observer.disconnect();
+      chromeObserver.disconnect();
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange, true);
+    };
   }, [props.snapshot.id]);
-  const frameBounds = props.coordinateSpace.logicalRectToClient({
-    x: props.snapshot.x,
-    y: props.snapshot.y,
-    width: props.snapshot.width,
-    height: props.snapshot.height,
-  });
-  const toolbarRect = toolbarRef.current?.getBoundingClientRect();
+  const rail = document.querySelector('[data-ui="editor.floating.tool-rail.stack"]');
+  const toolbarWidth = toolbarRef.current?.offsetWidth;
+  const toolbarHeight = toolbarRef.current?.offsetHeight;
   const position = resolveFrameAnnotationToolbarPlacement({
-    calloutBounds: props.calloutBounds,
-    frameBounds: {
-      bottom: frameBounds.y + frameBounds.height,
-      left: frameBounds.x,
-      right: frameBounds.x + frameBounds.width,
-      top: frameBounds.y,
+    railBounds: rail?.getBoundingClientRect() ?? {
+      bottom: 60,
+      left: 0,
+      right: window.innerWidth,
+      top: 0,
     },
-    ...(toolbarRect
-      ? { toolbarSize: { height: toolbarRect.height, width: toolbarRect.width } }
+    obstacleBounds: [
+      document.querySelector('[data-ui="editor.floating.document-bar"]'),
+      document.querySelector('[data-ui="editor.floating.tool-properties"]'),
+    ]
+      .filter((element): element is Element => element !== null)
+      .map((element) => element.getBoundingClientRect()),
+    ...(toolbarWidth && toolbarHeight
+      ? { toolbarSize: { height: toolbarHeight, width: toolbarWidth } }
       : {}),
     viewport: { height: window.innerHeight, width: window.innerWidth },
   });
@@ -340,6 +358,8 @@ function FrameProjectionToolbar(props: {
         left: position.left,
         top: position.top,
         width: 'max-content',
+        transform: `scale(${position.scale})`,
+        transformOrigin: 'top left',
         zIndex: 50,
         pointerEvents: 'auto',
       }}
@@ -357,6 +377,30 @@ function FrameProjectionToolbar(props: {
         stepBadgeEnabled={props.snapshot.stepBadge?.enabled}
         showEdit={false}
         onCommand={props.onCommand}
+        trailingSlot={
+          props.snapshot.callout?.enabled ? (
+            <FrameAnnotationToolbarAddCalloutButton
+              disabled={!canAppendFrameCallout(props.snapshot)}
+              title={translate('content.interactiveFrame.calloutAddAnother')}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!(event.currentTarget instanceof HTMLButtonElement)) return;
+                const anchor =
+                  getFrameCallouts(props.snapshot).length === MAX_FRAME_CALLOUTS - 1
+                    ? (toolbarRef.current?.querySelector<HTMLButtonElement>(
+                        'button:not(:disabled)'
+                      ) ?? event.currentTarget)
+                    : event.currentTarget;
+                props.onAddCallout(anchor);
+              }}
+            />
+          ) : null
+        }
       />
     </div>,
     props.controlsRoot

@@ -23,7 +23,7 @@ describe('toolbar-transient-menus contract', () => {
       /\.sniptale-toolbar-root \.sniptale-full-page-chevron svg \{[^}]*width: 12px;[^}]*height: 12px;/su
     );
     const chevronFocusRule = toolbarTransientMenusStylesheet.match(
-      /\.sniptale-toolbar-root \.sniptale-full-page-chevron:focus-visible \{[^}]*\}/su
+      /\.sniptale-toolbar-root\s+\.sniptale-full-page-chevron:focus-visible:not\(\[data-focus-restoration='pointer'\]\) \{[^}]*\}/su
     )?.[0];
     expect(chevronFocusRule).toContain('border-color: transparent;');
     expect(chevronFocusRule).toContain('box-shadow: none;');
@@ -70,11 +70,17 @@ describe('toolbar-transient-menus contract', () => {
     expect(toolbarTransientMenusStylesheet).toMatch(
       /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:not\(\[data-active='true'\]\):has\(\s*\.sniptale-btn:not\(:disabled\)\s*\):hover::after/su
     );
-    expect(toolbarTransientMenusStylesheet).toMatch(
-      /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:has\(\s*\.sniptale-full-page-chevron\[aria-expanded='true'\],\s*\.sniptale-btn:focus-visible\s*\)::after/su
+    expect(toolbarTransientMenusStylesheet).not.toMatch(
+      /\.sniptale-full-page-wrapper:has\([^)]*aria-expanded='true'[^)]*\)::after/su
+    );
+    expect(toolbarTransientMenusStylesheet).toContain(
+      ".sniptale-full-page-chevron[aria-expanded='true'] svg"
     );
     expect(toolbarTransientMenusStylesheet).toMatch(
-      /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:has\(\.sniptale-btn:focus-visible\)\s+\.sniptale-btn\s*\{[^}]*box-shadow:\s*none;/su
+      /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper:has\(\s*\.sniptale-btn:focus-visible:not\(\[data-focus-restoration='pointer'\]\)\s*\)\s+\.sniptale-btn\s*\{[^}]*box-shadow:\s*none;/su
+    );
+    expect(toolbarTransientMenusStylesheet).toMatch(
+      /\.sniptale-toolbar-root\s+\.sniptale-full-page-wrapper\s+\.sniptale-btn:focus-visible:not\(\[data-focus-restoration='pointer'\]\) \{[^}]*outline: 2px solid var\(--sniptale-color-text-primary\);/su
     );
     expect(toolbarTransientMenusStylesheet).not.toContain(
       '.sniptale-full-page-wrapper:focus-within'

@@ -1,3 +1,4 @@
+import { isValidScenarioBlurCanvasObject } from './scenario-blur-metadata';
 // policyStateIds: [] - parser sets and resource ceilings are immutable document import policy,
 // not mutable authority or capability state.
 import type { DrawingObject } from '../../features/drawing/public';
@@ -128,7 +129,16 @@ function isDrawingObject(value: unknown): value is DrawingObject {
       isPositiveSize(value['width'])
     );
   }
-  if (value['kind'] === 'blur') return isBounds(value['bounds']) && hasValidRotation(value);
+  if (value['kind'] === 'blur')
+    return (
+      isBounds(value['bounds']) &&
+      hasValidRotation(value) &&
+      (value['amount'] === undefined ||
+        (typeof value['amount'] === 'number' &&
+          Number.isFinite(value['amount']) &&
+          value['amount'] >= 0 &&
+          value['amount'] <= 25))
+    );
   if (value['kind'] === 'text') {
     return (
       isBounds(value['bounds']) &&
@@ -150,6 +160,11 @@ function isDrawingObject(value: unknown): value is DrawingObject {
 
 function expectedObjectType(kind: unknown): string {
   return SHAPE_KINDS.has(String(kind)) ? 'shape' : String(kind);
+}
+
+/** Serialize typed drawing state using the same version admitted at the document boundary. */
+export function serializeEditorDrawingMetadata(object: DrawingObject): string {
+  return JSON.stringify({ version: 1, object });
 }
 
 export function parseEditorDrawingMetadata(value: unknown): DrawingObject | null {
@@ -178,6 +193,10 @@ function assertDrawingFabricObject(value: UnknownRecord): void {
     )
   ) {
     throw new Error('Removed editor drawing object');
+  }
+  if (value['sniptaleScenarioBlurJson'] !== undefined) {
+    if (!isValidScenarioBlurCanvasObject(value)) throw new Error('Invalid scenario blur metadata');
+    return;
   }
   const serializedMetadata = value['sniptaleDrawingJson'];
   if (!DRAWING_TYPES.has(String(objectType)) && serializedMetadata === undefined) return;

@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
     refreshActiveToolSettingsPreview: vi.fn(),
   },
   previewSelectionSettings: vi.fn((callback: () => void) => callback()),
-  storeState: { browserFrame: { enabled: false, style: 'browser' } },
+  storeState: {
+    browserFrame: { enabled: false, style: 'browser' },
+    setFreshImageBackgroundPending: vi.fn(),
+  },
   utility: { id: 'utility' },
 }));
 

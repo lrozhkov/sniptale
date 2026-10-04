@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createTourImageSlide } from '../project/factories';
-import { resolveTourCamera, resolveTourEditingCamera } from './camera';
+import { resolveTourCamera, resolveTourEditingCamera, resolveTourFullViewCamera } from './camera';
 
 const viewport = { stageWidth: 500, stageHeight: 250 };
 function fixture() {
@@ -135,4 +135,22 @@ it('uses the authored auto zoom percentage without changing source or hotspot co
   expect(resolveTourCamera(slide, viewport, true)?.zoom).toBe(2.5);
   expect(resolveTourEditingCamera(slide, viewport)?.zoom).toBe(1);
   expect(slide.hotspots[0]!.point).toEqual({ x: 0.5, y: 0.5 });
+});
+
+it('fits the entire source in temporary full view without changing authored cover or camera', () => {
+  const slide = fixture();
+  slide.fit = 'cover';
+  slide.image!.height = 1000;
+  slide.camera = { mode: 'manual', zoom: 3, center: { x: 0.7, y: 0.3 } };
+  const before = structuredClone(slide);
+  expect(resolveTourFullViewCamera(slide, viewport)).toEqual({
+    x: 125,
+    y: 0,
+    width: 250,
+    height: 250,
+    zoom: 1,
+    center: { x: 0.5, y: 0.5 },
+  });
+  expect(slide).toEqual(before);
+  expect(resolveTourCamera(slide, viewport, false)!.width).toBe(1500);
 });

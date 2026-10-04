@@ -63,6 +63,25 @@ beforeEach(() => {
 });
 
 describe('media backup v6 dependency admission', () => {
+  it('does not inspect unrelated effect bundles for an image-only selection', async () => {
+    mocks.db.getAll.mockResolvedValue([]);
+    mocks.buildEffects.mockRejectedValue(new Error('Unrelated effect bundle is invalid'));
+
+    await expect(
+      buildMediaHubBackupExportPlanFromLibraryV6(
+        createMediaHubBackupExportOptions({
+          scope: 'selected',
+          selected: {
+            mediaAssetIds: ['image-one'],
+            scenarioProjectIds: [],
+            videoProjectIds: [],
+          },
+        })
+      )
+    ).resolves.toMatchObject({ roots: [] });
+    expect(mocks.buildEffects).not.toHaveBeenCalled();
+  });
+
   it('includes saved Gallery views only in a full-library backup', async () => {
     const view = {
       availability: 'available' as const,

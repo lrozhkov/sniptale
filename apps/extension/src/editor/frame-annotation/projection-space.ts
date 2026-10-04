@@ -27,7 +27,7 @@ export function useProjectionRect(elementRef: React.RefObject<HTMLElement | null
 }
 
 export function useEditorFrameCoordinateSpace(input: {
-  canvasRect: DOMRect | null;
+  canvasRect: Pick<DOMRect, 'left' | 'top' | 'width' | 'height'> | null;
   scale: number;
   viewport: { width: number; height: number };
 }) {

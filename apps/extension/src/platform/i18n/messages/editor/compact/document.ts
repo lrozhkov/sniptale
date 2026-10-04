@@ -45,6 +45,10 @@ export const editorCompactDocumentMessages = defineMessageSource({
     ru: 'Размер изображения',
     en: 'Image size',
   },
+  imageScaleHint: {
+    ru: 'Масштабирует всё изображение до заданного размера.',
+    en: 'Scale the whole image to the chosen size.',
+  },
   image: {
     ru: 'Изображение',
     en: 'Image',
@@ -65,9 +69,17 @@ export const editorCompactDocumentMessages = defineMessageSource({
     ru: 'Обрезать холст',
     en: 'Crop canvas',
   },
+  cropCanvasHint: {
+    ru: 'Задайте размер холста или выделите область мышью.',
+    en: 'Set the canvas size or select an area with the pointer.',
+  },
   applyCropCanvas: {
     ru: 'Применить обрезку',
     en: 'Apply crop',
+  },
+  applyExpandCanvas: {
+    ru: 'Применить область',
+    en: 'Apply area',
   },
   resizeTarget: {
     ru: 'Что изменить',

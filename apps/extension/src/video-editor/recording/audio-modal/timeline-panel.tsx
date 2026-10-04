@@ -1,41 +1,55 @@
 import { useLayoutEffect, useState, type ReactNode } from 'react';
-import { Mic, RotateCcw, Save, Square, X } from 'lucide-react';
+import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
 import { formatDurationLabel } from '../../../composition/audio-recording/format';
 import { renderAudioRecordingTrimPanel } from '../../../composition/audio-recording/dialog/trim';
+import {
+  AudioRecordingDownloadButton,
+  RecordingSetup,
+} from '../../../composition/audio-recording/dialog/controls';
+import { RecordingLevelMeter } from '../../../composition/audio-recording/dialog/level-meter';
 
-/** Transport and take review share one compact strip anchored to the recording interval. */
+/** Recording settings, transport and take actions remain in separate stable rows. */
 export function TimelineRecordingPanel(props: {
   titleId: string;
   startTime: number;
   duration: number;
+  captureDuration?: number;
+  limitInvalid?: boolean;
+  durationOptions?: ReactNode;
   controller: AudioRecordingControllerState;
   device: ReactNode;
+  playbackChoice?: ReactNode;
   starting: boolean;
   saving: boolean;
   error: string | null;
   onStart: () => void;
   onClose: () => void;
   onSave: () => Promise<void>;
+  onDownload: () => Promise<void>;
+  downloading: boolean;
 }) {
   const { transport, trim } = props.controller;
-  const recording = transport.status === 'recording';
   const busy = props.starting || props.saving;
   const recordButton = (
-    <ProductActionButton tone="secondary" disabled={busy} onClick={props.onStart}>
+    <ProductActionButton
+      tone={trim ? 'secondary' : 'primary'}
+      disabled={busy || props.limitInvalid || props.duration <= 0}
+      onClick={props.onStart}
+    >
       {trim ? <RotateCcw size={16} /> : <Mic size={16} />}
       {translate(trim ? 'videoEditor.app.recordAudioAgain' : 'videoEditor.app.recordAudioStart')}
     </ProductActionButton>
   );
   const context = (
-    <div className="shrink-0 text-xs">
+    <div className="min-w-0 text-sm">
       <span id={props.titleId} className="font-medium">
         {translate('videoEditor.app.recordAudioVoiceover')}
       </span>
-      <span className="ml-2 tabular-nums text-[var(--sniptale-color-text-muted)]">
+      <span className="ml-2 inline-block text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
         {formatDurationLabel(props.startTime)}–
         {formatDurationLabel(props.startTime + props.duration)}
       </span>
@@ -43,6 +57,7 @@ export function TimelineRecordingPanel(props: {
   );
   const closeButton = (
     <ContentToolbarButton
+      tone="close"
       title={translate('common.actions.close')}
       disabled={props.saving}
       onClick={props.onClose}
@@ -52,52 +67,41 @@ export function TimelineRecordingPanel(props: {
     </ContentToolbarButton>
   );
   return (
-    <div className="grid gap-2 px-3 py-2" data-ui="video-editor.audio-recording.strip">
+    <div className="grid min-w-0 gap-3 p-4" data-ui="video-editor.audio-recording.strip">
+      <header className="flex min-h-9 items-center gap-3">
+        {context}
+        <div className="ml-auto shrink-0">{closeButton}</div>
+      </header>
       {!trim && (
-        <div className="flex min-h-9 items-center gap-3">
-          {context}
-          <div className="w-40 min-w-0">{props.device}</div>
-          <span
-            className="ml-auto whitespace-nowrap text-xs tabular-nums"
-            data-ui="video-editor.audio-recording.limit"
-          >
-            {translate(
-              recording
-                ? 'videoEditor.app.recordAudioRemaining'
-                : 'videoEditor.app.recordAudioLimit'
-            )}{' '}
-            <strong>
-              {formatDurationLabel(
-                recording
-                  ? Math.ceil(Math.max(0, props.duration - transport.elapsedSeconds))
-                  : props.duration
-              )}
-            </strong>
-          </span>
-          {recording ? (
-            <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
-              <Square size={16} />
-              {translate('videoEditor.app.recordAudioStop')}
-            </ProductActionButton>
-          ) : (
-            recordButton
-          )}
-          {closeButton}
-        </div>
-      )}
-      {renderAudioRecordingTrimPanel(
-        trim,
-        busy,
-        true,
         <>
-          {context}
+          <RecordingSetup
+            device={props.device}
+            playback={props.playbackChoice}
+            duration={props.durationOptions}
+          />
+          <TimelineRecordingTransport
+            transport={transport}
+            duration={props.duration}
+            captureDuration={props.captureDuration}
+            startAction={recordButton}
+          />
+          <RecordingLevelMeter meter={props.controller.meter} preparing={props.starting} />
+        </>
+      )}
+      {trim && props.limitInvalid ? props.durationOptions : null}
+      {renderAudioRecordingTrimPanel(trim, busy, true)}
+      {trim && (
+        <footer className="flex flex-wrap justify-end gap-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+          <AudioRecordingDownloadButton
+            disabled={busy || props.downloading}
+            onDownload={props.onDownload}
+          />
           {recordButton}
-          <ProductActionButton tone="secondary" disabled={busy} onClick={() => void props.onSave()}>
-            <Save size={16} />
+          <ProductActionButton tone="primary" disabled={busy} onClick={() => void props.onSave()}>
+            <Save size={16} aria-hidden="true" />
             {translate('videoEditor.app.recordAudioInsert')}
           </ProductActionButton>
-          {closeButton}
-        </>
+        </footer>
       )}
       {props.starting && (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
@@ -109,6 +113,68 @@ export function TimelineRecordingPanel(props: {
           {props.error || transport.error}
         </p>
       )}
+    </div>
+  );
+}
+
+function TimelineRecordingTransport(props: {
+  transport: AudioRecordingControllerState['transport'];
+  duration: number;
+  captureDuration?: number | undefined;
+  startAction: ReactNode;
+}) {
+  const recording = props.transport.status === 'recording';
+  const paused = props.transport.status === 'paused';
+  return (
+    <div
+      className="flex flex-wrap items-center gap-3 border-t border-[var(--sniptale-color-border-soft)] pt-3"
+      role="status"
+    >
+      <span
+        className="inline-flex items-baseline gap-1 whitespace-nowrap text-xs tabular-nums"
+        data-ui="video-editor.audio-recording.limit"
+      >
+        {translate(
+          recording || paused
+            ? 'videoEditor.app.recordAudioRemaining'
+            : 'videoEditor.app.recordAudioLimit'
+        )}{' '}
+        <strong>
+          {formatDurationLabel(
+            recording || paused
+              ? Math.ceil(
+                  Math.max(
+                    0,
+                    (props.captureDuration ?? props.duration) - props.transport.elapsedSeconds
+                  )
+                )
+              : (props.captureDuration ?? props.duration)
+          )}
+        </strong>
+      </span>
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        {recording || paused ? (
+          <>
+            <ProductActionButton
+              tone="secondary"
+              onClick={() =>
+                paused ? void props.transport.resumeRecording() : props.transport.pauseRecording()
+              }
+            >
+              {paused ? <Play size={16} /> : <Pause size={16} />}
+              {translate(
+                paused ? 'videoEditor.app.recordAudioResume' : 'videoEditor.app.recordAudioPause'
+              )}
+            </ProductActionButton>
+            <ProductActionButton tone="secondary" onClick={props.transport.stopRecording}>
+              <Square size={16} />
+              {translate('videoEditor.app.recordAudioStop')}
+            </ProductActionButton>
+          </>
+        ) : (
+          props.startAction
+        )}
+      </div>
     </div>
   );
 }

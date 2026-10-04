@@ -12,6 +12,17 @@ const mocks = vi.hoisted(() => ({
   messageHandlers: vi.fn(),
   initializeTheme: vi.fn(),
   toastError: vi.fn(),
+  activeTab: {
+    url: null as string | null,
+    videoByMode: { TAB: { supported: true } },
+  },
+}));
+
+vi.mock('@sniptale/platform/browser/runtime', () => ({
+  runtimeInfo: { getURL: () => 'chrome-extension://sniptale/' },
+}));
+vi.mock('../tab-access/capabilities', () => ({
+  useActiveTabCapabilities: () => mocks.activeTab,
 }));
 
 vi.mock('../startup/coordinator', () => ({ resolvePopupStartupRoute: mocks.coordinator }));
@@ -49,15 +60,14 @@ vi.mock(
     savePopupLastPage: mocks.saveLastPage,
   })
 );
-vi.mock('../command-palette/route-first', () => ({
-  RouteFirstPopupCommandPalette: () => <div data-testid="route-first-palette" />,
-}));
 
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.activeTab.url = null;
+  mocks.activeTab.videoByMode.TAB.supported = true;
   mocks.coordinator.mockReset();
   mocks.loadRoute.mockReset();
   mocks.preload.mockReset();
@@ -73,6 +83,91 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('keeps navigation in place without an unsupported-tab banner on extension pages', async () => {
+  mocks.activeTab.url = 'chrome-extension://sniptale/apps/extension/src/settings/index.html';
+  mocks.activeTab.videoByMode.TAB.supported = false;
+  mocks.coordinator.mockReturnValue(new Promise(() => undefined));
+  const { PopupApp } = await import('./index');
+  act(() => root.render(<PopupApp />));
+
+  expect(container.querySelector('[data-ui="popup.app.extension-warning"]')).toBeNull();
+  expect(
+    container.querySelector('[data-ui="popup.app.root"]')?.hasAttribute('data-extension-warning')
+  ).toBe(false);
+  expect(container.querySelector('[data-ui="popup.app.tabs"]')).not.toBeNull();
+});
+
+it('preloads a tab from keyboard focus and pointer intent without changing navigation', async () => {
+  mocks.coordinator.mockReturnValue(new Promise(() => undefined));
+  const { PopupApp } = await import('./index');
+  act(() => root.render(<PopupApp />));
+  const menu = container.querySelector<HTMLButtonElement>('button[data-page="menu"]')!;
+  const video = container.querySelector<HTMLButtonElement>('button[data-page="video"]')!;
+
+  act(() => menu.focus());
+  await vi.waitFor(() => expect(mocks.preload).toHaveBeenCalledWith('menu'));
+  act(() => video.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  await vi.waitFor(() => expect(mocks.preload).toHaveBeenCalledWith('video'));
+  expect(container.querySelector('[data-ui="popup.app.route-skeleton"]')).not.toBeNull();
+});
+
+it('records which side the menu ring is entered from', async () => {
+  const Route = () => <div data-testid="route" />;
+  mocks.coordinator.mockResolvedValue({ page: 'screenshots' });
+  mocks.loadRoute.mockResolvedValue(Route);
+  const { PopupApp } = await import('./index');
+  await act(async () => root.render(<PopupApp />));
+  await vi.waitFor(() => expect(container.querySelector('[data-testid="route"]')).not.toBeNull());
+
+  const select = async (page: string) => {
+    await act(async () =>
+      container.querySelector<HTMLButtonElement>(`button[data-page="${page}"]`)?.click()
+    );
+  };
+  await select('menu');
+  const indicator = container.querySelector<HTMLElement>('.popup-react-shell__tab-indicator');
+  expect(indicator?.dataset['entrySide']).toBe('left');
+  expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('left');
+  expect(
+    container.querySelector<HTMLButtonElement>('button[data-page="menu"]')?.dataset['entrySide']
+  ).toBe('left');
+  expect(indicator?.querySelector('.popup-react-shell__menu-ring circle')).not.toBeNull();
+  expect(
+    container.querySelector('button[data-page="menu"] .popup-react-shell__menu-icon-accent')
+  ).not.toBeNull();
+
+  await select('export');
+  expect(
+    container.querySelector<HTMLButtonElement>('button[data-page="export"]')?.dataset['entrySide']
+  ).toBe('left');
+  expect(
+    container.querySelectorAll('button[data-page="export"] .popup-react-shell__tab-icon svg')
+  ).toHaveLength(2);
+  await select('menu');
+  expect(indicator?.dataset['entrySide']).toBe('right');
+  expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('right');
+  expect(
+    container.querySelector<HTMLButtonElement>('button[data-page="menu"]')?.dataset['entrySide']
+  ).toBe('right');
+  await vi.waitFor(() => expect(mocks.saveLastPage).toHaveBeenCalledTimes(3));
+});
+
+it('opens directly on menu with a completed, non-animated ring', async () => {
+  const Route = () => <div data-testid="route" />;
+  mocks.coordinator.mockResolvedValue({ page: 'menu' });
+  mocks.loadRoute.mockResolvedValue(Route);
+  const { PopupApp } = await import('./index');
+  await act(async () => root.render(<PopupApp />));
+  await vi.waitFor(() => expect(container.querySelector('[data-testid="route"]')).not.toBeNull());
+
+  const indicator = container.querySelector<HTMLElement>('.popup-react-shell__tab-indicator');
+  expect(indicator?.dataset['page']).toBe('menu');
+  expect(indicator?.dataset['entrySide']).toBe('none');
+  expect(container.querySelector('nav')?.dataset['menuEntry']).toBe('none');
+  expect(container.querySelector('nav')?.dataset['animate']).toBe('false');
+  expect(indicator?.querySelector('circle')?.getAttribute('pathLength')).toBe('100');
 });
 
 it('keeps current content until a cold navigation commits and only then persists it', async () => {
@@ -124,16 +219,17 @@ it('keeps current content until a cold navigation commits and only then persists
   await vi.waitFor(() => expect(mocks.saveLastPage).toHaveBeenCalledWith('video'));
 });
 
-it('loads the command palette only after the actual hotkey', async () => {
+it('does not open a command palette from the popup shortcut', async () => {
   mocks.coordinator.mockReturnValue(new Promise(() => undefined));
   const { PopupApp } = await import('./index');
   act(() => root.render(<PopupApp />));
-  expect(container.querySelector('[data-testid="route-first-palette"]')).toBeNull();
+  expect(container.querySelector('[data-ui="popup.command-palette"]')).toBeNull();
   await act(async () => {
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
-    await vi.dynamicImportSettled();
+    const shortcut = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, cancelable: true });
+    window.dispatchEvent(shortcut);
+    expect(shortcut.defaultPrevented).toBe(false);
   });
-  expect(container.querySelector('[data-testid="route-first-palette"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="popup.command-palette"]')).toBeNull();
 });
 
 it('keeps the committed route when a cold target fails to load', async () => {

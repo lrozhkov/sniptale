@@ -1,3 +1,4 @@
+import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
@@ -17,7 +18,13 @@ vi.mock('./render-spotlight', () => ({ drawReviewSpotlight: vi.fn() }));
 
 const state = vi.hoisted(() => ({
   configurations: [] as unknown[],
-  encoded: [] as { timestamp: number; close: unknown; width: number; height: number }[],
+  encoded: [] as {
+    timestamp: number;
+    duration: number;
+    close: unknown;
+    width: number;
+    height: number;
+  }[],
   composited: [] as unknown[][],
   drawn: [] as { draw: unknown; close: unknown }[],
   audioTrack: null as null | {
@@ -30,17 +37,31 @@ const state = vi.hoisted(() => ({
 vi.mock('mediabunny', () => {
   class VideoSample {
     timestamp: number;
+    duration: number;
     width: number;
     height: number;
     close = vi.fn();
     draw = vi.fn();
-    constructor(source: HTMLCanvasElement | null, init: { timestamp: number }) {
+    constructor(source: HTMLCanvasElement | null, init: { timestamp: number; duration?: number }) {
       this.timestamp = init.timestamp;
+      this.duration = init.duration ?? 0;
       this.width = source?.width ?? 0;
       this.height = source?.height ?? 0;
     }
   }
   class VideoSampleSink {
+    async getSample(time: number) {
+      const sample = new VideoSample(null, { timestamp: Math.floor(time * 2) / 2 });
+      state.drawn.push({ draw: sample.draw, close: sample.close });
+      return sample;
+    }
+    async *samples(start: number, end: number) {
+      const timestamp = Math.ceil(start * 2) / 2;
+      if (timestamp >= end) return;
+      const sample = new VideoSample(null, { timestamp });
+      state.drawn.push({ draw: sample.draw, close: sample.close });
+      yield sample;
+    }
     async *samplesAtTimestamps(times: readonly number[]) {
       for (const time of times) {
         const sample = new VideoSample(null, { timestamp: time });
@@ -78,6 +99,7 @@ vi.mock('mediabunny', () => {
     add = vi.fn(async (sample: VideoSample) => {
       state.encoded.push({
         timestamp: sample.timestamp,
+        duration: sample.duration,
         close: sample.close,
         width: sample.width,
         height: sample.height,
@@ -109,6 +131,8 @@ const realCreateImageBitmap = globalThis.createImageBitmap;
 
 function contextFixture() {
   return {
+    translate: vi.fn(),
+    scale: vi.fn(),
     fillStyle: '',
     globalAlpha: 1,
     font: '',
@@ -244,6 +268,23 @@ describe('reviewRenderFrameSchedule', () => {
     expect(windows[2]!.timestamps).toHaveLength(8);
     expect(windows[2]!.timestamps[0]).toBe(3);
     expect(windows[2]!.sourceTimes[2]).toBeCloseTo(5.5, 9);
+  });
+
+  it('renders both visible speed fragments around a cut with a continuous output clock', () => {
+    const windows = reviewRenderFrameSchedule(10, [speedEdit(1, 7), cutEdit(3, 5)], 2);
+    expect(
+      windows.map((window) => ({
+        start: window.segment.sourceStart,
+        end: window.segment.sourceEnd,
+        kind: window.segment.kind,
+        resultStart: window.segment.resultStart,
+      }))
+    ).toEqual([
+      { start: 0, end: 1, kind: 'keep', resultStart: 0 },
+      { start: 1, end: 3, kind: 'speed', resultStart: 1 },
+      { start: 5, end: 7, kind: 'speed', resultStart: 5 },
+      { start: 7, end: 10, kind: 'keep', resultStart: 9 },
+    ]);
   });
 
   it('keeps frames over a sub-frame tail and rejects invalid frame rates', () => {
@@ -707,4 +748,100 @@ it('scales spotlight blur with export resolution, preserving the scene effect', 
     expect.anything(),
     expect.objectContaining({ blur: 8 })
   );
+});
+
+it.each(['fixed', 'follow-video'] as const)(
+  'exports %s image motion with a matching rounded video boundary',
+  (zoomBehavior) => {
+    const context = contextFixture();
+    const canvas = { width: 800, height: 450 };
+    const image = { width: 800, height: 450 } as ImageBitmap;
+    const background = {
+      enabled: true as const,
+      type: 'image' as const,
+      assetId: 'image',
+      imageFit: 'cover' as const,
+      zoomBehavior,
+      layout: { padding: 40, cornerRadius: 20 },
+    };
+    for (const scale of [1, 1.5, 2]) {
+      vi.clearAllMocks();
+      const layout = computeQuickEditSceneLayout({
+        output: canvas,
+        canvas,
+        source: canvas,
+        background,
+        camera: { scale, centerX: 0.5, centerY: 0.5 },
+      });
+      const draw = vi.fn();
+      drawReviewSceneFrame(context, { canvas, layout, background, image, sample: { draw } });
+      const follows = zoomBehavior === 'follow-video';
+      const clip = follows ? layout.videoTransform : layout.videoRect;
+      expect(context.roundRect).toHaveBeenCalledWith(
+        clip.x,
+        clip.y,
+        clip.width,
+        clip.height,
+        20 * (follows ? scale : 1)
+      );
+      expect(draw).toHaveBeenCalledWith(
+        context,
+        layout.videoTransform.x,
+        layout.videoTransform.y,
+        layout.videoTransform.width,
+        layout.videoTransform.height
+      );
+      if (follows && scale > 1) {
+        expect(context.translate).toHaveBeenCalledWith((1 - scale) * 400, (1 - scale) * 225);
+        expect(context.scale).toHaveBeenCalledWith(scale, scale);
+        expect(vi.mocked(context.restore).mock.invocationCallOrder[0]).toBeLessThan(
+          draw.mock.invocationCallOrder[0]!
+        );
+      } else expect(context.scale).not.toHaveBeenCalled();
+    }
+  }
+);
+
+it('renders a transition on the unchanged result clock and releases endpoint samples', async () => {
+  state.drawn.length = 0;
+  state.encoded.length = 0;
+  const args = argsFixture();
+  args.edits = [{ ...cutEdit(0.5, 1), transition: { type: 'dissolve', before: 0.5, after: 0.5 } }];
+  const receipt = await writeReviewFrames(args);
+  expect(receipt.resultDuration).toBe(1.5);
+  expect(state.encoded.map((sample) => sample.timestamp)).toEqual([0, 0.5, 1]);
+  expect(state.drawn).toHaveLength(5);
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+  state.drawn.length = 0;
+  await expect(
+    writeReviewFrames({
+      ...args,
+      onProgress() {
+        throw new Error('stop render');
+      },
+    })
+  ).rejects.toThrow('stop render');
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('refuses an export whose retained side contains no admissible transition frame', async () => {
+  state.drawn.length = 0;
+  const args = argsFixture();
+  args.edits = [
+    { ...cutEdit(0.5, 1.75), transition: { type: 'dissolve', before: 0.5, after: 0.5 } },
+  ];
+  await expect(writeReviewFrames(args)).rejects.toMatchObject({
+    name: 'QuickEditExportUnavailable',
+    reasons: ['transition-frames'],
+  });
+  for (const sample of state.drawn) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('ends the final rendered frame at the exact retained duration instead of adding a full frame', async () => {
+  state.encoded.length = 0;
+  const args = argsFixture();
+  args.index.duration = 2.03;
+  await writeReviewFrames(args);
+  const last = state.encoded.at(-1)!;
+  expect(last.timestamp + last.duration).toBeCloseTo(2.03, 8);
 });

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
   initDB: vi.fn(),
   runMutation: vi.fn(),
+  journals: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -16,6 +17,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
 vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteAssetObject: mocks.deleteObject,
+  listReadyJournals: mocks.journals,
 }));
 
 import {
@@ -48,12 +50,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   mocks.deleteObject.mockResolvedValue(undefined);
+  mocks.journals.mockResolvedValue([]);
 });
 
 function installMutationHarness(current: unknown = operation) {
   const put = vi.fn().mockResolvedValue(undefined);
   const store = { get: vi.fn().mockResolvedValue(current), put };
   const db = {
+    get: vi.fn(async (): Promise<unknown> => undefined),
+    getAll: vi.fn(async (_store: string): Promise<unknown[]> => []),
     add: vi.fn().mockResolvedValue(undefined),
     delete: vi.fn().mockResolvedValue(undefined),
     transaction: vi.fn(() => ({ done: Promise.resolve(), objectStore: () => store })),
@@ -63,6 +68,51 @@ function installMutationHarness(current: unknown = operation) {
 }
 
 describe('durable asset operations', () => {
+  it.each(['owner', 'ready'] as const)(
+    'retains bytes adopted after their physical delete was journaled: %s',
+    async (claim) => {
+      const harness = installMutationHarness();
+      const intent = buildPhysicalDeleteOperation(['shared']);
+      if (claim === 'owner') {
+        const ref = {
+          assetId: 'shared',
+          createdAt: 1,
+          location: { kind: 'opfs', objectKey: 'objects/shared' },
+          mimeType: 'image/png',
+          size: 3,
+          sha256: null,
+        };
+        harness.db.getAll.mockImplementation(async (store: string) =>
+          store === 'asset_refs'
+            ? [ref]
+            : store === 'asset_owners'
+              ? [
+                  {
+                    assetId: 'shared',
+                    ownerKind: 'image-workspace',
+                    ownerId: 'copy',
+                    role: 'source',
+                  },
+                ]
+              : []
+        );
+      } else
+        mocks.journals.mockResolvedValue([
+          {
+            journalId: 'prepared-copy',
+            domain: 'image-workspace',
+            createdAt: 1,
+            assetRefs: [{ assetId: 'shared' }],
+            payload: {},
+          },
+        ]);
+      await completePhysicalDeleteOperation(intent);
+      expect(mocks.deleteObject).not.toHaveBeenCalled();
+      if (claim === 'owner')
+        expect(harness.db.delete).toHaveBeenCalledWith('asset_operations', intent.operationId);
+      else expect(harness.db.delete).not.toHaveBeenCalled();
+    }
+  );
   it('deduplicates physical-delete asset ids and completes deletion before removing intent', async () => {
     const harness = installMutationHarness();
     const intent = buildPhysicalDeleteOperation(['asset-1', 'asset-1', 'asset-2']);
@@ -223,3 +273,73 @@ describe('durable asset operations', () => {
     await expect(listArchiveRestoreSessions()).resolves.toEqual([session]);
   });
 });
+
+it.each(['obsolete', 'receipt'] as const)(
+  'retains bytes needed by unresolved legacy rollback: %s',
+  async (claim) => {
+    const harness = installMutationHarness();
+    const backup = {
+      ...operation,
+      obsoleteAssetIds: claim === 'obsolete' ? ['rollback-byte'] : [],
+      compensations:
+        claim === 'receipt'
+          ? [
+              {
+                assetId: 'new-byte',
+                journalId: 'legacy-ready',
+                nextMediaId: 'legacy',
+                nextOwnerId: 'legacy',
+                previousRecords: { assetRefEntry: { assetId: 'rollback-byte' } },
+              },
+            ]
+          : [],
+    };
+    harness.db.getAll.mockImplementation(async (store) =>
+      store === 'asset_operations' ? [backup] : []
+    );
+    const intent = buildPhysicalDeleteOperation(['rollback-byte']);
+    await completePhysicalDeleteOperation(intent);
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    expect(harness.db.delete).not.toHaveBeenCalled();
+  }
+);
+
+it('defers physical deletion when durable operation authority is invalid', async () => {
+  const harness = installMutationHarness();
+  harness.db.getAll.mockImplementation(async (store) =>
+    store === 'asset_operations'
+      ? [{ kind: 'backup-restore', obsoleteAssetIds: ['rollback-byte'] }]
+      : []
+  );
+  const intent = buildPhysicalDeleteOperation(['rollback-byte']);
+  await completePhysicalDeleteOperation(intent);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+  expect(harness.db.delete).not.toHaveBeenCalled();
+});
+
+it.each(['recording', 'invalid-source'] as const)(
+  'retains physical intent when durable %s metadata remains without refs and owners',
+  async (kind) => {
+    const harness = installMutationHarness();
+    const intent = buildPhysicalDeleteOperation(['shared']);
+    harness.db.getAll.mockImplementation(async (store: string) =>
+      store === 'recordings'
+        ? [
+            kind === 'recording'
+              ? {
+                  id: 'survivor',
+                  assetId: 'shared',
+                  createdAt: 1,
+                  filename: 'r.webm',
+                  mimeType: 'video/webm',
+                  size: 3,
+                }
+              : { id: 'invalid', invalid: true },
+          ]
+        : []
+    );
+    await completePhysicalDeleteOperation(intent);
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+    expect(harness.db.delete).not.toHaveBeenCalled();
+  }
+);

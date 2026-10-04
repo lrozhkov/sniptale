@@ -29,13 +29,15 @@ async function deleteProjectAssetThumbnails(assetIds: string[]): Promise<void> {
 }
 
 export async function deletePersistedVideoProject(
-  projectId: string
+  projectId: string,
+  options: { preserveExports?: boolean } = {}
 ): Promise<VideoProjectListItem[]> {
   let changedIds: string[] = [];
 
   await withMediaHubWriteGuard(translate('shared.mediaHub.deleteVideoProjectAction'), async () => {
     await deleteVideoPreviewCacheProjectRecords(projectId);
-    const exportIds = await deleteProjectExportArtifacts(projectId);
+    // Trash purges only the confirmed root; published exports have independent lifecycles.
+    const exportIds = options.preserveExports ? [] : await deleteProjectExportArtifacts(projectId);
     await deleteMediaThumbnail(`video-project:${projectId}`);
     const deletedProjectAssetIds = await deleteVideoProject(projectId);
     await deleteProjectAssetThumbnails(deletedProjectAssetIds);

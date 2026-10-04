@@ -119,6 +119,9 @@ function createToolbarPrimaryViewModel(
       setAction: vi.fn(),
     },
     derivedState: {
+      freePlacement: false,
+      dockPreview: null,
+      setFreePlacement: vi.fn(),
       compactMenus: false,
       currentViewport: null,
       displayMode: 'horizontal',
@@ -216,13 +219,13 @@ function expectModeMenuIcon(mode: 'quick-edit'): void {
 }
 
 describe('ToolbarPrimaryControls', () => {
-  it('keeps the mode selector neutral in cursor mode and active in editing modes', async () => {
+  it('shows the selected mode without a persistent active frame', async () => {
     const inactive = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(inactive.props);
 
     const modeButton = queryModeSelectorButton();
 
-    expect(modeButton?.getAttribute('data-active')).toBe('true');
+    expect(modeButton?.getAttribute('data-active')).toBeNull();
     expect(modeButton?.getAttribute('title')).toBe('Обычная работа со страницей');
 
     const active = createToolbarPrimaryControlsProps({ aiPickMode: true, isCursorMode: false });
@@ -232,7 +235,7 @@ describe('ToolbarPrimaryControls', () => {
       '[data-ui="content.toolbar.mode-selector-button"]'
     ) as HTMLButtonElement | null;
 
-    expect(activeModeButton?.getAttribute('data-active')).toBe('true');
+    expect(activeModeButton?.getAttribute('data-active')).toBeNull();
     expect(activeModeButton?.getAttribute('title')).toBe('Редактирование контента');
   });
 
@@ -247,23 +250,12 @@ describe('ToolbarPrimaryControls', () => {
     expect(document.querySelector('[data-ui="test.scenario-controls"]')).toBeNull();
   });
 
-  it('shows pin and collapse actions only next to Navigation', () => {
+  it('keeps Navigation pin and collapse actions with the settings group', () => {
     const navigation = createToolbarPrimaryControlsProps();
     renderToolbarPrimaryControls(navigation.props);
 
-    const pin = document.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.navigation.pin-to-tab"]'
-    );
-    const collapse = document.querySelector<HTMLButtonElement>(
-      '[data-ui="content.toolbar.navigation.collapse"]'
-    );
-    expect(pin).not.toBeNull();
-    expect(collapse).not.toBeNull();
-
-    act(() => pin?.click());
-    act(() => collapse?.click());
-    expect(navigation.props.toolbarProps.onPinToTabChange).toHaveBeenCalledWith(true, undefined);
-    expect(navigation.props.toolbarProps.onHide).toHaveBeenCalledOnce();
+    expect(document.querySelector('[data-ui="content.toolbar.navigation.pin-to-tab"]')).toBeNull();
+    expect(document.querySelector('[data-ui="content.toolbar.navigation.collapse"]')).toBeNull();
 
     const editing = createToolbarPrimaryControlsProps({ quickEditMode: true });
     renderToolbarPrimaryControls(editing.props);
@@ -305,7 +297,7 @@ describe('ToolbarPrimaryControls pending mode', () => {
 
     const modeButton = queryModeSelectorButton();
 
-    expect(modeButton?.getAttribute('data-active')).toBe('true');
+    expect(modeButton?.getAttribute('data-active')).toBeNull();
     expect(modeButton?.getAttribute('title')).toBe('Редактирование контента');
   });
 });

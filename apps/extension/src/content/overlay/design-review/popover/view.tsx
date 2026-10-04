@@ -35,14 +35,22 @@ function DeleteConfirmation(props: { onCancel: () => void; onConfirm: () => void
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           type="button"
-          className="h-9 rounded-[8px] border border-[color:var(--sniptale-color-border-soft)] text-xs font-semibold"
+          className={[
+            'h-9 rounded-[8px] border border-[color:var(--sniptale-color-border-soft)] text-xs font-semibold',
+            'hover:bg-[var(--sniptale-color-surface-input)] active:bg-[var(--sniptale-color-surface-hover)]',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+          ].join(' ')}
           onClick={props.onCancel}
         >
           {translate('content.designReview.cancel')}
         </button>
         <button
           type="button"
-          className="h-9 rounded-[8px] bg-[var(--sniptale-color-danger)] text-xs font-semibold text-white"
+          className={[
+            'h-9 rounded-[8px] bg-[var(--sniptale-color-danger)] text-xs font-semibold text-white',
+            'hover:opacity-90 active:opacity-80',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-accent)]',
+          ].join(' ')}
           onClick={props.onConfirm}
         >
           {translate('content.designReview.delete')}
@@ -98,6 +106,10 @@ function useDesignReviewPopoverViewModel(props: { open: boolean; state: DesignRe
     }
   }, [props.open, selectionElement]);
 
+  useEffect(() => {
+    if (props.state.settingsOpen) setDeleteRequested(false);
+  }, [props.state.settingsOpen]);
+
   return {
     basePosition,
     containedPopoverRef,
@@ -141,11 +153,13 @@ export function DesignReviewPopover(props: {
       <button
         type="button"
         className={[
+          'sniptale-dismiss-button',
           'pointer-events-auto absolute -right-3 -top-3 z-50 inline-flex h-8 w-8',
           'cursor-pointer items-center justify-center',
-          'rounded-full border shadow-md',
-          'border-[color:var(--sniptale-color-border-soft)]',
+          'rounded-full border',
+          'border-[color:var(--sniptale-color-border-strong)]',
           'bg-[var(--sniptale-color-surface-panel)]',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-border-strong)]',
         ].join(' ')}
         aria-label={translate('content.designReview.close')}
         title={translate('content.designReview.close')}
@@ -187,14 +201,22 @@ export function DesignReviewPopover(props: {
         </div>
         <div className="min-h-0 overflow-y-auto overscroll-contain">
           <DesignReviewElementBar
-            onCopyElement={() => void props.actions.copyElement()}
+            deleteRequested={view.deleteRequested}
+            hasFeedback={props.state.comment.marker !== null}
+            onCopyElement={props.actions.copyElement}
             onCopyPath={() => void props.actions.copyPath()}
-            onDeleteRequest={() => view.setDeleteRequested(true)}
-            onSettingsOpenChange={props.actions.setSettingsOpen}
+            onDeleteRequest={() => {
+              props.actions.setSettingsOpen(false);
+              view.setDeleteRequested((requested) => !requested);
+            }}
+            onSettingsOpenChange={(open) => {
+              view.setDeleteRequested(false);
+              props.actions.setSettingsOpen(open);
+            }}
             selection={props.state.selection}
             settingsOpen={props.state.settingsOpen}
           />
-          {view.deleteRequested ? (
+          {view.deleteRequested && !props.state.settingsOpen ? (
             <DeleteConfirmation
               onCancel={() => view.setDeleteRequested(false)}
               onConfirm={props.actions.delete}

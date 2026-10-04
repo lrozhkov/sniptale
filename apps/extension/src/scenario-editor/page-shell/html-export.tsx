@@ -3,24 +3,72 @@ import { Download, FileText, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
-import type { Ref } from 'react';
+import { exportGuideHtml } from './runtime/html-export';
+import { MissingGuideHtmlImageError } from './runtime/html-images';
+import { guideHtmlImages } from './html-image-settings';
+import { DEFAULT_GUIDE_READING, type GuideReadingOptions } from './reader-pages';
 import { exportGuideMarkdown } from './runtime/markdown-export';
+
+type ExportFeedback = {
+  format: 'html' | 'markdown';
+  status: 'idle' | 'pending' | 'saved' | 'history-failed' | 'failed' | 'missing-image';
+  missingNumber?: number;
+};
+
+/** Classifies one command outcome without acquiring or publishing another export. */
+function exportFailure(
+  error: unknown,
+  signal: AbortSignal,
+  project: GuideProject
+): Omit<ExportFeedback, 'format'> {
+  if (signal.aborted || (error instanceof DOMException && error.name === 'AbortError'))
+    return { status: 'idle' };
+  if (error instanceof MissingGuideHtmlImageError)
+    return {
+      status: 'missing-image',
+      missingNumber:
+        guideHtmlImages(project).findIndex(({ block }) => block.id === error.blockId) + 1,
+    };
+  return { status: 'failed' };
+}
+
+const exportMessages = {
+  html: {
+    pending: 'scenario.editor.guideHtmlPreparing',
+    saved: 'scenario.editor.guideHtmlSaved',
+    failed: 'scenario.editor.guideHtmlFailed',
+  },
+  markdown: {
+    pending: 'scenario.editor.guideMarkdownPreparing',
+    saved: 'scenario.editor.guideMarkdownSaved',
+    failed: 'scenario.editor.guideMarkdownFailed',
+  },
+} as const;
+
+/** Both formats share a single translated feedback surface. */
+function exportFeedbackText(feedback: ExportFeedback, t: Translate): string {
+  if (feedback.status === 'idle') return '';
+  if (feedback.status === 'missing-image')
+    return t('scenario.editor.htmlMissingImage').replace(
+      '{number}',
+      String(feedback.missingNumber)
+    );
+  if (feedback.status === 'history-failed') return t('scenario.editor.guideHtmlHistoryFailed');
+  return t(exportMessages[feedback.format][feedback.status]);
+}
 
 /** UI owns only a disposable export command and cancellation; file effects have one runtime owner. */
 export function GuideHtmlExport({
   project,
   t,
-  onOpenHtml,
-  htmlRef,
+  reading = DEFAULT_GUIDE_READING,
 }: {
   project: GuideProject;
   t: Translate;
-  onOpenHtml: () => void;
-  htmlRef?: Ref<HTMLButtonElement>;
+  reading?: GuideReadingOptions;
 }) {
-  const [status, setStatus] = useState<'idle' | 'pending' | 'saved' | 'history-failed' | 'failed'>(
-    'idle'
-  );
+  const [feedback, setFeedback] = useState<ExportFeedback>({ format: 'html', status: 'idle' });
+  const { status } = feedback;
   const job = useRef<AbortController | null>(null);
   useEffect(
     () => () => {
@@ -29,27 +77,29 @@ export function GuideHtmlExport({
     },
     []
   );
-  const save = async () => {
+  const save = async (format: 'html' | 'markdown') => {
     if (job.current) return;
     const controller = new AbortController();
     job.current = controller;
-    setStatus('pending');
+    setFeedback({ format, status: 'pending' });
     try {
       const args = {
         project,
         t,
         signal: controller.signal,
       };
-      const result = await exportGuideMarkdown(args);
-      if (job.current === controller) setStatus(result);
+      const result =
+        format === 'html'
+          ? await exportGuideHtml({
+              ...args,
+              reading,
+              theme: document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light',
+            })
+          : await exportGuideMarkdown(args);
+      if (job.current === controller) setFeedback({ format, status: result });
     } catch (error) {
       if (job.current === controller)
-        setStatus(
-          controller.signal.aborted ||
-            (error instanceof DOMException && error.name === 'AbortError')
-            ? 'idle'
-            : 'failed'
-        );
+        setFeedback({ format, ...exportFailure(error, controller.signal, project) });
     } finally {
       if (job.current === controller) job.current = null;
     }
@@ -60,8 +110,7 @@ export function GuideHtmlExport({
         className="guide-labeled-action"
         title={t('scenario.editor.guideHtmlExport')}
         disabled={status === 'pending'}
-        ref={htmlRef}
-        onClick={onOpenHtml}
+        onClick={() => void save('html')}
       >
         <Download size={16} aria-hidden="true" />
         <span>{t('scenario.editor.guideHtmlFormat')}</span>
@@ -70,7 +119,7 @@ export function GuideHtmlExport({
         className="guide-labeled-action"
         title={t('scenario.editor.guideMarkdownExport')}
         disabled={status === 'pending'}
-        onClick={() => void save()}
+        onClick={() => void save('markdown')}
       >
         <FileText size={16} aria-hidden="true" />
         <span>{t('scenario.editor.guideMarkdownFormat')}</span>
@@ -85,19 +134,7 @@ export function GuideHtmlExport({
           <span>{t('common.actions.cancel')}</span>
         </ContentToolbarButton>
       )}
-      {status !== 'idle' && (
-        <span role="status">
-          {t(
-            status === 'pending'
-              ? 'scenario.editor.guideMarkdownPreparing'
-              : status === 'saved'
-                ? 'scenario.editor.guideMarkdownSaved'
-                : status === 'history-failed'
-                  ? 'scenario.editor.guideHtmlHistoryFailed'
-                  : 'scenario.editor.guideMarkdownFailed'
-          )}
-        </span>
-      )}
+      {status !== 'idle' && <span role="status">{exportFeedbackText(feedback, t)}</span>}
     </div>
   );
 }

@@ -16,6 +16,13 @@ const text = z.string().max(TOUR_LIMITS.maxTextLength);
 const fraction = z.number().finite().min(0).max(1);
 const color = z.string().regex(/^#[a-fA-F0-9]{6}$/);
 const duration = z.number().finite().positive().max(TOUR_LIMITS.maxDurationSeconds);
+const highlightPhase = z
+  .object({
+    kind: z.enum(['none', 'fade']),
+    durationMs: z.number().finite().min(100).max(1000),
+  })
+  .strict();
+const highlightAnimation = z.object({ enter: highlightPhase, exit: highlightPhase }).strict();
 const point = z.object({ x: fraction, y: fraction }).strict();
 const rect = point
   .extend({ width: fraction.gt(0), height: fraction.gt(0) })
@@ -45,6 +52,13 @@ export const tourActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('slide'), slideId: id }).strict(),
   z.object({ kind: z.literal('url'), url }).strict(),
 ]);
+const markerAppearance = z
+  .object({
+    color: color.nullable(),
+    pulseColor: color.nullable(),
+    size: z.number().finite().min(16).max(64),
+  })
+  .strict();
 const textAppearance = z
   .object({
     surface: z
@@ -58,6 +72,7 @@ const textAppearance = z
       })
       .strict()
       .optional(),
+    calloutGap: z.number().finite().min(0).max(120).optional(),
     presentation: z.enum(['callout', 'caption-top', 'caption-bottom']),
     alignment: z.enum(['start', 'center', 'end']),
     placement: z.enum(['auto', 'top', 'bottom', 'left', 'right']),
@@ -102,6 +117,7 @@ const image = z
 export const tourObjectSchemas = {
   hotspot: z
     .object({
+      markerAppearance: markerAppearance.nullable().optional(),
       id,
       point,
       targetRect: rect.nullable(),
@@ -127,6 +143,8 @@ export const tourObjectSchemas = {
       id,
       rect,
       kind: z.enum(['spotlight', 'highlight', 'blur', 'redact']),
+      inheritStyle: z.boolean().optional(),
+      highlightAnimation: highlightAnimation.nullable().optional(),
       paint: tourPaintSchema.optional(),
       spotlightColor: color.optional(),
       spotlightOpacity: fraction.optional(),
@@ -160,6 +178,10 @@ const imageSlide = z
     hotspots: z.array(tourObjectSchemas.hotspot).max(TOUR_LIMITS.maxHotspots),
     annotations: z.array(tourObjectSchemas.annotation).max(TOUR_LIMITS.maxAnnotations),
     masks: z.array(tourObjectSchemas.mask).max(TOUR_LIMITS.maxMasks),
+    objectOrder: z
+      .array(id)
+      .max(TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations + TOUR_LIMITS.maxMasks)
+      .optional(),
     narration: narration.nullable(),
     timing,
   })
@@ -194,13 +216,55 @@ const navigationSlide = z
 export const tourDocumentSchema = z
   .object({
     version: z.literal(1),
+    backgroundMusic: z
+      .object({
+        assetId: id,
+        duration,
+        volume: fraction,
+        loop: z.boolean(),
+        ducking: z.object({ enabled: z.boolean(), level: fraction }).strict(),
+      })
+      .strict()
+      .nullable()
+      .optional(),
     audioResources: z
       .array(z.object({ assetId: id, duration, name: label }).strict())
       .max(TOUR_LIMITS.maxAudioResources)
       .optional(),
     id,
-    stage: z.object({ aspect: z.enum(['16:9', '4:3', '9:16']), background: color }).strict(),
-    style: z.object({ accent: color, text: color, surface: color, textAppearance }).strict(),
+    stage: z
+      .object({
+        aspect: z.enum(['16:9', '4:3', '9:16']),
+        background: color,
+        paint: tourPaintSchema.optional(),
+        image: image.nullable().optional(),
+        imageFit: z.enum(['contain', 'cover']).optional(),
+      })
+      .strict(),
+    style: z
+      .object({
+        accent: color,
+        text: color,
+        surface: color,
+        textAppearance,
+        hotspotAppearance: textAppearance.optional(),
+        markerAppearance: markerAppearance.optional(),
+        maskDefaults: z
+          .object({
+            highlight: z
+              .object({
+                paint: tourPaintSchema,
+                opacity: fraction,
+                animation: highlightAnimation.optional(),
+              })
+              .strict(),
+            spotlight: z.object({ color, opacity: fraction }).strict(),
+            blur: z.object({ radius: z.number().finite().min(1).max(80) }).strict(),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict(),
     playback: z
       .object({
         autoplay: z.boolean(),
@@ -254,6 +318,11 @@ function validReferences(document: TourDocument): boolean {
     if (audio.has(resource.assetId)) return false;
     audio.set(resource.assetId, resource.duration);
   }
+  const music = document.backgroundMusic;
+  if (music) {
+    if (audio.has(music.assetId) && audio.get(music.assetId) !== music.duration) return false;
+    audio.set(music.assetId, music.duration);
+  }
   for (const slide of document.slides) {
     const objects =
       slide.kind === 'image'
@@ -270,6 +339,7 @@ function validReferences(document: TourDocument): boolean {
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
     if (image && audio.has(image.assetId)) return false;
   }
+  if (document.stage.image && audio.has(document.stage.image.assetId)) return false;
   const ids = new Set([document.id]);
   const slides = new Set(document.slides.map((slide) => slide.id));
   const claim = (value: string) => {
@@ -292,6 +362,20 @@ function validReferences(document: TourDocument): boolean {
       if (!slide.hotspots.every((hotspot) => claim(hotspot.id) && actionExists(hotspot.action)))
         return false;
       if (![...slide.annotations, ...slide.masks].every((item) => claim(item.id))) return false;
+      if (slide.objectOrder !== undefined) {
+        const objects = new Set([
+          ...slide.hotspots.map((object) => object.id),
+          ...slide.annotations.map((object) => object.id),
+          ...slide.masks.map((object) => object.id),
+        ]);
+        const listed = new Set(slide.objectOrder);
+        if (
+          listed.size !== slide.objectOrder.length ||
+          listed.size !== objects.size ||
+          slide.objectOrder.some((objectId) => !objects.has(objectId))
+        )
+          return false;
+      }
     }
   }
   return true;

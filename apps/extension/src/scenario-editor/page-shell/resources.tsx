@@ -1,3 +1,4 @@
+import { CompactSegmentedSelector } from '../../ui/compact-inspector-controls/control-renderers';
 import { GuideVideoFrameResources } from './video-frame-resources';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useRef, useState } from 'react';
@@ -15,7 +16,9 @@ type ResourceProps = {
   toolbarTarget?: HTMLElement | null;
   disabled: boolean;
   selectedStepId: string | null;
+  steps?: readonly { id: string; title: string }[];
   target?: GuideImageImportPlacement | TourImageImportPlacement;
+  onAddTextStep?: ((title: string, description: string) => boolean) | undefined;
   onComplete?: () => void;
   onLibraryDragStart?: () => void;
   t: Translate;
@@ -94,7 +97,8 @@ function useGuideImageResources({
   const single =
     target?.kind === 'replace-image' ||
     target?.kind === 'tour-image' ||
-    target?.kind === 'tour-background';
+    target?.kind === 'tour-background' ||
+    target?.kind === 'tour-stage-background';
   const limit = target?.kind === 'tour-slides' ? 300 : 50;
   const chooseLibrary = (id: string, name: string) => {
     if (locked) return;
@@ -136,37 +140,41 @@ export function GuideImageResources(props: ResourceProps) {
   const { t, target, selectedStepId } = props;
   const state = useGuideImageResources(props);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const destination = importDestinationLabel(props, state.placement);
   const actions = (
     <div hidden={Boolean(videoId)} className="guide-import-actions" aria-busy={state.pending}>
-      <div className="guide-import-submit">
+      <div className="guide-import-destination">
         {!target && (
-          <div
-            className="guide-import-destination"
-            role="group"
-            aria-label={t('scenario.editor.guideImportPlacement')}
-          >
-            <ProductActionButton
-              tone="toggle"
-              compact
-              active={state.placement === 'steps'}
-              aria-pressed={state.placement === 'steps'}
-              disabled={state.locked}
-              onClick={() => state.setPlacement('steps')}
-            >
-              {t('scenario.editor.guideImportAsSteps')}
-            </ProductActionButton>
-            <ProductActionButton
-              tone="toggle"
-              compact
-              active={state.placement === 'blocks'}
-              aria-pressed={state.placement === 'blocks'}
-              disabled={state.locked || !selectedStepId}
-              onClick={() => state.setPlacement('blocks')}
-            >
-              {t('scenario.editor.guideImportAsBlocks')}
-            </ProductActionButton>
-          </div>
+          <CompactSegmentedSelector
+            ariaLabel={t('scenario.editor.guideImportPlacement')}
+            columns={2}
+            value={state.placement}
+            onChange={state.setPlacement}
+            options={[
+              {
+                value: 'steps',
+                label: t('scenario.editor.guideImportAsSteps'),
+                disabled: state.locked,
+              },
+              {
+                value: 'blocks',
+                label: t('scenario.editor.guideImportAsBlocks'),
+                disabled: state.locked || !selectedStepId,
+              },
+            ]}
+          />
         )}
+        <p className="guide-import-target" title={destination}>
+          {destination}
+        </p>
+      </div>
+      <div className="guide-import-submit">
+        <span className="guide-import-count" role="status">
+          {t('scenario.editor.guideImportSelectedCount').replace(
+            '{count}',
+            String(state.selection.length)
+          )}
+        </span>
         <ProductActionButton
           tone="primary"
           compact
@@ -202,17 +210,47 @@ export function GuideImageResources(props: ResourceProps) {
           item.source.kind === 'library' ? [item.source.mediaId] : []
         )}
         onPreview={() => setVideoId(null)}
+        onClosePreview={() => setVideoId(null)}
         onChoose={(id, name, kind) => {
           if (kind === 'image') state.chooseLibrary(id, name);
           else setVideoId(id);
         }}
         previewContent={
           videoId ? (
-            <GuideVideoFrameResources key={videoId} mediaId={videoId} {...props} />
+            <GuideVideoFrameResources
+              key={videoId}
+              mediaId={videoId}
+              {...props}
+              onAddTextStep={
+                !target && state.placement === 'steps' && props.onAddTextStep
+                  ? (title, description) =>
+                      !state.locked && Boolean(props.onAddTextStep?.(title, description))
+                  : undefined
+              }
+            />
           ) : undefined
         }
         onDragStart={props.onLibraryDragStart}
       />
     </div>
   );
+}
+
+/** Describe the admitted destination without exposing project or resource identifiers. */
+function importDestinationLabel(props: ResourceProps, placement: 'steps' | 'blocks'): string {
+  const { target, selectedStepId, steps, t } = props;
+  const kind = target?.kind ?? placement;
+  if (kind === 'tour-slides') return t('scenario.editor.guideImportTourSlides');
+  if (kind === 'tour-image') return t('scenario.editor.guideImportTourImage');
+  if (kind === 'tour-stage-background') return t('scenario.editor.tourBackground');
+  if (kind === 'tour-background') return t('scenario.editor.guideImportTourBackground');
+  if (kind === 'steps') return t('scenario.editor.guideImportStepsHint');
+  const stepId = target && 'stepId' in target ? target.stepId : selectedStepId;
+  const name =
+    steps?.find((step) => step.id === stepId)?.title.trim() || t('scenario.editor.untitledStep');
+  return t(
+    kind === 'replace-image'
+      ? 'scenario.editor.guideImportReplaceTarget'
+      : 'scenario.editor.guideImportStepTarget'
+  ).replace('{name}', name);
 }

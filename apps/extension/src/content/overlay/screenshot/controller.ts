@@ -1,3 +1,5 @@
+import { useScreenshotWindowSize } from './window-size';
+import type { ScreenshotWindowSizeControls } from '../toolbar/types';
 import { useEffect, useRef, useState } from 'react';
 
 import { createHandleCancelCountdown } from './session/cancel';
@@ -11,6 +13,7 @@ import { disableSelectionModeIfLoaded } from '../../selection/selection-mode/laz
 import { setUIHidden } from '../../selection/locker';
 
 interface UseScreenshotControllerResult {
+  windowSize: ScreenshotWindowSizeControls;
   countdown: number | null;
   handleCancelCountdown: () => void;
   handleTakeScreenshot: (
@@ -75,6 +78,7 @@ function resetInvalidatedCountdownState(
 export function useScreenshotController(
   params: UseScreenshotControllerParams
 ): UseScreenshotControllerResult {
+  const windowSize = useScreenshotWindowSize();
   const [countdown, setCountdown] = useState<number | null>(null);
   const [session] = useState(() => createScreenshotControllerSession(params.navigationLockEnabled));
   const handleCancelCountdownRef = useRef<(() => void) | null>(null);
@@ -84,7 +88,7 @@ export function useScreenshotController(
   });
 
   const actionArgs = {
-    params,
+    params: { ...params, prepareWindowSize: windowSize.prepare },
     runtime,
     session,
     setCountdown,
@@ -96,6 +100,7 @@ export function useScreenshotController(
   useCancelCountdownOnUnmount(session, handleCancelCountdownRef);
 
   return {
+    windowSize: windowSize.controls,
     countdown,
     handleCancelCountdown,
     handleTakeScreenshot,
@@ -117,11 +122,12 @@ function useCancelCountdownOnUnmount(
     return () => {
       if (hasActiveCountdownSession(session)) {
         handleCancelCountdown?.();
+        disableSelectionModeIfLoaded();
       }
     };
   }, [handleCancelCountdownRef, session]);
 }
 
 function hasActiveCountdownSession(session: ScreenshotControllerSession) {
-  return Boolean(session.countdownTimeout || session.countdownLock);
+  return Boolean(session.countdownTimeout || session.countdownLock || session.runActive);
 }

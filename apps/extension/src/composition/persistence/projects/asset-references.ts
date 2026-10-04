@@ -1,12 +1,11 @@
+import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
+import { releaseUnpublishedProjectAssets } from '../media-library/delete-cascade.sources';
 import type { VideoProject } from '../../../features/video/project/types';
-import type { VideoProjectEntry } from './contracts';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import { parseDbEntries } from '../infrastructure/indexed-db/read-primitives';
 import { parseVideoProjectEntry } from './read-guards';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import type { PhysicalDeleteAssetOperation } from '../assets';
-import { PROJECT_ASSET_OWNER_KIND, PROJECT_MEDIA_ASSET_ROLE } from './asset-publication';
-import { parseProjectAssetEntry } from './read-guards';
 import {
   createLibraryLifecycle,
   promoteLibraryLifecycle,
@@ -18,13 +17,6 @@ type ProjectAssetDeleteStore = {
   get(key: string): Promise<unknown>;
 };
 
-type ProjectAssetOwnerStore = {
-  delete(key: [string, string, string]): Promise<unknown>;
-  index(name: 'assetId'): { count(assetId: string): Promise<number> };
-};
-
-type ProjectAssetRefStore = { delete(key: string): Promise<unknown> };
-
 type ProjectAssetReferenceProjectStore = {
   getAll(): Promise<unknown[]>;
 };
@@ -33,26 +25,6 @@ type ProjectAssetMediaStore = ProjectAssetDeleteStore & {
   get(key: string): Promise<unknown>;
   put(value: unknown): Promise<unknown>;
 };
-
-export async function deletePublishedProjectEntry(args: {
-  countAssetOwners(assetId: string): Promise<number>;
-  deleteAssetEntry(): Promise<unknown>;
-  deleteAssetOwner(): Promise<unknown>;
-  deleteAssetRef(assetId: string): Promise<unknown>;
-  deleteMediaEntry(): Promise<unknown>;
-  entry: { assetId: string } | null;
-  operation: PhysicalDeleteAssetOperation;
-  recordOperation(): Promise<unknown>;
-}): Promise<void> {
-  await args.deleteAssetEntry();
-  await args.deleteMediaEntry();
-  if (!args.entry) return;
-  await args.deleteAssetOwner();
-  if ((await args.countAssetOwners(args.entry.assetId)) !== 0) return;
-  await args.deleteAssetRef(args.entry.assetId);
-  args.operation.assetIds.push(args.entry.assetId);
-  await args.recordOperation();
-}
 
 export function collectProjectOwnedAssetIds(project: VideoProject | undefined): string[] {
   if (!project) {
@@ -64,106 +36,24 @@ export function collectProjectOwnedAssetIds(project: VideoProject | undefined): 
   );
 }
 
-function collectAssetIdsReferencedByOtherProjects(
-  entries: VideoProjectEntry[],
-  ownerProjectId: string,
-  candidateAssetIds: Set<string>
-): Set<string> {
-  const referencedAssetIds = new Set<string>();
-
-  for (const entry of entries) {
-    if (entry.id === ownerProjectId) {
-      continue;
-    }
-
-    for (const assetId of collectProjectOwnedAssetIds(entry.project)) {
-      if (candidateAssetIds.has(assetId)) {
-        referencedAssetIds.add(assetId);
-      }
-    }
-  }
-
-  return referencedAssetIds;
-}
-
-async function deleteUnreferencedProjectAssets(
-  projectAssetStore: ProjectAssetDeleteStore,
-  mediaLibraryStore: ProjectAssetMediaStore,
-  projectAssetIds: string[],
-  referencedAssetIds: ReadonlySet<string>,
-  assetOwnerStore: ProjectAssetOwnerStore,
-  assetRefStore: ProjectAssetRefStore,
-  operation: PhysicalDeleteAssetOperation,
-  videoWorkspaceStore: ProjectAssetRefStore,
-  videoDraftStore: ProjectAssetRefStore
-): Promise<string[]> {
-  const deletedAssetIds: string[] = [];
-
-  for (const projectAssetId of projectAssetIds) {
-    if (referencedAssetIds.has(projectAssetId)) {
-      continue;
-    }
-
-    const mediaId = createProjectAssetMediaId(projectAssetId);
-    const media = parseMediaLibraryEntry(await mediaLibraryStore.get(mediaId));
-    if (media && media.lifecycle?.storageClass !== 'temporary') {
-      continue;
-    }
-
-    const projectAsset = parseProjectAssetEntry(await projectAssetStore.get(projectAssetId));
-    await projectAssetStore.delete(projectAssetId);
-    await mediaLibraryStore.delete(mediaId);
-    await videoWorkspaceStore.delete(mediaId);
-    await videoDraftStore.delete(mediaId);
-    if (projectAsset) {
-      await assetOwnerStore.delete([
-        PROJECT_ASSET_OWNER_KIND,
-        projectAssetId,
-        PROJECT_MEDIA_ASSET_ROLE,
-      ]);
-      if ((await assetOwnerStore.index('assetId').count(projectAsset.assetId)) === 0) {
-        await assetRefStore.delete(projectAsset.assetId);
-        operation.assetIds.push(projectAsset.assetId);
-      }
-    }
-    deletedAssetIds.push(projectAssetId);
-  }
-
-  return deletedAssetIds;
-}
-
 export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
-  assetOwnerStore: ProjectAssetOwnerStore;
-  assetRefStore: ProjectAssetRefStore;
-  mediaLibraryStore: ProjectAssetMediaStore;
+  tx: Parameters<typeof releaseUnpublishedProjectAssets>[0];
   operation: PhysicalDeleteAssetOperation;
-  ownerProjectId: string;
   projectAssetIds: string[];
-  projectAssetStore: ProjectAssetDeleteStore;
-  videoWorkspaceStore: ProjectAssetRefStore;
-  videoDraftStore: ProjectAssetRefStore;
-  projectStore: ProjectAssetReferenceProjectStore;
 }): Promise<string[]> {
-  const referencedAssetIds =
-    args.projectAssetIds.length > 0
-      ? collectAssetIdsReferencedByOtherProjects(
-          parseDbEntries(await args.projectStore.getAll(), parseVideoProjectEntry),
-          args.ownerProjectId,
-          new Set(args.projectAssetIds)
-        )
-      : new Set<string>();
-
-  return deleteUnreferencedProjectAssets(
-    args.projectAssetStore,
-    args.mediaLibraryStore,
-    args.projectAssetIds,
-    referencedAssetIds,
-    args.assetOwnerStore,
-    args.assetRefStore,
-    args.operation,
-    args.videoWorkspaceStore,
-    args.videoDraftStore
-  );
+  for (const projectAssetId of args.projectAssetIds) {
+    const mediaId = createProjectAssetMediaId(projectAssetId);
+    const store = args.tx.objectStore(MEDIA_LIBRARY_STORE);
+    const media = parseMediaLibraryEntry(await store.get(mediaId));
+    if (media?.id === mediaId && media.lifecycle?.storageClass === 'temporary') {
+      // Retain historical independently published mirrors when their project is detached.
+      await store.put!({
+        ...media,
+        lifecycle: promoteLibraryLifecycle(media.lifecycle, Date.now()),
+      });
+    }
+  }
+  return releaseUnpublishedProjectAssets(args.tx, new Set(args.projectAssetIds), args.operation);
 }
 
 export async function syncProjectAssetMirrorLifecycles(args: {
@@ -204,7 +94,7 @@ export async function syncProjectAssetMirrorLifecycles(args: {
           media.lifecycle ?? createLibraryLifecycle('library', media.updatedAt),
           args.now
         )
-      : createLibraryLifecycle('temporary', args.now);
+      : { ...media.lifecycle, ...createLibraryLifecycle('temporary', args.now) };
     await args.mediaLibraryStore.put({ ...media, lifecycle });
   }
 }

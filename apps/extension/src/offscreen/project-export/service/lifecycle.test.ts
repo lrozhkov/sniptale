@@ -121,7 +121,9 @@ beforeEach(() => {
   loadActiveLedgerMock.mockResolvedValue(null);
   markTerminalMock.mockResolvedValue(null);
   requestCancelMock.mockResolvedValue(null);
-  upsertLedgerMock.mockImplementation((input: unknown) => Promise.resolve(input));
+  upsertLedgerMock.mockImplementation((input: { jobId: string; projectId: string }) =>
+    Promise.resolve({ ...input, status: 'running', cancelRequested: false })
+  );
 });
 
 function expectPreloadSignal(preloadSignal: AbortSignal | null, aborted: boolean): void {
@@ -171,8 +173,7 @@ async function verifyActiveExportCancellation(): Promise<void> {
   const startPromise = service.startProjectExport('job-1', project, settings).then(() => {
     startAccepted = true;
   });
-  await flushPromises();
-  expect(renderCompositeExportMock).toHaveBeenCalledOnce();
+  await vi.waitFor(() => expect(renderCompositeExportMock).toHaveBeenCalledOnce());
   expect(finishRender).not.toBeNull();
   expect(startAccepted).toBe(true);
 
@@ -204,8 +205,7 @@ async function verifyPreloadCancellationCleanup(): Promise<void> {
   });
 
   const startPromise = service.startProjectExport('job-preload', project, settings);
-  await flushPromises();
-  expectPreloadSignal(preloadSignal, false);
+  await vi.waitFor(() => expectPreloadSignal(preloadSignal, false));
 
   await service.cancelProjectExport('job-preload');
   await startPromise;
@@ -282,4 +282,88 @@ describe('project-export service ledger reconciliation', () => {
       },
     });
   });
+});
+
+it('cancels pending data preparation without consuming the input or starting a late export', async () => {
+  const service = createProjectExportService();
+  let resolve!: () => void;
+  const data = new Promise<void>((done) => {
+    resolve = done;
+  });
+  const input = vi.fn(async () => createProject());
+  const pending = service.startProjectExport(
+    'job-pending',
+    input,
+    createExportSettings(),
+    () => data
+  );
+  await service.cancelProjectExport('job-pending');
+  await pending;
+  resolve();
+  await flushPromises();
+  expect(input).not.toHaveBeenCalled();
+  expect(renderCompositeExportMock).not.toHaveBeenCalled();
+  expect(requestCancelMock).toHaveBeenCalledWith('job-pending');
+});
+
+it('does not restart a terminal job returned by atomic ledger admission', async () => {
+  const service = createProjectExportService();
+  upsertLedgerMock.mockResolvedValueOnce({ status: 'cancelled', cancelRequested: true });
+  await service.startProjectExport('job-terminal', createProject(), createExportSettings());
+  expect(renderCompositeExportMock).not.toHaveBeenCalled();
+});
+
+it.each([false, true])(
+  'cancels during input consumption even when cancel persistence fails: %s',
+  async (failCancel) => {
+    const service = createProjectExportService();
+    let resolveInput!: (project: VideoProject) => void;
+    const input = vi.fn(
+      () =>
+        new Promise<VideoProject>((resolve) => {
+          resolveInput = resolve;
+        })
+    );
+    const pending = service.startProjectExport('job-old', input, createExportSettings());
+    await vi.waitFor(() => expect(input).toHaveBeenCalledOnce());
+    if (failCancel) requestCancelMock.mockRejectedValueOnce(new Error('session unavailable'));
+    const cancel = service.cancelProjectExport('job-old');
+    if (failCancel) await expect(cancel).rejects.toThrow('session unavailable');
+    else await cancel;
+    await pending;
+    const nextInput = vi.fn(async () => createProject());
+    const next = service.startProjectExport(
+      'job-new',
+      nextInput,
+      createExportSettings(),
+      () => new Promise(() => undefined)
+    );
+    resolveInput(createProject());
+    await flushPromises();
+    await expect(
+      service.startProjectExport('job-third', createProject(), createExportSettings())
+    ).rejects.toThrow('alreadyRunning');
+    expect(renderCompositeExportMock).not.toHaveBeenCalled();
+    expect(nextInput).not.toHaveBeenCalled();
+    await service.cancelProjectExport('job-new');
+    await next;
+    expect(cleanupJobMock).toHaveBeenCalledTimes(2);
+  }
+);
+
+it('cancels during ledger admission without launching the accepted renderer', async () => {
+  const service = createProjectExportService();
+  let admit!: (entry: { status: string; cancelRequested: boolean }) => void;
+  upsertLedgerMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        admit = resolve;
+      })
+  );
+  const start = service.startProjectExport('job-ledger', createProject(), createExportSettings());
+  await vi.waitFor(() => expect(upsertLedgerMock).toHaveBeenCalledOnce());
+  await service.cancelProjectExport('job-ledger');
+  admit({ status: 'running', cancelRequested: false });
+  await start;
+  expect(renderCompositeExportMock).not.toHaveBeenCalled();
 });

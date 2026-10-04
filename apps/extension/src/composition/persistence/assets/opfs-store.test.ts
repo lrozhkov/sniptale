@@ -14,6 +14,7 @@ import {
   listAssetObjectIds,
   listReadyJournals,
   listWritingAssetIds,
+  MissingAssetObjectError,
   readAssetFile,
   releaseAssetReadyProtection,
   writeBlobToAsset,
@@ -536,7 +537,7 @@ it('reports absent storage as empty and fails closed when an object is missing',
       'missing.webm',
       harness.options
     )
-  ).rejects.toThrow('missing');
+  ).rejects.toBeInstanceOf(MissingAssetObjectError);
 });
 
 it('fails closed when OPFS directory enumeration is unavailable', async () => {
@@ -746,3 +747,49 @@ it('rejects invalid write positions and aborts the same protected staging object
   expect(await listAssetObjectIds(harness.options)).toEqual([]);
   expect(await listWritingAssetIds(harness.options)).toEqual([]);
 });
+
+it('enumerates committed journals while a zero-byte handle awaits stream close', async () => {
+  const harness = createHarness();
+  const committed = {
+    assetRefs: [],
+    createdAt: 1,
+    domain: 'recording-assets',
+    journalId: 'committed',
+    payload: {},
+  };
+  await writeReadyJournal(committed, harness.options);
+  const assetRoot = harness.root.entriesByName.get(
+    ASSET_ROOT_DIRECTORY_NAME
+  ) as MemoryDirectoryHandle;
+  const ready = assetRoot.entriesByName.get('ready') as MemoryDirectoryHandle;
+  const handle = await ready.getFileHandle('pending', { create: true });
+  const stream = await handle.createWritable();
+  const pending = { ...committed, createdAt: 2, journalId: 'pending' };
+  await stream.write(JSON.stringify(pending));
+  expect((await handle.getFile()).size).toBe(0);
+  await expect(listReadyJournals(harness.options)).resolves.toEqual([committed]);
+  expect(ready.entriesByName.has('pending')).toBe(true);
+  await stream.close();
+  await expect(listReadyJournals(harness.options)).resolves.toEqual([committed, pending]);
+});
+
+it.each(['{', ' '])(
+  'retains objects when nonempty journal JSON is corrupt: %j',
+  async (contents) => {
+    const harness = createHarness();
+    const prepared = await writeBlobToAsset(new Blob(['protected']), harness.options);
+    const assetRoot = harness.root.entriesByName.get(
+      ASSET_ROOT_DIRECTORY_NAME
+    ) as MemoryDirectoryHandle;
+    const ready = await assetRoot.getDirectoryHandle('ready', { create: true });
+    const handle = await ready.getFileHandle('corrupt', { create: true });
+    const stream = await handle.createWritable();
+    await stream.write(contents);
+    await stream.close();
+    await expect(listReadyJournals(harness.options)).rejects.toThrow(SyntaxError);
+    await expect(collectQuiescentWritingObjects(harness.options)).rejects.toThrow(SyntaxError);
+    await expect(listAssetObjectIds(harness.options)).resolves.toContain(prepared.ref.assetId);
+    await expect(listWritingAssetIds(harness.options)).resolves.toContain(prepared.ref.assetId);
+    await discardPreparedAsset(prepared.ref.assetId, harness.options);
+  }
+);

@@ -24,6 +24,14 @@ import type { Translate } from '../../platform/i18n';
 type EditInput = Omit<Parameters<typeof applyScenarioImageEdit>[0], 'project' | 'baseUpdatedAt'>;
 type TourEditInput = Omit<Parameters<typeof applyTourImageEdit>[0], 'project' | 'baseUpdatedAt'>;
 
+function inspectorImageTrigger(id: string | null) {
+  return id
+    ? [...document.querySelectorAll<HTMLButtonElement>('[data-inspector-edit-image]')].find(
+        (entry) => entry.dataset['inspectorEditImage'] === id
+      )
+    : undefined;
+}
+
 /** Owns entering/leaving image mode and returning focus after the new image URL becomes available. */
 export function useGuideImageEditorMode(images: Record<string, string | null>) {
   const [selection, setSelection] = useState<{ itemId: string; blockId: string } | null>(null);
@@ -31,11 +39,18 @@ export function useGuideImageEditorMode(images: Record<string, string | null>) {
   const [tourSlideId, setTourSlideId] = useState<string | null>(null);
   const [returnSlideId, setReturnSlideId] = useState<string | null>(null);
   const returnTourFocus = useRef(false);
+  const inspectorOrigin = useRef<string | null>(null);
+  const rememberOrigin = () => {
+    inspectorOrigin.current =
+      document.activeElement?.getAttribute('data-inspector-edit-image') ?? null;
+  };
   useLayoutEffect(() => {
     if (tourSlideId || !returnTourFocus.current) return;
-    const button = [...document.querySelectorAll<HTMLButtonElement>('[data-tour-edit-image]')].find(
-      (entry) => entry.dataset['tourEditImage'] === returnSlideId
-    );
+    const button =
+      inspectorImageTrigger(inspectorOrigin.current) ??
+      [...document.querySelectorAll<HTMLButtonElement>('[data-tour-edit-image]')].find(
+        (entry) => entry.dataset['tourEditImage'] === returnSlideId
+      );
     if (!button || button.disabled) return;
     button.focus({ preventScroll: true });
     returnTourFocus.current = false;
@@ -45,7 +60,9 @@ export function useGuideImageEditorMode(images: Record<string, string | null>) {
     const block = [...document.querySelectorAll<HTMLElement>('[data-block-id]')].find(
       (entry) => entry.dataset['blockId'] === returnBlock.current
     );
-    const button = block?.querySelector<HTMLButtonElement>('[data-edit-image]');
+    const button =
+      inspectorImageTrigger(inspectorOrigin.current) ??
+      block?.querySelector<HTMLButtonElement>('[data-edit-image]');
     if (!button || button.disabled) return;
     button.focus();
     returnBlock.current = null;
@@ -54,13 +71,19 @@ export function useGuideImageEditorMode(images: Record<string, string | null>) {
     selection,
     tourSlideId,
     returnSlideId,
-    openTour: (slideId: string) => setTourSlideId(slideId),
+    openTour: (slideId: string) => {
+      rememberOrigin();
+      setTourSlideId(slideId);
+    },
     closeTour: () => {
       setReturnSlideId(tourSlideId);
       returnTourFocus.current = true;
       setTourSlideId(null);
     },
-    open: (itemId: string, blockId: string) => setSelection({ itemId, blockId }),
+    open: (itemId: string, blockId: string) => {
+      rememberOrigin();
+      setSelection({ itemId, blockId });
+    },
     close: () => {
       returnBlock.current = selection?.blockId ?? null;
       setSelection(null);

@@ -111,3 +111,57 @@ it('releases a bitmap returned after cancellation without encoding', async () =>
   expect(io.close).toHaveBeenCalledOnce();
   expect(io.encode).not.toHaveBeenCalled();
 });
+
+it.each(['absent', 'not-found'] as const)(
+  'identifies %s media without decoding an incomplete export',
+  async (failure) => {
+    if (failure === 'absent') io.asset.mockResolvedValue(undefined);
+    else io.asset.mockRejectedValue(new DOMException('File not found', 'NotFoundError'));
+    await expect(
+      prepareHtmlImage(image(), DEFAULT_HTML_IMAGES, new AbortController().signal)
+    ).rejects.toMatchObject({ name: 'MissingGuideHtmlImageError', blockId: 'a' });
+    expect(io.bitmap).not.toHaveBeenCalled();
+  }
+);
+it('does not read removed image blocks or replacement slots', async () => {
+  const project = createGuideProject('Guide');
+  const step = createGuideStep('Step');
+  step.blocks = [
+    {
+      kind: 'image-slot',
+      id: 'a',
+      frame: { width: 400, height: 200 },
+      fit: 'contain',
+      alt: '',
+      caption: '',
+    },
+  ];
+  project.items = [step];
+  io.asset.mockRejectedValue(new DOMException('File not found', 'NotFoundError'));
+  expect((await measureHtmlImages(project, new AbortController().signal)).rasters).toEqual([]);
+  expect(io.asset).not.toHaveBeenCalled();
+});
+it.each([false, true])(
+  'encodes frame quality at intrinsic crop dimensions with optimize=%s',
+  async (optimize) => {
+    const cropped = png();
+    io.crop.mockResolvedValue(cropped);
+    io.bitmap.mockResolvedValue({ width: 3000, height: 1500, close: io.close });
+    const encoded = new Blob(['ok'], { type: 'image/webp' });
+    io.encode.mockResolvedValue(encoded);
+    for (const maxEdge of [1280, 4096] as const) {
+      const result = await prepareHtmlImage(
+        image(),
+        { ...DEFAULT_HTML_IMAGES, content: 'frame', optimize, maxEdge, quality: 0.75 },
+        new AbortController().signal
+      );
+      expect(result).toMatchObject({ width: 3000, height: 1500 });
+      expect(result.blob).toBe(encoded);
+    }
+    expect(io.bitmap).toHaveBeenNthCalledWith(1, cropped);
+    expect(io.bitmap).toHaveBeenNthCalledWith(2, cropped);
+    expect(io.encode).toHaveBeenCalledTimes(2);
+    expect(io.encode).toHaveBeenLastCalledWith({ type: 'image/webp', quality: 0.75 });
+    expect(io.close).toHaveBeenCalledTimes(2);
+  }
+);

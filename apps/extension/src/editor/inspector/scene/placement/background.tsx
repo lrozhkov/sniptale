@@ -1,25 +1,49 @@
 import { translate } from '../../../../platform/i18n';
-import { PanelSection } from '../shared';
 import type { EditorInspectorFramePanelProps } from '../types';
-import type { ReactNode } from 'react';
 
-import { EditorInspectorFrameModeButtons } from './modes';
+type BackgroundModeProps = Pick<
+  EditorInspectorFramePanelProps,
+  'frameDraft' | 'lastFillModeRef' | 'setBackgroundMode'
+>;
 
-export function EditorInspectorFrameBackgroundSection(
-  props: Pick<
-    EditorInspectorFramePanelProps,
-    'frameBackgroundModeOptions' | 'frameDraft' | 'setBackgroundMode'
-  > & { children?: ReactNode }
-) {
+export function EditorInspectorFrameBackgroundModeControl(props: BackgroundModeProps) {
   return (
-    <PanelSection label={translate('editor.scene.backgroundTypeSection')}>
-      <EditorInspectorFrameModeButtons
-        ariaLabel={translate('editor.scene.backgroundTypeSection')}
-        options={props.frameBackgroundModeOptions}
-        value={props.frameDraft.backgroundMode}
-        onChange={props.setBackgroundMode}
-      />
-      {props.children ? <div className="mt-3 space-y-3">{props.children}</div> : null}
-    </PanelSection>
+    <div
+      role="group"
+      aria-label={translate('editor.scene.backgroundTypeSection')}
+      data-ui="editor.frame.background-mode"
+      className="grid grid-cols-3 gap-1 rounded-lg bg-[var(--sniptale-color-surface-hover)] p-1"
+    >
+      {(['color', 'gradient', 'image'] as const).map((mode) => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={props.frameDraft.backgroundMode === mode}
+          data-ui={`editor.frame.background-mode.${mode}`}
+          className={[
+            'min-w-0 rounded-md px-2 py-1.5 text-xs',
+            'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+            props.frameDraft.backgroundMode === mode
+              ? [
+                  'bg-[var(--sniptale-color-surface-panel)] font-medium shadow-sm',
+                  'text-[var(--sniptale-color-text-primary)]',
+                ].join(' ')
+              : [
+                  'text-[var(--sniptale-color-text-secondary)]',
+                  'hover:bg-[var(--sniptale-color-surface-panel)]',
+                ].join(' '),
+          ].join(' ')}
+          onClick={() => props.setBackgroundMode(mode)}
+        >
+          {translate(
+            mode === 'color'
+              ? 'editor.compact.frameBackgroundModeColor'
+              : mode === 'gradient'
+                ? 'editor.compact.frameBackgroundModeGradient'
+                : 'editor.compact.frameBackgroundModeImage'
+          )}
+        </button>
+      ))}
+    </div>
   );
 }

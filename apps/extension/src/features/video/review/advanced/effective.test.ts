@@ -371,3 +371,39 @@ it('suppresses disabled focus and added audio in preview/export while retaining 
   });
   expect({ zoom: state.zoom, audio: state.audio }).toEqual(content);
 });
+
+it.each(['basic', 'advanced'] as const)(
+  'renders configured cut transitions in %s mode or reports missing encoder',
+  (mode) => {
+    const advanced = createQuickEditAdvancedState();
+    advanced.ui.mode = mode;
+    const document = {
+      canvasComments: [],
+      edits: [
+        {
+          id: 'cut',
+          kind: 'cut' as const,
+          start: 2,
+          end: 4,
+          requestedStart: 2,
+          requestedEnd: 4,
+          transition: { type: 'dissolve' as const, before: 0.5, after: 0.5 },
+        },
+      ],
+    };
+    expect(
+      resolveQuickEditExportPlan({ document, advanced, videoRenderAvailable: true })
+    ).toMatchObject({
+      kind: 'ready',
+      video: 'render',
+      audio: 'copy',
+      reasons: ['cut-transition'],
+    });
+    expect(
+      resolveQuickEditExportPlan({ document, advanced, videoRenderAvailable: false })
+    ).toMatchObject({
+      kind: 'unavailable',
+      reasons: ['video-encoder'],
+    });
+  }
+);

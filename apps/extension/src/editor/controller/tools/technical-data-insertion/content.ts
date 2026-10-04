@@ -4,13 +4,14 @@ import {
   orderTechnicalDataKinds,
   type EditorTechnicalDataKind,
   type EditorTechnicalDataLayout,
-} from '../technical-data';
+} from '../../../../features/editor/document/technical-data';
 
 function buildTechnicalDataSection(
   kind: EditorTechnicalDataKind,
   sourceUrl: string,
   sourceTitle: string,
-  locale: AppLocale
+  locale: AppLocale,
+  capturedAt: number | null
 ): string {
   if (kind === 'url') {
     return `${translate('editor.runtime.metaStampUrlLabel', locale)}\n${
@@ -19,7 +20,7 @@ function buildTechnicalDataSection(
   }
   if (kind === 'date') {
     return `${translate('editor.runtime.metaStampDateLabel', locale)}\n${formatDateTime(
-      new Date(),
+      new Date(capturedAt ?? Date.now()),
       { dateStyle: 'medium', timeStyle: 'short' },
       locale
     )}`;
@@ -33,7 +34,8 @@ function buildTechnicalDataRowSection(
   kind: EditorTechnicalDataKind,
   sourceUrl: string,
   sourceTitle: string,
-  locale: AppLocale
+  locale: AppLocale,
+  capturedAt: number | null
 ): string {
   if (kind === 'url') {
     return `${translate('editor.runtime.metaStampUrlLabel', locale)}: ${
@@ -42,7 +44,7 @@ function buildTechnicalDataRowSection(
   }
   if (kind === 'date') {
     return `${translate('editor.runtime.metaStampDateLabel', locale)}: ${formatDateTime(
-      new Date(),
+      new Date(capturedAt ?? Date.now()),
       { dateStyle: 'medium', timeStyle: 'short' },
       locale
     )}`;
@@ -60,10 +62,19 @@ export function buildTechnicalDataText(options: {
   sourceUrl: string;
   sourceTitle: string;
   locale: AppLocale;
+  capturedAt?: number | null;
 }): string {
   const buildSection =
     options.layout === 'row' ? buildTechnicalDataRowSection : buildTechnicalDataSection;
   return orderTechnicalDataKinds(options.kinds)
-    .map((kind) => buildSection(kind, options.sourceUrl, options.sourceTitle, options.locale))
+    .map((kind) =>
+      buildSection(
+        kind,
+        options.sourceUrl,
+        options.sourceTitle,
+        options.locale,
+        options.capturedAt ?? null
+      )
+    )
     .join(options.layout === 'row' ? ' · ' : '\n\n');
 }

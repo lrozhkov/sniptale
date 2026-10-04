@@ -5,7 +5,10 @@ import {
   createEditorFrameGradientPatch,
   normalizeEditorFrameGradientColorStops,
 } from '../../../../features/editor/document/frame-gradient';
-import { createEditorGradientColorStopColor } from '../../../../features/editor/document/gradient';
+import {
+  createEditorGradientColorStopColor,
+  createEditorGradientCssStops,
+} from '../../../../features/editor/document/gradient';
 import { translate } from '../../../../platform/i18n';
 import { CompactPaintSelector } from '../../../../ui/paint-selector';
 import { EditorInspectorFrameBackgroundImageEditor } from './image';
@@ -54,6 +57,51 @@ function paintToFramePatch(paint: Paint) {
   };
 }
 
+function FrameGradientPresetChoices(props: EditorInspectorFrameBackgroundEditorProps) {
+  const stops = normalizeEditorFrameGradientColorStops(props.frameDraft);
+  return (
+    <div
+      data-ui="editor.frame.gradient-presets"
+      className="grid grid-cols-5 gap-1.5"
+      role="group"
+      aria-label={translate('editor.compact.frameBackgroundModeGradient')}
+    >
+      {props.gradientPresets.map((preset) => {
+        const presetStops = preset.stops ?? [
+          { color: preset.from, offset: 0 },
+          { color: preset.to, offset: 1 },
+        ];
+        const active =
+          props.frameDraft.backgroundGradientAngle === preset.angle &&
+          stops.length === presetStops.length &&
+          stops.every(
+            (stop, index) =>
+              stop.color === presetStops[index]?.color && stop.offset === presetStops[index]?.offset
+          );
+        return (
+          <button
+            key={preset.id}
+            type="button"
+            aria-label={preset.label}
+            title={preset.label}
+            aria-pressed={active}
+            className={[
+              'h-8 min-w-0 cursor-pointer rounded-md border',
+              'border-[var(--sniptale-color-border-soft)] transition-transform hover:scale-105',
+              'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+              active ? 'ring-2 ring-[var(--sniptale-color-accent)]' : '',
+            ].join(' ')}
+            style={{
+              backgroundImage: `linear-gradient(${preset.angle}deg, ${createEditorGradientCssStops(presetStops)})`,
+            }}
+            onClick={() => props.applyGradientPreset(preset)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function EditorInspectorFrameBackgroundFillEditor(
   props: EditorInspectorFrameBackgroundEditorProps
 ): ReactElement {
@@ -63,22 +111,28 @@ export function EditorInspectorFrameBackgroundFillEditor(
   }
 
   return (
-    <CompactPaintSelector
-      allowedModes={['solid', 'linear']}
-      showGradientAdvancedControls={false}
-      title={translate('editor.scene.sceneBackgroundTitle')}
-      label={translate('editor.scene.sceneBackgroundLabel')}
-      value={transactionValue ?? frameToPaint(props.frameDraft)}
-      recentColors={props.recentColors}
-      palette={props.frameBackgroundPalette}
-      onChange={(paint) => props.applyFramePatch(paintToFramePatch(paint))}
-      onPreviewChange={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
-      onPreviewReset={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
-      onOpenChange={(open) =>
-        setTransactionValue((current) =>
-          open ? (current ?? frameToPaint(props.frameDraft)) : null
-        )
-      }
-    />
+    <div className="space-y-3">
+      {props.frameDraft.backgroundMode === 'gradient' && props.gradientPresets.length > 0 ? (
+        <FrameGradientPresetChoices {...props} />
+      ) : null}
+      <CompactPaintSelector
+        triggerVariant="swatch"
+        allowedModes={props.frameDraft.backgroundMode === 'gradient' ? ['linear'] : ['solid']}
+        showGradientAdvancedControls={false}
+        title={translate('editor.scene.sceneBackgroundTitle')}
+        label={translate('editor.scene.sceneBackgroundLabel')}
+        value={transactionValue ?? frameToPaint(props.frameDraft)}
+        recentColors={props.recentColors}
+        palette={props.frameBackgroundPalette}
+        onChange={(paint) => props.applyFramePatch(paintToFramePatch(paint))}
+        onPreviewChange={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
+        onPreviewReset={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
+        onOpenChange={(open) =>
+          setTransactionValue((current) =>
+            open ? (current ?? frameToPaint(props.frameDraft)) : null
+          )
+        }
+      />
+    </div>
   );
 }

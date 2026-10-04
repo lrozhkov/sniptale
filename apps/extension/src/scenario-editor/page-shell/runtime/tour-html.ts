@@ -1,3 +1,4 @@
+import { createOutputFilename } from '../../../workflows/file-naming/index';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourMask } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-parser';
@@ -9,14 +10,8 @@ import {
   buildTourPlayerBlob,
   type TourPlayerLabels,
 } from '../../../features/scenario/tour-player/public';
-import {
-  getScenarioAssetBlob,
-  saveScenarioExportRecord,
-} from '../../../composition/persistence/scenario/store/public';
-import {
-  createDirectFileSink,
-  sanitizeArchivePathSegment,
-} from '../../../composition/archive-transfer';
+import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/public';
+import { saveScenarioHtmlExport } from './html-export';
 import { prepareTourRaster, type TourHtmlImageOptions } from './tour-html-images';
 
 /** A detached artifact is the only input to both preview and save. */
@@ -35,6 +30,7 @@ export async function prepareTourHtml(args: {
   labels: TourPlayerLabels;
   signal: AbortSignal;
   onProgress?: (done: number, total: number) => void;
+  readAsset?: (id: string) => Promise<Blob | undefined>;
 }): Promise<PreparedTourHtml> {
   const parsed = parseTourDocument(args.project.tour);
   if (parsed.status !== 'ok' || !parsed.document.slides.length) throw new Error('Invalid tour');
@@ -61,7 +57,7 @@ export async function prepareTourHtml(args: {
   args.onProgress?.(0, roles.size);
   for (const [id, kind] of roles) {
     args.signal.throwIfAborted();
-    const source = await getScenarioAssetBlob(id);
+    const source = await (args.readAsset ?? getScenarioAssetBlob)(id);
     args.signal.throwIfAborted();
     if (!source?.size) throw new Error('Missing tour media');
     inputSize += source.size;
@@ -91,7 +87,12 @@ export async function prepareTourHtml(args: {
   });
   return {
     blob,
-    filename: `${sanitizeArchivePathSegment(args.project.name)}.html`,
+    filename: await createOutputFilename({
+      category: 'documents',
+      type: 'tour',
+      title: args.project.name,
+      extension: 'html',
+    }),
     projectId: args.project.id,
     mediaCount: assets.length,
   };
@@ -103,41 +104,28 @@ export async function saveTourHtml(
   signal: AbortSignal
 ): Promise<'saved' | 'history-failed'> {
   signal.throwIfAborted();
-  const sink = await createDirectFileSink({
+  return saveScenarioHtmlExport({
+    projectId: artifact.projectId,
     filename: artifact.filename,
-    extension: '.html',
-    mimeType: 'text/html',
-    description: 'HTML',
-  });
-  try {
-    const writer = sink.writable.getWriter();
-    try {
-      for (let offset = 0; offset < artifact.blob.size; offset += 96 * 1024) {
-        signal.throwIfAborted();
-        await writer.write(
-          new Uint8Array(await artifact.blob.slice(offset, offset + 96 * 1024).arrayBuffer())
-        );
+    mode: 'tour',
+    signal,
+    write: async (sink, retain) => {
+      const writer = sink.writable.getWriter();
+      try {
+        for (let offset = 0; offset < artifact.blob.size; offset += 96 * 1024) {
+          signal.throwIfAborted();
+          const bytes = new Uint8Array(
+            await artifact.blob.slice(offset, offset + 96 * 1024).arrayBuffer()
+          );
+          await writer.write(bytes);
+          await retain(bytes);
+        }
+      } finally {
+        writer.releaseLock();
       }
-    } finally {
-      writer.releaseLock();
-    }
-    signal.throwIfAborted();
-    await sink.close();
-  } catch (error) {
-    await sink.abort(error);
-    throw error;
-  }
-  try {
-    await saveScenarioExportRecord({
-      projectId: artifact.projectId,
-      filename: artifact.filename,
-      format: 'html',
-      size: artifact.blob.size,
-    });
-    return 'saved';
-  } catch {
-    return 'history-failed';
-  }
+      return artifact.blob.size;
+    },
+  });
 }
 
 /** References and shared-source privacy are resolved together before reading media. */
@@ -156,6 +144,11 @@ function collectTourMedia(tour: TourDocument) {
       if (roles.get(narration.assetId) === 'image') throw new Error('Conflicting media');
       roles.set(narration.assetId, 'audio');
     }
+  }
+  if (tour.backgroundMusic) {
+    const id = tour.backgroundMusic.assetId;
+    if (roles.get(id) === 'image') throw new Error('Conflicting media');
+    roles.set(id, 'audio');
   }
   return { redactions, roles };
 }

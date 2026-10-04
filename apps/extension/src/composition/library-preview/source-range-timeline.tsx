@@ -30,6 +30,7 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
   const plane = useRef<HTMLDivElement>(null);
   const drag = useRef<Gesture | null>(null);
   const [preview, setPreview] = useState<SourceRange | null>(null);
+  const [activeEdge, setActiveEdge] = useState<'start' | 'end' | null>(null);
   const timeAt = (x: number) => {
     const bounds = plane.current!.getBoundingClientRect();
     return Math.max(
@@ -46,6 +47,7 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
     if (!current) return;
     drag.current = null;
     setPreview(null);
+    setActiveEdge(null);
     if (plane.current?.hasPointerCapture(current.pointerId))
       plane.current.releasePointerCapture(current.pointerId);
     if (cancel) props.onSeek(current.cursor);
@@ -82,6 +84,7 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
       mode,
       preview: null,
     };
+    setActiveEdge(mode === 'select' ? null : mode);
     plane.current!.setPointerCapture(event.pointerId);
     if (event.target instanceof HTMLElement)
       event.target.closest<HTMLElement>('[role="slider"]')?.focus();
@@ -104,7 +107,7 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
     );
     setPreview(current.preview);
   };
-  return { plane, preview, down, move, finish };
+  return { plane, preview, activeEdge, down, move, finish };
 }
 
 function constrainSourceRange(
@@ -157,6 +160,7 @@ export function SourceRangeTimeline(props: SourceTimelineProps) {
         data-in={range.start}
         data-out={range.end}
         className="relative min-w-0 select-none touch-none px-0 pb-1"
+        style={{ cursor: gesture.activeEdge ? 'ew-resize' : undefined }}
         onPointerDown={gesture.down}
         onPointerMove={gesture.move}
         onPointerUp={() => gesture.finish(false)}

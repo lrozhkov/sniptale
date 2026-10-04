@@ -155,3 +155,38 @@ describe('settings guards invalid payload coverage', () => {
     ).toMatchObject({ hasInvalidRoot: false, value: {} });
   });
 });
+
+describe('trash retention settings', () => {
+  it.each([
+    {},
+    { trashCleanupEnabled: 'true', trashRetentionDays: -1 },
+    { trashCleanupEnabled: 1, trashRetentionDays: 2 },
+    { trashCleanupEnabled: null, trashRetentionDays: '7' },
+  ])('defaults legacy or invalid trash fields safely: %j', (policy) => {
+    expect(
+      parseStoredSettings({ localStoragePolicy: policy }).value.localStoragePolicy
+    ).toMatchObject({
+      trashCleanupEnabled: false,
+      trashRetentionDays: 30,
+    });
+  });
+
+  it.each([1, 3, 7, 14, 30, 60, 90, 180, 365])(
+    'accepts supported trash ages independently of disabled draft cleanup: %s',
+    (trashRetentionDays) => {
+      expect(
+        parseStoredSettings({
+          localStoragePolicy: {
+            cleanupEnabled: false,
+            trashCleanupEnabled: true,
+            trashRetentionDays,
+          },
+        }).value.localStoragePolicy
+      ).toMatchObject({
+        cleanupEnabled: false,
+        trashCleanupEnabled: true,
+        trashRetentionDays,
+      });
+    }
+  );
+});

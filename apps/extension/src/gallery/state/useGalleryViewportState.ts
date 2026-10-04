@@ -8,7 +8,7 @@ function getViewportContentWidth(viewport: HTMLDivElement) {
   return Math.max(0, viewport.clientWidth - paddingLeft - paddingRight);
 }
 
-export function useGalleryViewportState() {
+export function useGalleryViewportState(viewportMounted = true) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(720);
   const [gridWidth, setGridWidth] = useState(1200);
@@ -23,7 +23,7 @@ export function useGalleryViewportState() {
 
   useEffect(() => {
     const viewport = gridViewportRef.current;
-    if (!viewport) {
+    if (!viewportMounted || !viewport) {
       return undefined;
     }
 
@@ -33,16 +33,26 @@ export function useGalleryViewportState() {
       setScrollTop(viewport.scrollTop);
     };
 
+    let scrollFrame: number | null = null;
+    const updateScroll = () => {
+      if (scrollFrame !== null) return;
+      scrollFrame = requestAnimationFrame(() => {
+        scrollFrame = null;
+        setScrollTop(viewport.scrollTop);
+      });
+    };
+
     updateMeasurements();
     const observer = new ResizeObserver(updateMeasurements);
     observer.observe(viewport);
-    viewport.addEventListener('scroll', updateMeasurements, { passive: true });
+    viewport.addEventListener('scroll', updateScroll, { passive: true });
 
     return () => {
       observer.disconnect();
-      viewport.removeEventListener('scroll', updateMeasurements);
+      viewport.removeEventListener('scroll', updateScroll);
+      if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
     };
-  }, []);
+  }, [viewportMounted]);
 
   return {
     gridViewportRef,

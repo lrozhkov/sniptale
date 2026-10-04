@@ -24,12 +24,17 @@ export const Toolbar: React.FC<ToolbarProps> = (props) => {
   };
 
   const handleViewportChange = (viewport: ToolbarViewportSelection, activationEvent?: Event) =>
-    void handleToolbarViewportChange(
-      viewport,
-      viewModel.derivedState.setCurrentViewport,
-      props.mutateViewport,
-      activationEvent ? createTrustedContentActionIntentSource(activationEvent) : undefined
-    );
+    props.windowSize
+      ? void props.windowSize.select(
+          viewport,
+          activationEvent ? createTrustedContentActionIntentSource(activationEvent) : undefined
+        )
+      : void handleToolbarViewportChange(
+          viewport,
+          viewModel.derivedState.setCurrentViewport,
+          props.mutateViewport,
+          activationEvent ? createTrustedContentActionIntentSource(activationEvent) : undefined
+        );
 
   return (
     <ToolbarShellContent

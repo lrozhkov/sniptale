@@ -75,3 +75,14 @@ it('keeps the launch-intent response narrowed to the export page or no page', ()
   });
   expect(() => contract.parseResponse({ page: 'settings', success: true })).toThrow();
 });
+
+it('validates download launch mode without coercion', () => {
+  const contract = tabUiExportMessageContracts[MessageType.CONSUME_POPUP_EXPORT_LAUNCH_INTENT];
+  for (const startExport of [false, true]) {
+    const response = { page: 'export', startExport, success: true };
+    expect(contract.parseResponse(response)).toEqual(response);
+  }
+  expect(() =>
+    contract.parseResponse({ page: 'export', startExport: 'true', success: true })
+  ).toThrow();
+});

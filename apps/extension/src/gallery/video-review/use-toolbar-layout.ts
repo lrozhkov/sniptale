@@ -22,6 +22,21 @@ export function useReviewToolbarLayout() {
           })
         );
       });
+    const updateAutosaveDivider = () => {
+      // Measure without the divider so its own width cannot oscillate the spacing decision.
+      delete toolbar.dataset['autosaveDivider'];
+      if (toolbar.dataset['layout'] === 'balanced') return;
+      const autosave = toolbar.querySelector<HTMLElement>('[data-ui="autosave-control"]');
+      const zoom = toolbar.querySelector<HTMLInputElement>(
+        '[data-toolbar-side="trailing"] input[type="range"]'
+      );
+      if (
+        autosave &&
+        zoom &&
+        zoom.getBoundingClientRect().left - autosave.getBoundingClientRect().right < 24
+      )
+        toolbar.dataset['autosaveDivider'] = 'shown';
+    };
     const measure = () => {
       if (!mounted) return;
       // This observer exclusively owns presentation attributes; no React state or size animation.
@@ -32,8 +47,10 @@ export function useReviewToolbarLayout() {
       ].sort((a, b) => a - b);
       const arrange = () => {
         toolbar.dataset['layout'] = 'balanced';
+        updateAutosaveDivider();
         if (fits()) return true;
         toolbar.dataset['layout'] = 'compact';
+        updateAutosaveDivider();
         return fits();
       };
       for (const priority of priorities) {
@@ -44,7 +61,10 @@ export function useReviewToolbarLayout() {
             button.dataset['captionHidden'] = '';
           });
       }
-      if (!arrange()) toolbar.dataset['layout'] = 'stacked';
+      if (!arrange()) {
+        toolbar.dataset['layout'] = 'stacked';
+        updateAutosaveDivider();
+      }
       const hidden = buttons.filter(
         (button) => button.dataset['captionHidden'] !== undefined
       ).length;

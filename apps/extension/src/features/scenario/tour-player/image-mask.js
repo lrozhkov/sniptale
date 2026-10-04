@@ -7,7 +7,7 @@ export function renderTourMask(
   mask,
   imageBox,
   sourceWidth,
-  { element, labels, authoring, signal }
+  { element, labels, authoring, signal, animation }
 ) {
   const box = element('div', `tour-mask tour-mask-${mask.kind}`);
   Object.assign(box.style, {
@@ -26,6 +26,14 @@ export function renderTourMask(
     effect.style.background =
       mask.kind === 'highlight' && mask.paint ? serializePaintToCss(mask.paint) : mask.color;
     effect.style.opacity = String(mask.kind === 'redact' ? 1 : mask.opacity);
+  }
+  if (!authoring && mask.kind === 'highlight' && animation) {
+    effect.dataset.tourHighlight = '';
+    effect.dataset.baseOpacity = String(mask.opacity);
+    effect.dataset.enterMs = String(
+      animation.enter.kind === 'fade' ? animation.enter.durationMs : 0
+    );
+    effect.dataset.exitMs = String(animation.exit.kind === 'fade' ? animation.exit.durationMs : 0);
   }
   box.append(effect);
   if (!authoring && mask.narration?.trigger === 'activation') {

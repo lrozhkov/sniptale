@@ -72,6 +72,12 @@
   pointer-events: none;
 }
 
+.sniptale-btn[data-menu-indicator='true'][aria-expanded='true']::before,
+.sniptale-btn[data-menu-indicator='true'][data-menu-open='true']::before {
+  border-top-color: var(--sniptale-color-accent);
+  opacity: 1;
+}
+
 .sniptale-toolbar-menu-item > svg,
 .sniptale-toolbar-menu-item > .sniptale-toolbar-mode-icon {
   width: 18px;
@@ -118,7 +124,6 @@
 }
 
 .sniptale-btn-danger:hover:not(:disabled),
-.sniptale-btn-close:hover:not(:disabled),
 .sniptale-btn-exit:hover:not(:disabled) {
   border-color: color-mix(
     in srgb,
@@ -139,9 +144,89 @@
   display: none !important;
 }
 
-.sniptale-btn:focus-visible {
+.sniptale-btn:focus-visible:not([data-focus-restoration='pointer']) {
   border-color: var(--sniptale-active-border);
   box-shadow:
     var(--sniptale-shadow-sm),
     0 0 0 1px color-mix(in srgb, var(--sniptale-color-accent) 22%, transparent);
+}
+
+/* Workspace chrome is neutral even when it reports a toggled layout state. */
+.sniptale-btn.sniptale-btn-utility {
+  color: var(--sniptale-color-text-muted);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  border-radius: var(--sniptale-radius-sm);
+}
+.sniptale-btn.sniptale-btn-utility:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-hover);
+  border-color: transparent;
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-utility:active:not(:disabled) {
+  background: var(--sniptale-color-surface-input);
+  transform: none;
+}
+.sniptale-btn.sniptale-btn-utility:focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+  border-color: transparent;
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-utility:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sniptale-btn.sniptale-btn-compact {
+  width: var(--sniptale-size-icon-compact);
+  height: var(--sniptale-size-icon-compact);
+  min-width: var(--sniptale-size-icon-compact);
+  min-height: var(--sniptale-size-icon-compact);
+  padding: 0;
+  flex-shrink: 0;
+}
+.sniptale-btn.sniptale-btn-compact svg {
+  width: 16px;
+  height: 16px;
+}
+
+.sniptale-btn.sniptale-btn-outline {
+  width: auto;
+  gap: 8px;
+  padding: 0 9px;
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-outline:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong);
+  background: transparent;
+  border-color: var(--sniptale-color-border-strong);
+  box-shadow: none;
+}
+.sniptale-btn.sniptale-btn-outline:focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+
+/* Dismiss actions keep their appearance inside independently styled toolbars and panels. */
+.sniptale-dismiss-button,
+.sniptale-btn.sniptale-btn-close {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--sniptale-color-text-muted) !important;
+}
+.sniptale-dismiss-button:hover:not(:disabled),
+.sniptale-btn.sniptale-btn-close:hover:not(:disabled) {
+  color: var(--sniptale-color-text-primary-strong) !important;
+}
+.sniptale-dismiss-button:focus-visible:not([data-focus-restoration='pointer']),
+.sniptale-btn.sniptale-btn-close:focus-visible:not([data-focus-restoration='pointer']) {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
 }

@@ -7,15 +7,17 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const title = await page.getByRole('textbox', { name: 'Scenario', exact: true }).inputValue();
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     const reader = page.locator('.guide-reader');
     await expect(reader.getByRole('heading', { level: 1 })).toHaveText(title);
-    const controlRows = await reader
+    const controlColumns = await reader
       .locator('.guide-reading-options')
-      .evaluate((node) => [...node.children].map((control) => control.getBoundingClientRect().top));
-    expect(Math.abs(controlRows[0]! - controlRows[1]!)).toBeLessThan(2);
+      .evaluate((node) =>
+        [...node.children].map((control) => control.getBoundingClientRect().left)
+      );
+    expect(Math.abs(controlColumns[0]! - controlColumns[1]!)).toBeLessThan(2);
     await expect(reader.locator('textarea, input')).toHaveCount(0);
     await expect(reader.locator('img')).toHaveCount(2);
     await expect(reader.getByRole('navigation', { name: 'Guide contents' })).toBeVisible();
@@ -23,9 +25,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(reader.locator('.guide-read-document > *')).toHaveCount(2);
     await expect(reader.locator('article')).toHaveAttribute('id', 'compare');
     await reader.getByRole('button', { name: 'Next step', exact: true }).click();
-    await expect(reader.locator('section')).toHaveCount(0);
+    await expect(reader.locator('.guide-read-document section')).toHaveCount(0);
     await reader.getByRole('button', { name: 'Previous step', exact: true }).click();
-    await expect(reader.locator('section')).toHaveAttribute('id', 'intro');
+    await expect(reader.locator('.guide-read-document section')).toHaveAttribute('id', 'intro');
     await expect(reader.getByRole('button', { name: 'Previous step', exact: true })).toBeDisabled();
     await page.keyboard.press('ArrowRight');
     await expect(reader.locator('article')).toHaveAttribute('id', 'text-only');
@@ -42,7 +44,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await page.setViewportSize({ width: 800, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await expect(
       reader.getByRole('button', { name: 'Back to editing', exact: true })
     ).toBeInViewport();

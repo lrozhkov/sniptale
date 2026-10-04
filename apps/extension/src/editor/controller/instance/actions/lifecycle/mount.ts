@@ -1,4 +1,4 @@
-import { Canvas } from 'fabric';
+import type { Canvas } from 'fabric';
 import { useEditorStore } from '../../../../state/useEditorStore';
 import { attachEditorControllerEventHandlers } from '../../../events';
 import { createEditorMagnetManager } from '../../../magnet';
@@ -11,15 +11,19 @@ import type { EditorControllerInstance } from '../../types';
 import { ensureEditorCanvasReadyHandoff } from '../../../../document/canvas-ready/handoff';
 import { createViewportPresentationContext } from '../viewport-context';
 import { attachEditorCanvasPointerCapture } from './pointer-capture';
+import { mountEditorSelectionChrome } from './selection-chrome';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 
 export function createMountedCanvas(canvasElement: HTMLCanvasElement) {
-  const canvas = new Canvas(canvasElement, {
+  const canvas = new EditorCanvas(canvasElement, {
     altActionKey: 'ctrlKey',
     centeredKey: 'ctrlKey',
     enablePointerEvents: true,
+    fireMiddleClick: false,
     preserveObjectStacking: true,
     selection: true,
     selectionKey: 'ctrlKey',
+    targetFindTolerance: 5,
     uniformScaling: false,
     uniScaleKey: 'shiftKey',
   });
@@ -62,6 +66,7 @@ export function mountEditorController(
 
   try {
     const canvas = createMountedCanvas(canvasElement);
+    canvas.setRenderViewport(viewportElement, stageElement);
 
     controller.canvas = canvas;
     controller.viewportElement = viewportElement;
@@ -88,6 +93,7 @@ export function mountEditorController(
       getCropGuide: () => controller.cropGuide,
       getWorkspace: () => useEditorStore.getState().workspace,
     });
+    mountEditorSelectionChrome(canvas, controller.magnetManager);
     controller.viewportResizeObserver = attachViewportObserver(controller, canvas, viewportElement);
     controller.selectionNudgeSession = null;
     controller.syncRuntimeState();

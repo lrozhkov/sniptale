@@ -2,6 +2,7 @@ import { useMemo, type PropsWithChildren } from 'react';
 import { useVideoEditorActionHandlers } from '../../commands';
 import { useVideoEditorRuntime } from '../../session';
 import { useVideoEditorProjectHistoryShortcuts } from '../../session/history-shortcuts';
+import { useVideoEditorExportShortcut } from '../../session/export-shortcuts';
 import { useVideoEditorLibraries } from '../libraries';
 import { useVideoEditorOverlayPlayback } from '../overlay-playback';
 import { usePlaybackRangeSanity } from '../playback-range';
@@ -74,6 +75,12 @@ function useVideoEditorRuntimeComposition(
     exportPort.exportState.dialogOpen ||
     exportPort.exportState.error !== null ||
     exportPort.exportState.isRunning;
+
+  useVideoEditorExportShortcut({
+    enabled:
+      lifecycle.project !== null && !blockingOverlayOpen && !workspace.preview.sourceViewerActive,
+    openExportDialog: exportPort.openExportDialog,
+  });
 
   useVideoEditorProjectHistoryShortcuts({
     enabled: lifecycle.project !== null && !blockingOverlayOpen,

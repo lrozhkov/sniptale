@@ -508,3 +508,130 @@ it('keeps embedded audio on an audio track when the chosen video track receives 
   expect(next.tracks.find((track) => track.id === audio.trackId)?.kind).toBe(VideoTrackKind.AUDIO);
   expect(audio.startTime).toBe(3);
 });
+
+it.each(['appendMaterial', 'overlayMaterial'] as const)(
+  '%s preserves a timed source shorter than 100 milliseconds',
+  (action) => {
+    const { store, asset } = setup(true);
+    asset.metadata.duration = 1 / 30;
+    expect(store.getState()[action](asset.id).status).toBe('placed');
+    expect(store.getState().project!.clips).toHaveLength(2);
+    for (const clip of store.getState().project!.clips) {
+      expect(clip.duration).toBeCloseTo(1 / 30);
+      expect('sourceDuration' in clip && clip.sourceDuration).toBeCloseTo(1 / 30);
+    }
+  }
+);
+
+it.each([
+  VideoProjectAssetType.VIDEO,
+  VideoProjectAssetType.IMAGE,
+  VideoProjectAssetType.AUDIO,
+  VideoProjectAssetType.RECORDING,
+])('drops %s onto the exact track and logical lane with one undo step', (type) => {
+  const { store, asset, project } = setup(false, type);
+  const track =
+    type === VideoProjectAssetType.AUDIO
+      ? createVideoProjectTrack('Audio', 1, VideoTrackKind.AUDIO)
+      : project.tracks[0]!;
+  if (!project.tracks.includes(track)) project.tracks.push(track);
+  track.logicalLanes = [{ id: 'line-1' }, { id: 'line-2' }];
+  const before = store.getState().project!;
+  expect(
+    store
+      .getState()
+      .placeMaterial(asset.id, { trackId: track.id, startTime: 2, timelineLaneId: 'line-2' }).status
+  ).toBe('placed');
+  const state = store.getState();
+  expect(state.project!.clips).toMatchObject([
+    {
+      trackId: track.id,
+      startTime: 2,
+      timelineLaneId: 'line-2',
+      duration: type === VideoProjectAssetType.IMAGE ? 5 : 6,
+    },
+  ]);
+  expect(state.projectHistory.past).toHaveLength(1);
+  expect(state.currentTime).toBe(3);
+  const undo = undoVideoEditorProjectHistory(state.projectHistory, state.project!);
+  expect(undo?.status).toBe('applied');
+  if (undo?.status === 'applied')
+    expect(undo.project).toEqual({ ...before, updatedAt: undo.project.updatedAt });
+});
+
+it('rejects occupied intervals but admits adjacency and a different logical lane', () => {
+  const { store, asset, project } = setup();
+  const track = project.tracks[0]!;
+  track.logicalLanes = [{ id: 'line-1' }, { id: 'line-2' }];
+  const target = { trackId: track.id, startTime: 2, timelineLaneId: 'line-1' };
+  expect(store.getState().placeMaterial(asset.id, target).status).toBe('placed');
+  const before = store.getState();
+  expect(store.getState().placeMaterial(asset.id, { ...target, startTime: 1 })).toEqual({
+    status: 'rejected',
+    reason: 'occupied-target',
+  });
+  expect(store.getState()).toBe(before);
+  expect(
+    store.getState().placeMaterial(asset.id, { ...target, timelineLaneId: 'line-2' }).status
+  ).toBe('placed');
+  expect(store.getState().placeMaterial(asset.id, { ...target, startTime: 8 }).status).toBe(
+    'placed'
+  );
+});
+
+it.each([
+  'locked',
+  'wrong-kind',
+  'camera',
+  'missing-track',
+  'missing-lane',
+  'negative-time',
+  'nan-time',
+])('rejects %s without project, selection or history mutation', (invalid) => {
+  const { store, asset, project } = setup(true);
+  const track = project.tracks[0]!;
+  if (invalid === 'locked') track.locked = true;
+  if (invalid === 'wrong-kind') track.kind = VideoTrackKind.AUDIO;
+  if (invalid === 'camera') track.role = 'CAMERA';
+  const target = {
+    trackId: invalid === 'missing-track' ? 'missing' : track.id,
+    timelineLaneId: invalid === 'missing-lane' ? 'missing' : 'line-1',
+    startTime: invalid === 'negative-time' ? -1 : invalid === 'nan-time' ? NaN : 2,
+  };
+  const before = store.getState();
+  expect(store.getState().placeMaterial(asset.id, target).status).toBe('rejected');
+  expect(store.getState()).toBe(before);
+});
+
+it('keeps a dropped recording composition synchronized on fresh companion tracks', () => {
+  const { store, asset, project } = setup(true, VideoProjectAssetType.RECORDING);
+  asset.recordingPart = { recordingId: 'recording', role: 'primary' };
+  const camera = {
+    ...asset,
+    id: 'camera',
+    recordingPart: { recordingId: 'recording', role: 'camera' as const },
+    metadata: { ...asset.metadata, duration: 3, hasAudio: false },
+  };
+  project.assets.push(camera);
+  store.getState().appendMaterial(asset.id);
+  const before = store.getState().project!;
+  const track = createVideoProjectTrack('Destination', -2, VideoTrackKind.PRIMARY);
+  store.setState({
+    project: {
+      ...before,
+      tracks: [...before.tracks.map((item) => ({ ...item, locked: true })), track],
+    },
+  });
+  expect(
+    store
+      .getState()
+      .placeMaterial(asset.id, { trackId: track.id, startTime: 1, timelineLaneId: 'line-1' }).status
+  ).toBe('placed');
+  const added = store.getState().project!.clips.slice(before.clips.length);
+  expect(added).toHaveLength(3);
+  expect(added.map((clip) => clip.startTime)).toEqual([1, 1, 1]);
+  expect(added.map((clip) => clip.duration)).toEqual([6, 6, 3]);
+  expect(new Set(added.map((clip) => clip.groupId)).size).toBe(1);
+  expect(added[0]!.trackId).toBe(track.id);
+  expect(store.getState().project!.clips.slice(0, before.clips.length)).toEqual(before.clips);
+});

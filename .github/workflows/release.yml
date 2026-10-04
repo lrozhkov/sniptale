@@ -1,5 +1,5 @@
-name: Continuous Deployment
-run-name: ${{ inputs.diagnostic && 'Continuous Deployment diagnostic' || 'Continuous Deployment' }}
+name: Publish release
+run-name: ${{ inputs.diagnostic && 'Publication diagnostics' || 'Publish release' }}
 
 on:
   workflow_dispatch:
@@ -41,6 +41,7 @@ concurrency:
 
 jobs:
   admission:
+    name: Verify release
     if: github.ref == 'refs/heads/main' || inputs.diagnostic
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -50,7 +51,7 @@ jobs:
     outputs:
       release-sha: ${{ steps.admission.outputs.release-sha }}
     steps:
-      - name: Validate deployment inputs
+      - name: Validate inputs
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
@@ -65,7 +66,7 @@ jobs:
             echo 'A non-latest provenance bypass requires an audit note.' >&2
             exit 1
           fi
-      - name: Check out signed tag
+      - name: Check out release tag
         if: github.ref == 'refs/heads/main'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
@@ -73,16 +74,19 @@ jobs:
         if: github.ref != 'refs/heads/main' && inputs.diagnostic
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', fetch-depth: 0, persist-credentials: false }
-      - name: Check out release control
+      - name: Check out release controls
         if: github.ref == 'refs/heads/main'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', path: build/release-control, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Install locked npm
-        run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Install exact publication dependencies
+      - name: Install pinned npm
+        run: |
+          npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
+          echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install dependencies
         run: npm ci --ignore-scripts
-      - name: Admit exact provenance source
+      - name: Verify release source
         id: admission
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,11 +107,11 @@ jobs:
               .head_sha == $sha and .head_branch == $branch and .event == "workflow_dispatch" and
               .status == "completed" and .conclusion == "success" and
               .path == ".github/workflows/provenance.yml" and
-              .display_title == "Release pipeline diagnostic"
+              .display_title == "Release diagnostics"
             ' <<<"$run" >/dev/null
             jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}/jobs?per_page=100")
             jq -s -e '
-              [.[].jobs[] | select(.name == "Release pipeline diagnostic Gate" and .conclusion == "success")] |
+              [.[].jobs[] | select(.name == "Diagnostic result" and .conclusion == "success")] |
               length == 1
             ' <<<"$jobs" >/dev/null
             artifact_prefix="release-provenance-${release_sha}-${PROVENANCE_RUN_ID}-"
@@ -137,15 +141,15 @@ jobs:
               .head_branch == "main" and .event == "workflow_dispatch" and
               .status == "completed" and .conclusion == "success" and
               .path == ".github/workflows/provenance-finalize.yml" and
-              .display_title == "Release provenance Finalize Gate"
+              .display_title == "Prepare release"
             ' <<<"$run" >/dev/null
             jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${PROVENANCE_RUN_ID}/jobs?per_page=100")
             jq -s -e '
-              [.[].jobs[] | select(.name == "Release provenance Finalize Gate" and .conclusion == "success")] |
+              [.[].jobs[] | select(.name == "Prepare release" and .conclusion == "success")] |
               length == 1
             ' <<<"$jobs" >/dev/null
             runs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/provenance-finalize.yml/runs?branch=main&event=workflow_dispatch&status=completed&head_sha=${control_sha}&per_page=100")
-            latest=$(jq -s -r '[.[].workflow_runs[] | select(.conclusion == "success" and .display_title == "Release provenance Finalize Gate")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
+            latest=$(jq -s -r '[.[].workflow_runs[] | select(.conclusion == "success" and .display_title == "Prepare release")] | sort_by(.run_number) | last | .id // empty' <<<"$runs")
             if [ "$PROVENANCE_RUN_ID" != "$latest" ] && [ "$ALLOW_NON_LATEST" != true ]; then
               echo "Finalizer run $PROVENANCE_RUN_ID is not the latest completed run $latest for control $control_sha." >&2
               exit 1
@@ -164,11 +168,11 @@ jobs:
               .head_sha == $sha and .head_branch == "main" and .event == "workflow_dispatch" and
               .status == "completed" and
               .path == ".github/workflows/provenance.yml" and
-              .display_title == "Release provenance Gate"
+              .display_title == "Release checks"
             ' <<<"$source" >/dev/null
             source_jobs=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/runs/${source_run_id}/jobs?filter=all&per_page=100")
             jq -s -e '
-              [.[].jobs[] | select(.name == "canonical-proof / Release provenance Gate" and .conclusion == "success")] |
+              [.[].jobs[] | select(.name == "Checks / Release result" and .conclusion == "success")] |
               length >= 1
             ' <<<"$source_jobs" >/dev/null
             proof_name="release-provenance-${release_sha}-${source_run_id}-${source_attempt}"
@@ -191,7 +195,7 @@ jobs:
           fi
           echo "release-sha=$release_sha" >> "$GITHUB_OUTPUT"
           {
-            echo '### Continuous Deployment admission'
+            echo '### Publish release admission'
             echo
             echo "Tag: $RELEASE_TAG"
             echo "Commit: $release_sha"
@@ -201,7 +205,7 @@ jobs:
             fi
             if [ -n "$BYPASS_REASON" ]; then echo "Bypass note: $BYPASS_REASON"; fi
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Prepare notes and classify existing release state without mutation
+      - name: Prepare release notes and assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAG: ${{ inputs.release_tag }}
@@ -256,7 +260,7 @@ jobs:
             echo "Prepared extension archive: $zip_name"
             echo "Existing release action: $(jq -er .action "$deployment_root/existing-release-state.json")"
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: Preserve publication input and prepared assets
+      - name: Save prepared assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: deployment-${{ steps.admission.outputs.release-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -271,18 +275,19 @@ jobs:
           retention-days: 30
 
   diagnostic-gate:
-    name: Continuous Deployment diagnostic Gate
+    name: Diagnostic result
     needs: admission
     if: always() && inputs.diagnostic
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
-      - name: Require read-only release admission and preparation
+      - name: Verify publication readiness
         env:
           ADMISSION_RESULT: ${{ needs.admission.result }}
         run: test "$ADMISSION_RESULT" = success
 
   publish:
+    name: Publish
     needs: admission
     if: github.ref == 'refs/heads/main' && needs.admission.result == 'success' && !inputs.diagnostic
     runs-on: ubuntu-24.04
@@ -292,20 +297,23 @@ jobs:
       actions: read
       contents: write
     steps:
-      - name: Check out signed tag
+      - name: Check out release tag
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ inputs.release_tag }}', fetch-depth: 0, persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Install locked npm
-        run: npm ci --ignore-scripts --prefix tooling/configs/ci/npm && echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
-      - name: Install exact publication dependencies
+      - name: Install pinned npm
+        run: |
+          npm ci --ignore-scripts --prefix tooling/configs/ci/npm
+          node tooling/ci/npm-runtime.mjs tooling/configs/ci/npm tooling/configs/ci/toolchain.lock.json
+          echo "$GITHUB_WORKSPACE/tooling/configs/ci/npm/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install dependencies
         run: npm ci --ignore-scripts
-      - name: Download exact admitted deployment artifact
+      - name: Download approved assets
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v6.0.0
         with:
           name: deployment-${{ needs.admission.outputs.release-sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: .
-      - name: Create draft, attach verified assets, and publish immutable release
+      - name: Publish immutable release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_POLICY_READ_TOKEN: ${{ secrets.RELEASE_POLICY_TOKEN || secrets.GITHUB_TOKEN }}

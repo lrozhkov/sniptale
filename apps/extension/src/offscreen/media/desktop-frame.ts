@@ -7,14 +7,17 @@ import {
 import { acquireDesktopStream } from './desktop-stream';
 import { captureDesktopStreamFrame } from '../../platform/media-utils/desktop-frame';
 
-const RESERVATION_TIMEOUT_MS = 30_000;
+// Cover the background picker budget plus the longest supported screenshot countdown.
+const RESERVATION_TIMEOUT_MS = 40_000;
 
-export type DesktopFrameResult = {
-  result: 'captured';
-  dataUrl: string;
-  width: number;
-  height: number;
-};
+export type DesktopFrameResult =
+  | { result: 'cancelled' }
+  | {
+      result: 'captured';
+      dataUrl: string;
+      width: number;
+      height: number;
+    };
 
 type Reservation = {
   lease: OffscreenMediaActivityLease;
@@ -66,22 +69,29 @@ export async function writeDesktopFrameClipboard(dataUrl: string): Promise<'copi
 
 export async function captureDesktopFrame(args: {
   requestId: string;
-  streamId: string;
+  streamId?: string;
   imageFormat: DesktopFrameImageFormat;
   imageQuality: number;
+  delaySeconds?: number;
 }): Promise<DesktopFrameResult> {
   const reservation = takeReservation(args.requestId);
   try {
     const frame = await captureDesktopStreamFrame({
       acquireStream: () =>
         acquireDesktopStream({
-          desktopStreamId: args.streamId,
+          ...(args.streamId === undefined ? {} : { desktopStreamId: args.streamId }),
           controlledCursorCaptureEnabled: true,
         }),
       imageFormat: args.imageFormat,
       imageQuality: args.imageQuality,
+      delaySeconds: args.delaySeconds ?? 0,
     });
     return { result: 'captured', ...frame };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      return { result: 'cancelled' };
+    }
+    throw error;
   } finally {
     reservation.lease.release();
   }

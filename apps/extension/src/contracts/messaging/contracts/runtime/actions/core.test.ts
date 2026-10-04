@@ -198,6 +198,7 @@ it('resolves desktop encoding policy before the popup opens the picker', () => {
       result: 'ready',
       imageFormat: 'webp',
       imageQuality: 72,
+      delaySeconds: 3,
       requestId: 'request-1',
       reservationToken: 'reservation-1',
     })
@@ -234,8 +235,29 @@ it('parses exact offscreen desktop frame responses and rejects malformed dimensi
     streamId: 'desktop-stream-1',
     imageFormat: 'png',
     imageQuality: 80,
+    delaySeconds: 3,
   } as const;
   expect(offscreenDesktopCaptureContract.parseRequest(captureRequest)).toEqual(captureRequest);
+  const { streamId: _streamId, ...offscreenOwnedRequest } = captureRequest;
+  expect(offscreenDesktopCaptureContract.parseRequest(offscreenOwnedRequest)).toEqual(
+    offscreenOwnedRequest
+  );
+  expect(
+    offscreenDesktopCaptureContract.parseResponse({ success: true, result: 'cancelled' })
+  ).toEqual({ success: true, result: 'cancelled' });
+  expect(() =>
+    offscreenDesktopCaptureContract.parseResponse({
+      success: true,
+      result: 'cancelled',
+      dataUrl: 'data:image/png;base64,AA==',
+    })
+  ).toThrow();
+
+  for (const delaySeconds of [-1, 2, 11, Number.NaN, '3', undefined]) {
+    expect(() =>
+      offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, delaySeconds })
+    ).toThrow();
+  }
   expect(() =>
     offscreenDesktopCaptureContract.parseRequest({ ...captureRequest, requestId: '' })
   ).toThrow();
@@ -710,4 +732,38 @@ it('requires activation proof and operation binding for runtime-token requests',
       type: MessageType.REQUEST_CONTENT_PRIVILEGED_ACTION_RUNTIME_TOKEN,
     })
   ).toThrow();
+});
+
+it('admits only unambiguous offscreen raster preparation and correlated completion', () => {
+  const prepare = {
+    type: MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE,
+    capabilityToken: 'capability',
+    operation: 'prepare',
+    leaseId: 'lease-1',
+  };
+  expect(offscreenFrameAnnotationRasterContract.parseRequest(prepare)).toMatchObject(prepare);
+  for (const invalid of [
+    { ...prepare, leaseId: '' },
+    { ...prepare, leaseId: 'x'.repeat(129) },
+    { ...prepare, capabilityToken: undefined },
+    { ...prepare, operation: 'other' },
+    { ...prepare, reference: { inputSha256: 'a'.repeat(64), jobId: 'lease-1', revision: 1 } },
+  ])
+    expect(() => offscreenFrameAnnotationRasterContract.parseRequest(invalid)).toThrow();
+  expect(
+    offscreenFrameAnnotationRasterContract.parseResponse({
+      success: true,
+      result: 'prepared',
+      leaseId: 'lease-1',
+    })
+  ).toMatchObject({ result: 'prepared', leaseId: 'lease-1' });
+  for (const leaseId of [undefined, '', 'x'.repeat(129)]) {
+    expect(() =>
+      offscreenFrameAnnotationRasterContract.parseResponse({
+        success: true,
+        result: 'prepared',
+        leaseId,
+      })
+    ).toThrow();
+  }
 });

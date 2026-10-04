@@ -25,7 +25,7 @@ const COMPACT_COLOR_OPTION_FOCUS_CLASS_NAME = [
 const COMPACT_COLOR_OPTION_ACTIVE_CLASS_NAME = [
   'border-[color:color-mix(in_srgb,var(--sniptale-color-accent)_66%,var(--sniptale-color-border-soft)_34%)]',
   'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-surface-panel)_52%,transparent)]',
-].join('');
+].join(' ');
 
 export interface CompactColorOptionProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   active?: boolean;
@@ -91,8 +91,9 @@ export function CompactColorOption({
     <button
       type={type ?? 'button'}
       {...props}
+      aria-pressed={active}
       className={cx(
-        'inline-flex h-7 w-7 items-center justify-center rounded-full border transition',
+        'inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full border transition-transform',
         'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_90%,transparent)]',
         'bg-[color:var(--sniptale-color-surface-panel)]',
         'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-surface-panel)_52%,transparent)]',

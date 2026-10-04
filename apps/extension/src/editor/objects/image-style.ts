@@ -1,6 +1,9 @@
 import type { FabricObject } from 'fabric';
 import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../features/editor/document/constants';
-import { type EditorImageSettings } from '../../features/editor/document/image-types';
+import {
+  resolveEditorSourceImageGlowBlur,
+  type EditorImageSettings,
+} from '../../features/editor/document/image-types';
 import { attachImageStyleRenderer } from './image-frame';
 import { createFabricShadow } from './shadow';
 
@@ -68,6 +71,7 @@ export function readImageSettingsFromObject(
 export function applyImageSettings(object: FabricObject, settings: EditorImageSettings): void {
   const shadowColor =
     settings.shadowColor ?? DEFAULT_EDITOR_IMAGE_SETTINGS.shadowColor ?? settings.strokeColor;
+  const sourceImage = object.sniptaleType === 'source-image';
 
   object.sniptaleBorderPresetId = settings.borderPresetId;
   object.sniptaleImageOpacity = settings.opacity;
@@ -88,8 +92,8 @@ export function applyImageSettings(object: FabricObject, settings: EditorImageSe
     opacity: settings.opacity,
     shadow: createFabricShadow(settings.shadow, shadowColor, {
       angle: settings.shadowAngle ?? 90,
-      blur: settings.shadowBlur ?? 12,
-      distance: settings.shadowDistance ?? 4,
+      blur: sourceImage ? resolveEditorSourceImageGlowBlur(settings) : (settings.shadowBlur ?? 12),
+      distance: sourceImage ? 0 : (settings.shadowDistance ?? 4),
     }),
     objectCaching: false,
     stroke: null,

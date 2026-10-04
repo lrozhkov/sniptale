@@ -8,6 +8,8 @@ import { DEFAULT_EDITOR_FRAME_SETTINGS } from '../../../../features/editor/docum
 import type { EditorFrameSettings } from '../../../../features/editor/document/types';
 import { translate } from '../../../../platform/i18n';
 import { EditorInspectorFrameBackgroundFillEditor } from './';
+import { EditorInspectorFrameBackgroundImageEditor } from './image';
+import { getFrameGradientPresets } from '../../sidebar-shared/options';
 
 vi.mock('../../../chrome/ui', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../chrome/ui')>()),
@@ -144,7 +146,8 @@ it('renders the solid color branch and forwards color updates', async () => {
   );
   expect(
     container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
-  ).toBe('solid,linear');
+  ).toBe('solid');
+  expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
 
   await act(async () => {
     (container?.querySelectorAll('button')[0] as HTMLButtonElement | undefined)?.click();
@@ -169,7 +172,7 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   await renderUi(
     <EditorInspectorFrameBackgroundFillEditor
       frameDraft={{ ...FRAME, backgroundMode: 'gradient' }}
-      gradientPresets={[{ id: 'preset-1', label: 'Preset 1', from: '#000', to: '#fff', angle: 45 }]}
+      gradientPresets={getFrameGradientPresets()}
       frameBackgroundPalette={['#111111']}
       frameBackgroundImageFitOptions={[{ value: 'cover', label: 'Cover' }]}
       recentColors={['#222222']}
@@ -185,6 +188,19 @@ it('renders the gradient branch and forwards gradient actions', async () => {
   expect(container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-kind')).toBe(
     'gradient'
   );
+  expect(
+    container?.querySelector('[data-testid="paint-control"]')?.getAttribute('data-modes')
+  ).toBe('linear');
+  expect(container?.querySelector('[data-ui="editor.frame.quick-colors"]')).toBeNull();
+  const presets = container?.querySelector('[data-ui="editor.frame.gradient-presets"]');
+  expect(presets?.className).toContain('grid-cols-5');
+  expect(presets?.querySelectorAll('button')).toHaveLength(10);
+  await act(async () => {
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="editor.frame.gradient-presets"] button')
+      ?.click();
+  });
+  expect(applyGradientPreset).toHaveBeenCalledOnce();
 
   await act(async () => {
     (
@@ -192,7 +208,7 @@ it('renders the gradient branch and forwards gradient actions', async () => {
     )?.click();
   });
 
-  expect(applyGradientPreset).not.toHaveBeenCalled();
+  expect(applyGradientPreset).toHaveBeenCalledOnce();
   expect(previewFramePatch).not.toHaveBeenCalled();
   expect(applyFramePatch).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -244,4 +260,51 @@ it('renders the image branch and forwards image mode updates', async () => {
   expect(onPickBackgroundImage).toHaveBeenCalledTimes(1);
   expect(onClearBackgroundImage).toHaveBeenCalledTimes(1);
   expect(applyFramePatch).toHaveBeenCalledWith({ backgroundImageFit: 'cover' });
+});
+
+it('offers image acquisition before fit controls, then reveals fit after picking an image', async () => {
+  const props = {
+    applyFramePatch: vi.fn(),
+    frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
+    frameDraft: { ...FRAME, backgroundMode: 'image' as const },
+    onClearBackgroundImage: vi.fn(),
+    onPickBackgroundImage: vi.fn(),
+  };
+  await renderUi(<EditorInspectorFrameBackgroundImageEditor {...props} />);
+  expect(container?.querySelector('[data-testid="select-field"]')).toBeNull();
+  await act(async () => container?.querySelector('button')?.click());
+  expect(props.onPickBackgroundImage).toHaveBeenCalledOnce();
+  await renderUi(
+    <EditorInspectorFrameBackgroundImageEditor
+      {...props}
+      frameDraft={{ ...props.frameDraft, backgroundImageData: 'data:image/png;base64,abc' }}
+    />
+  );
+  expect(container?.querySelector('[data-testid="select-field"]')).not.toBeNull();
+});
+
+it('previews the selected background resource and removes its preview when cleared', async () => {
+  const props = {
+    applyFramePatch: vi.fn(),
+    frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
+    frameDraft: {
+      ...FRAME,
+      backgroundMode: 'image' as const,
+      backgroundImageData: 'data:image/png;base64,selected',
+    },
+    onClearBackgroundImage: vi.fn(),
+    onPickBackgroundImage: vi.fn(),
+  };
+  await renderUi(<EditorInspectorFrameBackgroundImageEditor {...props} />);
+  expect(container?.querySelector('img')?.getAttribute('src')).toBe(
+    props.frameDraft.backgroundImageData
+  );
+  expect(container?.querySelector('img')?.getAttribute('alt')).toBeTruthy();
+  await renderUi(
+    <EditorInspectorFrameBackgroundImageEditor
+      {...props}
+      frameDraft={{ ...props.frameDraft, backgroundImageData: null }}
+    />
+  );
+  expect(container?.querySelector('img')).toBeNull();
 });

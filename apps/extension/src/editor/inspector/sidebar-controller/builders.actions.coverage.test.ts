@@ -1,4 +1,6 @@
 import { expect, it, vi } from 'vitest';
+import { useEditorStore } from '../../state/useEditorStore';
+import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../../features/editor/document/image-types';
 
 const actionRailMocks = vi.hoisted(() => ({ exportSession: vi.fn() }));
 const richShapeSelectionMocks = vi.hoisted(() => ({
@@ -63,7 +65,10 @@ function createControllerActionProps(args: {
     actions: {} as never,
     backgroundImageInputRef: { current: null } as never,
     controller: args.controller as never,
-    frameDraft: { id: 'draft' } as never,
+    frameDraft: {
+      id: 'draft',
+      sourceImage: { ...DEFAULT_EDITOR_IMAGE_SETTINGS, opacity: 0.4 },
+    } as never,
     importSessionInputRef: { current: null } as never,
     openImageInputRef: { current: null } as never,
     openLayerEffects: vi.fn(),
@@ -105,7 +110,12 @@ it('routes controller actions and rich-shape arrangement branches', async () => 
     enabled: true,
     id: 'brightness',
   });
-  expect(controller.applyFrameSettings).toHaveBeenCalledWith({ id: 'draft' });
+  expect(controller.applyFrameSettings).toHaveBeenCalledWith(
+    expect.objectContaining({
+      id: 'draft',
+      sourceImage: expect.objectContaining({ opacity: 1 }),
+    })
+  );
   expect(controller.resizeCanvas).toHaveBeenCalledWith(640, 480);
   expect(controller.resizeImage).toHaveBeenCalledWith(320, 240);
   expect(controller.bringForwardSelection).toHaveBeenCalledOnce();
@@ -114,4 +124,60 @@ it('routes controller actions and rich-shape arrangement branches', async () => 
   expect(controller.sendSelectionToBack).toHaveBeenCalledOnce();
   expect(controller.withHistoryMuted).toHaveBeenCalled();
   expect(richShapeSelectionMocks.updateSelectedRichShapeFormatting).toHaveBeenCalled();
+});
+
+it('keeps layer parameters open when raster action admission selects its target', async () => {
+  const previous = useEditorStore.getState();
+  const store = createStoreSlice();
+  const controller = createController();
+  store.setInspector.mockImplementation((inspector) =>
+    useEditorStore.getState().setInspector(inspector)
+  );
+  controller.selectLayer.mockImplementation(() =>
+    useEditorStore.getState().setActiveTool('select')
+  );
+  try {
+    useEditorStore.setState({ inspector: 'layer-effects' });
+    const props = createControllerActionProps({ controller, store });
+    await props.applyLayerTransformation('image-layer', 'rotate-left');
+    expect(useEditorStore.getState().inspector).toBe('layer-effects');
+    await props.applyLayerEffect('image-layer', { id: 'brightness', amount: 0.25, enabled: true });
+    expect(useEditorStore.getState().inspector).toBe('layer-effects');
+    expect(controller.selectLayer).toHaveBeenCalledWith('image-layer', { focusViewport: false });
+  } finally {
+    useEditorStore.setState(previous);
+  }
+});
+
+it('does not reopen parameters after the user leaves a pending raster action', async () => {
+  const previous = useEditorStore.getState();
+  const store = createStoreSlice();
+  const controller = createController();
+  let finish!: () => void;
+  controller.applyLayerTransformation.mockImplementation(
+    () =>
+      new Promise<undefined>((resolve) => {
+        finish = () => resolve(undefined);
+      })
+  );
+  store.setInspector.mockImplementation((inspector) =>
+    useEditorStore.getState().setInspector(inspector)
+  );
+  controller.selectLayer.mockImplementation(() =>
+    useEditorStore.getState().setActiveTool('select')
+  );
+  try {
+    useEditorStore.setState({ inspector: 'layer-effects' });
+    const pending = createControllerActionProps({ controller, store }).applyLayerTransformation(
+      'image-layer',
+      'rotate-left'
+    );
+    expect(useEditorStore.getState().inspector).toBe('layer-effects');
+    useEditorStore.getState().setInspector('tool');
+    finish();
+    await pending;
+    expect(useEditorStore.getState().inspector).toBe('tool');
+  } finally {
+    useEditorStore.setState(previous);
+  }
 });

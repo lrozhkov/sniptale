@@ -6,12 +6,14 @@ import {
   ClipboardCopy,
   Crop,
   Film,
-  Images,
+  Library,
   MessageSquarePlus,
   MonitorPlay,
   MonitorUp,
   Paintbrush,
   Pencil,
+  SwatchBook,
+  TextCursorInput,
   UnfoldVertical,
 } from 'lucide-react';
 import { useState, type ComponentType } from 'react';
@@ -51,7 +53,7 @@ function buildCaptureConfig(
   return {
     screenshotMode: mode,
     viewportPresetId: null,
-    delay: null,
+    delay: mode === 'desktop' ? 3 : null,
     afterCapture,
     imageFormat: afterCapture === 'copy' ? 'png' : null,
     imageQuality: null,
@@ -60,9 +62,9 @@ function buildCaptureConfig(
 }
 
 const workspaceActions = [
-  { icon: Images, labelKey: 'popup.home.libraryLabel', onClick: () => openLibrary() },
-  { icon: Film, labelKey: 'popup.home.videoEditorLabel', onClick: openVideoEditor },
+  { icon: Library, labelKey: 'popup.home.libraryLabel', onClick: () => openLibrary() },
   { icon: ImageEditorIcon, labelKey: 'popup.home.imageEditorLabel', onClick: openImageEditor },
+  { icon: Film, labelKey: 'popup.home.videoEditorLabel', onClick: openVideoEditor },
   {
     icon: ScenarioEditorIcon,
     labelKey: 'popup.home.scenarioEditorLabel',
@@ -83,52 +85,67 @@ const pageToolActions = [
     hintKey: 'content.toolbar.highlighterEnable',
     mode: 'highlighter',
   },
+  {
+    icon: TextCursorInput,
+    labelKey: 'content.toolbar.quickEditLabel',
+    hintKey: 'content.toolbar.quickEditEnable',
+    mode: 'quick-edit',
+  },
+  {
+    icon: SwatchBook,
+    labelKey: 'content.toolbar.designReviewLabel',
+    hintKey: 'content.toolbar.designReviewEnable',
+    mode: 'design-review',
+  },
 ] as const;
 
 const MENU_SURFACE_CLASS_NAME = [
-  'flex min-h-0 flex-1 flex-col overflow-hidden rounded-[16px] border p-3',
+  'flex min-h-0 flex-1 flex-col justify-between overflow-y-auto rounded-[16px] border p-3',
   'border-[var(--sniptale-color-border-soft)]',
   'bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
 
 const CAPTURE_BUTTON_CLASS_NAME = [
-  'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[14px] border',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_70%,transparent)]',
+  'group flex min-h-[88px] min-w-0 flex-col items-center justify-center gap-2.5 rounded-[12px] border-0',
+  'bg-[var(--sniptale-color-surface-input)]',
   'px-1.5 py-2.5 text-center transition-colors',
-  'hover:border-[var(--sniptale-color-border-accent-soft)]',
   'hover:bg-[var(--sniptale-color-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
+].join(' ');
+const CAPTURE_ICON_CLASS_NAME = [
+  'h-7 w-7 text-[var(--sniptale-color-accent)]',
+  'transition-transform duration-180 ease-out motion-reduce:transition-none',
+  'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
 ].join(' ');
 
-const WORKSPACE_BUTTON_CLASS_NAME = [
-  'group flex min-h-12 items-center gap-2.5 rounded-[12px] border px-3 text-left text-xs font-medium',
-  'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-primary)]',
-  'transition-colors hover:border-[var(--sniptale-color-border-accent-soft)]',
-  'hover:bg-[var(--sniptale-color-surface-hover)]',
+const MENU_SMALL_ICON_CLASS_NAME = [
+  'h-[18px] w-[18px] text-[var(--sniptale-color-text-secondary)]',
+  'transition-[transform,color] duration-180 ease-out motion-reduce:transition-none',
+  'group-hover:scale-110 group-focus-visible:scale-110 group-disabled:scale-100',
+  'group-hover:text-[var(--sniptale-color-text-primary)] group-disabled:text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 const QUICK_SCENARIO_BUTTON_CLASS_NAME = [
-  'group grid min-h-[58px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
-  'gap-1.5 rounded-[12px] border border-transparent bg-transparent px-1.5 py-1.5',
+  'group grid min-h-[54px] min-w-0 grid-rows-[18px_20px] content-center justify-items-center',
+  'gap-1.5 rounded-[12px] border-0 bg-transparent px-1.5 py-1.5',
   'text-center transition-colors',
   'text-[var(--sniptale-color-text-secondary)]',
-  'hover:border-[var(--sniptale-color-border-soft)] hover:bg-[var(--sniptale-color-surface-hover)]',
+  'hover:bg-[var(--sniptale-color-surface-hover)]',
   'hover:text-[var(--sniptale-color-text-primary)] disabled:cursor-not-allowed disabled:opacity-45',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--sniptale-color-accent)]',
 ].join(' ');
 const SECTION_HEADING_CLASS_NAME = [
-  'mb-2 text-[10px] font-semibold uppercase tracking-[0.08em]',
+  'mb-1 text-[10px] font-semibold uppercase tracking-[0.08em]',
   'text-[var(--sniptale-color-text-muted-strong)]',
+].join(' ');
+const DIVIDED_SECTION_CLASS_NAME = [
+  'shrink-0 border-t pt-2',
+  'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
 ].join(' ');
 const CAPTURE_LABEL_CLASS_NAME = [
   'whitespace-nowrap text-[9px] font-semibold leading-none',
   'text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
-const HOVER_LIFT_CLASS_NAME = [
-  'transition-transform duration-200 ease-out',
-  'group-hover:-translate-y-px group-focus-visible:-translate-y-px',
-  'group-disabled:translate-y-0 motion-reduce:transition-none',
-].join(' ');
-
 function getCaptureActions(): MenuAction[] {
   return [
     {
@@ -192,7 +209,7 @@ export function MenuRoute({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3" data-ui="popup.menu.route">
       <section className={MENU_SURFACE_CLASS_NAME}>
-        <header className="mb-2.5 shrink-0 px-0.5">
+        <header className="shrink-0 px-0.5">
           <h1 className="text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('popup.home.menuTitle')}
           </h1>
@@ -214,10 +231,14 @@ export function MenuRoute({
           onCapture={capture}
           onRecordTab={() => navigateToDescriptor({ page: 'video', videoMode: CaptureMode.TAB })}
         />
-        <div className="mt-auto shrink-0" data-ui="popup.menu.workspace">
+        <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.tools">
+          <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.toolsLabel')}</h2>
+          <MenuPageTools disabledReason={disabledReason} onOpenToolbar={openToolbar} />
+        </section>
+        <section className={DIVIDED_SECTION_CLASS_NAME} data-ui="popup.menu.workspace">
           <h2 className={SECTION_HEADING_CLASS_NAME}>{translate('popup.home.workspaceTitle')}</h2>
-          <MenuWorkspace disabledReason={disabledReason} onOpenToolbar={openToolbar} />
-        </div>
+          <MenuWorkspace />
+        </section>
         {error ? (
           <p className="mt-2 text-[11px] text-[var(--sniptale-color-danger)]" role="alert">
             {error}
@@ -275,10 +296,8 @@ function MenuCaptureActions(props: {
           title={props.disabledReason ?? hint}
           onClick={() => void props.onCapture(`download:${mode}`, mode)}
         >
-          <Icon
-            className={`h-7 w-7 text-[var(--sniptale-color-accent)] ${HOVER_LIFT_CLASS_NAME}`}
-          />
-          <span className={`${CAPTURE_LABEL_CLASS_NAME} ${HOVER_LIFT_CLASS_NAME}`}>
+          <Icon className={CAPTURE_ICON_CLASS_NAME} />
+          <span className={CAPTURE_LABEL_CLASS_NAME}>
             {props.pendingAction === `download:${mode}`
               ? translate('popup.home.capturePendingLabel')
               : label}
@@ -333,7 +352,7 @@ function MenuQuickScenarios(props: {
   ];
 
   return (
-    <div className="mt-2 grid grid-cols-4 gap-1">
+    <div className="grid grid-cols-4 gap-1">
       {scenarios.map(({ icon: Icon, label, ...scenario }) => (
         <button
           key={label}
@@ -343,19 +362,15 @@ function MenuQuickScenarios(props: {
           title={scenario.title}
           onClick={scenario.onClick}
         >
-          <Icon className={`h-[18px] w-[18px] ${HOVER_LIFT_CLASS_NAME}`} />
-          <span
-            className={`min-h-5 text-[9px] font-medium leading-[10px] ${HOVER_LIFT_CLASS_NAME}`}
-          >
-            {label}
-          </span>
+          <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
+          <span className="min-h-5 text-[9px] font-medium leading-[10px]">{label}</span>
         </button>
       ))}
     </div>
   );
 }
 
-function MenuWorkspace({
+function MenuPageTools({
   disabledReason,
   onOpenToolbar,
 }: {
@@ -363,20 +378,7 @@ function MenuWorkspace({
   onOpenToolbar(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
-        <button
-          key={labelKey}
-          type="button"
-          className={WORKSPACE_BUTTON_CLASS_NAME}
-          onClick={onClick}
-        >
-          <Icon
-            className={`h-4 w-4 text-[var(--sniptale-color-text-secondary)] ${HOVER_LIFT_CLASS_NAME}`}
-          />
-          <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
-        </button>
-      ))}
+    <div className="grid grid-cols-4 gap-1">
       {pageToolActions.map(({ icon: Icon, labelKey, hintKey, mode }) => (
         <MenuToolbarButton
           key={mode}
@@ -392,6 +394,26 @@ function MenuWorkspace({
   );
 }
 
+function MenuWorkspace() {
+  return (
+    <div className="grid grid-cols-4 gap-1">
+      {workspaceActions.map(({ icon: Icon, labelKey, onClick }) => (
+        <button
+          key={labelKey}
+          type="button"
+          className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
+          onClick={onClick}
+        >
+          <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
+          <span className="min-h-5 text-[9px] font-medium leading-[10px]">
+            {translate(labelKey)}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MenuToolbarButton({
   disabledReason,
   hintKey,
@@ -401,23 +423,23 @@ function MenuToolbarButton({
   onOpen,
 }: {
   disabledReason: string | null;
-  hintKey: 'content.toolbar.drawingEnable' | 'content.toolbar.highlighterEnable';
+  hintKey: (typeof pageToolActions)[number]['hintKey'];
   icon: ComponentType<{ className?: string }>;
-  labelKey: 'content.toolbar.drawingLabel' | 'content.toolbar.highlighterLabel';
+  labelKey: (typeof pageToolActions)[number]['labelKey'];
   mode: ToolbarWorkingMode;
   onOpen(mode: ToolbarWorkingMode): Promise<void>;
 }) {
   return (
     <button
       type="button"
-      className={`${WORKSPACE_BUTTON_CLASS_NAME} w-full`}
+      className={QUICK_SCENARIO_BUTTON_CLASS_NAME}
       data-ui={`popup.menu.tool-action.${mode}`}
       title={disabledReason ?? translate(hintKey)}
       disabled={Boolean(disabledReason)}
       onClick={() => void onOpen(mode)}
     >
-      <Icon className={`h-4 w-4 text-[var(--sniptale-color-accent)] ${HOVER_LIFT_CLASS_NAME}`} />
-      <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
+      <Icon className={MENU_SMALL_ICON_CLASS_NAME} />
+      <span className="min-h-5 text-[9px] font-medium leading-[10px]">{translate(labelKey)}</span>
     </button>
   );
 }

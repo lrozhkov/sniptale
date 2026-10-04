@@ -1,3 +1,4 @@
+import { mountFrozenSelectionFrame, watchFrozenSelectionViewport } from '../frozen';
 import type { CaptureArea } from '@sniptale/runtime-contracts/messaging/capture-messages';
 import { getSelectionFrameVisual } from '../../frame-runtime/selection-frame-visual';
 import { createSelectionModeEventHandlers } from '../events/handlers';
@@ -119,17 +120,34 @@ export function createSelectionModeRuntime(args: {
       enableSelectionModeApi({
         cleanup: args.cleanup,
         createHoverElements: () => uiRuntime.createHoverElements(),
-        createOverlayContainer: () => uiRuntime.createOverlayContainer(),
+        createOverlayContainer: () => {
+          uiRuntime.createOverlayContainer();
+          if (args.session.frozenFrame) {
+            mountFrozenSelectionFrame(args.session.dom.overlayContainer, args.session.frozenFrame);
+          }
+        },
         enableCursor: () => enableSelectionModeCursor(args.session),
         prepareUi: () => uiRuntime.prepare(),
         ...(options === undefined ? {} : { options }),
         session: args.session,
-        setupEventListeners: () =>
+        setupEventListeners: () => {
           setupSelectionModeRuntimeListeners({
             hideHoverFrame: runtimeArgs.hideHoverFrame,
             session: args.session,
             setupListenerHandlers: runtimeArgs.setupListenerHandlers,
-          }),
+          });
+          if (args.session.frozenFrame) {
+            const cleanup = args.session.cleanupEventListeners;
+            const stopWatching = watchFrozenSelectionViewport(
+              args.session.frozenFrame.geometry,
+              () => getEvents().cancelSelection()
+            );
+            args.session.cleanupEventListeners = () => {
+              stopWatching();
+              cleanup?.();
+            };
+          }
+        },
       }),
     isSelectionModeActive: () => isSelectionModeActiveApi(args.session.isActive),
   };

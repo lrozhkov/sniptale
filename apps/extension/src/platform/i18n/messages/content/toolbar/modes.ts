@@ -1,13 +1,13 @@
 import { defineMessageSource } from '../../source';
 
 const VIEWPORT_CONFLICT_ERROR_RU = [
-  'Размер окна сейчас нельзя изменить: окно занято другой операцией.',
-  'Завершите текущий снимок или запись и повторите попытку.',
+  'Размер окна занят текущим снимком или записью.',
+  'Завершите операцию и выберите размер снова.',
 ].join(' ');
 
 const VIEWPORT_CONFLICT_ERROR_EN = [
-  'The window size cannot be changed while another operation controls this window.',
-  'Finish the current capture or recording and try again.',
+  'A capture or recording is using this window size.',
+  'Finish it, then select the size again.',
 ].join(' ');
 
 export const contentToolbarModesMessages = defineMessageSource({
@@ -18,6 +18,34 @@ export const contentToolbarModesMessages = defineMessageSource({
   videoRecordingActionFailed: {
     ru: 'Не удалось выполнить действие с записью. Повторите попытку.',
     en: 'The recording action failed. Try again.',
+  },
+  videoRecordingStartPermissionRequired: {
+    ru: 'Chrome не разрешил захват вкладки. Откройте Sniptale через значок расширения и повторите запуск.',
+    en: 'Chrome did not allow tab capture. Open Sniptale from the extension icon and try again.',
+  },
+  videoRecordingStartStaleContext: {
+    ru: 'Страница изменилась. Обновите панель инструментов и повторите запуск.',
+    en: 'The page changed. Refresh the toolbar and try again.',
+  },
+  videoRecordingStartInvalidSource: {
+    ru: 'Эту вкладку нельзя записать. Выберите поддерживаемую страницу.',
+    en: 'This tab cannot be recorded. Choose a supported page.',
+  },
+  videoRecordingStartViewportTooLarge: {
+    ru: 'Выбранный размер окна не помещается на экране. Выберите другой размер в разделе «Видео».',
+    en: 'The selected window size does not fit on this display. Choose another size in Video settings.',
+  },
+  videoRecordingStartViewportVerificationFailed: {
+    ru: 'Chrome не смог применить выбранный размер окна. Выберите другой размер в разделе «Видео» и повторите запуск.',
+    en: 'Chrome could not apply the selected window size. Choose another size in Video settings and try again.',
+  },
+  videoRecordingStartAlreadyActive: {
+    ru: 'Запись уже запущена. Управляйте текущей записью.',
+    en: 'A recording is already running. Use the current recording controls.',
+  },
+  videoRecordingStartCancelled: {
+    ru: 'Запуск записи отменён. Можно повторить попытку.',
+    en: 'Recording start was cancelled. You can try again.',
   },
   viewportConflictError: {
     ru: VIEWPORT_CONFLICT_ERROR_RU,
@@ -139,8 +167,8 @@ export const contentToolbarModesMessages = defineMessageSource({
   drawingParallelogram: { ru: 'Параллелограмм', en: 'Parallelogram' },
   drawingArrow: { ru: 'Стрелка', en: 'Arrow' },
   drawingArrowModifierHint: {
-    ru: 'Ctrl — свободный угол; Shift — угол с шагом 15°',
-    en: 'Ctrl — free angle; Shift — angle in 15° steps',
+    ru: 'Свободный угол; Shift — шаг 15°',
+    en: 'Free angle; Shift — 15° steps',
   },
   drawingArrowUniformWidth: { ru: 'Равномерная толщина', en: 'Uniform width' },
   drawingArrowDynamicWidth: { ru: 'Динамическая толщина', en: 'Dynamic width' },
@@ -156,9 +184,15 @@ export const contentToolbarModesMessages = defineMessageSource({
   drawingNoBackground: { ru: 'Без фона', en: 'No background' },
   drawingFillColor: { ru: 'Цвет заливки', en: 'Fill color' },
   drawingNoFill: { ru: 'Без заливки', en: 'No fill' },
+  drawingEnableFill: { ru: 'Включить заливку', en: 'Enable fill' },
+  drawingDisableFill: { ru: 'Убрать заливку', en: 'Remove fill' },
   drawingColor: { ru: 'Цвет', en: 'Color' },
   drawingWidth: { ru: 'Толщина', en: 'Width' },
   drawingOpacity: { ru: 'Прозрачность', en: 'Opacity' },
+  drawingBlurWeak: { ru: 'Слабое', en: 'Weak' },
+  drawingBlurStrength: { ru: 'Сила размытия', en: 'Blur strength' },
+  drawingBlurMedium: { ru: 'Среднее', en: 'Medium' },
+  drawingBlurStrong: { ru: 'Сильное', en: 'Strong' },
   drawingTextSize: { ru: 'Размер текста', en: 'Text size' },
   drawingTextFontSans: { ru: 'Без засечек', en: 'Sans serif' },
   drawingTextFontSerif: { ru: 'С засечками', en: 'Serif' },
@@ -239,13 +273,33 @@ export const contentToolbarModesMessages = defineMessageSource({
     ru: 'Добавляйте рамки, маски, размытие и комментарии',
     en: 'Add frames, masks, blur, and comments',
   },
-  clearFrames: {
-    ru: 'Очистить все рамки',
-    en: 'Clear all frames',
-  },
   clearPagePreparation: {
-    ru: 'Очистить все изменения',
-    en: 'Clear all changes',
+    ru: 'Сбросить всё',
+    en: 'Reset all',
+  },
+  resetPagePreparationMessage: {
+    ru: 'Сбросить все изменения Sniptale на этой странице за текущую сессию?',
+    en: 'Reset all Sniptale changes on this page from the current session?',
+  },
+  modeChangesCleared: {
+    ru: 'Изменения текущего режима сброшены',
+    en: 'Changes in the current mode reset',
+  },
+  resetDrawingMessage: {
+    ru: 'Сбросить все рисунки в Drawing? Изменения остальных режимов сохранятся.',
+    en: 'Reset all drawings in Drawing? Changes from other modes will be kept.',
+  },
+  resetAnnotationMessage: {
+    ru: 'Сбросить все рамки, эффекты и комментарии Annotation? Изменения остальных режимов сохранятся.',
+    en: 'Reset all frames, effects and comments in Annotation? Changes from other modes will be kept.',
+  },
+  resetContentEditingMessage: {
+    ru: 'Сбросить все изменения Content Editing? Изменения остальных режимов сохранятся.',
+    en: 'Reset all Content Editing changes? Changes from other modes will be kept.',
+  },
+  resetDesignReviewMessage: {
+    ru: 'Сбросить все свойства и комментарии Design Review? Изменения остальных режимов сохранятся.',
+    en: 'Reset all Design Review properties and comments? Changes from other modes will be kept.',
   },
   autoBlur: {
     ru: 'Размытие данных',
@@ -262,6 +316,14 @@ export const contentToolbarModesMessages = defineMessageSource({
   settingsMenuTitle: {
     ru: 'Настройки панели',
     en: 'Toolbar settings',
+  },
+  panelFreePlacement: {
+    ru: 'Свободное размещение панели',
+    en: 'Free toolbar placement',
+  },
+  panelFreePlacementHint: {
+    ru: 'Перемещать панель свободно и выбирать её ориентацию вручную',
+    en: 'Move the toolbar freely and choose its orientation manually',
   },
   panelHorizontal: {
     ru: 'Горизонтальный вид',
@@ -298,6 +360,10 @@ export const contentToolbarModesMessages = defineMessageSource({
   pinToTabLockedHint: {
     ru: 'Панель закреплена, пока включён сценарий',
     en: 'The toolbar stays pinned while scenario mode is on',
+  },
+  pinToTabAutoBlurLockedHint: {
+    ru: 'Выключите авторазмытие данных, чтобы открепить панель',
+    en: 'Turn off automatic data blur before unpinning the toolbar',
   },
   pinToTabUnavailableHint: {
     ru: 'Разрешите расширению доступ ко всем сайтам, чтобы панель восстанавливалась после переходов',

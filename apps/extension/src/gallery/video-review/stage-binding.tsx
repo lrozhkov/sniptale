@@ -1,3 +1,4 @@
+import type { ReviewCutPreviewBinding } from './cut-transition-preview';
 import type { RefObject } from 'react';
 import { useCallback, useRef } from 'react';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
@@ -26,6 +27,7 @@ import { translate } from '../../platform/i18n';
  */
 export function ReviewStageBinding(props: {
   backgroundPending?: boolean;
+  cutPreview?: ReviewCutPreviewBinding | undefined;
   url: string;
   source: ReviewSource;
   canvas?: { width: number; height: number } | undefined;
@@ -102,6 +104,7 @@ export function ReviewStageBinding(props: {
       ) : null}
       <ReviewStage
         backgroundImageUrl={image.url}
+        cutPreview={props.cutPreview}
         url={props.url}
         source={props.source}
         video={props.video}

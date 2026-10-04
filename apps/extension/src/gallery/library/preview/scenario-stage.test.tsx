@@ -102,3 +102,13 @@ it('renders recent steps for scenario exports', async () => {
   expect(container?.textContent).toContain('gallery.app.scenarioStepLabel 1');
   expect(container?.querySelectorAll('article')).toHaveLength(8);
 });
+
+it('shows Trash scenario steps without guide or tour navigation links', async () => {
+  listScenarioPreviewStepsMock.mockResolvedValue([
+    { id: 'step-1', position: 0, numberLabel: '1', images: [], title: 'Deleted step' },
+  ]);
+  act(() => root?.render(<PreviewScenarioStage item={createScenarioItem()} trashMode />));
+  await flushEffects();
+  expect(container?.textContent).toContain('Deleted step');
+  expect(container?.querySelector('a[href]')).toBeNull();
+});

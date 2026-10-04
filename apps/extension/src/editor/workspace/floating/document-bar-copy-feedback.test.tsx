@@ -3,7 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { EditorFloatingDocumentBar } from './document-bar';
+import { EditorFloatingDocumentBar, ImageDocumentOperationsProvider } from './document-bar';
 import type { EditorFloatingDocumentController } from './document-bar';
 
 const mocks = vi.hoisted(() => ({
@@ -88,12 +88,14 @@ function renderDocumentBar(controller: EditorFloatingDocumentController) {
 
   act(() => {
     root?.render(
-      <EditorFloatingDocumentBar
-        documentController={controller}
-        hasImage
-        history={{ canRedo: false, canUndo: false, index: 0, size: 1 }}
-        onBeforeSelectionAwareAction={vi.fn()}
-      />
+      <ImageDocumentOperationsProvider hasImage>
+        <EditorFloatingDocumentBar
+          documentController={controller}
+          hasImage
+          history={{ canRedo: false, canUndo: false, index: 0, size: 1 }}
+          onBeforeSelectionAwareAction={vi.fn()}
+        />
+      </ImageDocumentOperationsProvider>
     );
   });
 }

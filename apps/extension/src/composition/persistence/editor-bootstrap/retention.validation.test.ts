@@ -82,6 +82,24 @@ it('deletes invalid data-url rows without returning them to the editor domain', 
   expect(retentionValidationMocks.blobToDataUrlMock).not.toHaveBeenCalled();
 });
 
+it('deletes a retained bootstrap row with an invalid capture timestamp', async () => {
+  const db = {
+    delete: vi.fn(),
+    get: vi.fn().mockResolvedValue({
+      capturedAt: Number.NaN,
+      createdAt: 4_000_000,
+      dataUrl: 'data:image/png;base64,cmVzdG9yZWQ=',
+      id: 'invalid-capture-time',
+    }),
+  };
+  retentionValidationMocks.openDBMock.mockResolvedValue(db);
+  vi.spyOn(Date, 'now').mockReturnValue(4_100_000);
+  const { consumePersistedEditorBootstrapPayload } = await importRetentionModule();
+
+  await expect(consumePersistedEditorBootstrapPayload('invalid-capture-time')).resolves.toBeNull();
+  expect(db.delete).toHaveBeenCalledWith('payloads', 'invalid-capture-time');
+});
+
 it('deletes legacy blob rows before converting them to data URLs', async () => {
   const db = {
     delete: vi.fn(),

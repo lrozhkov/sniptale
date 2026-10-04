@@ -19,6 +19,12 @@ it('retains focus during Space playback and restores keyboard modality on Tab', 
         <ReviewDialog>
           <button>Tool</button>
           <textarea />
+          <aside data-ui="gallery.videoReview.inspector">
+            <details>
+              <summary>Section</summary>
+            </details>
+            <button>Category</button>
+          </aside>
         </ReviewDialog>
       )
     );
@@ -42,6 +48,13 @@ it('retains focus during Space playback and restores keyboard modality on Tab', 
     expect(dialog.dataset['playbackFocus']).toBe('true');
     button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     expect(dialog.dataset['playbackFocus']).toBeUndefined();
+    for (const control of host.querySelectorAll('aside summary, aside button')) {
+      control.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      expect(dialog.dataset['playbackFocus']).toBe('true');
+      control.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      control.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      expect(dialog.dataset['playbackFocus']).toBeUndefined();
+    }
   } finally {
     act(() => root.unmount());
     expect(close).toHaveBeenCalledTimes(1);

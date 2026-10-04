@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useEditorController } from '../../application/controller-context';
 import { useCanvasImageIntake } from './use-intake';
 import { useCanvasWrapperState } from './use-state';
@@ -6,6 +6,7 @@ import { CanvasWrapperSurface } from './surface';
 import { useCanvasContextMenuOwner } from './use-context-menu';
 import { useCanvasGridStyle } from './grid-style';
 import { useCanvasMountEffect } from './mount-effect';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 interface CanvasWrapperProps {
   hasImage: boolean;
@@ -38,6 +39,8 @@ function useCanvasWrapperSurfaceProps(args: {
 }) {
   return {
     backgroundColor: args.state.backgroundColor,
+    showOutsideCanvas: args.state.showOutsideCanvas,
+    canvasCropMode: args.state.canvasCropMode,
     canvasRef: args.state.canvasRef,
     contextMenuState: args.contextMenuState,
     controller: args.controller,
@@ -81,6 +84,18 @@ export const CanvasWrapper: React.FC<CanvasWrapperProps> = ({ hasImage }) => {
     stageRef: state.stageRef,
     canvasRef: state.canvasRef,
   });
+  useEffect(() => {
+    const canvas = controller.getPublicApiAdapter?.().canvas;
+    if (canvas instanceof EditorCanvas) {
+      canvas.setExpandingCanvasWorkspace(
+        state.canvasCropMode === 'expand' && state.activeTool === 'crop'
+      );
+      canvas.setShowOutsideCanvas(
+        state.showOutsideCanvas ||
+          (state.canvasCropMode === 'expand' && state.activeTool === 'crop')
+      );
+    }
+  }, [controller, state.activeTool, state.canvasCropMode, state.showOutsideCanvas]);
   const { closeContextMenu, contextMenuState, handleCanvasContextMenu } = useCanvasContextMenuOwner(
     {
       controller,

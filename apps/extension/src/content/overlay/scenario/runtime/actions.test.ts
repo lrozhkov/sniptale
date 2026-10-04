@@ -59,6 +59,7 @@ function createSession(overrides: Partial<ScenarioSessionState> = {}): ScenarioS
 
 function createActions(session = createSession()) {
   return createScenarioControllerActions({
+    finishPendingRef: { current: null },
     applyScenarioResponse: vi.fn(),
     currentSurfaceRef: {
       current: {

@@ -4,7 +4,20 @@ import type { Translate } from '../../../platform/i18n';
 /** One translated vocabulary for authoring and exported playback. */
 export function tourPlayerLabels(t: Translate): TourPlayerLabels {
   return {
+    musicMute: t('scenario.editor.tourMusicMute'),
+    musicUnmute: t('scenario.editor.tourMusicUnmute'),
+    musicRetry: t('scenario.editor.tourMusicRetry'),
+    musicBlocked: t('scenario.editor.tourMusicBlocked'),
+    musicError: t('scenario.editor.tourMusicError'),
     audioBlocked: t('scenario.editor.tourHtmlAudioBlocked'),
+    audioError: t('scenario.editor.tourAudioFailed'),
+    narrationReplay: t('scenario.editor.tourNarrationReplay'),
+    narrationPause: t('scenario.editor.tourNarrationPause'),
+    narrationResume: t('scenario.editor.tourNarrationResume'),
+    volume: t('scenario.editor.tourVolume'),
+    mute: t('scenario.editor.tourMute'),
+    unmute: t('scenario.editor.tourUnmute'),
+
     resize: t('scenario.editor.tourResizeArea'),
     expand: t('scenario.editor.tourExpandCaption'),
     collapse: t('scenario.editor.tourCollapseCaption'),
@@ -17,6 +30,10 @@ export function tourPlayerLabels(t: Translate): TourPlayerLabels {
     empty: t('scenario.editor.tourImageEmpty'),
     point: t('scenario.editor.tourHotspot'),
     details: t('scenario.editor.tourAnnotation'),
+    fullView: t('scenario.editor.tourFullView'),
+    authoredView: t('scenario.editor.tourAuthoredView'),
+    end: t('scenario.editor.tourEnd'),
+    manual: t('scenario.editor.tourManual'),
     play: t('scenario.editor.tourPlay'),
     pause: t('scenario.editor.tourPause'),
     seek: t('scenario.editor.tourSeek'),

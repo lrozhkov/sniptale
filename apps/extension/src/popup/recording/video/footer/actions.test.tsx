@@ -131,10 +131,15 @@ it('keeps the footer actions and start button behavior stable', () => {
   expect(mocks.activeFooter).not.toHaveBeenCalled();
   expect(mocks.actionButton).toHaveBeenCalledWith(
     expect.objectContaining({
-      iconClassName: 'fill-current text-[var(--sniptale-color-danger)]',
+      iconClassName: expect.stringContaining('group-hover:text-[var(--sniptale-color-accent)]'),
       dataUi: 'popup.video-setup.start-recording-button',
     })
   );
+  expect(
+    mocks.actionButton.mock.calls.every(([props]) =>
+      String(props.iconClassName).includes('group-hover:text-[var(--sniptale-color-accent)]')
+    )
+  ).toBe(true);
   expect(
     mocks.actionButton.mock.calls.some(([props]) =>
       String(props.iconClassName).includes(

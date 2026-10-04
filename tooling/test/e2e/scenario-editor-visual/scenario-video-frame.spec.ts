@@ -1,3 +1,4 @@
+import { openGuideImageLibrary } from './scenario-editor-visual.state-steps';
 import { expect } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
@@ -15,8 +16,14 @@ for (const theme of ['light', 'dark'] as const) {
     theme,
   ].join(' ');
   test(title, async ({ page, hostOrigin }, testInfo) => {
-    await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
-    await page.setViewportSize({ width: 1024, height: 640 });
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: {
+        'sniptale-locale-preference': 'en',
+        'sniptale-theme-preference': theme,
+      },
+    });
+    await page.setViewportSize({ width: 1280, height: 560 });
     const id = crypto.randomUUID();
     const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
     url.search = new URLSearchParams({
@@ -28,7 +35,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(url.toString());
     await expect(page.locator('article')).toHaveCount(2);
     const libraryName = `library-${id}.webm`;
-    const guideUrl = page.url();
+    const guideUrl = url.toString();
     const upload = async (name: string) => {
       await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`);
       await page.locator('input[type="file"][accept*="video/"]').setInputFiles({
@@ -41,10 +48,7 @@ for (const theme of ['light', 'dark'] as const) {
     };
     const open = async (name: string) => {
       await page.getByRole('button', { name: 'Resources', exact: true }).click();
-      await page
-        .locator('#guide-library-panel')
-        .getByRole('button', { name: 'Image library', exact: true })
-        .click();
+      await openGuideImageLibrary(page);
       const drawer = page.locator('#guide-resource-drawer');
       await drawer.getByRole('button', { name: 'Video', exact: true }).click();
       await drawer.getByRole('button', { name, exact: true }).click();
@@ -61,6 +65,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect
       .poll(() => video.evaluate((node) => !node.seeking && node.readyState >= 2))
       .toBe(true);
+    await drawer.getByRole('button', { name: 'Edit step details', exact: true }).click();
     await drawer
       .getByRole('textbox', { name: 'Step title', exact: true })
       .fill('Local video frame');
@@ -95,6 +100,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect
       .poll(() => drawer.locator('video').evaluate((node) => node.readyState))
       .toBeGreaterThanOrEqual(2);
+    await drawer.getByRole('button', { name: 'Edit step details', exact: true }).click();
     await drawer
       .getByRole('textbox', { name: 'Step title', exact: true })
       .fill('Library video frame');
@@ -104,10 +110,9 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`);
     await page.getByRole('button', { name: libraryName, exact: true }).first().click();
     await page.getByRole('button', { name: 'Delete', exact: true }).click();
-    await page
-      .getByRole('alertdialog', { name: 'Confirm deletion', exact: true })
-      .getByRole('button', { name: 'Delete', exact: true })
-      .click();
+    const deletion = page.locator('[data-ui="gallery.deletion.menu"]');
+    await deletion.getByRole('menuitem', { name: 'Delete permanently', exact: true }).click();
+    await deletion.getByRole('menuitem', { name: 'Click again to confirm', exact: true }).click();
     await expect(page.getByRole('button', { name: libraryName, exact: true })).toHaveCount(0);
     await page.goto(guideUrl);
     await expect(page.locator('article')).toHaveCount(4);

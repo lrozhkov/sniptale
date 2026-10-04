@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-import { CompactInput, CompactRange, CompactSelect } from './primitives';
+import { ColorField, NumericRow, CompactInput, CompactRange, CompactSelect } from './primitives';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -92,4 +92,50 @@ it('forwards shared input and range commit handlers through the editor primitive
 
   expect(onInputCommit).toHaveBeenCalledWith('Draft');
   expect(onRangeCommit).toHaveBeenCalledWith(7);
+});
+
+it('uses shared video-inspector numeric and swatch variants', () => {
+  act(() =>
+    root?.render(
+      <>
+        <NumericRow
+          label="Radius"
+          value={8}
+          min={0}
+          max={100}
+          onPreviewValue={() => undefined}
+          onCommitValue={() => undefined}
+          scrub={{ min: 0, max: 100 }}
+        />
+        <ColorField
+          label="Color"
+          title="Color"
+          value="#ff0000"
+          palette={[]}
+          recentColors={[]}
+          onChange={() => undefined}
+        />
+      </>
+    )
+  );
+  expect(
+    container
+      ?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-row"]')
+      ?.getAttribute('data-appearance')
+  ).toBe('plain');
+  expect(
+    container
+      ?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-value-field"]')
+      ?.getAttribute('data-focus-appearance')
+  ).toBe('accent-box');
+  expect(
+    container
+      ?.querySelector('[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]')
+      ?.getAttribute('aria-hidden')
+  ).toBe('true');
+  expect(
+    container
+      ?.querySelector('[data-ui="shared.ui.color-selector.trigger"]')
+      ?.getAttribute('data-variant')
+  ).toBe('swatch');
 });

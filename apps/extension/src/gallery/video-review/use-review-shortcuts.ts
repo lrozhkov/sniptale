@@ -1,5 +1,27 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { useEffect } from 'react';
 import type { ReviewAnnotation } from '../../features/video/review/types';
+
+const localNavigation = [
+  '[role="slider"]:not([data-ui="gallery.videoReview.timePlane"])',
+  '[role="listbox"],[role="option"],[role="tab"],[role="menuitem"]',
+  '[data-ui="gallery.videoReview.inspector"] :is(button,summary)',
+].join(',');
+
+function handleBoundaryShortcut(
+  event: KeyboardEvent,
+  navigation: { start: number; end: number },
+  seek: (value: number, snap?: boolean) => void
+): boolean {
+  const home = event.code === 'Home' || event.key === 'Home';
+  const end = event.code === 'End' || event.key === 'End';
+  if (!home && !end) return false;
+  if (event.shiftKey || (event.target instanceof Element && event.target.closest(localNavigation)))
+    return false;
+  event.preventDefault();
+  seek(home ? navigation.start : navigation.end, false);
+  return true;
+}
 
 function useReviewKeys({
   time,
@@ -7,6 +29,7 @@ function useReviewKeys({
   play,
   cancelDrawing,
   boundaries,
+  navigation,
   undo,
   redo,
   remove,
@@ -15,7 +38,8 @@ function useReviewKeys({
 }: {
   time: number;
   boundaries?: readonly number[];
-  seek(value: number): void;
+  navigation: { start: number; end: number };
+  seek(value: number, snap?: boolean): void;
   play(): void;
   cancelDrawing(): void;
   undo(): void;
@@ -27,6 +51,11 @@ function useReviewKeys({
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing) return;
+      if (
+        event.target instanceof Element &&
+        event.target.closest('[role="dialog"],[role="alertdialog"]')
+      )
+        return;
       const key = event.code.startsWith('Key')
         ? event.code.slice(3).toLowerCase()
         : event.key.toLowerCase();
@@ -48,7 +77,14 @@ function useReviewKeys({
         return;
       }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (handleBoundaryShortcut(event, navigation, seek)) return;
       if (event.key === ' ') {
+        if (
+          target instanceof HTMLElement &&
+          target.closest('[data-ui="gallery.videoReview.inspector"]') &&
+          target.closest('button,summary')
+        )
+          return;
         event.preventDefault();
         if (!event.repeat) play();
         return;
@@ -87,9 +123,11 @@ function useReviewKeys({
 /** Gates every shortcut behind comment editing and exporter phases. */
 export function useReviewEditorShortcuts(args: {
   time: number;
+  navigation: { start: number; end: number };
   seek(value: number, snap?: boolean): void;
   play(): void;
   composerAnnotation: ReviewAnnotation | null;
+  beforeAction?: ReviewBeforeAction | undefined;
   busy: boolean;
   exporterPhase: 'idle' | 'exporting' | 'publishing';
   exporterAvailable: boolean;
@@ -105,10 +143,12 @@ export function useReviewEditorShortcuts(args: {
 }) {
   const editingBlocked = !!args.composerAnnotation;
   const exportBlocked = args.exporterPhase !== 'idle';
+  const admit = args.beforeAction ?? ((action: () => void) => action());
   useReviewKeys({
     time: args.time,
-    seek: args.seek,
-    play: args.play,
+    navigation: args.navigation,
+    seek: (...values) => admit(() => args.seek(...values)),
+    play: () => admit(args.play),
     cancelDrawing: args.cancelDrawing,
     undo: () => {
       if (!editingBlocked && !exportBlocked) void args.run(args.undo);
@@ -117,13 +157,15 @@ export function useReviewEditorShortcuts(args: {
       if (!editingBlocked && !exportBlocked) void args.run(args.redo);
     },
     remove: () => {
-      if (!editingBlocked && !args.busy && !exportBlocked) args.remove();
+      if (!editingBlocked && !args.busy && !exportBlocked) admit(args.remove);
     },
-    add: args.addComment,
+    add: () => admit(args.addComment),
     tool: (key) => {
       if (!editingBlocked && !args.busy && !exportBlocked) {
-        if (key === 'v') args.pointTool();
-        else if (args.exporterAvailable) args.toggleCut();
+        admit(() => {
+          if (key === 'v') args.pointTool();
+          else if (args.exporterAvailable) args.toggleCut();
+        });
       }
     },
     ...(args.boundaries ? { boundaries: args.boundaries } : {}),

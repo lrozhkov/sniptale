@@ -4,6 +4,9 @@ import { syncSourceStateFromObject } from '../../document/source';
 import type { CropSelection } from '../../core/types';
 import type { SourceState } from '../../../document/model/source-state';
 import { isUserObject } from '../../../document/model';
+import { shiftFrameAnnotationProxyForCrop } from '../../../frame-annotation/proxy';
+import { setEditorEditingSurfaceDimensions } from '../../../document/canvas-surface/editing-surface';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 export async function runEditorCropSelection(context: {
   canvas: Canvas;
@@ -19,8 +22,11 @@ export async function runEditorCropSelection(context: {
     height: context.crop.height,
   };
   shiftSceneObjectsForCrop(context.canvas, context.crop);
+  if (context.canvas instanceof EditorCanvas) {
+    context.canvas.prepareWorkspaceForCrop(context.crop);
+  }
   context.setCanvasDocumentSize(nextCanvasSize);
-  context.canvas.setDimensions(nextCanvasSize);
+  setEditorEditingSurfaceDimensions(context.canvas, nextCanvasSize);
   context.setSource(createPostCropSourceState(context.canvas, context.source, context.crop));
   context.syncViewportTransform();
   await context.rebuildFrameDecorations();
@@ -37,6 +43,7 @@ function shiftSceneObjectsForCrop(canvas: Canvas, crop: CropSelection): void {
 }
 
 function shiftObjectByCrop(object: FabricObject, crop: CropSelection): void {
+  if (shiftFrameAnnotationProxyForCrop(object, crop)) return;
   object.set({
     left: (object.left ?? 0) - crop.left,
     top: (object.top ?? 0) - crop.top,

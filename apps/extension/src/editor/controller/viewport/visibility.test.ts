@@ -95,9 +95,9 @@ describe('viewport, visibility, and zoom seams', () => {
     );
     expect(
       ensureEditorObjectReachable(canvas, { height: 100, width: 100 }, annotation as never)
-    ).toBe(true);
-    expect(annotation.setCoords).toHaveBeenCalled();
-    expect(ensureEditorObjectsReachable(canvas, { height: 100, width: 100 })).toBe(true);
+    ).toBe(false);
+    expect(annotation.setCoords).not.toHaveBeenCalled();
+    expect(ensureEditorObjectsReachable(canvas, { height: 100, width: 100 })).toBe(false);
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
@@ -129,6 +129,10 @@ describe('viewport, visibility, and zoom seams', () => {
     } as any;
 
     const panSession = startEditorViewportPan({ event, isSpacePressed: false, viewportElement });
+    expect(viewportElement.classList.add).toHaveBeenCalledWith(
+      'cursor-grabbing',
+      '[&_*]:!cursor-grabbing'
+    );
     moveEditorViewportPan({
       event: { preventDefault: vi.fn() } as any,
       panSession,
@@ -136,7 +140,10 @@ describe('viewport, visibility, and zoom seams', () => {
     });
     expect(mocks.applyViewportPanSessionMock).toHaveBeenCalled();
     expect(finishEditorViewportPan({ panSession, viewportElement })).toBeNull();
-    expect(viewportElement.classList.remove).toHaveBeenCalledWith('cursor-grabbing');
+    expect(viewportElement.classList.remove).toHaveBeenCalledWith(
+      'cursor-grabbing',
+      '[&_*]:!cursor-grabbing'
+    );
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
@@ -173,7 +180,7 @@ describe('viewport, visibility, and zoom seams', () => {
         canvas: null,
         canvasDocumentSize: { height: 100, width: 100 },
         stageElement: null,
-        syncRuntimeState: vi.fn(),
+        setZoomLevel: vi.fn(),
         syncViewportState: vi.fn(),
         viewportElement,
         zoomLevel: 2,
@@ -185,7 +192,7 @@ describe('viewport, visibility, and zoom seams', () => {
       canvasDocumentSize: { height: 100, width: 100 },
       devicePixelRatioBaseline: 1,
       stageElement: {} as HTMLElement,
-      syncRuntimeState: vi.fn(),
+      setZoomLevel: vi.fn(),
       syncViewportState: vi.fn(),
       viewportElement,
       zoomLevel: 2,
@@ -199,7 +206,7 @@ describe('viewport, visibility, and zoom seams', () => {
           canvasDocumentSize: { height: 100, width: 100 },
           devicePixelRatioBaseline: 1,
           stageElement: {} as HTMLElement,
-          syncRuntimeState: vi.fn(),
+          setZoomLevel: vi.fn(),
           syncViewportState: vi.fn(),
           viewportElement,
           zoomLevel: 1,

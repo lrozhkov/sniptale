@@ -32,7 +32,8 @@ export type EditorObjectType =
   | 'image'
   | 'browser-frame'
   | 'meta-stamp'
-  | 'rich-shape';
+  | 'rich-shape'
+  | 'group';
 
 type BrowserFrameCanvasMode = 'resize' | 'keep-size';
 type BrowserFrameContentMode = 'push-down' | 'fit-content';
@@ -101,6 +102,8 @@ interface EditorDocumentVersion2 {
   version: 2;
   sourceImageData: string;
   sourceName: string | null;
+  /** Editable document caption; legacy workspaces retain their aggregate caption. */
+  displayName?: string;
   sourceWidth: number;
   sourceHeight: number;
   canvasWidth: number;
@@ -122,6 +125,7 @@ export interface EditorLayerItem {
   effects: EditorRasterEffect[];
   id: string;
   immutable?: boolean;
+  reorderable?: boolean;
   type: EditorObjectType;
   previewColor: string | null;
   previewDataUrl: string | null;
@@ -132,6 +136,8 @@ export interface EditorLayerItem {
   selected: boolean;
   selectedCount: number;
   typeLabel: string;
+  groupSize?: number;
+  groupChildren?: Array<{ id: string; name: string; type: EditorObjectType; typeLabel: string }>;
   visible: boolean;
 }
 
@@ -172,8 +178,15 @@ export interface EditorHistoryState {
   size: number;
 }
 
+/** Persisted workspace preferences shared by editor state and its storage adapter. */
+export interface EditorWorkspaceDefaults {
+  backgroundColor: string;
+  hideSelectionWhileDragging: boolean;
+}
+
 export interface EditorWorkspaceSettings {
   backgroundColor: string;
+  hideSelectionWhileDragging: boolean;
   gridEnabled: boolean;
   gridSnapEnabled: boolean;
   magnetEnabled: boolean;

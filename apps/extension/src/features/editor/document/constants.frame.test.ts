@@ -7,6 +7,7 @@ import {
   normalizeBrowserFrameState,
   normalizeEditorFrameSettings,
 } from './constants';
+import { normalizeEditorImageSettings, resolveEditorSourceImageGlowBlur } from './image-types';
 import type { EditorFrameSettings } from './types';
 
 function assertFrameDefaultsForMissingInput(): void {
@@ -95,13 +96,25 @@ function registerEditorFrameDefaultTests() {
         backgroundMode: 'gradient',
         browserTitle: '',
         layoutMode: 'expand-canvas',
-        paddingBottom: 128,
-        paddingLeft: 128,
-        paddingRight: 128,
-        paddingTop: 128,
+        paddingBottom: 32,
+        paddingLeft: 32,
+        paddingRight: 32,
+        paddingTop: 32,
         sourceImage: DEFAULT_EDITOR_IMAGE_SETTINGS,
       })
     );
+  });
+
+  it('defaults shadow blur to zero while retaining blur saved in older images', () => {
+    const settingsWithoutBlur = { ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 20 };
+    Reflect.deleteProperty(settingsWithoutBlur, 'shadowBlur');
+    expect(DEFAULT_EDITOR_IMAGE_SETTINGS.shadowBlur).toBe(0);
+    expect(normalizeEditorImageSettings({ shadow: 20 }).shadowBlur).toBe(0);
+    expect(normalizeEditorImageSettings({ shadowBlur: 12 }).shadowBlur).toBe(12);
+    expect(resolveEditorSourceImageGlowBlur({ ...DEFAULT_EDITOR_IMAGE_SETTINGS, shadow: 20 })).toBe(
+      15
+    );
+    expect(resolveEditorSourceImageGlowBlur(settingsWithoutBlur)).toBe(15);
   });
 
   it(

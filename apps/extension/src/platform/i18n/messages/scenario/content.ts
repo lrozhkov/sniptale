@@ -1,6 +1,11 @@
 import { defineMessageSource } from '../source';
 
 export const scenarioContentMessages = defineMessageSource({
+  collapsePanel: { ru: 'Свернуть панель сценария', en: 'Collapse scenario panel' },
+  restorePanel: { ru: 'Развернуть панель сценария', en: 'Show scenario panel' },
+  moveStepUp: { ru: 'Переместить выше', en: 'Move up' },
+  moveStepDown: { ru: 'Переместить ниже', en: 'Move down' },
+  capturedStepTitle: { ru: 'Снимок страницы', en: 'Page capture' },
   toggle: {
     ru: 'Сценарий',
     en: 'Scenario',
@@ -69,13 +74,14 @@ export const scenarioContentMessages = defineMessageSource({
     ru: 'Редактор сценариев',
     en: 'Scenario editor',
   },
-  openEditorCta: {
-    ru: 'Перейти в редактор сценария',
-    en: 'Open scenario editor',
-  },
   finish: {
-    ru: 'Завершить',
-    en: 'Finish',
+    ru: 'Завершить и редактировать',
+    en: 'Finish and edit',
+  },
+  finishing: { ru: 'Завершение…', en: 'Finishing…' },
+  finishError: {
+    ru: 'Не удалось завершить запись и открыть редактор. Сохранённые шаги доступны в проекте.',
+    en: 'Could not finish recording and open the editor. Saved steps remain in the project.',
   },
   openStepInEditor: {
     ru: 'Открыть шаг в редакторе',
@@ -132,6 +138,14 @@ export const scenarioContentMessages = defineMessageSource({
   createProjectError: {
     ru: 'Не удалось создать проект сценария.',
     en: 'Failed to create the scenario project.',
+  },
+  selectProjectError: {
+    ru: 'Не удалось выбрать проект сценария.',
+    en: 'Failed to select the scenario project.',
+  },
+  captureModeError: {
+    ru: 'Не удалось изменить способ добавления шагов.',
+    en: 'Failed to change how steps are added.',
   },
   captureSaveError: {
     ru: 'Не удалось сохранить шаг сценария.',

@@ -126,7 +126,7 @@ export function ProductCountdownToast({
         {onCancel && cancelLabel ? (
           <button
             type="button"
-            className="sniptale-countdown-cancel"
+            className="sniptale-dismiss-button sniptale-countdown-cancel"
             onClick={onCancel}
             title={cancelLabel}
             aria-label={cancelLabel}

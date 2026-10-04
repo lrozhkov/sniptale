@@ -4,6 +4,7 @@ import type { useEditorController } from '../../application/controller-context';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
 import { insertEditorImageFromFile } from '../../document/file-actions';
 import { openLocalImageAsEditorDraft } from '../../workflows/open-local-image-draft';
+import { useEditorOpenStatus } from '../../runtime/open-status';
 import {
   getImageFileFromClipboardEvent,
   getImageFileFromDataTransfer,
@@ -19,6 +20,7 @@ interface UseCanvasImageIntakeProps {
   hasImage: boolean;
   openImageInputRef: RefObject<HTMLInputElement | null>;
   setImageData: (imageData: string | null) => void;
+  runOpen?: (action: () => Promise<void>) => Promise<void>;
 }
 
 function claimImageIntakeEvent(event: DragEvent<HTMLDivElement>) {
@@ -38,8 +40,15 @@ function runImageFileAction(
     return;
   }
 
-  fireAndReportEditorAction(`canvas-open-image-${source}`, () =>
-    openLocalImageAsEditorDraft(props.controller, file, props.setImageData)
+  fireAndReportEditorAction(
+    `canvas-open-image-${source}`,
+    () =>
+      props.runOpen
+        ? props.runOpen(() =>
+            openLocalImageAsEditorDraft(props.controller, file, props.setImageData)
+          )
+        : openLocalImageAsEditorDraft(props.controller, file, props.setImageData),
+    ...(props.runOpen ? [{ notify: false }] : [])
   );
 }
 
@@ -136,7 +145,11 @@ function useCanvasDragHandlers(args: {
 
 export function useCanvasImageIntake(props: UseCanvasImageIntakeProps) {
   const [dragActive, setDragActive] = useState(false);
-  const handleImageFile = useCanvasImageFileHandler(props);
+  const openStatus = useEditorOpenStatus();
+  const handleImageFile = useCanvasImageFileHandler({
+    ...props,
+    ...(openStatus ? { runOpen: openStatus.runOpen } : {}),
+  });
   const dragHandlers = useCanvasDragHandlers({
     handleImageFile,
     hasImage: props.hasImage,

@@ -18,15 +18,18 @@ import {
 } from './operations';
 import { reportAutoBlurApplyResult } from './feedback';
 import { isAutoBlurScanAbortError } from '../../../selection/auto-blur-runtime';
+import type { ContentPrivilegedActionIntentSource } from '../../../application/privileged-action-intent';
 
 const logger = createLogger({ namespace: 'ContentAutoBlur' });
 const APPLY_ERROR_MESSAGE_KEY = 'content.autoBlur.applyError' satisfies TranslationKey;
 const APPLY_ONCE_ERROR_MESSAGE_KEY = 'content.autoBlur.applyOnceError' satisfies TranslationKey;
+const PIN_REQUIRED_ERROR_MESSAGE_KEY = 'content.autoBlur.pinRequiredError' satisfies TranslationKey;
 
 interface ApplyActionArgs {
   blurSettings: BlurSettings;
   autoApplyEnabled: boolean;
   enableAutoApplyOnApply: boolean;
+  ensurePinned?: (source?: ContentPrivilegedActionIntentSource) => Promise<boolean>;
   beginApplying: () => void;
   close: () => void;
   failApplying: (message: TranslationKey) => void;
@@ -109,6 +112,7 @@ export function useApplyAction(args: ApplyActionArgs) {
     blurSettings,
     close,
     enableAutoApplyOnApply,
+    ensurePinned,
     failApplying,
     frameManager,
     matches,
@@ -118,10 +122,17 @@ export function useApplyAction(args: ApplyActionArgs) {
   } = args;
 
   return useCallback(
-    async (borderSettings: AppliedBorderSettings) => {
+    async (
+      borderSettings: AppliedBorderSettings,
+      contentIntentSource?: ContentPrivilegedActionIntentSource
+    ) => {
       beginApplying();
 
       try {
+        if (enableAutoApplyOnApply && ensurePinned && !(await ensurePinned(contentIntentSource))) {
+          failApplying(PIN_REQUIRED_ERROR_MESSAGE_KEY);
+          return;
+        }
         await applySelectedAutoBlurTargets({
           autoApplyEnabled,
           borderSettings,
@@ -145,6 +156,7 @@ export function useApplyAction(args: ApplyActionArgs) {
       blurSettings,
       close,
       enableAutoApplyOnApply,
+      ensurePinned,
       failApplying,
       frameManager,
       matches,
@@ -213,13 +225,20 @@ export function useClearAutoBlurAction(args: {
 
 export function useToggleAutoApplyAction(args: {
   autoApplyAllowed: boolean;
+  ensurePinned?: (source?: ContentPrivilegedActionIntentSource) => Promise<boolean>;
   beginApplying: () => void;
   failApplying: (message: TranslationKey) => void;
   finishApplying: () => void;
   setAutoApplyEnabled: (enabled: boolean) => void;
 }) {
-  const { autoApplyAllowed, beginApplying, failApplying, finishApplying, setAutoApplyEnabled } =
-    args;
+  const {
+    autoApplyAllowed,
+    beginApplying,
+    ensurePinned,
+    failApplying,
+    finishApplying,
+    setAutoApplyEnabled,
+  } = args;
 
   return useCallback(async () => {
     beginApplying();
@@ -231,6 +250,10 @@ export function useToggleAutoApplyAction(args: {
       }
 
       const nextEnabled = !settings.autoApplyEnabled;
+      if (nextEnabled && ensurePinned && !(await ensurePinned())) {
+        failApplying(PIN_REQUIRED_ERROR_MESSAGE_KEY);
+        return;
+      }
       const nextSettings = { ...settings, autoApplyEnabled: nextEnabled };
       await saveAutoBlurSettings(nextSettings);
       setAutoApplyEnabled(nextEnabled);
@@ -240,5 +263,12 @@ export function useToggleAutoApplyAction(args: {
     } finally {
       finishApplying();
     }
-  }, [autoApplyAllowed, beginApplying, failApplying, finishApplying, setAutoApplyEnabled]);
+  }, [
+    autoApplyAllowed,
+    beginApplying,
+    ensurePinned,
+    failApplying,
+    finishApplying,
+    setAutoApplyEnabled,
+  ]);
 }

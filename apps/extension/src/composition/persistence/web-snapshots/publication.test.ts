@@ -184,9 +184,32 @@ function createRef(assetId: string, mimeType: string, size: number) {
   };
 }
 
+it('rolls back the package owner when the screenshot role has a conflicting ref', async () => {
+  const writes: Array<[string, unknown]> = [];
+  const transaction = createTransaction(writes);
+  const originalStore = transaction.objectStore;
+  transaction.objectStore = (name: string) => {
+    const store = originalStore(name);
+    if (name === 'asset_refs') {
+      store.get = vi.fn(async (key: unknown) =>
+        key === 'screenshot-asset' ? { invalid: true } : undefined
+      );
+    }
+    return store;
+  };
+  mocks.runMutation.mockImplementation(async (operation) =>
+    operation({ transaction: () => transaction })
+  );
+  const { publishWebSnapshotJournal } = await import('./publication');
+  await expect(publishWebSnapshotJournal(createJournal())).rejects.toThrow('asset ref');
+  expect(transaction.abort).toHaveBeenCalledOnce();
+  expect(writes).toEqual([]);
+});
+
 function createTransaction(writes: Array<[string, unknown]>, existingRef?: unknown) {
   return {
     done: Promise.resolve(),
+    abort: vi.fn(() => writes.splice(0)),
     objectStore(name: string) {
       return {
         get: vi.fn(async (key: unknown) =>
@@ -197,3 +220,28 @@ function createTransaction(writes: Array<[string, unknown]>, existingRef?: unkno
     },
   };
 }
+
+it('preserves renamed and trashed material metadata on an exact package replay', async () => {
+  const prepared = createJournal();
+  const payload = prepared.payload as import('./publication').WebSnapshotPublicationPayload;
+  const retained = {
+    ...payload.mediaEntry,
+    filename: 'renamed.zip',
+    lifecycle: { storageClass: 'library' as const, savedAt: 1, updatedAt: 3, trashedAt: 3 },
+  };
+  const writes: Array<[string, unknown]> = [];
+  const transaction = createTransaction(writes);
+  const originalStore = transaction.objectStore;
+  transaction.objectStore = (name: string) => ({
+    ...originalStore(name),
+    get: vi.fn(async () =>
+      name === 'web_snapshots' ? payload.snapshot : name === 'media_library' ? retained : undefined
+    ),
+  });
+  mocks.runMutation.mockImplementation(async (callback) =>
+    callback({ transaction: () => transaction })
+  );
+  const { publishWebSnapshotJournal } = await import('./publication');
+  await publishWebSnapshotJournal(prepared);
+  expect(writes).toContainEqual(['media_library', expect.objectContaining(retained)]);
+});

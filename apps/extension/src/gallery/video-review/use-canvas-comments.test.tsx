@@ -47,6 +47,7 @@ it('merges pending comment text into a geometry patch using the latest persisted
       };
       return snapshot;
     },
+    saveVideoWorkspaceSnapshot: async () => snapshot,
     saveVideoWorkspaceDraft: async () => snapshot,
     saveVideoWorkspaceAdvanced: async () => snapshot,
     readVideoWorkspace: async () => snapshot,

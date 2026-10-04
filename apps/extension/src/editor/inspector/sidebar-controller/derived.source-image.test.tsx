@@ -83,3 +83,34 @@ it('keeps the source-image layer out of the resizable-layer inspector branch', (
     })
   );
 });
+
+it('shows whole-pixel image dimensions after a fractional crop', () => {
+  const getValue = renderHook({
+    activeTool: 'select',
+    canvasHeight: 1000,
+    canvasWidth: 2000,
+    frameDraft: { backgroundMode: 'color' } as never,
+    hasImage: true,
+    inspector: 'image-size',
+    selection: {
+      hasSelection: false,
+      selectedObjectCount: 0,
+      selectedObjectHeight: null,
+      selectedObjectId: null,
+      selectedObjectIds: [],
+      selectedObjectType: null,
+      selectedObjectWidth: null,
+    },
+    selectionToolSettings: {} as never,
+    sourceHeight: 999.6,
+    sourceWidth: 1999.4,
+    toolSettings: {} as never,
+  });
+
+  expect(getValue()).toEqual(
+    expect.objectContaining({
+      imageAspectRatio: 1999 / 1000,
+      imageSizeText: '1999 × 1000',
+    })
+  );
+});

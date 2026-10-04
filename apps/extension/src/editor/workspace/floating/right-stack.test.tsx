@@ -49,7 +49,7 @@ it('renders expanded layers inside the right stack and collapsed layers as a cor
   ).toContain('data-height-ratio="0.5"');
 });
 
-it('renders layer effects beside expanded layers and above the collapsed corner toolbar', () => {
+it('keeps effects inside the expanded layers surface even when layers were collapsed', () => {
   const props = {
     documentController: { inspector: 'layer-effects' } as never,
     hasImage: true,
@@ -63,9 +63,9 @@ it('renders layer effects beside expanded layers and above the collapsed corner 
 
   expect(
     renderToStaticMarkup(<EditorFloatingRightStack {...props} layersCollapsed={false} />)
-  ).toContain('data-collapsed-layers="false"');
+  ).toContain('mock.layers.expanded');
   expect(renderToStaticMarkup(<EditorFloatingRightStack {...props} layersCollapsed />)).toContain(
-    'data-collapsed-layers="true"'
+    'mock.layers.expanded'
   );
 });
 

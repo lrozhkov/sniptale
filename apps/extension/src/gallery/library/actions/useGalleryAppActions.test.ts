@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import { describe, expect, it, vi } from 'vitest';
+import { createElement } from 'react';
+import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createController, createMediaItem, runBusyAction } from './test-support/index';
 import { useGalleryAppActions } from './useGalleryAppActions';
 
@@ -21,6 +24,7 @@ const actionMocks = vi.hoisted(() => ({
   createImportMediaFilesActionMock: vi.fn(),
   createImportSelectedFileActionMock: vi.fn(),
   createNavigatePreviewActionMock: vi.fn(),
+  savePreviewDraftAfterPendingMock: vi.fn(),
   createSaveMetadataActionMock: vi.fn(),
   createRestoreOriginalActionMock: vi.fn(),
   createSaveImageCopyActionMock: vi.fn(),
@@ -60,8 +64,10 @@ vi.mock('./preview', () => ({
   resetPreviewChanges: actionMocks.resetPreviewChangesMock,
 }));
 
-vi.mock('./preview-navigation', () => ({
+vi.mock('./preview-navigation', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./preview-navigation')>()),
   createNavigatePreviewAction: actionMocks.createNavigatePreviewActionMock,
+  savePreviewDraftAfterPending: actionMocks.savePreviewDraftAfterPendingMock,
 }));
 
 vi.mock('./media-file-import', () => ({
@@ -89,6 +95,7 @@ vi.mock('./snapshot-screenshot', () => ({
 
 function prepareActionFactoryMocks() {
   actionMocks.createBusyActionRunnerMock.mockReturnValue(runBusyAction);
+  actionMocks.savePreviewDraftAfterPendingMock.mockResolvedValue(false);
   actionMocks.createDeleteManyActionMock.mockReturnValue(vi.fn(async () => undefined));
   actionMocks.createClosePendingExportActionMock.mockReturnValue(vi.fn());
   actionMocks.createClosePendingImportActionMock.mockReturnValue(vi.fn());
@@ -110,6 +117,25 @@ function prepareActionFactoryMocks() {
   actionMocks.createSaveImageCopyActionMock.mockReturnValue(vi.fn(async () => undefined));
 }
 
+const mountedRoots: Root[] = [];
+
+function renderActions(controller: Parameters<typeof useGalleryAppActions>[0]) {
+  const root = createRoot(document.createElement('div'));
+  mountedRoots.push(root);
+  const result: { current?: ReturnType<typeof useGalleryAppActions> } = {};
+  function Harness() {
+    result.current = useGalleryAppActions(controller);
+    return null;
+  }
+  act(() => root.render(createElement(Harness)));
+  if (!result.current) throw new Error('Gallery actions did not render');
+  return result.current;
+}
+
+afterEach(() => {
+  for (const root of mountedRoots.splice(0)) act(() => root.unmount());
+});
+
 describe('useGalleryAppActions', () => {
   it('wires gallery action factories through the shared busy runner and preview helpers', async () => {
     vi.clearAllMocks();
@@ -117,7 +143,7 @@ describe('useGalleryAppActions', () => {
     const { controller, getState } = createController({
       previewItem: createMediaItem({ id: 'asset-1' }),
     });
-    const actions = useGalleryAppActions(controller);
+    const actions = renderActions(controller);
     const backupOptions = {
       includeDrafts: false,
       scope: 'all' as const,
@@ -127,6 +153,8 @@ describe('useGalleryAppActions', () => {
     };
 
     await actions.selection.deleteMany([createMediaItem({ id: 'asset-2' })]);
+    const readController = actionMocks.createDeleteManyActionMock.mock.calls.at(-1)?.[1];
+    expect(readController()).toBe(controller);
     await actions.backup.exportBackup();
     await actions.backup.confirmExport(backupOptions);
     await actions.backup.inspectExport(backupOptions);
@@ -155,9 +183,17 @@ describe('useGalleryAppActions', () => {
     expect(actions.importing.importDroppedFiles).toEqual(expect.any(Function));
     expect(getState().storage.pendingMediaImport).toBeNull();
     expect(actionMocks.createInspectExportBackupActionMock).toHaveBeenCalledTimes(1);
-    expect(actionMocks.createNavigatePreviewActionMock).toHaveBeenCalledWith(controller);
+    expect(actionMocks.createNavigatePreviewActionMock).toHaveBeenCalledWith(
+      controller,
+      expect.objectContaining({ revision: 0 }),
+      expect.any(Function)
+    );
     expect(actionMocks.copyPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
-    expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(controller, runBusyAction);
+    expect(actionMocks.downloadPreviewItemMock).toHaveBeenCalledWith(
+      controller,
+      runBusyAction,
+      expect.any(Function)
+    );
     expect(actionMocks.downloadOriginalPreviewItemMock).toHaveBeenCalledWith(
       controller,
       runBusyAction
@@ -189,9 +225,71 @@ describe('useGalleryAppActions', () => {
     const importMediaFiles = vi.fn(async () => undefined);
     actionMocks.createImportMediaFilesActionMock.mockReturnValue(importMediaFiles);
 
-    const actions = useGalleryAppActions(controller);
+    const actions = renderActions(controller);
     await actions.importing.confirmMediaFileImport('duplicate');
 
     expect(importMediaFiles).toHaveBeenCalledWith(pendingFiles, 'duplicate');
   });
+});
+
+it('closes the current preview through fresh callbacks and rejects callbacks after replacement', async () => {
+  vi.clearAllMocks();
+  prepareActionFactoryMocks();
+  const { controller } = createController({ previewItem: createMediaItem({ id: 'source' }) });
+  const saved = vi.fn();
+  actionMocks.createClosePreviewActionMock.mockImplementation(
+    (current, canContinue, save) => async () => {
+      expect(canContinue()).toBe(true);
+      saved(await save());
+      expect(actionMocks.savePreviewDraftAfterPendingMock.mock.calls.at(-1)?.[4]()).toBe(true);
+      current.actions.preview.setPreview({ inspectorCollapsed: false, item: null, url: null });
+      expect(canContinue()).toBe(false);
+    }
+  );
+  const actions = renderActions(controller);
+  await actions.preview.close();
+  expect(saved).toHaveBeenCalledWith(false);
+  expect(controller.state.preview.session.item).toBeNull();
+  await actions.preview.close();
+  expect(actionMocks.createClosePreviewActionMock).toHaveBeenCalledOnce();
+});
+
+it('retries a failed pending preview save before closing and rejects an obsolete save result', async () => {
+  vi.clearAllMocks();
+  prepareActionFactoryMocks();
+  const { controller } = createController({ previewItem: createMediaItem({ id: 'source' }) });
+  const actions = renderActions(controller);
+  await actions.preview.navigate(createMediaItem({ id: 'next' }));
+  const coordinator = actionMocks.createNavigatePreviewActionMock.mock.calls.at(-1)?.[1];
+  const gate = Promise.withResolvers<boolean>();
+  coordinator.pendingSave = { sourceId: 'source', draftKey: 'same', promise: gate.promise };
+  actionMocks.savePreviewDraftAfterPendingMock.mockResolvedValue(null);
+  const saved = vi.fn();
+  actionMocks.createClosePreviewActionMock.mockImplementation(
+    (_current, _canContinue, save) => async () => saved(await save())
+  );
+  const closing = actions.preview.close();
+  expect(actionMocks.createClosePreviewActionMock).not.toHaveBeenCalled();
+  gate.reject(new Error('write failed'));
+  await closing;
+  expect(actionMocks.createClosePreviewActionMock).toHaveBeenCalledOnce();
+  expect(saved).toHaveBeenCalledWith(false);
+  expect(controller.state.preview.session.item?.id).toBe('source');
+});
+
+it('ignores a pending close superseded by another preview request', async () => {
+  vi.clearAllMocks();
+  prepareActionFactoryMocks();
+  const { controller } = createController({ previewItem: createMediaItem({ id: 'source' }) });
+  const actions = renderActions(controller);
+  await actions.preview.navigate(createMediaItem({ id: 'next' }));
+  const coordinator = actionMocks.createNavigatePreviewActionMock.mock.calls.at(-1)?.[1];
+  const gate = Promise.withResolvers<boolean>();
+  coordinator.pendingSave = { sourceId: 'source', draftKey: 'same', promise: gate.promise };
+  const closing = actions.preview.close();
+  coordinator.revision += 1;
+  gate.resolve(true);
+  await closing;
+  expect(actionMocks.createClosePreviewActionMock).not.toHaveBeenCalled();
+  expect(controller.state.preview.session.item?.id).toBe('source');
 });

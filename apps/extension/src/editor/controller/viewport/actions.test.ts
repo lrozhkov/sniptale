@@ -10,6 +10,7 @@ import {
 } from './actions';
 import { getDevicePixelRatioBaselineOptions } from './actions-types';
 import { getEditorViewportMetrics } from './metrics';
+import { EditorCanvas } from '../../document/canvas-surface/render-region';
 
 const CANVAS_SIZE = { width: 200, height: 100 };
 
@@ -54,6 +55,7 @@ function createZoomContext() {
     stageElement,
     syncRuntimeState: vi.fn(),
     syncViewportState: vi.fn(),
+    setZoomLevel: vi.fn(),
     viewportElement,
     zoomLevel: 1,
   };
@@ -73,8 +75,43 @@ it('routes fit, centered, explicit, and point zoom through viewport actions', ()
 
   expect(context.canvas.setDimensions).toHaveBeenCalled();
   expect(context.canvas.requestRenderAll).toHaveBeenCalled();
-  expect(context.syncRuntimeState).toHaveBeenCalledTimes(4);
+  expect(context.syncRuntimeState).not.toHaveBeenCalled();
+  expect(context.setZoomLevel).toHaveBeenCalledTimes(4);
+  expect(context.setZoomLevel).toHaveBeenLastCalledWith(1.25);
   expect(context.syncViewportState).toHaveBeenCalled();
+});
+
+it('restores an off-image pointer anchor before the next frame on a virtual canvas', () => {
+  const context = createZoomContext();
+  const canvas = Object.create(EditorCanvas.prototype) as EditorCanvas;
+  Reflect.set(canvas, 'virtualStage', document.createElement('div'));
+  canvas.setPresentationScale = vi.fn();
+  canvas.refreshVirtualViewport = vi.fn();
+  canvas.requestRenderAll = vi.fn();
+  context.viewportElement.scrollLeft = 600;
+  const animationFrame = vi.spyOn(globalThis, 'requestAnimationFrame');
+
+  setEditorZoomAtViewportPoint({ ...context, canvas } as never, 2, { clientX: 120, clientY: 60 });
+
+  expect(context.viewportElement.scrollLeft).toBeCloseTo(1192);
+  expect(canvas.refreshVirtualViewport).toHaveBeenCalledOnce();
+  expect(animationFrame).not.toHaveBeenCalled();
+});
+
+it('centers fit zoom and refreshes its virtual viewport in the same turn', () => {
+  const context = createZoomContext();
+  const canvas = Object.create(EditorCanvas.prototype) as EditorCanvas;
+  Reflect.set(canvas, 'virtualStage', document.createElement('div'));
+  canvas.setPresentationScale = vi.fn();
+  canvas.refreshVirtualViewport = vi.fn();
+  canvas.requestRenderAll = vi.fn();
+  const animationFrame = vi.spyOn(globalThis, 'requestAnimationFrame');
+
+  zoomEditorToFit({ ...context, canvas } as never);
+
+  expect(canvas.refreshVirtualViewport).toHaveBeenCalledOnce();
+  expect(context.syncViewportState).toHaveBeenCalledOnce();
+  expect(animationFrame).not.toHaveBeenCalled();
 });
 
 it('navigates and refreshes viewport presentation while preserving anchor state', () => {

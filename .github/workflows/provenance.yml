@@ -1,5 +1,5 @@
-name: Release provenance
-run-name: ${{ inputs.diagnostic && 'Release pipeline diagnostic' || 'Release provenance Gate' }}
+name: Release checks
+run-name: ${{ inputs.diagnostic && 'Release diagnostics' || 'Release checks' }}
 
 on:
   schedule:
@@ -17,7 +17,7 @@ on:
         default: ''
         type: string
       diagnostic:
-        description: Run the release QA graph on this branch without publication or attestation
+        description: Run release checks on this branch without publication or attestation
         required: false
         default: false
         type: boolean
@@ -31,6 +31,7 @@ concurrency:
 
 jobs:
   canonical-proof:
+    name: Checks
     if: >-
       github.ref == 'refs/heads/main' ||
       (github.event_name == 'workflow_dispatch' && inputs.diagnostic)
@@ -48,30 +49,31 @@ jobs:
       force_rebuild_reason: ${{ inputs.force_rebuild_reason || '' }}
 
   release-provenance-gate:
-    name: Release provenance Gate
+    name: Release result
     needs: canonical-proof
     if: always() && github.ref == 'refs/heads/main' && !inputs.diagnostic
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
-      - name: Require the exact canonical proof graph
+      - name: Verify required results
         env:
           CANONICAL_PROOF_RESULT: ${{ needs.canonical-proof.result }}
         run: test "$CANONICAL_PROOF_RESULT" = success
 
   diagnostic-gate:
-    name: Release pipeline diagnostic Gate
+    name: Diagnostic result
     needs: canonical-proof
     if: always() && github.event_name == 'workflow_dispatch' && inputs.diagnostic
     runs-on: ubuntu-24.04
     permissions: {}
     steps:
-      - name: Require the exact diagnostic proof graph
+      - name: Verify diagnostic results
         env:
           CANONICAL_PROOF_RESULT: ${{ needs.canonical-proof.result }}
         run: test "$CANONICAL_PROOF_RESULT" = success
 
   coverage-results:
+    name: Coverage
     needs: [canonical-proof, release-provenance-gate]
     if: needs.release-provenance-gate.result == 'success'
     continue-on-error: true
@@ -84,14 +86,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { ref: '${{ github.sha }}', persist-credentials: false }
       - uses: ./.github/actions/setup-locked-node
-      - name: Download exact admitted release coverage
+      - name: Download coverage
         env: { GH_TOKEN: '${{ secrets.GITHUB_TOKEN }}' }
         run: |
           prefix="release-provenance-${GITHUB_SHA}-${GITHUB_RUN_ID}-"
           artifact_name=$(node tooling/ci/resolve-run-artifact.mjs "$GITHUB_RUN_ID" "$prefix")
           gh run download "$GITHUB_RUN_ID" --name "$artifact_name" --dir build/release-proof
           node tooling/ci/verify-main-proof.mjs release build/release-proof "$GITHUB_SHA"
-      - name: Publish release provenance coverage to Coveralls
+      - name: Publish coverage
         uses: coverallsapp/github-action@8d6379e14d29928660c4ba802d8e85393440b329 # v2.3.8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

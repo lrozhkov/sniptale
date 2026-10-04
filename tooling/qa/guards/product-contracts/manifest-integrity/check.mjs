@@ -24,7 +24,7 @@ const EXPECTED_EXTENSION_PAGES_CSP = "script-src 'self'; object-src 'self';";
 const PASS_MESSAGE = 'Manifest integrity passed';
 const EXPECTED_OFFSCREEN_REASONS = {
   createPrivacyErasureOffscreenDocumentOptions: ['LOCAL_STORAGE'],
-  createUserMediaOffscreenDocumentOptions: ['USER_MEDIA', 'CLIPBOARD'],
+  createUserMediaOffscreenDocumentOptions: ['USER_MEDIA', 'CLIPBOARD', 'DISPLAY_MEDIA'],
 };
 
 function normalizePath(value) {

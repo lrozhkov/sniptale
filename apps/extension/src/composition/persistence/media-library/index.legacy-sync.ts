@@ -1,8 +1,4 @@
-import {
-  VIDEO_WORKSPACES_STORE,
-  VIDEO_WORKSPACE_DRAFTS_STORE,
-} from '../infrastructure/indexed-db/core.stores';
-import { MEDIA_LIBRARY_STORE, THUMBNAILS_STORE } from '../infrastructure/indexed-db/core';
+import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
   buildProjectAssetMediaEntry,
@@ -10,146 +6,61 @@ import {
   buildRecordingMediaEntry,
   mergeMediaEntry,
 } from './entry-mapping';
-import {
-  createProjectAssetMediaId,
-  createRecordingMediaId,
-} from '../../../features/media-hub/media-id';
+import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import { listAllProjectExports, listProjectAssets } from '../projects/index';
 import { listRecordings } from '../recordings/index';
 import type { MediaLibraryEntry } from './contracts';
+import { parseMediaLibraryEntry } from './read-guards';
 import { createLibraryLifecycle } from '../library-lifecycle/contracts';
+import { backfillScenarioLibraryAssets } from '../scenario/library-publication';
 
-interface LegacyMediaStore {
-  delete(key: string): Promise<void>;
-  put(value: MediaLibraryEntry): Promise<IDBValidKey>;
-}
-
-interface LegacyThumbnailStore {
-  delete(key: string): Promise<void>;
-}
-
-function shouldDeleteStaleManagedEntry(entry: MediaLibraryEntry, desiredIds: Set<string>): boolean {
-  if (entry.source.kind === 'screenshot') {
-    return false;
-  }
-
-  return !desiredIds.has(entry.id);
-}
-
+/** Compatibility metadata refresh cannot publish private project memberships or erase source evidence. */
 export async function syncLegacyMediaLibrary(): Promise<void> {
+  await backfillScenarioLibraryAssets();
+  const [recordings, projectExports, projectAssets] = await Promise.all([
+    listRecordings(),
+    listAllProjectExports(),
+    listProjectAssets(),
+  ]);
   await runWithIndexedDbMutation(async (db) => {
-    const [recordings, projectExports, projectAssets, currentEntries] = await Promise.all([
-      listRecordings(),
-      listAllProjectExports(),
-      listProjectAssets(),
-      db.getAll(MEDIA_LIBRARY_STORE) as Promise<MediaLibraryEntry[]>,
-    ]);
-    const currentMap = new Map(currentEntries.map((entry) => [entry.id, entry]));
-    const desiredManagedIds = new Set<string>();
-    const tx = db.transaction(
-      [MEDIA_LIBRARY_STORE, THUMBNAILS_STORE, VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
-      'readwrite'
-    );
-    const mediaStore: LegacyMediaStore = {
-      put: (value) => tx.objectStore(MEDIA_LIBRARY_STORE).put(value),
-      async delete(key) {
-        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(key);
-        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(key);
-        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(key);
-      },
-    };
-    const thumbnailsStore = tx.objectStore(THUMBNAILS_STORE);
-
-    await syncRecordingMirrors({
-      currentMap,
-      desiredManagedIds,
-      exportRecordingIds: new Set(),
-      mediaStore,
-      recordings,
-      thumbnailsStore,
-    });
-    await syncProjectExportMirrors({ currentMap, desiredManagedIds, mediaStore, projectExports });
-    await syncProjectAssetMirrors({
-      currentMap,
-      desiredManagedIds,
-      mediaStore,
-      projectAssets,
-    });
-    await deleteStaleManagedMirrors({
-      currentEntries,
-      desiredManagedIds,
-      mediaStore,
-      thumbnailsStore,
-    });
-    await tx.done;
+    const tx = db.transaction(MEDIA_LIBRARY_STORE, 'readwrite');
+    try {
+      const store = tx.objectStore(MEDIA_LIBRARY_STORE);
+      const currentEntries = (await store.getAll())
+        .map(parseMediaLibraryEntry)
+        .filter((entry): entry is MediaLibraryEntry => entry !== null);
+      const current = new Map(currentEntries.map((entry) => [entry.id, entry]));
+      for (const recording of recordings) {
+        const entry = buildRecordingMediaEntry(recording);
+        await store.put(mergeMediaEntry(current.get(entry.id), entry));
+      }
+      for (const exported of projectExports) {
+        const entry = buildProjectExportMediaEntry(exported);
+        await store.put(mergeMediaEntry(current.get(entry.id), entry));
+      }
+      for (const asset of projectAssets) {
+        const existing = current.get(createProjectAssetMediaId(asset.id));
+        if (!existing) continue;
+        if (existing.source.kind !== 'project-asset' || existing.source.projectAssetId !== asset.id)
+          throw new Error('Legacy material identity conflicts with its source.');
+        await store.put(
+          mergeMediaEntry(existing, {
+            ...buildProjectAssetMediaEntry(asset),
+            filename: asset.filename,
+            originalFilename: asset.filename,
+            lifecycle: existing.lifecycle ?? createLibraryLifecycle('library', asset.createdAt),
+          })
+        );
+      }
+      await tx.done;
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        /* The transaction may already have aborted. */
+      }
+      await tx.done.catch(() => undefined);
+      throw error;
+    }
   });
-}
-
-async function syncRecordingMirrors(args: {
-  currentMap: Map<string, MediaLibraryEntry>;
-  desiredManagedIds: Set<string>;
-  exportRecordingIds: Set<string>;
-  mediaStore: LegacyMediaStore;
-  recordings: Awaited<ReturnType<typeof listRecordings>>;
-  thumbnailsStore: LegacyThumbnailStore;
-}): Promise<void> {
-  for (const recording of args.recordings) {
-    if (args.exportRecordingIds.has(recording.id)) {
-      await args.mediaStore.delete(createRecordingMediaId(recording.id));
-      await args.thumbnailsStore.delete(createRecordingMediaId(recording.id));
-      continue;
-    }
-
-    const baseEntry = buildRecordingMediaEntry(recording);
-    args.desiredManagedIds.add(baseEntry.id);
-    await args.mediaStore.put(mergeMediaEntry(args.currentMap.get(baseEntry.id), baseEntry));
-  }
-}
-
-async function syncProjectExportMirrors(args: {
-  currentMap: Map<string, MediaLibraryEntry>;
-  desiredManagedIds: Set<string>;
-  mediaStore: LegacyMediaStore;
-  projectExports: Awaited<ReturnType<typeof listAllProjectExports>>;
-}): Promise<void> {
-  for (const projectExport of args.projectExports) {
-    const baseEntry = buildProjectExportMediaEntry(projectExport);
-    args.desiredManagedIds.add(baseEntry.id);
-    await args.mediaStore.put(mergeMediaEntry(args.currentMap.get(baseEntry.id), baseEntry));
-  }
-}
-
-async function syncProjectAssetMirrors(args: {
-  currentMap: Map<string, MediaLibraryEntry>;
-  desiredManagedIds: Set<string>;
-  mediaStore: LegacyMediaStore;
-  projectAssets: Awaited<ReturnType<typeof listProjectAssets>>;
-}): Promise<void> {
-  for (const projectAsset of args.projectAssets) {
-    const existing = args.currentMap.get(createProjectAssetMediaId(projectAsset.id));
-    const baseEntry = {
-      ...buildProjectAssetMediaEntry(projectAsset),
-      filename: projectAsset.filename,
-      lifecycle: existing?.lifecycle ?? createLibraryLifecycle('library', projectAsset.createdAt),
-      originalFilename: projectAsset.filename,
-    };
-    args.desiredManagedIds.add(baseEntry.id);
-    await args.mediaStore.put(mergeMediaEntry(existing, baseEntry));
-  }
-}
-
-async function deleteStaleManagedMirrors(args: {
-  currentEntries: MediaLibraryEntry[];
-  desiredManagedIds: Set<string>;
-  mediaStore: LegacyMediaStore;
-  thumbnailsStore: LegacyThumbnailStore;
-}): Promise<void> {
-  for (const entry of args.currentEntries) {
-    if (!shouldDeleteStaleManagedEntry(entry, args.desiredManagedIds)) {
-      continue;
-    }
-
-    await args.mediaStore.delete(entry.id);
-    await args.thumbnailsStore.delete(entry.id);
-  }
 }

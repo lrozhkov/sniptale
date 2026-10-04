@@ -1,218 +1,61 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
-import { EditorFloatingDocumentBar } from './document-bar';
-import type { EditorFloatingDocumentController } from './document-bar';
-import type { EditorToolbarContentProps } from '../toolbar/types';
 import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
+import type { EditorFloatingDocumentController } from './document-bar';
 
-const mocks = vi.hoisted(() => ({
-  autosaveDiscard: vi.fn(async () => undefined),
-  clearSelection: vi.fn(),
-  embed: {
-    mode: null as null | 'scenario',
-    onApply: null as null | (() => Promise<void>),
-    onClose: null as null | (() => void),
-  },
-  fireAndReport: vi.fn((_label: string, action: () => Promise<void> | void) => action()),
-  runAndReport: vi.fn((_label: string, action: () => Promise<void> | void) => action()),
-  exportSettings: {
-    imageFormat: 'png' as 'png' | 'jpeg' | 'webp',
-    isClipboardCopySupported: true,
-  },
-  getMediaLibraryEntry: vi.fn(),
-  commitImagePresentation: vi.fn(),
-  promoteImageAggregate: vi.fn(),
-  saveImageAggregateCopyFromDocument: vi.fn(),
-  autosaveActivate: vi.fn(),
-  autosaveRebindAggregate: vi.fn(),
-  autosaveLastWriteError: null as unknown,
-  connectAggregateEditorPresence: vi.fn(
-    (_args: { aggregate: { id: string; kind: 'image' }; promote: () => Promise<void> }) => ({
-      dispose: vi.fn(),
-    })
-  ),
-}));
-
-vi.mock('../../../workflows/aggregate-editor-presence/client', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../workflows/aggregate-editor-presence/client')>()),
-  connectAggregateEditorPresence: mocks.connectAggregateEditorPresence,
-}));
-
-vi.mock('../../../composition/persistence/media-library', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/media-library')>()),
-  getMediaLibraryEntry: mocks.getMediaLibraryEntry,
-}));
-vi.mock('../../../composition/persistence/image-aggregates', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/image-aggregates')>()),
-  commitImagePresentation: mocks.commitImagePresentation,
-  promoteImageAggregate: mocks.promoteImageAggregate,
-  saveImageAggregateCopyFromDocument: mocks.saveImageAggregateCopyFromDocument,
-}));
-vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
-  dataUrlToBlob: vi.fn(async () => new Blob(['preview'], { type: 'image/png' })),
-}));
-vi.mock('../../../platform/media-utils/image-thumbnail', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/media-utils/image-thumbnail')>()),
-  createImageThumbnailBlob: vi.fn(async () => new Blob(['thumbnail'], { type: 'image/webp' })),
-}));
-
-const storeState = vi.hoisted(() => ({
-  value: {
-    pageTitle: 'Captured page',
-    saveErrorMessage: null as string | null,
-    saveState: 'saved' as 'idle' | 'saving' | 'saved' | 'error',
-    sessionId: 'asset-1' as string | null,
-  },
-}));
-
-vi.mock('../../state/useEditorStore', () => ({
-  useEditorStore: (selector: (state: typeof storeState.value) => unknown) =>
-    selector(storeState.value),
-}));
-vi.mock('../../application/controller-context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../application/controller-context')>()),
-  useEditorController: () => ({
-    autosaveService: {
-      activate: mocks.autosaveActivate,
-      rebindAggregate: mocks.autosaveRebindAggregate,
-      discardDraft: mocks.autosaveDiscard,
-      flushAutosave: vi.fn(async () => undefined),
-      getDurableRevision: vi.fn(() => 1),
-      getLastWriteError: vi.fn(() => mocks.autosaveLastWriteError),
-    },
-    clearSelection: mocks.clearSelection,
-    closeDocument: vi.fn(),
-    exportDocument: vi.fn(),
-    renderForExport: vi.fn(async () => 'data:image/png;base64,YQ=='),
-  }),
-}));
-vi.mock('../../application/embed-context/context', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../application/embed-context/context')>()),
-  useEditorEmbedContext: () => mocks.embed,
-}));
-vi.mock('../../runtime/async-actions', () => ({
-  fireAndReportEditorAction: mocks.fireAndReport,
-  runAndReportEditorAction: mocks.runAndReport,
-  reportEditorActionFailure: vi.fn(),
-}));
-vi.mock('../../inspector/document-actions/export-settings', () => ({
-  useEditorExportSettingsState: () => mocks.exportSettings,
-}));
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-function createController(
-  overrides: Partial<EditorFloatingDocumentController> = {}
-): EditorFloatingDocumentController {
-  return {
-    canvasSize: { height: 720, width: 1280 },
-    copyRenderedImageDisabledReason: null,
-    defaultImagePresetId: 'default',
-    onCloseDocument: vi.fn(),
-    onCopyRenderedImage: vi.fn(),
-    onExportSession: vi.fn(),
-    onImportSession: vi.fn(),
-    onOpenImage: vi.fn(),
-    onSaveImage: vi.fn(),
-    onSaveImageAs: vi.fn(),
-    savePresets: [{ id: 'default', name: 'Downloads', path: 'Downloads' }],
-    setSavePresetPickerOpen: vi.fn(),
-    saveToPreset: vi.fn(),
-    ...overrides,
-  } as unknown as EditorFloatingDocumentController;
-}
-
-function createProps(
-  overrides: Partial<EditorToolbarContentProps> = {},
-  controller: EditorFloatingDocumentController = createController()
-) {
-  return {
-    documentController: controller,
-    hasImage: true,
-    history: { canRedo: true, canUndo: true, index: 1, size: 2 },
-    onBeforeSelectionAwareAction: vi.fn(),
-    ...overrides,
-  };
-}
-
-function renderDocumentBar(props = createProps()) {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
-  act(() => {
-    root?.render(<EditorFloatingDocumentBar {...props} />);
-  });
-}
-
-function rerenderDocumentBar(props = createProps()) {
-  act(() => root?.render(<EditorFloatingDocumentBar {...props} />));
-}
-
-function createDeferred<T>() {
-  let resolve: (value: T | PromiseLike<T>) => void = () => undefined;
-  let reject: (error: Error) => void = () => undefined;
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve;
-    reject = promiseReject;
-  });
-  return { promise, reject, resolve };
-}
-
-function getButton(dataUi: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`[data-ui="${dataUi}"]`);
-  expect(button).not.toBeNull();
-  return button as HTMLButtonElement;
-}
-
-beforeEach(() => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.clearAllMocks();
-  mocks.exportSettings.imageFormat = 'png';
-  mocks.exportSettings.isClipboardCopySupported = true;
-  mocks.embed.mode = null;
-  mocks.embed.onApply = null;
-  mocks.embed.onClose = null;
-  mocks.autosaveLastWriteError = null;
-  mocks.getMediaLibraryEntry.mockResolvedValue({
-    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
-  });
-  mocks.promoteImageAggregate.mockResolvedValue(undefined);
-  mocks.commitImagePresentation.mockResolvedValue(undefined);
-  mocks.saveImageAggregateCopyFromDocument.mockResolvedValue('image-copy');
-  storeState.value = {
-    pageTitle: 'Captured page',
-    saveErrorMessage: null,
-    saveState: 'saved',
-    sessionId: 'asset-1',
-  };
+it('keeps preview recovery out of the saved document status', async () => {
+  storeState.value.saveState = 'saved';
+  renderDocumentBar(createProps());
+  await act(async () => Promise.resolve());
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.retryPreview'));
 });
 
-afterEach(() => {
-  act(() => {
-    root?.unmount();
-  });
-  root = null;
-  container?.remove();
-  container = null;
-  vi.unstubAllGlobals();
+it('still opens actual document write failures with recovery guidance', async () => {
+  storeState.value.saveState = 'error';
+  renderDocumentBar(createProps());
+  await act(async () => Promise.resolve());
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+    translate('editor.documentActions.saveErrorDescription')
+  );
 });
+import {
+  container,
+  mocks,
+  storeState,
+  createController,
+  createProps,
+  renderDocumentBar,
+  rerenderDocumentBar,
+  createDeferred,
+  getButton,
+  unmountDocumentBar,
+} from './document-bar.test-support';
 
-it('renders storage and autosave status with a compact separator and routes quick actions', async () => {
+it('centers the document title without a storage badge and keeps the library icon unfilled', async () => {
   const controller = createController();
   renderDocumentBar(createProps({}, controller));
 
   expect(container?.textContent).toContain('Captured page');
   await act(async () => Promise.resolve());
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-  expect(container?.textContent).toContain(`·${translate('common.states.saved')}`);
-  expect(container?.querySelector('[data-state="saved"]')).not.toBeNull();
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.draft'));
+  expect(container?.textContent).not.toContain(translate('common.states.saved'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
+  expect(getButton('editor.floating.document-bar.title').parentElement?.className).toContain(
+    'items-center'
+  );
+  expect(getButton('editor.floating.document-bar.title').parentElement?.className).toContain(
+    'max-[1499px]:max-w-[6rem]'
+  );
+  const promote = getButton('editor.floating.document-bar.promote-button');
+  expect(promote.className).not.toContain('!bg-');
+  expect(promote.className).toContain('!text-[var(--sniptale-color-warning)]');
+  expect(
+    container?.querySelector('[data-ui="autosave-control"] button')?.getAttribute('aria-label')
+  ).toContain(translate('common.states.saved'));
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.file-menu-button"]')
   ).toBeNull();
@@ -227,9 +70,7 @@ it('renders storage and autosave status with a compact separator and routes quic
   expect(controller.onSaveImageAs).toHaveBeenCalledOnce();
   expect(controller.onCopyRenderedImage).toHaveBeenCalledOnce();
   expect(controller.onExportSession).not.toHaveBeenCalled();
-  expect(getButton('editor.floating.document-bar.save-button').className).toContain(
-    'max-[720px]:!hidden'
-  );
+  expect(getButton('editor.floating.document-bar.save-button').className).toContain('shrink-0');
   expect(
     getButton('editor.floating.document-bar.copy-button').getAttribute('data-copy-status')
   ).toBe('saved');
@@ -260,10 +101,11 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
   renderDocumentBar(createProps({}, controller));
   await act(async () => Promise.resolve());
 
-  const actionIds = Array.from(container?.querySelectorAll('button') ?? []).map((button) =>
-    button.getAttribute('data-ui')
-  );
+  const actionIds = Array.from(
+    container?.querySelectorAll('[data-ui="editor.floating.document-bar"] button') ?? []
+  ).map((button) => button.getAttribute('data-ui'));
   expect(actionIds).toEqual([
+    'editor.floating.document-bar.title',
     'editor.floating.document-bar.promote-button',
     'editor.floating.document-bar.save-button',
     'editor.floating.document-bar.save-as-button',
@@ -272,16 +114,16 @@ it('keeps the standalone quick-action order and opens the shared save dialog', a
     'editor.floating.document-bar.close-file-button',
   ]);
 
-  act(() => getButton('editor.floating.document-bar.save-to-folder-button').click());
+  await act(async () => getButton('editor.floating.document-bar.save-to-folder-button').click());
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   expect(container?.textContent).toContain('capture.png');
-  expect(document.querySelector<HTMLInputElement>('#save-dialog-filename')?.value).toBe(
-    'capture.webp'
+  expect(document.querySelector<HTMLInputElement>('#save-dialog-filename')?.value).toMatch(
+    /^Sniptale_edited_.*\.webp$/
   );
   expect(
     getButton('editor.floating.document-bar.save-to-folder-button').getAttribute('aria-expanded')
   ).toBe('true');
-  act(() => getButton('editor.floating.document-bar.save-to-folder-button').click());
+  await act(async () => getButton('editor.floating.document-bar.save-to-folder-button').click());
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(
     getButton('editor.floating.document-bar.save-to-folder-button').getAttribute('aria-expanded')
@@ -308,19 +150,25 @@ it('omits save-to-folder when no enabled preset is available', async () => {
   expect(getButton('editor.floating.document-bar.close-file-button')).not.toBeNull();
 });
 
-it('shows storage state separately and promotes a linked draft without changing its id', async () => {
+it('promotes a linked draft without showing a storage badge or changing its id', async () => {
   window.history.replaceState(null, '', '?assetId=asset-1');
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
   const promote = getButton('editor.floating.document-bar.promote-button');
   expect(promote.title).toBe(translate('editor.documentActions.saveToLibrary'));
-  expect(promote.previousElementSibling?.className).toContain('flex-col');
+  expect(promote.textContent).toBe('');
+  expect(promote.getAttribute('aria-label')).toBe(
+    translate('editor.documentActions.saveToLibrary')
+  );
+  expect(promote.previousElementSibling?.className).toContain('items-center');
   await act(async () => promote.click());
 
   expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.inLibrary'));
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
+  expect(promote.className).toContain('scale-90 opacity-0');
   window.history.replaceState(null, '', '/');
 });
 
@@ -334,12 +182,13 @@ it('keeps a failed promotion retryable and preserves the draft until success', a
   expect(document.querySelector('[role="alert"]')?.textContent).toContain(
     translate('editor.documentActions.saveToLibraryError')
   );
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   expect(getButton('editor.floating.document-bar.promote-button').disabled).toBe(false);
 
   await act(async () => getButton('editor.floating.document-bar.promote-button').click());
   expect(mocks.promoteImageAggregate).toHaveBeenCalledWith('asset-1', 1);
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(getButton('editor.floating.document-bar.promote-button').className).toContain(
+    'scale-90 opacity-0'
+  );
 });
 
 it('prevents duplicate promotion while the durable commit is pending', async () => {
@@ -358,6 +207,17 @@ it('prevents duplicate promotion while the durable commit is pending', async () 
 
   expect(mocks.commitImagePresentation).toHaveBeenCalledOnce();
   expect(getButton('editor.floating.document-bar.promote-button').disabled).toBe(true);
+  expect(getButton('editor.floating.document-bar.promote-button').getAttribute('aria-busy')).toBe(
+    'true'
+  );
+  expect(getButton('editor.floating.document-bar.promote-button').title).toBe(
+    translate('editor.documentActions.savingToLibrary')
+  );
+  expect(getButton('editor.floating.document-bar.promote-button').getAttribute('aria-label')).toBe(
+    translate('editor.documentActions.savingToLibrary')
+  );
+  expect(getButton('editor.floating.document-bar.promote-button').textContent).toBe('');
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
   await act(async () => commit.resolve());
 });
 
@@ -426,19 +286,22 @@ it('preserves operation identity and cleanup isolation across an A to B to A swi
 
   await act(async () => firstCommit.resolve());
   await Promise.all([firstAggregateResult, duplicateFirstResult]);
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
+  expect(getButton('editor.floating.document-bar.promote-button').className).toContain(
+    'scale-90 opacity-0'
+  );
 });
 
 it('keeps stale-copy actions disabled while promotion owns the aggregate lock', async () => {
   const commit = createDeferred<void>();
   mocks.commitImagePresentation.mockImplementationOnce(() => commit.promise);
   mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
+  storeState.value.saveState = 'error';
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
   act(() => getButton('editor.floating.document-bar.promote-button').click());
   await act(async () => Promise.resolve());
-  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
   );
   expect(saveCopy?.disabled).toBe(true);
@@ -467,10 +330,38 @@ it('ignores stale storage reads after the active document changes', async () => 
     })
   );
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.inLibrary'));
   expect(
     container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
   ).toBeNull();
+});
+
+it('does not show the previous document library state while the next document loads', async () => {
+  mocks.getMediaLibraryEntry.mockResolvedValueOnce({
+    lifecycle: { savedAt: 1, storageClass: 'library', updatedAt: 1 },
+  });
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+  expect(container?.querySelector('[data-storage-class]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
+  ).toBeNull();
+
+  const nextRead = createDeferred<{
+    lifecycle: { savedAt: null; storageClass: 'temporary'; updatedAt: number };
+  }>();
+  mocks.getMediaLibraryEntry.mockImplementationOnce(() => nextRead.promise);
+  storeState.value = { ...storeState.value, sessionId: 'asset-2' };
+  rerenderDocumentBar();
+  expect(
+    container?.querySelector('[data-ui="editor.floating.document-bar.promote-button"]')
+  ).toBeNull();
+
+  await act(async () =>
+    nextRead.resolve({
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
+    })
+  );
+  expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
 });
 
 it('keeps promotion available when library metadata cannot be read', async () => {
@@ -478,7 +369,6 @@ it('keeps promotion available when library metadata cannot be read', async () =>
   renderDocumentBar();
   await act(async () => Promise.resolve());
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
   expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
 });
 
@@ -507,8 +397,8 @@ it('offers reload and an atomic copy when another tab made the workspace stale',
   };
   renderDocumentBar();
 
-  expect(container?.textContent).toContain(translate('editor.documentActions.reloadLatest'));
-  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  expect(document.body.textContent).toContain(translate('editor.documentActions.reloadLatest'));
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
   );
   await act(async () => saveCopy?.click());
@@ -526,8 +416,9 @@ it('does not rebind a stale conflict copy after an A to B to A activation change
   const copy = createDeferred<string>();
   mocks.autosaveLastWriteError = new StaleImageWorkspaceError('asset-1');
   mocks.saveImageAggregateCopyFromDocument.mockImplementationOnce(() => copy.promise);
+  storeState.value.saveState = 'error';
   renderDocumentBar();
-  const saveCopy = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  const saveCopy = Array.from(document.querySelectorAll<HTMLButtonElement>('button')).find(
     (candidate) => candidate.textContent?.includes(translate('editor.documentActions.saveCopy'))
   );
   await act(async () => {
@@ -545,7 +436,7 @@ it('does not rebind a stale conflict copy after an A to B to A activation change
   await act(async () => copy.resolve('image-copy'));
 
   expect(mocks.autosaveActivate).not.toHaveBeenCalled();
-  expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
+  expect(getButton('editor.floating.document-bar.promote-button')).not.toBeNull();
 });
 
 it('removes the file menu from the floating document bar', () => {
@@ -645,14 +536,12 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
     storeState.value = state;
     renderDocumentBar();
     await act(async () => Promise.resolve());
-    expect(container?.textContent).toContain(translate('editor.documentActions.draft'));
-    expect(container?.textContent).toContain(`·${expectedLabel}`);
-    expect(container?.querySelector(`[data-state="${state.saveState}"]`)).not.toBeNull();
+    expect(container?.querySelector('[data-storage-class]')).toBeNull();
+    const status = container?.querySelector('[data-ui="autosave-control"] button');
+    expect(status?.getAttribute('aria-label')).toContain(expectedLabel);
+    expect(status?.getAttribute('title')).toContain(expectedLabel);
     expect(container?.textContent).not.toContain('Disk error');
-    act(() => root?.unmount());
-    root = null;
-    container?.remove();
-    container = null;
+    unmountDocumentBar();
   };
 
   await renderStatus(
@@ -680,12 +569,41 @@ it('keeps storage identity stable while reflecting autosave states', async () =>
       saveState: 'error',
       sessionId: 'asset-1',
     },
-    translate('common.states.error')
+    translate('editor.documentActions.saveErrorTitle')
   );
   await renderStatus(
     { pageTitle: 'Captured page', saveErrorMessage: null, saveState: 'idle', sessionId: 'asset-1' },
     translate('common.states.dirty')
   );
+});
+
+it('toggles autosave in its shared status popover and keeps the library control icon-only', async () => {
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="autosave-control"] button'
+  );
+  if (!trigger) throw new Error('Missing autosave trigger');
+  expect(trigger.getAttribute('aria-label')).toContain(translate('common.states.saved'));
+  act(() => trigger.click());
+  const popover = document.querySelector('[role="dialog"]');
+  expect(popover?.textContent).toContain(translate('editor.documentActions.autosaveOnDescription'));
+  const toggle = popover?.querySelector<HTMLInputElement>('input[role="switch"]');
+  expect(toggle?.checked).toBe(true);
+  act(() => toggle?.click());
+  expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(false, expect.any(Function));
+  expect(trigger.getAttribute('aria-label')).toContain(
+    translate('editor.documentActions.autosaveOffStatus')
+  );
+  expect(popover?.textContent).toContain(
+    translate('editor.documentActions.autosaveOffDescription')
+  );
+  act(() => toggle?.click());
+  expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(true, expect.any(Function));
+  expect(trigger.getAttribute('aria-label')).toContain(translate('common.states.saved'));
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(trigger);
 });
 
 it('keeps apply disabled before loading and blocks duplicate apply or cancel during rendering', async () => {
@@ -701,7 +619,7 @@ it('keeps apply disabled before loading and blocks duplicate apply or cancel dur
   mocks.embed.onClose = vi.fn();
   renderDocumentBar(createProps({ hasImage: false }));
   expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(true);
-  act(() => root?.render(<EditorFloatingDocumentBar {...createProps()} />));
+  rerenderDocumentBar(createProps());
   act(() => {
     getButton('editor.floating.document-bar.apply-scenario-button').click();
     getButton('editor.floating.document-bar.apply-scenario-button').click();
@@ -712,4 +630,47 @@ it('keeps apply disabled before loading and blocks duplicate apply or cancel dur
   await act(async () => finish());
   expect(getButton('editor.floating.document-bar.apply-scenario-button').disabled).toBe(false);
   expect(getButton('editor.floating.document-bar.cancel-scenario-button').disabled).toBe(false);
+});
+
+it('automatically opens a new error after recovery and never exposes diagnostic text', async () => {
+  storeState.value.saveState = 'error';
+  storeState.value.saveErrorMessage = 'internal-record-id=secret';
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+  let trigger = container?.querySelector<HTMLButtonElement>('[data-ui="autosave-control"] button');
+  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
+    translate('editor.documentActions.saveErrorDescription')
+  );
+  expect(document.body.textContent).not.toContain('internal-record-id');
+  act(() => trigger?.click());
+  storeState.value.saveState = 'saved';
+  rerenderDocumentBar();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  storeState.value.saveState = 'error';
+  rerenderDocumentBar();
+  trigger = container?.querySelector<HTMLButtonElement>('[data-ui="autosave-control"] button');
+  expect(trigger?.getAttribute('aria-expanded')).toBe('true');
+});
+
+it('keeps autosave control reachable after a failed save while the mode is off', async () => {
+  mocks.autosaveEnabled = false;
+  storeState.value.saveState = 'error';
+  renderDocumentBar();
+  await act(async () => Promise.resolve());
+
+  const trigger = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="autosave-control"] button'
+  );
+  if (!trigger) throw new Error('Missing autosave trigger');
+  expect(trigger.getAttribute('aria-label')).toContain(
+    translate('editor.documentActions.saveErrorTitle')
+  );
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  const toggle = document.querySelector<HTMLInputElement>('[role="dialog"] input[role="switch"]');
+  expect(toggle?.checked).toBe(false);
+  act(() => toggle?.click());
+  expect(mocks.autosaveSetEnabled).toHaveBeenCalledWith(true, expect.any(Function));
+  expect(trigger.getAttribute('aria-label')).toContain(
+    translate('editor.documentActions.saveErrorTitle')
+  );
 });

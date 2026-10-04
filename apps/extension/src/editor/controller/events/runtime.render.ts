@@ -1,35 +1,63 @@
-import type {
-  EditorControllerEventObjectBindings,
-  EditorControllerEventStateBindings,
-} from './types';
-import { EDITOR_CANVAS_CROP_OVERLAY } from '../../color/palette/constants';
+import type { Canvas } from 'fabric';
+import type { EditorControllerEventStateBindings } from './types';
 import { readEditorDrawingObject } from '../../drawing/object/metadata';
 import { renderEditorFreehandPreview } from '../../drawing/preview';
+
+type PreviewBindings = Pick<EditorControllerEventStateBindings, 'getCanvas' | 'getDrawSession'>;
+const pendingPreviews = new WeakMap<Canvas, number>();
+
+export function cancelEditorFreehandPreview(canvas: Canvas): void {
+  const frame = pendingPreviews.get(canvas);
+  if (frame === undefined) return;
+  window.cancelAnimationFrame(frame);
+  pendingPreviews.delete(canvas);
+}
+
+export function requestEditorFreehandPreview(bindings: PreviewBindings): void {
+  const canvas = bindings.getCanvas();
+  if (!canvas || pendingPreviews.has(canvas)) return;
+  const session = bindings.getDrawSession();
+  const frame = window.requestAnimationFrame(() => {
+    pendingPreviews.delete(canvas);
+    if (
+      canvas.disposed ||
+      canvas.destroyed ||
+      bindings.getCanvas() !== canvas ||
+      !session ||
+      bindings.getDrawSession() !== session ||
+      session.object?.visible
+    )
+      return;
+    canvas.renderTop();
+  });
+  pendingPreviews.set(canvas, frame);
+}
 
 function renderActiveDrawingPreview(
   bindings: Pick<EditorControllerEventStateBindings, 'getDrawSession'>,
   context: CanvasRenderingContext2D
-): void {
+): boolean {
   const object = bindings.getDrawSession()?.object;
-  if (!object || object.visible) return;
+  if (!object || object.visible) return false;
   const drawing = readEditorDrawingObject(object);
-  if (drawing?.kind !== 'pencil' && drawing?.kind !== 'marker') return;
-  renderEditorFreehandPreview(context, drawing);
+  if (drawing?.kind !== 'pencil' && drawing?.kind !== 'marker') return false;
+  return renderEditorFreehandPreview(context, drawing);
 }
 
 export function createAfterRenderHandler(
-  bindings: Pick<
-    EditorControllerEventStateBindings,
-    'getCanvas' | 'getCanvasDocumentSize' | 'getDrawSession'
-  > &
-    Pick<EditorControllerEventObjectBindings, 'getActiveCropRect'>
+  bindings: Pick<EditorControllerEventStateBindings, 'getCanvas' | 'getDrawSession'>
 ) {
-  return () => {
+  return (event: { ctx: CanvasRenderingContext2D }) => {
     const canvas = bindings.getCanvas();
-    if (!canvas || !canvas.contextTop) {
+    if (
+      !canvas ||
+      !canvas.contextTop ||
+      (event.ctx !== canvas.getContext() && event.ctx !== canvas.contextTop)
+    ) {
       return;
     }
 
+    cancelEditorFreehandPreview(canvas);
     const ctx = canvas.getSelectionContext();
     if (!ctx || !canvas.viewportTransform) {
       return;
@@ -37,29 +65,10 @@ export function createAfterRenderHandler(
 
     ctx.save();
     ctx.transform(...canvas.viewportTransform);
-    renderActiveDrawingPreview(bindings, ctx);
-
-    const activeCropRect = bindings.getActiveCropRect();
-    if (!activeCropRect) {
+    try {
+      if (renderActiveDrawingPreview(bindings, ctx)) canvas.contextTopDirty = true;
+    } finally {
       ctx.restore();
-      return;
     }
-
-    const cropBounds = activeCropRect.getBoundingRect();
-    const canvasWidth = bindings.getCanvasDocumentSize().width;
-    const canvasHeight = bindings.getCanvasDocumentSize().height;
-    const cropRight = cropBounds.left + cropBounds.width;
-    const cropBottom = cropBounds.top + cropBounds.height;
-    ctx.fillStyle = EDITOR_CANVAS_CROP_OVERLAY;
-    ctx.fillRect(0, 0, canvasWidth, cropBounds.top);
-    ctx.fillRect(0, cropBottom, canvasWidth, Math.max(0, canvasHeight - cropBottom));
-    ctx.fillRect(0, cropBounds.top, cropBounds.left, cropBounds.height);
-    ctx.fillRect(
-      cropRight,
-      cropBounds.top,
-      Math.max(0, canvasWidth - cropRight),
-      cropBounds.height
-    );
-    ctx.restore();
   };
 }

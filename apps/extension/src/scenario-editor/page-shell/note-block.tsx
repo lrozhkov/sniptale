@@ -18,11 +18,13 @@ export const guideNoteTypes = [
 export function GuideNoteBlock({
   block,
   disabled,
+  selected,
   onChange,
   t,
 }: {
   block: NoteBlock;
   disabled: boolean;
+  selected: boolean;
   onChange: (block: GuideBlock, group?: string | null) => void;
   t: Translate;
 }) {
@@ -35,23 +37,29 @@ export function GuideNoteBlock({
       role="note"
       aria-label={t(current.key)}
     >
-      <GuideActionMenu
-        label={t('scenario.editor.guideNoteType')}
-        icon={<Icon size={16} aria-hidden="true" />}
-        disabled={disabled}
-        items={guideNoteTypes.map((type) => ({
-          label: t(type.key),
-          icon:
-            type.tone === block.tone ? (
-              <Check size={16} aria-hidden="true" />
-            ) : (
-              <type.icon size={16} aria-hidden="true" />
-            ),
-          onSelect: () => {
-            if (type.tone !== block.tone) onChange({ ...block, tone: type.tone }, null);
-          },
-        }))}
-      />
+      <span className="guide-note-type">
+        <Icon className="guide-note-type-symbol" size={14} aria-hidden="true" />
+        {selected && (
+          <GuideActionMenu
+            label={t('scenario.editor.guideNoteType')}
+            icon={<Icon size={14} aria-hidden="true" />}
+            tone="utility"
+            disabled={disabled}
+            items={guideNoteTypes.map((type) => ({
+              label: t(type.key),
+              icon:
+                type.tone === block.tone ? (
+                  <Check size={16} aria-hidden="true" />
+                ) : (
+                  <type.icon size={16} aria-hidden="true" />
+                ),
+              onSelect: () => {
+                if (type.tone !== block.tone) onChange({ ...block, tone: type.tone }, null);
+              },
+            }))}
+          />
+        )}
+      </span>
       <GuideVoiceField
         aria-label={t('scenario.editor.guideNoteText')}
         placeholder={t('scenario.editor.guideNoteText')}

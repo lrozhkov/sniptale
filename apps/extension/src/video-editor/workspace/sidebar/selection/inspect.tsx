@@ -1,4 +1,7 @@
+import { EffectPresetEditingProvider } from './effect-instance/editing';
+import { InspectorDisclosurePreferences } from '../../../../composition/inspector-disclosures/state';
 import { InspectFxPanel } from './inspection/fx';
+import '../../../../ui/compact-inspector-controls/inspector-surface.css';
 import './inspector.css';
 import { InspectorSelectionFamilyContext } from './grouped-inspector/presentation';
 import { InspectorDetails } from './shared/details';
@@ -32,16 +35,20 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
         ? `track:${props.selectedTrack?.kind}`
         : props.selection.kind;
   return (
-    <InspectorSelectionFamilyContext.Provider value={family}>
-      <div
-        data-ui="video-editor.inspector.content"
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
-      >
-        <div className={PANEL_STACK_CLASS_NAME}>
-          <SelectionBody {...props} />
+    <InspectorDisclosurePreferences scope={`video:${family}`}>
+      <InspectorSelectionFamilyContext.Provider value={family}>
+        <div
+          data-ui="video-editor.inspector.content"
+          className="sniptale-inspector-surface min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
+        >
+          <div className={PANEL_STACK_CLASS_NAME}>
+            <EffectPresetEditingProvider key={JSON.stringify(props.selection)}>
+              <SelectionBody {...props} />
+            </EffectPresetEditingProvider>
+          </div>
         </div>
-      </div>
-    </InspectorSelectionFamilyContext.Provider>
+      </InspectorSelectionFamilyContext.Provider>
+    </InspectorDisclosurePreferences>
   );
 }
 
@@ -73,7 +80,10 @@ function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
           <p className={PANEL_META_CLASS_NAME}>
             {translate('videoEditor.sidebar.clipGroup')}: {clips.length}
           </p>
-          <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+          <InspectorDetails
+            preferenceId="inspect:videoEditor.sidebar.inspectorMoreDetails"
+            label={translate('videoEditor.sidebar.inspectorMoreDetails')}
+          >
             <ul className="space-y-2 text-sm text-[var(--sniptale-color-text-primary)]">
               {clips.map((clip) => (
                 <li key={clip.id} className="truncate" title={buildClipLabel(props.project, clip)}>

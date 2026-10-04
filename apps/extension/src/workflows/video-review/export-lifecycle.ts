@@ -1,13 +1,15 @@
+import { summarizeRecordingMetadata } from '../../features/media-hub/recording-metadata';
+import { createOutputFilename } from '../file-naming/index';
 import { configuredReviewExportPlan } from './export-configuration';
 import { resolveReviewOutputProfile } from './render-settings';
 import type { ReviewRenderSettings } from './media-index';
-import { isSafeArchiveEntryLeafFilename } from '@sniptale/platform/data/zip-profile/entry-filenames';
 import {
   assertAssetWriteAdmission,
   createSeekableAssetObjectWriter,
   readAssetFile,
   releaseAssetReadyProtection,
 } from '../../composition/persistence/assets';
+import { initDB } from '../../composition/persistence/infrastructure/indexed-db/core';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import {
   replayReviewHistory,
@@ -47,6 +49,7 @@ export interface ReviewExportReceipt extends ReviewPacketReceipt {
 const persistence = {
   assertAssetWriteAdmission,
   createSeekableAssetObjectWriter,
+  initDB,
   readAssetFile,
   releaseAssetReadyProtection,
   saveRecordingsBatchSafely,
@@ -187,7 +190,9 @@ export async function exportReviewedVideo(
       readProjectAsset: deps.readProjectAsset,
     });
   }
-  const speedAudio = !!index.audioCodec && edits.some((edit) => edit.kind === 'speed');
+  const speedAudio =
+    !!index.audioCodec &&
+    buildReviewTimeMap(index.duration, edits).some((part) => part.kind === 'speed');
   if (speedAudio && !(index.outputAudioCodecs?.[outputProfile.format] ?? index.processedAudioCodec))
     throw new QuickEditExportUnavailable(['audio-encoder']);
   const audioReencoded = speedAudio || !!exportAudio;
@@ -205,12 +210,18 @@ export async function exportReviewedVideo(
   const suffix = fragment
     ? `fragment-${fragment.start.toFixed(3)}-${fragment.end.toFixed(3)}`
     : 'edited';
-  const candidate = `${original.filename.replace(/\.[^.]+$/, '')}-${suffix}.${outputProfile.format}`;
-  const filename = isSafeArchiveEntryLeafFilename(candidate)
-    ? candidate
-    : `video-edited.${outputProfile.format}`;
+  const filename = await createOutputFilename({
+    category: 'recordings',
+    type: 'video-review',
+    title: original.filename.replace(/\.[^.]+$/, ''),
+    extension: outputProfile.format,
+    suffix,
+  });
   await deps.assertAssetWriteAdmission(original.file.size + 1024 * 1024);
   signal.throwIfAborted();
+  // Cold database admission reserves the exclusive transition gate; it must settle
+  // before the export writer holds a shared transition lease through publication.
+  await deps.initDB();
   const writer = await deps.createSeekableAssetObjectWriter({
     mimeType: `video/${outputProfile.format}`,
   });
@@ -267,6 +278,12 @@ export async function exportReviewedVideo(
         id,
         filename,
         preparedAsset: prepared,
+        ...(() => {
+          const recordingMetadata =
+            original.recordingMetadata ??
+            (original.telemetry ? summarizeRecordingMetadata(original.telemetry) : undefined);
+          return recordingMetadata ? { recordingMetadata } : {};
+        })(),
         mediaMetadata: {
           kind: 'video',
           width: outputSize.width,

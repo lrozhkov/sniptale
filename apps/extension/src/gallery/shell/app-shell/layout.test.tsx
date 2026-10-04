@@ -66,6 +66,7 @@ function createLayoutProps() {
     onBannerDismiss: vi.fn(),
     onClearSelection: vi.fn(),
     onConfirmDialogClose: vi.fn(),
+    onDeletionRequestClose: vi.fn(),
     onDeleteMany: vi.fn(),
     onExportBackup: vi.fn(),
     onFacetFilterChange: vi.fn(),
@@ -97,6 +98,7 @@ function createLayoutProps() {
     onResetFilters: vi.fn(),
     onSelectAllFiltered: vi.fn(),
     onSearchChange: vi.fn(),
+    onSearchCommit: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectionTagDraftChange: vi.fn(),
     onSelectionBackup: vi.fn(),
@@ -105,6 +107,7 @@ function createLayoutProps() {
     onViewModeChange: vi.fn(),
     onTagDraftChange: vi.fn(),
     onToggleSelection: vi.fn(),
+    onSelectRange: vi.fn(() => new Set<string>()),
     state: createGalleryState(),
     viewMode: 'compact-grid' as const,
   };
@@ -166,7 +169,7 @@ it('wires sidebar/main/overlay sections and normalizes storage info branches', (
   const withStorage = createLayoutProps();
   withStorage.state = createGalleryState({
     allTags: ['alpha'],
-    counts: { all: 4, export: 1, recording: 1, scenario: 1, screenshot: 2 },
+    counts: { all: 4, audio: 0, export: 1, recording: 1, scenario: 1, screenshot: 2 },
     filteredItems: [createMediaItem({ id: 'asset-1', tags: ['alpha'] })],
     facets: [
       {
@@ -198,6 +201,33 @@ it('wires sidebar/main/overlay sections and normalizes storage info branches', (
   expect(headerPropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ storageInfo: null }));
 });
 
+it('keeps the raw query in the header while the main content uses the applied query', () => {
+  const props = createLayoutProps();
+  props.state = createGalleryState({ search: 'unfinished query' });
+  props.state.filters.appliedSearch = 'previous query';
+
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+
+  expect(headerPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      search: 'unfinished query',
+      onSearchCommit: props.onSearchCommit,
+    })
+  );
+  expect(mainContentPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ search: 'previous query' })
+  );
+});
+
+it('marks a confirmed empty Library for its first-run empty state', () => {
+  const props = createLayoutProps();
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(mainContentPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ libraryEmpty: true })
+  );
+  expect(sidebarPropsMock).toHaveBeenLastCalledWith(expect.objectContaining({ countsKnown: true }));
+});
+
 it('passes all selected local media files to the dedicated import action', () => {
   const props = createLayoutProps();
   act(() => root?.render(<GalleryAppLayout {...props} />));
@@ -220,10 +250,18 @@ function expectLayoutSections(withStorage: ReturnType<typeof createLayoutProps>)
   expect(pageRoot?.className).toContain('overflow-hidden');
   expect(pageRoot?.className).not.toContain('fixed inset-0');
   expect(pageRoot?.className).not.toContain('h-screen');
+  expect(pageRoot?.className).toContain('p-3');
+  expect(container?.querySelector('[data-ui="test.header"]')?.parentElement?.className).toContain(
+    'gap-2'
+  );
+  expect(container?.querySelector('[data-ui="test.sidebar"]')?.parentElement?.className).toContain(
+    'gap-2'
+  );
   expect(sidebarPropsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       counts: expect.objectContaining({ scenario: 1 }),
       facets: [expect.objectContaining({ id: 'format' })],
+      trashSummary: withStorage.state.derived.trashSummary,
     })
   );
   expect(headerPropsMock).toHaveBeenCalledWith(
@@ -341,7 +379,7 @@ it('forwards facet, scope, grouped-recording, selection, and delete callbacks', 
   expect(props.onApplySelectionTag).toHaveBeenCalledWith('alpha');
   expect(onRecordingGroupOpen).toHaveBeenCalledTimes(1);
   expect(props.onScopeChange).toHaveBeenCalledWith('temporary');
-  expect(props.onDeleteMany).toHaveBeenCalledWith(props.state.derived.allItems);
+  expect(props.onDeleteMany).toHaveBeenCalledWith(props.state.derived.allItems, undefined);
 
   const {
     onFacetFilterChange: omittedFacetFilterChange,
@@ -365,4 +403,111 @@ it('forwards facet, scope, grouped-recording, selection, and delete callbacks', 
     fallbackSidebarProps.onScopeChange('all');
     fallbackMainProps.onScopeChange('all');
   }).not.toThrow();
+});
+
+it('shares the current filtered result count and selection authority with the sidebar', () => {
+  const props = createLayoutProps();
+  props.state.derived.hasResultContext = true;
+  props.state.derived.filteredItems = [createMediaItem({ id: 'matching' })];
+  props.state.storage.isBusy = true;
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  const header = headerPropsMock.mock.lastCall?.[0] as { resultActions: { onSelectAll(): void } };
+  expect(headerPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      resultActions: {
+        visible: true,
+        count: 1,
+        disabled: true,
+        onSelectAll: props.onSelectAllFiltered,
+      },
+    })
+  );
+  expect(sidebarPropsMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      filteredItemCount: 1,
+      onSelectAll: props.onSelectAllFiltered,
+    })
+  );
+  header.resultActions.onSelectAll();
+  expect(props.onSelectAllFiltered).toHaveBeenCalledOnce();
+});
+
+it('wires list keyboard commands and search exit through the existing shell handlers', () => {
+  const props = {
+    ...createLayoutProps(),
+    gridViewportRef: { current: null as HTMLDivElement | null },
+  };
+  const grid = document.createElement('div');
+  grid.tabIndex = -1;
+  document.body.append(grid);
+  props.gridViewportRef.current = grid;
+  props.state.selection.selectedItems = [createMediaItem()];
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  const header = headerPropsMock.mock.lastCall?.[0] as {
+    searchNavigation: {
+      inputRef: { current: HTMLInputElement | null };
+      onExit(): void;
+    };
+  };
+  const input = document.createElement('input');
+  input.value = 'current';
+  document.body.append(input);
+  header.searchNavigation.inputRef.current = input;
+  act(() =>
+    grid.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'KeyA',
+        key: 'a',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(props.onSelectAllFiltered).toHaveBeenCalledOnce();
+  act(() =>
+    grid.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(props.onClearSelection).toHaveBeenCalledOnce();
+  act(() =>
+    grid.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        code: 'KeyF',
+        key: 'f',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(document.activeElement).toBe(input);
+  expect(input.selectionEnd).toBe(7);
+  header.searchNavigation.onExit();
+  expect(document.activeElement).toBe(grid);
+  grid.remove();
+  input.remove();
+});
+
+it('presents one loading surface until the first snapshot, then preserves the shell on refresh or failure', () => {
+  const props = createLayoutProps();
+  props.state.storage.hasLoadedLibrarySnapshot = false;
+  props.state.storage.isLoading = true;
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(container?.querySelectorAll('[data-ui="gallery.loading"]')).toHaveLength(1);
+  expect(container?.querySelector('[data-ui="test.sidebar"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="test.main-content"]')).toBeNull();
+
+  props.state.storage.isLoading = false;
+  props.state.storage.banner = 'load failed';
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(container?.querySelector('[data-ui="gallery.loading"]')).toBeNull();
+  expect(mainContentPropsMock.mock.lastCall?.[0].banner).toBe('load failed');
+
+  props.state.storage.hasLoadedLibrarySnapshot = true;
+  props.state.storage.isLoading = true;
+  act(() => root?.render(<GalleryAppLayout {...props} />));
+  expect(container?.querySelector('[data-ui="gallery.loading"]')).toBeNull();
+  expect(container?.querySelector('[data-ui="test.sidebar"]')).not.toBeNull();
 });

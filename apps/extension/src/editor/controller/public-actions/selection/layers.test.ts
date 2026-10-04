@@ -102,37 +102,43 @@ function runSelectSuite() {
       .mockReturnValueOnce(false)
       .mockReturnValueOnce(true);
 
-    selectEditorLayerById({
-      canvas,
-      id: 'layer-1',
-      selectionOptions: { focusViewport: false, toggle: true },
-      ensureObjectReachable,
-      focusObjectInViewport,
-      commitHistory,
-      syncRuntimeState,
-    });
+    expect(
+      selectEditorLayerById({
+        canvas,
+        id: 'layer-1',
+        selectionOptions: { focusViewport: false, toggle: true },
+        ensureObjectReachable,
+        focusObjectInViewport,
+        commitHistory,
+        syncRuntimeState,
+      })
+    ).toBe(false);
     expect(commitHistory).not.toHaveBeenCalled();
     expect(syncRuntimeState).not.toHaveBeenCalled();
 
-    selectEditorLayerById({
-      canvas,
-      id: 'layer-1',
-      ensureObjectReachable,
-      focusObjectInViewport,
-      commitHistory,
-      syncRuntimeState,
-    });
+    expect(
+      selectEditorLayerById({
+        canvas,
+        id: 'layer-1',
+        ensureObjectReachable,
+        focusObjectInViewport,
+        commitHistory,
+        syncRuntimeState,
+      })
+    ).toBe(true);
     expect(commitHistory).not.toHaveBeenCalled();
     expect(syncRuntimeState).toHaveBeenCalledOnce();
 
-    selectEditorLayerById({
-      canvas,
-      id: 'layer-1',
-      ensureObjectReachable,
-      focusObjectInViewport,
-      commitHistory,
-      syncRuntimeState,
-    });
+    expect(
+      selectEditorLayerById({
+        canvas,
+        id: 'layer-1',
+        ensureObjectReachable,
+        focusObjectInViewport,
+        commitHistory,
+        syncRuntimeState,
+      })
+    ).toBe(true);
     expect(commitHistory).toHaveBeenCalledOnce();
     expect(syncRuntimeState).toHaveBeenCalledTimes(2);
     expect(mocks.selectLayerObjectMock).toHaveBeenNthCalledWith(

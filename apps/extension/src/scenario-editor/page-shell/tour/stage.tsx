@@ -4,9 +4,11 @@ import { createPortal } from 'react-dom';
 import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourPlayer } from '../../../features/scenario/tour-player/controller';
 import styles from '../../../features/scenario/tour-player/player.css?raw';
+import stageStyles from './stage-shadow.css?raw';
 import { tourPlayerLabels } from './labels';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
+import { tourActionTarget } from './action-navigation';
 
 /** The editor mounts the real scene renderer; the shadow root contains its stylesheet. */
 export function TourStage({
@@ -15,6 +17,7 @@ export function TourStage({
   selection,
   disabled = false,
   onSelectObject,
+  onNavigateSelection,
   onMoveObject,
   onResizeObject,
   onFrameCamera,
@@ -30,6 +33,7 @@ export function TourStage({
   selection: TourSelection | null;
   disabled?: boolean;
   onSelectObject: (id: string | null) => void;
+  onNavigateSelection?: (selection: Extract<TourSelection, { kind: 'slide' }>) => void;
   onResizeObject?: (id: string, rect: TourRect) => void;
   onMoveObject: (id: string, point: { x: number; y: number }) => void;
   t: Translate;
@@ -43,20 +47,35 @@ export function TourStage({
     onResizeObject,
     onFrameCamera,
     disabled,
+    onNavigateSelection,
   });
-  callbacks.current = { onSelectObject, onMoveObject, onResizeObject, onFrameCamera, disabled };
+  callbacks.current = {
+    onSelectObject,
+    onMoveObject,
+    onResizeObject,
+    onFrameCamera,
+    disabled,
+    onNavigateSelection,
+  };
   const labels = useRef(tourPlayerLabels(t)).current;
   const input = {
-    tour: view === 'preview' ? cameraPreviewTour(tour, selection) : tour,
+    tour:
+      view === 'preview'
+        ? { ...tour, playback: { ...tour.playback, autoplay: true, loop: false } }
+        : tour,
     labels,
     assets: Object.entries(images).flatMap(([id, src]) => (src ? [{ id, src }] : [])),
   };
   const latest = useRef({ input, selection });
   latest.current = { input, selection };
+  const hasAuthoringNavigation = Boolean(onNavigateSelection);
   useLayoutEffect(() => {
     if (!root.current) return;
     const player = createTourPlayer(root.current, latest.current.input, {
       preview: view === 'preview',
+      ...(view === 'preview' && latest.current.selection?.kind === 'slide'
+        ? { initialSlideId: latest.current.selection.slideId }
+        : {}),
       authoring:
         view === 'preview'
           ? undefined
@@ -67,6 +86,34 @@ export function TourStage({
               onSelectObject: (id) => callbacks.current.onSelectObject(id),
               onResizeObject: (id, rect) => callbacks.current.onResizeObject?.(id, rect),
               onMoveObject: (id, point) => callbacks.current.onMoveObject(id, point),
+              ...(hasAuthoringNavigation
+                ? {
+                    navigation: {
+                      canMove: (direction: -1 | 1) =>
+                        Boolean(
+                          tourActionTarget(
+                            latest.current.input.tour,
+                            latest.current.selection,
+                            direction
+                          )
+                        ),
+                      move: (direction: -1 | 1) => {
+                        const target = tourActionTarget(
+                          latest.current.input.tour,
+                          latest.current.selection,
+                          direction
+                        );
+                        if (target) callbacks.current.onNavigateSelection?.(target);
+                      },
+                      selectSlide: (slideId: string) =>
+                        callbacks.current.onNavigateSelection?.({
+                          kind: 'slide',
+                          slideId,
+                          objectId: null,
+                        }),
+                    },
+                  }
+                : {}),
             },
     });
     controller.current = player;
@@ -75,7 +122,7 @@ export function TourStage({
       player.dispose();
       controller.current = null;
     };
-  }, [shadow, view, previewKey]);
+  }, [shadow, view, previewKey, hasAuthoringNavigation]);
   useLayoutEffect(() => {
     if (!controller.current) return;
     controller.current.update(latest.current.input);
@@ -91,7 +138,7 @@ export function TourStage({
     <div
       className="tour-stage-host"
       data-view={view}
-      inert={view === 'preview'}
+      data-authoring-navigation={Boolean(onNavigateSelection)}
       onDragStart={(event) => event.preventDefault()}
       ref={(node) => {
         if (node && !node.shadowRoot) setShadow(node.attachShadow({ mode: 'open' }));
@@ -101,21 +148,7 @@ export function TourStage({
         createPortal(
           <>
             <style>{styles}</style>
-            <style>{`
-              :host { display: block; height: 100%; min-height: 0; font: 14px system-ui, sans-serif; }
-              #tour-player { height: 100%; background: transparent; }
-              .tour-toolbar, .tour-transport { display: none; }
-              .tour-scene[data-dragging=true], .tour-scene[data-dragging=true] * { cursor: grabbing !important; }
-              :host([data-view=frame]) .tour-hint,
-              :host([data-view=frame]) .tour-hotspot,
-              :host([data-view=frame]) .tour-mask:not(.tour-camera-frame) { display: none; }
-              .tour-camera-frame { box-shadow: 0 0 0 100vmax #11182766; z-index: 5; }
-              .tour-mask { border: 0; padding: 0; }
-              .tour-mask[data-selected=true] { outline: 2px solid var(--tour-accent); outline-offset: 2px; }
-              .tour-hotspot[data-selected=true], .tour-button[data-selected=true] {
-                z-index: 3; outline: 2px solid var(--tour-accent); outline-offset: 4px;
-              }
-            `}</style>
+            <style>{stageStyles}</style>
             <TourStageScaffold root={root} labels={labels} />
           </>,
           shadow
@@ -143,17 +176,13 @@ function TourStageScaffold({
 }) {
   return (
     <div id="tour-player" ref={root}>
-      <header className="tour-toolbar">
-        <button data-tour-contents>{labels.contents}</button>
-        <span data-tour-title />
-      </header>
       <div className="tour-viewport" data-tour-viewport>
         <section className="tour-stage" data-tour-stage>
           <div className="tour-scene" data-tour-scene />
         </section>
         <aside className="tour-hint" data-tour-hint hidden>
           <div className="tour-hint-header">
-            <span data-tour-hint-point-count hidden />
+            <strong className="tour-hint-action-title" data-tour-hint-action-title hidden />
             <button
               className="tour-button tour-caption-title"
               data-tour-hint-toggle
@@ -171,31 +200,41 @@ function TourStageScaffold({
             <button className="tour-button" data-tour-hint-previous aria-label={labels.previous}>
               {labels.previous}
             </button>
+            <span data-tour-hint-point-count hidden />
             <span data-tour-hint-count hidden />
             <button className="tour-button" data-tour-hint-next aria-label={labels.next}>
               {labels.next}
             </button>
           </div>
         </aside>
+        <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
       </div>
-      <footer className="tour-transport">
-        <button data-tour-previous>{labels.previous}</button>
-        <span data-tour-counter />
-        <button data-tour-next>{labels.next}</button>
+      <footer className="tour-toolbar">
+        <div className="tour-feedback">
+          <span className="tour-title" data-tour-title aria-live="polite" />
+          <span className="tour-playback-status" data-tour-status role="status" hidden />
+        </div>
+        <div className="tour-controls">
+          <div className="tour-playback" data-tour-playback />
+          <div className="tour-nav">
+            <button className="tour-button" data-tour-previous>
+              {labels.previous}
+            </button>
+            <span data-tour-counter />
+            <button className="tour-button" data-tour-next>
+              {labels.next}
+            </button>
+          </div>
+          <button
+            className="tour-button"
+            data-tour-contents
+            aria-haspopup="dialog"
+            aria-expanded="false"
+          >
+            {labels.contents}
+          </button>
+        </div>
       </footer>
-      <dialog className="tour-navigation" data-tour-navigation aria-label={labels.contents} />
     </div>
   );
-}
-
-function cameraPreviewTour(tour: TourDocument, selection: TourSelection | null): TourDocument {
-  const slide = tour.slides.find(
-    (entry) => entry.id === (selection?.kind === 'slide' ? selection.slideId : null)
-  );
-  return {
-    ...tour,
-    slides: slide ? [slide] : [],
-    playback: { ...tour.playback, autoplay: false, loop: false },
-    endScreen: { ...tour.endScreen, enabled: false },
-  };
 }

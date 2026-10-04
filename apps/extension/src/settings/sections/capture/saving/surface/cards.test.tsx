@@ -4,10 +4,6 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { productSelectPropsSpy } = vi.hoisted(() => ({
-  productSelectPropsSpy: vi.fn(),
-}));
-
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -21,67 +17,71 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
     onChange: (value: string) => void | Promise<void>;
     options: Array<{ label: string; value: string }>;
     value: string;
-  }) => {
-    productSelectPropsSpy(props);
-    return (
-      <select
-        aria-label={props['aria-label']}
-        data-testid="product-select"
-        disabled={props.disabled}
-        value={props.value}
-        onChange={(event) => void props.onChange(event.currentTarget.value)}
-      >
-        {props.options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    );
-  },
+  }) => (
+    <select
+      aria-label={props['aria-label']}
+      disabled={props.disabled}
+      value={props.value}
+      onChange={(event) => void props.onChange(event.currentTarget.value)}
+    >
+      {props.options.map((option) => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  ),
 }));
 
-import { SaveSettingsRows } from './cards';
+import { CaptureActionRow, DownloadPresetRows } from './cards';
 
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
+let container: HTMLDivElement;
+let root: Root;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  productSelectPropsSpy.mockReset();
 });
 
 afterEach(() => {
-  act(() => root?.unmount());
-  root = null;
-  container?.remove();
-  container = null;
+  act(() => root.unmount());
+  container.remove();
   vi.unstubAllGlobals();
-  vi.restoreAllMocks();
 });
 
-it('renders the save controls as compact label-and-select rows', async () => {
-  const onCaptureActionChange = vi.fn(async () => undefined);
-  const onDefaultImageChange = vi.fn(async () => undefined);
-  const onDefaultVideoChange = vi.fn(async () => undefined);
-  const onDefaultExportChange = vi.fn(async () => undefined);
-
+it('keeps after-capture behavior separate from file destination controls', async () => {
   await act(async () => {
-    root?.render(
-      <SaveSettingsRows
+    root.render(
+      <CaptureActionRow
         captureAction="download_default"
         captureActionOptions={[{ value: 'download_default', label: 'Download' }]}
+        isLoading={false}
+        onCaptureActionChange={vi.fn(async () => undefined)}
+      />
+    );
+  });
+  expect(container.querySelectorAll('select')).toHaveLength(1);
+  expect(container.textContent).toContain('savePresets.section.captureActionDescription');
+  expect(container.textContent).not.toContain('savePresets.section.downloadsDescription');
+});
+
+it('shows three compact file destination rows with live values and disabled state', async () => {
+  const onDefaultImageChange = vi.fn(async () => undefined);
+  const callbacks = {
+    onDefaultExportChange: vi.fn(async () => undefined),
+    onDefaultImageChange,
+    onDefaultVideoChange: vi.fn(async () => undefined),
+  };
+  await act(async () => {
+    root.render(
+      <DownloadPresetRows
+        {...callbacks}
         defaultExportPresetId="export"
         defaultImagePresetId="image"
         defaultVideoPresetId="video"
         isLoading={false}
-        onCaptureActionChange={onCaptureActionChange}
-        onDefaultExportChange={onDefaultExportChange}
-        onDefaultImageChange={onDefaultImageChange}
-        onDefaultVideoChange={onDefaultVideoChange}
         presetOptions={[
           { value: 'image', label: 'Image' },
           { value: 'video', label: 'Video' },
@@ -90,43 +90,32 @@ it('renders the save controls as compact label-and-select rows', async () => {
       />
     );
   });
-
-  const selects = Array.from(
-    container?.querySelectorAll<HTMLSelectElement>('[data-testid="product-select"]') ?? []
-  );
-  expect(selects).toHaveLength(4);
+  const selects = Array.from(container.querySelectorAll<HTMLSelectElement>('select'));
   expect(selects.map((select) => select.getAttribute('aria-label'))).toEqual([
-    'savePresets.section.captureActionLabel',
     'savePresets.section.imagePresetLabel',
     'savePresets.section.videoPresetLabel',
     'savePresets.section.exportPresetLabel',
   ]);
-  expect(container?.textContent).toContain('savePresets.section.captureActionLabel');
-  expect(container?.textContent).toContain('savePresets.section.imagePresetLabel');
-  expect(container?.textContent).not.toContain('savePresets.section.saveToGalleryLabel');
-  expect(container?.firstElementChild?.className).not.toContain('divide-y');
-  expect(container?.textContent).toContain('savePresets.section.captureActionDescription');
-  expect(container?.textContent).toContain('savePresets.section.downloadsDescription');
-
+  expect(selects.map((select) => select.value)).toEqual(['image', 'video', 'export']);
+  expect(container.textContent).not.toContain('savePresets.section.captureActionLabel');
   await act(async () => {
-    root?.render(
-      <SaveSettingsRows
-        captureAction="download_default"
-        captureActionOptions={[{ value: 'download_default', label: 'Download' }]}
+    selects[0]!.value = 'video';
+    selects[0]!.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(onDefaultImageChange).toHaveBeenCalledWith('video');
+  await act(async () => {
+    root.render(
+      <DownloadPresetRows
+        {...callbacks}
         defaultExportPresetId={null}
         defaultImagePresetId={null}
         defaultVideoPresetId={null}
         isLoading
-        onCaptureActionChange={onCaptureActionChange}
-        onDefaultExportChange={onDefaultExportChange}
-        onDefaultImageChange={onDefaultImageChange}
-        onDefaultVideoChange={onDefaultVideoChange}
         presetOptions={[{ value: '', label: 'Not set' }]}
       />
     );
   });
-
-  expect(productSelectPropsSpy).toHaveBeenLastCalledWith(
-    expect.objectContaining({ disabled: true, value: '' })
+  expect(Array.from(container.querySelectorAll('select')).every((select) => select.disabled)).toBe(
+    true
   );
 });

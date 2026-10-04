@@ -5,9 +5,14 @@ import { type PreparedAppliedDocument, prepareAppliedDocument } from '..';
 import { logEditorOpenTrace } from '../../core/debug';
 
 import type { SourceState } from '../../../document/model/source-state';
-import { maskCanvasElementDuringLoad } from './canvas';
+import {
+  freezeCanvasVisualDuringLoad,
+  maskCanvasElementDuringLoad,
+  renderCanvasAfterDocumentLoad,
+} from './canvas';
 import { loadPreparedDocumentOnCanvas } from './load';
 import type { AppliedDocumentCanvasLoadCallbacks, LoadPreparedDocumentOptions } from './types';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 function logPreparedDocument(prepared: PreparedAppliedDocument): void {
   logEditorOpenTrace('canvas:prepare', {
@@ -23,6 +28,7 @@ export async function applyEditorDocumentToCanvas(
     canvas: Canvas;
     document: EditorDocument;
     zoomLevel: number;
+    preserveViewport?: boolean;
     viewportDevicePixelRatioBaseline?: number;
   } & AppliedDocumentCanvasLoadCallbacks
 ): Promise<{
@@ -30,6 +36,13 @@ export async function applyEditorDocumentToCanvas(
   source: SourceState | null;
 }> {
   const prepared = prepareAppliedDocument(options.document);
+  const viewportPosition =
+    options.preserveViewport && options.canvas instanceof EditorCanvas
+      ? options.canvas.captureDocumentViewportPosition()
+      : null;
+  const restoreVisual = options.preserveViewport
+    ? freezeCanvasVisualDuringLoad(options.canvas)
+    : undefined;
   const restoreCanvasMask = maskCanvasElementDuringLoad(
     options.canvas,
     useEditorStore.getState().workspace.backgroundColor
@@ -41,6 +54,7 @@ export async function applyEditorDocumentToCanvas(
       canvas: options.canvas,
       prepared,
       zoomLevel: options.zoomLevel,
+      ...(options.preserveViewport ? { preserveViewport: true } : {}),
       prepareObject: options.prepareObject,
       rebuildFrameDecorations: options.rebuildFrameDecorations,
     };
@@ -51,12 +65,17 @@ export async function applyEditorDocumentToCanvas(
       loadOptions.viewportDevicePixelRatioBaseline = options.viewportDevicePixelRatioBaseline;
     }
     const source = await loadPreparedDocumentOnCanvas(loadOptions);
+    if (viewportPosition && options.canvas instanceof EditorCanvas) {
+      options.canvas.restoreDocumentViewportPosition(viewportPosition);
+      renderCanvasAfterDocumentLoad(options.canvas);
+    }
 
     return {
       prepared,
       source,
     };
   } finally {
+    restoreVisual?.();
     restoreCanvasMask?.();
   }
 }

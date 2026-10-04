@@ -74,6 +74,9 @@ export function normalizeSettingsTransferRegistryField(domainId: string, field: 
   if (domainId === 'styles.tags' && field !== 'tags') return 'active-filter';
   if (domainId === 'styles.tool-presets' && (field === 'step' || field === 'sceneBackground'))
     return 'items';
+  if (domainId === 'styles.tool-presets' && field === 'palette') return 'preferences';
+  if ((domainId === 'styles.surfaces' || domainId === 'styles.gradients') && field !== 'presets')
+    return 'defaults';
   if (domainId === 'ai.models' && field === 'defaultModelId') return 'default';
   if (domainId === 'ai.prompt-templates' && field === 'order') return 'items';
   if (domainId === 'styles.palettes' && field === 'slots') return 'items';

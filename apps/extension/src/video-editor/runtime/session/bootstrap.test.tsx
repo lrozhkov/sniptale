@@ -150,6 +150,28 @@ async function verifyRefreshFailuresSurfaceBeforeReady() {
 }
 
 describe('useVideoEditorBootstrap', () => {
+  it('opens an idle start page without a project write or export refresh', async () => {
+    const applyLoadedProject = vi.fn<ApplyLoadedProject>();
+    const setError = vi.fn();
+    const setReady = vi.fn();
+    const refreshProjectExports = vi.fn(async () => undefined);
+    loadInitialProjectFromLocationMock.mockResolvedValue({ project: null, recordingId: null });
+    await renderBootstrapHarness({
+      applyLoadedProject,
+      refreshProjectExports,
+      refreshProjects: async () => {
+        throw new Error('list unavailable');
+      },
+      refreshRecordings: async () => undefined,
+      setError,
+      setReady,
+    });
+    await flushEffects();
+    expect(applyLoadedProject).not.toHaveBeenCalled();
+    expect(refreshProjectExports).not.toHaveBeenCalled();
+    expect(setError).not.toHaveBeenCalled();
+    expect(setReady).toHaveBeenCalledWith(true);
+  });
   it(
     'waits for dependent library refreshes before marking the editor ready',
     verifyReadyWaitsForDependentRefreshes

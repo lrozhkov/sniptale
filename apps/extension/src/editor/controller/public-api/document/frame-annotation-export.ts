@@ -5,22 +5,25 @@ import { CUSTOM_JSON_PROPS } from '../../../document/model';
 import type { EditorRenderToDataUrlOptions } from '../../../document/model/render-options';
 import { flushActiveFrameAnnotationDraft } from '../../../frame-annotation/draft-coordinator';
 import { collectFrameAnnotationProxies } from '../../../frame-annotation/proxy';
-import { showToast } from '@sniptale/ui/product-feedback/toast-service';
-import { translate } from '../../../../platform/i18n';
 import { rasterizeFrameAnnotations } from '../../../../composition/frame-annotation-raster-client';
 import { createRuntimeMessagingTransport } from '../../../../platform/runtime-messaging';
+import { EditorCanvas } from '../../../document/canvas-surface/render-region';
 
 const frameAnnotationRasterTransport = createRuntimeMessagingTransport();
 const frameAnnotationExportQueues = new WeakMap<Canvas, Promise<void>>();
 
+export type FrameAnnotationDraftRenderPolicy = 'finalize' | 'committed';
+
 export async function renderEditorWithFrameAnnotations(options: {
   canvas: Canvas | null;
   canvasDocumentSize: { width: number; height: number };
+  draftPolicy?: FrameAnnotationDraftRenderPolicy;
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
+  options.renderOptions.signal?.throwIfAborted();
   const canvas = options.canvas;
   if (!canvas) {
-    flushActiveFrameAnnotationDraft();
+    if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
     return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
   }
   return enqueueFrameAnnotationExport(canvas, () =>
@@ -31,9 +34,11 @@ export async function renderEditorWithFrameAnnotations(options: {
 async function renderEditorWithFrameAnnotationsInTurn(options: {
   canvas: Canvas;
   canvasDocumentSize: { width: number; height: number };
+  draftPolicy?: FrameAnnotationDraftRenderPolicy;
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
-  flushActiveFrameAnnotationDraft();
+  options.renderOptions.signal?.throwIfAborted();
+  if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
   const { canvas } = options;
   const entries = collectFrameAnnotationProxies(canvas.getObjects());
   if (entries.length === 0) return renderEditorCanvasToDataUrl(canvas, options.renderOptions);
@@ -41,10 +46,12 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
   const signature = createCanvasVisualSignature(canvas);
   const output = await rasterizeFrameAnnotations({
     transport: frameAnnotationRasterTransport,
+    ...(options.renderOptions.signal ? { signal: options.renderOptions.signal } : {}),
     input: {
       baseImage: await renderBaseImage(
         canvas,
-        entries.map((entry) => entry.object)
+        entries.map((entry) => entry.object),
+        options.renderOptions.outputSize
       ),
       width: options.canvasDocumentSize.width,
       height: options.canvasDocumentSize.height,
@@ -58,12 +65,11 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
     },
     isCurrent: () => createCanvasVisualSignature(canvas) === signature,
   });
+  options.renderOptions.signal?.throwIfAborted();
   const result = await convertRasterBlob(output.blob, options.renderOptions);
+  options.renderOptions.signal?.throwIfAborted();
   if (createCanvasVisualSignature(canvas) !== signature) {
     throw new Error('Frame annotation raster result is stale');
-  }
-  if (output.metadata.downscaled) {
-    showToast(translate('highlighter.exportOptimizedSize'), 'warning');
   }
   return result;
 }
@@ -83,11 +89,21 @@ function enqueueFrameAnnotationExport<T>(canvas: Canvas, operation: () => Promis
   });
 }
 
-async function renderBaseImage(canvas: Canvas, proxies: FabricObject[]): Promise<Blob> {
+async function renderBaseImage(
+  canvas: Canvas,
+  proxies: FabricObject[],
+  outputSize?: EditorRenderToDataUrlOptions['outputSize']
+): Promise<Blob> {
   const visibility = proxies.map((object) => ({ object, visible: object.visible !== false }));
   for (const entry of visibility) entry.object.set({ visible: false });
   try {
-    return dataUrlToBlob(renderEditorCanvasToDataUrl(canvas, { format: 'png', quality: 1 }));
+    return dataUrlToBlob(
+      renderEditorCanvasToDataUrl(canvas, {
+        format: 'png',
+        quality: 1,
+        ...(outputSize ? { outputSize } : {}),
+      })
+    );
   } finally {
     for (const entry of visibility) entry.object.set({ visible: entry.visible });
     canvas.requestRenderAll();
@@ -103,16 +119,18 @@ const VISUAL_SIGNATURE_PROPS = [
 ] as const;
 
 function createCanvasVisualSignature(canvas: Canvas): string {
+  const virtualDocumentSize =
+    canvas instanceof EditorCanvas && canvas.hasVirtualViewport ? canvas.getDocumentSize() : null;
   return JSON.stringify({
     backgroundColor: serializeCanvasVisualValue(canvas.backgroundColor),
     backgroundImage: serializeCanvasVisualObject(canvas.backgroundImage),
     clipPath: serializeCanvasVisualObject(canvas.clipPath),
-    height: canvas.height,
+    height: virtualDocumentSize?.height ?? canvas.height,
     objects: canvas.getObjects().map(serializeCanvasVisualObject),
     overlayColor: serializeCanvasVisualValue(canvas.overlayColor),
     overlayImage: serializeCanvasVisualObject(canvas.overlayImage),
-    viewportTransform: canvas.viewportTransform,
-    width: canvas.width,
+    viewportTransform: virtualDocumentSize ? null : canvas.viewportTransform,
+    width: virtualDocumentSize?.width ?? canvas.width,
   });
 }
 

@@ -5,11 +5,10 @@ import type { FloatingToolbarGroup } from './canvas-toolbar-model';
 import { useToolPropertiesPopoverLayout } from './tool-properties-popover-layout';
 
 const TOOL_PROPERTIES_POPOVER_CLASS_NAME = floatingChromeClassNames(
-  'absolute left-[calc(100%+0.75rem)] top-[var(--editor-tool-properties-popover-top)]',
+  'absolute left-[var(--editor-tool-properties-popover-left)] top-[var(--editor-tool-properties-popover-top)]',
   'z-50 max-h-[var(--editor-floating-popover-max-height)]',
-  'overflow-y-auto p-3 [scrollbar-gutter:stable_both-edges]',
-  'max-[720px]:bottom-[calc(100%+0.75rem)] max-[720px]:left-0',
-  'max-[720px]:top-auto max-[720px]:translate-y-0'
+  'overflow-y-auto !rounded-none px-3 py-2 [scrollbar-gutter:stable_both-edges]',
+  'max-[720px]:translate-y-0'
 );
 
 const TOOL_PROPERTIES_POPOVER_WIDTH_CLASS_NAMES: Record<
@@ -52,6 +51,7 @@ export function ToolPropertiesButton(props: {
             {
               '--editor-floating-popover-max-height': `${popoverLayout.layout.maxHeight}px`,
               '--editor-tool-properties-popover-top': `${popoverLayout.layout.top}px`,
+              '--editor-tool-properties-popover-left': `${popoverLayout.layout.left}px`,
             } as React.CSSProperties
           }
         >

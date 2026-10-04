@@ -25,6 +25,7 @@ vi.mock('../viewport/interactions', () => ({
 
 function createBindings() {
   const viewportElement = document.createElement('div');
+  const canvas = { requestRenderAll: vi.fn() };
   const rasterToolSession = {
     hoverCursor: null as { scenePoint: { x: number; y: number }; tool: 'eraser' } | null,
     selection: null,
@@ -51,6 +52,7 @@ function createBindings() {
   });
 
   return {
+    getCanvas: vi.fn(() => canvas),
     getActiveTool: vi.fn(() => 'select'),
     getIsSpacePressed: vi.fn(() => true),
     getPanSession: vi.fn(() => ({ id: 'existing-pan' })),
@@ -79,8 +81,10 @@ function registerPanLifecycleTest() {
 
     handlers.handleViewportMouseDown(event);
     handlers.handleViewportScroll();
+
+    expect(bindings.getCanvas().requestRenderAll).toHaveBeenCalledOnce();
     handlers.handleWindowMouseMove(new MouseEvent('mousemove'));
-    handlers.handleWindowMouseUp();
+    handlers.handleWindowMouseUp(new MouseEvent('mouseup', { button: 0 }));
 
     expect(bindings.setPanSession).toHaveBeenNthCalledWith(1, { id: 'existing-pan' });
     expect(scheduleEditorViewportStateSyncFrameMock).toHaveBeenCalledWith(
@@ -148,4 +152,65 @@ describe('createPanEventHandlers', () => {
   registerPanLifecycleTest();
   registerPanSyncCallbackTest();
   registerWheelZoomTest();
+  it('pans with the right button and suppresses only the menu following a drag', () => {
+    const bindings = createBindings();
+    const viewport = bindings.getViewportElement();
+    const handlers = createPanEventHandlers(bindings as never);
+    startEditorViewportPanMock.mockReturnValueOnce({ startX: 10, startY: 10 });
+    bindings.getPanSession.mockReturnValue({ startX: 10, startY: 10 } as never);
+
+    handlers.handleViewportMouseDown(
+      new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10 })
+    );
+    handlers.handleWindowMouseMove(new MouseEvent('mousemove', { clientX: 20, clientY: 10 }));
+    const dragMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+    handlers.handleViewportContextMenu(dragMenu);
+    expect(dragMenu.defaultPrevented).toBe(true);
+    expect(moveEditorViewportPanMock).toHaveBeenCalledWith(
+      expect.objectContaining({ viewportElement: viewport })
+    );
+
+    handlers.handleWindowMouseUp(new MouseEvent('mouseup', { button: 2 }));
+    const keyboardMenu = new MouseEvent('contextmenu', { cancelable: true, button: 0 });
+    handlers.handleViewportContextMenu(keyboardMenu);
+    expect(keyboardMenu.defaultPrevented).toBe(false);
+    handlers.handleViewportMouseDown(
+      new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10 })
+    );
+    handlers.handleWindowMouseUp(new MouseEvent('mouseup', { button: 2 }));
+    const clickMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, button: 2 });
+    handlers.handleViewportContextMenu(clickMenu);
+    expect(clickMenu.defaultPrevented).toBe(false);
+  });
+
+  it('defers an early right-click menu until release and drops it after a drag', () => {
+    const bindings = createBindings();
+    const handlers = createPanEventHandlers(bindings as never);
+    const target = document.createElement('div');
+    const replayed = vi.fn();
+    target.addEventListener('contextmenu', replayed);
+    startEditorViewportPanMock.mockReturnValue({ startX: 10, startY: 10 });
+    bindings.getPanSession.mockReturnValue({ startX: 10, startY: 10 } as never);
+
+    handlers.handleViewportMouseDown(
+      new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10 })
+    );
+    const earlyClick = new MouseEvent('contextmenu', { button: 2, cancelable: true });
+    Object.defineProperty(earlyClick, 'target', { value: target });
+    handlers.handleViewportContextMenu(earlyClick);
+    expect(earlyClick.defaultPrevented).toBe(true);
+    expect(replayed).not.toHaveBeenCalled();
+    handlers.handleWindowMouseUp(new MouseEvent('mouseup', { button: 2 }));
+    expect(replayed).toHaveBeenCalledOnce();
+
+    handlers.handleViewportMouseDown(
+      new MouseEvent('mousedown', { button: 2, clientX: 10, clientY: 10 })
+    );
+    const earlyDrag = new MouseEvent('contextmenu', { button: 2, cancelable: true });
+    Object.defineProperty(earlyDrag, 'target', { value: target });
+    handlers.handleViewportContextMenu(earlyDrag);
+    handlers.handleWindowMouseMove(new MouseEvent('mousemove', { clientX: 20, clientY: 10 }));
+    handlers.handleWindowMouseUp(new MouseEvent('mouseup', { button: 2 }));
+    expect(replayed).toHaveBeenCalledOnce();
+  });
 });

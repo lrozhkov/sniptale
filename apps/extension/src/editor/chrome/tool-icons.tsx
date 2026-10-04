@@ -5,6 +5,7 @@ import {
   Crop,
   Droplet,
   FileImage,
+  Folder,
   Hash,
   Highlighter,
   Image as ImageIcon,
@@ -64,6 +65,7 @@ const OBJECT_TYPE_TO_TOOL = {
   'source-image': 'image',
   'meta-stamp': 'text',
   'rich-shape': 'shape',
+  group: 'select',
 } satisfies Partial<Record<EditorObjectType, EditorTool>>;
 
 const LAYER_ICON_COMPONENTS = {
@@ -73,6 +75,7 @@ const LAYER_ICON_COMPONENTS = {
   'source-image': FileImage,
   image: FileImage,
   'meta-stamp': Type,
+  group: Folder,
 } satisfies Partial<Record<EditorObjectType, ToolIconComponent>>;
 
 function renderToolIcon(tool: EditorTool, size = 18): React.ReactNode {

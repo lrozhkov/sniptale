@@ -95,7 +95,13 @@ function ensurePendingPageStyleHistory(
       timer: null,
       transactionId: createInspectorMutationId('design-review'),
     };
-    if (!pagePreparationHistory.beginTransaction(pendingHistoryCommit.transactionId)) {
+    if (
+      !pagePreparationHistory.beginTransaction(
+        pendingHistoryCommit.transactionId,
+        null,
+        'design-review'
+      )
+    ) {
       pendingHistoryCommit = null;
       throw new Error('Page style history transaction is unavailable');
     }

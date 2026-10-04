@@ -18,6 +18,14 @@ export function createEditorControllerPublicApiMethods(controller: EditorControl
     nextLabelIndex: (type: EditorObjectType) => controller.nextLabelIndex(type),
     commitHistory: () => controller.commitHistory(),
     syncRuntimeState: () => controller.syncRuntimeState(),
+    publishHistoryDocument: (
+      document: EditorDocument,
+      options: { scheduleAutosave?: boolean } = {}
+    ) => {
+      controller.syncRuntimeState();
+      if (options.scheduleAutosave !== false)
+        controller.autosaveService?.scheduleAutosave(document);
+    },
     ensureObjectReachable: (object: FabricObject) => controller.ensureObjectReachable(object),
     focusObjectInViewport: (object: FabricObject) => controller.focusObjectInViewport(object),
     ensureReachableObjects: () => controller.ensureReachableObjects(),

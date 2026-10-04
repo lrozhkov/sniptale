@@ -1,4 +1,5 @@
-import { ArrowUpRight, FileStack } from 'lucide-react';
+import { ScenarioEditorIcon } from '@sniptale/ui/editor-chrome';
+import { ArrowUpRight } from 'lucide-react';
 import { buildScenarioEditorUrl } from '../../../platform/navigation/extension-pages/scenario-editor';
 import { translate } from '../../../platform/i18n';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
@@ -11,7 +12,7 @@ export function GalleryScenarioProjectsCard(props: { scenarioProjects: ScenarioP
         p-4 shadow-sm"
     >
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-        <FileStack className="h-4 w-4 text-[var(--sniptale-color-accent-emphasis)]" />
+        <ScenarioEditorIcon className="h-4 w-4 text-[var(--sniptale-color-accent-emphasis)]" />
         {translate('gallery.app.scenarioProjectsTitle')}
       </div>
       <div className="grid gap-2">

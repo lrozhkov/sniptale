@@ -8,7 +8,7 @@ import { SelectField } from '../../../chrome/ui';
 function buildBrowserFrameCanvasModeCommand(params: InspectorCommandParams): CompactCommand {
   return {
     id: 'browser-frame-canvas-mode',
-    title: translate('editor.compact.canvas'),
+    title: translate('editor.compact.canvasBehavior'),
     trigger: <CompactCommandToken>CV</CompactCommandToken>,
     value:
       params.browserFrame.canvasMode === 'resize'
@@ -41,7 +41,7 @@ function buildBrowserFrameCanvasModeCommand(params: InspectorCommandParams): Com
 function buildBrowserFrameContentModeCommand(params: InspectorCommandParams): CompactCommand {
   return {
     id: 'browser-frame-content-mode',
-    title: translate('editor.compact.scene'),
+    title: translate('editor.compact.sceneBehavior'),
     trigger: <CompactCommandToken>SC</CompactCommandToken>,
     value:
       params.browserFrame.contentMode === 'push-down'

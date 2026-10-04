@@ -29,14 +29,24 @@ export type RuntimeFrameAnnotationRasterRequestByType = {
         operation: 'rasterize';
         reference: FrameAnnotationRasterReferencePayload;
       };
-  [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: {
-    type: typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE;
-    capabilityToken: string;
-    reference: FrameAnnotationRasterReferencePayload;
-  };
+  [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]:
+    | {
+        type: typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE;
+        capabilityToken: string;
+        operation: 'prepare';
+        leaseId: string;
+      }
+    | {
+        type: typeof MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE;
+        capabilityToken: string;
+        operation?: never;
+        reference: FrameAnnotationRasterReferencePayload;
+      };
 };
 
 export type RuntimeFrameAnnotationRasterResponseByType = {
   [MessageType.FRAME_ANNOTATION_RASTERIZE]: RuntimeMessageResponse<{ result: string }>;
-  [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: RuntimeMessageResponse<{ result: string }>;
+  [MessageType.OFFSCREEN_FRAME_ANNOTATION_RASTERIZE]: RuntimeMessageResponse<
+    { result: 'applied' } | { result: 'prepared'; leaseId: string }
+  >;
 };

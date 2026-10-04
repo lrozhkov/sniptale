@@ -25,7 +25,10 @@ function renderHeader() {
     root?.render(
       <ScenarioRecorderSidebarHeader
         dragging={false}
+        onCollapse={vi.fn()}
         onMouseDown={vi.fn()}
+        onProjectMenuToggle={vi.fn()}
+        projectMenuOpen={false}
         projectName="Scenario"
       />
     );
@@ -51,12 +54,26 @@ it('renders only the project summary without the sidebar steps label', () => {
 
   const surface = container?.querySelector('div');
 
-  expect(container?.textContent).toContain('scenario.content.project');
+  expect(
+    container
+      ?.querySelector('[data-ui="content.scenario.sidebar.project-button"]')
+      ?.getAttribute('title')
+  ).toBe('scenario.content.projectButton');
   expect(container?.textContent).toContain('Scenario');
   expect(container?.textContent).not.toContain('scenario.content.sidebar');
   expect(container?.textContent).not.toContain('scenario.content.stepsCount');
-  expect(surface?.className).toContain('rounded-[18px]');
+  expect(container?.querySelectorAll('.lucide-grip')).toHaveLength(1);
+  expect(surface?.className).toContain('rounded-[14px]');
   expect(
     container?.querySelector('[data-ui="content.scenario.sidebar.drag-handle"]')
   ).not.toBeNull();
+});
+
+it('keeps project selection outside the panel drag handle', () => {
+  renderHeader();
+  const dragHandle = container?.querySelector('[data-ui="content.scenario.sidebar.drag-handle"]');
+  const projectButton = container?.querySelector(
+    '[data-ui="content.scenario.sidebar.project-button"]'
+  );
+  expect(dragHandle?.contains(projectButton ?? null)).toBe(false);
 });

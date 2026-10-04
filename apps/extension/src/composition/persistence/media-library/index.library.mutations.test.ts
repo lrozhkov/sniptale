@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MediaLibraryEntry } from './contracts';
+import type { MediaAssetProjectUsage } from './usage';
 
 const dbMocks = vi.hoisted(() => ({
+  listMediaAssetProjectUsageMock: vi.fn(async (): Promise<MediaAssetProjectUsage[]> => []),
+  deleteCascadeMock: vi.fn(),
   deleteProjectAssetMock: vi.fn(),
   deleteProjectExportMock: vi.fn(),
   deleteRecordingMock: vi.fn(),
@@ -12,6 +15,16 @@ const dbMocks = vi.hoisted(() => ({
   putMock: vi.fn(),
   listReadyJournalsMock: vi.fn(),
   txDoneMock: vi.fn(),
+}));
+vi.mock('./usage', () => ({
+  listMediaAssetProjectUsage: dbMocks.listMediaAssetProjectUsageMock,
+}));
+vi.mock('./delete-cascade.sources', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./delete-cascade.sources')>()),
+  recoverMediaSourcePublications: vi.fn(),
+}));
+vi.mock('./delete-cascade', () => ({
+  deleteMediaAssetWithProjectCascade: dbMocks.deleteCascadeMock,
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -125,13 +138,10 @@ function mockDeleteMediaLibraryAssetEntries() {
 }
 
 function expectDeleteMediaLibraryAssetCleanup() {
-  expect(dbMocks.deleteRecordingMock).toHaveBeenCalledWith('rec-1');
-  expect(dbMocks.deleteProjectExportMock).toHaveBeenCalledWith('exp-1');
-  expect(dbMocks.deleteRecordingMock).toHaveBeenCalledOnce();
-  expect(dbMocks.deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
-  ['recording', 'export', 'asset', 'screenshot'].forEach((assetId) =>
-    expect(dbMocks.objectStoreDeleteMock).toHaveBeenCalledWith(assetId)
-  );
+  for (const id of ['recording', 'export', 'asset', 'screenshot']) {
+    expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith(id, []);
+  }
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -142,13 +152,38 @@ beforeEach(() => {
 });
 
 function registerUpdateMediaLibraryEntryTests() {
+  it('writes an empty metadata patch and awaits transaction completion', async () => {
+    dbMocks.objectStoreGetMock.mockResolvedValue(createMediaEntry());
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(999);
+    let complete!: () => void;
+    dbMocks.txDoneMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        complete = resolve;
+      })
+    );
+    let settled = false;
+    const pending = updateMediaLibraryEntry('asset-1', {}).then(() => {
+      settled = true;
+    });
+    try {
+      await vi.waitFor(() => expect(dbMocks.putMock).toHaveBeenCalledOnce());
+      expect(dbMocks.putMock).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: 999 }));
+      expect(settled).toBe(false);
+      complete();
+      await pending;
+      expect(settled).toBe(true);
+    } finally {
+      complete();
+      clock.mockRestore();
+    }
+  });
   it('updates media metadata while preserving existing tags and refresh timestamps', async () => {
     const existingEntry = createMediaEntry({
       tags: ['old'],
       sourceTitle: 'Before',
       lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 100 },
     });
-    dbMocks.getMock.mockResolvedValue(existingEntry);
+    dbMocks.objectStoreGetMock.mockResolvedValue(existingEntry);
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(999);
 
     try {
@@ -161,7 +196,6 @@ function registerUpdateMediaLibraryEntryTests() {
     }
 
     expect(dbMocks.putMock).toHaveBeenCalledWith(
-      'media_library',
       expect.objectContaining({
         filename: 'renamed.png',
         sourceTitle: 'After',
@@ -188,12 +222,26 @@ function registerDeleteMediaLibraryAssetTests() {
 }
 
 function registerDeleteMediaLibraryAssetFailureTests() {
+  it('refuses to delete a source still referenced by a project', async () => {
+    dbMocks.getMock.mockResolvedValue(createMediaEntry());
+    dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce([
+      { id: 'project-1', kind: 'video', name: 'Video', primary: false },
+    ]);
+
+    await expect(deleteMediaLibraryAsset('recording')).rejects.toMatchObject({
+      assetId: 'recording',
+      stage: 'linked-source-cleanup',
+    });
+    expect(dbMocks.deleteRecordingMock).not.toHaveBeenCalled();
+    expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
+  });
+
   it('preserves media rows when source cleanup fails', async () => {
     const sourceError = new Error('recording delete failed');
     dbMocks.getMock.mockResolvedValue(
       createMediaEntry({ source: { kind: 'recording', recordingId: 'rec-1' } })
     );
-    dbMocks.deleteRecordingMock.mockRejectedValue(sourceError);
+    dbMocks.deleteCascadeMock.mockRejectedValueOnce(sourceError);
 
     try {
       await deleteMediaLibraryAsset('recording');
@@ -210,12 +258,12 @@ function registerDeleteMediaLibraryAssetFailureTests() {
     expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
   });
 
-  it('surfaces explicit failure when media rows fail after source cleanup', async () => {
+  it('does not run a second media-row deletion after atomic cascade failure', async () => {
     const transactionError = new Error('transaction failed');
     dbMocks.getMock.mockResolvedValue(
       createMediaEntry({ source: { kind: 'project-asset', projectAssetId: 'asset-1' } })
     );
-    dbMocks.txDoneMock.mockReturnValueOnce(Promise.reject(transactionError));
+    dbMocks.deleteCascadeMock.mockRejectedValueOnce(transactionError);
 
     try {
       await deleteMediaLibraryAsset('asset');
@@ -225,11 +273,11 @@ function registerDeleteMediaLibraryAssetFailureTests() {
       expect(error).toMatchObject({
         assetId: 'asset',
         cause: transactionError,
-        stage: 'media-library-transaction',
+        stage: 'linked-source-cleanup',
       });
     }
 
-    expect(dbMocks.deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
+    expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
   });
 }
 
@@ -237,4 +285,31 @@ describe('media-library-db.library mutations', () => {
   registerUpdateMediaLibraryEntryTests();
   registerDeleteMediaLibraryAssetTests();
   registerDeleteMediaLibraryAssetFailureTests();
+});
+
+it('refuses permanent deletion while an image workspace publication still owns pending bytes', async () => {
+  dbMocks.listReadyJournalsMock.mockResolvedValueOnce([
+    { domain: 'image-workspace', payload: { aggregateId: 'pending-image' } },
+  ]);
+  await expect(deleteMediaLibraryAsset('pending-image')).rejects.toMatchObject({
+    assetId: 'pending-image',
+    stage: 'linked-source-cleanup',
+    cause: expect.objectContaining({ reason: 'pending-publication' }),
+  });
+  expect(dbMocks.deleteCascadeMock).not.toHaveBeenCalled();
+  expect(dbMocks.objectStoreDeleteMock).not.toHaveBeenCalled();
+});
+
+it.each<MediaLibraryEntry['source']>([
+  { kind: 'screenshot' },
+  { kind: 'project-export', exportId: 'exp-1', projectId: 'project-1' },
+  { kind: 'web-snapshot', snapshotId: 'snapshot-1' },
+])('routes confirmed linked $kind media through the shared project cascade', async (source) => {
+  const usage: MediaAssetProjectUsage[] = [
+    { id: 'scenario', kind: 'scenario', name: 'Guide', primary: false },
+  ];
+  dbMocks.getMock.mockResolvedValue(createMediaEntry({ id: 'linked', source }));
+  dbMocks.listMediaAssetProjectUsageMock.mockResolvedValueOnce(usage);
+  await deleteMediaLibraryAsset('linked', { expectedUsage: usage });
+  expect(dbMocks.deleteCascadeMock).toHaveBeenCalledWith('linked', usage);
 });

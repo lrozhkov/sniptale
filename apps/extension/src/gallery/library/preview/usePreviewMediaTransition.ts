@@ -1,143 +1,155 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { isGalleryMediaItem, type GalleryItem } from '../items';
+import type { GalleryPreviewPresentation } from '../types';
 
 type PreviewTransitionDirection = -1 | 0 | 1;
-
 interface PreviewTransitionFrame {
   direction: PreviewTransitionDirection;
   item: GalleryItem;
   naturalSize: { height: number; width: number } | null;
   previewUrl: string | null;
   revision: number;
+  requestKey: string;
 }
 
-const UNRESOLVED_PREVIEW_HOLD_MS = 320;
-
-function canRenderPreview(item: GalleryItem, previewUrl: string | null): boolean {
-  return !isGalleryMediaItem(item) || previewUrl !== null;
-}
-
-function isImagePreview(item: GalleryItem, previewUrl: string | null): boolean {
-  return (
-    previewUrl !== null &&
-    isGalleryMediaItem(item) &&
-    (item.kind === 'image' || item.kind === 'screenshot' || item.kind === 'web-archive')
-  );
-}
-
-function getTransitionDirection(
-  previousPosition: number | undefined,
-  nextPosition: number | undefined
-): PreviewTransitionDirection {
-  if (previousPosition === undefined || nextPosition === undefined) return 0;
-  if (nextPosition > previousPosition) return 1;
-  if (nextPosition < previousPosition) return -1;
-  return 0;
-}
-
+/** Keeps the last decoded frame while the selected request prepares its replacement. */
 export function usePreviewMediaTransition(args: {
   item: GalleryItem;
   navigationPosition: number | undefined;
   previewUrl: string | null;
-}): PreviewTransitionFrame {
-  const [frame, setFrame] = useState<PreviewTransitionFrame>({
-    direction: 0,
-    item: args.item,
-    naturalSize: null,
-    previewUrl: args.previewUrl,
-    revision: 0,
-  });
-  const requestRef = useRef({ id: args.item.id, position: args.navigationPosition });
-  const pendingDirectionRef = useRef<PreviewTransitionDirection>(0);
+  loadStatus?: 'loading' | 'ready' | 'missing' | 'error' | undefined;
+  requestRevision?: number | undefined;
+  onPresented?: ((presentation: GalleryPreviewPresentation) => void) | undefined;
+}) {
+  const requestKey = `${args.requestRevision ?? 0}:${args.item.id}:${args.previewUrl ?? ''}`;
+  const request = useRef(requestKey);
+  request.current = requestKey;
+  const callback = useRef(args.onPresented);
+  callback.current = args.onPresented;
+  const [frame, setFrame] = useState<PreviewTransitionFrame | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const previousPosition = useRef(args.navigationPosition);
+  const direction = useRef<PreviewTransitionDirection>(0);
+  const media = isGalleryMediaItem(args.item);
+  const terminal = media && (args.loadStatus === 'missing' || args.loadStatus === 'error');
+  const invalid = failure === requestKey;
+  const pending = !terminal && !invalid && frame?.requestKey !== requestKey;
+  const video =
+    media &&
+    (args.item.kind === 'video' || args.item.kind === 'recording') &&
+    args.previewUrl !== null;
+  const { item, previewUrl, navigationPosition, loadStatus, requestRevision } = args;
+  const commit = useCallback(
+    (naturalSize: PreviewTransitionFrame['naturalSize']) => {
+      if (request.current !== requestKey) return;
+      setFrame((current) =>
+        current?.requestKey === requestKey
+          ? current
+          : {
+              item,
+              previewUrl,
+              naturalSize,
+              direction: current?.item.id === item.id ? 0 : direction.current,
+              revision: (current?.revision ?? 0) + 1,
+              requestKey,
+            }
+      );
+    },
+    [item, previewUrl, requestKey]
+  );
+  const fail = useCallback(() => {
+    if (request.current === requestKey) setFailure(requestKey);
+  }, [requestKey]);
 
   useEffect(() => {
-    const previousRequest = requestRef.current;
-    const itemChanged = previousRequest.id !== args.item.id;
-    if (itemChanged) {
-      pendingDirectionRef.current = getTransitionDirection(
-        previousRequest.position,
-        args.navigationPosition
-      );
+    const position = navigationPosition;
+    const previous = previousPosition.current;
+    if (position !== undefined && previous !== undefined && position !== previous) {
+      direction.current = position > previous ? 1 : -1;
     }
-    requestRef.current = { id: args.item.id, position: args.navigationPosition };
-
-    if (canRenderPreview(args.item, args.previewUrl)) {
-      let disposed = false;
-      const commitFrame = (naturalSize: PreviewTransitionFrame['naturalSize']) => {
-        if (disposed) return;
-        setFrame((current) => {
-          if (current.item.id === args.item.id && current.previewUrl === args.previewUrl) {
-            return current;
-          }
-          const direction = current.item.id === args.item.id ? 0 : pendingDirectionRef.current;
-          pendingDirectionRef.current = 0;
-          return {
-            direction,
-            item: args.item,
-            naturalSize,
-            previewUrl: args.previewUrl,
-            revision: current.revision + 1,
-          };
-        });
+    previousPosition.current = position;
+    if (terminal || invalid) {
+      setFrame(null);
+      return;
+    }
+    if (media && (!previewUrl || loadStatus === 'loading')) return;
+    if (video) return;
+    let disposed = false;
+    if (
+      media &&
+      previewUrl &&
+      (item.kind === 'image' || item.kind === 'screenshot' || item.kind === 'web-archive')
+    ) {
+      const image = new Image();
+      image.onload = () => {
+        if (!disposed) commit({ height: image.naturalHeight, width: image.naturalWidth });
       };
-
-      if (isImagePreview(args.item, args.previewUrl)) {
-        const image = new Image();
-        image.onload = () =>
-          commitFrame({
-            height: image.naturalHeight,
-            width: image.naturalWidth,
-          });
-        image.onerror = () => commitFrame(null);
-        image.src = args.previewUrl ?? '';
-        return () => {
-          disposed = true;
-          image.onload = null;
-          image.onerror = null;
-        };
-      }
-
-      commitFrame(null);
+      image.onerror = () => {
+        if (!disposed) fail();
+      };
+      image.src = previewUrl;
       return () => {
         disposed = true;
+        image.onload = null;
+        image.onerror = null;
+        image.src = '';
       };
     }
+    commit(null);
+    return () => {
+      disposed = true;
+    };
+  }, [
+    terminal,
+    invalid,
+    loadStatus,
+    media,
+    video,
+    navigationPosition,
+    previewUrl,
+    item.kind,
+    commit,
+    fail,
+  ]);
 
-    const timeoutId = window.setTimeout(() => {
-      setFrame((current) => {
-        if (current.item.id === args.item.id) return current;
-        pendingDirectionRef.current = 0;
-        return {
-          direction: 0,
-          item: args.item,
-          naturalSize: null,
-          previewUrl: null,
-          revision: current.revision + 1,
-        };
+  const outcome = terminal || invalid ? 'terminal' : pending ? null : 'presented';
+  useEffect(() => {
+    if (outcome)
+      callback.current?.({
+        requestRevision: requestRevision ?? 0,
+        url: outcome === 'presented' ? previewUrl : null,
+        outcome,
       });
-    }, UNRESOLVED_PREVIEW_HOLD_MS);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [args.item, args.navigationPosition, args.previewUrl]);
-
-  return frame;
+  }, [requestKey, outcome, requestRevision, previewUrl]);
+  return {
+    frame: terminal || invalid ? null : frame,
+    pending,
+    invalid,
+    commitVideo: () => commit(null),
+    fail,
+    prepareVideo: video && pending && args.loadStatus !== 'loading',
+  };
 }
 
 export function usePreviewMediaTransitionAnimation(
   elementRef: RefObject<HTMLDivElement | null>,
-  frame: PreviewTransitionFrame
+  frame: PreviewTransitionFrame | null
 ) {
+  const direction = frame?.direction ?? 0;
+  const revision = frame?.revision ?? 0;
+  const hasFrame = frame !== null;
   useEffect(() => {
     const element = elementRef.current;
+    if (!hasFrame) return;
     if (!element?.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       return undefined;
     }
 
-    const offset = frame.direction * 18;
+    const offset = direction * 18;
     const animation = element.animate(
       [
         {
-          opacity: frame.direction === 0 ? 0.88 : 0.82,
+          opacity: direction === 0 ? 0.88 : 0.82,
           transform: `translate3d(${offset}px, 0, 0)`,
         },
         { opacity: 1, transform: 'translate3d(0, 0, 0)' },
@@ -150,5 +162,5 @@ export function usePreviewMediaTransitionAnimation(
     );
 
     return () => animation.cancel();
-  }, [elementRef, frame.direction, frame.revision]);
+  }, [elementRef, direction, revision, hasFrame]);
 }

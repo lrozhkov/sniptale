@@ -48,6 +48,7 @@ export const runtimeActionPagePackageDownloadLeaseContracts = {
       'runtime OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE message',
       createMessageGuard({
         type: MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,
+        optional: { downloadFormat: (value) => value === 'html' },
         required: {
           capabilityToken: isString,
           downloadOperationId: isOperationId,

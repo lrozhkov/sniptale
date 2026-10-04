@@ -9,6 +9,7 @@ import { useVideoEditorExportEvents } from './export-events';
 import type { ApplyLoadedProject } from './types';
 
 interface RuntimeEffectsParams {
+  autosaveEnabled: boolean;
   project: VideoProject | null;
   recordingId: string | null;
   getActiveExportJobId: () => string | null;
@@ -36,6 +37,7 @@ export function createApplyLoadedProject(
 }
 
 export function useVideoEditorRuntimeEffects({
+  autosaveEnabled,
   project,
   recordingId,
   getActiveExportJobId,
@@ -77,6 +79,7 @@ export function useVideoEditorRuntimeEffects({
     recordingId,
     setSaveState,
     libraries.refreshProjects,
-    syncProjectRevision
+    syncProjectRevision,
+    autosaveEnabled
   );
 }

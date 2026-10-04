@@ -27,13 +27,16 @@ export function registerOverlayRefreshHandlers(
   canvas: Canvas,
   refreshRichShapeTextEditor: () => void
 ): () => void {
+  const refreshAfterLiveRender = (event: { ctx: CanvasRenderingContext2D }) => {
+    if (event.ctx === canvas.getContext()) refreshRichShapeTextEditor();
+  };
   document.addEventListener('scroll', refreshRichShapeTextEditor, true);
   window.addEventListener('resize', refreshRichShapeTextEditor);
-  canvas.on('after:render', refreshRichShapeTextEditor);
+  canvas.on('after:render', refreshAfterLiveRender);
 
   return () => {
     document.removeEventListener('scroll', refreshRichShapeTextEditor, true);
     window.removeEventListener('resize', refreshRichShapeTextEditor);
-    canvas.off('after:render', refreshRichShapeTextEditor);
+    canvas.off('after:render', refreshAfterLiveRender);
   };
 }

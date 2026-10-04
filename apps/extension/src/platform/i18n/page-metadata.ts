@@ -13,15 +13,24 @@ function applyPageLocaleMetadata(metadata: PageLocaleMetadata): void {
   document.title = metadata.title;
 }
 
-export function usePageLocaleMetadata(titleKey: TranslationKey): AppLocale {
+/** Keeps browser metadata synchronized with the active document and locale. */
+export function usePageLocaleMetadata(
+  titleKey: TranslationKey,
+  documentName?: string | null,
+  modeKey?: TranslationKey
+): AppLocale {
   const locale = useAppLocale();
 
   useEffect(() => {
     applyPageLocaleMetadata({
       locale,
-      title: readSourceTranslation(locale, titleKey),
+      title: documentName?.trim()
+        ? [documentName.trim(), modeKey ? readSourceTranslation(locale, modeKey) : null]
+            .filter(Boolean)
+            .join(' · ')
+        : readSourceTranslation(locale, titleKey),
     });
-  }, [locale, titleKey]);
+  }, [locale, titleKey, documentName, modeKey]);
 
   return locale;
 }

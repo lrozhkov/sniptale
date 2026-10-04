@@ -1,4 +1,5 @@
-import { expect } from '@playwright/test';
+import { expect, type Page, type TestInfo } from '@playwright/test';
+import { checkInspectorLabels } from '../support/inspector-utilities';
 import { test } from '../support/extension-fixture';
 import {
   countPersistedEffectInstances,
@@ -14,12 +15,7 @@ import {
   openEffectVideoEditorHarness,
   readPreviewCanvasSignature,
 } from './extension-critical-video-effects.helpers';
-import {
-  VIDEO_EDITOR_EFFECT_DISABLE_LABEL,
-  VIDEO_EDITOR_EFFECT_ENABLE_LABEL,
-  VIDEO_EDITOR_PAUSE_LABEL,
-  VIDEO_EDITOR_PLAY_LABEL,
-} from '../extension-critical.helpers';
+import { VIDEO_EDITOR_PAUSE_LABEL, VIDEO_EDITOR_PLAY_LABEL } from '../extension-critical.helpers';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
 const VIDEO_EDITOR_PREVIEW_CACHE_LABEL = translate('videoEditor.stage.previewModeCache', 'ru');
@@ -30,32 +26,52 @@ const VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL = translate(
 
 test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
   page,
-  hostOrigin,
+  extensionId,
 }) => {
+  const hostOrigin = `chrome-extension://${extensionId}`;
+  await page.goto(`${hostOrigin}/apps/extension/src/video-editor/index.html`);
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
-  await openEffectVideoEditorHarness(page, hostOrigin);
+  await page
+    .getByRole('button', { name: translate('videoEditor.app.newProjectAction', 'en'), exact: true })
+    .click();
   await importEffectFile(page, {
     documentId: 'neutral-standalone',
     fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
+    locale: 'en',
   });
 
-  await page.getByRole('button', { name: VIDEO_EDITOR_EFFECT_DISABLE_LABEL, exact: true }).click();
-  const enableButton = page.getByRole('button', {
-    name: VIDEO_EDITOR_EFFECT_ENABLE_LABEL,
-    exact: true,
-  });
-  await expect(enableButton).toBeVisible();
-  await enableButton.click();
-  await expect(page.locator('[data-effect-document="neutral-standalone"]')).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: VIDEO_EDITOR_EFFECT_DISABLE_LABEL, exact: true })
-  ).toBeVisible();
+  const settings = await page.context().newPage();
+  try {
+    await settings.goto(
+      `${hostOrigin}/apps/extension/src/settings/index.html?section=video-effects`
+    );
+    const row = settings
+      .locator('[data-settings-collection-item]')
+      .filter({ hasText: 'Neutral Standalone' });
+    const toggle = row.getByRole('switch');
+    await expect(toggle).toBeChecked();
+    await toggle.click();
+    await expect(toggle).not.toBeChecked();
+    await page.bringToFront();
+    // Headless Chromium keeps both pages focused; deliver the real return-to-editor event.
+    await page.evaluate(() => window.dispatchEvent(new FocusEvent('focus')));
+    await expect(page.locator('[data-effect-document="neutral-standalone"]')).toHaveCount(0);
+    await settings.bringToFront();
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    await page.bringToFront();
+    // Headless Chromium keeps both pages focused; deliver the real return-to-editor event.
+    await page.evaluate(() => window.dispatchEvent(new FocusEvent('focus')));
+    await expect(page.locator('[data-effect-document="neutral-standalone"]')).toBeVisible();
+  } finally {
+    await settings.close();
+  }
   expect(pageErrors).toEqual([]);
 });
 
-test('EffectV1 playback keeps the video editor responsive', async ({ page, hostOrigin }) => {
+test('EffectV1 playback keeps the video editor responsive', async ({ page, hostOrigin }, info) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
 
@@ -64,6 +80,7 @@ test('EffectV1 playback keeps the video editor responsive', async ({ page, hostO
     documentId: 'neutral-standalone',
     fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
   });
+  await verifyEffectInspector(page, info, 'annotation');
   await expect(page.locator('[data-playback-counter="true"]')).toContainText('0:03.0');
 
   const playButton = page.getByRole('button', { name: VIDEO_EDITOR_PLAY_LABEL, exact: true });
@@ -96,11 +113,11 @@ test('cached EffectV1 preview prepares beyond the first frame and starts playbac
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: VIDEO_EDITOR_PLAY_LABEL, exact: true }).click();
 
-  await expect(page.getByText(VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL, { exact: true })).toBeVisible(
-    {
-      timeout: 30_000,
-    }
-  );
+  await expect(
+    page.getByRole('status', { name: VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL, exact: true })
+  ).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_PAUSE_LABEL, exact: true })
   ).toBeVisible();
@@ -151,7 +168,7 @@ test('target EffectV1 playback keeps visual input rendering responsive', async (
 test('transition EffectV1 playback keeps the junction runtime responsive', async ({
   page,
   hostOrigin,
-}) => {
+}, info) => {
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
@@ -165,6 +182,7 @@ test('transition EffectV1 playback keeps the junction runtime responsive', async
     fixturePath: EFFECT_V1_TRANSITION_FIXTURE,
   });
   await expect.poll(() => countPersistedEffectInstances(page)).toBe(1);
+  await verifyEffectInspector(page, info, 'transition');
 
   await page.getByRole('button', { name: VIDEO_EDITOR_PLAY_LABEL, exact: true }).click();
   await expect(page.locator('iframe[src*="effect-runtime-sandbox"]')).toHaveCount(1);
@@ -180,3 +198,26 @@ test('transition EffectV1 playback keeps the junction runtime responsive', async
   }
   expect(consoleErrors).toEqual([]);
 });
+
+async function verifyEffectInspector(page: Page, info: TestInfo, kind: string) {
+  const panel = page.locator('[data-ui="video-editor.inspector.content"]');
+  await expect(panel).toBeVisible();
+  if (!(await panel.locator('[data-presentation="all"]').isVisible())) {
+    await page.locator('[data-ui="video-editor.inspector.presentation-toggle"]').click();
+  }
+  await expect(panel.locator('[data-effect-instance]').first()).toBeVisible();
+  for (const width of [280, 420]) {
+    await page
+      .locator('[data-ui="video-editor.floating.context-inspector"]')
+      .evaluate((node, value) => {
+        if (node instanceof HTMLElement) node.style.width = `${value}px`;
+      }, width);
+    await checkInspectorLabels(panel);
+    await expect
+      .poll(() => panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1))
+      .toBe(true);
+    await page.screenshot({ path: info.outputPath(`${kind}-inspector-${width}.png`) });
+    await panel.locator('[data-effect-instance]').first().scrollIntoViewIfNeeded();
+    await panel.screenshot({ path: info.outputPath(`${kind}-parameters-${width}.png`) });
+  }
+}

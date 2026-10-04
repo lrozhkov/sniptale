@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
+  createTourDocument,
   createGuideImageBlock,
   createGuideProject,
   createGuideStep,
@@ -15,6 +16,7 @@ const io = vi.hoisted(() => ({
   decode: vi.fn(),
   event: vi.fn(),
   release: vi.fn(),
+  borrow: vi.fn(),
 }));
 vi.mock('../../media-library', () => ({ getMediaLibraryEntry: io.entry }));
 vi.mock('../../aggregate-presentations', () => ({ getAggregatePresentation: io.presentation }));
@@ -31,6 +33,10 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', () => ({
 }));
 vi.mock('../../../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: io.event,
+}));
+vi.mock('./borrowed-asset', async (original) => ({
+  ...(await original<typeof import('./borrowed-asset')>()),
+  readBorrowableLibraryImage: io.borrow,
 }));
 import { importScenarioImages } from './image-import';
 function png(name = 'image.png') {
@@ -61,6 +67,97 @@ beforeEach(() => {
       size: blob.size,
     },
   }));
+  io.borrow.mockResolvedValue(null);
+});
+it('reuses an unedited immutable library source without staging a second object', async () => {
+  const sourceBlob = png('original.png');
+  const ref = {
+    assetId: 'opfs-original',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/opfs-original' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: sourceBlob.size,
+  };
+  io.entry.mockResolvedValue({
+    id: 'library',
+    kind: 'image',
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    filename: 'original.png',
+    originalFilename: 'original.png',
+    createdAt: 1,
+    updatedAt: 1,
+    size: sourceBlob.size,
+    mimeType: 'image/png',
+    width: 120,
+    height: 80,
+    duration: null,
+    sourceUrl: null,
+    sourceTitle: null,
+    sourceFavicon: null,
+    tags: [],
+    workspaceRevision: 0,
+    imageContentState: 'original',
+  });
+  io.borrow.mockResolvedValue({ blob: sourceBlob, ref });
+  const result = await importScenarioImages({
+    ...input(),
+    sources: [{ kind: 'library', mediaId: 'library' }],
+  });
+  expect(result.items).toHaveLength(1);
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.presentation).not.toHaveBeenCalled();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts?.[0]).toMatchObject({
+    assetId: ref.assetId,
+    borrowedMediaId: 'library',
+    galleryAssetId: 'library',
+    assetRef: ref,
+  });
+});
+it('never discards a borrowed source when import is cancelled or the aggregate rejects', async () => {
+  const sourceBlob = png('original.png');
+  const ref = {
+    assetId: 'owned-original',
+    createdAt: 1,
+    location: { kind: 'opfs' as const, objectKey: 'objects/owned-original' },
+    mimeType: 'image/png',
+    sha256: null,
+    size: sourceBlob.size,
+  };
+  io.entry.mockResolvedValue({
+    id: 'library',
+    kind: 'image',
+    source: { kind: 'stored-asset', assetId: ref.assetId },
+    filename: 'original.png',
+    originalFilename: 'original.png',
+    createdAt: 1,
+    updatedAt: 1,
+    size: sourceBlob.size,
+    mimeType: 'image/png',
+    width: 120,
+    height: 80,
+    duration: null,
+    sourceUrl: null,
+    sourceTitle: null,
+    sourceFavicon: null,
+    tags: [],
+    workspaceRevision: 0,
+    imageContentState: 'original',
+  });
+  io.borrow.mockResolvedValue({ blob: sourceBlob, ref });
+  const controller = new AbortController();
+  const args = { ...input(), sources: [{ kind: 'library' as const, mediaId: 'library' }] };
+  await expect(
+    importScenarioImages({
+      ...args,
+      signal: controller.signal,
+      onProgress: () => controller.abort(),
+    })
+  ).rejects.toThrow();
+  expect(io.discard).not.toHaveBeenCalled();
+  io.commit.mockRejectedValueOnce(new Error('stale aggregate'));
+  await expect(importScenarioImages(args)).rejects.toThrow('stale aggregate');
+  expect(io.discard).not.toHaveBeenCalled();
 });
 it('publishes ordered independent images as one aggregate and preserves the source buffer', async () => {
   const args = input();
@@ -553,4 +650,140 @@ it('creates a tour hotspot from video action evidence and preserves its source c
     })
   ).rejects.toThrow('text');
   expect(io.write).not.toHaveBeenCalled();
+});
+
+it.each(
+  (['image', 'image-slot'] as const).flatMap((kind) =>
+    (['file', 'library'] as const).flatMap((sourceKind) =>
+      ([undefined, 'start', 'center', 'end'] as const).map((captionAlignment) => ({
+        kind,
+        sourceKind,
+        captionAlignment,
+      }))
+    )
+  )
+)(
+  'preserves $kind caption alignment $captionAlignment on $sourceKind replacement',
+  async ({ kind, sourceKind, captionAlignment }) => {
+    const args = replacementInput();
+    const step = args.project.items[0];
+    if (step?.kind !== 'step') throw new Error('Missing step');
+    const target = step.blocks[1];
+    if (target?.kind !== 'image') throw new Error('Missing image');
+    if (captionAlignment !== undefined) target.captionAlignment = captionAlignment;
+    if (kind === 'image-slot')
+      step.blocks[1] = {
+        kind,
+        id: target.id,
+        frame: target.frame,
+        fit: target.fit,
+        alt: target.alt,
+        caption: target.caption,
+        width: target.width,
+        rowStart: target.rowStart,
+        ...(captionAlignment === undefined ? {} : { captionAlignment }),
+      };
+    if (sourceKind === 'library') {
+      io.entry.mockResolvedValue({
+        id: 'library',
+        kind: 'image',
+        source: { kind: 'screenshot' },
+        filename: 'Library.png',
+        originalFilename: 'Library.png',
+        createdAt: 1,
+        updatedAt: 1,
+        size: 9,
+        mimeType: 'image/png',
+        width: 120,
+        height: 80,
+        duration: null,
+        sourceUrl: null,
+        sourceTitle: null,
+        sourceFavicon: null,
+        tags: [],
+        workspaceRevision: 0,
+      });
+      io.presentation.mockResolvedValue({
+        aggregateId: 'library',
+        aggregateKind: 'image',
+        presentationRevision: 0,
+        previewBlob: png(),
+        thumbnailBlob: png(),
+        updatedAt: 1,
+      });
+    }
+    const original = structuredClone(args.project);
+    const result = await importScenarioImages({
+      ...args,
+      sources: sourceKind === 'library' ? [{ kind: 'library', mediaId: 'library' }] : args.sources,
+    });
+    const next = result.items[0];
+    if (next?.kind !== 'step') throw new Error('Missing result step');
+    const image = next.blocks[1];
+    if (image?.kind !== 'image') throw new Error('Missing replacement');
+    expect(image.captionAlignment).toBe(captionAlignment);
+    expect(Object.hasOwn(image, 'captionAlignment')).toBe(captionAlignment !== undefined);
+    expect(image).toMatchObject({
+      id: target.id,
+      caption: target.caption,
+      alt: target.alt,
+      frame: target.frame,
+      fit: target.fit,
+      width: target.width,
+      rowStart: target.rowStart,
+      contentTransform: { x: 0, y: 0, scale: 1 },
+      galleryAssetId: sourceKind === 'library' ? 'library' : null,
+      editDocumentId: null,
+    });
+    expect(image.assetId).not.toBe(target.assetId);
+    expect(next.blocks).toHaveLength(step.blocks.length);
+    expect(next.blocks[0]).toEqual(step.blocks[0]);
+    expect(next.blocks[2]).toEqual(step.blocks[2]);
+    expect(args.project).toEqual(original);
+    expect(io.commit).toHaveBeenCalledOnce();
+    expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts).toHaveLength(1);
+  }
+);
+
+it('imports stage background through the shared transaction without changing the caller', async () => {
+  const args = input();
+  args.project.tour = createTourDocument();
+  const original = structuredClone(args.project);
+  const result = await importScenarioImages({
+    ...args,
+    placement: { kind: 'tour-stage-background' },
+  });
+  expect(result.tour?.stage.image).toMatchObject({ width: 120, height: 80 });
+  expect(result.tour?.slides).toEqual(original.tour?.slides);
+  expect(args.project).toEqual(original);
+  expect(io.commit).toHaveBeenCalledOnce();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts).toHaveLength(1);
+});
+it('rejects invalid stage acquisition, preserves publication cleanup authority and compensates abort', async () => {
+  const args = input();
+  const placement = { kind: 'tour-stage-background' as const };
+  await expect(importScenarioImages({ ...args, placement })).rejects.toThrow('unavailable');
+  args.project.tour = createTourDocument();
+  await expect(
+    importScenarioImages({ ...args, placement, sources: [...args.sources, ...args.sources] })
+  ).rejects.toThrow('unavailable');
+  expect(io.write).not.toHaveBeenCalled();
+  io.commit.mockRejectedValueOnce(new Error('publication rejected'));
+  await expect(importScenarioImages({ ...args, placement })).rejects.toThrow(
+    'publication rejected'
+  );
+  expect(io.discard).not.toHaveBeenCalled();
+  io.commit.mockClear();
+  const controller = new AbortController();
+  await expect(
+    importScenarioImages({
+      ...args,
+      placement,
+      signal: controller.signal,
+      onProgress: () => controller.abort(),
+    })
+  ).rejects.toThrow();
+  expect(io.discard).toHaveBeenCalledOnce();
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(args.project.tour.stage.image).toBeUndefined();
 });

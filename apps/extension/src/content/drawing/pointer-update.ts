@@ -21,44 +21,34 @@ function updateCreateDraft(
   root: PageScrollRoot
 ): Extract<PointerDraft, { kind: 'create' }> {
   const modifiers = { ctrlKey: event.ctrlKey, shiftKey: event.shiftKey };
-  const samples =
+  const coalesced =
     typeof event.nativeEvent.getCoalescedEvents === 'function'
       ? event.nativeEvent.getCoalescedEvents()
-      : [event.nativeEvent];
+      : [];
+  const samples = coalesced.length > 0 ? coalesced : [event.nativeEvent];
   let object = draft.object;
   if (
     (object.kind === 'pencil' || object.kind === 'marker') &&
-    (modifiers.ctrlKey || modifiers.shiftKey)
+    !modifiers.ctrlKey &&
+    !modifiers.shiftKey
   ) {
-    const sample = samples.at(-1) ?? event.nativeEvent;
-    object = updateCreatedDrawingObject({
-      modifiers,
-      object,
-      start: draft.start,
-      point: toDrawingScenePoint(sample, root),
-      timestamp: sample.timeStamp,
-    });
-  } else if (object.kind === 'pencil' || object.kind === 'marker') {
     object = {
       ...object,
       samples: appendDrawingSamples(
         object.samples,
-        samples.map((sample) => ({
-          ...toDrawingScenePoint(sample, root),
-          t: sample.timeStamp,
-        })),
+        samples.map((sample) => ({ ...toDrawingScenePoint(sample, root), t: sample.timeStamp })),
         object.kind === 'pencil'
       ),
     };
   } else {
-    samples.forEach((sample) => {
-      object = updateCreatedDrawingObject({
-        modifiers,
-        object,
-        start: draft.start,
-        point: toDrawingScenePoint(sample, root),
-        timestamp: sample.timeStamp,
-      });
+    object = updateCreatedDrawingObject({
+      arrowFreeAngle: object.kind === 'arrow',
+      arrowFromTip: draft.arrowFromTip,
+      modifiers,
+      object,
+      start: draft.start,
+      point: toDrawingScenePoint(event, root),
+      timestamp: event.timeStamp,
     });
   }
   return { ...draft, object };

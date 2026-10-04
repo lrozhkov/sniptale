@@ -2,13 +2,18 @@ import type React from 'react';
 import { useEffect, useMemo, useRef } from 'react';
 import type { ImageEditorController } from '../../controller';
 import type { EditorViewportMetrics } from './types';
-import { getPreviewSize, getViewportCenter, getViewportFrame } from './helpers';
+import {
+  getPreviewContentRect,
+  getPreviewSize,
+  getViewportCenter,
+  getViewportFrame,
+} from './helpers';
 import { startEditorViewportPreviewLoop } from './drawing';
 import { navigateEditorViewportFromClientPoint } from './navigation';
 
 interface UseEditorViewportPreviewArgs {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  controller: Pick<ImageEditorController, 'navigateViewportTo'>;
+  controller: Pick<ImageEditorController, 'navigateViewportTo' | 'canvas'>;
   hasImage: boolean;
   maxWidth?: number;
   viewport: EditorViewportMetrics;
@@ -26,6 +31,14 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
   );
 
   const viewportCenter = useMemo(() => getViewportCenter(args.viewport), [args.viewport]);
+  const contentRect = useMemo(
+    () =>
+      getPreviewContentRect(previewSize, {
+        width: args.viewport.canvasWidth,
+        height: args.viewport.canvasHeight,
+      }),
+    [previewSize, args.viewport.canvasWidth, args.viewport.canvasHeight]
+  );
 
   const viewportFrame = useMemo(
     () => getViewportFrame({ previewSize, viewport: args.viewport }),
@@ -33,15 +46,33 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
   );
 
   useEffect(() => {
+    dragPointerIdRef.current = null;
     if (!args.viewportPreviewOpen || !args.hasImage) {
       return undefined;
     }
-    return startEditorViewportPreviewLoop({
+    const stop = startEditorViewportPreviewLoop({
       canvasRef: args.canvasRef,
+      getCanvas: () => args.controller.canvas,
       previewCanvasRef,
       previewSize,
+      documentSize: {
+        width: args.viewport.canvasWidth,
+        height: args.viewport.canvasHeight,
+      },
     });
-  }, [args.canvasRef, args.hasImage, args.viewportPreviewOpen, previewSize]);
+    return () => {
+      stop();
+      dragPointerIdRef.current = null;
+    };
+  }, [
+    args.canvasRef,
+    args.controller.canvas,
+    args.hasImage,
+    args.viewport.canvasWidth,
+    args.viewport.canvasHeight,
+    args.viewportPreviewOpen,
+    previewSize,
+  ]);
 
   const navigateFromClientPoint = (clientX: number, clientY: number) => {
     navigateEditorViewportFromClientPoint({
@@ -49,11 +80,14 @@ export function useEditorViewportPreview(args: UseEditorViewportPreviewArgs) {
       clientY,
       controller: args.controller,
       previewSurfaceRef,
+      previewSize,
+      contentRect,
     });
   };
 
   return {
     dragPointerIdRef,
+    contentRect,
     navigateFromClientPoint,
     previewCanvasRef,
     previewSize,

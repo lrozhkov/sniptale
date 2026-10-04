@@ -120,3 +120,29 @@ it('keys each localized style independently of unrelated user presets', async ()
     })
   );
 });
+
+it('invalidates covers after transition source, default preset or selected values change', async () => {
+  const { effectPosterKey } = await import('./effect-catalog-preview');
+  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const entry = {
+    ...catalog.documents[0]!,
+    kind: 'transition' as const,
+    presetPreferences: {
+      defaultPreset: { kind: 'user' as const, id: 'custom' },
+      presets: [{ id: 'custom', name: 'Custom', values: { amount: 0.2 } }],
+    },
+  };
+  const key = effectPosterKey(entry);
+  expect(effectPosterKey({ ...entry, sha256: 'b'.repeat(64) })).not.toBe(key);
+  expect(
+    effectPosterKey({
+      ...entry,
+      presetPreferences: {
+        ...entry.presetPreferences,
+        presets: [{ id: 'custom', name: 'Custom', values: { amount: 0.8 } }],
+      },
+    })
+  ).not.toBe(key);
+  expect(effectPosterKey({ ...entry, previewPresetId: 'built-in' })).not.toBe(key);
+  expect(effectPosterKey({ ...entry, presetPreferences: { presets: [] } })).not.toBe(key);
+});

@@ -7,6 +7,7 @@ import { CompactSelect } from '../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from './inspector';
 import type { Translate } from '../../platform/i18n';
 import { guideDocumentStyle } from './document-appearance';
+import { DEFAULT_DRAWING_COLORS } from '../../features/drawing/public';
 
 const choices = {
   theme: [
@@ -87,18 +88,25 @@ function StyleChoice<T extends string>({
 /** Compact fields emit only the edited key, so unmodified values keep inheriting. */
 export function GuideStyleFields({
   style,
+  nested = false,
   disabled,
   onChange,
   t,
 }: {
   style: GuideStyle;
+  nested?: boolean;
   disabled: boolean;
   onChange: (patch: Partial<GuideStyle>) => void;
   t: Translate;
 }) {
   return (
     <fieldset className="guide-style-fields" disabled={disabled}>
-      <GuideInspectorGroup icon={Palette} title={t('scenario.editor.guideStyleGroup')}>
+      <GuideInspectorGroup
+        id="style"
+        level={nested ? 'group' : 'section'}
+        icon={Palette}
+        title={t('scenario.editor.guideStyleGroup')}
+      >
         <StyleChoice
           label={t('scenario.editor.appearanceTheme')}
           value={style.theme}
@@ -115,12 +123,16 @@ export function GuideStyleFields({
           t={t}
           segmented
         />
-        <div className="guide-style-accent">
+        <div className="guide-style-accent" title={t('scenario.editor.appearanceAccentHint')}>
           <ColorField
-            label={t('scenario.editor.appearanceAccent')}
-            title={t('scenario.editor.appearanceAccent')}
+            triggerVariant="swatch"
+            floatingPlacement="side"
+            layout="stacked"
+            label={t('scenario.editor.appearanceAccentElements')}
+            title={t('scenario.editor.appearanceAccentElements')}
             value={guideDocumentStyle(style)['--guide-accent']!}
             disabled={disabled}
+            palette={DEFAULT_DRAWING_COLORS}
             allowAlpha={false}
             allowTransparent={false}
             onChange={(accentColor) => onChange({ accentColor })}
@@ -134,7 +146,12 @@ export function GuideStyleFields({
           </ContentToolbarButton>
         </div>
       </GuideInspectorGroup>
-      <GuideInspectorGroup icon={LayoutTemplate} title={t('scenario.editor.guideLayoutGroup')}>
+      <GuideInspectorGroup
+        id="layout"
+        level={nested ? 'group' : 'section'}
+        icon={LayoutTemplate}
+        title={t('scenario.editor.guideLayoutGroup')}
+      >
         <StyleChoice
           label={t('scenario.editor.appearanceDensity')}
           value={style.density}
@@ -150,7 +167,12 @@ export function GuideStyleFields({
           t={t}
         />
       </GuideInspectorGroup>
-      <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.guideDetailsGroup')}>
+      <GuideInspectorGroup
+        id="details"
+        level={nested ? 'group' : 'section'}
+        icon={ScanLine}
+        title={t('scenario.editor.guideDetailsGroup')}
+      >
         <StyleChoice
           label={t('scenario.editor.appearanceBorder')}
           value={style.imageBorder}
@@ -184,7 +206,12 @@ export function GuideLayoutFields({
 }) {
   return (
     <fieldset className="guide-style-fields" disabled={disabled}>
-      <GuideInspectorGroup icon={LayoutTemplate} title={t('scenario.editor.appearanceLayout')}>
+      <GuideInspectorGroup
+        id="appearanceLayout"
+        collapsible={false}
+        icon={LayoutTemplate}
+        title={t('scenario.editor.appearanceLayout')}
+      >
         <CompactSelect
           aria-label={t('scenario.editor.appearanceLayout')}
           value={layout}

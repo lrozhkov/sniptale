@@ -8,7 +8,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     page,
     hostOrigin,
   }, testInfo) => {
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 900 });
     const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
     url.searchParams.set('projectId', `blocks-${crypto.randomUUID()}`);
     url.searchParams.set('theme', theme);
@@ -105,7 +105,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       page,
       hostOrigin,
     }, testInfo) => {
-      await openVisualHarness(page, hostOrigin, theme, locale, { width: 1024, height: 640 });
+      await openVisualHarness(page, hostOrigin, theme, locale, { width: 1280, height: 560 });
       const add = page
         .locator('article#compare .guide-insertion-block')
         .last()

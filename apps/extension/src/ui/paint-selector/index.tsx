@@ -1,3 +1,4 @@
+import './trigger.css';
 import { useCallback, useId, useRef } from 'react';
 import { usePaintSelectorState } from '@sniptale/ui/paint-selector/state';
 import type { CompactPaintSelectorProps } from '@sniptale/ui/paint-selector/types';
@@ -50,13 +51,15 @@ export function CompactPaintSelector(props: CompactPaintSelectorProps) {
       tabIndex={-1}
       className={props.className ?? 'relative w-full min-w-0'}
       data-ui="shared.ui.paint-selector"
+      data-trigger-variant={props.triggerVariant ?? 'default'}
     >
       <PaintSelectorTrigger
+        variant={props.triggerVariant}
         buttonRef={triggerRef}
         disabled={props.disabled}
         draft={state.draft}
         label={props.label}
-        onClick={state.show}
+        onClick={state.open ? state.cancel : state.show}
         open={state.open}
       />
       <PaintSelectorPortal

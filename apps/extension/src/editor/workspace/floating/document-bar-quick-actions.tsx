@@ -1,6 +1,6 @@
+import { createOutputFilename } from '../../../workflows/file-naming';
 import { Check, ClipboardCopy, Download, ArrowLeft, FolderInput, Save, X } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeDivider } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
@@ -19,19 +19,11 @@ import { useEditorStore } from '../../state/useEditorStore';
 import { closeEditorPageDocument } from '../../workflows/close-page-document';
 import { EditorAnchoredConfirmPopover } from './anchored-feedback';
 
-const QUICK_ACTION_BUTTON_CLASS_NAME = 'max-[720px]:!hidden';
+const QUICK_ACTION_BUTTON_CLASS_NAME = 'shrink-0';
 const COPY_FEEDBACK_BUTTON_CLASS_NAME = [
   QUICK_ACTION_BUTTON_CLASS_NAME,
   'data-[copy-status=saved]:scale-105 data-[copy-status=saved]:text-[var(--sniptale-color-success)]',
 ].join(' ');
-const RASTER_FILENAME_EXTENSION = /\.(?:avif|bmp|gif|jpe?g|png|webp)$/i;
-
-function resolveDefaultExportFilename(pageTitle: string, imageFormat: string): string {
-  const title = pageTitle.trim() || 'edited';
-  const basename = title.replace(RASTER_FILENAME_EXTENSION, '');
-  return `${basename}.${imageFormat}`;
-}
-
 function runDocumentBarAction(label: string, action: () => Promise<void> | void) {
   return fireAndReportEditorAction(`floating-document-bar:${label}`, action);
 }
@@ -71,7 +63,8 @@ export function EditorFloatingDocumentQuickActions({
   const saveToFolderButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const standalone = embed.mode !== 'scenario';
-  const defaultFilename = resolveDefaultExportFilename(pageTitle, actionState.imageFormat);
+  const [defaultFilename, setDefaultFilename] = useState('');
+  const preparingFilename = useRef(false);
 
   return (
     <>
@@ -88,6 +81,7 @@ export function EditorFloatingDocumentQuickActions({
         />
       )}
       <DocumentImageQuickActions
+        embedded={!standalone}
         actionState={actionState}
         documentController={documentController}
         hasImage={hasImage}
@@ -101,7 +95,29 @@ export function EditorFloatingDocumentQuickActions({
           aria-expanded={saveDialogOpen}
           aria-haspopup="dialog"
           className={QUICK_ACTION_BUTTON_CLASS_NAME}
-          onClick={() => setSaveDialogOpen((open) => !open)}
+          onClick={() =>
+            runDocumentBarAction('prepare-save-name', async () => {
+              if (saveDialogOpen) {
+                setSaveDialogOpen(false);
+                return;
+              }
+              if (preparingFilename.current) return;
+              preparingFilename.current = true;
+              try {
+                setDefaultFilename(
+                  await createOutputFilename({
+                    category: 'images',
+                    type: 'edited',
+                    title: pageTitle,
+                    extension: actionState.imageFormat,
+                  })
+                );
+                setSaveDialogOpen(true);
+              } finally {
+                preparingFilename.current = false;
+              }
+            })
+          }
           dataUi="editor.floating.document-bar.save-to-folder-button"
         >
           <FolderInput size={18} strokeWidth={2} />
@@ -111,6 +127,7 @@ export function EditorFloatingDocumentQuickActions({
         <>
           <FloatingChromeDivider vertical className={QUICK_ACTION_BUTTON_CLASS_NAME} />
           <ContentToolbarButton
+            tone="close"
             ref={closeButtonRef}
             title={translate('editor.documentActions.closeFile')}
             disabled={!hasImage}
@@ -160,11 +177,13 @@ function DocumentImageQuickActions(props: {
   actionState: ReturnType<typeof useQuickActionState>;
   documentController: EditorFloatingDocumentController;
   hasImage: boolean;
+  embedded: boolean;
 }) {
-  const { actionState, documentController, hasImage } = props;
+  const { actionState, documentController, hasImage, embedded } = props;
   return (
     <>
       <ContentToolbarButton
+        tone={embedded ? 'outline' : 'default'}
         title={getDocumentRequiredTitle(translate('editor.documentActions.download'), hasImage)}
         disabled={!hasImage}
         className={QUICK_ACTION_BUTTON_CLASS_NAME}
@@ -174,6 +193,7 @@ function DocumentImageQuickActions(props: {
         <Download size={18} strokeWidth={2} />
       </ContentToolbarButton>
       <ContentToolbarButton
+        tone={embedded ? 'outline' : 'default'}
         title={getDocumentRequiredTitle(translate('editor.documentActions.downloadAs'), hasImage)}
         disabled={!hasImage}
         className={QUICK_ACTION_BUTTON_CLASS_NAME}
@@ -185,19 +205,25 @@ function DocumentImageQuickActions(props: {
         <Save size={18} strokeWidth={2} />
       </ContentToolbarButton>
       {actionState.canCopy ? (
-        <CopyPngQuickAction actionState={actionState} documentController={documentController} />
+        <CopyPngQuickAction
+          actionState={actionState}
+          documentController={documentController}
+          embedded={embedded}
+        />
       ) : null}
     </>
   );
 }
 
 function CopyPngQuickAction(props: {
+  embedded: boolean;
   actionState: ReturnType<typeof useQuickActionState>;
   documentController: EditorFloatingDocumentController;
 }) {
   const { copyStatus, runActionFeedback } = props.actionState;
   return (
     <ContentToolbarButton
+      tone={props.embedded ? 'outline' : 'default'}
       title={translate('editor.documentActions.copyPng')}
       active={copyStatus === 'saved'}
       className={COPY_FEEDBACK_BUTTON_CLASS_NAME}
@@ -232,22 +258,21 @@ function ScenarioQuickActions(props: {
   if (embed.mode !== 'scenario') return null;
   return (
     <>
-      <ProductActionButton
-        compact
-        tone="secondary"
+      <ContentToolbarButton
+        type="button"
+        tone="outline"
         disabled={pending || !embed.onClose}
         onClick={() => runDocumentBarAction('close-scenario-editor', () => embed.onClose?.())}
-        data-ui="editor.floating.document-bar.cancel-scenario-button"
+        dataUi="editor.floating.document-bar.cancel-scenario-button"
       >
         <ArrowLeft size={16} aria-hidden="true" />
         {translate('editor.documentActions.returnToScenario')}
-      </ProductActionButton>
-      <ProductActionButton
-        compact
-        tone="primary"
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        tone="outline"
         disabled={!hasImage || pending || !embed.onApply}
         aria-busy={pending}
-        className="!bg-[var(--sniptale-color-accent-soft)] !border-[var(--sniptale-color-border-accent-strong)]"
         onClick={() => {
           if (applying.current) return;
           applying.current = true;
@@ -263,11 +288,11 @@ function ScenarioQuickActions(props: {
             }
           });
         }}
-        data-ui="editor.floating.document-bar.apply-scenario-button"
+        dataUi="editor.floating.document-bar.apply-scenario-button"
       >
         <Check size={16} aria-hidden="true" />
         {translate('editor.documentActions.applyToScenario')}
-      </ProductActionButton>
+      </ContentToolbarButton>
     </>
   );
 }

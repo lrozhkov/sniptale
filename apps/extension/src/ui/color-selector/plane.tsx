@@ -4,6 +4,7 @@ import {
   useRef,
   useState,
   type MutableRefObject,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { translate } from '../../platform/i18n';
@@ -150,9 +151,40 @@ function usePlaneInteractions(props: ColorPlaneProps) {
     },
     [planeElement, updatePlaneSelection]
   );
+  const handleKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const step = event.shiftKey ? 0.1 : 0.01;
+      const selection = { saturation: props.saturation, value: props.value };
+      switch (event.key) {
+        case 'ArrowLeft':
+          selection.saturation = Math.max(0, selection.saturation - step);
+          break;
+        case 'ArrowRight':
+          selection.saturation = Math.min(1, selection.saturation + step);
+          break;
+        case 'ArrowDown':
+          selection.value = Math.max(0, selection.value - step);
+          break;
+        case 'ArrowUp':
+          selection.value = Math.min(1, selection.value + step);
+          break;
+        case 'Home':
+          selection.saturation = 0;
+          break;
+        case 'End':
+          selection.saturation = 1;
+          break;
+        default:
+          return;
+      }
+      event.preventDefault();
+      props.onSelectionChange(selection);
+    },
+    [props]
+  );
 
   usePlanePointerLifecycle(planeElement, activePointerIdRef, updatePlaneSelection);
-  return { assignPlaneRef, handlePointerDown };
+  return { assignPlaneRef, handleKeyDown, handlePointerDown };
 }
 
 export function ColorPlane(props: ColorPlaneProps) {
@@ -166,25 +198,35 @@ export function ColorPlane(props: ColorPlaneProps) {
       aria-valuemax={100}
       aria-valuemin={0}
       aria-valuenow={Math.round(props.value * 100)}
+      aria-valuetext={`${Math.round(props.saturation * 100)}%, ${Math.round(props.value * 100)}%`}
+      tabIndex={0}
+      onKeyDown={interactions.handleKeyDown}
       onPointerDown={interactions.handlePointerDown}
       className={[
-        'relative h-36 overflow-hidden rounded-[12px] border',
-        'border-[color:var(--sniptale-color-border-soft)] touch-none',
+        'relative h-36 rounded-[12px] border',
+        'border-[color:var(--sniptale-color-border-soft)] touch-none cursor-pointer',
+        'focus-visible:outline-2 focus-visible:outline-offset-2',
+        'focus-visible:outline-[color:var(--sniptale-color-border-strong)]',
       ].join(' ')}
       style={{ backgroundColor: props.planeColor }}
     >
-      <div className="absolute inset-0 bg-[linear-gradient(90deg,#fff,transparent)]" />
-      <div className="absolute inset-0 bg-[linear-gradient(0deg,#000,transparent)]" />
-      <div
-        className={[
-          'pointer-events-none absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2',
-          'rounded-full border-2 border-white shadow',
-        ].join(' ')}
+      <div className="absolute inset-0 rounded-[11px] bg-[linear-gradient(90deg,#fff,transparent)]" />
+      <div className="absolute inset-0 rounded-[11px] bg-[linear-gradient(0deg,#000,transparent)]" />
+      <svg
+        data-ui="shared.ui.color-selector.plane-marker"
+        aria-hidden="true"
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 overflow-visible"
         style={{
           left: `${props.saturation * 100}%`,
           top: `${(1 - props.value) * 100}%`,
         }}
-      />
+      >
+        <circle cx="8" cy="8" r="7" fill="none" stroke="#000" strokeWidth="2" />
+        <circle cx="8" cy="8" r="5" fill="none" stroke="#fff" strokeWidth="2" />
+      </svg>
     </div>
   );
 }

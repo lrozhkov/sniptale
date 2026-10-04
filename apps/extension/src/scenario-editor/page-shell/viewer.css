@@ -1,0 +1,52 @@
+.scenario-viewer {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-canvas);
+}
+.scenario-viewer-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.scenario-viewer-header h1 {
+  margin: 0;
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.scenario-viewer-header p {
+  margin: 4px 0 0;
+  color: var(--sniptale-color-text-secondary);
+  font-size: 13px;
+}
+.scenario-viewer-header nav {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.scenario-viewer-header a {
+  color: var(--sniptale-color-text-primary);
+  text-decoration: underline;
+}
+.scenario-viewer-document {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.scenario-viewer-document > p {
+  padding: 16px;
+}
+.scenario-viewer-document iframe {
+  border: 0;
+  width: 100%;
+  flex: 1;
+  min-height: 200px;
+}

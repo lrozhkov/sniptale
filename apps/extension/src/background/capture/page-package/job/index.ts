@@ -57,8 +57,12 @@ export { assertActivePopupExportStageBinding } from './active-job';
 function assertPagePackageStartInvariants(args: {
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
   options: ExportOptions;
 }): void {
+  if (args.downloadFormat === 'html' && (args.intent !== 'export' || !args.includeWebCopy)) {
+    throw new Error('HTML download requires an exported Web copy.');
+  }
   if (args.intent !== 'save') return;
   if (!args.includeWebCopy) throw new Error('Saved Page Packages require a Web copy.');
   if (!args.options.includeFullPageScreenshot) {
@@ -66,10 +70,24 @@ function assertPagePackageStartInvariants(args: {
   }
 }
 
+function assertDocumentBoundPagePackageSources(args: {
+  sourceDocumentId?: string;
+  sources: PagePackageCaptureSource[];
+}): void {
+  if (
+    args.sourceDocumentId !== undefined &&
+    (args.sources.length !== 1 || args.sources[0]?.kind !== 'tab')
+  ) {
+    throw new Error('Document-bound Page Package jobs require exactly one tab source.');
+  }
+}
+
 function createPopupExportJob(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
+  sourceDocumentId?: string;
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -92,6 +110,7 @@ function createPopupExportJob(args: {
     cancellationCleanupError: null,
     cancellationQueue: Promise.resolve(),
     contentPort: args.contentPort,
+    ...(args.sourceDocumentId ? { sourceDocumentId: args.sourceDocumentId } : {}),
     captureTiming: args.captureTiming ?? { ...DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING },
     completion: null,
     finishCancellation: null,
@@ -101,6 +120,7 @@ function createPopupExportJob(args: {
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {
+      ...(args.downloadFormat ? { downloadFormat: args.downloadFormat } : {}),
       effectiveComponentPlan: createEffectiveComponentPlan(
         args.intent,
         effectiveOptions,
@@ -205,6 +225,7 @@ export async function startPagePackageJob(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -237,6 +258,8 @@ export async function startPagePackageJobFromSources(args: {
   contentPort: PopupExportJobContentPort;
   includeWebCopy: boolean;
   intent: 'export' | 'save';
+  downloadFormat?: 'html';
+  sourceDocumentId?: string;
   jobId: string;
   locale?: AppLocale;
   options: ExportOptions;
@@ -244,6 +267,7 @@ export async function startPagePackageJobFromSources(args: {
   warnings: string[];
 }): Promise<PagePackageJobStatusV1> {
   await ensureLocaleHydrated().catch(() => undefined);
+  assertDocumentBoundPagePackageSources(args);
   assertPagePackageStartInvariants(args);
   const releaseMutation = acquireStartPermit(args.sources.length);
   let materialized: Awaited<ReturnType<typeof materializePagePackageCaptureSources>> | null = null;

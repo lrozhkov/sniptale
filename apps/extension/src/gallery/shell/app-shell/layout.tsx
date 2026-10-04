@@ -1,4 +1,7 @@
-import type { Ref } from 'react';
+import { GalleryLoadingPanel } from './loading';
+import { useRef, type Ref } from 'react';
+import { useGalleryLibraryShortcuts } from '../../library/keyboard/use-library-shortcuts';
+import { isGalleryListInteractionEnabled } from './list-interaction';
 import { GalleryHeader } from '../../library/main-content/header';
 import { GalleryMainContent } from '../../library/main-content';
 import { GalleryOverlays } from './overlays';
@@ -50,10 +53,21 @@ function GallerySidebarSection(props: GalleryAppLayoutProps) {
 
   return (
     <GallerySidebar
+      trashMode={Boolean(state.filters.trashMode)}
+      busy={state.storage.isBusy}
+      selectedCount={state.selection.selectedItems.length}
+      onClearSelection={props.onClearSelection}
+      trashSummary={state.derived.trashSummary}
+      {...(props.onTrashModeChange ? { onTrashModeChange: props.onTrashModeChange } : {})}
+      {...(props.onRestoreTrash ? { onRestoreTrash: props.onRestoreTrash } : {})}
+      onDeleteTrash={(opening) => props.onDeleteMany(state.selection.selectedItems, opening)}
+      onEmptyTrash={(opening) => props.onDeleteMany(state.derived.allItems, opening)}
       activeSavedView={state.filters.activeSavedView}
       activeTags={state.filters.activeTags}
       allTags={state.derived.allTags}
       counts={state.derived.counts}
+      countsKnown={state.storage.hasLoadedLibrarySnapshot}
+      countsLoading={state.storage.isLoading}
       facetFilters={state.filters.facetFilters}
       facets={state.derived.facets}
       filteredItemCount={state.derived.filteredItems.length}
@@ -83,6 +97,21 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
 
   return (
     <GalleryMainContent
+      navigationContext={JSON.stringify([
+        state.filters.trashMode,
+        state.filters.folderFilter,
+        state.filters.scope,
+        state.filters.appliedSearch,
+        state.filters.activeTags,
+        state.filters.facetFilters,
+        state.filters.activeSavedView?.id,
+        state.filters.sortMode,
+        props.viewMode,
+      ])}
+      keyboardEnabled={isGalleryListInteractionEnabled(state)}
+      previewOpen={Boolean(state.preview.session.item)}
+      trashMode={Boolean(state.filters.trashMode)}
+      trashItemCount={state.derived.allItems.length}
       allTags={state.derived.allTags}
       banner={state.storage.banner}
       filteredItems={state.derived.filteredItems}
@@ -91,7 +120,8 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       gridWidth={state.derived.gridWidth}
       gridViewportRef={gridViewportRef}
       isLoading={state.storage.isLoading}
-      search={state.filters.search}
+      libraryEmpty={state.storage.hasLoadedLibrarySnapshot && state.derived.counts.all === 0}
+      search={state.filters.appliedSearch}
       scope={state.filters.scope}
       selectedIds={state.selection.selectedIds}
       selectedItems={state.selection.selectedItems}
@@ -105,6 +135,7 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       onClearSelection={props.onClearSelection}
       onDeleteMany={props.onDeleteMany}
       onPreviewOpen={props.onPreviewOpen}
+      {...(props.onProjectOpen ? { onProjectOpen: props.onProjectOpen } : {})}
       {...(props.onRecordingGroupOpen ? { onRecordingGroupOpen: props.onRecordingGroupOpen } : {})}
       onSearchChange={props.onSearchChange}
       onScopeChange={props.onScopeChange ?? (() => undefined)}
@@ -113,12 +144,25 @@ function GalleryMainSection(props: GalleryAppLayoutProps) {
       onSelectionZip={props.onSelectionZip}
       onSortModeChange={props.onSortModeChange}
       onToggleSelection={props.onToggleSelection}
+      onSelectRange={props.onSelectRange}
       onViewModeChange={props.onViewModeChange}
     />
   );
 }
 
 export function GalleryAppLayout(props: GalleryAppLayoutProps) {
+  const searchRef = useRef<HTMLInputElement>(null);
+  useGalleryLibraryShortcuts({
+    enabled: isGalleryListInteractionEnabled(props.state),
+    gridRef: props.gridViewportRef,
+    searchRef,
+    selectedCount: props.state.selection.selectedItems.length,
+    onSelectAll: props.onSelectAllFiltered,
+    onClearSelection: props.onClearSelection,
+  });
+  if (!props.state.storage.hasLoadedLibrarySnapshot && props.state.storage.isLoading) {
+    return <GalleryLoadingPanel />;
+  }
   return (
     <GalleryImportDropTarget
       disabled={props.state.storage.isBusy}
@@ -135,8 +179,19 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onDismiss={props.onActiveImportDismiss}
         />
       ) : null}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-clip">
         <GalleryHeader
+          searchNavigation={{
+            inputRef: searchRef,
+            onExit: () => props.gridViewportRef.current?.focus(),
+          }}
+          resultActions={{
+            visible: props.state.derived.hasResultContext,
+            count: props.state.derived.filteredItems.length,
+            disabled: props.state.storage.isBusy,
+            onSelectAll: props.onSelectAllFiltered,
+          }}
+          trashMode={Boolean(props.state.filters.trashMode)}
           activeStorageBarClass={props.state.derived.activeStorageBarClass}
           allTags={props.state.derived.allTags}
           folderFilter={props.state.filters.folderFilter}
@@ -149,9 +204,10 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           onApplySelectionTag={props.onApplySelectionTag}
           onClearSelection={props.onClearSelection}
           onDeleteMany={props.onDeleteMany}
-          onDeleteAll={() => props.onDeleteMany(props.state.derived.allItems)}
+          onDeleteAll={(opening) => props.onDeleteMany(props.state.derived.allItems, opening)}
           onExportBackup={props.onExportBackup}
           onSearchChange={props.onSearchChange}
+          onSearchCommit={props.onSearchCommit}
           onImportBackupClick={props.onImportBackupClick}
           onImportMediaClick={props.onImportMediaClick}
           {...(props.onImportWebSnapshotClick
@@ -170,7 +226,7 @@ export function GalleryAppLayout(props: GalleryAppLayoutProps) {
           storageInfo={props.state.storage.storageInfo}
           viewMode={props.viewMode}
         />
-        <div className="flex min-h-0 min-w-0 flex-1 gap-4 overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 gap-2 overflow-hidden">
           <GallerySidebarSection {...props} />
           <GalleryMainSection {...props} />
         </div>

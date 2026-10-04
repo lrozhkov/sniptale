@@ -27,6 +27,7 @@ it('renders each palette color once as a picker without a duplicate heading or v
   expect(node.textContent?.match(/#123456/gi)).toHaveLength(1);
   expect(node.textContent).not.toMatch(/#1(?![0-9a-f])/i);
   expect(node.querySelector('h2')).toBeNull();
+  expect(node.textContent).toContain('settings.editor.drawingQuickColorsDescription');
   expect(node.textContent).not.toContain('gradient-presets');
   expect(node.querySelectorAll('[data-ui="shared.ui.color-selector"]')).toHaveLength(1);
   act(() => root.unmount());
@@ -67,4 +68,14 @@ it('forwards palette selection, reorder, and picker updates', async () => {
   expect(state.value.changeColor).toHaveBeenCalledWith(0, '#abcdef');
   await act(async () => root.unmount());
   node.remove();
+});
+
+it('does not describe drawing shortcuts for other palettes', () => {
+  state.value.key = 'sceneBackground';
+  const node = document.createElement('div');
+  const root = createRoot(node);
+  act(() => root.render(<PalettesSettings />));
+  expect(node.textContent).not.toContain('settings.editor.drawingQuickColorsDescription');
+  act(() => root.unmount());
+  state.value.key = 'drawing';
 });

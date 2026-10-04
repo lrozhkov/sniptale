@@ -5,14 +5,14 @@ const mocks = vi.hoisted(() => ({
   clearEditorCropGuideMock: vi.fn(),
   applyCropGuideSelectionMock: vi.fn(),
   createCropGuideRectMock: vi.fn(),
-  normalizeEditorCropSelectionMock: vi.fn(),
+  clampEditorCropSelectionPositionMock: vi.fn(),
 }));
 
 vi.mock('../tools/crop', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../tools/crop')>()),
   applyCropGuideSelection: mocks.applyCropGuideSelectionMock,
   createCropGuideRect: mocks.createCropGuideRectMock,
-  normalizeEditorCropSelection: mocks.normalizeEditorCropSelectionMock,
+  clampEditorCropSelectionPosition: mocks.clampEditorCropSelectionPositionMock,
 }));
 
 vi.mock('../transient', async (importOriginal) => ({
@@ -33,12 +33,7 @@ beforeEach(() => {
   mocks.clearEditorCropGuideMock.mockReturnValue({ cropGuide: null, cropSelection: null });
   mocks.cancelEditorCropDrawSessionMock.mockReturnValue({ drawSession: null, cropSelection: null });
   mocks.createCropGuideRectMock.mockReturnValue({ id: 'preview-guide' });
-  mocks.normalizeEditorCropSelectionMock.mockReturnValue({
-    left: 10,
-    top: 20,
-    width: 100,
-    height: 60,
-  });
+  mocks.clampEditorCropSelectionPositionMock.mockImplementation((selection) => selection);
 });
 
 function expectCropGuideCleared(
@@ -66,7 +61,7 @@ it('clears the crop guide through the transient crop seam', () => {
   expect(nextState).toEqual({ cropGuide: null, cropSelection: null });
 });
 
-it('previews canvas size without making crop apply ready until a selection exists', () => {
+it('creates an applicable crop selection from a canvas size preset', () => {
   const canvas = {
     add: vi.fn(),
     requestRenderAll: vi.fn(),
@@ -87,10 +82,13 @@ it('previews canvas size without making crop apply ready until a selection exist
   expect(mocks.applyCropGuideSelectionMock).toHaveBeenCalledWith(
     previewGuide,
     { height: 360, left: 0, top: 0, width: 640 },
-    'preview'
+    'selection'
   );
   expect(canvas.add).toHaveBeenCalledWith(previewGuide);
-  expect(nextState).toEqual({ cropGuide: previewGuide, cropSelection: null });
+  expect(nextState).toEqual({
+    cropGuide: previewGuide,
+    cropSelection: { left: 0, top: 0, width: 640, height: 360 },
+  });
 });
 
 it('does not create a canvas size preview for the current canvas size', () => {
@@ -114,6 +112,34 @@ it('does not create a canvas size preview for the current canvas size', () => {
   expect(canvas.add).not.toHaveBeenCalled();
 });
 
+it('anchors manual expansion at the image origin so existing layers keep their position', () => {
+  const canvas = {
+    add: vi.fn(),
+    getZoom: () => 1,
+    requestRenderAll: vi.fn(),
+    setActiveObject: vi.fn(),
+  };
+  mocks.createCropGuideRectMock.mockReturnValueOnce({ id: 'expansion-guide', set: vi.fn() });
+  const result = previewEditorCanvasSizeSelection({
+    canvas: canvas as never,
+    cropGuide: null,
+    cropSelection: null,
+    canvasDocumentSize: { width: 1200, height: 900 },
+    width: 1200,
+    height: 1200,
+    mode: 'expand',
+  });
+
+  expect(result?.cropSelection).toEqual({ left: 0, top: 0, width: 1200, height: 1200 });
+  expect(mocks.applyCropGuideSelectionMock).toHaveBeenCalledWith(
+    expect.anything(),
+    { left: 0, top: 0, width: 1200, height: 1200 },
+    'selection'
+  );
+  expect(canvas.setActiveObject).toHaveBeenCalledWith(result?.cropGuide);
+  expect(result?.cropGuide?.hasBorders).toBe(false);
+});
+
 it('updates an existing crop selection from the canvas size preview owner', () => {
   const canvas = {
     add: vi.fn(),
@@ -121,7 +147,7 @@ it('updates an existing crop selection from the canvas size preview owner', () =
     setActiveObject: vi.fn(),
   };
   const cropGuide = { id: 'guide' };
-  mocks.normalizeEditorCropSelectionMock.mockReturnValueOnce({
+  mocks.clampEditorCropSelectionPositionMock.mockReturnValueOnce({
     left: 10,
     top: 20,
     width: 640,
@@ -137,7 +163,7 @@ it('updates an existing crop selection from the canvas size preview owner', () =
     height: 360,
   });
 
-  expect(mocks.normalizeEditorCropSelectionMock).toHaveBeenCalledWith(
+  expect(mocks.clampEditorCropSelectionPositionMock).toHaveBeenCalledWith(
     { height: 360, left: 10, top: 20, width: 640 },
     { width: 1280, height: 720 }
   );
@@ -160,7 +186,7 @@ it('does not resync the same crop selection preview', () => {
     setActiveObject: vi.fn(),
   };
   const cropGuide = { id: 'guide' };
-  mocks.normalizeEditorCropSelectionMock.mockReturnValueOnce({
+  mocks.clampEditorCropSelectionPositionMock.mockReturnValueOnce({
     left: 10,
     top: 20,
     width: 100,

@@ -1,3 +1,4 @@
+import { createContextMenuLayout } from '../../../contracts/settings/context-menu-layout';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { browserStorageSyncGetMock, browserStorageSyncSetMock, loggerDebugMock, loggerWarnMock } =
@@ -71,6 +72,7 @@ describe('settings patch persistence', () => {
 
     browserStorageSyncGetMock
       .mockResolvedValueOnce({ sniptale_settings: initialSettings })
+      .mockResolvedValueOnce({ sniptale_settings: initialSettings })
       .mockResolvedValueOnce({ sniptale_settings: firstCommittedSettings });
     browserStorageSyncSetMock
       .mockImplementationOnce(() => deferredSet.promise)
@@ -81,18 +83,26 @@ describe('settings patch persistence', () => {
 
     await flushMicrotasks();
 
-    expect(browserStorageSyncGetMock).toHaveBeenCalledTimes(1);
+    expect(browserStorageSyncGetMock).toHaveBeenCalledTimes(2);
 
     deferredSet.resolve();
 
     await expect(firstPatch).resolves.toEqual(firstCommittedSettings);
     await expect(secondPatch).resolves.toEqual(secondCommittedSettings);
-    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(1, {
-      sniptale_settings: firstCommittedSettings,
-    });
-    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(2, {
-      sniptale_settings: secondCommittedSettings,
-    });
+    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(
+      1,
+      {
+        sniptale_settings: firstCommittedSettings,
+      },
+      expect.anything()
+    );
+    expect(browserStorageSyncSetMock).toHaveBeenNthCalledWith(
+      2,
+      {
+        sniptale_settings: secondCommittedSettings,
+      },
+      expect.anything()
+    );
   });
 });
 
@@ -112,8 +122,33 @@ describe('settings reset persistence', () => {
     await expect(patchSettings({ imageQuality: 55 })).rejects.toThrow('persist failed');
     await expect(resetSettingsToDefaults()).resolves.toEqual(createDefaultSettings());
 
-    expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith({
-      sniptale_settings: createDefaultSettings(),
-    });
+    expect(browserStorageSyncSetMock).toHaveBeenLastCalledWith(
+      {
+        sniptale_settings: createDefaultSettings(),
+      },
+      expect.anything()
+    );
+  });
+});
+
+it('persists menu layout, retains it in unrelated patches and rejects malformed writes', async () => {
+  const layout = createContextMenuLayout();
+  browserStorageSyncGetMock.mockResolvedValue({
+    sniptale_settings: {
+      ...createDefaultSettings(),
+      contextMenu: { ...DEFAULT_SETTINGS.contextMenu, layout },
+    },
+  });
+  const patched = await patchSettings({ contextMenu: { showVideo: false } });
+  expect(patched.contextMenu).toMatchObject({ layout, showVideo: false });
+  const invalid = createContextMenuLayout();
+  invalid.sections = [];
+  browserStorageSyncSetMock.mockClear();
+  await expect(patchSettings({ contextMenu: { layout: invalid } })).rejects.toThrow(
+    'Context menu layout is invalid'
+  );
+  expect(browserStorageSyncSetMock).not.toHaveBeenCalled();
+  await expect(patchSettings({ contextMenu: { layout } })).resolves.toMatchObject({
+    contextMenu: { layout },
   });
 });

@@ -6,7 +6,7 @@ import { createController, createMediaItem } from './test-support';
 const mocks = vi.hoisted(() => ({
   assertSafe: vi.fn(),
   saveRecordings: vi.fn(),
-  saveScreenshot: vi.fn(),
+  saveProjectAsset: vi.fn(),
   getMediaAssetBlob: vi.fn(),
 }));
 
@@ -28,7 +28,7 @@ vi.mock('../../../features/media-hub/project-assets', async (importOriginal) => 
 vi.mock('../../../workflows/media-hub/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../workflows/media-hub/store')>()),
   saveRecordingsBatchSafely: mocks.saveRecordings,
-  saveScreenshotMediaAssetSafely: mocks.saveScreenshot,
+  saveProjectAssetSafely: mocks.saveProjectAsset,
 }));
 
 import { createCancelActiveImportAction } from './backup';
@@ -37,7 +37,6 @@ import { createImportMediaFilesAction } from './media-file-import';
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getMediaAssetBlob.mockReset();
-  mocks.saveScreenshot.mockResolvedValue({ id: 'image-1' });
 });
 
 afterEach(() => {
@@ -56,8 +55,12 @@ it('imports supported images independently and reports skipped files', async () 
   await action([createImage('photo.png'), new File(['text'], 'notes.txt', { type: 'text/plain' })]);
 
   expect(mocks.assertSafe).toHaveBeenCalledTimes(1);
-  expect(mocks.saveScreenshot).toHaveBeenCalledWith(
-    expect.objectContaining({ filename: 'photo.png', kind: 'image' })
+  expect(mocks.saveProjectAsset).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(Blob),
+    'image/png',
+    'photo.png',
+    expect.any(Number)
   );
   expect(getState().storage.activeImport).toMatchObject({
     failedFilenames: ['notes.txt'],
@@ -75,9 +78,31 @@ it('preserves the original file date when importing an image', async () => {
 
   await action([new File(['image'], 'photo.png', { lastModified: createdAt, type: 'image/png' })]);
 
-  expect(mocks.saveScreenshot).toHaveBeenCalledWith(
-    expect.objectContaining({ createdAt, filename: 'photo.png', kind: 'image' })
+  expect(mocks.saveProjectAsset).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(Blob),
+    'image/png',
+    'photo.png',
+    createdAt
   );
+});
+
+it('imports an audio file as a library project asset', async () => {
+  const { controller, getState } = createController();
+  const action = createImportMediaFilesAction(controller, async (run) => run());
+  await action([new File(['audio'], 'narration.mp3', { type: 'audio/mpeg' })]);
+
+  expect(mocks.saveProjectAsset).toHaveBeenCalledWith(
+    expect.any(String),
+    expect.any(Blob),
+    'audio/mpeg',
+    'narration.mp3',
+    expect.any(Number)
+  );
+  expect(getState().storage.activeImport).toMatchObject({
+    result: { imported: 1, skipped: 0 },
+    status: 'completed',
+  });
 });
 
 it('pauses before importing exact filename, size, and content matches', async () => {
@@ -89,7 +114,7 @@ it('pauses before importing exact filename, size, and content matches', async ()
 
   await action([file]);
 
-  expect(mocks.saveScreenshot).not.toHaveBeenCalled();
+  expect(mocks.saveProjectAsset).not.toHaveBeenCalled();
   expect(getState().storage.activeImport).toBeNull();
   const pendingMediaImport = getState().storage.pendingMediaImport;
   expect(pendingMediaImport).toMatchObject({
@@ -98,7 +123,7 @@ it('pauses before importing exact filename, size, and content matches', async ()
 
   await action([file], 'skip');
 
-  expect(mocks.saveScreenshot).not.toHaveBeenCalled();
+  expect(mocks.saveProjectAsset).not.toHaveBeenCalled();
   expect(getState().storage.pendingMediaImport).toBeNull();
   expect(getState().storage.activeImport).toMatchObject({
     progress: { bytesRead: file.size, rootsComplete: 1 },
@@ -117,7 +142,7 @@ it('imports an exact match when the user explicitly keeps both copies', async ()
   await action([file], 'duplicate');
 
   expect(mocks.getMediaAssetBlob).not.toHaveBeenCalled();
-  expect(mocks.saveScreenshot).toHaveBeenCalledTimes(1);
+  expect(mocks.saveProjectAsset).toHaveBeenCalledTimes(1);
   expect(getState().storage.activeImport).toMatchObject({
     result: { conflictsResolved: 0, imported: 1, skipped: 0 },
     status: 'completed',
@@ -134,7 +159,7 @@ it('does not report a conflict for a same-name and same-size file with different
   await action([file]);
 
   expect(getState().storage.pendingMediaImport).toBeNull();
-  expect(mocks.saveScreenshot).toHaveBeenCalledTimes(1);
+  expect(mocks.saveProjectAsset).toHaveBeenCalledTimes(1);
 });
 
 it('marks a selection as failed when no file can be imported', async () => {
@@ -246,7 +271,7 @@ it('rejects a video that exposes metadata but cannot decode a frame', async () =
 it('stops before the next file when the user cancels an active import', async () => {
   const { controller, getState } = createController();
   let releaseSave: (() => void) | undefined;
-  mocks.saveScreenshot.mockImplementationOnce(
+  mocks.saveProjectAsset.mockImplementationOnce(
     () => new Promise<void>((resolve) => (releaseSave = resolve))
   );
   const action = createImportMediaFilesAction(controller, async (run) => run());
@@ -256,7 +281,7 @@ it('stops before the next file when the user cancels an active import', async ()
   releaseSave?.();
   await pending;
 
-  expect(mocks.saveScreenshot).toHaveBeenCalledTimes(1);
+  expect(mocks.saveProjectAsset).toHaveBeenCalledTimes(1);
   expect(getState().storage.activeImport).toMatchObject({
     result: { imported: 1, skipped: 0 },
     status: 'cancelled',

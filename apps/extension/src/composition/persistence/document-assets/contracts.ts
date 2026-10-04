@@ -1,5 +1,5 @@
 import type { EditorDocument } from '../../../features/editor/document/types';
-import type { AssetRef, PreparedAssetObject } from '../assets';
+import type { AssetRef, PreparedAssetObject } from '../assets/contracts';
 
 export interface PersistedEditorAssetPointer {
   assetId: string;

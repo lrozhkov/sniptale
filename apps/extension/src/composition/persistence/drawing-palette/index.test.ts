@@ -103,6 +103,7 @@ describe('drawing palette persistence', () => {
 
     expect(await reorderDrawingPaletteColor(0, 2)).toBe('applied');
     expect(stored.colors.slice(0, 2)).toEqual(['#020202', '#010101']);
+    expect((await loadDrawingPaletteState()).colors).toEqual(stored.colors);
     expect(await changeDrawingPaletteColor(99, '#030303')).toBe('rejected');
     expect(await reorderDrawingPaletteColor(0, 99)).toBe('rejected');
   });

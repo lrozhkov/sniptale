@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createDefaultDrawingToolDefaults,
@@ -176,4 +177,33 @@ it('retains a newer local tool choice when an older save and notification arrive
 
   resolveNewerSave?.('applied');
   stop();
+});
+
+it('uses the supplied history port for commit rejection and releases its clear subscription', () => {
+  const unsubscribe = vi.fn();
+  let clear: (() => void) | undefined;
+  const history = {
+    commitEntry: vi.fn(() => false),
+    subscribeToClear: vi.fn((listener: () => void) => {
+      clear = listener;
+      return unsubscribe;
+    }),
+  };
+  const controller = createContentDrawingController(history);
+  const object = {
+    id: 'injected',
+    kind: 'blur' as const,
+    bounds: { x: 1, y: 2, width: 30, height: 20 },
+  };
+  expect(controller.getObjectAnchor).toBeTypeOf('function');
+  controller.session.commitObject(object);
+  expect(history.commitEntry).toHaveBeenCalledOnce();
+  expect(controller.session.getSnapshot().document.objects).toEqual([]);
+  history.commitEntry.mockReturnValue(true);
+  controller.session.commitObject(object);
+  expect(controller.session.getSnapshot().document.objects).toHaveLength(1);
+  clear?.();
+  expect(controller.session.getSnapshot().document.objects).toEqual([]);
+  controller.session.dispose();
+  expect(unsubscribe).toHaveBeenCalledOnce();
 });

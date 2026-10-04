@@ -247,3 +247,367 @@ it('leaves Space available to native actions when previewing an image', () => {
   expect(space(action).defaultPrevented).toBe(false);
   expect(nativeKey).toHaveBeenCalledOnce();
 });
+
+it.each(['image', 'video'] as const)(
+  'reports a %s decoding failure separately from playback actions',
+  (kind) => {
+    act(() =>
+      root.render(
+        <LibraryMediaPlayer src={`blob:${kind}`} filename="Selected" kind={kind}>
+          <span>Loading</span>
+        </LibraryMediaPlayer>
+      )
+    );
+    act(() =>
+      container.querySelector(kind === 'image' ? 'img' : 'video')!.dispatchEvent(new Event('error'))
+    );
+    expect(container.querySelector('[role="alert"]')?.textContent).toBe(
+      kind === 'image'
+        ? 'videoEditor.sidebar.mediaPreviewImageDecodeFailed'
+        : 'videoEditor.sidebar.mediaPreviewVideoDecodeFailed'
+    );
+    act(() =>
+      root.render(
+        <LibraryMediaPlayer src="blob:next" filename="Next" kind={kind}>
+          <span>Loading</span>
+        </LibraryMediaPlayer>
+      )
+    );
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  }
+);
+
+it('adjusts volume, preserves it across mute and recovers from zero volume', () => {
+  const volume = control('videoEditor.sidebar.mediaPreviewVolume');
+  const change = (value: string) =>
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        volume,
+        value
+      );
+      volume.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  change('0.35');
+  expect(video.volume).toBe(0.35);
+  act(() => control('videoEditor.sidebar.mediaPreviewMute').click());
+  expect(video.muted).toBe(true);
+  expect(video.volume).toBe(0.35);
+  act(() => control('videoEditor.sidebar.mediaPreviewUnmute').click());
+  expect(video.volume).toBe(0.35);
+  change('0');
+  act(() => control('videoEditor.sidebar.mediaPreviewUnmute').click());
+  expect(video.volume).toBe(1);
+  expect(video.muted).toBe(false);
+  act(() => control('videoEditor.sidebar.mediaPreviewMute').click());
+  change('0.5');
+  expect(video.muted).toBe(false);
+  expect(video.volume).toBe(0.5);
+  expect(volume.getAttribute('aria-valuetext')).toBe('50%');
+});
+
+it('offers numeric seek only with a custom frame-selection timeline', () => {
+  expect(container.querySelector('input[type=number]')).toBeNull();
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer
+        src="blob:preview"
+        filename="Recording"
+        renderTimeline={() => <div>Frames</div>}
+      >
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const position = control('videoEditor.app.sourcePosition');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      position,
+      '1.25'
+    );
+    position.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(video.currentTime).toBe(1.25);
+});
+
+it('provides image zoom and fit without playback or volume controls', () => {
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:image" filename="Image" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  expect(control('videoEditor.sidebar.mediaPreviewVolume')).toBeNull();
+  expect(container.textContent).not.toContain('videoEditor.sidebar.mediaPreviewImageZoomHint');
+  expect(control('videoEditor.sidebar.mediaPreviewSeek')).toBeNull();
+  const zoom = control('videoEditor.sidebar.mediaPreviewImageZoomLabel');
+  expect(zoom.disabled).toBe(true);
+  act(() => container.querySelector('img')!.dispatchEvent(new Event('load')));
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoom, '2');
+    zoom.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  const fit = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'videoEditor.sidebar.mediaPreviewFit'
+  )!;
+  act(() => fit.click());
+  expect(
+    container.querySelector<HTMLElement>('[data-ui="library-media-picture"]')!.style.width
+  ).toBe('100%');
+  expect(fit.getAttribute('aria-pressed')).toBe('true');
+});
+
+it('fits natural image pixels, follows resize, zooms with modified wheel and resets a new source', () => {
+  let resize = () => {};
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    }
+  );
+  act(() => root.render(<div />));
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:large" filename="Large" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const viewport = container.querySelector<HTMLDivElement>('[data-ui="library-media-viewport"]')!;
+  Object.defineProperties(viewport, {
+    clientWidth: { configurable: true, value: 600 },
+    clientHeight: { configurable: true, value: 300 },
+  });
+  const image = container.querySelector('img')!;
+  Object.defineProperties(image, { naturalWidth: { value: 1200 }, naturalHeight: { value: 600 } });
+  act(() => {
+    resize();
+    image.dispatchEvent(new Event('load'));
+  });
+  expect(image.style.width).toBe('600px');
+  expect(image.style.height).toBe('300px');
+  const zoom = control('videoEditor.sidebar.mediaPreviewImageZoomLabel');
+  expect(zoom.getAttribute('min')).toBe('0.5');
+  const plain = new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true });
+  act(() => viewport.dispatchEvent(plain));
+  expect(plain.defaultPrevented).toBe(false);
+  const wheel = new WheelEvent('wheel', {
+    deltaY: -100,
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => viewport.dispatchEvent(wheel));
+  expect(wheel.defaultPrevented).toBe(true);
+  expect(Number.parseFloat(image.style.width)).toBeGreaterThan(600);
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoom, '1');
+    zoom.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(image.style.width).toBe('1200px');
+  Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 450 });
+  act(() => resize());
+  expect(image.style.width).toBe('1200px');
+  const fit = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'videoEditor.sidebar.mediaPreviewFit'
+  )!;
+  act(() => fit.click());
+  Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 300 });
+  act(() => resize());
+  expect(image.style.width).toBe('300px');
+  expect(image.style.height).toBe('150px');
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:small" filename="Small" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const small = container.querySelector('img')!;
+  expect(control('videoEditor.sidebar.mediaPreviewImageZoomLabel').disabled).toBe(true);
+  Object.defineProperties(small, { naturalWidth: { value: 100 }, naturalHeight: { value: 50 } });
+  act(() => small.dispatchEvent(new Event('load')));
+  expect(small.style.width).toBe('100px');
+  expect(small.style.height).toBe('50px');
+  expect(fit.getAttribute('aria-pressed')).toBe('true');
+  act(() => small.dispatchEvent(new Event('error')));
+  expect(control('videoEditor.sidebar.mediaPreviewImageZoomLabel').disabled).toBe(true);
+});
+
+it('keeps centered image pixels anchored when zoom crosses letterbox margins', () => {
+  let resize = () => {};
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    }
+  );
+  act(() => root.render(<div />));
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:square" filename="Square" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const viewport = container.querySelector<HTMLDivElement>('[data-ui="library-media-viewport"]')!;
+  Object.defineProperties(viewport, { clientWidth: { value: 600 }, clientHeight: { value: 600 } });
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 600, 600));
+  const picture = container.querySelector('img')!;
+  Object.defineProperties(picture, { naturalWidth: { value: 400 }, naturalHeight: { value: 400 } });
+  vi.spyOn(picture, 'getBoundingClientRect').mockImplementation(() => {
+    const width = Number.parseFloat(picture.style.width) || 400;
+    const height = Number.parseFloat(picture.style.height) || 400;
+    return new DOMRect(
+      Math.max(0, (600 - width) / 2) - viewport.scrollLeft,
+      Math.max(0, (600 - height) / 2) - viewport.scrollTop,
+      width,
+      height
+    );
+  });
+  act(() => {
+    resize();
+    picture.dispatchEvent(new Event('load'));
+  });
+  const zoom = control('videoEditor.sidebar.mediaPreviewImageZoomLabel');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoom, '2');
+    zoom.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(picture.style.width).toBe('800px');
+  expect(viewport.scrollLeft).toBe(100);
+  expect(viewport.scrollTop).toBe(100);
+  const fit = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'videoEditor.sidebar.mediaPreviewFit'
+  )!;
+  act(() => fit.click());
+  expect(viewport.scrollLeft).toBe(0);
+  expect(viewport.scrollTop).toBe(0);
+  act(() =>
+    viewport.dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaY: -240,
+        ctrlKey: true,
+        clientX: 300,
+        clientY: 300,
+        cancelable: true,
+      })
+    )
+  );
+  const bounds = picture.getBoundingClientRect();
+  expect((300 - bounds.left) / bounds.width).toBeCloseTo(0.5);
+  expect((300 - bounds.top) / bounds.height).toBeCloseTo(0.5);
+});
+
+it('keeps image zoom, native pixels and Fit consistent through fullscreen transitions', () => {
+  let resize = () => {};
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    }
+  );
+  act(() => root.render(<div />));
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:controls" filename="Large image" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  expect(control('gallery.preview.zoomIn').disabled).toBe(true);
+  const viewport = container.querySelector<HTMLDivElement>('[data-ui="library-media-viewport"]')!;
+  Object.defineProperties(viewport, {
+    clientWidth: { configurable: true, value: 600 },
+    clientHeight: { configurable: true, value: 300 },
+  });
+  const image = container.querySelector('img')!;
+  Object.defineProperties(image, { naturalWidth: { value: 1200 }, naturalHeight: { value: 600 } });
+  act(() => {
+    resize();
+    image.dispatchEvent(new Event('load'));
+  });
+  expect(control('gallery.preview.zoomOut').disabled).toBe(true);
+  act(() => control('gallery.preview.zoomIn').click());
+  expect(image.style.width).toBe('750px');
+  act(() => control('gallery.preview.zoomOut').click());
+  expect(image.style.width).toBe('600px');
+  const native = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === '100%'
+  )!;
+  act(() => native.click());
+  expect(image.style.width).toBe('1200px');
+  expect(native.getAttribute('aria-pressed')).toBe('true');
+  const frame = container.querySelector('[data-ui="library-media-player"]');
+  try {
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: frame });
+    act(() => document.dispatchEvent(new Event('fullscreenchange')));
+    expect(document.activeElement).toBe(control('videoEditor.stage.exitFullscreen'));
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 1000 });
+    Object.defineProperty(viewport, 'clientHeight', { configurable: true, value: 500 });
+    act(() => resize());
+    expect(image.style.width).toBe('1200px');
+    const fit = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'videoEditor.sidebar.mediaPreviewFit'
+    )!;
+    act(() => fit.click());
+    expect(image.style.width).toBe('1000px');
+    expect(control('gallery.preview.zoomOut').disabled).toBe(true);
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+    act(() => document.dispatchEvent(new Event('fullscreenchange')));
+    expect(document.activeElement).toBe(control('videoEditor.stage.enterFullscreen'));
+    act(() => image.dispatchEvent(new Event('error')));
+    expect(control('gallery.preview.zoomIn').disabled).toBe(true);
+  } finally {
+    Reflect.deleteProperty(document, 'fullscreenElement');
+  }
+});
+
+it('keeps consumer form actions inside fullscreen without intercepting their native Space', () => {
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer
+        src="blob:preview"
+        filename="Recording"
+        footer={<button>Save step</button>}
+      >
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const frame = container.querySelector('[data-ui="library-media-player"]')!;
+  const footer = container.querySelector('[data-ui="library-media-footer"]')!;
+  const action = footer.querySelector('button')!;
+  expect(frame.contains(footer)).toBe(true);
+  expect(container.querySelector('[data-ui="library-media-picture"]')!.contains(footer)).toBe(
+    false
+  );
+  const nativeKey = vi.fn();
+  action.addEventListener('keydown', nativeKey);
+  action.focus();
+  expect(space(action).defaultPrevented).toBe(false);
+  expect(nativeKey).toHaveBeenCalledTimes(1);
+  expect(video.paused).toBe(true);
+  try {
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: frame });
+    act(() => document.dispatchEvent(new Event('fullscreenchange')));
+    expect(frame.contains(action)).toBe(true);
+    action.focus();
+    expect(space(action).defaultPrevented).toBe(false);
+    expect(nativeKey).toHaveBeenCalledTimes(2);
+  } finally {
+    Reflect.deleteProperty(document, 'fullscreenElement');
+  }
+});

@@ -61,17 +61,28 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: settings.paper, exact: true }).click();
       await page.getByRole('button', { name: settings.orientation, exact: true }).click();
       await page.getByRole('button', { name: settings.pagination, exact: true }).click();
-      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+      await page.emulateMedia({ media: 'print' });
+      await expect(page.locator('.guide-print article').last()).toHaveCSS(
+        'break-before',
+        settings.pagination === 'Document' ? 'auto' : 'page'
+      );
+      const pdf = await page.pdf({
+        path: testInfo.outputPath(`${settings.name}-${theme}.pdf`),
+        preferCSSPageSize: true,
+        printBackground: true,
+      });
+      await page.emulateMedia({ media: 'screen' });
       await testInfo.attach(`${settings.name}-${theme}`, {
         body: pdf,
         contentType: 'application/pdf',
       });
     }
-    await page.setViewportSize({ width: 800, height: 640 });
+    await page.setViewportSize({ width: 1280, height: 560 });
     await expect(page.getByRole('button', { name: 'Print / PDF', exact: true })).toBeInViewport();
     await expect(
       page.getByRole('button', { name: 'Back to export', exact: true })
     ).toBeInViewport();
+    await page.getByRole('button', { name: 'Back to export', exact: true }).focus();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'Print / PDF', exact: true })).toBeFocused();
     await expect(page.locator('.guide-reader article')).toHaveCount(1);

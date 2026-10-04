@@ -74,7 +74,7 @@ function AutoHideControl(props: {
   const closeMenu = useCallback(() => {
     if (props.toolbarMenuState) props.toolbarMenuState.closeMenu('recording-auto-hide');
     else setLocalOpen(false);
-    queueMicrotask(() => triggerRef.current?.blur());
+    if (!props.toolbarMenuState) queueMicrotask(() => triggerRef.current?.blur());
   }, [props.toolbarMenuState]);
   useToolbarFloatingMenuDismissal({
     menuRef,

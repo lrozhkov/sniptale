@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, expect, it } from 'vitest';
-import { materializePreparedSnapshotStyles } from './styles';
+import { markPreparedSnapshotShadowStyles, materializePreparedSnapshotStyles } from './styles';
 
 afterEach(() => {
   document.head
@@ -190,3 +190,43 @@ it('pins the captured body font size after site cascade layers', () => {
     'body { font-family: Inter, sans-serif; font-size: 14px; }'
   );
 });
+
+it.each(['style', 'link'] as const)(
+  'replaces cloned shadow %s once in place with its current CSSOM and media',
+  (tag) => {
+    const host = document.createElement('page-card');
+    const shadow = host.attachShadow({ mode: 'open' });
+    const style = document.createElement(tag);
+    if (style instanceof HTMLLinkElement) {
+      style.rel = 'stylesheet';
+      style.href = '/theme.css';
+    }
+    style.media = 'screen';
+    style.textContent = '.card { color: red; }';
+    shadow.append(style);
+    document.body.append(host);
+    const sheet = new CSSStyleSheet();
+    sheet.insertRule('.card { color: blue; }');
+    Object.defineProperty(sheet, 'ownerNode', { value: style });
+    Object.defineProperty(shadow, 'styleSheets', { value: [sheet] });
+    const marks = markPreparedSnapshotShadowStyles(document);
+    try {
+      const snapshot = document.implementation.createHTMLDocument('snapshot');
+      const clone = snapshot.importNode(host, true);
+      clone.append(snapshot.importNode(style, true));
+      snapshot.body.append(clone);
+      marks.materialize(snapshot);
+      marks.encapsulate(snapshot);
+      const template = clone.querySelector('template');
+      const styles = template?.content.querySelectorAll('style');
+      expect(styles).toHaveLength(1);
+      expect(template?.content.querySelector('link')).toBeNull();
+      expect(styles?.[0]?.textContent).toContain('blue');
+      expect(styles?.[0]?.textContent).not.toContain('red');
+      expect(styles?.[0]?.textContent).toContain('@media screen');
+    } finally {
+      marks.cleanup();
+      host.remove();
+    }
+  }
+);

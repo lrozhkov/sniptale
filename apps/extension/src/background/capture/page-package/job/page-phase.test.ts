@@ -150,6 +150,23 @@ it('retains only fixed staged descriptors and continues after a page failure', a
   );
 });
 
+it('passes the admitted source document only to the direct export source tab', async () => {
+  const request = vi.fn().mockResolvedValue({
+    success: true,
+    stagedPagePackage: descriptor(0),
+  });
+  const active = job(request);
+  active.sourceDocumentId = 'document-7';
+  active.status.orderedTabs = [{ tabId: 7, title: 'One' }];
+  active.status.pageOutcomes = [{ ordinal: 0, status: 'pending', tabId: 7 }];
+
+  await collectPopupExportPagePackages(active, new Map([[7, { id: 7 } as chrome.tabs.Tab]]));
+
+  expect(request).toHaveBeenCalledWith(
+    expect.objectContaining({ tabId: 7, sourceDocumentId: 'document-7' })
+  );
+});
+
 it('publishes page collection as a partial progress patch', async () => {
   const request = vi.fn().mockResolvedValue({ success: true, stagedPagePackage: descriptor(0) });
   const active = job(request);

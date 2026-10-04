@@ -1,3 +1,4 @@
+import { type FilenameSession } from '../../../workflows/file-naming/index';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { RecordingStagingCoordinator } from '../../../composition/persistence/recordings/staging';
 import { createWebcamSidecarRecorder } from '../sidecar';
@@ -14,6 +15,7 @@ type WebcamProjectInput = {
 };
 
 export function createMultiSourceWebcamRecorder(params: {
+  filenameSession?: FilenameSession;
   baseRecordingId: string;
   coordinator: RecordingStagingCoordinator;
   settings: VideoRecordingSettings;

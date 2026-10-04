@@ -57,6 +57,7 @@ export function createQuickEditDocumentMode(props: QuickEditDocumentModeProps) {
   return {
     disable: () => disableDocumentMode(props, state, historyTracker),
     enable: () => enableDocumentMode(props, state, historyTracker),
+    hasPendingChanges: historyTracker.hasPendingChanges,
     isEnabled,
   };
 }

@@ -16,12 +16,55 @@ interface ReviewTimeMap {
   getSegments(): readonly ReviewTimeSegment[];
 }
 
+/** Copy needs verified boundaries only where authored edits change visible source material. */
+export function reviewVisibleEditBoundaries(edits: readonly ReviewEdit[]): number[] {
+  const cuts = edits.filter((edit) => edit.kind === 'cut');
+  return edits.flatMap((edit) =>
+    [edit.start, edit.end].filter(
+      (time) => edit.kind === 'cut' || !cuts.some((cut) => cut.start < time && time < cut.end)
+    )
+  );
+}
+
+/** Edits on one lane cannot overlap each other; cuts and speed retain independent lanes. */
+function validateReviewEditIntervals(duration: number, edits: readonly ReviewEdit[]): void {
+  for (const kind of ['cut', 'speed'] as const) {
+    let previousEnd = 0;
+    for (const edit of edits
+      .filter((item) => item.kind === kind)
+      .sort((a, b) => a.start - b.start)) {
+      if (
+        !Number.isFinite(edit.start) ||
+        !Number.isFinite(edit.end) ||
+        edit.start < previousEnd ||
+        edit.start < 0 ||
+        edit.start >= edit.end ||
+        edit.end > duration
+      )
+        throw new Error('Review edit interval is invalid.');
+      previousEnd = edit.end;
+    }
+  }
+}
+
+/** A cut has precedence within one disjoint source interval, without changing its speed edit. */
+function effectiveReviewInterval(start: number, end: number, edits: readonly ReviewEdit[]) {
+  const covering = (kind: ReviewEdit['kind']) =>
+    edits.find((edit) => edit.kind === kind && edit.start <= start && edit.end >= end);
+  if (covering('cut')) return { kind: 'cut' as const, rate: 1 };
+  const speed = covering('speed');
+  return speed?.kind === 'speed'
+    ? { kind: 'speed' as const, rate: speed.rate }
+    : { kind: 'keep' as const, rate: 1 };
+}
+
 /** Single source-time lane; removed spans retain their source width and have zero result duration. */
 export function buildReviewTimeMap(
   duration: number,
   edits: readonly ReviewEdit[]
 ): ReviewTimeSegment[] {
   if (!Number.isFinite(duration) || duration <= 0) throw new Error('Review duration is invalid.');
+  validateReviewEditIntervals(duration, edits);
   const segments: ReviewTimeSegment[] = [];
   let sourceEnd = 0;
   let resultEnd = 0;
@@ -39,19 +82,15 @@ export function buildReviewTimeMap(
     sourceEnd = end;
     resultEnd = next;
   };
-  for (const edit of [...edits].sort((a, b) => a.start - b.start)) {
-    if (
-      !Number.isFinite(edit.start) ||
-      !Number.isFinite(edit.end) ||
-      edit.start < sourceEnd ||
-      edit.start >= edit.end ||
-      edit.end > duration
-    )
-      throw new Error('Review edit interval is invalid.');
-    append(edit.start, 'keep', 1);
-    append(edit.end, edit.kind, edit.kind === 'speed' ? edit.rate : 1);
+  const boundaries = [
+    ...new Set([0, duration, ...edits.flatMap((edit) => [edit.start, edit.end])]),
+  ].sort((a, b) => a - b);
+  for (let index = 1; index < boundaries.length; index += 1) {
+    const start = boundaries[index - 1]!;
+    const end = boundaries[index]!;
+    const interval = effectiveReviewInterval(start, end, edits);
+    append(end, interval.kind, interval.rate);
   }
-  append(duration, 'keep', 1);
   return segments;
 }
 

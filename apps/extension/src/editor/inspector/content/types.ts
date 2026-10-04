@@ -56,6 +56,7 @@ export interface EditorInspectorContentProps
   imageAspectRatio: number | null;
   canvasAspectRatio: number | null;
   frameDraft: EditorFrameSettings;
+  lastFillModeRef: React.RefObject<'color' | 'gradient'>;
   framePaddingSummary: string;
   layoutModeLabel: string;
   backgroundModeLabel: string;

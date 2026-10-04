@@ -38,7 +38,10 @@ export function renderTransformFields(
         formatValue={(value) => `${Math.round(value * 100)}%`}
         onChange={(value) => onUpdateClipTransform(selectedClip.id, { opacity: value })}
       />
-      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
+      <InspectorDetails
+        preferenceId="transform-fields:videoEditor.sidebar.inspectorExactPlacement"
+        label={translate('videoEditor.sidebar.inspectorExactPlacement')}
+      >
         <TransformGeometryFields
           clip={selectedClip}
           hideSize={hideSize}

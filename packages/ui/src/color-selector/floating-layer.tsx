@@ -25,7 +25,8 @@ import {
 } from '../floating-interactions/scale';
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
-const COLOR_SELECTOR_LAYER_GAP = 10;
+const COLOR_SELECTOR_PICKER_LAYER_WIDTH = 280;
+const COLOR_SELECTOR_LAYER_GAP = 8;
 const COLOR_SELECTOR_VIEWPORT_PADDING = 8;
 
 type ColorSelectorFloatingPlacement = 'auto' | 'side';
@@ -52,11 +53,13 @@ function resolveSideLayerStyle(args: {
   uiScale: number;
   viewportHeight: number;
   viewportWidth: number;
+  layerHeight: number;
+  layerWidth: number;
 }): CSSProperties | null {
   const boundaryRight = args.boundaryRect.x + args.boundaryRect.width;
   const rightRoom = args.viewportWidth - boundaryRight - COLOR_SELECTOR_VIEWPORT_PADDING;
   const leftRoom = args.boundaryRect.x - COLOR_SELECTOR_VIEWPORT_PADDING;
-  const requiredRoom = COLOR_SELECTOR_LAYER_WIDTH + COLOR_SELECTOR_LAYER_GAP;
+  const requiredRoom = args.layerWidth + COLOR_SELECTOR_LAYER_GAP;
   if (Math.max(leftRoom, rightRoom) < requiredRoom) return null;
 
   const placeRight =
@@ -66,7 +69,7 @@ function resolveSideLayerStyle(args: {
     Math.max(args.anchorRect.y, COLOR_SELECTOR_VIEWPORT_PADDING),
     Math.max(
       COLOR_SELECTOR_VIEWPORT_PADDING,
-      args.viewportHeight - COLOR_SELECTOR_VIEWPORT_PADDING - 420
+      args.viewportHeight - COLOR_SELECTOR_VIEWPORT_PADDING - args.layerHeight
     )
   );
   const clientPosition = projectContentUiPointToClient(
@@ -83,17 +86,43 @@ function resolveSideLayerStyle(args: {
     maxHeight,
     top: clientPosition.y,
     transform: placeRight ? undefined : 'translateX(-100%)',
-    width: COLOR_SELECTOR_LAYER_WIDTH,
+    width: args.layerWidth,
+  };
+}
+
+function resolveVerticalLayerSpace(args: {
+  boundaryBottom: number;
+  boundaryTop: number;
+  layerHeight: number;
+  viewportHeight: number;
+}) {
+  const belowRoom = args.viewportHeight - args.boundaryBottom - COLOR_SELECTOR_VIEWPORT_PADDING;
+  const aboveRoom = args.boundaryTop - COLOR_SELECTOR_VIEWPORT_PADDING;
+  const placeAbove = belowRoom < args.layerHeight && aboveRoom > belowRoom;
+  return {
+    maxHeight: Math.max(
+      180,
+      Math.min(420, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
+    ),
+    placeAbove,
+    y: placeAbove
+      ? args.boundaryTop - COLOR_SELECTOR_LAYER_GAP
+      : args.boundaryBottom + COLOR_SELECTOR_LAYER_GAP,
   };
 }
 
 function resolveColorSelectorLayerStyle(
   anchor: HTMLElement | null,
   placement: ColorSelectorFloatingPlacement,
-  boundary: HTMLElement | null
+  boundary: HTMLElement | null,
+  layer: HTMLElement | null = null,
+  layerKind: 'palette' | 'picker' = 'palette',
+  preferredHeight = 260
 ): CSSProperties {
+  const preferredWidth =
+    layerKind === 'picker' ? COLOR_SELECTOR_PICKER_LAYER_WIDTH : COLOR_SELECTOR_LAYER_WIDTH;
   if (!anchor || typeof window === 'undefined') {
-    return { width: COLOR_SELECTOR_LAYER_WIDTH };
+    return { width: preferredWidth };
   }
 
   const uiScale = readContentUiScaleCompensation(anchor);
@@ -107,6 +136,7 @@ function resolveColorSelectorLayerStyle(
   });
   const viewportWidth = viewport.width;
   const viewportHeight = viewport.height;
+  const layerWidth = Math.min(preferredWidth, Math.max(0, viewportWidth - 16));
   if (placement === 'side') {
     const sideStyle = resolveSideLayerStyle({
       anchorRect: rect,
@@ -114,40 +144,41 @@ function resolveColorSelectorLayerStyle(
       uiScale,
       viewportHeight,
       viewportWidth,
+      layerHeight: layer ? projectElementRect(layer, uiScale).rect.height : 420,
+      layerWidth,
     });
     if (sideStyle) return sideStyle;
   }
-  const boundaryBottom = boundaryRect.y + boundaryRect.height;
-  const belowRoom = viewportHeight - boundaryBottom - COLOR_SELECTOR_VIEWPORT_PADDING;
-  const aboveRoom = boundaryRect.y - COLOR_SELECTOR_VIEWPORT_PADDING;
-  const placeAbove = belowRoom < 260 && aboveRoom > belowRoom;
-  const maxHeight = Math.max(
-    180,
-    Math.min(420, (placeAbove ? aboveRoom : belowRoom) - COLOR_SELECTOR_LAYER_GAP)
-  );
+  const measuredHeight = layer
+    ? Math.max(preferredHeight, projectElementRect(layer, uiScale).rect.height)
+    : preferredHeight;
+  const vertical = resolveVerticalLayerSpace({
+    boundaryBottom: rect.y + rect.height,
+    boundaryTop: rect.y,
+    layerHeight: measuredHeight,
+    viewportHeight,
+  });
   const left = Math.min(
-    Math.max(right - COLOR_SELECTOR_LAYER_WIDTH, COLOR_SELECTOR_VIEWPORT_PADDING),
+    Math.max(right - layerWidth, COLOR_SELECTOR_VIEWPORT_PADDING),
     Math.max(
       COLOR_SELECTOR_VIEWPORT_PADDING,
-      viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING - COLOR_SELECTOR_LAYER_WIDTH
+      viewportWidth - COLOR_SELECTOR_VIEWPORT_PADDING - layerWidth
     )
   );
 
   const clientPosition = projectContentUiPointToClient(
     {
       x: left,
-      y: placeAbove
-        ? boundaryRect.y - COLOR_SELECTOR_LAYER_GAP
-        : boundaryBottom + COLOR_SELECTOR_LAYER_GAP,
+      y: vertical.y,
     },
     uiScale
   );
   return {
     left: clientPosition.x,
-    maxHeight,
+    maxHeight: vertical.maxHeight,
     top: clientPosition.y,
-    transform: placeAbove ? 'translateY(-100%)' : undefined,
-    width: COLOR_SELECTOR_LAYER_WIDTH,
+    transform: vertical.placeAbove ? 'translateY(-100%)' : undefined,
+    width: layerWidth,
   };
 }
 
@@ -155,22 +186,49 @@ export function useColorSelectorLayerStyle(
   anchor: HTMLElement | null,
   open: boolean,
   placement: ColorSelectorFloatingPlacement = 'auto',
-  boundary: HTMLElement | null = null
+  boundary: HTMLElement | null = null,
+  layerRef?: RefObject<HTMLElement | null>,
+  layerKind: 'palette' | 'picker' = 'palette',
+  preferredHeight = 260
 ) {
   const [style, setStyle] = useState<CSSProperties>(() =>
-    resolveColorSelectorLayerStyle(anchor, placement, boundary)
+    resolveColorSelectorLayerStyle(
+      anchor,
+      placement,
+      boundary,
+      layerRef?.current,
+      layerKind,
+      preferredHeight
+    )
   );
   const updateStyle = useCallback(() => {
-    setStyle(resolveColorSelectorLayerStyle(anchor, placement, boundary));
-  }, [anchor, boundary, placement]);
+    setStyle(
+      resolveColorSelectorLayerStyle(
+        anchor,
+        placement,
+        boundary,
+        layerRef?.current,
+        layerKind,
+        preferredHeight
+      )
+    );
+  }, [anchor, boundary, layerKind, layerRef, placement, preferredHeight]);
 
   useEffect(() => {
     if (!open) {
       return undefined;
     }
 
-    return bindFloatingInteractionPositionListeners(anchor, updateStyle);
-  }, [anchor, open, updateStyle]);
+    const unbind = bindFloatingInteractionPositionListeners(anchor, updateStyle);
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateStyle);
+    if (anchor) observer?.observe(anchor);
+    if (boundary) observer?.observe(boundary);
+    if (layerRef?.current) observer?.observe(layerRef.current);
+    return () => {
+      unbind?.();
+      observer?.disconnect();
+    };
+  }, [anchor, boundary, layerKind, layerRef, open, updateStyle]);
 
   return style;
 }

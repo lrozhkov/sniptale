@@ -81,7 +81,7 @@ describe('video settings layout', () => {
     );
   });
 
-  it('renders and applies the full countdown option range', () => {
+  it.each([3, 5, 10])('offers only supported countdowns and applies %s seconds', (seconds) => {
     const onSettingsChange = vi.fn();
     renderGrid({
       onSettingsChange,
@@ -90,10 +90,30 @@ describe('video settings layout', () => {
 
     expect(container.textContent).toContain('popup.video.countdownManyOption:3');
     clickButtonContaining('popup.video.countdownLabel');
-    clickButtonContaining('popup.video.countdownManyOption:2');
+    expect(
+      Array.from(container.querySelectorAll('[role="option"]')).map((option) => option.textContent)
+    ).toEqual([
+      'popup.video.countdownManyOption:3',
+      'popup.video.countdownManyOption:5',
+      'popup.video.countdownManyOption:10',
+    ]);
+    const option = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[role="option"]')
+    ).find((candidate) => candidate.textContent === `popup.video.countdownManyOption:${seconds}`);
+    act(() => option?.click());
 
-    expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: 2 });
+    expect(onSettingsChange).toHaveBeenCalledWith({ countdownSeconds: seconds });
   });
+
+  it.each(Object.values(CaptureMode))(
+    'omits the unavailable cursor-theme option for %s',
+    (captureMode) => {
+      renderGrid({ captureMode, onSettingsChange: vi.fn() });
+      expect(container.querySelector('input[type="checkbox"]')).toBeNull();
+      expect(container.textContent).not.toContain('popup.video.cursorThemeLabel');
+      expect(container.textContent).not.toContain('popup.video.cursorThemePending');
+    }
+  );
 
   it('covers immediate countdown and screen source-count states', () => {
     const onSettingsChange = vi.fn();

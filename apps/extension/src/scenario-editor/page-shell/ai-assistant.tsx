@@ -28,6 +28,7 @@ type AssistantProps = {
   selectedBlockId: string | null;
   disabled: boolean;
   onOpen: () => void;
+  prepareProject: () => Promise<GuideProject | null>;
   onChange: (project: GuideProject) => void;
   onReload: () => Promise<void>;
   t: Translate;
@@ -46,7 +47,9 @@ export function GuideAiEntry(
       {...props}
       project={props.project}
       selectedBlockId={block ? block.id : null}
-      disabled={props.disabled || !['ready', 'saved'].includes(props.status)}
+      disabled={
+        props.disabled || !['ready', 'saved', 'dirty', 'saving', 'failed'].includes(props.status)
+      }
     />
   );
 }
@@ -134,6 +137,7 @@ function GuideAiDialog({
   selectedBlockId,
   disabled,
   onChange,
+  prepareProject,
   onReload,
   onClose,
   t,
@@ -145,6 +149,7 @@ function GuideAiDialog({
     selectedStepId,
     selectedBlockId,
     onChange,
+    prepareProject,
     onClose,
     t,
   });

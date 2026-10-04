@@ -61,25 +61,40 @@ it('renders folder actions, highlights the active folder, and forwards selection
 
   render(
     <GalleryFolderList
-      counts={{ all: 7, export: 1, recording: 2, scenario: 3, screenshot: 4 }}
+      countsKnown
+      counts={{ all: 7, audio: 0, export: 1, recording: 2, scenario: 3, screenshot: 4 }}
       folderFilter="recording"
       onFolderFilterChange={onFolderFilterChange}
     />
   );
 
   const activeButton = findButton(translate('gallery.preview.folderRecording'));
-  expect(activeButton?.className).toContain('shadow-sm');
+  expect(container?.firstElementChild?.className).toContain('shrink-0');
+  expect(activeButton?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(activeButton?.className).toContain(
+    'focus-visible:ring-[var(--sniptale-color-text-primary)]'
+  );
   expect(container?.textContent).toContain('7');
-  expect(findButton(translate('gallery.preview.folderExport'))).toBeUndefined();
+  expect(findButton(translate('gallery.preview.folderExport'))).toBeDefined();
+  expect(findButton(translate('gallery.preview.folderVideoProject'))).toBeUndefined();
   expect(translate('gallery.preview.folderWebSnapshot')).toBe('Веб-снимки');
-  expect(container?.textContent).toContain('Веб-снимки');
+  expect(container?.textContent).not.toContain('Веб-снимки');
 
   click(findButton(translate('gallery.preview.folderScenario')));
   expect(onFolderFilterChange).toHaveBeenCalledWith('scenario');
 
   render(
     <GalleryFolderList
-      counts={{ all: 8, export: 1, recording: 2, scenario: 3, screenshot: 4, 'web-snapshot': 5 }}
+      countsKnown
+      counts={{
+        all: 8,
+        audio: 0,
+        export: 1,
+        recording: 2,
+        scenario: 3,
+        screenshot: 4,
+        'web-snapshot': 5,
+      }}
       folderFilter="web-snapshot"
       onFolderFilterChange={onFolderFilterChange}
     />
@@ -116,8 +131,9 @@ it('renders saved views under their category without icons or counters and reque
 
   render(
     <GalleryFolderList
+      countsKnown
       activeSavedView={view}
-      counts={{ all: 7, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
+      counts={{ all: 7, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 4 }}
       folderFilter="screenshot"
       savedViews={[view]}
       savedViewsLoaded
@@ -129,6 +145,13 @@ it('renders saved views under their category without icons or counters and reque
   );
 
   const viewButton = findButton('PNG review');
+  expect(viewButton?.parentElement?.className).toContain(
+    'bg-[var(--sniptale-color-surface-hover)]'
+  );
+  expect(viewButton?.parentElement?.className).toContain('border-transparent');
+  expect(viewButton?.className).toContain(
+    'focus-visible:ring-[var(--sniptale-color-text-primary)]'
+  );
   expect(viewButton?.querySelector('svg')).toBeNull();
   expect(viewButton?.className).toContain('h-full w-full');
   expect(viewButton?.parentElement?.querySelector('div')?.className).toContain('opacity-0');
@@ -167,7 +190,8 @@ it('reveals saved views in batches and requests sibling reordering', () => {
 
   render(
     <GalleryFolderList
-      counts={{ all: 6, export: 0, recording: 0, scenario: 0, screenshot: 6 }}
+      countsKnown
+      counts={{ all: 6, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 6 }}
       folderFilter="screenshot"
       savedViews={views}
       savedViewsLoaded
@@ -200,9 +224,10 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
 
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={['beta']}
       allTags={['alpha', 'beta']}
-      counts={{ all: 2, export: 0, recording: 0, scenario: 0, screenshot: 2 }}
+      counts={{ all: 2, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 2 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -241,6 +266,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
       onActiveTagsChange={onActiveTagsChange}
       onFacetFilterChange={onFacetFilterChange}
       onFolderFilterChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onResetFilters={onResetFilters}
       onScopeChange={onScopeChange}
@@ -248,6 +274,21 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   );
 
   const initialSummaries = Array.from(container?.querySelectorAll('summary') ?? []);
+  expect(container?.firstElementChild?.className).toContain('shrink-0');
+  for (const summary of initialSummaries) {
+    expect(summary.className).toContain('h-7');
+    expect(summary.className).toContain('mx-1.5');
+    expect(summary.className).toContain('rounded-[var(--sniptale-radius-sm)]');
+    expect(summary.className).toContain('hover:shadow-[6px_0_0_var(');
+    expect(summary.className).toContain('focus-visible:outline-[var(--sniptale-color-accent)]');
+    const chevron = summary.querySelector(':scope > svg:last-child');
+    expect(chevron?.getAttribute('class')).toContain('-rotate-90');
+    expect(chevron?.getAttribute('class')).toContain('group-open:rotate-0');
+    expect(chevron?.getAttribute('class')).toContain('motion-reduce:transition-none');
+  }
+  for (const section of Array.from(container?.querySelectorAll('details') ?? [])) {
+    expect(section.className).toContain('py-1');
+  }
   expect(initialSummaries[0]?.textContent).toContain(`${translate('gallery.app.facetSelected')} 2`);
   expect(initialSummaries[1]?.textContent).toContain('beta');
   expect(initialSummaries[1]?.textContent).not.toContain(
@@ -255,6 +296,14 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
   );
 
   const labels = Array.from(container?.querySelectorAll('label') ?? []);
+  const selectedLabel = labels.find((label) => label.textContent?.includes('beta'));
+  expect(selectedLabel?.className).toContain('has-[:focus-visible]:ring-2');
+  expect(selectedLabel?.className).not.toContain('focus-within:ring-2');
+  expect(selectedLabel?.className).toContain('border-transparent');
+  expect(selectedLabel?.className).not.toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(selectedLabel?.querySelector(':scope > span[class*="pointer-events-none"]')).toBeNull();
+  expect(selectedLabel?.className).not.toContain('group-hover:');
+  expect(selectedLabel?.querySelector('[aria-hidden="true"]')?.className).not.toContain('accent');
   click(labels.find((label) => label.textContent?.includes('alpha')));
   click(labels.find((label) => label.textContent?.includes('Сохранённые')));
   click(container?.querySelectorAll('summary')[2]);
@@ -275,6 +324,7 @@ it('renders searchable facet groups and forwards tag, status, and range selectio
       `[aria-label="${translate('gallery.app.facetClear')} ${translate('gallery.app.facetTitle.tags')}"]`
     )
   );
+  expect(container?.querySelectorAll('details')[1]?.open).toBe(true);
   click(findButton(translate('gallery.app.facetResetAll')));
 
   expect(onActiveTagsChange).toHaveBeenLastCalledWith([]);
@@ -313,10 +363,11 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
     .mockImplementation(async (name: string) => createdView(name));
   render(
     <GalleryFacetFilters
+      countsKnown
       activeSavedView={null}
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -336,6 +387,7 @@ it('opens a compact saved-view name field, reports a conflict, and confirms crea
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
     />
   );
@@ -380,10 +432,11 @@ it('updates a changed active saved view instead of opening the name field', asyn
   };
   render(
     <GalleryFacetFilters
+      countsKnown
       activeSavedView={view}
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -403,6 +456,7 @@ it('updates a changed active saved view instead of opening the name field', asyn
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onUpdateSavedView={onUpdateSavedView}
     />
@@ -439,10 +493,11 @@ it('hides reset and update actions while the active saved view matches its basel
 
   render(
     <GalleryFacetFilters
+      countsKnown
       activeSavedView={view}
       activeTags={view.filters.activeTags}
       allTags={['review']}
-      counts={{ all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 }}
       facetFilters={view.filters.facetFilters}
       facets={[]}
       filteredItemCount={1}
@@ -454,6 +509,7 @@ it('hides reset and update actions while the active saved view matches its basel
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onUpdateSavedView={vi.fn()}
     />
@@ -464,6 +520,7 @@ it('hides reset and update actions while the active saved view matches its basel
 });
 
 it('shows search and scrolling only for facet lists with more than ten values', () => {
+  const onActiveTagsChange = vi.fn();
   const options = Array.from({ length: 11 }, (_, index) => ({
     count: 1,
     label: `tag-${index}`,
@@ -472,9 +529,10 @@ it('shows search and scrolling only for facet lists with more than ten values', 
 
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={[]}
       allTags={options.map((option) => option.value)}
-      counts={{ all: 11, export: 0, recording: 0, scenario: 0, screenshot: 11 }}
+      counts={{ all: 11, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 11 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -488,10 +546,11 @@ it('shows search and scrolling only for facet lists with more than ten values', 
       filteredItemCount={11}
       folderFilter="all"
       scope="all"
-      onActiveTagsChange={vi.fn()}
+      onActiveTagsChange={onActiveTagsChange}
       onFacetFilterChange={vi.fn()}
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
       onScopeChange={vi.fn()}
     />
@@ -515,15 +574,22 @@ it('shows search and scrolling only for facet lists with more than ten values', 
 
   expect(searchInput.value).toBe('');
   expect(container?.querySelectorAll('input[type="checkbox"]')).toHaveLength(11);
+  click(
+    Array.from(container?.querySelectorAll('label') ?? []).find((label) =>
+      label.textContent?.includes('tag-10')
+    )
+  );
+  expect(onActiveTagsChange).toHaveBeenCalledWith(['tag-10']);
 });
 
 it('shows result selection for a non-default section without a redundant filter reset', () => {
   const onSelectAll = vi.fn();
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 3, export: 0, recording: 0, scenario: 0, screenshot: 3 }}
+      counts={{ all: 3, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 3 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -542,6 +608,7 @@ it('shows result selection for a non-default section without a redundant filter 
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={onSelectAll}
     />
   );
@@ -557,9 +624,10 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
   const onFacetFilterChange = vi.fn();
   render(
     <GalleryFacetFilters
+      countsKnown
       activeTags={[]}
       allTags={[]}
-      counts={{ all: 1, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
+      counts={{ all: 1, audio: 0, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
       facetFilters={{
         created: [],
         duration: [],
@@ -587,6 +655,7 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
       onFolderFilterChange={vi.fn()}
       onResetFilters={vi.fn()}
       onScopeChange={vi.fn()}
+      onClearSelection={vi.fn()}
       onSelectAll={vi.fn()}
     />
   );
@@ -606,11 +675,12 @@ it('keeps a selected unavailable facet visible and allows only clearing it', () 
   expect(onFacetFilterChange).toHaveBeenCalledWith('source', []);
 });
 
-it('restores expanded facet sections after remounting the sidebar', async () => {
-  const facetProps = {
+function createFacetProps(searchable = false) {
+  return {
     activeTags: [],
     allTags: [],
-    counts: { all: 1, export: 0, recording: 0, scenario: 0, screenshot: 1 },
+    countsKnown: true,
+    counts: { all: 1, audio: 0, export: 0, recording: 0, scenario: 0, screenshot: 1 },
     facetFilters: {
       created: [],
       duration: [],
@@ -623,7 +693,7 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
     facets: [
       {
         id: 'format' as const,
-        searchable: false,
+        searchable,
         options: [{ count: 1, label: 'PNG', value: 'png' }],
       },
     ],
@@ -636,7 +706,12 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
     onResetFilters: vi.fn(),
     onScopeChange: vi.fn(),
     onSelectAll: vi.fn(),
+    onClearSelection: vi.fn(),
   };
+}
+
+it('restores expanded facet sections after remounting the sidebar', async () => {
+  const facetProps = createFacetProps();
 
   render(<GalleryFacetFilters {...facetProps} />);
   click(container?.querySelector('summary'));
@@ -648,4 +723,35 @@ it('restores expanded facet sections after remounting the sidebar', async () => 
   root = createRoot(container!);
   render(<GalleryFacetFilters {...facetProps} />);
   expect(container?.querySelector('details')?.open).toBe(true);
+});
+
+it('shows the Audio count and selects its section', () => {
+  const onFolderFilterChange = vi.fn();
+  render(
+    <GalleryFolderList
+      countsKnown
+      counts={{ all: 3, audio: 2, export: 0, recording: 1, scenario: 0, screenshot: 0 }}
+      folderFilter="audio"
+      onFolderFilterChange={onFolderFilterChange}
+    />
+  );
+  const button = findButton(translate('gallery.preview.kindAudio'));
+  expect(button?.textContent).toContain('2');
+  expect(button?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  click(button);
+  expect(onFolderFilterChange).toHaveBeenCalledWith('audio');
+});
+
+it('preserves the Find query and accessible name through focus and blur', () => {
+  render(<GalleryFacetFilters {...createFacetProps(true)} />);
+  click(container?.querySelector('summary'));
+  const input = container!.querySelector<HTMLInputElement>('input[type="text"],input:not([type])')!;
+  const label = `${translate('gallery.app.facetSearch')} ${translate('gallery.app.facetTitle.format')}`;
+  expect(input.getAttribute('aria-label')).toBe(label);
+  act(() => input.focus());
+  act(() => updateInputValue(input, 'PNG'));
+  act(() => input.blur());
+  expect(input.value).toBe('PNG');
+  expect(input.getAttribute('aria-label')).toBe(label);
+  expect(container!.querySelector('label')!.textContent).toContain('PNG');
 });

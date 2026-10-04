@@ -5,7 +5,7 @@ import type {
   EditorViewportState,
   EditorWorkspaceSettings,
 } from '../../features/editor/document/types';
-import type { EditorWorkspaceDefaults } from '../persistence/workspace';
+import type { EditorWorkspaceDefaults } from '../../features/editor/document/types';
 import {
   DEFAULT_BROWSER_FRAME_STATE,
   DEFAULT_EDITOR_FRAME_SETTINGS,
@@ -34,9 +34,11 @@ type ResetDocumentState = Pick<
   EditorState,
   | 'activeTool'
   | 'inspector'
+  | 'freshImageBackgroundPending'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
+  | 'showOutsideCanvas'
   | 'saveErrorMessage'
   | 'saveState'
   | 'selectionToolSettings'
@@ -45,6 +47,7 @@ type ResetDocumentState = Pick<
   | 'cropReady'
   | 'cropSelection'
   | 'richShapeToolSelection'
+  | 'canvasCropMode'
   | 'layers'
   | 'selection'
   | 'history'
@@ -142,9 +145,11 @@ function createResetDocumentUiState(
   ResetDocumentState,
   | 'activeTool'
   | 'inspector'
+  | 'freshImageBackgroundPending'
   | 'inspectorCollapsed'
   | 'layerEffectsCategory'
   | 'viewportPreviewOpen'
+  | 'showOutsideCanvas'
   | 'saveErrorMessage'
   | 'saveState'
   | 'selectionToolSettings'
@@ -153,15 +158,18 @@ function createResetDocumentUiState(
   | 'cropReady'
   | 'cropSelection'
   | 'richShapeToolSelection'
+  | 'canvasCropMode'
 > {
   return {
     activeTool: 'select',
     inspector: 'file',
+    freshImageBackgroundPending: false,
     inspectorCollapsed: false,
     layerEffectsCategory: 'adjustments',
     viewportPreviewOpen: state.viewportPreviewAutomationBlockedInSession
       ? state.viewportPreviewOpen
       : false,
+    showOutsideCanvas: false,
     saveErrorMessage: null,
     saveState: 'idle',
     selectionToolSettings: state.toolSettings,
@@ -170,6 +178,7 @@ function createResetDocumentUiState(
     cropReady: false,
     cropSelection: null,
     richShapeToolSelection: null,
+    canvasCropMode: 'crop',
   };
 }
 
@@ -209,6 +218,7 @@ function createWorkspaceSettingsFromDefaults(
   return {
     ...DEFAULT_EDITOR_WORKSPACE_SETTINGS,
     backgroundColor: defaults.backgroundColor,
+    hideSelectionWhileDragging: defaults.hideSelectionWhileDragging,
   };
 }
 

@@ -7,7 +7,7 @@ import {
   readPinToTabToolbarVisibilitySessionStorageState,
   writePinToTabSessionStorageState,
 } from '../../../composition/persistence/content-pin-session/index';
-import type { ScenarioRecorderSurfaceState } from '@sniptale/runtime-contracts/scenario/types/session';
+import { readScenarioRestoreState, type ScenarioRestoreState } from './scenario-restore';
 import type { ContentSenderBinding } from '../../routing-contracts/capabilities/content-action/capability-store';
 import type { BackgroundRuntimeMessageDeps } from '../routing/boundary/shared';
 import { respondAsyncRoute } from '../../routing-contracts/response';
@@ -40,13 +40,6 @@ type ContentRuntimeWakeupMessage = {
   pinToTab?: boolean;
   toolbarVisible?: boolean;
   type: typeof MessageType.CONTENT_RUNTIME_WAKEUP;
-};
-
-type ScenarioRestoreState = {
-  shouldEnablePreparation: boolean;
-  shouldRestore: boolean;
-  shouldWriteForcedScenarioSurface: boolean;
-  surface: ScenarioRecorderSurfaceState;
 };
 
 type UserPinnedState = {
@@ -114,13 +107,19 @@ function observeUserPinnedSession(
 
 function synchronizeToolbarVisibility(args: {
   operation: PinnedToolbarSessionOperation;
+  runtimeState: BackgroundRuntimeMessageDeps;
   tabId: number;
   toolbarVisible: boolean;
 }): Promise<UserPinnedState> {
   return args.operation.runExclusive(async () => {
     const availability = hasPinnedToolbarAllSitesAccess();
     const currentState = await readUserPinnedSessionState(args.tabId);
-    if (args.operation.isCurrent() && currentState.userPinned) {
+    const scenario = await readScenarioRestoreState(args.tabId, args.runtimeState);
+    if (args.operation.isCurrent() && scenario.shouldRestore) {
+      await args.runtimeState.scenarioSessionService.updateSurfaceState(args.tabId, {
+        toolbarVisible: args.toolbarVisible,
+      });
+    } else if (args.operation.isCurrent() && currentState.userPinned) {
       await writePinToTabSessionStorageState(
         args.tabId,
         { toolbarVisible: args.toolbarVisible },
@@ -258,6 +257,7 @@ async function synchronizeUserPinActivation(args: {
 
 async function synchronizeUserPinnedState(args: {
   message: ContentRuntimeWakeupMessage;
+  runtimeState: BackgroundRuntimeMessageDeps;
   senderBinding: ContentSenderBinding;
 }): Promise<UserPinnedState> {
   const tabId = args.senderBinding.tabId;
@@ -270,6 +270,7 @@ async function synchronizeUserPinnedState(args: {
   if (requestedToolbarVisibility !== undefined) {
     return synchronizeToolbarVisibility({
       operation: beginPinnedToolbarDurableOperation(tabId),
+      runtimeState: args.runtimeState,
       tabId,
       toolbarVisible: requestedToolbarVisibility,
     });
@@ -285,29 +286,6 @@ async function synchronizeUserPinnedState(args: {
   });
 }
 
-function shouldScenarioSurfaceRestore(surface: ScenarioRecorderSurfaceState): boolean {
-  return surface.captureAction === 'scenario' || surface.screenshotMode || surface.toolbarVisible;
-}
-
-async function readScenarioRestoreState(
-  tabId: number,
-  runtimeState: BackgroundRuntimeMessageDeps
-): Promise<ScenarioRestoreState> {
-  const [session, surface] = await Promise.all([
-    runtimeState.scenarioSessionService.getSession(tabId),
-    runtimeState.scenarioSessionService.getSurface(tabId),
-  ]);
-  const shouldRestore = session.enabled || shouldScenarioSurfaceRestore(surface);
-  return {
-    shouldEnablePreparation: session.enabled || shouldScenarioSurfaceRestore(surface),
-    shouldRestore,
-    shouldWriteForcedScenarioSurface:
-      session.enabled &&
-      (surface.captureAction !== 'scenario' || !surface.screenshotMode || !surface.toolbarVisible),
-    surface,
-  };
-}
-
 async function restoreForcedScenarioSurface(args: {
   scenarioState: ScenarioRestoreState;
   tabId: number;
@@ -321,7 +299,7 @@ async function restoreForcedScenarioSurface(args: {
     ...args.scenarioState.surface,
     captureAction: 'scenario',
     screenshotMode: true,
-    toolbarVisible: true,
+    toolbarVisible: args.scenarioState.surface.toolbarVisible,
   });
 }
 
@@ -409,7 +387,7 @@ async function restoreRuntimeForWakeup(args: {
   if (args.userPinned || args.scenarioState.shouldEnablePreparation) {
     const scenarioOwnsPreparation = args.scenarioState.shouldEnablePreparation;
     const toolbarVisible = scenarioOwnsPreparation
-      ? true
+      ? args.scenarioState.surface.toolbarVisible
       : args.userPinned
         ? args.toolbarVisible
         : undefined;
@@ -432,13 +410,12 @@ async function handleContentRuntimeWakeup(args: {
   senderBinding: ContentSenderBinding;
 }): Promise<ContentRuntimeWakeupResponse> {
   const tabId = args.senderBinding.tabId;
-  const [userPinState, scenarioState] = await Promise.all([
-    synchronizeUserPinnedState({
-      message: args.message,
-      senderBinding: args.senderBinding,
-    }),
-    readScenarioRestoreState(tabId, args.runtimeState),
-  ]);
+  const userPinState = await synchronizeUserPinnedState({
+    message: args.message,
+    runtimeState: args.runtimeState,
+    senderBinding: args.senderBinding,
+  });
+  const scenarioState = await readScenarioRestoreState(tabId, args.runtimeState);
   const userPinned = userPinState.userPinned;
   const pinToTabAvailable = userPinState.pinToTabAvailable;
   const restorableUserPin = userPinned && pinToTabAvailable;
@@ -495,7 +472,9 @@ async function handleContentRuntimeWakeup(args: {
     reason: restorableUserPin ? 'pin-to-tab' : 'scenario',
     restored: true,
     success: true,
-    toolbarVisible: scenarioState.shouldEnablePreparation ? true : userPinState.toolbarVisible,
+    toolbarVisible: scenarioState.shouldEnablePreparation
+      ? scenarioState.surface.toolbarVisible
+      : userPinState.toolbarVisible,
   };
 }
 

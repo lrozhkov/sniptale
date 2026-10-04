@@ -1,5 +1,6 @@
+import type { ReviewBeforeAction } from './note-transitions';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createTrackProjection, type ReviewTrackProjection } from './track-projection';
 import { ReviewTimeline } from './timeline';
 import type { ReviewWaveform } from '../../workflows/video-review/waveform';
@@ -24,12 +25,12 @@ type Exporter = ReturnType<typeof useReviewExport>;
 
 /** Zoom lane on the result-time scale with shared snap candidates. */
 function ReviewZoomLane(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   advanced: QuickEditAdvancedState;
   projection?: ReviewTrackProjection;
   resultDuration: number;
   outputTime: number | null;
   edits: readonly ReviewEdit[];
-  boundaries: readonly number[] | undefined;
   zoom: ReturnType<typeof useReviewZoomEditor>;
   onAdd(): void;
   sourceSelection?: ReviewAnchor | undefined;
@@ -37,22 +38,28 @@ function ReviewZoomLane(props: {
 }) {
   return (
     <ReviewZoomTrack
+      beforeAction={props.beforeAction}
       projection={props.projection}
       sourceSelection={props.sourceSelection}
       enabled={props.advanced.zoom.enabled}
-      onToggleEnabled={props.zoom.toggleEnabled}
+      onToggleEnabled={() =>
+        (props.beforeAction ?? ((action) => action()))(props.zoom.toggleEnabled)
+      }
       duration={props.resultDuration}
       time={props.outputTime}
       regions={props.advanced.zoom.regions}
       edits={props.edits}
-      boundaries={props.boundaries}
       toOutputTime={props.toOutputTime}
       selectedId={props.zoom.selection}
       onSelect={props.zoom.setSelection}
-      onLink={(id, linkTo) => props.zoom.change(id, { linkTo })}
+      onLink={(id, linkTo) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.zoom.change(id, { linkTo }))
+      }
       linkSelectedId={props.zoom.linkSelection}
-      onSelectLink={props.zoom.setLinkSelection}
-      onAdd={props.onAdd}
+      onSelectLink={(id) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.zoom.setLinkSelection(id))
+      }
+      onAdd={() => (props.beforeAction ?? ((action) => action()))(props.onAdd)}
       onDragCommit={props.zoom.commitDrag}
     />
   );
@@ -60,6 +67,7 @@ function ReviewZoomLane(props: {
 
 /** Audio lane on the result-time scale with bounded clip mutations. */
 function ReviewAudioLane(props: {
+  beforeAction?: ReviewBeforeAction | undefined;
   edits: readonly ReviewEdit[];
   selectedEditId: string | undefined;
   onOriginalRange(range: ReviewAnchor): void;
@@ -78,6 +86,7 @@ function ReviewAudioLane(props: {
 }) {
   return (
     <ReviewAudioTrack
+      beforeAction={props.beforeAction}
       originalEditor={props.audio}
       selectedEditId={props.selectedEditId}
       edits={props.edits}
@@ -105,6 +114,8 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  zoomAnchor?: number | null | undefined;
+  beforeAction?: ReviewBeforeAction | undefined;
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
     cutting: Editing['cutting'];
     exporter: Exporter;
@@ -137,9 +148,12 @@ type TimelineBindingProps = {
   onRecordVoiceover(): void;
   onMarker(marker: ReviewTelemetryMarker): void;
   onClearSelection(): void;
+  selectedObject: boolean;
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
   onPlay(): void;
+  onOpenExport(): void;
+  exportActive?: boolean | undefined;
 };
 
 /** Toolbar lock covers every content and presentation control during blocked phases. */
@@ -155,13 +169,13 @@ function ReviewTimelineToolsBinding(
       className="contents"
     >
       <ReviewTimelineToolbar
+        beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
         focusTool={props.focusTool}
         editing={{
           mode: props.editing.mode,
           rate: props.editing.rate,
           audio: props.editing.audio,
-          selected: !!props.editing.selected,
           exporter: props.editing.exporter,
           setCutting: (value) => {
             props.clearFocusTool();
@@ -171,13 +185,14 @@ function ReviewTimelineToolsBinding(
           toggle: (kind) => {
             props.clearFocusTool();
             props.audio.setOriginalTool(false);
+            props.audio.setOriginalRangeSelected(false);
             void props.editing.toggle(kind);
           },
           canApply: props.editing.canApply,
           changeRate: props.editing.changeRate,
           changeAudio: props.editing.changeAudio,
-          remove: props.editing.remove,
         }}
+        selectedObject={props.selectedObject}
         busy={props.busy}
         composerBusy={props.composerBusy}
         selection={props.selection}
@@ -203,6 +218,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
     [props.source.duration, props.edits]
   );
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
+  useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
   const onZoomAdd = () => {
     focus.clear();
@@ -213,6 +229,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      zoomAnchor={props.zoomAnchor}
+      beforeAction={props.beforeAction}
+      onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
+      exportActive={props.exportActive}
       historyControls={props.historyControls}
       expandedTools={props.editing.mode === 'speed'}
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -225,12 +245,21 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         />
       }
       onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
+      onFocusRangePreview={focus.setPreview}
+      originalRangeTool={features.mode === 'advanced' && props.audio.originalTool}
+      snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
       trackControls={
         <ReviewTrackControls
           advanced={props.advanced}
-          setMode={props.setMode}
+          setMode={(mode) =>
+            (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
+          }
           telemetryAvailable={props.telemetryAvailable}
-          setTrackVisibility={props.setTrackVisibility}
+          setTrackVisibility={(track, visible) =>
+            (props.beforeAction ?? ((action) => action()))(() =>
+              props.setTrackVisibility(track, visible)
+            )
+          }
           busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
         />
       }
@@ -239,13 +268,13 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             zoomTrack: (
               <ReviewZoomLane
+                beforeAction={props.beforeAction}
                 projection={projection}
-                sourceSelection={focus.tool.active ? props.selection : undefined}
+                sourceSelection={focus.tool.active ? (focus.preview ?? undefined) : undefined}
                 advanced={props.advanced}
                 resultDuration={props.resultDuration}
                 outputTime={props.outputTime}
                 edits={props.edits}
-                boundaries={props.editing.exporter.index?.boundaries}
                 zoom={props.zoom}
                 onAdd={onZoomAdd}
                 toOutputTime={props.toOutputTime}
@@ -263,12 +292,15 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             audioTrack: (
               <ReviewAudioLane
+                beforeAction={props.beforeAction}
                 selectedEditId={props.editing.selected?.id}
                 edits={props.edits}
                 onOriginalRange={(range) => {
                   props.onClearSelection();
-                  props.setSelection(range);
-                  props.audio.setOriginalRangeSelected(true);
+                  props.setSelection({
+                    kind: 'point',
+                    time: range.kind === 'range' ? range.start : range.time,
+                  });
                 }}
                 onSelectSpeed={props.editing.select}
                 showAddedAudio={features.audioTrackVisible}
@@ -276,18 +308,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                   props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
                 }
                 projection={projection}
-                snapTimes={[
-                  ...(props.outputTime === null ? [] : [props.outputTime]),
-                  ...props.edits
-                    .flatMap((edit) => [
-                      props.toOutputTime(edit.start),
-                      props.toOutputTime(edit.end),
-                    ])
-                    .filter((time): time is number => time !== null),
-                  ...props.advanced.zoom.regions
-                    .filter((region) => !region.dormant)
-                    .flatMap((region) => [region.start, region.end]),
-                ]}
+                snapTimes={reviewAudioSnapTimes(props)}
                 audioState={props.audioState}
                 waveforms={props.waveforms}
                 resultDuration={props.resultDuration}
@@ -307,24 +328,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       }}
       time={props.time}
       playing={props.playing}
-      selection={
-        props.advanced.ui.mode !== 'advanced' &&
-        props.editing.cutting &&
-        props.editing.exporter.index &&
-        props.selection.kind === 'range'
-          ? {
-              kind: 'range',
-              start: nearestReviewBoundary(
-                props.selection.start,
-                props.editing.exporter.index.boundaries
-              ),
-              end: nearestReviewBoundary(
-                props.selection.end,
-                props.editing.exporter.index.boundaries
-              ),
-            }
-          : props.selection
-      }
+      selection={reviewTimelineSourceSelection(props)}
       edits={props.edits}
       onEdit={props.editing.select}
       selectedEditId={props.editing.selected?.id}
@@ -337,21 +341,56 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         props.setSelection(range);
       }}
       onPlay={props.onPlay}
-      onMarker={props.onMarker}
+      onMarker={(marker) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.onMarker(marker))
+      }
       onClearSelection={props.onClearSelection}
-      onComment={props.onComment}
+      onComment={(note) =>
+        (props.beforeAction ?? ((action) => action()))(() => props.onComment(note))
+      }
     />
   );
+}
+
+/** Basic selection display snaps through the same media boundaries used by edit commits. */
+function reviewTimelineSourceSelection(props: TimelineBindingProps): ReviewAnchor {
+  return props.advanced.ui.mode !== 'advanced' &&
+    props.editing.cutting &&
+    props.editing.exporter.index &&
+    props.selection.kind === 'range'
+    ? {
+        kind: 'range',
+        start: nearestReviewBoundary(
+          props.selection.start,
+          props.editing.exporter.index.boundaries
+        ),
+        end: nearestReviewBoundary(props.selection.end, props.editing.exporter.index.boundaries),
+      }
+    : props.selection;
+}
+
+/** Drawing availability follows the existing advanced audio capability. */
+function useOriginalAudioPlacement(props: TimelineBindingProps) {
+  const mode = props.advanced.ui.mode;
+  const audioCodec = props.editing.exporter.index?.audioCodec;
+  const { setOriginalTool } = props.audio;
+  useEffect(() => {
+    if (mode !== 'advanced' || audioCodec === null) setOriginalTool(false);
+  }, [mode, audioCodec, setOriginalTool]);
 }
 
 /** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */
 function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackProjection) {
   const { drawing: enabled, setDrawing: setEnabled } = props.zoom;
+  const [preview, setPreview] = useState<ReviewAnchor | null>(null);
   const visible = resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible;
   const active = enabled && visible && !props.audio.originalTool && !props.editing.mode;
   useEffect(() => {
     if (!visible || props.audio.originalTool || props.editing.mode) setEnabled(false);
   }, [visible, props.audio.originalTool, props.editing.mode, setEnabled]);
+  useEffect(() => {
+    if (!active) setPreview(null);
+  }, [active]);
   const candidate = (range: ReviewAnchor) => {
     if (
       range.kind !== 'range' ||
@@ -372,6 +411,7 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
       return null;
     return createQuickEditZoomRegion({
       id: 'draft',
+      sourceAnchor: { start: range.start, end: range.end },
       at: start,
       duration: end - start,
       endMax: end,
@@ -382,20 +422,30 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
     if (!region) return;
     if (props.zoom.addRegion(region)) {
       setEnabled(false);
+      props.setSelection({
+        kind: 'point',
+        time: range.kind === 'range' ? range.start : props.time,
+      });
       props.onSeek(range.kind === 'range' ? range.start : props.time);
     }
   };
   return {
     clear: () => setEnabled(false),
+    preview,
+    setPreview,
     commit,
     tool: {
       active,
-      available: active || props.selection.kind !== 'range' || !!candidate(props.selection),
+      available:
+        active ||
+        props.selectedObject ||
+        props.selection.kind !== 'range' ||
+        !!candidate(props.selection),
       onToggle: () => {
         props.audio.setOriginalTool(false);
         props.editing.setCutting(false);
         if (active) setEnabled(false);
-        else if (props.selection.kind === 'range') {
+        else if (!props.selectedObject && props.selection.kind === 'range') {
           props.setTrackVisibility('zoom', true);
           commit(props.selection);
         } else {
@@ -405,4 +455,21 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
       },
     },
   };
+}
+
+/** Projects the existing audio lane snap targets onto its result clock. */
+export function reviewAudioSnapTimes(
+  props: Pick<TimelineBindingProps, 'outputTime' | 'edits' | 'toOutputTime' | 'advanced'>
+) {
+  return [
+    ...(props.outputTime === null ? [] : [props.outputTime]),
+    ...props.edits
+      .flatMap((edit) => [props.toOutputTime(edit.start), props.toOutputTime(edit.end)])
+      .filter((time): time is number => time !== null),
+    ...(resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible
+      ? props.advanced.zoom.regions
+          .filter((region) => !region.dormant)
+          .flatMap((region) => [region.start, region.end])
+      : []),
+  ];
 }

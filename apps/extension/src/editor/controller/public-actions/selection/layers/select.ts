@@ -1,5 +1,6 @@
 import type { Canvas, FabricObject } from 'fabric';
 import { selectLayerObject } from '../../../layer-actions';
+import { EditorCanvas } from '../../../../document/canvas-surface/render-region';
 
 export function selectEditorLayerById(options: {
   canvas: Canvas | null;
@@ -15,7 +16,7 @@ export function selectEditorLayerById(options: {
   focusObjectInViewport: (object: FabricObject) => void;
   commitHistory: () => void;
   syncRuntimeState: () => void;
-}): void {
+}): boolean {
   const recovered = selectLayerObject(
     options.canvas,
     options.id,
@@ -24,11 +25,19 @@ export function selectEditorLayerById(options: {
     options.focusObjectInViewport
   );
   if (recovered === null) {
-    return;
+    return false;
+  }
+
+  if (options.canvas instanceof EditorCanvas) {
+    const activeObjects = options.canvas.getActiveObjects();
+    options.canvas.setLayerSelectionPriority(
+      activeObjects.length === 1 ? (activeObjects[0] ?? null) : null
+    );
   }
 
   if (recovered) {
     options.commitHistory();
   }
   options.syncRuntimeState();
+  return true;
 }

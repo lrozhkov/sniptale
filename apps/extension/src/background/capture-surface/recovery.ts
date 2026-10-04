@@ -19,6 +19,7 @@ async function unwindRecoveredStack(
 ): Promise<void> {
   while (stack.length > 0) {
     const state = stack.at(-1)!;
+    let changedOutsideOwner = false;
     try {
       await beforeAbandonedRestore?.({
         generation: state.entry.generation,
@@ -37,6 +38,7 @@ async function unwindRecoveredStack(
         ) {
           await restoreCaptureSurfaceSnapshot(state);
         } else if (!captureSurfaceSnapshotsEqual(state.prior, observation.current)) {
+          changedOutsideOwner = true;
           throw new Error('restore-conflict');
         }
         await observation.releaseAcquisition();
@@ -46,6 +48,11 @@ async function unwindRecoveredStack(
       }
       registry.remove(state);
     } catch {
+      if (changedOutsideOwner) {
+        for (const abandoned of [...stack]) registry.remove(abandoned);
+        await registry.persist();
+        return;
+      }
       delete state.entry.alignmentFrom;
       state.entry.phase = 'conflict';
     }

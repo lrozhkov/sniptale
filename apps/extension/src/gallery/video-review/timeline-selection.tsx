@@ -1,19 +1,19 @@
+import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useRef, useState } from 'react';
-import { Film, MessageSquare, Scissors, Gauge } from 'lucide-react';
+import { Film, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
-import {
-  SNAP_THRESHOLD_PX,
-  getSnapCandidates,
-  snapTimelineTime,
-} from '../../features/video/review/snap';
 import { reviewTimeLabel } from './controls';
 import { ReviewTrackRow } from './track-row';
+import { ReviewCommentMarkers } from './timeline-comment-markers';
 import { useReviewDragEscape } from './timeline-drag';
+import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
+  beforeAction?: ReviewBeforeAction | undefined;
+  rangeEnabled?: boolean;
   duration: number;
   time: number;
   selection: ReviewAnchor;
@@ -21,6 +21,7 @@ type SelectionProps = {
   edits?: readonly ReviewEdit[];
   selectedEditId?: string | undefined;
   boundaries?: readonly number[];
+  snapToKeyframes?: boolean;
   onEdit?(edit: ReviewEdit): void;
   onChangeEdit?(edit: ReviewEdit, range: ReviewAnchor): void | Promise<void>;
   onSeek(time: number): void;
@@ -39,7 +40,8 @@ export function ReviewSourceLane(props: SelectionProps) {
     >
       <div
         data-ui="gallery.videoReview.sourceLane"
-        className="relative mt-1 h-12 rounded bg-[var(--sniptale-color-surface-hover)]"
+        className={`relative h-12 rounded bg-[var(--sniptale-color-surface-hover)]
+          ${props.annotations.length ? 'mt-6' : 'mt-1'}`}
       >
         {guide !== null ? (
           <div
@@ -49,7 +51,9 @@ export function ReviewSourceLane(props: SelectionProps) {
             style={{ left: percent(guide, props.duration) }}
           />
         ) : null}
-        {props.selection.kind === 'range' && !props.selectedEditId ? (
+        {props.rangeEnabled !== false &&
+        props.selection.kind === 'range' &&
+        !props.selectedEditId ? (
           <div
             data-ui="gallery.videoReview.sourceRange"
             className="pointer-events-none absolute inset-y-0 border
@@ -74,7 +78,9 @@ function ReviewEditBlock(
 ) {
   const { edit, duration, onSnap } = props;
   const [preview, setPreview] = useState<{ start: number; end: number } | null>(null);
+  const [dragEdge, setDragEdge] = useState<'start' | 'end' | 'move' | null>(null);
   const drag = useRef<{
+    admission: ReturnType<typeof deferReviewGesture>;
     x: number;
     width: number;
     edge: 'start' | 'end' | 'move';
@@ -85,30 +91,36 @@ function ReviewEditBlock(
   } | null>(null);
   useReviewDragEscape(drag, () => {
     setPreview(null);
+    setDragEdge(null);
     onSnap(null);
   });
   const committing = useRef(false);
   const range = preview ?? edit;
-  const { name, value, label } = reviewEditCaption(edit);
+  const { name, value, caption, covered, position } = reviewEditPresentation(edit, props.edits);
   const selected = props.selectedEditId === edit.id;
   return (
     <div
       data-ui="gallery.videoReview.editBlock"
-      title={`${label} · ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`}
-      className={`absolute inset-y-1 z-[5] rounded border text-xs ${reviewTimelineItemTone(selected, edit.kind)}`}
+      data-cut-suppressed={covered.length ? 'true' : 'false'}
+      title={caption}
+      className={`absolute rounded border text-xs ${position} ${reviewTimelineItemTone(selected, edit.kind)}`}
+      data-drag-edge={dragEdge ?? undefined}
       style={{
         left: percent(range.start, duration),
         width: percent(range.end - range.start, duration),
+        cursor: dragEdge === 'move' ? 'grabbing' : dragEdge ? 'ew-resize' : undefined,
       }}
       onPointerDown={(event) => {
-        if (event.button !== 0 || committing.current) return;
+        if (props.rangeEnabled === false || event.button !== 0 || committing.current) return;
         event.stopPropagation();
         const target = event.target;
         const edge =
           target instanceof Element
             ? target.closest('[data-edge]')?.getAttribute('data-edge')
             : null;
+        setDragEdge(edge === 'start' || edge === 'end' ? edge : 'move');
         drag.current = {
+          admission: deferReviewGesture(props.beforeAction, () => props.onEdit?.(edit)),
           x: event.clientX,
           width: event.currentTarget.parentElement!.getBoundingClientRect().width,
           edge: edge === 'start' || edge === 'end' ? edge : 'move',
@@ -118,37 +130,22 @@ function ReviewEditBlock(
           pointerId: event.pointerId,
         };
         event.currentTarget.setPointerCapture(event.pointerId);
-        props.onEdit?.(edit);
       }}
       onPointerMove={(event) => {
         const current = drag.current;
         if (!current || current.width <= 0) return;
-        const delta = ((event.clientX - current.x) / current.width) * duration;
         current.moved ||= Math.abs(event.clientX - current.x) > 3;
-        const length = edit.end - edit.start;
-        let start =
-          current.edge === 'end'
-            ? edit.start
-            : Math.max(
-                0,
-                Math.min(duration - (current.edge === 'move' ? length : 0), edit.start + delta)
-              );
-        let end =
-          current.edge === 'start'
-            ? edit.end
-            : current.edge === 'move'
-              ? start + length
-              : Math.max(0, Math.min(duration, edit.end + delta));
         const snapped = snapReviewEditDrag({
           edge: current.edge,
-          start,
-          end,
+          deltaPx: event.clientX - current.x,
           duration,
           widthPx: current.width,
           bypass: event.shiftKey,
           edits: props.edits,
           boundaries: props.boundaries,
           playhead: props.time,
+          current: edit,
+          keyframeMove: !!props.snapToKeyframes,
         });
         onSnap(snapped.guide);
         if (snapped.start < snapped.end) {
@@ -159,31 +156,43 @@ function ReviewEditBlock(
       onPointerUp={async (event) => {
         const current = drag.current;
         drag.current = null;
+        setDragEdge(null);
         onSnap(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId))
           event.currentTarget.releasePointerCapture(event.pointerId);
-        committing.current = true;
-        try {
-          if (current?.moved) await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
-        } finally {
-          committing.current = false;
-          setPreview(null);
-        }
+        if (!current) return;
+        current.admission.commit(async () => {
+          committing.current = true;
+          try {
+            if (
+              current?.moved &&
+              (current.range.start !== edit.start || current.range.end !== edit.end)
+            )
+              await props.onChangeEdit?.(edit, { kind: 'range', ...current.range });
+          } finally {
+            committing.current = false;
+            setPreview(null);
+          }
+        });
       }}
       onPointerCancel={() => {
+        drag.current?.admission.cancel();
         drag.current = null;
+        setDragEdge(null);
         setPreview(null);
         onSnap(null);
       }}
     >
       <button
         type="button"
-        aria-label={`${label} ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`}
+        aria-label={caption}
+        disabled={props.rangeEnabled === false}
         aria-pressed={selected}
         className="absolute inset-0 flex cursor-grab items-center justify-center gap-1
-            overflow-hidden px-3 active:cursor-grabbing"
+            overflow-hidden px-3 active:cursor-grabbing disabled:cursor-default"
         onClick={(event) => {
-          if (event.detail === 0) props.onEdit?.(edit);
+          if (event.detail === 0)
+            (props.beforeAction ?? ((action) => action()))(() => props.onEdit?.(edit));
         }}
       >
         <ReviewTimelineLabel
@@ -192,10 +201,12 @@ function ReviewEditBlock(
           value={value}
         />
       </button>
+      <ReviewSpeedCutMasks edit={edit} cuts={covered} />
       {(['start', 'end'] as const).map((edge) => (
         <ReviewEditEdge
           key={edge}
           edge={edge}
+          disabled={props.rangeEnabled === false}
           duration={duration}
           edit={edit}
           boundaries={props.boundaries}
@@ -204,6 +215,54 @@ function ReviewEditBlock(
       ))}
     </div>
   );
+}
+
+/** Source-lane cut/speed geometry keeps both edit kinds selectable during an overlap. */
+function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
+  const { name, value, label } = reviewEditCaption(edit);
+  const overlap =
+    edits?.some(
+      (item) => item.kind !== edit.kind && item.start < edit.end && item.end > edit.start
+    ) ?? false;
+  const covered =
+    edit.kind === 'speed'
+      ? (edits?.filter(
+          (item) => item.kind === 'cut' && item.start < edit.end && item.end > edit.start
+        ) ?? [])
+      : [];
+  const hint = covered.length ? ` · ${translate('gallery.videoReview.cutOverlapHint')}` : '';
+  const position = overlap
+    ? edit.kind === 'cut'
+      ? 'top-1 bottom-[52%] z-[6]'
+      : 'top-[52%] bottom-1 z-[5]'
+    : 'inset-y-1 z-[5]';
+  return {
+    name,
+    value,
+    covered,
+    position,
+    caption: `${label} · ${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}${hint}`,
+  };
+}
+
+/** Only the source span hidden by a cut receives the disabled treatment. */
+function ReviewSpeedCutMasks(props: { edit: ReviewEdit; cuts: readonly ReviewEdit[] }) {
+  const edit = props.edit;
+  return props.cuts.map((cut) => (
+    <span
+      key={cut.id}
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-y-0 border-x border-dashed
+        border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]/65"
+      style={{
+        left: percent(Math.max(cut.start, edit.start) - edit.start, edit.end - edit.start),
+        width: percent(
+          Math.min(cut.end, edit.end) - Math.max(cut.start, edit.start),
+          edit.end - edit.start
+        ),
+      }}
+    />
+  ));
 }
 
 /** One complete caption feeds the tooltip, accessible label and responsive visible parts. */
@@ -218,6 +277,7 @@ function reviewEditCaption(edit: ReviewEdit) {
 
 /** Pointer and keyboard resizing of one edit edge; keyboard steps follow the media boundaries. */
 function ReviewEditEdge(props: {
+  disabled: boolean;
   edge: 'start' | 'end';
   duration: number;
   edit: ReviewEdit;
@@ -228,13 +288,14 @@ function ReviewEditEdge(props: {
     <button
       type="button"
       data-edge={props.edge}
+      disabled={props.disabled}
       aria-label={translate(
         props.edge === 'start' ? 'gallery.videoReview.resizeStart' : 'gallery.videoReview.resizeEnd'
       )}
-      className={`${reviewTimelineResizeHandleClassName}
+      className={`${reviewTimelineResizeHandleClassName} disabled:cursor-default
           ${props.edge === 'start' ? 'left-0' : 'right-0'}`}
       onKeyDown={(event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        if (props.disabled || (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight')) return;
         event.preventDefault();
         event.stopPropagation();
         const choices = props.boundaries ?? [];
@@ -265,105 +326,4 @@ function ReviewEditEdge(props: {
       <span aria-hidden="true" className="h-4 w-px bg-current opacity-60" />
     </button>
   );
-}
-
-/** Trim snaps only the dragged edge; a whole-block move keeps both edges magnetic. */
-function snapReviewEditDrag(args: {
-  edge: 'start' | 'end' | 'move';
-  start: number;
-  end: number;
-  duration: number;
-  widthPx: number;
-  bypass: boolean;
-  edits: readonly ReviewEdit[] | undefined;
-  boundaries: readonly number[] | undefined;
-  playhead: number;
-}): { start: number; end: number; guide: number | null } {
-  if (args.bypass || !args.edits || args.widthPx <= 0)
-    return { start: args.start, end: args.end, guide: null };
-  const threshold = (SNAP_THRESHOLD_PX * args.duration) / args.widthPx;
-  const candidates = getSnapCandidates({
-    edits: args.edits,
-    playhead: args.playhead,
-    ...(args.boundaries ? { boundaries: args.boundaries } : {}),
-  });
-  let guide: number | null = null;
-  let { start, end } = args;
-  if (args.edge !== 'end') {
-    const snap = snapTimelineTime(start, candidates, threshold);
-    start = snap.time;
-    guide = snap.candidate;
-  }
-  if (args.edge !== 'start') {
-    const snap = snapTimelineTime(end, candidates, threshold);
-    end = snap.time;
-    guide = snap.candidate ?? guide;
-  }
-  return { start, end, guide };
-}
-
-/** Co-located point comments share one marker; the full set remains in the inspector feed. */
-function ReviewCommentMarkers(
-  props: Pick<SelectionProps, 'annotations' | 'duration' | 'onComment'>
-) {
-  const groups = new Map<string, ReviewAnnotation[]>();
-  for (const annotation of props.annotations) {
-    const anchor = annotation.anchor;
-    const key =
-      anchor.kind === 'point' ? `point:${anchor.time}` : `range:${anchor.start}:${anchor.end}`;
-    const group = groups.get(key) ?? [];
-    group.push(annotation);
-    groups.set(key, group);
-  }
-  return [...groups.values()].map((group) => {
-    const annotation = group[0]!;
-    const anchor = annotation.anchor;
-    const time = anchor.kind === 'point' ? anchor.time : anchor.start;
-    const range = anchor.kind === 'range';
-    const caption = group.map((item) => item.text).join(' · ');
-    return (
-      <button
-        key={annotation.id}
-        type="button"
-        title={caption}
-        aria-label={[
-          translate('gallery.videoReview.commentText'),
-          reviewTimeLabel(time),
-          caption,
-        ].join(' · ')}
-        onClick={() => props.onComment(annotation)}
-        style={{
-          left: range
-            ? percent(time, props.duration)
-            : `clamp(8px, ${percent(time, props.duration)}, calc(100% - 8px))`,
-          ...(range
-            ? {
-                width: percent(anchor.end - anchor.start, props.duration),
-                top: 6,
-                height: 30,
-                backgroundColor:
-                  'color-mix(in srgb, var(--sniptale-color-accent) 14%, var(--sniptale-color-surface-canvas))',
-              }
-            : { top: -8 }),
-        }}
-        className={`absolute z-10 flex h-4 min-w-4 items-center justify-center gap-1
-        overflow-hidden rounded border border-[var(--sniptale-color-border-accent-strong)]
-        bg-[var(--sniptale-color-surface-canvas)] px-1 text-[10px] font-medium
-        text-[var(--sniptale-color-accent-emphasis)] ${range ? '' : '-translate-x-1/2'}`}
-      >
-        {range ? (
-          <ReviewTimelineLabel
-            icon={<MessageSquare size={11} />}
-            name={translate('gallery.videoReview.commentText')}
-            value={group.length > 1 ? String(group.length) : undefined}
-          />
-        ) : (
-          <>
-            <MessageSquare size={11} className="shrink-0" />
-            {group.length > 1 ? <span>{group.length}</span> : null}
-          </>
-        )}
-      </button>
-    );
-  });
 }

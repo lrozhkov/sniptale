@@ -154,6 +154,36 @@ it('starts Save through the same background job without requesting export-only h
   );
 });
 
+it('uses the click-authorized source document without requesting access from popup startup', async () => {
+  const state = createStartState(true);
+  const requestAllUrlsPermission = vi.fn(async () => false);
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps, 'export', undefined, {
+    sourceDocumentId: 'document-42',
+  });
+
+  expect(requestAllUrlsPermission).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceDocumentId: 'document-42' })
+  );
+});
+
+it('uses the click-authorized source document without requesting access from popup startup', async () => {
+  const state = createStartState(true);
+  const requestAllUrlsPermission = vi.fn(async () => false);
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps, 'export', undefined, {
+    sourceDocumentId: 'document-42',
+  });
+
+  expect(requestAllUrlsPermission).not.toHaveBeenCalled();
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({ sourceDocumentId: 'document-42' })
+  );
+});
+
 it('launches a combined download from the remembered download plan', async () => {
   const state = createStartState();
   state.includeWebCopy = true;
@@ -322,4 +352,37 @@ it('normalizes browser titles and caps generated start requests to the contract 
     new TextEncoder().encode(request.sources[0]!.kind === 'tab' ? request.sources[0]!.title : '')
       .byteLength
   ).toBeLessThanOrEqual(2 * 1024);
+});
+
+it('launches HTML with a fixed web-copy plan even when no ZIP components are selected', async () => {
+  const state = createStartState();
+  state.canExport = false;
+  state.includeFiles = true;
+  state.includeJson = true;
+  const deps = createStartDeps();
+  await startPopupExportImpl(state, deps, 'export', 'html');
+  expect(state.setLaunchedPlan).toHaveBeenCalledWith(
+    expect.objectContaining({
+      includeWebCopy: true,
+      includeFullPageScreenshot: false,
+    })
+  );
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      downloadFormat: 'html',
+      intent: 'export',
+      includeWebCopy: true,
+      sources: [{ kind: 'tab', tabId: 42, title: 'Page' }],
+      options: expect.objectContaining({
+        includeFiles: false,
+        includeImages: false,
+        includeJson: false,
+        includeMarkdown: false,
+        includeBasicLogs: false,
+        includePageDiagnostics: false,
+      }),
+    })
+  );
+  await startPopupExportImpl(state, deps, 'export', 'html');
+  expect(deps.sendStartJobMessage).toHaveBeenCalledTimes(1);
 });

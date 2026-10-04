@@ -178,17 +178,37 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Ресурсы сверх лимита пропускаются с предупреждением, а пакет продолжает собираться.',
     en: 'Resources over a limit are skipped with a warning while package creation continues.',
   },
+  packageDestinationHtml: { ru: 'Скачать HTML', en: 'Download HTML' },
+  packageDestinationHtmlDescription: {
+    ru: 'По одному файлу на страницу. Стили, изображения и шрифты внутри; ссылки открываются по нажатию.',
+    en: 'One file per page. Styles, images and fonts are embedded; links open when clicked.',
+  },
+  packageDestinationHtmlShortDescription: {
+    ru: 'Веб-копия одним файлом',
+    en: 'Web copy in one file',
+  },
+  htmlCompositionTitle: { ru: 'Состав файла', en: 'File contents' },
+  htmlCompositionFileTitle: { ru: 'Веб-копия · HTML', en: 'Web copy · HTML' },
+  htmlResourceSettingsTitle: { ru: 'Ресурсы веб-копии', en: 'Web copy resources' },
+  htmlResourceSettingsDescription: {
+    ru: 'Выберите, какие ресурсы сохранять внутри HTML-файла.',
+    en: 'Choose which resources to save inside the HTML file.',
+  },
   packageDestinationLabel: {
     ru: 'Настройки действия',
     en: 'Action settings',
   },
   packageDestinationDownload: {
-    ru: 'Скачать',
-    en: 'Download',
+    ru: 'Скачать ZIP',
+    en: 'Download ZIP',
   },
   packageDestinationDownloadDescription: {
     ru: 'Скачать полный пакет страницы как ZIP-архив.',
     en: 'Download the complete page package as a ZIP archive.',
+  },
+  packageDestinationDownloadShortDescription: {
+    ru: 'Полный пакет ZIP',
+    en: 'Complete ZIP package',
   },
   packageDestinationLibrary: {
     ru: 'В библиотеку',
@@ -197,6 +217,10 @@ export const popupExportMessages = defineMessageSource({
   packageDestinationLibraryDescription: {
     ru: 'Сохранить веб-копию и открыть веб-снимок.',
     en: 'Save the Web copy and open the Web Snapshot.',
+  },
+  packageDestinationLibraryShortDescription: {
+    ru: 'Снимок в библиотеке',
+    en: 'Snapshot in Library',
   },
   packagePresetLabel: {
     ru: 'Быстрый выбор',

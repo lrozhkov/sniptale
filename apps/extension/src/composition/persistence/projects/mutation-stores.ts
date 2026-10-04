@@ -5,11 +5,16 @@ import {
 import type { initDB } from '../infrastructure/indexed-db/core';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
+  IMAGE_WORKSPACES_STORE,
+  THUMBNAILS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
+  SCENARIO_ASSETS_STORE,
+  SCENARIO_PROJECTS_STORE,
+  STORE_NAME,
   VIDEO_PROJECTS_STORE,
 } from '../infrastructure/indexed-db/core';
 
@@ -19,6 +24,12 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
   const tx = db.transaction(
     [
       VIDEO_PROJECTS_STORE,
+      IMAGE_WORKSPACES_STORE,
+      THUMBNAILS_STORE,
+      STORE_NAME,
+      AGGREGATE_PRESENTATIONS_STORE,
+      SCENARIO_ASSETS_STORE,
+      SCENARIO_PROJECTS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
@@ -38,6 +49,9 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
     videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
+    scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
+    scenarioProjectStore: tx.objectStore(SCENARIO_PROJECTS_STORE),
+    recordingStore: tx.objectStore(STORE_NAME),
     tx,
   };
 }
@@ -46,6 +60,9 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
   const tx = db.transaction(
     [
       VIDEO_PROJECTS_STORE,
+      IMAGE_WORKSPACES_STORE,
+      THUMBNAILS_STORE,
+      SCENARIO_ASSETS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
       VIDEO_WORKSPACES_STORE,
@@ -58,6 +75,7 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
     'readwrite'
   );
   return {
+    scenarioAssetStore: tx.objectStore(SCENARIO_ASSETS_STORE),
     aggregatePresentationStore: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),
     assetOperationStore: tx.objectStore(ASSET_OPERATIONS_STORE),
     assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),

@@ -71,6 +71,7 @@ describe('quick-actions-presets bundled defaults', () => {
       expect.objectContaining({
         afterCapture: 'download_default',
         bundledId: 'default-desktop-capture',
+        delay: 3,
         exitAfterCapture: false,
         icon: 'Monitor',
         imageFormat: null,
@@ -255,7 +256,7 @@ describe('quick-actions-presets user normalization', () => {
     ).toEqual(
       expect.objectContaining({
         afterCapture: 'download_default',
-        delay: null,
+        delay: 5,
         exitAfterCapture: false,
         imageFormat: 'webp',
         screenshotMode: 'desktop',

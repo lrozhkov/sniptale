@@ -67,29 +67,32 @@ function arrangeStoredSettingsWithNestedSiblings(): void {
 }
 
 function expectPersistedNestedMerge(): void {
-  expect(browserStorageSyncSetMock).toHaveBeenCalledWith({
-    sniptale_settings: expect.objectContaining({
-      contentToolbar: {
-        displayMode: 'vertical',
-        compactMenus: true,
-        position: { x: 96, y: 120 },
-      },
-      contextMenu: expect.objectContaining({
-        showGallery: false,
-        showSettings: false,
+  expect(browserStorageSyncSetMock).toHaveBeenCalledWith(
+    {
+      sniptale_settings: expect.objectContaining({
+        contentToolbar: {
+          displayMode: 'vertical',
+          compactMenus: true,
+          position: { x: 96, y: 120 },
+        },
+        contextMenu: expect.objectContaining({
+          showGallery: false,
+          showSettings: false,
+        }),
+        fullPageCapture: {
+          floatingElements: 'repeat',
+          freezeMotion: false,
+          preloadLazyContent: false,
+        },
+        voiceInput: {
+          language: 'en-US',
+          microphoneDeviceId: 'microphone-1',
+          mode: 'browser-managed',
+        },
       }),
-      fullPageCapture: {
-        floatingElements: 'repeat',
-        freezeMotion: false,
-        preloadLazyContent: false,
-      },
-      voiceInput: {
-        language: 'en-US',
-        microphoneDeviceId: 'microphone-1',
-        mode: 'browser-managed',
-      },
-    }),
-  });
+    },
+    expect.anything()
+  );
 }
 
 describe('settings nested patch persistence', () => {

@@ -11,6 +11,7 @@ import {
 import type { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { buildQuickEditClipEnvelope } from '../../features/video/review/advanced/audio-plan';
 import type { QuickEditAudioPlanEntry } from '../../features/video/review/advanced/audio-plan';
+import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './audio-clip-render';
 
 export interface ReviewExportClipPlan {
   /** Fragment-local entries: output time is already shifted into the fragment. */
@@ -50,7 +51,8 @@ export async function* renderReviewAudio(
   segment: Segment,
   muted: boolean,
   signal: AbortSignal,
-  exportAudio?: ReviewExportClipPlan
+  exportAudio?: ReviewExportClipPlan,
+  clipRenderer: ReviewAudioClipRenderer = createReviewAudioClipRenderer()
 ): AsyncGenerator<AudioSample, void, unknown> {
   const sink = track ? new AudioSampleSink(track) : null;
   const sourceRate = track ? await track.getSampleRate() : outputRate;
@@ -73,6 +75,7 @@ export async function* renderReviewAudio(
       count,
       muted,
       signal,
+      clipRenderer,
       ...(exportAudio ? { exportAudio } : {}),
     });
     for (const sample of AudioSample.fromAudioBuffer(buffer, frame / outputRate)) {
@@ -96,6 +99,7 @@ interface AudioRenderWindow {
   count: number;
   muted: boolean;
   signal: AbortSignal;
+  clipRenderer: ReviewAudioClipRenderer;
   exportAudio?: ReviewExportClipPlan;
   tempo?: ReturnType<typeof createReviewTempo>;
 }
@@ -130,7 +134,7 @@ async function renderWindow(args: AudioRenderWindow) {
     connectOriginal(node, offline, args.exportAudio);
     node.start();
   }
-  scheduleClipWindows(offline, args);
+  await scheduleClipWindows(offline, args);
   // A bounded render cannot be cancelled by Web Audio; check cancellation before using its result.
   const rendered = await offline.startRendering();
   signal.throwIfAborted();
@@ -186,9 +190,9 @@ function connectOriginal(
 
 const leadSeconds = paddingFrames / outputRate;
 
-function scheduleClipWindows(
+async function scheduleClipWindows(
   offline: OfflineAudioContext,
-  args: { frame: number; count: number; exportAudio?: ReviewExportClipPlan }
+  args: Pick<AudioRenderWindow, 'frame' | 'count' | 'exportAudio' | 'signal' | 'clipRenderer'>
 ) {
   const { frame, count } = args;
   const plan = args.exportAudio;
@@ -201,8 +205,17 @@ function scheduleClipWindows(
     if (audibleTo <= audibleFrom) continue;
     const buffer = plan.buffers.get(entry.assetId);
     if (!buffer) continue;
+    const rate = entry.playbackRate ?? 1;
+    const localFrom = Math.max(0, audibleFrom - entry.timelineStart);
+    const localTo = Math.max(0, audibleTo - entry.timelineStart);
+    const prepared =
+      rate === 1
+        ? buffer
+        : await args.clipRenderer.render(entry, buffer, localFrom, localTo, args.signal);
+    args.signal.throwIfAborted();
     const source = offline.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = prepared;
+    source.playbackRate.value = 1;
     const gain = offline.createGain();
     source.connect(gain);
     gain.connect(offline.destination);
@@ -210,6 +223,14 @@ function scheduleClipWindows(
     // Envelope automation is clip-local; points beyond the audible window are
     // skipped so gain events stay chronological for the offline context.
     const windowEndAt = leadSeconds + (audibleTo - outStart);
+    if (rate !== 1) {
+      const precedingGain = buildQuickEditClipEnvelope({
+        entry,
+        duration: entry.duration,
+        elapsed: Math.max(0, localFrom - leadSeconds),
+      })[0]![1];
+      gain.gain.setValueAtTime(precedingGain, Math.max(0, audibleFrom - outStart));
+    }
     const points = [
       ...buildQuickEditClipEnvelope({
         entry,
@@ -234,9 +255,9 @@ function scheduleClipWindows(
     if (first) gain.gain.setValueAtTime(tailGain, windowEndAt);
     else gain.gain.linearRampToValueAtTime(tailGain, windowEndAt);
     source.start(
-      leadSeconds + (audibleFrom - outStart),
-      entry.sourceOffset + Math.max(0, localAt(audibleFrom)),
-      audibleTo - audibleFrom
+      (rate === 1 ? leadSeconds : 0) + (audibleFrom - outStart),
+      rate === 1 ? entry.sourceOffset + localFrom : 0,
+      audibleTo - audibleFrom + (rate === 1 ? 0 : 2 * leadSeconds)
     );
   }
 }

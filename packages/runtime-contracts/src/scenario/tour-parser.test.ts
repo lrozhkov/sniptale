@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parseTourDocument, tourDocumentSchema } from './tour-parser';
-import { TOUR_HINT_SURFACE, type TourDocument, type TourImageSlide } from './types/tour';
+import {
+  getTourSlideObjects,
+  resolveTourMask,
+  resolveTourHighlightAnimation,
+  TOUR_HIGHLIGHT_ANIMATION_DEFAULTS,
+  resolveTourMarkerAppearance,
+  TOUR_MARKER_DEFAULTS,
+  resolveTourTextAppearance,
+  tourTextDefaults,
+  TOUR_MASK_DEFAULTS,
+  TOUR_HINT_SURFACE,
+  TOUR_LIMITS,
+  type TourDocument,
+  type TourImageSlide,
+} from './types/tour';
 
 function imageSlide(): TourImageSlide {
   return {
@@ -424,5 +438,362 @@ it('bounds the camera entrance duration, delay and explicit automatic zoom', () 
         { ...slide, camera: { ...slide.camera, ...invalid } },
       ]).success
     ).toBe(false);
+  }
+});
+
+describe('slide object order', () => {
+  const ordered = (change: (slide: TourImageSlide) => void) =>
+    parseTourDocument(mutateSlide(change));
+  it('roundtrips a valid mixed order and derives legacy order without the field', () => {
+    const value = mutateSlide((slide) => {
+      slide.objectOrder = ['mask', 'point', 'hint'];
+    });
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    const parsed = parseTourDocument(document());
+    expect(parsed.status).toBe('ok');
+    if (parsed.status !== 'ok') throw new Error('Expected document');
+    const slide = parsed.document.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image slide');
+    expect(slide.objectOrder).toBeUndefined();
+    expect(getTourSlideObjects(slide).map((entry) => entry.object.id)).toEqual([
+      'point',
+      'hint',
+      'mask',
+    ]);
+  });
+  it('orders mixed objects by stored ids and appends unlisted objects deterministically', () => {
+    const slide = imageSlide();
+    slide.objectOrder = ['mask', 'point', 'hint'];
+    expect(getTourSlideObjects(slide).map((entry) => entry.object.id)).toEqual([
+      'mask',
+      'point',
+      'hint',
+    ]);
+    expect(
+      getTourSlideObjects({ ...slide, objectOrder: ['hint'] }).map((entry) => entry.object.id)
+    ).toEqual(['hint', 'point', 'mask']);
+  });
+  it.each([
+    ['duplicate ids', ['point', 'point', 'hint', 'mask']],
+    ['a missing object', ['point', 'hint']],
+    ['an unknown id', ['point', 'hint', 'mask', 'other']],
+    ['an empty list on a populated slide', []],
+  ])('rejects an explicit order with %s', (_name, objectOrder) => {
+    expect(
+      ordered((slide) => {
+        slide.objectOrder = objectOrder;
+      }).status
+    ).toBe('invalid');
+  });
+  it('rejects an order above the combined object limit and malformed ids', () => {
+    const limit = TOUR_LIMITS.maxHotspots + TOUR_LIMITS.maxAnnotations + TOUR_LIMITS.maxMasks;
+    expect(
+      ordered((slide) => {
+        slide.objectOrder = Array.from({ length: limit + 1 }, (_value, index) => `o-${index}`);
+      }).status
+    ).toBe('invalid');
+    expect(
+      ordered((slide) => {
+        slide.objectOrder = ['point', 'hint', 'mask', 'bad id!'];
+      }).status
+    ).toBe('invalid');
+  });
+  it('keeps navigation slides free of the field under strict parsing', () => {
+    const value = document();
+    const slide = value.slides[1]!;
+    expect(
+      parseTourDocument({
+        ...value,
+        slides: [value.slides[0]!, { ...slide, objectOrder: ['button'] }],
+      }).status
+    ).toBe('invalid');
+  });
+});
+
+it('roundtrips central defaults and inheritance while retaining legacy overrides', () => {
+  const value = document();
+  const slide = imageSlide();
+  value.slides[0] = slide;
+  value.style.hotspotAppearance = {
+    ...value.style.textAppearance,
+    surface: { ...TOUR_HINT_SURFACE, width: 400 },
+  };
+  value.style.maskDefaults = structuredClone(TOUR_MASK_DEFAULTS);
+  value.style.maskDefaults.blur.radius = 30;
+  slide.masks[0]!.inheritStyle = true;
+  const parsed = parseTourDocument(JSON.parse(JSON.stringify(value)));
+  expect(parsed).toEqual({ status: 'ok', document: value });
+  expect(resolveTourMask(slide.masks[0]!, value.style.maskDefaults).blurRadius).toBe(30);
+  const local = {
+    ...resolveTourMask(slide.masks[0]!, value.style.maskDefaults),
+    inheritStyle: false,
+  };
+  value.style.maskDefaults.blur.radius = 40;
+  expect(resolveTourMask(local, value.style.maskDefaults).blurRadius).toBe(30);
+  expect(
+    resolveTourMask({ ...local, inheritStyle: true }, value.style.maskDefaults).blurRadius
+  ).toBe(40);
+  expect(resolveTourMask(imageSlide().masks[0]!, value.style.maskDefaults)).toEqual(
+    imageSlide().masks[0]
+  );
+  const redaction = { ...local, kind: 'redact' as const, inheritStyle: true };
+  expect(resolveTourMask(redaction, value.style.maskDefaults)).toEqual(redaction);
+  const defaults = tourTextDefaults(value.style, 'hotspot');
+  expect(resolveTourTextAppearance('hotspot', null, defaults).surface?.width).toBe(400);
+  expect(
+    resolveTourTextAppearance('annotation', null, tourTextDefaults(value.style, 'annotation'))
+      .surface
+  ).toBeUndefined();
+  expect(
+    resolveTourTextAppearance('hotspot', { ...value.style.textAppearance }, defaults).surface?.width
+  ).toBe(400);
+});
+
+it('rejects malformed style defaults and inheritance flags without losing legacy admission', () => {
+  for (const patch of [
+    { maskDefaults: { ...TOUR_MASK_DEFAULTS, blur: { radius: 0 } } },
+    { maskDefaults: { ...TOUR_MASK_DEFAULTS, spotlight: { color: 'url(x)', opacity: 0.6 } } },
+    { hotspotAppearance: { presentation: 'unknown' } },
+  ])
+    expect(
+      parseTourDocument({ ...document(), style: { ...document().style, ...patch } }).status
+    ).toBe('invalid');
+  const value = document();
+  const slide = imageSlide();
+  expect(
+    parseTourDocument({
+      ...value,
+      slides: [{ ...slide, masks: [{ ...slide.masks[0], inheritStyle: 'true' }] }],
+    }).status
+  ).toBe('invalid');
+  expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+});
+
+describe('marker appearance and callout distance', () => {
+  it('preserves legacy absence and resolves fresh defaults without materializing fields', () => {
+    const value = document();
+    const before = structuredClone(value);
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: before });
+    const resolved = resolveTourMarkerAppearance(value.style);
+    expect(resolved).toEqual({ color: null, pulseColor: null, size: 30 });
+    expect(resolved).not.toBe(TOUR_MARKER_DEFAULTS);
+    resolved.size = 64;
+    expect(resolveTourMarkerAppearance(value.style).size).toBe(30);
+    expect(resolveTourTextAppearance('hotspot', null, value.style.textAppearance).calloutGap).toBe(
+      30
+    );
+    expect(value).toEqual(before);
+  });
+  it('uses whole-object local precedence and null reset without aliasing defaults', () => {
+    const style = {
+      ...document().style,
+      markerAppearance: { color: '#123456', pulseColor: '#abcdef', size: 48 },
+    };
+    const local = { markerAppearance: { color: null, pulseColor: null, size: 16 } };
+    expect(resolveTourMarkerAppearance(style, local)).toEqual(local.markerAppearance);
+    expect(resolveTourMarkerAppearance(style, local)).not.toBe(local.markerAppearance);
+    expect(resolveTourMarkerAppearance(style, { markerAppearance: null })).toEqual(
+      style.markerAppearance
+    );
+    expect(resolveTourMarkerAppearance(style)).not.toBe(style.markerAppearance);
+    const defaults = { ...style.textAppearance, calloutGap: 70 };
+    expect(resolveTourTextAppearance('hotspot', style.textAppearance, defaults).calloutGap).toBe(
+      70
+    );
+    expect(
+      resolveTourTextAppearance('hotspot', { ...defaults, calloutGap: 0 }, defaults).calloutGap
+    ).toBe(0);
+  });
+  it.each([
+    [16, 0],
+    [64, 120],
+  ])('roundtrips marker size %s and gap %s boundaries', (size, calloutGap) => {
+    const value = document();
+    value.style.markerAppearance = { color: '#Ab12EF', pulseColor: null, size };
+    value.style.hotspotAppearance = { ...value.style.textAppearance, calloutGap };
+    const slide = imageSlide();
+    slide.hotspots[0]!.markerAppearance = { color: null, pulseColor: '#abcdef', size };
+    slide.hotspots[0]!.appearance = { ...value.style.textAppearance, calloutGap };
+    value.slides[0] = slide;
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    slide.hotspots[0]!.markerAppearance = null;
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+  });
+  it('rejects malformed marker fields at both global and local boundaries', () => {
+    const valid = { color: null, pulseColor: null, size: 30 };
+    for (const markerAppearance of [
+      ...[15, 65, NaN, Infinity, -Infinity, '30'].map((size) => ({ ...valid, size })),
+      ...['red', '#fff', '#12345678', 'url(x)', 'transparent'].flatMap((color) => [
+        { ...valid, color },
+        { ...valid, pulseColor: color },
+      ]),
+      { ...valid, extra: true },
+      { size: 30 },
+    ]) {
+      const value = document();
+      expect(
+        parseTourDocument({ ...value, style: { ...value.style, markerAppearance } }).status
+      ).toBe('invalid');
+      const slide = imageSlide();
+      expect(
+        parseTourDocument({
+          ...value,
+          slides: [{ ...slide, hotspots: [{ ...slide.hotspots[0], markerAppearance }] }],
+        }).status
+      ).toBe('invalid');
+    }
+    const value = document();
+    expect(
+      parseTourDocument({ ...value, style: { ...value.style, markerAppearance: null } }).status
+    ).toBe('invalid');
+  });
+  it('rejects invalid distances and unknown appearance fields', () => {
+    const value = document();
+    for (const patch of [
+      ...[-1, 121, NaN, Infinity, -Infinity, '30', null].map((calloutGap) => ({ calloutGap })),
+      { extra: true },
+    ]) {
+      const appearance = { ...value.style.textAppearance, ...patch };
+      expect(
+        parseTourDocument({ ...value, style: { ...value.style, hotspotAppearance: appearance } })
+          .status
+      ).toBe('invalid');
+      const slide = imageSlide();
+      expect(
+        parseTourDocument({
+          ...value,
+          slides: [{ ...slide, hotspots: [{ ...slide.hotspots[0], appearance }] }],
+        }).status
+      ).toBe('invalid');
+    }
+  });
+});
+
+describe('stage background boundary', () => {
+  it('retains legacy absence without materializing background defaults', () => {
+    const value = document();
+    const parsed = parseTourDocument(value);
+    expect(parsed).toEqual({ status: 'ok', document: value });
+    if (parsed.status !== 'ok') throw new Error('Expected document');
+    expect(Object.keys(parsed.document.stage).sort()).toEqual(['aspect', 'background']);
+  });
+  it.each(['contain', 'cover'] as const)(
+    'roundtrips a gradient and stage image with %s fit',
+    (imageFit) => {
+      const value = document();
+      value.stage.image = imageSlide().image;
+      value.stage.imageFit = imageFit;
+      value.stage.paint = {
+        kind: 'gradient',
+        gradient: {
+          type: 'linear',
+          angle: 45,
+          interpolation: 'srgb',
+          repeat: { enabled: false, span: 1 },
+          stops: [
+            { id: 'a', color: '#112233ff', position: 0, midpoint: 0.5 },
+            { id: 'b', color: '#abcdef80', position: 1, midpoint: 0.5 },
+          ],
+        },
+      };
+      const before = structuredClone(value);
+      const parsed = parseTourDocument(value);
+      expect(parsed).toEqual({ status: 'ok', document: before });
+      if (parsed.status !== 'ok') throw new Error('Expected document');
+      parsed.document.stage.image!.alt = 'changed';
+      expect(value).toEqual(before);
+      value.stage.image = null;
+      value.stage.paint = { kind: 'solid', color: '#123456ff' };
+      expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    }
+  );
+  it('rejects malformed stage fields using existing paint and image admission', () => {
+    const value = document();
+    for (const patch of [
+      { imageFit: 'stretch' },
+      { imageFit: null },
+      { paint: null },
+      { paint: { kind: 'solid', color: 'url(https://example.com)' } },
+      { paint: { kind: 'solid', color: '#123456ff', extra: true } },
+      { image: { ...imageSlide().image, width: 0 } },
+      { image: { ...imageSlide().image, assetId: 'bad id!' } },
+      { image: { ...imageSlide().image, url: 'https://example.com' } },
+      { background: 'url(https://example.com)' },
+      { extra: true },
+    ]) {
+      expect(parseTourDocument({ ...value, stage: { ...value.stage, ...patch } }).status).toBe(
+        'invalid'
+      );
+    }
+  });
+  it('rejects stage images sharing an audio resource or narration identity', () => {
+    const value = document();
+    value.stage.image = { ...imageSlide().image!, assetId: 'audio' };
+    expect(parseTourDocument(value).status).toBe('invalid');
+    value.slides = [];
+    value.audioResources = [{ assetId: 'audio', duration: 12, name: 'Voice' }];
+    expect(parseTourDocument(value).status).toBe('invalid');
+    value.audioResources = [];
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+  });
+});
+
+it('resolves independent highlight phases without persisting defaults or animating other effects', () => {
+  const value = document();
+  const slide = imageSlide();
+  const mask = slide.masks[0]!;
+  mask.kind = 'highlight';
+  const defaults = (value.style.maskDefaults = structuredClone(TOUR_MASK_DEFAULTS));
+  const animation = {
+    enter: { kind: 'fade' as const, durationMs: 100 },
+    exit: { kind: 'none' as const, durationMs: 1000 },
+  };
+  expect(resolveTourHighlightAnimation(mask)).toEqual(TOUR_HIGHLIGHT_ANIMATION_DEFAULTS);
+  defaults.highlight.animation = animation;
+  expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(animation);
+  mask.highlightAnimation = structuredClone(TOUR_HIGHLIGHT_ANIMATION_DEFAULTS);
+  expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(mask.highlightAnimation);
+  const resolved = resolveTourHighlightAnimation(mask, defaults);
+  resolved.enter.durationMs = 700;
+  expect(mask.highlightAnimation.enter.durationMs).toBe(250);
+  mask.highlightAnimation = null;
+  expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(animation);
+  for (const kind of ['spotlight', 'blur', 'redact'] as const) {
+    mask.kind = kind;
+    mask.highlightAnimation = animation;
+    expect(resolveTourHighlightAnimation(mask, defaults)).toEqual(
+      TOUR_HIGHLIGHT_ANIMATION_DEFAULTS
+    );
+  }
+  value.slides[0] = slide;
+  expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+});
+it('strictly admits complete bounded global and local highlight phase pairs', () => {
+  const phase = { kind: 'fade', durationMs: 100 };
+  const value = document();
+  value.style.maskDefaults = structuredClone(TOUR_MASK_DEFAULTS);
+  const slide = imageSlide();
+  value.slides[0] = slide;
+  for (const animation of [
+    null,
+    {},
+    { enter: phase },
+    { enter: phase, exit: phase, extra: true },
+    { enter: { ...phase, extra: true }, exit: phase },
+    ...[99, 1001, NaN, Infinity].map((durationMs) => ({
+      enter: { ...phase, durationMs },
+      exit: phase,
+    })),
+    { enter: { ...phase, kind: 'zoom' }, exit: phase },
+  ]) {
+    Reflect.set(value.style.maskDefaults.highlight, 'animation', animation);
+    expect(parseTourDocument(value).status).toBe('invalid');
+    Reflect.deleteProperty(value.style.maskDefaults.highlight, 'animation');
+    expect(
+      parseTourDocument({
+        ...value,
+        slides: [{ ...slide, masks: [{ ...slide.masks[0], highlightAnimation: animation }] }],
+      }).status
+    ).toBe(animation === null ? 'ok' : 'invalid');
   }
 });

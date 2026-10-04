@@ -1,5 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
+vi.mock('../assets', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../assets')>()),
+  completePhysicalDeleteOperation: vi.fn(),
+}));
+
+vi.mock('./project-retention', () => ({
+  repairTemporaryProjectLifecycles: vi.fn().mockResolvedValue(0),
+}));
+
 const persistenceMocks = vi.hoisted(() => ({
   listMediaLibrary: vi.fn(),
   listScenarioProjectEntries: vi.fn(),
@@ -22,6 +31,10 @@ vi.mock('../image-aggregates/mutations', async (importOriginal) => ({
 
 vi.mock('../infrastructure/indexed-db/mutation', () => ({
   runWithIndexedDbMutation: persistenceMocks.runWithIndexedDbMutation,
+}));
+vi.mock('./project-recordings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./project-recordings')>()),
+  repairLinkedRecordingLifecycles: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('../media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../media-library')>()),
@@ -72,8 +85,22 @@ it('deletes an expired orphan project-asset blob and never schedules a library a
         done: Promise.resolve(),
         objectStore: vi.fn((name: string) => ({
           delete: vi.fn(async (id: string) => deletes(name, id)),
-          get: vi.fn(async () => temporary),
+          get: vi.fn(async () =>
+            name === 'project_assets'
+              ? {
+                  id: 'orphan',
+                  assetId: 'orphan-object',
+                  mimeType: 'image/png',
+                  size: 5,
+                  createdAt: 1,
+                }
+              : name === 'media_library'
+                ? temporary
+                : undefined
+          ),
+          index: vi.fn(() => ({ count: vi.fn(async () => 0) })),
           getAll: vi.fn(async () => []),
+          put: vi.fn(),
         })),
       })),
     })

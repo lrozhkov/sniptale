@@ -67,7 +67,9 @@ function registerCatalogMetadataTests() {
       expect(entry.insertDefaults.shapeFamily).toBeTruthy();
       expect(entry.insertDefaults.shapeKind).toBeTruthy();
       expect(entry.insertDefaults.frame.width).toBeGreaterThan(0);
-      expect(entry.insertDefaults.style.fillTransparency).toBe(1);
+      expect(entry.insertDefaults.style.fillTransparency).toBe(
+        entry.id === 'cursor-pointer' ? 0 : 1
+      );
       expect(entry.capabilities.length).toBeGreaterThan(0);
       expect(isValidEditorBuiltInShapeGeometry(entry.thumbnail)).toBe(true);
       expect(isValidEditorBuiltInShapeGeometry(entry.geometry)).toBe(true);

@@ -18,13 +18,18 @@ export type EditorStoreSetters = Pick<
   | 'setActiveTool'
   | 'syncActiveTool'
   | 'setInspector'
+  | 'setFreshImageBackgroundPending'
   | 'setLayerEffectsCategory'
   | 'setInspectorCollapsed'
   | 'setViewportPreviewOpenFromUser'
   | 'setViewportPreviewOpenFromSync'
+  | 'setShowOutsideCanvas'
+  | 'setCanvasCropMode'
   | 'setSaveErrorMessage'
   | 'setSaveState'
   | 'setSessionId'
+  | 'setCapturedAt'
+  | 'updateTechnicalDataTextSettings'
   | 'setImageData'
   | 'setPageTitle'
   | 'setRichShapeToolSelection'
@@ -52,15 +57,28 @@ export function createEditorStoreSetterActions(set: EditorStoreSet): EditorStore
     setActiveTool: (activeTool) => set({ activeTool, inspector: 'tool' }),
     syncActiveTool: (activeTool) => set({ activeTool }),
     setInspector: (inspector) => set({ inspector }),
+    setFreshImageBackgroundPending: (freshImageBackgroundPending) =>
+      set({ freshImageBackgroundPending }),
     setLayerEffectsCategory: (layerEffectsCategory: EditorLayerEffectCategory) =>
       set({ layerEffectsCategory }),
     setInspectorCollapsed: (inspectorCollapsed) => set({ inspectorCollapsed }),
     setViewportPreviewOpenFromUser: (open) =>
       set((state) => createManualViewportPreviewPatch(state, open)),
     setViewportPreviewOpenFromSync: (viewportPreviewOpen) => set({ viewportPreviewOpen }),
+    setShowOutsideCanvas: (showOutsideCanvas) => set({ showOutsideCanvas }),
+    setCanvasCropMode: (canvasCropMode) => set({ canvasCropMode }),
     setSaveErrorMessage: (saveErrorMessage) => set({ saveErrorMessage }),
     setSaveState: (saveState) => set({ saveState }),
-    setSessionId: (sessionId) => set({ sessionId }),
+    setSessionId: (sessionId) =>
+      set((state) => ({
+        sessionId,
+        capturedAt: state.sessionId === sessionId ? state.capturedAt : null,
+      })),
+    setCapturedAt: (capturedAt) => set({ capturedAt }),
+    updateTechnicalDataTextSettings: (patch) =>
+      set((state) => ({
+        technicalDataTextSettings: { ...state.technicalDataTextSettings, ...patch },
+      })),
     setImageData: (imageData) => set({ imageData }),
     setPageTitle: (pageTitle) => set({ pageTitle }),
     setRichShapeToolSelection: (richShapeToolSelection) => set({ richShapeToolSelection }),
@@ -81,16 +99,25 @@ function createWorkspaceDefaultsHydrator(
 ): EditorStoreToolActions['hydrateWorkspaceDefaults'] {
   return (defaults) =>
     set((state) => {
-      const workspaceDefaults = { ...state.workspaceDefaults, ...defaults };
+      const workspaceDefaults = {
+        ...state.workspaceDefaults,
+        ...defaults,
+        hideSelectionWhileDragging: state.workspaceSelectionVisibilityEdited
+          ? state.workspaceDefaults.hideSelectionWhileDragging
+          : defaults.hideSelectionWhileDragging,
+      };
 
       return {
         workspaceDefaults,
-        workspace: state.workspaceBackgroundEdited
-          ? state.workspace
-          : {
-              ...state.workspace,
-              backgroundColor: workspaceDefaults.backgroundColor,
-            },
+        workspace: {
+          ...state.workspace,
+          backgroundColor: state.workspaceBackgroundEdited
+            ? state.workspace.backgroundColor
+            : workspaceDefaults.backgroundColor,
+          hideSelectionWhileDragging: state.workspaceSelectionVisibilityEdited
+            ? state.workspace.hideSelectionWhileDragging
+            : workspaceDefaults.hideSelectionWhileDragging,
+        },
       };
     });
 }
@@ -121,6 +148,9 @@ export function createEditorStoreLayoutActions(set: EditorStoreSet): EditorStore
       set((state) => ({
         workspace: createObjectPatch<EditorWorkspaceSettings>(state.workspace, patch),
         ...(patch.backgroundColor === undefined ? {} : { workspaceBackgroundEdited: true }),
+        ...(patch.hideSelectionWhileDragging === undefined
+          ? {}
+          : { workspaceSelectionVisibilityEdited: true }),
       })),
     updateViewport: (patch) =>
       set((state) => ({

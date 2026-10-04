@@ -1,3 +1,4 @@
+import { Save } from 'lucide-react';
 import { useState } from 'react';
 import { translate } from '../../../platform/i18n';
 
@@ -18,6 +19,8 @@ export function PromotionAction({ className, onPromote, visible }: PromotionActi
     <>
       <button
         type="button"
+        title={translate('gallery.preview.saveToLibrary')}
+        aria-label={translate('gallery.preview.saveToLibrary')}
         disabled={state === 'saving'}
         onClick={async () => {
           setState('saving');
@@ -34,13 +37,18 @@ export function PromotionAction({ className, onPromote, visible }: PromotionActi
         }}
         className={className}
       >
-        {translate('gallery.preview.saveToLibrary')}
+        <Save className="h-4 w-4" aria-hidden="true" />
+        <span className="sr-only">{translate('gallery.preview.saveToLibrary')}</span>
       </button>
       {state === 'error' ? (
-        <p role="alert">{translate('gallery.preview.saveToLibraryError')}</p>
+        <p role="alert" className="col-span-full text-xs text-[var(--sniptale-color-danger)]">
+          {translate('gallery.preview.saveToLibraryError')}
+        </p>
       ) : null}
       {state === 'multiple-editors' ? (
-        <p role="alert">{translate('gallery.preview.saveToLibraryMultipleEditors')}</p>
+        <p role="alert" className="col-span-full text-xs text-[var(--sniptale-color-danger)]">
+          {translate('gallery.preview.saveToLibraryMultipleEditors')}
+        </p>
       ) : null}
     </>
   );

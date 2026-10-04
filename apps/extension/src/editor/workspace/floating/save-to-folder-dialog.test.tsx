@@ -153,7 +153,7 @@ it('anchors below its trigger and dismisses on Escape or an outside pointer', ()
   const positioner = document.querySelector<HTMLElement>('.sniptale-content-popover-positioner');
 
   expect(positioner?.style.position).toBe('fixed');
-  expect(positioner?.style.top).toBe('56px');
+  expect(positioner?.style.top).toBe('60px');
   expect(document.querySelector('[role="dialog"]')).not.toBeNull();
   expect(document.activeElement?.getAttribute('aria-label')).toBe('Filename');
 
@@ -171,4 +171,17 @@ it('restores focus to the save trigger when the dialog unmounts', () => {
   act(() => root?.render(null));
 
   expect(document.activeElement).toBe(anchor);
+});
+
+it('measures the save gap from the toolbar border after layout changes', () => {
+  renderDialog(createController());
+  const toolbar = document.createElement('div');
+  toolbar.className = 'sniptale-toolbar-root';
+  vi.spyOn(toolbar, 'getBoundingClientRect').mockReturnValue(new DOMRect(680, 12, 180, 52));
+  document.body.append(toolbar);
+  if (anchor) toolbar.append(anchor);
+  act(() => window.dispatchEvent(new Event('resize')));
+  const positioner = document.querySelector<HTMLElement>('.sniptale-content-popover-positioner');
+  expect(positioner?.style.top).toBe('76px');
+  toolbar.remove();
 });
