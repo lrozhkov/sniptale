@@ -107,6 +107,30 @@ a:focus-visible {
   align-items: center;
   gap: 10px;
 }
+.tour-narration-controls,
+.tour-audio-controls {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+}
+.tour-narration-controls[hidden],
+.tour-audio-controls[hidden] {
+  display: none;
+}
+[data-tour-volume] {
+  width: 64px;
+  min-width: 0;
+  height: 28px;
+  margin: 0;
+  accent-color: var(--tour-text);
+  cursor: pointer;
+}
+[data-tour-volume]:focus-visible {
+  outline: 2px solid var(--tour-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
 .tour-nav {
   flex: none;
   display: flex;

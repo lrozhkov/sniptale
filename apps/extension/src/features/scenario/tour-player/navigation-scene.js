@@ -1,4 +1,4 @@
-import { createTourNarrationButton } from './transport.js';
+import { createTourNarrationControls } from './transport.js';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { TOUR_NAVIGATION_LAYOUT } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { measureHintPages } from './hints.js';
@@ -58,13 +58,12 @@ export function renderTourNavigationScene({
   for (const button of slide.buttons.slice(buttonPage * pageSize, (buttonPage + 1) * pageSize)) {
     const node = actionButton(button.label, button.action, 'tour-button', button.id);
     node.style.height = `${rowHeight}px`;
-    if (!authoring && button.narration?.trigger === 'activation') {
+    if (!authoring && button.narration) {
       const group = element('div', 'tour-navigation-audio');
       group.style.display = 'flex';
       group.style.gap = '4px';
       node.style.flex = '1';
-      const voice = createTourNarrationButton(root.ownerDocument, labels.play);
-      voice.dataset.tourNarration = button.id;
+      const voice = createTourNarrationControls(root.ownerDocument, labels, button.id);
       group.append(node, voice);
       buttons.append(group);
     } else buttons.append(node);

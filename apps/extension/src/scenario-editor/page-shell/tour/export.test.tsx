@@ -60,6 +60,12 @@ it.each(['ru', 'en'] as const)(
     expect(button('htmlSave').disabled).toBe(true);
     await act(async () => button('tourHtmlPrepare').click());
     expect(io.prepare.mock.calls[0]![0].labels).toMatchObject({
+      narrationReplay: locale === 'ru' ? 'Повторить озвучку' : 'Replay narration',
+      narrationPause: locale === 'ru' ? 'Приостановить озвучку' : 'Pause narration',
+      narrationResume: locale === 'ru' ? 'Продолжить озвучку' : 'Resume narration',
+      volume: locale === 'ru' ? 'Громкость' : 'Volume',
+      mute: locale === 'ru' ? 'Выключить звук' : 'Mute',
+      unmute: locale === 'ru' ? 'Включить звук' : 'Unmute',
       manual: t('scenario.editor.tourManual'),
       fullView: locale === 'ru' ? 'Слайд целиком' : 'Full slide',
       authoredView: locale === 'ru' ? 'Авторский вид' : 'Authored view',

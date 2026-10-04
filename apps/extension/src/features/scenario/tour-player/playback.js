@@ -7,7 +7,12 @@ import {
   tourEntranceTiming,
   tourHighlightTiming,
 } from './timing.js';
-import { createTourTransport } from './transport.js';
+import {
+  createTourTransport,
+  createTourVolumeControls,
+  projectTourAudioControls,
+} from './transport.js';
+import { getTourNarrationTargets } from '../project/tour-resources';
 
 /** Audio preview syncs only until a decoding error takes over the transport state. */
 function syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state }) {
@@ -33,16 +38,22 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const reduced = () => Boolean(motionPreference?.matches);
   const update = createTourTransport(root, input.labels, signal, toggle, seek, manual);
+  const setVolumeAvailable = createTourVolumeControls(root, input.labels, signal);
   const playbackView = (elapsed, state) => ({
     elapsed: ended ? (timeline?.duration ?? duration) : (timeline?.offsets[index] ?? 0) + elapsed,
     duration: timeline?.duration ?? duration,
     state: audioState ?? (choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state),
   });
   let audioState = null;
-  const audio = createTourAudio(root, signal, (state) => {
-    audioState = state;
-    session.pause();
-  });
+  const audio = createTourAudio(
+    root,
+    signal,
+    (state) => {
+      audioState = state;
+      session.pause();
+    },
+    (snapshot) => projectTourAudioControls(root, input.labels, snapshot)
+  );
   const session = createTourPlaybackSession({
     signal,
     motion,
@@ -112,23 +123,16 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     audioState = null;
     audio.show(ended ? null : slide, assets);
     timeline = tourLinearTimeline(tour, reduced());
-    entrance = tourEntranceTiming(tour, ended ? null : slide, reduced()).total;
-    exitStart = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
-    duration = exitStart + tourHighlightTiming(tour, ended ? null : slide, reduced()).exitMs;
+    const spec = tourPlaybackSpec(tour, ended ? null : slide, assets, reduced());
+    ({ entrance, exitStart, duration } = spec);
+    setVolumeAvailable(tourHasPlayableNarration(tour, assets));
     if (!slide) {
       session.clear();
       return;
     }
     if (ended) session.pause();
     visited.add(slide.id);
-    const image = ended ? null : slide.kind === 'image' ? slide.image : slide.background.image;
-    session.load({
-      duration,
-      entrance,
-      exitStart,
-      source: assets.find((asset) => asset.id === image?.assetId)?.src,
-      required: Boolean(image),
-    });
+    session.load(spec);
   }
   bindMotionPreference(
     motionPreference,
@@ -144,6 +148,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   return {
     show,
     pause,
+    refreshAudioControls: () => projectTourAudioControls(root, input.labels, audio.snapshot),
     depart(callbacks) {
       audio.stop();
       session.depart(callbacks);
@@ -186,21 +191,77 @@ function bindPlaybackLifetime(root, signal, session, audio, clearAudioState) {
     },
     { signal, capture: true }
   );
+  bindLocalAudioCommands(root, signal, session, audio, clearAudioState);
+  return pause;
+}
+
+/** Local audio detaches before pausing the timeline, whose change callback synchronizes immediately. */
+function bindLocalAudioCommands(root, signal, session, audio, clearAudioState) {
   root.addEventListener(
     'click',
     (event) => {
       const target =
         event.target instanceof globalThis.Element
-          ? event.target.closest('[data-tour-narration]')
+          ? event.target.closest(
+              '[data-tour-narration-toggle],[data-tour-narration-replay],[data-tour-narration],[data-tour-mute]'
+            )
           : null;
       if (!target) return;
+      if (target.hasAttribute('data-tour-mute')) {
+        audio.setMuted(!audio.snapshot.muted);
+        return;
+      }
+      const snapshot = audio.snapshot;
+      const id = target.dataset.tourNarrationToggle ?? target.dataset.tourNarrationReplay;
+      const sameCue = snapshot.objectId === id;
+      const playing = snapshot.status === 'playing' || snapshot.status === 'loading';
       clearAudioState();
+      audio.pause();
       session.pause();
-      audio.activate(target.dataset.tourNarration);
+      if (target.hasAttribute('data-tour-narration-replay')) audio.replay(id);
+      else if (target.hasAttribute('data-tour-narration-toggle')) {
+        if (sameCue && playing) return;
+        if (sameCue && snapshot.canResume) audio.resume();
+        else audio.replay(id);
+      } else audio.activate(target.dataset.tourNarration);
     },
     { signal }
   );
-  return pause;
+  root.addEventListener(
+    'input',
+    (event) => {
+      const target = event.target;
+      if (target instanceof globalThis.HTMLInputElement && target.hasAttribute('data-tour-volume'))
+        audio.setVolume(Number(target.value));
+    },
+    { signal }
+  );
+}
+
+/** Timing and media source are a projection of the currently rendered slide. */
+function tourPlaybackSpec(tour, slide, assets, reduced) {
+  const entrance = tourEntranceTiming(tour, slide, reduced).total;
+  const exitStart = entrance + (slide ? tourSlideDuration(tour, slide) : 0);
+  const duration = exitStart + tourHighlightTiming(tour, slide, reduced).exitMs;
+  const image = !slide ? null : slide.kind === 'image' ? slide.image : slide.background.image;
+  return {
+    entrance,
+    exitStart,
+    duration,
+    source: assets.find((asset) => asset.id === image?.assetId)?.src,
+    required: Boolean(image),
+  };
+}
+
+/** Detached resources do not make a tour audible; a live attachment needs its playable asset. */
+function tourHasPlayableNarration(tour, assets) {
+  return tour.slides.some((slide) =>
+    getTourNarrationTargets(slide).some(
+      (target) =>
+        target.narration &&
+        assets.some((asset) => asset.id === target.narration.assetId && asset.src)
+    )
+  );
 }
 
 /** Reduced-motion changes retain the hold position while rebuilding the entrance gate. */

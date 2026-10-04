@@ -389,4 +389,10 @@ export const scenarioTourMessages = {
   tourHintPadding: { ru: 'Внутренний отступ', en: 'Inner padding' },
   tourHintRadius: { ru: 'Скругление', en: 'Corner radius' },
   tourSceneTextColor: { ru: 'Текст сцены', en: 'Scene text' },
+  tourNarrationReplay: { ru: 'Повторить озвучку', en: 'Replay narration' },
+  tourNarrationPause: { ru: 'Приостановить озвучку', en: 'Pause narration' },
+  tourNarrationResume: { ru: 'Продолжить озвучку', en: 'Resume narration' },
+  tourVolume: { ru: 'Громкость', en: 'Volume' },
+  tourMute: { ru: 'Выключить звук', en: 'Mute' },
+  tourUnmute: { ru: 'Включить звук', en: 'Unmute' },
 } as const;

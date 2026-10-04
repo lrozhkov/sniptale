@@ -118,6 +118,7 @@ export function createTourScene(root, input, onAction, signal, options = {}, bou
       selectedObjectId
     );
     refreshFullView();
+    boundary?.refreshNarration?.();
   }
   function resize() {
     if (signal.aborted) return;

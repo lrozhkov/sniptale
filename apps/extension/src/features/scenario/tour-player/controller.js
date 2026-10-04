@@ -28,6 +28,7 @@ export function createTourPlayer(root, input, options = {}) {
   const authoringNavigation = options.authoring?.navigation;
   const view = createTourScene(root, input, act, lifetime.signal, options, {
     canMove,
+    refreshNarration: () => playback?.refreshAudioControls(),
     move: (direction) => {
       manualGo(projectedIndex() + direction, true, direction);
     },

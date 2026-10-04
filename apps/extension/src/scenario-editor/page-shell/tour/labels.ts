@@ -6,6 +6,13 @@ export function tourPlayerLabels(t: Translate): TourPlayerLabels {
   return {
     audioBlocked: t('scenario.editor.tourHtmlAudioBlocked'),
     audioError: t('scenario.editor.tourAudioFailed'),
+    narrationReplay: t('scenario.editor.tourNarrationReplay'),
+    narrationPause: t('scenario.editor.tourNarrationPause'),
+    narrationResume: t('scenario.editor.tourNarrationResume'),
+    volume: t('scenario.editor.tourVolume'),
+    mute: t('scenario.editor.tourMute'),
+    unmute: t('scenario.editor.tourUnmute'),
+
     resize: t('scenario.editor.tourResizeArea'),
     expand: t('scenario.editor.tourExpandCaption'),
     collapse: t('scenario.editor.tourCollapseCaption'),

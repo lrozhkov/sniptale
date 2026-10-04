@@ -1,5 +1,5 @@
 import { createTourCaption } from './caption.js';
-import { createTourNarrationButton } from './transport.js';
+import { createTourNarrationControls, setTourNarrationIdentity } from './transport.js';
 import {
   resolveTourTextAppearance,
   tourTextDefaults,
@@ -66,12 +66,11 @@ export function createTourHints(
   function paginate() {
     const { stageWidth, stageHeight } = geometry;
     const current = dismissed ? null : hints[activeHint];
+    updateTourVoice(voice, current, hideVoice, boundary);
     if (!current) {
       hint.hidden = true;
       return;
     }
-    voice.hidden = Boolean(hideVoice) || current.narration?.trigger !== 'activation';
-    voice.dataset.tourNarration = current.id;
     activeHintId = current.id;
     hint.hidden = false;
     const defaultAppearance = tourTextDefaults(
@@ -180,8 +179,15 @@ export function createTourHints(
   };
 }
 
+/** Rebind the visible attachment before reading its current media projection. */
+function updateTourVoice(voice, current, hideVoice, boundary) {
+  voice.hidden = Boolean(hideVoice) || !current?.narration;
+  if (current) setTourNarrationIdentity(voice, current.id);
+  boundary?.refreshNarration?.();
+}
+
 function createTourVoiceButton(close, labels, signal) {
-  const voice = createTourNarrationButton(close.ownerDocument, labels.play);
+  const voice = createTourNarrationControls(close.ownerDocument, labels, '');
   close.before(voice);
   signal.addEventListener('abort', () => voice.remove(), { once: true });
   return voice;

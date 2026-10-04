@@ -7,6 +7,7 @@ const FACES = {
   play: { fill: 'currentColor', d: 'M8 5v14l11-7z' },
   pause: { fill: 'currentColor', d: 'M7 5h4v14H7zm6 0h4v14h-4z' },
   retry: { fill: 'none', d: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6' },
+  volume: { fill: 'none', d: 'M11 5 6 9H3v6h3l5 4V5zm4 3a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14' },
   contents: { fill: 'none', d: 'M3 4h18v16H3zM14 4v16M17 8h1M17 12h1M17 16h1' },
   previous: { fill: 'none', d: 'm15 18-6-6 6-6' },
   next: { fill: 'none', d: 'm9 18 6-6-6-6' },
@@ -133,4 +134,92 @@ export function createTourNarrationButton(document, label) {
   button.title = label;
   button.append(createIcon(document, FACES.play));
   return button;
+}
+
+/** Attachment controls contain only command identity; media snapshots project their current face. */
+export function createTourNarrationControls(document, labels, id) {
+  const group = document.createElement('span');
+  group.className = 'tour-narration-controls';
+  const toggle = createTourNarrationButton(document, labels.narrationReplay ?? labels.play);
+  toggle.dataset.tourNarrationAction = 'replay';
+  const replay = createTourNarrationButton(document, labels.narrationReplay ?? labels.retry);
+  replay.replaceChildren(createIcon(document, FACES.retry));
+  group.append(toggle, replay);
+  setTourNarrationIdentity(group, id);
+  return group;
+}
+
+/** Hint pagination changes the attachment without creating a second audio state. */
+export function setTourNarrationIdentity(group, id) {
+  group.dataset.tourNarrationControls = id;
+  const [toggle, replay] = group.children;
+  toggle.dataset.tourNarrationToggle = id;
+  toggle.dataset.tourNarration = id;
+  replay.dataset.tourNarrationReplay = id;
+}
+
+/** Master controls share the mounted transport lifetime; playback owns all input commands. */
+export function createTourVolumeControls(root, labels, signal) {
+  const document = root.ownerDocument;
+  const group = document.createElement('span');
+  group.className = 'tour-audio-controls';
+  group.dataset.tourAudioControls = '';
+  group.hidden = true;
+  const mute = createTourNarrationButton(document, labels.mute ?? 'Mute');
+  mute.dataset.tourMute = '';
+  mute.replaceChildren(createIcon(document, FACES.volume));
+  const volume = document.createElement('input');
+  volume.type = 'range';
+  volume.min = '0';
+  volume.max = '1';
+  volume.step = '0.01';
+  volume.value = '1';
+  volume.dataset.tourVolume = '';
+  volume.setAttribute('aria-label', labels.volume ?? 'Volume');
+  volume.title = labels.volume ?? 'Volume';
+  group.append(mute, volume);
+  root.querySelector('[data-tour-playback]').append(group);
+  signal.addEventListener('abort', () => group.remove(), { once: true });
+  return (available) => {
+    group.hidden = !available;
+  };
+}
+
+/** Re-project after media changes or scene reconstruction; no snapshot is cached in the view. */
+export function projectTourAudioControls(root, labels, snapshot) {
+  for (const group of root.querySelectorAll('[data-tour-narration-controls]')) {
+    const current =
+      snapshot.objectId !== null && snapshot.objectId === group.dataset.tourNarrationControls;
+    const pausable = current && ['playing', 'loading'].includes(snapshot.status);
+    const action = pausable ? 'pause' : current && snapshot.canResume ? 'resume' : 'replay';
+    const text =
+      action === 'pause'
+        ? (labels.narrationPause ?? labels.pause)
+        : action === 'resume'
+          ? (labels.narrationResume ?? labels.play)
+          : (labels.narrationReplay ?? labels.play);
+    const toggle = group.querySelector('[data-tour-narration-toggle]');
+    toggle.dataset.tourNarrationAction = action;
+    group.dataset.tourNarrationStatus = current ? snapshot.status : 'idle';
+    toggle.setAttribute('aria-label', text);
+    toggle.title = text;
+    toggle.setAttribute('aria-pressed', String(pausable));
+    const face = pausable ? 'pause' : 'play';
+    if (toggle.dataset.tourFace !== face) {
+      toggle.dataset.tourFace = face;
+      toggle.replaceChildren(createIcon(root.ownerDocument, FACES[face]));
+    }
+  }
+  const volume = root.querySelector('[data-tour-volume]');
+  if (volume) {
+    volume.value = String(snapshot.volume);
+    volume.setAttribute('aria-valuetext', `${Math.round(snapshot.volume * 100)}%`);
+  }
+  const mute = root.querySelector('[data-tour-mute]');
+  if (mute) {
+    const text = snapshot.muted ? (labels.unmute ?? 'Unmute') : (labels.mute ?? 'Mute');
+    mute.setAttribute('aria-label', text);
+    mute.title = text;
+    mute.setAttribute('aria-pressed', String(snapshot.muted));
+  }
 }
