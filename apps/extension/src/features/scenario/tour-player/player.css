@@ -64,15 +64,13 @@ a:focus-visible {
     opacity 0.25s ease,
     transform 0.25s ease;
 }
+/* Reserve feedback height so loading and choice states do not resize the fitted scene. */
 .tour-feedback {
   display: flex;
   align-items: baseline;
   gap: 12px;
   min-width: 0;
   min-height: 17px;
-}
-.tour-feedback:has(.tour-playback-status[hidden]) {
-  display: none;
 }
 .tour-title {
   display: none;
@@ -337,6 +335,8 @@ a:focus-visible {
   overscroll-behavior: contain;
 }
 .tour-navigation .tour-contents-list .tour-button {
+  position: relative;
+  border-color: transparent;
   flex: none;
   text-align: start;
   min-width: 0;
@@ -344,9 +344,17 @@ a:focus-visible {
   overflow-wrap: anywhere;
 }
 .tour-navigation .tour-contents-list .tour-button[aria-current] {
-  border-inline-start: 3px solid var(--tour-text);
-  font-weight: 700;
   background: color-mix(in srgb, var(--tour-text) 12%, var(--tour-surface));
+}
+.tour-navigation .tour-contents-list .tour-button[aria-current]::before {
+  content: '';
+  position: absolute;
+  inset-block: 6px;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--tour-text);
+  pointer-events: none;
 }
 .tour-contents-list {
   display: grid;

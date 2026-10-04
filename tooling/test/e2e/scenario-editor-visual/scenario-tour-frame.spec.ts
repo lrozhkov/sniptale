@@ -1083,3 +1083,233 @@ for (const [locale, theme, viewport] of [
     }
   });
 }
+
+async function readPlayerFrame(player: Locator) {
+  return player.evaluate(async (root) => {
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+    );
+    const box = (node: Element) => {
+      const { x, y, width, height } = node.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    return {
+      root: box(root),
+      viewport: box(root.querySelector('.tour-viewport')!),
+      stage: box(root.querySelector('.tour-stage')!),
+      toolbar: box(root.querySelector('.tour-toolbar')!),
+    };
+  });
+}
+
+for (const [locale, theme, viewport] of [
+  ['ru', 'light', { width: 1280, height: 560 }],
+  ['en', 'dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`tour outer frame and contents accent stay stable across playback states ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openVisualHarness(page, hostOrigin, theme, locale, viewport, 'compare', {
+      tourFixture: '1',
+    });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    const panel = page.locator('#guide-inspector-panel');
+    const category = (name: string) =>
+      panel.getByRole('navigation').getByRole('button', { name, exact: true });
+    await category(t('scenario.editor.tourObjects')).click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourAnnotation'), exact: true })
+      .click();
+    const copy = (
+      locale === 'ru'
+        ? 'Подробное пояснение сохраняет геометрию сцены. '
+        : 'Detailed explanation preserves scene geometry. '
+    )
+      .repeat(30)
+      .trim();
+    await panel
+      .getByRole('textbox', { name: t('scenario.editor.textLabel'), exact: true })
+      .fill(copy);
+    await page.locator('.tour-slide-select').nth(1).click();
+    const portrait = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 240;
+      const context = canvas.getContext('2d')!;
+      context.fillStyle = '#2563eb';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    });
+    const clipboard = await page.evaluateHandle((encoded) => {
+      const transfer = new DataTransfer();
+      const bytes = Uint8Array.from(atob(encoded), (letter) => letter.charCodeAt(0));
+      transfer.items.add(new File([bytes], 'portrait.png', { type: 'image/png' }));
+      return transfer;
+    }, portrait);
+    await page.locator('.tour-canvas').dispatchEvent('drop', { dataTransfer: clipboard });
+    await expect
+      .poll(() =>
+        page
+          .locator('.tour-stage-host .tour-image')
+          .evaluate((image: HTMLImageElement) => image.naturalHeight)
+      )
+      .toBe(240);
+    await page
+      .locator('#guide-library-panel')
+      .getByRole('button', { name: t('scenario.editor.tourAddNavigation'), exact: true })
+      .click();
+    await category(t('scenario.editor.tourContentsLinks')).click();
+    await panel.locator('.tour-contents-build').click();
+    await page.locator('.tour-slide-select').first().click();
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    const player = page.locator('.tour-stage-host #tour-player');
+    const status = player.locator('[data-tour-status]');
+    await expect(status).toBeHidden();
+    await expect(player.locator('.tour-scene')).toHaveCSS('opacity', '1');
+    await page.evaluate(() => {
+      const decode = HTMLImageElement.prototype.decode;
+      const releases: (() => void)[] = [];
+      Reflect.set(window, 'holdTourDecode', false);
+      Reflect.set(window, 'releaseTourDecode', () => {
+        Reflect.set(window, 'holdTourDecode', false);
+        releases.splice(0).forEach((release) => release());
+      });
+      HTMLImageElement.prototype.decode = async function () {
+        await decode.call(this);
+        if (!this.isConnected && Reflect.get(window, 'holdTourDecode'))
+          await new Promise<void>((resolve) => releases.push(resolve));
+      };
+    });
+    const evidence: unknown[] = [];
+    const assertFrame = async (
+      name: string,
+      before: Awaited<ReturnType<typeof readPlayerFrame>>
+    ) => {
+      const current = await readPlayerFrame(player);
+      evidence.push({ name, current });
+      for (const region of ['root', 'viewport', 'stage', 'toolbar'] as const)
+        for (const dimension of ['x', 'y', 'width', 'height'] as const)
+          expect
+            .soft(
+              Math.abs(current[region][dimension] - before[region][dimension]),
+              `${name} ${region}.${dimension}`
+            )
+            .toBeLessThanOrEqual(1);
+    };
+    const direct = async (index: number) => {
+      await player.locator('[data-tour-contents]').click();
+      await player.locator('.tour-contents-list .tour-button').nth(index).click();
+    };
+    for (const fullscreen of [false, true]) {
+      if (fullscreen) {
+        await player.evaluate((root) => root.requestFullscreen());
+        await expect.poll(() => player.evaluate((root) => root.matches(':fullscreen'))).toBe(true);
+      }
+      await direct(0);
+      await expect(status).toBeHidden();
+      await expect(player.locator('.tour-scene')).toHaveCSS('opacity', '1');
+      const baseline = await readPlayerFrame(player);
+      evidence.push({ fullscreen, baseline });
+      await player.locator('[data-tour-hint-toggle]').click();
+      await expect(player.locator('[data-tour-hint]')).toHaveAttribute('data-collapsed', 'false');
+      await assertFrame('expanded long caption', baseline);
+      await expect
+        .poll(() =>
+          player.locator('[data-tour-hint-text]').evaluate((body) => {
+            body.scrollTop = body.scrollHeight;
+            return body.scrollTop;
+          })
+        )
+        .toBeGreaterThan(0);
+      await page.screenshot({
+        path: info.outputPath(`caption-${locale}-${fullscreen}.png`),
+        fullPage: false,
+      });
+      await page.evaluate(() => Reflect.set(window, 'holdTourDecode', true));
+      await player.locator('[data-tour-next]').click();
+      await expect(status).toHaveText(t('scenario.editor.tourLoading'));
+      await assertFrame('loading portrait', baseline);
+      await page.evaluate(() => Reflect.get(window, 'releaseTourDecode')());
+      await expect(status).toBeHidden();
+      await expect(player.locator('.tour-image')).toHaveJSProperty('naturalHeight', 240);
+      await assertFrame('ready portrait', baseline);
+      await player.locator('[data-tour-next]').click();
+      await expect(player.locator('.tour-navigation-scene')).toBeVisible();
+      await assertFrame('navigation content', baseline);
+      await player.locator('[data-tour-seek]').evaluate((range: HTMLInputElement) => {
+        range.value = String(Number(range.max) - 1);
+        range.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      await player.locator('[data-tour-play]').click();
+      await expect(status).toHaveText(t('scenario.editor.tourChooseDestination'));
+      await assertFrame('choice status', baseline);
+      await player.locator('[data-tour-previous]').click();
+      await expect(status).toBeHidden();
+      await assertFrame('previous portrait', baseline);
+      await direct(0);
+      await expect(status).toBeHidden();
+      await assertFrame('direct first slide', baseline);
+      await player.locator('[data-tour-contents]').click();
+      const first = player.locator('.tour-contents-list .tour-button').first();
+      const readRow = () =>
+        first.evaluate((row) => {
+          const style = getComputedStyle(row);
+          const accent = getComputedStyle(row, '::before');
+          const box = row.getBoundingClientRect();
+          const range = document.createRange();
+          range.selectNodeContents(row);
+          return {
+            width: box.width,
+            textLeft: range.getBoundingClientRect().left,
+            border: style.borderLeftWidth,
+            borderColor: style.borderTopColor,
+            accentContent: accent.content,
+            accentWidth: accent.width,
+            accentPosition: accent.position,
+          };
+        });
+      const selected = await readRow();
+      expect.soft(selected.accentContent).not.toBe('none');
+      expect.soft(selected.accentWidth).toBe('2px');
+      expect.soft(selected.accentPosition).toBe('absolute');
+      expect.soft(selected.borderColor).toBe('rgba(0, 0, 0, 0)');
+      await first.hover();
+      expect.soft(await readRow()).toEqual(selected);
+      await first.press('Shift+Tab');
+      const closeContents = player.locator('.tour-contents-header .tour-button');
+      await expect(closeContents).toBeFocused();
+      await first.hover();
+      await expect(first).toHaveCSS('outline-style', 'none');
+      await page.screenshot({
+        path: info.outputPath(`contents-pointer-${locale}-${fullscreen}.png`),
+        fullPage: false,
+      });
+      await closeContents.press('Tab');
+      await expect(first).toBeFocused();
+      await first.press('Tab');
+      const second = player.locator('.tour-contents-list .tour-button').nth(1);
+      await expect(second).toBeFocused();
+      await expect(second).toHaveCSS('outline-style', 'solid');
+      await second.press('Enter');
+      await expect(status).toBeHidden();
+      await player.locator('[data-tour-contents]').click();
+      const unselected = await readRow();
+      expect.soft(unselected.width).toEqual(selected.width);
+      expect.soft(unselected.textLeft).toEqual(selected.textLeft);
+      evidence.push({ fullscreen, selected, unselected });
+      await page.screenshot({
+        path: info.outputPath(`contents-${locale}-${fullscreen}.png`),
+        fullPage: false,
+      });
+      await page.keyboard.press('Escape');
+      if (fullscreen) await page.evaluate(() => document.exitFullscreen());
+    }
+    await writeFile(info.outputPath('player-frame-states.json'), JSON.stringify(evidence, null, 2));
+  });
+}

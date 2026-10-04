@@ -539,3 +539,87 @@ test('direct HTML cancellation keeps the reader available for retry', async ({
     'true'
   );
 });
+
+for (const variant of [
+  { width: 1280, height: 560, theme: 'light', locale: 'ru' },
+  { width: 1920, height: 900, theme: 'dark', locale: 'en' },
+] as const) {
+  test(`export Back spacing ${variant.width} ${variant.locale} ${variant.theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const ru = variant.locale === 'ru';
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      variant.theme,
+      variant.locale,
+      { width: variant.width, height: variant.height },
+      'compare',
+      { tourFixture: '1' }
+    );
+    const exportName = ru ? 'Экспорт' : 'Export';
+    for (const mode of ['guide', 'tour'] as const) {
+      if (mode === 'tour')
+        await page
+          .getByRole('button', { name: ru ? 'Интерактивный тур' : 'Interactive tour', exact: true })
+          .click();
+      await page.getByRole('button', { name: exportName, exact: true }).click();
+      const workspace = page.locator('main.guide-export-workspace');
+      const heading = workspace.locator('.guide-export-heading');
+      const back = heading.locator('button');
+      await expect(back).toBeFocused();
+      await back.hover();
+      await expect(back).toBeVisible();
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+      const metrics = await heading.evaluate((node) => {
+        const h = node.getBoundingClientRect();
+        const b = node.querySelector('button')!.getBoundingClientRect();
+        const title = node.querySelector('h1')!.getBoundingClientRect();
+        return {
+          height: b.height,
+          left: b.left - h.left,
+          top: b.top - h.top,
+          right: h.right - b.right,
+          bottom: h.bottom - b.bottom,
+          titleGap: title.top >= b.bottom ? title.top - b.bottom : title.left - b.right,
+        };
+      });
+      expect(metrics, `${mode} Back hover bounds`).toMatchObject({ height: expect.any(Number) });
+      expect(metrics.height, `${mode} Back control height`).toBeGreaterThanOrEqual(40);
+      for (const edge of ['left', 'right', 'top', 'bottom'] as const)
+        expect(metrics[edge], `${mode} ${edge} inset`).toBeGreaterThanOrEqual(8);
+      expect(metrics.titleGap, `${mode} heading gap`).toBeGreaterThanOrEqual(8);
+      await expect(workspace.locator('.guide-export-actions')).toBeInViewport();
+      await testInfo.attach(`${mode}-back-hover-${variant.width}`, {
+        body: await page.screenshot({
+          fullPage: false,
+          path: `.tmp/backlog7/b26-${mode}-back-${variant.width}.png`,
+        }),
+        contentType: 'image/png',
+      });
+      if (mode === 'guide') await back.click();
+      else await page.keyboard.press('Escape');
+      await expect(workspace).toHaveCount(0);
+      await expect(page.getByRole('button', { name: exportName, exact: true })).toBeFocused();
+    }
+    if (variant.width === 1280) {
+      await page.setViewportSize({ width: 1100, height: 560 });
+      await page.getByRole('button', { name: exportName, exact: true }).click();
+      const viewport = page.locator('.guide-editor-viewport');
+      expect(
+        await viewport.evaluate((node) => node.scrollWidth - node.clientWidth)
+      ).toBeGreaterThanOrEqual(180);
+      const back = page.locator('.guide-export-heading button');
+      await back.scrollIntoViewIfNeeded();
+      await expect(back).toBeInViewport();
+      await back.click();
+      await expect(page.locator('main.guide-export-workspace')).toHaveCount(0);
+    }
+  });
+}
