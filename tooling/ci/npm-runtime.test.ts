@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import {
   normalizeNpmRuntime,
   validateNpmInputs,
@@ -189,3 +189,58 @@ it('rejects unknown cache bytes before deleting any bundled dependency', () => {
   expect(() => normalizeNpmRuntime(root, lock)).toThrow('source drift');
   expect(fs.existsSync(path.join(npmRoot, 'node_modules/brace-expansion'))).toBe(true);
 });
+
+it('never follows a source path replaced after its validated read', () => {
+  const { root, lock } = runtimeFixture();
+  const source = path.join(root, 'node_modules/http-cache-semantics/index.js');
+  const outside = path.join(root, 'outside.js');
+  fs.writeFileSync(outside, 'external bytes');
+  const read = fs.readFileSync.bind(fs);
+  let swapped = false;
+  const spy = vi.spyOn(fs, 'readFileSync').mockImplementation((...args) => {
+    const result = read(...args);
+    if (!swapped && typeof result === 'string' && result.includes('class CachePolicy')) {
+      swapped = true;
+      fs.renameSync(source, source + '.original');
+      fs.symlinkSync(outside, source);
+    }
+    return result;
+  });
+  try {
+    expect(() => normalizeNpmRuntime(root, lock)).toThrow();
+    expect(swapped).toBe(true);
+    expect(read(outside, 'utf8')).toBe('external bytes');
+  } finally {
+    spy.mockRestore();
+  }
+});
+
+it.each(['symlink', 'directory', 'invalid bytes'])(
+  'refuses %s sources without mutations and closes any opened descriptor',
+  (kind) => {
+    const { root, npmRoot, lock } = runtimeFixture();
+    const source = path.join(root, 'node_modules/http-cache-semantics/index.js');
+    const outside = path.join(root, 'outside.js');
+    fs.writeFileSync(outside, 'untouched');
+    fs.unlinkSync(source);
+    if (kind === 'symlink') fs.symlinkSync(outside, source);
+    else if (kind === 'directory') fs.mkdirSync(source);
+    else fs.writeFileSync(source, 'unknown source');
+    const open = fs.openSync.bind(fs);
+    let descriptor: number | undefined;
+    const spy = vi.spyOn(fs, 'openSync').mockImplementation((...args) => {
+      const result = open(...args);
+      if (args[0] === source) descriptor = result;
+      return result;
+    });
+    try {
+      expect(() => normalizeNpmRuntime(root, lock)).toThrow();
+      expect(fs.readFileSync(outside, 'utf8')).toBe('untouched');
+      expect(fs.existsSync(path.join(npmRoot, 'node_modules/brace-expansion'))).toBe(true);
+      if (kind === 'invalid bytes') expect(descriptor).toBeDefined();
+      if (descriptor !== undefined) expect(() => fs.fstatSync(descriptor!)).toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+  }
+);

@@ -26,19 +26,42 @@ const CACHE_PATCH = `        // Sniptale: shared-cache reuse prohibitions cannot
 
 `;
 
-function cacheSourcePatch(directory) {
+function withCacheSource(directory, writable, consume) {
   const file = path.join(directory, 'node_modules/http-cache-semantics/index.js');
-  if (!fs.lstatSync(file).isFile() || fs.realpathSync(file) !== file)
-    throw new Error('Canonical npm cache source must be a physical file.');
-  const source = fs.readFileSync(file, 'utf8');
-  const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
-  const hash = digest(source);
-  if (hash === CACHE_PATCHED_SHA256) return { file, source, patched: true };
-  if (hash !== CACHE_SOURCE_SHA256) throw new Error('Canonical npm cache source drift.');
-  const patched = source.replace(CACHE_ANCHOR, CACHE_PATCH + CACHE_ANCHOR);
-  if (digest(patched) !== CACHE_PATCHED_SHA256)
-    throw new Error('Canonical npm cache patch output drift.');
-  return { file, source: patched, patched: false };
+  const flags =
+    (writable ? fs.constants.O_RDWR : fs.constants.O_RDONLY) |
+    fs.constants.O_NOFOLLOW |
+    fs.constants.O_NONBLOCK;
+  const descriptor = fs.openSync(file, flags);
+  try {
+    if (
+      !fs.fstatSync(descriptor).isFile() ||
+      fs.realpathSync(`/proc/self/fd/${descriptor}`) !== file
+    )
+      throw new Error('Canonical npm cache source must be a physical file.');
+    const source = fs.readFileSync(descriptor, 'utf8');
+    const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
+    const hash = digest(source);
+    if (hash === CACHE_PATCHED_SHA256) return consume({ descriptor, source, patched: true });
+    if (hash !== CACHE_SOURCE_SHA256) throw new Error('Canonical npm cache source drift.');
+    const patched = source.replace(CACHE_ANCHOR, CACHE_PATCH + CACHE_ANCHOR);
+    if (digest(patched) !== CACHE_PATCHED_SHA256)
+      throw new Error('Canonical npm cache patch output drift.');
+    return consume({ descriptor, source: patched, patched: false });
+  } finally {
+    fs.closeSync(descriptor);
+  }
+}
+
+function writeCachePatch({ descriptor, source }) {
+  const bytes = Buffer.from(source);
+  let offset = 0;
+  while (offset < bytes.length) {
+    const written = fs.writeSync(descriptor, bytes, offset, bytes.length - offset, offset);
+    if (written === 0) throw new Error('Canonical npm cache patch write stalled.');
+    offset += written;
+  }
+  fs.ftruncateSync(descriptor, bytes.length);
 }
 
 function readJson(file) {
@@ -86,16 +109,18 @@ function preparedRuntime(root, lock) {
       throw new Error(`Canonical npm replacement version drift: ${dependency.name}`);
     return { ...dependency, replacement };
   });
-  return { npmRoot, replacements, cache: cacheSourcePatch(directory) };
+  return { directory, npmRoot, replacements };
 }
 
 export function validateNpmRuntime(root, lock) {
-  const { npmRoot, replacements, cache } = preparedRuntime(root, lock);
+  const { directory, npmRoot, replacements } = preparedRuntime(root, lock);
   for (const dependency of replacements) {
     if (fs.existsSync(path.join(npmRoot, 'node_modules', dependency.name)))
       throw new Error(`Canonical npm still resolves a bundled dependency: ${dependency.name}`);
   }
-  if (!cache.patched) throw new Error('Canonical npm cache source is not patched.');
+  withCacheSource(directory, false, (cache) => {
+    if (!cache.patched) throw new Error('Canonical npm cache source is not patched.');
+  });
   const npmRequire = createRequire(path.join(npmRoot, 'package.json'));
   for (const dependency of replacements) {
     const expected = path.join(dependency.replacement, 'package.json');
@@ -120,14 +145,16 @@ export function validateNpmRuntimeEnvironment(root, lock, environment) {
 
 /** npm ci restores upstream bundles; normalization completes the canonical locked installation. */
 export function normalizeNpmRuntime(root, lock) {
-  const { npmRoot, replacements, cache } = preparedRuntime(root, lock);
+  const { directory, npmRoot, replacements } = preparedRuntime(root, lock);
   requirePhysicalDirectory(path.join(npmRoot, 'node_modules'));
-  if (!cache.patched) fs.writeFileSync(cache.file, cache.source);
-  for (const dependency of replacements)
-    fs.rmSync(path.join(npmRoot, 'node_modules', dependency.name), {
-      recursive: true,
-      force: true,
-    });
+  withCacheSource(directory, true, (cache) => {
+    if (!cache.patched) writeCachePatch(cache);
+    for (const dependency of replacements)
+      fs.rmSync(path.join(npmRoot, 'node_modules', dependency.name), {
+        recursive: true,
+        force: true,
+      });
+  });
   return validateNpmRuntime(root, lock);
 }
 
