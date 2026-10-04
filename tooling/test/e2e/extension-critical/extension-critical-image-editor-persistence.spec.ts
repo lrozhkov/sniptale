@@ -817,3 +817,48 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('.sniptale-callout')).toHaveCount(0);
   });
 }
+
+for (const effect of ['Рамка', 'Фокус']) {
+  test(`canvas drag releases toolbar focus before deleting ${effect}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await page.setViewportSize({ width: 1680, height: 1000 });
+    await applyHarnessBootstrap(page, { apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR });
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await waitForEditorReady(page);
+    const tool = page.locator('[data-ui="content.toolbar.future-frame-style"]');
+    if (effect === 'Фокус') {
+      await page.locator('[data-ui="content.toolbar.future-frame-style.menu"]').click();
+      await page.getByRole('button', { name: 'Фокус', exact: true }).click();
+      await page.keyboard.press('Escape');
+    }
+    await expect(tool).toHaveAttribute('title', effect);
+    const objectCount = () =>
+      page.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0);
+    const initialCount = await objectCount();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await tool.click();
+      const plane = await page.locator('[data-ui="editor.frame-annotation-plane"]').boundingBox();
+      const start = { x: plane!.x + plane!.width / 2 - 80, y: plane!.y + plane!.height / 2 - 50 };
+      await page.mouse.move(start.x, start.y);
+      await page.mouse.down();
+      await page.mouse.move(start.x + 160, start.y + 100, { steps: 4 });
+      await page.mouse.up();
+      await expect.poll(objectCount).toBe(initialCount + 1);
+      expect(await tool.evaluate((button) => button.ownerDocument.activeElement === button)).toBe(
+        false
+      );
+      await page.keyboard.press('Delete');
+      await expect.poll(objectCount).toBe(initialCount);
+      expect(await tool.evaluate((button) => button.ownerDocument.activeElement === button)).toBe(
+        false
+      );
+    }
+    await tool.focus();
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(tool).toBeFocused();
+    expect(await tool.evaluate((button) => button.matches(':focus-visible'))).toBe(true);
+  });
+}

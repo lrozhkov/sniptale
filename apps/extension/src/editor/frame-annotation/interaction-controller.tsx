@@ -600,6 +600,8 @@ function startExistingDrag(
 }
 
 function captureDragPointer(event: React.PointerEvent): void {
+  const focusedElement = event.currentTarget.ownerDocument.activeElement;
+  if (focusedElement instanceof HTMLElement) focusedElement.blur();
   try {
     event.currentTarget.setPointerCapture(event.pointerId);
   } catch {
