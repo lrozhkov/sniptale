@@ -1,3 +1,4 @@
+import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -27,6 +28,7 @@ import { areScenarioProjectsEqual } from './aggregate-comparison';
 import { isRecord } from '../infrastructure/indexed-db/read-primitives';
 import {
   assertNewScenarioGallerySource,
+  promoteScenarioSourceLifecycles,
   assertBorrowedScenarioAsset,
   assertBorrowedScenarioAssetSource,
   publishScenarioAssetToLibrary,
@@ -167,7 +169,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
     | typeof PROJECT_ASSETS_STORE
     | typeof STORE_NAME
     | typeof VIDEO_PROJECTS_STORE
-  > = [SCENARIO_PROJECTS_STORE];
+  > = [SCENARIO_PROJECTS_STORE, SCENARIO_ASSETS_STORE, MEDIA_LIBRARY_STORE, STORE_NAME];
   if ((children?.assetPuts?.length ?? 0) > 0 || (children?.assetDeletes?.length ?? 0) > 0) {
     storeNames.push(
       SCENARIO_ASSETS_STORE,
@@ -179,7 +181,7 @@ function getMutationStoreNames(children: PreparedScenarioAggregateChildMutation 
       PROJECT_ASSETS_STORE
     );
   }
-  if (children?.assetPuts?.some((asset) => asset.borrowedMediaId)) {
+  if (children?.assetPuts?.some((asset) => asset.borrowedMediaId || asset.galleryAssetId)) {
     storeNames.push(PROJECT_ASSETS_STORE, STORE_NAME);
   }
   if (
@@ -333,6 +335,7 @@ async function commitScenarioAggregateInTransaction(
           lifecycle: promoteLibraryLifecycle(existing.lifecycle, Date.now()),
         });
       }
+      await promoteScenarioSourceLifecycles(tx, existing, Date.now());
       await tx.done;
       return {
         result: { project: existing.project, workspaceRevision: existing.workspaceRevision ?? 0 },
@@ -348,6 +351,7 @@ async function commitScenarioAggregateInTransaction(
     });
     entry = createScenarioAggregateEntry({ existing, options, project });
     await applyScenarioAssetMutations(tx, project.id, options.children, physicalDelete);
+    await promoteScenarioSourceLifecycles(tx, entry, entry.updatedAt);
     await projectStore.put(entry);
     await applyScenarioDocumentMutations({
       children: options.children,
@@ -467,6 +471,15 @@ export async function applyScenarioAssetMutations(
           ...(asset.borrowedMediaId ? { borrowedMediaId: asset.borrowedMediaId } : {}),
         };
     await assetStore.put!(storedAsset);
+    const originMediaId = asset.borrowedMediaId ?? asset.galleryAssetId;
+    if (originMediaId) {
+      await promoteReferencedMediaLifecycles({
+        mediaIds: new Set([originMediaId]),
+        mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+        recordingStore: tx.objectStore(STORE_NAME),
+        now: Date.now(),
+      });
+    }
     if (!asset.borrowedMediaId || asset.independentLibraryIdentity)
       await publishScenarioAssetToLibrary(tx, storedAsset);
   }

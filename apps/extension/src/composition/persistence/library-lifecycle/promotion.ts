@@ -19,6 +19,41 @@ import { parseScenarioAssetEntry, parseScenarioProjectEntry } from '../scenario/
 import { createLibraryLifecycle, promoteLibraryLifecycle } from './contracts';
 import { collectVideoProjectReferences } from './references';
 
+type LifecycleMutationStore = {
+  get(key: string): Promise<unknown>;
+  put: ((value: unknown) => Promise<unknown>) | undefined;
+};
+
+/** Retain accepted logical sources inside the caller's aggregate transaction. */
+export async function promoteReferencedMediaLifecycles(args: {
+  mediaIds: ReadonlySet<string>;
+  mediaStore: LifecycleMutationStore;
+  recordingStore: LifecycleMutationStore;
+  now: number;
+}): Promise<void> {
+  for (const mediaId of args.mediaIds) {
+    const media = parseMediaLibraryEntry(await args.mediaStore.get(mediaId));
+    if (!media || media.id !== mediaId) continue;
+    if (media.lifecycle?.storageClass === 'temporary') {
+      await args.mediaStore.put!({
+        ...media,
+        lifecycle: promoteLibraryLifecycle(media.lifecycle, args.now),
+      });
+    }
+    if (media.source.kind !== 'recording') continue;
+    const recording = parseRecordingEntry(await args.recordingStore.get(media.source.recordingId));
+    if (
+      recording?.id === media.source.recordingId &&
+      recording.lifecycle?.storageClass === 'temporary'
+    ) {
+      await args.recordingStore.put!({
+        ...recording,
+        lifecycle: promoteLibraryLifecycle(recording.lifecycle, args.now),
+      });
+    }
+  }
+}
+
 export type LibraryLifecycleTarget =
   | { kind: 'media'; id: string }
   | { kind: 'scenario-project'; id: string }

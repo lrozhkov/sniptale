@@ -1,3 +1,4 @@
+import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import type { VideoProject } from '../../../features/video/project/types';
 import { videoSourceReferences } from '../media-library/dependencies';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
@@ -74,4 +75,31 @@ export async function assertNewProjectSources(
     if (!entry || entry.id !== locator.id)
       throw new Error('New video project source is unavailable.');
   }
+}
+
+/** Called only by an accepted parent commit, never by source preparation. */
+export async function promoteProjectSourceLifecycles(
+  project: VideoProject,
+  stores: Parameters<typeof assertNewProjectSources>[2],
+  now: number
+): Promise<void> {
+  const mediaIds = new Set<string>();
+  for (const locator of locators(project)) {
+    if (locator.kind === 'library-asset') mediaIds.add(locator.id);
+    if (locator.kind === 'project-asset') {
+      const asset = parseProjectAssetEntry(await stores.projectAssetStore.get(locator.id));
+      if (asset?.originMediaId) mediaIds.add(asset.originMediaId);
+    }
+    if (locator.kind === 'scenario-asset') {
+      const asset = parseScenarioAssetEntry(await stores.scenarioAssetStore.get(locator.id));
+      if (asset)
+        mediaIds.add(asset.borrowedMediaId ?? asset.galleryAssetId ?? `scenario-asset:${asset.id}`);
+    }
+  }
+  await promoteReferencedMediaLifecycles({
+    mediaIds,
+    mediaStore: stores.mediaLibraryStore,
+    recordingStore: stores.recordingStore,
+    now,
+  });
 }

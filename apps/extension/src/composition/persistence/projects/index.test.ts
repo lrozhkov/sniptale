@@ -262,6 +262,55 @@ describe('projects-db video project flows', () => {
       })
     );
   });
+  it.each(['direct', 'private-origin', 'recording-origin'] as const)(
+    'promotes the accepted logical source for %s insertion',
+    async (path) => {
+      const { saveVideoProject } = await importProjectsDbModule();
+      const project = createVideoProjectEntryWithMediaClip().project;
+      const media = createMediaLibraryEntry({
+        id: 'logical-origin',
+        ...(path === 'recording-origin'
+          ? { source: { kind: 'recording' as const, recordingId: 'source-recording' } }
+          : {}),
+        lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+      });
+      if (path === 'direct')
+        project.assets[0]!.source = { kind: 'library-asset', mediaId: media.id };
+      projectsDbMocks.txGetMock.mockImplementation(async (id: string) =>
+        id === 'project-asset-1'
+          ? createProjectAssetEntry({ id, originMediaId: media.id })
+          : id === media.id
+            ? media
+            : id === 'source-recording'
+              ? {
+                  id,
+                  assetId: 'recording-bytes',
+                  createdAt: 1,
+                  filename: 'source.webm',
+                  size: 5,
+                  mimeType: 'video/webm',
+                  lifecycle: media.lifecycle,
+                }
+              : undefined
+      );
+      await saveVideoProject(project);
+      expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: media.id,
+          lifecycle: expect.objectContaining({ storageClass: 'library' }),
+        })
+      );
+      if (path === 'recording-origin') {
+        expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            id: 'source-recording',
+            lifecycle: expect.objectContaining({ storageClass: 'library' }),
+          })
+        );
+      }
+    }
+  );
+
   it('does not downgrade an independently promoted project asset on draft autosave', async () => {
     const { saveVideoProject } = await importProjectsDbModule();
     const project = createVideoProjectEntryWithMediaClip().project;

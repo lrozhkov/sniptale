@@ -1,3 +1,6 @@
+import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
+import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
+import type { ScenarioProjectEntry } from './contracts';
 import {
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
@@ -219,4 +222,31 @@ export async function freezeScenarioMediaRepresentations(
     const { borrowedMediaId: _borrowedMediaId, ...frozen } = asset;
     await store.put!({ ...frozen, galleryAssetId: media.id });
   }
+}
+
+/** Current and retained versions keep their logical Library origins permanent. */
+export async function promoteScenarioSourceLifecycles(
+  tx: ScenarioLibraryTransaction,
+  entry: ScenarioProjectEntry,
+  now: number
+): Promise<void> {
+  const childIds = new Set<string>();
+  for (const project of [
+    entry.project,
+    ...(entry.history ?? []).map((version) => version.project),
+  ]) {
+    for (const id of getScenarioResourceReferences(project).assets) childIds.add(id);
+  }
+  const mediaIds = new Set<string>();
+  for (const id of childIds) {
+    const child = parseScenarioAssetEntry(await tx.objectStore(SCENARIO_ASSETS_STORE).get(id));
+    if (child?.projectId !== entry.id) continue;
+    mediaIds.add(child.borrowedMediaId ?? child.galleryAssetId ?? scenarioLibraryMediaId(child.id));
+  }
+  await promoteReferencedMediaLifecycles({
+    mediaIds,
+    mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+    recordingStore: tx.objectStore(STORE_NAME),
+    now,
+  });
 }

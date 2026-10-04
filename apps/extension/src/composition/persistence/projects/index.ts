@@ -1,4 +1,4 @@
-import { assertNewProjectSources } from './new-reference-admission';
+import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-reference-admission';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
   ASSET_REFS_STORE,
@@ -124,6 +124,7 @@ export async function saveVideoProject(
         projectStore,
         recordingStore,
       });
+      await promoteProjectSourceLifecycles(entry.project, stores, now);
       await deleteProjectAssetsUnreferencedByOtherProjects({
         tx,
         operation: physicalDelete,

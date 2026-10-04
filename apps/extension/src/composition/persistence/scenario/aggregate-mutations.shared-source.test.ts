@@ -1,6 +1,10 @@
 import { createAsset, db, getStore } from './aggregate-mutations.test-support';
 import { expect, it, vi } from 'vitest';
-import { createGuideProject } from '../../../features/scenario/project/factories';
+import {
+  createGuideProject,
+  createGuideStep,
+  createGuideImageBlock,
+} from '../../../features/scenario/project/factories';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 vi.mock('./resource-sessions', () => ({
@@ -285,4 +289,92 @@ it('cancels an interrupted frozen-origin journal after its Library source disapp
   await expect(recoverScenarioAssetPublications()).resolves.toBe(1);
   expect(getStore('scenario_assets').has(frozen.id)).toBe(false);
   expect(assets.cancelAssetPublication).toHaveBeenCalledWith(journal, expect.anything());
+});
+
+it.each(['borrowed', 'frozen'] as const)(
+  'promotes the original Library identity only when a %s scenario insertion commits',
+  async (path) => {
+    const source = createGuideProject('Source');
+    const original = createAsset(source.id, 'original');
+    await commitScenarioAggregateMutation(source, { children: { assetPuts: [original] } });
+    const mediaId = 'scenario-asset:original';
+    const draft = {
+      ...(getStore('media_library').get(mediaId) as object),
+      lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+    };
+    getStore('media_library').set(mediaId, draft);
+    const destination = createGuideProject('Destination');
+    const inserted =
+      path === 'borrowed'
+        ? {
+            ...original,
+            id: 'inserted',
+            projectId: destination.id,
+            galleryAssetId: mediaId,
+            borrowedMediaId: mediaId,
+          }
+        : { ...createAsset(destination.id, 'inserted'), galleryAssetId: mediaId };
+    expect(getStore('media_library').get(mediaId)).toEqual(draft);
+    await commitScenarioAggregateMutation(destination, { children: { assetPuts: [inserted] } });
+    expect(getStore('media_library').get(mediaId)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+  }
+);
+
+it('rolls back source promotion if a later scenario child fails validation', async () => {
+  const source = createGuideProject('Source');
+  const original = createAsset(source.id, 'original');
+  await commitScenarioAggregateMutation(source, { children: { assetPuts: [original] } });
+  const mediaId = 'scenario-asset:original';
+  const draft = {
+    ...(getStore('media_library').get(mediaId) as object),
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+  };
+  getStore('media_library').set(mediaId, draft);
+  const destination = createGuideProject('Destination');
+  const broken = createAsset(destination.id, 'broken');
+  await expect(
+    commitScenarioAggregateMutation(destination, {
+      children: {
+        assetPuts: [
+          {
+            ...original,
+            id: 'inserted',
+            projectId: destination.id,
+            galleryAssetId: mediaId,
+            borrowedMediaId: mediaId,
+          },
+          { ...broken, galleryAssetId: 'missing-origin' },
+        ],
+      },
+    })
+  ).rejects.toThrow('Scenario Library source is unavailable');
+  expect(getStore('media_library').get(mediaId)).toEqual(draft);
+  expect(getStore('scenario_assets').has('inserted')).toBe(false);
+});
+
+it('promotes a retained child when a parent-only edit accepts its use', async () => {
+  const project = createGuideProject('Existing');
+  const original = createAsset(project.id, 'retained');
+  await commitScenarioAggregateMutation(project, { children: { assetPuts: [original] } });
+  const mediaId = 'scenario-asset:retained';
+  getStore('media_library').set(mediaId, {
+    ...(getStore('media_library').get(mediaId) as object),
+    lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 1 },
+  });
+  const step = createGuideStep('Accepted');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'retained-block',
+      assetId: original.id,
+      width: 10,
+      height: 10,
+      source: { kind: 'import', filename: 'retained.png' },
+    }),
+  ];
+  await commitScenarioAggregateMutation({ ...project, items: [step] });
+  expect(getStore('media_library').get(mediaId)).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+  });
 });
