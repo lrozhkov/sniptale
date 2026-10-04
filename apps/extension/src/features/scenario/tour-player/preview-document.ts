@@ -8,6 +8,7 @@ const retainedGuideRuntimeHashes = [
 
 // Exact retired Tour bundles; guide policy never admits them.
 const retainedTourRuntimeHashes = [
+  'nAQz1YgJIjg9kJFafiMGEUjByJMjeUs9X0xgljLzKyc=', // Before manual playback mode (d84fd9be).
   'wcvHun2bWRhYVo/KsSUC86BDTL0POnoKio273Y5dkb4=', // Before marker controls (3542f819).
   'Wzekv7b/kkq0XmPuhHgXIz8+9wALBHFuTqMr2mAuGfQ=', // Before stage backgrounds (4777f97e).
 ];

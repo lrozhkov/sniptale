@@ -3,7 +3,8 @@ import { waitForTourImage } from './media.js';
 
 /** One media-gated clock owns entrance and hold; navigation stays in the playback binding. */
 export function createTourPlaybackSession({ signal, motion, hidden, autoplay, changed, complete }) {
-  let wanted = autoplay;
+  let mode = autoplay ? 'playback' : 'manual';
+  let wanted = autoplay && !hidden();
   let running = false;
   let state = 'empty';
   let generation = 0;
@@ -23,7 +24,7 @@ export function createTourPlaybackSession({ signal, motion, hidden, autoplay, ch
         return;
       }
       motion.frame(elapsed);
-      changed(elapsed, wanted || running, state);
+      changed(elapsed, wanted || running, state, mode, wanted);
     },
     onComplete() {
       if (wanted) complete();
@@ -78,6 +79,13 @@ export function createTourPlaybackSession({ signal, motion, hidden, autoplay, ch
   return {
     load,
     pause,
+    get mode() {
+      return mode;
+    },
+    setManual() {
+      mode = 'manual';
+      pause();
+    },
     get elapsed() {
       return clock.elapsed;
     },
@@ -91,12 +99,13 @@ export function createTourPlaybackSession({ signal, motion, hidden, autoplay, ch
       return state;
     },
     play() {
+      mode = 'playback';
       wanted = true;
       if (state === 'error' && spec) load(spec);
       else {
         if (clock.elapsed >= (spec?.duration ?? 0)) clock.seek(0);
         if (state === 'ready') clock.play();
-        else changed(clock.elapsed, true, state);
+        else changed(clock.elapsed, true, state, mode, wanted);
       }
     },
     seek(elapsed) {

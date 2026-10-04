@@ -1313,3 +1313,128 @@ for (const [locale, theme, viewport] of [
     await writeFile(info.outputPath('player-frame-states.json'), JSON.stringify(evidence, null, 2));
   });
 }
+
+for (const [locale, theme, viewport] of [
+  ['ru', 'light', { width: 1280, height: 560 }],
+  ['en', 'dark', { width: 1920, height: 900 }],
+] as const) {
+  test(`tour manual Space and playback pause agree in live fullscreen and offline ${locale}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    const t = createTranslator(locale);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openVisualHarness(page, hostOrigin, theme, locale, viewport, 'compare', {
+      tourFixture: '1',
+    });
+    await page.getByRole('button', { name: t('scenario.editor.tourMode'), exact: true }).click();
+    await page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true })
+      .click();
+    const checkKeyboard = async (player: Locator, name: string) => {
+      const manual = player.locator('[data-tour-manual]');
+      const play = player.locator('[data-tour-play]');
+      const next = player.locator('[data-tour-next]');
+      const first = async () => {
+        await player.locator('[data-tour-contents]').click();
+        await player.locator('.tour-contents-list button').first().click();
+        await expect(player.locator('[data-tour-scene]')).toHaveCSS('opacity', '1');
+      };
+      const focusScene = async () => {
+        await player.locator('[data-tour-stage]').click({ position: { x: 4, y: 4 } });
+      };
+      await manual.click();
+      await expect(manual).toHaveAccessibleName(t('scenario.editor.tourManual'));
+      await expect(manual).toHaveAttribute('aria-pressed', 'true');
+      await first();
+      const firstId = await player.getAttribute('data-slide-id');
+      const scroll = await page.evaluate(() => ({ x: scrollX, y: scrollY }));
+      await focusScene();
+      await page.keyboard.press('Space');
+      await expect(player).not.toHaveAttribute('data-slide-id', firstId!);
+      await expect(player).not.toHaveAttribute('data-slide-id', 'end');
+      await page.keyboard.press('Space');
+      await expect(player).toHaveAttribute('data-slide-id', 'end');
+      expect(await page.evaluate(() => ({ x: scrollX, y: scrollY }))).toEqual(scroll);
+      await expect(manual).toHaveAttribute('aria-pressed', 'true');
+      await first();
+      await next.focus();
+      await page.keyboard.press('Space');
+      await expect(player).not.toHaveAttribute('data-slide-id', firstId!);
+      await expect(player).not.toHaveAttribute('data-slide-id', 'end');
+      await first();
+      await play.focus();
+      await page.keyboard.press('Space');
+      await expect(manual).toHaveAttribute('aria-pressed', 'false');
+      await expect(play).toHaveAccessibleName(t('scenario.editor.tourPause'));
+      await focusScene();
+      await page.keyboard.press('Space');
+      await expect(play).toHaveAccessibleName(t('scenario.editor.tourPlay'));
+      await page.keyboard.press('Space');
+      await expect(play).toHaveAccessibleName(t('scenario.editor.tourPlay'));
+      await expect(player).toHaveAttribute('data-slide-id', firstId!);
+      await expect(manual).toHaveAttribute('aria-pressed', 'false');
+      await manual.focus();
+      await page.keyboard.press('Space');
+      await expect(manual).toHaveAttribute('aria-pressed', 'true');
+      await expect(player).toHaveAttribute('data-slide-id', firstId!);
+      for (const control of [manual, play, next, player.locator('[data-tour-contents]')])
+        await expect(control).toBeInViewport({ ratio: 1 });
+      await first();
+      await expect(player.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+      await info.attach(`manual-keyboard-${name}-${locale}`, {
+        body: await page.screenshot({
+          fullPage: false,
+          path: info.outputPath(`manual-keyboard-${name}-${locale}.png`),
+        }),
+        contentType: 'image/png',
+      });
+    };
+    const player = page.locator('.tour-stage-host #tour-player');
+    await checkKeyboard(player, 'normal');
+    await player.evaluate((root) => root.requestFullscreen());
+    await expect.poll(() => player.evaluate((root) => root.matches(':fullscreen'))).toBe(true);
+    await checkKeyboard(player, 'fullscreen');
+    await page.evaluate(() => document.exitFullscreen());
+    await page.evaluate(() => {
+      const chunks: Uint8Array[] = [];
+      Object.defineProperty(window, 'showSaveFilePicker', {
+        configurable: true,
+        value: async () => ({
+          createWritable: async () =>
+            new WritableStream<Uint8Array>({
+              write: (chunk) => {
+                chunks.push(chunk);
+              },
+            }),
+        }),
+      });
+      Object.defineProperty(window, 'savedKeyboardTour', {
+        configurable: true,
+        get: () => chunks.map((chunk) => new TextDecoder().decode(chunk)).join(''),
+      });
+    });
+    await page.getByRole('button', { name: t('scenario.editor.export'), exact: true }).click();
+    await page
+      .locator('.guide-export-stage')
+      .getByRole('button', { name: t('scenario.editor.tourHtmlPrepare'), exact: true })
+      .click();
+    await page.getByRole('button', { name: t('scenario.editor.htmlSave'), exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => String(Reflect.get(window, 'savedKeyboardTour'))))
+      .toContain('<!doctype html>');
+    const output = info.outputPath('manual-keyboard-tour.html');
+    await writeFile(
+      output,
+      await page.evaluate(() => String(Reflect.get(window, 'savedKeyboardTour')))
+    );
+    await page.context().setOffline(true);
+    try {
+      await page.goto(pathToFileURL(output).href);
+      await checkKeyboard(page.locator('#tour-player'), 'offline');
+    } finally {
+      await page.context().setOffline(false);
+    }
+  });
+}

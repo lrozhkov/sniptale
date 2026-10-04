@@ -19,6 +19,7 @@ export interface TourPlayerLabels {
   empty: string;
   point: string;
   details: string;
+  manual?: string;
   play: string;
   pause: string;
   seek: string;

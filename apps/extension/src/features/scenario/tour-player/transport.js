@@ -1,5 +1,9 @@
 const SVG = 'http://www.w3.org/2000/svg';
 const FACES = {
+  manual: {
+    fill: 'none',
+    d: 'M8 13V6a2 2 0 0 1 4 0v5-7a2 2 0 0 1 4 0v8-5a2 2 0 0 1 4 0v8c0 5-3 7-7 7-3 0-5-2-7-5l-3-4a2 2 0 0 1 3-2l2 2',
+  },
   play: { fill: 'currentColor', d: 'M8 5v14l11-7z' },
   pause: { fill: 'currentColor', d: 'M7 5h4v14H7zm6 0h4v14h-4z' },
   retry: { fill: 'none', d: 'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6' },
@@ -9,7 +13,7 @@ const FACES = {
 };
 
 /** Disposable transport DOM; elapsed time and navigation remain owned by the player. */
-export function createTourTransport(root, labels, signal, onToggle, onSeek) {
+export function createTourTransport(root, labels, signal, onToggle, onSeek, onManual) {
   const document = root.ownerDocument;
   for (const name of ['contents', 'previous', 'next']) {
     const control = root.querySelector(`[data-tour-${name}]`);
@@ -24,6 +28,14 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   button.className = 'tour-button tour-icon-button';
   button.dataset.tourPlay = '';
   button.addEventListener('click', onToggle, { signal });
+  const manual = document.createElement('button');
+  manual.type = 'button';
+  manual.className = 'tour-button tour-icon-button';
+  manual.dataset.tourManual = '';
+  manual.title = labels.manual ?? 'Manual navigation';
+  manual.setAttribute('aria-label', manual.title);
+  manual.append(createIcon(document, FACES.manual));
+  manual.addEventListener('click', onManual, { signal });
   const label = document.createElement('span');
   label.className = 'tour-playback-label';
   const time = document.createElement('span');
@@ -39,9 +51,12 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
   range.addEventListener('input', () => onSeek(Number(range.value)), { signal });
   const status = root.querySelector('[data-tour-status]');
   const playback = root.querySelector('[data-tour-playback]');
-  playback.append(button, time, range);
+  playback.append(manual, button, time, range);
   signal.addEventListener('abort', () => playback.replaceChildren(), { once: true });
-  return ({ elapsed, duration, playing, state }) => {
+  return ({ elapsed, duration, playing, state, mode }) => {
+    root.dataset.tourMode = mode;
+    manual.setAttribute('aria-pressed', String(mode === 'manual'));
+    manual.disabled = state === 'empty';
     const face = transportFace(state, playing);
     const text =
       state === 'error' || state === 'audio-error'

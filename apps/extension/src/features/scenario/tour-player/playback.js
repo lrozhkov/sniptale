@@ -30,7 +30,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   const visited = new Set();
   const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const reduced = () => Boolean(motionPreference?.matches);
-  const update = createTourTransport(root, input.labels, signal, toggle, seek);
+  const update = createTourTransport(root, input.labels, signal, toggle, seek, manual);
   const playbackView = (elapsed, state) => ({
     elapsed: ended ? (timeline?.duration ?? duration) : (timeline?.offsets[index] ?? 0) + elapsed,
     duration: timeline?.duration ?? duration,
@@ -45,12 +45,12 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     signal,
     motion,
     hidden: () => root.ownerDocument.hidden,
-    autoplay: tour.playback.autoplay && !root.ownerDocument.hidden,
-    changed(elapsed, playing, state) {
+    autoplay: tour.playback.autoplay,
+    changed(elapsed, playing, state, mode, continuous) {
       syncPlaybackAudio(audio, { audioState, elapsed, entrance, playing, state });
       const view = playbackView(elapsed, state);
-      update({ ...view, playing });
-      chrome?.update({ playing, state: view.state });
+      update({ ...view, playing: continuous, mode });
+      chrome?.update({ playing: continuous, state: view.state });
     },
     complete: advance,
   });
@@ -74,7 +74,7 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   function toggle() {
     audio.stop();
     audioState = null;
-    if (session.playing) {
+    if (session.continuous) {
       session.pause();
       return;
     }
@@ -84,23 +84,20 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
     if (ended) navigate(0, true);
     session.play();
   }
+  function manual() {
+    audio.stop();
+    visited.clear();
+    session.setManual();
+  }
   function seek(value) {
     audio.stop();
     audioState = null;
     session.pause();
-    if (timeline) {
-      const target = Math.max(
-        0,
-        timeline.offsets.findLastIndex((offset) => offset <= value)
-      );
-      const offset = timeline.offsets[target];
-      if (target !== index || ended) navigate(target);
-      session.seek(value - offset);
-    } else {
-      if (ended) navigate(index);
-      session.seek(value);
-    }
+    const target = resolveTourSeek(timeline, index, value);
+    if (target.index !== index || ended) navigate(target.index);
+    session.seek(target.elapsed);
   }
+
   function show(nextTour, nextIndex, isEnd, nextAssets) {
     assets = nextAssets;
     tour = nextTour;
@@ -148,12 +145,25 @@ export function createTourPlayback(root, input, { signal, motion, navigate, chro
   return {
     show,
     pause,
+    get mode() {
+      return session.mode;
+    },
     interact() {
       visited.clear();
       pause();
     },
   };
 }
+/** Converts the shared scrub position to one slide-local clock position. */
+function resolveTourSeek(timeline, index, value) {
+  if (!timeline) return { index, elapsed: value };
+  const target = Math.max(
+    0,
+    timeline.offsets.findLastIndex((offset) => offset <= value)
+  );
+  return { index: target, elapsed: value - timeline.offsets[target] };
+}
+
 function bindPlaybackLifetime(root, signal, pause) {
   root.ownerDocument.addEventListener(
     'visibilitychange',

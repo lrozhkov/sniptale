@@ -6,6 +6,7 @@ import { admitSavedScenarioHtml } from './preview-document';
 import { SCENARIO_PREVIEW_MAX_BYTES } from './preview-contract';
 import retainedTourRuntime from './preview-document.retained-tour.fixture.txt?raw';
 import retainedMarkerTourRuntime from './preview-document.retained-marker-tour.fixture.txt?raw';
+import retainedStageTourRuntime from './preview-document.retained-stage-tour.fixture.txt?raw';
 beforeEach(() => {
   vi.stubGlobal('Blob', NodeBlob);
   vi.stubGlobal('crypto', webcrypto);
@@ -330,8 +331,14 @@ it('admits the retained caption-aware guide runtime while rejecting archive-sele
   expect(await admitSavedScenarioHtml(wrongMode.blob, 'tour', current.hash)).toBe(false);
 });
 
-// Immutable built bundles from 3542f819 and 4777f97e; never regenerate from current code.
+// Immutable built bundles from 3542f819, 4777f97e and d84fd9be; never regenerate from current code.
 it.each([
+  {
+    name: 'pre-manual-playback',
+    runtime: retainedStageTourRuntime,
+    bytes: 125760,
+    hash: 'nAQz1YgJIjg9kJFafiMGEUjByJMjeUs9X0xgljLzKyc=',
+  },
   {
     name: 'pre-marker',
     runtime: retainedTourRuntime,

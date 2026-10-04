@@ -892,3 +892,8 @@ a:focus-visible {
 .tour-hint[data-presentation^='caption-'][data-caption-long='false'] .tour-hint-controls {
   grid-row: 2;
 }
+
+.tour-controls [data-tour-manual][aria-pressed='true'] {
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  box-shadow: inset 0 0 0 1px currentColor;
+}

@@ -11,10 +11,7 @@ export function createTourPlayer(root, input, options = {}) {
   delete root.dataset.slideId;
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const scene = query('scene');
-  const title = query('title');
-  const counter = query('counter');
-  const previous = query('previous');
-  const next = query('next');
+  const updatePosition = createTourPosition(root, labels);
   let index = Math.max(
     0,
     tour.slides.findIndex((slide) => slide.id === options.initialSlideId)
@@ -75,13 +72,7 @@ export function createTourPlayer(root, input, options = {}) {
   function render(hintEdge = 0) {
     if (lifetime.signal.aborted) return;
     const slide = tour.slides[index];
-    title.textContent = ended ? tour.endScreen.title : (slide?.title ?? '');
-    counter.textContent = ended
-      ? labels.finished
-      : `${tour.slides.length ? index + 1 : 0} / ${tour.slides.length}`;
-    previous.disabled = !ended && index === 0 && history.length === 0;
-    next.disabled =
-      ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
+    updatePosition(tour, index, ended, history.length);
     navigationInput.updateControls();
     view.show(slide, ended, hintEdge);
     playback?.show(tour, index, ended, input.assets);
@@ -93,6 +84,10 @@ export function createTourPlayer(root, input, options = {}) {
     index: () => index,
     slides: () => tour.slides,
     interact: () => playback?.interact(),
+    space: (next) => {
+      if (playback?.mode === 'manual') next();
+      else playback?.pause();
+    },
     openContents: (select) => {
       playback?.pause();
       view.openContents(tour.slides, index, select);
@@ -144,6 +139,25 @@ export function createTourPlayer(root, input, options = {}) {
   };
 }
 
+/** Binds navigation DOM once; selection and history remain controller-owned. */
+function createTourPosition(root, labels) {
+  const query = (name) => root.querySelector(`[data-tour-${name}]`);
+  const title = query('title');
+  const counter = query('counter');
+  const previous = query('previous');
+  const next = query('next');
+  return (tour, index, ended, historyLength) => {
+    const slide = tour.slides[index];
+    title.textContent = ended ? tour.endScreen.title : (slide?.title ?? '');
+    counter.textContent = ended
+      ? labels.finished
+      : `${tour.slides.length ? index + 1 : 0} / ${tour.slides.length}`;
+    previous.disabled = !ended && index === 0 && historyLength === 0;
+    next.disabled =
+      ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
+  };
+}
+
 /** Keyboard admission leaves text fields and modal navigation in control of their own keys. */
 function handleTourKeyboard(event, navigationOpen, actions) {
   if (
@@ -153,10 +167,20 @@ function handleTourKeyboard(event, navigationOpen, actions) {
       event.target.closest('input,textarea,select,[contenteditable]'))
   )
     return;
+  if (
+    event.key === ' ' &&
+    (event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      event.isComposing ||
+      isTourNativeControl(event))
+  )
+    return;
   const action = Object.hasOwn(actions, event.key) ? actions[event.key] : null;
   if (!action) return;
   event.preventDefault();
-  action();
+  if (event.key !== ' ' || !event.repeat) action();
 }
 
 /** Viewport observation shares the mounted player abort lifetime. */
@@ -170,15 +194,47 @@ function observeViewport(viewport, resize, signal) {
   } else globalThis.addEventListener('resize', resize, { signal: signal });
 }
 
-function bindTourKeyboard(document, navigation, options, signal, actions) {
+function isTourNativeControl(event) {
+  return event
+    .composedPath()
+    .some(
+      (node) =>
+        node instanceof globalThis.Element &&
+        node.matches(
+          'input,textarea,select,button,a,[contenteditable],' +
+            '[role="button"],[role="slider"],[role="combobox"],' +
+            '[role="menuitem"],[role="listbox"],[role="switch"]'
+        )
+    );
+}
+
+function bindTourKeyboard(root, navigation, options, signal, actions) {
+  if (options.authoring) return;
+  const document = root.ownerDocument;
+  if (!root.hasAttribute('tabindex')) root.tabIndex = -1;
+  root.addEventListener(
+    'pointerdown',
+    (event) => {
+      if (!isTourNativeControl(event)) root.focus({ preventScroll: true });
+    },
+    { signal }
+  );
   document.addEventListener(
     'keydown',
-    (event) =>
+    (event) => {
+      if (event.key === ' ' && !event.composedPath().includes(root)) {
+        const standalone =
+          root.getRootNode() === document &&
+          document.querySelectorAll('[data-tour-mode]').length === 1 &&
+          (event.target === document || event.target === document.body);
+        if (!standalone) return;
+      }
       handleTourKeyboard(
         event,
-        navigation.open || Boolean(options.authoring || options.preview),
+        navigation.open || Boolean(options.authoring) || (options.preview && event.key !== ' '),
         actions
-      ),
+      );
+    },
     { signal }
   );
 }
@@ -204,17 +260,16 @@ function mountTourNavigationInput(root, options, signal, actions) {
     },
     { signal }
   );
-  query('next').addEventListener(
-    'click',
-    () => {
-      if (authoring) authoring.move(1);
-      else manualGo(actions.index() + 1);
-    },
-    { signal }
-  );
+  function next() {
+    if (query('next').disabled) return;
+    if (authoring) authoring.move(1);
+    else manualGo(actions.index() + 1);
+  }
+  query('next').addEventListener('click', next, { signal });
   query('contents').addEventListener('click', () => actions.openContents(manualGo), { signal });
-  bindTourKeyboard(root.ownerDocument, query('navigation'), options, signal, {
-    ArrowRight: () => manualGo(actions.index() + 1),
+  bindTourKeyboard(root, query('navigation'), options, signal, {
+    ArrowRight: next,
+    ' ': () => actions.space(next),
     ArrowLeft: actions.back,
     Home: () => manualGo(0),
     End: () => manualGo(actions.slides().length - 1),

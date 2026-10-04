@@ -581,8 +581,8 @@ it('animates manual entrance and pauses or resumes it through the transport cloc
   const play = root.querySelector<HTMLButtonElement>('[data-tour-play]')!;
   await tick(50);
   expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
-  expect(play.textContent).toBe('Pause');
-  play.click();
+  expect(play.textContent).toBe('Play');
+  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
   await tick(1000);
   expect(root.querySelector<HTMLElement>('.tour-motion-previous')!.style.opacity).toBe('0.5');
   play.click();

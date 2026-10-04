@@ -117,6 +117,7 @@ export const scenarioTourMessages = {
     ru: 'Изображение меняется первым, затем точка перемещается. Для нескольких точек — плавное появление. Системное уменьшение движения отключает анимацию.',
     en: 'The image changes first, then the hotspot moves. Multiple hotspots fade together. System reduced motion disables animation.',
   },
+  tourManual: { ru: 'Ручная навигация', en: 'Manual navigation' },
   tourPlay: { ru: 'Воспроизвести', en: 'Play' },
   tourPause: { ru: 'Пауза', en: 'Pause' },
   tourSeek: { ru: 'Позиция воспроизведения', en: 'Playback position' },

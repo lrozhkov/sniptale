@@ -564,3 +564,128 @@ it('updates stage paint and image layers without changing scene geometry', async
   expect(stage.style.backgroundColor).toBe('rgb(17, 24, 39)');
   expect([stage.style.width, stage.style.height]).toEqual(dimensions);
 });
+
+it('keeps manual entrances separate from playback and routes Space by persistent mode', async () => {
+  instantImages();
+  const tick = playbackFrames();
+  const tour = previewTour();
+  tour.playback.autoplay = false;
+  tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
+  const { root } = await mount(tour);
+  await settleMedia();
+  const press = (repeat = false) => {
+    const event = new KeyboardEvent('keydown', {
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+      repeat,
+    });
+    root.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+  };
+  expect(root.dataset['tourMode']).toBe('manual');
+  press();
+  expect(root.dataset['slideId']).toBe('second');
+  press(true);
+  expect(root.dataset['slideId']).toBe('second');
+  await tick(100000);
+  expect(root.dataset['slideId']).toBe('second');
+  root.querySelector<HTMLButtonElement>('[data-tour-play]')!.click();
+  expect(root.dataset['tourMode']).toBe('playback');
+  press();
+  press();
+  await tick(100000);
+  expect(root.dataset['slideId']).toBe('second');
+  expect(root.querySelector('[data-tour-play]')!.getAttribute('aria-pressed')).toBe('false');
+  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
+  press();
+  expect(root.dataset['slideId']).toBe('end');
+});
+
+it('admits Space only for the active player and leaves native controls and modified keys alone', async () => {
+  instantImages();
+  playbackFrames();
+  const tour = previewTour();
+  tour.playback.autoplay = false;
+  tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
+  const first = await mount(tour);
+  const second = await mount(tour);
+  for (const tag of ['input', 'textarea', 'select', 'button', 'a']) {
+    const control = document.createElement(tag);
+    first.root.append(control);
+    const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    control.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  }
+  for (const init of [{ ctrlKey: true }, { isComposing: true }, { altKey: true }]) {
+    const event = new KeyboardEvent('keydown', {
+      key: ' ',
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    first.root.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+  }
+  first.root.dispatchEvent(
+    new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+  );
+  expect(first.root.dataset['slideId']).toBe('second');
+  expect(second.root.dataset['slideId']).not.toBe('second');
+});
+
+it('retains authored playback mode when hidden and manual choice cancels pending media progression', async () => {
+  const tick = playbackFrames();
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+  const hidden = await mount(previewTour());
+  expect(hidden.root.dataset['tourMode']).toBe('playback');
+  vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+  const ready: (() => void)[] = [];
+  vi.stubGlobal(
+    'Image',
+    class {
+      onload: (() => void) | null = null;
+      set src(_value: string) {
+        ready.push(() => this.onload?.());
+      }
+    }
+  );
+  const tour = previewTour();
+  tour.slides = [imageSlide('first'), imageSlide('second')];
+  const { root } = await mount(tour, [{ id: 'image', mime: 'image/png', base64: 'AA==' }]);
+  root.querySelector<HTMLButtonElement>('[data-tour-manual]')!.click();
+  root.querySelector<HTMLButtonElement>('[data-tour-next]')!.click();
+  ready.forEach((resolve) => resolve());
+  await tick(100000);
+  await tick(100000);
+  expect(root.dataset['slideId']).toBe('second');
+  expect(root.dataset['tourMode']).toBe('manual');
+});
+
+it('preserves consumed keys, contents dialog and ARIA control focus', async () => {
+  playbackFrames();
+  const tour = previewTour();
+  tour.playback.autoplay = false;
+  tour.slides = [createTourImageSlide('first'), createTourImageSlide('second')];
+  const { root } = await mount(tour);
+  const consumed = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+  consumed.preventDefault();
+  root.dispatchEvent(consumed);
+  for (const role of ['slider', 'combobox', 'menuitem', 'button']) {
+    const control = document.createElement('div');
+    control.setAttribute('role', role);
+    control.tabIndex = 0;
+    root.append(control);
+    control.focus();
+    control.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    expect(document.activeElement).toBe(control);
+    const key = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    control.dispatchEvent(key);
+    expect(key.defaultPrevented).toBe(false);
+  }
+  root.querySelector<HTMLDialogElement>('[data-tour-navigation]')!.open = true;
+  const key = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+  root.dispatchEvent(key);
+  expect(key.defaultPrevented).toBe(false);
+  expect(root.dataset['slideId']).toBe('first');
+});
