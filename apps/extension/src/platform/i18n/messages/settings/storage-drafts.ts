@@ -11,10 +11,12 @@ export const settingsStorageDraftsMessages = defineMessageSource({
     ru: 'Sniptale сохраняет внутреннюю рабочую копию захватов, записей и проектов для редакторов, истории и восстановления. Скачивание файла в папку Downloads выполняется отдельно.',
     en: 'Sniptale keeps an internal working copy of captures, recordings, and projects for editors, history, and recovery. Downloading a file to Downloads happens separately.',
   },
-  destinationLabel: { ru: 'Рабочая копия по умолчанию', en: 'Default working copy' },
+  destinationLabel: { ru: 'Снимки и изображения', en: 'Screenshots and images' },
+  recordingDestination: { ru: 'Видеозаписи', en: 'Video recordings' },
+  webSnapshotDestination: { ru: 'Веб-архивы', en: 'Web archives' },
   destinationDescription: {
-    ru: 'Черновики удаляются по сроку хранения. Материалы библиотеки сохраняются постоянно. Действие «Сохранить в библиотеку» всегда имеет приоритет.',
-    en: 'Drafts follow the retention policy. Library items are kept permanently. The “Save to library” action always takes priority.',
+    ru: 'Правила категорий применяются только к новым материалам. Существующие материалы не меняют статус. Действие «Сохранить в библиотеку» всегда имеет приоритет.',
+    en: 'Category rules apply only to new materials. Existing items keep their status. The “Save to library” action always takes priority.',
   },
   destinationTemporary: { ru: 'В черновики', en: 'Drafts' },
   destinationLibrary: { ru: 'Сразу в библиотеку', en: 'Library immediately' },
@@ -45,7 +47,7 @@ export const settingsStorageDraftsMessages = defineMessageSource({
       'They are removed at the next regular cleanup or after you confirm “Delete expired”. ' +
       'A longer period cannot restore deleted drafts.',
   },
-  ordinaryRetention: { ru: 'Изображения и проекты', en: 'Images and projects' },
+  ordinaryRetention: { ru: 'Изображения и веб-архивы', en: 'Images and web archives' },
   videoRetention: { ru: 'Исходные видеозаписи', en: 'Source video recordings' },
   trashTitle: { ru: 'Корзина', en: 'Trash' },
   trashCleanupEnabled: {

@@ -67,25 +67,43 @@ function SectionLabel(props: { children: string }) {
 function NewItemsSection(
   props: Pick<StorageDraftsContentProps, 'busy' | 'policy' | 'updatePolicy'>
 ) {
-  const label = translate('settings.storageDrafts.destinationLabel');
+  const categories = [
+    {
+      key: 'defaultDestination',
+      label: translate('settings.storageDrafts.destinationLabel'),
+      value: props.policy.defaultDestination,
+    },
+    {
+      key: 'recordingDestination',
+      label: translate('settings.storageDrafts.recordingDestination'),
+      value: props.policy.recordingDestination ?? props.policy.defaultDestination,
+    },
+    {
+      key: 'webSnapshotDestination',
+      label: translate('settings.storageDrafts.webSnapshotDestination'),
+      value: props.policy.webSnapshotDestination ?? 'library',
+    },
+  ] as const;
   return (
     <section className={sectionClassName}>
       <SectionLabel>{translate('settings.storageDrafts.newItemsTitle')}</SectionLabel>
       <p className="max-w-[720px] text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
         {translate('settings.storageDrafts.newItemsDescription')}
       </p>
-      <SettingsControlRow
-        label={label}
-        description={translate('settings.storageDrafts.destinationDescription')}
-      >
-        <ProductSelect<LocalStorageDestination>
-          aria-label={label}
-          disabled={props.busy}
-          value={props.policy.defaultDestination}
-          options={destinationOptions}
-          onChange={(value) => props.updatePolicy({ defaultDestination: value })}
-        />
-      </SettingsControlRow>
+      {categories.map(({ key, label, value }) => (
+        <SettingsControlRow key={key} label={label}>
+          <ProductSelect<LocalStorageDestination>
+            aria-label={label}
+            disabled={props.busy}
+            value={value}
+            options={destinationOptions}
+            onChange={(destination) => props.updatePolicy({ [key]: destination })}
+          />
+        </SettingsControlRow>
+      ))}
+      <p className="max-w-[720px] text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+        {translate('settings.storageDrafts.destinationDescription')}
+      </p>
     </section>
   );
 }

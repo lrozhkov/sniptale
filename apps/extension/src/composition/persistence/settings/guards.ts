@@ -199,6 +199,8 @@ function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<Local
   if (value === undefined) return undefined;
   if (!isRecord(value)) return INVALID_FIELD;
   const defaultDestination = value['defaultDestination'];
+  const recordingDestination = value['recordingDestination'];
+  const webSnapshotDestination = value['webSnapshotDestination'];
   const cleanupEnabled = value['cleanupEnabled'];
   const draftRetentionDays = value['draftRetentionDays'];
   const videoDraftRetentionDays = value['videoDraftRetentionDays'];
@@ -209,6 +211,12 @@ function parseOptionalLocalStoragePolicy(value: unknown): ParsedFieldValue<Local
       defaultDestination === 'temporary' || defaultDestination === 'library'
         ? defaultDestination
         : DEFAULT_LOCAL_STORAGE_POLICY.defaultDestination,
+    ...(recordingDestination === 'temporary' || recordingDestination === 'library'
+      ? { recordingDestination }
+      : {}),
+    ...(webSnapshotDestination === 'temporary' || webSnapshotDestination === 'library'
+      ? { webSnapshotDestination }
+      : {}),
     cleanupEnabled: isBoolean(cleanupEnabled)
       ? cleanupEnabled
       : DEFAULT_LOCAL_STORAGE_POLICY.cleanupEnabled,

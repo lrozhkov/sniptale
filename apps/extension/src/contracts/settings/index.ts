@@ -68,7 +68,10 @@ export type LocalStorageDestination = 'temporary' | 'library';
 
 export interface LocalStoragePolicy {
   cleanupEnabled: boolean;
+  /** New image captures; also the migration fallback for legacy recording preferences. */
   defaultDestination: LocalStorageDestination;
+  recordingDestination?: LocalStorageDestination;
+  webSnapshotDestination?: LocalStorageDestination;
   draftRetentionDays: number;
   videoDraftRetentionDays: number;
   /** Missing legacy values disable automatic permanent deletion from trash. */

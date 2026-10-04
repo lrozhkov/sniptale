@@ -70,75 +70,78 @@ beforeEach(() => {
 });
 
 describe('recording finalizer', () => {
-  it('commits primary and sidecar artifacts atomically before deleting staging', async () => {
-    const staging = createStaging();
-    const primary = createArtifact('finalizer-batch-primary');
-    const webcam = createArtifact('finalizer-batch-webcam');
-    loadSettingsMock.mockResolvedValueOnce({
-      localStoragePolicy: { defaultDestination: 'temporary' },
-    });
+  it.each(['temporary', 'library'] as const)(
+    'commits primary and sidecar artifacts atomically before deleting staging',
+    async (recordingDestination) => {
+      const staging = createStaging();
+      const primary = createArtifact(`finalizer-batch-primary-${recordingDestination}`);
+      const webcam = createArtifact(`finalizer-batch-webcam-${recordingDestination}`);
+      loadSettingsMock.mockResolvedValueOnce({
+        localStoragePolicy: { defaultDestination: 'temporary', recordingDestination },
+      });
 
-    await expect(
-      finalizeRecording({
-        artifacts: [primary, webcam],
-        discard: false,
-        primaryRecordingId: primary.artifactId,
-        recordingGroups: {
-          [primary.artifactId]: {
-            dimensions: { height: 1080, width: 1920 },
-            groupId: primary.artifactId,
-            order: 0,
-            role: 'display',
-            sourceLabel: 'Design review',
+      await expect(
+        finalizeRecording({
+          artifacts: [primary, webcam],
+          discard: false,
+          primaryRecordingId: primary.artifactId,
+          recordingGroups: {
+            [primary.artifactId]: {
+              dimensions: { height: 1080, width: 1920 },
+              groupId: primary.artifactId,
+              order: 0,
+              role: 'display',
+              sourceLabel: 'Design review',
+            },
+            [webcam.artifactId]: {
+              dimensions: { height: 720, width: 1280 },
+              groupId: primary.artifactId,
+              order: 1,
+              role: 'webcam',
+              sourceLabel: 'HD Camera',
+            },
           },
-          [webcam.artifactId]: {
-            dimensions: { height: 720, width: 1280 },
-            groupId: primary.artifactId,
-            order: 1,
-            role: 'webcam',
-            sourceLabel: 'HD Camera',
-          },
-        },
-        staging,
-      })
-    ).resolves.toEqual({ filename: primary.filename, recordingId: primary.artifactId });
+          staging,
+        })
+      ).resolves.toEqual({ filename: primary.filename, recordingId: primary.artifactId });
 
-    expect(saveBatchMock).toHaveBeenCalledWith(
-      [
+      expect(saveBatchMock).toHaveBeenCalledWith(
+        [
+          {
+            preparedAsset: primary.asset,
+            filename: primary.filename,
+            id: primary.artifactId,
+            recordingGroup: expect.objectContaining({
+              dimensions: { height: 1080, width: 1920 },
+              role: 'display',
+              sourceLabel: 'Design review',
+            }),
+            storageClass: recordingDestination,
+          },
+          {
+            preparedAsset: webcam.asset,
+            filename: webcam.filename,
+            id: webcam.artifactId,
+            recordingGroup: expect.objectContaining({
+              dimensions: { height: 720, width: 1280 },
+              role: 'webcam',
+              sourceLabel: 'HD Camera',
+            }),
+            storageClass: recordingDestination,
+          },
+        ],
         {
-          preparedAsset: primary.asset,
-          filename: primary.filename,
-          id: primary.artifactId,
-          recordingGroup: expect.objectContaining({
-            dimensions: { height: 1080, width: 1920 },
-            role: 'display',
-            sourceLabel: 'Design review',
-          }),
-          storageClass: 'temporary',
-        },
-        {
-          preparedAsset: webcam.asset,
-          filename: webcam.filename,
-          id: webcam.artifactId,
-          recordingGroup: expect.objectContaining({
-            dimensions: { height: 720, width: 1280 },
-            role: 'webcam',
-            sourceLabel: 'HD Camera',
-          }),
-          storageClass: 'temporary',
-        },
-      ],
-      {
-        primaryRecordingId: primary.artifactId,
-        projectId: null,
-        recordingId: primary.artifactId,
-      }
-    );
-    expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(staging.delete).mock.invocationCallOrder[0]!
-    );
-    expect(persistStaticFrameSignalsMock).toHaveBeenCalledWith(primary.artifactId);
-  });
+          primaryRecordingId: primary.artifactId,
+          projectId: null,
+          recordingId: primary.artifactId,
+        }
+      );
+      expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
+        vi.mocked(staging.delete).mock.invocationCallOrder[0]!
+      );
+      expect(persistStaticFrameSignalsMock).toHaveBeenCalledWith(primary.artifactId);
+    }
+  );
 
   it('aborts staging without publishing media when discarded', async () => {
     const staging = createStaging();

@@ -72,6 +72,7 @@ it('revalidates a rebuilt package, discards staging, and publishes through the a
   expect(mocks.save).toHaveBeenCalledWith(
     expect.objectContaining({
       id: 'local-id',
+      storageClass: 'library',
       manifest,
       packageBlob: rebuiltFile,
       screenshotBlob,

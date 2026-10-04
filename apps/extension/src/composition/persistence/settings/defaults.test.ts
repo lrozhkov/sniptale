@@ -88,3 +88,65 @@ describe('settings default graph', () => {
     });
   });
 });
+
+describe('new material category destinations', () => {
+  it('defaults captures to drafts and web snapshots to permanent storage', () => {
+    expect(createDefaultSettings().localStoragePolicy).toMatchObject({
+      defaultDestination: 'temporary',
+      recordingDestination: 'temporary',
+      webSnapshotDestination: 'library',
+    });
+  });
+
+  it.each(['temporary', 'library'] as const)(
+    'retains the legacy %s capture destination for images and recordings',
+    async (defaultDestination) => {
+      browserStorageSyncGetMock.mockResolvedValue({
+        sniptale_settings: { localStoragePolicy: { defaultDestination } },
+      });
+      expect((await loadSettings()).localStoragePolicy).toMatchObject({
+        defaultDestination,
+        recordingDestination: defaultDestination,
+        webSnapshotDestination: 'library',
+      });
+    }
+  );
+
+  it('loads independent category choices without changing retention periods', async () => {
+    browserStorageSyncGetMock.mockResolvedValue({
+      sniptale_settings: {
+        localStoragePolicy: {
+          defaultDestination: 'temporary',
+          recordingDestination: 'library',
+          webSnapshotDestination: 'temporary',
+          draftRetentionDays: 90,
+          videoDraftRetentionDays: 14,
+        },
+      },
+    });
+    expect((await loadSettings()).localStoragePolicy).toMatchObject({
+      defaultDestination: 'temporary',
+      recordingDestination: 'library',
+      webSnapshotDestination: 'temporary',
+      draftRetentionDays: 90,
+      videoDraftRetentionDays: 14,
+    });
+  });
+
+  it('uses safe category defaults for malformed stored destination values', async () => {
+    browserStorageSyncGetMock.mockResolvedValue({
+      sniptale_settings: {
+        localStoragePolicy: {
+          defaultDestination: 'library',
+          recordingDestination: 'delete',
+          webSnapshotDestination: null,
+        },
+      },
+    });
+    expect((await loadSettings()).localStoragePolicy).toMatchObject({
+      defaultDestination: 'library',
+      recordingDestination: 'library',
+      webSnapshotDestination: 'library',
+    });
+  });
+});

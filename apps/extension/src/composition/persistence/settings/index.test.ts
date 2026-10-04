@@ -108,6 +108,8 @@ const DEFAULT_VOICE_INPUT = {
 const TEMPORARY_STORAGE_POLICY = {
   cleanupEnabled: true,
   defaultDestination: 'temporary' as const,
+  recordingDestination: 'temporary' as const,
+  webSnapshotDestination: 'library' as const,
   draftRetentionDays: 30,
   videoDraftRetentionDays: 7,
   trashCleanupEnabled: false,
@@ -116,6 +118,7 @@ const TEMPORARY_STORAGE_POLICY = {
 const LIBRARY_STORAGE_POLICY = {
   ...TEMPORARY_STORAGE_POLICY,
   defaultDestination: 'library' as const,
+  recordingDestination: 'library' as const,
 };
 
 it('does not rewrite synchronized settings when the retired field is absent', async () => {

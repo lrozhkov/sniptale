@@ -78,6 +78,7 @@ export interface SaveScreenshotMediaAssetInput {
 }
 
 export interface SaveWebSnapshotMediaAssetInput {
+  storageClass?: LibraryStorageClass;
   id?: string;
   createdAt?: number;
   filename: string;

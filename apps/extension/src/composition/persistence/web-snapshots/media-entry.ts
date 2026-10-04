@@ -1,3 +1,4 @@
+import { createLibraryLifecycle, type LibraryStorageClass } from '../library-lifecycle/contracts';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type {
@@ -34,6 +35,7 @@ export async function createWebSnapshotMediaEntry(args: {
   now: number;
   screenshotDimensions: { height: number; width: number };
   snapshot: StoredWebSnapshotRecord;
+  storageClass?: LibraryStorageClass;
 }): Promise<MediaLibraryEntry> {
   return {
     id: args.assetId,
@@ -54,5 +56,6 @@ export async function createWebSnapshotMediaEntry(args: {
       args.input.sourceFavicon ?? args.input.manifest.source.faviconUrl
     ),
     tags: args.input.tags ?? [],
+    lifecycle: createLibraryLifecycle(args.storageClass ?? 'library', args.now),
   };
 }

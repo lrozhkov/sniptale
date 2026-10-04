@@ -158,6 +158,23 @@ it('renders usage, policy warnings, confirmation, and editable policy fields', a
   );
   act(() => libraryOption?.click());
   expect(state.updatePolicy).toHaveBeenCalledWith({ defaultDestination: 'library' });
+  for (const [index, key, destination] of [
+    [1, 'recordingDestination', 'library'],
+    [2, 'webSnapshotDestination', 'temporary'],
+  ] as const) {
+    act(() => selects[index]?.click());
+    const label = translate(
+      destination === 'library'
+        ? 'settings.storageDrafts.destinationLibrary'
+        : 'settings.storageDrafts.destinationTemporary'
+    );
+    const option = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+      (candidate) => candidate.textContent?.includes(label)
+    );
+    expect(option).toBeDefined();
+    act(() => option?.click());
+    expect(state.updatePolicy).toHaveBeenLastCalledWith({ [key]: destination });
+  }
 
   act(() => root.render(<SectionHarness view="storage" />));
   expect(container.textContent).not.toContain(translate('settings.storageDrafts.newItemsTitle'));

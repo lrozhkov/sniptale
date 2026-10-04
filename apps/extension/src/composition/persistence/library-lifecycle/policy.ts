@@ -5,6 +5,8 @@ export const LOCAL_STORAGE_RETENTION_DAY_OPTIONS = [1, 3, 7, 14, 30, 60, 90, 180
 export const DEFAULT_LOCAL_STORAGE_POLICY = {
   cleanupEnabled: true,
   defaultDestination: 'temporary',
+  recordingDestination: 'temporary',
+  webSnapshotDestination: 'library',
   draftRetentionDays: 30,
   videoDraftRetentionDays: 7,
   trashCleanupEnabled: false,
@@ -12,9 +14,13 @@ export const DEFAULT_LOCAL_STORAGE_POLICY = {
 } satisfies LocalStoragePolicy;
 
 export function resolveInitialStorageClass(
-  settings: Pick<NormalizedSettings, 'localStoragePolicy'>
+  settings: Pick<NormalizedSettings, 'localStoragePolicy'>,
+  category: 'image' | 'recording' | 'web-snapshot' = 'image'
 ): LocalStoragePolicy['defaultDestination'] {
-  return settings.localStoragePolicy.defaultDestination;
+  const policy = settings.localStoragePolicy;
+  if (category === 'web-snapshot') return policy.webSnapshotDestination ?? 'library';
+  if (category === 'recording') return policy.recordingDestination ?? policy.defaultDestination;
+  return policy.defaultDestination;
 }
 
 export function getDraftRetentionMs(

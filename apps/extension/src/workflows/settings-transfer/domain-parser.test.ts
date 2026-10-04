@@ -57,3 +57,25 @@ it.each([
 ])('rejects invalid menus before transfer apply %#', (value) => {
   expect(() => parseSettingsTransferDomains(domains(value))).toThrow();
 });
+
+it('round trips independent new material destinations without dropping categories', () => {
+  const input = {
+    'capture.retention': {
+      schemaVersion: 1,
+      data: {
+        policy: {
+          cleanupEnabled: true,
+          defaultDestination: 'temporary',
+          recordingDestination: 'library',
+          webSnapshotDestination: 'temporary',
+          draftRetentionDays: 30,
+          videoDraftRetentionDays: 7,
+          trashCleanupEnabled: false,
+          trashRetentionDays: 30,
+        },
+      },
+    },
+  };
+  expect(parseSettingsTransferDomains(input)).toEqual(input);
+  expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
+});

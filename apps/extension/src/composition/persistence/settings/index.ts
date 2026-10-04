@@ -311,6 +311,13 @@ function normalizeLocalStoragePolicy(parsedValue: Partial<Settings>): LocalStora
   return {
     ...DEFAULT_LOCAL_STORAGE_POLICY,
     defaultDestination: parsedValue.localStoragePolicy?.defaultDestination ?? legacyDestination,
+    recordingDestination:
+      parsedValue.localStoragePolicy?.recordingDestination ??
+      parsedValue.localStoragePolicy?.defaultDestination ??
+      legacyDestination,
+    webSnapshotDestination:
+      parsedValue.localStoragePolicy?.webSnapshotDestination ??
+      DEFAULT_LOCAL_STORAGE_POLICY.webSnapshotDestination,
     cleanupEnabled:
       parsedValue.localStoragePolicy?.cleanupEnabled ?? DEFAULT_LOCAL_STORAGE_POLICY.cleanupEnabled,
     draftRetentionDays:
