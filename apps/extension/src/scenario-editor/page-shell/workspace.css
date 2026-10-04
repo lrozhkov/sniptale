@@ -23,6 +23,7 @@
 .guide-page
   :is(
     [data-ui='shared.ui.compact-inspector.numeric-value-field'],
+    [data-ui='shared.ui.color-selector.trigger'],
     [data-ui='shared.ui.compact-inspector.numeric-range-scrub']
   )
   input:focus-visible {
@@ -1567,11 +1568,6 @@ html[data-guide-reordering] .guide-block-grip {
   flex: 1;
   justify-content: space-between;
   font-size: 0.75rem;
-}
-.guide-style-accent input {
-  width: 3rem;
-  height: 1.75rem;
-  padding: 0.125rem;
 }
 
 .guide-block-inspector {

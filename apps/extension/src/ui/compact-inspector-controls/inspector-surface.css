@@ -53,6 +53,7 @@
   :is(
     [data-ui='shared.ui.compact-select'] > button,
     [data-ui='shared.ui.compact-inspector.numeric-value-field'] > input,
+    [data-ui='shared.ui.color-selector.trigger'] input,
     [data-ui='shared.ui.color-selector.picker-trigger']
   ) {
   font: 500 12px / 1.5 var(--sniptale-font-sans);

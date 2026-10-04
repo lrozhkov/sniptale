@@ -26,7 +26,7 @@ import {
 
 const COLOR_SELECTOR_LAYER_WIDTH = 224;
 const COLOR_SELECTOR_PICKER_LAYER_WIDTH = 280;
-const COLOR_SELECTOR_LAYER_GAP = 10;
+const COLOR_SELECTOR_LAYER_GAP = 8;
 const COLOR_SELECTOR_VIEWPORT_PADDING = 8;
 
 type ColorSelectorFloatingPlacement = 'auto' | 'side';
@@ -153,8 +153,8 @@ function resolveColorSelectorLayerStyle(
     ? Math.max(preferredHeight, projectElementRect(layer, uiScale).rect.height)
     : preferredHeight;
   const vertical = resolveVerticalLayerSpace({
-    boundaryBottom: boundaryRect.y + boundaryRect.height,
-    boundaryTop: boundaryRect.y,
+    boundaryBottom: rect.y + rect.height,
+    boundaryTop: rect.y,
     layerHeight: measuredHeight,
     viewportHeight,
   });

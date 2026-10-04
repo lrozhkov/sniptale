@@ -222,3 +222,33 @@ it('rebinds resize observation when the palette is replaced by the picker', () =
   host.remove();
   vi.unstubAllGlobals();
 });
+
+function PanelAnchorProbe(props: { anchor: HTMLElement; boundary: HTMLElement }) {
+  const style = useColorSelectorLayerStyle(props.anchor, true, 'auto', props.boundary);
+  return <output data-top={style.top} data-transform={style.transform} />;
+}
+
+it('keeps automatic placement beside the field inside a tall drawing panel', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(window, 'innerWidth', 'get').mockReturnValue(1280);
+  vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(900);
+  const anchor = document.createElement('button');
+  const boundary = document.createElement('div');
+  vi.spyOn(anchor, 'getBoundingClientRect').mockReturnValue(new DOMRect(300, 100, 140, 32));
+  vi.spyOn(boundary, 'getBoundingClientRect').mockReturnValue(new DOMRect(280, 60, 320, 650));
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    act(() => root.render(<PanelAnchorProbe anchor={anchor} boundary={boundary} />));
+    const top = Number(host.querySelector('output')?.dataset['top']);
+    expect(top).toBeGreaterThan(132);
+    expect(top).toBeLessThanOrEqual(140);
+    expect(host.querySelector('output')?.dataset['transform']).toBeUndefined();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  }
+});

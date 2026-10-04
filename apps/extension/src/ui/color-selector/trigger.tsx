@@ -2,10 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getColorAlpha } from '@sniptale/foundation/color';
 import { translate } from '../../platform/i18n';
 import {
-  COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
-  COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME,
-  COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME,
-  resolveCompactInspectorInteractiveControlStyle,
+  COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+  COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
+  COMPACT_INLINE_VALUE_INPUT_CLASS_NAME,
 } from '../compact-inspector-controls/interactive-control-style';
 import { cx } from '../compact-inspector-controls/shared';
 import {
@@ -85,34 +84,45 @@ function ColorValue(props: {
   };
   if (editing)
     return (
-      <span className="flex h-8 min-w-0 flex-1 flex-col justify-center">
-        <input
-          ref={focusInput}
-          aria-label={props.label}
-          aria-invalid={invalid || undefined}
-          title={invalid ? translate('shared.ui.colorSelectorInvalid') : props.label}
-          disabled={props.disabled}
-          spellCheck={false}
-          className="h-4! min-h-0! w-full min-w-0 bg-transparent p-0! text-right text-xs leading-4! outline-none"
-          value={draft}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setInvalid(false);
-          }}
-          onBlur={() => finish(false, false)}
-          onKeyDown={(event) => {
-            event.stopPropagation();
-            if (event.key === 'Enter' || event.key === 'Escape') {
-              event.preventDefault();
-              finish(event.key === 'Escape', true);
-            }
-          }}
-        />
-        {invalid ? (
-          <span role="alert" className="block truncate text-right text-[10px] leading-3">
-            {translate('shared.ui.colorSelectorInvalid')}
-          </span>
-        ) : null}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span
+          className={cx(
+            'flex min-w-0 flex-col justify-center',
+            COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+            COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME
+          )}
+        >
+          <input
+            ref={focusInput}
+            aria-label={props.label}
+            aria-invalid={invalid || undefined}
+            title={invalid ? translate('shared.ui.colorSelectorInvalid') : props.label}
+            disabled={props.disabled}
+            spellCheck={false}
+            className={cx(COMPACT_INLINE_VALUE_INPUT_CLASS_NAME, 'w-full min-h-0')}
+            value={draft}
+            onChange={(event) => {
+              setDraft(event.target.value);
+              setInvalid(false);
+            }}
+            onBlur={() => finish(false, false)}
+            onKeyDown={(event) => {
+              event.stopPropagation();
+              if (event.key === 'Enter' || event.key === 'Escape') {
+                event.preventDefault();
+                finish(event.key === 'Escape', true);
+              }
+            }}
+          />
+          {invalid ? (
+            <span
+              role="alert"
+              className="block w-full shrink-0 truncate text-right text-[10px] leading-3"
+            >
+              {translate('shared.ui.colorSelectorInvalid')}
+            </span>
+          ) : null}
+        </span>
       </span>
     );
   return (
@@ -124,7 +134,9 @@ function ColorValue(props: {
       title={props.displayValue}
       data-ui="shared.ui.color-selector.value-trigger"
       className={[
-        'h-full min-w-0 flex-1 truncate rounded-[7px] bg-transparent text-right text-[12px] font-semibold',
+        COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+        COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
+        'min-w-0 flex-1 truncate text-right text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
         'focus-visible:outline focus-visible:outline-1',
       ].join(' ')}
       onClick={() => {
@@ -156,17 +168,12 @@ export function ColorSelectorTrigger(props: {
   return (
     <div
       className={cx(
-        'relative flex w-full min-w-0 max-w-full items-center gap-2 px-2',
-        COMPACT_INSPECTOR_INTERACTIVE_CONTROL_CLASS_NAME,
-        COMPACT_INSPECTOR_INTERACTIVE_CONTROL_SURFACE_CLASS_NAME,
-        props.variant === 'swatch' && '!gap-1 !px-0',
-        props.active && COMPACT_INSPECTOR_INTERACTIVE_CONTROL_VISIBLE_CLASS_NAME,
+        'relative flex w-full min-w-0 max-w-full items-center gap-1 text-[var(--sniptale-color-text-primary)]',
         props.disabled && 'cursor-not-allowed opacity-55'
       )}
       aria-disabled={props.disabled || undefined}
       data-ui="shared.ui.color-selector.trigger"
       data-variant={props.variant ?? 'value'}
-      style={resolveCompactInspectorInteractiveControlStyle(undefined)}
     >
       <button
         type="button"
@@ -175,7 +182,8 @@ export function ColorSelectorTrigger(props: {
         title={displayValue}
         onClick={props.onOpenPicker}
         className={[
-          'inline-flex h-full w-6 shrink-0 items-center justify-center rounded-[7px] bg-transparent',
+          'inline-flex h-[var(--sniptale-compact-control-height,32px)] w-6 shrink-0',
+          'items-center justify-center rounded-[7px] bg-transparent',
           'focus-visible:outline focus-visible:outline-1',
         ].join(' ')}
         data-ui="shared.ui.color-selector.picker-trigger"

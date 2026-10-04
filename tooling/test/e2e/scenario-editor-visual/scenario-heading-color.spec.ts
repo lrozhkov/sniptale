@@ -366,6 +366,18 @@ for (const theme of ['light', 'dark'] as const) {
       await value.click();
       const input = field.getByRole('textbox');
       await expect(input).toBeFocused();
+      const inputGeometry = await input.evaluate((element) => {
+        const shell = element.parentElement!;
+        const style = getComputedStyle(shell);
+        return {
+          available:
+            shell.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
+          width: element.getBoundingClientRect().width,
+          outline: getComputedStyle(element).outlineStyle,
+        };
+      });
+      expect(Math.abs(inputGeometry.width - inputGeometry.available)).toBeLessThanOrEqual(1);
+      expect(inputGeometry.outline).toBe('none');
       expect(await field.boundingBox()).toEqual(before);
       await input.fill('#abcdef');
       await input.press('Enter');

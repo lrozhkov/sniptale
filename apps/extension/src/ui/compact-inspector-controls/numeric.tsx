@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import {
+  COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+  COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
+  COMPACT_INLINE_VALUE_INPUT_CLASS_NAME,
+} from './interactive-control-style';
 import { cx, type CompactInspectorNumericScrub, type CompactInspectorUnit } from './shared';
 import { NumericRangeScrub } from './numeric-range-scrub';
 import { NumericStepper } from './stepper';
@@ -59,16 +64,10 @@ function NumericValueFieldView({
       data-focus-appearance={props.focusAppearance ?? 'accent-box'}
       className={cx(
         'group/compact-numeric relative flex',
-        'h-[var(--sniptale-compact-control-height,32px)] w-[6.25rem] shrink-0 items-center',
+        'w-[6.25rem] shrink-0 items-center',
         'gap-0',
-        'rounded-[7px] px-2 transition-[border-color,background-color]',
-        'border border-transparent bg-transparent',
-        ...(quietFocus
-          ? []
-          : [
-              'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
-              'focus-within:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_70%,transparent)]',
-            ]),
+        COMPACT_INLINE_VALUE_SURFACE_CLASS_NAME,
+        !quietFocus && COMPACT_INLINE_VALUE_FOCUS_CLASS_NAME,
         props.invalid &&
           'border-[color:var(--sniptale-color-danger)] text-[color:var(--sniptale-color-danger)]',
         props.disabled && 'cursor-not-allowed opacity-55',
@@ -113,10 +112,7 @@ function NumericValueInput({
       onBlur={state.commitDraft}
       onKeyDown={state.handleKeyDown}
       onPointerDown={state.handlePointerDown}
-      className={cx(
-        'h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-right',
-        'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold text-inherit outline-none'
-      )}
+      className={COMPACT_INLINE_VALUE_INPUT_CLASS_NAME}
     />
   );
 }
