@@ -78,6 +78,18 @@ export function EditorFrameCallout(props: {
     titleText: callout.content.titleText,
     voiceActive: voice.state.active,
   });
+  const handleEditingBlur = (event?: React.FocusEvent<HTMLDivElement>) => {
+    const target = event?.relatedTarget;
+    if (
+      props.isSettingsOpen &&
+      target instanceof Element &&
+      props.controlsPortalTarget?.contains(target) &&
+      target.closest('.sniptale-callout-settings-popover')
+    ) {
+      return;
+    }
+    editing.events.blur(event);
+  };
   const actions = createFrameCalloutActions({
     apply,
     callout,
@@ -110,6 +122,7 @@ export function EditorFrameCallout(props: {
           : {})}
         editing={{
           ...editing,
+          events: { ...editing.events, blur: handleEditingBlur },
           layout: { ...editing.layout, floatingToolbarRect: null },
         }}
         frameBorderWidth={surface.strokeVisible ? surface.geometry.strokeWidth : 0}

@@ -767,3 +767,53 @@ test('managed background follows canvas expansion and history', async ({
     .toBe(400);
   await reopened.close();
 });
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`empty frame comment survives repeated style selection before typing in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await page.setViewportSize({ width: 1680, height: 1000 });
+    await page.emulateMedia({ colorScheme: theme });
+    await applyHarnessBootstrap(page, { storage: { 'sniptale-theme-preference': theme } });
+    await page.goto(`${hostOrigin}${EDITOR_HARNESS_PATH}`);
+    await waitForEditorReady(page);
+    await page.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+    const plane = await page.locator('[data-ui="editor.frame-annotation-plane"]').boundingBox();
+    const start = { x: plane!.x + plane!.width / 2 - 80, y: plane!.y + plane!.height / 2 - 50 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 160, start.y + 100, { steps: 4 });
+    await page.mouse.up();
+    await page.getByRole('button', { name: 'Добавить комментарий', exact: true }).click();
+    const editable = page.locator('.sniptale-callout [contenteditable="true"]');
+    const picker = page.locator('[data-ui="content.toolbar.future-callout-popover"]');
+    await expect(editable).toBeVisible();
+    for (const name of ['Редакционная цитата', 'Неоновый терминал']) {
+      await picker
+        .getByRole('button', { name: new RegExp(name) })
+        .first()
+        .click();
+      await expect(picker.getByRole('button', { name: new RegExp(name) }).first()).toHaveClass(
+        /sniptale-glass-preset-item--active/
+      );
+      await expect(editable).toBeVisible();
+      await expect(editable).toHaveText('');
+    }
+    await editable.fill('Comment after choosing style');
+    await picker
+      .getByRole('button', { name: /Редакционная цитата/ })
+      .first()
+      .click();
+    await expect(editable).toHaveText('Comment after choosing style');
+    await editable.click();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.sniptale-callout')).toContainText('Comment after choosing style');
+    await expect(editable).toHaveCount(0);
+    await page.locator('.sniptale-callout [contenteditable]').click();
+    await expect(editable).toBeVisible();
+    await editable.fill('');
+    await page.locator('[data-ui="editor.floating.document-bar.close-file-button"]').focus();
+    await expect(page.locator('.sniptale-callout')).toHaveCount(0);
+  });
+}
