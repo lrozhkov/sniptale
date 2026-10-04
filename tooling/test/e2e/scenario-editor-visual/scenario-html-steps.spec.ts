@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness, createPageIssueCollector } from './scenario-editor-visual.helpers';
@@ -11,7 +11,13 @@ for (const theme of ['light', 'dark'] as const) {
     hostOrigin,
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
-    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      theme,
+      'en',
+      theme === 'light' ? { width: 1280, height: 560 } : { width: 1920, height: 900 }
+    );
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     await page.getByRole('button', { name: 'Step by step', exact: true }).click();
     const reader = page.locator('.guide-reader');
@@ -76,13 +82,7 @@ for (const theme of ['light', 'dark'] as const) {
     );
     await expect(page.locator('.guide-read-document > section')).toBeVisible();
     await expect(page.locator('.guide-read-document > article:visible')).toHaveCount(1);
-    const openImage = page.locator('[data-guide-open]').first();
-    await openImage.click();
-    await expect(page.locator('dialog')).toBeVisible();
-    await page.keyboard.press('ArrowRight');
-    await expect(page.locator('[data-guide-progress]')).toHaveText('1 / 2');
-    await page.keyboard.press('Escape');
-    await expect(openImage).toBeFocused();
+    await inspectStandaloneViewer(page, testInfo, theme);
     await page.getByRole('button', { name: 'Next step', exact: true }).click();
     await expect(page.locator('[data-guide-progress]')).toHaveText('2 / 2');
     await expect(page.locator('.guide-read-document > section')).toBeHidden();
@@ -111,8 +111,38 @@ for (const theme of ['light', 'dark'] as const) {
     });
     await page.emulateMedia({ media: 'print' });
     await expect(page.locator('.guide-read-document > article:visible')).toHaveCount(2);
+    await expect(page.locator('[data-guide-open]').first()).toBeHidden();
+    await expect(page.locator('[data-guide-viewer]')).toBeHidden();
     expect(network).toEqual([]);
     issues.assertClean();
+    const touch = await page
+      .context()
+      .browser()!
+      .newContext({
+        viewport: { width: 390, height: 640 },
+        deviceScaleFactor: 1,
+        hasTouch: true,
+        isMobile: true,
+      });
+    try {
+      const mobile = await touch.newPage();
+      await mobile.goto(pathToFileURL(filename).href);
+      const trigger = mobile.locator('[data-guide-open]').first();
+      await expect(trigger).toHaveCSS('opacity', '1');
+      await trigger.tap();
+      await expect(mobile.locator('[data-close]')).toBeInViewport();
+      await expectFittedImage(mobile);
+      await mobile.locator('dialog [data-zoom]').tap();
+      await expect(mobile.locator('dialog')).toHaveAttribute('data-zoom', 'full');
+      await testInfo.attach(`html-viewer-touch-${theme}`, {
+        body: await mobile.screenshot(),
+        contentType: 'image/png',
+      });
+      await mobile.locator('[data-close]').tap();
+      await expect(trigger).toBeFocused();
+    } finally {
+      await touch.close();
+    }
     const noScript = await page.context().browser()!.newContext({ javaScriptEnabled: false });
     try {
       const fallback = await noScript.newPage();
@@ -299,4 +329,102 @@ for (const theme of ['light', 'dark'] as const) {
       contentType: 'image/png',
     });
   });
+}
+
+async function expectFittedImage(page: Page) {
+  const viewport = page.locator('[data-viewport]');
+  const image = viewport.locator('img');
+  await expect
+    .poll(() => image.evaluate((node: HTMLImageElement) => node.complete && node.naturalWidth > 0))
+    .toBe(true);
+  const bounds = await viewport.boundingBox();
+  const pixels = await image.boundingBox();
+  expect(pixels!.width).toBeGreaterThan(0);
+  expect(pixels!.height).toBeGreaterThan(0);
+  expect(pixels!.width).toBeLessThanOrEqual(bounds!.width + 1);
+  expect(pixels!.height).toBeLessThanOrEqual(bounds!.height + 1);
+}
+
+async function inspectStandaloneViewer(page: Page, info: TestInfo, theme: string) {
+  const trigger = page.locator('[data-guide-open]').first();
+  await trigger.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  await expect(trigger).toHaveCSS('opacity', '0');
+  await trigger.locator('..').hover();
+  await expect(trigger).toHaveCSS('opacity', '1');
+  await page.mouse.move(0, 0);
+  await trigger.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveCSS('opacity', '1');
+  const readingScroll = () =>
+    page.locator('.guide-html-content').evaluate((node) => node.scrollTop);
+  const position = await readingScroll();
+  await page.keyboard.press('Enter');
+  const dialog = page.locator('[data-guide-viewer]');
+  const close = dialog.locator('[data-close]');
+  const fit = dialog.locator('[data-fit]');
+  const full = dialog.locator('[data-zoom]');
+  const viewport = dialog.locator('[data-viewport]');
+  await expect(close).toBeFocused();
+  await expect(fit).toHaveAttribute('aria-pressed', 'true');
+  await expect(full).toHaveAttribute('aria-pressed', 'false');
+  await expectFittedImage(page);
+  await page.keyboard.press('Tab');
+  expect(await dialog.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  await viewport.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('[data-guide-progress]')).toHaveText('1 / 2');
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+  expect(await readingScroll()).toBe(position);
+
+  // Synthetic landscape/portrait pixels exercise extremes inside the actual generated CSP document.
+  // The original exported source was exercised above; runtime and markup remain unchanged here.
+  for (const [width, height, caption] of [
+    [2400, 1600, 'Long caption '.repeat(80)],
+    [1200, 2400, ''],
+  ] as const) {
+    await trigger.evaluate(
+      (button, media) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = media.width;
+        canvas.height = media.height;
+        canvas.getContext('2d')!.fillRect(0, 0, media.width, media.height);
+        const source = document.getElementById((button as HTMLElement).dataset['guideOpen']!)!;
+        source.setAttribute('href', canvas.toDataURL('image/png'));
+        (button as HTMLElement).dataset['caption'] = media.caption;
+      },
+      { width, height, caption }
+    );
+    await trigger.click();
+    await expectFittedImage(page);
+    await expect(close).toBeInViewport();
+    await expect(dialog.locator('figcaption')).toHaveText(caption.trim());
+    await full.click();
+    await expect(full).toHaveAttribute('aria-pressed', 'true');
+    await expect(fit).toHaveAttribute('aria-pressed', 'false');
+    const image = await viewport.locator('img').boundingBox();
+    expect(image!.width).toBe(width);
+    expect(image!.height).toBe(height);
+    await viewport.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(() => viewport.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+    await expect(page.locator('[data-guide-progress]')).toHaveText('1 / 2');
+    await close.click();
+    await expect(trigger).toBeFocused();
+    expect(await readingScroll()).toBe(position);
+    await trigger.click();
+    await expect(dialog).toHaveAttribute('data-zoom', 'fit');
+    expect(await viewport.evaluate((node) => node.scrollTop + node.scrollLeft)).toBe(0);
+    await full.click();
+    await fit.click();
+    await expectFittedImage(page);
+    await info.attach(`html-viewer-${theme}-${width}x${height}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await close.click();
+  }
 }

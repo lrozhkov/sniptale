@@ -1,3 +1,4 @@
+import { Search, X } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server.browser';
 import tokens from '@sniptale/ui/styles/design-tokens?raw';
 import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?inline';
@@ -126,27 +127,52 @@ export async function buildGuideHtml(
               </div>
             </div>
           </main>
-          <dialog data-guide-viewer="" aria-label={t('scenario.editor.htmlImageOpen')}>
-            <header>
-              <button type="button" data-zoom="" aria-pressed="false">
-                100%
-              </button>
-              <button type="button" data-close="">
-                {t('common.actions.close')}
-              </button>
-            </header>
-            <figure>
-              <div data-viewport="">
-                <img alt="" />
-              </div>
-              <figcaption />
-            </figure>
-          </dialog>
+          <HtmlImageViewer t={t} />
           <script>{viewerScript}</script>
         </body>
       </html>
     );
   return { html, rasters: media.rasters };
+}
+
+function HtmlImageViewer({ t }: { t: Translate }) {
+  return (
+    <dialog data-guide-viewer="" data-zoom="fit" aria-label={t('scenario.editor.htmlImageOpen')}>
+      <header>
+        <button
+          type="button"
+          data-fit=""
+          aria-pressed="true"
+          aria-label={t('scenario.editor.htmlFit')}
+          title={t('scenario.editor.htmlFit')}
+        >
+          {t('scenario.editor.htmlFit')}
+        </button>
+        <button type="button" data-zoom="" aria-pressed="false" aria-label="100%" title="100%">
+          100%
+        </button>
+        <button
+          type="button"
+          data-close=""
+          aria-label={t('common.actions.close')}
+          title={t('common.actions.close')}
+        >
+          <X size={18} aria-hidden="true" />
+        </button>
+      </header>
+      <figure>
+        <div
+          data-viewport=""
+          tabIndex={0}
+          role="region"
+          aria-label={t('scenario.editor.htmlPreview')}
+        >
+          <img alt="" />
+        </div>
+        <figcaption />
+      </figure>
+    </dialog>
+  );
 }
 
 function HtmlImage({
@@ -205,8 +231,9 @@ function HtmlImage({
           data-caption={block.caption}
           data-caption-alignment={block.captionAlignment ?? 'center'}
           aria-label={t('scenario.editor.htmlImageOpen')}
+          title={t('scenario.editor.htmlImageOpen')}
         >
-          +
+          <Search size={18} aria-hidden="true" />
         </button>
       )}
       {block.caption && (

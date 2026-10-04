@@ -51,6 +51,9 @@ it('serializes canonical content safely with local styles, fonts and private ima
   });
   const document = new DOMParser().parseFromString(result.html, 'text/html');
   expect(result.rasters).toHaveLength(1);
+  const opener = document.querySelector('[data-guide-open]')!;
+  expect(opener.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+  expect(opener.textContent).not.toContain('+');
   expect(document.querySelectorAll('script')).toHaveLength(1);
   expect(document.querySelector('script')?.textContent).not.toContain(project.name);
   expect(document.querySelector('title')?.textContent).toBe(project.name);
@@ -260,3 +263,35 @@ it('suppresses inherited and explicit legacy frame viewers while retaining full-
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['en', 'ru'] as const)(
+  'exports named Fit, 100%%, Close and scroll viewport in %s',
+  async (locale) => {
+    vi.stubGlobal('crypto', webcrypto);
+    try {
+      const t = createTranslator(locale);
+      const result = await buildGuideHtml(createGuideProject('Guide'), t, 'light', {
+        rasters: [],
+        blocks: new Map(),
+      });
+      const doc = new DOMParser().parseFromString(result.html, 'text/html');
+      const dialog = doc.querySelector('dialog')!;
+      expect(dialog.getAttribute('data-zoom')).toBe('fit');
+      const fit = dialog.querySelector('[data-fit]')!;
+      expect(fit).not.toBeNull();
+      expect(fit.getAttribute('aria-label')).toBe(t('scenario.editor.htmlFit'));
+      expect(fit.getAttribute('aria-pressed')).toBe('true');
+      const nativeSize = dialog.querySelector('button[data-zoom]')!;
+      expect(nativeSize.getAttribute('aria-label')).toBe('100%');
+      expect(nativeSize.getAttribute('aria-pressed')).toBe('false');
+      const close = dialog.querySelector('[data-close]')!;
+      expect(close.getAttribute('aria-label')).toBe(t('common.actions.close'));
+      expect(close.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+      const viewport = dialog.querySelector('[data-viewport]')!;
+      expect(viewport.getAttribute('tabindex')).toBe('0');
+      expect(viewport.getAttribute('aria-label')).toBe(t('scenario.editor.htmlPreview'));
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);

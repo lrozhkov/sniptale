@@ -5,6 +5,15 @@
   const image = dialog.querySelector('img');
   const caption = dialog.querySelector('figcaption');
   const zoom = dialog.querySelector('[data-zoom]');
+  const fit = dialog.querySelector('[data-fit]');
+  const viewport = dialog.querySelector('[data-viewport]');
+  const close = dialog.querySelector('[data-close]');
+  const setZoom = (full) => {
+    dialog.dataset.zoom = full ? 'full' : 'fit';
+    zoom.setAttribute('aria-pressed', String(full));
+    fit.setAttribute('aria-pressed', String(!full));
+    viewport.scrollTo(0, 0);
+  };
   let trigger;
   for (const button of globalThis.document.querySelectorAll('[data-guide-open]')) {
     button.hidden = false;
@@ -16,21 +25,19 @@
       caption.textContent = button.dataset.caption;
       const alignment = button.dataset.captionAlignment;
       caption.style.textAlign = alignment === 'start' || alignment === 'end' ? alignment : 'center';
-      dialog.dataset.zoom = 'fit';
-      zoom.setAttribute('aria-pressed', 'false');
+      setZoom(false);
       trigger = button;
       dialog.showModal();
+      viewport.scrollTo(0, 0);
+      close.focus({ preventScroll: true });
     });
   }
-  zoom.addEventListener('click', () => {
-    const full = dialog.dataset.zoom !== 'full';
-    dialog.dataset.zoom = full ? 'full' : 'fit';
-    zoom.setAttribute('aria-pressed', String(full));
-  });
-  dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+  zoom.addEventListener('click', () => setZoom(true));
+  fit.addEventListener('click', () => setZoom(false));
+  close.addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => {
     image.removeAttribute('src');
-    trigger?.focus();
+    trigger?.focus({ preventScroll: true });
   });
 })();
 

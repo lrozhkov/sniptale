@@ -1,7 +1,10 @@
 import { SCENARIO_PREVIEW_MAX_BYTES } from './preview-contract';
 
-// Bundled guide runtime before caption alignment (110c14f9a); immutable saved exports retain it.
-const retainedGuideRuntimeHash = 'dzYMBa1Mh84duGVb11ECbGEj5Zso1ZXmoUwZj2Jp9fs=';
+// Immutable saved exports retain these exact previously bundled guide runtimes.
+const retainedGuideRuntimeHashes = [
+  'dzYMBa1Mh84duGVb11ECbGEj5Zso1ZXmoUwZj2Jp9fs=', // Before caption alignment (110c14f9a).
+  'Om79Cdbfp0CYdQb8K01kOmAsY7YHTTtCrkrwSnNfFHo=', // Before viewer controls (2367c5e618).
+];
 
 /** Runs only in the opaque sandbox: inert admission precedes mounting the original saved Blob. */
 export async function admitSavedScenarioHtml(
@@ -22,7 +25,8 @@ export async function admitSavedScenarioHtml(
     policies[0]?.getAttribute('http-equiv')?.toLowerCase() !== 'content-security-policy'
   )
     return false;
-  const trustedHashes = mode === 'guide' ? [scriptHash, retainedGuideRuntimeHash] : [scriptHash];
+  const trustedHashes =
+    mode === 'guide' ? [scriptHash, ...retainedGuideRuntimeHashes] : [scriptHash];
   const admittedHash = trustedHashes.find((hash) => {
     const expectedPolicy =
       mode === 'guide'
