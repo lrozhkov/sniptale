@@ -1,3 +1,5 @@
+import { loadSettings } from '../settings';
+import { resolveInitialStorageClass } from '../library-lifecycle/policy';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import type { EditorDocument } from '../../../features/editor/document/types';
@@ -61,6 +63,7 @@ interface PreparedImageWorkspaceInput extends Omit<
   'document' | 'reusableAssetsByRuntimeUrl'
 > {
   document: PersistedEditorDocumentV3;
+  initialStorageClass?: 'temporary' | 'library';
   refs: AssetRef[];
 }
 
@@ -108,7 +111,7 @@ function createNewImageAggregateRoot(
     id: input.aggregateId,
     imageContentState: 'original',
     kind: 'image',
-    lifecycle: createLibraryLifecycle('temporary', now),
+    lifecycle: createLibraryLifecycle(input.initialStorageClass ?? 'temporary', now),
     mimeType: prepared.originalBlob.type || 'image/png',
     originalFilename: filename,
     size: prepared.originalBlob.size,
@@ -311,6 +314,10 @@ export async function commitImageWorkspace(
   // staged assets hold shared transition leases or admission could queue behind them.
   await initDB();
   await recoverImageWorkspacePublications();
+  const initialStorageClass =
+    input.expectedRevision === 0 && !input.requireExistingRoot
+      ? resolveInitialStorageClass(await loadSettings(), 'image')
+      : undefined;
   const preparedDocument = await preparePersistedEditorDocument(input.document, {
     ...(input.reusableAssetsByRuntimeUrl
       ? { reusableAssetsByRuntimeUrl: input.reusableAssetsByRuntimeUrl }
@@ -320,6 +327,7 @@ export async function commitImageWorkspace(
   const preparedInput: PreparedImageWorkspaceInput = {
     ...serializableInput,
     document: preparedDocument.document,
+    ...(initialStorageClass === undefined ? {} : { initialStorageClass }),
     refs: preparedDocument.refs,
   };
   let journalCreated = false;
@@ -362,6 +370,13 @@ export async function commitImageWorkspace(
 
 function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWorkspaceInput | null {
   if (!isRecord(value)) return null;
+  const initialStorageClass = value['initialStorageClass'];
+  if (
+    initialStorageClass !== undefined &&
+    initialStorageClass !== 'temporary' &&
+    initialStorageClass !== 'library'
+  )
+    return null;
   const document = parsePersistedEditorDocument(value['document']);
   if (
     !document ||
@@ -419,6 +434,7 @@ function parseImageWorkspacePublicationPayload(value: unknown): PreparedImageWor
   }
   return {
     aggregateId: value['aggregateId'],
+    ...(initialStorageClass === undefined ? {} : { initialStorageClass }),
     document,
     expectedRevision: value['expectedRevision'],
     ...(captureTime === undefined ? {} : { captureTime }),

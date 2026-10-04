@@ -6,6 +6,7 @@ import { createPersistedEditorDocumentFixture } from '../document-assets/test-su
 const mocks = vi.hoisted(() => ({
   blobToDataUrl: vi.fn(async () => 'data:image/png;base64,b3JpZ2luYWw='),
   createThumbnail: vi.fn(async () => new Blob(['original-thumbnail'])),
+  loadSettings: vi.fn(),
   getMedia: vi.fn(),
   getPresentation: vi.fn(),
   getWorkspace: vi.fn(),
@@ -17,6 +18,11 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: mocks.initDB,
+}));
+
+vi.mock('../settings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../settings')>()),
+  loadSettings: mocks.loadSettings,
 }));
 
 vi.mock('../assets', async (importOriginal) => ({
@@ -211,6 +217,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(Date, 'now').mockReturnValue(10);
   mocks.assetSequence = 0;
+  mocks.loadSettings.mockResolvedValue({ localStoragePolicy: { defaultDestination: 'temporary' } });
   mocks.initDB.mockResolvedValue({ get: vi.fn(async () => undefined) });
 });
 
