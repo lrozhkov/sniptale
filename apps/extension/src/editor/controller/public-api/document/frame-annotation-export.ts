@@ -20,6 +20,7 @@ export async function renderEditorWithFrameAnnotations(options: {
   draftPolicy?: FrameAnnotationDraftRenderPolicy;
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
+  options.renderOptions.signal?.throwIfAborted();
   const canvas = options.canvas;
   if (!canvas) {
     if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
@@ -36,6 +37,7 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
   draftPolicy?: FrameAnnotationDraftRenderPolicy;
   renderOptions: EditorRenderToDataUrlOptions;
 }): Promise<string> {
+  options.renderOptions.signal?.throwIfAborted();
   if (options.draftPolicy !== 'committed') flushActiveFrameAnnotationDraft();
   const { canvas } = options;
   const entries = collectFrameAnnotationProxies(canvas.getObjects());
@@ -44,6 +46,7 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
   const signature = createCanvasVisualSignature(canvas);
   const output = await rasterizeFrameAnnotations({
     transport: frameAnnotationRasterTransport,
+    ...(options.renderOptions.signal ? { signal: options.renderOptions.signal } : {}),
     input: {
       baseImage: await renderBaseImage(
         canvas,
@@ -62,7 +65,9 @@ async function renderEditorWithFrameAnnotationsInTurn(options: {
     },
     isCurrent: () => createCanvasVisualSignature(canvas) === signature,
   });
+  options.renderOptions.signal?.throwIfAborted();
   const result = await convertRasterBlob(output.blob, options.renderOptions);
+  options.renderOptions.signal?.throwIfAborted();
   if (createCanvasVisualSignature(canvas) !== signature) {
     throw new Error('Frame annotation raster result is stale');
   }

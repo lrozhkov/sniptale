@@ -101,7 +101,10 @@ it('keeps restored file URLs alive after save-as-copy and through the next autos
   await expect(autosaveService.persistSnapshot(() => document)).resolves.toBeUndefined();
   await vi.advanceTimersByTimeAsync(3_001);
   expect(renderForExport).toHaveBeenCalledTimes(2);
-  expect(renderForExport).toHaveBeenLastCalledWith({ format: 'png', quality: 1 }, 'committed');
+  expect(renderForExport).toHaveBeenLastCalledWith(
+    { format: 'png', quality: 1, signal: expect.any(AbortSignal) },
+    'committed'
+  );
   expect(mocks.commitWorkspace).toHaveBeenCalledWith(
     expect.objectContaining({ aggregateId: 'image-copy', document })
   );

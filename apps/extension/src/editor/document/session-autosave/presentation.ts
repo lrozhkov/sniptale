@@ -3,7 +3,6 @@ import {
   StaleImageWorkspaceError,
 } from '../../../composition/persistence/image-aggregates';
 import { publishMediaHubLibraryChanged } from '../../../features/media-hub/events';
-import { translate } from '../../../platform/i18n';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -33,33 +32,26 @@ function isCurrentPresentation(
   );
 }
 
-function reportPresentationFailure(state: EditorSessionAutosaveState, error: unknown): void {
-  if (error instanceof StaleImageWorkspaceError) {
-    state.lastWriteError = error;
-  } else {
-    logger.warn('Failed to update image presentation', error);
-    state.presentationError = true;
-    useEditorStore
-      .getState()
-      .setSaveErrorMessage(translate('editor.documentActions.previewErrorDescription'));
-  }
-  useEditorStore.getState().setSaveState('error');
-}
-
 async function updateImagePresentation(
   context: ActiveEditorSessionContext,
   revision: number,
   editRevision: number,
   state: EditorSessionAutosaveState,
   contextGeneration: number,
-  surfaceFailure = false
+  signal: AbortSignal
 ): Promise<void> {
   if (!context.renderPresentation) return;
+  const interactionRevision = state.interactionRevision;
   const isCurrent = () =>
+    !signal.aborted &&
+    !state.interactionActive &&
+    state.interactionRevision === interactionRevision &&
     isCurrentPresentation(state, context, contextGeneration, revision, editRevision);
   if (!isCurrent()) return;
   try {
-    const previewBlob = await dataUrlToBlob(await context.renderPresentation());
+    const previewDataUrl = await context.renderPresentation(signal);
+    if (!isCurrent()) return;
+    const previewBlob = await dataUrlToBlob(previewDataUrl);
     if (!isCurrent()) return;
     const thumbnailBlob = await createImageThumbnailBlob(previewBlob);
     if (!isCurrent()) return;
@@ -71,51 +63,52 @@ async function updateImagePresentation(
     });
     publishMediaHubLibraryChanged('update', [context.aggregateId]);
     if (isCurrent()) {
-      state.presentationError = false;
-      state.presentationRetryBlocked = false;
+      state.presentationPending = false;
+      state.presentationRetryAttempt = 0;
       state.lastWriteError = null;
       useEditorStore.getState().setSaveErrorMessage(null);
       useEditorStore.getState().setSaveState('saved');
     }
   } catch (error) {
-    if (isCurrent()) reportPresentationFailure(state, error);
-    else if (!(error instanceof StaleImageWorkspaceError)) {
-      logger.warn('Failed to update image presentation', error);
+    if (isCurrent()) {
+      if (error instanceof StaleImageWorkspaceError) {
+        state.lastWriteError = error;
+        useEditorStore.getState().setSaveState('error');
+      } else {
+        state.presentationRetryAttempt = Math.min(state.presentationRetryAttempt + 1, 5);
+        logger.debug('Image presentation deferred');
+      }
     }
-    if (surfaceFailure) throw error;
   }
 }
 
-export async function retryImagePresentation(state: EditorSessionAutosaveState): Promise<void> {
+function startImagePresentation(
+  context: ActiveEditorSessionContext,
+  revision: number,
+  editRevision: number,
+  state: EditorSessionAutosaveState
+): Promise<void> {
   if (state.presentationRetryPromise) return state.presentationRetryPromise;
-  const context = state.activeContext;
-  if (!context || !context.renderPresentation) return;
-  if (state.hasUnsavedChanges || state.pendingDocument) {
-    state.presentationError = true;
-    state.presentationRetryBlocked = true;
-    useEditorStore
-      .getState()
-      .setSaveErrorMessage(translate('editor.documentActions.previewRequiresSavedDocument'));
-    useEditorStore.getState().setSaveState('error');
-    throw new Error('Preview retry requires a clean durable workspace.');
-  }
-  clearPendingPresentationTimer(state);
-  state.presentationRetryBlocked = false;
-  useEditorStore.getState().setSaveState('saving');
-  const retry = updateImagePresentation(
+  const abortController = new AbortController();
+  state.presentationAbortController = abortController;
+  const task = updateImagePresentation(
     context,
-    context.durableRevision,
-    state.autosaveRevision,
+    revision,
+    editRevision,
     state,
     state.contextGeneration,
-    true
+    abortController.signal
   );
-  state.presentationRetryPromise = retry;
-  try {
-    await retry;
-  } finally {
-    if (state.presentationRetryPromise === retry) state.presentationRetryPromise = null;
-  }
+  state.presentationRetryPromise = task;
+  return task.finally(() => {
+    if (state.presentationRetryPromise !== task) return;
+    state.presentationRetryPromise = null;
+    state.presentationAbortController = null;
+    const current = state.activeContext;
+    if (current && state.presentationPending && !state.lastWriteError) {
+      scheduleImagePresentation(current, current.durableRevision, state.autosaveRevision, state);
+    }
+  });
 }
 
 export function scheduleImagePresentation(
@@ -126,9 +119,21 @@ export function scheduleImagePresentation(
 ): void {
   clearPendingPresentationTimer(state);
   if (!context.renderPresentation) return;
+  state.presentationPending = true;
+  if (
+    state.interactionActive ||
+    state.hasUnsavedChanges ||
+    state.pendingDocument ||
+    state.presentationRetryPromise
+  )
+    return;
   const contextGeneration = state.contextGeneration;
-  state.presentationTimer = window.setTimeout(() => {
-    state.presentationTimer = 0;
-    void updateImagePresentation(context, revision, editRevision, state, contextGeneration);
-  }, EDITOR_PRESENTATION_DEBOUNCE_MS);
+  state.presentationTimer = window.setTimeout(
+    () => {
+      state.presentationTimer = 0;
+      if (state.contextGeneration !== contextGeneration || state.interactionActive) return;
+      void startImagePresentation(context, revision, editRevision, state);
+    },
+    Math.min(60_000, EDITOR_PRESENTATION_DEBOUNCE_MS * 2 ** state.presentationRetryAttempt)
+  );
 }

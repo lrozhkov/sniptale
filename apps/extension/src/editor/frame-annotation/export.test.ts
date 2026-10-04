@@ -373,3 +373,44 @@ it.each([
   expect(toDataURL).toHaveBeenCalledWith(fixture.mime, fixture.encodedQuality);
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:raster');
 });
+
+it('discards a cancelled raster result and skips a cancelled export waiting in the canvas queue', async () => {
+  const { canvas, proxy } = createCanvas();
+  const output = {
+    blob: new Blob(['output']),
+    metadata: { downscaled: false, outputHeight: 100, outputScale: 1, outputWidth: 200 },
+  };
+  let finish: (value: typeof output) => void = () => undefined;
+  mocks.rasterize.mockImplementationOnce(
+    () =>
+      new Promise<typeof output>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const active = new AbortController();
+  const queued = new AbortController();
+  const options = {
+    canvas: createFabricCanvasFixture(canvas),
+    canvasDocumentSize: { width: 200, height: 100 },
+    draftPolicy: 'committed' as const,
+  };
+  const rendering = renderEditorWithFrameAnnotations({
+    ...options,
+    renderOptions: { format: 'png', quality: 1, signal: active.signal },
+  });
+  const waiting = renderEditorWithFrameAnnotations({
+    ...options,
+    renderOptions: { format: 'png', quality: 1, signal: queued.signal },
+  });
+  const abortedRendering = expect(rendering).rejects.toMatchObject({ name: 'AbortError' });
+  const abortedWaiting = expect(waiting).rejects.toMatchObject({ name: 'AbortError' });
+  await vi.waitFor(() => expect(mocks.rasterize).toHaveBeenCalledOnce());
+  expect(mocks.rasterize).toHaveBeenCalledWith(expect.objectContaining({ signal: active.signal }));
+  active.abort();
+  queued.abort();
+  finish(output);
+  await Promise.all([abortedRendering, abortedWaiting]);
+  expect(mocks.rasterize).toHaveBeenCalledOnce();
+  expect(mocks.blobToDataUrl).not.toHaveBeenCalled();
+  expect(proxy.visible).toBe(true);
+});

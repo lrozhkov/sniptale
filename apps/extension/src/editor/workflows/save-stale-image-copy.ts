@@ -34,8 +34,11 @@ export async function saveStaleEditorImageCopy(args: {
   args.autosaveService.rebindAggregate({
     aggregateId: targetAggregateId,
     durableRevision: 1,
-    renderPresentation: () =>
-      args.controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
+    renderPresentation: (signal) =>
+      args.controller.renderForExport(
+        { format: 'png', quality: 1, ...(signal ? { signal } : {}) },
+        'committed'
+      ),
     sourceTitle: args.pageTitle,
     sourceUrl: null,
   });

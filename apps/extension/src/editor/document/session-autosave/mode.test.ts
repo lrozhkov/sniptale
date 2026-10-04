@@ -128,3 +128,110 @@ describe('image autosave mode', () => {
     expect(autosave.isEnabled()).toBe(true);
   });
 });
+
+it('defers document and preview work during a gesture and resumes after the idle delay', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
+  autosave.activate({
+    aggregateId: 'image-1',
+    durableRevision: 0,
+    renderPresentation,
+    sourceTitle: null,
+    sourceUrl: null,
+  });
+  autosave.scheduleAutosave(createDocument('completed edit'));
+  autosave.setInteractionActive(true);
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(commitWorkspaceMock).not.toHaveBeenCalled();
+  expect(renderPresentation).not.toHaveBeenCalled();
+  autosave.setInteractionActive(false);
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(3_000);
+  expect(renderPresentation).toHaveBeenCalledOnce();
+  autosave.dispose();
+});
+
+it('cancels an in-flight preview when input resumes and never publishes its late result', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const autosave = createEditorSessionAutosaveService();
+  let finishRender: (value: string) => void = () => undefined;
+  const renderPresentation = vi.fn(
+    (_signal?: AbortSignal) =>
+      new Promise<string>((resolve) => {
+        finishRender = resolve;
+      })
+  );
+  autosave.activate({
+    aggregateId: 'image-1',
+    durableRevision: 0,
+    renderPresentation,
+    sourceTitle: null,
+    sourceUrl: null,
+  });
+  await autosave.saveNow(() => createDocument('saved'));
+  await vi.advanceTimersByTimeAsync(3_000);
+  const signal = renderPresentation.mock.calls[0]?.[0];
+  autosave.setInteractionActive(true);
+  expect(signal?.aborted).toBe(true);
+  finishRender('data:image/png;base64,cHJldmlldw==');
+  await vi.advanceTimersByTimeAsync(0);
+  expect(commitPresentationMock).not.toHaveBeenCalled();
+  autosave.dispose();
+});
+
+it('automatically recovers a temporary preview failure without marking the saved document failed', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  const autosave = createEditorSessionAutosaveService();
+  const renderPresentation = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('temporary renderer unavailable'))
+    .mockResolvedValue('data:image/png;base64,cHJldmlldw==');
+  autosave.activate({
+    aggregateId: 'image-1',
+    durableRevision: 0,
+    renderPresentation,
+    sourceTitle: null,
+    sourceUrl: null,
+  });
+  await autosave.saveNow(() => createDocument('saved document'));
+  await vi.advanceTimersByTimeAsync(3_000);
+  expect(renderPresentation).toHaveBeenCalledOnce();
+  expect(useEditorStore.getState().saveState).toBe('saved');
+  expect(useEditorStore.getState().saveErrorMessage).toBeNull();
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(renderPresentation).toHaveBeenCalledTimes(2);
+  expect(commitPresentationMock).toHaveBeenCalledOnce();
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  autosave.dispose();
+});
+
+it('recovers a restored preview without marking its saved document failed', async () => {
+  const { createEditorSessionAutosaveService } = await import('./');
+  const { useEditorStore } = await import('../../state/useEditorStore');
+  const autosave = createEditorSessionAutosaveService();
+  const renderPresentation = vi
+    .fn()
+    .mockRejectedValueOnce(new Error('temporary restore preview failure'))
+    .mockResolvedValue('data:image/png;base64,cHJldmlldw==');
+  autosave.activate({
+    aggregateId: 'restored',
+    durableRevision: 4,
+    sourceTitle: null,
+    sourceUrl: null,
+    renderPresentation,
+  });
+  useEditorStore.getState().setSaveState('saved');
+  autosave.schedulePresentation();
+  await vi.advanceTimersByTimeAsync(3_000);
+  expect(useEditorStore.getState().saveState).toBe('saved');
+  expect(useEditorStore.getState().saveErrorMessage).toBeNull();
+  await vi.advanceTimersByTimeAsync(6_000);
+  expect(commitPresentationMock).toHaveBeenCalledWith(
+    expect.objectContaining({ expectedWorkspaceRevision: 4 })
+  );
+  expect(commitWorkspaceMock).not.toHaveBeenCalled();
+  autosave.dispose();
+});

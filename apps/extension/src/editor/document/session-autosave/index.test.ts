@@ -2,7 +2,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../page-session/document.test-support';
-import { translate } from '../../../platform/i18n';
 
 vi.setConfig({ testTimeout: 20_000 });
 
@@ -90,43 +89,30 @@ function createDocument(sourceImageData: string) {
   return { ...createEditorDocumentFixture(), sourceImageData };
 }
 
-describe('presentation retry admission', () => {
-  it('refuses retry while autosave is off and the canvas contains unsaved edits', async () => {
+describe('presentation scheduling admission', () => {
+  it('defers presentation while autosave is off and the canvas contains unsaved edits', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
-    const { useEditorStore } = await import('../../state/useEditorStore');
     const autosave = createEditorSessionAutosaveService();
     const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
-    autosave.activate({
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      renderPresentation,
-      sourceTitle: null,
-      sourceUrl: null,
-    });
+    activate(autosave);
+    autosave.updateContext({ durableRevision: 4, renderPresentation });
     autosave.setEnabled(false);
-    autosave.scheduleAutosave(createDocument('unsaved canvas'));
-
-    await expect(autosave.retryPresentation()).rejects.toThrow();
+    autosave.scheduleAutosave(createDocument('unsaved'));
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(renderPresentation).not.toHaveBeenCalled();
     expect(commitPresentationMock).not.toHaveBeenCalled();
-    expect(useEditorStore.getState().saveState).not.toBe('saved');
-    expect(useEditorStore.getState().saveErrorMessage).toBe(
-      translate('editor.documentActions.previewRequiresSavedDocument')
-    );
+    expect(autosave.hasUnsavedChanges()).toBe(true);
+    expect(autosave.getLastWriteError()).toBeNull();
     autosave.dispose();
   });
 
-  it('refuses retry while a newer workspace write is in flight', async () => {
+  it('waits for a newer workspace write before presenting its durable revision', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const autosave = createEditorSessionAutosaveService();
     const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
-    autosave.activate({
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      renderPresentation,
-      sourceTitle: null,
-      sourceUrl: null,
-    });
+    activate(autosave);
+    autosave.updateContext({ durableRevision: 4, renderPresentation });
     let finishWrite: (value: unknown) => void = () => undefined;
     commitWorkspaceMock.mockImplementationOnce(
       () =>
@@ -134,173 +120,138 @@ describe('presentation retry admission', () => {
           finishWrite = resolve;
         })
     );
-    const save = autosave.persistSnapshot(() => createDocument('newer canvas'));
-    await vi.waitFor(() => expect(commitWorkspaceMock).toHaveBeenCalledOnce());
-
-    await expect(autosave.retryPresentation()).rejects.toThrow();
+    const save = autosave.persistSnapshot(() => createDocument('newer'));
+    await vi.advanceTimersByTimeAsync(0);
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(renderPresentation).not.toHaveBeenCalled();
-    expect(commitPresentationMock).not.toHaveBeenCalled();
-    finishWrite({ aggregateId: 'image-1', revision: 5, documentAssetsByRuntimeUrl: new Map() });
+    finishWrite({ revision: 5, documentAssetsByRuntimeUrl: new Map() });
     await save;
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(commitPresentationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedWorkspaceRevision: 5 })
+    );
     autosave.dispose();
   });
 });
 
-describe('presentation retry recovery', () => {
-  it('retries a restored revision without committing the workspace and surfaces a failed render', async () => {
-    const { createEditorSessionAutosaveService } = await import('./');
-    const { useEditorStore } = await import('../../state/useEditorStore');
-    const autosave = createEditorSessionAutosaveService();
-    const renderPresentation = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('render failed'))
-      .mockResolvedValueOnce('data:image/png;base64,cHJldmlldw==');
-    autosave.activate({
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      renderPresentation,
-      sourceTitle: null,
-      sourceUrl: null,
-    });
-    await expect(autosave.retryPresentation()).rejects.toThrow('render failed');
-    expect(useEditorStore.getState().saveErrorMessage).toBeTruthy();
-    expect(commitWorkspaceMock).not.toHaveBeenCalled();
-    await autosave.retryPresentation();
-    expect(commitPresentationMock).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedWorkspaceRevision: 4 })
-    );
-    expect(publishLibraryChangedMock).toHaveBeenCalledWith('update', ['image-1']);
-    expect(useEditorStore.getState().saveErrorMessage).toBeNull();
-    autosave.dispose();
-  });
-
-  it.each(['thumbnail', 'commit'] as const)(
-    'keeps presentation %s failure retryable',
+describe('automatic presentation recovery', () => {
+  it.each(['render', 'thumbnail', 'commit'] as const)(
+    'retries transient %s failures without rewriting the workspace',
     async (stage) => {
       const { createEditorSessionAutosaveService } = await import('./');
+      const { useEditorStore } = await import('../../state/useEditorStore');
       const autosave = createEditorSessionAutosaveService();
       const renderPresentation = vi.fn(async () => 'data:image/png;base64,cHJldmlldw==');
-      autosave.activate({
-        aggregateId: 'image-1',
-        durableRevision: 7,
-        renderPresentation,
-        sourceTitle: null,
-        sourceUrl: null,
-      });
-      const failedStep = stage === 'thumbnail' ? createThumbnailMock : commitPresentationMock;
+      activate(autosave);
+      autosave.updateContext({ durableRevision: 7, renderPresentation });
+      useEditorStore.getState().setSaveState('saved');
+      const failedStep =
+        stage === 'render'
+          ? renderPresentation
+          : stage === 'thumbnail'
+            ? createThumbnailMock
+            : commitPresentationMock;
       failedStep.mockRejectedValueOnce(new Error(`${stage} failed`));
-      await expect(autosave.retryPresentation()).rejects.toThrow(`${stage} failed`);
-      expect(autosave.hasPresentationError()).toBe(true);
-      expect(commitWorkspaceMock).not.toHaveBeenCalled();
-      await autosave.retryPresentation();
-      expect(autosave.hasPresentationError()).toBe(false);
+      autosave.schedulePresentation();
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(useEditorStore.getState().saveState).toBe('saved');
+      expect(useEditorStore.getState().saveErrorMessage).toBeNull();
+      await vi.advanceTimersByTimeAsync(6_000);
       expect(commitPresentationMock).toHaveBeenCalledWith(
         expect.objectContaining({ expectedWorkspaceRevision: 7 })
       );
+      expect(publishLibraryChangedMock).toHaveBeenCalledWith('update', ['image-1']);
+      expect(commitWorkspaceMock).not.toHaveBeenCalled();
       autosave.dispose();
     }
   );
-});
 
-describe('presentation retry across revisions and sessions', () => {
-  it('discards a retry render superseded by a newer edit', async () => {
+  it('resumes a restored preview after input aborts its first render', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const autosave = createEditorSessionAutosaveService();
-    let finishRender: (value: string) => void = () => undefined;
-    const renderPresentation = vi.fn(
-      () =>
-        new Promise<string>((resolve) => {
-          finishRender = resolve;
-        })
-    );
-    autosave.activate({
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      renderPresentation,
-      sourceTitle: null,
-      sourceUrl: null,
+    let finish: (value: string) => void = () => undefined;
+    const renderPresentation = vi
+      .fn((_signal?: AbortSignal) => Promise.resolve('data:image/png;base64,bmV3'))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          })
+      );
+    activate(autosave);
+    autosave.updateContext({ durableRevision: 4, renderPresentation });
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(3_000);
+    autosave.setInteractionActive(true);
+    expect(renderPresentation.mock.calls[0]?.[0]?.aborted).toBe(true);
+    finish('data:image/png;base64,b2xk');
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(commitPresentationMock).not.toHaveBeenCalled();
+    autosave.setInteractionActive(false);
+    await vi.advanceTimersByTimeAsync(3_000);
+    expect(renderPresentation).toHaveBeenCalledTimes(2);
+    expect(commitPresentationMock).toHaveBeenCalledOnce();
+    expect(commitWorkspaceMock).not.toHaveBeenCalled();
+    autosave.dispose();
+  });
+});
+
+describe('presentation across revisions and sessions', () => {
+  it('discards a render superseded by a newer edit', async () => {
+    const { createEditorSessionAutosaveService } = await import('./');
+    const autosave = createEditorSessionAutosaveService();
+    let finish: (value: string) => void = () => undefined;
+    activate(autosave);
+    autosave.updateContext({
+      renderPresentation: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
     });
-    const retry = autosave.retryPresentation();
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(3_000);
     autosave.scheduleAutosave(createDocument('newer'));
-    finishRender('data:image/png;base64,cHJldmlldw==');
-    await retry;
+    finish('data:image/png;base64,b2xk');
+    await vi.advanceTimersByTimeAsync(0);
     expect(commitPresentationMock).not.toHaveBeenCalled();
     autosave.dispose();
   });
 
-  it('discards a render from a disposed context reactivated at the same revision', async () => {
-    const { createEditorSessionAutosaveService } = await import('./');
-    const autosave = createEditorSessionAutosaveService();
-    let finishRender: (value: string) => void = () => undefined;
-    const oldRender = vi.fn(
-      () =>
-        new Promise<string>((resolve) => {
-          finishRender = resolve;
-        })
-    );
-    autosave.activate({
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      renderPresentation: oldRender,
-      sourceTitle: null,
-      sourceUrl: null,
-    });
-    const retry = autosave.retryPresentation();
-    autosave.dispose();
-    autosave.activate({
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      renderPresentation: vi.fn(async () => 'data:image/png;base64,bmV3'),
-      sourceTitle: null,
-      sourceUrl: null,
-    });
-    await autosave.retryPresentation();
-    expect(commitPresentationMock).toHaveBeenCalledTimes(1);
-    finishRender('data:image/png;base64,b2xk');
-    await retry;
-    expect(commitPresentationMock).toHaveBeenCalledTimes(1);
-    autosave.dispose();
-  });
-  it('keeps a newer pending retry deduplicated after an old context finishes', async () => {
+  it('keeps a newer render deduplicated after a disposed context at the same revision finishes', async () => {
     const { createEditorSessionAutosaveService } = await import('./');
     const autosave = createEditorSessionAutosaveService();
     let finishOld: (value: string) => void = () => undefined;
     let finishNew: (value: string) => void = () => undefined;
-    const context = {
-      aggregateId: 'image-1',
-      durableRevision: 4,
-      sourceTitle: null,
-      sourceUrl: null,
-    };
-    autosave.activate({
-      ...context,
+    activate(autosave);
+    autosave.updateContext({
       renderPresentation: () =>
-        new Promise<string>((resolve) => {
+        new Promise((resolve) => {
           finishOld = resolve;
         }),
     });
-    const oldRetry = autosave.retryPresentation();
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(3_000);
     autosave.dispose();
-    const newRender = vi.fn(
+    activate(autosave);
+    const renderNew = vi.fn(
       () =>
         new Promise<string>((resolve) => {
           finishNew = resolve;
         })
     );
-    autosave.activate({ ...context, renderPresentation: newRender });
-    const newRetry = autosave.retryPresentation();
+    autosave.updateContext({ renderPresentation: renderNew });
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(3_000);
     finishOld('data:image/png;base64,b2xk');
-    await oldRetry;
-    const duplicate = autosave.retryPresentation();
-    expect(newRender).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(0);
+    autosave.schedulePresentation();
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(renderNew).toHaveBeenCalledOnce();
     expect(commitPresentationMock).not.toHaveBeenCalled();
     finishNew('data:image/png;base64,bmV3');
-    await Promise.all([newRetry, duplicate]);
-    expect(commitPresentationMock).toHaveBeenCalledTimes(1);
-    const nextRetry = autosave.retryPresentation();
-    expect(newRender).toHaveBeenCalledTimes(2);
-    finishNew('data:image/png;base64,bmV3');
-    await nextRetry;
+    await vi.advanceTimersByTimeAsync(0);
+    expect(commitPresentationMock).toHaveBeenCalledOnce();
     autosave.dispose();
   });
 });
@@ -358,7 +309,7 @@ describe('image aggregate autosave', () => {
     autosave.updateContext({ capturedAt: 3 });
     autosave.scheduleAutosave(createDocument('first'));
     const { useEditorStore } = await import('../../state/useEditorStore');
-    expect(useEditorStore.getState().saveState).toBe('saving');
+    expect(useEditorStore.getState().saveState).toBe('idle');
     await vi.advanceTimersByTimeAsync(1_500);
     const latest = createDocument('latest');
     autosave.scheduleAutosave(latest);
@@ -499,12 +450,8 @@ describe('image aggregate autosave', () => {
     commitPresentationMock.mockRejectedValueOnce(new Error('render storage failed'));
     await autosave.persistSnapshot(() => createDocument('presentation-failure'));
     await vi.advanceTimersByTimeAsync(3_000);
-    await vi.waitFor(() =>
-      expect(loggerWarnMock).toHaveBeenCalledWith(
-        'Failed to update image presentation',
-        expect.any(Error)
-      )
-    );
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+    expect(autosave.getLastWriteError()).toBeNull();
 
     loggerWarnMock.mockClear();
     commitPresentationMock.mockRejectedValueOnce(new StaleImageWorkspaceError('image-1'));
@@ -639,7 +586,7 @@ it('keeps the save indicator pending when another edit follows an in-flight writ
   autosave.scheduleAutosave(createDocument('second'));
   finishFirst({ revision: 1, documentAssetsByRuntimeUrl: new Map<never, never>() });
   await vi.advanceTimersByTimeAsync(0);
-  expect(useEditorStore.getState().saveState).toBe('saving');
+  expect(useEditorStore.getState().saveState).toBe('idle');
   await vi.advanceTimersByTimeAsync(2_000);
   expect(useEditorStore.getState().saveState).toBe('saved');
 });

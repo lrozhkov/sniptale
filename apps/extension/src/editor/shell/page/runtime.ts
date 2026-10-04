@@ -103,7 +103,7 @@ async function openRestoredEditorDraft(
   );
   if (isEditorPageBootstrapAborted(runtime, services, bootstrapRevision)) return;
   if (presentation?.presentationRevision !== durableRevision) {
-    void services.autosaveService.retryPresentation().catch(() => undefined);
+    services.autosaveService.schedulePresentation();
   }
 }
 
@@ -155,11 +155,12 @@ export async function openEditorBootstrapPayload(
     aggregateId,
     capturedAt,
     durableRevision: 0,
-    renderPresentation: () =>
+    renderPresentation: (signal) =>
       services.controller.renderForExport(
         {
           format: 'png',
           quality: 1,
+          ...(signal ? { signal } : {}),
           outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
         },
         'committed'
@@ -206,11 +207,12 @@ export async function bootstrapEditorPageSession(
   services.autosaveService.activate({
     aggregateId,
     durableRevision: 0,
-    renderPresentation: () =>
+    renderPresentation: (signal) =>
       services.controller.renderForExport(
         {
           format: 'png',
           quality: 1,
+          ...(signal ? { signal } : {}),
           outputSize: getAutosavePresentationSize(services.controller.canvasDocumentSize),
         },
         'committed'
@@ -266,4 +268,65 @@ export function flushEditorAutosaveIfNeeded(
   }
 
   void services.autosaveService.flushAutosave(() => services.controller.exportDocument());
+}
+
+/** Binds disposable input activity to the page-owned background scheduler. */
+export function bindEditorAutosaveActivity(
+  service: Pick<EditorSessionAutosaveService, 'setInteractionActive'>
+): () => void {
+  const pointers = new Set<number>();
+  let composing = false;
+  let inputTimer = 0;
+  const sync = () =>
+    service.setInteractionActive(pointers.size > 0 || composing || inputTimer !== 0);
+  const pulse = () => {
+    window.clearTimeout(inputTimer);
+    inputTimer = window.setTimeout(() => {
+      inputTimer = 0;
+      sync();
+    }, 500);
+    sync();
+  };
+  const down = (event: PointerEvent) => {
+    pointers.add(event.pointerId);
+    sync();
+  };
+  const up = (event: PointerEvent) => {
+    pointers.delete(event.pointerId);
+    sync();
+  };
+  const compositionStart = () => {
+    composing = true;
+    sync();
+  };
+  const compositionEnd = () => {
+    composing = false;
+    pulse();
+  };
+  const reset = () => {
+    pointers.clear();
+    composing = false;
+    window.clearTimeout(inputTimer);
+    inputTimer = 0;
+    sync();
+  };
+  window.addEventListener('pointerdown', down, true);
+  window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', up, true);
+  window.addEventListener('keydown', pulse, true);
+  window.addEventListener('input', pulse, true);
+  window.addEventListener('compositionstart', compositionStart, true);
+  window.addEventListener('compositionend', compositionEnd, true);
+  window.addEventListener('blur', reset);
+  return () => {
+    window.removeEventListener('pointerdown', down, true);
+    window.removeEventListener('pointerup', up, true);
+    window.removeEventListener('pointercancel', up, true);
+    window.removeEventListener('keydown', pulse, true);
+    window.removeEventListener('input', pulse, true);
+    window.removeEventListener('compositionstart', compositionStart, true);
+    window.removeEventListener('compositionend', compositionEnd, true);
+    window.removeEventListener('blur', reset);
+    reset();
+  };
 }

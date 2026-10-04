@@ -186,12 +186,12 @@ async function verifiesDraftPreviewRetryAfterHydration() {
     capturedAt: 1,
   });
   await bootstrapEditorPageSession(runtime, { autosaveService, controller } as never);
-  expect(autosaveService.retryPresentation).toHaveBeenCalledOnce();
+  expect(autosaveService.schedulePresentation).toHaveBeenCalledOnce();
   expect(controller.loadDocument.mock.invocationCallOrder[0]).toBeLessThan(
     getAggregatePresentationMock.mock.invocationCallOrder[0]!
   );
   expect(controller.loadDocument.mock.invocationCallOrder[0]).toBeLessThan(
-    autosaveService.retryPresentation.mock.invocationCallOrder[0]!
+    autosaveService.schedulePresentation.mock.invocationCallOrder[0]!
   );
   expect(autosaveService.saveNow).not.toHaveBeenCalled();
 }

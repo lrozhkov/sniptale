@@ -160,15 +160,16 @@ async function readImageWorkspaceRevision(page: Page, aggregateId: string): Prom
 }
 
 async function verifySaveErrorPopover(page: Page) {
-  const trigger = page.locator('[data-ui="editor.floating.document-bar.error-trigger"]');
-  const popup = page.locator('[data-ui="editor.floating.document-bar.save-error"]');
+  const trigger = page.locator('[data-ui="autosave-control"] button');
+  const popup = page.getByRole('dialog', { name: 'Не удалось сохранить изменения', exact: true });
   const toolbar = page.locator('[data-ui="editor.floating.document-bar"]');
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(popup).toBeVisible();
-  await expect(popup).toContainText('Изображение изменено в другой вкладке');
+  await expect(popup).toContainText('Сохраните свои правки отдельной копией');
   const expandedBar = await toolbar.boundingBox();
   const expandedPopup = await popup.boundingBox();
-  expect(expandedPopup!.y).toBeGreaterThanOrEqual(expandedBar!.y + expandedBar!.height + 8);
+  expect(expandedPopup!.width).toBeGreaterThan(0);
+  await expect(popup).toBeInViewport();
   await popup.getByRole('button', { name: 'Закрыть', exact: true }).click();
   await expect(popup).toHaveCount(0);
   expect((await toolbar.boundingBox())!.height).toBe(expandedBar!.height);
@@ -211,7 +212,7 @@ test('same image in two tabs rejects the stale publication and keeps the winner'
   await pageA.goto(editorHarnessUrl(hostOrigin, assetId), { waitUntil: 'domcontentloaded' });
   await waitForEditorReady(pageA);
   await expect(
-    pageA.locator('[data-ui="editor.floating.document-bar"] [data-state="saved"]')
+    pageA.getByRole('button', { name: 'Автосохранение: Сохранено', exact: true })
   ).toBeVisible();
   await expect.poll(() => readImageWorkspaceRevision(pageA, assetId)).toBe(1);
 
@@ -220,19 +221,19 @@ test('same image in two tabs rejects the stale publication and keeps the winner'
   await pageB.goto(editorHarnessUrl(hostOrigin, assetId), { waitUntil: 'domcontentloaded' });
   await waitForEditorReady(pageB);
   await expect(
-    pageB.locator('[data-ui="editor.floating.document-bar"] [data-state="saved"]')
+    pageB.getByRole('button', { name: 'Автосохранение: Сохранено', exact: true })
   ).toBeVisible();
   await expect.poll(() => readImageWorkspaceRevision(pageB, assetId)).toBe(2);
 
   await pageB.evaluate(() => window.__sniptaleEditorHarness?.applyBrowserFrameMutation());
   await expect(
-    pageB.locator('[data-ui="editor.floating.document-bar"] [data-state="saved"]')
+    pageB.getByRole('button', { name: 'Автосохранение: Сохранено', exact: true })
   ).toBeVisible();
   await expect.poll(() => readImageWorkspaceRevision(pageB, assetId)).toBe(3);
 
   await pageA.evaluate(() => window.__sniptaleEditorHarness?.applyBrowserFrameMutation());
   await expect(
-    pageA.locator('[data-ui="editor.floating.document-bar"] [data-state="error"]')
+    pageA.locator('[data-ui="autosave-control"] button[aria-expanded="true"]')
   ).toBeVisible();
   await expect.poll(() => readImageWorkspaceRevision(pageA, assetId)).toBe(3);
 
@@ -261,7 +262,7 @@ test('same image in two tabs rejects the stale publication and keeps the winner'
   await pageReopen.goto(editorHarnessUrl(hostOrigin, assetId), { waitUntil: 'domcontentloaded' });
   await waitForEditorReady(pageReopen);
   await expect(
-    pageReopen.locator('[data-ui="editor.floating.document-bar"] [data-state="saved"]')
+    pageReopen.getByRole('button', { name: 'Автосохранение: Сохранено', exact: true })
   ).toBeVisible();
   await expect.poll(() => readImageWorkspaceRevision(pageReopen, assetId)).toBe(4);
   // The reopened editor must show the winner's persisted document state, not a
@@ -860,5 +861,104 @@ for (const effect of ['Рамка', 'Фокус']) {
     await page.keyboard.press('Shift+Tab');
     await expect(tool).toBeFocused();
     expect(await tool.evaluate((button) => button.matches(':focus-visible'))).toBe(true);
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`long arrow gesture defers autosave until release in ${theme}`, async ({
+    page,
+    context,
+    hostOrigin,
+  }, testInfo) => {
+    const assetId = `e2e-held-arrow-${theme}`;
+    await page.setViewportSize({ width: 1680, height: 1000 });
+    await seedImageAssetBootstrap(page, {
+      id: assetId,
+      filename: 'held-arrow.png',
+      createdAt: Date.now(),
+    });
+    await page.goto(editorHarnessUrl(hostOrigin, assetId));
+    await waitForEditorReady(page);
+    await page.evaluate(
+      async ({ theme, apiBehavior }) => {
+        await chrome.storage.local.set({ 'sniptale-theme-preference': theme });
+        window.__sniptaleHarness?.setApiBehavior(apiBehavior);
+      },
+      { theme, apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR }
+    );
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await expect.poll(() => readImageWorkspaceRevision(page, assetId)).toBe(1);
+    await page.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+    const plane = await page.locator('[data-ui="editor.frame-annotation-plane"]').boundingBox();
+    const start = { x: plane!.x + plane!.width / 2 - 80, y: plane!.y + plane!.height / 2 - 50 };
+    await page.mouse.move(start.x, start.y);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 160, start.y + 100, { steps: 4 });
+    await page.mouse.up();
+    await page.locator('[data-ui="editor.floating.tool-rail.arrow"]').click();
+    await page.mouse.move(start.x, start.y + 120);
+    await page.mouse.down();
+    await page.mouse.move(start.x + 100, start.y + 150, { steps: 4 });
+    const rendersBeforeHold = (
+      await getRuntimeMessagesByType(page, MessageType.FRAME_ANNOTATION_RASTERIZE)
+    ).length;
+    await page.waitForTimeout(7_000);
+    expect(
+      (await getRuntimeMessagesByType(page, MessageType.FRAME_ANNOTATION_RASTERIZE)).length
+    ).toBe(rendersBeforeHold);
+    expect(await readImageWorkspaceRevision(page, assetId)).toBe(1);
+    await expect(
+      page.getByRole('dialog', { name: 'Не удалось сохранить изменения', exact: true })
+    ).toHaveCount(0);
+    const moveStarted = performance.now();
+    await page.mouse.move(start.x + 220, start.y + 170, { steps: 4 });
+    await testInfo.attach('held-arrow-input-timing', {
+      body: JSON.stringify({
+        theme,
+        fourStepMoveMs: performance.now() - moveStarted,
+        heldMs: 7_000,
+        backgroundRendersDuringHold: 0,
+      }),
+      contentType: 'application/json',
+    });
+    await page.mouse.up();
+    await expect.poll(() => readImageWorkspaceRevision(page, assetId)).toBeGreaterThan(1);
+    const committedCount = await page.evaluate(
+      () => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0
+    );
+    expect(committedCount).toBeGreaterThanOrEqual(3);
+    await page.locator('[data-ui="editor.floating.document-bar.close-file-button"]').click();
+    await page
+      .locator(
+        '[data-ui="editor.floating.document-bar.close-confirm"] [data-confirm-action="true"]'
+      )
+      .click();
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0)
+      )
+      .toBe(0);
+    const reopened = await context.newPage();
+    await preserveMediaLibraryBootstrap(reopened);
+    await reopened.goto(editorHarnessUrl(hostOrigin, assetId));
+    await waitForEditorReady(reopened);
+    await expect
+      .poll(() =>
+        reopened.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0)
+      )
+      .toBe(committedCount);
+    await expect(reopened.locator('[data-ui="editor.page.open-loading"]')).toHaveCount(0);
+    await reopened.locator('[data-ui="editor.floating.document-bar.close-file-button"]').click();
+    await reopened
+      .locator(
+        '[data-ui="editor.floating.document-bar.close-confirm"] [data-confirm-action="true"]'
+      )
+      .click();
+    await expect
+      .poll(() =>
+        reopened.evaluate(() => window.__sniptaleEditorHarness?.getCanvasObjects().length ?? 0)
+      )
+      .toBe(0);
+    await reopened.close();
   });
 }

@@ -96,6 +96,7 @@ function createServices() {
     autosaveService: {
       dispose: vi.fn(),
       hasUnsavedChanges: vi.fn(() => false),
+      setInteractionActive: vi.fn(),
     },
     controller: {
       dispose: vi.fn(),
@@ -290,6 +291,8 @@ describe('EditorPage', () => {
     );
     expect(bootstrapEditorPageSessionMock).not.toHaveBeenCalled();
     expect(openEditorBootstrapPayloadMock).not.toHaveBeenCalled();
+    window.dispatchEvent(new Event('pointerdown'));
+    expect(services.autosaveService.setInteractionActive).not.toHaveBeenCalled();
   });
 
   it(
@@ -304,4 +307,41 @@ describe('EditorPage', () => {
     'routes bootstrap events through the extracted runtime opener and disposes services on unmount',
     verifiesBootstrapEventRoutingAndDispose
   );
+  it('tracks held pointers and input idle time, and removes activity listeners on unmount', async () => {
+    vi.useFakeTimers();
+    try {
+      const services = createServices();
+      createEditorPageServicesMock.mockReturnValue(services);
+      applyEditorStoreState(createEditorStoreState());
+      await renderEditorPage();
+      const active = services.autosaveService.setInteractionActive;
+      const pointer = (type: string, pointerId: number) => {
+        const event = new Event(type);
+        Object.defineProperty(event, 'pointerId', { value: pointerId });
+        window.dispatchEvent(event);
+      };
+      pointer('pointerdown', 1);
+      pointer('pointerdown', 2);
+      pointer('pointerup', 1);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(active).toHaveBeenLastCalledWith(true);
+      pointer('pointercancel', 2);
+      expect(active).toHaveBeenLastCalledWith(false);
+      window.dispatchEvent(new Event('input'));
+      expect(active).toHaveBeenLastCalledWith(true);
+      await vi.advanceTimersByTimeAsync(499);
+      expect(active).toHaveBeenLastCalledWith(true);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(active).toHaveBeenLastCalledWith(false);
+      await act(async () => root?.unmount());
+      root = null;
+      active.mockClear();
+      pointer('pointerdown', 3);
+      window.dispatchEvent(new Event('input'));
+      await vi.advanceTimersByTimeAsync(1_000);
+      expect(active).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -14,6 +14,10 @@ vi.mock('../../../composition/persistence/image-aggregates', async (importOrigin
 beforeEach(() => {
   vi.useFakeTimers();
   commitWorkspaceMock.mockReset();
+  commitWorkspaceMock.mockImplementation(async (input) => ({
+    revision: input.expectedRevision + 1,
+    documentAssetsByRuntimeUrl: new Map(),
+  }));
 });
 afterEach(() => {
   useEditorStore.getState().setSaveState('idle');
@@ -63,5 +67,124 @@ it('serializes caption history snapshots while an earlier save is pending', asyn
   ]);
   expect(autosave.getLastWriteError()).toBeNull();
   expect(autosave.getDurableRevision()).toBe(3);
+  autosave.dispose();
+});
+
+function activate(autosave: ReturnType<typeof createEditorSessionAutosaveService>) {
+  autosave.activate({
+    aggregateId: 'image-1',
+    durableRevision: 0,
+    renderPresentation: null,
+    sourceTitle: 'Capture',
+    sourceUrl: null,
+  });
+}
+
+function createDocument(sourceImageData: string) {
+  return { ...createEditorDocumentFixture(), sourceImageData };
+}
+
+it('flushes edits arriving during the awaited write before allowing the document to close', async () => {
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let finishFirst: () => void = () => undefined;
+  const firstWrite = new Promise<void>((resolve) => {
+    finishFirst = resolve;
+  });
+  commitWorkspaceMock.mockImplementationOnce(async () => {
+    await firstWrite;
+    return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+  });
+  let current = createDocument('first');
+  const closing = autosave.flushAutosave(() => current);
+  await vi.advanceTimersByTimeAsync(0);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  current = createDocument('newest');
+  autosave.scheduleAutosave(current);
+  finishFirst();
+  await closing;
+  expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ document: current, expectedRevision: 1 })
+  );
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
+
+it('waits for the active gesture before flushing its final committed snapshot', async () => {
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  autosave.setInteractionActive(true);
+  let current = createDocument('before gesture');
+  const closing = autosave.flushAutosave(() => current);
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(commitWorkspaceMock).not.toHaveBeenCalled();
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  current = createDocument('finished gesture');
+  autosave.scheduleAutosave(current);
+  autosave.setInteractionActive(false);
+  await closing;
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  expect(commitWorkspaceMock).toHaveBeenCalledWith(expect.objectContaining({ document: current }));
+  expect(autosave.hasUnsavedChanges()).toBe(false);
+  autosave.dispose();
+});
+
+it('refuses an old close flush when its in-flight atomic write finishes after a context switch', async () => {
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let finishWrite: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(async () => {
+    await new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    return { revision: 9, documentAssetsByRuntimeUrl: new Map() };
+  });
+  const closing = autosave.flushAutosave(() => createDocument('old'));
+  const refused = expect(closing).rejects.toThrow('Editor document changed');
+  await vi.advanceTimersByTimeAsync(0);
+  autosave.activate({
+    aggregateId: 'new-image',
+    durableRevision: 2,
+    renderPresentation: null,
+    sourceTitle: null,
+    sourceUrl: null,
+  });
+  autosave.scheduleAutosave(createDocument('new'));
+  finishWrite();
+  await refused;
+  expect(autosave.getDurableRevision()).toBe(2);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  autosave.dispose();
+});
+
+it('finishes the atomic write when input resumes, then saves the newest snapshot after release', async () => {
+  const autosave = createEditorSessionAutosaveService();
+  activate(autosave);
+  let finishWrite: () => void = () => undefined;
+  commitWorkspaceMock.mockImplementationOnce(async () => {
+    await new Promise<void>((resolve) => {
+      finishWrite = resolve;
+    });
+    return { revision: 1, documentAssetsByRuntimeUrl: new Map() };
+  });
+  autosave.scheduleAutosave(createDocument('first'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  autosave.scheduleAutosave(createDocument('queued'));
+  await vi.advanceTimersByTimeAsync(2_000);
+  autosave.setInteractionActive(true);
+  autosave.scheduleAutosave(createDocument('newest'));
+  finishWrite();
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(commitWorkspaceMock).toHaveBeenCalledOnce();
+  expect(autosave.getDurableRevision()).toBe(1);
+  expect(autosave.hasUnsavedChanges()).toBe(true);
+  autosave.setInteractionActive(false);
+  await vi.advanceTimersByTimeAsync(2_000);
+  expect(commitWorkspaceMock).toHaveBeenCalledTimes(2);
+  expect(commitWorkspaceMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({ document: createDocument('newest'), expectedRevision: 1 })
+  );
+  expect(autosave.hasUnsavedChanges()).toBe(false);
   autosave.dispose();
 });

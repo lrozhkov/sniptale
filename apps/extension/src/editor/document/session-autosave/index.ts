@@ -12,12 +12,15 @@ import {
   flushPendingAutosave,
   persistAutosaveSnapshot,
   queuePendingAutosave,
+  schedulePendingAutosaveWrite,
   saveEditorSessionSnapshot,
   setEditorSaveState,
 } from './persistence';
-import { retryImagePresentation } from './presentation';
+import { scheduleImagePresentation } from './presentation';
 import {
   clearPendingAutosaveTimer,
+  interruptImagePresentation,
+  releaseAutosaveInteraction,
   createAutosaveState,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
@@ -32,6 +35,8 @@ export interface EditorSessionAutosaveService {
     isCurrent?: () => boolean
   ) => Promise<ImageWorkspaceEntry | undefined>;
   scheduleAutosave: (document: EditorDocument) => void;
+  /** Suspends background work for an active page interaction without aborting atomic writes. */
+  setInteractionActive: (active: boolean) => void;
   flushAutosave: (getDocument: () => EditorDocument) => Promise<void>;
   persistSnapshot: (getDocument: () => EditorDocument) => Promise<void>;
   saveNow: (getDocument: () => EditorDocument) => Promise<void>;
@@ -41,9 +46,7 @@ export interface EditorSessionAutosaveService {
   discardDraft: (aggregateId?: string | null) => Promise<void>;
   getDurableRevision: () => number | null;
   getLastWriteError: () => unknown | null;
-  hasPresentationError: () => boolean;
-  isPresentationRetryBlocked: () => boolean;
-  retryPresentation: () => Promise<void>;
+  schedulePresentation: () => void;
   dispose: () => void;
 }
 
@@ -58,11 +61,27 @@ function createEditorSessionAutosaveActions(
     updateContext: (patch) => updateAutosaveContext(state, patch),
     restoreDraft: (aggregateId, isCurrent) => restoreAutosaveDraft(state, aggregateId, isCurrent),
     scheduleAutosave: (document) => queuePendingAutosave(state, document),
+    setInteractionActive: (active) => {
+      if (state.interactionActive === active) return;
+      state.interactionRevision += 1;
+      state.interactionActive = active;
+      if (active) {
+        clearPendingAutosaveTimer(state);
+        interruptImagePresentation(state);
+        return;
+      }
+      releaseAutosaveInteraction(state);
+      schedulePendingAutosaveWrite(state);
+      const context = state.activeContext;
+      if (context && state.presentationPending) {
+        scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
+      }
+    },
     flushAutosave: (getDocument) => flushPendingAutosave(state, getDocument),
     persistSnapshot: (getDocument) => persistAutosaveSnapshot(state, getDocument),
     saveNow: (getDocument) => saveEditorSessionSnapshot(state, getDocument),
     isEnabled: () => state.enabled,
-    hasUnsavedChanges: () => state.hasUnsavedChanges,
+    hasUnsavedChanges: () => state.hasUnsavedChanges || state.interactionActive,
     setEnabled: (enabled, getDocument) => {
       if (state.enabled === enabled) return;
       state.enabled = enabled;
@@ -77,9 +96,11 @@ function createEditorSessionAutosaveActions(
     discardDraft: (aggregateId) => discardAutosaveDraft(state, aggregateId),
     getDurableRevision: () => state.activeContext?.durableRevision ?? null,
     getLastWriteError: () => state.lastWriteError,
-    hasPresentationError: () => state.presentationError,
-    isPresentationRetryBlocked: () => state.presentationRetryBlocked,
-    retryPresentation: () => retryImagePresentation(state),
+    schedulePresentation: () => {
+      const context = state.activeContext;
+      if (context)
+        scheduleImagePresentation(context, context.durableRevision, state.autosaveRevision, state);
+    },
     dispose: () => disposeAutosaveState(state),
   };
 }

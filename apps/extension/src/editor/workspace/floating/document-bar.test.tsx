@@ -6,31 +6,20 @@ import { translate } from '../../../platform/i18n';
 import { StaleImageWorkspaceError } from '../../../composition/persistence/image-aggregates';
 import type { EditorFloatingDocumentController } from './document-bar';
 
-it('shows a retry action when preview generation fails after the workspace was saved', async () => {
-  mocks.autosavePresentationError = true;
-  storeState.value.saveState = 'error';
+it('keeps preview recovery out of the saved document status', async () => {
+  storeState.value.saveState = 'saved';
   renderDocumentBar(createProps());
   await act(async () => Promise.resolve());
-  expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
-    translate('editor.documentActions.previewErrorDescription')
-  );
-  const retry = Array.from(
-    document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')
-  ).find((button) => button.textContent === translate('editor.documentActions.retryPreview'));
-  expect(retry).toBeDefined();
-  await act(async () => retry?.click());
-  expect(mocks.autosaveRetryPresentation).toHaveBeenCalledOnce();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(container?.textContent).not.toContain(translate('editor.documentActions.retryPreview'));
 });
 
-it('explains how to make a dirty document safe for preview retry', async () => {
-  mocks.autosavePresentationError = true;
-  mocks.autosavePresentationRetryBlocked = true;
-  mocks.autosaveEnabled = false;
+it('still opens actual document write failures with recovery guidance', async () => {
   storeState.value.saveState = 'error';
   renderDocumentBar(createProps());
   await act(async () => Promise.resolve());
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain(
-    translate('editor.documentActions.previewRequiresSavedDocument')
+    translate('editor.documentActions.saveErrorDescription')
   );
 });
 import {

@@ -25,7 +25,7 @@ export function createEditorPageAutosaveService() {
       produceDocument();
     }),
     getDurableRevision: vi.fn((): number | null => null),
-    retryPresentation: vi.fn(async () => undefined),
+    schedulePresentation: vi.fn(async () => undefined),
     updateContext: vi.fn(),
   };
 }

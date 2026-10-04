@@ -12,7 +12,7 @@ interface LocalImageDraftController extends EditorDocumentOpenPort {
   exportDocument(): EditorDocument;
   isDocumentReadyForExport(): boolean;
   renderForExport(
-    options: { format: 'png'; quality: 1 },
+    options: { format: 'png'; quality: 1; signal?: AbortSignal },
     draftPolicy?: 'finalize' | 'committed'
   ): Promise<string> | string;
 }
@@ -41,8 +41,11 @@ export function openLocalImageAsEditorDraft(
       if (!autosaveService) return;
       beginEditorPageLocalDraft({
         autosaveService,
-        renderPresentation: () =>
-          controller.renderForExport({ format: 'png', quality: 1 }, 'committed'),
+        renderPresentation: (signal) =>
+          controller.renderForExport(
+            { format: 'png', quality: 1, ...(signal ? { signal } : {}) },
+            'committed'
+          ),
         sourceTitle: file.name,
       });
       const initialDocument = controller.exportDocument();

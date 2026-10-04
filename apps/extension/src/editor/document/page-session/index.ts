@@ -87,7 +87,7 @@ export function replaceEditorPageAggregateId(aggregateId: string): void {
 /** Starts a fresh standalone draft for a local image opened in the current editor tab. */
 export function beginEditorPageLocalDraft(args: {
   autosaveService: Pick<EditorSessionAutosaveService, 'activate'>;
-  renderPresentation: () => Promise<string> | string;
+  renderPresentation: (signal?: AbortSignal) => Promise<string> | string;
   sourceTitle: string;
 }): string {
   const aggregateId = createAggregateId();

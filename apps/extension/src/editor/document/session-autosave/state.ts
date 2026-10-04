@@ -8,7 +8,7 @@ export interface ActiveEditorSessionContext {
   requireExistingRoot?: boolean;
   sourceUrl: string | null;
   sourceTitle: string | null;
-  renderPresentation: (() => Promise<string> | string) | null;
+  renderPresentation: ((signal?: AbortSignal) => Promise<string> | string) | null;
 }
 
 export type EditorSessionAutosaveState = {
@@ -20,9 +20,13 @@ export type EditorSessionAutosaveState = {
   pendingDocument: EditorDocument | null;
   pendingTimer: number;
   presentationTimer: number;
+  interactionActive: boolean;
+  interactionRevision: number;
+  interactionWaiters: Array<() => void>;
+  presentationPending: boolean;
+  presentationRetryAttempt: number;
+  presentationAbortController: AbortController | null;
   lastWriteError: unknown | null;
-  presentationError: boolean;
-  presentationRetryBlocked: boolean;
   presentationRetryPromise: Promise<void> | null;
   documentAssetsByRuntimeUrl: ReadonlyMap<string, AssetRef>;
   releaseHydratedDocument: (() => void) | null;
@@ -39,9 +43,13 @@ export function createAutosaveState(): EditorSessionAutosaveState {
     pendingDocument: null,
     pendingTimer: 0,
     presentationTimer: 0,
+    interactionActive: false,
+    interactionRevision: 0,
+    interactionWaiters: [],
+    presentationPending: false,
+    presentationRetryAttempt: 0,
+    presentationAbortController: null,
     lastWriteError: null,
-    presentationError: false,
-    presentationRetryBlocked: false,
     presentationRetryPromise: null,
     documentAssetsByRuntimeUrl: new Map(),
     releaseHydratedDocument: null,
@@ -62,4 +70,14 @@ export function clearPendingPresentationTimer(state: EditorSessionAutosaveState)
   if (state.presentationTimer === 0) return;
   window.clearTimeout(state.presentationTimer);
   state.presentationTimer = 0;
+}
+
+export function interruptImagePresentation(state: EditorSessionAutosaveState): void {
+  clearPendingPresentationTimer(state);
+  state.presentationAbortController?.abort();
+}
+
+export function releaseAutosaveInteraction(state: EditorSessionAutosaveState): void {
+  state.interactionActive = false;
+  for (const resolve of state.interactionWaiters.splice(0)) resolve();
 }

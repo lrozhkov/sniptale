@@ -9,6 +9,7 @@ import { EditorControllerProvider } from '../../application/controller-context';
 import { EditorEmbedProvider } from '../../application/embed-context/context';
 import {
   bootstrapEditorPageSession,
+  bindEditorAutosaveActivity,
   createEditorPageServices,
   flushEditorAutosaveIfNeeded,
   loadEditorPageDefaults,
@@ -77,6 +78,11 @@ function useEditorPageBootstrapEffects(
       window.removeEventListener(EDITOR_BOOTSTRAP_EVENT, lifecycle.handleBootstrap);
     };
   }, [services, setPageTitle, runOpen]);
+
+  useEffect(() => {
+    if (readEditorEmbedMode(window.location.search) === 'scenario') return;
+    return bindEditorAutosaveActivity(services.autosaveService);
+  }, [services]);
 
   useEffect(() => {
     const protectUnsaved = (event: BeforeUnloadEvent) => {

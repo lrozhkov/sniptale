@@ -5,7 +5,8 @@ import {
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   clearPendingAutosaveTimer,
-  clearPendingPresentationTimer,
+  interruptImagePresentation,
+  releaseAutosaveInteraction,
   type ActiveEditorSessionContext,
   type EditorSessionAutosaveState,
 } from './state';
@@ -17,7 +18,10 @@ export function activateAutosaveContext(
   options: { preserveHydratedDocument?: boolean } = {}
 ): void {
   clearPendingAutosaveTimer(state);
-  clearPendingPresentationTimer(state);
+  interruptImagePresentation(state);
+  releaseAutosaveInteraction(state);
+  state.presentationPending = false;
+  state.presentationRetryAttempt = 0;
   if (!options.preserveHydratedDocument) {
     state.releaseHydratedDocument?.();
     state.releaseHydratedDocument = null;
@@ -25,8 +29,6 @@ export function activateAutosaveContext(
   }
   state.pendingDocument = null;
   state.lastWriteError = null;
-  state.presentationError = false;
-  state.presentationRetryBlocked = false;
   state.hasUnsavedChanges = false;
   state.activeContext = context;
   state.contextGeneration += 1;
@@ -92,14 +94,15 @@ export async function discardAutosaveDraft(
   _aggregateId?: string | null
 ): Promise<void> {
   clearPendingAutosaveTimer(state);
-  clearPendingPresentationTimer(state);
+  interruptImagePresentation(state);
+  releaseAutosaveInteraction(state);
+  state.presentationPending = false;
+  state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();
   state.pendingDocument = null;
   state.lastWriteError = null;
-  state.presentationError = false;
-  state.presentationRetryBlocked = false;
   state.hasUnsavedChanges = false;
   state.activeContext = null;
   state.contextGeneration += 1;
@@ -111,7 +114,10 @@ export async function discardAutosaveDraft(
 
 export function disposeAutosaveState(state: EditorSessionAutosaveState): void {
   clearPendingAutosaveTimer(state);
-  clearPendingPresentationTimer(state);
+  interruptImagePresentation(state);
+  releaseAutosaveInteraction(state);
+  state.presentationPending = false;
+  state.presentationRetryAttempt = 0;
   state.releaseHydratedDocument?.();
   state.releaseHydratedDocument = null;
   state.documentAssetsByRuntimeUrl = new Map();

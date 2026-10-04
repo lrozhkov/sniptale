@@ -29,9 +29,16 @@ export type FrameAnnotationRasterTransitionOptions = {
 export async function runFrameAnnotationRasterTransition(
   options: FrameAnnotationRasterTransitionOptions
 ): Promise<{ blob: Blob; metadata: FrameAnnotationRasterOutputMetadata }> {
+  options.signal?.throwIfAborted();
   // Cold database admission needs the exclusive transition gate before we hold it shared.
   await initDB();
+  options.signal?.throwIfAborted();
   const leaseId = crypto.randomUUID();
+  const cancel = () => cancelRasterLease(options, leaseId);
+  const onAbort = () => {
+    void cancel().catch(() => undefined);
+  };
+  options.signal?.addEventListener('abort', onAbort, { once: true });
   try {
     const prepare = await withTimeout(
       options.transport.sendRuntimeMessage({
@@ -42,6 +49,7 @@ export async function runFrameAnnotationRasterTransition(
       PREPARE_TIMEOUT_MS,
       'Frame annotation raster preparation timed out'
     );
+    options.signal?.throwIfAborted();
     if (!prepare.success || prepare.result !== leaseId) {
       throw new Error(prepare.error ?? 'Frame annotation raster preparation failed');
     }
@@ -49,17 +57,8 @@ export async function runFrameAnnotationRasterTransition(
       runAdmittedRasterTransition(options, leaseId)
     );
   } finally {
-    await Promise.allSettled([
-      withTimeout(
-        options.transport.sendRuntimeMessage({
-          type: MessageType.FRAME_ANNOTATION_RASTERIZE,
-          operation: 'cancel',
-          leaseId,
-        }),
-        CANCEL_TIMEOUT_MS,
-        'Frame annotation raster cancellation timed out'
-      ),
-    ]);
+    options.signal?.removeEventListener('abort', onAbort);
+    await Promise.allSettled([cancel()]);
   }
 }
 
@@ -69,6 +68,7 @@ async function runAdmittedRasterTransition(
 ): Promise<{ blob: Blob; metadata: FrameAnnotationRasterOutputMetadata }> {
   let reference: Awaited<ReturnType<typeof stageFrameAnnotationRasterJob>> | null = null;
   try {
+    options.signal?.throwIfAborted();
     const confirmation = await withTimeout(
       options.transport.sendRuntimeMessage({
         type: MessageType.FRAME_ANNOTATION_RASTERIZE,
@@ -78,6 +78,7 @@ async function runAdmittedRasterTransition(
       CONFIRM_TIMEOUT_MS,
       'Frame annotation raster lease confirmation timed out'
     );
+    options.signal?.throwIfAborted();
     if (!confirmation.success || confirmation.result !== leaseId) {
       throw new Error(confirmation.error ?? 'Frame annotation raster lease is no longer active');
     }
@@ -115,6 +116,21 @@ async function runAdmittedRasterTransition(
       ]);
     }
   }
+}
+
+async function cancelRasterLease(
+  options: FrameAnnotationRasterTransitionOptions,
+  leaseId: string
+): Promise<void> {
+  await withTimeout(
+    options.transport.sendRuntimeMessage({
+      type: MessageType.FRAME_ANNOTATION_RASTERIZE,
+      operation: 'cancel',
+      leaseId,
+    }),
+    CANCEL_TIMEOUT_MS,
+    'Frame annotation raster cancellation timed out'
+  );
 }
 
 function withTimeout<T>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> {
