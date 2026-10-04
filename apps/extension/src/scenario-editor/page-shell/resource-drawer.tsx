@@ -34,7 +34,7 @@ export function GuideResourceDrawer({
 }: ResourceDrawerProps &
   Pick<
     ComponentProps<typeof GuideImageResources>,
-    'onImport' | 'disabled' | 'selectedStepId' | 'steps'
+    'onImport' | 'onAddTextStep' | 'disabled' | 'selectedStepId' | 'steps'
   >) {
   const [target, setTarget] = useState<ResourceTarget | null>(null);
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null);

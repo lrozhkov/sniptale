@@ -4,6 +4,7 @@ import {
   createTourDocument,
   createTourImageSlide,
   applyTourCommands,
+  applyGuideStructureOperation,
 } from '../../../features/scenario/project/public';
 import { reduceGuideHistory, type GuideHistory } from './history';
 
@@ -153,4 +154,20 @@ it('undoes a whole tour command batch in the existing project history', () => {
   state = reduceGuideHistory(state, { kind: 'redo' });
   expect(state.present).toEqual(changed);
   expect(state.present?.items).toEqual(source.items);
+});
+
+it('undoes and redoes frameless title and body together in one history entry', () => {
+  let state = initial();
+  const source = state.present!;
+  const changed = applyGuideStructureOperation(source, {
+    kind: 'add-step',
+    title: 'Context',
+    description: 'Read before continuing',
+  });
+  state = reduceGuideHistory(state, { kind: 'edit', project: changed, group: null });
+  expect(state.past).toEqual([source]);
+  state = reduceGuideHistory(state, { kind: 'undo' });
+  expect(state.present).toEqual(source);
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present).toEqual(changed);
 });

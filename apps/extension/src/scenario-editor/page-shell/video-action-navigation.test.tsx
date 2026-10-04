@@ -124,3 +124,58 @@ it('keeps source navigation available when there are no recorded actions', async
   expect(host.textContent).toContain('No recorded clicks or keystrokes');
   expect(host.querySelector('[role="slider"]')).not.toBeNull();
 });
+it('previews source time without seeking and clears stale hover after zoom or leaving', async () => {
+  const video = await mount();
+  await click('1.00 · Click');
+  const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+  slider.hasPointerCapture = () => false;
+  vi.spyOn(slider, 'getBoundingClientRect').mockReturnValue(new DOMRect(-100, 0, 200, 30));
+  await act(async () =>
+    slider.dispatchEvent(new MouseEvent('pointermove', { clientX: 50, bubbles: true }))
+  );
+  const guide = host.querySelector<HTMLElement>('.guide-video-hover-guide')!;
+  expect(guide.textContent).toBe('3.75');
+  expect(guide.style.left).toBe('75%');
+  expect(video.currentTime).toBe(1);
+  expect(host.querySelector<HTMLElement>('.guide-video-playhead')!.style.left).toBe('20%');
+  await click('Zoom in timeline');
+  expect(host.querySelector('.guide-video-hover-guide')).toBeNull();
+  await act(async () =>
+    slider.dispatchEvent(new MouseEvent('pointermove', { clientX: 0, bubbles: true }))
+  );
+  expect(host.querySelector('.guide-video-hover-guide')!.textContent).toBe('2.50');
+  await act(async () => slider.dispatchEvent(new MouseEvent('pointerout', { bubbles: true })));
+  expect(host.querySelector('.guide-video-hover-guide')).toBeNull();
+});
+it('clamps captured seeking on a scrolled zoomed ruler and stops seeking after release', async () => {
+  const video = await mount();
+  await click('Zoom in timeline');
+  const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+  let captured = false;
+  slider.setPointerCapture = vi.fn(() => {
+    captured = true;
+  });
+  slider.hasPointerCapture = () => captured;
+  slider.releasePointerCapture = vi.fn(() => {
+    captured = false;
+  });
+  vi.spyOn(slider, 'getBoundingClientRect').mockReturnValue(new DOMRect(-100, 0, 200, 30));
+  const pointer = async (type: string, clientX: number) => {
+    await act(async () =>
+      slider.dispatchEvent(new MouseEvent(type, { button: 0, clientX, bubbles: true }))
+    );
+  };
+  await pointer('pointerdown', 0);
+  expect(video.currentTime).toBe(2.5);
+  await pointer('pointermove', 200);
+  expect(video.currentTime).toBe(5);
+  await pointer('pointermove', -200);
+  expect(video.currentTime).toBe(0);
+  await pointer('pointerup', -200);
+  expect(slider.releasePointerCapture).toHaveBeenCalled();
+  await pointer('pointermove', 0);
+  expect(video.currentTime).toBe(0);
+  expect(host.querySelector('.guide-video-hover-guide')!.textContent).toBe('2.50');
+  await pointer('pointercancel', 0);
+  expect(host.querySelector('.guide-video-hover-guide')).toBeNull();
+});

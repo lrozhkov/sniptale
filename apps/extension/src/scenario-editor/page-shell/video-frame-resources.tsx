@@ -2,7 +2,7 @@ import { GuideVideoActionNavigation, GuideVideoActionOverlay } from './video-act
 import type { GuideVideoAction } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { guideVideoActionAt } from './runtime/video-actions';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { GuideVoiceField } from './voice-field';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -24,6 +24,7 @@ type VideoResourcesProps = {
   disabled: boolean;
   target?: GuideImageImportPlacement | TourImageImportPlacement;
   onComplete?: () => void;
+  onAddTextStep?: ((title: string, description: string) => boolean) | undefined;
   t: Translate;
   onImport: (input: {
     sources: readonly GuideImageImportSource[];
@@ -46,6 +47,11 @@ function useVideoFrames(props: VideoResourcesProps) {
   const [applied, setApplied] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  useEffect(() => {
+    setTitle('');
+    setDescription('');
+    setPending(false);
+  }, [props.mediaId]);
   useEffect(() => {
     const controller = new AbortController();
     let url: string | null = null;
@@ -143,91 +149,261 @@ function useVideoFrames(props: VideoResourcesProps) {
   };
 }
 
-/** Reuses library navigation while presenting shared source-video playback and frame insertion. */
+/** Reuses library playback; the scenario-owned footer remains inside its fullscreen root. */
 export function GuideVideoFrameResources(props: VideoResourcesProps) {
   const { t } = props;
   const state = useVideoFrames(props);
   const [hoveredAction, setHoveredAction] = useState<GuideVideoAction | null>(null);
-  const locked = props.disabled || state.pending;
+  const feedback = <VideoFrameFeedback state={state} t={t} disabled={props.disabled} />;
   return (
     <div className="guide-video-preview">
       {state.source ? (
-        <>
-          <LibraryMediaPlayer
-            key={state.source.url}
-            videoRef={state.video}
-            src={state.source.url}
-            filename={state.source.filename}
-            onReadyChange={state.onReadyChange}
-            renderTimeline={(playback) => (
-              <GuideVideoActionNavigation
-                playback={playback}
-                actions={state.source?.actions ?? []}
-                onHover={setHoveredAction}
-                t={t}
-              />
-            )}
-            renderOverlay={(playback) => (
-              <GuideVideoActionOverlay
-                playback={playback}
-                action={
-                  guideVideoActionAt(hoveredAction ? [hoveredAction] : [], playback.media.time) ??
-                  guideVideoActionAt(state.source?.actions ?? [], playback.media.time)
-                }
-              />
-            )}
-          >
-            <span role="status">{t('scenario.editor.loading')}</span>
-          </LibraryMediaPlayer>
-          <span>{state.source.filename}</span>
-          {(!props.target || props.target.kind === 'tour-slides') && (
-            <>
-              <div className="guide-video-field">
-                <span>{t('scenario.editor.guideStepTitle')}</span>
-                <GuideVoiceField
-                  aria-label={t('scenario.editor.guideStepTitle')}
-                  formControl
-                  singleLine
-                  clearable
-                  value={state.title}
-                  maxLength={GUIDE_LIMITS.maxLabelLength}
-                  disabled={locked}
-                  onValueChange={state.writeTitle}
-                />
-              </div>
-              <div className="guide-video-field">
-                <span>{t('scenario.editor.guideAddText')}</span>
-                <GuideVoiceField
-                  aria-label={t('scenario.editor.guideAddText')}
-                  formControl
-                  clearable
-                  value={state.description}
-                  rows={2}
-                  maxLength={
-                    props.target?.kind === 'tour-slides' ? 4000 : GUIDE_LIMITS.maxTextLength
-                  }
-                  disabled={locked}
-                  onValueChange={state.writeDescription}
-                />
-              </div>
-            </>
+        <LibraryMediaPlayer
+          key={state.source.url}
+          videoRef={state.video}
+          src={state.source.url}
+          filename={state.source.filename}
+          onReadyChange={state.onReadyChange}
+          footer={
+            <VideoStepComposer key={props.mediaId} state={state} {...props}>
+              {feedback}
+            </VideoStepComposer>
+          }
+          renderTimeline={(playback) => (
+            <GuideVideoActionNavigation
+              playback={playback}
+              actions={state.source?.actions ?? []}
+              onHover={setHoveredAction}
+              t={t}
+            />
           )}
+          renderOverlay={(playback) => (
+            <GuideVideoActionOverlay
+              playback={playback}
+              action={
+                guideVideoActionAt(hoveredAction ? [hoveredAction] : [], playback.media.time) ??
+                guideVideoActionAt(state.source?.actions ?? [], playback.media.time)
+              }
+            />
+          )}
+        >
+          <span role="status">{t('scenario.editor.loading')}</span>
+        </LibraryMediaPlayer>
+      ) : (
+        <>
+          <p>{t('scenario.editor.guideChooseVideoHint')}</p>
+          {feedback}
+        </>
+      )}
+    </div>
+  );
+}
+
+type FrameState = ReturnType<typeof useVideoFrames>;
+
+/** One draft can be captured with a frame or submitted as an asset-free Guide step. */
+function VideoStepComposer(
+  props: VideoResourcesProps & { state: FrameState; children: ReactNode }
+) {
+  const { state, t } = props;
+  const [mode, setMode] = useState<'frame' | 'text' | null>(null);
+  const [textResult, setTextResult] = useState<'added' | 'failed' | null>(null);
+  const active = useRef(false);
+  const trigger = useRef<HTMLButtonElement | null>(null);
+  const locked = props.disabled || state.pending;
+  const metadata =
+    !props.target || props.target.kind === 'steps' || props.target.kind === 'tour-slides';
+  const textAllowed =
+    Boolean(props.onAddTextStep) && (!props.target || props.target.kind === 'steps');
+  const close = () => {
+    active.current = false;
+    setMode(null);
+    trigger.current?.focus({ preventScroll: true });
+  };
+  const open = (next: 'frame' | 'text', button: HTMLButtonElement) => {
+    trigger.current = button;
+    active.current = true;
+    setTextResult(null);
+    setMode(next);
+  };
+  const submit = () => {
+    if (!active.current || locked) return;
+    if (mode === 'frame') {
+      void state.submit();
+      return;
+    }
+    if (!textAllowed) return;
+    active.current = false;
+    const accepted = props.onAddTextStep?.(state.title, state.description);
+    setTextResult(accepted ? 'added' : 'failed');
+    if (accepted) close();
+    else active.current = true;
+  };
+  return (
+    <div className="guide-video-composer">
+      <div className="guide-video-composer-actions">
+        <span className="guide-video-filename" title={state.source?.filename}>
+          {state.source?.filename}
+        </span>
+        <ProductActionButton
+          compact
+          tone="primary"
+          disabled={locked || !state.ready}
+          onClick={() => void state.submit()}
+        >
+          {t(
+            props.target
+              ? 'scenario.editor.guideUseVideoFrame'
+              : 'scenario.editor.guideVideoFrameStep'
+          )}
+        </ProductActionButton>
+        {metadata && (
           <ProductActionButton
             compact
-            tone="primary"
-            disabled={locked || !state.ready}
-            onClick={() => void state.submit()}
+            tone="secondary"
+            disabled={locked}
+            onClick={(event) => open('frame', event.currentTarget)}
           >
-            {t(
-              props.target
-                ? 'scenario.editor.guideUseVideoFrame'
-                : 'scenario.editor.guideVideoFrameStep'
-            )}
+            {t('scenario.editor.guideVideoEditDetails')}
           </ProductActionButton>
-        </>
-      ) : (
-        <p>{t('scenario.editor.guideChooseVideoHint')}</p>
+        )}
+        {textAllowed && (
+          <ProductActionButton
+            compact
+            tone="secondary"
+            disabled={locked}
+            onClick={(event) => open('text', event.currentTarget)}
+          >
+            {t('scenario.editor.guideVideoTextStep')}
+          </ProductActionButton>
+        )}
+      </div>
+      {mode && (
+        <VideoStepForm
+          state={state}
+          t={t}
+          disabled={locked}
+          tour={props.target?.kind === 'tour-slides'}
+          mode={mode}
+          onSubmit={submit}
+          onClose={close}
+        >
+          {textResult === 'failed' && (
+            <p role="alert">{t('scenario.editor.guideVideoTextFailed')}</p>
+          )}
+          {props.children}
+        </VideoStepForm>
       )}
+      {!mode && textResult === 'added' && (
+        <p role="status">{t('scenario.editor.guideVideoTextAdded')}</p>
+      )}
+      {!mode && props.children}
+    </div>
+  );
+}
+
+/** Owns the bounded form, its fields, keyboard dismissal and reachable feedback. */
+function VideoStepForm({
+  state,
+  t,
+  disabled,
+  tour,
+  mode,
+  onSubmit,
+  onClose,
+  children,
+}: {
+  state: FrameState;
+  t: Translate;
+  disabled: boolean;
+  tour: boolean;
+  mode: 'frame' | 'text';
+  onSubmit: () => void;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const form = useRef<HTMLFormElement>(null);
+  useLayoutEffect(() => {
+    form.current?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+  }, [mode]);
+  return (
+    <form
+      ref={form}
+      className="guide-video-composer-form"
+      aria-label={t(
+        mode === 'text'
+          ? 'scenario.editor.guideVideoTextStep'
+          : 'scenario.editor.guideVideoEditDetails'
+      )}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (state.pending) state.cancel();
+        onClose();
+      }}
+    >
+      <div className="guide-video-field">
+        <span>{t('scenario.editor.guideStepTitle')}</span>
+        <GuideVoiceField
+          aria-label={t('scenario.editor.guideStepTitle')}
+          formControl
+          singleLine
+          clearable
+          value={state.title}
+          maxLength={GUIDE_LIMITS.maxLabelLength}
+          disabled={disabled}
+          onValueChange={state.writeTitle}
+        />
+      </div>
+      <div className="guide-video-field">
+        <span>{t('scenario.editor.guideAddText')}</span>
+        <GuideVoiceField
+          aria-label={t('scenario.editor.guideAddText')}
+          formControl
+          clearable
+          value={state.description}
+          rows={2}
+          maxLength={tour ? 4000 : GUIDE_LIMITS.maxTextLength}
+          disabled={disabled}
+          onValueChange={state.writeDescription}
+        />
+      </div>
+      <div className="guide-video-composer-actions">
+        <ProductActionButton
+          type="submit"
+          compact
+          tone="primary"
+          disabled={disabled || (mode === 'frame' && !state.ready)}
+        >
+          {t(mode === 'text' ? 'common.actions.save' : 'scenario.editor.guideUseVideoFrame')}
+        </ProductActionButton>
+        {!state.pending && (
+          <ProductActionButton compact tone="secondary" onClick={onClose}>
+            {t('common.actions.cancel')}
+          </ProductActionButton>
+        )}
+      </div>
+      {children}
+    </form>
+  );
+}
+
+function VideoFrameFeedback({
+  state,
+  t,
+  disabled,
+}: {
+  state: FrameState;
+  t: Translate;
+  disabled: boolean;
+}) {
+  return (
+    <>
       {state.loading && <p role="status">{t('scenario.editor.loading')}</p>}
       {state.pending && (
         <p role="status">
@@ -241,13 +417,13 @@ export function GuideVideoFrameResources(props: VideoResourcesProps) {
         <p role="alert">
           {t('scenario.editor.guideVideoFrameFailed')}
           {!state.source && (
-            <ProductActionButton compact tone="secondary" disabled={locked} onClick={state.retry}>
+            <ProductActionButton compact tone="secondary" disabled={disabled} onClick={state.retry}>
               {t('common.actions.retry')}
             </ProductActionButton>
           )}
         </p>
       )}
       {state.applied && <p role="status">{t('scenario.editor.guideVideoFrameAdded')}</p>}
-    </div>
+    </>
   );
 }

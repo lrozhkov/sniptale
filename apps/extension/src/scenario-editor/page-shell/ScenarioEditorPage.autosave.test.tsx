@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
+import type { GuideLibraryBrowser } from './library-browser';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -13,6 +14,34 @@ const io = vi.hoisted(() => ({
   save: vi.fn(),
   request: vi.fn(),
   session: vi.fn(),
+  select: vi.fn(),
+  importImages: vi.fn(),
+}));
+vi.mock('./library-browser', () => ({
+  GuideLibraryBrowser: ({
+    onChoose,
+    previewContent,
+  }: Pick<ComponentProps<typeof GuideLibraryBrowser>, 'onChoose' | 'previewContent'>) => (
+    <>
+      <button onClick={() => onChoose('library-image', 'one.png', 'image')}>Library image</button>
+      <button onClick={() => onChoose('library-video', 'clip.mp4', 'video')}>Library video</button>
+      {previewContent}
+    </>
+  ),
+}));
+vi.mock('./video-frame-resources', () => ({
+  GuideVideoFrameResources: ({
+    onAddTextStep,
+  }: {
+    onAddTextStep?: (title: string, description: string) => boolean;
+  }) =>
+    onAddTextStep ? (
+      <button onClick={() => onAddTextStep('Context', 'Read before continuing')}>
+        Frameless step
+      </button>
+    ) : (
+      <p>No frameless action</p>
+    ),
 }));
 vi.mock('./runtime/ai-request', () => ({
   loadGuideAiConfiguration: async () => ({ providers: [], models: [], defaultModelId: 'model' }),
@@ -39,9 +68,9 @@ vi.mock('../../composition/persistence/scenario/store/public', () => ({
   duplicateScenarioProjectRecord: vi.fn(),
   deleteScenarioProjectRecord: vi.fn(),
   saveScenarioProjectRecord: io.save,
-  importScenarioImages: vi.fn(),
+  importScenarioImages: io.importImages,
 }));
-vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: vi.fn() }));
+vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: io.select }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   useAppLocale: () => 'en',
@@ -61,6 +90,8 @@ beforeEach(() => {
   const project = createGuideProject('Local guide', 'guide', 100);
   project.items.push(createGuideStep('Step', 'step'));
   project.tour = createTourDocument();
+  io.select.mockReset();
+  io.importImages.mockReset();
   io.load.mockReset();
   io.load.mockResolvedValue(project);
   io.session.mockReset();
@@ -344,3 +375,33 @@ async function confirmRecoveryReload() {
   if (!confirm) throw new Error('Missing reload confirmation');
   await act(async () => confirm.click());
 }
+
+it('adds frameless content in one undo while preserving preview focus and selected step', async () => {
+  await act(async () => root.render(<ScenarioEditorPage />));
+  await clickGuideControl('Resources', host);
+  await clickGuideControl('Image library', host);
+  await clickGuideControl('Library video', document.body);
+  const add = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+    (button) => button.textContent === 'Frameless step'
+  )!;
+  io.select.mockClear();
+  await act(async () => {
+    add.focus();
+    add.click();
+  });
+  expect(document.activeElement).toBe(add);
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(io.select).not.toHaveBeenCalled();
+  expect(io.importImages).not.toHaveBeenCalled();
+  expect(host.querySelectorAll('article')).toHaveLength(2);
+  await settle();
+  expect(io.save.mock.lastCall?.[0].items.at(-1)).toMatchObject({
+    title: 'Context',
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('Read before continuing') }],
+  });
+  await clickGuideControl('Close', document.body);
+  await clickGuideControl('Undo', host);
+  expect(host.querySelectorAll('article')).toHaveLength(1);
+  await clickGuideControl('Redo', host);
+  expect(host.querySelectorAll('article')).toHaveLength(2);
+});

@@ -633,3 +633,39 @@ it.each([undefined, 'start', 'center', 'end'] as const)(
     expect(source).toEqual(original);
   }
 );
+
+it('adds a complete frameless step atomically without changing existing media or content', () => {
+  const source = fixture();
+  const before = structuredClone(source);
+  const next = applyGuideStructureOperation(source, {
+    kind: 'add-step',
+    title: 'Explain the result',
+    description: 'First line\nSecond line',
+  });
+  expect(next.items.slice(0, -1)).toEqual(source.items);
+  expect(next.items.at(-1)).toMatchObject({
+    kind: 'step',
+    title: 'Explain the result',
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('First line\nSecond line') }],
+  });
+  const added = next.items.at(-1)!;
+  expect(added.kind === 'step' && added.blocks).toHaveLength(1);
+  expect(source).toEqual(before);
+  expect(applyGuideStructureOperation(source, { kind: 'add-step' }).items.at(-1)).toMatchObject({
+    title: '',
+    blocks: [{ kind: 'text', paragraphs: createGuideParagraphs('') }],
+  });
+});
+
+it('rejects invalid frameless content without partially inserting the step', () => {
+  const source = fixture();
+  const before = structuredClone(source);
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'add-step',
+      title: 'x'.repeat(GUIDE_LIMITS.maxLabelLength + 1),
+      description: 'Body',
+    })
+  ).toThrow('Guide content limits exceeded.');
+  expect(source).toEqual(before);
+});

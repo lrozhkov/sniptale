@@ -38,15 +38,15 @@ export function LibraryMediaTransport(props: {
   );
   return (
     <div
-      className={[
-        'flex min-w-0 shrink-0 flex-wrap items-center justify-start gap-2',
-        props.image ? 'sniptale-toolbar-root' : '',
-      ].join(' ')}
+      className="sniptale-toolbar-root flex min-w-0 shrink-0 flex-wrap items-center justify-start gap-2"
       data-ui="library-media-transport"
     >
       {!props.image ? (
         <>
           <ContentToolbarButton
+            tone="utility"
+            size="compact"
+            className="!h-9 !w-9 shrink-0 !p-0"
             aria-label={playLabel}
             title={playLabel}
             disabled={!ready}
@@ -60,6 +60,9 @@ export function LibraryMediaTransport(props: {
             {media.duration === null ? '—' : formatDuration(media.duration)}
           </span>
           <ContentToolbarButton
+            tone="utility"
+            size="compact"
+            className="!h-9 !w-9 shrink-0 !p-0"
             aria-label={muteLabel}
             title={muteLabel}
             disabled={!ready}
@@ -67,7 +70,7 @@ export function LibraryMediaTransport(props: {
           >
             {media.muted || media.volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
           </ContentToolbarButton>
-          <label className="flex w-28 items-center gap-2">
+          <label className="flex w-20 items-center gap-2">
             <ProductRange
               min={0}
               max={1}
@@ -86,6 +89,11 @@ export function LibraryMediaTransport(props: {
       {props.children}
       {props.onExitFullscreen ? (
         <ContentToolbarButton
+          {...(!props.image && {
+            tone: 'utility' as const,
+            size: 'compact' as const,
+            className: '!h-9 !w-9 shrink-0 !p-0',
+          })}
           ref={props.fullscreenButtonRef}
           onClick={props.onExitFullscreen}
           title={translate('videoEditor.stage.exitFullscreen')}
@@ -95,11 +103,6 @@ export function LibraryMediaTransport(props: {
           <Minimize2 size={16} aria-hidden="true" />
         </ContentToolbarButton>
       ) : null}
-      {!props.image && (
-        <p className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.sidebar.mediaPreviewZoomHint')}
-        </p>
-      )}
     </div>
   );
 }
@@ -169,6 +172,11 @@ export function LibraryViewControls({
     <>
       {!fullscreen ? (
         <ContentToolbarButton
+          {...(!image && {
+            tone: 'utility' as const,
+            size: 'compact' as const,
+            className: '!h-9 !w-9 shrink-0 !p-0',
+          })}
           ref={fullscreenButton}
           aria-label={fullscreenLabel}
           title={fullscreenLabel}
@@ -182,7 +190,6 @@ export function LibraryViewControls({
         <LibraryImageZoomControls state={state} ready={ready} />
       ) : (
         <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums">
-          <span>{zoomLabel}</span>
           <Search size={14} aria-hidden />
           <ProductRange
             className="!w-24"

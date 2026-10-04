@@ -7,10 +7,10 @@
   min-height: 0;
 }
 .guide-video-preview > [data-ui='library-media-player'] {
-  min-height: 180px;
+  min-height: 0;
 }
 .guide-video-preview [data-ui='library-media-viewport'] {
-  min-height: 160px;
+  min-height: 64px;
 }
 .guide-video-field {
   display: grid;
@@ -48,4 +48,38 @@
 .guide-video-field .guide-voice-field > textarea {
   height: 4rem;
   min-height: 4rem;
+}
+
+.guide-video-composer {
+  min-width: 0;
+}
+.guide-video-composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.guide-video-filename {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-video-composer-form {
+  position: absolute;
+  z-index: 5;
+  inset: 8px 8px auto auto;
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-md);
+  background: var(--sniptale-color-surface-panel);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sniptale-color-shadow-strong) 16%, transparent);
 }

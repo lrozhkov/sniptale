@@ -32,7 +32,8 @@ function registerPlaybackSpaceShortcut(
     document.documentElement.removeAttribute('data-video-editor-focus');
   const onKeyDown = (event: KeyboardEvent) => {
     const nativeDisclosure =
-      event.target instanceof Element && event.target.closest('summary, [role="switch"]');
+      event.target instanceof Element &&
+      event.target.closest('summary, [role="switch"], [data-ui="library-media-footer"]');
     if (
       event.code !== 'Space' ||
       (targetPolicy === 'native-controls' && (isEditableTarget(event.target) || nativeDisclosure))

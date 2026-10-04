@@ -223,6 +223,12 @@ function GuideDocumentWorkspace({
         selectedStepId={selectedStepId}
         steps={project.items.filter((item) => item.kind === 'step')}
         onImport={imports.resources}
+        onAddTextStep={
+          project.purpose !== 'step-template'
+            ? (title, description) =>
+                !importDisabled && Boolean(state.operate({ kind: 'add-step', title, description }))
+            : undefined
+        }
       >
         <GuideImageDropZone
           t={t}

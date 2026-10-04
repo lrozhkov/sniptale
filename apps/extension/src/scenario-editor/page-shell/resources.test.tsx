@@ -3,7 +3,7 @@ import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
-const io = vi.hoisted(() => ({ list: vi.fn(), import: vi.fn(), revoke: vi.fn() }));
+const io = vi.hoisted(() => ({ list: vi.fn(), import: vi.fn(), revoke: vi.fn(), video: vi.fn() }));
 vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.list }));
 vi.mock('../../composition/persistence/gallery-saved-views', () => ({
   listGallerySavedViews: async () => [],
@@ -12,7 +12,10 @@ vi.mock('../../composition/persistence/aggregate-presentations', () => ({
   getAggregatePresentation: async () => undefined,
 }));
 vi.mock('./video-frame-resources', () => ({
-  GuideVideoFrameResources: () => <p>Video frame preview</p>,
+  GuideVideoFrameResources: (props: unknown) => {
+    io.video(props);
+    return <p>Video frame preview</p>;
+  },
 }));
 import { GuideImageResources } from './resources';
 let root: Root;
@@ -37,7 +40,8 @@ afterEach(() => {
 });
 async function render(
   selectedStepId: string | null = 'step',
-  target?: NonNullable<ComponentProps<typeof GuideImageResources>['target']>
+  target?: NonNullable<ComponentProps<typeof GuideImageResources>['target']>,
+  overrides: Partial<ComponentProps<typeof GuideImageResources>> = {}
 ) {
   await act(async () =>
     root.render(
@@ -48,6 +52,7 @@ async function render(
         steps={[{ id: 'step', title: 'Destination step' }]}
         t={createTranslator('en')}
         onImport={io.import}
+        {...overrides}
       />
     )
   );
@@ -299,3 +304,40 @@ it('restores image import actions and preserves ordered selection and mode after
     placement: { kind: 'blocks', stepId: 'step' },
   });
 });
+
+it.each(['steps', 'blocks', 'replacement', 'tour', 'disabled'] as const)(
+  'admits frameless insertion only for an unlocked Guide steps destination: %s',
+  async (mode) => {
+    const add = vi.fn(() => true);
+    const target =
+      mode === 'replacement'
+        ? { kind: 'replace-image' as const, stepId: 'step', blockId: 'image' }
+        : mode === 'tour'
+          ? { kind: 'tour-slides' as const }
+          : undefined;
+    await render('step', target, { onAddTextStep: add });
+    if (mode === 'blocks') await click('As blocks in selected step');
+    io.list.mockResolvedValue([
+      {
+        id: 'clip',
+        filename: 'Clip.mp4',
+        kind: 'video',
+        mimeType: 'video/mp4',
+        source: { kind: 'recording' },
+        tags: [],
+      },
+    ]);
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    await click('All materials');
+    await click('Clip.mp4');
+    if (mode === 'disabled') await render('step', target, { onAddTextStep: add, disabled: true });
+    const callback = io.video.mock.lastCall?.[0].onAddTextStep;
+    if (mode === 'steps' || mode === 'disabled') {
+      expect(callback('Title', 'Body')).toBe(mode === 'steps');
+      expect(add).toHaveBeenCalledTimes(mode === 'steps' ? 1 : 0);
+      if (mode === 'steps') expect(add).toHaveBeenCalledWith('Title', 'Body');
+    } else expect(callback).toBeUndefined();
+    expect(io.import).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Video frame preview');
+  }
+);

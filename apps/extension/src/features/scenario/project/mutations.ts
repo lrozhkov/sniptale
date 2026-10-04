@@ -40,7 +40,13 @@ export type GuideStructureOperation =
       | { itemId: string; blockId?: string; beforeItemId?: never }
       | { itemId?: never; blockId?: never; beforeItemId?: string }
     ))
-  | { kind: 'add-step'; beforeItemId?: string; layout?: GuideStep['layout'] }
+  | {
+      kind: 'add-step';
+      beforeItemId?: string;
+      layout?: GuideStep['layout'];
+      title?: string;
+      description?: string;
+    }
   | { kind: 'add-section'; beforeItemId?: string }
   | { kind: 'merge-next'; itemId: string }
   | { kind: 'split-step'; itemId: string; blockId: string };
@@ -73,10 +79,14 @@ export function applyGuideStructureOperation(
       placeImage(next, operation);
       break;
     case 'add-step': {
-      const step = createGuideStep();
+      const step = createGuideStep(operation.title ?? '');
       step.layout = operation.layout ?? step.layout;
       step.blocks = [
-        { kind: 'text', id: crypto.randomUUID(), paragraphs: createGuideParagraphs('') },
+        {
+          kind: 'text',
+          id: crypto.randomUUID(),
+          paragraphs: createGuideParagraphs(operation.description ?? ''),
+        },
       ];
       next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, step);
       break;

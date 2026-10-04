@@ -574,3 +574,40 @@ it('keeps image zoom, native pixels and Fit consistent through fullscreen transi
     Reflect.deleteProperty(document, 'fullscreenElement');
   }
 });
+
+it('keeps consumer form actions inside fullscreen without intercepting their native Space', () => {
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer
+        src="blob:preview"
+        filename="Recording"
+        footer={<button>Save step</button>}
+      >
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const frame = container.querySelector('[data-ui="library-media-player"]')!;
+  const footer = container.querySelector('[data-ui="library-media-footer"]')!;
+  const action = footer.querySelector('button')!;
+  expect(frame.contains(footer)).toBe(true);
+  expect(container.querySelector('[data-ui="library-media-picture"]')!.contains(footer)).toBe(
+    false
+  );
+  const nativeKey = vi.fn();
+  action.addEventListener('keydown', nativeKey);
+  action.focus();
+  expect(space(action).defaultPrevented).toBe(false);
+  expect(nativeKey).toHaveBeenCalledTimes(1);
+  expect(video.paused).toBe(true);
+  try {
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: frame });
+    act(() => document.dispatchEvent(new Event('fullscreenchange')));
+    expect(frame.contains(action)).toBe(true);
+    action.focus();
+    expect(space(action).defaultPrevented).toBe(false);
+    expect(nativeKey).toHaveBeenCalledTimes(2);
+  } finally {
+    Reflect.deleteProperty(document, 'fullscreenElement');
+  }
+});

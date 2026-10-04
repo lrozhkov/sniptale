@@ -8,6 +8,7 @@ type PlayerProps = {
   filename: string;
   kind?: 'video' | 'image';
   children: ReactNode;
+  footer?: ReactNode;
   videoRef?: RefObject<HTMLVideoElement | null>;
   renderTimeline?: (playback: ReturnType<typeof useLibraryPlayback>) => ReactNode;
   renderOverlay?: (playback: ReturnType<typeof useLibraryPlayback>) => ReactNode;
@@ -34,8 +35,8 @@ export function LibraryMediaPlayer(props: PlayerProps) {
       ref={frame}
       className={
         fullscreen
-          ? 'flex h-full flex-col gap-2 bg-[var(--sniptale-color-surface-panel)] p-3'
-          : 'flex min-h-0 min-w-0 flex-1 flex-col gap-2'
+          ? 'relative flex h-full flex-col gap-2 bg-[var(--sniptale-color-surface-panel)] p-3'
+          : 'relative flex min-h-0 min-w-0 flex-1 flex-col gap-2'
       }
       data-ui="library-media-player"
     >
@@ -86,6 +87,11 @@ export function LibraryMediaPlayer(props: PlayerProps) {
       >
         <LibraryViewControls state={state} ready={ready} image={props.kind === 'image'} />
       </LibraryMediaTransport>
+      {props.footer && (
+        <div className="min-h-0 shrink-0" data-ui="library-media-footer">
+          {props.footer}
+        </div>
+      )}
     </div>
   );
 }

@@ -18,6 +18,7 @@ type ResourceProps = {
   selectedStepId: string | null;
   steps?: readonly { id: string; title: string }[];
   target?: GuideImageImportPlacement | TourImageImportPlacement;
+  onAddTextStep?: ((title: string, description: string) => boolean) | undefined;
   onComplete?: () => void;
   onLibraryDragStart?: () => void;
   t: Translate;
@@ -215,7 +216,17 @@ export function GuideImageResources(props: ResourceProps) {
         }}
         previewContent={
           videoId ? (
-            <GuideVideoFrameResources key={videoId} mediaId={videoId} {...props} />
+            <GuideVideoFrameResources
+              key={videoId}
+              mediaId={videoId}
+              {...props}
+              onAddTextStep={
+                !target && state.placement === 'steps' && props.onAddTextStep
+                  ? (title, description) =>
+                      !state.locked && Boolean(props.onAddTextStep?.(title, description))
+                  : undefined
+              }
+            />
           ) : undefined
         }
         onDragStart={props.onLibraryDragStart}

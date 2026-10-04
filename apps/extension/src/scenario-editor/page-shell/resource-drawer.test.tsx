@@ -13,13 +13,16 @@ const cleanup = vi.fn();
 function ImportChild({
   onLibraryDragStart,
   toolbarTarget,
+  onAddTextStep,
 }: {
   onLibraryDragStart?: () => void;
   toolbarTarget?: HTMLElement | null;
+  onAddTextStep?: (title: string, description: string) => boolean;
 }) {
   useEffect(() => cleanup, []);
   return (
     <>
+      {onAddTextStep && <button onClick={() => onAddTextStep('Title', 'Body')}>Frameless</button>}
       {toolbarTarget && createPortal(<button>Import selected</button>, toolbarTarget)}
       <input
         aria-label="Import search"
@@ -144,4 +147,33 @@ it('places import controls after the stable title row and before the scrolling b
   expect(toolbar.nextElementSibling).toBe(body);
   expect(toolbar.textContent).toBe('Import selected');
   expect(title.querySelector('button')?.getAttribute('aria-label')).toBe('Close');
+});
+
+it('forwards frameless insertion without completing or closing the resource session', async () => {
+  const add = vi.fn(() => true);
+  await act(async () =>
+    root.render(
+      <GuideResourceDrawer
+        t={createTranslator('en')}
+        disabled={false}
+        selectedStepId={null}
+        onImport={async () => true}
+        onAddTextStep={add}
+      >
+        <GuideResourceTrigger t={createTranslator('en')} />
+      </GuideResourceDrawer>
+    )
+  );
+  await open();
+  const button = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
+    (item) => item.textContent === 'Frameless'
+  )!;
+  await act(async () => {
+    button.focus();
+    button.click();
+  });
+  expect(add).toHaveBeenCalledWith('Title', 'Body');
+  expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(document.activeElement).toBe(button);
+  expect(cleanup).not.toHaveBeenCalled();
 });
