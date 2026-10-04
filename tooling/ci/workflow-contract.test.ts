@@ -184,7 +184,9 @@ describe('release workflow topology', () => {
     }
     const upload = steps.find((step) => step.uses?.startsWith('actions/upload-artifact@'));
     expect(upload?.with).toMatchObject({
-      name: 'release-finalized-assets-${{ steps.source.outputs.source-sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+      name:
+        'release-finalized-assets-${{ steps.source.outputs.source-sha }}-' +
+        '${{ github.run_id }}-${{ github.run_attempt }}',
       'if-no-files-found': 'error',
     });
     expect(String(upload?.with?.path)).toContain('finalizer-admission.json');
@@ -531,7 +533,8 @@ it('keeps readable pipeline labels aligned with exact release admission checks',
     }
   }
   const provenance = readWorkflow(PROVENANCE);
-  const nested = `${provenance.jobs['canonical-proof'].name} / ${readWorkflow(CANONICAL).jobs['release-provenance-gate'].name}`;
+  const proof = readWorkflow(CANONICAL);
+  const nested = `${provenance.jobs['canonical-proof'].name} / ${proof.jobs['release-provenance-gate'].name}`;
   expect(nested).toBe('Checks / Release result');
   for (const path of [RELEASE, FINALIZE]) {
     expect(readSource(path)).toContain(`.name == "${nested}"`);
