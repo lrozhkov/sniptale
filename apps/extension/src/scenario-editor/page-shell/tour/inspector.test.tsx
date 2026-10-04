@@ -11,6 +11,7 @@ import {
 } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createTranslator } from '../../../platform/i18n';
+import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { TourInspector } from './inspector';
 import { getSystemSurfaceStylePresets } from '../../../features/highlighter/surface-style/system-presets';
 vi.mock(
@@ -572,9 +573,15 @@ it('edits navigation composition independently from its text and links', async (
 for (const kind of ['Hotspot', 'Slide explanation']) {
   it(`selects a visual ${kind} style directly while preserving numeric settings`, async () => {
     await click(kind);
+    const object = kind === 'Hotspot' ? current().hotspots[0]! : current().annotations[0]!;
+    object.appearance = {
+      ...project.tour!.style.textAppearance,
+      surface: { ...TOUR_HINT_SURFACE, radius: 20 },
+    };
+    draw();
     await fill('Explanation width', '280');
     await fill('Inner padding', '16');
-    await fill('Corner radius', '20');
+    expect(host.querySelector('input[aria-label="Corner radius"]')).toBeNull();
     await act(async () =>
       host
         .querySelector<HTMLButtonElement>('[data-ui="shared.ui.surface-style-selector"] button')!

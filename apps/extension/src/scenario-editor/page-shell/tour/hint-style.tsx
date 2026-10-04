@@ -51,7 +51,6 @@ export function TourHintStyle({
         [
           { key: 'width', label: t('scenario.editor.tourHintWidth'), min: 200, max: 640 },
           { key: 'padding', label: t('scenario.editor.tourHintPadding'), min: 8, max: 24 },
-          { key: 'radius', label: t('scenario.editor.tourHintRadius'), min: 0, max: 32 },
         ] as const
       ).map(({ key, ...props }) => (
         <TourInspectorNumericRow

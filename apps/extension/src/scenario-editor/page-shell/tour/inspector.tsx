@@ -253,7 +253,7 @@ function TourInspectorContent(props: InspectorProps) {
     );
   if (objectId)
     return (
-      <>
+      <div className="tour-object-inspector">
         <ScenarioInspectorBackButton
           label={t('scenario.editor.tourBackToSlide')}
           onBack={() => onSelectObject(null)}
@@ -273,7 +273,7 @@ function TourInspectorContent(props: InspectorProps) {
               },
             ])
           : settings('object')}
-      </>
+      </div>
     );
   return (
     <div ref={list}>
@@ -468,27 +468,29 @@ function TourImageObjectSettings({
             }
           />
         )}
-        <ScenarioInspectorActionButton
-          tone="danger"
-          disabled={disabled}
-          onClick={() => {
-            if (
-              onChange({
-                ...slide,
-                hotspots: slide.hotspots.filter((entry) => entry.id !== objectId),
-                annotations: slide.annotations.filter((entry) => entry.id !== objectId),
-                masks: slide.masks.filter((entry) => entry.id !== objectId),
-                ...(slide.objectOrder
-                  ? { objectOrder: slide.objectOrder.filter((id) => id !== objectId) }
-                  : {}),
-              })
-            )
-              onSelect(null);
-          }}
-        >
-          <Trash2 size={15} />
-          {t('common.actions.delete')}
-        </ScenarioInspectorActionButton>
+        <div className="tour-object-destructive-actions">
+          <ScenarioInspectorActionButton
+            tone="danger"
+            disabled={disabled}
+            onClick={() => {
+              if (
+                onChange({
+                  ...slide,
+                  hotspots: slide.hotspots.filter((entry) => entry.id !== objectId),
+                  annotations: slide.annotations.filter((entry) => entry.id !== objectId),
+                  masks: slide.masks.filter((entry) => entry.id !== objectId),
+                  ...(slide.objectOrder
+                    ? { objectOrder: slide.objectOrder.filter((id) => id !== objectId) }
+                    : {}),
+                })
+              )
+                onSelect(null);
+            }}
+          >
+            <Trash2 size={15} />
+            {t('common.actions.delete')}
+          </ScenarioInspectorActionButton>
+        </div>
       </>
     );
   return null;

@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { openVisualHarness, SCENARIO_VISUAL_THEMES } from './scenario-editor-visual.helpers';
 import { createTranslator } from '../../../../apps/extension/src/platform/i18n';
@@ -821,7 +821,7 @@ for (const [locale, theme] of [
       hostOrigin,
       theme,
       locale,
-      { width: 1280, height: 560 },
+      theme === 'light' ? { width: 1280, height: 560 } : { width: 1920, height: 900 },
       'compare',
       { tourFixture: '1' }
     );
@@ -907,7 +907,43 @@ for (const [locale, theme] of [
           .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true })
           .click();
       }
+      await checkTourObjectActions(panel, t);
+      if (key === 'tourHotspot') {
+        await info.attach(`object-delete-${locale}-${theme}`, {
+          body: await panel.screenshot(),
+          contentType: 'image/png',
+        });
+      }
+      await panel
+        .getByRole('button', { name: t('scenario.editor.inspectorShowAll'), exact: true })
+        .click();
+      await checkTourObjectActions(panel, t);
+      await expect
+        .soft(
+          panel.getByRole('textbox', { name: t('scenario.editor.tourHintRadius'), exact: true })
+        )
+        .toHaveCount(0);
+      await panel
+        .getByRole('button', { name: t('scenario.editor.inspectorShowSections'), exact: true })
+        .click();
       await visit(count, key);
+      if (key === 'tourAnnotation') {
+        await category(t('scenario.editor.textLabel')).click();
+        for (const placement of ['tourCaptionTop', 'tourCaptionBottom'] as const) {
+          await panel
+            .getByRole('button', { name: t('scenario.editor.tourSlidePlacement'), exact: true })
+            .click();
+          await page
+            .getByRole('option', { name: t(`scenario.editor.${placement}`), exact: true })
+            .click();
+          await checkTourObjectActions(panel, t);
+          await expect
+            .soft(
+              panel.getByRole('textbox', { name: t('scenario.editor.tourHintRadius'), exact: true })
+            )
+            .toHaveCount(0);
+        }
+      }
       if (key === 'tourHotspot') {
         await expect(panel).not.toContainText('review-voice-speech.wav');
         await panel
@@ -931,6 +967,12 @@ for (const [locale, theme] of [
               exact: true,
             })
           ).toBeVisible();
+          if (effect === 'tourHighlight') await checkTourObjectActions(panel, t);
+          if (effect === 'tourBlur') {
+            await expect(
+              panel.getByRole('textbox', { name: t('scenario.editor.tourBlurRadius'), exact: true })
+            ).toBeVisible();
+          }
           await category(t('scenario.editor.tourEffectType')).click();
         }
       }
@@ -946,6 +988,18 @@ for (const [locale, theme] of [
     await category(t('scenario.editor.tourContentsLinks')).click();
     await panel
       .getByRole('button', { name: t('scenario.editor.tourAddButton'), exact: true })
+      .click();
+    await checkTourObjectActions(panel, t);
+    await info.attach(`navigation-delete-${locale}-${theme}`, {
+      body: await panel.screenshot(),
+      contentType: 'image/png',
+    });
+    await panel
+      .getByRole('button', { name: t('scenario.editor.inspectorShowAll'), exact: true })
+      .click();
+    await checkTourObjectActions(panel, t);
+    await panel
+      .getByRole('button', { name: t('scenario.editor.inspectorShowSections'), exact: true })
       .click();
     await visit(2, 'navigation-button');
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -964,6 +1018,11 @@ for (const [locale, theme] of [
     for (let index = 0; index < 6; index++) {
       await defaults.nth(index).click();
       await expect(defaults.nth(index)).toHaveAttribute('aria-pressed', 'true');
+      await expect
+        .soft(
+          panel.getByRole('textbox', { name: t('scenario.editor.tourHintRadius'), exact: true })
+        )
+        .toHaveCount(0);
       expect(await panel.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
       await page.screenshot({
         path: `.tmp/backlog6-w16-visual/tour-default-${index}-${locale}-${theme}.png`,
@@ -1051,4 +1110,71 @@ for (const [locale, theme] of [
       contentType: 'image/png',
     });
   });
+}
+
+async function checkTourObjectActions(panel: Locator, t: ReturnType<typeof createTranslator>) {
+  const back = panel.getByRole('button', {
+    name: t('scenario.editor.tourBackToSlide'),
+    exact: true,
+  });
+  await back.scrollIntoViewIfNeeded();
+  await panel.locator('.guide-panel-scroll').evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  const geometry = await back.evaluate((node) => {
+    const rect = node.getBoundingClientRect();
+    const scroll = node.closest('.guide-panel-scroll')!.getBoundingClientRect();
+    return {
+      inset: rect.top - scroll.top,
+      left: rect.left - scroll.left,
+      right: scroll.right - rect.right,
+      height: rect.height,
+    };
+  });
+  expect.soft(geometry.inset).toBeGreaterThanOrEqual(8);
+  expect.soft(geometry.left).toBeGreaterThanOrEqual(0);
+  expect.soft(geometry.right).toBeGreaterThanOrEqual(0);
+  expect.soft(geometry.height).toBeGreaterThanOrEqual(32);
+  await back.hover();
+  await back.focus();
+  await back.page().keyboard.press('Tab');
+  await back.page().keyboard.press('Shift+Tab');
+  await expect(back).toBeFocused();
+  const focus = await back.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      visible: node.matches(':focus-visible'),
+      width: parseFloat(style.borderTopWidth),
+      style: style.borderTopStyle,
+      color: style.borderTopColor,
+    };
+  });
+  expect(focus.visible).toBe(true);
+  expect(focus.width).toBeGreaterThanOrEqual(1);
+  expect(focus.style).not.toBe('none');
+  expect(focus.color).not.toBe('rgba(0, 0, 0, 0)');
+  expect
+    .soft(
+      await back.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return [box.left + 2, box.right - 2].every((x) =>
+          node.contains(document.elementFromPoint(x, box.top + box.height / 2))
+        );
+      })
+    )
+    .toBe(true);
+  const remove = panel.getByRole('button', { name: t('common.actions.delete'), exact: true });
+  await remove.scrollIntoViewIfNeeded();
+  const separator = await remove.evaluate((node) => {
+    const group = node.parentElement!;
+    const style = getComputedStyle(group);
+    return {
+      border: parseFloat(style.borderTopWidth),
+      padding: parseFloat(style.paddingTop),
+      color: style.borderTopColor,
+    };
+  });
+  expect.soft(separator.border).toBeGreaterThanOrEqual(1);
+  expect.soft(separator.padding).toBeGreaterThanOrEqual(8);
+  expect.soft(separator.color).not.toBe('rgba(0, 0, 0, 0)');
 }

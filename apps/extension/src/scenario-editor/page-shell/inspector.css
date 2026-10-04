@@ -484,6 +484,17 @@
 .guide-inspector-panel > .guide-panel-scroll:has([data-ui='scenario-editor.inspector-categories']) {
   padding-top: 0;
 }
+.guide-inspector-panel > .guide-panel-scroll:has(> .tour-object-inspector) {
+  padding-top: 12px;
+}
+.guide-inspector-panel .tour-object-destructive-actions {
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-inspector-panel .tour-object-destructive-actions > .scenario-inspector-action-danger {
+  margin-top: 0;
+}
 .guide-inspector-panel [data-ui='scenario-editor.inspector-categories'] {
   margin-inline: -12px;
   grid-template-columns: 49px minmax(0, 1fr);

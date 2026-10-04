@@ -11,6 +11,7 @@ import {
 } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createTranslator } from '../../../platform/i18n';
+import { TOUR_HINT_SURFACE } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { TourInspector } from './inspector';
 import type { TourSelection } from './selection';
 let root: Root;
@@ -366,4 +367,34 @@ it('keeps legacy redaction controls distinct while grouping its narration', asyn
   await click('Effect type');
   await choose('Highlight', 'Blur');
   expect(current().masks[0]!.kind).toBe('blur');
+});
+
+it('hides obsolete hint radius while retaining authored radius through global and inherited local edits', async () => {
+  project.tour!.style.textAppearance.surface = { ...TOUR_HINT_SURFACE, radius: 20 };
+  scope = 'document';
+  presentation = 'sections';
+  draw();
+  await click('Slide explanation');
+  expect(host.querySelector('input[aria-label="Corner radius"]')).toBeNull();
+  await fill('Explanation width', '420');
+  await fill('Inner padding', '18');
+  expect(project.tour!.style.textAppearance.surface).toEqual({
+    ...TOUR_HINT_SURFACE,
+    radius: 20,
+    width: 420,
+    padding: 18,
+  });
+  scope = 'selection';
+  presentation = 'all';
+  draw();
+  await click('Slide explanation');
+  await click('Use tour style');
+  expect(current().annotations[0]!.appearance?.surface?.radius).toBe(20);
+  await fill('Explanation width', '300');
+  expect(current().annotations[0]!.appearance?.surface).toMatchObject({
+    radius: 20,
+    width: 300,
+    padding: 18,
+  });
+  expect(project.tour!.style.textAppearance.surface?.width).toBe(420);
 });

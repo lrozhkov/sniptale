@@ -171,19 +171,23 @@ for (const theme of ['light', 'dark'] as const) {
         '.tour-hint-style-settings [data-ui="shared.ui.compact-inspector.color-field"]'
       );
       check((await textColor.boundingBox())!.height).toBeLessThanOrEqual(40);
-      const labels = [
-        ru ? 'Внутренний отступ' : 'Inner padding',
-        ru ? 'Скругление' : 'Corner radius',
-        ru ? 'По нажатию' : 'On click',
-      ];
-      const centers: number[] = [];
-      for (const label of labels) {
-        const box = await panel.getByText(label, { exact: true }).boundingBox();
-        centers.push(box!.y + box!.height / 2);
-      }
-      check(Math.abs(centers[1]! - centers[0]! - (centers[2]! - centers[1]!))).toBeLessThanOrEqual(
-        1
-      );
+      await expect(
+        panel.getByText(ru ? 'Скругление' : 'Corner radius', { exact: true })
+      ).toHaveCount(0);
+      const width = panel.getByRole('textbox', {
+        name: ru ? 'Ширина пояснения' : 'Explanation width',
+        exact: true,
+      });
+      const padding = panel.getByRole('textbox', {
+        name: ru ? 'Внутренний отступ' : 'Inner padding',
+        exact: true,
+      });
+      await expect(width).toBeEnabled();
+      await expect(padding).toBeEnabled();
+      const widthBounds = (await width.boundingBox())!;
+      const paddingBounds = (await padding.boundingBox())!;
+      expect(paddingBounds.y - widthBounds.y - widthBounds.height).toBeGreaterThanOrEqual(8);
+      expect(paddingBounds.height).toBeCloseTo(widthBounds.height, 1);
       await textColor.scrollIntoViewIfNeeded();
       await info.attach(`hotspot-fields-${locale}-${theme}`, {
         body: await panel.screenshot({ path: info.outputPath('color-panel.png') }),
