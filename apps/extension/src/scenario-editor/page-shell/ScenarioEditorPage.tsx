@@ -221,6 +221,7 @@ function GuideDocumentWorkspace({
         t={t}
         disabled={importDisabled}
         selectedStepId={selectedStepId}
+        steps={project.items.filter((item) => item.kind === 'step')}
         onImport={imports.resources}
       >
         <GuideImageDropZone

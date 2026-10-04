@@ -312,6 +312,22 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideImportAsSteps: { ru: 'Каждое в отдельный шаг', en: 'Each as a separate step' },
   guideImportAsBlocks: { ru: 'Блоками в выбранный шаг', en: 'As blocks in selected step' },
   guideImportSelected: { ru: 'Импортировать выбранное', en: 'Import selected' },
+  guideImportSelectedCount: { ru: 'Выбрано: {count}', en: 'Selected: {count}' },
+  guideImportStepsHint: {
+    ru: 'Новые шаги в порядке выбора материалов',
+    en: 'New steps in selection order',
+  },
+  guideImportStepTarget: { ru: 'Добавить в шаг «{name}»', en: 'Add to step “{name}”' },
+  guideImportReplaceTarget: {
+    ru: 'Заменить изображение в шаге «{name}»',
+    en: 'Replace image in step “{name}”',
+  },
+  guideImportTourSlides: {
+    ru: 'Новые слайды в порядке выбора материалов',
+    en: 'New slides in selection order',
+  },
+  guideImportTourImage: { ru: 'Заменить изображение слайда', en: 'Replace slide image' },
+  guideImportTourBackground: { ru: 'Заменить фон слайда', en: 'Replace slide background' },
   guideImportProgress: { ru: 'Подготовка изображений', en: 'Preparing images' },
   guideImportCancel: { ru: 'Отменить подготовку', en: 'Cancel preparation' },
   guideImportFailed: {

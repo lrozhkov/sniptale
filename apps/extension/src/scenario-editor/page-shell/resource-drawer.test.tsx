@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
 import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
@@ -9,20 +10,29 @@ vi.mock('./resources', () => ({ GuideImageResources: ImportChild }));
 let root: Root;
 let host: HTMLDivElement;
 const cleanup = vi.fn();
-function ImportChild({ onLibraryDragStart }: { onLibraryDragStart?: () => void }) {
+function ImportChild({
+  onLibraryDragStart,
+  toolbarTarget,
+}: {
+  onLibraryDragStart?: () => void;
+  toolbarTarget?: HTMLElement | null;
+}) {
   useEffect(() => cleanup, []);
   return (
-    <input
-      aria-label="Import search"
-      draggable
-      onDragStart={onLibraryDragStart}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          event.stopPropagation();
-        }
-      }}
-    />
+    <>
+      {toolbarTarget && createPortal(<button>Import selected</button>, toolbarTarget)}
+      <input
+        aria-label="Import search"
+        draggable
+        onDragStart={onLibraryDragStart}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        }}
+      />
+    </>
   );
 }
 beforeEach(() => {
@@ -121,4 +131,17 @@ it('keeps the source mounted during drag and closes cleanly on dragend or Escape
   await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
   expect(document.querySelector('.guide-resource-dragging')).toBeNull();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
+});
+
+it('places import controls after the stable title row and before the scrolling body', async () => {
+  await open();
+  const dialog = document.querySelector('[role="dialog"]')!;
+  const title = dialog.querySelector('.guide-resource-drawer-close')!;
+  const toolbar = dialog.querySelector('.guide-resource-header-actions')!;
+  const body = dialog.querySelector('.guide-resource-drawer-body')!;
+  expect(title.contains(toolbar)).toBe(false);
+  expect(title.nextElementSibling).toBe(toolbar);
+  expect(toolbar.nextElementSibling).toBe(body);
+  expect(toolbar.textContent).toBe('Import selected');
+  expect(title.querySelector('button')?.getAttribute('aria-label')).toBe('Close');
 });

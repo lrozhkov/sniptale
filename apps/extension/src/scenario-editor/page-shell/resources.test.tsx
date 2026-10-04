@@ -42,6 +42,7 @@ async function render(
         disabled={false}
         {...(target ? { target } : {})}
         selectedStepId={selectedStepId}
+        steps={[{ id: 'step', title: 'Destination step' }]}
         t={createTranslator('en')}
         onImport={io.import}
       />
@@ -145,6 +146,10 @@ it('imports one selected source into the requested image block without a destina
       <GuideImageResources
         disabled={false}
         selectedStepId="other"
+        steps={[
+          { id: 'other', title: 'Other step' },
+          { id: 'target-step', title: 'Actual target' },
+        ]}
         target={{ kind: 'replace-image', stepId: 'target-step', blockId: 'target-image' }}
         t={createTranslator('en')}
         onImport={io.import}
@@ -153,6 +158,11 @@ it('imports one selected source into the requested image block without a destina
   );
   await files('first.png');
   await files('replacement.png');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(
+    'Replace image in step “Actual target”'
+  );
+  expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 1');
   await click('Import selected');
   expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(1);
   expect(io.import.mock.calls[0]?.[0].sources[0].mediaId).toBe('replacement.png');
@@ -204,4 +214,47 @@ it('imports a tour replacement as one image and keeps tour slide imports ordered
       { kind: 'library', mediaId: 'second.png' },
     ],
   });
+});
+
+it('separates destination, ordered selection count and confirmation without changing selection', async () => {
+  await render();
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 0');
+  await files('first.png', 'second.png');
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 2');
+  await click('As blocks in selected step');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(
+    'Add to step “Destination step”'
+  );
+  expect(
+    [...host.querySelectorAll('.guide-library-card-select')].map((node) => node.textContent)
+  ).toEqual(['1', '2']);
+  await click('Each as a separate step');
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(
+    'New steps in selection order'
+  );
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 2');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'steps' });
+  expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 0');
+});
+
+it('keeps selected-step insertion disabled without a selected step', async () => {
+  await render(null);
+  const blocks = host.querySelector<HTMLButtonElement>('[title="As blocks in selected step"]')!;
+  expect(blocks.disabled).toBe(true);
+  await files('first.png');
+  await click('As blocks in selected step');
+  expect(blocks.getAttribute('aria-pressed')).toBe('false');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'steps' });
+});
+
+it.each([
+  [{ kind: 'tour-slides' as const }, 'New slides in selection order'],
+  [{ kind: 'tour-image' as const, slideId: 'slide' }, 'Replace slide image'],
+  [{ kind: 'tour-background' as const, slideId: 'slide' }, 'Replace slide background'],
+])('describes the fixed %s destination without Guide placement controls', async (target, label) => {
+  await render(null, target);
+  expect(host.querySelector('.guide-import-target')?.textContent).toBe(label);
+  expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
 });

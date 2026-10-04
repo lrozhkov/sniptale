@@ -32,7 +32,10 @@ export function GuideResourceDrawer({
   t,
   ...props
 }: ResourceDrawerProps &
-  Pick<ComponentProps<typeof GuideImageResources>, 'onImport' | 'disabled' | 'selectedStepId'>) {
+  Pick<
+    ComponentProps<typeof GuideImageResources>,
+    'onImport' | 'disabled' | 'selectedStepId' | 'steps'
+  >) {
   const [target, setTarget] = useState<ResourceTarget | null>(null);
   const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState(false);
@@ -212,7 +215,6 @@ export function GuideResourceDialog({
         <div className="guide-resource-drawer-close">
           <Image size={16} aria-hidden="true" />
           <strong>{title ?? props.t('scenario.editor.guideOpenImageLibrary')}</strong>
-          {toolbarRef && <div className="guide-resource-header-actions" ref={toolbarRef} />}
           <ContentToolbarButton
             tone="close"
             type="button"
@@ -222,6 +224,7 @@ export function GuideResourceDialog({
             <X size={16} aria-hidden="true" />
           </ContentToolbarButton>
         </div>
+        {toolbarRef && <div className="guide-resource-header-actions" ref={toolbarRef} />}
         <div className="guide-resource-drawer-body">
           <div>{props.children}</div>
         </div>
