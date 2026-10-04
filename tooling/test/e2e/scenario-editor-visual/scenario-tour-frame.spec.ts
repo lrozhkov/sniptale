@@ -162,6 +162,76 @@ for (const [locale, theme] of [
     await page.locator('.tour-slide-select').first().click();
     await expect(host.locator('#tour-player')).toHaveAttribute('data-slide-id', 'tour-before');
     const panel = page.locator('#guide-inspector-panel');
+    const category = (key: 'tourObjects' | 'tourCamera' | 'tourTargetArea' | 'textLabel') =>
+      panel
+        .getByRole('navigation')
+        .getByRole('button', { name: t(`scenario.editor.${key}`), exact: true });
+    await category('tourObjects').click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourHotspot'), exact: true })
+      .click();
+    const point = await Promise.all(
+      ['X', 'Y'].map((name) => panel.getByRole('textbox', { name, exact: true }).inputValue())
+    );
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
+      .click();
+    await category('tourCamera').click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourCameraMode'), exact: true })
+      .click();
+    await page
+      .getByRole('option', { name: t('scenario.editor.tourCameraAuto'), exact: true })
+      .click();
+    const preview = page
+      .locator('.tour-header-controls')
+      .getByRole('button', { name: t('scenario.editor.tourPreviewSlide'), exact: true });
+    await preview.click();
+    await expect(host.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+    const fittedImage = () =>
+      host.locator('.tour-image-plane > .tour-image').evaluate((node) => {
+        const image = node.getBoundingClientRect();
+        const stage = node.closest('[data-tour-stage]')!.getBoundingClientRect();
+        return { width: image.width / stage.width, height: image.height / stage.height };
+      });
+    const withoutArea = await fittedImage();
+    await page
+      .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
+      .click();
+    await category('tourObjects').click();
+    await panel.locator('[data-inspector-object]').first().click();
+    await category('tourTargetArea').click();
+    await panel
+      .getByRole('switch', { name: t('scenario.editor.tourTargetArea'), exact: true })
+      .check();
+    for (const [name, value] of [
+      ['X', '0'],
+      ['Y', '0'],
+      [t('scenario.editor.width'), '90'],
+      [t('scenario.editor.height'), '90'],
+    ]) {
+      const input = panel.getByRole('textbox', { name: name!, exact: true });
+      await input.fill(value!);
+      await input.press('Enter');
+    }
+    await category('textLabel').click();
+    expect(
+      await Promise.all(
+        ['X', 'Y'].map((name) => panel.getByRole('textbox', { name, exact: true }).inputValue())
+      )
+    ).toEqual(point);
+    await preview.click();
+    await expect(host.locator('[data-tour-stage]')).toHaveAttribute('data-motion', 'settled');
+    const withArea = await fittedImage();
+    expect(withArea.width).toBeLessThan(withoutArea.width);
+    expect(withArea.height).toBeLessThan(withoutArea.height);
+    await page
+      .getByRole('button', { name: t('scenario.editor.tourReturnToEditing'), exact: true })
+      .click();
+    await panel
+      .getByRole('button', { name: t('scenario.editor.tourBackToSlide'), exact: true })
+      .click();
+
     await panel
       .getByRole('navigation')
       .getByRole('button', { name: t('scenario.editor.tourCamera'), exact: true })
@@ -345,6 +415,10 @@ for (const [locale, theme] of [
       .trim();
     await field.fill(copy);
     await field.blur();
+    await panel
+      .getByRole('navigation')
+      .getByRole('button', { name: t('scenario.editor.appearance'), exact: true })
+      .click();
     const selector = panel.locator('[data-ui="shared.ui.surface-style-selector"]');
     await selector.locator('button').first().click();
     const styles = selector.getByRole('dialog');

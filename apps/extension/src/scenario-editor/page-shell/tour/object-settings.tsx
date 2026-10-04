@@ -44,6 +44,7 @@ export function TourHotspotSettings({
         <>
           <GuideInspectorGroup
             id="hotspot"
+            collapsible={false}
             icon={Crosshair}
             title={t('scenario.editor.tourHotspot')}
           >
@@ -60,30 +61,13 @@ export function TourHotspotSettings({
               disabled={disabled}
               onChange={(text) => onChange({ ...value, text })}
             />
-          </GuideInspectorGroup>
-        </>
-      ),
-    },
-    {
-      id: 'position',
-      icon: Crosshair,
-      label: t('scenario.editor.tourPosition'),
-      categorized: true,
-      content: (
-        <GuideInspectorGroup
-          id="position"
-          icon={Crosshair}
-          title={t('scenario.editor.tourPosition')}
-        >
-          <details className="tour-coordinate-disclosure">
-            <summary>{t('scenario.editor.tourAdvancedSettings')}</summary>
             <TourPointFields
               point={value.point}
               disabled={disabled}
               onChange={(point) => onChange({ ...value, point })}
             />
-          </details>
-        </GuideInspectorGroup>
+          </GuideInspectorGroup>
+        </>
       ),
     },
     {
@@ -157,7 +141,7 @@ function TourTargetArea({
       icon={ScanLine}
       title={t('scenario.editor.tourTargetArea')}
     >
-      <label className="guide-number-toggle">
+      <label className="guide-number-toggle" title={t('scenario.editor.tourTargetAreaHint')}>
         <ProductToggle
           size="sm"
           disabled={disabled}
@@ -193,33 +177,55 @@ function TourTargetArea({
 
 export function TourAnnotationSettings({
   value,
+  presentation = 'all',
+  narration,
   tour,
   disabled,
   onChange,
   t,
 }: SettingsProps<TourAnnotation>) {
-  return (
-    <GuideInspectorGroup
-      id="annotation"
-      icon={MessageSquare}
-      title={t('scenario.editor.tourAnnotation')}
-    >
-      <TourTextField
-        label={t('scenario.editor.textLabel')}
-        value={value.text}
-        disabled={disabled}
-        onChange={(text) => onChange({ ...value, text })}
-      />
-      <TourTextPresentation
-        kind="annotation"
-        value={value.appearance}
-        defaults={tour.style.textAppearance}
-        disabled={disabled}
-        onChange={(appearance) => onChange({ ...value, appearance })}
-        t={t}
-      />
-    </GuideInspectorGroup>
-  );
+  const renderSections = useTourInspectorSections(presentation, t, narration);
+  return renderSections('annotation', [
+    {
+      id: 'content',
+      icon: MessageSquare,
+      label: t('scenario.editor.textLabel'),
+      categorized: true,
+      content: (
+        <GuideInspectorGroup
+          id="annotation"
+          icon={MessageSquare}
+          title={t('scenario.editor.textLabel')}
+          collapsible={false}
+        >
+          <TourTextField
+            label={t('scenario.editor.textLabel')}
+            value={value.text}
+            disabled={disabled}
+            onChange={(text) => onChange({ ...value, text })}
+          />
+        </GuideInspectorGroup>
+      ),
+    },
+    {
+      id: 'appearance',
+      icon: Palette,
+      label: t('scenario.editor.appearance'),
+      categorized: true,
+      content: (
+        <GuideInspectorGroup id="appearance" icon={Palette} title={t('scenario.editor.appearance')}>
+          <TourTextPresentation
+            kind="annotation"
+            value={value.appearance}
+            defaults={tour.style.textAppearance}
+            disabled={disabled}
+            onChange={(appearance) => onChange({ ...value, appearance })}
+            t={t}
+          />
+        </GuideInspectorGroup>
+      ),
+    },
+  ]);
 }
 
 function TourRectFields({

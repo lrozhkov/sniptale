@@ -398,3 +398,28 @@ it('hides obsolete hint radius while retaining authored radius through global an
   });
   expect(project.tour!.style.textAppearance.surface?.width).toBe(420);
 });
+
+it('exposes hotspot coordinates in Text and annotation categories without mutating selection content', async () => {
+  await click('Hotspot');
+  presentation = 'sections';
+  draw();
+  expect(host.querySelector('input[aria-label="X"]')).not.toBeNull();
+  expect(host.querySelector('details')).toBeNull();
+  await click('Back to slide settings');
+  presentation = 'all';
+  draw();
+  await click('Add');
+  await click('Slide explanation');
+  presentation = 'sections';
+  draw();
+  const before = structuredClone(project);
+  expect(host.querySelector('textarea[aria-label="Text"]')).not.toBeNull();
+  await click('Appearance');
+  expect(host.querySelector('[aria-label="Placement on slide"]')).not.toBeNull();
+  await click('Text');
+  expect(host.querySelector('textarea[aria-label="Text"]')).not.toBeNull();
+  expect(project).toEqual(before);
+  presentation = 'all';
+  draw();
+  expect(host.querySelectorAll('[data-testid="narration-slot"]')).toHaveLength(1);
+});

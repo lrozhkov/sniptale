@@ -258,16 +258,12 @@ function TourInspectorContent(props: InspectorProps) {
           label={t('scenario.editor.tourBackToSlide')}
           onBack={() => onSelectObject(null)}
         />
-        {slide.kind === 'navigation' || slide.annotations.some((entry) => entry.id === objectId)
-          ? renderSections(slide.kind === 'navigation' ? 'navigation-button' : 'annotation', [
+        {slide.kind === 'navigation'
+          ? renderSections('navigation-button', [
               {
                 id: 'content',
-                icon: slide.kind === 'navigation' ? MousePointer2 : MessageSquare,
-                label: t(
-                  slide.kind === 'navigation'
-                    ? 'scenario.editor.tourButton'
-                    : 'scenario.editor.textLabel'
-                ),
+                icon: MousePointer2,
+                label: t('scenario.editor.tourButton'),
                 categorized: true,
                 content: settings('object'),
               },
@@ -438,6 +434,8 @@ function TourImageObjectSettings({
         )}
         {annotation && (
           <TourAnnotationSettings
+            presentation={presentation}
+            narration={narration}
             value={annotation}
             tour={tour}
             disabled={disabled}

@@ -187,9 +187,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
         .click();
       await tourPanel
         .getByRole('navigation')
-        .getByRole('button', { name: locale === 'ru' ? 'Положение' : 'Position', exact: true })
+        .getByRole('button', { name: locale === 'ru' ? 'Текст' : 'Text', exact: true })
         .click();
-      await tourPanel.locator('.tour-coordinate-disclosure summary').click();
       await expect(
         tourPanel.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]').first()
       ).toBeVisible();
@@ -893,8 +892,8 @@ for (const [locale, theme] of [
       .setInputFiles('tooling/test/e2e/fixtures/review-voice-speech.wav');
     await expect(panel).toContainText('review-voice-speech.wav');
     for (const [key, count] of [
-      ['tourHotspot', 6],
-      ['tourAnnotation', 2],
+      ['tourHotspot', 5],
+      ['tourAnnotation', 3],
       ['tourMask', 3],
     ] as const) {
       await category(t('scenario.editor.tourObjects')).click();
@@ -928,7 +927,7 @@ for (const [locale, theme] of [
         .click();
       await visit(count, key);
       if (key === 'tourAnnotation') {
-        await category(t('scenario.editor.textLabel')).click();
+        await category(t('scenario.editor.appearance')).click();
         for (const placement of ['tourCaptionTop', 'tourCaptionBottom'] as const) {
           await panel
             .getByRole('button', { name: t('scenario.editor.tourSlidePlacement'), exact: true })

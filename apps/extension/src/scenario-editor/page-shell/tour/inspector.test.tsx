@@ -162,15 +162,12 @@ it('edits an image slide and hotspots through canonical commands without changin
   await fill('Action label', 'Open settings');
   await fill('Text', 'Click here');
   await click('Pulse hotspot');
-  const coordinates = host.querySelector<HTMLDetailsElement>('.tour-coordinate-disclosure')!;
-  expect(coordinates.open).toBe(false);
-  expect(coordinates.querySelector<HTMLInputElement>('[aria-label="X"]')).not.toBeNull();
-  await act(async () => coordinates.querySelector('summary')!.click());
-  expect(coordinates.open).toBe(true);
+  expect(host.querySelector('.tour-coordinate-disclosure')).toBeNull();
+  expect(host.querySelector('input[aria-label="X"]')).not.toBeNull();
   await fill('X', '30');
   await fill('Y', '40');
-  await click('Target area');
-  await click('Target area');
+  await click('Auto-zoom area');
+  await click('Auto-zoom area');
   await choose('Hotspot hint', 'At hotspot');
   await choose('Hotspot hint', 'Use tour default');
   await choose('On click', 'Open link');
@@ -730,4 +727,32 @@ it('groups selected action points and highlights when sections are enabled', asy
   presentation = 'sections';
   draw();
   expect(host.querySelector('[data-ui="scenario-editor.inspector-categories"]')).not.toBeNull();
+});
+
+it('keeps marker and auto-zoom rectangle independent and bounds the rectangle', async () => {
+  await click('Hotspot');
+  await click('Auto-zoom area');
+  const rectangle = structuredClone(current().hotspots[0]!.targetRect);
+  await fill('X', '30');
+  await fill('Y', '40');
+  expect(current().hotspots[0]!.targetRect).toEqual(rectangle);
+  const point = structuredClone(current().hotspots[0]!.point);
+  const area = host.querySelector('section[aria-label="Auto-zoom area"]')!;
+  expect(area.querySelector('label')?.title).toContain('one hotspot');
+  expect(area.querySelector('input[aria-label="X range"]')?.getAttribute('max')).toBe('80');
+  const x = area.querySelector<HTMLInputElement>('input[aria-label="X"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(x, '95');
+    x.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => x.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(current().hotspots[0]!.targetRect?.x).toBe(0.8);
+  expect(current().hotspots[0]!.point).toEqual(point);
+  const width = host.querySelector(
+    'section[aria-label="Auto-zoom area"] input[aria-label="Width range"]'
+  );
+  expect(Number(width?.getAttribute('max'))).toBeCloseTo(20);
+  await click('Auto-zoom area');
+  expect(current().hotspots[0]!.targetRect).toBeNull();
+  expect(current().hotspots[0]!.point).toEqual(point);
 });

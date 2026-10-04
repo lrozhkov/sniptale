@@ -278,7 +278,11 @@ export const scenarioTourMessages = {
   tourRestart: { ru: 'В начало', en: 'Restart' },
   tourPosition: { ru: 'Положение', en: 'Position' },
   tourObjectLabel: { ru: 'Название действия', en: 'Action label' },
-  tourTargetArea: { ru: 'Область элемента', en: 'Target area' },
+  tourTargetArea: { ru: 'Область автоприближения', en: 'Auto-zoom area' },
+  tourTargetAreaHint: {
+    ru: 'При автоматической камере и одной точке просмотр показывает точку вместе с этой областью.',
+    en: 'With automatic camera and one hotspot, preview frames the hotspot together with this area.',
+  },
   tourOpacity: { ru: 'Непрозрачность', en: 'Opacity' },
   tourInherited: { ru: 'Как во всём туре', en: 'Use tour default' },
   tourInvalidUrl: {
