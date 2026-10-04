@@ -338,8 +338,9 @@ it('provides image zoom and fit without playback or volume controls', () => {
     )
   );
   expect(control('videoEditor.sidebar.mediaPreviewVolume')).toBeNull();
+  expect(container.textContent).not.toContain('videoEditor.sidebar.mediaPreviewImageZoomHint');
   expect(control('videoEditor.sidebar.mediaPreviewSeek')).toBeNull();
-  const zoom = control('videoEditor.sidebar.mediaPreviewZoomLabel');
+  const zoom = control('videoEditor.sidebar.mediaPreviewImageZoomLabel');
   expect(zoom.disabled).toBe(true);
   act(() => container.querySelector('img')!.dispatchEvent(new Event('load')));
   act(() => {
@@ -427,7 +428,7 @@ it('fits natural image pixels, follows resize, zooms with modified wheel and res
     )
   );
   const small = container.querySelector('img')!;
-  expect(control('videoEditor.sidebar.mediaPreviewZoomLabel').disabled).toBe(true);
+  expect(control('videoEditor.sidebar.mediaPreviewImageZoomLabel').disabled).toBe(true);
   Object.defineProperties(small, { naturalWidth: { value: 100 }, naturalHeight: { value: 50 } });
   act(() => small.dispatchEvent(new Event('load')));
   expect(small.style.width).toBe('100px');
@@ -504,4 +505,72 @@ it('keeps centered image pixels anchored when zoom crosses letterbox margins', (
   const bounds = picture.getBoundingClientRect();
   expect((300 - bounds.left) / bounds.width).toBeCloseTo(0.5);
   expect((300 - bounds.top) / bounds.height).toBeCloseTo(0.5);
+});
+
+it('keeps image zoom, native pixels and Fit consistent through fullscreen transitions', () => {
+  let resize = () => {};
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        resize = callback;
+      }
+      observe() {}
+      disconnect() {}
+    }
+  );
+  act(() => root.render(<div />));
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:controls" filename="Large image" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  expect(control('gallery.preview.zoomIn').disabled).toBe(true);
+  const viewport = container.querySelector<HTMLDivElement>('[data-ui="library-media-viewport"]')!;
+  Object.defineProperties(viewport, {
+    clientWidth: { configurable: true, value: 600 },
+    clientHeight: { configurable: true, value: 300 },
+  });
+  const image = container.querySelector('img')!;
+  Object.defineProperties(image, { naturalWidth: { value: 1200 }, naturalHeight: { value: 600 } });
+  act(() => {
+    resize();
+    image.dispatchEvent(new Event('load'));
+  });
+  expect(control('gallery.preview.zoomOut').disabled).toBe(true);
+  act(() => control('gallery.preview.zoomIn').click());
+  expect(image.style.width).toBe('750px');
+  act(() => control('gallery.preview.zoomOut').click());
+  expect(image.style.width).toBe('600px');
+  const native = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === '100%'
+  )!;
+  act(() => native.click());
+  expect(image.style.width).toBe('1200px');
+  expect(native.getAttribute('aria-pressed')).toBe('true');
+  const frame = container.querySelector('[data-ui="library-media-player"]');
+  try {
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: frame });
+    act(() => document.dispatchEvent(new Event('fullscreenchange')));
+    expect(document.activeElement).toBe(control('videoEditor.stage.exitFullscreen'));
+    Object.defineProperty(viewport, 'clientWidth', { configurable: true, value: 1000 });
+    Object.defineProperty(viewport, 'clientHeight', { configurable: true, value: 500 });
+    act(() => resize());
+    expect(image.style.width).toBe('1200px');
+    const fit = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'videoEditor.sidebar.mediaPreviewFit'
+    )!;
+    act(() => fit.click());
+    expect(image.style.width).toBe('1000px');
+    expect(control('gallery.preview.zoomOut').disabled).toBe(true);
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+    act(() => document.dispatchEvent(new Event('fullscreenchange')));
+    expect(document.activeElement).toBe(control('videoEditor.stage.enterFullscreen'));
+    act(() => image.dispatchEvent(new Event('error')));
+    expect(control('gallery.preview.zoomIn').disabled).toBe(true);
+  } finally {
+    Reflect.deleteProperty(document, 'fullscreenElement');
+  }
 });

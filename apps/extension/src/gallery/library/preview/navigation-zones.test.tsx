@@ -93,3 +93,25 @@ it('replaces callbacks and boundary state with the current filtered list', () =>
   renderZones(null);
   expect(host.querySelector('[data-ui^="gallery.preview.navigationZone"]')).toBeNull();
 });
+
+it.each(['previous', 'next'] as const)(
+  'releases %s pointer focus after keyboard use but preserves keyboard activation focus',
+  (direction) => {
+    const onPrevious = vi.fn();
+    const onNext = vi.fn();
+    renderZones({ current: 2, total: 4, hasPrevious: true, hasNext: true, onPrevious, onNext });
+    const zone = host.querySelector<HTMLButtonElement>(
+      `[data-ui="gallery.preview.navigationZone.${direction}"]`
+    )!;
+    const navigate = direction === 'previous' ? onPrevious : onNext;
+    for (let repeat = 0; repeat < 2; repeat++) {
+      zone.focus();
+      act(() => zone.click());
+      expect(document.activeElement).toBe(zone);
+      act(() => zone.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+      expect(document.activeElement).not.toBe(zone);
+    }
+    expect(navigate).toHaveBeenCalledTimes(4);
+    expect(direction === 'previous' ? onNext : onPrevious).not.toHaveBeenCalled();
+  }
+);

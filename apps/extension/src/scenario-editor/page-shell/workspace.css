@@ -1651,8 +1651,29 @@ html[data-guide-reordering] .guide-block-grip {
   }
 }
 
+.guide-library-preview-header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.guide-library-preview-header > button,
+.guide-library-preview-header > span {
+  flex: none;
+}
+.guide-library-preview-header > span {
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-library-preview-header > strong {
+  flex: 1;
+  min-width: 0;
+}
 .guide-library-preview > strong {
   flex: none;
+}
+.guide-library-preview-header > strong,
+.guide-library-preview > strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1663,6 +1684,9 @@ html[data-guide-reordering] .guide-block-grip {
 }
 .guide-library-preview [data-ui='library-media-player'] {
   min-height: 180px;
+}
+.guide-library-preview-raster [data-ui='library-media-player'] {
+  min-height: 0;
 }
 .guide-import-actions[hidden] {
   display: none;

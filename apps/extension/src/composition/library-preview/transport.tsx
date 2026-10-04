@@ -1,6 +1,16 @@
 import type { useLibraryViewport } from './viewport';
 import type { RefObject, ReactNode } from 'react';
-import { Pause, Play, Volume2, VolumeX, Minimize2, Maximize2, Search } from 'lucide-react';
+import {
+  Pause,
+  Play,
+  Volume2,
+  VolumeX,
+  Minimize2,
+  Maximize2,
+  Search,
+  Minus,
+  Plus,
+} from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange, ProductInput } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../platform/i18n';
@@ -28,7 +38,10 @@ export function LibraryMediaTransport(props: {
   );
   return (
     <div
-      className="flex min-w-0 shrink-0 flex-wrap items-center justify-start gap-2"
+      className={[
+        'flex min-w-0 shrink-0 flex-wrap items-center justify-start gap-2',
+        props.image ? 'sniptale-toolbar-root' : '',
+      ].join(' ')}
       data-ui="library-media-transport"
     >
       {!props.image ? (
@@ -82,13 +95,11 @@ export function LibraryMediaTransport(props: {
           <Minimize2 size={16} aria-hidden="true" />
         </ContentToolbarButton>
       ) : null}
-      <p className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate(
-          props.image
-            ? 'videoEditor.sidebar.mediaPreviewImageZoomHint'
-            : 'videoEditor.sidebar.mediaPreviewZoomHint'
-        )}
-      </p>
+      {!props.image && (
+        <p className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.sidebar.mediaPreviewZoomHint')}
+        </p>
+      )}
     </div>
   );
 }
@@ -141,12 +152,13 @@ function LibrarySeek({
 export function LibraryViewControls({
   state,
   ready,
+  image,
 }: {
   state: ReturnType<typeof useLibraryViewport>;
   ready: boolean;
+  image: boolean;
 }) {
   const { fullscreen, fullscreenButton, enterFullscreen, zoom, setZoom } = state;
-  const image = state.imageSize !== null;
   const zoomLabel = translate(
     image
       ? 'videoEditor.sidebar.mediaPreviewImageZoomLabel'
@@ -166,34 +178,24 @@ export function LibraryViewControls({
           <Maximize2 size={16} />
         </ContentToolbarButton>
       ) : null}
-      <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums">
-        <span>{zoomLabel}</span>
-        <Search size={14} aria-hidden />
-        <ProductRange
-          className="!w-24"
-          min={image ? state.fitScale : 1}
-          max={image ? 4 : 2}
-          step={image ? 0.01 : 0.1}
-          value={image ? zoom * state.fitScale : zoom}
-          disabled={!ready}
-          aria-label={zoomLabel}
-          onChange={(event) =>
-            setZoom(Math.max(1, Number(event.currentTarget.value) / (image ? state.fitScale : 1)))
-          }
-        />
-        <span className="min-w-10 text-right">
-          {image ? `${Math.round(zoom * state.fitScale * 100)}%` : `${zoom.toFixed(1)}×`}
-        </span>
-      </label>
-      {image && (
-        <ContentToolbarButton
-          className="!w-auto !px-3 text-xs"
-          disabled={!ready}
-          aria-pressed={Math.abs(zoom * state.fitScale - 1) < 0.001}
-          onClick={() => setZoom(1 / state.fitScale)}
-        >
-          100%
-        </ContentToolbarButton>
+      {image ? (
+        <LibraryImageZoomControls state={state} ready={ready} />
+      ) : (
+        <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs tabular-nums">
+          <span>{zoomLabel}</span>
+          <Search size={14} aria-hidden />
+          <ProductRange
+            className="!w-24"
+            min={1}
+            max={2}
+            step={0.1}
+            value={zoom}
+            disabled={!ready}
+            aria-label={zoomLabel}
+            onChange={(event) => setZoom(Math.max(1, Number(event.currentTarget.value)))}
+          />
+          <span className="min-w-10 text-right">{zoom.toFixed(1)}×</span>
+        </label>
       )}
       <ContentToolbarButton
         className="!w-auto !px-3 text-xs"
@@ -202,6 +204,59 @@ export function LibraryViewControls({
         onClick={() => setZoom(1)}
       >
         {translate('videoEditor.sidebar.mediaPreviewFit')}
+      </ContentToolbarButton>
+    </>
+  );
+}
+
+/** Compact image controls adapt pixel scale to the viewport's existing normalized zoom. */
+function LibraryImageZoomControls({
+  state,
+  ready,
+}: {
+  state: ReturnType<typeof useLibraryViewport>;
+  ready: boolean;
+}) {
+  const scale = state.zoom * state.fitScale;
+  const setScale = (value: number) =>
+    state.setZoom(Math.max(state.fitScale, Math.min(4, value)) / state.fitScale);
+  return (
+    <>
+      <ContentToolbarButton
+        aria-label={translate('gallery.preview.zoomOut')}
+        title={translate('gallery.preview.zoomOut')}
+        disabled={!ready || state.zoom <= 1}
+        onClick={() => setScale(scale / 1.25)}
+      >
+        <Minus size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+      <ProductRange
+        className="!w-24"
+        min={state.fitScale}
+        max={4}
+        step={0.01}
+        value={scale}
+        disabled={!ready}
+        aria-label={translate('videoEditor.sidebar.mediaPreviewImageZoomLabel')}
+        aria-valuetext={`${Math.round(scale * 100)}%`}
+        onChange={(event) => setScale(event.currentTarget.valueAsNumber)}
+      />
+      <span className="min-w-10 text-right text-xs tabular-nums">{Math.round(scale * 100)}%</span>
+      <ContentToolbarButton
+        aria-label={translate('gallery.preview.zoomIn')}
+        title={translate('gallery.preview.zoomIn')}
+        disabled={!ready || scale >= 4}
+        onClick={() => setScale(scale * 1.25)}
+      >
+        <Plus size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        className="!w-auto !px-3 text-xs"
+        disabled={!ready}
+        aria-pressed={Math.abs(scale - 1) < 0.001}
+        onClick={() => setScale(1)}
+      >
+        100%
       </ContentToolbarButton>
     </>
   );

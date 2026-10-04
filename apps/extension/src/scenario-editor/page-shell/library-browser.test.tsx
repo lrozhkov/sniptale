@@ -323,3 +323,27 @@ it('collapses cards independently of ordered insertion and releases a filtered p
     host.querySelector('[data-ui="library-materials-list"]')?.getAttribute('data-layout')
   ).toBe('grid');
 });
+
+it.each(['image', 'video'] as const)(
+  'returns from %s preview without clearing selected order or category',
+  async (kind) => {
+    io.list.mockResolvedValue([
+      item,
+      { ...item, id: 'clip', kind: 'video', mimeType: 'video/mp4', filename: 'Clip.mp4' },
+    ]);
+    await render(false, ['image']);
+    await click('All materials');
+    const name = kind === 'image' ? 'Current.png' : 'Clip.mp4';
+    for (let cycle = 0; cycle < 2; cycle++) {
+      await click(name);
+      expect(host.querySelector('.guide-library-preview')).not.toBeNull();
+      if (cycle === 0) await click('Hide materials');
+      await click('Back to materials');
+      expect(host.querySelector('.guide-library-preview')).toBeNull();
+      expect(host.querySelector('[data-layout="grid"]')).not.toBeNull();
+      expect(host.querySelector('.guide-library-card-select')?.textContent).toBe('1');
+      expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
+      expect(document.activeElement?.textContent).toContain(name);
+    }
+  }
+);

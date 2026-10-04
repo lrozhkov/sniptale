@@ -283,6 +283,7 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideLibraryScreenshots: { ru: 'Скриншоты', en: 'Screenshots' },
   guideLibraryImages: { ru: 'Изображения', en: 'Images' },
   guideLibraryNavigation: { ru: 'Разделы библиотеки', en: 'Library sections' },
+  guideLibraryBack: { ru: 'К списку материалов', en: 'Back to materials' },
   guideLibraryPreview: { ru: 'Предпросмотр', en: 'Preview' },
   guideLibraryPreviewHint: {
     ru: 'Выберите изображение для просмотра.',

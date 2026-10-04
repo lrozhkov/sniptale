@@ -208,6 +208,7 @@ export function GuideImageResources(props: ResourceProps) {
           item.source.kind === 'library' ? [item.source.mediaId] : []
         )}
         onPreview={() => setVideoId(null)}
+        onClosePreview={() => setVideoId(null)}
         onChoose={(id, name, kind) => {
           if (kind === 'image') state.chooseLibrary(id, name);
           else setVideoId(id);

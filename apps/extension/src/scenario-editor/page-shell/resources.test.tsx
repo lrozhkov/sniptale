@@ -11,6 +11,9 @@ vi.mock('../../composition/persistence/gallery-saved-views', () => ({
 vi.mock('../../composition/persistence/aggregate-presentations', () => ({
   getAggregatePresentation: async () => undefined,
 }));
+vi.mock('./video-frame-resources', () => ({
+  GuideVideoFrameResources: () => <p>Video frame preview</p>,
+}));
 import { GuideImageResources } from './resources';
 let root: Root;
 let host: HTMLDivElement;
@@ -257,4 +260,42 @@ it.each([
   await render(null, target);
   expect(host.querySelector('.guide-import-target')?.textContent).toBe(label);
   expect(host.querySelector('[aria-label="Add images"]')).toBeNull();
+});
+
+it('restores image import actions and preserves ordered selection and mode after video return', async () => {
+  await render();
+  await files('first.png', 'second.png');
+  await click('As blocks in selected step');
+  io.list.mockResolvedValue([
+    ...(await io.list()),
+    {
+      id: 'clip',
+      filename: 'Clip.mp4',
+      kind: 'video',
+      mimeType: 'video/mp4',
+      source: { kind: 'recording' },
+      tags: [],
+    },
+  ]);
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  await click('All materials');
+  for (let cycle = 0; cycle < 2; cycle++) {
+    await click('Clip.mp4');
+    expect(host.textContent).toContain('Video frame preview');
+    expect(host.querySelector<HTMLElement>('.guide-import-actions')?.hidden).toBe(true);
+    await click('Back to materials');
+    expect(host.textContent).not.toContain('Video frame preview');
+    expect(host.querySelector<HTMLElement>('.guide-import-actions')?.hidden).toBe(false);
+    expect(host.querySelector('.guide-import-count')?.textContent).toBe('Selected: 2');
+  }
+  await click('first.png');
+  await click('Back to materials');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0]).toMatchObject({
+    sources: [
+      { kind: 'library', mediaId: 'first.png' },
+      { kind: 'library', mediaId: 'second.png' },
+    ],
+    placement: { kind: 'blocks', stepId: 'step' },
+  });
 });

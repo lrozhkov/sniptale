@@ -1653,8 +1653,8 @@ for (const variant of [
 }
 
 for (const variant of [
-  { locale: 'ru', theme: 'light' },
-  { locale: 'en', theme: 'dark' },
+  { locale: 'ru', theme: 'light', viewport: { width: 1280, height: 560 } },
+  { locale: 'en', theme: 'dark', viewport: { width: 1920, height: 900 } },
 ] as const) {
   browserTest(
     `gallery navigates mixed scenarios and synchronizes inspector (${variant.locale}, ${variant.theme})`,
@@ -1692,7 +1692,7 @@ for (const variant of [
         await page.addInitScript(() => {
           window.__sniptaleHarnessBootstrap!.preserveMediaLibrary = true;
         });
-        await page.setViewportSize({ width: 1280, height: 720 });
+        await page.setViewportSize(variant.viewport);
         await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
         await page.locator('[data-ui="gallery.page.root"]').waitFor();
         await seedDraftProjectEntries(page, video, first, now);
@@ -1734,6 +1734,36 @@ for (const variant of [
             dialog.locator('[data-ui="gallery.preview.inspectorContent"] input').first()
           ).toHaveValue(names[order[index]!]!);
         }
+        const idleShadow = await next.evaluate((node) => getComputedStyle(node).boxShadow);
+        for (const direction of ['next', 'previous'] as const) {
+          const zone = direction === 'next' ? next : previous;
+          if (direction === 'previous') await next.click();
+          await zone.click();
+          const pointerStyle = await zone.evaluate((node) => ({
+            focusVisible: node.matches(':focus-visible'),
+            shadow: getComputedStyle(node).boxShadow,
+          }));
+          expect(pointerStyle.focusVisible).toBe(false);
+          await page.keyboard.press(direction === 'next' ? 'ArrowRight' : 'ArrowLeft');
+          await expect(dialog).toHaveAttribute(
+            'aria-label',
+            names[order[direction === 'next' ? 2 : 1]!]!
+          );
+          await expect(zone).toBeEnabled();
+          expect.soft(await zone.evaluate((node) => node.matches(':focus-visible'))).toBe(false);
+          expect
+            .soft(await zone.evaluate((node) => getComputedStyle(node).boxShadow))
+            .toBe(pointerStyle.shadow);
+        }
+        for (let tab = 0; tab < 40; tab++) {
+          await page.keyboard.press('Tab');
+          if (await next.evaluate((node) => node === document.activeElement)) break;
+        }
+        await expect(next).toBeFocused();
+        expect(await next.evaluate((node) => node.matches(':focus-visible'))).toBe(true);
+        const keyboardRing = await next.evaluate((node) => getComputedStyle(node).boxShadow);
+        expect(keyboardRing).not.toBe(idleShadow);
+        expect(keyboardRing).not.toBe('none');
         await dialog
           .getByRole('button', { name: label('common.actions.close'), exact: true })
           .click();

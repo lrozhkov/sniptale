@@ -182,6 +182,7 @@ type GuideLibraryBrowserProps = {
   disabled: boolean;
   selectedIds: string[];
   onPreview?: () => void;
+  onClosePreview?: () => void;
   onChoose: (id: string, name: string, kind: 'image' | 'video') => void;
   onDragStart?: (() => void) | undefined;
   previewContent?: ReactNode;
@@ -193,6 +194,7 @@ export function GuideLibraryBrowser({
   selectedIds,
   onChoose,
   onPreview,
+  onClosePreview,
   onDragStart,
   previewContent,
 }: GuideLibraryBrowserProps) {
@@ -202,6 +204,13 @@ export function GuideLibraryBrowser({
   const [category, setCategory] = useState<'all' | 'video' | 'image'>('image');
   const [viewId, setViewId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
+  const cards = useRef(new Map<string, HTMLButtonElement>());
+  const returnFocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (previewId !== null || returnFocus.current === null) return;
+    cards.current.get(returnFocus.current)?.focus({ preventScroll: true });
+    returnFocus.current = null;
+  }, [previewId]);
   const view = catalog.views.find((entry) => entry.id === viewId);
   const normalized = query.trim().toLocaleLowerCase();
   const items = catalog.items.filter(
@@ -279,28 +288,26 @@ export function GuideLibraryBrowser({
       }
       preview={
         preview ? (
-          <aside
-            className="guide-library-preview flex-1"
-            aria-label={t('scenario.editor.guideLibraryPreview')}
-          >
-            {preview.kind !== 'image' && preview.kind !== 'screenshot' ? (
-              previewContent
-            ) : (
-              <>
-                <strong title={preview.filename}>{preview.filename}</strong>
-                <LibraryRaster item={preview} full t={t} />
-                <span>
-                  {preview.width} × {preview.height}
-                </span>
-              </>
-            )}
-          </aside>
+          <LibraryPreview
+            item={preview}
+            t={t}
+            videoContent={previewContent}
+            onReturn={() => {
+              returnFocus.current = preview.id;
+              setPreviewId(null);
+              onClosePreview?.();
+            }}
+          />
         ) : undefined
       }
     >
       {items.map((item) => (
         <LibraryCard
           key={item.id}
+          cardRef={(node) => {
+            if (node) cards.current.set(item.id, node);
+            else cards.current.delete(item.id);
+          }}
           item={item}
           t={t}
           disabled={disabled}
@@ -328,8 +335,45 @@ export function GuideLibraryBrowser({
   );
 }
 
+/** Presents the shared return header and the selected media without owning navigation state. */
+function LibraryPreview({
+  item,
+  t,
+  videoContent,
+  onReturn,
+}: {
+  item: MediaLibraryItem;
+  t: Translate;
+  videoContent: ReactNode;
+  onReturn: () => void;
+}) {
+  const image = item.kind === 'image' || item.kind === 'screenshot';
+  return (
+    <aside
+      className="guide-library-preview flex-1"
+      aria-label={t('scenario.editor.guideLibraryPreview')}
+    >
+      <div className="guide-library-preview-header">
+        <ProductActionButton compact tone="secondary" onClick={onReturn}>
+          {t('scenario.editor.guideLibraryBack')}
+        </ProductActionButton>
+        {image && (
+          <>
+            <strong title={item.filename}>{item.filename}</strong>
+            <span>
+              {item.width} × {item.height}
+            </span>
+          </>
+        )}
+      </div>
+      {image ? <LibraryRaster item={item} full t={t} /> : videoContent}
+    </aside>
+  );
+}
+
 /** One media card owns its selection affordance and native image drag payload. */
 function LibraryCard({
+  cardRef,
   item,
   t,
   disabled,
@@ -339,6 +383,7 @@ function LibraryCard({
   onDragStart,
   onChoose,
 }: {
+  cardRef: (node: HTMLButtonElement | null) => void;
   item: MediaLibraryItem;
   t: Translate;
   disabled: boolean;
@@ -352,6 +397,7 @@ function LibraryCard({
     <div className="guide-library-card-container">
       <button
         type="button"
+        ref={cardRef}
         className="guide-library-card"
         draggable={
           (item.kind === 'image' || item.kind === 'screenshot') && !disabled && Boolean(onDragStart)

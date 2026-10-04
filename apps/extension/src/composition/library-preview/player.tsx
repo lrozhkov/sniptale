@@ -84,7 +84,7 @@ export function LibraryMediaPlayer(props: PlayerProps) {
         onExitFullscreen={fullscreen ? exitFullscreen : undefined}
         fullscreenButtonRef={fullscreenButton}
       >
-        <LibraryViewControls state={state} ready={ready} />
+        <LibraryViewControls state={state} ready={ready} image={props.kind === 'image'} />
       </LibraryMediaTransport>
     </div>
   );

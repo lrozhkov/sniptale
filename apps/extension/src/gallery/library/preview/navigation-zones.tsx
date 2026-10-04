@@ -19,7 +19,11 @@ export function PreviewNavigationZone({
       aria-label={translate(previous ? 'gallery.preview.previous' : 'gallery.preview.next')}
       title={translate(previous ? 'gallery.preview.previous' : 'gallery.preview.next')}
       disabled={disabled}
-      onClick={previous ? navigation.onPrevious : navigation.onNext}
+      onClick={(event) => {
+        // Arrow navigation belongs to the preview; pointer clicks must not retain a zone ring.
+        if (event.detail > 0) event.currentTarget.blur();
+        (previous ? navigation.onPrevious : navigation.onNext)();
+      }}
       className={`gallery-preview-navigation-${direction} group relative flex h-full w-6 shrink-0
         cursor-pointer items-center justify-center
         bg-transparent text-[var(--sniptale-color-text-secondary)] transition-colors

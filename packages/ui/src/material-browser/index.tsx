@@ -57,7 +57,7 @@ function MaterialBrowserList({
   hasPreview: boolean;
   listClassName: string | undefined;
 }) {
-  const { listId, list, hidden, toggle } = useMaterialListDisclosure(hasPreview);
+  const { listId, list, hidden, toggle, rememberScroll } = useMaterialListDisclosure(hasPreview);
   return (
     <>
       {hasPreview && (
@@ -72,6 +72,8 @@ function MaterialBrowserList({
       )}
       <div
         ref={list}
+        onScroll={rememberScroll}
+        onClickCapture={rememberScroll}
         id={listId}
         hidden={hidden}
         aria-label={labels.list}
@@ -92,24 +94,28 @@ function MaterialBrowserList({
   );
 }
 
-/** Disclosure preserves scroll coordinates while card resources leave the hidden list. */
+/** Grid and strip retain independent positions while disclosure releases hidden card resources. */
 function useMaterialListDisclosure(hasPreview: boolean) {
   const listId = useId();
   const list = useRef<HTMLDivElement>(null);
-  const scroll = useRef({ left: 0, top: 0 });
+  const scroll = useRef({ grid: { left: 0, top: 0 }, strip: { left: 0, top: 0 } });
+  const mode = hasPreview ? 'strip' : 'grid';
   const [collapsed, setCollapsed] = useState(false);
   const hidden = hasPreview && collapsed;
   useLayoutEffect(() => {
     if (!hidden && list.current) {
-      list.current.scrollLeft = scroll.current.left;
-      list.current.scrollTop = scroll.current.top;
+      list.current.scrollLeft = scroll.current[mode].left;
+      list.current.scrollTop = scroll.current[mode].top;
     }
-  }, [hidden]);
-  const toggle = () => {
+  }, [hidden, mode]);
+  const rememberScroll = () => {
     if (!hidden && list.current) {
-      scroll.current = { left: list.current.scrollLeft, top: list.current.scrollTop };
+      scroll.current[mode] = { left: list.current.scrollLeft, top: list.current.scrollTop };
     }
+  };
+  const toggle = () => {
+    rememberScroll();
     setCollapsed((value) => !value);
   };
-  return { listId, list, hidden, toggle };
+  return { listId, list, hidden, toggle, rememberScroll };
 }
