@@ -226,6 +226,14 @@ export const galleryVideoReviewMessages = defineMessageSource({
   zoomTransitionIn: { ru: 'Начало эффекта', en: 'Effect entrance' },
   zoomTransitionOut: { ru: 'Завершение эффекта', en: 'Effect exit' },
   zoomTransitionDuration: { ru: 'Длительность', en: 'Duration' },
+  zoomSourceTimingHint: {
+    ru: 'Длительности заданы в секундах исходного видео. Ускорение сокращает их при воспроизведении. При укорачивании эффекта обе фазы уменьшаются пропорционально.',
+    en: 'Durations use source video seconds. Speed shortens them during playback. Shortening the effect reduces both phases proportionally.',
+  },
+  zoomTimingHint: {
+    ru: 'При укорачивании эффекта обе фазы уменьшаются пропорционально.',
+    en: 'Shortening the effect reduces both phases proportionally.',
+  },
   zoomTransitionType: { ru: 'Анимация', en: 'Animation' },
   zoomPreview: { ru: 'Кадрирование', en: 'Framing' },
   zoomPreviewArea: { ru: 'Область', en: 'Area' },

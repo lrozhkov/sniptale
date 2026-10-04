@@ -12,6 +12,7 @@ import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import {
   availableQuickEditZoomRange,
   createQuickEditZoomRegion,
+  fitQuickEditZoomTransitions,
   insertQuickEditZoomRegion,
   moveQuickEditZoomRegion,
   trimQuickEditZoomRegion,
@@ -78,6 +79,13 @@ function applyZoomChange(
       return { ...region, end: range.end, dormant: false };
     });
   }
+  if (patch.start !== undefined || patch.end !== undefined) {
+    regions = regions.map((region) =>
+      region.id === id
+        ? fitQuickEditZoomTransitions({ ...region, ...sourceAnchorPatch(region, timeMap) })
+        : region
+    );
+  }
   const { start: _startPatch, end: _endPatch, ...rest } = patch;
   // Any user-authored edit proves result-time intent and revives a dormant
   // placement, unless its stored interval collides with an active neighbor.
@@ -87,17 +95,7 @@ function applyZoomChange(
     revived && fitsActiveWindow(zoom, id, revived.start, revived.end)
       ? updated.map((region) => (region.id === id ? { ...region, dormant: false } : region))
       : updated.map((region) => (region.id === id ? originalRegion : region));
-  return {
-    ...zoom,
-    regions:
-      patch.start === undefined && patch.end === undefined
-        ? regions
-        : regions.map((region) =>
-            region.id === id && timeMap
-              ? { ...region, ...sourceAnchorPatch(region, timeMap) }
-              : region
-          ),
-  };
+  return { ...zoom, regions };
 }
 
 /** Source-intent commits validate current neighbors before projecting the visible result cache. */
@@ -124,7 +122,7 @@ function applySourceZoomCommit(
     return !!anchor && start < anchor.end && end > anchor.start;
   });
   if (collision) return zoom;
-  const authored = { ...region, sourceAnchor, dormant: false };
+  const authored = fitQuickEditZoomTransitions({ ...region, sourceAnchor, dormant: false });
   const visible = projectReviewFocus([authored], timeMap);
   const updated = {
     ...authored,
@@ -156,7 +154,12 @@ function applyZoomCommit(
       ...zoom,
       regions: zoom.regions.map((item) =>
         item.id === id
-          ? { ...item, ...moved, dormant: false, ...sourceAnchorPatch(moved, timeMap) }
+          ? fitQuickEditZoomTransitions({
+              ...item,
+              ...moved,
+              dormant: false,
+              ...sourceAnchorPatch(moved, timeMap),
+            })
           : item
       ),
     };
@@ -173,13 +176,13 @@ function applyZoomCommit(
     ...zoom,
     regions: zoom.regions.map((item) =>
       item.id === id
-        ? {
+        ? fitQuickEditZoomTransitions({
             ...item,
             start: trimmed.start,
             end: trimmed.end,
             dormant: false,
             ...sourceAnchorPatch(trimmed, timeMap),
-          }
+          })
         : item
     ),
   };
@@ -331,11 +334,11 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
         !fitsActiveWindow(args.zoom, region.id, region.start, region.end)
       )
         return null;
-      const created = {
+      const created = fitQuickEditZoomTransitions({
         ...region,
         id: `zoom-${crypto.randomUUID()}`,
         ...sourceAnchorPatch(region, args.timeMap),
-      };
+      });
       args.setZoom((zoom) => ({
         ...zoom,
         enabled: true,

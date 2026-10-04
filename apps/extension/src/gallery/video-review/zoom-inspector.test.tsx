@@ -273,15 +273,15 @@ it('edits spotlight strength, area, reveal, rounding and blur through shared con
   expect(spotlight).toMatchObject({ effect: 'blur', blur: 8, reveal: 'contract' });
 });
 
-it('uses a precise transition slider while preserving longer typed durations', async () => {
+it('bounds the transition slider and typed duration by the other phase', async () => {
   const change = vi.fn();
   renderInspector(change);
   const phase = host.querySelector('fieldset')!;
-  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('3');
+  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('1.7');
   const duration = phase.querySelector<HTMLInputElement>('input')!;
   await type(duration, '12');
   await commit(duration);
-  expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 12 } });
+  expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 1.7 } });
 });
 
 it('distinguishes compact nested position from collapsible top-level sections', () => {
@@ -328,4 +328,40 @@ it('switches directly between Zoom and Spotlight without resetting the camera', 
   await render({ ...region, spotlight: patch.spotlight! });
   await choose('gallery.videoReview.zoomRegionLabel');
   expect(change).toHaveBeenLastCalledWith({ spotlight: null });
+});
+
+it('offers five source seconds on the slider and retains valid longer typed phases', async () => {
+  const change = vi.fn();
+  const long = { ...region, start: 0, end: 10, sourceAnchor: { start: 0, end: 20 } };
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector region={long} onChange={change} onReset={vi.fn()} onDelete={vi.fn()} />
+    )
+  );
+  const phase = host.querySelector('fieldset')!;
+  expect(phase.querySelector('input[type="range"]')?.getAttribute('max')).toBe('5');
+  const duration = phase.querySelector<HTMLInputElement>('input')!;
+  await type(duration, '12');
+  await commit(duration);
+  expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 12 } });
+  expect(host.textContent).toContain('gallery.videoReview.zoomSourceTimingHint');
+});
+
+it('displays fitted legacy phases without emitting a persistence change on mount', async () => {
+  const change = vi.fn();
+  const legacy = {
+    ...region,
+    enter: { type: 'linear' as const, duration: 4 },
+    exit: { type: 'linear' as const, duration: 2 },
+  };
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector region={legacy} onChange={change} onReset={vi.fn()} onDelete={vi.fn()} />
+    )
+  );
+  const phases = host.querySelectorAll('fieldset');
+  expect(Number(phases[0]!.querySelector<HTMLInputElement>('input')!.value)).toBeCloseTo(1.33);
+  expect(Number(phases[1]!.querySelector<HTMLInputElement>('input')!.value)).toBeCloseTo(0.67);
+  expect(change).not.toHaveBeenCalled();
+  expect(legacy.enter.duration).toBe(4);
 });

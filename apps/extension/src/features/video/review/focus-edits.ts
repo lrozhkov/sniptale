@@ -1,3 +1,4 @@
+import { fitQuickEditZoomTransitions } from './advanced/zoom';
 import type { QuickEditZoomRegion } from './advanced/types';
 import { buildReviewTimeMap, type ReviewTimeSegment } from './timeline';
 import type { ReviewEdit } from './types';
@@ -99,7 +100,10 @@ export function projectReviewFocus(
   regions: readonly QuickEditZoomRegion[],
   map?: readonly ReviewTimeSegment[]
 ): QuickEditZoomRegion[] {
-  if (!map) return regions.filter((region) => !region.dormant);
+  const active = regions
+    .filter((region) => !region.dormant)
+    .map((region) => fitQuickEditZoomTransitions(region));
+  if (!map) return active;
   const resultDuration = (start: number, end: number) =>
     map.reduce(
       (duration, part) =>
@@ -110,7 +114,6 @@ export function projectReviewFocus(
             part.rate),
       0
     );
-  const active = regions.filter((region) => !region.dormant);
   const visible = active.map((region) => {
     const anchor = region.sourceAnchor;
     if (!anchor) return [region];
@@ -146,14 +149,20 @@ export function projectReviewFocus(
             ? { type: 'none' as const, duration: 0 }
             : {
                 ...region.enter,
-                duration: resultDuration(anchor.start, anchor.start + region.enter.duration),
+                duration: resultDuration(
+                  anchor.start,
+                  Math.min(span.sourceEnd, anchor.start + region.enter.duration)
+                ),
               },
         exit:
           span.sourceEnd < anchor.end
             ? { type: 'none' as const, duration: 0 }
             : {
                 ...region.exit,
-                duration: resultDuration(anchor.end - region.exit.duration, anchor.end),
+                duration: resultDuration(
+                  Math.max(span.sourceStart, anchor.end - region.exit.duration),
+                  anchor.end
+                ),
               },
       };
     });

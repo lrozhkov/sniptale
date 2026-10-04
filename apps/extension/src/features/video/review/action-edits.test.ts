@@ -99,3 +99,28 @@ it('follows safe-boundary admission and forbids cutting the whole video', () => 
   expect(entire.cut).toBeNull();
   expect(entire.speed).not.toBeNull();
 });
+
+it('keeps phase defaults in source seconds for short accelerated actions', () => {
+  const result = plan({
+    marker: { ...marker, start: 2, end: 2.8 },
+    edits: [
+      {
+        id: 's',
+        kind: 'speed',
+        start: 0,
+        end: 10,
+        requestedStart: 0,
+        requestedEnd: 10,
+        rate: 4,
+        audio: 'speed',
+      },
+    ],
+  });
+  expect(result.focus).toMatchObject({
+    start: 0.5,
+    end: 0.7,
+    sourceAnchor: { start: 2, end: 2.8 },
+    enter: { duration: 0.3 },
+    exit: { duration: 0.3 },
+  });
+});

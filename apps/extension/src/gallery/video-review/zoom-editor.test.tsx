@@ -430,3 +430,54 @@ it('commits authored source intent under a Cut and rejects stale source collisio
     expect(apply(setZoom, hidden)).toBe(hidden);
   }
 });
+
+it.each(
+  (['start', 'end'] as const).flatMap((edge) =>
+    (['source', 'result', 'inspector'] as const).map((method) => ({ edge, method }))
+  )
+)('contracts phases on the $edge edge through $method under Speed', ({ edge, method }) => {
+  const original = {
+    ...region('focus', 0, 5),
+    sourceAnchor: { start: 0, end: 10 },
+    enter: { type: 'linear' as const, duration: 4 },
+    exit: { type: 'linear' as const, duration: 2 },
+  };
+  let zoom: QuickEditZoomState = { enabled: true, regions: [original] };
+  const timeMap = buildReviewTimeMap(10, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 10,
+      requestedStart: 0,
+      requestedEnd: 10,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom,
+      timeMap,
+      timelineDuration: 5,
+      setZoom(update) {
+        zoom = update(zoom);
+      },
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  const sourceAnchor = edge === 'start' ? { start: 7, end: 10 } : { start: 0, end: 3 };
+  act(() => {
+    const range = { start: sourceAnchor.start / 2, end: sourceAnchor.end / 2 };
+    if (method === 'inspector') editor.change('focus', { [edge]: range[edge] });
+    else editor.commitDrag('focus', range, edge, method === 'source' ? sourceAnchor : undefined);
+  });
+  expect(zoom.regions[0]).toMatchObject({
+    sourceAnchor,
+    enter: { duration: 2 },
+    exit: { duration: 1 },
+  });
+  expect(original.enter.duration).toBe(4);
+});

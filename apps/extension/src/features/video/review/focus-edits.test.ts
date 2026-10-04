@@ -121,3 +121,61 @@ it('anchors focus when a speed edit is inserted or changed and does not revive d
     reconcileReviewFocus({ regions, duration: 12, before: [], after: [speed], edit: speed })
   ).toEqual([focus('active', 1, 4), dormant]);
 });
+
+it('projects fitted legacy phases through mixed Speed without mutating authored history', () => {
+  const original = {
+    ...focus('legacy', 0, 10),
+    sourceAnchor: { start: 0, end: 10 },
+    enter: { type: 'linear' as const, duration: 8 },
+    exit: { type: 'linear' as const, duration: 8 },
+  };
+  const map = buildReviewTimeMap(10, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 5,
+      requestedStart: 0,
+      requestedEnd: 5,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const projected = projectReviewFocus([original], map);
+  expect(projected[0]).toMatchObject({
+    start: 0,
+    end: 7.5,
+    enter: { duration: 2.5 },
+    exit: { duration: 5 },
+  });
+  expect(evaluateQuickEditCameraAtTime(projected, 1.25).scale).toBeCloseTo(1.25);
+  expect(evaluateQuickEditCameraAtTime(projected, 2.5).scale).toBeCloseTo(1.5);
+  expect(evaluateQuickEditCameraAtTime(projected, 5).scale).toBeCloseTo(1.25);
+  expect(original.enter.duration).toBe(8);
+});
+
+it('bounds output phases by each surviving cut slice', () => {
+  const original = {
+    ...focus('cut', 0, 10),
+    sourceAnchor: { start: 0, end: 10 },
+    enter: { type: 'linear' as const, duration: 5 },
+    exit: { type: 'linear' as const, duration: 5 },
+  };
+  const projected = projectReviewFocus([original], buildReviewTimeMap(10, [cut(2, 4)]));
+  expect(projected).toHaveLength(2);
+  expect(projected[0]).toMatchObject({
+    start: 0,
+    end: 2,
+    enter: { duration: 2 },
+    exit: { type: 'none', duration: 0 },
+  });
+  expect(projected[1]).toMatchObject({
+    start: 2,
+    end: 8,
+    enter: { type: 'none', duration: 0 },
+    exit: { duration: 5 },
+  });
+  for (const item of projected)
+    expect(item.enter.duration + item.exit.duration).toBeLessThanOrEqual(item.end - item.start);
+  expect(original.enter.duration).toBe(5);
+});

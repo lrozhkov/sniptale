@@ -1,3 +1,4 @@
+import { fitQuickEditZoomTransitions } from './zoom';
 import { fitVideoRect } from '../geometry';
 import type {
   QuickEditBackgroundSettings,
@@ -145,24 +146,6 @@ function cameraProgress(
   return easing((timelineTime - region.start) / transition.duration, transition.type);
 }
 
-/**
- * Over-long enter/exit pairs normalize proportionally into the region so the
- * camera always reaches its target; only evaluation changes, never the stored
- * region. Returns the effective transition durations for this region length.
- */
-function normalizeQuickEditZoomTransitions(region: QuickEditZoomRegion): {
-  enter: number;
-  exit: number;
-} {
-  const enter = region.enter.type === 'none' ? 0 : region.enter.duration;
-  const exit = region.exit.type === 'none' ? 0 : region.exit.duration;
-  const sum = enter + exit;
-  const available = Math.max(0, region.end - region.start);
-  if (sum <= available || sum <= 0) return { enter, exit };
-  const factor = available / sum;
-  return { enter: enter * factor, exit: exit * factor };
-}
-
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
 /** Translation in units of the unscaled video; clamping prevents empty camera edges. */
@@ -225,12 +208,7 @@ export function sampleQuickEditFocusAtTime(
       return { from: region, to: next, progress, phase: 'link' };
     }
     if (timelineTime < region.start || timelineTime >= region.end) continue;
-    const normalized = normalizeQuickEditZoomTransitions(region);
-    const scaled: QuickEditZoomRegion = {
-      ...region,
-      enter: { ...region.enter, duration: normalized.enter },
-      exit: { ...region.exit, duration: normalized.exit },
-    };
+    const scaled = fitQuickEditZoomTransitions(region, region.end - region.start);
     const entering = linkedPrevious ? 1 : cameraProgress(scaled, timelineTime, 'enter');
     const exiting = linkedNext ? 1 : cameraProgress(scaled, timelineTime, 'exit');
     return {

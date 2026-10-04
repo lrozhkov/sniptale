@@ -411,6 +411,7 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
       return null;
     return createQuickEditZoomRegion({
       id: 'draft',
+      sourceAnchor: { start: range.start, end: range.end },
       at: start,
       duration: end - start,
       endMax: end,

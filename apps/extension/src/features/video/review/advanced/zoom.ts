@@ -15,12 +15,50 @@ const DEFAULT_REGION_SCALE = 1.5;
 const DEFAULT_TRANSITION: QuickEditZoomTransition = { type: 'ease-in-out', duration: 0.3 };
 const clampUnit = (value: number) => Math.max(0, Math.min(1, value));
 
+/**
+ * Fit active phases proportionally without mutating snapshots. Authoring uses source
+ * seconds when anchored; projected render consumers must pass their output duration.
+ */
+export function fitQuickEditZoomTransitions(
+  region: QuickEditZoomRegion,
+  duration = (region.sourceAnchor ?? region).end - (region.sourceAnchor ?? region).start
+): QuickEditZoomRegion {
+  const enter = region.enter.type === 'none' ? 0 : region.enter.duration;
+  const exit = region.exit.type === 'none' ? 0 : region.exit.duration;
+  const available = Math.max(0, duration);
+  const total = enter + exit;
+  const factor = total > available ? available / total : 1;
+  const fittedEnter = enter * factor;
+  const fittedExit =
+    total > available ? Math.min(exit * factor, Math.max(0, available - fittedEnter)) : exit;
+  return {
+    ...region,
+    enter: { ...region.enter, duration: fittedEnter },
+    exit: { ...region.exit, duration: fittedExit },
+  };
+}
+
+/** Single-phase edits reserve the other phase; range edits contract the pair. */
+function fitZoomTimingPatch(region: QuickEditZoomRegion, patch: QuickEditZoomRegionPatch) {
+  if (Boolean(patch.enter) === Boolean(patch.exit)) return fitQuickEditZoomTransitions(region);
+  const phase = patch.enter ? 'enter' : 'exit';
+  const other = phase === 'enter' ? 'exit' : 'enter';
+  const interval = region.sourceAnchor ?? region;
+  const reserved = region[other].type === 'none' ? 0 : region[other].duration;
+  const remaining = Math.max(0, interval.end - interval.start - reserved);
+  return fitQuickEditZoomTransitions({
+    ...region,
+    [phase]: { ...region[phase], duration: Math.min(remaining, region[phase].duration) },
+  });
+}
+
 /** New regions start at the playhead with a sensible default duration and camera. */
 export function createQuickEditZoomRegion(args: {
   id: string;
   at: number;
   duration?: number;
   endMax?: number;
+  sourceAnchor?: QuickEditZoomRegion['sourceAnchor'];
 }): QuickEditZoomRegion {
   const endMax = args.endMax ?? Infinity;
   const duration = Math.max(
@@ -31,14 +69,15 @@ export function createQuickEditZoomRegion(args: {
     )
   );
   const start = args.at;
-  return {
+  return fitQuickEditZoomTransitions({
     id: args.id,
+    ...(args.sourceAnchor ? { sourceAnchor: args.sourceAnchor } : {}),
     start,
     end: Math.min(start + duration, endMax),
     transform: { scale: DEFAULT_REGION_SCALE, centerX: 0.5, centerY: 0.5 },
     enter: { ...DEFAULT_TRANSITION },
     exit: { ...DEFAULT_TRANSITION },
-  };
+  });
 }
 
 export type QuickEditZoomRegionPatch = {
@@ -60,12 +99,15 @@ export function updateQuickEditZoomRegion(
   id: string,
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
+  const changesPhases = Boolean(patch.enter || patch.exit);
+  const changesTiming = changesPhases || patch.start !== undefined || patch.end !== undefined;
   const updated = regions.map((region) => {
     if (region.id !== id) return region;
-    const { linkTo: previousLink, spotlight: previousSpotlight, ...rest } = region;
+    const timing = changesPhases ? fitQuickEditZoomTransitions(region) : region;
+    const { linkTo: previousLink, spotlight: previousSpotlight, ...rest } = timing;
     const spotlight = patch.spotlight === undefined ? previousSpotlight : patch.spotlight;
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
-    return {
+    const updated = {
       ...rest,
       ...(spotlight ? { spotlight } : {}),
       ...(linkTo ? { linkTo } : {}),
@@ -79,10 +121,11 @@ export function updateQuickEditZoomRegion(
         centerX: clampUnit(patch.centerX ?? region.transform.centerX),
         centerY: clampUnit(patch.centerY ?? region.transform.centerY),
       },
-      ...(patch.enter === undefined ? {} : { enter: patch.enter }),
-      ...(patch.exit === undefined ? {} : { exit: patch.exit }),
+      enter: patch.enter ?? timing.enter,
+      exit: patch.exit ?? timing.exit,
       ...(patch.linkEasing === undefined ? {} : { linkEasing: patch.linkEasing }),
     };
+    return changesTiming ? fitZoomTimingPatch(updated, patch) : updated;
   });
   return updated.map((region) => {
     if (!region.linkTo) return region;

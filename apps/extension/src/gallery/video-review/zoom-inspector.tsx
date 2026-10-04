@@ -10,7 +10,10 @@ import type {
   QuickEditZoomRegion,
   QuickEditZoomTransition,
 } from '../../features/video/review/advanced/types';
-import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
+import {
+  fitQuickEditZoomTransitions,
+  type QuickEditZoomRegionPatch,
+} from '../../features/video/review/advanced/zoom';
 import { Trash2, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
@@ -33,6 +36,7 @@ const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeo
 function ZoomTransitionSection(props: {
   label: string;
   value: QuickEditZoomTransition;
+  max: number;
   onChange(next: QuickEditZoomTransition): void;
   children?: ReactNode;
 }) {
@@ -54,8 +58,8 @@ function ZoomTransitionSection(props: {
         label={translate('gallery.videoReview.zoomTransitionDuration')}
         unit="s"
         min={0}
-        max={60}
-        scrubMax={3}
+        max={props.max}
+        scrubMax={Math.min(5, props.max)}
         step={0.1}
         precision={2}
         scrubStep={0.1}
@@ -153,36 +157,7 @@ export function ReviewZoomInspector(props: {
             id: 'animation',
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             icon: Waves,
-            content: (
-              <>
-                <ZoomTransitionSection
-                  label={translate('gallery.videoReview.zoomTransitionIn')}
-                  value={region.enter}
-                  onChange={(enter) => onChange({ enter })}
-                >
-                  {region.spotlight ? (
-                    <ReviewSpotlightAnimation
-                      value={region.spotlight}
-                      phase="enter"
-                      onChange={(spotlight) => onChange({ spotlight })}
-                    />
-                  ) : null}
-                </ZoomTransitionSection>
-                <ZoomTransitionSection
-                  label={translate('gallery.videoReview.zoomTransitionOut')}
-                  value={region.exit}
-                  onChange={(exit) => onChange({ exit })}
-                >
-                  {region.spotlight ? (
-                    <ReviewSpotlightAnimation
-                      value={region.spotlight}
-                      phase="exit"
-                      onChange={(spotlight) => onChange({ spotlight })}
-                    />
-                  ) : null}
-                </ZoomTransitionSection>
-              </>
-            ),
+            content: <ReviewZoomAnimation region={region} onChange={onChange} />,
           },
         ]}
       />
@@ -205,6 +180,56 @@ export function ReviewZoomInspector(props: {
         </ReviewButton>
       </div>
     </div>
+  );
+}
+
+/** Owns the coupled phase controls and their source-clock duration budget. */
+function ReviewZoomAnimation(props: {
+  region: QuickEditZoomRegion;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+}) {
+  const { onChange } = props;
+  const region = fitQuickEditZoomTransitions(props.region);
+  const interval = region.sourceAnchor ?? region;
+  const duration = interval.end - interval.start;
+  return (
+    <>
+      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+        {translate(
+          region.sourceAnchor
+            ? 'gallery.videoReview.zoomSourceTimingHint'
+            : 'gallery.videoReview.zoomTimingHint'
+        )}
+      </p>
+      <ZoomTransitionSection
+        label={translate('gallery.videoReview.zoomTransitionIn')}
+        value={region.enter}
+        max={Math.min(60, Math.max(0, duration - region.exit.duration))}
+        onChange={(enter) => onChange({ enter })}
+      >
+        {region.spotlight ? (
+          <ReviewSpotlightAnimation
+            value={region.spotlight}
+            phase="enter"
+            onChange={(spotlight) => onChange({ spotlight })}
+          />
+        ) : null}
+      </ZoomTransitionSection>
+      <ZoomTransitionSection
+        label={translate('gallery.videoReview.zoomTransitionOut')}
+        value={region.exit}
+        max={Math.min(60, Math.max(0, duration - region.enter.duration))}
+        onChange={(exit) => onChange({ exit })}
+      >
+        {region.spotlight ? (
+          <ReviewSpotlightAnimation
+            value={region.spotlight}
+            phase="exit"
+            onChange={(spotlight) => onChange({ spotlight })}
+          />
+        ) : null}
+      </ZoomTransitionSection>
+    </>
   );
 }
 
