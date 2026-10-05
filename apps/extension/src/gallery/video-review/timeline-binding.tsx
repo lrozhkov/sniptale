@@ -1,3 +1,5 @@
+import { withReviewFocusType } from './zoom-editor';
+import { quickEditFocusConflicts } from '../../features/video/review/advanced/focus-layout';
 import type { ReviewBeforeAction } from './note-transitions';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -402,20 +404,18 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
       return null;
     const start = projection.output(range.start);
     const end = projection.output(range.end);
-    if (
-      end - start < 0.001 ||
-      props.advanced.zoom.regions.some(
-        (region) => !region.dormant && region.start < end && region.end > start
-      )
-    )
-      return null;
-    return createQuickEditZoomRegion({
-      id: 'draft',
-      sourceAnchor: { start: range.start, end: range.end },
-      at: start,
-      duration: end - start,
-      endMax: end,
-    });
+    if (end - start < 0.001) return null;
+    const region = withReviewFocusType(
+      createQuickEditZoomRegion({
+        id: 'draft',
+        sourceAnchor: { start: range.start, end: range.end },
+        at: start,
+        duration: end - start,
+        endMax: end,
+      }),
+      props.zoom.insertionType
+    );
+    return quickEditFocusConflicts(props.advanced.zoom.regions, region) ? null : region;
   };
   const commit = (range: ReviewAnchor) => {
     const region = candidate(range);
@@ -435,6 +435,8 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
     setPreview,
     commit,
     tool: {
+      type: props.zoom.insertionType,
+      onType: props.zoom.setInsertionType,
       active,
       available:
         active ||

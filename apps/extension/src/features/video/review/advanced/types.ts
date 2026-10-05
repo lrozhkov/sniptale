@@ -1,7 +1,7 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 2;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 3;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -49,7 +49,29 @@ export interface QuickEditSpotlight {
   exitReveal: 'fade' | 'contract';
 }
 
+/** Source-attached annotation; transition types own immediate entrance/exit. */
+export interface QuickEditBorder {
+  area: { x: number; y: number; width: number; height: number };
+  color: string;
+  width: number;
+  roundness: number;
+  style: 'solid' | 'dashed' | 'dotted';
+  reveal: 'fade' | 'draw';
+  exitReveal: 'fade' | 'erase';
+  loop: boolean;
+  period: number;
+}
+
 export interface QuickEditZoomRegion {
+  border?: QuickEditBorder;
+  /** Derived only; parser drops this projection clock before persistence admission. */
+  borderClock?: {
+    offset: number;
+    rate: number;
+    duration: number;
+    enter: QuickEditZoomTransition;
+    exit: QuickEditZoomTransition;
+  };
   spotlight?: QuickEditSpotlight;
   id: string;
   start: number;

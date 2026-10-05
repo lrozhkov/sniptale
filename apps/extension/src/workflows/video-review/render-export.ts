@@ -1,3 +1,5 @@
+import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
+import { drawReviewBorders } from './render-border';
 import { drawReviewSceneShadow } from './scene-shadow';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
@@ -7,8 +9,8 @@ import {
   type ReviewCutTransitionPlan,
 } from '../../features/video/review/cuts';
 import { createReviewTransitionFrames, paintReviewCutTransition } from './cut-transition-frames';
-import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
-import { drawReviewSpotlight } from './render-spotlight';
+import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
+import { drawReviewSpotlights } from './render-spotlight';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type { ReviewOutputCodec, ReviewRenderSettings } from './media-index';
 import {
@@ -562,17 +564,37 @@ export async function renderRenderWindowFrames(args: {
         cameraScale: camera.scale,
         sceneScale: args.sceneScale ?? 1,
       });
-      drawReviewSpotlight(
+      const motion = computeQuickEditSceneCamera(layout, args.background);
+      drawReviewSpotlights(
         context,
         canvas,
         scratch,
-        evaluateQuickEditSpotlightAtTime({
+        evaluateQuickEditSpotlightsAtTime({
           regions: args.zoomRegions,
           time: timestamp + args.fragmentOffset,
           output: canvas,
-          video: layout.videoRect,
-          scale: args.sceneScale ?? 1,
-        })
+          video: layout.videoTransform,
+          scale: (args.sceneScale ?? 1) * camera.scale,
+        }),
+        {
+          rect: motion.windowClip,
+          radius: args.background.enabled ? args.background.layout.cornerRadius * motion.scale : 0,
+        }
+      );
+      drawReviewBorders(
+        context,
+        canvas,
+        evaluateQuickEditBordersAtTime({
+          regions: args.zoomRegions,
+          time: timestamp + args.fragmentOffset,
+          output: canvas,
+          video: layout.videoTransform,
+          scale: (args.sceneScale ?? 1) * camera.scale,
+        }),
+        {
+          rect: motion.windowClip,
+          radius: args.background.enabled ? args.background.layout.cornerRadius * motion.scale : 0,
+        }
       );
       const encoded = new VideoSample(canvas, {
         timestamp,

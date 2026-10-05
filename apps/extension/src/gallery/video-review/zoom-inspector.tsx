@@ -1,6 +1,8 @@
 import { ReviewInspectorSections } from './inspector-sections';
 import { reviewSelectFieldClassName } from './controls';
-import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
+import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
+import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
+import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
 import { ReviewSpotlightInspector, ReviewSpotlightAnimation } from './spotlight-inspector';
 import type { ReactNode } from 'react';
 import { ReviewNumberRow } from './number-row';
@@ -75,6 +77,8 @@ function ZoomTransitionSection(props: {
 export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
   cutSuppressed?: boolean;
+  zoomConversionBlocked?: boolean;
+  onPreview?(patch: QuickEditZoomRegionPatch | null): void;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onReset(): void;
   onDelete(): void;
@@ -103,9 +107,19 @@ export function ReviewZoomInspector(props: {
             icon: Scan,
             content: (
               <>
-                <ReviewFocusType region={region} onChange={onChange} />
+                <ReviewFocusType
+                  region={region}
+                  onChange={onChange}
+                  blocked={props.zoomConversionBlocked ?? false}
+                />
                 {props.preview}
-                {region.spotlight ? (
+                {region.border ? (
+                  <ReviewBorderInspector
+                    value={region.border}
+                    onChange={(border) => onChange({ border })}
+                    onPreview={props.onPreview}
+                  />
+                ) : region.spotlight ? (
                   <ReviewSpotlightInspector
                     value={region.spotlight}
                     onChange={(spotlight) => onChange({ spotlight })}
@@ -157,7 +171,15 @@ export function ReviewZoomInspector(props: {
             id: 'animation',
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             icon: Waves,
-            content: <ReviewZoomAnimation region={region} onChange={onChange} />,
+            content: region.border ? (
+              <ReviewBorderAnimation
+                onPreview={props.onPreview}
+                region={fitQuickEditZoomTransitions(region)}
+                onChange={onChange}
+              />
+            ) : (
+              <ReviewZoomAnimation region={region} onChange={onChange} />
+            ),
           },
         ]}
       />
@@ -285,7 +307,9 @@ export function ReviewZoomLinkInspector(props: {
 function ReviewFocusType({
   region,
   onChange,
+  blocked,
 }: {
+  blocked: boolean;
   region: QuickEditZoomRegion;
   onChange(patch: QuickEditZoomRegionPatch): void;
 }) {
@@ -294,22 +318,31 @@ function ReviewFocusType({
       <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
         {translate('gallery.videoReview.focusType')}
       </span>
-      <SegmentedSwitch<'zoom' | 'spotlight'>
+      <SegmentedSwitch<FocusType>
         dataAttribute={{ 'data-ui': 'gallery.videoReview.focusType' }}
         ariaLabel={translate('gallery.videoReview.focusType')}
         density="compact"
-        activeId={region.spotlight ? 'spotlight' : 'zoom'}
+        activeId={quickEditFocusType(region)}
         options={[
-          { id: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
+          {
+            id: 'zoom',
+            label: translate('gallery.videoReview.zoomRegionLabel'),
+            disabled: blocked,
+          },
           { id: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+          { id: 'border', label: translate('gallery.videoReview.focusBorder') },
         ]}
         onChange={(type) => {
-          if ((type === 'spotlight') === !!region.spotlight) return;
-          onChange({
-            spotlight: type === 'spotlight' ? createQuickEditSpotlight() : null,
-          });
+          if (type === quickEditFocusType(region) || (type === 'zoom' && blocked)) return;
+          const next = withReviewFocusType(region, type);
+          onChange({ spotlight: next.spotlight ?? null, border: next.border ?? null });
         }}
       />
+      {blocked ? (
+        <p role="status" className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.focusZoomConflict')}
+        </p>
+      ) : null}
     </div>
   );
 }

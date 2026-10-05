@@ -1,7 +1,7 @@
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
-import { drawReviewSpotlight } from './render-spotlight';
+import { drawReviewSpotlights } from './render-spotlight';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -14,7 +14,7 @@ import {
   writeReviewFrames,
 } from './render-export';
 
-vi.mock('./render-spotlight', () => ({ drawReviewSpotlight: vi.fn() }));
+vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
 
 const state = vi.hoisted(() => ({
   configurations: [] as unknown[],
@@ -729,6 +729,7 @@ it('passes the calibrated variable-rate quality profile to the actual encoder so
 });
 
 it('scales spotlight blur with export resolution, preserving the scene effect', async () => {
+  vi.mocked(drawReviewSpotlights).mockClear();
   const args = argsFixture({ frameRate: 30 });
   args.advanced.canvas = { width: 1920, height: 1080 };
   args.advanced.zoom.enabled = true;
@@ -742,12 +743,9 @@ it('scales spotlight blur with export resolution, preserving the scene effect', 
     ...args,
     renderSettings: { quality: 'HIGH', frameRate: 30, resolution: '720P' },
   });
-  expect(drawReviewSpotlight).toHaveBeenCalledWith(
-    expect.anything(),
-    expect.anything(),
-    expect.anything(),
-    expect.objectContaining({ blur: 8 })
-  );
+  const frames = vi.mocked(drawReviewSpotlights).mock.calls.flatMap((call) => call[3]);
+  expect(frames.length).toBeGreaterThan(0);
+  for (const frame of frames) expect(frame.blur).toBe(8);
 });
 
 it.each(['fixed', 'follow-video'] as const)(

@@ -140,7 +140,7 @@ describe('resolveQuickEditZoomLink', () => {
 describe('insertQuickEditZoomRegion', () => {
   it('keeps the list ascending by start', () => {
     expect(
-      insertQuickEditZoomRegion([region('a', 0, 2), region('b', 4, 6)], region('c', 1, 3)).map(
+      insertQuickEditZoomRegion([region('a', 0, 2), region('b', 4, 6)], region('c', 2, 3)).map(
         (item) => item.id
       )
     ).toEqual(['a', 'c', 'b']);

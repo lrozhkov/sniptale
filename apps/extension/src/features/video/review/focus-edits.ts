@@ -117,7 +117,13 @@ export function projectReviewFocus(
   const visible = active.map((region) => {
     const anchor = region.sourceAnchor;
     if (!anchor) return [region];
-    const spans: { start: number; end: number; sourceStart: number; sourceEnd: number }[] = [];
+    const spans: {
+      start: number;
+      end: number;
+      sourceStart: number;
+      sourceEnd: number;
+      rate: number;
+    }[] = [];
     for (const part of map) {
       if (part.kind === 'cut') continue;
       const sourceStart = Math.max(anchor.start, part.sourceStart);
@@ -126,15 +132,26 @@ export function projectReviewFocus(
       const start = part.resultStart + (sourceStart - part.sourceStart) / part.rate;
       const end = part.resultStart + (sourceEnd - part.sourceStart) / part.rate;
       const previous = spans.at(-1);
-      if (previous && Math.abs(previous.sourceEnd - sourceStart) < 0.000001) {
+      if (!region.border && previous && Math.abs(previous.sourceEnd - sourceStart) < 0.000001) {
         previous.end = end;
         previous.sourceEnd = sourceEnd;
-      } else spans.push({ start, end, sourceStart, sourceEnd });
+      } else spans.push({ start, end, sourceStart, sourceEnd, rate: part.rate });
     }
     return spans.map((span, index) => {
       const { linkTo: _linkTo, linkEasing: _linkEasing, ...withoutLink } = region;
       return {
         ...withoutLink,
+        ...(region.border
+          ? {
+              borderClock: {
+                offset: span.sourceStart - anchor.start,
+                rate: span.rate,
+                duration: anchor.end - anchor.start,
+                enter: region.enter,
+                exit: region.exit,
+              },
+            }
+          : {}),
         ...(index === spans.length - 1 && region.linkTo
           ? {
               linkTo: region.linkTo,
@@ -170,8 +187,9 @@ export function projectReviewFocus(
   return visible.flatMap((slices, index) =>
     slices.map((slice, sliceIndex) => {
       if (!slice.linkTo) return slice;
-      const target = active[index + 1];
-      const targetSlice = visible[index + 1]?.[0];
+      const targetIndex = active.findIndex((region) => region.id === slice.linkTo);
+      const target = active[targetIndex];
+      const targetSlice = visible[targetIndex]?.[0];
       const gapCut = !!map.some(
         (part) =>
           part.kind === 'cut' &&

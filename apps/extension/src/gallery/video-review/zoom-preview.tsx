@@ -1,3 +1,7 @@
+import { ReviewSpotlightOverlay } from './spotlight-overlay';
+import { ReviewBorderOverlay } from './border-overlay';
+import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
+import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { useReviewWindowHeader } from './use-window-header';
 import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
@@ -9,6 +13,8 @@ import type {
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import {
+  evaluateQuickEditCameraAtTime,
+  computeQuickEditSceneCamera,
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
@@ -27,6 +33,7 @@ const PREVIEW_WIDTH_PX = 480;
  */
 export function ReviewZoomPreview(props: {
   region: QuickEditZoomRegion;
+  focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
   background: QuickEditBackgroundSettings;
   source: { width: number; height: number };
   canvas?: { width: number; height: number } | undefined;
@@ -48,17 +55,27 @@ export function ReviewZoomPreview(props: {
   const header = useReviewWindowHeader(props.windowHeader, props.source.width);
   const [view, setView] = useState<'area' | 'result'>('area');
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
-  const playback = region.spotlight ? undefined : props.playback;
-  const camera = playback?.camera ?? region.transform;
+  const overlay = !!(region.spotlight || region.border);
+  const playback = props.playback;
+  const camera = resolvePreviewCamera(props, view);
 
-  const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(
-    props,
-    camera,
-    !!region.spotlight
-  );
+  const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
   const previewStatus = playback ? 'ready' : status;
   const interactive = !props.disabled && !playback && status === 'ready';
   const background = props.background;
+  const surface = {
+    background,
+    headerImage: header.image,
+    imageUrl: image.url,
+    cornerRadius,
+    camera,
+    disabled: !interactive,
+    live: !!playback,
+    frame: playback ? { image: playback.video, ...props.source } : frame,
+    layout,
+    output,
+    onPreview: props.onPreview,
+  };
   return (
     <section
       data-ui="gallery.videoReview.zoomPreview"
@@ -71,12 +88,14 @@ export function ReviewZoomPreview(props: {
       <div className="flex items-center justify-between gap-2">
         <h5 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
           {translate(
-            region.spotlight
-              ? 'gallery.videoReview.focusPreview'
-              : 'gallery.videoReview.zoomPreview'
+            region.border
+              ? 'gallery.videoReview.borderPreview'
+              : overlay
+                ? 'gallery.videoReview.focusPreview'
+                : 'gallery.videoReview.zoomPreview'
           )}
         </h5>
-        {!region.spotlight ? (
+        {
           <SegmentedSwitch<'area' | 'result'>
             dataAttribute={{ 'data-ui': 'gallery.videoReview.previewMode' }}
             ariaLabel={translate('gallery.videoReview.zoomPreview')}
@@ -88,56 +107,43 @@ export function ReviewZoomPreview(props: {
             ]}
             onChange={setView}
           />
-        ) : null}
+        }
       </div>
       <div
         {...previewInteractionHandlers(interactive, sourceTime, props.onInteract)}
         className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
-        style={{ background: region.spotlight ? previewBackgroundPaint(background) : '#000000' }}
+        style={{ background: overlay ? previewBackgroundPaint(background) : '#000000' }}
       >
-        {region.spotlight && image.url && background.enabled && background.type === 'image' ? (
-          <img
-            src={image.url}
-            alt=""
-            className="pointer-events-none absolute inset-0 h-full w-full"
-            style={{ objectFit: background.imageFit }}
-          />
-        ) : null}
-        {region.spotlight ? (
+        {overlay ? (
           <ReviewSpotlightPreview
-            background={props.background}
-            headerImage={header.image}
+            {...surface}
             key={region.id}
             region={region}
-            spotlight={region.spotlight}
-            frame={frame}
-            output={output}
-            layout={layout}
-            cornerRadius={cornerRadius}
+            focus={props.focus}
+            view={playback ? 'result' : view}
             scale={previewScale}
-            disabled={!interactive}
-            onChange={(spotlight) => props.onChange({ spotlight })}
-            onPreview={(spotlight) => props.onPreview?.(spotlight ? { spotlight } : null)}
+            onChange={props.onChange}
           />
         ) : (
           <ZoomPreviewCanvas
-            headerImage={header.image}
-            background={props.background}
-            previewScale={previewScale}
-            imageUrl={image.url}
+            {...surface}
             key={region.id}
-            cornerRadius={cornerRadius}
-            camera={camera}
-            disabled={!interactive}
-            live={!!playback}
-            frame={playback ? { image: playback.video, ...props.source } : frame}
-            layout={layout}
-            output={output}
+            previewScale={previewScale}
             view={view}
             onCenter={props.onChange}
-            onPreview={props.onPreview}
           />
         )}
+        {!overlay && (view === 'result' || playback) ? (
+          <ZoomResultOverlays
+            region={region}
+            focus={props.focus}
+            background={background}
+            output={output}
+            layout={layout}
+            scale={previewScale * camera.scale}
+            cornerRadius={cornerRadius}
+          />
+        ) : null}
       </div>
       <ZoomPreviewFeedback
         status={previewStatus}
@@ -149,6 +155,54 @@ export function ReviewZoomPreview(props: {
         }}
       />
     </section>
+  );
+}
+
+/** Framing uses the full source; results use the independently sampled camera. */
+function resolvePreviewCamera(
+  props: Parameters<typeof ReviewZoomPreview>[0],
+  view: 'area' | 'result'
+) {
+  if (props.playback) return props.playback.camera;
+  if (!props.region.spotlight && !props.region.border) return props.region.transform;
+  if (view === 'area') return { scale: 1, centerX: 0.5, centerY: 0.5 };
+  return props.focus
+    ? evaluateQuickEditCameraAtTime(props.focus.regions, props.focus.time)
+    : props.region.transform;
+}
+
+/** Results composite all sampled masks before source-attached strokes in the same window. */
+function ZoomResultOverlays(props: {
+  region: QuickEditZoomRegion;
+  focus: Parameters<typeof ReviewZoomPreview>[0]['focus'];
+  background: QuickEditBackgroundSettings;
+  output: { width: number; height: number };
+  layout: ReturnType<typeof computeQuickEditSceneLayout>;
+  scale: number;
+  cornerRadius: number;
+}) {
+  const sample = {
+    regions: props.focus?.regions ?? [props.region],
+    time: props.focus?.time ?? (props.region.start + props.region.end) / 2,
+    output: props.output,
+    video: props.layout.videoTransform,
+    scale: props.scale,
+  };
+  const motion = computeQuickEditSceneCamera(props.layout, props.background);
+  const clip = { rect: motion.windowClip, radius: props.cornerRadius * motion.scale };
+  return (
+    <>
+      <ReviewSpotlightOverlay
+        output={props.output}
+        frames={evaluateQuickEditSpotlightsAtTime(sample)}
+        clip={clip}
+      />
+      <ReviewBorderOverlay
+        output={props.output}
+        frames={evaluateQuickEditBordersAtTime(sample)}
+        clip={clip}
+      />
+    </>
   );
 }
 
@@ -208,8 +262,7 @@ function ZoomPreviewFeedback(props: {
 /** Memoizes the inspector viewport and source/window projection as one consistent scene. */
 function useZoomPreviewGeometry(
   { source, canvas, background, windowHeader }: Parameters<typeof computeQuickEditSceneSize>[0],
-  camera: QuickEditZoomRegion['transform'],
-  spotlight: boolean
+  camera: QuickEditZoomRegion['transform']
 ) {
   return useMemo(() => {
     const size = computeQuickEditSceneSize({ source, canvas, background, windowHeader });
@@ -227,8 +280,8 @@ function useZoomPreviewGeometry(
         background,
         windowHeader,
         output,
-        camera: spotlight ? { scale: 1, centerX: 0.5, centerY: 0.5 } : camera,
+        camera,
       }),
     };
-  }, [source, canvas, background, windowHeader, camera, spotlight]);
+  }, [source, canvas, background, windowHeader, camera]);
 }

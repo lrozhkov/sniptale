@@ -1,3 +1,5 @@
+import { parseQuickEditBorder } from './border';
+import { quickEditFocusConflicts } from './focus-layout';
 import { parseOriginalAudioRanges } from './original-audio';
 import { parseVoiceoverAnchors, parseVoiceoverSegments } from '../voiceover-validation';
 import { parseQuickEditSpotlight } from './focus';
@@ -111,7 +113,14 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     return null;
   const spotlight =
     value['spotlight'] === undefined ? undefined : parseQuickEditSpotlight(value['spotlight']);
-  if (spotlight === null) return null;
+  const border = value['border'] === undefined ? undefined : parseQuickEditBorder(value['border']);
+  if (
+    spotlight === null ||
+    border === null ||
+    (spotlight && border) ||
+    (border && value['linkTo'] !== undefined)
+  )
+    return null;
   const transform = parseCameraTransform(value['transform']);
   const enter = parseZoomTransition(value['enter']);
   const exit = parseZoomTransition(value['exit']);
@@ -134,6 +143,7 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     return null;
   return {
     ...(spotlight ? { spotlight } : {}),
+    ...(border ? { border } : {}),
     id: value['id'],
     start: value['start'],
     end: value['end'],
@@ -161,25 +171,17 @@ function parseZoomRegions(value: unknown): QuickEditZoomRegion[] | null {
   const regions = parseBoundedArray(value, MAX_QUICK_EDIT_ZOOM_REGIONS, parseZoomRegion);
   if (!regions) return null;
   const ids = new Set<string>();
-  let previous: QuickEditZoomRegion | null = null;
   for (const region of regions) {
-    if (ids.has(region.id)) return null;
+    if (ids.has(region.id) || quickEditFocusConflicts(regions, region)) return null;
     ids.add(region.id);
-    if (region.dormant) continue;
-    if (
-      previous &&
-      (region.sourceAnchor?.start ?? region.start) < (previous.sourceAnchor?.end ?? previous.end)
-    )
-      return null;
-    previous = region;
   }
   return regions;
 }
 
-function parseZoomState(value: unknown): QuickEditZoomState | null {
+function parseZoomState(value: unknown, allowBorder: boolean): QuickEditZoomState | null {
   if (!isRecord(value) || typeof value['enabled'] !== 'boolean') return null;
   const regions = parseZoomRegions(value['regions']);
-  if (!regions) return null;
+  if (!regions || (!allowBorder && regions.some((region) => region.border))) return null;
   return { enabled: value['enabled'], regions };
 }
 
@@ -342,9 +344,16 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
  * rejects the operation at the workspace boundary.
  */
 export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvancedContent | null {
-  if (!isRecord(raw) || raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION || 'ui' in raw)
+  if (
+    !isRecord(raw) ||
+    (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION && raw['schemaVersion'] !== 2) ||
+    'ui' in raw
+  )
     return null;
-  const zoom = parseZoomState(raw['zoom']);
+  const zoom = parseZoomState(
+    raw['zoom'],
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+  );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
@@ -374,7 +383,8 @@ export function loadQuickEditAdvancedState(
   if (raw === undefined) return createQuickEditAdvancedState();
   if (!isRecord(raw)) return null;
   const version = raw['schemaVersion'];
-  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION) return parseAdvancedFields(raw);
+  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || version === 2)
+    return parseAdvancedFields(raw);
   if (version === QUICK_EDIT_ADVANCED_SCHEMA_V1 && segments) {
     const parsed = parseAdvancedFields(raw);
     if (!parsed) return null;
@@ -387,7 +397,10 @@ export function loadQuickEditAdvancedState(
 /** Parses the current shape; the recovery copy is an opaque string. */
 function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedState | null {
   const ui = parseUiState(raw['ui']);
-  const zoom = parseZoomState(raw['zoom']);
+  const zoom = parseZoomState(
+    raw['zoom'],
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+  );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);

@@ -1,3 +1,4 @@
+import { resolveQuickEditFocusLink } from './focus-layout';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../../project/validation/primitives';
 import { sampleQuickEditFocusAtTime, type QuickEditRect } from './scene';
@@ -66,6 +67,11 @@ export interface QuickEditSpotlightFrame {
   radius: number;
   dim: number;
   blur: number;
+  protectionOpening?: QuickEditRect;
+  protectionRadius?: number;
+  presence?: number;
+  /** Contract opening clips interpolate from the full output to the video window. */
+  openingClipProgress?: number;
 }
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -96,7 +102,10 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   video: QuickEditRect;
   scale: number;
 }): QuickEditSpotlightFrame | null {
-  const sample = sampleQuickEditFocusAtTime(args.regions, args.time);
+  const sample = sampleQuickEditFocusAtTime(
+    args.regions.filter((region) => region.spotlight),
+    args.time
+  );
   if (!sample?.to.spotlight) return null;
   const end = targetFrame(sample.to.spotlight, args.video, args.scale);
   const animation =
@@ -135,4 +144,46 @@ export function quickEditSpotlightPath(
     `Q${x + w} ${y} ${x + w} ${y + r}V${y + h - r}Q${x + w} ${y + h} ${x + w - r} ${y + h}` +
     `H${x + r}Q${x} ${y + h} ${x} ${y + h - r}V${y + r}Q${x} ${y} ${x + r} ${y}Z`
   );
+}
+
+/** All independent masks, with final protection holes and linked morph presence. */
+export function evaluateQuickEditSpotlightsAtTime(
+  args: Parameters<typeof evaluateQuickEditSpotlightAtTime>[0]
+): QuickEditSpotlightFrame[] {
+  const regions = args.regions.filter((region) => !region.dormant && region.spotlight);
+  const frames: QuickEditSpotlightFrame[] = [];
+  for (const region of regions) {
+    const link = resolveQuickEditFocusLink(regions, region.id);
+    if (link && args.time >= region.end && args.time < link.target.start) {
+      const frame = evaluateQuickEditSpotlightAtTime({ ...args, regions: [region, link.target] });
+      if (frame)
+        frames.push({
+          ...frame,
+          protectionOpening: frame.opening,
+          protectionRadius: frame.radius,
+          presence: 1,
+          openingClipProgress: 1,
+        });
+      continue;
+    }
+    if (args.time < region.start || args.time >= region.end) continue;
+    const incoming = regions.find(
+      (item) => resolveQuickEditFocusLink(regions, item.id)?.target.id === region.id
+    );
+    const connected = [...(incoming ? [incoming] : []), region, ...(link ? [link.target] : [])];
+    const sample = sampleQuickEditFocusAtTime(connected, args.time);
+    const frame = evaluateQuickEditSpotlightAtTime({ ...args, regions: connected });
+    if (!frame || !sample) continue;
+    const target = targetFrame(region.spotlight!, args.video, args.scale);
+    const reveal =
+      sample.phase === 'exit' ? region.spotlight!.exitReveal : region.spotlight!.reveal;
+    frames.push({
+      ...frame,
+      protectionOpening: target.opening,
+      protectionRadius: target.radius,
+      presence: sample.progress,
+      openingClipProgress: reveal === 'contract' ? sample.progress : 1,
+    });
+  }
+  return frames;
 }

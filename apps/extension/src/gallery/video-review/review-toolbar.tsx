@@ -1,3 +1,4 @@
+import type { ReviewFocusType } from './zoom-editor';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { useReviewAudio } from './use-review-audio';
 import { translate } from '../../platform/i18n';
@@ -25,7 +26,13 @@ type Editing = ReturnType<typeof useReviewEdits>;
 
 type ToolbarProps = {
   beforeAction?: ReviewBeforeAction | undefined;
-  focusTool?: { active: boolean; available: boolean; onToggle(): void };
+  focusTool?: {
+    active: boolean;
+    available: boolean;
+    type?: ReviewFocusType;
+    onType?(type: ReviewFocusType): void;
+    onToggle(): void;
+  };
   originalAudioEditor?: ReturnType<typeof useReviewAudio>;
   editing: {
     mode: 'cut' | 'speed' | null;
@@ -111,17 +118,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           onAudio={(audio) => admit(() => props.editing.changeAudio(audio))}
         />
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.focusRangeTool')}
-            toolbarLabel={translate('gallery.videoReview.zoomTrack')}
-            title={translate('gallery.videoReview.focusRangeHint')}
-            aria-pressed={props.focusTool.active}
-            className={plain}
-            disabled={busy || !props.focusTool.available}
-            onClick={() => admit(props.focusTool!.onToggle)}
-          >
-            <Focus size={16} aria-hidden="true" />
-          </ReviewButton>
+          <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
         ) : null}
         {advanced.ui.mode === 'advanced' && props.originalAudioEditor ? (
           <ReviewButton
@@ -278,5 +275,50 @@ function ReviewHistoryTrackControl(
     >
       <Activity size={props.compact ? 14 : 16} aria-hidden="true" />
     </ReviewButton>
+  );
+}
+
+/** Focus insertion owns its action availability and disposable kind selection together. */
+function ReviewFocusToolControl({
+  tool,
+  busy,
+  admit,
+}: {
+  tool: NonNullable<ToolbarProps['focusTool']>;
+  busy: boolean;
+  admit: (action: () => void) => void;
+}) {
+  return (
+    <>
+      <ReviewButton
+        label={translate('gallery.videoReview.focusRangeTool')}
+        toolbarLabel={translate('gallery.videoReview.zoomTrack')}
+        title={translate('gallery.videoReview.focusRangeHint')}
+        aria-pressed={tool.active}
+        className={plain}
+        disabled={busy || !tool.available}
+        onClick={() => admit(tool.onToggle)}
+      >
+        <Focus size={16} aria-hidden="true" />
+      </ReviewButton>
+      <ProductSelect
+        aria-label={translate('gallery.videoReview.focusType')}
+        controlSize="sm"
+        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+        containerClassName="!w-auto !min-w-0 shrink-0"
+        menuWidth={160}
+        value={tool.type ?? 'zoom'}
+        disabled={busy}
+        options={[
+          { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
+          { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+          { value: 'border', label: translate('gallery.videoReview.focusBorder') },
+        ]}
+        onChange={(value) => {
+          if (value === 'zoom' || value === 'spotlight' || value === 'border')
+            admit(() => tool.onType?.(value));
+        }}
+      />
+    </>
   );
 }

@@ -247,6 +247,7 @@ function ReviewInspectorBinding({
           video.current?.pause();
           state.seek(time, false);
         }}
+        focusTime={state.timeline.sceneOutputTime}
         playback={
           state.playing && video.current
             ? {
@@ -611,12 +612,16 @@ function reviewSelectionLabel(state: InspectorState): string | undefined {
     );
     return reviewEventLabel(marker?.eventType ?? '');
   }
-  if (selection.kind === 'zoom')
+  if (selection.kind === 'zoom') {
+    const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
     return translate(
-      state.advanced.zoom.regions.find((region) => region.id === selection.id)?.spotlight
-        ? 'gallery.videoReview.focusSpotlight'
-        : 'gallery.videoReview.zoomRegionLabel'
+      region?.border
+        ? 'gallery.videoReview.focusBorder'
+        : region?.spotlight
+          ? 'gallery.videoReview.focusSpotlight'
+          : 'gallery.videoReview.zoomRegionLabel'
     );
+  }
   if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
   if (selection.kind === 'canvas-comment') return translate('gallery.videoReview.overlayComments');
   if (selection.kind === 'original-audio')

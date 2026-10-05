@@ -24,6 +24,7 @@ const CRITICAL_SPECS = [
   'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-gallery-focus-border.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-image-editor-persistence.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',

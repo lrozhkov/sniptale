@@ -175,3 +175,78 @@ it('restores nested disclosure choices after another object and a fresh editor m
   await act(async () => render('gallery:zoom', 'another-project'));
   expect(host.querySelector('details')!.open).toBe(true);
 });
+
+it('disables dormant Spotlight conversion when revival would overlap an active Zoom', async () => {
+  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'dormant', at: 1, duration: 2, endMax: 10 }),
+      spotlight: createQuickEditSpotlight(),
+      dormant: true,
+    },
+    createQuickEditZoomRegion({ id: 'camera', at: 2, duration: 2, endMax: 10 }),
+  ];
+  const setZoom = vi.fn();
+  function DormantHarness() {
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      timelineDuration: 10,
+      selection: 'dormant',
+      setZoom,
+    });
+    return <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />;
+  }
+  act(() => root.render(<DormantHarness />));
+  const zoomButton = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.focusType"] button[title="gallery.videoReview.zoomRegionLabel"]'
+  )!;
+  expect(zoomButton.disabled).toBe(true);
+  expect(host.textContent).toContain('gallery.videoReview.focusZoomConflict');
+  act(() => zoomButton.click());
+  expect(setZoom).not.toHaveBeenCalled();
+});
+
+it('routes Border numeric drafts through the panel and cancels without a durable mutation', async () => {
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'border', at: 1, duration: 2, endMax: 10 }),
+    border: createQuickEditBorder(),
+  };
+  advanced.zoom.regions = [region];
+  const setZoom = vi.fn();
+  function DraftHarness() {
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      timelineDuration: 10,
+      selection: region.id,
+      setZoom,
+    });
+    return (
+      <>
+        <output data-testid="draft-width">{zoom.previewRegion(region).border!.width}</output>
+        <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />
+      </>
+    );
+  }
+  act(() => root.render(<DraftHarness />));
+  const range = host.querySelector<HTMLInputElement>(
+    '[aria-label="gallery.videoReview.borderWidth range"]'
+  )!;
+  await act(async () => {
+    range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    setInputValue(range, '9');
+  });
+  expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('9');
+  expect(region.border.width).toBe(3);
+  expect(setZoom).not.toHaveBeenCalled();
+  await act(async () =>
+    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('3');
+  expect(setZoom).not.toHaveBeenCalled();
+});

@@ -449,7 +449,7 @@ it('migrates a v1 advanced payload on load and keeps the workspace writable (R03
     },
   });
   const opened = await openVideoWorkspace(id, source);
-  expect(opened.workspace.advanced.schemaVersion).toBe(2);
+  expect(opened.workspace.advanced.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
   expect(opened.workspace.advanced.zoom.regions[0]).toMatchObject({
     start: 0.5,
     end: 1.5,

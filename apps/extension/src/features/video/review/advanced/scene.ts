@@ -1,3 +1,4 @@
+import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { quickEditWindowHeaderSize } from './window-header';
 import { fitVideoRect } from '../geometry';
@@ -234,21 +235,17 @@ export function sampleQuickEditFocusAtTime(
   progress: number;
   phase: 'enter' | 'exit' | 'link';
 } | null {
-  const active = regions.filter((region) => !region.dormant);
+  const active = regions
+    .filter((region) => !region.dormant)
+    .toSorted((a, b) => a.start - b.start || a.id.localeCompare(b.id));
   for (let index = 0; index < active.length; index++) {
     const region = active[index]!;
-    const next = active[index + 1];
-    const previous = active[index - 1];
-    const linkedNext =
-      next &&
-      region.linkTo === next.id &&
-      next.start > region.end &&
-      !!region.spotlight === !!next.spotlight;
-    const linkedPrevious =
-      previous?.linkTo === region.id &&
-      region.start > previous.end &&
-      !!region.spotlight === !!previous.spotlight;
-    if (linkedNext && timelineTime >= region.end && timelineTime < next.start) {
+    const next = resolveQuickEditFocusLink(active, region.id)?.target;
+    const linkedNext = !!next;
+    const linkedPrevious = active.some(
+      (item) => resolveQuickEditFocusLink(active, item.id)?.target.id === region.id
+    );
+    if (linkedNext && next && timelineTime >= region.end && timelineTime < next.start) {
       const progress = easing(
         (timelineTime - region.end) / (next.start - region.end),
         region.linkEasing ?? 'ease-in-out'
@@ -274,7 +271,10 @@ export function evaluateQuickEditCameraAtTime(
   regions: readonly QuickEditZoomRegion[],
   timelineTime: number
 ): QuickEditCameraTransform {
-  const sample = sampleQuickEditFocusAtTime(regions, timelineTime);
+  const sample = sampleQuickEditFocusAtTime(
+    regions.filter((region) => quickEditFocusType(region) === 'zoom'),
+    timelineTime
+  );
   if (!sample || sample.to.spotlight) return QUICK_EDIT_IDENTITY_CAMERA;
   return interpolateCamera(
     sample.from?.transform ?? QUICK_EDIT_IDENTITY_CAMERA,

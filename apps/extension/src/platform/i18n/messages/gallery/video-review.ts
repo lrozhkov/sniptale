@@ -1,6 +1,27 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  focusBorder: { ru: 'Рамка', en: 'Border' },
+  borderPreview: { ru: 'Область рамки', en: 'Border area' },
+  focusZoomConflict: {
+    ru: 'На этом интервале уже есть зум или связанный переход.',
+    en: 'This interval overlaps a Zoom or linked camera transition.',
+  },
+  borderColor: { ru: 'Цвет', en: 'Color' },
+  borderWidth: { ru: 'Толщина', en: 'Width' },
+  borderStyle: { ru: 'Линия', en: 'Stroke' },
+  borderStyle_solid: { ru: 'Сплошная', en: 'Solid' },
+  borderStyle_dashed: { ru: 'Штриховая', en: 'Dashed' },
+  borderStyle_dotted: { ru: 'Пунктирная', en: 'Dotted' },
+  borderAppear: { ru: 'Появиться', en: 'Appear' },
+  borderDisappear: { ru: 'Исчезнуть', en: 'Disappear' },
+  borderDraw: { ru: 'Прорисовка по часовой стрелке', en: 'Draw clockwise' },
+  borderErase: { ru: 'Стирание по часовой стрелке', en: 'Erase clockwise' },
+  borderHold: { ru: 'Во время показа', en: 'Hold' },
+  borderStill: { ru: 'Неподвижная', en: 'Still' },
+  borderMoving: { ru: 'Движущийся отрезок', en: 'Moving segment' },
+  borderPeriod: { ru: 'Период', en: 'Period' },
+
   exportBlockerCanvasSize: {
     ru: 'размер видео с шапкой превышает допустимый; уменьшите разрешение экспорта',
     en: 'video with its header exceeds the size limit; lower the export resolution',

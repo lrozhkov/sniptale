@@ -571,3 +571,79 @@ it.each([false, true])(
     );
   }
 );
+
+it('repacks transient overlapping overlay ranges and restores rows on Escape', async () => {
+  const overlay = (id: string, start: number, end: number) => ({
+    ...zoom(id, start, end),
+    sourceAnchor: { start, end },
+    spotlight: createQuickEditSpotlight(),
+  });
+  const commit = vi.fn();
+  const projection = createTrackProjection(10, []);
+  const track = renderTrack([overlay('a', 0, 2), overlay('b', 3, 5)], commit, vi.fn(), null, {
+    projection,
+  });
+  const [first, second] = track.blocks;
+  first!.setPointerCapture = vi.fn();
+  first!.hasPointerCapture = vi.fn(() => false);
+  expect(first!.style.top).toBe(second!.style.top);
+  await track.event(first!, 'pointerdown', 0);
+  await track.event(first!, 'pointermove', 300, true);
+  expect(first!.style.top).not.toBe(second!.style.top);
+  expect(track.lane.style.height).toBe('104px');
+  expect(commit).not.toHaveBeenCalled();
+  await act(async () =>
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(first!.style.top).toBe(second!.style.top);
+  await track.event(first!, 'pointerup', 300, true);
+  expect(commit).not.toHaveBeenCalled();
+});
+
+it('keeps a Spotlight link tied to its target across an independent overlay', async () => {
+  const overlay = (id: string, start: number, end: number) => ({
+    ...zoom(id, start, end),
+    spotlight: createQuickEditSpotlight(),
+  });
+  const onLink = vi.fn();
+  const onSelectLink = vi.fn();
+  const track = renderTrack(
+    [{ ...overlay('a', 0, 2), linkTo: 'b' }, overlay('c', 3, 4), overlay('b', 6, 8)],
+    vi.fn(),
+    vi.fn(),
+    null,
+    { onLink, onSelectLink }
+  );
+  const link = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.zoomLink"][data-connected="true"]'
+  )!;
+  expect(link.style.left).toBe('20%');
+  expect(link.style.width).toBe('40%');
+  expect(track.blocks[0]!.style.top).toBe(track.blocks[2]!.style.top);
+  expect(track.blocks[0]!.style.top).not.toBe(track.blocks[1]!.style.top);
+  await act(async () => link.click());
+  expect(onSelectLink).toHaveBeenCalledWith('a');
+  expect(onLink).not.toHaveBeenCalled();
+});
+
+it('offers no Border links or camera link across an intervening camera', async () => {
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  renderTrack(
+    [
+      { ...zoom('a', 0, 2), border: createQuickEditBorder() },
+      { ...zoom('b', 6, 8), border: createQuickEditBorder() },
+    ],
+    vi.fn(),
+    vi.fn(),
+    null,
+    { onLink: vi.fn() }
+  );
+  expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
+  renderTrack([zoom('a', 0, 2), zoom('c', 1, 4), zoom('b', 6, 8)], vi.fn(), vi.fn(), null, {
+    onLink: vi.fn(),
+  });
+  const links = [
+    ...host.querySelectorAll<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]'),
+  ];
+  expect(links.some((link) => link.style.left === '20%')).toBe(false);
+});

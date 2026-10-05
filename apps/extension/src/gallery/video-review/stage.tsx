@@ -1,8 +1,10 @@
+import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
+import { ReviewBorderOverlay } from './border-overlay';
 import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { ReviewButton } from './controls';
 import { useReviewWindowHeader } from './use-window-header';
 import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
-import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
+import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import { ReviewStageFocusControl, type ReviewStageFocus } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
@@ -95,8 +97,16 @@ export function ReviewStage(props: {
 }) {
   const host = useRef<HTMLDivElement>(null);
   const header = useReviewWindowHeader(props.scene?.windowHeader, props.source.width);
-  const { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight } =
-    useReviewStageGeometry(props, host);
+  const {
+    size,
+    sceneLayout,
+    zoomLayout,
+    backgroundPaint,
+    content,
+    spotlight,
+    borders,
+    overlayClip,
+  } = useReviewStageGeometry(props, host);
   const motion =
     sceneLayout && props.scene
       ? computeQuickEditSceneCamera(sceneLayout, props.scene.background)
@@ -180,7 +190,8 @@ export function ReviewStage(props: {
           onPlaying={props.onPlaying}
           onError={props.onError}
         />
-        <ReviewSpotlightOverlay output={size} frame={spotlight} />
+        <ReviewSpotlightOverlay output={size} frames={spotlight} clip={overlayClip} />
+        <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
         {props.comments && props.comments.items.length ? (
           <ReviewStageComments
             comments={props.comments}
@@ -472,9 +483,10 @@ function useReviewStageGeometry(
         windowHeader: props.scene?.windowHeader,
         source: props.source,
         background: props.scene?.background ?? { enabled: false },
-        camera: props.zoom.region.spotlight
-          ? { scale: 1, centerX: 0.5, centerY: 0.5 }
-          : props.zoom.region.transform,
+        camera:
+          props.zoom.region.spotlight || props.zoom.region.border
+            ? (props.scene?.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 })
+            : props.zoom.region.transform,
       })
     : null;
   const backgroundPaint = props.scene?.background.enabled
@@ -492,12 +504,45 @@ function useReviewStageGeometry(
   }, [size, sceneLayout, reportGeometry]);
   const spotlight =
     sceneLayout && props.scene?.focus
-      ? evaluateQuickEditSpotlightAtTime({
+      ? evaluateQuickEditSpotlightsAtTime({
           ...props.scene.focus,
           output: size,
-          video: sceneLayout.videoRect,
-          scale: size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width),
+          video: sceneLayout.videoTransform,
+          scale:
+            (size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
+            props.scene.camera.scale,
         })
-      : null;
-  return { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight };
+      : [];
+  const borders =
+    sceneLayout && props.scene?.focus
+      ? evaluateQuickEditBordersAtTime({
+          ...props.scene.focus,
+          output: size,
+          video: sceneLayout.videoTransform,
+          scale:
+            (size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
+            props.scene.camera.scale,
+        })
+      : [];
+  const overlayClip =
+    sceneLayout && props.scene
+      ? {
+          rect: computeQuickEditSceneCamera(sceneLayout, props.scene.background).windowClip,
+          radius: props.scene.background.enabled
+            ? ((props.scene.background.layout.cornerRadius * size.width) /
+                Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
+              computeQuickEditSceneCamera(sceneLayout, props.scene.background).scale
+            : 0,
+        }
+      : undefined;
+  return {
+    size,
+    sceneLayout,
+    zoomLayout,
+    backgroundPaint,
+    content,
+    spotlight,
+    borders,
+    overlayClip,
+  };
 }

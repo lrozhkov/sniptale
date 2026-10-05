@@ -62,3 +62,23 @@ it('keeps compact segments usable when the active item was removed', () => {
   expect(markup).toContain('Second');
   expect(markup).not.toContain('NaN');
 });
+
+it.each([false, true])(
+  'exposes unavailable choices as native disabled buttons (wrap=%s)',
+  (wrap) => {
+    const markup = renderToStaticMarkup(
+      <SegmentedSwitch
+        activeId="border"
+        ariaLabel="Focus type"
+        wrap={wrap}
+        options={[
+          { id: 'zoom', label: 'Zoom', disabled: true },
+          { id: 'border', label: 'Border' },
+        ]}
+        onChange={vi.fn()}
+      />
+    );
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*title="Zoom"/);
+    expect(markup.match(/disabled=""/g)).toHaveLength(1);
+  }
+);

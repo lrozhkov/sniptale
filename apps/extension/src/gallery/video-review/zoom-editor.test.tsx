@@ -2,7 +2,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useReviewZoomEditor } from './zoom-editor';
+import { useReviewZoomEditor, withReviewFocusType } from './zoom-editor';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { reconcileReviewFocus, projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -187,11 +187,10 @@ it('revives a dormant migrated region on a user edit and keeps invalid commits d
   act(() => current().change('z', { scale: 3 }));
   const revived = apply(setZoom, dormant);
   expect(revived.regions[0]).toMatchObject({ dormant: false, transform: { scale: 3 } });
-  // A dormant region no longer blocks insertion at its stored coordinates.
+  // Recheck the latest state: the revived camera now reserves its coordinates.
   act(() => current().add(1, 10));
   const after = apply(setZoom, revived);
-  expect(after.regions).toHaveLength(2);
-  expect(after.regions[1]).toMatchObject({ start: 1, end: 3 });
+  expect(after.regions).toEqual(revived.regions);
 });
 
 it('keeps a dormant region dormant when its stored interval collides with an active one', async () => {
@@ -546,3 +545,98 @@ it.each([
     expect(restored[0]).toMatchObject({ start: 2, end: 4 });
   }
 );
+
+it('inserts overlapping borders and retains camera and area through type conversion', () => {
+  const camera = region('camera', 1, 5);
+  const border = withReviewFocusType(camera, 'border');
+  border.border!.area = { x: 0.1, y: 0.2, width: 0.6, height: 0.4 };
+  border.border!.roundness = 0.23;
+  const spotlight = withReviewFocusType(border, 'spotlight');
+  expect(spotlight.spotlight).toMatchObject({ area: border.border!.area, roundness: 0.23 });
+  expect(withReviewFocusType(spotlight, 'zoom').transform).toEqual(camera.transform);
+  const setZoom = vi.fn();
+  const zoom = { enabled: true, regions: [camera] };
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({ setZoom, zoom, timelineDuration: 10 });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.setInsertionType('border'));
+  act(() => editor.add(2, 10));
+  const added = apply(setZoom, zoom);
+  expect(added.regions).toHaveLength(2);
+  expect(added.regions.find((item) => item.id !== camera.id)?.border).toBeDefined();
+  act(() => editor.change(camera.id, { border: border.border! }));
+  expect(apply(setZoom, zoom).regions[0]?.transform).toEqual(camera.transform);
+});
+
+it('refuses dormant overlay conversion against the intended active camera without a history entry', () => {
+  const dormant = { ...withReviewFocusType(region('dormant', 1, 3), 'spotlight'), dormant: true };
+  let zoom: QuickEditZoomState = { enabled: true, regions: [dormant, region('camera', 2, 4)] };
+  const initial = zoom;
+  const history = vi.fn();
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom,
+      timelineDuration: 10,
+      selection: 'dormant',
+      setZoom(update) {
+        const next = update(zoom);
+        if (next !== zoom) history(next);
+        zoom = next;
+      },
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.change('dormant', { spotlight: null, border: null }));
+  expect(zoom).toBe(initial);
+  expect(history).not.toHaveBeenCalled();
+  expect(editor.selection).toBe('dormant');
+});
+
+it('revives a nonconflicting dormant overlay as Zoom using its intended result-time placement', () => {
+  const timeMap = buildReviewTimeMap(12, [
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0,
+      end: 4,
+      requestedStart: 0,
+      requestedEnd: 4,
+      rate: 2,
+      audio: 'speed',
+    },
+  ]);
+  const dormant = {
+    ...withReviewFocusType(region('dormant', 1, 2), 'spotlight'),
+    dormant: true,
+    sourceAnchor: { start: 8, end: 10 },
+  };
+  let zoom: QuickEditZoomState = {
+    enabled: true,
+    regions: [dormant, { ...region('camera', 5, 7), sourceAnchor: { start: 7, end: 9 } }],
+  };
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom,
+      timeMap,
+      timelineDuration: 10,
+      setZoom(update) {
+        zoom = update(zoom);
+      },
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  act(() => editor.change('dormant', { spotlight: null, border: null }));
+  expect(zoom.regions[0]).toMatchObject({
+    dormant: false,
+    sourceAnchor: { start: 2, end: 4 },
+    transform: dormant.transform,
+  });
+  expect(zoom.regions[0]?.spotlight).toBeUndefined();
+});

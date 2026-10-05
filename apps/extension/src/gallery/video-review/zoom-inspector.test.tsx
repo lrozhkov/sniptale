@@ -205,7 +205,7 @@ it('keeps spotlight settings when the active type is selected again', async () =
   );
   const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
   expect(group.getAttribute('aria-label')).toBe('gallery.videoReview.focusType');
-  expect(group.querySelectorAll('button')).toHaveLength(2);
+  expect(group.querySelectorAll('button')).toHaveLength(3);
   const active = group.querySelector<HTMLButtonElement>(
     '[title="gallery.videoReview.focusSpotlight"]'
   )!;
@@ -327,7 +327,7 @@ it('switches directly between Zoom and Spotlight without resetting the camera', 
   expect(host.querySelector('[role="listbox"]')).toBeNull();
   await render({ ...region, spotlight: patch.spotlight! });
   await choose('gallery.videoReview.zoomRegionLabel');
-  expect(change).toHaveBeenLastCalledWith({ spotlight: null });
+  expect(change).toHaveBeenLastCalledWith({ spotlight: null, border: null });
 });
 
 it('offers five source seconds on the slider and retains valid longer typed phases', async () => {
@@ -404,4 +404,76 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
   await act(async () => ranges()[1]!.blur());
   expect(current).toEqual(before);
   expect(change).not.toHaveBeenCalled();
+});
+
+it('preserves the source area when switching Spotlight to Border and blocks conflicting Zoom', async () => {
+  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  const spotlight = {
+    ...createQuickEditSpotlight(),
+    roundness: 0.21,
+    area: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 },
+  };
+  const onChange = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewZoomInspector
+        region={{ ...region, spotlight }}
+        zoomConversionBlocked
+        onChange={onChange}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const group = host.querySelector('[data-ui="gallery.videoReview.focusType"]')!;
+  const zoom = group.querySelector<HTMLButtonElement>(
+    '[title="gallery.videoReview.zoomRegionLabel"]'
+  )!;
+  expect(zoom.disabled).toBe(true);
+  act(() => zoom.click());
+  expect(onChange).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('gallery.videoReview.focusZoomConflict');
+  act(() =>
+    group.querySelector<HTMLButtonElement>('[title="gallery.videoReview.focusBorder"]')!.click()
+  );
+  expect(onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      spotlight: null,
+      border: expect.objectContaining({ area: spotlight.area, roundness: spotlight.roundness }),
+    })
+  );
+});
+
+it('previews Border width without history writes, commits once, and cancels with Escape', async () => {
+  const { ReviewBorderInspector } = await import('./border-inspector');
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const onChange = vi.fn();
+  const onPreview = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBorderInspector
+        value={createQuickEditBorder()}
+        onChange={onChange}
+        onPreview={onPreview}
+      />
+    )
+  );
+  const range = field('gallery.videoReview.borderWidth range');
+  act(() => range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  await type(range, '5');
+  await type(range, '8');
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onPreview).toHaveBeenLastCalledWith(
+    expect.objectContaining({ border: expect.objectContaining({ width: 8 }) })
+  );
+  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(onChange).toHaveBeenCalledTimes(1);
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ width: 8 }));
+  onChange.mockClear();
+  act(() => range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  await type(range, '11');
+  act(() => range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(onChange).not.toHaveBeenCalled();
+  expect(onPreview).toHaveBeenLastCalledWith(null);
 });

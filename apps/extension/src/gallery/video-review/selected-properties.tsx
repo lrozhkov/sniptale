@@ -1,3 +1,6 @@
+import { projectReviewFocus } from '../../features/video/review/focus-edits';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
@@ -37,6 +40,7 @@ type SelectedPropertiesProps = {
   markers: readonly ReviewTelemetryMarker[];
   onFocus(region: QuickEditZoomRegion): void;
   onPreviewFrame?(time: number): void;
+  focusTime?: number | undefined;
   playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
@@ -103,6 +107,22 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle'}
                 region={zoom.previewRegion(region)}
+                focus={{
+                  regions:
+                    resolveQuickEditEffectiveFeatures(advanced).zoomTrackVisible &&
+                    advanced.zoom.enabled
+                      ? projectReviewFocus(
+                          advanced.zoom.regions.map((item) => zoom.previewRegion(item)),
+                          buildReviewTimeMap(
+                            resource.source.duration,
+                            resource.session.getSnapshot().document.edits
+                          )
+                        )
+                      : [],
+                  time: props.playback
+                    ? (props.focusTime ?? (region.start + region.end) / 2)
+                    : (region.start + region.end) / 2,
+                }}
                 background={advanced.background}
                 source={resource.source}
                 canvas={advanced.canvas}

@@ -29,15 +29,35 @@ export function ReviewStageFocusControl(props: {
     onPreview: focus.onPreview,
     onInteract: focus.onInteract,
   });
-  if (focus.region.spotlight)
+  const overlay = focus.region.spotlight ?? focus.region.border;
+  if (overlay)
     return (
       <ReviewFocusArea
-        spotlight={focus.region.spotlight}
+        area={overlay.area}
+        label={translate(
+          focus.region.border
+            ? 'gallery.videoReview.focusBorder'
+            : 'gallery.videoReview.focusSpotlight'
+        )}
         output={output}
-        video={layout.videoRect}
+        video={layout.videoTransform}
         onInteract={focus.onInteract}
-        onPreview={(spotlight) => focus.onPreview(spotlight ? { spotlight } : null)}
-        onChange={(spotlight) => focus.onChange({ spotlight })}
+        onPreview={(area) =>
+          focus.onPreview(
+            area
+              ? focus.region.border
+                ? { border: { ...focus.region.border, area } }
+                : { spotlight: { ...focus.region.spotlight!, area } }
+              : null
+          )
+        }
+        onChange={(area) =>
+          focus.onChange(
+            focus.region.border
+              ? { border: { ...focus.region.border, area } }
+              : { spotlight: { ...focus.region.spotlight!, area } }
+          )
+        }
       />
     );
   return (
