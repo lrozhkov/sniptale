@@ -177,7 +177,20 @@ function useReviewEditorTimeline(
     canStart,
   } = base;
   const onTransportFailure = () => setMessage(translate('gallery.videoReview.playbackFailed'));
-  const { video, time, onTime, playing, setPlaying, seek, play, timeline } = useReviewTransport({
+  const {
+    video,
+    time,
+    onTime,
+    playing,
+    setPlaying,
+    seek,
+    play,
+    timeline,
+    playbackRange,
+    setPlaybackRange,
+    onEnded,
+    seekRevision,
+  } = useReviewTransport({
     resource,
     edits: snapshot.document.edits,
     originalAudio: features.originalAudio,
@@ -189,6 +202,7 @@ function useReviewEditorTimeline(
     boundaries: () =>
       cuts.cutting && advanced.ui.mode !== 'advanced' ? exporter.index?.boundaries : undefined,
     onTransportFailure,
+    onInvalidRange: () => setMessage(translate('gallery.videoReview.emptyPlaybackRange')),
     silent: voiceoverSilent,
   });
   const { zoom, cuts } = useReviewEditingTools({
@@ -214,6 +228,10 @@ function useReviewEditorTimeline(
     video,
     time,
     onTime,
+    playbackRange,
+    setPlaybackRange,
+    onEnded,
+    seekRevision,
     playing,
     setPlaying,
     seek,

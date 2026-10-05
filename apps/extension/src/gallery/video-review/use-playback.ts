@@ -1,53 +1,54 @@
+import {
+  createReviewPlaybackRange,
+  reviewPlaybackRangeStart,
+  resolveReviewPlaybackSample,
+  type ReviewPlaybackRange,
+} from './playback-range';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { useEffect, useRef, useState } from 'react';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
-import { nearestReviewBoundary, reviewPlaybackSettings } from '../../features/video/review/cuts';
+import { nearestReviewBoundary } from '../../features/video/review/cuts';
 
-/** Owns source-time playback; the persisted original-audio gate and rate live here. */
-export function useReviewPlayback(props: {
+interface ReviewPlaybackProps {
   duration: number;
   edits: readonly ReviewEdit[];
   boundaries(): readonly number[] | undefined;
   onSeek(value: number): void;
   onFailure(): void;
+  onInvalidRange?: (() => void) | undefined;
   original: QuickEditOriginalAudio;
   silent?: boolean;
   retainCutTime?: boolean;
-}) {
+}
+
+/** Owns source-time playback; the persisted original-audio gate and rate live here. */
+export function useReviewPlayback(props: ReviewPlaybackProps) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [playbackRange, updateRange] = useState<ReviewPlaybackRange | null>(null);
+  const rangeRef = useRef(playbackRange);
+  const [seekRevision, reviseSeek] = useState(0);
+  const setRange = (range: ReviewPlaybackRange | null) => {
+    rangeRef.current = range;
+    updateRange(range);
+  };
   const latest = useRef(props);
   latest.current = props;
   const synchronize = (value: number, applyEdits: boolean) => {
     const node = video.current;
-    const inRecordedCut =
-      latest.current.retainCutTime &&
-      latest.current.edits.some(
-        (edit) => edit.kind === 'cut' && value >= edit.start && value < edit.end
-      );
-    const settings = inRecordedCut
-      ? { time: value, rate: 1, muted: true }
-      : reviewPlaybackSettings(value, latest.current.edits);
-    // Media clocks quantize seeks to microseconds. Round cut destinations forward
-    // so truncation cannot land inside the same cut and seek on every frame.
-    const next =
-      applyEdits && settings.time !== value
-        ? Math.min(latest.current.duration, cutSeekTarget(settings.time))
-        : value;
-    if (node) {
-      if (next !== value) node.currentTime = next;
-      if (node.playbackRate !== settings.rate) node.playbackRate = settings.rate;
-      if (node.preservesPitch !== true) node.preservesPitch = true;
-      const gain = originalAudioGainAt(latest.current.original, next, latest.current.edits);
-      const muted = latest.current.silent || settings.muted || gain === 0;
-      if (node.muted !== muted) node.muted = muted;
-      // The element caps at one; the preview audio graph amplifies beyond it.
-      const volume = Math.min(1, gain);
-      if (node.volume !== volume) node.volume = volume;
-      if (next >= latest.current.duration) node.pause();
-    }
+    const effective = resolveReviewPlaybackSample({
+      time: value,
+      applyEdits,
+      duration: latest.current.duration,
+      edits: latest.current.edits,
+      retainCutTime: latest.current.retainCutTime ?? false,
+      range: rangeRef.current,
+    });
+    const next = effective.time;
+    if (effective.looped) reviseSeek((revision) => revision + 1);
+    if (node) applyReviewPlaybackSample(node, effective, value, latest.current);
     setTime(next);
     return next;
   };
@@ -60,9 +61,19 @@ export function useReviewPlayback(props: {
   const tick = useRef(synchronize);
   tick.current = synchronize;
   useEffect(() => {
+    const range = rangeRef.current;
+    if (range) {
+      const normalized = createReviewPlaybackRange(range.start, range.end, props.duration);
+      if (!normalized || reviewPlaybackRangeStart(normalized, latest.current.edits) === null) {
+        setRange(null);
+        video.current?.pause();
+        setPlaying(false);
+      } else if (normalized.start !== range.start || normalized.end !== range.end)
+        setRange(normalized);
+    }
     const node = video.current;
     if (node) tick.current(node.currentTime, false);
-  }, [audioSettingsKey]);
+  }, [audioSettingsKey, props.duration]);
   useEffect(() => {
     if (!playing) return;
     let frame = 0;
@@ -79,12 +90,46 @@ export function useReviewPlayback(props: {
     time,
     playing,
     setPlaying,
+    playbackRange,
+    seekRevision,
+    setPlaybackRange: (requested: ReviewPlaybackRange | null) => {
+      if (!requested) {
+        setRange(null);
+        return;
+      }
+      const range = createReviewPlaybackRange(requested.start, requested.end, props.duration);
+      if (!range) return;
+      const start = reviewPlaybackRangeStart(range, props.edits);
+      if (start === null) {
+        props.onInvalidRange?.();
+        return;
+      }
+      setRange(range);
+      if (video.current) video.current.currentTime = start;
+      reviseSeek((revision) => revision + 1);
+      synchronize(start, false);
+      props.onSeek(start);
+    },
+    onEnded: () => {
+      const range = props.retainCutTime ? null : rangeRef.current;
+      const start = range && reviewPlaybackRangeStart(range, props.edits);
+      if (range && start !== null && video.current) {
+        video.current.currentTime = start;
+        reviseSeek((revision) => revision + 1);
+        synchronize(start, true);
+        void video.current.play().catch(props.onFailure);
+      } else setPlaying(false);
+    },
     onTime: (value: number) => synchronize(value, playing),
     seek: (value: number, snap = true) => {
       const clamped = Math.max(0, Math.min(props.duration, value));
       const boundaries = snap ? props.boundaries() : undefined;
       const next = boundaries ? nearestReviewBoundary(clamped, boundaries) : clamped;
+      const range = rangeRef.current;
+      if (range && !props.retainCutTime && (next < range.start || next >= range.end))
+        setRange(null);
       if (video.current) video.current.currentTime = next;
+      reviseSeek((revision) => revision + 1);
       synchronize(next, false);
       props.onSeek(next);
     },
@@ -101,8 +146,21 @@ export function useReviewPlayback(props: {
   };
 }
 
-/** Account for binary floating-point truncation when Chromium converts seconds to microseconds. */
-function cutSeekTarget(time: number): number {
-  const rounded = Math.ceil(time * 1e6) / 1e6;
-  return Math.floor(rounded * 1e6) / 1e6 < time ? rounded + 1e-6 : rounded;
+/** Applies the resolved source sample and authored audio settings to the native element. */
+function applyReviewPlaybackSample(
+  node: HTMLVideoElement,
+  sample: ReturnType<typeof resolveReviewPlaybackSample>,
+  previousTime: number,
+  props: ReviewPlaybackProps
+) {
+  if (sample.time !== previousTime) node.currentTime = sample.time;
+  if (node.playbackRate !== sample.rate) node.playbackRate = sample.rate;
+  if (node.preservesPitch !== true) node.preservesPitch = true;
+  const gain = originalAudioGainAt(props.original, sample.time, props.edits);
+  const muted = props.silent || sample.muted || gain === 0;
+  if (node.muted !== muted) node.muted = muted;
+  // The element caps at one; the preview audio graph amplifies beyond it.
+  const volume = Math.min(1, gain);
+  if (node.volume !== volume) node.volume = volume;
+  if (sample.time >= props.duration) node.pause();
 }

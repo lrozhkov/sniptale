@@ -444,6 +444,7 @@ function ReviewPreviewBinding({
           );
         }}
         onPlaying={state.setPlaying}
+        onEnded={state.onEnded}
         onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
       />
     </main>
@@ -511,6 +512,8 @@ function ReviewEditor({
           }
         >
           <ReviewTimelineBinding
+            playbackRange={state.playbackRange}
+            onPlaybackRange={state.setPlaybackRange}
             zoomAnchor={state.zoomAnchor}
             beforeAction={state.beforeAction}
             onOpenExport={() => requestExport((value) => value + 1)}

@@ -25,6 +25,12 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Стирание против часовой стрелки',
     en: 'Erase counterclockwise',
   },
+  playbackRange: { ru: 'Интервал повтора', en: 'Loop range' },
+  clearPlaybackRange: { ru: 'Сбросить интервал повтора', en: 'Clear loop range' },
+  emptyPlaybackRange: {
+    ru: 'Этот интервал полностью вырезан. Выберите интервал с оставшимся видео.',
+    en: 'This range is fully cut. Select a range containing kept video.',
+  },
   borderSegmentPercent: { ru: 'Длина отрезка', en: 'Segment length' },
   borderHold: { ru: 'Во время показа', en: 'Hold' },
   borderStill: { ru: 'Нет', en: 'None' },

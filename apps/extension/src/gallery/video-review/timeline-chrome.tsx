@@ -1,3 +1,4 @@
+import type { ReviewPlaybackRange } from './playback-range';
 import { ReviewResetControl } from './reset-control';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -6,6 +7,8 @@ import './timeline-toolbar.css';
 import { useReviewToolbarLayout } from './use-toolbar-layout';
 import { formatPreciseTime } from '../../composition/library-preview/time-format';
 import {
+  X,
+  Repeat2,
   Play,
   Pause,
   SkipBack,
@@ -16,13 +19,21 @@ import {
   StickyNote,
   FileVideo,
 } from 'lucide-react';
-import { useState, type ReactNode, type CSSProperties } from 'react';
+import { useState, type ReactNode, type CSSProperties, type HTMLAttributes } from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 
 /** Useful ruler units at the current zoom; labels do not contribute to canvas width. */
-export function ReviewRuler({ duration, width }: { duration: number; width: number }) {
+export function ReviewRuler({
+  duration,
+  width,
+  interaction,
+}: {
+  duration: number;
+  width: number;
+  interaction?: HTMLAttributes<HTMLDivElement>;
+}) {
   const required = duration / Math.max(1, width / 80);
   const magnitude = 10 ** Math.floor(Math.log10(required));
   const major =
@@ -33,8 +44,10 @@ export function ReviewRuler({ duration, width }: { duration: number; width: numb
   return (
     <div
       data-ui="gallery.videoReview.ruler"
-      aria-hidden="true"
-      className="relative h-7 select-none overflow-hidden"
+      aria-hidden={interaction ? undefined : true}
+      {...interaction}
+      className="relative h-7 select-none overflow-hidden outline-none focus-visible:ring-1
+        focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)] touch-none"
     >
       {Array.from({ length: count + 1 }, (_, index) => {
         const time = index * minor;
@@ -66,8 +79,69 @@ function playbackTime(value: number): string {
   return formatPreciseTime(Math.round(value * 100) / 100).slice(0, -1);
 }
 
+/** Disposable loop readout and reset beside the transport clock. */
+function ReviewLoopSummary(props: {
+  range?: ReviewPlaybackRange | null | undefined;
+  busy?: boolean | undefined;
+  onClear?: (() => void) | undefined;
+}) {
+  return props.range ? (
+    <div
+      data-ui="gallery.videoReview.loopSummary"
+      className="flex items-center justify-center gap-1 text-[10px] leading-3 tabular-nums
+                text-[var(--sniptale-color-accent-emphasis)] whitespace-nowrap"
+      title={[
+        translate('gallery.videoReview.playbackRange'),
+        `${formatPreciseTime(props.range.start)} – ${formatPreciseTime(props.range.end)}`,
+      ].join(': ')}
+    >
+      <Repeat2 size={12} aria-hidden="true" />
+      <span>
+        {playbackTime(props.range.start)} – {playbackTime(props.range.end)}
+      </span>
+      <ReviewButton
+        disabled={props.busy}
+        label={translate('gallery.videoReview.clearPlaybackRange')}
+        className={`${plain} !h-4 !min-h-4 !w-4 !min-w-4 !p-0`}
+        onKeyDown={(event) => {
+          if (event.key === ' ') event.stopPropagation();
+        }}
+        onClick={props.onClear}
+      >
+        <X size={12} aria-hidden="true" />
+      </ReviewButton>
+    </div>
+  ) : null;
+}
+
+/** Source-time cursor shared by all timeline lanes. */
+export function ReviewPlayhead(props: {
+  time: number;
+  duration: number;
+  gutter: number;
+  width: number;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      data-ui="gallery.videoReview.playhead"
+      className="pointer-events-none absolute bottom-2 top-0 z-20
+        bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125"
+      style={{
+        left:
+          props.gutter + Math.max(0, Math.min(1, props.time / props.duration)) * props.width - 5,
+        width: 10,
+        clipPath: 'polygon(0 0, 100% 0, 55% 8px, 55% 100%, 45% 100%, 45% 8px)',
+      }}
+    />
+  );
+}
+
 /** Editing tools, centered transport and viewport controls share one quiet toolbar. */
 export function ReviewToolbar(props: {
+  busy?: boolean;
+  playbackRange?: ReviewPlaybackRange | null | undefined;
+  onClearPlaybackRange?(): void;
   duration: number;
   time: number;
   playing: boolean;
@@ -120,9 +194,16 @@ export function ReviewToolbar(props: {
         >
           <SkipForward size={16} strokeWidth={2.2} aria-hidden="true" />
         </ReviewButton>
-        <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
-          {playbackTime(props.time)} / {playbackTime(props.duration)}
-        </span>
+        <div className="min-w-0 text-center">
+          <ReviewLoopSummary
+            range={props.playbackRange}
+            busy={props.busy}
+            onClear={props.onClearPlaybackRange}
+          />
+          <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
+            {playbackTime(props.time)} / {playbackTime(props.duration)}
+          </span>
+        </div>
         {props.resultDuration !== undefined &&
         Math.abs(props.resultDuration - props.duration) > 0.05 ? (
           <output

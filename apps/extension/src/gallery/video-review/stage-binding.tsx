@@ -52,6 +52,7 @@ export function ReviewStageBinding(props: {
   onReady(): void;
   onTime(value: number): void;
   onPlaying(value: boolean): void;
+  onEnded?: (() => void) | undefined;
   onError(): void;
 }) {
   const image = useReviewBackgroundImage(props.background, props.backgroundPending);
@@ -140,6 +141,7 @@ export function ReviewStageBinding(props: {
         onReady={props.onReady}
         onTime={props.onTime}
         onPlaying={props.onPlaying}
+        onEnded={props.onEnded}
         onError={props.onError}
       />
     </>

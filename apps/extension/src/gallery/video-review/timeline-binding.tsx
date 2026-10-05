@@ -1,3 +1,4 @@
+import type { ReviewPlaybackRange } from './playback-range';
 import { withReviewFocusType } from './zoom-editor';
 import { quickEditFocusConflicts } from '../../features/video/review/advanced/focus-layout';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -116,6 +117,8 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  playbackRange?: ReviewPlaybackRange | null | undefined;
+  onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
   zoomAnchor?: number | null | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   editing: Omit<Editing, 'cutting' | 'exporter'> & {
@@ -231,6 +234,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   };
   return (
     <ReviewTimeline
+      playbackRange={props.playbackRange}
+      onPlaybackRange={props.onPlaybackRange}
+      sourceRangeTool={!!props.editing.mode}
       zoomAnchor={props.zoomAnchor}
       beforeAction={props.beforeAction}
       onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { reviewTimelineNavigationBounds } from './track-projection';
@@ -101,4 +101,33 @@ function revealBoundary(
   const x = gutter + (target / duration) * width * zoom;
   if (x < node.scrollLeft + 16 || x > node.scrollLeft + node.clientWidth - 24)
     node.scrollLeft = target === navigation.start ? 0 : Math.max(0, x - node.clientWidth + 24);
+}
+
+/** Tool activation reveals its lane through the existing vertical viewport, preserving horizontal position. */
+export function useReviewToolLaneNavigation(
+  viewport: RefObject<HTMLDivElement | null>,
+  tools: { focus: boolean; original: boolean; source: boolean }
+) {
+  const active = tools.focus
+    ? 'focus'
+    : tools.original
+      ? 'original'
+      : tools.source
+        ? 'source'
+        : null;
+  useEffect(() => {
+    if (!active || !viewport.current) return;
+    const selectors = {
+      focus: '[data-ui="gallery.videoReview.zoomLane"]',
+      original: '[data-original-audio-lane]',
+      source: '[data-ui="gallery.videoReview.sourceLane"]',
+    };
+    const lane = viewport.current.querySelector<HTMLElement>(selectors[active]);
+    if (!lane) return;
+    const bounds = viewport.current.getBoundingClientRect();
+    const rect = lane.getBoundingClientRect();
+    if (rect.top < bounds.top || rect.bottom > bounds.bottom)
+      viewport.current.scrollTop += rect.top - bounds.top - 4;
+  }, [active, viewport]);
+  return active;
 }

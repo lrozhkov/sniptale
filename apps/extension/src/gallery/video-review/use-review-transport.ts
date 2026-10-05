@@ -18,10 +18,23 @@ export function useReviewTransport(args: {
   onSeek(value: number): void;
   boundaries(): readonly number[] | undefined;
   onTransportFailure(): void;
+  onInvalidRange?(): void;
   silent?: boolean;
 }) {
   const { session, source } = args.resource;
-  const { video, time, onTime, playing, setPlaying, seek, play } = useReviewPlayback({
+  const {
+    video,
+    time,
+    onTime,
+    playing,
+    setPlaying,
+    seek,
+    play,
+    playbackRange,
+    setPlaybackRange,
+    onEnded,
+    seekRevision,
+  } = useReviewPlayback({
     duration: source.duration,
     edits: args.edits,
     original: args.originalAudio,
@@ -30,6 +43,7 @@ export function useReviewTransport(args: {
     boundaries: args.boundaries,
     onSeek: args.onSeek,
     onFailure: args.onTransportFailure,
+    onInvalidRange: args.onInvalidRange,
   });
   const timeline = useReviewTimeMap(source, args.edits, time);
   useReviewEditorAudioRuntime({
@@ -37,11 +51,25 @@ export function useReviewTransport(args: {
     playing: playing && !args.silent,
     silent: args.silent ?? false,
     outputTime: timeline.sceneOutputTime,
+    seekRevision,
     originalAudio: args.originalAudio,
     voiceover: args.voiceover,
     music: args.music,
     sessionKey: session.getSnapshot().snapshot.workspace.aggregateId,
     onFailure: args.onTransportFailure,
   });
-  return { video, time, onTime, playing, setPlaying, seek, play, timeline };
+  return {
+    video,
+    time,
+    onTime,
+    playing,
+    setPlaying,
+    seek,
+    play,
+    timeline,
+    playbackRange,
+    setPlaybackRange,
+    onEnded,
+    seekRevision,
+  };
 }

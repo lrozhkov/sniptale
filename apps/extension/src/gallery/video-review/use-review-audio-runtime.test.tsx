@@ -563,3 +563,24 @@ it('schedules a zero-fade voiceover at constant volume through its end', async (
     ],
   });
 });
+
+it('reschedules external clips on explicit short-loop discontinuities below the clock heuristic', async () => {
+  const engine = new FakeEngine();
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2,
+    seekRevision: 0,
+    music: [clip({ timelineStart: 0, duration: 7 })],
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  const stops = engine.stops;
+  engine.currentTime = 100.06;
+  await act(async () => root.render(<Harness outputTime={2.06} />));
+  expect(engine.stops).toBe(stops);
+  await act(async () => root.render(<Harness outputTime={2} seekRevision={1} />));
+  expect(engine.stops).toBe(stops + 1);
+  expect(engine.scheduled).toHaveLength(2);
+  expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 2 });
+});

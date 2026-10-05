@@ -93,6 +93,7 @@ export function ReviewStage(props: {
   onReady(): void;
   onTime(time: number): void;
   onPlaying(value: boolean): void;
+  onEnded?: (() => void) | undefined;
   onError(): void;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -188,6 +189,7 @@ export function ReviewStage(props: {
           onReady={props.onReady}
           onTime={props.onTime}
           onPlaying={props.onPlaying}
+          onEnded={props.onEnded}
           onError={props.onError}
         />
         <ReviewSpotlightOverlay output={size} frames={spotlight} clip={overlayClip} />
@@ -259,6 +261,7 @@ function ReviewSceneVideo(props: {
   onReady(): void;
   onTime(time: number): void;
   onPlaying(value: boolean): void;
+  onEnded?: (() => void) | undefined;
   onError(): void;
 }) {
   const clip = props.scene?.background.enabled ? props.scene.background.layout : null;
@@ -348,7 +351,7 @@ function ReviewSceneVideo(props: {
         onTimeUpdate={(event) => props.onTime(event.currentTarget.currentTime)}
         onPlay={() => props.onPlaying(true)}
         onPause={() => props.onPlaying(false)}
-        onEnded={() => props.onPlaying(false)}
+        onEnded={() => (props.onEnded ? props.onEnded() : props.onPlaying(false))}
         onError={props.onError}
       />
       {props.cutPreview && props.layout ? (

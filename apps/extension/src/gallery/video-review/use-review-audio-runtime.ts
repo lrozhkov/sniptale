@@ -152,6 +152,7 @@ interface ReviewAudioRuntimeProps {
   playing: boolean;
   silent?: boolean;
   outputTime: number;
+  seekRevision?: number | undefined;
   original: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -209,6 +210,7 @@ export function useReviewEditorAudioRuntime(args: {
   playing: boolean;
   silent?: boolean;
   outputTime: number;
+  seekRevision?: number | undefined;
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -220,6 +222,7 @@ export function useReviewEditorAudioRuntime(args: {
     playing: args.playing,
     silent: args.silent ?? false,
     outputTime: args.outputTime,
+    seekRevision: args.seekRevision,
     original: args.originalAudio,
     voiceover: args.voiceover,
     music: args.music,
@@ -378,7 +381,7 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
   useEffect(() => {
     if (props.playing) session.current?.schedule(planKey);
     else session.current?.stop();
-  }, [planKey, props.playing, props.sessionKey]);
+  }, [planKey, props.playing, props.sessionKey, props.seekRevision]);
   useEffect(() => {
     if (session.current?.needsSeek(props.outputTime)) session.current.schedule(planKey);
   }, [props.outputTime, planKey]);

@@ -286,7 +286,13 @@ it('inverts the actual transformed video bounds for source-attached area gesture
 it('retains the projected source phase clock in Border Result after cut and speed projection', async () => {
   const region = {
     ...createQuickEditZoomRegion({ id: 'border', at: 0, duration: 4 }),
-    border: { ...createQuickEditBorder(), loop: true, period: 2 },
+    border: {
+      ...createQuickEditBorder(),
+      style: 'dashed' as const,
+      loop: true,
+      period: 2,
+      segmentPercent: 25,
+    },
     enter: { type: 'linear' as const, duration: 1 },
     exit: { type: 'none' as const, duration: 0 },
   };
@@ -315,7 +321,14 @@ it('retains the projected source phase clock in Border Result after cut and spee
   expect(drawReviewBorders).toHaveBeenLastCalledWith(
     expect.anything(),
     output,
-    [expect.objectContaining({ start: 0.25, end: 0.5, opacity: 1 })],
+    [
+      expect.objectContaining({
+        start: expect.closeTo(7.5 / (284 + Math.PI), 10),
+        end: expect.closeTo(7.5 / (284 + Math.PI) + 0.25, 10),
+        dashOffset: -7.5,
+        opacity: 1,
+      }),
+    ],
     expect.anything()
   );
 });

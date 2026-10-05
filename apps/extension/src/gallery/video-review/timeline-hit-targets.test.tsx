@@ -63,6 +63,14 @@ function planeWithMetrics(host: HTMLDivElement) {
     releasePointerCapture: vi.fn(),
     hasPointerCapture: vi.fn(() => true),
   });
+  const ruler = host.querySelector('[data-ui="gallery.videoReview.ruler"]');
+  if (ruler)
+    Object.assign(ruler, {
+      getBoundingClientRect: () => new DOMRect(0, 0, 400, 28),
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
   return plane;
 }
 
@@ -190,9 +198,11 @@ it('clears range hover before original audio takes local pointer capture', () =>
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
 
-it('keeps the ruler usable while existing edit bodies and trim handles take cursor priority', () => {
+it('keeps ruler looping separate while existing edit bodies and trim handles take cursor priority', () => {
   const onRangeCommit = vi.fn();
+  const onPlaybackRange = vi.fn();
   const { host, props } = renderTimeline({
+    onPlaybackRange,
     edits: [{ id: 'cut-1', kind: 'cut', start: 1, end: 2, requestedStart: 1, requestedEnd: 2 }],
     onRangeCommit,
   });
@@ -210,12 +220,13 @@ it('keeps the ruler usable while existing edit bodies and trim handles take curs
   hoverAt(ruler, 180);
   expect(plane.style.cursor).toContain('4 16, cell');
   dispatchPlane(ruler as HTMLElement, [{ type: 'pointerdown', x: 100 }]);
-  dispatchPlane(plane, [
+  dispatchPlane(ruler as HTMLElement, [
     { type: 'pointermove', x: 180 },
     { type: 'pointerup', x: 180 },
   ]);
-  expect(props.onSelect).toHaveBeenCalledWith({ kind: 'range', start: 1, end: 1.8 });
-  expect(onRangeCommit).toHaveBeenCalledOnce();
+  expect(props.onSelect).not.toHaveBeenCalled();
+  expect(onRangeCommit).not.toHaveBeenCalled();
+  expect(onPlaybackRange).toHaveBeenCalledExactlyOnceWith({ start: 1, end: 1.8 });
 });
 
 it('clears lane hover when the timeline scrolls or zoom changes', () => {
@@ -236,7 +247,7 @@ it('clears lane hover when the timeline scrolls or zoom changes', () => {
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
 
-it('keeps source and ruler neutral while the focus drawing tool owns range selection', () => {
+it('keeps source seeking and ruler looping separate while the focus drawing tool owns range selection', () => {
   const onFocusRangeCommit = vi.fn();
   const onRangeCommit = vi.fn();
   const { props, host } = renderTimeline({
@@ -248,7 +259,9 @@ it('keeps source and ruler neutral while the focus drawing tool owns range selec
   for (const selector of ['sourceLane', 'ruler']) {
     const target = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${selector}"]`)!;
     hoverAt(target, 100);
-    expect(plane.style.cursor).toBe('default');
+    expect(plane.style.cursor).toEqual(
+      selector === 'ruler' ? expect.stringContaining('4 16, cell') : 'default'
+    );
     dispatchPlane(target, [
       { type: 'pointerdown', x: 100 },
       { type: 'pointermove', x: 250 },
@@ -301,7 +314,9 @@ it('keeps source video and ruler out of original gain drawing and uses seek curs
   for (const selector of ['sourceLane', 'ruler']) {
     const target = host.querySelector<HTMLElement>(`[data-ui="gallery.videoReview.${selector}"]`)!;
     hoverAt(target, 100);
-    expect(plane.style.cursor).toBe('default');
+    expect(plane.style.cursor).toEqual(
+      selector === 'ruler' ? expect.stringContaining('4 16, cell') : 'default'
+    );
     dispatchPlane(target, [
       { type: 'pointerdown', x: 100 },
       { type: 'pointermove', x: 250 },
@@ -310,4 +325,36 @@ it('keeps source video and ruler out of original gain drawing and uses seek curs
     expect(props.onSelect).not.toHaveBeenCalledWith(expect.objectContaining({ kind: 'range' }));
     expect(onRangeCommit).not.toHaveBeenCalled();
   }
+});
+
+it('reveals only the active tool lane vertically and preserves horizontal scrolling and selections', () => {
+  const { host, props } = renderTimeline({
+    zoomTrack: <div data-ui="gallery.videoReview.zoomLane" />,
+    audioTrack: <div data-ui="gallery.videoReview.audioLane" data-original-audio-lane />,
+    playbackRange: { start: 1, end: 3 },
+  });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  viewport.scrollLeft = 400;
+  Object.assign(viewport, { getBoundingClientRect: () => new DOMRect(0, 100, 800, 100) });
+  const source = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.sourceLane"]')!;
+  const focus = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomLane"]')!;
+  const audio = host.querySelector<HTMLElement>('[data-original-audio-lane]')!;
+  for (const [lane, top] of [
+    [source, 300],
+    [focus, 400],
+    [audio, 500],
+  ] as const)
+    Object.assign(lane, { getBoundingClientRect: () => new DOMRect(120, top, 600, 40) });
+  renderTimeline({ ...props, onFocusRangeCommit: vi.fn() });
+  expect(viewport.scrollTop).toBe(296);
+  renderTimeline({ ...props, sourceRangeTool: true });
+  expect(viewport.scrollTop).toBe(492);
+  renderTimeline({ ...props, originalRangeTool: true });
+  expect(viewport.scrollTop).toBe(888);
+  expect(viewport.scrollLeft).toBe(400);
+  expect(props.onSelect).not.toHaveBeenCalled();
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(host.querySelector('[data-ui="gallery.videoReview.playbackRangeOverlay"]')).not.toBeNull();
 });

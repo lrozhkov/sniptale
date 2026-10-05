@@ -3,7 +3,7 @@ import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { reviewTimeLabel } from './controls';
 import { planeTime, reviewPlaneLane } from './timeline-drag';
 
-type HoverLane = 'source' | 'focus' | 'original' | 'seek';
+type HoverLane = 'source' | 'focus' | 'original' | 'seek' | 'ruler';
 type Hover = { time: number; x: number; snapped: boolean; lane: HoverLane };
 type HoverOptions = {
   busy: boolean;
