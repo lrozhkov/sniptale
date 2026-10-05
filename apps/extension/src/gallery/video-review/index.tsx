@@ -1,3 +1,4 @@
+import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { ReviewFeedback } from './feedback';
 import { ReviewDialog } from './review-dialog';
@@ -160,111 +161,115 @@ function ReviewInspectorBinding({
     });
   };
   return (
-    <ReviewInspector
-      beforeAction={state.beforeAction}
-      fullHeight={fullHeight}
-      navigation={navigation}
-      onToggleHeight={onToggleHeight}
-      filename={resource.filename}
-      annotations={snapshot.document.annotations}
-      selectedId={state.selected?.id ?? null}
-      busy={busy || editing.exporter.phase !== 'idle'}
-      actions={
-        <ReviewInspectorActions
-          editing={editing}
-          snapshot={snapshot}
-          busy={busy}
-          composerBusy={!!composer.before}
-          onExport={() => {
-            video.current?.pause();
-            void editing.exporter.start();
-          }}
-        />
-      }
-      settingsAvailable={state.advanced.ui.mode === 'advanced'}
-      editingId={composer.annotation?.id}
-      composer={
-        composer.annotation ? (
-          <ReviewCommentComposer state={state} annotation={composer.annotation} />
-        ) : null
-      }
-      selectionLabel={reviewSelectionLabel(state)}
-      selectionPreferenceScope={state.activeSelection.kind}
-      selectionHasSections={
-        state.advanced.ui.mode === 'advanced' &&
-        (state.activeSelection.kind === 'zoom' ||
-          state.activeSelection.kind === 'canvas-comment' ||
-          state.activeSelection.kind === 'audio' ||
-          state.activeSelection.kind === 'original-audio')
-      }
-      scene={
-        <ReviewSceneProperties
-          background={state.advanced.background}
-          canvas={state.advanced.canvas}
-          source={resource.source}
-          onCanvas={state.setCanvas}
-          windowHeader={state.advanced.windowHeader}
-          onWindowHeader={state.setWindowHeader}
-          audio={state.advanced.audio}
-          hasOriginalAudio={editing.exporter.index === null || !!editing.exporter.index.audioCodec}
-          onOriginalVolume={(volume) => audio.setOriginal({ volume })}
-          onLaneVolume={audio.setLaneVolume}
-          busy={busy || editing.exporter.phase !== 'idle'}
-          pending={state.backgroundImport.pending}
-          failed={state.backgroundImport.failed}
-          onImportImage={(file) =>
-            state.beforeAction(() => void state.backgroundImport.importImage(file))
-          }
-          setBackground={state.setBackground}
-        />
-      }
-      saveStatus={
-        state.advancedFailed
-          ? 'failed'
-          : state.advancedPending || snapshot.pending > 0
-            ? 'saving'
-            : 'saved'
-      }
-      onRetry={() => void run(state.retryAdvanced)}
-      message={snapshot.error ? reviewErrorMessage(snapshot.error) : null}
-      onBack={() => leave(onBack)}
-      onClose={() => leave(onClose)}
-      rangeSelected={state.selection.kind === 'range'}
-      onAdd={state.add}
-      onSelect={state.selectComment}
-      onHover={state.setHovered}
-      {...reviewInspectorNoteActions(state, resource)}
-    >
-      <ReviewSelectedProperties
-        advanced={state.advanced}
-        selection={state.activeSelection}
-        editing={state.editing}
-        zoom={state.zoom}
-        busy={state.busy}
-        markers={state.projected.markers}
-        onFocus={(region) => focusRecordedAction(state, region)}
-        onPreviewFrame={(time) => {
-          video.current?.pause();
-          state.seek(time, false);
-        }}
-        focusTime={state.timeline.sceneOutputTime}
-        playback={
-          state.playing && video.current
-            ? {
-                video: video.current,
-                camera: evaluateQuickEditCameraAtTime(
-                  state.features.zoomRegions,
-                  state.timeline.sceneOutputTime
-                ),
-              }
-            : undefined
+    <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
+      <ReviewInspector
+        beforeAction={state.beforeAction}
+        fullHeight={fullHeight}
+        navigation={navigation}
+        onToggleHeight={onToggleHeight}
+        filename={resource.filename}
+        annotations={snapshot.document.annotations}
+        selectedId={state.selected?.id ?? null}
+        busy={busy || editing.exporter.phase !== 'idle'}
+        actions={
+          <ReviewInspectorActions
+            editing={editing}
+            snapshot={snapshot}
+            busy={busy}
+            composerBusy={!!composer.before}
+            onExport={() => {
+              video.current?.pause();
+              void editing.exporter.start();
+            }}
+          />
         }
-        toSourceTime={state.timeline.timeMap.timelineToSource}
-        resource={resource}
-        audio={audio}
-        canvasComments={canvasComments}
-      />
-    </ReviewInspector>
+        settingsAvailable={state.advanced.ui.mode === 'advanced'}
+        editingId={composer.annotation?.id}
+        composer={
+          composer.annotation ? (
+            <ReviewCommentComposer state={state} annotation={composer.annotation} />
+          ) : null
+        }
+        selectionLabel={reviewSelectionLabel(state)}
+        selectionPreferenceScope={state.activeSelection.kind}
+        selectionHasSections={
+          state.advanced.ui.mode === 'advanced' &&
+          (state.activeSelection.kind === 'zoom' ||
+            state.activeSelection.kind === 'canvas-comment' ||
+            state.activeSelection.kind === 'audio' ||
+            state.activeSelection.kind === 'original-audio')
+        }
+        scene={
+          <ReviewSceneProperties
+            background={state.advanced.background}
+            canvas={state.advanced.canvas}
+            source={resource.source}
+            onCanvas={state.setCanvas}
+            windowHeader={state.advanced.windowHeader}
+            onWindowHeader={state.setWindowHeader}
+            audio={state.advanced.audio}
+            hasOriginalAudio={
+              editing.exporter.index === null || !!editing.exporter.index.audioCodec
+            }
+            onOriginalVolume={(volume) => audio.setOriginal({ volume })}
+            onLaneVolume={audio.setLaneVolume}
+            busy={busy || editing.exporter.phase !== 'idle'}
+            pending={state.backgroundImport.pending}
+            failed={state.backgroundImport.failed}
+            onImportImage={(file) =>
+              state.beforeAction(() => void state.backgroundImport.importImage(file))
+            }
+            setBackground={state.setBackground}
+          />
+        }
+        saveStatus={
+          state.advancedFailed
+            ? 'failed'
+            : state.advancedPending || snapshot.pending > 0
+              ? 'saving'
+              : 'saved'
+        }
+        onRetry={() => void run(state.retryAdvanced)}
+        message={snapshot.error ? reviewErrorMessage(snapshot.error) : null}
+        onBack={() => leave(onBack)}
+        onClose={() => leave(onClose)}
+        rangeSelected={state.selection.kind === 'range'}
+        onAdd={state.add}
+        onSelect={state.selectComment}
+        onHover={state.setHovered}
+        {...reviewInspectorNoteActions(state, resource)}
+      >
+        <ReviewSelectedProperties
+          advanced={state.advanced}
+          selection={state.activeSelection}
+          editing={state.editing}
+          zoom={state.zoom}
+          busy={state.busy}
+          markers={state.projected.markers}
+          onFocus={(region) => focusRecordedAction(state, region)}
+          onPreviewFrame={(time) => {
+            video.current?.pause();
+            state.seek(time, false);
+          }}
+          focusTime={state.timeline.sceneOutputTime}
+          playback={
+            state.playing && video.current
+              ? {
+                  video: video.current,
+                  camera: evaluateQuickEditCameraAtTime(
+                    state.features.zoomRegions,
+                    state.timeline.sceneOutputTime
+                  ),
+                }
+              : undefined
+          }
+          toSourceTime={state.timeline.timeMap.timelineToSource}
+          resource={resource}
+          audio={audio}
+          canvasComments={canvasComments}
+        />
+      </ReviewInspector>
+    </ReviewIntervalMap.Provider>
   );
 }
 

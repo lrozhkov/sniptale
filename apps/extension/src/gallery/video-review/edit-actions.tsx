@@ -193,10 +193,16 @@ export function ReviewEditActions(props: {
 }) {
   const running = props.phase !== 'idle';
   const blocked = !!props.advancedBlockers?.length;
+  const actionDivider = props.settings
+    ? 'border-t border-[var(--sniptale-color-border-soft)] pt-2'
+    : '';
   return (
     <div className="space-y-2">
       {props.settings}
-      <div className="grid grid-cols-1 gap-1 border-t border-[var(--sniptale-color-border-soft)] pt-2">
+      <div
+        data-ui="gallery.videoReview.exportActions"
+        className={`grid grid-cols-1 gap-1 ${actionDivider}`}
+      >
         <ReviewButton
           label={translate('gallery.videoReview.exportVideo')}
           className={`${reviewTextButtonClassName}

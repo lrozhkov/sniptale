@@ -81,6 +81,13 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
     host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`);
   try {
     act(() => root.render(<ReviewEditActions {...props} />));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportActions"]')?.className
+    ).not.toContain('border-t');
+    act(() => root.render(<ReviewEditActions {...props} settings={<div>Settings</div>} />));
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportActions"]')?.className
+    ).toContain('border-t');
     expect(button('gallery.videoReview.applyCut')).toBeNull();
     expect(button('gallery.videoReview.downloadVideo')?.disabled).toBe(true);
     act(() => button('gallery.videoReview.cancelExport')!.click());

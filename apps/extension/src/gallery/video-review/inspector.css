@@ -243,20 +243,29 @@
     outline: 2px solid var(--sniptale-color-accent);
     outline-offset: -2px;
   }
+  [data-ui='gallery.videoReview.inspector'] .review-inspector-close:hover:not(:disabled) {
+    color: var(--sniptale-color-danger) !important;
+    border-color: transparent !important;
+    background: transparent !important;
+  }
   [data-ui='gallery.videoReview.inspector'] .review-inspector-danger {
     min-height: 36px !important;
     padding-inline: 10px !important;
   }
   [data-ui='gallery.videoReview.inspector'] :is(.review-inspector-danger, [data-note-delete]) {
-    color: var(--sniptale-color-danger) !important;
+    color: var(--sniptale-color-text-secondary) !important;
     border-color: transparent !important;
     background: transparent !important;
   }
   [data-ui='gallery.videoReview.inspector']
+    :is(.review-inspector-danger, [data-note-delete]):disabled {
+    color: var(--sniptale-color-text-muted) !important;
+  }
+  [data-ui='gallery.videoReview.inspector']
     :is(.review-inspector-danger, [data-note-delete]):hover:not(:disabled) {
     color: var(--sniptale-color-danger) !important;
-    border-color: color-mix(in srgb, var(--sniptale-color-danger) 45%, transparent) !important;
-    background: color-mix(in srgb, var(--sniptale-color-danger) 12%, transparent) !important;
+    border-color: var(--sniptale-color-danger) !important;
+    background: transparent !important;
   }
 }
 @media (prefers-reduced-motion: reduce) {

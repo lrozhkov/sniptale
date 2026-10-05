@@ -26,6 +26,10 @@ async function proveToolGroup(page: Page, selectorLabel: string, outputPath: str
   expect(bounds.height).toBe(32);
   for (const control of await controls.all()) {
     const rect = (await control.boundingBox())!;
+    await expect(control).toHaveCSS(
+      'border-radius',
+      await group.evaluate((node) => getComputedStyle(node).borderRadius)
+    );
     expect(rect.y).toBe(bounds.y);
     expect(rect.height).toBe(bounds.height);
     expect(rect.x).toBeGreaterThanOrEqual(bounds.x);
@@ -172,7 +176,10 @@ for (const variant of [
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'focus');
       const focus = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       await expect(focus).toBeInViewport();
-      await expect(focus).not.toHaveCSS('box-shadow', 'none');
+      await expect(focus).toHaveCSS('box-shadow', 'none');
+      await expect(
+        focus.locator('xpath=../..').locator('[data-ui="gallery.videoReview.trackHeader"]')
+      ).not.toHaveCSS('box-shadow', 'none');
       await page.screenshot({ path: info.outputPath('focus-tool-lane.png'), fullPage: false });
       await expect(summary).toBeVisible();
       await expect(focus.locator('[role="button"]')).toHaveCount(1);
@@ -212,6 +219,43 @@ for (const variant of [
       await expect(source).toBeInViewport();
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(1);
       await expect(button('gallery.videoReview.speedMode')).toBeDisabled();
+      const timing = dialog.locator('[data-ui="gallery.videoReview.interval"]');
+      await expect(timing).toContainText(variant.locale === 'ru' ? '6 с' : '6 s');
+      await expect(timing.locator('[data-ui="gallery.videoReview.intervalResult"]')).toContainText(
+        variant.locale === 'ru' ? '3 с' : '3 s'
+      );
+      expect((await timing.boundingBox())!.height).toBe(32);
+      await expect(timing).toContainText(label('gallery.videoReview.interval'));
+      const rangeText = (await timing
+        .locator('[data-ui="gallery.videoReview.intervalRange"]')
+        .boundingBox())!;
+      const durationText = (await timing
+        .locator('[data-ui="gallery.videoReview.intervalDuration"]')
+        .boundingBox())!;
+      expect(durationText.x - rangeText.x - rangeText.width).toBeLessThanOrEqual(8);
+
+      expect(await timing.evaluate((node) => node.scrollWidth <= node.clientWidth)).toBe(true);
+      const remove = dialog
+        .locator('aside')
+        .getByRole('button', { name: label('gallery.videoReview.deleteSelected'), exact: true });
+      await remove.scrollIntoViewIfNeeded();
+      const idleColor = await remove.evaluate((node) => getComputedStyle(node).color);
+      await remove.hover();
+      await expect(remove).not.toHaveCSS('color', idleColor);
+      await expect(remove).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect
+        .poll(() =>
+          remove.evaluate((node) => {
+            const style = getComputedStyle(node);
+            return style.borderColor === style.color;
+          })
+        )
+        .toBe(true);
+      await page.screenshot({
+        path: info.outputPath('duration-delete-hover.png'),
+        fullPage: false,
+      });
+
       const speedBounds = (await dialog
         .locator('[data-ui="gallery.videoReview.editBlock"]')
         .boundingBox())!;
@@ -226,8 +270,14 @@ for (const variant of [
       await source.hover({ position: { x: 10, y: 40 } });
       await expect(plane).toHaveCSS('cursor', 'crosshair');
       await expect(
-        dialog.locator('[title="' + label('gallery.videoReview.resultDuration') + '"]')
+        toolbar.locator('[title="' + label('gallery.videoReview.resultDuration') + '"]')
       ).toHaveCount(0);
+      await expect(button('gallery.videoReview.originalAudioRange')).toHaveAttribute(
+        'title',
+        variant.locale === 'ru'
+          ? 'Выделите участок исходного аудио, чтобы создать изменение громкости'
+          : 'Drag a range on the source audio to add a volume change'
+      );
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'original');
       await proveToolGroup(

@@ -1,5 +1,10 @@
 import { ReviewInspectorSections } from './inspector-sections';
-import { reviewVoiceoverRange } from '../../features/video/review/voiceover-edits';
+import { useContext } from 'react';
+import { ReviewIntervalMap } from './interval-timing';
+import {
+  reviewVoiceoverPlaybackDuration,
+  reviewVoiceoverRange,
+} from '../../features/video/review/voiceover-edits';
 import { ReviewNumberRow } from './number-row';
 import { translate } from '../../platform/i18n';
 import type { QuickEditAudioClip } from '../../features/video/review/advanced/types';
@@ -21,9 +26,16 @@ export function ReviewAudioClipEditor(props: {
   onPatch(patch: Partial<Omit<QuickEditAudioClip, 'id' | 'assetId'>>): void;
   onDelete(): void;
 }) {
+  const map = useContext(ReviewIntervalMap);
   return (
     <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">
       <ReviewInterval
+        timeBasis={props.clip.sourceAnchor ? 'source' : 'result'}
+        duration={props.clip.duration}
+        resultDuration={reviewVoiceoverPlaybackDuration(
+          props.clip,
+          props.lane === 'voiceover' ? map : undefined
+        )}
         start={reviewVoiceoverRange(props.clip).start}
         end={reviewVoiceoverRange(props.clip).end}
       />

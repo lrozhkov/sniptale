@@ -1,7 +1,9 @@
 import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
-import { translate } from '../../platform/i18n';
-import { ChevronDown, type LucideIcon } from 'lucide-react';
+import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
+import { useContext } from 'react';
+import { ReviewIntervalMap, reviewIntervalDuration } from './interval-timing';
+import { ChevronDown, Clock3, type LucideIcon } from 'lucide-react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
 import {
@@ -90,24 +92,93 @@ export function ReviewToolGroup({
 /** Reversible delete actions keep the same geometry with a distinct danger tone. */
 export const reviewDeleteButtonClassName =
   reviewTextButtonClassName +
-  ' review-inspector-danger !text-[var(--sniptale-color-danger)] enabled:hover:!text-[var(--sniptale-color-danger)]';
+  ' review-inspector-danger enabled:hover:!text-[var(--sniptale-color-danger)] ' +
+  'enabled:hover:!border-[var(--sniptale-color-danger)]';
 
-/** Read-only timing uses the same label/value row as editable inspector parameters. */
-export function ReviewInterval({ start, end }: { start: number; end: number }) {
+/** Source placement and playback duration remain distinct without adding inspector rows. */
+export function ReviewInterval({
+  start,
+  end,
+  timeBasis = 'source',
+  duration = end - start,
+  resultDuration,
+}: {
+  start: number;
+  end: number;
+  timeBasis?: 'source' | 'result';
+  duration?: number;
+  resultDuration?: number;
+}) {
+  const map = useContext(ReviewIntervalMap);
+  const locale = useAppLocale();
+  const format = (value: number) => formatNumber(value, { maximumFractionDigits: 2 }, locale);
+  const seconds = (value: number) =>
+    translate('gallery.videoReview.intervalSeconds').replace(
+      '{value}',
+      value > 0 && value < 0.005 ? `<${format(0.01)}` : format(Math.max(0, value))
+    );
+  const result =
+    resultDuration ?? (timeBasis === 'source' ? reviewIntervalDuration(start, end, map) : duration);
+  const originalLabel = seconds(duration);
+  const resultLabel = seconds(result);
+  const changed = start !== end && originalLabel !== resultLabel;
+  const range =
+    start === end ? reviewTimeLabel(start) : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`;
+  const rangeLabel = translate(
+    timeBasis === 'source'
+      ? 'gallery.videoReview.sourceInterval'
+      : 'gallery.videoReview.resultInterval'
+  );
+  const rangeTitle = `${rangeLabel}: ${range}`;
   return (
     <div
-      className="flex min-h-8 items-center justify-between gap-3 py-0.5"
+      className="flex min-h-8 min-w-0 items-center justify-between gap-2 py-0.5 text-xs tabular-nums"
       data-ui="gallery.videoReview.interval"
     >
-      <span className="text-xs font-medium text-[var(--sniptale-color-text-secondary)]">
+      <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
         {translate(
           start === end ? 'gallery.videoReview.timePosition' : 'gallery.videoReview.interval'
         )}
       </span>
-      <span className="shrink-0 whitespace-nowrap text-xs tabular-nums text-[var(--sniptale-color-text-primary)]">
-        {start === end
-          ? reviewTimeLabel(start)
-          : `${reviewTimeLabel(start)} – ${reviewTimeLabel(end)}`}
+      <span
+        data-ui="gallery.videoReview.intervalValues"
+        className="flex min-w-0 items-center gap-2"
+      >
+        <span
+          data-ui="gallery.videoReview.intervalRange"
+          className="min-w-0 truncate text-[var(--sniptale-color-text-secondary)]"
+          title={rangeTitle}
+        >
+          {range}
+        </span>
+        {start !== end ? (
+          <span
+            data-ui="gallery.videoReview.intervalDuration"
+            className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[var(--sniptale-color-text-primary)]"
+          >
+            <span aria-hidden="true" className="mr-1 text-[var(--sniptale-color-text-muted)]">
+              ·
+            </span>
+            <Clock3
+              size={12}
+              aria-hidden="true"
+              className="text-[var(--sniptale-color-text-muted)]"
+            />
+            <span title={translate('gallery.videoReview.intervalDuration')}>{originalLabel}</span>
+            {changed ? (
+              <span
+                data-ui="gallery.videoReview.intervalResult"
+                title={translate('gallery.videoReview.resultDuration')}
+              >
+                <span aria-hidden="true" className="text-[var(--sniptale-color-text-muted)]">
+                  {' '}
+                  →{' '}
+                </span>
+                <span className="font-medium">{resultLabel}</span>
+              </span>
+            ) : null}
+          </span>
+        ) : null}
       </span>
     </div>
   );

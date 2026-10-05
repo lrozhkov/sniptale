@@ -84,14 +84,6 @@ export function ReviewInspector(props: {
           )
         }
       />
-      <div className="shrink-0">
-        <p
-          className="truncate text-xs text-[var(--sniptale-color-text-muted)]"
-          title={props.filename}
-        >
-          {props.filename}
-        </p>
-      </div>
       <ReviewInspectorStatus {...props} />
       {props.settingsAvailable || props.selectionLabel || props.actions ? (
         <div
@@ -329,8 +321,8 @@ function ReviewInspectorHeader(
       >
         <ArrowLeft size={16} aria-hidden="true" />
       </ContentToolbarButton>
-      <h2 className="min-w-0 flex-1 text-sm font-semibold">
-        {translate('gallery.videoReview.editorTitle')}
+      <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
+        {props.filename}
       </h2>
       <ContentToolbarButton
         type="button"
@@ -371,6 +363,7 @@ function ReviewInspectorHeader(
       <ContentToolbarButton
         type="button"
         tone="close"
+        className="review-inspector-close"
         size="compact"
         title={translate('common.actions.close')}
         disabled={props.busy}

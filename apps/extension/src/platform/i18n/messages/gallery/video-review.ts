@@ -444,6 +444,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
   resetCancel: { ru: 'Отмена', en: 'Cancel' },
   undo: { ru: 'Отменить изменение', en: 'Undo change' },
   redo: { ru: 'Повторить изменение', en: 'Redo change' },
+  sourceInterval: { ru: 'Интервал исходника', en: 'Source interval' },
+  resultInterval: { ru: 'Интервал результата', en: 'Result interval' },
+  intervalDuration: { ru: 'Исходная длительность', en: 'Original duration' },
+  intervalSeconds: { ru: '{value} с', en: '{value} s' },
   interval: { ru: 'Интервал', en: 'Interval' },
   timePosition: { ru: 'Время', en: 'Time' },
   actionCut: { ru: 'Вырезать из видео', en: 'Cut from video' },
@@ -541,8 +545,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   addOverlayComment: { ru: 'Комментарий на кадре', en: 'Frame comment' },
   originalAudioRange: { ru: 'Громкость участка', en: 'Range volume' },
   originalAudioRangeHint: {
-    ru: 'Выделите участок исходного видео, чтобы создать изменение громкости',
-    en: 'Drag a range on the source video to add a volume change',
+    ru: 'Выделите участок исходного аудио, чтобы создать изменение громкости',
+    en: 'Drag a range on the source audio to add a volume change',
   },
   originalAudioUnavailable: {
     ru: 'В этом видео нет исходного звука',

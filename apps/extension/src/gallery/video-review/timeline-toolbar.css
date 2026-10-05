@@ -16,6 +16,9 @@
     gap: 2px;
     border-radius: var(--sniptale-radius-sm);
   }
+  .review-timeline-toolbar .review-tool-group button {
+    border-radius: var(--sniptale-radius-sm) !important;
+  }
   .review-timeline-toolbar .review-tool-group[data-active] {
     background: var(--sniptale-color-surface-hover);
   }

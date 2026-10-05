@@ -61,6 +61,9 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
         </ReviewInspector>
       )
     );
+    expect(host.querySelector('header h2')?.textContent).toBe('clip.webm');
+    expect(host.querySelector('header h2')?.getAttribute('title')).toBe('clip.webm');
+    expect(host.querySelectorAll('[title="clip.webm"]')).toHaveLength(1);
     act(() =>
       host.querySelector('li')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }))
     );

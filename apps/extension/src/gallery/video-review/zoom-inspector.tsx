@@ -1,3 +1,6 @@
+import { useContext } from 'react';
+import { ReviewIntervalMap } from './interval-timing';
+import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
 import { ReviewInspectorSections } from './inspector-sections';
 import { reviewSelectFieldClassName } from './controls';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
@@ -85,11 +88,14 @@ export function ReviewZoomInspector(props: {
   preview?: ReactNode;
 }) {
   const { region, onChange } = props;
+  const map = useContext(ReviewIntervalMap);
+  const sourceRange = region.sourceAnchor ?? (map ? reviewFocusSourceRange(region, map) : null);
   return (
     <div data-ui="gallery.videoReview.zoomInspector" className="min-w-0 space-y-3">
       <ReviewInterval
-        start={region.sourceAnchor?.start ?? region.start}
-        end={region.sourceAnchor?.end ?? region.end}
+        start={sourceRange?.start ?? region.start}
+        end={sourceRange?.end ?? region.end}
+        timeBasis={sourceRange ? 'source' : 'result'}
       />
       {props.cutSuppressed ? (
         <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
@@ -265,9 +271,18 @@ export function ReviewZoomLinkInspector(props: {
   onRemove(): void;
 }) {
   const gap = props.link.target.start - props.link.source.end;
+  const map = useContext(ReviewIntervalMap);
+  const source =
+    props.link.source.sourceAnchor ?? (map ? reviewFocusSourceRange(props.link.source, map) : null);
+  const target =
+    props.link.target.sourceAnchor ?? (map ? reviewFocusSourceRange(props.link.target, map) : null);
   return (
     <div data-ui="gallery.videoReview.zoomLinkInspector" className="min-w-0 space-y-3">
-      <ReviewInterval start={props.link.source.end} end={props.link.target.start} />
+      <ReviewInterval
+        start={source && target ? source.end : props.link.source.end}
+        end={source && target ? target.start : props.link.target.start}
+        timeBasis={source && target ? 'source' : 'result'}
+      />
       <SelectField<QuickEditZoomLinkEasing>
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.zoomLinkEasing')}

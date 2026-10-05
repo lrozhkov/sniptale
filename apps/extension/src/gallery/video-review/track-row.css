@@ -26,3 +26,20 @@
     color-mix(in srgb, var(--sniptale-color-text-dim) 12%, transparent) 7px 8px
   );
 }
+
+/* Mark the sticky lane header so tool guidance never covers authored items. */
+:is(
+    [data-active-tool-lane='source']
+      [data-review-track-muted]:has([data-ui='gallery.videoReview.sourceLane']),
+    [data-active-tool-lane='focus']
+      [data-review-track-muted]:has([data-ui='gallery.videoReview.zoomLane']),
+    [data-active-tool-lane='original'] [data-review-track-muted]:has([data-original-audio-lane])
+  )
+  > [data-ui='gallery.videoReview.trackHeader'] {
+  box-shadow: inset 2px 0 color-mix(in srgb, var(--sniptale-color-accent) 60%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 6%,
+    var(--sniptale-color-surface-panel)
+  );
+}
