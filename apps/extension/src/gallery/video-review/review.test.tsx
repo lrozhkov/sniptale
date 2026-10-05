@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { VideoReviewLoadError } from '../../workflows/video-review/source';
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -220,10 +221,10 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
 it('offers source-load retry and surfaces playback failure without exiting', async () => {
   const fixture = createEditorFixture(integration);
   const { root, host, back, click } = fixture;
-  integration.load.mockRejectedValueOnce(new Error('Missing source'));
+  integration.load.mockRejectedValueOnce(new VideoReviewLoadError('workspace', 'invalid'));
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
-    expect(host.textContent).toContain('gallery.videoReview.loadFailed');
+    expect(host.textContent).toContain('gallery.videoReview.workspaceLoadFailed');
     await click('retry');
     expect(host.querySelector('video')).not.toBeNull();
     vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('Unsupported'));

@@ -453,11 +453,11 @@ it('keeps camera link gaps and future-camera intersections out of overlay chains
   expect(packQuickEditFocusRows(regions).get('gap')).toBe(2);
 });
 
-it('disables solid rotation on admission and when evaluating raw authored state', () => {
+it('retains authored solid hold on admission while rendering it stationary', () => {
   const region = border();
   region.border.loop = true;
   region.border.segmentPercent = 25;
-  expect(parseQuickEditBorder(region.border)?.loop).toBe(false);
+  expect(parseQuickEditBorder(region.border)?.loop).toBe(true);
   const frame = evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time: 2 })[0]!;
   expect(frame).toMatchObject({ start: 0, end: 1, dashOffset: 0 });
 });
@@ -480,7 +480,7 @@ it('normalizes legacy motion and validates expanded speed and explicit motion', 
   for (const period of [0.5, 20])
     expect(parseQuickEditBorder({ ...legacy, period })?.period).toBe(period);
   for (const motion of ['clockwise', 'counterclockwise', 'pulse'] as const) {
-    expect(parseQuickEditBorder({ ...legacy, loop: true, motion })?.loop).toBe(motion === 'pulse');
+    expect(parseQuickEditBorder({ ...legacy, loop: true, motion })?.loop).toBe(true);
     expect(parseQuickEditBorder({ ...legacy, style: 'dotted', loop: true, motion })?.loop).toBe(
       true
     );

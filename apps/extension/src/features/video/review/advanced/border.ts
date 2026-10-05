@@ -58,7 +58,8 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     roundness: value['roundness'],
     period: value['period'],
     segmentPercent: typeof value['segmentPercent'] === 'number' ? value['segmentPercent'] : 25,
-    loop: value['loop'] && (value['style'] !== 'solid' || value['motion'] === 'pulse'),
+    // Retain authored history: normalizing this flag can collapse a stored toggle into a no-op.
+    loop: value['loop'],
     motion:
       value['motion'] === 'pulse' || value['motion'] === 'counterclockwise'
         ? value['motion']

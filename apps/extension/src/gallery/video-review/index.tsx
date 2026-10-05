@@ -584,15 +584,26 @@ export function VideoReview({
       ) : (
         <div className="space-y-4 p-4">
           <ReviewButton label={translate('gallery.videoReview.back')} onClick={onBack} />
-          <p role={failed ? 'alert' : 'status'}>
-            {translate(failed ? 'gallery.videoReview.loadFailed' : 'gallery.videoReview.loading')}
-          </p>
+          <ReviewLoadStatus failure={failed} />
           {failed ? (
             <ReviewButton label={translate('gallery.videoReview.retry')} onClick={retry} />
           ) : null}
         </div>
       )}
     </ReviewDialog>
+  );
+}
+
+/** Load feedback distinguishes saved editing state from source acquisition. */
+function ReviewLoadStatus({ failure }: { failure: ReturnType<typeof useLoadedReview>['failed'] }) {
+  if (!failure) return <p role="status">{translate('gallery.videoReview.loading')}</p>;
+  const workspace = failure.stage === 'workspace' || failure.stage === 'session';
+  return (
+    <p role="alert">
+      {translate(
+        workspace ? 'gallery.videoReview.workspaceLoadFailed' : 'gallery.videoReview.loadFailed'
+      )}
+    </p>
   );
 }
 

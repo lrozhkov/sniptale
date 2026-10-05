@@ -6,6 +6,28 @@ import type { ReviewDocument, ReviewOperation, ReviewSource } from './types';
 import { createQuickEditAdvancedContent } from './advanced/defaults';
 import type { QuickEditAdvancedContent } from './advanced/types';
 
+const historyMessages = {
+  'identity-invalid': 'Review operation identity is invalid.',
+  'before-mismatch': 'Review operation does not match the current document.',
+  'no-change': 'Review operation has no change.',
+  'edit-overlap': 'Review edit ranges overlap.',
+  'entire-video-cut': 'Review cuts remove the entire video.',
+  'voiceover-invalid': 'Voiceover placement is invalid.',
+  'cursor-invalid': 'Review history cursor is invalid.',
+  'unexpected-replay-failure': 'Review history could not be replayed.',
+} as const;
+
+/** Content-free invariant failure, optionally located in retained history. */
+export class ReviewHistoryError extends Error {
+  constructor(
+    public readonly reason: keyof typeof historyMessages,
+    public readonly operationIndex?: number,
+    public readonly target?: ReviewOperation['target']
+  ) {
+    super(historyMessages[reason]);
+  }
+}
+
 /**
  * The replay baseline for a persisted advanced record: pre-migration content
  * stays frozen while `advancedContent` operations accumulate on top of it.
@@ -31,14 +53,14 @@ export function reviewAdvancedContentBaseline(state: {
 function replaceItem<T extends { id: string }>(items: T[], before: T | null, after: T | null): T[] {
   const id = before?.id ?? after?.id;
   if (!id || (before && after && before.id !== after.id)) {
-    throw new Error('Review operation identity is invalid.');
+    throw new ReviewHistoryError('identity-invalid');
   }
   const existing = items.find((item) => item.id === id) ?? null;
   if (JSON.stringify(existing) !== JSON.stringify(before)) {
-    throw new Error('Review operation does not match the current document.');
+    throw new ReviewHistoryError('before-mismatch');
   }
   if (JSON.stringify(before) === JSON.stringify(after)) {
-    throw new Error('Review operation has no change.');
+    throw new ReviewHistoryError('no-change');
   }
   return [...items.filter((item) => item.id !== id), ...(after ? [after] : [])].sort((a, b) =>
     a.id.localeCompare(b.id)
@@ -51,10 +73,10 @@ function replaceAdvancedContent(
   after: QuickEditAdvancedContent
 ): QuickEditAdvancedContent {
   if (JSON.stringify(current) !== JSON.stringify(before)) {
-    throw new Error('Review operation does not match the current document.');
+    throw new ReviewHistoryError('before-mismatch');
   }
   if (JSON.stringify(before) === JSON.stringify(after)) {
-    throw new Error('Review operation has no change.');
+    throw new ReviewHistoryError('no-change');
   }
   return after;
 }
@@ -92,11 +114,11 @@ export function applyReviewOperation(
   const previousEnd: Record<'cut' | 'speed', number> = { cut: 0, speed: 0 };
   let removed = 0;
   for (const edit of ordered) {
-    if (edit.start < previousEnd[edit.kind]) throw new Error('Review edit ranges overlap.');
+    if (edit.start < previousEnd[edit.kind]) throw new ReviewHistoryError('edit-overlap');
     previousEnd[edit.kind] = edit.end;
     if (edit.kind === 'cut') removed += edit.end - edit.start;
   }
-  if (removed >= source.duration) throw new Error('Review cuts remove the entire video.');
+  if (removed >= source.duration) throw new ReviewHistoryError('entire-video-cut');
   const advancedContent = operation.preserveFocusAnchors
     ? {
         ...document.advancedContent,
@@ -128,7 +150,7 @@ export function applyReviewOperation(
         }),
       },
     });
-    if (!content) throw new Error('Voiceover placement is invalid.');
+    if (!content) throw new ReviewHistoryError('voiceover-invalid');
     return { ...document, edits, advancedContent: content };
   }
   return { ...document, edits, advancedContent };
@@ -142,7 +164,7 @@ export function replayReviewHistory(
   advancedBaseline?: QuickEditAdvancedContent
 ): ReviewDocument {
   if (!Number.isSafeInteger(cursor) || cursor < 0 || cursor > history.length) {
-    throw new Error('Review history cursor is invalid.');
+    throw new ReviewHistoryError('cursor-invalid');
   }
   let document: ReviewDocument = {
     annotations: [],
@@ -150,8 +172,16 @@ export function replayReviewHistory(
     canvasComments: [],
     advancedContent: advancedBaseline ?? createQuickEditAdvancedContent(),
   };
-  for (const operation of history.slice(0, cursor)) {
-    document = applyReviewOperation(document, operation, source);
+  for (const [index, operation] of history.slice(0, cursor).entries()) {
+    try {
+      document = applyReviewOperation(document, operation, source);
+    } catch (error) {
+      throw new ReviewHistoryError(
+        error instanceof ReviewHistoryError ? error.reason : 'unexpected-replay-failure',
+        index,
+        operation.target
+      );
+    }
   }
   return document;
 }

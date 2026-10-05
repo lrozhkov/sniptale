@@ -6,9 +6,12 @@ import {
   useSyncExternalStore,
   type RefObject,
 } from 'react';
-import { loadVideoReviewSource } from '../../workflows/video-review/source';
+import { createLogger } from '@sniptale/platform/observability/logger';
+import { loadVideoReviewSource, VideoReviewLoadError } from '../../workflows/video-review/source';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import type { ReviewAnnotation } from '../../features/video/review/types';
+
+const logger = createLogger({ namespace: 'gallery:video-review' });
 
 type Session = ReturnType<typeof createVideoReviewSession>;
 export type LoadedReview = Awaited<ReturnType<typeof loadVideoReviewSource>> & {
@@ -19,21 +22,34 @@ export type LoadedReview = Awaited<ReturnType<typeof loadVideoReviewSource>> & {
 /** Owns the source URL and rejects late loads from a previously opened video. */
 export function useLoadedReview(aggregateId: string) {
   const [resource, setResource] = useState<LoadedReview | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<VideoReviewLoadError | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     let url: string | null = null;
     setResource(null);
-    setFailed(false);
+    setFailed(null);
+    let loadedSource = false;
     void loadVideoReviewSource(aggregateId, controller.signal)
       .then((loaded) => {
         if (controller.signal.aborted) return;
+        loadedSource = true;
+        const session = createVideoReviewSession(loaded.snapshot);
         url = URL.createObjectURL(loaded.file);
-        setResource({ ...loaded, url, session: createVideoReviewSession(loaded.snapshot) });
+        setResource({ ...loaded, url, session });
       })
-      .catch(() => {
-        if (!controller.signal.aborted) setFailed(true);
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        const failure =
+          error instanceof VideoReviewLoadError
+            ? error
+            : new VideoReviewLoadError(loadedSource ? 'session' : 'source', 'unknown');
+        logger.error('video-review-open-failed', {
+          stage: failure.stage,
+          reason: failure.reason,
+          ...(failure.diagnostic ? { validation: failure.diagnostic } : {}),
+        });
+        setFailed(failure);
       });
     return () => {
       controller.abort();

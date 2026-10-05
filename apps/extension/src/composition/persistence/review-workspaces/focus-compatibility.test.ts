@@ -228,6 +228,42 @@ describe('Focus payload compatibility through workspace and archive boundaries',
     ).toBeNull();
   });
 
+  it.each([0, 1])('retains a legacy Solid hold toggle at cursor %i', (cursor) => {
+    const { motion: _motion, ...border } = createQuickEditBorder();
+    const region = { ...createQuickEditZoomRegion({ id: 'solid', at: 1 }), border };
+    const before = {
+      ...createQuickEditAdvancedContent(),
+      zoom: { enabled: true, regions: [region] },
+    };
+    const after = {
+      ...before,
+      zoom: { enabled: true, regions: [{ ...region, border: { ...border, loop: true } }] },
+    };
+    const raw = {
+      ...legacyWorkspace(cursor),
+      advanced: { ...createQuickEditAdvancedState(), zoom: before.zoom },
+      history: [{ id: 'hold-toggle', at: 2, target: 'advancedContent', before, after }],
+    };
+    const unchanged = structuredClone(raw);
+    const parsed = parseVideoWorkspace(raw);
+    expect(parsed).not.toBeNull();
+    expect(raw).toEqual(unchanged);
+    expect(parsed!.cursor).toBe(cursor);
+    expect(parsed!.history).toHaveLength(1);
+    const baseline = reviewAdvancedContentBaseline(parsed!.advanced);
+    for (const step of [0, 1]) {
+      expect(
+        replayReviewHistory(parsed!.history, step, parsed!.source, baseline).advancedContent.zoom
+          .regions[0]?.border?.loop
+      ).toBe(step === 1);
+    }
+    expect(parseVideoWorkspace(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+    const { sourceAssetId: _source, ...portable } = raw;
+    expect(
+      parsePortableVideoReview({ workspace: portable, draft: null }, raw.aggregateId)
+    ).toBeTruthy();
+  });
+
   it('rejects unsupported future content even in the unapplied redo suffix', () => {
     const raw = legacyWorkspace(0);
     raw.history[0]!.after.schemaVersion = 999;

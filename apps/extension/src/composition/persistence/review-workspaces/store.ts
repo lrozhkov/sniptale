@@ -25,7 +25,12 @@ import { parseReviewOperation, parseReviewSource } from '../../../features/video
 import { loadQuickEditAdvancedState } from '../../../features/video/review/advanced/validation';
 import type { ReviewHistoryDirection, ReviewSource } from '../../../features/video/review/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
-import { parseVideoWorkspace, parseVideoWorkspaceDraft } from './parser';
+import {
+  inspectVideoWorkspace,
+  type VideoWorkspaceDiagnostic,
+  parseVideoWorkspace,
+  parseVideoWorkspaceDraft,
+} from './parser';
 
 const stores = [
   MEDIA_LIBRARY_STORE,
@@ -43,8 +48,11 @@ function beginWriteTransaction(db: Database) {
 type WriteTransaction = ReturnType<typeof beginWriteTransaction>;
 
 /** Recoverable failure codes; never include user text in the error. */
-class VideoWorkspaceError extends Error {
-  constructor(public readonly code: 'invalid' | 'conflict' | 'missing-media' | 'changed-source') {
+export class VideoWorkspaceError extends Error {
+  constructor(
+    public readonly code: 'invalid' | 'conflict' | 'missing-media' | 'changed-source',
+    public readonly diagnostic?: VideoWorkspaceDiagnostic
+  ) {
     super(`Video workspace ${code}.`);
     this.name = 'VideoWorkspaceError';
   }
@@ -78,12 +86,14 @@ async function readSnapshot(
   const raw: unknown = await tx.objectStore(VIDEO_WORKSPACES_STORE).get(aggregateId);
   const rawDraft: unknown = await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).get(aggregateId);
   if (raw === undefined && rawDraft === undefined) return null;
-  const workspace = parseVideoWorkspace(raw);
-  if (!workspace || workspace.aggregateId !== aggregateId) throw new VideoWorkspaceError('invalid');
+  const { workspace, failure } = inspectVideoWorkspace(raw);
+  if (!workspace) throw new VideoWorkspaceError('invalid', failure ?? undefined);
+  if (workspace.aggregateId !== aggregateId)
+    throw new VideoWorkspaceError('invalid', { check: 'workspace-identity', reason: 'invalid' });
   const draft =
     rawDraft === undefined ? null : parseVideoWorkspaceDraft(rawDraft, workspace.source.duration);
   if (rawDraft !== undefined && (!draft || draft.aggregateId !== aggregateId)) {
-    throw new VideoWorkspaceError('invalid');
+    throw new VideoWorkspaceError('invalid', { check: 'draft', reason: 'invalid' });
   }
   if (workspace.sourceAssetId !== (await readSourceAssetId(tx, aggregateId)))
     throw new VideoWorkspaceError('changed-source');

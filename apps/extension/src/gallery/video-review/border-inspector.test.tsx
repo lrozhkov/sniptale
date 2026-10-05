@@ -260,3 +260,17 @@ it('previews pulse speed and cancels Escape without committing', async () => {
   expect(onChange).not.toHaveBeenCalled();
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
+
+it('shows legacy Solid rotation as still without rewriting saved state', () => {
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'legacy', at: 0 }),
+    border: { ...createQuickEditBorder(), loop: true },
+  };
+  const onChange = vi.fn();
+  act(() => root.render(<ReviewBorderAnimation region={region} onChange={onChange} />));
+  expect(field('borderHold').textContent).toContain('gallery.videoReview.borderStill');
+  expect(field('borderSpeed')).toBeNull();
+  expect(field('borderSegmentPercent')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(region.border.loop).toBe(true);
+});

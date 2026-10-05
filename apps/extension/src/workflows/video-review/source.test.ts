@@ -1,3 +1,4 @@
+import { VideoWorkspaceError } from '../../composition/persistence/review-workspaces/store';
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   media: vi.fn(),
@@ -157,7 +158,7 @@ it('opens project exports and ready project assets without inferring recording t
   mocks.asset.mockResolvedValue({ status: 'missing' });
   await expect(
     loadVideoReviewSource('project-asset:asset', new AbortController().signal)
-  ).rejects.toThrow('Video source');
+  ).rejects.toThrow('video-review-open:source:unavailable');
 });
 
 it('rejects unavailable, non-video and invalid-duration sources before persisting a session', async () => {
@@ -200,4 +201,55 @@ it('preserves exported acquisition facts without rebuilding them from current te
   const result = await loadVideoReviewSource('recording:copy', new AbortController().signal);
   expect(result.recordingMetadata).toEqual(recordingMetadata);
   expect(result.telemetry).toBeNull();
+});
+
+it.each([
+  ['library', 'media'],
+  ['source', 'recording'],
+  ['metadata', 'metadata'],
+  ['telemetry', 'telemetry'],
+  ['workspace', 'open'],
+] as const)('reports fixed %s stage without retaining exception data', async (stage, method) => {
+  mocks[method].mockRejectedValueOnce(new Error('private-file-name SECRET_PAYLOAD'));
+  await expect(
+    loadVideoReviewSource('private-id', new AbortController().signal)
+  ).rejects.toMatchObject({
+    stage,
+    reason: 'unknown',
+    message: `video-review-open:${stage}:unknown`,
+  });
+});
+it.each(['invalid', 'conflict', 'missing-media', 'changed-source'] as const)(
+  'preserves typed workspace refusal %s',
+  async (code) => {
+    mocks.open.mockRejectedValueOnce({ code, secret: 'private-content' });
+    await expect(
+      loadVideoReviewSource('private-id', new AbortController().signal)
+    ).rejects.toMatchObject({ stage: 'workspace', reason: code });
+  }
+);
+it('keeps aborted workspace admission a cancellation', async () => {
+  const controller = new AbortController();
+  mocks.open.mockImplementationOnce(() => {
+    controller.abort();
+    throw new Error('private');
+  });
+  await expect(loadVideoReviewSource('private-id', controller.signal)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+});
+
+it('carries structured workspace validation details without raw errors', async () => {
+  const diagnostic = {
+    check: 'history-replay' as const,
+    reason: 'no-change' as const,
+    operationIndex: 2,
+    target: 'advancedContent' as const,
+    cursor: 3,
+    historyLength: 4,
+  };
+  mocks.open.mockRejectedValueOnce(new VideoWorkspaceError('invalid', diagnostic));
+  await expect(
+    loadVideoReviewSource('private-id', new AbortController().signal)
+  ).rejects.toMatchObject({ stage: 'workspace', reason: 'invalid', diagnostic });
 });

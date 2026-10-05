@@ -233,6 +233,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Открываем видео и сохранённую сессию…',
     en: 'Opening video and saved session\u2026',
   },
+  workspaceLoadFailed: {
+    ru: 'Не удалось открыть сохранённые правки этого видео. Исходное видео и сохранённые данные не изменены.',
+    en: 'Could not open the saved edits for this video. The original video and saved data are unchanged.',
+  },
   loadFailed: {
     ru: 'Не удалось открыть видео. Повторите попытку.',
     en: 'Could not open this video. Try again.',

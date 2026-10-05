@@ -225,13 +225,14 @@ function BorderHold(props: {
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 }) {
   const { border, onChange } = props;
+  const moving = border.loop && (border.style !== 'solid' || border.motion === 'pulse');
   return (
     <>
       <SelectField<QuickEditBorder['motion'] | 'still'>
         className={reviewSelectFieldClassName}
         selectClassName={borderAnimationSelectClassName}
         label={translate('gallery.videoReview.borderHold')}
-        value={border.loop ? border.motion : 'still'}
+        value={moving ? border.motion : 'still'}
         options={[
           { value: 'still', label: translate('gallery.videoReview.borderStill') },
           ...(border.style === 'solid'
@@ -258,7 +259,7 @@ function BorderHold(props: {
           })
         }
       />
-      {border.loop ? (
+      {moving ? (
         <>
           {border.motion !== 'pulse' ? (
             <BorderNumberRow
