@@ -1,3 +1,4 @@
+import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import {
   planReviewCutTransitions,
@@ -163,11 +164,11 @@ export async function writeReviewFrames(args: {
     const videoOut = tracks.video.source;
     const audioOut = tracks.audio;
     await tracks.output.start();
-    const frameSink = new VideoSampleSink(source.video);
+    const frameSink = createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
     const transitions = planReviewCutTransitions(args.index.duration, args.edits);
     if (transitions.length)
       transitionFrames = createReviewTransitionFrames(
-        new VideoSampleSink(source.video),
+        createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal),
         args.signal
       );
     for (const window of preparation.windows) {
@@ -489,7 +490,7 @@ export async function renderRenderWindowFrames(args: {
   headerImage?: CanvasImageSource | null;
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
-  frameSink: VideoSampleSink;
+  frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
   transitions?: readonly ReviewCutTransitionPlan[];
   transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
@@ -498,8 +499,7 @@ export async function renderRenderWindowFrames(args: {
   signal: AbortSignal;
 }): Promise<number> {
   const { window, fps, canvas, context, videoOut, signal } = args;
-  // Decode surfaces may contain padded rows. Filter only the visible raster when composing,
-  // otherwise GPU interpolation can sample chroma from outside the source's visible rect.
+  // Stage normalized source pixels once before camera filtering and transition composition.
   const raster = document.createElement('canvas');
   raster.width = args.sourceSize.width;
   raster.height = args.sourceSize.height;
@@ -516,10 +516,13 @@ export async function renderRenderWindowFrames(args: {
   }
   let frame = 0;
   for await (const sample of args.frameSink.samplesAtTimestamps(window.sourceTimes)) {
-    signal.throwIfAborted();
-    if (!sample) throw new Error('Source frame is unavailable.');
+    if (!sample) {
+      signal.throwIfAborted();
+      throw new Error('Source frame is unavailable.');
+    }
     const timestamp = window.timestamps[frame]!;
     try {
+      signal.throwIfAborted();
       const camera = evaluateQuickEditCameraAtTime(
         args.zoomRegions,
         timestamp + args.fragmentOffset
