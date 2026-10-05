@@ -122,3 +122,38 @@ it('describes the captured target and full interval in the action hint', () => {
   expect(button.title).toContain('4.0');
   expect(button.getAttribute('aria-label')).toContain('Search projects');
 });
+
+it('keeps history height, rows and selection stable while zooming and returning to Fit', () => {
+  const markers = [
+    marker('signal', 'idle1', 0.13, 3.27),
+    marker('signal', 'idle2', 3.27, 6.41),
+    marker('action', 'click1', 1),
+    marker('action', 'click2', 1.05),
+  ];
+  const onMarker = vi.fn();
+  let geometry: string[] | undefined;
+  for (const zoom of [1, 1.3, 2, 8, 40, 2, 1]) {
+    act(() =>
+      root.render(
+        <ReviewTelemetryStrip
+          markers={markers}
+          duration={10}
+          time={0}
+          width={1000}
+          zoom={zoom}
+          selectedTelemetryRef={markers[1]!.ref}
+          onMarker={onMarker}
+        />
+      )
+    );
+    const strip = host.firstElementChild as HTMLDivElement;
+    const buttons = [...strip.querySelectorAll<HTMLButtonElement>('button')];
+    const current = [strip.style.height, ...buttons.map((button) => button.style.top)];
+    if (!geometry) geometry = current;
+    expect(current).toEqual(geometry);
+    expect(strip.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
+    expect(buttons.at(-1)?.getAttribute('aria-pressed')).toBe('true');
+    act(() => buttons.at(-1)!.click());
+  }
+  expect(onMarker).toHaveBeenCalledTimes(7);
+});

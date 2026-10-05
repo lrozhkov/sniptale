@@ -60,15 +60,34 @@ it('deduplicates cursor samples per display bucket while keeping actions', () =>
   expect(layout.items.filter((item) => item.marker.ref.kind === 'cursor')).toHaveLength(2);
 });
 
-it('repacks lanes when the timeline zoom changes', () => {
-  const markers = [marker('a', 1), marker('b', 1.05)];
-  expect(layoutReviewActionLanes(markers, viewport).items.map((item) => item.lane)).toEqual([0, 1]);
-  // 8x zoom keeps the 0.05s gap under the point-event floor: still two lanes.
-  const zoomed = layoutReviewActionLanes(markers, { ...viewport, zoom: 8 });
-  expect(zoomed.items.map((item) => item.lane)).toEqual([0, 1]);
-  // 40x zoom separates the events by real pixels: the first free lane wins again.
-  const wide = layoutReviewActionLanes(markers, { duration: 10, width: 100, zoom: 40 });
-  expect(wide.items.map((item) => item.lane)).toEqual([0, 0]);
+it('preserves fit-scale lanes and cursor grouping throughout a zoom sweep', () => {
+  const markers = [
+    marker('a', 1),
+    marker('b', 1.05),
+    marker('cursor1', 2.01, 2.01, 'cursor'),
+    marker('cursor2', 2.02, 2.02, 'cursor'),
+  ];
+  const base = layoutReviewActionLanes(markers, viewport);
+  for (const zoom of [1, 1.1, 2, 8, 40, 16, 1]) {
+    const layout = layoutReviewActionLanes(markers, { ...viewport, zoom });
+    expect(layout.items.map(({ marker, lane }) => [marker.ref.id, lane])).toEqual(
+      base.items.map(({ marker, lane }) => [marker.ref.id, lane])
+    );
+    expect(layout.laneCount).toBe(base.laneCount);
+    expect(layout.items.every((item) => item.width >= REVIEW_ACTION_MIN_POINT_WIDTH_PX)).toBe(true);
+  }
+});
+
+it('keeps adjacent long intervals on the same lane at every fractional zoom', () => {
+  const markers = [marker('idle1', 0.13, 3.27), marker('idle2', 3.27, 6.41)];
+  for (let step = 0; step <= 100; step++) {
+    const layout = layoutReviewActionLanes(markers, {
+      duration: 12.01,
+      width: 1063,
+      zoom: 1 + step / 7,
+    });
+    expect(layout.items.map((item) => item.lane)).toEqual([0, 0]);
+  }
 });
 
 it('rejects an invalid viewport instead of manufacturing a layout', () => {
