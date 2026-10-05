@@ -510,7 +510,7 @@ function useReviewStageGeometry(
       ? evaluateQuickEditSpotlightsAtTime({
           ...props.scene.focus,
           output: size,
-          video: sceneLayout.videoTransform,
+          video: computeQuickEditWindowTransform(sceneLayout),
           scale:
             (size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
             props.scene.camera.scale,
@@ -521,7 +521,7 @@ function useReviewStageGeometry(
       ? evaluateQuickEditBordersAtTime({
           ...props.scene.focus,
           output: size,
-          video: sceneLayout.videoTransform,
+          video: computeQuickEditWindowTransform(sceneLayout),
           scale:
             (size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
             props.scene.camera.scale,

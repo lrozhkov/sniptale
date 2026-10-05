@@ -573,7 +573,7 @@ export async function renderRenderWindowFrames(args: {
           regions: args.zoomRegions,
           time: timestamp + args.fragmentOffset,
           output: canvas,
-          video: layout.videoTransform,
+          video: computeQuickEditWindowTransform(layout),
           scale: (args.sceneScale ?? 1) * camera.scale,
         }),
         {
@@ -588,7 +588,7 @@ export async function renderRenderWindowFrames(args: {
           regions: args.zoomRegions,
           time: timestamp + args.fragmentOffset,
           output: canvas,
-          video: layout.videoTransform,
+          video: computeQuickEditWindowTransform(layout),
           scale: (args.sceneScale ?? 1) * camera.scale,
         }),
         {

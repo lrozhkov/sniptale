@@ -253,6 +253,42 @@ for (const variant of [
           '[data-ui="gallery.videoReview.stage"] [data-ui="gallery.videoReview.border"]'
         )
       ).toBeVisible();
+      await blocks
+        .filter({ hasText: label('gallery.videoReview.zoomRegionLabel') })
+        .first()
+        .click();
+      const zoomScale = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomScale'),
+        exact: true,
+      });
+      await zoomScale.fill('1');
+      await zoomScale.press('Enter');
+      // Both overlay types must reach the decoration, not stop at the first video row.
+      for (const type of [
+        'gallery.videoReview.focusSpotlight',
+        'gallery.videoReview.focusBorder',
+      ] as const) {
+        await blocks
+          .filter({ hasText: label(type) })
+          .first()
+          .click();
+        const frame = dialog.locator('[data-ui="gallery.videoReview.stage"] [data-focus-frame]');
+        await frame.focus();
+        for (let i = 0; i < 3; i++) await frame.press('Shift+ArrowUp');
+        const header = dialog.locator('[data-ui="gallery.videoReview.stage"] img');
+        await expect
+          .poll(async () =>
+            Math.abs((await frame.boundingBox())!.y - (await header.boundingBox())!.y)
+          )
+          .toBeLessThan(1);
+        const areaFrame = inspector.locator(
+          '[data-ui="gallery.videoReview.zoomPreview"] [data-focus-frame]'
+        );
+        await expect(areaFrame).toBeVisible();
+        expect(
+          parseFloat(await areaFrame.evaluate((node) => (node as HTMLElement).style.top))
+        ).toBeLessThan(10);
+      }
       await page.screenshot({ path: info.outputPath('focus-border-overlap.png'), fullPage: false });
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -291,22 +327,26 @@ for (const variant of [
           context.drawImage(video, 0, 0);
           const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
           let count = 0;
+          let headerCount = 0;
           for (let i = 0; i < pixels.length; i += 4)
             if (
               pixels[i]! > 225 &&
               pixels[i + 1]! > 100 &&
               pixels[i + 1]! < 170 &&
               pixels[i + 2]! < 40
-            )
+            ) {
               count++;
-          return count;
+              if (Math.floor(i / 4 / canvas.width) < 24) headerCount++;
+            }
+          return { count, headerCount };
         } finally {
           video.removeAttribute('src');
           video.load();
           URL.revokeObjectURL(url);
         }
       }, encoded);
-      expect(orangePixels).toBeGreaterThan(100);
+      expect(orangePixels.count).toBeGreaterThan(100);
+      expect(orangePixels.headerCount).toBeGreaterThan(5);
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))

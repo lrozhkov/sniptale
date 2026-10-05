@@ -4,7 +4,7 @@ import { isBoundedNumber } from '../../project/validation/primitives';
 import { sampleQuickEditFocusAtTime, type QuickEditRect } from './scene';
 import type { QuickEditSpotlight, QuickEditZoomRegion } from './types';
 
-/** Validates persisted source coordinates and bounded scene effects without coercion. */
+/** Validates persisted window coordinates and bounded scene effects without coercion. */
 export function parseQuickEditSpotlight(value: unknown): QuickEditSpotlight | null {
   if (!isRecord(value) || !isRecord(value['area'])) return null;
   const area = value['area'];
@@ -49,7 +49,7 @@ export function createQuickEditSpotlight(): QuickEditSpotlight {
   };
 }
 
-/** Clamp a dragged or numerically edited opening within the source frame. */
+/** Clamp a dragged or numerically edited opening within the decorated window. */
 export function clampQuickEditSpotlightArea(area: QuickEditRect): QuickEditRect {
   const width = Math.max(0.01, Math.min(1, area.width));
   const height = Math.max(0.01, Math.min(1, area.height));

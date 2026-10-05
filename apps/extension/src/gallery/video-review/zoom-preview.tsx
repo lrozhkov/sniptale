@@ -15,6 +15,7 @@ import type {
 import {
   evaluateQuickEditCameraAtTime,
   computeQuickEditSceneCamera,
+  computeQuickEditWindowTransform,
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
 } from '../../features/video/review/advanced/scene';
@@ -185,7 +186,7 @@ function ZoomResultOverlays(props: {
     regions: props.focus?.regions ?? [props.region],
     time: props.focus?.time ?? (props.region.start + props.region.end) / 2,
     output: props.output,
-    video: props.layout.videoTransform,
+    video: computeQuickEditWindowTransform(props.layout),
     scale: props.scale,
   };
   const motion = computeQuickEditSceneCamera(props.layout, props.background);

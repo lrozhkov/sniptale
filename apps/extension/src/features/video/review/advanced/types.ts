@@ -38,7 +38,7 @@ export interface QuickEditCameraTransform {
  * Zoom interval on the quick-editor timeline. `start`/`end` are timeline seconds,
  * matching the shared ReviewTimeMap coordinate domain.
  */
-/** A source-normalized opening; outside effects cover the entire composed scene. */
+/** An opening normalized over the decorated window; outside effects cover the composed scene. */
 export interface QuickEditSpotlight {
   area: { x: number; y: number; width: number; height: number };
   effect: 'dim' | 'blur';
@@ -49,7 +49,7 @@ export interface QuickEditSpotlight {
   exitReveal: 'fade' | 'contract';
 }
 
-/** Source-attached annotation; transition types own immediate entrance/exit. */
+/** Window-normalized annotation, including decoration; transitions own immediate entrance/exit. */
 export interface QuickEditBorder {
   area: { x: number; y: number; width: number; height: number };
   color: string;

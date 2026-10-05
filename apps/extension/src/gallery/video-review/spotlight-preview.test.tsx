@@ -1,3 +1,13 @@
+import { ReviewStageFocusControl } from './stage-focus';
+import {
+  computeQuickEditSceneLayout,
+  computeQuickEditSceneSize,
+} from '../../features/video/review/advanced/scene';
+import type {
+  QuickEditBackgroundSettings,
+  QuickEditWindowHeader,
+} from '../../features/video/review/advanced/types';
+import * as focusEvaluation from '../../features/video/review/advanced/focus';
 import { createQuickEditBorder } from '../../features/video/review/advanced/border';
 import { drawReviewBorders } from '../../workflows/video-review/render-border';
 // @vitest-environment jsdom
@@ -399,3 +409,96 @@ it('retains the projected source phase clock in Border Result after cut and spee
     expect.anything()
   );
 });
+
+for (const type of ['border', 'spotlight'] as const) {
+  for (const surface of ['stage', 'inspector'] as const) {
+    it(`${type} ${surface} reaches the header and restores bounds after scene switches`, async () => {
+      const evaluate = vi.spyOn(focusEvaluation, 'evaluateQuickEditSpotlightsAtTime');
+      const area = { x: 0.2, y: 0, width: 0.5, height: 0.1 };
+      const region = {
+        ...createQuickEditZoomRegion({ id: 'header', at: 0, duration: 4 }),
+        ...(type === 'border'
+          ? { border: { ...createQuickEditBorder(), area } }
+          : { spotlight: { ...createQuickEditSpotlight(), area } }),
+        enter: { type: 'none' as const, duration: 0 },
+        exit: { type: 'none' as const, duration: 0 },
+      };
+      const onChange = vi.fn();
+      const source = { width: 200, height: 100 };
+      const header: QuickEditWindowHeader = { kind: 'browser', title: 'Header' };
+      for (const windowHeader of [header, undefined, header]) {
+        for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
+          const background: QuickEditBackgroundSettings = {
+            enabled: true,
+            type: 'solid',
+            color: '#222222',
+            layout: { padding: 8, cornerRadius: 4 },
+            zoomBehavior,
+          };
+          for (const scale of [1, 2]) {
+            const camera = { scale, centerX: 0.5, centerY: 0.25 };
+            const output = computeQuickEditSceneSize({ source, background, windowHeader });
+            const layout = computeQuickEditSceneLayout({
+              source,
+              output,
+              background,
+              windowHeader,
+              camera,
+            });
+            const expected = {
+              x: layout.videoTransform.x,
+              y: layout.videoTransform.y - (layout.videoRect.y - layout.windowRect.y) * scale,
+              width: layout.windowRect.width * scale,
+              height: layout.windowRect.height * scale,
+            };
+            await act(async () =>
+              root.render(
+                surface === 'stage' ? (
+                  <ReviewStageFocusControl
+                    focus={{ region, onChange, onPreview: vi.fn(), onInteract: vi.fn() }}
+                    layout={layout}
+                    output={output}
+                  />
+                ) : (
+                  <ReviewSpotlightPreview
+                    region={region}
+                    view="area"
+                    camera={camera}
+                    frame={null}
+                    output={output}
+                    layout={layout}
+                    background={background}
+                    cornerRadius={4}
+                    scale={1}
+                    disabled={false}
+                    onChange={onChange}
+                  />
+                )
+              )
+            );
+            const frame = host.querySelector<HTMLElement>('[data-focus-frame]')!;
+            expect(parseFloat(frame.style.top)).toBeCloseTo((expected.y / output.height) * 100);
+            expect(parseFloat(frame.style.height)).toBeCloseTo(
+              ((expected.height * area.height) / output.height) * 100
+            );
+            if (surface === 'inspector')
+              expect(evaluate).toHaveBeenLastCalledWith(
+                expect.objectContaining({ video: expected })
+              );
+            const plane = host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!;
+            await pointer(frame, 'pointerdown', 50, 20);
+            await pointer(plane, 'pointermove', 50, 25);
+            await pointer(plane, 'pointerup', 50, 25);
+            expect(onChange).toHaveBeenLastCalledWith({
+              [type]: expect.objectContaining({
+                area: expect.objectContaining({
+                  y: expect.closeTo(5 / ((100 * expected.height) / output.height), 8),
+                }),
+              }),
+            });
+          }
+        }
+      }
+    });
+  }
+}

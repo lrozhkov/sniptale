@@ -1,3 +1,4 @@
+import { computeQuickEditWindowTransform } from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { translate } from '../../platform/i18n';
@@ -40,7 +41,7 @@ export function ReviewStageFocusControl(props: {
             : 'gallery.videoReview.focusSpotlight'
         )}
         output={output}
-        video={layout.videoTransform}
+        video={computeQuickEditWindowTransform(layout)}
         onInteract={focus.onInteract}
         onPreview={(area) =>
           focus.onPreview(

@@ -15,6 +15,7 @@ type FocusAreaProps = {
   area: QuickEditSpotlight['area'];
   label?: string;
   output: { width: number; height: number };
+  /** Transformed decorated window, including the optional header. */
   video: QuickEditRect;
   disabled?: boolean;
   /** Inspector framing stays visible; the stage retains interaction-only controls. */
@@ -23,7 +24,7 @@ type FocusAreaProps = {
   onPreview?: ((value: QuickEditSpotlight['area'] | null) => void) | undefined;
   onChange(value: QuickEditSpotlight['area']): void;
 };
-/** Shared source area view; stage and inspector use one Spotlight gesture owner. */
+/** Shared window area view; stage and inspector use one Spotlight gesture owner. */
 export function ReviewFocusArea(props: FocusAreaProps) {
   const gesture = useSpotlightAreaGesture(props);
   return (
@@ -63,7 +64,7 @@ type SpotlightCapture = {
   pending: QuickEditSpotlight['area'] | null;
 };
 
-/** Captured source geometry, preview and commit/cancel stay in this single transient owner. */
+/** Captured window geometry, preview and commit/cancel stay in this single transient owner. */
 function useSpotlightAreaGesture(props: FocusAreaProps) {
   const { onPreview } = props;
   const { frame, hovered, trackPointer, pointerInteraction, keyboardInteraction } =
@@ -188,7 +189,7 @@ function resizeSpotlightArea(
   };
 }
 
-/** Keyboard source movement uses the same area bounds as pointer movement. */
+/** Keyboard window movement uses the same area bounds as pointer movement. */
 function moveSpotlightWithKey(area: QuickEditSpotlight['area'], key: string, shift: boolean) {
   if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) return null;
   const step = shift ? 0.1 : 0.01;
