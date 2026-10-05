@@ -1,6 +1,9 @@
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
-import { anchorReviewVoiceover } from '../../features/video/review/voiceover-edits';
-import { translate } from '../../platform/i18n';
+import type { ReviewTimeSegment } from '../../features/video/review/timeline';
+import {
+  anchorReviewVoiceover,
+  anchorReviewVoiceoverAtSource,
+} from '../../features/video/review/voiceover-edits';
 import {
   importReviewAudio,
   importedAudioClip,
@@ -18,8 +21,8 @@ export async function saveReviewVoiceoverTake(args: {
   signal: AbortSignal;
   take: Blob;
   onRetained?: () => void;
-  outputStart: number | null;
-  resultDuration: number;
+  sourceStart: number;
+  segments: readonly ReviewTimeSegment[];
   audio: ReturnType<typeof useReviewAudio>;
   session: ReviewSession;
   takeIds: WeakMap<Blob, string>;
@@ -33,7 +36,6 @@ export async function saveReviewVoiceoverTake(args: {
     clipId = `audio-${crypto.randomUUID()}`;
     args.takeIds.set(args.take, clipId);
   }
-  if (args.outputStart === null) throw new Error(translate('gallery.videoReview.placementOnCut'));
   if (!args.isCurrent()) throw new Error('Recording review changed');
   const snapshot = () => args.session.getSnapshot();
   const attached = (assetId?: string) =>
@@ -58,7 +60,6 @@ export async function saveReviewVoiceoverTake(args: {
     args.preparedTakes.delete(args.take);
     return;
   }
-  const placement = args.outputStart + args.trim.trimStart;
   await args.flushAdvanced();
   await importReviewAudio({
     file: args.file,
@@ -69,8 +70,6 @@ export async function saveReviewVoiceoverTake(args: {
     },
     assertCurrentTarget: () => {
       if (!args.isCurrent()) throw new Error('Recording review changed');
-      if (placement >= args.resultDuration)
-        throw new Error(translate('gallery.videoReview.placementOnCut'));
     },
     hasDurableReference: (assetId) =>
       attached(assetId) || args.session.hasDurableVoiceoverClip(clipId, assetId),
@@ -81,8 +80,9 @@ export async function saveReviewVoiceoverTake(args: {
         clipId,
         assetId,
         duration,
-        placement,
-        args.resultDuration,
+        args.sourceStart,
+        args.segments,
+        args.trim.trimStart,
         args.onRetained
       ),
   });
@@ -99,7 +99,8 @@ async function commitRecordedClip(
   assetId: string,
   duration: number,
   placement: number,
-  resultDuration: number,
+  segments: readonly ReviewTimeSegment[],
+  trimOffset: number,
   onRetained?: () => void
 ): Promise<void> {
   const before = session.getSnapshot().document.advancedContent;
@@ -107,10 +108,12 @@ async function commitRecordedClip(
     if (onRetained && (await session.hasDurableVoiceoverClip(clipId, assetId))) onRetained();
     return;
   }
-  const clip = { ...importedAudioClip(assetId, duration, placement, resultDuration), id: clipId };
-  const anchored = before.audio.voiceoverSegments
-    ? anchorReviewVoiceover(clip, before.audio.voiceoverSegments)
-    : clip;
+  const clip = {
+    ...importedAudioClip(assetId, duration, placement, placement + duration),
+    id: clipId,
+  };
+  const anchored = anchorReviewVoiceoverAtSource(clip, segments, trimOffset);
+  const voiceoverSegments = before.audio.voiceoverSegments ?? [...segments];
   try {
     await session.commitDurable({
       id: crypto.randomUUID(),
@@ -119,7 +122,14 @@ async function commitRecordedClip(
       before,
       after: {
         ...before,
-        audio: { ...before.audio, voiceover: [...before.audio.voiceover, anchored] },
+        audio: {
+          ...before.audio,
+          voiceoverSegments,
+          voiceover: [
+            ...before.audio.voiceover.map((item) => anchorReviewVoiceover(item, voiceoverSegments)),
+            anchored,
+          ],
+        },
       },
     });
   } catch (error) {

@@ -140,12 +140,19 @@ function createReviewAudioClipActions(
     );
   return {
     addClip: (clip: QuickEditAudioClip, lane: ReviewAudioLane) =>
-      patchLane(lane, (clips) => [
-        ...clips,
-        lane === 'voiceover' && args.audio.voiceoverSegments
-          ? anchorReviewVoiceover(clip, args.audio.voiceoverSegments)
-          : clip,
-      ]),
+      args.setAudio((audio) => {
+        if (lane !== 'voiceover') return { ...audio, [lane]: [...audio[lane], clip] };
+        const voiceoverSegments =
+          audio.voiceoverSegments ??
+          buildReviewTimeMap(args.sourceDuration ?? args.timelineDuration, args.edits ?? []);
+        return {
+          ...audio,
+          voiceoverSegments,
+          voiceover: [...audio.voiceover, clip].map((item) =>
+            anchorReviewVoiceover(item, voiceoverSegments)
+          ),
+        };
+      }),
     moveClip: (lane: ReviewAudioLane, id: string, timelineStart: number) =>
       updateClip(lane, id, (clip) =>
         moveQuickEditAudioClip(

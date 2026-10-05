@@ -412,7 +412,9 @@ function reviewAudioClipGesture(props: ReviewAudioClipBlockProps, assetDuration?
       ];
       const start = snapTimelineTime(base.timelineStart + delta, candidates, threshold);
       const mapped =
-        original.sourceAnchor && !props.cutSuppressed ? props.sourceProjection : undefined;
+        original.sourceAnchor && !props.cutSuppressed && range.end <= props.duration
+          ? props.sourceProjection
+          : undefined;
       const playbackDuration = original.sourceAnchor
         ? reviewVoiceoverPlaybackDuration(original, props.voiceoverSegments)
         : original.duration;
@@ -560,13 +562,7 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
           onMoveClip={props.onMoveClip}
           onTrimClip={props.onTrimClip}
           onDropFile={(file: File, timelineTime: number) =>
-            props.onImportFile(
-              file,
-              lane.key,
-              lane.key === 'voiceover' && props.audio.voiceoverSegments
-                ? (props.projection?.output(timelineTime) ?? timelineTime)
-                : timelineTime
-            )
+            props.onImportFile(file, lane.key, timelineTime)
           }
           trailing={
             <>

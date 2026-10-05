@@ -379,13 +379,17 @@ it('refreshes the whole Follow Video footprint after scene edits without camera 
       root.render(
         <ReviewZoomPreview
           region={selected}
-          background={{
-            enabled,
-            type: 'solid',
-            color: '#000000ff',
-            zoomBehavior,
-            layout: { padding, cornerRadius: 0 },
-          }}
+          background={
+            enabled
+              ? {
+                  enabled: true,
+                  type: 'solid',
+                  color: '#000000ff',
+                  zoomBehavior,
+                  layout: { padding, cornerRadius: 0 },
+                }
+              : { enabled: false, zoomBehavior }
+          }
           source={{ width: 800, height: 800 }}
           canvas={canvas}
           sourceTime={3}

@@ -2666,12 +2666,11 @@ for (const variant of [
   { locale: 'en' as const, theme: 'dark' as const },
 ]) {
   const testName =
-    `quick editor voiceover strip supports pause and optional cap at HD ` +
+    `quick editor voiceover strip supports pause and optional cap at desktop sizes ` +
     `in ${variant.locale}/${variant.theme}`;
   test(testName, async ({ page }, testInfo) => {
     const host = await startHostServer();
     try {
-      await page.setViewportSize({ width: 1280, height: 720 });
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         storage: {
@@ -2689,6 +2688,10 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.cutMode').click();
+      await timelineGesture(page, 2, 4);
+      await button('gallery.videoReview.pointerTool').click();
+      await timelineGesture(page, 3);
       await button('gallery.videoReview.recordVoiceover').click();
       const strip = dialog.locator('[data-ui="gallery.videoReview.voiceoverStrip"]');
       await expect(strip).toBeVisible();
@@ -2709,10 +2712,11 @@ for (const variant of [
 
       expect(Number(await numericLimit.inputValue())).toBeGreaterThan(0);
       expect((await numericLimit.inputValue()).split('.')[1]?.length ?? 0).toBeLessThanOrEqual(3);
-      const exactMaximum = await numericLimit.getAttribute('max');
+      await expect(numericLimit).toHaveValue('60');
+      expect(await numericLimit.getAttribute('max')).toBeNull();
       await numericLimit.focus();
       await numericLimit.blur();
-      await expect(numericLimit).toHaveAttribute('max', exactMaximum!);
+      expect(await numericLimit.getAttribute('max')).toBeNull();
       const microphone = strip.getByRole('button', {
         name: translate('videoEditor.app.recordAudioDevice', variant.locale),
         exact: true,
@@ -2739,14 +2743,17 @@ for (const variant of [
       await numericLimit.fill('');
       await expect(startCapture).toBeDisabled();
       await expect(strip.getByRole('alert')).toBeVisible();
-      await numericLimit.fill('999999');
+      await numericLimit.fill('0');
       await expect(startCapture).toBeDisabled();
+      await numericLimit.fill('20');
+      await expect(startCapture).toBeEnabled();
       await numericLimit.fill('1');
       await expect(startCapture).toBeEnabled();
       await expect(numericLimit).toBeInViewport();
       await expect(startCapture).toBeInViewport();
       await expect(dialog.locator('[inert]')).toHaveCount(1);
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-ready-${variant.locale}-${variant.theme}.png`),
       });
       const durationLimit = strip.getByRole('switch', {
@@ -2825,6 +2832,7 @@ for (const variant of [
       ).toHaveCount(1);
       await expect(playback.locator('[data-review-toolbar-label]')).toHaveCount(0);
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-recording-${variant.locale}-${variant.theme}.png`),
       });
       await strip
@@ -2843,6 +2851,7 @@ for (const variant of [
       );
       await expect(playback.locator('svg.lucide-play')).toHaveCount(1);
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-paused-${variant.locale}-${variant.theme}.png`),
       });
       const confirmation = dialog.getByRole('alertdialog');
@@ -2859,6 +2868,7 @@ for (const variant of [
         })
       ).toBeFocused();
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-discard-${variant.locale}-${variant.theme}.png`),
       });
       await page.keyboard.press('Space');
@@ -2878,6 +2888,7 @@ for (const variant of [
         })
       ).toBeVisible();
       await page.screenshot({
+        fullPage: false,
         path: testInfo.outputPath(`voiceover-take-${variant.locale}-${variant.theme}.png`),
       });
       await expect(strip.locator('header')).toContainText(
@@ -2962,6 +2973,67 @@ for (const variant of [
       expect(retained[0]!.duration).toBeGreaterThan(0);
       expect(retained[0]!.samples).toBeGreaterThan(0);
       expect(retained[0]!.peak).toBeGreaterThan(0.01);
+      const voice = dialog.locator('[data-audio-lane="voiceover"] [data-audio-id]');
+      await expect(voice).toHaveAttribute('data-cut-suppressed', 'true');
+      const clipId = await voice.getAttribute('data-audio-id');
+      await dialog
+        .locator(
+          '[data-ui="gallery.videoReview.sourceLane"] [data-ui="gallery.videoReview.editBlock"]'
+        )
+        .click();
+      await page.keyboard.press('Delete');
+      await expect(voice).toHaveAttribute('data-cut-suppressed', 'false');
+      await expect(voice).toHaveAttribute('data-audio-id', clipId!);
+      await button('gallery.videoReview.undo').click();
+      await expect(voice).toHaveAttribute('data-cut-suppressed', 'true');
+      await timelineGesture(page, 11.8);
+      await button('gallery.videoReview.recordVoiceover').click();
+      await playVideo.check();
+      await durationLimit.uncheck();
+      await page.evaluate(() => {
+        Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
+          configurable: true,
+          value: async () => {
+            const audio = new AudioContext();
+            const oscillator = audio.createOscillator();
+            const destination = audio.createMediaStreamDestination();
+            oscillator.connect(destination);
+            oscillator.start();
+            return destination.stream;
+          },
+        });
+      });
+      await startCapture.click();
+      await expect
+        .poll(() =>
+          dialog
+            .locator('video')
+            .first()
+            .evaluate((video) => video.paused && video.currentTime >= 12)
+        )
+        .toBe(true);
+      await expect(
+        strip.getByRole('button', {
+          name: translate('videoEditor.app.recordAudioPause', variant.locale),
+          exact: true,
+        })
+      ).toBeVisible();
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioStop', variant.locale),
+          exact: true,
+        })
+        .click();
+      await strip
+        .getByRole('button', {
+          name: translate('videoEditor.app.recordAudioSave', variant.locale),
+          exact: true,
+        })
+        .click();
+      await expect(strip).toHaveCount(0);
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(2);
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

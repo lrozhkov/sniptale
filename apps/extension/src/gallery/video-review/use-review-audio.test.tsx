@@ -5,6 +5,7 @@ import { expect, it, vi } from 'vitest';
 import { useReviewAudio } from './use-review-audio';
 import {
   anchorReviewVoiceover,
+  anchorReviewVoiceoverAtSource,
   projectReviewVoiceover,
   reviewVoiceoverRange,
 } from '../../features/video/review/voiceover-edits';
@@ -535,6 +536,52 @@ it('creates lossless timing when own tempo is edited before the first video Spee
       playbackRate: 2,
     });
     expect(audio.voiceover[0]?.duration).toBe(4);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('initializes source timing when the first voiceover is imported without preceding edits', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let audio: QuickEditAudioState = {
+    original: { muted: false, volume: 1 },
+    voiceover: [],
+    music: [],
+  };
+  const map = buildReviewTimeMap(10, []);
+  const imported = anchorReviewVoiceoverAtSource(
+    createQuickEditAudioClip({
+      id: 'new',
+      assetId: 'asset',
+      timelineStart: 9,
+      duration: 4,
+      endMax: 13,
+    }),
+    map
+  );
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewAudio>;
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+      timelineDuration: 10,
+      sourceDuration: 10,
+      edits: [],
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.addImported(imported, 'voiceover', 4, 'voice.wav'));
+    expect(audio.voiceoverSegments).toEqual(map);
+    expect(audio.voiceover).toEqual([imported]);
+    expect(projectReviewVoiceover(audio.voiceover, audio.voiceoverSegments)).toMatchObject([
+      { timelineStart: 9, duration: 1 },
+    ]);
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

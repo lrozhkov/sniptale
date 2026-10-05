@@ -33,6 +33,10 @@ export const videoEditorAppMessages = defineMessageSource({
   recordAudioKeep: { ru: 'Вернуться к записи', en: 'Keep recording' },
   recordAudioDiscard: { ru: 'Отказаться от записи', en: 'Discard recording' },
   recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
+  recordAudioPositiveDuration: {
+    ru: 'Введите длительность больше нуля.',
+    en: 'Enter a duration greater than zero.',
+  },
   recordAudioSeconds: { ru: 'сек', en: 'sec' },
   recordAudioLimitInvalid: {
     ru: 'Введите длительность больше нуля, не превышающую доступный максимум.',

@@ -13,6 +13,7 @@ export function useReviewPlayback(props: {
   onFailure(): void;
   original: QuickEditOriginalAudio;
   silent?: boolean;
+  retainCutTime?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const [time, setTime] = useState(0);
@@ -21,7 +22,14 @@ export function useReviewPlayback(props: {
   latest.current = props;
   const synchronize = (value: number, applyEdits: boolean) => {
     const node = video.current;
-    const settings = reviewPlaybackSettings(value, latest.current.edits);
+    const inRecordedCut =
+      latest.current.retainCutTime &&
+      latest.current.edits.some(
+        (edit) => edit.kind === 'cut' && value >= edit.start && value < edit.end
+      );
+    const settings = inRecordedCut
+      ? { time: value, rate: 1, muted: true }
+      : reviewPlaybackSettings(value, latest.current.edits);
     // Media clocks quantize seeks to microseconds. Round cut destinations forward
     // so truncation cannot land inside the same cut and seek on every frame.
     const next =
@@ -43,7 +51,12 @@ export function useReviewPlayback(props: {
     setTime(next);
     return next;
   };
-  const audioSettingsKey = JSON.stringify([props.original, props.edits, props.silent]);
+  const audioSettingsKey = JSON.stringify([
+    props.original,
+    props.edits,
+    props.silent,
+    props.retainCutTime,
+  ]);
   const tick = useRef(synchronize);
   tick.current = synchronize;
   useEffect(() => {

@@ -147,3 +147,55 @@ it.each([2.123456789, 0.12956810631229235])(
     }
   }
 );
+
+it('traverses cut source time while recording, preserves kept speed and restores cut skipping', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('requestAnimationFrame', () => 1);
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewPlayback>;
+  let recording = true;
+  function Harness() {
+    hook = useReviewPlayback({
+      duration: 12,
+      boundaries: () => undefined,
+      onSeek: vi.fn(),
+      onFailure: vi.fn(),
+      original: { muted: false, volume: 1 },
+      silent: recording,
+      retainCutTime: recording,
+      edits: [
+        { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+        {
+          id: 'speed',
+          kind: 'speed',
+          start: 1,
+          end: 8,
+          requestedStart: 1,
+          requestedEnd: 8,
+          rate: 2,
+          audio: 'speed',
+        },
+      ],
+    });
+    return <video ref={hook.video} />;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.setPlaying(true));
+    act(() => hook.onTime(3));
+    expect(hook.time).toBe(3);
+    expect(hook.video.current!.playbackRate).toBe(1);
+    expect(hook.video.current!.muted).toBe(true);
+    act(() => hook.onTime(4));
+    expect(hook.video.current!.playbackRate).toBe(2);
+    recording = false;
+    act(() => root.render(<Harness />));
+    act(() => hook.onTime(3));
+    expect(hook.time).toBe(4);
+    expect(hook.video.current!.muted).toBe(false);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

@@ -26,6 +26,7 @@ export function useReviewTransport(args: {
     edits: args.edits,
     original: args.originalAudio,
     silent: args.silent ?? false,
+    retainCutTime: args.silent ?? false,
     boundaries: args.boundaries,
     onSeek: args.onSeek,
     onFailure: args.onTransportFailure,

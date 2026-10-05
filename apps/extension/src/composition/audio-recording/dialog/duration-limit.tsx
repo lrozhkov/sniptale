@@ -8,8 +8,8 @@ function durationText(value: number) {
   return String(value >= 0.001 ? Math.floor(value * 1000) / 1000 : Number(value.toPrecision(3)));
 }
 
-/** A capture cap is a draft in seconds, bounded by the available destination interval. */
-export function useRecordingDurationLimit(maximum: number) {
+/** A capture cap is a draft in seconds, optionally bounded by a destination interval. */
+export function useRecordingDurationLimit(maximum = Infinity) {
   const [enabled, setEnabled] = useState(true);
   const [draft, setText] = useState<string | null>(null);
   const defaultValue = Math.min(60, Math.max(0, maximum));
@@ -33,7 +33,7 @@ export function useRecordingDurationLimit(maximum: number) {
 /** Both timeline recorders expose the same switch, numeric draft and validation. */
 export function RecordingDurationLimit(props: {
   value: ReturnType<typeof useRecordingDurationLimit>;
-  maximum: number;
+  maximum?: number;
   disabled: boolean;
 }) {
   const [editing, setEditing] = useState(false);
@@ -79,7 +79,11 @@ export function RecordingDurationLimit(props: {
       </div>
       {value.invalid ? (
         <p id={errorId} role="alert" className="text-[var(--sniptale-color-danger-text)]">
-          {translate('videoEditor.app.recordAudioLimitInvalid')}
+          {translate(
+            props.maximum === undefined
+              ? 'videoEditor.app.recordAudioPositiveDuration'
+              : 'videoEditor.app.recordAudioLimitInvalid'
+          )}
         </p>
       ) : null}
     </div>

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   anchorReviewVoiceover,
+  anchorReviewVoiceoverAtSource,
   normalizeReviewVoiceoverTempo,
   reviewVoiceoverPlaybackDuration,
   projectReviewVoiceover,
@@ -271,3 +272,76 @@ it.each([0.25, 0.5, 1, 2, 4])(
     expect(projectReviewVoiceover([trimmed], map)[0]?.duration).toBeCloseTo(3 / tempo);
   }
 );
+
+it('places new audio through cuts and speed without losing hidden samples or end tails', () => {
+  const map = buildReviewTimeMap(12, [
+    cut(2, 4),
+    { ...cut(4, 8), kind: 'speed', rate: 2, audio: 'speed' },
+  ]);
+  const recording = anchorReviewVoiceoverAtSource(
+    { ...clip, timelineStart: 3, sourceOffset: 0, duration: 10 },
+    map
+  );
+  expect(recording.sourceAnchor).toEqual([
+    { start: 3, end: 4, offset: 0, duration: 1 },
+    { start: 4, end: 8, offset: 1, duration: 2 },
+    { start: 8, end: 12, offset: 3, duration: 4 },
+    { start: 12, end: 15, offset: 7, duration: 3 },
+  ]);
+  expect(parseVoiceoverAnchors(recording.sourceAnchor, 3, 10)).toEqual(recording.sourceAnchor);
+  expect(projectReviewVoiceover([recording], map)).toMatchObject([
+    { timelineStart: 2, sourceOffset: 1, duration: 6, playbackRate: 1 },
+  ]);
+  const restored = buildReviewTimeMap(12, [
+    { ...cut(4, 8), kind: 'speed', rate: 2, audio: 'speed' },
+  ]);
+  expect(projectReviewVoiceover([recording], restored)).toMatchObject([
+    { timelineStart: 3, sourceOffset: 0, duration: 7, playbackRate: 1 },
+  ]);
+  const trimmed = anchorReviewVoiceoverAtSource(
+    { ...clip, timelineStart: 3, sourceOffset: 0, duration: 2 },
+    map,
+    2
+  );
+  expect(trimmed.timelineStart).toBe(6);
+  expect(trimmed.sourceAnchor).toEqual([
+    { start: 6, end: 8, offset: 0, duration: 1 },
+    { start: 8, end: 9, offset: 1, duration: 1 },
+  ]);
+});
+
+it.each([0, 2, 12, 14])(
+  'retains new audio at source %s even if the entire video is cut',
+  (start) => {
+    const map = buildReviewTimeMap(12, [cut(0, 12)]);
+    const recording = anchorReviewVoiceoverAtSource({ ...clip, timelineStart: start }, map);
+    expect(recording.timelineStart).toBe(start);
+    expect(recording.duration).toBe(4);
+    expect(parseVoiceoverAnchors(recording.sourceAnchor, start, 4)).toEqual(recording.sourceAnchor);
+    expect(projectReviewVoiceover([recording], map)).toEqual([]);
+  }
+);
+
+it.each([2, 3, 9, 12])(
+  'moves a retained long take to source %s without clamping it back to zero',
+  (start) => {
+    const map = buildReviewTimeMap(12, [cut(2, 4)]);
+    const recording = anchorReviewVoiceoverAtSource(
+      { ...clip, timelineStart: 0, duration: 20 },
+      map
+    );
+    const moved = moveReviewVoiceover(recording, start, 12, map);
+    expect(moved.timelineStart).toBe(start);
+    expect(moved.duration).toBe(20);
+    expect(parseVoiceoverAnchors(moved.sourceAnchor, start, 20)).toEqual(moved.sourceAnchor);
+  }
+);
+
+it('moves a retained take to the endpoint when the final source segment is cut', () => {
+  const map = buildReviewTimeMap(12, [cut(6, 12)]);
+  const recording = anchorReviewVoiceoverAtSource({ ...clip, timelineStart: 0, duration: 20 }, map);
+  const moved = moveReviewVoiceover(recording, 12, 12, map);
+  expect(moved.timelineStart).toBe(12);
+  expect(moved.duration).toBe(20);
+  expect(projectReviewVoiceover([moved], map)).toEqual([]);
+});

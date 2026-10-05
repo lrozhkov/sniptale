@@ -1,5 +1,5 @@
 import { RecordingDiscardConfirmation } from '../../composition/audio-recording/dialog/dismissal';
-import { useEffect, useState, type RefObject } from 'react';
+import { useState } from 'react';
 import { Mic, Pause, Play, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ProductModal } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -28,16 +28,12 @@ type RecordingSession = ReturnType<typeof useAudioRecordingDialogSession>;
 /** Connect the Gallery recording session to its screen-space presentation. */
 export function ReviewVoiceoverLayer(props: {
   voiceover: ReturnType<typeof useReviewVoiceoverRecording>;
-  outputTime: number | null;
-  resultDuration: number;
 }) {
   const { voiceover } = props;
   return (
     <ReviewVoiceoverRecording
       isOpen={voiceover.recording}
-      video={voiceover.video}
-      playhead={voiceover.takeOutputStart ?? props.outputTime ?? 0}
-      timelineDuration={props.resultDuration}
+      playhead={voiceover.takeStart ?? 0}
       onClose={voiceover.close}
       onSyncStart={voiceover.syncStart}
       onSyncStop={voiceover.syncStop}
@@ -53,9 +49,7 @@ export function ReviewVoiceoverLayer(props: {
  */
 export function ReviewVoiceoverRecording(props: {
   isOpen: boolean;
-  video?: RefObject<HTMLVideoElement | null>;
   playhead: number;
-  timelineDuration: number;
   onClose(): void;
   onSyncStart(playVideo: boolean): Promise<void>;
   onSyncStop(): void;
@@ -69,8 +63,7 @@ export function ReviewVoiceoverRecording(props: {
     onRetained?: () => void
   ): Promise<void>;
 }) {
-  const remaining = Math.max(0, props.timelineDuration - props.playhead);
-  const durationLimit = useRecordingDurationLimit(remaining);
+  const durationLimit = useRecordingDurationLimit();
   const [playVideo, setPlayVideo] = useState(true);
   const session = useAudioRecordingDialogSession({
     isOpen: props.isOpen,
@@ -78,7 +71,7 @@ export function ReviewVoiceoverRecording(props: {
     onSave: props.onSave,
     timeline: {
       startTime: props.playhead,
-      duration: remaining,
+      duration: Infinity,
       beforeStart: () => props.onSyncStart(playVideo),
       onStop: props.onSyncStop,
       onPause: props.onSyncPause,
@@ -95,15 +88,6 @@ export function ReviewVoiceoverRecording(props: {
   const { controller, starting, isSaving, saveError } = session;
   const { transport, trim } = controller;
   const capturing = transport.status === 'recording' || transport.status === 'paused';
-  const stopRecording = transport.stopRecording;
-  useEffect(() => {
-    if (!props.isOpen || !playVideo || transport.status !== 'recording') return;
-    const video = props.video?.current;
-    if (!video) return;
-    const onEnded = () => stopRecording();
-    video.addEventListener('ended', onEnded);
-    return () => video.removeEventListener('ended', onEnded);
-  }, [playVideo, props.isOpen, props.video, transport.status, stopRecording]);
   if (!props.isOpen) return null;
   return (
     <>
@@ -130,7 +114,7 @@ export function ReviewVoiceoverRecording(props: {
             <span id={titleId} className="mr-auto min-w-0 text-sm font-medium">
               {translate('gallery.videoReview.recordVoiceover')}
               <span className="ml-2 inline-block text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-                {formatDurationLabel(props.playhead)}–{formatDurationLabel(props.timelineDuration)}
+                {formatDurationLabel(props.playhead)}
               </span>
             </span>
             <ContentToolbarButton
@@ -144,11 +128,7 @@ export function ReviewVoiceoverRecording(props: {
             </ContentToolbarButton>
           </header>
           {trim ? (
-            <VoiceoverTakeReview
-              session={session}
-              durationLimit={durationLimit}
-              maximum={remaining}
-            />
+            <VoiceoverTakeReview session={session} durationLimit={durationLimit} />
           ) : (
             <>
               <VoiceoverCaptureOptions
@@ -157,12 +137,10 @@ export function ReviewVoiceoverRecording(props: {
                 playVideo={playVideo}
                 onPlayVideo={setPlayVideo}
                 durationLimit={durationLimit}
-                maximum={remaining}
               />
               <VoiceoverTransport
                 session={session}
-                remaining={remaining}
-                limit={durationLimit.effective}
+                limit={durationLimit.seconds}
                 invalid={durationLimit.invalid}
               />
               <RecordingLevelMeter meter={controller.meter} preparing={starting} />
@@ -189,7 +167,6 @@ function VoiceoverCaptureOptions(props: {
   playVideo: boolean;
   onPlayVideo(value: boolean): void;
   durationLimit: ReturnType<typeof useRecordingDurationLimit>;
-  maximum: number;
 }) {
   const disabled = props.session.starting || props.capturing;
   return (
@@ -211,7 +188,6 @@ function VoiceoverCaptureOptions(props: {
       duration={
         <RecordingDurationLimit
           value={props.durationLimit}
-          maximum={props.maximum}
           disabled={disabled || props.session.isSaving}
         />
       }
@@ -221,8 +197,7 @@ function VoiceoverCaptureOptions(props: {
 
 function VoiceoverTransport(props: {
   session: RecordingSession;
-  remaining: number;
-  limit: number;
+  limit: number | undefined;
   invalid: boolean;
 }) {
   const { transport } = props.session.controller;
@@ -234,11 +209,15 @@ function VoiceoverTransport(props: {
     >
       <span className="mr-auto inline-flex items-baseline gap-1 tabular-nums">
         {translate(
-          capturing ? 'videoEditor.app.recordAudioRemaining' : 'videoEditor.app.recordAudioLimit'
+          capturing && props.limit !== undefined
+            ? 'videoEditor.app.recordAudioRemaining'
+            : 'videoEditor.app.recordAudioDurationLabel'
         )}{' '}
         <strong>
           {formatDurationLabel(
-            capturing ? Math.max(0, props.limit - transport.elapsedSeconds) : props.limit
+            capturing && props.limit !== undefined
+              ? Math.max(0, props.limit - transport.elapsedSeconds)
+              : transport.elapsedSeconds
           )}
         </strong>
       </span>
@@ -261,7 +240,7 @@ function VoiceoverTransport(props: {
       ) : (
         <ProductActionButton
           tone="primary"
-          disabled={props.session.starting || props.remaining <= 0 || props.invalid}
+          disabled={props.session.starting || props.invalid}
           onClick={props.session.startRecording}
         >
           <Mic size={16} aria-hidden="true" />
@@ -275,18 +254,15 @@ function VoiceoverTransport(props: {
 function VoiceoverTakeReview({
   session,
   durationLimit,
-  maximum,
 }: {
   session: RecordingSession;
   durationLimit: ReturnType<typeof useRecordingDurationLimit>;
-  maximum: number;
 }) {
   return (
     <>
       {durationLimit.invalid ? (
         <RecordingDurationLimit
           value={durationLimit}
-          maximum={maximum}
           disabled={session.isSaving || session.starting}
         />
       ) : null}
@@ -302,7 +278,7 @@ function VoiceoverTakeReview({
         />
         <ProductActionButton
           tone="secondary"
-          disabled={session.isSaving || session.starting || durationLimit.invalid || maximum <= 0}
+          disabled={session.isSaving || session.starting || durationLimit.invalid}
           onClick={session.startRecording}
         >
           <RotateCcw size={16} aria-hidden="true" />

@@ -89,6 +89,30 @@ export function anchorReviewVoiceover(
     : clip;
 }
 
+/** Places new source-authored audio through Cut (1x) and Speed, retaining every sample. */
+export function anchorReviewVoiceoverAtSource(
+  clip: QuickEditAudioClip,
+  map: readonly ReviewTimeSegment[],
+  trimOffset = 0
+): QuickEditAudioClip {
+  const start = reviewVoiceoverSourceAtOffset(clip.timelineStart, trimOffset, clip.tempo ?? 1, map);
+  return retimeReviewVoiceover(
+    {
+      ...clip,
+      timelineStart: start,
+      sourceAnchor: [
+        {
+          start,
+          end: start + clip.duration / (clip.tempo ?? 1),
+          offset: 0,
+          duration: clip.duration,
+        },
+      ],
+    },
+    map
+  );
+}
+
 /** Source coordinates of the single retained record, including portions hidden by cuts. */
 export function reviewVoiceoverRange(clip: QuickEditAudioClip) {
   return {
@@ -198,15 +222,13 @@ export function moveReviewVoiceover(
       (part) =>
         part.kind !== 'cut' &&
         requestedStart >= part.sourceStart &&
-        requestedStart <= part.sourceEnd
+        (requestedStart < part.sourceEnd ||
+          (requestedStart === sourceDuration && part.sourceEnd === sourceDuration))
     )
   )
     return placeAudibleVoiceover(clip, requestedStart, sourceDuration, map);
   const range = reviewVoiceoverRange(clip);
-  const start = Math.max(
-    0,
-    Math.min(requestedStart, Math.max(0, sourceDuration - (range.end - range.start)))
-  );
+  const start = Math.max(0, Math.min(requestedStart, sourceDuration));
   const delta = start - range.start;
   return {
     ...clip,
@@ -235,14 +257,9 @@ function placeAudibleVoiceover(
         (requested === sourceDuration && part.sourceEnd === sourceDuration))
   );
   if (!segment || duration <= 0) return clip;
-  const outputStart = Math.max(
-    0,
-    Math.min(
-      segment.resultStart +
-        (Math.min(requested, segment.sourceEnd) - segment.sourceStart) / segment.rate,
-      map.at(-1)!.resultEnd - duration
-    )
-  );
+  const outputStart =
+    segment.resultStart +
+    (Math.min(requested, segment.sourceEnd) - segment.sourceStart) / segment.rate;
   const { sourceAnchor: _anchor, ...recording } = clip;
   const placed = anchorReviewVoiceover({ ...recording, timelineStart: outputStart }, map);
   return placed;

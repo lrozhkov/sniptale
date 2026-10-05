@@ -338,6 +338,7 @@ function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
     canStart: state.canStart,
     time: state.time,
     resultDuration: state.timeline.resultDuration,
+    segments: state.timeline.timeMap.getSegments(),
     toOutputTime: state.timeline.toOutputTime,
     onCutPlacement: () => state.setMessage(translate('gallery.videoReview.placementOnCut')),
     video: state.video,
@@ -551,11 +552,7 @@ function ReviewEditor({
           />
         </div>
       </div>
-      <ReviewVoiceoverLayer
-        voiceover={voiceover}
-        outputTime={state.timeline.outputTime}
-        resultDuration={state.timeline.resultDuration}
-      />
+      <ReviewVoiceoverLayer voiceover={voiceover} />
     </>
   );
 }
