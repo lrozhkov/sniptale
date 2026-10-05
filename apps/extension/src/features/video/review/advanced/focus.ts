@@ -70,7 +70,7 @@ export interface QuickEditSpotlightFrame {
   protectionOpening?: QuickEditRect;
   protectionRadius?: number;
   presence?: number;
-  /** Contract opening clips interpolate from the full output to the video window. */
+  /** Contract clips expand by the same distance as the opening, keeping its center fixed. */
   openingClipProgress?: number;
 }
 
@@ -110,11 +110,12 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   const end = targetFrame(sample.to.spotlight, args.video, args.scale);
   const animation =
     sample.phase === 'exit' ? sample.to.spotlight.exitReveal : sample.to.spotlight.reveal;
+  const expanded = expandSpotlightOpening(end, args.output);
   const start = sample.from?.spotlight
     ? targetFrame(sample.from.spotlight, args.video, args.scale)
     : {
-        opening: animation === 'contract' ? { x: 0, y: 0, ...args.output } : end.opening,
-        radius: 0,
+        opening: animation === 'contract' ? expanded.opening : end.opening,
+        radius: animation === 'contract' ? expanded.radius : 0,
         dim: 0,
         blur: 0,
       };
@@ -132,15 +133,44 @@ export function evaluateQuickEditSpotlightAtTime(args: {
   };
 }
 
+/** Parallel outward edges and rounded corners cover the farthest output corner without panning. */
+function expandSpotlightOpening(
+  frame: QuickEditSpotlightFrame,
+  output: { width: number; height: number }
+) {
+  const { opening, radius } = frame;
+  const distance =
+    Math.hypot(
+      Math.max(0, opening.x, output.width - opening.x - opening.width),
+      Math.max(0, opening.y, output.height - opening.y - opening.height)
+    ) + radius;
+  return {
+    opening: {
+      x: opening.x - distance,
+      y: opening.y - distance,
+      width: opening.width + 2 * distance,
+      height: opening.height + 2 * distance,
+    },
+    radius: radius + distance,
+  };
+}
+
 /** Numeric even-odd path shared by CSS clipping and Canvas Path2D. */
 export function quickEditSpotlightPath(
   output: { width: number; height: number },
   frame: QuickEditSpotlightFrame
 ): string {
+  return `M0 0H${output.width}V${output.height}H0Z ${quickEditSpotlightOpeningPath(frame)}`;
+}
+
+/** Closed hole geometry shared by the SVG preview and Canvas mask. */
+export function quickEditSpotlightOpeningPath(
+  frame: Pick<QuickEditSpotlightFrame, 'opening' | 'radius'>
+): string {
   const { x, y, width: w, height: h } = frame.opening;
   const r = Math.max(0, Math.min(frame.radius, w / 2, h / 2));
   return (
-    `M0 0H${output.width}V${output.height}H0Z M${x + r} ${y}H${x + w - r}` +
+    `M${x + r} ${y}H${x + w - r}` +
     `Q${x + w} ${y} ${x + w} ${y + r}V${y + h - r}Q${x + w} ${y + h} ${x + w - r} ${y + h}` +
     `H${x + r}Q${x} ${y + h} ${x} ${y + h - r}V${y + r}Q${x} ${y} ${x + r} ${y}Z`
   );

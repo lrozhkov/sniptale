@@ -502,3 +502,41 @@ for (const type of ['border', 'spotlight'] as const) {
     });
   }
 }
+
+it('keeps a single edge-clipped spotlight vector-only during live samples', async () => {
+  const frame = { opening: { x: 0, y: 40, width: 10, height: 10 }, radius: 2, dim: 0, blur: 12 };
+  for (let i = 0; i < 10; i++)
+    await act(async () =>
+      root.render(
+        <ReviewSpotlightOverlay
+          output={{ ...output }}
+          frames={[{ ...frame }]}
+          clip={{ rect: { x: 8, y: 8, width: 184, height: 84 }, radius: 4 }}
+        />
+      )
+    );
+  expect(HTMLCanvasElement.prototype.toDataURL).not.toHaveBeenCalled();
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.spotlight"]')!.style.maskImage
+  ).toContain('svg');
+});
+
+it('reuses combined masks across identical live samples and invalidates changed geometry', async () => {
+  const frame = { opening: { x: 10, y: 40, width: 10, height: 10 }, radius: 2, dim: 0.5, blur: 12 };
+  const show = (x: number) =>
+    act(async () =>
+      root.render(
+        <ReviewSpotlightOverlay
+          output={{ ...output }}
+          frames={[{ ...frame }, { ...frame, opening: { ...frame.opening, x } }]}
+        />
+      )
+    );
+  await show(30);
+  const generated = vi.mocked(HTMLCanvasElement.prototype.toDataURL).mock.calls.length;
+  expect(generated).toBe(2);
+  for (let i = 0; i < 10; i++) await show(30);
+  expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(generated);
+  await show(40);
+  expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(generated + 2);
+});

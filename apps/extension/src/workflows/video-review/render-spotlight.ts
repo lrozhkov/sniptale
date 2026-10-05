@@ -1,7 +1,9 @@
+import { drawReviewBlurredScene } from './spotlight-blur';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
 import {
   quickEditSpotlightPath,
+  quickEditSpotlightOpeningPath,
   type QuickEditSpotlightFrame,
 } from '../../features/video/review/advanced/focus';
 
@@ -16,18 +18,10 @@ export function drawReviewSpotlight(
   frame: QuickEditSpotlightFrame | null
 ) {
   if (!frame) return;
-  if (frame.blur > 0 && scratch) {
-    const copy = scratch.getContext('2d');
-    if (!copy) throw new Error('Spotlight compositor is unavailable.');
-    copy.clearRect(0, 0, scratch.width, scratch.height);
-    copy.drawImage(canvas, 0, 0);
-  }
   context.save();
   context.clip(new Path2D(quickEditSpotlightPath(canvas, frame)), 'evenodd');
   if (frame.blur > 0 && scratch) {
-    context.filter = `blur(${frame.blur}px)`;
-    context.drawImage(scratch, 0, 0);
-    context.filter = 'none';
+    drawReviewBlurredScene(context, canvas, scratch, frame.blur);
   }
   if (frame.dim > 0) {
     context.fillStyle = `rgba(0,0,0,${frame.dim})`;
@@ -51,6 +45,28 @@ export function reviewSpotlightNeedsClip(
   );
 }
 
+/** Opening and window clips expand in parallel; final protection keeps the real window bounds. */
+export function reviewSpotlightOpeningClip(
+  frame: QuickEditSpotlightFrame,
+  clip: ReviewSpotlightClip | undefined
+): ReviewSpotlightClip | undefined {
+  if (!clip) return undefined;
+  const target = frame.protectionOpening ?? frame.opening;
+  const distance =
+    (frame.openingClipProgress ?? 1) < 1
+      ? Math.max(0, (frame.opening.width - target.width) / 2)
+      : 0;
+  return {
+    rect: {
+      x: clip.rect.x - distance,
+      y: clip.rect.y - distance,
+      width: clip.rect.width + 2 * distance,
+      height: clip.rect.height + 2 * distance,
+    },
+    radius: clip.radius + distance,
+  };
+}
+
 function maskCanvas(output: { width: number; height: number }) {
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.round(output.width));
@@ -72,30 +88,25 @@ export function createReviewSpotlightMasks(
   const coverage = (
     rect: QuickEditSpotlightFrame['opening'],
     radius: number,
-    progress: number,
+    bounds: ReviewSpotlightClip | undefined,
     clipped: boolean
   ) => {
     hole.context.clearRect(0, 0, hole.canvas.width, hole.canvas.height);
     hole.context.save();
-    if (clip && clipped) {
-      const p = Math.max(0, Math.min(1, progress));
+    if (bounds && clipped) {
       hole.context.beginPath();
       hole.context.roundRect(
-        clip.rect.x * p,
-        clip.rect.y * p,
-        output.width + (clip.rect.width - output.width) * p,
-        output.height + (clip.rect.height - output.height) * p,
-        clip.radius * p
+        bounds.rect.x,
+        bounds.rect.y,
+        bounds.rect.width,
+        bounds.rect.height,
+        bounds.radius
       );
       hole.context.clip();
     }
-    // Retain the legacy quadratic corner geometry, including its antialiased coverage.
-    hole.context.fillRect(0, 0, hole.canvas.width, hole.canvas.height);
-    hole.context.globalCompositeOperation = 'destination-out';
-    hole.context.fill(
-      new Path2D(quickEditSpotlightPath(output, { opening: rect, radius, dim: 0, blur: 0 })),
-      'evenodd'
-    );
+    // Draw the positive opening once. Subtracting its inverse under an antialiased clip
+    // applies edge coverage twice and leaves a translucent ring around the whole window.
+    hole.context.fill(new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius })));
     hole.context.restore();
     return hole.context.getImageData(0, 0, hole.canvas.width, hole.canvas.height).data;
   };
@@ -103,7 +114,7 @@ export function createReviewSpotlightMasks(
     coverage(
       frame.opening,
       frame.radius,
-      frame.openingClipProgress ?? 1,
+      reviewSpotlightOpeningClip(frame, clip),
       reviewSpotlightNeedsClip(frame, clip)
     )
   );
@@ -111,7 +122,7 @@ export function createReviewSpotlightMasks(
     coverage(
       frame.protectionOpening ?? frame.opening,
       frame.protectionRadius ?? frame.radius,
-      1,
+      clip,
       reviewSpotlightNeedsClip(frame, clip)
     )
   );
@@ -160,9 +171,12 @@ export function drawReviewSpotlights(
   const masks = createReviewSpotlightMasks(canvas, frames, clip);
   if (masks.radius > 0) {
     const layer = maskCanvas(canvas);
-    layer.context.filter = `blur(${masks.radius}px)`;
-    layer.context.drawImage(canvas, 0, 0);
-    layer.context.filter = 'none';
+    drawReviewBlurredScene(
+      layer.context,
+      canvas,
+      scratch ?? document.createElement('canvas'),
+      masks.radius
+    );
     layer.context.globalCompositeOperation = 'destination-in';
     layer.context.drawImage(masks.blur, 0, 0);
     context.drawImage(layer.canvas, 0, 0);

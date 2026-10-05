@@ -1,3 +1,4 @@
+import { drawReviewBlurredScene } from './spotlight-blur';
 import { afterEach, expect, it, vi } from 'vitest';
 import { drawReviewSpotlight } from './render-spotlight';
 
@@ -27,7 +28,15 @@ it('copies the composed scene before blur and clips only the outside with even-o
     scratch as unknown as HTMLCanvasElement,
     { opening: { x: 25, y: 20, width: 50, height: 40 }, radius: 4, dim: 0.3, blur: 6 }
   );
-  expect(events).toEqual(['snapshot', 'save', 'clip', 'blur', 'dim', 'restore']);
+  expect(events).toEqual([
+    'save',
+    'clip',
+    ...Array<string>(9).fill('snapshot'),
+    'blur',
+    'dim',
+    'restore',
+  ]);
+  expect(scratch).toMatchObject({ width: 140, height: 120 });
   expect(context.clip.mock.calls[0]).toMatchObject([expect.anything(), 'evenodd']);
   expect(context.filter).toBe('none');
 });
@@ -154,8 +163,8 @@ it('expands only the animated contract clip while the protection hole retains th
     { width: 100, height: 100 },
     [
       {
-        opening: { x: 0, y: 0, width: 100, height: 100 },
-        radius: 0,
+        opening: { x: -70, y: -40, width: 180, height: 180 },
+        radius: 50,
         dim: 0.8,
         blur: 0,
         protectionOpening: { x: -20, y: 10, width: 80, height: 80 },
@@ -167,7 +176,44 @@ it('expands only the animated contract clip while the protection hole retains th
     { rect: { x: 20, y: 20, width: 60, height: 60 }, radius: 4 }
   );
   expect(rectangles.mock.calls).toEqual([
-    [0, 0, 100, 100, 0],
+    [-30, -30, 160, 160, 54],
     [20, 20, 60, 60, 4],
   ]);
+});
+
+it('reuses the padded surface between video frames and refreshes its pixels', () => {
+  const copy = { clearRect: vi.fn(), drawImage: vi.fn() };
+  const scratch = { width: 140, height: 120, getContext: () => copy };
+  const width = vi.fn(),
+    height = vi.fn();
+  Object.defineProperty(scratch, 'width', { get: () => 140, set: width });
+  Object.defineProperty(scratch, 'height', { get: () => 120, set: height });
+  const context = { filter: 'none', drawImage: vi.fn() };
+  const source = { width: 100, height: 80 } as HTMLCanvasElement;
+  for (let frame = 0; frame < 2; frame++)
+    drawReviewBlurredScene(
+      context as unknown as CanvasRenderingContext2D,
+      source,
+      scratch as unknown as HTMLCanvasElement,
+      6
+    );
+  expect(width).not.toHaveBeenCalled();
+  expect(height).not.toHaveBeenCalled();
+  expect(copy.clearRect).toHaveBeenCalledTimes(2);
+  expect(context.drawImage).toHaveBeenCalledTimes(2);
+  expect(context.filter).toBe('none');
+});
+
+it('fails the blur composition when its backing context is unavailable', () => {
+  const scratch = { width: 140, height: 120, getContext: () => null };
+  const context = { drawImage: vi.fn() };
+  expect(() =>
+    drawReviewBlurredScene(
+      context as unknown as CanvasRenderingContext2D,
+      { width: 100, height: 80 } as HTMLCanvasElement,
+      scratch as unknown as HTMLCanvasElement,
+      6
+    )
+  ).toThrow('Spotlight compositor is unavailable.');
+  expect(context.drawImage).not.toHaveBeenCalled();
 });
