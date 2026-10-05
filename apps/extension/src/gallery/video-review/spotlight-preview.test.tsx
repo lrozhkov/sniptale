@@ -228,7 +228,9 @@ it('keeps the inspector Spotlight frame visible after hover and cancellation', a
   await pointer(view.plane, 'pointermove', -10, -10);
   expect(view.group.getAttribute('data-controls-visible')).toBe('true');
   await pointer(view.group, 'pointerdown', 50);
+  expect(view.group.getAttribute('data-controls-visible')).toBe('true');
   await pointer(view.plane, 'pointermove', 70);
+  expect(view.group.getAttribute('data-controls-visible')).toBe('true');
   await key(view.group, 'Escape');
   expect(view.group.getAttribute('data-controls-visible')).toBe('true');
   expect(view.onChange).not.toHaveBeenCalled();
@@ -253,6 +255,71 @@ it('preserves interaction-only Spotlight controls on the main stage', async () =
   await pointer(plane, 'pointermove', -10, -10);
   expect(group.dataset['controlsVisible']).toBe('false');
 });
+
+it.each([null, 'nw', 'ne', 'sw', 'se'] as const)(
+  'hides stage hover controls from pointerdown through movement (%s)',
+  async (corner) => {
+    const onChange = vi.fn();
+    act(() =>
+      root.render(
+        <ReviewFocusArea
+          area={createQuickEditSpotlight().area}
+          output={output}
+          video={rect}
+          onChange={onChange}
+        />
+      )
+    );
+    const group = host.querySelector<HTMLElement>('[data-focus-frame]')!;
+    const plane = host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!;
+    await pointer(group, 'pointerover', 60);
+    expect(group.dataset['controlsVisible']).toBe('true');
+    const target = corner ? group.querySelector(`[data-resize="${corner}"]`)! : group;
+    await pointer(target, 'pointerdown', 60);
+    expect(group.dataset['controlsVisible']).toBe('false');
+    expect(group.dataset['pointerInteraction']).toBe('true');
+    await pointer(plane, 'pointermove', 70);
+    expect(group.dataset['controlsVisible']).toBe('false');
+    await pointer(plane, 'pointerup', 70);
+    expect(group.dataset['controlsVisible']).toBe('true');
+    expect(onChange).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['pointerup', 'pointercancel', 'lostpointercapture', 'Escape', 'blur'])(
+  'restores stage hover after %s and never shows it outside the frame',
+  async (finish) => {
+    const onChange = vi.fn(),
+      onPreview = vi.fn();
+    act(() =>
+      root.render(
+        <ReviewFocusArea
+          area={createQuickEditSpotlight().area}
+          output={output}
+          video={rect}
+          onChange={onChange}
+          onPreview={onPreview}
+        />
+      )
+    );
+    const group = host.querySelector<HTMLElement>('[data-focus-frame]')!;
+    const plane = host.querySelector('[data-ui="gallery.videoReview.focusArea"]')!;
+    for (const endX of [70, 1000]) {
+      await pointer(group, 'pointerdown', 60);
+      await pointer(plane, 'pointermove', endX);
+      expect(group.dataset['controlsVisible']).toBe('false');
+      if (finish === 'Escape') await key(group, 'Escape');
+      else if (finish === 'blur')
+        await act(async () => {
+          window.dispatchEvent(new Event('blur'));
+        });
+      else await pointer(plane, finish, endX);
+      expect(group.dataset['controlsVisible']).toBe(String(endX === 70));
+      expect(onPreview).toHaveBeenLastCalledWith(null);
+    }
+    expect(onChange).toHaveBeenCalledTimes(finish === 'pointerup' ? 2 : 0);
+  }
+);
 
 it('inverts the actual transformed video bounds for source-attached area gestures', async () => {
   const onChange = vi.fn(),

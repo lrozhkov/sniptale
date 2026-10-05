@@ -139,7 +139,7 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     host,
     frame,
     area: areaValue,
-    visible: hovered || !!draft,
+    visible: hovered && !draft,
     pointerInteraction,
     planeHandlers: {
       onPointerMove,
