@@ -145,6 +145,21 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
       host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.fit"]')!.click()
     );
     expect(onZoom).toHaveBeenCalledWith(1);
+    act(() =>
+      root.render(
+        <ReviewToolbar
+          {...props}
+          time={3}
+          resultDuration={8}
+          playbackRange={{ start: 1, end: 2 }}
+        />
+      )
+    );
+    expect(host.querySelector('[data-toolbar-transport]')?.textContent).toContain(
+      '0:01.00 – 0:02.00'
+    );
+    expect(host.querySelector('[data-toolbar-transport]')?.textContent).not.toContain('0:03.00');
+    expect(host.querySelector('[title="gallery.videoReview.resultDuration"]')).toBeNull();
   } finally {
     act(() => root.unmount());
     host.remove();

@@ -50,6 +50,7 @@ type ZoomTrackProps = {
   selectedId: string | null;
   onSelect(id: string | null): void;
   onAdd(): void;
+  addHint?: string | undefined;
   onLink?(id: string, targetId: string | null): void;
   /** Transient connection-settings selection; a linked gap opens it instead of unlinking. */
   linkSelectedId?: string | null;
@@ -213,6 +214,8 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
         <>
           <ReviewButton
             label={translate('gallery.videoReview.zoomAdd')}
+            title={props.addHint ?? translate('gallery.videoReview.zoomAdd')}
+            disabled={!!props.addHint}
             className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
             onClick={props.onAdd}
           >

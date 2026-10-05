@@ -1,3 +1,5 @@
+import { reviewOriginalAudioPlacementIssue, reviewRangePlacementIssue } from './range-placement';
+import { translate } from '../../platform/i18n';
 import type { ReviewPlaybackRange } from './playback-range';
 import { withReviewFocusType } from './zoom-editor';
 import { quickEditFocusConflicts } from '../../features/video/review/advanced/focus-layout';
@@ -36,6 +38,7 @@ function ReviewZoomLane(props: {
   edits: readonly ReviewEdit[];
   zoom: ReturnType<typeof useReviewZoomEditor>;
   onAdd(): void;
+  addHint?: string | undefined;
   sourceSelection?: ReviewAnchor | undefined;
   toOutputTime(source: number): number | null;
 }) {
@@ -62,6 +65,7 @@ function ReviewZoomLane(props: {
       onSelectLink={(id) =>
         (props.beforeAction ?? ((action) => action()))(() => props.zoom.setLinkSelection(id))
       }
+      addHint={props.addHint}
       onAdd={() => (props.beforeAction ?? ((action) => action()))(props.onAdd)}
       onDragCommit={props.zoom.commitDrag}
     />
@@ -164,10 +168,15 @@ type TimelineBindingProps = {
 /** Toolbar lock covers every content and presentation control during blocked phases. */
 function ReviewTimelineToolsBinding(
   props: TimelineBindingProps & {
-    focusTool: { active: boolean; available: boolean; onToggle(): void };
+    focusTool: { active: boolean; available: boolean; hint?: string | undefined; onToggle(): void };
     clearFocusTool(): void;
   }
 ) {
+  const range = props.playbackRange
+    ? { kind: 'range' as const, ...props.playbackRange }
+    : props.selection;
+  const issue = (kind: 'cut' | 'speed') =>
+    !props.playbackRange && props.selectedObject ? null : reviewEditRangeIssue(props, kind, range);
   return (
     <fieldset
       disabled={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
@@ -176,6 +185,8 @@ function ReviewTimelineToolsBinding(
       <ReviewTimelineToolbar
         beforeAction={props.beforeAction}
         originalAudioEditor={props.audio}
+        rulerRange={props.playbackRange ? range : undefined}
+        placementHints={{ cut: placementHint(issue('cut')), speed: placementHint(issue('speed')) }}
         focusTool={props.focusTool}
         editing={{
           mode: props.editing.mode,
@@ -191,25 +202,25 @@ function ReviewTimelineToolsBinding(
             props.clearFocusTool();
             props.audio.setOriginalTool(false);
             props.audio.setOriginalRangeSelected(false);
-            void props.editing.toggle(kind);
+            if (props.playbackRange) {
+              if (!issue(kind)) void props.editing.commitRange(range, null, kind);
+            } else void props.editing.toggle(kind);
           },
           canApply: props.editing.canApply,
           changeRate: props.editing.changeRate,
           changeAudio: props.editing.changeAudio,
         }}
-        selectedObject={props.selectedObject}
+        selectedObject={props.playbackRange ? false : props.selectedObject}
         busy={props.busy}
         composerBusy={props.composerBusy}
-        selection={props.selection}
+        selection={range}
         edits={props.edits}
         advanced={props.advanced}
         telemetryAvailable={props.telemetryAvailable}
         setTrackVisibility={props.setTrackVisibility}
         setMode={props.setMode}
         onDownloadFragment={() =>
-          props.selection.kind === 'range'
-            ? props.editing.exporter.downloadSelection(props.selection)
-            : undefined
+          range.kind === 'range' ? props.editing.exporter.downloadSelection(range) : undefined
         }
       />
     </fieldset>
@@ -228,6 +239,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const onZoomAdd = () => {
     focus.clear();
     props.audio.setOriginalTool(false);
+    if (props.playbackRange) {
+      focus.commit({ kind: 'range', ...props.playbackRange });
+      return;
+    }
     const at = props.toOutputTime(props.time);
     if (at === null) props.onCutPlacement();
     else props.zoom.add(at, props.resultDuration);
@@ -237,6 +252,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       playbackRange={props.playbackRange}
       onPlaybackRange={props.onPlaybackRange}
       sourceRangeTool={!!props.editing.mode}
+      placementHints={reviewCursorPlacementHints(props, focus.tool.hint)}
       zoomAnchor={props.zoomAnchor}
       beforeAction={props.beforeAction}
       onOpenExport={() => (props.beforeAction ?? ((action) => action()))(props.onOpenExport)}
@@ -285,6 +301,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 edits={props.edits}
                 zoom={props.zoom}
                 onAdd={onZoomAdd}
+                addHint={props.playbackRange ? focus.tool.hint : undefined}
                 toOutputTime={props.toOutputTime}
               />
             ),
@@ -389,6 +406,9 @@ function useOriginalAudioPlacement(props: TimelineBindingProps) {
 
 /** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */
 function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackProjection) {
+  const target = props.playbackRange
+    ? { kind: 'range' as const, ...props.playbackRange }
+    : props.selection;
   const { drawing: enabled, setDrawing: setEnabled } = props.zoom;
   const [preview, setPreview] = useState<ReviewAnchor | null>(null);
   const visible = resolveQuickEditEffectiveFeatures(props.advanced).zoomTrackVisible;
@@ -425,9 +445,9 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
   };
   const commit = (range: ReviewAnchor) => {
     const region = candidate(range);
-    if (!region) return;
+    if (!region || props.advanced.zoom.regions.length >= 512) return;
     if (props.zoom.addRegion(region)) {
-      setEnabled(false);
+      setEnabled(!!props.playbackRange);
       props.setSelection({
         kind: 'point',
         time: range.kind === 'range' ? range.start : props.time,
@@ -444,19 +464,29 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
       type: props.zoom.insertionType,
       onType: props.zoom.setInsertionType,
       active,
-      available:
-        active ||
-        props.selectedObject ||
-        props.selection.kind !== 'range' ||
-        !!candidate(props.selection),
+      available: props.playbackRange
+        ? !!candidate(target) && props.advanced.zoom.regions.length < 512
+        : active || props.selectedObject || target.kind !== 'range' || !!candidate(target),
+      hint:
+        target.kind === 'range' && (props.playbackRange || !props.selectedObject)
+          ? placementHint(
+              reviewRangePlacementIssue({
+                range: target,
+                edits: props.edits,
+                available: !!candidate(target),
+                limit: props.advanced.zoom.regions.length >= 512,
+                occupied: !candidate(target) && target.end - target.start >= 0.001,
+              })
+            )
+          : undefined,
       onToggle: () => {
         props.audio.setOriginalTool(false);
         props.editing.setCutting(false);
-        if (active) setEnabled(false);
-        else if (!props.selectedObject && props.selection.kind === 'range') {
+        if (props.playbackRange || (!active && !props.selectedObject && target.kind === 'range')) {
           props.setTrackVisibility('zoom', true);
-          commit(props.selection);
-        } else {
+          commit(target);
+        } else if (active) setEnabled(false);
+        else {
           props.setTrackVisibility('zoom', true);
           setEnabled(true);
         }
@@ -480,4 +510,52 @@ export function reviewAudioSnapTimes(
           .flatMap((region) => [region.start, region.end])
       : []),
   ];
+}
+
+/** Source edit availability shares the exact commit candidate, with explicit placement feedback. */
+function reviewEditRangeIssue(
+  props: TimelineBindingProps,
+  kind: 'cut' | 'speed',
+  range: ReviewAnchor
+) {
+  return reviewRangePlacementIssue({
+    range,
+    edits: props.edits,
+    available: props.editing.canApply(kind, range),
+    occupied:
+      range.kind === 'range' &&
+      props.edits.some(
+        (edit) => edit.kind === kind && edit.start < range.end && edit.end > range.start
+      ),
+    removesAll:
+      kind === 'cut' &&
+      range.kind === 'range' &&
+      range.end - range.start >=
+        props.source.duration -
+          props.edits.reduce(
+            (total, edit) => total + (edit.kind === 'cut' ? edit.end - edit.start : 0),
+            0
+          ),
+  });
+}
+function placementHint(issue: ReturnType<typeof reviewRangePlacementIssue>) {
+  return issue ? translate(`gallery.videoReview.placement_${issue}`) : undefined;
+}
+function reviewCursorPlacementHints(props: TimelineBindingProps, focus: string | undefined) {
+  if (!props.playbackRange) return undefined;
+  const range = { kind: 'range' as const, ...props.playbackRange };
+  return {
+    source: props.editing.mode
+      ? placementHint(reviewEditRangeIssue(props, props.editing.mode, range))
+      : undefined,
+    focus,
+    original: placementHint(
+      reviewOriginalAudioPlacementIssue({
+        range,
+        edits: props.edits,
+        available: props.audio.canAddOriginal(range),
+        ranges: props.audioState.original.ranges,
+      })
+    ),
+  };
 }

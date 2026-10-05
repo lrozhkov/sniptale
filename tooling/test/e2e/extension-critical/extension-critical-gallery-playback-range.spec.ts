@@ -81,14 +81,22 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
-        dialog.getByRole('button', { name: label(key), exact: true });
+        dialog
+          .getByRole('button', { name: label(key), exact: true })
+          .and(dialog.locator('[aria-label]:not([data-audio-id])'));
       const video = dialog.locator('video').first();
       await expect.poll(() => video.evaluate((node) => node.readyState)).toBeGreaterThan(1);
       // Ruler looping works even when basic Cut would snap edits to distant keyframes.
       await button('gallery.videoReview.cutMode').click();
+      const toolbar = dialog.locator('[data-ui="gallery.videoReview.toolbar"]');
+      const toolbarHeight = (await toolbar.boundingBox())!.height;
       await rulerDrag(page, 1.25, 1.85);
       const summary = dialog.locator('[data-ui="gallery.videoReview.loopSummary"]');
       await expect(summary).toContainText('0:01.25');
+      expect((await toolbar.boundingBox())!.height).toBe(toolbarHeight);
+      const clear = button('gallery.videoReview.clearPlaybackRange');
+      await expect(clear).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+      expect((await clear.boundingBox())!.height).toBeLessThanOrEqual(28);
       await expect(video).toHaveJSProperty('paused', true);
       await expect.poll(() => video.evaluate((node) => node.currentTime)).toBeCloseTo(1.25, 1);
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(0);
@@ -135,14 +143,56 @@ for (const variant of [
       await expect(focus).not.toHaveCSS('box-shadow', 'none');
       await page.screenshot({ path: info.outputPath('focus-tool-lane.png'), fullPage: false });
       await expect(summary).toBeVisible();
-      await expect(focus.locator('[role="button"]')).toHaveCount(0);
+      await expect(focus.locator('[role="button"]')).toHaveCount(1);
+      await expect(button('gallery.videoReview.focusRangeTool')).toBeDisabled();
+      await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute(
+        'title',
+        label('gallery.videoReview.placement_occupied')
+      );
+      await expect(button('gallery.videoReview.zoomAdd')).toBeDisabled();
+      for (const kind of ['focusSpotlight', 'focusBorder'] as const) {
+        await button('gallery.videoReview.focusType').click();
+        await page
+          .getByRole('option', { name: label(`gallery.videoReview.${kind}`), exact: true })
+          .click();
+        await expect(button('gallery.videoReview.focusRangeTool')).toBeEnabled();
+        await button('gallery.videoReview.focusRangeTool').click();
+      }
+      await expect(focus.locator('[role="button"]')).toHaveCount(3);
+
       await button('gallery.videoReview.speedMode').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'source');
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
       await expect(source).toBeInViewport();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(1);
+      await expect(button('gallery.videoReview.speedMode')).toBeDisabled();
+      const speedBounds = (await dialog
+        .locator('[data-ui="gallery.videoReview.editBlock"]')
+        .boundingBox())!;
+      const rangeBounds = (await overlay.boundingBox())!;
+      expect(Math.abs(speedBounds.x - rangeBounds.x)).toBeLessThan(2);
+      expect(Math.abs(speedBounds.width - rangeBounds.width)).toBeLessThan(2);
+
+      await expect(button('gallery.videoReview.speedMode')).toHaveAttribute(
+        'title',
+        label('gallery.videoReview.placement_occupied')
+      );
+      await source.hover({ position: { x: 10, y: 40 } });
+      await expect(plane).toHaveCSS('cursor', 'crosshair');
+      await expect(
+        dialog.locator('[title="' + label('gallery.videoReview.resultDuration') + '"]')
+      ).toHaveCount(0);
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'original');
       await expect(dialog.locator('[data-original-audio-lane]')).toBeInViewport();
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]')
+      ).toHaveCount(1);
+      await expect(button('gallery.videoReview.originalAudioRange')).toBeDisabled();
+      await expect(button('gallery.videoReview.originalAudioRange')).toHaveAttribute(
+        'title',
+        label('gallery.videoReview.placement_occupied')
+      );
       await button('gallery.videoReview.pointerTool').click();
       await dialog.locator('[data-ui="gallery.videoReview.ruler"]').scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('loop-all-lanes.png'), fullPage: false });
@@ -175,11 +225,23 @@ for (const variant of [
       // Existing source-lane drawing still creates an edit.
       await button('gallery.videoReview.speedMode').click();
       const sourceRect = (await source.boundingBox())!;
-      await page.mouse.move(sourceRect.x + sourceRect.width * 0.2, sourceRect.y + 20);
+      await page.mouse.move(sourceRect.x + sourceRect.width * 0.65, sourceRect.y + 20);
       await page.mouse.down();
-      await page.mouse.move(sourceRect.x + sourceRect.width * 0.4, sourceRect.y + 20, { steps: 5 });
+      await page.mouse.move(sourceRect.x + sourceRect.width * 0.8, sourceRect.y + 20, { steps: 5 });
       await page.mouse.up();
-      await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(1);
+      await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(2);
+      await rulerDrag(page, 11, 11.5);
+      await button('gallery.videoReview.cutMode').click();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(3);
+      await expect(summary).toHaveCount(0);
+      await rulerDrag(page, 10.8, 11.7);
+      for (const key of ['cutMode', 'speedMode', 'focusRangeTool', 'originalAudioRange'] as const) {
+        await expect(button(`gallery.videoReview.${key}`)).toBeDisabled();
+        await expect(button(`gallery.videoReview.${key}`)).toHaveAttribute(
+          'title',
+          label('gallery.videoReview.placement_cut')
+        );
+      }
       await rulerDrag(page, 1, 4);
       await page.screenshot({ path: info.outputPath('loop-with-speed.png'), fullPage: false });
       await dialog

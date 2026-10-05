@@ -237,6 +237,23 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Не удалось открыть сохранённые правки этого видео. Исходное видео и сохранённые данные не изменены.',
     en: 'Could not open the saved edits for this video. The original video and saved data are unchanged.',
   },
+  placement_cut: { ru: 'Интервал пересекает вырезанный участок.', en: 'The range overlaps a cut.' },
+  placement_occupied: {
+    ru: 'На этой дорожке интервал уже занят.',
+    en: 'This range is already occupied on this track.',
+  },
+  'placement_whole-video': {
+    ru: 'Нельзя вырезать всё видео.',
+    en: 'The entire video cannot be cut.',
+  },
+  'placement_invalid-range': {
+    ru: 'Не удалось разместить эффект: выберите свободный интервал достаточной длительности.',
+    en: 'Cannot place the effect: choose a free range with sufficient duration.',
+  },
+  placement_limit: {
+    ru: 'Достигнут предел числа элементов на дорожке.',
+    en: 'The track has reached its item limit.',
+  },
   loadFailed: {
     ru: 'Не удалось открыть видео. Повторите попытку.',
     en: 'Could not open this video. Try again.',

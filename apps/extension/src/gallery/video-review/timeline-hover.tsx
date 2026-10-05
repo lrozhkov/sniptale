@@ -5,7 +5,11 @@ import { planeTime, reviewPlaneLane } from './timeline-drag';
 
 type HoverLane = 'source' | 'focus' | 'original' | 'seek' | 'ruler';
 type Hover = { time: number; x: number; snapped: boolean; lane: HoverLane };
+export type ReviewPlacementHints = Partial<
+  Record<'source' | 'focus' | 'original', string | undefined>
+>;
 type HoverOptions = {
+  placementHints?: ReviewPlacementHints | undefined;
   busy: boolean;
   duration: number;
   gutter: number;
@@ -71,10 +75,19 @@ export function useReviewTimelineHover(options: HoverOptions) {
       lane,
     });
   };
+  const blocked =
+    hover && (hover.lane === 'source' || hover.lane === 'focus' || hover.lane === 'original')
+      ? options.placementHints?.[hover.lane]
+      : undefined;
   return {
+    reason: blocked,
     move,
     clear: () => setHover(null),
-    cursor: !options.busy && hover && hover.lane !== 'seek' ? rangeCursor : 'default',
+    cursor: blocked
+      ? 'crosshair'
+      : !options.busy && hover && hover.lane !== 'seek'
+        ? rangeCursor
+        : 'default',
     hover,
   };
 }

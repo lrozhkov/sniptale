@@ -11,7 +11,11 @@ import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { ReviewTelemetryStrip } from './timeline-telemetry';
 import { useReviewTimelinePlaneDrag } from './timeline-drag';
-import { ReviewTimelineHoverGuide, useReviewTimelineHover } from './timeline-hover';
+import {
+  ReviewTimelineHoverGuide,
+  useReviewTimelineHover,
+  type ReviewPlacementHints,
+} from './timeline-hover';
 import {
   useReviewTimelineGeometry,
   useReviewTimelineNavigation,
@@ -21,6 +25,7 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  placementHints?: ReviewPlacementHints | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   busy?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
@@ -87,6 +92,7 @@ export function ReviewTimeline(props: TimelineProps) {
   });
   const plane = useReviewTimelinePlaneDrag({ ...props, gutter });
   const hover = useReviewTimelineHover({
+    placementHints: props.placementHints,
     busy: !!props.busy,
     duration: props.duration,
     gutter,
@@ -125,6 +131,7 @@ export function ReviewTimeline(props: TimelineProps) {
           ref={plane.plane}
           data-ui="gallery.videoReview.timePlane"
           data-active-tool-lane={activeLane ?? undefined}
+          title={hover.reason}
           role="slider"
           tabIndex={0}
           aria-label={translate('gallery.videoReview.position')}

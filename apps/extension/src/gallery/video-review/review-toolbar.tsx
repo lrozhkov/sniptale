@@ -1,3 +1,4 @@
+import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { useReviewAudio } from './use-review-audio';
@@ -29,6 +30,7 @@ type ToolbarProps = {
   focusTool?: {
     active: boolean;
     available: boolean;
+    hint?: string | undefined;
     type?: ReviewFocusType;
     onType?(type: ReviewFocusType): void;
     onToggle(): void;
@@ -45,6 +47,8 @@ type ToolbarProps = {
     changeRate(rate: Editing['rate']): void;
     changeAudio(audio: Editing['audio']): void;
   };
+  rulerRange?: ReviewAnchor | undefined;
+  placementHints?: { cut?: string | undefined; speed?: string | undefined };
   selectedObject?: boolean;
   busy: boolean;
   composerBusy: boolean;
@@ -63,6 +67,20 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
   const admit = props.beforeAction ?? ((action: () => void) => action());
   const advanced = props.advanced;
   const sourceAudioReady = !!props.editing.exporter.index?.audioCodec;
+  const volumeIssue =
+    props.rulerRange && props.originalAudioEditor
+      ? reviewOriginalAudioPlacementIssue({
+          range: props.rulerRange,
+          edits: props.edits,
+          available: props.originalAudioEditor.canAddOriginal(props.rulerRange),
+          ranges: props.advanced.audio.original.ranges,
+        })
+      : null;
+  const volumeHint = !sourceAudioReady
+    ? translate('gallery.videoReview.originalAudioUnavailable')
+    : volumeIssue
+      ? translate(`gallery.videoReview.placement_${volumeIssue}`)
+      : undefined;
   return (
     <>
       {advanced.ui.mode === 'basic' ? (
@@ -97,14 +115,22 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
                 : props.editing.mode
           }
           available={!!props.editing.exporter.index}
+          cutHint={props.placementHints?.cut}
+          speedHint={props.placementHints?.speed}
           cutAvailable={
-            (props.selectedObject || !props.originalAudioEditor?.originalRangeSelected) &&
+            !props.placementHints?.cut &&
+            (props.rulerRange ||
+              props.selectedObject ||
+              !props.originalAudioEditor?.originalRangeSelected) &&
             (props.selectedObject ||
               props.selection.kind !== 'range' ||
               props.editing.canApply('cut', props.selection))
           }
           speedAvailable={
-            (props.selectedObject || !props.originalAudioEditor?.originalRangeSelected) &&
+            !props.placementHints?.speed &&
+            (props.rulerRange ||
+              props.selectedObject ||
+              !props.originalAudioEditor?.originalRangeSelected) &&
             (props.selectedObject ||
               props.selection.kind !== 'range' ||
               props.editing.canApply('speed', props.selection))
@@ -124,18 +150,17 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           <ReviewButton
             label={translate('gallery.videoReview.originalAudioRange')}
             toolbarLabel={translate('gallery.videoReview.volume')}
-            title={translate(
-              sourceAudioReady
-                ? 'gallery.videoReview.originalAudioRangeHint'
-                : 'gallery.videoReview.originalAudioUnavailable'
-            )}
+            title={volumeHint ?? translate('gallery.videoReview.originalAudioRangeHint')}
             aria-pressed={props.originalAudioEditor.originalTool}
             className={plain}
-            disabled={busy || !sourceAudioReady}
+            disabled={busy || !sourceAudioReady || !!volumeHint}
             onClick={() =>
               admit(() => {
                 props.editing.setCutting(false);
-                if (props.originalAudioEditor?.originalTool)
+                if (props.rulerRange) {
+                  if (!volumeHint && props.originalAudioEditor?.addOriginal(props.rulerRange))
+                    props.originalAudioEditor.setOriginalTool(true);
+                } else if (props.originalAudioEditor?.originalTool)
                   props.originalAudioEditor.setOriginalTool(false);
                 else if (!props.selectedObject && props.selection.kind === 'range') {
                   if (!props.originalAudioEditor?.addOriginal(props.selection))
@@ -293,7 +318,7 @@ function ReviewFocusToolControl({
       <ReviewButton
         label={translate('gallery.videoReview.focusRangeTool')}
         toolbarLabel={translate('gallery.videoReview.zoomTrack')}
-        title={translate('gallery.videoReview.focusRangeHint')}
+        title={tool.hint ?? translate('gallery.videoReview.focusRangeHint')}
         aria-pressed={tool.active}
         className={plain}
         disabled={busy || !tool.available}

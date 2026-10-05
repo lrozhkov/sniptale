@@ -358,3 +358,14 @@ it('reveals only the active tool lane vertically and preserves horizontal scroll
   expect(props.onSeek).not.toHaveBeenCalled();
   expect(host.querySelector('[data-ui="gallery.videoReview.playbackRangeOverlay"]')).not.toBeNull();
 });
+
+it('removes the add cursor and explains blocked selected-range placement', () => {
+  const { host } = renderTimeline({
+    sourceRangeTool: true,
+    placementHints: { source: 'Range already occupied' },
+  });
+  const plane = planeWithMetrics(host);
+  hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 100);
+  expect(plane.style.cursor).toBe('crosshair');
+  expect(plane.title).toBe('Range already occupied');
+});

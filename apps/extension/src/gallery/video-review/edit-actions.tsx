@@ -50,6 +50,8 @@ export function ReviewTimelineTools(props: {
   mode: 'cut' | 'speed' | 'audio' | 'focus' | null;
   available: boolean;
   cutAvailable?: boolean;
+  cutHint?: string | undefined;
+  speedHint?: string | undefined;
   speedAvailable?: boolean;
   busy: boolean;
   rate: number;
@@ -73,7 +75,7 @@ export function ReviewTimelineTools(props: {
       <ReviewButton
         label={translate('gallery.videoReview.cutMode')}
         toolbarLabel={translate('gallery.videoReview.toolbarCut')}
-        title={translate('gallery.videoReview.cutGesture')}
+        title={props.cutHint ?? translate('gallery.videoReview.cutGesture')}
         aria-pressed={props.mode === 'cut'}
         className={plain}
         disabled={!props.available || props.busy || props.cutAvailable === false}
@@ -84,6 +86,7 @@ export function ReviewTimelineTools(props: {
       <ReviewButton
         label={translate('gallery.videoReview.speedMode')}
         toolbarLabel={translate('gallery.videoReview.speedMode')}
+        title={props.speedHint ?? translate('gallery.videoReview.speedMode')}
         aria-pressed={props.mode === 'speed'}
         className={plain}
         disabled={!props.available || props.busy || props.speedAvailable === false}

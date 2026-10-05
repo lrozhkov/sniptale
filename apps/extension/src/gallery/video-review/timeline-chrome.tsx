@@ -1,3 +1,4 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReviewPlaybackRange } from './playback-range';
 import { ReviewResetControl } from './reset-control';
 import { AutosaveControl } from '@sniptale/ui/autosave-control';
@@ -88,7 +89,7 @@ function ReviewLoopSummary(props: {
   return props.range ? (
     <div
       data-ui="gallery.videoReview.loopSummary"
-      className="flex items-center justify-center gap-1 text-[10px] leading-3 tabular-nums
+      className="flex items-center justify-center gap-1 text-xs font-semibold tabular-nums
                 text-[var(--sniptale-color-accent-emphasis)] whitespace-nowrap"
       title={[
         translate('gallery.videoReview.playbackRange'),
@@ -99,17 +100,18 @@ function ReviewLoopSummary(props: {
       <span>
         {playbackTime(props.range.start)} – {playbackTime(props.range.end)}
       </span>
-      <ReviewButton
+      <ContentToolbarButton
         disabled={props.busy}
-        label={translate('gallery.videoReview.clearPlaybackRange')}
-        className={`${plain} !h-4 !min-h-4 !w-4 !min-w-4 !p-0`}
+        title={translate('gallery.videoReview.clearPlaybackRange')}
+        tone="utility"
+        size="compact"
         onKeyDown={(event) => {
           if (event.key === ' ') event.stopPropagation();
         }}
         onClick={props.onClear}
       >
         <X size={12} aria-hidden="true" />
-      </ReviewButton>
+      </ContentToolbarButton>
     </div>
   ) : null;
 }
@@ -195,16 +197,20 @@ export function ReviewToolbar(props: {
           <SkipForward size={16} strokeWidth={2.2} aria-hidden="true" />
         </ReviewButton>
         <div className="min-w-0 text-center">
-          <ReviewLoopSummary
-            range={props.playbackRange}
-            busy={props.busy}
-            onClear={props.onClearPlaybackRange}
-          />
-          <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
-            {playbackTime(props.time)} / {playbackTime(props.duration)}
-          </span>
+          {props.playbackRange ? (
+            <ReviewLoopSummary
+              range={props.playbackRange}
+              busy={props.busy}
+              onClear={props.onClearPlaybackRange}
+            />
+          ) : (
+            <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
+              {playbackTime(props.time)} / {playbackTime(props.duration)}
+            </span>
+          )}
         </div>
-        {props.resultDuration !== undefined &&
+        {!props.playbackRange &&
+        props.resultDuration !== undefined &&
         Math.abs(props.resultDuration - props.duration) > 0.05 ? (
           <output
             title={translate('gallery.videoReview.resultDuration')}
