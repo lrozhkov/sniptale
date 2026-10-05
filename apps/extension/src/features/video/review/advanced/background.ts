@@ -8,6 +8,14 @@ const DEFAULT_LAYOUT: QuickEditBackgroundLayout = { padding: 40, cornerRadius: 2
 const DEFAULT_COLOR = '#000000ff';
 
 const clampLayout = (layout: QuickEditBackgroundLayout): QuickEditBackgroundLayout => ({
+  ...(layout.shadow
+    ? {
+        shadow: {
+          ...layout.shadow,
+          intensity: Math.max(0, Math.min(100, layout.shadow.intensity)),
+        },
+      }
+    : {}),
   padding: Math.max(0, Math.min(MAX_BACKGROUND_SIZE, layout.padding)),
   cornerRadius: Math.max(0, Math.min(MAX_BACKGROUND_SIZE, layout.cornerRadius)),
 });

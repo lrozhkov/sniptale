@@ -3,6 +3,7 @@ import { ReviewFocusArea } from './focus-area';
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import type {
   QuickEditSpotlight,
+  QuickEditBackgroundSettings,
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import { paintZoomPreview, type ZoomPreviewLayout } from './zoom-preview-paint';
@@ -18,6 +19,7 @@ export function ReviewSpotlightPreview(props: {
   output: { width: number; height: number };
   layout: ZoomPreviewLayout;
   cornerRadius: number;
+  background?: QuickEditBackgroundSettings;
   scale: number;
   disabled: boolean;
   onChange(value: QuickEditSpotlight): void;
@@ -45,6 +47,8 @@ export function ReviewSpotlightPreview(props: {
         output={props.output}
         layout={props.layout}
         cornerRadius={props.cornerRadius}
+        background={props.background ?? { enabled: false }}
+        previewScale={props.scale}
       />
       <ReviewSpotlightOverlay output={props.output} frame={mask} />
       <ReviewFocusArea
@@ -70,6 +74,8 @@ function SpotlightSourceFrame(props: {
   output: { width: number; height: number };
   layout: ZoomPreviewLayout;
   cornerRadius: number;
+  background?: QuickEditBackgroundSettings;
+  previewScale?: number;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -77,6 +83,8 @@ function SpotlightSourceFrame(props: {
     if (!context) return;
     paintZoomPreview(context, {
       accent: '#ffffff',
+      background: props.background ?? { enabled: false },
+      previewScale: props.previewScale ?? 1,
       camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
       cornerRadius: props.cornerRadius,
       frame: props.frame,
@@ -86,7 +94,15 @@ function SpotlightSourceFrame(props: {
       layout: props.layout,
       view: 'result',
     });
-  }, [props.frame, props.headerImage, props.output, props.layout, props.cornerRadius]);
+  }, [
+    props.frame,
+    props.headerImage,
+    props.output,
+    props.layout,
+    props.cornerRadius,
+    props.background,
+    props.previewScale,
+  ]);
   return (
     <canvas
       ref={canvas}

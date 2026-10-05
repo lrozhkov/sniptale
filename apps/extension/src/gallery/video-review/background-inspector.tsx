@@ -1,12 +1,9 @@
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ReviewNumberRow } from './number-row';
 import { useRef } from 'react';
 import { translate } from '../../platform/i18n';
-import type {
-  QuickEditBackgroundLayout,
-  QuickEditBackgroundSettings,
-} from '../../features/video/review/advanced/types';
+import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import type { QuickEditBackgroundPatch } from '../../features/video/review/advanced/background';
 import { serializePaintToCss, createSolidPaint, type Paint } from '@sniptale/foundation/paint';
 import { useGradientPresetCatalog } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
@@ -166,7 +163,14 @@ function ReviewBackgroundLayoutControls({
   background: Extract<QuickEditBackgroundSettings, { enabled: true }>;
   onChange(patch: QuickEditBackgroundPatch): void;
 }) {
-  const layoutField = (key: keyof QuickEditBackgroundLayout, label: string) => (
+  const changeShadowColor = (color: string) =>
+    onChange({
+      layout: {
+        ...background.layout,
+        shadow: { intensity: background.layout.shadow?.intensity ?? 0, color },
+      },
+    });
+  const layoutField = (key: 'padding' | 'cornerRadius', label: string) => (
     <ReviewNumberRow
       label={label}
       unit="px"
@@ -198,6 +202,30 @@ function ReviewBackgroundLayoutControls({
       />
       {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
       {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
+      <ReviewNumberRow
+        label={translate('gallery.videoReview.backgroundShadow')}
+        unit="%"
+        min={0}
+        max={100}
+        step={1}
+        value={background.layout.shadow?.intensity ?? 0}
+        onChange={(intensity) =>
+          onChange({
+            layout: {
+              ...background.layout,
+              shadow: { color: background.layout.shadow?.color ?? '#475569ff', intensity },
+            },
+          })
+        }
+      />
+      <ColorField
+        label={translate('gallery.videoReview.backgroundShadowColor')}
+        title={translate('gallery.videoReview.backgroundShadowColor')}
+        value={background.layout.shadow?.color ?? '#475569ff'}
+        onChange={changeShadowColor}
+        onPreviewChange={changeShadowColor}
+        onPreviewReset={changeShadowColor}
+      />
     </div>
   );
 }

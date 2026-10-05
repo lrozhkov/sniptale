@@ -30,6 +30,7 @@ type ZoomCanvasProps = {
   output: { width: number; height: number };
   view: 'area' | 'result';
   cornerRadius: number;
+  previewScale?: number;
   onPreview?:
     | ((center: { centerX: number; centerY: number; scale?: number } | null) => void)
     | undefined;
@@ -246,6 +247,7 @@ function useZoomCanvasPaint(
           getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() || '#4f7cff',
         camera: props.camera,
         cornerRadius: props.cornerRadius,
+        previewScale: props.previewScale ?? 1,
         frame: props.frame,
         headerImage: props.headerImage,
         height: canvas.height,
@@ -271,6 +273,7 @@ function useZoomCanvasPaint(
     props.view,
     props.camera,
     props.cornerRadius,
+    props.previewScale,
     props.background,
     props.live,
   ]);

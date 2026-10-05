@@ -105,6 +105,7 @@ export function ReviewZoomPreview(props: {
         ) : null}
         {region.spotlight ? (
           <ReviewSpotlightPreview
+            background={props.background}
             headerImage={header.image}
             key={region.id}
             region={region}
@@ -122,6 +123,7 @@ export function ReviewZoomPreview(props: {
           <ZoomPreviewCanvas
             headerImage={header.image}
             background={props.background}
+            previewScale={previewScale}
             imageUrl={image.url}
             key={region.id}
             cornerRadius={cornerRadius}

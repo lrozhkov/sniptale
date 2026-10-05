@@ -1,3 +1,4 @@
+import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { ReviewButton } from './controls';
 import { useReviewWindowHeader } from './use-window-header';
 import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
@@ -254,6 +255,10 @@ function ReviewSceneVideo(props: {
     props.layout && props.scene
       ? computeQuickEditSceneCamera(props.layout, props.scene.background)
       : null;
+  const shadow = resolveQuickEditShadow(
+    props.scene?.background ?? { enabled: false },
+    props.previewScale * (motion?.scale ?? 1)
+  );
   const videoClip = motion?.windowClip ?? props.layout?.windowRect;
   const header = props.header;
   const window = props.layout ? computeQuickEditWindowTransform(props.layout) : null;
@@ -274,6 +279,9 @@ function ReviewSceneVideo(props: {
         width: videoClip?.width ?? undefined,
         height: videoClip?.height ?? undefined,
         overflow: 'hidden',
+        boxShadow: shadow
+          ? `0 0 ${shadow.blur}px color-mix(in srgb, ${shadow.color} ${shadow.opacity * 100}%, transparent)`
+          : undefined,
         borderRadius: clip
           ? clip.cornerRadius * props.previewScale * (motion?.scale ?? 1)
           : undefined,

@@ -1,3 +1,4 @@
+import { drawReviewSceneShadow } from '../../workflows/video-review/scene-shadow';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import {
   computeQuickEditSceneCamera,
@@ -30,6 +31,7 @@ export function paintZoomPreview(
     view: 'area' | 'result';
     width: number;
     cornerRadius?: number;
+    previewScale?: number;
     showControls?: boolean;
   }
 ) {
@@ -37,6 +39,13 @@ export function paintZoomPreview(
   const motion = computeQuickEditSceneCamera(args.layout, args.background ?? { enabled: false });
   const clip = args.view === 'area' ? args.layout.windowRect : motion.windowClip;
   context.clearRect(0, 0, args.width, args.height);
+  drawReviewSceneShadow(
+    context,
+    args.background ?? { enabled: false },
+    clip,
+    (args.cornerRadius ?? 0) * (args.view === 'result' ? motion.scale : 1),
+    (args.previewScale ?? 1) * (args.view === 'result' ? motion.scale : 1)
+  );
   context.save();
   context.beginPath();
   context.roundRect(

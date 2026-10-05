@@ -190,6 +190,17 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
     !isBoundedNumber(value['cornerRadius'], 0, MAX_QUICK_EDIT_BACKGROUND_SIZE)
   )
     return null;
+  const shadow = value['shadow'];
+  if (shadow !== undefined) {
+    if (!isRecord(shadow) || !isBoundedNumber(shadow['intensity'], 0, 100)) return null;
+    const color = typeof shadow['color'] === 'string' ? normalizePaintColor(shadow['color']) : null;
+    if (!color) return null;
+    return {
+      padding: value['padding'],
+      cornerRadius: value['cornerRadius'],
+      shadow: { intensity: shadow['intensity'], color },
+    };
+  }
   return { padding: value['padding'], cornerRadius: value['cornerRadius'] };
 }
 

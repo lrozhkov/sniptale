@@ -75,6 +75,7 @@ export interface QuickEditZoomState {
 export interface QuickEditBackgroundLayout {
   padding: number;
   cornerRadius: number;
+  shadow?: { intensity: number; color: string };
 }
 
 export type QuickEditBackgroundSettings = {

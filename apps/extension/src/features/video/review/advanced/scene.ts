@@ -80,6 +80,7 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     ? {
         ...input.background,
         layout: {
+          ...input.background.layout,
           padding: input.background.layout.padding * scale,
           cornerRadius: input.background.layout.cornerRadius * scale,
         },

@@ -153,7 +153,7 @@ it('uses precise layout sliders without limiting typed high-resolution values', 
     )
   );
   const ranges = [...host.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-  expect(ranges.map((input) => input.max)).toEqual(['200', '100']);
+  expect(ranges.map((input) => input.max)).toEqual(['200', '100', '100']);
   for (const [index, key] of ['padding', 'cornerRadius'].entries()) {
     await act(async () => {
       ranges[index]!.dispatchEvent(
@@ -171,6 +171,15 @@ it('uses precise layout sliders without limiting typed high-resolution values', 
       layout: { ...layout, [key]: (key === 'padding' ? layout.padding : layout.cornerRadius) + 1 },
     });
   }
+  await act(async () => {
+    ranges[2]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
+    );
+    ranges[2]!.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }));
+  });
+  expect(change).toHaveBeenLastCalledWith({
+    layout: { ...layout, shadow: { intensity: 1, color: '#475569ff' } },
+  });
   const padding = host.querySelector<HTMLInputElement>(
     'input[type="text"][aria-label="gallery.videoReview.backgroundPadding"]'
   )!;

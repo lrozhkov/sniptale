@@ -1,3 +1,4 @@
+import { drawReviewSceneShadow } from './scene-shadow';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import {
@@ -559,6 +560,7 @@ export async function renderRenderWindowFrames(args: {
         comments: burned,
         sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
         cameraScale: camera.scale,
+        sceneScale: args.sceneScale ?? 1,
       });
       drawReviewSpotlight(
         context,
@@ -634,6 +636,7 @@ export function drawReviewSceneFrame(
     comments?: readonly CanvasCommentExport[];
     sourceTime?: number;
     cameraScale?: number;
+    sceneScale?: number;
   }
 ) {
   const { canvas, layout, background, image, sample, comments, sourceTime } = args;
@@ -656,6 +659,13 @@ export function drawReviewSceneFrame(
     }
   }
   if (motion.scale !== 1) context.restore();
+  drawReviewSceneShadow(
+    context,
+    background,
+    motion.windowClip,
+    background.enabled ? background.layout.cornerRadius * motion.scale : 0,
+    (args.sceneScale ?? 1) * motion.scale
+  );
   context.save();
   context.beginPath();
   const videoClip = motion.windowClip;

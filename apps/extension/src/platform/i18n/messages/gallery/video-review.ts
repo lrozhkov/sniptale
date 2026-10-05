@@ -305,6 +305,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   backgroundZoomFixed: { ru: 'Неподвижный', en: 'Fixed' },
   backgroundZoomFollow: { ru: 'Вместе с видео', en: 'Follow video' },
   backgroundPadding: { ru: 'Отступ', en: 'Padding' },
+  backgroundShadow: { ru: 'Тень', en: 'Shadow' },
+  backgroundShadowColor: { ru: 'Цвет тени', en: 'Shadow color' },
   backgroundCornerRadius: { ru: 'Скругление углов', en: 'Corner radius' },
   audioTrack: { ru: 'Звук', en: 'Audio' },
   advancedSuppressedHint: {

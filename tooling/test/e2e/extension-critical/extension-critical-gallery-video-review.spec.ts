@@ -3735,3 +3735,139 @@ for (const variant of [
     }
   });
 }
+
+for (const locale of ['en', 'ru'] as const) {
+  test(`quick editor outer video shadow (${locale})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': locale,
+          'sniptale-theme-preference': locale === 'ru' ? 'dark' : 'light',
+        },
+      });
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?theme=${locale === 'ru' ? 'dark' : 'light'}`
+      );
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 4 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('gallery.videoReview.backgroundSolid').click();
+      const padding = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await padding.fill('20');
+      await padding.press('Enter');
+      const intensity = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundShadow'),
+        exact: true,
+      });
+      await expect(intensity).toHaveValue('0');
+      await intensity.fill('40');
+      await intensity.press('Enter');
+      await button('gallery.videoReview.backgroundShadowColor').click();
+      const color = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundShadowColor'),
+        exact: true,
+      });
+      await color.fill('#ffffffff');
+      await color.press('Enter');
+      const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      const window = stage.locator('video').locator('..');
+      await expect
+        .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
+        .not.toBe('none');
+      await button('gallery.videoReview.windowHeader').click();
+      await page
+        .getByRole('option', {
+          name: label('gallery.videoReview.windowHeaderBrowser'),
+          exact: true,
+        })
+        .click();
+      await expect(stage.locator('img')).toHaveCount(1);
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(intensity).toHaveValue('40');
+      await intensity.fill('0');
+      await intensity.press('Enter');
+      await expect
+        .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
+        .toBe('none');
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.undo').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(intensity).toHaveValue('40');
+      await intensity.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('video-shadow-scene.png'), fullPage: false });
+      const downloading = page.waitForEvent('download');
+      await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
+      const download = await downloading;
+      await download.saveAs(info.outputPath('outer-shadow.webm'));
+      const pixels = await page.evaluate(
+        async (encoded) => {
+          const url = URL.createObjectURL(
+            new Blob([Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0))], {
+              type: 'video/webm',
+            })
+          );
+          const video = document.createElement('video');
+          video.muted = true;
+          try {
+            await new Promise<void>((resolve, reject) => {
+              video.onloadeddata = () => resolve();
+              video.onerror = () => reject(new Error('Shadow export decode failed'));
+              video.src = url;
+            });
+            await new Promise<void>((resolve) => {
+              video.onseeked = () => resolve();
+              video.currentTime = 0.001;
+            });
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(video, 0, 0);
+            // Base 160×90, padding20: window x≈36, y20; its top includes the header.
+            return {
+              width: canvas.width,
+              side: Array.from(ctx.getImageData(31, 50, 1, 1).data),
+              top: Array.from(ctx.getImageData(80, 15, 1, 1).data),
+              far: Array.from(ctx.getImageData(2, 2, 1, 1).data),
+            };
+          } finally {
+            video.removeAttribute('src');
+            video.load();
+            URL.revokeObjectURL(url);
+          }
+        },
+        (await readFile(await download.path())).toString('base64')
+      );
+      expect(pixels.width).toBe(160);
+      expect(pixels.side[0]).toBeGreaterThan(10);
+      expect(pixels.top[0]).toBeGreaterThan(10);
+      expect(pixels.far[0]).toBeLessThan(8);
+      await button('gallery.videoReview.scene').click();
+      await page.setViewportSize({ width: 1100, height: 560 });
+      await intensity.scrollIntoViewIfNeeded();
+      await expect(intensity).toBeInViewport();
+      await page.screenshot({
+        path: info.outputPath('video-shadow-horizontal-scroll.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

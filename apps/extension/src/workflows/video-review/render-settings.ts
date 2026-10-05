@@ -80,6 +80,7 @@ export function resolveReviewSceneOutput(
     ? {
         ...settings.background,
         layout: {
+          ...settings.background.layout,
           padding: settings.background.layout.padding * scale,
           cornerRadius: settings.background.layout.cornerRadius * scale,
         },
