@@ -62,7 +62,7 @@ function ZoomTransitionSection(props: {
         scrubMax={Math.min(5, props.max)}
         step={0.1}
         precision={2}
-        scrubStep={0.1}
+        scrubStep={0.01}
         disabled={props.value.type === 'none'}
         value={props.value.duration}
         onChange={(duration) => props.onChange({ ...props.value, duration })}

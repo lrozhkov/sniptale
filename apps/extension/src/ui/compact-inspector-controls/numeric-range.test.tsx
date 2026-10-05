@@ -36,7 +36,9 @@ function renderNumericRow(props: Partial<React.ComponentProps<typeof NumericRow>
   return { onCommitValue, onPreviewValue };
 }
 
-function renderStatefulNumericRow() {
+function renderStatefulNumericRow(
+  options: { value?: number; min?: number; max?: number; step?: number } = {}
+) {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -44,7 +46,7 @@ function renderStatefulNumericRow() {
   const onPreviewValue = vi.fn();
 
   function StatefulNumericRow() {
-    const [value, setValue] = useState(40);
+    const [value, setValue] = useState(options.value ?? 40);
     return (
       <NumericRow
         label="Opacity"
@@ -53,7 +55,7 @@ function renderStatefulNumericRow() {
         min={0}
         max={100}
         step={5}
-        scrub={{ min: 0, max: 100, step: 1 }}
+        scrub={{ min: options.min ?? 0, max: options.max ?? 100, step: options.step ?? 1 }}
         onPreviewValue={(nextValue) => {
           setValue(nextValue);
           onPreviewValue(nextValue);
@@ -325,4 +327,76 @@ it('hides after a pointer commit and leave, while keyboard editing can retain vi
   expect(shell.getAttribute('aria-hidden')).toBeNull();
   act(() => range.blur());
   expect(shell.getAttribute('aria-hidden')).toBe('true');
+});
+
+it.each([
+  { min: 0, max: 0.4, value: 0.3, percent: 75 },
+  { min: 5, max: 5.4, value: 5.3, percent: 75 },
+  { min: 0, max: 0, value: 0, percent: 0 },
+])('aligns fractional range fill with the native thumb for $min..$max', (sample) => {
+  renderNumericRow({
+    value: sample.value,
+    min: sample.min,
+    max: sample.max,
+    scrub: { min: sample.min, max: sample.max, step: 0.1 },
+  });
+  const range = getRange();
+  expect(
+    Number.parseFloat(range.style.getPropertyValue('--sniptale-range-fill-ratio'))
+  ).toBeCloseTo(sample.percent);
+  expect(
+    Number.parseFloat(range.parentElement!.style.getPropertyValue('--sniptale-range-fill-ratio'))
+  ).toBeCloseTo(sample.percent);
+});
+
+it('does not commit a fitted off-step duration just because its slider loses focus', () => {
+  const { onCommitValue, onPreviewValue } = renderNumericRow({
+    value: 1 / 3,
+    scrub: { min: 0, max: 1 / 3, step: 0.1 },
+  });
+  act(() => getRange().focus());
+  act(() => getRange().blur());
+  expect(onPreviewValue).not.toHaveBeenCalled();
+  expect(onCommitValue).not.toHaveBeenCalled();
+});
+
+it('uses configured fractional keyboard steps and exact off-step endpoints without float noise', () => {
+  const { onPreviewValue, onCommitValue } = renderStatefulNumericRow({
+    value: 0.2,
+    max: 0.333,
+    step: 0.1,
+  });
+  const range = getRange();
+  const press = (key: string) =>
+    act(() => {
+      range.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      range.dispatchEvent(new KeyboardEvent('keyup', { key, bubbles: true }));
+    });
+  press('ArrowRight');
+  expect(onPreviewValue).toHaveBeenLastCalledWith(0.3);
+  expect(onCommitValue).toHaveBeenLastCalledWith(0.3);
+  press('End');
+  expect(onCommitValue).toHaveBeenLastCalledWith(0.333);
+  press('ArrowLeft');
+  expect(onCommitValue).toHaveBeenLastCalledWith(0.3);
+  press('Home');
+  expect(onCommitValue).toHaveBeenLastCalledWith(0);
+  const count = onCommitValue.mock.calls.length;
+  press('Tab');
+  expect(onCommitValue).toHaveBeenCalledTimes(count);
+});
+
+it('finishes a changed pointer gesture once when capture is cancelled', () => {
+  const { onCommitValue, onPreviewValue } = renderNumericRow();
+  const range = getRange();
+  act(() => {
+    range.dispatchEvent(createPointerEvent('pointerdown', { bubbles: true }));
+    setRangeValue(range, '72');
+    assignInputValue(range, '72');
+    range.dispatchEvent(createPointerEvent('pointercancel', { bubbles: true }));
+    range.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+  expect(onPreviewValue).toHaveBeenCalledWith(72);
+  expect(onCommitValue).toHaveBeenCalledOnce();
+  expect(onCommitValue).toHaveBeenCalledWith(72);
 });

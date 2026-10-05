@@ -365,3 +365,43 @@ it('displays fitted legacy phases without emitting a persistence change on mount
   expect(change).not.toHaveBeenCalled();
   expect(legacy.enter.duration).toBe(4);
 });
+
+it('updates the opposite fractional budget live and keeps fitted values unchanged on blur', async () => {
+  const { updateQuickEditZoomRegion, fitQuickEditZoomTransitions } =
+    await import('../../features/video/review/advanced/zoom');
+  let current = { ...region, start: 0, end: 0.6 };
+  const render = () =>
+    root.render(
+      <ReviewZoomInspector
+        region={current}
+        onChange={change}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+  const change = vi.fn((patch: QuickEditZoomRegionPatch) => {
+    current = updateQuickEditZoomRegion([current], current.id, patch)[0]!;
+    render();
+  });
+  await act(async () => render());
+  const ranges = () => [...host.querySelectorAll<HTMLInputElement>('fieldset input[type="range"]')];
+  await type(ranges()[0]!, '0.17');
+  expect(current.enter.duration).toBe(0.17);
+  expect(current.exit.duration).toBe(0.3);
+  expect(Number(ranges()[1]!.max)).toBeCloseTo(0.43);
+  expect(
+    Number.parseFloat(ranges()[1]!.style.getPropertyValue('--sniptale-range-fill-ratio'))
+  ).toBeCloseTo((0.3 / 0.43) * 100);
+  await type(ranges()[1]!, '0.42');
+  expect(current.exit.duration).toBe(0.42);
+  expect(current.enter.duration + current.exit.duration).toBeLessThanOrEqual(0.6);
+  await act(async () => ranges()[1]!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  current = fitQuickEditZoomTransitions({ ...current, end: 0.4 });
+  await act(async () => render());
+  const before = structuredClone(current);
+  change.mockClear();
+  await act(async () => ranges()[1]!.focus());
+  await act(async () => ranges()[1]!.blur());
+  expect(current).toEqual(before);
+  expect(change).not.toHaveBeenCalled();
+});
