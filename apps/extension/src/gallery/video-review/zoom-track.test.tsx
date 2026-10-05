@@ -64,6 +64,7 @@ function renderTrack(
     linkSelectedId?: string | null;
     projection?: ReturnType<typeof createTrackProjection>;
     duration?: number;
+    compact?: boolean;
   }
 ) {
   act(() => {
@@ -71,6 +72,7 @@ function renderTrack(
       <ReviewZoomTrack
         beforeAction={overrides?.beforeAction}
         duration={overrides?.duration ?? 10}
+        compact={overrides?.compact}
         {...(time === null ? { time: null } : { time })}
         regions={regions}
         edits={overrides?.edits ?? edits}
@@ -111,48 +113,55 @@ it('adds regions through the lane button', async () => {
   expect(onAdd).toHaveBeenCalledOnce();
 });
 
-it('keeps source width while moving focus across a speed segment', async () => {
-  const speed: ReviewEdit = {
-    id: 'speed',
-    kind: 'speed',
-    start: 2,
-    end: 6,
-    requestedStart: 2,
-    requestedEnd: 6,
-    rate: 2,
-    audio: 'speed',
-  };
-  const projection = createTrackProjection(10, [speed]);
-  const commit = vi.fn();
-  const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), null, {
-    projection,
-    toOutputTime: projection.output,
-  });
-  const block = track.blocks[0]!;
-  Object.assign(block, {
-    setPointerCapture: vi.fn(),
-    hasPointerCapture: () => true,
-    releasePointerCapture: vi.fn(),
-  });
-  expect(block.style.width).toBe('20%');
-  await track.event(block, 'pointerdown', 0);
-  await track.event(block, 'pointermove', 300, true);
-  expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
-  expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
-  await track.event(block, 'pointerup', 300, true);
-  expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', { start: 3, end: 5 });
-  renderTrack(
-    [{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }],
-    commit,
-    vi.fn(),
-    null,
-    {
+it.each([false, true])(
+  'keeps source width while moving focus across a speed segment (compact=%s)',
+  async (compact) => {
+    const speed: ReviewEdit = {
+      id: 'speed',
+      kind: 'speed',
+      start: 2,
+      end: 6,
+      requestedStart: 2,
+      requestedEnd: 6,
+      rate: 2,
+      audio: 'speed',
+    };
+    const projection = createTrackProjection(10, [speed]);
+    const commit = vi.fn();
+    const track = renderTrack([zoom('a', 0, 2)], commit, vi.fn(), null, {
       projection,
+      compact,
       toOutputTime: projection.output,
-    }
-  );
-  expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(20);
-});
+    });
+    const block = track.blocks[0]!;
+    Object.assign(block, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    expect(block.style.width).toBe('20%');
+    await track.event(block, 'pointerdown', 0);
+    await track.event(block, 'pointermove', 300, true);
+    expect(Number.parseFloat(block.style.left)).toBeCloseTo(30);
+    expect(Number.parseFloat(block.style.width)).toBeCloseTo(20);
+    await track.event(block, 'pointerup', 300, true);
+    expect(commit).toHaveBeenCalledWith('a', { start: 2.5, end: 3.5 }, 'move', {
+      start: 3,
+      end: 5,
+    });
+    renderTrack(
+      [{ ...zoom('a', 2.5, 3.5), sourceAnchor: { start: 3, end: 5 } }],
+      commit,
+      vi.fn(),
+      null,
+      {
+        projection,
+        toOutputTime: projection.output,
+      }
+    );
+    expect(Number.parseFloat(track.blocks[0]!.style.width)).toBeCloseTo(20);
+  }
+);
 
 it('snaps to edit edges projected into result time (R03)', async () => {
   const commit = vi.fn((_id: string, _range: { start: number; end: number }) => undefined);

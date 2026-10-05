@@ -1,4 +1,7 @@
 import type { ReactNode } from 'react';
+import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { translate } from '../../platform/i18n';
+import { ReviewButton, reviewCompactTrackButtonClassName } from './controls';
 import './track-row.css';
 
 /** Shared row geometry keeps track controls outside the time-coordinate surface. */
@@ -56,4 +59,27 @@ export function ReviewTrackCuts({
       }}
     />
   ));
+}
+
+/** Per-track density is a view preference, separate from enabled/editing state. */
+export function ReviewTrackHeightButton(props: { compact: boolean; onToggle(): void }) {
+  return (
+    <ReviewButton
+      label={translate('gallery.videoReview.compactTrackHeight')}
+      title={translate(
+        props.compact
+          ? 'gallery.videoReview.normalTrackHeight'
+          : 'gallery.videoReview.compactTrackHeight'
+      )}
+      aria-pressed={props.compact}
+      className={`${reviewCompactTrackButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+      onClick={props.onToggle}
+    >
+      {props.compact ? (
+        <ChevronsUpDown size={14} aria-hidden />
+      ) : (
+        <ChevronsDownUp size={14} aria-hidden />
+      )}
+    </ReviewButton>
+  );
 }

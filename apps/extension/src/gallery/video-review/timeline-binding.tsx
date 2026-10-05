@@ -30,6 +30,8 @@ type Exporter = ReturnType<typeof useReviewExport>;
 
 /** Zoom lane on the result-time scale with shared snap candidates. */
 function ReviewZoomLane(props: {
+  compact: boolean;
+  onToggleHeight(): void;
   beforeAction?: ReviewBeforeAction | undefined;
   advanced: QuickEditAdvancedState;
   projection?: ReviewTrackProjection;
@@ -44,6 +46,8 @@ function ReviewZoomLane(props: {
 }) {
   return (
     <ReviewZoomTrack
+      compact={props.compact}
+      onToggleHeight={props.onToggleHeight}
       beforeAction={props.beforeAction}
       projection={props.projection}
       sourceSelection={props.sourceSelection}
@@ -229,6 +233,8 @@ function ReviewTimelineToolsBinding(
 
 /** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
 export function ReviewTimelineBinding(props: TimelineBindingProps) {
+  const [sourceCompact, setSourceCompact] = useState(false);
+  const [focusCompact, setFocusCompact] = useState(false);
   const projection = useMemo(
     () => createTrackProjection(props.source.duration, props.edits),
     [props.source.duration, props.edits]
@@ -236,19 +242,10 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const features = resolveQuickEditEffectiveFeatures(props.advanced);
   useOriginalAudioPlacement(props);
   const focus = useFocusPlacement(props, projection);
-  const onZoomAdd = () => {
-    focus.clear();
-    props.audio.setOriginalTool(false);
-    if (props.playbackRange) {
-      focus.commit({ kind: 'range', ...props.playbackRange });
-      return;
-    }
-    const at = props.toOutputTime(props.time);
-    if (at === null) props.onCutPlacement();
-    else props.zoom.add(at, props.resultDuration);
-  };
   return (
     <ReviewTimeline
+      sourceCompact={sourceCompact}
+      onToggleSourceHeight={() => setSourceCompact((value) => !value)}
       playbackRange={props.playbackRange}
       onPlaybackRange={props.onPlaybackRange}
       sourceRangeTool={!!props.editing.mode}
@@ -292,6 +289,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             zoomTrack: (
               <ReviewZoomLane
+                compact={focusCompact}
+                onToggleHeight={() => setFocusCompact((value) => !value)}
                 beforeAction={props.beforeAction}
                 projection={projection}
                 sourceSelection={focus.tool.active ? (focus.preview ?? undefined) : undefined}
@@ -300,7 +299,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 outputTime={props.outputTime}
                 edits={props.edits}
                 zoom={props.zoom}
-                onAdd={onZoomAdd}
+                onAdd={focus.add}
                 addHint={props.playbackRange ? focus.tool.hint : undefined}
                 toOutputTime={props.toOutputTime}
               />
@@ -456,6 +455,17 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
     }
   };
   return {
+    add: () => {
+      setEnabled(false);
+      props.audio.setOriginalTool(false);
+      if (props.playbackRange) {
+        commit({ kind: 'range', ...props.playbackRange });
+        return;
+      }
+      const at = props.toOutputTime(props.time);
+      if (at === null) props.onCutPlacement();
+      else props.zoom.add(at, props.resultDuration);
+    },
     clear: () => setEnabled(false),
     preview,
     setPreview,

@@ -25,6 +25,8 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  sourceCompact?: boolean | undefined;
+  onToggleSourceHeight?: (() => void) | undefined;
   placementHints?: ReviewPlacementHints | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   busy?: boolean;

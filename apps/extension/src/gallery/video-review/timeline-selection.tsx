@@ -6,12 +6,14 @@ import { Film, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import { reviewTimeLabel } from './controls';
-import { ReviewTrackRow } from './track-row';
+import { ReviewTrackRow, ReviewTrackHeightButton } from './track-row';
 import { ReviewCommentMarkers } from './timeline-comment-markers';
 import { useReviewDragEscape } from './timeline-drag';
 import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
+  sourceCompact?: boolean | undefined;
+  onToggleSourceHeight?: (() => void) | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   rangeEnabled?: boolean;
   duration: number;
@@ -37,10 +39,18 @@ export function ReviewSourceLane(props: SelectionProps) {
     <ReviewTrackRow
       label={translate('gallery.videoReview.sourceVideo')}
       icon={<Film size={14} aria-hidden="true" />}
+      controls={
+        props.onToggleSourceHeight ? (
+          <ReviewTrackHeightButton
+            compact={!!props.sourceCompact}
+            onToggle={props.onToggleSourceHeight}
+          />
+        ) : undefined
+      }
     >
       <div
         data-ui="gallery.videoReview.sourceLane"
-        className={`relative h-12 rounded bg-[var(--sniptale-color-surface-hover)]
+        className={`relative ${props.sourceCompact ? 'h-8' : 'h-12'} rounded bg-[var(--sniptale-color-surface-hover)]
           ${props.annotations.length ? 'mt-6' : 'mt-1'}`}
       >
         {guide !== null ? (

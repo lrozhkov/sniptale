@@ -28,13 +28,15 @@ import {
   reviewTimeLabel,
 } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
-import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
+import { ReviewTrackRow, ReviewTrackCuts, ReviewTrackHeightButton } from './track-row';
 import { useReviewDragEscape } from './timeline-drag';
 
 type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
 type FocusAxis = Pick<ReviewTrackProjection, 'duration' | 'source' | 'output'>;
 
 type ZoomTrackProps = {
+  compact?: boolean | undefined;
+  onToggleHeight?: (() => void) | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   sourceSelection?: ReviewAnchor | undefined;
   projection?: ReviewTrackProjection | undefined;
@@ -212,6 +214,9 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       icon={<Focus size={14} aria-hidden="true" />}
       controls={
         <>
+          {props.onToggleHeight ? (
+            <ReviewTrackHeightButton compact={!!props.compact} onToggle={props.onToggleHeight} />
+          ) : null}
           <ReviewButton
             label={translate('gallery.videoReview.zoomAdd')}
             title={props.addHint ?? translate('gallery.videoReview.zoomAdd')}
@@ -237,7 +242,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       <div
         data-ui="gallery.videoReview.zoomLane"
         className="relative mt-1 rounded bg-[var(--sniptale-color-surface-hover)]"
-        style={{ height: rowCount * 36 - 4 }}
+        style={{ height: rowCount * (props.compact ? 28 : 36) - 4 }}
       >
         {shownRegions
           .filter((region) => !region.dormant)
@@ -248,6 +253,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
               enabled={props.enabled}
               linkSelectedId={props.linkSelectedId}
               row={rows.get(region.id) ?? 0}
+              compact={props.compact}
               next={nextFocusLink(shownRegions, region)}
               projection={props.projection}
               region={region}
@@ -316,6 +322,7 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
  * click; a connected gap selects its link settings instead of silently unlinking.
  */
 function ReviewZoomGapLink(props: {
+  compact?: boolean | undefined;
   row: number;
   duration: number;
   enabled?: boolean | undefined;
@@ -359,8 +366,8 @@ function ReviewZoomGapLink(props: {
       style={{
         left: `${left * 100}%`,
         width: `${(right - left) * 100}%`,
-        top: props.row * 36 + 4,
-        height: 24,
+        top: props.row * (props.compact ? 28 : 36) + (props.compact ? 2 : 4),
+        height: props.compact ? 20 : 24,
         bottom: 'auto',
       }}
       onPointerDown={(event) => event.stopPropagation()}
@@ -543,7 +550,12 @@ function ReviewZoomRegionBlock(
       aria-pressed={props.selected}
       className={`absolute inset-y-0 z-[5] cursor-grab rounded border text-xs
           active:cursor-grabbing ${tone}`}
-      style={{ ...style, top: props.row * 36, height: 32, bottom: 'auto' }}
+      style={{
+        ...style,
+        top: props.row * (props.compact ? 28 : 36),
+        height: props.compact ? 24 : 32,
+        bottom: 'auto',
+      }}
       onPointerDown={begin}
       onPointerMove={(event) => {
         const current = props.drag.current;

@@ -221,6 +221,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   eventStatic: { ru: 'Изображение без изменений', en: 'Unchanged image' },
   eventCursor: { ru: 'Положение курсора', en: 'Cursor position' },
   sourceVideo: { ru: 'Исходное видео', en: 'Original video' },
+  compactTrackHeight: { ru: 'Компактная высота дорожки', en: 'Compact track height' },
+  normalTrackHeight: { ru: 'Обычная высота дорожки', en: 'Normal track height' },
   selectionStart: { ru: 'Начало выделения', en: 'Selection start' },
   selectionEnd: { ru: 'Конец выделения', en: 'Selection end' },
   timelineZoom: { ru: 'Масштаб таймлайна', en: 'Timeline zoom' },
