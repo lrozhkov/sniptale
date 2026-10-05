@@ -364,3 +364,117 @@ it('keeps the inspector Zoom area visible before hover and after pointer departu
   await act(async () => Promise.resolve());
   expect(area().getAttribute('data-controls-visible')).toBe('true');
 });
+
+it('refreshes the whole Follow Video footprint after scene edits without camera writes', async () => {
+  const onChange = vi.fn();
+  const loadFrame = vi.fn(async () => frame);
+  const selected = region({ transform: { scale: 1.25, centerX: 0.1, centerY: 0.5 } });
+  const render = async (
+    enabled: boolean,
+    zoomBehavior: 'fixed' | 'follow-video',
+    padding = 100,
+    canvas?: { width: number; height: number }
+  ) => {
+    await act(async () =>
+      root.render(
+        <ReviewZoomPreview
+          region={selected}
+          background={{
+            enabled,
+            type: 'solid',
+            color: '#000000ff',
+            zoomBehavior,
+            layout: { padding, cornerRadius: 0 },
+          }}
+          source={{ width: 800, height: 800 }}
+          canvas={canvas}
+          sourceTime={3}
+          loadFrame={loadFrame}
+          onChange={onChange}
+        />
+      )
+    );
+    return host.querySelector<HTMLElement>('[data-focus-frame]')!;
+  };
+  let area = await render(true, 'follow-video');
+  expect(Number.parseFloat(area.style.left)).toBeCloseTo(2.5);
+  expect(Number.parseFloat(area.style.width)).toBeCloseTo(80);
+  area = await render(true, 'fixed');
+  expect(Number.parseFloat(area.style.left)).toBeCloseTo(12.5);
+  expect(Number.parseFloat(area.style.width)).toBeCloseTo(60);
+  area = await render(true, 'follow-video', 160);
+  expect(Number.parseFloat(area.style.left)).toBeCloseTo(4);
+  expect(Number.parseFloat(area.style.width)).toBeCloseTo(80);
+  area = await render(true, 'follow-video', 100, { width: 800, height: 400 });
+  expect(Number.parseFloat(area.style.left)).toBeCloseTo(7.5);
+  expect(Number.parseFloat(area.style.width)).toBeCloseTo(80);
+  area = await render(false, 'follow-video');
+  expect(Number.parseFloat(area.style.left)).toBeCloseTo(0);
+  expect(Number.parseFloat(area.style.width)).toBeCloseTo(80);
+  expect(onChange).not.toHaveBeenCalled();
+  expect(loadFrame).toHaveBeenCalledTimes(1);
+});
+
+it('paints live transport, then restores the target and cancels animation on stop or unmount', async () => {
+  const drawImage = vi.fn();
+  const context = {
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    clip: vi.fn(),
+    drawImage,
+    restore: vi.fn(),
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D
+  );
+  const requests = new Map<number, FrameRequestCallback>();
+  let sequence = 0;
+  vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+    requests.set(++sequence, callback);
+    return sequence;
+  });
+  vi.stubGlobal('cancelAnimationFrame', (id: number) => requests.delete(id));
+  const onChange = vi.fn();
+  const onInteract = vi.fn();
+  const video = document.createElement('video');
+  const loadFrame = vi.fn(async () => frame);
+  const render = (scale?: number) =>
+    act(async () =>
+      root.render(
+        <ReviewZoomPreview
+          region={region()}
+          background={{ ...background, enabled: false }}
+          source={{ width: 640, height: 360 }}
+          sourceTime={3}
+          loadFrame={loadFrame}
+          onChange={onChange}
+          onInteract={onInteract}
+          playback={scale ? { video, camera: { scale, centerX: 0.5, centerY: 0.5 } } : undefined}
+        />
+      )
+    );
+  await render(1);
+  expect(drawImage).toHaveBeenLastCalledWith(video, 0, 0, 480, 270);
+  const area = () => host.querySelector<HTMLElement>('[data-focus-frame]')!;
+  expect(Number.parseFloat(area().style.width)).toBeCloseTo(100);
+  const [id, tick] = [...requests.entries()][0]!;
+  requests.delete(id);
+  drawImage.mockClear();
+  tick(16);
+  expect(drawImage).toHaveBeenCalledWith(video, 0, 0, 480, 270);
+  await render(1.5);
+  expect(Number.parseFloat(area().style.width)).toBeCloseTo(100 / 1.5);
+  await pointer(host.querySelector('canvas')!, 'pointerdown', 20, 20);
+  expect(onInteract).not.toHaveBeenCalled();
+  expect(onChange).not.toHaveBeenCalled();
+  await render();
+  expect(requests.size).toBe(0);
+  expect(Number.parseFloat(area().style.width)).toBeCloseTo(50);
+  expect(drawImage).toHaveBeenLastCalledWith(frame.image, 0, 0, 480, 270);
+  expect(loadFrame).toHaveBeenCalledTimes(1);
+  await render(1);
+  await act(async () => root.render(null));
+  expect(requests.size).toBe(0);
+});

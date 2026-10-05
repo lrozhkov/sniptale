@@ -29,6 +29,8 @@ export function ReviewZoomPreview(props: {
   /** Result-time region midpoint mapped through cuts/speed; null while it has no frame. */
   sourceTime: number | null;
   loadFrame: ZoomPreviewFrameLoader | null;
+  /** Read-only transport sample while playing; paused editing retains the selected target. */
+  playback?: { video: HTMLVideoElement; camera: QuickEditZoomRegion['transform'] } | undefined;
   onInteract?: ((sourceTime: number) => void) | undefined;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
@@ -38,6 +40,8 @@ export function ReviewZoomPreview(props: {
   const image = useReviewBackgroundImage(props.background);
   const [view, setView] = useState<'area' | 'result'>('area');
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
+  const playback = region.spotlight ? undefined : props.playback;
+  const camera = playback?.camera ?? region.transform;
 
   const output = useMemo(() => {
     const size = props.canvas ?? props.source;
@@ -53,22 +57,24 @@ export function ReviewZoomPreview(props: {
         canvas: props.canvas,
         source: props.source,
         background: props.background,
-        camera: region.spotlight ? { scale: 1, centerX: 0.5, centerY: 0.5 } : region.transform,
+        camera: region.spotlight ? { scale: 1, centerX: 0.5, centerY: 0.5 } : camera,
       }),
-    [output, props.source, props.canvas, props.background, region.transform, region.spotlight]
+    [output, props.source, props.canvas, props.background, camera, region.spotlight]
   );
 
   const previewScale = output.width / Math.max(1, props.canvas?.width ?? props.source.width);
   const cornerRadius = props.background.enabled
     ? props.background.layout.cornerRadius * previewScale
     : 0;
-  const unavailable = sourceTime === null || !loadFrame;
+  const previewStatus = playback ? 'ready' : status;
+  const interactive = !props.disabled && !playback && status === 'ready';
   const background = props.background;
   return (
     <section
       data-ui="gallery.videoReview.zoomPreview"
       data-view={view}
-      data-status={status}
+      data-status={previewStatus}
+      data-playing={!!playback}
       aria-label={translate('gallery.videoReview.zoomPreview')}
       className="space-y-2"
     >
@@ -95,11 +101,7 @@ export function ReviewZoomPreview(props: {
         ) : null}
       </div>
       <div
-        {...previewInteractionHandlers(
-          !props.disabled && status === 'ready',
-          sourceTime,
-          props.onInteract
-        )}
+        {...previewInteractionHandlers(interactive, sourceTime, props.onInteract)}
         className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
         style={{ background: region.spotlight ? previewBackgroundPaint(background) : '#000000' }}
       >
@@ -121,7 +123,7 @@ export function ReviewZoomPreview(props: {
             layout={layout}
             cornerRadius={cornerRadius}
             scale={previewScale}
-            disabled={!!props.disabled || status !== 'ready'}
+            disabled={!interactive}
             onChange={(spotlight) => props.onChange({ spotlight })}
             onPreview={(spotlight) => props.onPreview?.(spotlight ? { spotlight } : null)}
           />
@@ -131,9 +133,10 @@ export function ReviewZoomPreview(props: {
             imageUrl={image.url}
             key={region.id}
             cornerRadius={cornerRadius}
-            camera={region.transform}
-            disabled={props.disabled || status !== 'ready'}
-            frame={frame}
+            camera={camera}
+            disabled={!interactive}
+            live={!!playback}
+            frame={playback ? { image: playback.video, ...props.source } : frame}
             layout={layout}
             output={output}
             view={view}
@@ -142,32 +145,14 @@ export function ReviewZoomPreview(props: {
           />
         )}
       </div>
-      {unavailable ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.zoomPreviewUnavailable')}
-        </p>
-      ) : null}
-      {!unavailable && status === 'loading' ? (
-        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.zoomPreviewLoading')}
-        </p>
-      ) : null}
-      {(!unavailable && status === 'failed') || image.failed ? (
-        <p
-          role="alert"
-          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-danger)]"
-        >
-          <span>{translate('gallery.videoReview.zoomPreviewFailed')}</span>
-          <ReviewButton
-            label={translate('gallery.videoReview.retry')}
-            className="!h-6 !min-h-6 !px-1.5 text-xs"
-            onClick={() => {
-              image.retry();
-              retry();
-            }}
-          />
-        </p>
-      ) : null}
+      <ZoomPreviewFeedback
+        status={previewStatus}
+        imageFailed={image.failed}
+        onRetry={() => {
+          image.retry();
+          retry();
+        }}
+      />
     </section>
   );
 }
@@ -189,4 +174,38 @@ function previewInteractionHandlers(
       if (event.key.startsWith('Arrow')) seek();
     },
   };
+}
+
+/** Frame and background loading feedback stays independent of camera geometry and gestures. */
+function ZoomPreviewFeedback(props: {
+  status: ReturnType<typeof useZoomPreviewFrame>['status'];
+  imageFailed: boolean;
+  onRetry(): void;
+}) {
+  return (
+    <>
+      {props.status === 'unavailable' || props.status === 'loading' ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate(
+            props.status === 'unavailable'
+              ? 'gallery.videoReview.zoomPreviewUnavailable'
+              : 'gallery.videoReview.zoomPreviewLoading'
+          )}
+        </p>
+      ) : null}
+      {props.status === 'failed' || props.imageFailed ? (
+        <p
+          role="alert"
+          className="flex items-center gap-2 text-xs text-[var(--sniptale-color-danger)]"
+        >
+          <span>{translate('gallery.videoReview.zoomPreviewFailed')}</span>
+          <ReviewButton
+            label={translate('gallery.videoReview.retry')}
+            className="!h-6 !min-h-6 !px-1.5 text-xs"
+            onClick={props.onRetry}
+          />
+        </p>
+      ) : null}
+    </>
+  );
 }

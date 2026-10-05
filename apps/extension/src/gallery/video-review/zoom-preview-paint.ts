@@ -54,7 +54,7 @@ export function paintZoomPreview(
   }
   context.restore();
   if (args.view === 'area' && args.showControls !== false) {
-    const visible = computeQuickEditVisibleSourceRect(
+    const visible = computeZoomPreviewArea(
       args.layout,
       args.background ?? { enabled: false },
       args
@@ -87,4 +87,21 @@ export function previewBackgroundPaint(background: QuickEditBackgroundSettings):
   if (!background.enabled || background.type === 'image') return '#000000';
   if (background.type === 'solid') return background.color;
   return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
+}
+
+/** Inspector footprint in source coordinates; Follow Video includes the whole scene, not only video pixels. */
+export function computeZoomPreviewArea(
+  layout: ZoomPreviewLayout,
+  background: QuickEditBackgroundSettings,
+  output: { width: number; height: number }
+): QuickEditRect {
+  if (!background.enabled || background.zoomBehavior !== 'follow-video')
+    return computeQuickEditVisibleSourceRect(layout, background, output);
+  const video = layout.videoTransform;
+  return {
+    x: -video.x / video.width,
+    y: -video.y / video.height,
+    width: output.width / video.width,
+    height: output.height / video.height,
+  };
 }

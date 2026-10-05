@@ -1,3 +1,4 @@
+import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { ReviewFeedback } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
@@ -43,6 +44,8 @@ type InspectorState = Pick<
   | 'composer'
   | 'video'
   | 'time'
+  | 'playing'
+  | 'features'
   | 'selected'
   | 'setHovered'
   | 'busy'
@@ -241,6 +244,17 @@ function ReviewInspectorBinding({
           video.current?.pause();
           state.seek(time, false);
         }}
+        playback={
+          state.playing && video.current
+            ? {
+                video: video.current,
+                camera: evaluateQuickEditCameraAtTime(
+                  state.features.zoomRegions,
+                  state.timeline.sceneOutputTime
+                ),
+              }
+            : undefined
+        }
         toSourceTime={state.timeline.timeMap.timelineToSource}
         resource={resource}
         audio={audio}

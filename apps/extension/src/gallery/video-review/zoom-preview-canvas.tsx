@@ -8,10 +8,10 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneCamera,
-  computeQuickEditVisibleSourceRect,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import {
+  computeZoomPreviewArea,
   paintZoomPreview,
   previewBackgroundPaint,
   type ZoomPreviewLayout,
@@ -24,6 +24,7 @@ type ZoomCanvasProps = {
   camera: QuickEditZoomRegion['transform'];
   disabled?: boolean | undefined;
   frame: ZoomPreviewFrame | null;
+  live?: boolean | undefined;
   layout: ZoomPreviewLayout;
   output: { width: number; height: number };
   view: 'area' | 'result';
@@ -188,7 +189,7 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     interactionElement: canvasRef,
     viewport,
     videoRect: props.layout.videoRect,
-    visibleArea: computeQuickEditVisibleSourceRect(props.layout, props.background, props.output),
+    visibleArea: computeZoomPreviewArea(props.layout, props.background, props.output),
     onCommit: props.onCenter,
   });
   const layout = useMemo(
@@ -200,7 +201,7 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
   );
   useZoomCanvasPaint(canvasRef, { ...props, camera, layout });
 
-  const visible = computeQuickEditVisibleSourceRect(layout, props.background, props.output);
+  const visible = computeZoomPreviewArea(layout, props.background, props.output);
   const opening = {
     x: video.x + visible.x * video.width,
     y: video.y + visible.y * video.height,
@@ -235,19 +236,29 @@ function useZoomCanvasPaint(
     const canvas = canvasRef.current;
     const context = canvas?.getContext('2d');
     if (!canvas || !context) return;
-    paintZoomPreview(context, {
-      background: props.background,
-      accent:
-        getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() || '#4f7cff',
-      camera: props.camera,
-      cornerRadius: props.cornerRadius,
-      frame: props.frame,
-      height: canvas.height,
-      layout: props.layout,
-      view: props.view,
-      showControls: false,
-      width: canvas.width,
-    });
+    const paint = () =>
+      paintZoomPreview(context, {
+        background: props.background,
+        accent:
+          getComputedStyle(canvas).getPropertyValue('--sniptale-color-accent').trim() || '#4f7cff',
+        camera: props.camera,
+        cornerRadius: props.cornerRadius,
+        frame: props.frame,
+        height: canvas.height,
+        layout: props.layout,
+        view: props.view,
+        showControls: false,
+        width: canvas.width,
+      });
+    paint();
+    if (!props.live) return;
+    let request: number;
+    const tick = () => {
+      paint();
+      request = requestAnimationFrame(tick);
+    };
+    request = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(request);
   }, [
     canvasRef,
     props.layout,
@@ -256,5 +267,6 @@ function useZoomCanvasPaint(
     props.camera,
     props.cornerRadius,
     props.background,
+    props.live,
   ]);
 }

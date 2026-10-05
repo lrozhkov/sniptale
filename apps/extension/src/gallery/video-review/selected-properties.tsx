@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
 import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
@@ -37,6 +37,7 @@ type SelectedPropertiesProps = {
   markers: readonly ReviewTelemetryMarker[];
   onFocus(region: QuickEditZoomRegion): void;
   onPreviewFrame?(time: number): void;
+  playback?: ComponentProps<typeof ReviewZoomPreview>['playback'];
   toSourceTime(time: number): number | null;
   resource: LoadedReview;
   audio: ReturnType<typeof useReviewAudio>;
@@ -108,6 +109,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 sourceTime={props.toSourceTime((region.start + region.end) / 2)}
                 onInteract={props.onPreviewFrame}
                 loadFrame={previewLoader}
+                playback={props.playback}
                 onChange={(patch) => zoom.change(region.id, patch)}
                 onPreview={(patch) => zoom.preview(region.id, patch)}
               />
