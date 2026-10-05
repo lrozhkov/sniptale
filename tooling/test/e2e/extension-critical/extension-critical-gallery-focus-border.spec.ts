@@ -92,6 +92,30 @@ for (const variant of [
       await expect(
         inspector.getByText(label('gallery.videoReview.focusZoomConflict'), { exact: true })
       ).toBeVisible();
+      const resetPosition = inspector.getByRole('button', {
+        name: label('gallery.videoReview.zoomResetPosition'),
+        exact: true,
+      });
+      const removeFocus = inspector.getByRole('button', {
+        name: label('gallery.videoReview.zoomDelete'),
+        exact: true,
+      });
+      await removeFocus.scrollIntoViewIfNeeded();
+      await expect(removeFocus).toBeVisible();
+      const resetSize = await resetPosition.evaluate((node) => ({
+        height: node.getBoundingClientRect().height,
+        padding: getComputedStyle(node).paddingInline,
+      }));
+      const removeSize = await removeFocus.evaluate((node) => ({
+        height: node.getBoundingClientRect().height,
+        padding: getComputedStyle(node).paddingInline,
+      }));
+      expect(removeSize).toEqual(resetSize);
+      expect(removeSize.height).toBe(32);
+      await page.screenshot({
+        path: info.outputPath('inspector-footer-actions.png'),
+        fullPage: false,
+      });
       const width = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.borderWidth'),
         exact: true,

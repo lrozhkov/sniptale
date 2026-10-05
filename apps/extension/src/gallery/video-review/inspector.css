@@ -248,10 +248,6 @@
     border-color: transparent !important;
     background: transparent !important;
   }
-  [data-ui='gallery.videoReview.inspector'] .review-inspector-danger {
-    min-height: 36px !important;
-    padding-inline: 10px !important;
-  }
   [data-ui='gallery.videoReview.inspector'] :is(.review-inspector-danger, [data-note-delete]) {
     color: var(--sniptale-color-text-secondary) !important;
     border-color: transparent !important;
