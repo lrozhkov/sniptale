@@ -74,6 +74,9 @@ describe('Focus payload compatibility through workspace and archive boundaries',
         reveal: 'draw-ccw' as const,
         exitReveal: 'erase-ccw' as const,
         segmentPercent: 65,
+        motion: 'pulse' as const,
+        loop: true,
+        period: 4,
       },
     };
     const after = { ...before, zoom: { enabled: true, regions: [...before.zoom.regions, border] } };
@@ -164,6 +167,63 @@ describe('Focus payload compatibility through workspace and archive boundaries',
             regions: [{ ...region, border: { ...oldBorder, segmentPercent: 101 } }],
           },
         },
+      })
+    ).toBeNull();
+  });
+
+  it('normalizes legacy rotation and roundtrips a counterclockwise speed edit through history', () => {
+    const { motion: _motion, ...legacyBorder } = createQuickEditBorder();
+    const old = {
+      ...createQuickEditZoomRegion({ id: 'legacy-rotation', at: 1 }),
+      border: { ...legacyBorder, style: 'dashed', loop: true, period: 10 },
+    };
+    const before = { ...createQuickEditAdvancedContent(), zoom: { enabled: true, regions: [old] } };
+    const after = {
+      ...before,
+      zoom: {
+        enabled: true,
+        regions: [{ ...old, border: { ...old.border, motion: 'counterclockwise', period: 20 } }],
+      },
+    };
+    const raw = {
+      ...legacyWorkspace(1),
+      advanced: { ...createQuickEditAdvancedState(), zoom: before.zoom },
+      history: [{ id: 'rotation-speed', at: 2, target: 'advancedContent', before, after }],
+    };
+    const parsed = parseVideoWorkspace(raw)!;
+    expect(parsed).not.toBeNull();
+    expect(parsed.advanced.zoom.regions[0]?.border).toMatchObject({
+      motion: 'clockwise',
+      loop: true,
+      period: 10,
+    });
+    const replayed = replayReviewHistory(
+      parsed.history,
+      1,
+      parsed.source,
+      reviewAdvancedContentBaseline(parsed.advanced)
+    );
+    expect(replayed.advancedContent.zoom.regions[0]?.border).toMatchObject({
+      motion: 'counterclockwise',
+      loop: true,
+      period: 20,
+    });
+    expect(parseVideoWorkspace(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+    expect(
+      parseVideoWorkspace({
+        ...raw,
+        history: [
+          {
+            ...raw.history[0],
+            after: {
+              ...after,
+              zoom: {
+                enabled: true,
+                regions: [{ ...old, border: { ...old.border, motion: 'invalid' } }],
+              },
+            },
+          },
+        ],
       })
     ).toBeNull();
   });

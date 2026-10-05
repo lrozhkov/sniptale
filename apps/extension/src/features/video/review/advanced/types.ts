@@ -59,6 +59,7 @@ export interface QuickEditBorder {
   reveal: 'fade' | 'draw' | 'draw-ccw';
   exitReveal: 'fade' | 'erase' | 'erase-ccw';
   loop: boolean;
+  motion: 'clockwise' | 'counterclockwise' | 'pulse';
   period: number;
   segmentPercent: number;
 }

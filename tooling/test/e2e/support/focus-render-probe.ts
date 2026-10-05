@@ -128,7 +128,7 @@ function probeBorderMotion() {
   const moving = (['solid', 'dashed', 'dotted'] as const).map((style) => {
     const border = { ...region.border, style, loop: true, segmentPercent: 100 };
     const first = render(border, 1.25);
-    const second = render(border, 1.3);
+    const second = render(border, 1.75);
     let changed = 0,
       painted = 0;
     for (let i = 3; i < first.length; i += 4) {
@@ -137,5 +137,28 @@ function probeBorderMotion() {
     }
     return { style, changed, painted };
   });
-  return { draw, erase, moving };
+  const pulse = (['solid', 'dashed', 'dotted'] as const).map((style) => {
+    const border = { ...region.border, style, loop: true, motion: 'pulse' as const };
+    const full = render(border, 1);
+    const low = render(border, 2);
+    let fullAlpha = 0,
+      lowAlpha = 0;
+    for (let i = 3; i < full.length; i += 4) {
+      fullAlpha += full[i]!;
+      lowAlpha += low[i]!;
+    }
+    return { style, fullAlpha, lowAlpha };
+  });
+  const clockwise = render(
+    { ...region.border, style: 'dashed', loop: true, motion: 'clockwise' },
+    1.2
+  );
+  const counterclockwise = render(
+    { ...region.border, style: 'dashed', loop: true, motion: 'counterclockwise' },
+    1.2
+  );
+  let oppositePixels = 0;
+  for (let i = 3; i < clockwise.length; i += 4)
+    if (clockwise[i] !== counterclockwise[i]) oppositePixels++;
+  return { draw, erase, moving, pulse, oppositePixels };
 }

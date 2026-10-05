@@ -10,6 +10,10 @@ import { clampQuickEditSpotlightArea } from '../../features/video/review/advance
 import type { ReviewNumberRow } from './number-row';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
 
+// Override inspector wrapping for long motion labels while retaining the shared overflow tooltip.
+const borderAnimationSelectClassName =
+  '[&_.truncate]:whitespace-nowrap! [&_.truncate]:overflow-hidden! [&_.truncate]:text-ellipsis!';
+
 /** Source geometry and stroke appearance share the selected effect's draft owner. */
 export function ReviewBorderInspector(props: {
   value: QuickEditBorder;
@@ -48,7 +52,13 @@ export function ReviewBorderInspector(props: {
           value: style,
           label: translate(`gallery.videoReview.borderStyle_${style}`),
         }))}
-        onChange={(style: QuickEditBorder['style']) => onChange({ ...value, style })}
+        onChange={(style: QuickEditBorder['style']) =>
+          onChange({
+            ...value,
+            style,
+            loop: value.loop && (style !== 'solid' || value.motion === 'pulse'),
+          })
+        }
       />
       <BorderNumberRow
         label={translate('gallery.videoReview.focusRoundness')}
@@ -136,6 +146,7 @@ export function ReviewBorderAnimation(props: {
             </legend>
             <SelectField
               className={reviewSelectFieldClassName}
+              selectClassName={borderAnimationSelectClassName}
               label={translate('gallery.videoReview.focusReveal')}
               value={clock.type === 'none' ? 'none' : reveal}
               options={[
@@ -202,55 +213,102 @@ export function ReviewBorderAnimation(props: {
           </fieldset>
         );
       })}
-      <SelectField
+      <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
+    </div>
+  );
+}
+
+/** Hold uses the persisted period as its single clock; the inspector exposes a speed multiplier. */
+function BorderHold(props: {
+  border: QuickEditBorder;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+  onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
+}) {
+  const { border, onChange } = props;
+  return (
+    <>
+      <SelectField<QuickEditBorder['motion'] | 'still'>
         className={reviewSelectFieldClassName}
+        selectClassName={borderAnimationSelectClassName}
         label={translate('gallery.videoReview.borderHold')}
-        value={border.loop ? 'moving' : 'still'}
+        value={border.loop ? border.motion : 'still'}
         options={[
           { value: 'still', label: translate('gallery.videoReview.borderStill') },
-          { value: 'moving', label: translate('gallery.videoReview.borderMoving') },
+          ...(border.style === 'solid'
+            ? []
+            : [
+                {
+                  value: 'clockwise' as const,
+                  label: translate('gallery.videoReview.borderRotateClockwise'),
+                },
+                {
+                  value: 'counterclockwise' as const,
+                  label: translate('gallery.videoReview.borderRotateCounterclockwise'),
+                },
+              ]),
+          { value: 'pulse', label: translate('gallery.videoReview.borderPulse') },
         ]}
-        onChange={(value) => onChange({ border: { ...border, loop: value === 'moving' } })}
+        onChange={(value) =>
+          onChange({
+            border: {
+              ...border,
+              loop: value !== 'still',
+              motion: value === 'still' ? border.motion : value,
+            },
+          })
+        }
       />
       {border.loop ? (
         <>
+          {border.motion !== 'pulse' ? (
+            <BorderNumberRow
+              label={translate('gallery.videoReview.borderSegmentPercent')}
+              min={1}
+              max={100}
+              step={1}
+              precision={0}
+              unit="%"
+              value={border.segmentPercent}
+              onPreview={(segmentPercent) =>
+                props.onPreview?.(
+                  segmentPercent === null ? null : { border: { ...border, segmentPercent } }
+                )
+              }
+              onChange={(segmentPercent) => onChange({ border: { ...border, segmentPercent } })}
+            />
+          ) : null}
           <BorderNumberRow
-            label={translate('gallery.videoReview.borderSegmentPercent')}
-            min={1}
-            max={100}
-            step={1}
-            precision={0}
-            unit="%"
-            value={border.segmentPercent}
-            onPreview={(segmentPercent) =>
-              props.onPreview?.(
-                segmentPercent === null ? null : { border: { ...border, segmentPercent } }
-              )
-            }
-            onChange={(segmentPercent) => onChange({ border: { ...border, segmentPercent } })}
-          />
-          <BorderNumberRow
-            label={translate('gallery.videoReview.borderPeriod')}
-            min={0.5}
-            max={10}
+            label={translate('gallery.videoReview.borderSpeed')}
+            title={translate(
+              border.motion === 'pulse'
+                ? 'gallery.videoReview.borderPulseSpeedHint'
+                : 'gallery.videoReview.borderRotationSpeedHint'
+            )}
+            min={0.1}
+            max={4}
             step={0.1}
             precision={1}
-            unit="s"
-            value={border.period}
-            onPreview={(period) =>
-              props.onPreview?.(period === null ? null : { border: { ...border, period } })
+            unit="x"
+            value={2 / border.period}
+            onPreview={(speed) =>
+              props.onPreview?.(
+                speed === null ? null : { border: { ...border, period: 2 / speed } }
+              )
             }
-            onChange={(period) => onChange({ border: { ...border, period } })}
+            onChange={(speed) => onChange({ border: { ...border, period: 2 / speed } })}
           />
         </>
       ) : null}
-    </div>
+    </>
   );
 }
 
 /** A numeric gesture previews locally and commits once; cancellation clears the effect draft. */
 function BorderNumberRow(
-  props: ComponentProps<typeof ReviewNumberRow> & { onPreview?(value: number | null): void }
+  props: ComponentProps<typeof ReviewNumberRow> & {
+    onPreview?(value: number | null): void;
+    title?: string;
+  }
 ) {
   const [draft, setDraft] = useState(props.value);
   const cancelled = useRef(false);
@@ -262,6 +320,7 @@ function BorderNumberRow(
   };
   return (
     <div
+      title={props.title}
       onPointerDownCapture={() => {
         cancelled.current = false;
       }}

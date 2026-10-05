@@ -104,17 +104,84 @@ for (const variant of [
       await expect(width).toHaveValue('3');
       await button('gallery.videoReview.redo').click();
       await expect(width).toHaveValue('6');
-      await inspector
-        .getByRole('button', { name: label('gallery.videoReview.borderHold'), exact: true })
-        .click();
+      const entrance = inspector
+        .getByRole('button', { name: label('gallery.videoReview.focusReveal'), exact: true })
+        .first();
+      await entrance.click();
       await page
-        .getByRole('option', { name: label('gallery.videoReview.borderMoving'), exact: true })
+        .getByRole('option', {
+          name: label('gallery.videoReview.borderDrawCounterclockwise'),
+          exact: true,
+        })
         .click();
-      const period = inspector.getByRole('textbox', {
-        name: label('gallery.videoReview.borderPeriod'),
+      await expect
+        .poll(async () => (await entrance.boundingBox())?.height ?? 100)
+        .toBeLessThanOrEqual(40);
+      await page.screenshot({
+        path: info.outputPath('border-counterclockwise-label.png'),
+        fullPage: false,
+      });
+      const hold = inspector.getByRole('button', {
+        name: label('gallery.videoReview.borderHold'),
         exact: true,
       });
-      await expect(period).toHaveValue('2');
+      await hold.click();
+      await expect(
+        page.getByRole('option', {
+          name: label('gallery.videoReview.borderRotateClockwise'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.borderPulse'), exact: true })
+        .click();
+      const speed = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.borderSpeed'),
+        exact: true,
+      });
+      await expect(speed).toHaveValue('1');
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.borderSegmentPercent'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await speed.fill('0.5');
+      await speed.press('Enter');
+      await expect.poll(async () => (await persistedFocus(page))?.border?.period).toBe(4);
+      const style = inspector.getByRole('button', {
+        name: label('gallery.videoReview.borderStyle'),
+        exact: true,
+      });
+      await style.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.borderStyle_dashed'), exact: true })
+        .click();
+      await hold.click();
+      await page
+        .getByRole('option', {
+          name: label('gallery.videoReview.borderRotateCounterclockwise'),
+          exact: true,
+        })
+        .click();
+      await style.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.borderStyle_solid'), exact: true })
+        .click();
+      await expect(hold).toContainText(label('gallery.videoReview.borderStill'));
+      await expect(speed).toHaveCount(0);
+      await style.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.borderStyle_dashed'), exact: true })
+        .click();
+      await hold.click();
+      await page
+        .getByRole('option', {
+          name: label('gallery.videoReview.borderRotateCounterclockwise'),
+          exact: true,
+        })
+        .click();
+      await expect(speed).toHaveValue('0.5');
       const segmentSize = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.borderSegmentPercent'),
         exact: true,
@@ -123,7 +190,7 @@ for (const variant of [
       await segmentSize.fill('65');
       await segmentSize.press('Enter');
       await expect.poll(async () => (await persistedFocus(page))?.border?.segmentPercent).toBe(65);
-      await period.scrollIntoViewIfNeeded();
+      await speed.scrollIntoViewIfNeeded();
       await page.screenshot({
         path: info.outputPath('focus-border-animation-controls.png'),
         fullPage: false,
@@ -192,6 +259,8 @@ for (const variant of [
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
       await expect(width).toHaveValue('6');
       await expect(segmentSize).toHaveValue('65');
+      await expect(speed).toHaveValue('0.5');
+      await expect(hold).toContainText(label('gallery.videoReview.borderRotateCounterclockwise'));
       const downloading = page.waitForEvent('download');
       await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
       const download = await downloading;
@@ -281,6 +350,12 @@ test('Focus compositor produces union holes and a partial clockwise Border in Ch
     { direction: 'erase', top: 0, left: 255 },
     { direction: 'erase-ccw', top: 255, left: 0 },
   ]);
+  expect(pixels.motion.oppositePixels).toBeGreaterThan(100);
+  for (const pulse of pixels.motion.pulse) {
+    expect(pulse.fullAlpha).toBeGreaterThan(0);
+    expect(pulse.lowAlpha / pulse.fullAlpha).toBeGreaterThan(0.3);
+    expect(pulse.lowAlpha / pulse.fullAlpha).toBeLessThan(0.4);
+  }
   for (const pattern of pixels.motion.moving) {
     expect(pattern.painted).toBeGreaterThan(100);
     if (pattern.style === 'solid') expect(pattern.changed).toBe(0);

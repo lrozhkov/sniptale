@@ -97,11 +97,11 @@ it('edits stroke style and clamped source area without changing unrelated appear
   expect(preview).toHaveBeenLastCalledWith(null);
 });
 
-it('uses source-time coupled duration budgets and exposes moving hold period only when needed', async () => {
+it('uses source-time coupled duration budgets and exposes rotation speed only when needed', async () => {
   let region = {
     ...createQuickEditZoomRegion({ id: 'border', at: 0, duration: 10, endMax: 10 }),
     sourceAnchor: { start: 2, end: 4 },
-    border: createQuickEditBorder(),
+    border: { ...createQuickEditBorder(), style: 'dashed' as const },
   };
   const preview = vi.fn();
   const change = vi.fn((patch: Parameters<typeof updateQuickEditZoomRegion>[2]) => {
@@ -133,8 +133,8 @@ it('uses source-time coupled duration budgets and exposes moving hold period onl
   await choose('focusReveal', 'focusFade', phases()[0]);
   await choose('focusReveal', 'focusFade', phases()[1]);
   expect(region.border).toMatchObject({ reveal: 'fade', exitReveal: 'fade' });
-  expect(field('borderPeriod')).toBeNull();
-  await choose('borderHold', 'borderMoving');
+  expect(field('borderSpeed')).toBeNull();
+  await choose('borderHold', 'borderRotateClockwise');
   expect(field('borderSegmentPercent').value).toBe('100');
   await scrub('borderSegmentPercent', '35');
   expect(region.border.segmentPercent).toBe(35);
@@ -152,14 +152,23 @@ it('uses source-time coupled duration budgets and exposes moving hold period onl
   expect(region.border.segmentPercent).toBe(100);
   await enter(field('borderSegmentPercent'), '0');
   expect(region.border.segmentPercent).toBe(1);
-  await scrub('borderPeriod', '4');
-  expect(region.border.period).toBe(4);
-  await scrub('borderPeriod', '6', true);
-  expect(region.border.period).toBe(4);
+  await scrub('borderSpeed', '4');
+  expect(region.border.period).toBe(0.5);
+  await scrub('borderSpeed', '1', true);
+  expect(region.border.period).toBe(0.5);
+  await enter(field('borderSpeed'), '0');
+  expect(region.border.period).toBe(20);
+  await enter(field('borderSpeed'), '10');
+  expect(region.border.period).toBe(0.5);
+  await choose('borderHold', 'borderRotateCounterclockwise');
+  expect(region.border.motion).toBe('counterclockwise');
+  await choose('borderHold', 'borderPulse');
+  expect(region.border.motion).toBe('pulse');
+  expect(field('borderSegmentPercent')).toBeNull();
   expect(preview).toHaveBeenLastCalledWith(null);
   await choose('borderHold', 'borderStill');
   expect(region.border.loop).toBe(false);
-  expect(field('borderPeriod')).toBeNull();
+  expect(field('borderSpeed')).toBeNull();
 });
 
 it('commits an edited color and discards an open picker draft on Escape', async () => {
@@ -195,5 +204,59 @@ it('commits an edited color and discards an open picker draft on Escape', async 
     expect.objectContaining({ border: expect.objectContaining({ color: '#abcdef' }) })
   );
   act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+});
+
+it('offers no rotating hold for a solid stroke', async () => {
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'solid', at: 0 }),
+    border: createQuickEditBorder(),
+  };
+  act(() => root.render(<ReviewBorderAnimation region={region} onChange={vi.fn()} />));
+  act(() => field('borderHold').click());
+  const options = [...document.querySelectorAll('[role="option"]')].map((node) => node.textContent);
+  expect(options).toEqual(['gallery.videoReview.borderStill', 'gallery.videoReview.borderPulse']);
+});
+
+it('stops rotation when switching to solid but retains pulse for all stroke styles', async () => {
+  let value = {
+    ...createQuickEditBorder(),
+    style: 'dashed' as 'solid' | 'dashed' | 'dotted',
+    loop: true,
+  };
+  const change = vi.fn((next: typeof value) => {
+    value = next;
+    render();
+  });
+  const render = () => root.render(<ReviewBorderInspector value={value} onChange={change} />);
+  act(render);
+  await choose('borderStyle', 'borderStyle_solid');
+  expect(value.loop).toBe(false);
+  value = { ...value, loop: true, motion: 'pulse' };
+  act(render);
+  await choose('borderStyle', 'borderStyle_dotted');
+  await choose('borderStyle', 'borderStyle_solid');
+  expect(value).toMatchObject({ loop: true, motion: 'pulse', style: 'solid' });
+});
+
+it('previews pulse speed and cancels Escape without committing', async () => {
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'pulse', at: 0 }),
+    border: { ...createQuickEditBorder(), motion: 'pulse' as const, loop: true },
+  };
+  const onChange = vi.fn();
+  const onPreview = vi.fn();
+  act(() =>
+    root.render(<ReviewBorderAnimation region={region} onChange={onChange} onPreview={onPreview} />)
+  );
+  expect(field('borderSpeed').value).toBe('1');
+  expect(field('borderSegmentPercent')).toBeNull();
+  const slider = field('borderSpeed range');
+  act(() => slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  await input(slider, '2');
+  expect(onPreview).toHaveBeenLastCalledWith({ border: { ...region.border, period: 1 } });
+  act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  act(() => slider.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(onChange).not.toHaveBeenCalled();
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });

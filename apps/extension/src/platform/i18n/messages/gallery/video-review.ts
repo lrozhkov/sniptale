@@ -27,9 +27,22 @@ export const galleryVideoReviewMessages = defineMessageSource({
   },
   borderSegmentPercent: { ru: 'Длина отрезка', en: 'Segment length' },
   borderHold: { ru: 'Во время показа', en: 'Hold' },
-  borderStill: { ru: 'Неподвижная', en: 'Still' },
-  borderMoving: { ru: 'Движущийся отрезок', en: 'Moving segment' },
-  borderPeriod: { ru: 'Период', en: 'Period' },
+  borderStill: { ru: 'Нет', en: 'None' },
+  borderRotateClockwise: { ru: 'Вращение по часовой стрелке', en: 'Rotate clockwise' },
+  borderRotateCounterclockwise: {
+    ru: 'Вращение против часовой стрелки',
+    en: 'Rotate counterclockwise',
+  },
+  borderPulse: { ru: 'Пульсация', en: 'Pulse' },
+  borderSpeed: { ru: 'Скорость', en: 'Speed' },
+  borderRotationSpeedHint: {
+    ru: 'При 1× узор сдвигается на один шаг штриха или точки за секунду видео.',
+    en: 'At 1×, the pattern moves by one dash or dot spacing per video second.',
+  },
+  borderPulseSpeedHint: {
+    ru: 'При 1× один цикл пульсации занимает 2 секунды видео.',
+    en: 'At 1×, one pulse cycle takes 2 video seconds.',
+  },
 
   exportBlockerCanvasSize: {
     ru: 'размер видео с шапкой превышает допустимый; уменьшите разрешение экспорта',

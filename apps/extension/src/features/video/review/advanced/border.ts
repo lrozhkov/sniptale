@@ -17,6 +17,7 @@ export function createQuickEditBorder(): QuickEditBorder {
     reveal: 'fade',
     exitReveal: 'fade',
     loop: false,
+    motion: 'clockwise',
     period: 2,
     segmentPercent: 100,
   };
@@ -36,8 +37,12 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     color !== value['color'] ||
     !isBoundedNumber(value['width'], 1, 24) ||
     !isBoundedNumber(value['roundness'], 0, 0.5) ||
-    !isBoundedNumber(value['period'], 0.5, 10) ||
+    !isBoundedNumber(value['period'], 0.5, 20) ||
     ('segmentPercent' in value && !isBoundedNumber(value['segmentPercent'], 1, 100)) ||
+    ('motion' in value &&
+      value['motion'] !== 'clockwise' &&
+      value['motion'] !== 'counterclockwise' &&
+      value['motion'] !== 'pulse') ||
     typeof value['loop'] !== 'boolean' ||
     (value['style'] !== 'solid' && value['style'] !== 'dashed' && value['style'] !== 'dotted') ||
     (value['reveal'] !== 'fade' && value['reveal'] !== 'draw' && value['reveal'] !== 'draw-ccw') ||
@@ -53,7 +58,11 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     roundness: value['roundness'],
     period: value['period'],
     segmentPercent: typeof value['segmentPercent'] === 'number' ? value['segmentPercent'] : 25,
-    loop: value['loop'],
+    loop: value['loop'] && (value['style'] !== 'solid' || value['motion'] === 'pulse'),
+    motion:
+      value['motion'] === 'pulse' || value['motion'] === 'counterclockwise'
+        ? value['motion']
+        : 'clockwise',
     style: value['style'],
     reveal: value['reveal'],
     exitReveal: value['exitReveal'],
@@ -95,7 +104,12 @@ const ease = (t: number, type: QuickEditZoomRegion['enter']['type']) => {
   return type === 'none' ? 1 : type === 'linear' ? p : p * p * (3 - 2 * p);
 };
 
-function borderPhase(region: QuickEditZoomRegion, border: QuickEditBorder, time: number) {
+function borderPhase(
+  region: QuickEditZoomRegion,
+  border: QuickEditBorder,
+  time: number,
+  geometry: { width: number; perimeter: number }
+) {
   const clock = region.borderClock;
   const fitted = fitQuickEditZoomTransitions(region);
   const duration = clock?.duration ?? region.end - region.start;
@@ -105,11 +119,16 @@ function borderPhase(region: QuickEditZoomRegion, border: QuickEditBorder, time:
   const enterDuration = enter.type === 'none' ? 0 : enter.duration;
   const exitDuration = exit.type === 'none' ? 0 : exit.duration;
   const hold = Math.max(0, duration - enterDuration - exitDuration);
-  const holdInterval = (time: number) => {
-    if (!border.loop || hold <= 0) return { start: 0, end: 1 };
-    const elapsed = Math.max(0, time - enterDuration);
+  const elapsed = Math.max(0, Math.min(t, duration - exitDuration) - enterDuration);
+  const active = border.loop && hold > 0;
+  const rotation = active && border.motion !== 'pulse' && border.style !== 'solid';
+  const direction = border.motion === 'counterclockwise' ? -1 : 1;
+  const pitch = geometry.width * (border.style === 'dashed' ? 5 : 2);
+  const movement = rotation ? direction * elapsed * (2 / border.period) * pitch : 0;
+  const holdInterval = () => {
+    if (!rotation) return { start: 0, end: 1 };
     const shrink = Math.min(1, elapsed / Math.min(0.2, hold));
-    const start = elapsed / border.period;
+    const start = geometry.perimeter > 0 ? movement / geometry.perimeter : 0;
     return { start, end: start + 1 - (1 - border.segmentPercent / 100) * shrink };
   };
   let start = 0,
@@ -123,12 +142,14 @@ function borderPhase(region: QuickEditZoomRegion, border: QuickEditBorder, time:
       end = 0;
     } else opacity = p;
   } else {
-    ({ start, end } = holdInterval(Math.min(t, duration - exitDuration)));
+    ({ start, end } = holdInterval());
+    if (active && border.motion === 'pulse')
+      opacity = 0.675 + 0.325 * Math.cos((2 * Math.PI * elapsed) / border.period);
     if (exitDuration > 0 && t > duration - exitDuration) {
       const p = ease((t - duration + exitDuration) / exitDuration, exit.type);
       if (border.exitReveal === 'erase') start += (end - start) * p;
       else if (border.exitReveal === 'erase-ccw') end -= (end - start) * p;
-      else opacity = 1 - p;
+      else opacity *= 1 - p;
     }
   }
   const offset = Math.floor(start);
@@ -136,10 +157,7 @@ function borderPhase(region: QuickEditZoomRegion, border: QuickEditBorder, time:
     start: start - offset,
     end: end - offset,
     opacity,
-    movement:
-      border.loop && hold > 0
-        ? Math.max(0, Math.min(t, duration - exitDuration) - enterDuration) / border.period
-        : 0,
+    movement,
   };
 }
 
@@ -163,7 +181,6 @@ export function evaluateQuickEditBordersAtTime(args: {
     )
     .map((region) => {
       const border = region.border!;
-      const phase = borderPhase(region, border, args.time);
       const area = {
         x: args.video.x + border.area.x * args.video.width,
         y: args.video.y + border.area.y * args.video.height,
@@ -182,6 +199,7 @@ export function evaluateQuickEditBordersAtTime(args: {
         rect,
         Math.max(0, Math.min(area.width, area.height) * border.roundness - inset)
       );
+      const phase = borderPhase(region, border, args.time, { width, perimeter: path.perimeter });
       return {
         id: region.id,
         ...path,
@@ -191,7 +209,7 @@ export function evaluateQuickEditBordersAtTime(args: {
         start: phase.start,
         end: phase.end,
         opacity: phase.opacity,
-        dashOffset: 0 - phase.movement * path.perimeter,
+        dashOffset: 0 - phase.movement,
       };
     });
 }

@@ -82,7 +82,13 @@ it('starts clockwise at the tangent with analytic circular perimeter', () => {
 });
 it('preserves source-clock phase across cut and speed slices and strips no authored fields', () => {
   const region = border();
-  region.border = { ...region.border, loop: true, reveal: 'draw', exitReveal: 'erase' };
+  region.border = {
+    ...region.border,
+    style: 'dashed',
+    loop: true,
+    reveal: 'draw',
+    exitReveal: 'erase',
+  };
   const map = buildReviewTimeMap(10, [
     {
       id: 'speed',
@@ -106,7 +112,13 @@ it('preserves source-clock phase across cut and speed slices and strips no autho
 });
 it('holds a full line initially, shrinks to a quarter and exits without a segment flash', () => {
   const region = border();
-  region.border = { ...region.border, loop: true, exitReveal: 'erase', segmentPercent: 25 };
+  region.border = {
+    ...region.border,
+    style: 'dashed',
+    loop: true,
+    exitReveal: 'erase',
+    segmentPercent: 25,
+  };
   const sample = (time: number) =>
     evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time })[0]!;
   expect(sample(0.3).end - sample(0.3).start).toBe(1);
@@ -177,17 +189,26 @@ it('rejects Border in legacy state and history envelopes rather than upgrading m
 });
 
 it.each([
-  ['draw', 'erase'],
-  ['draw-ccw', 'erase-ccw'],
+  ['draw', 'erase', 'clockwise'],
+  ['draw-ccw', 'erase-ccw', 'counterclockwise'],
+  ['fade', 'fade', 'pulse'],
 ] as const)(
-  'matches source %s and %s exactly after cuts and across speed boundaries',
-  (reveal, exitReveal) => {
+  'matches source %s and %s with %s exactly after cuts and speed boundaries',
+  (reveal, exitReveal, motion) => {
     const region = {
       ...border(),
       enter: { type: 'linear' as const, duration: 3 },
       exit: { type: 'linear' as const, duration: 3 },
     };
-    region.border = { ...region.border, reveal, exitReveal, loop: true, segmentPercent: 37 };
+    region.border = {
+      ...region.border,
+      reveal,
+      exitReveal,
+      motion,
+      style: 'dashed',
+      loop: true,
+      segmentPercent: 37,
+    };
     const map = buildReviewTimeMap(10, [
       {
         id: 'speed',
@@ -399,7 +420,7 @@ it('draws and erases from either end and moves a full patterned stroke without c
     exit = sample(9),
     later = sample(9.5);
   expect(a.end - a.start).toBe(1);
-  expect(b.end - b.start).toBe(1);
+  expect(b.end - b.start).toBeCloseTo(1);
   expect(b.dashOffset).toBeLessThan(a.dashOffset!);
   expect(later.dashOffset).toBe(exit.dashOffset);
   expect(later.end - later.start).toBeCloseTo(0.5);
@@ -431,3 +452,90 @@ it('keeps camera link gaps and future-camera intersections out of overlay chains
   expect(packQuickEditFocusRows(moved).get('gap')).toBe(0);
   expect(packQuickEditFocusRows(regions).get('gap')).toBe(2);
 });
+
+it('disables solid rotation on admission and when evaluating raw authored state', () => {
+  const region = border();
+  region.border.loop = true;
+  region.border.segmentPercent = 25;
+  expect(parseQuickEditBorder(region.border)?.loop).toBe(false);
+  const frame = evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time: 2 })[0]!;
+  expect(frame).toMatchObject({ start: 0, end: 1, dashOffset: 0 });
+});
+
+it('calibrates default rotation to one pattern pitch per source second', () => {
+  const region = border();
+  region.border = { ...region.border, style: 'dashed', loop: true };
+  const sample = (time: number) =>
+    evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time })[0]!;
+  expect(sample(2).dashOffset! - sample(1).dashOffset!).toBeCloseTo(-15);
+});
+
+it('normalizes legacy motion and validates expanded speed and explicit motion', () => {
+  const { motion: _motion, ...legacy } = createQuickEditBorder();
+  expect(parseQuickEditBorder(legacy)?.motion).toBe('clockwise');
+  for (const motion of [null, undefined, 'reverse', 1])
+    expect(parseQuickEditBorder({ ...legacy, motion })).toBeNull();
+  for (const period of [0.49, 20.01, Infinity])
+    expect(parseQuickEditBorder({ ...legacy, period })).toBeNull();
+  for (const period of [0.5, 20])
+    expect(parseQuickEditBorder({ ...legacy, period })?.period).toBe(period);
+  for (const motion of ['clockwise', 'counterclockwise', 'pulse'] as const) {
+    expect(parseQuickEditBorder({ ...legacy, loop: true, motion })?.loop).toBe(motion === 'pulse');
+    expect(parseQuickEditBorder({ ...legacy, style: 'dotted', loop: true, motion })?.loop).toBe(
+      true
+    );
+  }
+});
+
+it.each(['dashed', 'dotted'] as const)(
+  'rotates %s in opposite directions with scale-independent pattern speed',
+  (style) => {
+    const region = { ...border(), enter: { type: 'none' as const, duration: 0 } };
+    region.border = { ...region.border, style, loop: true, segmentPercent: 25 };
+    const sample = (time: number, scale = 1) =>
+      evaluateQuickEditBordersAtTime({
+        ...geometry,
+        scale,
+        video: { x: 0, y: 0, width: 100 * scale, height: 100 * scale },
+        regions: [region],
+        time,
+      })[0]!;
+    const clockwise = sample(1);
+    expect(clockwise.dashOffset).toBe(-(style === 'dashed' ? 15 : 6));
+    expect(sample(1, 2).dashOffset).toBe(clockwise.dashOffset! * 2);
+    expect(sample(1, 2).start).toBeCloseTo(clockwise.start);
+    region.border.motion = 'counterclockwise';
+    const reverse = sample(1);
+    expect(reverse.dashOffset).toBe(-clockwise.dashOffset!);
+    expect(reverse.start).toBeCloseTo(1 - clockwise.start);
+    expect(reverse.end - reverse.start).toBeCloseTo(0.25);
+    region.border.period = 1;
+    expect(sample(1).dashOffset).toBe(reverse.dashOffset! * 2);
+  }
+);
+
+it.each(['solid', 'dashed', 'dotted'] as const)(
+  'pulses %s smoothly and freezes hold opacity through exit',
+  (style) => {
+    const region = {
+      ...border(),
+      enter: { type: 'linear' as const, duration: 1 },
+      exit: { type: 'linear' as const, duration: 2 },
+    };
+    region.border = { ...region.border, style, loop: true, motion: 'pulse', segmentPercent: 1 };
+    const sample = (time: number) =>
+      evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time })[0]!;
+    expect(sample(0.5).opacity).toBeCloseTo(0.5);
+    expect(sample(1)).toMatchObject({ opacity: 1, start: 0, end: 1, dashOffset: 0 });
+    expect(sample(2).opacity).toBeCloseTo(0.35);
+    expect(sample(3).opacity).toBeCloseTo(1);
+    expect(sample(8).opacity).toBeCloseTo(0.35);
+    expect(sample(9).opacity).toBeCloseTo(0.175);
+    region.border.exitReveal = 'erase';
+    expect(sample(9)).toMatchObject({ start: 0.5, end: 1 });
+    expect(sample(9).opacity).toBeCloseTo(0.35);
+    region.border.exitReveal = 'erase-ccw';
+    expect(sample(9)).toMatchObject({ start: 0, end: 0.5 });
+    expect(sample(9).opacity).toBeCloseTo(0.35);
+  }
+);
