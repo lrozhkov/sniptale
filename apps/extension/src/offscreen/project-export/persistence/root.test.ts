@@ -96,7 +96,7 @@ function useProjectExportPersistenceTestScope() {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-22T10:11:12.345Z'));
+    vi.setSystemTime(new Date(2026, 2, 22, 13, 11, 12, 345));
     sendRuntimeMessageMock.mockResolvedValue({ success: true });
     saveProjectExportSafelyMock.mockResolvedValue(undefined);
   });
