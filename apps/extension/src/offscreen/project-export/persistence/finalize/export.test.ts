@@ -179,7 +179,7 @@ beforeEach(() => {
   telemetryRead.mockResolvedValue(undefined);
   mediaRead.mockResolvedValue(undefined);
   vi.useFakeTimers();
-  vi.setSystemTime(new Date('2026-03-22T10:11:12.345Z'));
+  vi.setSystemTime(new Date(2026, 2, 22, 13, 11, 12, 345));
   installFileReaderStub();
   sendRuntimeMessageMock.mockResolvedValue({ success: true });
   saveProjectExportSafelyMock.mockResolvedValue(undefined);
