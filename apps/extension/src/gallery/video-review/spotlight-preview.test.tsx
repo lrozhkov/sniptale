@@ -540,3 +540,10 @@ it('reuses combined masks across identical live samples and invalidates changed 
   await show(40);
   expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(generated + 2);
 });
+
+it('lets Escape reach fullscreen dismissal when no area gesture is active', () => {
+  const view = render();
+  const event = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+  act(() => view.group.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(false);
+});

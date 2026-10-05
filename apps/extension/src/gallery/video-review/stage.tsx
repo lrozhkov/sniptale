@@ -6,7 +6,12 @@ import { useReviewWindowHeader } from './use-window-header';
 import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
-import { ReviewStageFocusControl, type ReviewStageFocus } from './stage-focus';
+import {
+  ReviewStageFocusControl,
+  ReviewStageFocusTargets,
+  type ReviewStageFocus,
+  type ReviewStageFocusPicker,
+} from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
@@ -88,6 +93,7 @@ export function ReviewStage(props: {
   scene?: ReviewStageScene;
   /** Selected focus controls; disabled during playback and export by the binding. */
   zoom?: ReviewStageFocus;
+  focusPicker?: ReviewStageFocusPicker | undefined;
   comments?: ReviewStageCommentBinding;
   onRegion(value: ReviewRegion): void;
   onReady(): void;
@@ -202,10 +208,20 @@ export function ReviewStage(props: {
             layout={sceneLayout}
           />
         ) : null}
+        {props.focusPicker && sceneLayout ? (
+          <ReviewStageFocusTargets
+            picker={props.focusPicker}
+            clip={overlayClip}
+            output={size}
+            selectedId={props.zoom?.region.id}
+            video={computeQuickEditWindowTransform(sceneLayout)}
+          />
+        ) : null}
         {props.zoom && zoomLayout ? (
           <ReviewStageFocusControl
             key={props.zoom.region.id}
             focus={props.zoom}
+            behindTargets={!!props.focusPicker}
             layout={zoomLayout}
             output={size}
           />

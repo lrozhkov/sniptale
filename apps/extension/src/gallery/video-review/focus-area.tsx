@@ -121,7 +121,7 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     onPreview?.(props.area);
   };
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
+    if (event.key === 'Escape' && drag.current) {
       event.preventDefault();
       event.stopPropagation();
       cancel();

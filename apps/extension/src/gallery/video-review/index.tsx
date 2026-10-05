@@ -1,3 +1,5 @@
+import { ReviewPreviewFrame } from './preview-frame';
+import { reviewStagePickRegions } from './stage-focus';
 import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
 import { ReviewFeedback } from './feedback';
@@ -410,48 +412,96 @@ function ReviewPreviewBinding({
           audio.dismissOriginalFeedback();
         }}
       />
-      <ReviewStageBinding
-        cutPreview={{
-          file: resource.file,
-          duration: state.source.duration,
-          edits: snapshot.document.edits,
-          time: state.timeline.sceneOutputTime,
-        }}
-        backgroundPending={state.backgroundImport.pending}
-        url={resource.url}
-        source={state.source}
-        canvas={features.canvas}
-        windowHeader={features.windowHeader}
-        video={state.video}
-        drawing={!!composer.annotation && !state.playing && !busy}
-        region={state.displayRegion}
-        zoomRegions={features.zoomRegions}
-        background={features.background}
-        outputTime={state.timeline.sceneOutputTime}
-        zoomOverlay={reviewFocusOverlay(state)}
-        comments={snapshot.document.canvasComments}
-        annotations={snapshot.document.annotations}
-        canvasComments={canvasComments}
-        overlaysVisible={features.overlaysVisible}
-        time={state.time}
-        busy={busy}
-        onRegion={(region) => {
-          if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
-        }}
-        onReady={() => {
-          const anchor = composer.annotation?.anchor;
-          if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
-        }}
-        onTime={(value) => {
-          const next = state.onTime(value);
-          state.setSelection((current) =>
-            current.kind === 'point' ? { kind: 'point', time: next } : current
-          );
-        }}
-        onPlaying={state.setPlaying}
-        onEnded={state.onEnded}
-        onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
-      />
+      <ReviewPreviewFrame
+        time={state.timeline.sceneOutputTime}
+        duration={state.timeline.resultDuration}
+        playing={state.playing}
+        disabled={busy || state.editing.exporter.phase !== 'idle'}
+        onPlay={() => state.beforeAction(state.play)}
+        onSeek={(value) =>
+          state.beforeAction(() => {
+            const sourceTime = state.timeline.timeMap.timelineToSource(value);
+            if (sourceTime !== null) {
+              state.setActiveSelection({ kind: 'none' });
+              state.seek(sourceTime, false);
+            }
+          })
+        }
+      >
+        {(fullscreen) => (
+          <ReviewStageBinding
+            cutPreview={{
+              file: resource.file,
+              duration: state.source.duration,
+              edits: snapshot.document.edits,
+              time: state.timeline.sceneOutputTime,
+            }}
+            backgroundPending={state.backgroundImport.pending}
+            url={resource.url}
+            source={state.source}
+            canvas={features.canvas}
+            windowHeader={features.windowHeader}
+            video={state.video}
+            drawing={!!composer.annotation && !state.playing && !busy}
+            region={state.displayRegion}
+            zoomRegions={features.zoomRegions}
+            background={features.background}
+            outputTime={state.timeline.sceneOutputTime}
+            zoomOverlay={reviewFocusOverlay(state)}
+            focusTimeMap={state.timeline.timeMap.getSegments()}
+            focusPicker={
+              fullscreen &&
+              !state.playing &&
+              !busy &&
+              state.editing.exporter.phase === 'idle' &&
+              !composer.annotation &&
+              features.zoomApplied
+                ? {
+                    regions: reviewStagePickRegions(
+                      state.advanced.zoom.regions,
+                      state.timeline.timeMap.getSegments(),
+                      state.timeline.sceneOutputTime
+                    ),
+                    onSelect: (id) => {
+                      const region = state.advanced.zoom.regions.find((item) => item.id === id);
+                      if (!region) return;
+                      state.zoom.setSelection(id);
+                      const sourceTime = state.timeline.timeMap.timelineToSource(
+                        (region.start + region.end) / 2
+                      );
+                      if (sourceTime !== null) state.seek(sourceTime, false);
+                    },
+                  }
+                : undefined
+            }
+            comments={snapshot.document.canvasComments}
+            annotations={snapshot.document.annotations}
+            canvasComments={canvasComments}
+            overlaysVisible={features.overlaysVisible}
+            time={state.time}
+            busy={busy}
+            onRegion={(region) => {
+              if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
+            }}
+            onReady={() => {
+              const anchor = composer.annotation?.anchor;
+              if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
+            }}
+            onTime={(value) => {
+              const next = state.onTime(value);
+              state.setSelection((current) =>
+                current.kind === 'point' ? { kind: 'point', time: next } : current
+              );
+            }}
+            onPlaying={(playing) => {
+              if (playing) state.setActiveSelection({ kind: 'none' });
+              state.setPlaying(playing);
+            }}
+            onEnded={state.onEnded}
+            onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
+          />
+        )}
+      </ReviewPreviewFrame>
     </main>
   );
 }

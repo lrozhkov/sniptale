@@ -259,6 +259,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
     en: 'Could not open this video. Try again.',
   },
   retry: { ru: 'Повторить', en: 'Retry' },
+  fullscreenFailed: {
+    ru: 'Не удалось открыть полный экран. Попробуйте ещё раз.',
+    en: 'Could not enter fullscreen. Try again.',
+  },
   play: { ru: 'Воспроизвести', en: 'Play' },
   pause: { ru: 'Пауза', en: 'Pause' },
   playbackFailed: {

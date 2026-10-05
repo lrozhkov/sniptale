@@ -1,3 +1,5 @@
+import { projectReviewFocus } from '../../features/video/review/focus-edits';
+import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { ReviewCutPreviewBinding } from './cut-transition-preview';
 import type { RefObject } from 'react';
 import { useCallback, useRef } from 'react';
@@ -15,7 +17,7 @@ import type {
 } from '../../features/video/review/types';
 import type { useCanvasComments } from './use-canvas-comments';
 import { ReviewStage } from './stage';
-import type { ReviewStageFocus } from './stage-focus';
+import type { ReviewStageFocus, ReviewStageFocusPicker } from './stage-focus';
 import { useReviewBackgroundImage } from './use-review-background';
 import { ReviewButton } from './controls';
 import { translate } from '../../platform/i18n';
@@ -41,6 +43,8 @@ export function ReviewStageBinding(props: {
   background: QuickEditBackgroundSettings;
   outputTime: number;
   zoomOverlay: ReviewStageFocus | undefined;
+  focusPicker?: ReviewStageFocusPicker | undefined;
+  focusTimeMap?: readonly ReviewTimeSegment[] | undefined;
   comments: readonly CanvasComment[];
   annotations: readonly ReviewAnnotation[];
   canvasComments: ReturnType<typeof useCanvasComments>;
@@ -57,19 +61,31 @@ export function ReviewStageBinding(props: {
 }) {
   const image = useReviewBackgroundImage(props.background, props.backgroundPending);
   const selected = props.zoomOverlay?.region;
+  const projected = selected ? projectReviewFocus([selected], props.focusTimeMap) : [];
   const framing =
-    selected &&
-    props.zoomRegions.some((region) => region.id === selected.id) &&
-    Math.abs(props.outputTime - (selected.start + selected.end) / 2) < 0.05;
-  const regions = framing
-    ? [
-        {
-          ...selected,
-          enter: { type: 'none' as const, duration: 0 },
-          exit: { type: 'none' as const, duration: 0 },
-        },
-      ]
-    : props.zoomRegions;
+    projected.length > 0 &&
+    Math.abs(props.outputTime - (projected[0]!.start + projected.at(-1)!.end) / 2) < 0.05;
+  const regions = props.zoomRegions.map((region) => {
+    const target = projected.find((item) => item.id === region.id);
+    if (!target) return region;
+    // Resolved links belong to the complete scene, not the isolated selected projection.
+    const updated = { ...region, ...target };
+    if (!framing) return updated;
+    return {
+      ...updated,
+      enter: { type: 'none' as const, duration: 0 },
+      exit: { type: 'none' as const, duration: 0 },
+      ...(target.borderClock
+        ? {
+            borderClock: {
+              ...target.borderClock,
+              enter: { type: 'none' as const, duration: 0 },
+              exit: { type: 'none' as const, duration: 0 },
+            },
+          }
+        : {}),
+    };
+  });
   const camera: QuickEditCameraTransform = regions.length
     ? evaluateQuickEditCameraAtTime(regions, props.outputTime)
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
@@ -107,6 +123,7 @@ export function ReviewStageBinding(props: {
         </div>
       ) : null}
       <ReviewStage
+        focusPicker={props.focusPicker}
         backgroundImageUrl={image.url}
         cutPreview={props.cutPreview}
         url={props.url}
