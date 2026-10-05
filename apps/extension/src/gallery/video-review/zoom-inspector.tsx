@@ -19,7 +19,7 @@ import {
   fitQuickEditZoomTransitions,
   type QuickEditZoomRegionPatch,
 } from '../../features/video/review/advanced/zoom';
-import { Trash2, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
+import { Trash2, Copy, RotateCcw, Unlink, Scan, Waves } from 'lucide-react';
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
@@ -85,6 +85,7 @@ export function ReviewZoomInspector(props: {
   onChange(patch: QuickEditZoomRegionPatch): void;
   onReset(): void;
   onDelete(): void;
+  onDuplicate?: (() => void) | undefined;
   preview?: ReactNode;
 }) {
   const { region, onChange } = props;
@@ -189,24 +190,60 @@ export function ReviewZoomInspector(props: {
           },
         ]}
       />
-      <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <ReviewFocusActions
+        region={region}
+        onReset={props.onReset}
+        onDelete={props.onDelete}
+        onDuplicate={props.onDuplicate}
+      />
+    </div>
+  );
+}
+
+/** Selected Focus actions share one size, availability policy and presentation. */
+function ReviewFocusActions(props: {
+  region: QuickEditZoomRegion;
+  onReset(): void;
+  onDelete(): void;
+  onDuplicate?: (() => void) | undefined;
+}) {
+  const { region } = props;
+  return (
+    <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <ReviewButton
+        label={translate('gallery.videoReview.zoomResetPosition')}
+        className={`${reviewTextButtonClassName} !w-full justify-start`}
+        onClick={props.onReset}
+      >
+        <RotateCcw size={15} aria-hidden="true" />
+        <span>{translate('gallery.videoReview.zoomResetPosition')}</span>
+      </ReviewButton>
+      {props.onDuplicate ? (
         <ReviewButton
-          label={translate('gallery.videoReview.zoomResetPosition')}
+          label={translate('gallery.videoReview.focusDuplicate')}
+          title={translate(
+            region.dormant
+              ? 'gallery.videoReview.focusDuplicateDormant'
+              : !region.border && !region.spotlight
+                ? 'gallery.videoReview.focusDuplicateZoom'
+                : 'gallery.videoReview.focusDuplicate'
+          )}
+          disabled={!!region.dormant || (!region.border && !region.spotlight)}
           className={`${reviewTextButtonClassName} !w-full justify-start`}
-          onClick={props.onReset}
+          onClick={props.onDuplicate}
         >
-          <RotateCcw size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.zoomResetPosition')}</span>
+          <Copy size={15} aria-hidden="true" />
+          <span>{translate('gallery.videoReview.focusDuplicate')}</span>
         </ReviewButton>
-        <ReviewButton
-          label={translate('gallery.videoReview.zoomDelete')}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={props.onDelete}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.zoomDelete')}</span>
-        </ReviewButton>
-      </div>
+      ) : null}
+      <ReviewButton
+        label={translate('gallery.videoReview.zoomDelete')}
+        className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+        onClick={props.onDelete}
+      >
+        <Trash2 size={15} aria-hidden="true" />
+        <span>{translate('gallery.videoReview.zoomDelete')}</span>
+      </ReviewButton>
     </div>
   );
 }

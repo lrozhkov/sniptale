@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
+import { packQuickEditFocusRows } from '../../features/video/review/advanced/focus-layout';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewZoomEditor, withReviewFocusType } from './zoom-editor';
@@ -652,4 +653,76 @@ it('defaults new Borders to a one-second entrance and fits short source interval
   border.enter.duration = 0.2;
   border.border!.segmentPercent = 25;
   expect(withReviewFocusType(border, 'border')).toBe(border);
+});
+
+it.each(['spotlight', 'border'] as const)(
+  'duplicates %s independently on its retained source interval',
+  (type) => {
+    const original = {
+      ...withReviewFocusType(region('original', 1, 3), type),
+      sourceAnchor: { start: 4, end: 8 },
+      linkTo: 'next',
+      linkEasing: 'linear' as const,
+    };
+    const next = withReviewFocusType(region('next', 7, 9), type);
+    let editor!: ReturnType<typeof useReviewZoomEditor>;
+    let state!: QuickEditZoomState;
+    function Harness() {
+      const [zoom, setZoom] = useState({
+        enabled: true,
+        regions: [original, next] as QuickEditZoomRegion[],
+      });
+      state = zoom;
+      editor = useReviewZoomEditor({ zoom, setZoom, timelineDuration: 10 });
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    act(() => {
+      editor.duplicate(original.id);
+    });
+    const copy = state.regions.find((item) => item.id === editor.selection)!;
+    expect(copy.id).not.toBe(original.id);
+    expect(copy).toMatchObject({ start: 1, end: 3, sourceAnchor: { start: 4, end: 8 } });
+    expect(copy.linkTo).toBeUndefined();
+    expect(copy.linkEasing).toBeUndefined();
+    expect(copy[type]).toEqual(original[type]);
+    expect(copy[type]).not.toBe(original[type]);
+    expect(state.regions.find((item) => item.id === original.id)).toEqual(original);
+    const rows = packQuickEditFocusRows(state.regions);
+    expect(rows.get(copy.id)).not.toBe(rows.get(original.id));
+    act(() => editor.change(copy.id, { scale: 2.5 }));
+    expect(state.regions.find((item) => item.id === original.id)?.transform.scale).toBe(1.5);
+    act(() => {
+      editor.duplicate(copy.id);
+    });
+    expect(state.regions).toHaveLength(4);
+    expect(editor.selection).not.toBe(copy.id);
+  }
+);
+
+it('does not duplicate a camera, unresolved placement, or missing selection', () => {
+  const setZoom = vi.fn();
+  let editor!: ReturnType<typeof useReviewZoomEditor>;
+  function Harness() {
+    editor = useReviewZoomEditor({
+      zoom: {
+        enabled: true,
+        regions: [
+          region('camera', 1, 3),
+          { ...withReviewFocusType(region('dormant', 2, 4), 'border'), dormant: true },
+        ],
+      },
+      setZoom,
+      timelineDuration: 10,
+    });
+    return null;
+  }
+  act(() => root.render(<Harness />));
+  for (const id of ['camera', 'dormant', 'missing']) {
+    act(() => {
+      expect(editor.duplicate(id)).toBeNull();
+    });
+  }
+  expect(setZoom).not.toHaveBeenCalled();
+  expect(editor.selection).toBeNull();
 });

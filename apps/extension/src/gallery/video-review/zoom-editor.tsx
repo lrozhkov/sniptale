@@ -309,6 +309,19 @@ function addZoomAt(
   return region.id;
 }
 
+/** Copies authored overlay content through the same history/autosave mutation as other edits. */
+function duplicateFocus(args: ZoomEditorArgs, id: string): string | null {
+  const original = args.zoom.regions.find((item) => item.id === id);
+  if (!original || original.dormant || (!original.border && !original.spotlight)) return null;
+  const { linkTo: _link, linkEasing: _easing, borderClock: _clock, ...values } = original;
+  const copy = { ...structuredClone(values), id: `zoom-${crypto.randomUUID()}` };
+  args.setZoom((zoom) => ({
+    ...zoom,
+    regions: insertQuickEditZoomRegion(zoom.regions, copy),
+  }));
+  return copy.id;
+}
+
 /** One zoom-editing workflow owner: region selection, updates, and the stage focus overlay. */
 export function useReviewZoomEditor(args: ZoomEditorArgs) {
   const [draft, setDraft] = useState<{
@@ -423,6 +436,14 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
       }));
       setSelection(created.id);
       return created.id;
+    },
+    duplicate: (id: string) => {
+      const copyId = duplicateFocus(args, id);
+      if (!copyId) return null;
+      setDraft(null);
+      setLinkSelection(null);
+      setSelection(copyId);
+      return copyId;
     },
     remove,
     resetPosition,

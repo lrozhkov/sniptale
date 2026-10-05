@@ -358,6 +358,15 @@ export const galleryVideoReviewMessages = defineMessageSource({
   transitionLinear: { ru: 'Равномерно', en: 'Constant speed' },
   transitionSmooth: { ru: 'Плавно', en: 'Smooth' },
   zoomResetPosition: { ru: 'Вернуть в центр', en: 'Center area' },
+  focusDuplicate: { ru: 'Создать копию', en: 'Create copy' },
+  focusDuplicateZoom: {
+    ru: 'Приближения не могут пересекаться на одном интервале',
+    en: 'Zoom effects cannot overlap on the same interval',
+  },
+  focusDuplicateDormant: {
+    ru: 'Сначала восстановите положение фокусировки на таймлайне',
+    en: 'Restore the focus placement on the timeline first',
+  },
   zoomDelete: { ru: 'Удалить фокусировку', en: 'Delete focus' },
   zoomPanHint: {
     ru: 'Перетащите кадр. Стрелки уточняют фокус, Shift ускоряет. Esc отменяет перемещение.',

@@ -116,6 +116,21 @@ for (const variant of [
         path: info.outputPath('inspector-footer-actions.png'),
         fullPage: false,
       });
+      const duplicateFocus = inspector.getByRole('button', {
+        name: label('gallery.videoReview.focusDuplicate'),
+        exact: true,
+      });
+      await duplicateFocus.click();
+      await expect(blocks).toHaveCount(3);
+      await page.screenshot({ path: info.outputPath('focus-copy.png'), fullPage: false });
+      await button('gallery.videoReview.undo').click();
+      await expect(blocks).toHaveCount(2);
+      await button('gallery.videoReview.redo').click();
+      await expect(blocks).toHaveCount(3);
+      await blocks.last().click();
+      await removeFocus.click();
+      await expect(blocks).toHaveCount(2);
+      await blocks.last().click();
       const width = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.borderWidth'),
         exact: true,

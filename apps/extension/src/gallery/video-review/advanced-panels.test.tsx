@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { createQuickEditBorder } from '../../features/video/review/advanced/border';
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { ReviewDetails } from './controls';
 import { createInspectorDisclosureStore } from '../../composition/persistence/inspector-disclosures/store';
@@ -249,4 +251,54 @@ it('routes Border numeric drafts through the panel and cancels without a durable
   await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
   expect(host.querySelector('[data-testid="draft-width"]')!.textContent).toBe('3');
   expect(setZoom).not.toHaveBeenCalled();
+});
+
+it('duplicates the selected overlay through the panel binding and selects its independent copy', () => {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.mode = 'advanced';
+  initial.zoom.regions = [
+    {
+      ...createQuickEditZoomRegion({ id: 'original', at: 1 }),
+      border: createQuickEditBorder(),
+      sourceAnchor: { start: 1, end: 3 },
+    },
+  ];
+  initial.audio.voiceoverSegments = buildReviewTimeMap(10, [
+    { id: 'cut', kind: 'cut', start: 1.5, end: 2, requestedStart: 1.5, requestedEnd: 2 },
+  ]);
+  let state = initial;
+  let selected: string | null = null;
+  function CopyHarness() {
+    const [advanced, setAdvanced] = useState(initial);
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      setZoom: (update) => setAdvanced((current) => ({ ...current, zoom: update(current.zoom) })),
+      timelineDuration: 10,
+    });
+    state = advanced;
+    selected = zoom.selection;
+    return (
+      <>
+        <button aria-label="selectOriginal" onClick={() => zoom.setSelection('original')} />
+        <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />
+      </>
+    );
+  }
+  act(() => root.render(<CopyHarness />));
+  act(() => host.querySelector<HTMLButtonElement>('[aria-label="selectOriginal"]')!.click());
+  const copy = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.focusDuplicate"]'
+  )!;
+  expect(copy.disabled).toBe(false);
+  expect(host.textContent).toContain('gallery.videoReview.cutOverlapHint');
+  act(() => copy.click());
+  expect(state.zoom.regions).toHaveLength(2);
+  expect(selected).not.toBe('original');
+  expect(state.zoom.regions.find((item) => item.id === selected)?.sourceAnchor).toEqual({
+    start: 1,
+    end: 3,
+  });
+  expect(state.zoom.regions.find((item) => item.id === selected)?.border).toEqual(
+    initial.zoom.regions[0]!.border
+  );
 });

@@ -479,3 +479,31 @@ it('previews Border width without history writes, commits once, and cancels with
   expect(onChange).not.toHaveBeenCalled();
   expect(onPreview).toHaveBeenLastCalledWith(null);
 });
+
+it('explains why cameras and unresolved placements cannot be copied', () => {
+  const duplicate = vi.fn();
+  for (const dormant of [false, true]) {
+    act(() =>
+      root.render(
+        <ReviewZoomInspector
+          region={{ ...region, dormant }}
+          onChange={vi.fn()}
+          onReset={vi.fn()}
+          onDelete={vi.fn()}
+          onDuplicate={duplicate}
+        />
+      )
+    );
+    const button = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.focusDuplicate"]'
+    )!;
+    expect(button.disabled).toBe(true);
+    expect(button.title).toBe(
+      dormant
+        ? 'gallery.videoReview.focusDuplicateDormant'
+        : 'gallery.videoReview.focusDuplicateZoom'
+    );
+    act(() => button.click());
+  }
+  expect(duplicate).not.toHaveBeenCalled();
+});

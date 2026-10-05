@@ -77,6 +77,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
           preview={args.zoomPreview?.(zoomRegion)}
           onChange={applyZoomRegionPatch.bind(null, args, zoomRegion.id)}
           onReset={resetZoomRegion.bind(null, args, zoomRegion.id)}
+          onDuplicate={() => args.zoom.duplicate(zoomRegion.id)}
           onDelete={removeZoomRegion.bind(null, args, zoomRegion.id)}
         />
       ) : null}
