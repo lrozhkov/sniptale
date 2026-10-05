@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       proof_run_id:
-        description: Release check run to finalize without repeating tests
+        description: Successful release check run; requires a later post-proof-only control commit
         required: true
         type: string
 
