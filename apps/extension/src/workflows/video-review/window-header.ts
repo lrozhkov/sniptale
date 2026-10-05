@@ -13,7 +13,10 @@ export function reviewWindowHeaderUrl(header: QuickEditWindowHeader, width: numb
     title: header.title,
     url: header.url?.trim() || null,
   });
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  // Even output rows and preview snapping can stretch the header slightly. Fill that
+  // exact rectangle so SVG aspect fitting cannot open a seam above the video.
+  const fitted = svg.replace('<svg ', '<svg preserveAspectRatio="none" ');
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fitted)}`;
 }
 
 /** The caller owns cancellation and the decoded image; no URL or persisted asset is acquired. */

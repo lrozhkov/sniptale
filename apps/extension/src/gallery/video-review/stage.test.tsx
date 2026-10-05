@@ -493,3 +493,54 @@ it.each(['fixed', 'follow-video'] as const)(
       }
   }
 );
+
+it('recomputes the decorated pan plane and top boundary across header and background switches', () => {
+  vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
+    url: 'data:image/svg+xml,header',
+    image: document.createElement('img'),
+    failed: false,
+    retry: vi.fn(),
+  });
+  const camera = { scale: 4, centerX: 0.5, centerY: 0 };
+  const region = {
+    id: 'top',
+    start: 0,
+    end: 4,
+    transform: camera,
+    enter: { type: 'none' as const, duration: 0 },
+    exit: { type: 'none' as const, duration: 0 },
+  };
+  for (const zoomBehavior of ['fixed', 'follow-video', 'fixed'] as const) {
+    for (const windowHeader of [
+      { kind: 'browser' as const, title: '' },
+      undefined,
+      { kind: 'browser' as const, title: '' },
+    ]) {
+      const { video } = renderStage({
+        scene: {
+          camera,
+          windowHeader,
+          background: {
+            enabled: true,
+            type: 'solid',
+            color: '#000000ff',
+            zoomBehavior,
+            layout: { padding: 10, cornerRadius: 12 },
+          },
+        },
+        zoom: { region, onChange: vi.fn(), onPreview: vi.fn(), onInteract: vi.fn() },
+      });
+      const target = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.zoomTarget"]')!;
+      const header = host.querySelector('img');
+      if (windowHeader) {
+        expect(Number.parseFloat(header!.style.top)).toBeCloseTo(0);
+        expect(Number.parseFloat(target.style.height)).toBeGreaterThan(
+          Number.parseFloat(video.style.height)
+        );
+      } else
+        expect(Number.parseFloat(target.style.height)).toBeCloseTo(
+          Number.parseFloat(video.style.height)
+        );
+    }
+  }
+});

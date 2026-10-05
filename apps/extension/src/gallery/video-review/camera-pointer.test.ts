@@ -94,3 +94,21 @@ it('places the decorated footprint center under an Area click while preserving s
   expect(active.pending?.centerX).toBeCloseTo(0.25);
   expect(active.pending?.centerY).toBeCloseTo(0.3);
 });
+
+it('captures and resizes the full window crop including the header at maximum zoom', () => {
+  const windowRect = { x: 40, y: 40, width: 640, height: 440 };
+  for (const view of ['area', 'result'] as const) {
+    const active = capture('nw', {
+      videoRect: windowRect,
+      output: { width: 720, height: 520 },
+      camera: { scale: 4, centerX: 0.5, centerY: 0 },
+      view,
+    });
+    expect(active.origin.centerY).toBe(0.125);
+    if (view === 'area') {
+      const resized = resizeCameraPointer(active, 0, -0.05);
+      expect(resized.scale).toBeLessThan(4);
+      expect(resized.centerY - 0.5 / resized.scale).toBeCloseTo(0);
+    }
+  }
+});

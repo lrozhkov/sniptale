@@ -3871,3 +3871,168 @@ for (const locale of ['en', 'ru'] as const) {
     }
   });
 }
+
+for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
+  test(`quick editor zoom reaches browser header (${zoomBehavior})`, async ({ page }, info) => {
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': 'en' },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=light`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const button = (key: Parameters<typeof translate>[0]) =>
+        dialog.getByRole('button', { name: label(key), exact: true });
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('gallery.videoReview.backgroundSolid').click();
+      const padding = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await padding.fill('8');
+      await padding.press('Enter');
+      const corners = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundCornerRadius'),
+        exact: true,
+      });
+      await corners.fill('0');
+      await corners.press('Enter');
+      const chooseHeader = async (on: boolean) => {
+        await button('gallery.videoReview.windowHeader').click();
+        await page
+          .getByRole('option', {
+            name: label(
+              on
+                ? 'gallery.videoReview.windowHeaderBrowser'
+                : 'gallery.videoReview.windowHeaderNone'
+            ),
+            exact: true,
+          })
+          .click();
+      };
+      const chooseMotion = async (follows: boolean) => {
+        await button('gallery.videoReview.backgroundZoom').click();
+        await page
+          .getByRole('option', {
+            name: label(
+              follows
+                ? 'gallery.videoReview.backgroundZoomFollow'
+                : 'gallery.videoReview.backgroundZoomFixed'
+            ),
+            exact: true,
+          })
+          .click();
+      };
+      await chooseHeader(true);
+      await chooseMotion(zoomBehavior === 'follow-video');
+      await timelineGesture(page, 2);
+      await button('gallery.videoReview.zoomAdd').first().click();
+      const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
+      const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+      await expect(preview).toHaveAttribute('data-status', 'ready');
+      const scale = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomScale'),
+        exact: true,
+      });
+      await scale.fill('4');
+      await scale.press('Enter');
+      await inspector
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.precisePosition') })
+        .click();
+      const y = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.zoomFocusY'),
+        exact: true,
+      });
+      await y.fill('20');
+      await y.press('Enter');
+      const target = dialog.locator('[data-ui="gallery.videoReview.zoomTarget"]');
+      const rect = (await target.boundingBox())!;
+      // Begin inside the header strip: it must be part of the main pan hit target.
+      await page.mouse.move(rect.x + rect.width / 2, rect.y + 5);
+      await page.mouse.down();
+      await page.mouse.move(rect.x + rect.width / 2, rect.y + 5 + rect.height * 0.4, { steps: 5 });
+      await page.mouse.up();
+      await expect.poll(async () => Number(await y.inputValue())).toBeCloseTo(10, 0);
+      const topAligned = async () => {
+        const header = dialog.locator('[data-ui="gallery.videoReview.stage"] img');
+        const [head, plane] = await Promise.all([header.boundingBox(), target.boundingBox()]);
+        return Math.abs(head!.y - plane!.y);
+      };
+      await expect.poll(topAligned).toBeLessThan(1.5);
+      await preview.scrollIntoViewIfNeeded();
+      await button('gallery.videoReview.zoomPreviewResult').click();
+      const headerPixel = () =>
+        preview.locator('canvas').evaluate((node) => {
+          const c = node as HTMLCanvasElement;
+          const pixel = c
+            .getContext('2d')!
+            .getImageData(Math.floor(c.width / 2), Math.floor(c.height * 0.12), 1, 1).data;
+          return Math.min(pixel[0]!, pixel[1]!, pixel[2]!);
+        });
+      await expect.poll(headerPixel).toBeGreaterThan(170);
+      await preview.locator('canvas').focus();
+      await page.keyboard.press('Shift+ArrowUp');
+      await expect(y).toHaveValue('0');
+      await expect.poll(topAligned).toBeLessThan(1.5);
+      const headerBounds = (await dialog
+        .locator('[data-ui="gallery.videoReview.stage"] img')
+        .boundingBox())!;
+      const stageBounds = (await dialog
+        .locator('[data-ui="gallery.videoReview.stage"]')
+        .boundingBox())!;
+      const screenshot = await page.screenshot({
+        path: info.outputPath('maximum-zoom-header.png'),
+        fullPage: false,
+      });
+      const seam = await page.evaluate(
+        async ({ encoded, x, y }) => {
+          const image = new Image();
+          image.src = `data:image/png;base64,${encoded}`;
+          await image.decode();
+          const canvas = document.createElement('canvas');
+          canvas.width = image.width;
+          canvas.height = image.height;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(image, 0, 0);
+          return Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3);
+        },
+        {
+          encoded: screenshot.toString('base64'),
+          x: Math.floor(stageBounds.x + stageBounds.width / 2),
+          y: Math.floor(headerBounds.y + headerBounds.height - 3),
+        }
+      );
+      expect(Math.min(...seam)).toBeGreaterThan(150);
+      const region = dialog
+        .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
+        .first();
+      for (const enabled of [false, true]) {
+        await button('gallery.videoReview.scene').click();
+        await chooseHeader(enabled);
+        await chooseMotion(zoomBehavior !== 'follow-video');
+        await chooseMotion(zoomBehavior === 'follow-video');
+        await region.click();
+        await expect(scale).toHaveValue('4');
+        await expect(y).toHaveValue('0');
+        if (enabled) await expect.poll(topAligned).toBeLessThan(1.5);
+      }
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await region.click();
+      await expect(scale).toHaveValue('4');
+      await expect(y).toHaveValue('0');
+      await expect.poll(topAligned).toBeLessThan(1.5);
+    } finally {
+      await new Promise<void>((resolve) => host.server.close(() => resolve()));
+    }
+  });
+}

@@ -111,7 +111,7 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     },
     windowRect,
     videoRect,
-    videoTransform: computeQuickEditVideoTransform({ videoRect, camera: input.camera }),
+    videoTransform: computeQuickEditVideoTransform({ videoRect, windowRect, camera: input.camera }),
   };
 }
 
@@ -132,19 +132,21 @@ export function computeQuickEditWindowTransform(layout: {
 }
 
 /**
- * Centered source viewport, clamped to the video edges like the full editor camera.
+ * Camera focus is normalized over the decorated window; source pixels retain their own rect.
  */
 export function computeQuickEditVideoTransform(args: {
   videoRect: QuickEditRect;
+  windowRect?: QuickEditRect;
   camera: QuickEditCameraTransform;
 }): QuickEditRect {
   const { camera, videoRect } = args;
+  const window = args.windowRect ?? videoRect;
   const offset = cameraTranslation(camera);
   const width = videoRect.width * camera.scale;
   const height = videoRect.height * camera.scale;
   return {
-    x: videoRect.x - offset.x * videoRect.width,
-    y: videoRect.y - offset.y * videoRect.height,
+    x: window.x - offset.x * window.width + (videoRect.x - window.x) * camera.scale,
+    y: window.y - offset.y * window.height + (videoRect.y - window.y) * camera.scale,
     width,
     height,
   };
@@ -194,7 +196,7 @@ function cameraProgress(
 
 const lerp = (from: number, to: number, progress: number) => from + (to - from) * progress;
 
-/** Translation in units of the unscaled video; clamping prevents empty camera edges. */
+/** Translation in units of the unscaled camera window; clamping prevents empty camera edges. */
 function cameraTranslation(camera: QuickEditCameraTransform) {
   const offset = (center: number) =>
     Math.max(0, Math.min(camera.scale - 1, center * camera.scale - 0.5));
@@ -211,7 +213,7 @@ function interpolateCamera(
   const scale = lerp(from.scale, to.scale, progress);
   const start = cameraTranslation(from);
   const end = cameraTranslation(to);
-  // Interpolate rendered translation first, then recover a source-space center.
+  // Interpolate rendered translation first, then recover a window-space center.
   return {
     scale,
     centerX: (lerp(start.x, end.x, progress) + 0.5) / scale,

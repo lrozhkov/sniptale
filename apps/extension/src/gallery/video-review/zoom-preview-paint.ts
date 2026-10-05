@@ -71,10 +71,10 @@ export function paintZoomPreview(
   if (args.view !== 'area' || args.showControls === false) return;
   const visible = computeZoomPreviewArea(args.layout, args.background ?? { enabled: false }, args);
   const footprint: QuickEditRect = {
-    x: videoRect.x + visible.x * videoRect.width,
-    y: videoRect.y + visible.y * videoRect.height,
-    width: visible.width * videoRect.width,
-    height: visible.height * videoRect.height,
+    x: args.layout.windowRect.x + visible.x * args.layout.windowRect.width,
+    y: args.layout.windowRect.y + visible.y * args.layout.windowRect.height,
+    width: visible.width * args.layout.windowRect.width,
+    height: visible.height * args.layout.windowRect.height,
   };
   context.strokeStyle = args.accent;
   context.lineWidth = 2;
@@ -98,19 +98,27 @@ export function previewBackgroundPaint(background: QuickEditBackgroundSettings):
   return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
 }
 
-/** Inspector footprint in source coordinates; Follow Video includes the whole scene, not only video pixels. */
+/** Inspector footprint in normalized window coordinates; Follow Video includes the whole scene, not only video pixels. */
 export function computeZoomPreviewArea(
   layout: ZoomPreviewLayout,
   background: QuickEditBackgroundSettings,
   output: { width: number; height: number }
 ): QuickEditRect {
-  if (!background.enabled || background.zoomBehavior !== 'follow-video')
-    return computeQuickEditVisibleSourceRect(layout, background, output);
-  const video = layout.videoTransform;
+  const source =
+    !background.enabled || background.zoomBehavior !== 'follow-video'
+      ? computeQuickEditVisibleSourceRect(layout, background, output)
+      : {
+          x: -layout.videoTransform.x / layout.videoTransform.width,
+          y: -layout.videoTransform.y / layout.videoTransform.height,
+          width: output.width / layout.videoTransform.width,
+          height: output.height / layout.videoTransform.height,
+        };
+  const window = layout.windowRect;
+  const video = layout.videoRect;
   return {
-    x: -video.x / video.width,
-    y: -video.y / video.height,
-    width: output.width / video.width,
-    height: output.height / video.height,
+    x: (video.x - window.x + source.x * video.width) / window.width,
+    y: (video.y - window.y + source.y * video.height) / window.height,
+    width: (source.width * video.width) / window.width,
+    height: (source.height * video.height) / window.height,
   };
 }

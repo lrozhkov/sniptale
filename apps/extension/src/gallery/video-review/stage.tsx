@@ -430,16 +430,17 @@ function snapPreviewRect(rect: ReviewRegion): ReviewRegion {
 function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout>[0]) {
   const layout = computeQuickEditSceneLayout(input);
   const videoRect = snapPreviewRect(layout.videoRect);
+  const windowRect = {
+    ...videoRect,
+    y: Math.round(layout.windowRect.y),
+    height: videoRect.height + videoRect.y - Math.round(layout.windowRect.y),
+  };
   // Camera motion stays subpixel-smooth and overlays use the same displayed frame bounds.
   return {
     ...layout,
     videoRect,
-    windowRect: {
-      ...videoRect,
-      y: Math.round(layout.windowRect.y),
-      height: videoRect.height + videoRect.y - Math.round(layout.windowRect.y),
-    },
-    videoTransform: computeQuickEditVideoTransform({ videoRect, camera: input.camera }),
+    windowRect,
+    videoTransform: computeQuickEditVideoTransform({ videoRect, windowRect, camera: input.camera }),
   };
 }
 

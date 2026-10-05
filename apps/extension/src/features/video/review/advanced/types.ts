@@ -27,7 +27,7 @@ export interface QuickEditZoomTransition {
 /** Easing of an outgoing zoom link; absent on legacy documents means the smooth default. */
 export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
 
-/** Camera target in normalized content coordinates, independent of background layout. */
+/** Camera target normalized over the whole window (video plus optional header), excluding background. */
 export interface QuickEditCameraTransform {
   scale: number;
   centerX: number;

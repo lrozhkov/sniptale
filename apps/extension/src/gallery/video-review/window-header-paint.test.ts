@@ -79,8 +79,11 @@ it.each(['fixed', 'follow-video'] as const)(
         expect(Number(head![2]) + Number(head![4])).toBeCloseTo(Number(frame![2]));
         expect(head![1]).toBe(frame![1]);
         expect(head![3]).toBe(frame![3]);
-        if (scale === 1)
-          expect(computeZoomPreviewArea(layout, background, output).y).toBeLessThan(0);
+        if (scale === 1) {
+          const area = computeZoomPreviewArea(layout, background, output);
+          if (zoomBehavior === 'fixed') expect(area.y).toBeCloseTo(0);
+          else expect(area.y).toBeLessThan(0);
+        }
       }
   }
 );

@@ -22,8 +22,8 @@ export function ReviewStageFocusControl(props: {
   const { focus, layout, output } = props;
   const gesture = useReviewCameraGesture({
     camera: focus.region.transform,
-    videoRect: { ...layout.videoRect, x: 0, y: 0 },
-    output: layout.videoRect,
+    videoRect: { ...layout.windowRect, x: 0, y: 0 },
+    output: layout.windowRect,
     view: 'result',
     onCommit: focus.onChange,
     onPreview: focus.onPreview,
@@ -50,7 +50,7 @@ export function ReviewStageFocusControl(props: {
         title={translate('gallery.videoReview.zoomPanHint')}
         className="pointer-events-auto absolute cursor-grab outline-none active:cursor-grabbing
           focus-visible:ring-1 focus-visible:ring-[var(--sniptale-color-accent)]"
-        style={{ ...rectStyle(layout.videoRect), touchAction: 'none' }}
+        style={{ ...rectStyle(layout.windowRect), touchAction: 'none' }}
         {...gesture.handlers}
       />
     </div>

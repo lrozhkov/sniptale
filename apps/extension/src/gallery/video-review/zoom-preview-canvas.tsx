@@ -175,33 +175,32 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     pointerInteraction,
     keyboardInteraction,
   } = useFocusFrameHover();
-  const video = props.layout.videoRect;
+  const windowRect = props.layout.windowRect;
   const follows = props.background.enabled && props.background.zoomBehavior === 'follow-video';
   const viewport = follows
     ? {
-        x: -video.x / video.width,
-        y: -video.y / video.height,
-        width: props.output.width / video.width,
-        height: props.output.height / video.height,
+        x: -windowRect.x / windowRect.width,
+        y: -windowRect.y / windowRect.height,
+        width: props.output.width / windowRect.width,
+        height: props.output.height / windowRect.height,
       }
-    : {
-        x: (props.layout.windowRect.x - video.x) / video.width,
-        y: (props.layout.windowRect.y - video.y) / video.height,
-        width: props.layout.windowRect.width / video.width,
-        height: props.layout.windowRect.height / video.height,
-      };
+    : { x: 0, y: 0, width: 1, height: 1 };
   const { camera, handlers } = useReviewCameraGesture({
     ...props,
     interactionElement: canvasRef,
     viewport,
-    videoRect: props.layout.videoRect,
+    videoRect: props.layout.windowRect,
     visibleArea: computeZoomPreviewArea(props.layout, props.background, props.output),
     onCommit: props.onCenter,
   });
   const layout = useMemo(
     () => ({
       ...props.layout,
-      videoTransform: computeQuickEditVideoTransform({ videoRect: props.layout.videoRect, camera }),
+      videoTransform: computeQuickEditVideoTransform({
+        videoRect: props.layout.videoRect,
+        windowRect: props.layout.windowRect,
+        camera,
+      }),
     }),
     [props.layout, camera]
   );
@@ -209,10 +208,10 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
 
   const visible = computeZoomPreviewArea(layout, props.background, props.output);
   const opening = {
-    x: video.x + visible.x * video.width,
-    y: video.y + visible.y * video.height,
-    width: visible.width * video.width,
-    height: visible.height * video.height,
+    x: windowRect.x + visible.x * windowRect.width,
+    y: windowRect.y + visible.y * windowRect.height,
+    width: visible.width * windowRect.width,
+    height: visible.height * windowRect.height,
   };
   const motion = computeQuickEditSceneCamera(layout, props.background);
   const offsetX = (motion.x / props.output.width) * 100;
