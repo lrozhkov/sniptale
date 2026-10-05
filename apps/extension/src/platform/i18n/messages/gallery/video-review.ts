@@ -49,9 +49,10 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Участок должен содержать хотя бы один ключевой интервал, не пересекать другие правки и не удалять всё видео.',
     en: 'Choose at least one keyframe interval, without overlapping other edits or removing the entire video.',
   },
+  dismissFeedback: { ru: 'Закрыть сообщение', en: 'Dismiss message' },
   placementOnCut: {
-    ru: 'Плейхед на вырезанном участке — переместите его на сохранённый отрезок, чтобы разместить эффект или звук.',
-    en: 'The playhead is on a removed part — move it to a kept segment to place the effect or audio.',
+    ru: 'Нельзя добавить эффект или звук в вырезанный участок. Переместите указатель времени на оставшуюся часть видео и повторите попытку.',
+    en: 'Cannot add an effect or audio to a removed segment. Move the playhead to a part of the video that remains and try again.',
   },
   commentRange: { ru: 'Заметка к интервалу', en: 'Note on interval' },
   commentsEmpty: { ru: 'Пока нет заметок', en: 'No notes yet' },

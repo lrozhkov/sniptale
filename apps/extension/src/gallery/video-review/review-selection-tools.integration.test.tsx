@@ -408,7 +408,7 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
   }
 });
 
-it('keeps repeated gain failures in the inspector without source selection', async () => {
+it('dismisses and repeats gain feedback without changing source selection', async () => {
   const fixture = createEditorFixture(integration);
   integration.index.mockResolvedValue({
     duration: 4,
@@ -431,27 +431,29 @@ it('keeps repeated gain failures in the inspector without source selection', asy
     await fixture.click('originalAudioRange');
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await dragRange(fixture.host, { lane: 'original', start: 80, end: 180 });
-      expect(fixture.host.querySelector('aside')?.textContent).toContain(
-        'gallery.videoReview.originalAudioOverlap'
-      );
+      expect(
+        fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
+      ).toContain('gallery.videoReview.originalAudioOverlap');
       expect(timeline.textContent).not.toContain('gallery.videoReview.originalAudioOverlap');
       expect(timeline.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
       expect(
         timeline.querySelectorAll('[data-ui="gallery.videoReview.originalAudioRange"]')
       ).toHaveLength(1);
+      await fixture.click('dismissFeedback');
+      expect(fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')).toBeNull();
     }
     vi.mocked(HTMLMediaElement.prototype.play).mockRejectedValueOnce(new Error('playback'));
     await fixture.click('play');
-    expect(fixture.host.querySelector('aside')?.textContent).toContain(
-      'gallery.videoReview.playbackFailed'
-    );
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
+    ).toContain('gallery.videoReview.playbackFailed');
     await dragRange(fixture.host, { lane: 'original', start: 80, end: 180 });
-    expect(fixture.host.querySelector('aside')?.textContent).toContain(
-      'gallery.videoReview.playbackFailed'
-    );
-    expect(fixture.host.querySelector('aside')?.textContent).not.toContain(
-      'gallery.videoReview.originalAudioOverlap'
-    );
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
+    ).toContain('gallery.videoReview.playbackFailed');
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.feedback"]')?.textContent
+    ).not.toContain('gallery.videoReview.originalAudioOverlap');
   } finally {
     await fixture.cleanup();
   }

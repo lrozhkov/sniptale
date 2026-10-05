@@ -16,11 +16,14 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
       data-ui="gallery.videoReview.dialog"
       onKeyDownCapture={(event) => {
         const target = event.target;
-        const inspectorControl =
+        const localControl =
           target instanceof HTMLElement &&
-          target.closest('[data-ui="gallery.videoReview.inspector"] :is(button,summary)');
+          target.closest(
+            '[data-ui="gallery.videoReview.inspector"] :is(button,summary), ' +
+              '[data-ui="gallery.videoReview.feedback"] button'
+          );
         if (
-          inspectorControl &&
+          localControl &&
           [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
             event.key
           )

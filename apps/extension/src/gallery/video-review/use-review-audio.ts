@@ -285,6 +285,7 @@ function useOriginalAudioRanges(args: Parameters<typeof useReviewAudio>[0]) {
       if (Number.isFinite(volume) && volume >= 0 && volume <= 2) setDefaultOriginalVolume(volume);
     },
     originalFeedback,
+    dismissOriginalFeedback: () => setOriginalFeedback(null),
     originalRangeSelected,
     setOriginalRangeSelected,
     originalTool,

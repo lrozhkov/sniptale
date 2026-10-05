@@ -203,6 +203,10 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     expect(back).not.toHaveBeenCalled();
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
     expect(host.textContent).toContain('gallery.videoReview.saveFailed');
+    await click('dismissFeedback');
+    expect(host.querySelector('[data-ui="gallery.videoReview.feedback"]')).toBeNull();
+    expect(host.textContent).toContain('gallery.videoReview.saveFailed');
+    expect(host.querySelector('textarea')?.value).toBe('Keep this text');
     await click('back');
     expect(back).toHaveBeenCalledOnce();
     expect(fixture.snapshot.draft).toBeNull();
@@ -552,6 +556,34 @@ it('refuses a zoom placement while the playhead is on a removed part (R03)', asy
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(0);
     expect(host.textContent).toContain('gallery.videoReview.placementOnCut');
+    const notice = () => host.querySelector('[data-ui="gallery.videoReview.feedback"]');
+    expect(notice()?.getAttribute('role')).toBe('alert');
+    expect(notice()?.closest('main')).not.toBeNull();
+    await click('dismissFeedback');
+    expect(notice()).toBeNull();
+    expect(fixture.back).not.toHaveBeenCalled();
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.zoomAdd"]'
+    )!;
+    trigger.focus();
+    await click('zoomAdd');
+    expect(notice()?.textContent).toContain('gallery.videoReview.placementOnCut');
+    const dismiss = notice()!.querySelector('button')!;
+    dismiss.focus();
+    await act(async () => {
+      dismiss.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+    expect(notice()).not.toBeNull();
+    await act(async () => {
+      dismiss.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(document.activeElement).toBe(trigger);
+    expect(notice()).toBeNull();
+    await dragTimePlane(host, 200);
+    await click('zoomAdd');
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
+    expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(1);
+    expect(notice()).toBeNull();
   } finally {
     await fixture.cleanup();
   }

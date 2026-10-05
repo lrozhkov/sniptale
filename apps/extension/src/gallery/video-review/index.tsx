@@ -1,4 +1,4 @@
-import { reviewOriginalAudioFeedbackMessage } from './original-audio-feedback';
+import { ReviewFeedback } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { ReviewSelectedProperties } from './selected-properties';
@@ -220,11 +220,7 @@ function ReviewInspectorBinding({
             : 'saved'
       }
       onRetry={() => void run(state.retryAdvanced)}
-      message={
-        snapshot.error
-          ? reviewErrorMessage(snapshot.error)
-          : (state.message ?? reviewOriginalAudioFeedbackMessage(audio.originalFeedback))
-      }
+      message={snapshot.error ? reviewErrorMessage(snapshot.error) : null}
       onBack={() => leave(onBack)}
       onClose={() => leave(onClose)}
       rangeSelected={state.selection.kind === 'range'}
@@ -371,6 +367,69 @@ function ReviewHistoryControlBinding({
   );
 }
 
+/** Preview layout, feedback and stage events share one visible-area binding. */
+function ReviewPreviewBinding({
+  resource,
+  state,
+}: {
+  resource: LoadedReview;
+  state: ReturnType<typeof useReviewEditorState>;
+}) {
+  const { busy, features, composer, snapshot, canvasComments, audio } = state;
+  return (
+    <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
+      <ReviewFeedback
+        message={state.message}
+        originalFeedback={audio.originalFeedback}
+        onDismiss={() => {
+          state.setMessage(null);
+          audio.dismissOriginalFeedback();
+        }}
+      />
+      <ReviewStageBinding
+        cutPreview={{
+          file: resource.file,
+          duration: state.source.duration,
+          edits: snapshot.document.edits,
+          time: state.timeline.sceneOutputTime,
+        }}
+        backgroundPending={state.backgroundImport.pending}
+        url={resource.url}
+        source={state.source}
+        canvas={features.canvas}
+        video={state.video}
+        drawing={!!composer.annotation && !state.playing && !busy}
+        region={state.displayRegion}
+        zoomRegions={features.zoomRegions}
+        background={features.background}
+        outputTime={state.timeline.sceneOutputTime}
+        zoomOverlay={reviewFocusOverlay(state)}
+        comments={snapshot.document.canvasComments}
+        annotations={snapshot.document.annotations}
+        canvasComments={canvasComments}
+        overlaysVisible={features.overlaysVisible}
+        time={state.time}
+        busy={busy}
+        onRegion={(region) => {
+          if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
+        }}
+        onReady={() => {
+          const anchor = composer.annotation?.anchor;
+          if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
+        }}
+        onTime={(value) => {
+          const next = state.onTime(value);
+          state.setSelection((current) =>
+            current.kind === 'point' ? { kind: 'point', time: next } : current
+          );
+        }}
+        onPlaying={state.setPlaying}
+        onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
+      />
+    </main>
+  );
+}
+
 function ReviewEditor({
   resource,
   onBack,
@@ -411,48 +470,7 @@ function ReviewEditor({
           max-[799px]:grid-rows-[minmax(280px,45dvh)_minmax(360px,1fr)_auto]
           max-[799px]:overflow-y-auto ${voiceover.recording ? 'pb-40' : ''}`}
       >
-        <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
-          <ReviewStageBinding
-            cutPreview={{
-              file: resource.file,
-              duration: state.source.duration,
-              edits: snapshot.document.edits,
-              time: state.timeline.sceneOutputTime,
-            }}
-            backgroundPending={state.backgroundImport.pending}
-            url={resource.url}
-            source={state.source}
-            canvas={features.canvas}
-            video={state.video}
-            drawing={!!composer.annotation && !state.playing && !busy}
-            region={state.displayRegion}
-            zoomRegions={features.zoomRegions}
-            background={features.background}
-            outputTime={state.timeline.sceneOutputTime}
-            zoomOverlay={reviewFocusOverlay(state)}
-            comments={snapshot.document.canvasComments}
-            annotations={snapshot.document.annotations}
-            canvasComments={canvasComments}
-            overlaysVisible={features.overlaysVisible}
-            time={state.time}
-            busy={busy}
-            onRegion={(region) => {
-              if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
-            }}
-            onReady={() => {
-              const anchor = composer.annotation?.anchor;
-              if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
-            }}
-            onTime={(value) => {
-              const next = state.onTime(value);
-              state.setSelection((current) =>
-                current.kind === 'point' ? { kind: 'point', time: next } : current
-              );
-            }}
-            onPlaying={state.setPlaying}
-            onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
-          />
-        </main>
+        <ReviewPreviewBinding resource={resource} state={state} />
         <ReviewInspectorBinding
           navigation={navigation}
           fullHeight={fullHeight}
