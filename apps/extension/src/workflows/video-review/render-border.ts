@@ -42,8 +42,14 @@ export function drawReviewBorders(
           : []
     );
     stroke.lineDashOffset = frame.dashOffset ?? 0;
+    if (length < 1 && frame.style === 'solid') {
+      // Native segment caps stay round; a reveal mask would slice them flat.
+      stroke.lineCap = 'round';
+      stroke.setLineDash([length * frame.perimeter, (1 - length) * frame.perimeter]);
+      stroke.lineDashOffset = -frame.start * frame.perimeter;
+    }
     stroke.stroke(path);
-    if (length < 1) {
+    if (length < 1 && frame.style !== 'solid') {
       // Reveal clipping and the traveling pattern have independent, sampled phases.
       reveal.clearRect(0, 0, mask.width, mask.height);
       reveal.lineCap = 'butt';

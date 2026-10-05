@@ -58,7 +58,6 @@ const target = (context: ReturnType<typeof surface>['context']) =>
 afterEach(() => vi.unstubAllGlobals());
 
 it.each([
-  { style: 'solid' as const, dash: [], cap: 'butt' },
   { style: 'dashed' as const, dash: [12, 8], cap: 'butt' },
   { style: 'dotted' as const, dash: [0, 8], cap: 'round' },
 ])('reveals a wrapping $style segment without moving its pattern phase', ({ style, dash, cap }) => {
@@ -149,4 +148,19 @@ it('moves a full patterned perimeter and resets its phase for a following static
   ]);
   expect(phases).toEqual([-37, -61, 0]);
   expect(mask.context.stroke).not.toHaveBeenCalled();
+});
+
+it.each([
+  { start: 0, end: 0.25 },
+  { start: 0.75, end: 1 },
+  { start: 0.9, end: 1.15 },
+])('paints partial solid strokes with native round endpoints: $start to $end', ({ start, end }) => {
+  const { destination, layer, mask } = compositor();
+  drawReviewBorders(target(destination.context), output, [{ ...frame, start, end }]);
+  expect(layer.context.lineCap).toBe('round');
+  expect(layer.context.setLineDash.mock.calls.at(-1)?.[0][0]).toBeCloseTo(80);
+  expect(layer.context.setLineDash.mock.calls.at(-1)?.[0][1]).toBeCloseTo(240);
+  expect(layer.context.lineDashOffset).toBeCloseTo(-start * frame.perimeter);
+  expect(mask.context.stroke).not.toHaveBeenCalled();
+  expect(layer.context.drawImage).not.toHaveBeenCalled();
 });

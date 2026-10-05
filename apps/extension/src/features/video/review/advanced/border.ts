@@ -84,18 +84,22 @@ export interface QuickEditBorderFrame {
   dashOffset?: number;
 }
 
-/** Clockwise circular-corner path, starting at the top-left horizontal tangent. */
+/** Clockwise circular-corner path, starting at top-center away from corner tangents. */
 export function quickEditBorderPath(rect: QuickEditRect, radius: number) {
   const { x, y, width: w, height: h } = rect;
   const r = Math.max(0, Math.min(radius, w / 2, h / 2));
   // Chromium resets stroke dashes at degenerate arcs, so square corners use lines.
-  if (r === 0) return { path: `M${x} ${y}H${x + w}V${y + h}H${x}V${y}Z`, perimeter: 2 * (w + h) };
+  if (r === 0)
+    return {
+      path: `M${x + w / 2} ${y}H${x + w}V${y + h}H${x}V${y}H${x + w / 2}Z`,
+      perimeter: 2 * (w + h),
+    };
   return {
     path:
-      `M${x + r} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}` +
+      `M${x + w / 2} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}` +
       `V${y + h - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + h}` +
       `H${x + r}A${r} ${r} 0 0 1 ${x} ${y + h - r}` +
-      `V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`,
+      `V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}H${x + w / 2}Z`,
     perimeter: 2 * (w + h - 4 * r) + 2 * Math.PI * r,
   };
 }

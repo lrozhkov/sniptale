@@ -48,7 +48,7 @@ export function probe() {
   });
   drawReviewBorders(context, output, frames);
   const stroke = (x: number, y: number) => context.getImageData(x, y, 1, 1).data[3];
-  const edges = { top: stroke(50, 11), bottom: stroke(50, 88), right: stroke(88, 50) };
+  const edges = { top: stroke(75, 11), bottom: stroke(50, 88), right: stroke(88, 70) };
   const patterned = (['solid', 'dashed', 'dotted'] as const).map((style) => {
     const counts = [0.25, 1.5].map((time) => {
       context.clearRect(0, 0, 100, 100);
@@ -71,6 +71,7 @@ export function probe() {
     return { style, partial: counts[0], full: counts[1] };
   });
   return {
+    start: probeBorderStart(),
     motion: probeBorderMotion(),
     patterned,
     outside: alpha(90, 90),
@@ -114,8 +115,8 @@ function probeBorderMotion() {
     return context.getImageData(0, 0, 100, 100).data;
   };
   const edges = (data: Uint8ClampedArray) => ({
-    top: data[(11 * 100 + 50) * 4 + 3],
-    left: data[(50 * 100 + 11) * 4 + 3],
+    topRight: data[(11 * 100 + 75) * 4 + 3],
+    topLeft: data[(11 * 100 + 25) * 4 + 3],
   });
   const draw = (['draw', 'draw-ccw'] as const).map((reveal) => ({
     direction: reveal,
@@ -161,4 +162,69 @@ function probeBorderMotion() {
   for (let i = 3; i < clockwise.length; i += 4)
     if (clockwise[i] !== counterclockwise[i]) oppositePixels++;
   return { draw, erase, moving, pulse, oppositePixels };
+}
+
+/** Early frames reveal the origin/cap shape, not just completed perimeter coverage. */
+function probeBorderStart() {
+  const output = { width: 240, height: 100 };
+  const sheet = document.createElement('canvas');
+  sheet.width = 720;
+  sheet.height = 240;
+  sheet.setAttribute('aria-label', 'Border entrance: clockwise above, counterclockwise below');
+  document.body.append(sheet);
+  const preview = sheet.getContext('2d')!;
+  preview.fillStyle = '#ffffff';
+  preview.fillRect(0, 0, sheet.width, sheet.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = output.width;
+  canvas.height = output.height;
+  const context = canvas.getContext('2d')!;
+  return (['draw', 'draw-ccw'] as const).map((reveal, row) => {
+    const samples = [0, 0.025, 0.08, 0.35, 1].map((time) => {
+      context.clearRect(0, 0, output.width, output.height);
+      const region = {
+        ...createQuickEditZoomRegion({ id: 'early', at: 0, duration: 4 }),
+        border: {
+          ...createQuickEditBorder(),
+          width: 8,
+          roundness: 0.15,
+          reveal,
+          area: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+        },
+        enter: { type: 'linear' as const, duration: 1 },
+      };
+      drawReviewBorders(
+        context,
+        output,
+        evaluateQuickEditBordersAtTime({
+          regions: [region],
+          time,
+          output,
+          video: { x: 0, y: 0, ...output },
+          scale: 1,
+        })
+      );
+      if (time > 0 && time < 1) {
+        const column = time === 0.025 ? 0 : time === 0.08 ? 1 : 2;
+        preview.drawImage(canvas, column * 240, row * 120 + 20);
+        preview.fillStyle = '#333333';
+        preview.fillText(`${reveal} · ${time}s`, column * 240 + 24, row * 120 + 16);
+      }
+      const alpha = (x: number, y: number) => context.getImageData(x, y, 1, 1).data[3];
+      const pixels = context.getImageData(0, 0, output.width, output.height).data;
+      let painted = 0;
+      for (let i = 3; i < pixels.length; i += 4) if (pixels[i]! > 0) painted++;
+      return {
+        time,
+        painted,
+        center: alpha(120, 14),
+        cap: alpha(reveal === 'draw' ? 117 : 122, 14),
+        capOutside: alpha(reveal === 'draw' ? 116 : 123, 10),
+        right: alpha(130, 14),
+        left: alpha(110, 14),
+        corner: alpha(28, 20),
+      };
+    });
+    return { reveal, samples };
+  });
 }

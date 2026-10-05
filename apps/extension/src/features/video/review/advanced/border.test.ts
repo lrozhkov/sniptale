@@ -75,9 +75,9 @@ it('samples camera independently and packs overlays reproducibly', () => {
     })
   ).toHaveLength(2);
 });
-it('starts clockwise at the tangent with analytic circular perimeter', () => {
+it('starts clockwise at top-center with analytic circular perimeter', () => {
   const path = quickEditBorderPath({ x: 0, y: 0, width: 20, height: 10 }, 2);
-  expect(path.path.startsWith('M2 0H18')).toBe(true);
+  expect(path.path.startsWith('M10 0H18')).toBe(true);
   expect(path.perimeter).toBeCloseTo(44 + 4 * Math.PI);
 });
 it('preserves source-clock phase across cut and speed slices and strips no authored fields', () => {
@@ -364,7 +364,7 @@ it('retains independent third Spotlight throughout a linked morph with full morp
 
 it('uses continuous straight segments for square corners without degenerate dash-resetting arcs', () => {
   const path = quickEditBorderPath({ x: 1, y: 2, width: 20, height: 10 }, 0);
-  expect(path).toEqual({ path: 'M1 2H21V12H1V2Z', perimeter: 60 });
+  expect(path).toEqual({ path: 'M11 2H21V12H1V2H11Z', perimeter: 60 });
 });
 
 it('shares camera gaps but reserves future cameras and whole linked overlay chains', () => {

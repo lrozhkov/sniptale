@@ -221,6 +221,7 @@ for (const variant of [
             .evaluate((node: HTMLVideoElement) => node.currentTime)
         )
         .toBeGreaterThan(1.4);
+      await button('gallery.videoReview.scene').click();
       await button('gallery.videoReview.windowHeader').click();
       await page
         .getByRole('option', {
@@ -316,7 +317,7 @@ for (const variant of [
 
 test('Focus compositor produces union holes and a partial clockwise Border in Chromium', async ({
   page,
-}) => {
+}, info) => {
   const bundle = await build({
     entryPoints: ['tooling/test/e2e/support/focus-render-probe.ts'],
     bundle: true,
@@ -343,13 +344,25 @@ test('Focus compositor produces union holes and a partial clockwise Border in Ch
     right: 0,
   });
   expect(pixels.motion.draw).toEqual([
-    { direction: 'draw', top: 255, left: 0 },
-    { direction: 'draw-ccw', top: 0, left: 255 },
+    { direction: 'draw', topRight: 255, topLeft: 0 },
+    { direction: 'draw-ccw', topRight: 0, topLeft: 255 },
   ]);
   expect(pixels.motion.erase).toEqual([
-    { direction: 'erase', top: 0, left: 255 },
-    { direction: 'erase-ccw', top: 255, left: 0 },
+    { direction: 'erase', topRight: 0, topLeft: 255 },
+    { direction: 'erase-ccw', topRight: 255, topLeft: 0 },
   ]);
+  for (const entrance of pixels.start) {
+    expect(entrance.samples[0].painted).toBe(0);
+    const early = entrance.samples[1];
+    expect(early.center).toBe(255);
+    expect(early.cap).toBeGreaterThan(150);
+    expect(early.capOutside).toBe(0);
+    expect(early.corner).toBe(0);
+    expect(early.right).toBe(entrance.reveal === 'draw' ? 255 : 0);
+    expect(early.left).toBe(entrance.reveal === 'draw-ccw' ? 255 : 0);
+    expect(entrance.samples[4].painted).toBeGreaterThan(early.painted * 10);
+  }
+  await page.screenshot({ path: info.outputPath('border-early-frames.png'), fullPage: false });
   expect(pixels.motion.oppositePixels).toBeGreaterThan(100);
   for (const pulse of pixels.motion.pulse) {
     expect(pulse.fullAlpha).toBeGreaterThan(0);
