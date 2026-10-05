@@ -150,6 +150,8 @@ export interface QuickEditOriginalAudio {
 export interface QuickEditWindowHeader {
   kind: 'browser';
   title: string;
+  /** Display text only; missing addresses remain blank for legacy headers. */
+  url?: string;
 }
 
 /** An explicit base canvas size; absence means native source dimensions. */

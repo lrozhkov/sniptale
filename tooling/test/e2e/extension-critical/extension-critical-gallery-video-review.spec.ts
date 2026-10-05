@@ -3602,7 +3602,14 @@ for (const variant of [
         name: label('gallery.videoReview.windowHeaderTitle'),
         exact: true,
       });
+      const address = section.getByRole('textbox', {
+        name: label('gallery.videoReview.windowHeaderUrl'),
+        exact: true,
+      });
+      await expect(address).toHaveValue('');
+      await address.fill('https://sniptale.test/?a=1&b=2');
       await title.fill('Browser & <title>');
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
       await title.press('Tab');
       const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
       await expect(stage.locator('img')).toHaveCount(1);
@@ -3615,11 +3622,27 @@ for (const variant of [
           return Math.abs(box.width / box.height - 160 / 108);
         })
         .toBeLessThan(0.02);
+      const artwork = async () =>
+        decodeURIComponent((await stage.locator('img').getAttribute('src'))!);
+      await expect.poll(artwork).toContain('https://sniptale.test/?a=1&amp;b=2');
+      await address.fill('');
+      await address.press('Tab');
+      await expect.poll(artwork).not.toContain('sniptale.test');
+      await expect(title).toHaveValue('Browser & <title>');
+      await address.fill('https://sniptale.test/?a=1&b=2');
+      await address.press('Tab');
+      await expect.poll(artwork).toContain('https://sniptale.test/?a=1&amp;b=2');
       await page.screenshot({ path: info.outputPath('browser-header-scene.png'), fullPage: false });
+      // Reopen commits the authored fields before testing removal as a separate history step.
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.scene').click();
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
       await choose('gallery.videoReview.windowHeaderNone');
       await expect(stage.locator('img')).toHaveCount(0);
       await button('gallery.videoReview.undo').click();
       await expect(title).toHaveValue('Browser & <title>');
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
       await expect(stage.locator('img')).toHaveCount(1);
       await timelineGesture(page, 2);
       await button('gallery.videoReview.zoomAdd').first().click();
@@ -3647,6 +3670,7 @@ for (const variant of [
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       await expect(title).toHaveValue('Browser & <title>');
+      await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
       const downloading = page.waitForEvent('download');
       await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
       const download = await downloading;
@@ -3700,8 +3724,8 @@ for (const variant of [
       }
       await button('gallery.videoReview.scene').click();
       await page.setViewportSize({ width: 1100, height: 560 });
-      await title.scrollIntoViewIfNeeded();
-      await expect(title).toBeInViewport();
+      await address.scrollIntoViewIfNeeded();
+      await expect(address).toBeInViewport();
       await page.screenshot({
         path: info.outputPath('browser-header-horizontal-scroll.png'),
         fullPage: false,

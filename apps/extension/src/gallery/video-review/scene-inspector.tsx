@@ -147,16 +147,28 @@ export function ReviewWindowHeaderSettings(props: {
         }
       />
       {props.header ? (
-        <TextField
-          label={translate('gallery.videoReview.windowHeaderTitle')}
-          value={props.header.title}
-          onChange={(event) =>
-            props.onChange?.({
-              kind: 'browser',
-              title: event.target.value.slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
-            })
-          }
-        />
+        <>
+          <TextField
+            label={translate('gallery.videoReview.windowHeaderTitle')}
+            value={props.header.title}
+            onChange={(event) =>
+              props.onChange?.({
+                ...props.header!,
+                title: event.target.value.slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
+              })
+            }
+          />
+          <TextField
+            label={translate('gallery.videoReview.windowHeaderUrl')}
+            value={props.header.url ?? ''}
+            onChange={(event) =>
+              props.onChange?.({
+                ...props.header!,
+                url: event.target.value.slice(0, 2048).replace(/[\uD800-\uDFFF]/gu, ''),
+              })
+            }
+          />
+        </>
       ) : null}
     </section>
   );

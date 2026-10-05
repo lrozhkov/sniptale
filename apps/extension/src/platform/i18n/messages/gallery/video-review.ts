@@ -8,6 +8,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   windowHeader: { ru: 'Шапка окна', en: 'Window header' },
   windowHeaderNone: { ru: 'Нет', en: 'None' },
   windowHeaderBrowser: { ru: 'Браузер', en: 'Browser' },
+  windowHeaderUrl: { ru: 'Адрес сайта', en: 'Website address' },
   windowHeaderTitle: { ru: 'Название вкладки', en: 'Tab title' },
   windowHeaderFailed: {
     ru: 'Не удалось показать шапку окна. Повторите попытку.',

@@ -2,7 +2,7 @@ import { quickEditWindowHeaderSize } from '../../features/video/review/advanced/
 import { composeExactBrowserFrameSvg } from '../../features/browser-frame/compositor';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 
-/** Local artwork only: the title is escaped by the shared compositor, with no remote resources. */
+/** Local artwork only: title and address are escaped by the shared compositor, with no remote resources. */
 export function reviewWindowHeaderUrl(header: QuickEditWindowHeader, width: number): string {
   const size = quickEditWindowHeaderSize(width);
   const svg = composeExactBrowserFrameSvg({
@@ -11,7 +11,7 @@ export function reviewWindowHeaderUrl(header: QuickEditWindowHeader, width: numb
     contentHeight: 0,
     radius: 0,
     title: header.title,
-    url: null,
+    url: header.url?.trim() || null,
   });
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }

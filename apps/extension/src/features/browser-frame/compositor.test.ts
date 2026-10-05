@@ -184,3 +184,24 @@ describe('browser-frame-factory exact compositor', () => {
   registerTemplateSliceTest();
   registerWideWidthCompositionTest();
 });
+
+it.each([0, 720])(
+  'keeps replacement tokens literal in a shell with %i content rows',
+  (contentHeight) => {
+    const title = "$$ $& $` $'";
+    const url = `https://site.test/${title}?a=<text>&b="quoted"`;
+    const svg = composeExactBrowserFrameSvg({
+      contentHeight,
+      headerHeight: 86,
+      height: contentHeight + 86,
+      radius: 12,
+      title,
+      url,
+      width: 1920,
+    });
+    const parsed = new DOMParser().parseFromString(svg, 'image/svg+xml');
+    expect(parsed.querySelector('parsererror')).toBeNull();
+    expect(parsed.querySelector('#tab-title')?.textContent?.trim()).toBe(title);
+    expect(parsed.querySelector('#address-url')?.textContent?.trim()).toBe(url);
+  }
+);

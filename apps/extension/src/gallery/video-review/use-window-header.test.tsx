@@ -6,7 +6,8 @@ import { useReviewWindowHeader } from './use-window-header';
 import { loadReviewWindowHeader } from '../../workflows/video-review/window-header';
 
 vi.mock('../../workflows/video-review/window-header', () => ({
-  reviewWindowHeaderUrl: (header: { title: string }) => header.title,
+  reviewWindowHeaderUrl: (header: { title: string; url?: string }) =>
+    `${header.title}|${header.url ?? ''}`,
   loadReviewWindowHeader: vi.fn(),
 }));
 
@@ -23,13 +24,14 @@ it('cancels obsolete titles, ignores late results and retries a failed decode', 
   const host = document.createElement('div'),
     root = createRoot(host);
   let result: ReturnType<typeof useReviewWindowHeader>;
-  function Harness({ title }: { title: string }) {
-    result = useReviewWindowHeader({ kind: 'browser', title }, 1920);
+  function Harness({ title, url = '' }: { title: string; url?: string }) {
+    result = useReviewWindowHeader({ kind: 'browser', title, url }, 1920);
     return null;
   }
   try {
     await act(async () => root.render(<Harness title="first" />));
-    await act(async () => root.render(<Harness title="second" />));
+    await act(async () => root.render(<Harness title="first" url="https://site.test" />));
+    expect(result!.url).toBe('first|https://site.test');
     expect(pending[0]!.signal.aborted).toBe(true);
     const stale = document.createElement('img'),
       current = document.createElement('img');

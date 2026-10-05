@@ -11,7 +11,13 @@ export function parseQuickEditWindowHeader(value: unknown): QuickEditWindowHeade
     /[\uD800-\uDFFF]/u.test(value['title'])
   )
     return null;
-  return { kind: 'browser', title: value['title'] };
+  const url = value['url'];
+  if (
+    url !== undefined &&
+    (typeof url !== 'string' || url.length > 2048 || /[\uD800-\uDFFF]/u.test(url))
+  )
+    return null;
+  return { kind: 'browser', title: value['title'], ...(url === undefined ? {} : { url }) };
 }
 
 /** Keep browser controls legible on narrow source rasters by scaling the complete artwork. */

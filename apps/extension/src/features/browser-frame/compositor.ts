@@ -105,7 +105,7 @@ function buildTemplateTextNode(args: {
 
   return resizedMarkup.replace(
     /<tspan\b[^>]*>[\s\S]*?<\/tspan>/,
-    `<tspan x="${args.x}" y="${args.baseline}">${args.text}</tspan>`
+    () => `<tspan x="${args.x}" y="${args.baseline}">${args.text}</tspan>`
   );
 }
 

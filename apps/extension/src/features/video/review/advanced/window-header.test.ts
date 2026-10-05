@@ -14,7 +14,11 @@ import { resolveQuickEditEffectiveState, resolveQuickEditExportPlan } from './ef
 import type { QuickEditBackgroundSettings } from './types';
 
 const source = { width: 1920, height: 1080 };
-const windowHeader = { kind: 'browser' as const, title: 'Example & <title>' };
+const windowHeader = {
+  kind: 'browser' as const,
+  title: 'Example & <title>',
+  url: 'https://sniptale.test/?a=1&b=2',
+};
 const identity = { scale: 1, centerX: 0.5, centerY: 0.5 };
 
 describe('decorated original video', () => {
@@ -69,6 +73,10 @@ describe('decorated original video', () => {
   it('parses persisted content and rejects invalid header contracts without modifying legacy content', () => {
     const state = { ...createQuickEditAdvancedState(), windowHeader };
     expect(loadQuickEditAdvancedState(state)?.windowHeader).toEqual(windowHeader);
+    expect(
+      loadQuickEditAdvancedState({ ...state, windowHeader: { kind: 'browser', title: '' } })
+        ?.windowHeader
+    ).toEqual({ kind: 'browser', title: '' });
     const content = reviewAdvancedContentBaseline(state);
     expect(loadQuickEditAdvancedContentState(content)).toEqual(content);
     expect(
@@ -79,6 +87,9 @@ describe('decorated original video', () => {
       { kind: 'os', title: '' },
       { kind: 'browser', title: 1 },
       { kind: 'browser', title: 'x'.repeat(513) },
+      { ...windowHeader, url: 1 },
+      { ...windowHeader, url: 'x'.repeat(2049) },
+      { ...windowHeader, url: '\uD800' },
     ]) {
       expect(loadQuickEditAdvancedState({ ...state, windowHeader: invalid })).toBeNull();
       expect(loadQuickEditAdvancedContentState({ ...content, windowHeader: invalid })).toBeNull();

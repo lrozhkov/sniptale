@@ -48,3 +48,18 @@ it('renders a long Unicode tab title without splitting an emoji during truncatio
     reviewWindowHeaderUrl({ kind: 'browser', title: 'a' + '😀'.repeat(40) }, 1920)
   ).not.toThrow();
 });
+
+it('renders supplied addresses as inert escaped text and keeps empty addresses blank', () => {
+  const header = {
+    kind: 'browser' as const,
+    title: 'Tab',
+    url: 'https://site.test/<img>?a="b"&c=1',
+  };
+  const svg = decodeURIComponent(reviewWindowHeaderUrl(header, 1920).split(',')[1]!);
+  expect(svg).toContain('https://site.test/&lt;img&gt;?a=&quot;b&quot;&amp;c=1');
+  expect(svg).not.toContain('<img>');
+  expect(svg).not.toMatch(/(?:href|src)="https:\/\/site\.test/);
+  expect(decodeURIComponent(reviewWindowHeaderUrl({ ...header, url: '  ' }, 1920))).not.toContain(
+    'example.com'
+  );
+});

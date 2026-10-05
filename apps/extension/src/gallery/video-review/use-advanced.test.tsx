@@ -307,12 +307,19 @@ it('rejects malformed staged content without losing the pending edit and allows 
 
 it('persists and removes a browser header through the existing content history', async () => {
   const { session, deps, build } = setup();
-  act(() => advanced.setWindowHeader({ kind: 'browser', title: 'A <browser> & title' }));
+  act(() =>
+    advanced.setWindowHeader({
+      kind: 'browser',
+      title: 'A <browser> & title',
+      url: 'https://site.test/?a=1&b=2',
+    })
+  );
   await act(async () => advanced.flush());
   const reopened = createVideoReviewSession(build(), deps);
   expect(reopened.getSnapshot().document.advancedContent.windowHeader).toEqual({
     kind: 'browser',
     title: 'A <browser> & title',
+    url: 'https://site.test/?a=1&b=2',
   });
   act(() => advanced.setWindowHeader(undefined));
   await act(async () => advanced.flush());
