@@ -146,7 +146,13 @@ export interface QuickEditOriginalAudio {
   volume: number;
 }
 
-/** An explicit output size; absence means the native source canvas. */
+/** Browser is the only supported window decoration; original source coordinates stay unchanged. */
+export interface QuickEditWindowHeader {
+  kind: 'browser';
+  title: string;
+}
+
+/** An explicit base canvas size; absence means native source dimensions. */
 export interface QuickEditCanvasSize {
   width: number;
   height: number;
@@ -169,6 +175,7 @@ export interface QuickEditAdvancedState {
   zoom: QuickEditZoomState;
   background: QuickEditBackgroundSettings;
   canvas?: QuickEditCanvasSize;
+  windowHeader?: QuickEditWindowHeader;
   audio: QuickEditAudioState;
   /** Raw v1 payload retained by the deterministic load-time migration. */
   recoveryV1?: string;
@@ -185,5 +192,6 @@ export interface QuickEditAdvancedContent {
   zoom: QuickEditZoomState;
   background: QuickEditBackgroundSettings;
   canvas?: QuickEditCanvasSize;
+  windowHeader?: QuickEditWindowHeader;
   audio: QuickEditAudioState;
 }

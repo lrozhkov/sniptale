@@ -54,3 +54,33 @@ describe('calibrated quick-edit export profile', () => {
     expect(() => resolveReviewRenderBitrate({ width: NaN, height: 1080, fps: 30 })).toThrow();
   });
 });
+
+it('adds browser header after the selected output preset and reports encoder budget overflow', () => {
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.windowHeader = { kind: 'browser', title: 'Browser' };
+  const source = { ...index, width: 1920, height: 1080 };
+  expect(
+    resolveReviewOutputProfile(source, state, {
+      quality: 'HIGH',
+      frameRate: 30,
+      resolution: '1080P',
+    })
+  ).toMatchObject({ width: 1920, height: 1166, dimensionsSupported: true });
+  expect(
+    resolveReviewOutputProfile(source, state, {
+      quality: 'HIGH',
+      frameRate: 30,
+      resolution: '720P',
+    })
+  ).toMatchObject({ width: 1280, height: 778 });
+  state.canvas = { width: 7680, height: 4320 };
+  expect(resolveReviewOutputProfile(source, state)).toMatchObject({ dimensionsSupported: false });
+  expect(
+    resolveReviewOutputProfile(source, state, {
+      quality: 'HIGH',
+      frameRate: 30,
+      resolution: '1080P',
+    })
+  ).toMatchObject({ dimensionsSupported: true });
+});

@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n';
+import { translate } from '../../platform/i18n';
 
 function sanitizeTitle(value: string): string {
   const next = value.trim();
@@ -24,9 +24,13 @@ function escapeXml(value: string): string {
 }
 
 function truncateText(value: string, maxLength: number): string {
-  return value.length <= maxLength
+  const characters = Array.from(value);
+  return characters.length <= maxLength
     ? value
-    : `${value.slice(0, Math.max(0, maxLength - 1)).trimEnd()}…`;
+    : `${characters
+        .slice(0, Math.max(0, maxLength - 1))
+        .join('')
+        .trimEnd()}…`;
 }
 
 function resolveMaxLength(width: number, averageGlyphWidth: number, floor: number): number {

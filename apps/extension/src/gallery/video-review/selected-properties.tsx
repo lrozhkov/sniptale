@@ -106,6 +106,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 background={advanced.background}
                 source={resource.source}
                 canvas={advanced.canvas}
+                windowHeader={advanced.windowHeader}
                 sourceTime={props.toSourceTime((region.start + region.end) / 2)}
                 onInteract={props.onPreviewFrame}
                 loadFrame={previewLoader}

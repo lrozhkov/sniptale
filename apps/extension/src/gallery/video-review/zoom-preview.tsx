@@ -1,3 +1,4 @@
+import { useReviewWindowHeader } from './use-window-header';
 import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
 import { useMemo, useState } from 'react';
@@ -7,7 +8,10 @@ import type {
   QuickEditBackgroundSettings,
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
-import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
+import {
+  computeQuickEditSceneLayout,
+  computeQuickEditSceneSize,
+} from '../../features/video/review/advanced/scene';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { ReviewButton } from './controls';
@@ -26,6 +30,9 @@ export function ReviewZoomPreview(props: {
   background: QuickEditBackgroundSettings;
   source: { width: number; height: number };
   canvas?: { width: number; height: number } | undefined;
+  windowHeader?:
+    | import('../../features/video/review/advanced/types').QuickEditWindowHeader
+    | undefined;
   /** Result-time region midpoint mapped through cuts/speed; null while it has no frame. */
   sourceTime: number | null;
   loadFrame: ZoomPreviewFrameLoader | null;
@@ -38,34 +45,17 @@ export function ReviewZoomPreview(props: {
 }) {
   const { loadFrame, region, sourceTime } = props;
   const image = useReviewBackgroundImage(props.background);
+  const header = useReviewWindowHeader(props.windowHeader, props.source.width);
   const [view, setView] = useState<'area' | 'result'>('area');
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
   const playback = region.spotlight ? undefined : props.playback;
   const camera = playback?.camera ?? region.transform;
 
-  const output = useMemo(() => {
-    const size = props.canvas ?? props.source;
-    const width = Math.max(1, Math.min(PREVIEW_WIDTH_PX, Math.round(size.width) || 1));
-    const height = Math.max(1, Math.round((width * (size.height || 1)) / Math.max(1, size.width)));
-    return { width, height };
-  }, [props.source, props.canvas]);
-
-  const layout = useMemo(
-    () =>
-      computeQuickEditSceneLayout({
-        output,
-        canvas: props.canvas,
-        source: props.source,
-        background: props.background,
-        camera: region.spotlight ? { scale: 1, centerX: 0.5, centerY: 0.5 } : camera,
-      }),
-    [output, props.source, props.canvas, props.background, camera, region.spotlight]
+  const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(
+    props,
+    camera,
+    !!region.spotlight
   );
-
-  const previewScale = output.width / Math.max(1, props.canvas?.width ?? props.source.width);
-  const cornerRadius = props.background.enabled
-    ? props.background.layout.cornerRadius * previewScale
-    : 0;
   const previewStatus = playback ? 'ready' : status;
   const interactive = !props.disabled && !playback && status === 'ready';
   const background = props.background;
@@ -115,6 +105,7 @@ export function ReviewZoomPreview(props: {
         ) : null}
         {region.spotlight ? (
           <ReviewSpotlightPreview
+            headerImage={header.image}
             key={region.id}
             region={region}
             spotlight={region.spotlight}
@@ -129,6 +120,7 @@ export function ReviewZoomPreview(props: {
           />
         ) : (
           <ZoomPreviewCanvas
+            headerImage={header.image}
             background={props.background}
             imageUrl={image.url}
             key={region.id}
@@ -147,9 +139,10 @@ export function ReviewZoomPreview(props: {
       </div>
       <ZoomPreviewFeedback
         status={previewStatus}
-        imageFailed={image.failed}
+        imageFailed={image.failed || header.failed}
         onRetry={() => {
           image.retry();
+          header.retry();
           retry();
         }}
       />
@@ -208,4 +201,32 @@ function ZoomPreviewFeedback(props: {
       ) : null}
     </>
   );
+}
+
+/** Memoizes the inspector viewport and source/window projection as one consistent scene. */
+function useZoomPreviewGeometry(
+  { source, canvas, background, windowHeader }: Parameters<typeof computeQuickEditSceneSize>[0],
+  camera: QuickEditZoomRegion['transform'],
+  spotlight: boolean
+) {
+  return useMemo(() => {
+    const size = computeQuickEditSceneSize({ source, canvas, background, windowHeader });
+    const width = Math.max(1, Math.min(PREVIEW_WIDTH_PX, Math.round(size.width) || 1));
+    const height = Math.max(1, Math.round((width * (size.height || 1)) / Math.max(1, size.width)));
+    const output = { width, height };
+    const previewScale = width / Math.max(1, canvas?.width ?? source.width);
+    return {
+      output,
+      previewScale,
+      cornerRadius: background.enabled ? background.layout.cornerRadius * previewScale : 0,
+      layout: computeQuickEditSceneLayout({
+        source,
+        canvas,
+        background,
+        windowHeader,
+        output,
+        camera: spotlight ? { scale: 1, centerX: 0.5, centerY: 0.5 } : camera,
+      }),
+    };
+  }, [source, canvas, background, windowHeader, camera, spotlight]);
 }

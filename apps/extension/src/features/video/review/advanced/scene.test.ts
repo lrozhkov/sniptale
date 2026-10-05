@@ -403,7 +403,13 @@ it.each(['none', 'linear', 'ease-in-out'] as const)(
           );
           expect(
             computeQuickEditSceneCamera(layout, { ...background, zoomBehavior: 'fixed' })
-          ).toEqual({ x: 0, y: 0, scale: 1, videoClip: layout.videoRect });
+          ).toEqual({
+            x: 0,
+            y: 0,
+            scale: 1,
+            videoClip: layout.videoRect,
+            windowClip: layout.windowRect,
+          });
         }
       }
     }

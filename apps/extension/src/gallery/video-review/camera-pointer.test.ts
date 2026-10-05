@@ -85,3 +85,12 @@ it('uses the unclipped viewport with padding and one clipped axis, including zer
   expect(visible(shifted).x).toBeGreaterThan(0);
   expect(visible(shifted).x + visible(shifted).width).toBeCloseTo(7 / 12);
 });
+
+it('places the decorated footprint center under an Area click while preserving source camera coordinates', () => {
+  const active = capture('', {
+    camera: { scale: 2, centerX: 0.8, centerY: 0.8 },
+    viewport: { x: 0, y: -0.2, width: 1, height: 1.2 },
+  });
+  expect(active.pending?.centerX).toBeCloseTo(0.25);
+  expect(active.pending?.centerY).toBeCloseTo(0.3);
+});

@@ -1,9 +1,11 @@
 import { fitQuickEditZoomTransitions } from './zoom';
+import { quickEditWindowHeaderSize } from './window-header';
 import { fitVideoRect } from '../geometry';
 import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
   QuickEditZoomRegion,
+  QuickEditWindowHeader,
 } from './types';
 
 export interface QuickEditRect {
@@ -44,23 +46,36 @@ export function computeQuickEditContentRect(
   };
 }
 
-/**
- * One scene layout for preview and export: background padding, fitted video, and camera.
- * The stored camera target stays normalized to the video; only the canvas conversion
- * changes when the background layout changes.
- */
-export function computeQuickEditSceneLayout(input: {
+type SceneInput = {
   output: { width: number; height: number };
   canvas?: { width: number; height: number } | undefined;
   source: { width: number; height: number };
   background: QuickEditBackgroundSettings;
+  windowHeader?: QuickEditWindowHeader | undefined;
   camera: QuickEditCameraTransform;
-}): {
-  contentRect: QuickEditRect;
-  videoRect: QuickEditRect;
-  videoTransform: QuickEditRect;
-} {
-  const scale = input.output.width / Math.max(1, input.canvas?.width ?? input.source.width);
+};
+
+/** Adds space above the source without changing the base canvas or fitting the video again. */
+export function computeQuickEditSceneSize(input: Omit<SceneInput, 'output' | 'camera'>) {
+  const base = input.canvas ?? input.source;
+  const content = computeQuickEditContentRect(base, input.background);
+  const fitted = fitVideoRect(content, input.source);
+  const headerHeight = input.windowHeader
+    ? Math.ceil(
+        (quickEditWindowHeaderSize(input.source.width).height * fitted.width) /
+          quickEditWindowHeaderSize(input.source.width).width /
+          2
+      ) * 2
+    : 0;
+  return { width: base.width, height: base.height + headerHeight, headerHeight };
+}
+
+/** Source coordinates belong to videoRect; decoration and corner clipping belong to windowRect. */
+export function computeQuickEditSceneLayout(input: SceneInput) {
+  const base = input.canvas ?? input.source;
+  const scale = input.output.width / Math.max(1, base.width);
+  const scene = computeQuickEditSceneSize(input);
+  const headerHeight = scene.headerHeight * scale;
   const background = input.background.enabled
     ? {
         ...input.background,
@@ -70,18 +85,48 @@ export function computeQuickEditSceneLayout(input: {
         },
       }
     : input.background;
-  const contentRect = computeQuickEditContentRect(input.output, background);
-  const fitted = fitVideoRect(contentRect, input.source);
+  const content = computeQuickEditContentRect(
+    { width: input.output.width, height: input.output.height - headerHeight },
+    background
+  );
+  const fitted = fitVideoRect(content, input.source);
   const videoRect = {
-    x: contentRect.x + fitted.x,
-    y: contentRect.y + fitted.y,
+    x: content.x + fitted.x,
+    y: content.y + fitted.y + headerHeight,
     width: fitted.width,
     height: fitted.height,
   };
+  const windowRect = {
+    ...videoRect,
+    y: videoRect.y - headerHeight,
+    height: videoRect.height + headerHeight,
+  };
   return {
-    contentRect,
+    contentRect: {
+      x: content.x,
+      y: content.y,
+      width: content.width,
+      height: content.height + headerHeight,
+    },
+    windowRect,
     videoRect,
     videoTransform: computeQuickEditVideoTransform({ videoRect, camera: input.camera }),
+  };
+}
+
+/** Recomputes decoration from the actual video transform, including live inspector gestures. */
+export function computeQuickEditWindowTransform(layout: {
+  videoRect: QuickEditRect;
+  videoTransform: QuickEditRect;
+  windowRect?: QuickEditRect;
+}): QuickEditRect {
+  const window = layout.windowRect ?? layout.videoRect;
+  const scale = layout.videoTransform.width / layout.videoRect.width;
+  return {
+    x: layout.videoTransform.x + (window.x - layout.videoRect.x) * scale,
+    y: layout.videoTransform.y + (window.y - layout.videoRect.y) * scale,
+    width: window.width * scale,
+    height: window.height * scale,
   };
 }
 
@@ -237,7 +282,7 @@ export function evaluateQuickEditCameraAtTime(
 
 /** Shared camera bounds: following backgrounds and rounded video edges move together. */
 export function computeQuickEditSceneCamera(
-  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect },
+  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect; windowRect?: QuickEditRect },
   background: QuickEditBackgroundSettings
 ) {
   const follows = background.enabled && background.zoomBehavior === 'follow-video';
@@ -247,16 +292,19 @@ export function computeQuickEditSceneCamera(
     x: follows ? layout.videoTransform.x - scale * layout.videoRect.x : 0,
     y: follows ? layout.videoTransform.y - scale * layout.videoRect.y : 0,
     videoClip: follows ? layout.videoTransform : layout.videoRect,
+    windowClip: follows
+      ? computeQuickEditWindowTransform(layout)
+      : (layout.windowRect ?? layout.videoRect),
   };
 }
 
 /** Visible video crop in normalized source coordinates, shared by Area paint and hit-testing. */
 export function computeQuickEditVisibleSourceRect(
-  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect },
+  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect; windowRect?: QuickEditRect },
   background: QuickEditBackgroundSettings,
   output: { width: number; height: number }
 ): QuickEditRect {
-  const clip = computeQuickEditSceneCamera(layout, background).videoClip;
+  const clip = computeQuickEditSceneCamera(layout, background).windowClip;
   const left = Math.max(0, clip.x);
   const top = Math.max(0, clip.y);
   return {

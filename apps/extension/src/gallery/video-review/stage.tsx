@@ -1,3 +1,5 @@
+import { ReviewButton } from './controls';
+import { useReviewWindowHeader } from './use-window-header';
 import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -15,6 +17,8 @@ import type {
 } from '../../features/video/review/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSceneSize,
+  computeQuickEditWindowTransform,
   computeQuickEditSceneCamera,
   computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
@@ -28,6 +32,9 @@ import { useReviewDrawingPlane } from './stage-drawing';
 type ReviewStageScene = {
   background: QuickEditBackgroundSettings;
   canvas?: { width: number; height: number } | undefined;
+  windowHeader?:
+    | import('../../features/video/review/advanced/types').QuickEditWindowHeader
+    | undefined;
   camera: QuickEditCameraTransform;
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number };
 };
@@ -86,6 +93,7 @@ export function ReviewStage(props: {
   onError(): void;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const header = useReviewWindowHeader(props.scene?.windowHeader, props.source.width);
   const { size, sceneLayout, zoomLayout, backgroundPaint, content, spotlight } =
     useReviewStageGeometry(props, host);
   const motion =
@@ -110,6 +118,16 @@ export function ReviewStage(props: {
       className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]
           bg-[var(--sniptale-color-surface-canvas)]"
     >
+      {header.failed ? (
+        <div
+          role="alert"
+          className="absolute inset-x-0 top-0 z-20 flex items-center gap-2
+            bg-[var(--sniptale-color-surface-panel)] p-2 text-xs"
+        >
+          <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
+          <ReviewButton label={translate('gallery.videoReview.retry')} onClick={header.retry} />
+        </div>
+      ) : null}
       <div
         data-ui="gallery.videoReview.stage"
         className="absolute overflow-hidden bg-black"
@@ -152,6 +170,7 @@ export function ReviewStage(props: {
           video={props.video}
           {...(props.scene ? { scene: props.scene } : {})}
           layout={sceneLayout}
+          header={header}
           previewScale={size.width / Math.max(1, props.scene?.canvas?.width ?? props.source.width)}
           drawing={props.drawing}
           projected={projected}
@@ -162,7 +181,12 @@ export function ReviewStage(props: {
         />
         <ReviewSpotlightOverlay output={size} frame={spotlight} />
         {props.comments && props.comments.items.length ? (
-          <ReviewStageComments comments={props.comments} output={size} source={props.source} />
+          <ReviewStageComments
+            comments={props.comments}
+            output={size}
+            source={props.source}
+            layout={sceneLayout}
+          />
         ) : null}
         {props.zoom && zoomLayout ? (
           <ReviewStageFocusControl
@@ -180,11 +204,13 @@ export function ReviewStage(props: {
 /** Overlay comment stack using the shared scene geometry. */
 function ReviewStageComments(props: {
   comments: ReviewStageCommentBinding;
+  layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
   output: { width: number; height: number };
   source: ReviewSource;
 }) {
   return (
     <ReviewCommentOverlay
+      layout={props.layout ?? undefined}
       comments={props.comments.items}
       annotations={props.comments.annotations}
       output={props.output}
@@ -208,10 +234,14 @@ function ReviewSceneVideo(props: {
   scene?: {
     background: QuickEditBackgroundSettings;
     canvas?: { width: number; height: number } | undefined;
+    windowHeader?:
+      | import('../../features/video/review/advanced/types').QuickEditWindowHeader
+      | undefined;
     camera: QuickEditCameraTransform;
   };
   layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
   previewScale: number;
+  header: ReturnType<typeof useReviewWindowHeader>;
   drawing: boolean;
   projected: ReviewRegion | null;
   onReady(): void;
@@ -224,7 +254,9 @@ function ReviewSceneVideo(props: {
     props.layout && props.scene
       ? computeQuickEditSceneCamera(props.layout, props.scene.background)
       : null;
-  const videoClip = motion?.videoClip ?? props.layout?.videoRect;
+  const videoClip = motion?.windowClip ?? props.layout?.windowRect;
+  const header = props.header;
+  const window = props.layout ? computeQuickEditWindowTransform(props.layout) : null;
   const translation = props.layout
     ? {
         x: props.layout.videoTransform.x - (videoClip?.x ?? 0),
@@ -247,6 +279,21 @@ function ReviewSceneVideo(props: {
           : undefined,
       }}
     >
+      {header.image && window && props.layout ? (
+        <img
+          alt=""
+          src={header.url ?? undefined}
+          draggable={false}
+          className="pointer-events-none absolute"
+          style={{
+            left: window.x - (videoClip?.x ?? 0),
+            top: window.y - (videoClip?.y ?? 0),
+            width: window.width,
+            height: props.layout.videoTransform.y - window.y,
+            maxWidth: 'none',
+          }}
+        />
+      ) : null}
       <video
         ref={props.video}
         src={props.url}
@@ -379,6 +426,11 @@ function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout
   return {
     ...layout,
     videoRect,
+    windowRect: {
+      ...videoRect,
+      y: Math.round(layout.windowRect.y),
+      height: videoRect.height + videoRect.y - Math.round(layout.windowRect.y),
+    },
     videoTransform: computeQuickEditVideoTransform({ videoRect, camera: input.camera }),
   };
 }
@@ -389,12 +441,16 @@ function useReviewStageGeometry(
   host: RefObject<HTMLDivElement | null>
 ) {
   const viewport = useStageMeasure(host);
-  const fitted = fitVideoRect(viewport, props.scene?.canvas ?? props.source);
+  const sceneSize = props.scene
+    ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
+    : props.source;
+  const fitted = fitVideoRect(viewport, sceneSize);
   const size = snapPreviewRect(fitted);
   const sceneLayout = props.scene
     ? previewSceneLayout({
         output: fitted,
         canvas: props.scene?.canvas,
+        windowHeader: props.scene?.windowHeader,
         source: props.source,
         background: props.scene.background,
         camera: props.scene.camera,
@@ -404,6 +460,7 @@ function useReviewStageGeometry(
     ? previewSceneLayout({
         output: fitted,
         canvas: props.scene?.canvas,
+        windowHeader: props.scene?.windowHeader,
         source: props.source,
         background: props.scene?.background ?? { enabled: false },
         camera: props.zoom.region.spotlight

@@ -16,6 +16,7 @@ export function reviewAdvancedContentBaseline(state: {
   background: QuickEditAdvancedContent['background'];
   audio: QuickEditAdvancedContent['audio'];
   canvas?: QuickEditAdvancedContent['canvas'];
+  windowHeader?: QuickEditAdvancedContent['windowHeader'];
 }): QuickEditAdvancedContent {
   return {
     schemaVersion: state.schemaVersion,
@@ -23,6 +24,7 @@ export function reviewAdvancedContentBaseline(state: {
     background: state.background,
     audio: state.audio,
     ...(state.canvas ? { canvas: state.canvas } : {}),
+    ...(state.windowHeader ? { windowHeader: state.windowHeader } : {}),
   };
 }
 

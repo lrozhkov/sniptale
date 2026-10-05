@@ -31,6 +31,9 @@ export function ReviewStageBinding(props: {
   url: string;
   source: ReviewSource;
   canvas?: { width: number; height: number } | undefined;
+  windowHeader?:
+    | import('../../features/video/review/advanced/types').QuickEditWindowHeader
+    | undefined;
   video: RefObject<HTMLVideoElement | null>;
   drawing: boolean;
   region: ReviewRegion | undefined;
@@ -114,6 +117,7 @@ export function ReviewStageBinding(props: {
           background: props.background,
           camera,
           canvas: props.canvas,
+          windowHeader: props.windowHeader,
           focus: { regions, time: props.outputTime },
         }}
         {...(props.zoomOverlay ? { zoom: props.zoomOverlay } : {})}

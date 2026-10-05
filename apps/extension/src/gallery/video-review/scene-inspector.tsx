@@ -1,11 +1,12 @@
 import { translate } from '../../platform/i18n';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { SelectField, TextField } from '../../ui/compact-inspector-controls';
 import { ReviewNumberRow } from './number-row';
 import { reviewSelectFieldClassName } from './controls';
 import { quickEditCanvasPreset } from '../../features/video/review/advanced/canvas';
 import type {
   QuickEditAudioState,
   QuickEditCanvasSize,
+  QuickEditWindowHeader,
 } from '../../features/video/review/advanced/types';
 
 const FORMATS = [
@@ -122,6 +123,41 @@ export function ReviewSceneAudio(props: {
           />
         );
       })}
+    </section>
+  );
+}
+
+/** A source-window decoration, independent of the background and selected effect. */
+export function ReviewWindowHeaderSettings(props: {
+  header: QuickEditWindowHeader | undefined;
+  onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
+}) {
+  return (
+    <section className="space-y-2" data-ui="gallery.videoReview.windowHeader">
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.windowHeader')}
+        value={props.header?.kind ?? 'none'}
+        options={[
+          { value: 'none', label: translate('gallery.videoReview.windowHeaderNone') },
+          { value: 'browser', label: translate('gallery.videoReview.windowHeaderBrowser') },
+        ]}
+        onChange={(value) =>
+          props.onChange?.(value === 'browser' ? { kind: 'browser', title: '' } : undefined)
+        }
+      />
+      {props.header ? (
+        <TextField
+          label={translate('gallery.videoReview.windowHeaderTitle')}
+          value={props.header.title}
+          onChange={(event) =>
+            props.onChange?.({
+              kind: 'browser',
+              title: event.target.value.slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
+            })
+          }
+        />
+      ) : null}
     </section>
   );
 }

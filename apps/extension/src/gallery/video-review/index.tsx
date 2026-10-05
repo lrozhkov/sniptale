@@ -65,6 +65,7 @@ type InspectorState = Pick<
   | 'timeline'
   | 'setBackground'
   | 'setCanvas'
+  | 'setWindowHeader'
   | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'flushAdvanced'
@@ -202,6 +203,8 @@ function ReviewInspectorBinding({
           canvas={state.advanced.canvas}
           source={resource.source}
           onCanvas={state.setCanvas}
+          windowHeader={state.advanced.windowHeader}
+          onWindowHeader={state.setWindowHeader}
           audio={state.advanced.audio}
           hasOriginalAudio={editing.exporter.index === null || !!editing.exporter.index.audioCodec}
           onOriginalVolume={(volume) => audio.setOriginal({ volume })}
@@ -412,6 +415,7 @@ function ReviewPreviewBinding({
         url={resource.url}
         source={state.source}
         canvas={features.canvas}
+        windowHeader={features.windowHeader}
         video={state.video}
         drawing={!!composer.annotation && !state.playing && !busy}
         region={state.displayRegion}

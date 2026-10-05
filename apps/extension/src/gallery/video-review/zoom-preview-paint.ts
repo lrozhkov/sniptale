@@ -1,6 +1,7 @@
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import {
   computeQuickEditSceneCamera,
+  computeQuickEditWindowTransform,
   computeQuickEditVisibleSourceRect,
 } from '../../features/video/review/advanced/scene';
 import type {
@@ -20,6 +21,7 @@ export function paintZoomPreview(
   context: CanvasRenderingContext2D,
   args: {
     background?: QuickEditBackgroundSettings;
+    headerImage?: CanvasImageSource | null | undefined;
     accent: string;
     camera: QuickEditZoomRegion['transform'];
     frame: ZoomPreviewFrame | null;
@@ -33,7 +35,7 @@ export function paintZoomPreview(
 ) {
   const { videoRect, videoTransform } = args.layout;
   const motion = computeQuickEditSceneCamera(args.layout, args.background ?? { enabled: false });
-  const clip = args.view === 'area' ? videoRect : motion.videoClip;
+  const clip = args.view === 'area' ? args.layout.windowRect : motion.windowClip;
   context.clearRect(0, 0, args.width, args.height);
   context.save();
   context.beginPath();
@@ -46,6 +48,10 @@ export function paintZoomPreview(
   );
   context.clip();
   const target = args.view === 'area' ? videoRect : videoTransform;
+  const window =
+    args.view === 'area' ? args.layout.windowRect : computeQuickEditWindowTransform(args.layout);
+  if (args.headerImage)
+    context.drawImage(args.headerImage, window.x, window.y, window.width, target.y - window.y);
   if (args.frame)
     context.drawImage(args.frame.image, target.x, target.y, target.width, target.height);
   else {

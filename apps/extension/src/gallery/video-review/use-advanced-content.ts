@@ -150,6 +150,11 @@ export function useReviewAdvancedContent(
         background: QuickEditAdvancedState['background']
       ) => QuickEditAdvancedState['background']
     ) => stage((content) => ({ ...content, background: update(content.background) })),
+    setWindowHeader: (windowHeader: QuickEditAdvancedState['windowHeader']) =>
+      stage((content) => {
+        const { windowHeader: _previous, ...rest } = content;
+        return windowHeader ? { ...rest, windowHeader } : rest;
+      }),
     setCanvas: (canvas: QuickEditAdvancedState['canvas']) =>
       stage((content) => {
         const { canvas: _previous, ...rest } = content;

@@ -18,10 +18,13 @@ export function configuredReviewExportPlan(
   const { index, advanced } = args;
   const settings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;
   const output = index ? resolveReviewOutputProfile(index, advanced, settings) : null;
+  if (output && !output.dimensionsSupported)
+    return { kind: 'unavailable', reasons: ['canvas-size'] };
   const codec = output?.codec;
   const videoAvailable = !!(
     index &&
     output &&
+    output.dimensionsSupported &&
     codec &&
     reviewOutputCodecs(index, output.format).includes(codec)
   );

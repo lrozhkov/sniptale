@@ -22,6 +22,7 @@ import {
   type QuickEditZoomTransition,
 } from './types';
 import { parseQuickEditCanvas } from './canvas';
+import { parseQuickEditWindowHeader } from './window-header';
 import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';
 import type { ReviewTimeSegment } from '../timeline';
@@ -336,7 +337,9 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
-  if (canvas === null) return null;
+  const windowHeader =
+    raw['windowHeader'] === undefined ? undefined : parseQuickEditWindowHeader(raw['windowHeader']);
+  if (canvas === null || windowHeader === null) return null;
   if (!zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
@@ -344,6 +347,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     background,
     audio,
     ...(canvas ? { canvas } : {}),
+    ...(windowHeader ? { windowHeader } : {}),
   };
 }
 
@@ -376,7 +380,9 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
-  if (canvas === null) return null;
+  const windowHeader =
+    raw['windowHeader'] === undefined ? undefined : parseQuickEditWindowHeader(raw['windowHeader']);
+  if (canvas === null || windowHeader === null) return null;
   const recovery = raw['recoveryV1'];
   if (recovery !== undefined && typeof recovery !== 'string') return null;
   if (!ui || !zoom || !background || !audio) return null;
@@ -387,6 +393,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     zoom,
     background,
     ...(canvas ? { canvas } : {}),
+    ...(windowHeader ? { windowHeader } : {}),
     audio,
   };
 }

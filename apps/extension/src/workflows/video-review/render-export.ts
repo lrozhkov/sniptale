@@ -1,3 +1,4 @@
+import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import {
   planReviewCutTransitions,
   reviewCutTransitionAt,
@@ -6,10 +7,7 @@ import {
 import { createReviewTransitionFrames, paintReviewCutTransition } from './cut-transition-frames';
 import { evaluateQuickEditSpotlightAtTime } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlight } from './render-spotlight';
-import {
-  resolveVideoOutputDimensions,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type { ReviewOutputCodec, ReviewRenderSettings } from './media-index';
 import {
   ALL_FORMATS,
@@ -23,6 +21,7 @@ import {
 } from 'mediabunny';
 import {
   resolveReviewRenderBitrate,
+  resolveReviewSceneOutput,
   reviewOutputCodecs,
   resolveReviewVideoEncoderConfig,
 } from './render-settings';
@@ -36,6 +35,7 @@ import type {
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
+  computeQuickEditWindowTransform,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
 import {
@@ -199,6 +199,9 @@ export async function writeReviewFrames(args: {
         canvas: source.canvas,
         sourceSize: source.sourceSize,
         sceneScale: source.sceneScale,
+        baseCanvas: source.baseCanvas,
+        windowHeader: preparation.effective.windowHeader,
+        headerImage: source.headerImage,
         context: source.context,
         image: source.image,
         frameSink,
@@ -224,6 +227,7 @@ export async function writeReviewFrames(args: {
   } finally {
     transitionFrames?.dispose();
     source?.image?.close();
+    if (source?.headerImage) source.headerImage.src = '';
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }
@@ -304,6 +308,8 @@ interface ReviewRenderSource {
   processedAudio: 'aac' | 'opus' | null;
   sampleRate: number;
   sceneScale: number;
+  baseCanvas: { width: number; height: number };
+  headerImage: HTMLImageElement | null;
   canvas: HTMLCanvasElement;
   sourceSize: { width: number; height: number };
   context: CanvasRenderingContext2D;
@@ -348,23 +354,13 @@ async function openReviewRenderSource(
     height: Math.round(await video.getDisplayHeight()),
   };
   const canvas = document.createElement('canvas');
-  const dimensions = resolveVideoOutputDimensions(
-    preparation.effective.canvas?.width ?? sourceSize.width,
-    preparation.effective.canvas?.height ?? sourceSize.height,
-    preparation.resolution
-  );
+  const scene = resolveReviewSceneOutput(sourceSize, preparation.effective, preparation.resolution);
+  if (!scene.supported) throw new QuickEditExportUnavailable(['canvas-size']);
+  const dimensions = scene.output;
   canvas.width = dimensions.width;
   canvas.height = dimensions.height;
-  const scale = canvas.width / (preparation.effective.canvas?.width ?? sourceSize.width);
-  const background = preparation.effective.background;
-  if (background.enabled)
-    preparation.effective.background = {
-      ...background,
-      layout: {
-        padding: background.layout.padding * scale,
-        cornerRadius: background.layout.cornerRadius * scale,
-      },
-    };
+  const scale = scene.scale;
+  preparation.effective.background = scene.background;
 
   const supported = await supportedReviewVideoCodecs(preparation.container, {
     width: canvas.width,
@@ -401,6 +397,13 @@ async function openReviewRenderSource(
       canvas,
       sourceSize,
       sceneScale: scale,
+      baseCanvas: scene.canvas,
+      headerImage: preparation.effective.windowHeader
+        ? await loadReviewWindowHeader(
+            reviewWindowHeaderUrl(preparation.effective.windowHeader, sourceSize.width),
+            signal
+          )
+        : null,
       context,
       image: backgroundImage,
     };
@@ -481,6 +484,9 @@ export async function renderRenderWindowFrames(args: {
   canvas: HTMLCanvasElement;
   sourceSize: { width: number; height: number };
   sceneScale?: number;
+  baseCanvas?: { width: number; height: number };
+  windowHeader?: QuickEditAdvancedState['windowHeader'];
+  headerImage?: CanvasImageSource | null;
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
   frameSink: VideoSampleSink;
@@ -521,7 +527,8 @@ export async function renderRenderWindowFrames(args: {
       const layout = computeQuickEditSceneLayout({
         output: canvas,
         source: args.sourceSize,
-        canvas,
+        canvas: args.baseCanvas ?? canvas,
+        windowHeader: args.windowHeader,
         background: args.background,
         camera,
       });
@@ -542,6 +549,7 @@ export async function renderRenderWindowFrames(args: {
         layout,
         background: args.background,
         image: args.image,
+        headerImage: args.headerImage,
         sample: {
           draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
         },
@@ -605,9 +613,12 @@ export function drawReviewSceneFrame(
   context: CanvasRenderingContext2D,
   args: {
     canvas: { width: number; height: number };
-    layout: ReturnType<typeof computeQuickEditSceneLayout>;
+    layout: Omit<ReturnType<typeof computeQuickEditSceneLayout>, 'windowRect'> & {
+      windowRect?: ReturnType<typeof computeQuickEditSceneLayout>['windowRect'];
+    };
     background: QuickEditAdvancedState['background'];
     image: ImageBitmap | null;
+    headerImage?: CanvasImageSource | null | undefined;
     sample: {
       draw(
         context: CanvasRenderingContext2D,
@@ -644,7 +655,7 @@ export function drawReviewSceneFrame(
   if (motion.scale !== 1) context.restore();
   context.save();
   context.beginPath();
-  const videoClip = motion.videoClip;
+  const videoClip = motion.windowClip;
   const clip = background.enabled ? background.layout : null;
   if (clip && clip.cornerRadius > 0) {
     context.roundRect(
@@ -658,6 +669,16 @@ export function drawReviewSceneFrame(
     context.rect(videoClip.x, videoClip.y, videoClip.width, videoClip.height);
   }
   context.clip();
+  if (args.headerImage) {
+    const window = computeQuickEditWindowTransform(layout);
+    context.drawImage(
+      args.headerImage,
+      window.x,
+      window.y,
+      window.width,
+      layout.videoTransform.y - window.y
+    );
+  }
   sample.draw(
     context,
     layout.videoTransform.x,

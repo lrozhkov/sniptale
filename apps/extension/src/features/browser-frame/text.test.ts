@@ -4,8 +4,8 @@ const { translateMock } = vi.hoisted(() => ({
   translateMock: vi.fn(() => 'New tab'),
 }));
 
-vi.mock('../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: translateMock,
 }));
 

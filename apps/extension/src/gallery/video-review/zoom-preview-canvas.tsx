@@ -21,6 +21,7 @@ import type { ZoomPreviewFrame } from './use-zoom-preview-source';
 type ZoomCanvasProps = {
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
+  headerImage?: CanvasImageSource | null | undefined;
   camera: QuickEditZoomRegion['transform'];
   disabled?: boolean | undefined;
   frame: ZoomPreviewFrame | null;
@@ -136,6 +137,7 @@ function ZoomPreviewBackground({
 }: {
   background: QuickEditBackgroundSettings;
   imageUrl: string | null | undefined;
+  headerImage?: CanvasImageSource | null | undefined;
   view: 'area' | 'result';
   offsetX: number;
   offsetY: number;
@@ -181,7 +183,12 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
         width: props.output.width / video.width,
         height: props.output.height / video.height,
       }
-    : { x: 0, y: 0, width: 1, height: 1 };
+    : {
+        x: (props.layout.windowRect.x - video.x) / video.width,
+        y: (props.layout.windowRect.y - video.y) / video.height,
+        width: props.layout.windowRect.width / video.width,
+        height: props.layout.windowRect.height / video.height,
+      };
   const { camera, handlers } = useReviewCameraGesture({
     ...props,
     interactionElement: canvasRef,
@@ -240,6 +247,7 @@ function useZoomCanvasPaint(
         camera: props.camera,
         cornerRadius: props.cornerRadius,
         frame: props.frame,
+        headerImage: props.headerImage,
         height: canvas.height,
         layout: props.layout,
         view: props.view,
@@ -259,6 +267,7 @@ function useZoomCanvasPaint(
     canvasRef,
     props.layout,
     props.frame,
+    props.headerImage,
     props.view,
     props.camera,
     props.cornerRadius,

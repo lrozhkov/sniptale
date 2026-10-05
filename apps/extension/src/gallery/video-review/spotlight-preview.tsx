@@ -14,6 +14,7 @@ export function ReviewSpotlightPreview(props: {
   region: QuickEditZoomRegion;
   spotlight: QuickEditSpotlight;
   frame: ZoomPreviewFrame | null;
+  headerImage?: CanvasImageSource | null | undefined;
   output: { width: number; height: number };
   layout: ZoomPreviewLayout;
   cornerRadius: number;
@@ -40,6 +41,7 @@ export function ReviewSpotlightPreview(props: {
     <div className="relative">
       <SpotlightSourceFrame
         frame={props.frame}
+        headerImage={props.headerImage}
         output={props.output}
         layout={props.layout}
         cornerRadius={props.cornerRadius}
@@ -64,6 +66,7 @@ export function ReviewSpotlightPreview(props: {
 /** Source frame painting has its own frame/geometry lifecycle, separate from area gestures. */
 function SpotlightSourceFrame(props: {
   frame: ZoomPreviewFrame | null;
+  headerImage?: CanvasImageSource | null | undefined;
   output: { width: number; height: number };
   layout: ZoomPreviewLayout;
   cornerRadius: number;
@@ -77,12 +80,13 @@ function SpotlightSourceFrame(props: {
       camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
       cornerRadius: props.cornerRadius,
       frame: props.frame,
+      headerImage: props.headerImage,
       height: props.output.height,
       width: props.output.width,
       layout: props.layout,
       view: 'result',
     });
-  }, [props.frame, props.output, props.layout, props.cornerRadius]);
+  }, [props.frame, props.headerImage, props.output, props.layout, props.cornerRadius]);
   return (
     <canvas
       ref={canvas}

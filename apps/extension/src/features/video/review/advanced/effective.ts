@@ -57,6 +57,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   zoomRegions: readonly QuickEditZoomRegion[];
   background: QuickEditBackgroundSettings;
   canvas: QuickEditCanvasSize | undefined;
+  windowHeader: QuickEditAdvancedState['windowHeader'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -76,6 +77,7 @@ export function resolveQuickEditEffectiveState(
     ),
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
+    windowHeader: advanced ? state.windowHeader : undefined,
     originalAudio: advanced ? state.audio.original : { muted: false, volume: 1 },
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
@@ -98,6 +100,8 @@ export function resolveQuickEditEffectiveState(
 
 export type QuickEditExportReason =
   | 'canvas'
+  | 'window-header'
+  | 'canvas-size'
   | 'precise-edits'
   | 'cut-transition'
   | 'transition-frames'
@@ -166,6 +170,7 @@ export function resolveQuickEditExportPlan(args: {
   )
     audio.push('original-audio');
   if (args.advanced.canvas) visual.push('canvas');
+  if (args.advanced.windowHeader) visual.push('window-header');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (args.advanced.background.enabled) visual.push('background');
   if (
@@ -197,6 +202,7 @@ export function resolveQuickEditExportPlan(args: {
 export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): boolean {
   return (
     !!state.canvas ||
+    !!state.windowHeader ||
     state.zoom.regions.length > 0 ||
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||

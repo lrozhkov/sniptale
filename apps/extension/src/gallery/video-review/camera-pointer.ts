@@ -56,17 +56,23 @@ export function captureCameraPointer(
       point.centerX > area.x + area.width ||
       point.centerY < area.y ||
       point.centerY > area.y + area.height);
+  const viewport = props.viewport ?? { x: 0, y: 0, width: 1, height: 1 };
+  // Decoration can make the visible window asymmetric around the original video.
+  const placement = {
+    centerX: point.centerX - (viewport.x + viewport.width / 2 - 0.5) / props.camera.scale,
+    centerY: point.centerY - (viewport.y + viewport.height / 2 - 0.5) / props.camera.scale,
+  };
   return {
     corner,
-    viewport: props.viewport ?? { x: 0, y: 0, width: 1, height: 1 },
+    viewport,
     scale: props.camera.scale,
     id: event.pointerId,
     x: event.clientX,
     y: event.clientY,
     width: (props.videoRect.width * factor * bounds.width) / props.output.width,
     height: (props.videoRect.height * factor * bounds.height) / props.output.height,
-    origin: place ? point : visible,
-    pending: place ? point : null,
+    origin: place ? placement : visible,
+    pending: place ? placement : null,
     direction: result ? -1 : 1,
   };
 }

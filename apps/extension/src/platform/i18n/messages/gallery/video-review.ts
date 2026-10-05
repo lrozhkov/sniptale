@@ -1,6 +1,19 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  exportBlockerCanvasSize: {
+    ru: 'размер видео с шапкой превышает допустимый; уменьшите разрешение экспорта',
+    en: 'video with its header exceeds the size limit; lower the export resolution',
+  },
+  windowHeader: { ru: 'Шапка окна', en: 'Window header' },
+  windowHeaderNone: { ru: 'Нет', en: 'None' },
+  windowHeaderBrowser: { ru: 'Браузер', en: 'Browser' },
+  windowHeaderTitle: { ru: 'Название вкладки', en: 'Tab title' },
+  windowHeaderFailed: {
+    ru: 'Не удалось показать шапку окна. Повторите попытку.',
+    en: 'Could not display the window header. Try again.',
+  },
+
   cutTransitionFramesUnavailable: {
     ru: 'Для перехода недостаточно сохранённых кадров. Сдвиньте границу вырезания или отключите переход.',
     en: 'Not enough retained frames for this transition. Adjust the cut boundary or disable the transition.',

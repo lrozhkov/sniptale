@@ -206,6 +206,7 @@ function OverlayComment(props: {
  */
 export function ReviewCommentOverlay(props: {
   comments: readonly CanvasComment[];
+  layout?: ReturnType<typeof computeQuickEditSceneLayout> | undefined;
   annotations?: readonly ReviewAnnotation[];
   output: { width: number; height: number };
   source: { width: number; height: number };
@@ -217,12 +218,14 @@ export function ReviewCommentOverlay(props: {
   onMove(id: string, position: { x: number; y: number }): void;
   busy: boolean;
 }) {
-  const layout = computeQuickEditSceneLayout({
-    output: props.output,
-    source: props.source,
-    background: props.background,
-    camera: props.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 },
-  });
+  const layout =
+    props.layout ??
+    computeQuickEditSceneLayout({
+      output: props.output,
+      source: props.source,
+      background: props.background,
+      camera: props.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
   return (
     <div
       data-ui="gallery.videoReview.commentOverlay"

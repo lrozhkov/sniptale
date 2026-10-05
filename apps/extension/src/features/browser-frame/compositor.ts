@@ -10,7 +10,7 @@ interface ExactBrowserFrameCompositorOptions {
   height: number;
   radius: number;
   title: string;
-  url: string;
+  url: string | null;
   width: number;
 }
 
@@ -140,7 +140,10 @@ function createTextLayers(
 export function composeExactBrowserFrameSvg(options: ExactBrowserFrameCompositorOptions): string {
   const geometry = resolveExactBrowserFrameGeometry(options);
   const titleText = resolveExactBrowserFrameTitleText(geometry.titleSlot.width, options.title);
-  const urlText = resolveExactBrowserFrameUrlText(geometry.urlSlot.width, options.url);
+  const urlText =
+    options.url === null
+      ? ''
+      : resolveExactBrowserFrameUrlText(geometry.urlSlot.width, options.url);
   const shell = [
     createBodyShell(options, geometry),
     createTemplateSlices({

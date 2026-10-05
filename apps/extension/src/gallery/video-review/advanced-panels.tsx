@@ -1,4 +1,4 @@
-import { Scan, Paintbrush, AudioLines } from 'lucide-react';
+import { Scan, Paintbrush, AudioLines, PanelTop } from 'lucide-react';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
@@ -10,7 +10,11 @@ import type { QuickEditZoomRegionPatch } from '../../features/video/review/advan
 import { updateQuickEditBackground } from '../../features/video/review/advanced/background';
 import { resolveQuickEditZoomLink } from '../../features/video/review/advanced/zoom';
 import type { useReviewZoomEditor } from './zoom-editor';
-import { ReviewCanvasSettings, ReviewSceneAudio } from './scene-inspector';
+import {
+  ReviewCanvasSettings,
+  ReviewSceneAudio,
+  ReviewWindowHeaderSettings,
+} from './scene-inspector';
 import { ReviewBackgroundInspector } from './background-inspector';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
 
@@ -82,6 +86,8 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
 export function ReviewSceneProperties(props: {
   background: QuickEditAdvancedState['background'];
   canvas: QuickEditAdvancedState['canvas'];
+  windowHeader?: QuickEditAdvancedState['windowHeader'];
+  onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
   source: { width: number; height: number };
   audio: QuickEditAdvancedState['audio'];
   hasOriginalAudio: boolean;
@@ -115,6 +121,17 @@ export function ReviewSceneProperties(props: {
                 source={props.source}
                 canvas={props.canvas}
                 onChange={props.onCanvas}
+              />
+            ),
+          },
+          {
+            id: 'window-header',
+            label: translate('gallery.videoReview.windowHeader'),
+            icon: PanelTop,
+            content: (
+              <ReviewWindowHeaderSettings
+                header={props.windowHeader}
+                onChange={props.onWindowHeader}
               />
             ),
           },

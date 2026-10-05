@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ReviewStageFocus } from './stage-focus';
 import { ReviewStage } from './stage';
+import * as headerPreview from './use-window-header';
 import type {
   QuickEditBackgroundSettings,
   QuickEditCameraTransform,
@@ -450,5 +451,45 @@ it.each(['fixed', 'follow-video'] as const)(
           : 'translate3d(0px, 0px, 0) scale(1)'
       );
     }
+  }
+);
+
+it.each(['fixed', 'follow-video'] as const)(
+  'keeps the DOM header attached through camera changes with %s background',
+  (zoomBehavior) => {
+    vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
+      url: 'data:image/svg+xml,header',
+      image: document.createElement('img'),
+      failed: false,
+      retry: vi.fn(),
+    });
+    const background: QuickEditBackgroundSettings = {
+      enabled: true,
+      type: 'solid',
+      color: '#123456ff',
+      zoomBehavior,
+      layout: { padding: 10, cornerRadius: 12 },
+    };
+    for (const scale of [1, 1.2, 2, 4])
+      for (const center of [0, 0.5, 1]) {
+        const { video } = renderStage({
+          scene: {
+            background,
+            camera: { scale, centerX: center, centerY: center },
+            windowHeader: { kind: 'browser', title: 'Browser' },
+          },
+        });
+        const header = host.querySelector('img')!;
+        const translation = video.style.transform.match(/translate3d\(([^,]+)px, ([^,]+)px/)!;
+        expect(Number.parseFloat(header.style.left)).toBeCloseTo(Number(translation[1]));
+        expect(
+          Number.parseFloat(header.style.top) + Number.parseFloat(header.style.height)
+        ).toBeCloseTo(Number(translation[2]));
+        expect(Number.parseFloat(header.style.width)).toBeCloseTo(
+          Number.parseFloat(video.style.width) * scale
+        );
+        expect(header.parentElement).toBe(video.parentElement);
+        expect(video.parentElement!.style.overflow).toBe('hidden');
+      }
   }
 );

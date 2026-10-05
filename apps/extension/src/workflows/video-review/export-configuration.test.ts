@@ -69,3 +69,19 @@ it('does not require an audio encoder for silent output and preserves compatible
   args.index.audioCodec = 'opus';
   expect(configuredReviewExportPlan(args)).toMatchObject({ kind: 'ready', audio: 'copy' });
 });
+
+it('explains an oversized decorated output and accepts a smaller export preset', () => {
+  const args = fixture();
+  args.advanced.windowHeader = { kind: 'browser', title: 'Browser' };
+  args.advanced.canvas = { width: 7680, height: 4320 };
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'unavailable',
+    reasons: ['canvas-size'],
+  });
+  expect(
+    configuredReviewExportPlan({
+      ...args,
+      renderSettings: { ...args.renderSettings, resolution: '1080P' },
+    })
+  ).toMatchObject({ kind: 'ready', video: 'render' });
+});

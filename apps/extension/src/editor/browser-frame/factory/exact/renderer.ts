@@ -1,5 +1,5 @@
 import type { BrowserFrameState } from '../../../../features/editor/document/types';
-import { composeExactBrowserFrameSvg } from './compositor';
+import { composeExactBrowserFrameSvg } from '../../../../features/browser-frame/compositor';
 
 interface ExactBrowserFrameRenderOptions {
   browserFrame: BrowserFrameState;

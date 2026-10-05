@@ -290,6 +290,7 @@ function reviewAdvancedControls(
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setBackground: advancedState.setBackground,
     setCanvas: advancedState.setCanvas,
+    setWindowHeader: advancedState.setWindowHeader,
     resetAdvanced: advancedState.reset,
     flushAdvanced: advancedState.flush,
     advancedPending: advancedState.pending,

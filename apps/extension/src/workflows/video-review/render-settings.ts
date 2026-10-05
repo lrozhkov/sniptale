@@ -1,3 +1,6 @@
+import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
+import { parseQuickEditCanvas } from '../../features/video/review/advanced/canvas';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import {
   resolveVideoOutputDimensions,
   VideoQuality,
@@ -27,20 +30,18 @@ export function resolveReviewOutputProfile(
   const format = settings?.format ?? index.container;
   const codecs = reviewOutputCodecs(index, format);
   const codec = settings?.codec ?? codecs[0] ?? null;
-  const scene =
-    advanced.ui.mode === 'advanced' && advanced.canvas
-      ? advanced.canvas
-      : { width: index.width ?? 1920, height: index.height ?? 1080 };
-  const dimensions = resolveVideoOutputDimensions(
-    scene.width,
-    scene.height,
+  const scene = resolveReviewSceneOutput(
+    { width: index.width ?? 1920, height: index.height ?? 1080 },
+    resolveQuickEditEffectiveState(advanced),
     settings?.resolution ?? VideoResolutionPreset.SOURCE
   );
+  const dimensions = scene.output;
   const fps = settings?.frameRate || index.frameRate || 30;
   return {
     format,
     codec,
     ...dimensions,
+    dimensionsSupported: scene.supported,
     fps,
     bitrate: resolveReviewRenderBitrate({ ...dimensions, fps }, settings?.quality),
   };
@@ -60,4 +61,42 @@ export function reviewOutputCodecs(
         (index.processedVideoCodec ? [index.processedVideoCodec] : []))
       : []);
   return allowed.filter((codec) => probed.includes(codec));
+}
+
+/** Resolve the base preset first; decoration adds rows rather than shrinking the original video. */
+export function resolveReviewSceneOutput(
+  source: { width: number; height: number },
+  settings: {
+    canvas?: QuickEditAdvancedState['canvas'];
+    background: QuickEditAdvancedState['background'];
+    windowHeader?: QuickEditAdvancedState['windowHeader'];
+  },
+  resolution: VideoResolutionPreset
+) {
+  const base = settings.canvas ?? source;
+  const canvas = resolveVideoOutputDimensions(base.width, base.height, resolution);
+  const scale = canvas.width / base.width;
+  const background = settings.background.enabled
+    ? {
+        ...settings.background,
+        layout: {
+          padding: settings.background.layout.padding * scale,
+          cornerRadius: settings.background.layout.cornerRadius * scale,
+        },
+      }
+    : settings.background;
+  const scene = computeQuickEditSceneSize({
+    source,
+    canvas,
+    background,
+    windowHeader: settings.windowHeader,
+  });
+  const output = { width: scene.width, height: scene.height };
+  return {
+    canvas,
+    output,
+    background,
+    scale,
+    supported: !settings.windowHeader || parseQuickEditCanvas(output) !== null,
+  };
 }
