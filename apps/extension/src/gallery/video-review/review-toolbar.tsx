@@ -14,6 +14,7 @@ import {
   reviewCompactTrackButtonClassName,
   reviewTextButtonClassName,
   ReviewButton,
+  ReviewToolGroup,
 } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
@@ -147,53 +148,56 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
           <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
         ) : null}
         {advanced.ui.mode === 'advanced' && props.originalAudioEditor ? (
-          <ReviewButton
-            label={translate('gallery.videoReview.originalAudioRange')}
-            toolbarLabel={translate('gallery.videoReview.volume')}
-            title={volumeHint ?? translate('gallery.videoReview.originalAudioRangeHint')}
-            aria-pressed={props.originalAudioEditor.originalTool}
-            className={plain}
-            disabled={busy || !sourceAudioReady || !!volumeHint}
-            onClick={() =>
-              admit(() => {
-                props.editing.setCutting(false);
-                if (props.rulerRange) {
-                  if (!volumeHint && props.originalAudioEditor?.addOriginal(props.rulerRange))
-                    props.originalAudioEditor.setOriginalTool(true);
-                } else if (props.originalAudioEditor?.originalTool)
-                  props.originalAudioEditor.setOriginalTool(false);
-                else if (!props.selectedObject && props.selection.kind === 'range') {
-                  if (!props.originalAudioEditor?.addOriginal(props.selection))
-                    props.originalAudioEditor?.setOriginalTool(true);
-                } else
-                  props.originalAudioEditor?.setOriginalTool(
-                    !props.originalAudioEditor.originalTool
-                  );
-              })
-            }
+          <ReviewToolGroup
+            active={props.originalAudioEditor.originalTool && sourceAudioReady}
+            label={translate('gallery.videoReview.volume')}
           >
-            <Volume2 size={16} aria-hidden="true" />
-          </ReviewButton>
-        ) : null}
-        {advanced.ui.mode === 'advanced' &&
-        props.originalAudioEditor?.originalTool &&
-        sourceAudioReady ? (
-          <ProductSelect
-            aria-label={translate('gallery.videoReview.volume')}
-            controlSize="sm"
-            className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
-            containerClassName="!w-auto !min-w-0 shrink-0"
-            menuWidth={112}
-            value={String(props.originalAudioEditor.defaultOriginalVolume)}
-            disabled={busy}
-            options={[0, 0.25, 0.5, 0.75, 1, 1.5, 2].map((volume) => ({
-              value: String(volume),
-              label: `${Math.round(volume * 100)}%`,
-            }))}
-            onChange={(value) =>
-              admit(() => props.originalAudioEditor?.setDefaultOriginalVolume(Number(value)))
-            }
-          />
+            <ReviewButton
+              label={translate('gallery.videoReview.originalAudioRange')}
+              toolbarLabel={translate('gallery.videoReview.volume')}
+              title={volumeHint ?? translate('gallery.videoReview.originalAudioRangeHint')}
+              aria-pressed={props.originalAudioEditor.originalTool}
+              className={plain}
+              disabled={busy || !sourceAudioReady || !!volumeHint}
+              onClick={() =>
+                admit(() => {
+                  props.editing.setCutting(false);
+                  if (props.rulerRange) {
+                    if (!volumeHint && props.originalAudioEditor?.addOriginal(props.rulerRange))
+                      props.originalAudioEditor.setOriginalTool(true);
+                  } else if (props.originalAudioEditor?.originalTool)
+                    props.originalAudioEditor.setOriginalTool(false);
+                  else if (!props.selectedObject && props.selection.kind === 'range') {
+                    if (!props.originalAudioEditor?.addOriginal(props.selection))
+                      props.originalAudioEditor?.setOriginalTool(true);
+                  } else
+                    props.originalAudioEditor?.setOriginalTool(
+                      !props.originalAudioEditor.originalTool
+                    );
+                })
+              }
+            >
+              <Volume2 size={16} aria-hidden="true" />
+            </ReviewButton>
+            {props.originalAudioEditor.originalTool && sourceAudioReady ? (
+              <ProductSelect
+                aria-label={translate('gallery.videoReview.volume')}
+                controlSize="sm"
+                className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+                containerClassName="!w-auto !min-w-0 shrink-0"
+                menuWidth={112}
+                value={String(props.originalAudioEditor.defaultOriginalVolume)}
+                disabled={busy}
+                options={[0, 0.25, 0.5, 0.75, 1, 1.5, 2].map((volume) => ({
+                  value: String(volume),
+                  label: `${Math.round(volume * 100)}%`,
+                }))}
+                onChange={(value) =>
+                  admit(() => props.originalAudioEditor?.setDefaultOriginalVolume(Number(value)))
+                }
+              />
+            ) : null}
+          </ReviewToolGroup>
         ) : null}
         <ReviewFragmentAction
           selection={props.selection}
@@ -314,7 +318,7 @@ function ReviewFocusToolControl({
   admit: (action: () => void) => void;
 }) {
   return (
-    <>
+    <ReviewToolGroup active={tool.active} label={translate('gallery.videoReview.zoomTrack')}>
       <ReviewButton
         label={translate('gallery.videoReview.focusRangeTool')}
         toolbarLabel={translate('gallery.videoReview.zoomTrack')}
@@ -346,6 +350,6 @@ function ReviewFocusToolControl({
           }}
         />
       ) : null}
-    </>
+    </ReviewToolGroup>
   );
 }

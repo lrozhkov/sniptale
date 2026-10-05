@@ -11,6 +11,28 @@
     min-width: 0;
     border-bottom: 1px solid var(--sniptale-color-border-soft);
   }
+  .review-timeline-toolbar .review-tool-group {
+    flex-shrink: 0;
+    gap: 2px;
+    border-radius: var(--sniptale-radius-sm);
+  }
+  .review-timeline-toolbar .review-tool-group[data-active] {
+    background: var(--sniptale-color-surface-hover);
+  }
+  .review-timeline-toolbar .review-tool-group[data-active] > button::after {
+    content: '';
+    position: absolute;
+    inset-block: 8px;
+    right: -2px;
+    width: 1px;
+    background: var(--sniptale-color-border-strong);
+    pointer-events: none;
+  }
+  .review-timeline-toolbar .review-tool-group[data-active] button:enabled:hover,
+  .review-timeline-toolbar .review-tool-group[data-active] button[aria-expanded='true'] {
+    border-color: transparent !important;
+    background: var(--sniptale-color-surface-hover) !important;
+  }
   .review-timeline-toolbar [data-review-toolbar-button] {
     position: relative;
     flex-shrink: 0;

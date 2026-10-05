@@ -78,7 +78,7 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
     onDownload: vi.fn(),
   };
   const button = (key: Parameters<typeof translate>[0]) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`);
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`);
   try {
     act(() => root.render(<ReviewEditActions {...props} />));
     expect(button('gallery.videoReview.applyCut')).toBeNull();
@@ -110,7 +110,7 @@ it('sets speed creation defaults without a toolbar delete action', () => {
     onAudio: vi.fn(),
   };
   const button = (key: Parameters<typeof translate>[0]) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`)!;
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!;
   try {
     act(() => root.render(<ReviewTimelineTools {...props} />));
     act(() => button('gallery.videoReview.pointerTool').click());
@@ -190,7 +190,7 @@ it('shows expanded export settings before both destination actions', () => {
   const root = createRoot(host);
   const onDownload = vi.fn();
   const button = (key: Parameters<typeof translate>[0]) =>
-    host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`)!;
+    host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!;
   try {
     act(() =>
       root.render(

@@ -15,6 +15,38 @@ async function rulerDrag(page: Page, start: number, end: number) {
   await page.mouse.up();
 }
 
+async function proveToolGroup(page: Page, selectorLabel: string, outputPath: string) {
+  const toolbar = page.locator('[data-ui="gallery.videoReview.toolbar"]');
+  const group = toolbar.locator('[data-ui="gallery.videoReview.toolGroup"][data-active]');
+  await expect(group).toHaveCount(1);
+  await expect(group).toHaveAttribute('role', 'group');
+  await expect(group).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const controls = group.locator('button');
+  const bounds = (await group.boundingBox())!;
+  expect(bounds.height).toBe(32);
+  for (const control of await controls.all()) {
+    const rect = (await control.boundingBox())!;
+    expect(rect.y).toBe(bounds.y);
+    expect(rect.height).toBe(bounds.height);
+    expect(rect.x).toBeGreaterThanOrEqual(bounds.x);
+    expect(rect.x + rect.width).toBeLessThanOrEqual(bounds.x + bounds.width + 1);
+  }
+  await page.screenshot({ path: outputPath, fullPage: false });
+  const selector = group.getByRole('button', { name: selectorLabel, exact: true });
+  await expect(selector).toBeEnabled();
+  await selector.focus();
+  await selector.press('Enter');
+  await expect(selector).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('listbox')).toBeInViewport();
+  await page.screenshot({ path: outputPath.replace('.png', '-menu.png'), fullPage: false });
+  await page.keyboard.press('Escape');
+  await expect(selector).toBeFocused();
+  await expect(selector).toHaveAttribute('aria-expanded', 'false');
+  await selector.hover();
+  await expect(selector).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
+  await expect(selector).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+}
+
 async function proveToolbarBoundary(page: Page, outputPath: (name: string) => string) {
   const original = page.viewportSize()!;
   const toolbar = page.locator('[data-ui="gallery.videoReview.toolbar"]');
@@ -150,6 +182,13 @@ for (const variant of [
         label('gallery.videoReview.placement_occupied')
       );
       await expect(button('gallery.videoReview.zoomAdd')).toBeDisabled();
+      await proveToolGroup(
+        page,
+        label('gallery.videoReview.focusType'),
+        info.outputPath('focus-group.png')
+      );
+      if (variant.locale === 'en' && !('viewport' in variant))
+        await proveToolbarBoundary(page, (name) => info.outputPath(`focus-${name}`));
       for (const kind of ['focusSpotlight', 'focusBorder'] as const) {
         await button('gallery.videoReview.focusType').click();
         await page
@@ -162,6 +201,13 @@ for (const variant of [
 
       await button('gallery.videoReview.speedMode').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'source');
+      await proveToolGroup(
+        page,
+        label('gallery.videoReview.speedRate'),
+        info.outputPath('speed-group.png')
+      );
+      if (variant.locale === 'en' && !('viewport' in variant))
+        await proveToolbarBoundary(page, (name) => info.outputPath(`speed-${name}`));
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
       await expect(source).toBeInViewport();
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(1);
@@ -184,6 +230,11 @@ for (const variant of [
       ).toHaveCount(0);
       await button('gallery.videoReview.originalAudioRange').click();
       await expect(plane).toHaveAttribute('data-active-tool-lane', 'original');
+      await proveToolGroup(
+        page,
+        label('gallery.videoReview.volume'),
+        info.outputPath('volume-group.png')
+      );
       await expect(dialog.locator('[data-original-audio-lane]')).toBeInViewport();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.originalAudioRange"]')
@@ -194,6 +245,9 @@ for (const variant of [
         label('gallery.videoReview.placement_occupied')
       );
       await button('gallery.videoReview.pointerTool').click();
+      await expect(
+        toolbar.locator('[data-ui="gallery.videoReview.toolGroup"][data-active]')
+      ).toHaveCount(0);
       await dialog.locator('[data-ui="gallery.videoReview.ruler"]').scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('loop-all-lanes.png'), fullPage: false });
       if (variant.locale === 'en' && !('viewport' in variant))

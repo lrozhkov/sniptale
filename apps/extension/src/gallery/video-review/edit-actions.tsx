@@ -21,6 +21,7 @@ import type { QuickEditExportReason } from '../../features/video/review/advanced
 import {
   reviewIconButtonClassName,
   ReviewButton,
+  ReviewToolGroup,
   reviewTextButtonClassName,
   reviewTimeLabel,
 } from './controls';
@@ -83,18 +84,23 @@ export function ReviewTimelineTools(props: {
       >
         <Scissors size={16} />
       </ReviewButton>
-      <ReviewButton
+      <ReviewToolGroup
+        active={props.mode === 'speed'}
         label={translate('gallery.videoReview.speedMode')}
-        toolbarLabel={translate('gallery.videoReview.speedMode')}
-        title={props.speedHint ?? translate('gallery.videoReview.speedMode')}
-        aria-pressed={props.mode === 'speed'}
-        className={plain}
-        disabled={!props.available || props.busy || props.speedAvailable === false}
-        onClick={() => props.onToggle('speed')}
       >
-        <Gauge size={16} />
-      </ReviewButton>
-      {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
+        <ReviewButton
+          label={translate('gallery.videoReview.speedMode')}
+          toolbarLabel={translate('gallery.videoReview.speedMode')}
+          title={props.speedHint ?? translate('gallery.videoReview.speedMode')}
+          aria-pressed={props.mode === 'speed'}
+          className={plain}
+          disabled={!props.available || props.busy || props.speedAvailable === false}
+          onClick={() => props.onToggle('speed')}
+        >
+          <Gauge size={16} />
+        </ReviewButton>
+        {props.mode === 'speed' ? <ReviewSpeedOptions {...props} /> : null}
+      </ReviewToolGroup>
     </>
   );
 }

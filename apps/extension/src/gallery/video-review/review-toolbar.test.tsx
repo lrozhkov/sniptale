@@ -208,7 +208,7 @@ it('shows the Focus type only while Focus is active and retains the insertion ch
   };
   const click = async (key: Parameters<typeof translate>[0]) =>
     act(async () =>
-      host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`)!.click()
+      host.querySelector<HTMLButtonElement>(`button[aria-label="${translate(key)}"]`)!.click()
     );
   const speedOption = async (key: Parameters<typeof translate>[0], label: string) => {
     await click(key);

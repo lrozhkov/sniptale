@@ -1,3 +1,4 @@
+import { ContentToolbarGroup } from '@sniptale/ui/content-toolbar';
 import { useInspectorDisclosure } from '../../composition/inspector-disclosures/state';
 import { translate } from '../../platform/i18n';
 import { ChevronDown, type LucideIcon } from 'lucide-react';
@@ -62,6 +63,29 @@ export const reviewTrackStatusButtonClassName =
 /** Labelled commands share the transparent timeline-button states without a fixed icon width. */
 export const reviewTextButtonClassName =
   reviewIconButtonClassName + ' !w-auto gap-2 !text-xs [&_svg]:shrink-0';
+
+/** Keeps a timeline tool and its contextual values on one surface without disabling its options. */
+export function ReviewToolGroup({
+  active,
+  label,
+  children,
+}: {
+  active: boolean;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <ContentToolbarGroup
+      dataUi="gallery.videoReview.toolGroup"
+      className="review-tool-group"
+      data-active={active ? 'true' : undefined}
+      role={active ? 'group' : undefined}
+      aria-label={active ? label : undefined}
+    >
+      {children}
+    </ContentToolbarGroup>
+  );
+}
 
 /** Reversible delete actions keep the same geometry with a distinct danger tone. */
 export const reviewDeleteButtonClassName =
