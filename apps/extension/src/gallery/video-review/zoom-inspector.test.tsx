@@ -440,6 +440,8 @@ it('preserves the source area when switching Spotlight to Border and blocks conf
     expect.objectContaining({
       spotlight: null,
       border: expect.objectContaining({ area: spotlight.area, roundness: spotlight.roundness }),
+      enter: { type: 'ease-in-out', duration: 1 },
+      exit: region.exit,
     })
   );
 });

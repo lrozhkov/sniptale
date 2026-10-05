@@ -590,7 +590,7 @@ it('repacks transient overlapping overlay ranges and restores rows on Escape', a
   await track.event(first!, 'pointerdown', 0);
   await track.event(first!, 'pointermove', 300, true);
   expect(first!.style.top).not.toBe(second!.style.top);
-  expect(track.lane.style.height).toBe('104px');
+  expect(track.lane.style.height).toBe('68px');
   expect(commit).not.toHaveBeenCalled();
   await act(async () =>
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
@@ -646,4 +646,20 @@ it('offers no Border links or camera link across an intervening camera', async (
     ...host.querySelectorAll<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]'),
   ];
   expect(links.some((link) => link.style.left === '20%')).toBe(false);
+});
+
+it('uses one visible row for adjacent Zoom, Spotlight and Border intervals', async () => {
+  const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+  const track = renderTrack(
+    [
+      zoom('camera-a', 0, 2),
+      { ...zoom('spotlight', 2, 4), spotlight: createQuickEditSpotlight() },
+      { ...zoom('border', 4, 6), border: createQuickEditBorder() },
+      zoom('camera-b', 6, 8),
+    ],
+    vi.fn()
+  );
+  expect(track.blocks).toHaveLength(4);
+  expect(new Set(track.blocks.map((block) => block.style.top)).size).toBe(1);
+  expect(track.lane.style.height).toBe('32px');
 });

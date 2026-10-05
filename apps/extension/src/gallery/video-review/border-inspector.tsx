@@ -156,6 +156,14 @@ export function ReviewBorderAnimation(props: {
                       : 'gallery.videoReview.borderErase'
                   ),
                 },
+                {
+                  value: phase === 'enter' ? 'draw-ccw' : 'erase-ccw',
+                  label: translate(
+                    phase === 'enter'
+                      ? 'gallery.videoReview.borderDrawCounterclockwise'
+                      : 'gallery.videoReview.borderEraseCounterclockwise'
+                  ),
+                },
               ]}
               onChange={(value) =>
                 onChange({
@@ -205,19 +213,36 @@ export function ReviewBorderAnimation(props: {
         onChange={(value) => onChange({ border: { ...border, loop: value === 'moving' } })}
       />
       {border.loop ? (
-        <BorderNumberRow
-          label={translate('gallery.videoReview.borderPeriod')}
-          min={0.5}
-          max={10}
-          step={0.1}
-          precision={1}
-          unit="s"
-          value={border.period}
-          onPreview={(period) =>
-            props.onPreview?.(period === null ? null : { border: { ...border, period } })
-          }
-          onChange={(period) => onChange({ border: { ...border, period } })}
-        />
+        <>
+          <BorderNumberRow
+            label={translate('gallery.videoReview.borderSegmentPercent')}
+            min={1}
+            max={100}
+            step={1}
+            precision={0}
+            unit="%"
+            value={border.segmentPercent}
+            onPreview={(segmentPercent) =>
+              props.onPreview?.(
+                segmentPercent === null ? null : { border: { ...border, segmentPercent } }
+              )
+            }
+            onChange={(segmentPercent) => onChange({ border: { ...border, segmentPercent } })}
+          />
+          <BorderNumberRow
+            label={translate('gallery.videoReview.borderPeriod')}
+            min={0.5}
+            max={10}
+            step={0.1}
+            precision={1}
+            unit="s"
+            value={border.period}
+            onPreview={(period) =>
+              props.onPreview?.(period === null ? null : { border: { ...border, period } })
+            }
+            onChange={(period) => onChange({ border: { ...border, period } })}
+          />
+        </>
       ) : null}
     </div>
   );

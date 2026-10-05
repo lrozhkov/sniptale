@@ -17,6 +17,15 @@ export const galleryVideoReviewMessages = defineMessageSource({
   borderDisappear: { ru: 'Исчезнуть', en: 'Disappear' },
   borderDraw: { ru: 'Прорисовка по часовой стрелке', en: 'Draw clockwise' },
   borderErase: { ru: 'Стирание по часовой стрелке', en: 'Erase clockwise' },
+  borderDrawCounterclockwise: {
+    ru: 'Прорисовка против часовой стрелки',
+    en: 'Draw counterclockwise',
+  },
+  borderEraseCounterclockwise: {
+    ru: 'Стирание против часовой стрелки',
+    en: 'Erase counterclockwise',
+  },
+  borderSegmentPercent: { ru: 'Длина отрезка', en: 'Segment length' },
   borderHold: { ru: 'Во время показа', en: 'Hold' },
   borderStill: { ru: 'Неподвижная', en: 'Still' },
   borderMoving: { ru: 'Движущийся отрезок', en: 'Moving segment' },

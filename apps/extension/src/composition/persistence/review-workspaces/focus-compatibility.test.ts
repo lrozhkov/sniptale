@@ -69,7 +69,12 @@ describe('Focus payload compatibility through workspace and archive boundaries',
     ).advancedContent;
     const border = {
       ...createQuickEditZoomRegion({ id: 'border', at: 1 }),
-      border: createQuickEditBorder(),
+      border: {
+        ...createQuickEditBorder(),
+        reveal: 'draw-ccw' as const,
+        exitReveal: 'erase-ccw' as const,
+        segmentPercent: 65,
+      },
     };
     const after = { ...before, zoom: { enabled: true, regions: [...before.zoom.regions, border] } };
     const next = {
@@ -106,6 +111,61 @@ describe('Focus payload compatibility through workspace and archive boundaries',
         reviewAdvancedContentBaseline(parsed.advanced)
       ).advancedContent.zoom.regions
     ).toHaveLength(1);
+  });
+
+  it('normalizes retained Border segment size in baseline and redo without altering authored timing', () => {
+    const { segmentPercent: _newSize, ...oldBorder } = createQuickEditBorder();
+    const region = {
+      ...createQuickEditZoomRegion({ id: 'retained', at: 1 }),
+      border: oldBorder,
+    };
+    const content = {
+      ...createQuickEditAdvancedContent(),
+      zoom: { enabled: true, regions: [region] },
+    };
+    const raw = {
+      ...legacyWorkspace(0),
+      advanced: { ...createQuickEditAdvancedState(), zoom: content.zoom },
+      history: [
+        {
+          id: 'retained-operation',
+          at: 2,
+          target: 'advancedContent',
+          before: content,
+          after: {
+            ...content,
+            zoom: { enabled: true, regions: [{ ...region, border: { ...oldBorder, width: 6 } }] },
+          },
+        },
+      ],
+    };
+    const parsed = parseVideoWorkspace(raw)!;
+    expect(parsed).not.toBeNull();
+    expect(parsed.advanced.zoom.regions[0]?.border?.segmentPercent).toBe(25);
+    const replayed = replayReviewHistory(
+      parsed.history,
+      1,
+      parsed.source,
+      reviewAdvancedContentBaseline(parsed.advanced)
+    );
+    expect(replayed.advancedContent.zoom.regions[0]).toMatchObject({
+      border: { segmentPercent: 25 },
+      enter: region.enter,
+      exit: region.exit,
+    });
+    expect(parseVideoWorkspace(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+    expect(
+      parseVideoWorkspace({
+        ...raw,
+        advanced: {
+          ...raw.advanced,
+          zoom: {
+            enabled: true,
+            regions: [{ ...region, border: { ...oldBorder, segmentPercent: 101 } }],
+          },
+        },
+      })
+    ).toBeNull();
   });
 
   it('rejects unsupported future content even in the unapplied redo suffix', () => {

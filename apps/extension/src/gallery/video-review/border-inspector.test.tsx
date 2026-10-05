@@ -115,6 +115,9 @@ it('uses source-time coupled duration budgets and exposes moving hold period onl
   await choose('focusReveal', 'borderDraw', phases()[0]);
   await choose('focusReveal', 'borderErase', phases()[1]);
   expect(region.border).toMatchObject({ reveal: 'draw', exitReveal: 'erase' });
+  await choose('focusReveal', 'borderDrawCounterclockwise', phases()[0]);
+  await choose('focusReveal', 'borderEraseCounterclockwise', phases()[1]);
+  expect(region.border).toMatchObject({ reveal: 'draw-ccw', exitReveal: 'erase-ccw' });
   await enter(field('zoomTransitionDuration', phases()[0]), '9');
   expect(region.enter.duration).toBe(1.7);
   expect(region.enter.duration + region.exit.duration).toBe(2);
@@ -132,6 +135,23 @@ it('uses source-time coupled duration budgets and exposes moving hold period onl
   expect(region.border).toMatchObject({ reveal: 'fade', exitReveal: 'fade' });
   expect(field('borderPeriod')).toBeNull();
   await choose('borderHold', 'borderMoving');
+  expect(field('borderSegmentPercent').value).toBe('100');
+  await scrub('borderSegmentPercent', '35');
+  expect(region.border.segmentPercent).toBe(35);
+  await scrub('borderSegmentPercent', '50', true);
+  expect(region.border.segmentPercent).toBe(35);
+  await input(field('borderSegmentPercent'), '70');
+  act(() =>
+    field('borderSegmentPercent').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })
+    )
+  );
+  expect(region.border.segmentPercent).toBe(35);
+  expect(preview).toHaveBeenLastCalledWith(null);
+  await enter(field('borderSegmentPercent'), '200');
+  expect(region.border.segmentPercent).toBe(100);
+  await enter(field('borderSegmentPercent'), '0');
+  expect(region.border.segmentPercent).toBe(1);
   await scrub('borderPeriod', '4');
   expect(region.border.period).toBe(4);
   await scrub('borderPeriod', '6', true);

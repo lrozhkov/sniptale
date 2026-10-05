@@ -56,10 +56,11 @@ export interface QuickEditBorder {
   width: number;
   roundness: number;
   style: 'solid' | 'dashed' | 'dotted';
-  reveal: 'fade' | 'draw';
-  exitReveal: 'fade' | 'erase';
+  reveal: 'fade' | 'draw' | 'draw-ccw';
+  exitReveal: 'fade' | 'erase' | 'erase-ccw';
   loop: boolean;
   period: number;
+  segmentPercent: number;
 }
 
 export interface QuickEditZoomRegion {

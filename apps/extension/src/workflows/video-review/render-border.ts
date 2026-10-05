@@ -41,9 +41,10 @@ export function drawReviewBorders(
           ? [0, 2 * frame.width]
           : []
     );
+    stroke.lineDashOffset = frame.dashOffset ?? 0;
     stroke.stroke(path);
     if (length < 1) {
-      // Mask the patterned stroke; its dash phase never moves with the reveal interval.
+      // Reveal clipping and the traveling pattern have independent, sampled phases.
       reveal.clearRect(0, 0, mask.width, mask.height);
       reveal.lineCap = 'butt';
       reveal.lineWidth = frame.width + 2;

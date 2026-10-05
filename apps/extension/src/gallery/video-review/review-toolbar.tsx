@@ -301,24 +301,26 @@ function ReviewFocusToolControl({
       >
         <Focus size={16} aria-hidden="true" />
       </ReviewButton>
-      <ProductSelect
-        aria-label={translate('gallery.videoReview.focusType')}
-        controlSize="sm"
-        className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
-        containerClassName="!w-auto !min-w-0 shrink-0"
-        menuWidth={160}
-        value={tool.type ?? 'zoom'}
-        disabled={busy}
-        options={[
-          { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
-          { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
-          { value: 'border', label: translate('gallery.videoReview.focusBorder') },
-        ]}
-        onChange={(value) => {
-          if (value === 'zoom' || value === 'spotlight' || value === 'border')
-            admit(() => tool.onType?.(value));
-        }}
-      />
+      {tool.active ? (
+        <ProductSelect
+          aria-label={translate('gallery.videoReview.focusType')}
+          controlSize="sm"
+          className={`${reviewTextButtonClassName} !min-w-0 !py-0 !font-normal`}
+          containerClassName="!w-auto !min-w-0 shrink-0"
+          menuWidth={192}
+          value={tool.type ?? 'zoom'}
+          disabled={busy}
+          options={[
+            { value: 'zoom', label: translate('gallery.videoReview.zoomRegionLabel') },
+            { value: 'spotlight', label: translate('gallery.videoReview.focusSpotlight') },
+            { value: 'border', label: translate('gallery.videoReview.focusBorder') },
+          ]}
+          onChange={(value) => {
+            if (value === 'zoom' || value === 'spotlight' || value === 'border')
+              admit(() => tool.onType?.(value));
+          }}
+        />
+      ) : null}
     </>
   );
 }

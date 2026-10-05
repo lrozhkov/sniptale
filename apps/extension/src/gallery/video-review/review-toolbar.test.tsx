@@ -134,3 +134,130 @@ it('keeps all compact lane switches quiet while preserving active and focus stat
     vi.unstubAllGlobals();
   }
 });
+
+it('shows the Focus type only while Focus is active and retains the insertion choice', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  let kind: 'zoom' | 'spotlight' | 'border' | undefined;
+  let admitted = true;
+  const onToggle = vi.fn();
+  const setCutting = vi.fn();
+  const toggle = vi.fn();
+  const changeRate = vi.fn();
+  const changeAudio = vi.fn();
+  const onType = vi.fn((value: 'zoom' | 'spotlight' | 'border') => {
+    kind = value;
+  });
+  const beforeAction = vi.fn((action: () => void) => {
+    if (admitted) action();
+  });
+  const render = (active: boolean, busy = false) =>
+    act(async () =>
+      root.render(
+        <ReviewTimelineToolbar
+          advanced={advanced}
+          busy={busy}
+          beforeAction={beforeAction}
+          composerBusy={false}
+          setMode={vi.fn()}
+          setTrackVisibility={vi.fn()}
+          telemetryAvailable
+          selection={{ kind: 'point', time: 0 }}
+          edits={[]}
+          onDownloadFragment={vi.fn()}
+          focusTool={{ active, available: true, ...(kind ? { type: kind } : {}), onType, onToggle }}
+          editing={{
+            mode: active ? null : 'speed',
+            rate: 2,
+            audio: 'speed',
+            exporter: {
+              index: {
+                duration: 6,
+                boundaries: [0, 6],
+                videoCodec: 'vp8',
+                audioCodec: null,
+                container: 'webm',
+                rotation: 0,
+              },
+              phase: 'idle',
+            },
+            setCutting,
+            toggle,
+            canApply: vi.fn(() => true),
+            changeRate,
+            changeAudio,
+          }}
+        />
+      )
+    );
+  const selector = () =>
+    host.querySelector<HTMLButtonElement>(
+      `[aria-label="${translate('gallery.videoReview.focusType')}"]`
+    );
+  const choose = async (label: string) => {
+    await act(async () => selector()!.click());
+    const option = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')].find(
+      (node) => node.textContent?.includes(label)
+    )!;
+    expect(option).toBeDefined();
+    await act(async () => option.click());
+  };
+  const click = async (key: Parameters<typeof translate>[0]) =>
+    act(async () =>
+      host.querySelector<HTMLButtonElement>(`[aria-label="${translate(key)}"]`)!.click()
+    );
+  const speedOption = async (key: Parameters<typeof translate>[0], label: string) => {
+    await click(key);
+    await act(async () =>
+      [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')]
+        .find((node) => node.textContent === label)!
+        .click()
+    );
+  };
+  try {
+    await render(false);
+    await click('gallery.videoReview.focusRangeTool');
+    expect(onToggle).toHaveBeenCalledOnce();
+    await click('gallery.videoReview.pointerTool');
+    expect(setCutting).toHaveBeenCalledWith(false);
+    await click('gallery.videoReview.speedMode');
+    expect(toggle).toHaveBeenCalledWith('speed');
+    await speedOption('gallery.videoReview.speedRate', '4×');
+    expect(changeRate).toHaveBeenCalledWith(4);
+    await speedOption('gallery.videoReview.speedAudio', translate('gallery.videoReview.muteSound'));
+    expect(changeAudio).toHaveBeenCalledWith('mute');
+    beforeAction.mockClear();
+    expect(selector()).toBeNull();
+    await render(true);
+    expect(selector()?.textContent).toContain(translate('gallery.videoReview.zoomRegionLabel'));
+    await choose(translate('gallery.videoReview.focusSpotlight'));
+    expect(onType).toHaveBeenLastCalledWith('spotlight');
+    await render(true);
+    await choose(translate('gallery.videoReview.focusBorder'));
+    expect(onType).toHaveBeenLastCalledWith('border');
+    await render(false);
+    expect(selector()).toBeNull();
+    await render(true);
+    expect(selector()?.textContent).toContain(translate('gallery.videoReview.focusBorder'));
+    admitted = false;
+    await choose(translate('gallery.videoReview.zoomRegionLabel'));
+    expect(onType).toHaveBeenCalledTimes(2);
+    expect(beforeAction).toHaveBeenCalledTimes(3);
+    admitted = true;
+    await choose(translate('gallery.videoReview.zoomRegionLabel'));
+    expect(onType).toHaveBeenLastCalledWith('zoom');
+    await render(true, true);
+    expect(selector()?.disabled).toBe(true);
+    await act(async () => selector()!.click());
+    expect(document.querySelector('[role="option"]')).toBeNull();
+    expect(onType).toHaveBeenCalledTimes(3);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

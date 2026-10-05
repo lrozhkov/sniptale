@@ -60,12 +60,11 @@ export function quickEditFocusConflicts(
   });
 }
 
-/** Disposable deterministic lane packing; camera owns row zero and links reserve their gaps. */
+/** Disposable first-fit packing; camera and complete linked chains reserve their spans. */
 export function packQuickEditFocusRows(
   regions: readonly QuickEditZoomRegion[]
 ): Map<string, number> {
   const rows = new Map<string, number>();
-  const ends: number[] = [];
   const sorted = regions
     .filter((region) => !region.dormant)
     .toSorted(
@@ -73,23 +72,45 @@ export function packQuickEditFocusRows(
         quickEditFocusInterval(a).start - quickEditFocusInterval(b).start ||
         a.id.localeCompare(b.id)
     );
+  const targets = new Map<string, QuickEditZoomRegion>();
+  const incoming = new Set<string>();
   for (const region of sorted) {
-    if (quickEditFocusType(region) === 'zoom') {
-      rows.set(region.id, 0);
-      continue;
-    }
-    const interval = quickEditFocusInterval(region);
-    const incoming = sorted.find(
-      (item) =>
-        resolveQuickEditFocusLink(sorted, item.id, { sourceTime: true })?.target.id === region.id
-    );
-    let row = incoming
-      ? (rows.get(incoming.id) ?? 1) - 1
-      : ends.findIndex((end) => end <= interval.start);
-    if (row < 0) row = ends.length;
     const link = resolveQuickEditFocusLink(sorted, region.id, { sourceTime: true });
-    ends[row] = link ? quickEditFocusInterval(link.target).end : interval.end;
-    rows.set(region.id, row + 1);
+    if (link) {
+      targets.set(region.id, link.target);
+      incoming.add(link.target.id);
+    }
+  }
+  const chains = sorted
+    .filter((region) => !incoming.has(region.id))
+    .map((first) => {
+      const members = [first];
+      let last = first;
+      while (targets.has(last.id)) {
+        last = targets.get(last.id)!;
+        members.push(last);
+      }
+      return {
+        members,
+        start: quickEditFocusInterval(first).start,
+        end: quickEditFocusInterval(last).end,
+      };
+    });
+  const lanes: { start: number; end: number }[][] = [[]];
+  for (const chain of chains.filter((item) => quickEditFocusType(item.members[0]!) === 'zoom')) {
+    lanes[0]!.push(chain);
+    for (const member of chain.members) rows.set(member.id, 0);
+  }
+  for (const chain of chains.filter((item) => quickEditFocusType(item.members[0]!) !== 'zoom')) {
+    let row = lanes.findIndex((lane) =>
+      lane.every((span) => chain.start >= span.end || chain.end <= span.start)
+    );
+    if (row < 0) {
+      row = lanes.length;
+      lanes.push([]);
+    }
+    lanes[row]!.push(chain);
+    for (const member of chain.members) rows.set(member.id, row);
   }
   return rows;
 }

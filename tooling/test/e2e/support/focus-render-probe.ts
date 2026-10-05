@@ -71,6 +71,7 @@ export function probe() {
     return { style, partial: counts[0], full: counts[1] };
   });
   return {
+    motion: probeBorderMotion(),
     patterned,
     outside: alpha(90, 90),
     firstOnly: alpha(15, 15),
@@ -78,4 +79,63 @@ export function probe() {
     secondOnly: alpha(60, 60),
     ...edges,
   };
+}
+
+/** Sample actual Chromium raster output: opposite directions and moving full patterns. */
+function probeBorderMotion() {
+  const output = { width: 100, height: 100 };
+  const canvas = document.createElement('canvas');
+  canvas.width = output.width;
+  canvas.height = output.height;
+  const context = canvas.getContext('2d')!;
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'motion', at: 0, duration: 4 }),
+    border: {
+      ...createQuickEditBorder(),
+      roundness: 0,
+      area: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+    },
+    enter: { type: 'linear' as const, duration: 1 },
+    exit: { type: 'linear' as const, duration: 1 },
+  };
+  const render = (border: typeof region.border, time: number) => {
+    context.clearRect(0, 0, 100, 100);
+    drawReviewBorders(
+      context,
+      output,
+      evaluateQuickEditBordersAtTime({
+        regions: [{ ...region, border }],
+        time,
+        output,
+        video: { x: 0, y: 0, width: 100, height: 100 },
+        scale: 1,
+      })
+    );
+    return context.getImageData(0, 0, 100, 100).data;
+  };
+  const edges = (data: Uint8ClampedArray) => ({
+    top: data[(11 * 100 + 50) * 4 + 3],
+    left: data[(50 * 100 + 11) * 4 + 3],
+  });
+  const draw = (['draw', 'draw-ccw'] as const).map((reveal) => ({
+    direction: reveal,
+    ...edges(render({ ...region.border, reveal }, 0.25)),
+  }));
+  const erase = (['erase', 'erase-ccw'] as const).map((exitReveal) => ({
+    direction: exitReveal,
+    ...edges(render({ ...region.border, exitReveal }, 3.25)),
+  }));
+  const moving = (['solid', 'dashed', 'dotted'] as const).map((style) => {
+    const border = { ...region.border, style, loop: true, segmentPercent: 100 };
+    const first = render(border, 1.25);
+    const second = render(border, 1.3);
+    let changed = 0,
+      painted = 0;
+    for (let i = 3; i < first.length; i += 4) {
+      if (first[i] !== second[i]) changed++;
+      if (second[i]! > 0) painted++;
+    }
+    return { style, changed, painted };
+  });
+  return { draw, erase, moving };
 }

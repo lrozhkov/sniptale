@@ -335,7 +335,11 @@ function ReviewFocusType({
         onChange={(type) => {
           if (type === quickEditFocusType(region) || (type === 'zoom' && blocked)) return;
           const next = withReviewFocusType(region, type);
-          onChange({ spotlight: next.spotlight ?? null, border: next.border ?? null });
+          onChange({
+            spotlight: next.spotlight ?? null,
+            border: next.border ?? null,
+            ...(type === 'border' ? { enter: next.enter, exit: next.exit } : {}),
+          });
         }}
       />
       {blocked ? (

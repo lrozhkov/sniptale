@@ -59,6 +59,7 @@ export function withReviewFocusType(
   region: QuickEditZoomRegion,
   type: ReviewFocusType
 ): QuickEditZoomRegion {
+  if (type === 'border' && region.border) return region;
   const { spotlight, border, ...camera } = region;
   const area = spotlight ?? border;
   return type === 'zoom'
@@ -71,13 +72,14 @@ export function withReviewFocusType(
             ...(area ? { area: area.area, roundness: area.roundness } : {}),
           },
         }
-      : {
+      : fitQuickEditZoomTransitions({
           ...camera,
+          enter: { type: 'ease-in-out', duration: 1 },
           border: {
             ...createQuickEditBorder(),
             ...(area ? { area: area.area, roundness: area.roundness } : {}),
           },
-        };
+        });
 }
 
 /** Bounded region changes; a colliding dormant placement keeps its stored values. */

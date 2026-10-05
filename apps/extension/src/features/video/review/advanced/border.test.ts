@@ -106,7 +106,7 @@ it('preserves source-clock phase across cut and speed slices and strips no autho
 });
 it('holds a full line initially, shrinks to a quarter and exits without a segment flash', () => {
   const region = border();
-  region.border = { ...region.border, loop: true, exitReveal: 'erase' };
+  region.border = { ...region.border, loop: true, exitReveal: 'erase', segmentPercent: 25 };
   const sample = (time: number) =>
     evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time })[0]!;
   expect(sample(0.3).end - sample(0.3).start).toBe(1);
@@ -176,50 +176,68 @@ it('rejects Border in legacy state and history envelopes rather than upgrading m
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 2 })).toBeNull();
 });
 
-it('matches source draw and erase exactly after cuts and across speed boundaries', () => {
-  const region = {
-    ...border(),
-    enter: { type: 'linear' as const, duration: 3 },
-    exit: { type: 'linear' as const, duration: 3 },
-  };
-  region.border = { ...region.border, reveal: 'draw', exitReveal: 'erase', loop: true };
-  const map = buildReviewTimeMap(10, [
-    {
-      id: 'speed',
-      kind: 'speed',
-      start: 0,
-      end: 8,
-      requestedStart: 0,
-      requestedEnd: 8,
-      rate: 2,
-      audio: 'speed',
-    },
-    { id: 'enter-cut', kind: 'cut', start: 0.5, end: 1.5, requestedStart: 0.5, requestedEnd: 1.5 },
-    { id: 'exit-cut', kind: 'cut', start: 8.5, end: 9, requestedStart: 8.5, requestedEnd: 9 },
-  ]);
-  const projected = projectReviewFocus([region], map);
-  for (const span of map.filter((part) => part.kind !== 'cut')) {
-    for (const time of [
-      span.resultStart,
-      span.resultStart + (span.resultEnd - span.resultStart) / 2,
-      span.resultEnd - 0.000001,
-    ]) {
-      const source = span.sourceStart + (time - span.resultStart) * span.rate;
-      const actual = evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time })[0]!;
-      const expected = evaluateQuickEditBordersAtTime({
-        ...geometry,
-        regions: [region],
-        time: source,
-      })[0]!;
-      expect(actual.start).toBeCloseTo(expected.start, 10);
-      expect(actual.end).toBeCloseTo(expected.end, 10);
-      expect(actual.opacity).toBeCloseTo(expected.opacity, 10);
-      expect(evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time })[0]).toEqual(
-        actual
-      );
+it.each([
+  ['draw', 'erase'],
+  ['draw-ccw', 'erase-ccw'],
+] as const)(
+  'matches source %s and %s exactly after cuts and across speed boundaries',
+  (reveal, exitReveal) => {
+    const region = {
+      ...border(),
+      enter: { type: 'linear' as const, duration: 3 },
+      exit: { type: 'linear' as const, duration: 3 },
+    };
+    region.border = { ...region.border, reveal, exitReveal, loop: true, segmentPercent: 37 };
+    const map = buildReviewTimeMap(10, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 0,
+        end: 8,
+        requestedStart: 0,
+        requestedEnd: 8,
+        rate: 2,
+        audio: 'speed',
+      },
+      {
+        id: 'enter-cut',
+        kind: 'cut',
+        start: 0.5,
+        end: 1.5,
+        requestedStart: 0.5,
+        requestedEnd: 1.5,
+      },
+      { id: 'exit-cut', kind: 'cut', start: 8.5, end: 9, requestedStart: 8.5, requestedEnd: 9 },
+    ]);
+    const projected = projectReviewFocus([region], map);
+    for (const span of map.filter((part) => part.kind !== 'cut')) {
+      for (const time of [
+        span.resultStart,
+        span.resultStart + (span.resultEnd - span.resultStart) / 2,
+        span.resultEnd - 0.000001,
+      ]) {
+        const source = span.sourceStart + (time - span.resultStart) * span.rate;
+        const actual = evaluateQuickEditBordersAtTime({
+          ...geometry,
+          regions: projected,
+          time,
+        })[0]!;
+        const expected = evaluateQuickEditBordersAtTime({
+          ...geometry,
+          regions: [region],
+          time: source,
+        })[0]!;
+        expect(actual.start).toBeCloseTo(expected.start, 10);
+        expect(actual.end).toBeCloseTo(expected.end, 10);
+        expect(actual.opacity).toBeCloseTo(expected.opacity, 10);
+        expect(actual.dashOffset).toBeCloseTo(expected.dashOffset!, 10);
+        expect(
+          evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time })[0]
+        ).toEqual(actual);
+      }
     }
   }
-});
+);
 
 it('fits phase budget, omits looping without hold and gives immediate zero phases', () => {
   const base = {
@@ -326,4 +344,90 @@ it('retains independent third Spotlight throughout a linked morph with full morp
 it('uses continuous straight segments for square corners without degenerate dash-resetting arcs', () => {
   const path = quickEditBorderPath({ x: 1, y: 2, width: 20, height: 10 }, 0);
   expect(path).toEqual({ path: 'M1 2H21V12H1V2Z', perimeter: 60 });
+});
+
+it('shares camera gaps but reserves future cameras and whole linked overlay chains', () => {
+  const overlay = (id: string, start: number, end: number) => ({
+    ...camera(id, start, end),
+    spotlight: createQuickEditSpotlight(),
+  });
+  const regions = [
+    camera('z', 4, 6),
+    overlay('early', 0, 2),
+    overlay('overlap', 3, 5),
+    { ...overlay('a', 7, 8), linkTo: 'b' },
+    { ...overlay('b', 10, 11), linkTo: 'c' },
+    overlay('c', 14, 15),
+    overlay('gap', 12, 13),
+  ];
+  const rows = packQuickEditFocusRows(regions);
+  expect(rows.get('early')).toBe(0);
+  expect(rows.get('overlap')).toBe(1);
+  expect(rows.get('a')).toBe(0);
+  expect(rows.get('b')).toBe(0);
+  expect(rows.get('c')).toBe(0);
+  expect(rows.get('gap')).toBe(1);
+  expect([...packQuickEditFocusRows([...regions].reverse())]).toEqual([...rows]);
+});
+
+it('normalizes retained segment length and rejects explicitly invalid lengths', () => {
+  const current = createQuickEditBorder();
+  expect(current.segmentPercent).toBe(100);
+  const { segmentPercent: _length, ...legacy } = current;
+  expect(parseQuickEditBorder(legacy)?.segmentPercent).toBe(25);
+  for (const segmentPercent of [0, 101, Infinity, NaN, null, undefined, '50'])
+    expect(parseQuickEditBorder({ ...legacy, segmentPercent })).toBeNull();
+  expect(
+    parseQuickEditBorder({ ...current, reveal: 'draw-ccw', exitReveal: 'erase-ccw' })
+  ).toMatchObject({ reveal: 'draw-ccw', exitReveal: 'erase-ccw' });
+});
+
+it('draws and erases from either end and moves a full patterned stroke without changing its length', () => {
+  const region = {
+    ...border(),
+    enter: { type: 'linear' as const, duration: 1 },
+    exit: { type: 'linear' as const, duration: 1 },
+  };
+  const sample = (time: number) =>
+    evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time })[0]!;
+  region.border = { ...region.border, reveal: 'draw-ccw', exitReveal: 'erase-ccw' };
+  expect(sample(0.25)).toMatchObject({ start: 0.75, end: 1, opacity: 1, dashOffset: 0 });
+  expect(sample(9.25)).toMatchObject({ start: 0, end: 0.75 });
+  region.border = { ...region.border, loop: true, style: 'dashed' };
+  const a = sample(2),
+    b = sample(2.5),
+    exit = sample(9),
+    later = sample(9.5);
+  expect(a.end - a.start).toBe(1);
+  expect(b.end - b.start).toBe(1);
+  expect(b.dashOffset).toBeLessThan(a.dashOffset!);
+  expect(later.dashOffset).toBe(exit.dashOffset);
+  expect(later.end - later.start).toBeCloseTo(0.5);
+});
+
+it('keeps camera link gaps and future-camera intersections out of overlay chains', () => {
+  const s = (id: string, start: number, end: number) => ({
+    ...camera(id, start, end),
+    spotlight: createQuickEditSpotlight(),
+  });
+  const regions = [
+    { ...camera('z1', 4, 5), linkTo: 'z2' },
+    camera('z2', 8, 9),
+    { ...s('a', 0, 1), linkTo: 'b' },
+    s('b', 10, 11),
+    s('gap', 6, 7),
+    { ...s('hidden', 12, 13), dormant: true },
+  ];
+  expect(Object.fromEntries(packQuickEditFocusRows(regions))).toEqual({
+    z1: 0,
+    z2: 0,
+    a: 1,
+    b: 1,
+    gap: 2,
+  });
+  const moved = regions.map((region) =>
+    region.id === 'gap' ? { ...region, start: 11, end: 12 } : region
+  );
+  expect(packQuickEditFocusRows(moved).get('gap')).toBe(0);
+  expect(packQuickEditFocusRows(regions).get('gap')).toBe(2);
 });

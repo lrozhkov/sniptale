@@ -53,11 +53,31 @@ for (const variant of [
       await button('gallery.videoReview.zoomAdd').click();
       const blocks = dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]');
       await expect(blocks).toHaveCount(1);
-      await button('gallery.videoReview.focusRangeTool').click();
       const toolbar = dialog.locator('[data-ui="gallery.videoReview.editingTools"]');
+      const focusSelector = toolbar.getByRole('button', {
+        name: label('gallery.videoReview.focusType'),
+        exact: true,
+      });
+      await expect(focusSelector).toHaveCount(0);
+      await button('gallery.videoReview.focusRangeTool').click();
+      await expect(focusSelector).toBeVisible();
       await toolbar
         .getByRole('button', { name: label('gallery.videoReview.focusType'), exact: true })
         .click();
+      await expect
+        .poll(
+          async () =>
+            (
+              await page
+                .getByRole('option', {
+                  name: label('gallery.videoReview.zoomRegionLabel'),
+                  exact: true,
+                })
+                .boundingBox()
+            )?.height ?? 100
+        )
+        .toBeLessThan(50);
+      await page.screenshot({ path: info.outputPath('focus-type-menu.png'), fullPage: false });
       await page
         .getByRole('option', { name: label('gallery.videoReview.focusBorder'), exact: true })
         .click();
@@ -95,6 +115,14 @@ for (const variant of [
         exact: true,
       });
       await expect(period).toHaveValue('2');
+      const segmentSize = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.borderSegmentPercent'),
+        exact: true,
+      });
+      await expect(segmentSize).toHaveValue('100');
+      await segmentSize.fill('65');
+      await segmentSize.press('Enter');
+      await expect.poll(async () => (await persistedFocus(page))?.border?.segmentPercent).toBe(65);
       await period.scrollIntoViewIfNeeded();
       await page.screenshot({
         path: info.outputPath('focus-border-animation-controls.png'),
@@ -117,6 +145,7 @@ for (const variant of [
       await expect(blocks).toHaveCount(4);
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
       await button('gallery.videoReview.pointerTool').click();
+      await expect(focusSelector).toHaveCount(0);
       await seek(page, 1.5);
       await expect
         .poll(async () =>
@@ -162,6 +191,7 @@ for (const variant of [
       await expect(blocks).toHaveCount(4);
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
       await expect(width).toHaveValue('6');
+      await expect(segmentSize).toHaveValue('65');
       const downloading = page.waitForEvent('download');
       await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
       const download = await downloading;
@@ -243,6 +273,19 @@ test('Focus compositor produces union holes and a partial clockwise Border in Ch
     bottom: 0,
     right: 0,
   });
+  expect(pixels.motion.draw).toEqual([
+    { direction: 'draw', top: 255, left: 0 },
+    { direction: 'draw-ccw', top: 0, left: 255 },
+  ]);
+  expect(pixels.motion.erase).toEqual([
+    { direction: 'erase', top: 0, left: 255 },
+    { direction: 'erase-ccw', top: 255, left: 0 },
+  ]);
+  for (const pattern of pixels.motion.moving) {
+    expect(pattern.painted).toBeGreaterThan(100);
+    if (pattern.style === 'solid') expect(pattern.changed).toBe(0);
+    else expect(pattern.changed).toBeGreaterThan(100);
+  }
   for (const stroke of pixels.patterned) {
     expect(stroke.partial).toBeGreaterThan(0);
     expect(stroke.full).toBeGreaterThan(stroke.partial * 2);

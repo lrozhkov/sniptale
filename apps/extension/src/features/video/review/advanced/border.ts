@@ -18,6 +18,7 @@ export function createQuickEditBorder(): QuickEditBorder {
     exitReveal: 'fade',
     loop: false,
     period: 2,
+    segmentPercent: 100,
   };
 }
 
@@ -36,10 +37,13 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     !isBoundedNumber(value['width'], 1, 24) ||
     !isBoundedNumber(value['roundness'], 0, 0.5) ||
     !isBoundedNumber(value['period'], 0.5, 10) ||
+    ('segmentPercent' in value && !isBoundedNumber(value['segmentPercent'], 1, 100)) ||
     typeof value['loop'] !== 'boolean' ||
     (value['style'] !== 'solid' && value['style'] !== 'dashed' && value['style'] !== 'dotted') ||
-    (value['reveal'] !== 'fade' && value['reveal'] !== 'draw') ||
-    (value['exitReveal'] !== 'fade' && value['exitReveal'] !== 'erase')
+    (value['reveal'] !== 'fade' && value['reveal'] !== 'draw' && value['reveal'] !== 'draw-ccw') ||
+    (value['exitReveal'] !== 'fade' &&
+      value['exitReveal'] !== 'erase' &&
+      value['exitReveal'] !== 'erase-ccw')
   )
     return null;
   return {
@@ -48,6 +52,7 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     width: value['width'],
     roundness: value['roundness'],
     period: value['period'],
+    segmentPercent: typeof value['segmentPercent'] === 'number' ? value['segmentPercent'] : 25,
     loop: value['loop'],
     style: value['style'],
     reveal: value['reveal'],
@@ -65,6 +70,8 @@ export interface QuickEditBorderFrame {
   start: number;
   end: number;
   opacity: number;
+  /** Canvas dash offset in scene pixels; absent legacy frames are stationary. */
+  dashOffset?: number;
 }
 
 /** Clockwise circular-corner path, starting at the top-left horizontal tangent. */
@@ -88,6 +95,54 @@ const ease = (t: number, type: QuickEditZoomRegion['enter']['type']) => {
   return type === 'none' ? 1 : type === 'linear' ? p : p * p * (3 - 2 * p);
 };
 
+function borderPhase(region: QuickEditZoomRegion, border: QuickEditBorder, time: number) {
+  const clock = region.borderClock;
+  const fitted = fitQuickEditZoomTransitions(region);
+  const duration = clock?.duration ?? region.end - region.start;
+  const enter = clock?.enter ?? fitted.enter;
+  const exit = clock?.exit ?? fitted.exit;
+  const t = clock ? clock.offset + (time - region.start) * clock.rate : time - region.start;
+  const enterDuration = enter.type === 'none' ? 0 : enter.duration;
+  const exitDuration = exit.type === 'none' ? 0 : exit.duration;
+  const hold = Math.max(0, duration - enterDuration - exitDuration);
+  const holdInterval = (time: number) => {
+    if (!border.loop || hold <= 0) return { start: 0, end: 1 };
+    const elapsed = Math.max(0, time - enterDuration);
+    const shrink = Math.min(1, elapsed / Math.min(0.2, hold));
+    const start = elapsed / border.period;
+    return { start, end: start + 1 - (1 - border.segmentPercent / 100) * shrink };
+  };
+  let start = 0,
+    end = 1,
+    opacity = 1;
+  if (t < enterDuration) {
+    const p = ease(t / enterDuration, enter.type);
+    if (border.reveal === 'draw') end = p;
+    else if (border.reveal === 'draw-ccw') {
+      start = -p;
+      end = 0;
+    } else opacity = p;
+  } else {
+    ({ start, end } = holdInterval(Math.min(t, duration - exitDuration)));
+    if (exitDuration > 0 && t > duration - exitDuration) {
+      const p = ease((t - duration + exitDuration) / exitDuration, exit.type);
+      if (border.exitReveal === 'erase') start += (end - start) * p;
+      else if (border.exitReveal === 'erase-ccw') end -= (end - start) * p;
+      else opacity = 1 - p;
+    }
+  }
+  const offset = Math.floor(start);
+  return {
+    start: start - offset,
+    end: end - offset,
+    opacity,
+    movement:
+      border.loop && hold > 0
+        ? Math.max(0, Math.min(t, duration - exitDuration) - enterDuration) / border.period
+        : 0,
+  };
+}
+
 /** Timeline-only source clock; cuts skip phases and speed changes follow footage. */
 export function evaluateQuickEditBordersAtTime(args: {
   regions: readonly QuickEditZoomRegion[];
@@ -108,39 +163,7 @@ export function evaluateQuickEditBordersAtTime(args: {
     )
     .map((region) => {
       const border = region.border!;
-      const clock = region.borderClock;
-      const fitted = fitQuickEditZoomTransitions(region);
-      const duration = clock?.duration ?? region.end - region.start;
-      const enter = clock?.enter ?? fitted.enter;
-      const exit = clock?.exit ?? fitted.exit;
-      const t = clock
-        ? clock.offset + (args.time - region.start) * clock.rate
-        : args.time - region.start;
-      const enterDuration = enter.type === 'none' ? 0 : enter.duration;
-      const exitDuration = exit.type === 'none' ? 0 : exit.duration;
-      const hold = Math.max(0, duration - enterDuration - exitDuration);
-      const holdInterval = (time: number) => {
-        if (!border.loop || hold <= 0) return { start: 0, end: 1 };
-        const elapsed = Math.max(0, time - enterDuration);
-        const shrink = Math.min(1, elapsed / Math.min(0.2, hold));
-        const start = elapsed / border.period;
-        return { start, end: start + 1 - 0.75 * shrink };
-      };
-      let start = 0,
-        end = 1,
-        opacity = 1;
-      if (t < enterDuration) {
-        const p = ease(t / enterDuration, enter.type);
-        if (border.reveal === 'draw') end = p;
-        else opacity = p;
-      } else {
-        ({ start, end } = holdInterval(Math.min(t, duration - exitDuration)));
-        if (exitDuration > 0 && t > duration - exitDuration) {
-          const p = ease((t - duration + exitDuration) / exitDuration, exit.type);
-          if (border.exitReveal === 'erase') start += (end - start) * p;
-          else opacity = 1 - p;
-        }
-      }
+      const phase = borderPhase(region, border, args.time);
       const area = {
         x: args.video.x + border.area.x * args.video.width,
         y: args.video.y + border.area.y * args.video.height,
@@ -159,16 +182,16 @@ export function evaluateQuickEditBordersAtTime(args: {
         rect,
         Math.max(0, Math.min(area.width, area.height) * border.roundness - inset)
       );
-      const offset = Math.floor(start);
       return {
         id: region.id,
         ...path,
         width,
         color: border.color,
         style: border.style,
-        start: start - offset,
-        end: end - offset,
-        opacity,
+        start: phase.start,
+        end: phase.end,
+        opacity: phase.opacity,
+        dashOffset: 0 - phase.movement * path.perimeter,
       };
     });
 }

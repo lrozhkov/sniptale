@@ -135,3 +135,18 @@ it.each(['layer', 'mask'] as const)(
     expect(parts.destination.context.drawImage).not.toHaveBeenCalled();
   }
 );
+
+it('moves a full patterned perimeter and resets its phase for a following static frame', () => {
+  const { destination, layer, mask } = compositor();
+  const phases: number[] = [];
+  layer.context.stroke.mockImplementation(() => {
+    phases.push(layer.context.lineDashOffset);
+  });
+  drawReviewBorders(target(destination.context), output, [
+    { ...frame, style: 'dashed', dashOffset: -37 },
+    { ...frame, style: 'dotted', dashOffset: -61 },
+    frame,
+  ]);
+  expect(phases).toEqual([-37, -61, 0]);
+  expect(mask.context.stroke).not.toHaveBeenCalled();
+});

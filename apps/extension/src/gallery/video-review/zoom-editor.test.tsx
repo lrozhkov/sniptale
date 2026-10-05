@@ -640,3 +640,16 @@ it('revives a nonconflicting dormant overlay as Zoom using its intended result-t
   });
   expect(zoom.regions[0]?.spotlight).toBeUndefined();
 });
+
+it('defaults new Borders to a one-second entrance and fits short source intervals', () => {
+  const camera = region('camera', 1, 5);
+  const border = withReviewFocusType(camera, 'border');
+  expect(border.enter).toEqual({ type: 'ease-in-out', duration: 1 });
+  expect(border.border?.segmentPercent).toBe(100);
+  const short = withReviewFocusType({ ...camera, sourceAnchor: { start: 1, end: 1.5 } }, 'border');
+  expect(short.enter.duration).toBeGreaterThan(short.exit.duration);
+  expect(short.enter.duration + short.exit.duration).toBeCloseTo(0.5);
+  border.enter.duration = 0.2;
+  border.border!.segmentPercent = 25;
+  expect(withReviewFocusType(border, 'border')).toBe(border);
+});
