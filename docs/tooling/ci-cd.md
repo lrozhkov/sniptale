@@ -54,6 +54,8 @@ Artifacts and logs exclude credentials, raw project identifiers, JIT configurati
 
 The provenance finalizer requires a later control commit with at least one path classified as `post-proof-only`. After the source proof succeeds, land that control-only change through the normal pull-request path before dispatching the finalizer; the source proof commit itself is not a valid finalizer control commit. Unknown paths and changes to product, build, QA, container, or proof composition require a new provenance run.
 
+For a release, complete Release checks on the source commit before creating its signed version tag. Then land the allowed control-only correction and run Prepare release from that later `main` commit with the successful source run ID. The tag stays on the proven source commit; the finalizer runs on the later control commit. Dispatching Prepare release on the source commit itself fails admission even when its proof is green.
+
 Publication is restricted to `main`. It requires a GitHub-verifiable annotated version tag, the matching finalizer result, verified release assets, and attestations for every published subject. Diagnostic mode is read-only and cannot enter the publisher environment.
 
 The local PR bypass requires a clean exact candidate, container proof, and an operator reason. It posts evidence and never merges. Use it only for an external-capacity failure or incident.
