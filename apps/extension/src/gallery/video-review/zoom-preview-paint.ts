@@ -53,28 +53,22 @@ export function paintZoomPreview(
     context.fillRect(target.x, target.y, target.width, target.height);
   }
   context.restore();
-  if (args.view === 'area' && args.showControls !== false) {
-    const visible = computeZoomPreviewArea(
-      args.layout,
-      args.background ?? { enabled: false },
-      args
-    );
-    const footprint: QuickEditRect = {
-      x: videoRect.x + visible.x * videoRect.width,
-      y: videoRect.y + visible.y * videoRect.height,
-      width: visible.width * videoRect.width,
-      height: visible.height * videoRect.height,
-    };
-    context.strokeStyle = args.accent;
-    context.lineWidth = 2;
-    context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
-  }
   if (args.view !== 'area' || args.showControls === false) return;
+  const visible = computeZoomPreviewArea(args.layout, args.background ?? { enabled: false }, args);
+  const footprint: QuickEditRect = {
+    x: videoRect.x + visible.x * videoRect.width,
+    y: videoRect.y + visible.y * videoRect.height,
+    width: visible.width * videoRect.width,
+    height: visible.height * videoRect.height,
+  };
+  context.strokeStyle = args.accent;
+  context.lineWidth = 2;
+  context.strokeRect(footprint.x, footprint.y, footprint.width, footprint.height);
   context.fillStyle = args.accent;
   context.beginPath();
   context.arc(
-    videoRect.x + args.camera.centerX * videoRect.width,
-    videoRect.y + args.camera.centerY * videoRect.height,
+    footprint.x + footprint.width / 2,
+    footprint.y + footprint.height / 2,
     3,
     0,
     Math.PI * 2

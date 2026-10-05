@@ -117,3 +117,56 @@ it('omits editor chrome without changing source painting when a DOM frame owns i
   expect(context.strokeRect).not.toHaveBeenCalled();
   expect(context.arc).not.toHaveBeenCalled();
 });
+
+it.each(['fixed', 'follow-video'] as const)(
+  'aligns %s Area, center and Result with the clamped camera at padded scene edges',
+  (zoomBehavior) => {
+    const background = {
+      enabled: true as const,
+      type: 'solid' as const,
+      color: '#123456ff',
+      zoomBehavior,
+      layout: { padding: 60, cornerRadius: 0 },
+    };
+    const camera = { scale: 1.25, centerX: 0.1, centerY: 0.9 };
+    const layout = computeQuickEditSceneLayout({
+      output: { width: 480, height: 480 },
+      source: { width: 480, height: 480 },
+      camera,
+      background,
+    });
+    const context = {
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      clip: vi.fn(),
+      drawImage: vi.fn(),
+      strokeRect: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+    };
+    const image = {} as CanvasImageSource;
+    const args = {
+      accent: '#ffffff',
+      camera,
+      frame: { image, width: 480, height: 480 },
+      width: 480,
+      height: 480,
+      layout,
+      background,
+    };
+    paintZoomPreview(context as unknown as CanvasRenderingContext2D, { ...args, view: 'area' });
+    const follows = zoomBehavior === 'follow-video';
+    expect(context.strokeRect).toHaveBeenCalledWith(
+      ...(follows ? [12, 84, 384, 384] : [60, 132, 288, 288])
+    );
+    expect(context.arc).toHaveBeenCalledWith(204, 276, 3, 0, Math.PI * 2);
+    paintZoomPreview(context as unknown as CanvasRenderingContext2D, { ...args, view: 'result' });
+    expect(context.drawImage).toHaveBeenLastCalledWith(image, 60, -30, 450, 450);
+    expect(context.roundRect).toHaveBeenLastCalledWith(
+      ...(follows ? [60, -30, 450, 450, 0] : [60, 60, 360, 360, 0])
+    );
+  }
+);

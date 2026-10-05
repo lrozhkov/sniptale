@@ -478,3 +478,44 @@ it('paints live transport, then restores the target and cancels animation on sto
   await act(async () => root.render(null));
   expect(requests.size).toBe(0);
 });
+
+it.each(['fixed', 'follow-video'] as const)(
+  'keeps the %s framing marker at the rendered center before and during capture',
+  async (zoomBehavior) => {
+    const onChange = vi.fn();
+    await act(async () =>
+      root.render(
+        <ReviewZoomPreview
+          region={region({ transform: { scale: 1.25, centerX: 0.1, centerY: 0.9 } })}
+          background={{
+            enabled: true,
+            type: 'solid',
+            color: '#123456ff',
+            zoomBehavior,
+            layout: { padding: 100, cornerRadius: 0 },
+          }}
+          source={{ width: 800, height: 800 }}
+          sourceTime={3}
+          loadFrame={async () => frame}
+          onChange={onChange}
+        />
+      )
+    );
+    const canvas = host.querySelector('canvas')!;
+    vi.spyOn(canvas, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 480));
+    Object.assign(canvas, {
+      setPointerCapture: vi.fn(),
+      hasPointerCapture: () => true,
+      releasePointerCapture: vi.fn(),
+    });
+    const marker = host.querySelector<HTMLElement>('.review-focus-center')!;
+    expect(Number.parseFloat(marker.style.left)).toBeCloseTo(50);
+    expect(Number.parseFloat(marker.style.top)).toBeCloseTo(50);
+    const resting = marker.style.cssText;
+    await pointer(canvas, 'pointerdown', 204, 276);
+    expect(marker.style.cssText).toBe(resting);
+    await pointer(canvas, 'pointerup', 204, 276);
+    expect(marker.style.cssText).toBe(resting);
+    expect(onChange).not.toHaveBeenCalled();
+  }
+);

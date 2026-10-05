@@ -1,8 +1,110 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+
+/** Compare the inspector projection with actual stage boxes, not the preview's geometry helper. */
+async function checkFramingGeometry(page: Page, follow: boolean, locale: 'ru' | 'en') {
+  const preview = page.locator('[data-ui="gallery.videoReview.zoomPreview"]');
+  const video = page.locator('dialog video');
+  await video.evaluate((node) => {
+    node.currentTime = 1;
+  });
+  await expect
+    .poll(() => video.evaluate((node) => !node.seeking && Math.abs(node.currentTime - 1) < 0.001))
+    .toBe(true);
+  await expect
+    .poll(() => video.evaluate((node) => new DOMMatrix(getComputedStyle(node).transform).a))
+    .toBeCloseTo(1.25);
+  const geometry = await page.evaluate((follows) => {
+    const stage = document.querySelector('[data-ui="gallery.videoReview.stage"]')!;
+    const video = stage.querySelector('video')!;
+    const frame = document.querySelector<HTMLElement>(
+      '[data-ui="gallery.videoReview.zoomPreview"] [data-focus-frame]'
+    )!;
+    const output = stage.getBoundingClientRect();
+    const source = video.getBoundingClientRect();
+    const clip = video.parentElement!.getBoundingClientRect();
+    const scale = new DOMMatrix(getComputedStyle(video).transform).a;
+    const baseX = (output.width - Number.parseFloat(video.style.width)) / 2;
+    const baseY = (output.height - Number.parseFloat(video.style.height)) / 2;
+    const left = Math.max(output.left, clip.left),
+      top = Math.max(output.top, clip.top);
+    const width = Math.min(output.right, clip.right) - left;
+    const height = Math.min(output.bottom, clip.bottom) - top;
+    const viewport = follows ? output : { left, top, width, height };
+    const bounds = frame.getBoundingClientRect();
+    const center = frame.querySelector('.review-focus-center')!.getBoundingClientRect();
+    return {
+      expected: [
+        (baseX + (viewport.left - source.left) / scale) / output.width,
+        (baseY + (viewport.top - source.top) / scale) / output.height,
+        viewport.width / scale / output.width,
+        viewport.height / scale / output.height,
+      ],
+      actual: [frame.style.left, frame.style.top, frame.style.width, frame.style.height].map(
+        (value) => Number.parseFloat(value) / 100
+      ),
+      clip: [
+        (left - output.left) / output.width,
+        (top - output.top) / output.height,
+        width / output.width,
+        height / output.height,
+      ],
+      markerGap: Math.hypot(
+        center.x + center.width / 2 - bounds.x - bounds.width / 2,
+        center.y + center.height / 2 - bounds.y - bounds.height / 2
+      ),
+    };
+  }, follow);
+  for (let index = 0; index < 4; index++)
+    expect(Math.abs(geometry.actual[index]! - geometry.expected[index]!)).toBeLessThan(0.004);
+  expect(geometry.markerGap).toBeLessThan(0.6);
+  await preview.scrollIntoViewIfNeeded();
+  const bounds = (await preview.locator('[data-focus-frame]').boundingBox())!;
+  await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+  const marker = preview.locator('.review-focus-center');
+  const before = await marker.boundingBox();
+  await page.mouse.down();
+  expect(await marker.boundingBox()).toEqual(before);
+  await page.mouse.up();
+  expect(await marker.boundingBox()).toEqual(before);
+  await preview
+    .getByRole('button', {
+      name: translate('gallery.videoReview.zoomPreviewResult', locale),
+      exact: true,
+    })
+    .click();
+  const raster = await preview.locator('canvas').evaluate((canvas) => {
+    const { width, height } = canvas;
+    const pixels = canvas.getContext('2d')!.getImageData(0, 0, width, height).data;
+    let left = width,
+      top = height,
+      right = 0,
+      bottom = 0;
+    for (let y = 0; y < height; y++)
+      for (let x = 0; x < width; x++) {
+        if (pixels[(y * width + x) * 4 + 3]! < 128) continue;
+        left = Math.min(left, x);
+        top = Math.min(top, y);
+        right = Math.max(right, x + 1);
+        bottom = Math.max(bottom, y + 1);
+      }
+    return {
+      rect: [left / width, top / height, (right - left) / width, (bottom - top) / height],
+      tolerance: 2 / Math.min(width, height),
+    };
+  });
+  for (let index = 0; index < 4; index++)
+    expect(Math.abs(raster.rect[index]! - geometry.clip[index]!)).toBeLessThan(raster.tolerance);
+  await preview
+    .getByRole('button', {
+      name: translate('gallery.videoReview.zoomPreviewArea', locale),
+      exact: true,
+    })
+    .click();
+}
 
 for (const variant of [
   { locale: 'ru' as const, theme: 'light' as const },
@@ -40,6 +142,7 @@ for (const variant of [
       await button('gallery.videoReview.scene').click();
       await button('gallery.videoReview.backgroundSolid').click();
       await setNumber('gallery.videoReview.backgroundPadding', '20');
+      await setNumber('gallery.videoReview.backgroundCornerRadius', '0');
       await button('gallery.videoReview.zoomAdd').click();
       await setNumber('gallery.videoReview.zoomScale', '1.25');
       await dialog
@@ -57,6 +160,7 @@ for (const variant of [
         .poll(async () => (await persistedFocus(page))?.transform)
         .toEqual({ scale: 1.25, centerX: 0.1, centerY: 0.5 });
       const before = (await persistedFocus(page))!;
+      await checkFramingGeometry(page, false, variant.locale);
       const sceneMode = async (follow: boolean, padding: string) => {
         await button('gallery.videoReview.scene').click();
         await button('gallery.videoReview.backgroundZoom').click();
@@ -73,6 +177,7 @@ for (const variant of [
         await setNumber('gallery.videoReview.backgroundPadding', padding);
         await button('gallery.videoReview.zoomRegionLabel').click();
         await expect(preview).toHaveAttribute('data-status', 'ready');
+        await checkFramingGeometry(page, follow, variant.locale);
       };
       await sceneMode(true, '20');
       await expect.poll(width).toBeCloseTo(80, 3);

@@ -44,9 +44,7 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
     trackPointer,
     pointerInteraction,
     keyboardInteraction,
-    camera,
     handlers,
-    video,
     opening,
     motion,
     offsetX,
@@ -113,8 +111,8 @@ export function ZoomPreviewCanvas(props: ZoomCanvasProps) {
             pointerInteraction={pointerInteraction}
             borderWidth={2}
             center={{
-              x: video.x + camera.centerX * video.width,
-              y: video.y + camera.centerY * video.height,
+              x: opening.x + opening.width / 2,
+              y: opening.y + opening.height / 2,
             }}
             onPointerEnter={trackPointer}
             onPointerMove={trackPointer}
@@ -217,9 +215,7 @@ function useZoomCanvasModel(props: ZoomCanvasProps) {
     trackPointer,
     pointerInteraction,
     keyboardInteraction,
-    camera,
     handlers,
-    video,
     opening,
     motion,
     offsetX,
