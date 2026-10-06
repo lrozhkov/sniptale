@@ -38,7 +38,8 @@ export function ReviewComposer(props: {
       onBlur={(event) => {
         const target = event.relatedTarget;
         if (!(target instanceof Element) || event.currentTarget.contains(target)) return;
-        if (target.closest('[data-ui="gallery.videoReview.stage"]')) return;
+        if (target.closest('[data-ui="gallery.videoReview.stage"], [data-review-panel-resize]'))
+          return;
         props.onLeave?.();
       }}
       data-ui="gallery.videoReview.commentComposer"

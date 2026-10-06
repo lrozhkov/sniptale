@@ -1,6 +1,11 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  resizeTimeline: { ru: 'Изменить высоту таймлайна', en: 'Resize timeline' },
+  resizePanelHint: {
+    ru: 'Перетащите границу. Двойной щелчок или Enter — сбросить размер.',
+    en: 'Drag to resize. Double-click or Enter to reset.',
+  },
   focusBorder: { ru: 'Рамка', en: 'Border' },
   borderPreview: { ru: 'Область рамки', en: 'Border area' },
   focusZoomConflict: {

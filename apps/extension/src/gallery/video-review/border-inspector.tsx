@@ -131,7 +131,7 @@ export function ReviewBorderAnimation(props: {
   const border = region.border!;
   const interval = region.sourceAnchor ?? region;
   return (
-    <div className="space-y-3">
+    <div className="review-inspector-columns">
       {(['enter', 'exit'] as const).map((phase) => {
         const clock = region[phase];
         const reveal = phase === 'enter' ? border.reveal : border.exitReveal;
@@ -213,7 +213,9 @@ export function ReviewBorderAnimation(props: {
           </fieldset>
         );
       })}
-      <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
+      <div className="min-w-0 space-y-3">
+        <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
+      </div>
     </div>
   );
 }

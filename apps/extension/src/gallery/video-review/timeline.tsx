@@ -25,6 +25,7 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  fillHeight?: boolean | undefined;
   sourceCompact?: boolean | undefined;
   onToggleSourceHeight?: (() => void) | undefined;
   placementHints?: ReviewPlacementHints | undefined;
@@ -108,8 +109,10 @@ export function ReviewTimeline(props: TimelineProps) {
   return (
     <section
       data-ui="gallery.videoReview.timeline"
-      className="@container flex min-h-0 max-h-[min(42dvh,calc(100dvh-420px))] min-w-0 max-w-full shrink-0 flex-col
-        overflow-hidden border-t border-[var(--sniptale-color-border-soft)]"
+      className={`@container flex min-h-0 ${
+        props.fillHeight ? 'h-full' : 'max-h-[min(42dvh,calc(100dvh-420px))]'
+      } min-w-0 max-w-full shrink-0 flex-col
+        overflow-hidden border-t border-[var(--sniptale-color-border-soft)]`}
     >
       <ReviewToolbar
         {...props}
@@ -127,7 +130,8 @@ export function ReviewTimeline(props: TimelineProps) {
         data-ui="gallery.videoReview.timelineViewport"
         style={{ overflowX: zoom === 1 ? 'hidden' : 'auto' }}
         onScroll={hover.clear}
-        className="w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain"
+        className={`w-full min-h-0 min-w-0 max-w-full overflow-auto overscroll-contain
+          ${props.fillHeight ? 'flex-1' : ''}`}
       >
         <div
           ref={plane.plane}

@@ -87,5 +87,7 @@
   .review-timeline-toolbar[data-layout='stacked'] [data-toolbar-side='trailing'] {
     grid-column: 2;
     grid-row: 1;
+    justify-content: flex-start;
+    overflow-x: auto;
   }
 }

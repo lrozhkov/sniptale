@@ -1,3 +1,4 @@
+import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
 import { ReviewPreviewFrame } from './preview-frame';
 import { reviewStagePickRegions } from './stage-focus';
 import { ReviewIntervalMap } from './interval-timing';
@@ -6,7 +7,7 @@ import { ReviewFeedback } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { ReviewSelectedProperties } from './selected-properties';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import { ReviewButton, reviewEventLabel } from './controls';
@@ -140,7 +141,9 @@ function ReviewInspectorBinding({
   fullHeight,
   onToggleHeight,
   navigation,
+  resizeHandle,
 }: {
+  resizeHandle?: ReactNode;
   fullHeight: boolean;
   navigation: ReviewInspectorNavigation;
   onToggleHeight(): void;
@@ -167,6 +170,7 @@ function ReviewInspectorBinding({
       <ReviewInspector
         beforeAction={state.beforeAction}
         fullHeight={fullHeight}
+        resizeHandle={resizeHandle}
         navigation={navigation}
         onToggleHeight={onToggleHeight}
         filename={resource.filename}
@@ -519,6 +523,8 @@ function ReviewEditor({
 }) {
   const state = useReviewEditorState(resource);
   const [fullHeight, setFullHeight] = useState(false);
+  const panelsEnabled = state.advanced.ui.mode === 'advanced';
+  const panels = useReviewPanelLayout(panelsEnabled);
   const [exportRequest, requestExport] = useState(0);
   const navigation = useReviewInspectorNavigation({
     beforeAction: state.beforeAction,
@@ -542,79 +548,95 @@ function ReviewEditor({
   return (
     <>
       <div
-        inert={voiceover.recording}
-        className={`grid h-full min-h-0 grid-cols-[minmax(0,1fr)_320px] grid-rows-[minmax(0,1fr)_auto]
-          max-[799px]:grid-cols-1
-          max-[799px]:grid-rows-[minmax(280px,45dvh)_minmax(360px,1fr)_auto]
-          max-[799px]:overflow-y-auto ${voiceover.recording ? 'pb-40' : ''}`}
+        data-ui="gallery.videoReview.workspaceScroll"
+        className="h-full min-h-0 overflow-x-auto overflow-y-hidden"
       >
-        <ReviewPreviewBinding resource={resource} state={state} />
-        <ReviewInspectorBinding
-          navigation={navigation}
-          fullHeight={fullHeight}
-          onToggleHeight={() => setFullHeight((value) => !value)}
-          resource={resource}
-          state={state}
-          canvasComments={canvasComments}
-          audio={audio}
-          onBack={onBack}
-          onClose={onClose}
-        />
         <div
-          className={
-            `${voiceover.recording ? 'opacity-50' : ''} ` +
-            (fullHeight
-              ? 'col-start-1 row-start-2 min-h-0 min-w-0 max-[799px]:row-start-3'
-              : 'col-span-full min-h-0 min-w-0')
-          }
+          ref={panels.container}
+          data-ui="gallery.videoReview.workspace"
+          inert={voiceover.recording}
+          style={{
+            gridTemplateColumns: `minmax(0,1fr) ${panels.inspectorWidth}px`,
+            gridTemplateRows: `minmax(0,1fr) ${panels.timelineHeight === null ? 'auto' : `${panels.timelineHeight}px`}`,
+          }}
+          className={`grid h-full min-h-0 min-w-[1254px] ${voiceover.recording ? 'pb-40' : ''}`}
         >
-          <ReviewTimelineBinding
-            playbackRange={state.playbackRange}
-            onPlaybackRange={state.setPlaybackRange}
-            zoomAnchor={state.zoomAnchor}
-            beforeAction={state.beforeAction}
-            onOpenExport={() => requestExport((value) => value + 1)}
-            exportActive={navigation.shown === 'export'}
-            historyControls={<ReviewHistoryControlBinding state={state} />}
-            editing={editing}
-            edits={snapshot.document.edits}
-            annotations={snapshot.document.annotations}
-            source={state.source}
-            busy={busy}
-            composerBusy={!!composer.before}
-            selection={state.selection}
-            setSelection={state.setSelection}
-            advanced={advanced}
-            resultDuration={state.timeline.resultDuration}
-            outputTime={state.timeline.outputTime}
-            toOutputTime={state.timeline.toOutputTime}
-            onCutPlacement={() => state.setMessage(translate('gallery.videoReview.placementOnCut'))}
-            setTrackVisibility={state.setTrackVisibility}
-            setMode={state.setMode}
-            telemetryAvailable={state.projected.markers.length > 0}
-            time={state.time}
-            playing={state.playing}
-            markers={state.telemetry ? state.projected.markers : []}
-            selectedTelemetryRef={
-              state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
+          <ReviewPreviewBinding resource={resource} state={state} />
+          <ReviewInspectorBinding
+            navigation={navigation}
+            resizeHandle={
+              panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null
             }
-            zoom={zoom}
+            fullHeight={fullHeight}
+            onToggleHeight={() => setFullHeight((value) => !value)}
+            resource={resource}
+            state={state}
+            canvasComments={canvasComments}
             audio={audio}
-            audioState={advanced.audio}
-            waveforms={waveforms}
-            onImportAudioFile={(...args) => state.beforeAction(() => onImportAudioFile(...args))}
-            onRecordVoiceover={() => state.beforeAction(voiceover.open)}
-            onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
-            selectedObject={state.activeSelection.kind !== 'none'}
-            onMarker={(marker) => {
-              if (!state.canStart()) return;
-              state.seek(marker.start, false);
-              state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
-            }}
-            onComment={state.selectComment}
-            onSeek={state.seek}
-            onPlay={() => state.beforeAction(state.play)}
+            onBack={onBack}
+            onClose={onClose}
           />
+          <div
+            ref={panels.timeline}
+            className={
+              `relative ${voiceover.recording ? 'opacity-50' : ''} ` +
+              (fullHeight
+                ? 'col-start-1 row-start-2 min-h-0 min-w-0'
+                : 'col-span-full min-h-0 min-w-0')
+            }
+          >
+            {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
+            <ReviewTimelineBinding
+              fillHeight={panels.timelineHeight !== null}
+              playbackRange={state.playbackRange}
+              onPlaybackRange={state.setPlaybackRange}
+              zoomAnchor={state.zoomAnchor}
+              beforeAction={state.beforeAction}
+              onOpenExport={() => requestExport((value) => value + 1)}
+              exportActive={navigation.shown === 'export'}
+              historyControls={<ReviewHistoryControlBinding state={state} />}
+              editing={editing}
+              edits={snapshot.document.edits}
+              annotations={snapshot.document.annotations}
+              source={state.source}
+              busy={busy}
+              composerBusy={!!composer.before}
+              selection={state.selection}
+              setSelection={state.setSelection}
+              advanced={advanced}
+              resultDuration={state.timeline.resultDuration}
+              outputTime={state.timeline.outputTime}
+              toOutputTime={state.timeline.toOutputTime}
+              onCutPlacement={() =>
+                state.setMessage(translate('gallery.videoReview.placementOnCut'))
+              }
+              setTrackVisibility={state.setTrackVisibility}
+              setMode={state.setMode}
+              telemetryAvailable={state.projected.markers.length > 0}
+              time={state.time}
+              playing={state.playing}
+              markers={state.telemetry ? state.projected.markers : []}
+              selectedTelemetryRef={
+                state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined
+              }
+              zoom={zoom}
+              audio={audio}
+              audioState={advanced.audio}
+              waveforms={waveforms}
+              onImportAudioFile={(...args) => state.beforeAction(() => onImportAudioFile(...args))}
+              onRecordVoiceover={() => state.beforeAction(voiceover.open)}
+              onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
+              selectedObject={state.activeSelection.kind !== 'none'}
+              onMarker={(marker) => {
+                if (!state.canStart()) return;
+                state.seek(marker.start, false);
+                state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
+              }}
+              onComment={state.selectComment}
+              onSeek={state.seek}
+              onPlay={() => state.beforeAction(state.play)}
+            />
+          </div>
         </div>
       </div>
       <ReviewVoiceoverLayer voiceover={voiceover} />

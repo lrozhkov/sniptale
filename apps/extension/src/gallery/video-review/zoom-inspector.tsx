@@ -1,7 +1,7 @@
 import { useContext } from 'react';
 import { ReviewIntervalMap } from './interval-timing';
 import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
-import { ReviewInspectorSections } from './inspector-sections';
+import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
 import { reviewSelectFieldClassName } from './controls';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
@@ -113,65 +113,69 @@ export function ReviewZoomInspector(props: {
             label: translate('gallery.videoReview.zoomPreview'),
             icon: Scan,
             content: (
-              <>
-                <ReviewFocusType
-                  region={region}
-                  onChange={onChange}
-                  blocked={props.zoomConversionBlocked ?? false}
-                />
-                {props.preview}
-                {region.border ? (
-                  <ReviewBorderInspector
-                    value={region.border}
-                    onChange={(border) => onChange({ border })}
-                    onPreview={props.onPreview}
+              <ReviewInspectorColumns>
+                <div className="min-w-0 space-y-2">
+                  <ReviewFocusType
+                    region={region}
+                    onChange={onChange}
+                    blocked={props.zoomConversionBlocked ?? false}
                   />
-                ) : region.spotlight ? (
-                  <ReviewSpotlightInspector
-                    value={region.spotlight}
-                    onChange={(spotlight) => onChange({ spotlight })}
-                  />
-                ) : (
-                  <>
-                    <ReviewNumberRow
-                      label={translate('gallery.videoReview.zoomScale')}
-                      unit="x"
-                      min={1}
-                      max={4}
-                      step={0.1}
-                      precision={2}
-                      scrubStep={0.05}
-                      value={region.transform.scale}
-                      onChange={(scale) => onChange({ scale })}
+                  {props.preview}
+                </div>
+                <div className="min-w-0 space-y-2">
+                  {region.border ? (
+                    <ReviewBorderInspector
+                      value={region.border}
+                      onChange={(border) => onChange({ border })}
+                      onPreview={props.onPreview}
                     />
-                    <ReviewDetails
-                      preferenceId="gallery.videoReview.precisePosition"
-                      label={translate('gallery.videoReview.precisePosition')}
-                    >
+                  ) : region.spotlight ? (
+                    <ReviewSpotlightInspector
+                      value={region.spotlight}
+                      onChange={(spotlight) => onChange({ spotlight })}
+                    />
+                  ) : (
+                    <>
                       <ReviewNumberRow
-                        label={translate('gallery.videoReview.zoomFocusX')}
-                        unit="%"
-                        min={0}
-                        max={100}
-                        step={1}
-                        precision={1}
-                        value={region.transform.centerX * 100}
-                        onChange={(value) => onChange({ centerX: value / 100 })}
+                        label={translate('gallery.videoReview.zoomScale')}
+                        unit="x"
+                        min={1}
+                        max={4}
+                        step={0.1}
+                        precision={2}
+                        scrubStep={0.05}
+                        value={region.transform.scale}
+                        onChange={(scale) => onChange({ scale })}
                       />
-                      <ReviewNumberRow
-                        label={translate('gallery.videoReview.zoomFocusY')}
-                        unit="%"
-                        min={0}
-                        max={100}
-                        step={1}
-                        precision={1}
-                        value={region.transform.centerY * 100}
-                        onChange={(value) => onChange({ centerY: value / 100 })}
-                      />
-                    </ReviewDetails>
-                  </>
-                )}
-              </>
+                      <ReviewDetails
+                        preferenceId="gallery.videoReview.precisePosition"
+                        label={translate('gallery.videoReview.precisePosition')}
+                      >
+                        <ReviewNumberRow
+                          label={translate('gallery.videoReview.zoomFocusX')}
+                          unit="%"
+                          min={0}
+                          max={100}
+                          step={1}
+                          precision={1}
+                          value={region.transform.centerX * 100}
+                          onChange={(value) => onChange({ centerX: value / 100 })}
+                        />
+                        <ReviewNumberRow
+                          label={translate('gallery.videoReview.zoomFocusY')}
+                          unit="%"
+                          min={0}
+                          max={100}
+                          step={1}
+                          precision={1}
+                          value={region.transform.centerY * 100}
+                          onChange={(value) => onChange({ centerY: value / 100 })}
+                        />
+                      </ReviewDetails>
+                    </>
+                  )}
+                </div>
+              </ReviewInspectorColumns>
             ),
           },
           {
@@ -266,34 +270,36 @@ function ReviewZoomAnimation(props: {
             : 'gallery.videoReview.zoomTimingHint'
         )}
       </p>
-      <ZoomTransitionSection
-        label={translate('gallery.videoReview.zoomTransitionIn')}
-        value={region.enter}
-        max={Math.min(60, Math.max(0, duration - region.exit.duration))}
-        onChange={(enter) => onChange({ enter })}
-      >
-        {region.spotlight ? (
-          <ReviewSpotlightAnimation
-            value={region.spotlight}
-            phase="enter"
-            onChange={(spotlight) => onChange({ spotlight })}
-          />
-        ) : null}
-      </ZoomTransitionSection>
-      <ZoomTransitionSection
-        label={translate('gallery.videoReview.zoomTransitionOut')}
-        value={region.exit}
-        max={Math.min(60, Math.max(0, duration - region.enter.duration))}
-        onChange={(exit) => onChange({ exit })}
-      >
-        {region.spotlight ? (
-          <ReviewSpotlightAnimation
-            value={region.spotlight}
-            phase="exit"
-            onChange={(spotlight) => onChange({ spotlight })}
-          />
-        ) : null}
-      </ZoomTransitionSection>
+      <ReviewInspectorColumns>
+        <ZoomTransitionSection
+          label={translate('gallery.videoReview.zoomTransitionIn')}
+          value={region.enter}
+          max={Math.min(60, Math.max(0, duration - region.exit.duration))}
+          onChange={(enter) => onChange({ enter })}
+        >
+          {region.spotlight ? (
+            <ReviewSpotlightAnimation
+              value={region.spotlight}
+              phase="enter"
+              onChange={(spotlight) => onChange({ spotlight })}
+            />
+          ) : null}
+        </ZoomTransitionSection>
+        <ZoomTransitionSection
+          label={translate('gallery.videoReview.zoomTransitionOut')}
+          value={region.exit}
+          max={Math.min(60, Math.max(0, duration - region.enter.duration))}
+          onChange={(exit) => onChange({ exit })}
+        >
+          {region.spotlight ? (
+            <ReviewSpotlightAnimation
+              value={region.spotlight}
+              phase="exit"
+              onChange={(spotlight) => onChange({ spotlight })}
+            />
+          ) : null}
+        </ZoomTransitionSection>
+      </ReviewInspectorColumns>
     </>
   );
 }

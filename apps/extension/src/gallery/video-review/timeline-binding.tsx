@@ -125,6 +125,7 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  fillHeight?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
   onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
   zoomAnchor?: number | null | undefined;
@@ -246,6 +247,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const focus = useFocusPlacement(props, projection);
   return (
     <ReviewTimeline
+      fillHeight={props.fillHeight}
       sourceCompact={sourceCompact}
       onToggleSourceHeight={() => setSourceCompact((value) => !value)}
       playbackRange={props.playbackRange}

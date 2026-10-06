@@ -36,7 +36,7 @@ export function ReviewCanvasSettings(props: {
     (item) => item.canvas.width === size.width && item.canvas.height === size.height
   );
   return (
-    <section className="space-y-2" data-ui="gallery.videoReview.canvasSettings">
+    <section className="review-inspector-columns" data-ui="gallery.videoReview.canvasSettings">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('videoEditor.sidebar.canvasFormatLabel')}
@@ -104,7 +104,7 @@ export function ReviewSceneAudio(props: {
   ];
   if (!lanes.length) return null;
   return (
-    <section className="space-y-2" data-ui="gallery.videoReview.sceneAudio">
+    <section className="review-inspector-columns" data-ui="gallery.videoReview.sceneAudio">
       {lanes.map((lane) => {
         const change = (value: number) =>
           lane.key === 'original'
@@ -133,7 +133,7 @@ export function ReviewWindowHeaderSettings(props: {
   onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
 }) {
   return (
-    <section className="space-y-2" data-ui="gallery.videoReview.windowHeader">
+    <section className="review-inspector-columns" data-ui="gallery.videoReview.windowHeader">
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.windowHeader')}
@@ -147,7 +147,7 @@ export function ReviewWindowHeaderSettings(props: {
         }
       />
       {props.header ? (
-        <>
+        <div className="min-w-0 space-y-2">
           <TextField
             label={translate('gallery.videoReview.windowHeaderTitle')}
             value={props.header.title}
@@ -168,7 +168,7 @@ export function ReviewWindowHeaderSettings(props: {
               })
             }
           />
-        </>
+        </div>
       ) : null}
     </section>
   );

@@ -46,3 +46,13 @@
     outline-offset: -2px;
   }
 }
+
+@container review-inspector (min-width: 604px) {
+  .review-inspector-navigation > [role='group'] {
+    width: max-content;
+    max-width: 100%;
+  }
+  .review-inspector-navigation button {
+    padding-inline: 12px !important;
+  }
+}

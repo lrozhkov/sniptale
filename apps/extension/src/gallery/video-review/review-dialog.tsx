@@ -20,7 +20,7 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
           target instanceof HTMLElement &&
           target.closest(
             '[data-ui="gallery.videoReview.inspector"] :is(button,summary), ' +
-              '[data-ui="gallery.videoReview.feedback"] button'
+              '[data-ui="gallery.videoReview.feedback"] button, [data-review-panel-resize]'
           );
         if (
           localControl &&

@@ -37,6 +37,7 @@ export function ReviewInspector(props: {
   selectedId: string | null;
   busy: boolean;
   fullHeight?: boolean;
+  resizeHandle?: ReactNode;
   onToggleHeight?(): void;
   message: string | null;
   recovery?: ReactNode;
@@ -67,13 +68,12 @@ export function ReviewInspector(props: {
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
-      className={`sniptale-inspector-surface flex min-h-0 flex-col gap-2 overflow-hidden border-l
+      className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 overflow-hidden border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
-          props.fullHeight
-            ? 'min-[800px]:col-start-2 min-[800px]:row-start-1 min-[800px]:row-span-2'
-            : ''
+          props.fullHeight ? 'col-start-2 row-start-1 row-span-2' : ''
         }`}
     >
+      {props.resizeHandle}
       <ReviewInspectorHeader
         {...props}
         presentation={presentation}

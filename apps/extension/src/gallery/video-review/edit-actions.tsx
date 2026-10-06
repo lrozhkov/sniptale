@@ -342,76 +342,80 @@ export function ReviewRenderOptions({
   const codecs = reviewOutputCodecs(exporter.index, format);
   return (
     <div className="min-w-0 max-w-full text-xs" data-ui="gallery.videoReview.exportSettings">
-      <fieldset disabled={busy} className="min-w-0 space-y-2 pb-2">
-        <SelectField
-          className={reviewSelectFieldClassName}
-          label={translate('videoEditor.exportDialog.formatLabel')}
-          disabled={busy}
-          value={format}
-          options={(['mp4', 'webm'] as const).map((value) => ({
-            value,
-            label: value === 'mp4' ? 'MP4' : 'WebM',
-            disabled: reviewOutputCodecs(exporter.index!, value).length === 0,
-          }))}
-          onChange={(format) => {
-            const codec = reviewOutputCodecs(exporter.index!, format)[0];
-            if (codec) exporter.setRenderSettings({ ...settings, format, codec });
-          }}
-        />
-        <SelectField
-          className={reviewSelectFieldClassName}
-          label={translate('gallery.videoReview.exportCodec')}
-          disabled={busy}
-          value={settings.codec ?? codecs[0] ?? ''}
-          options={codecs.map((codec) => ({
-            value: codec,
-            label:
-              codec === 'avc' ? 'H.264' : codec === 'hevc' ? 'H.265 / HEVC' : codec.toUpperCase(),
-          }))}
-          onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
-        />
-        <SelectField
-          className={reviewSelectFieldClassName}
-          label={translate('videoEditor.exportDialog.resolutionLabel')}
-          disabled={busy}
-          value={settings.resolution ?? VideoResolutionPreset.SOURCE}
-          options={Object.values(VideoResolutionPreset).map((value) => ({
-            value,
-            label:
-              value === VideoResolutionPreset.SOURCE
-                ? translate('gallery.videoReview.exportSceneSize')
-                : value.toLowerCase(),
-          }))}
-          onChange={(resolution) => exporter.setRenderSettings({ ...settings, resolution })}
-        />
-        <SelectField
-          className={reviewSelectFieldClassName}
-          label={translate('gallery.videoReview.exportFrameRate')}
-          disabled={busy}
-          value={String(settings.frameRate)}
-          options={[
-            { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
-            ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
-          ]}
-          onChange={(value) => {
-            const frameRate = Number(value);
-            if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
-              exporter.setRenderSettings({ ...settings, frameRate });
-          }}
-        />
-        <SelectField<VideoQuality>
-          className={reviewSelectFieldClassName}
-          label={translate('gallery.videoReview.exportQuality')}
-          disabled={busy}
-          value={settings.quality}
-          options={[
-            { value: 'LOW', label: translate('videoEditor.exportDialog.qualityLow') },
-            { value: 'MEDIUM', label: translate('videoEditor.exportDialog.qualityMedium') },
-            { value: 'HIGH', label: translate('videoEditor.exportDialog.qualityHigh') },
-            { value: 'ULTRA', label: translate('videoEditor.exportDialog.qualityUltra') },
-          ]}
-          onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
-        />
+      <fieldset disabled={busy} className="review-inspector-columns pb-2">
+        <div className="min-w-0 space-y-2">
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('videoEditor.exportDialog.formatLabel')}
+            disabled={busy}
+            value={format}
+            options={(['mp4', 'webm'] as const).map((value) => ({
+              value,
+              label: value === 'mp4' ? 'MP4' : 'WebM',
+              disabled: reviewOutputCodecs(exporter.index!, value).length === 0,
+            }))}
+            onChange={(format) => {
+              const codec = reviewOutputCodecs(exporter.index!, format)[0];
+              if (codec) exporter.setRenderSettings({ ...settings, format, codec });
+            }}
+          />
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.exportCodec')}
+            disabled={busy}
+            value={settings.codec ?? codecs[0] ?? ''}
+            options={codecs.map((codec) => ({
+              value: codec,
+              label:
+                codec === 'avc' ? 'H.264' : codec === 'hevc' ? 'H.265 / HEVC' : codec.toUpperCase(),
+            }))}
+            onChange={(codec) => exporter.setRenderSettings({ ...settings, codec })}
+          />
+        </div>
+        <div className="min-w-0 space-y-2">
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('videoEditor.exportDialog.resolutionLabel')}
+            disabled={busy}
+            value={settings.resolution ?? VideoResolutionPreset.SOURCE}
+            options={Object.values(VideoResolutionPreset).map((value) => ({
+              value,
+              label:
+                value === VideoResolutionPreset.SOURCE
+                  ? translate('gallery.videoReview.exportSceneSize')
+                  : value.toLowerCase(),
+            }))}
+            onChange={(resolution) => exporter.setRenderSettings({ ...settings, resolution })}
+          />
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.exportFrameRate')}
+            disabled={busy}
+            value={String(settings.frameRate)}
+            options={[
+              { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
+              ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
+            ]}
+            onChange={(value) => {
+              const frameRate = Number(value);
+              if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
+                exporter.setRenderSettings({ ...settings, frameRate });
+            }}
+          />
+          <SelectField<VideoQuality>
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.exportQuality')}
+            disabled={busy}
+            value={settings.quality}
+            options={[
+              { value: 'LOW', label: translate('videoEditor.exportDialog.qualityLow') },
+              { value: 'MEDIUM', label: translate('videoEditor.exportDialog.qualityMedium') },
+              { value: 'HIGH', label: translate('videoEditor.exportDialog.qualityHigh') },
+              { value: 'ULTRA', label: translate('videoEditor.exportDialog.qualityUltra') },
+            ]}
+            onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
+          />
+        </div>
       </fieldset>
     </div>
   );

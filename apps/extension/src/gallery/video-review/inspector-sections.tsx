@@ -67,3 +67,8 @@ export function ReviewInspectorSections({ sections }: { sections: readonly Revie
     </div>
   );
 }
+
+/** Each child stays one semantic unit as available inspector space changes. */
+export function ReviewInspectorColumns({ children }: { children: ReactNode }) {
+  return <div className="review-inspector-columns">{children}</div>;
+}

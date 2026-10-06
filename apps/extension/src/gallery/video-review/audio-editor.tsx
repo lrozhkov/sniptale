@@ -1,4 +1,4 @@
-import { ReviewInspectorSections } from './inspector-sections';
+import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
 import { useContext } from 'react';
 import { ReviewIntervalMap } from './interval-timing';
 import {
@@ -93,7 +93,7 @@ export function ReviewAudioClipEditor(props: {
             label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             icon: Waves,
             content: (
-              <>
+              <ReviewInspectorColumns>
                 {(['fadeIn', 'fadeOut'] as const).map((key) => (
                   <ReviewNumberRow
                     key={key}
@@ -113,7 +113,7 @@ export function ReviewAudioClipEditor(props: {
                     onChange={(value) => props.onPatch({ [key]: value })}
                   />
                 ))}
-              </>
+              </ReviewInspectorColumns>
             ),
           },
         ]}

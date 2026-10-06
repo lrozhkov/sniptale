@@ -291,3 +291,41 @@
 [data-ui='gallery.videoReview.inspector'] .review-overlay-number > input {
   background: transparent;
 }
+
+[data-ui='gallery.videoReview.inspector'] {
+  container: review-inspector / inline-size;
+}
+
+/* Whole semantic groups flow in DOM order; nested groups fall back to one column. */
+.review-inspector-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 296px), 1fr));
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+.review-inspector-columns > * {
+  min-width: 0;
+}
+.review-inspector-columns > .review-inspector-phase {
+  margin-top: 0;
+}
+
+.review-inspector-scroll {
+  container: review-inspector-content / inline-size;
+}
+
+@container review-inspector-content (min-width: 604px) {
+  [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all'] {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all']
+    > .review-inspector-section {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+}

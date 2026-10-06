@@ -19,6 +19,7 @@ it('retains focus during Space playback and restores keyboard modality on Tab', 
         <ReviewDialog>
           <button>Tool</button>
           <textarea />
+          <div data-review-panel-resize="timeline" role="separator" tabIndex={0} />
           <aside data-ui="gallery.videoReview.inspector">
             <details>
               <summary>Section</summary>
@@ -48,7 +49,9 @@ it('retains focus during Space playback and restores keyboard modality on Tab', 
     expect(dialog.dataset['playbackFocus']).toBe('true');
     button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     expect(dialog.dataset['playbackFocus']).toBeUndefined();
-    for (const control of host.querySelectorAll('aside summary, aside button')) {
+    for (const control of host.querySelectorAll(
+      'aside summary, aside button, [role="separator"]'
+    )) {
       control.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
       expect(dialog.dataset['playbackFocus']).toBe('true');
       control.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));

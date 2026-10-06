@@ -194,35 +194,39 @@ function SelectedEdit(
           {translate('gallery.videoReview.cutOverlapHint')}
         </p>
       ) : null}
-      {selected.kind === 'speed' ? (
-        <ReviewSpeedOptions
-          layout="inspector"
-          rate={selected.rate}
-          audio={selected.audio}
-          busy={busy}
-          onRate={editing.changeSelectedRate}
-          onAudio={editing.changeSelectedAudio}
-        />
-      ) : null}
-      {selected.kind === 'cut' ? (
-        <CutTransitionFields
-          key={selected.id}
+      <div className="review-inspector-columns">
+        <div className="min-w-0 space-y-3">
+          {selected.kind === 'speed' ? (
+            <ReviewSpeedOptions
+              layout="inspector"
+              rate={selected.rate}
+              audio={selected.audio}
+              busy={busy}
+              onRate={editing.changeSelectedRate}
+              onAudio={editing.changeSelectedAudio}
+            />
+          ) : null}
+          {selected.kind === 'cut' ? (
+            <CutTransitionFields
+              key={selected.id}
+              edit={selected}
+              edits={resource.session.getSnapshot().document.edits}
+              duration={resource.source.duration}
+              onChange={editing.changeSelectedTransition}
+            />
+          ) : null}
+        </div>
+        <ReviewEditRangeFields
+          key={`${selected.id}:${advanced.ui.mode}`}
           edit={selected}
           edits={resource.session.getSnapshot().document.edits}
           duration={resource.source.duration}
-          onChange={editing.changeSelectedTransition}
+          boundaries={
+            advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
+          }
+          onApply={(range) => editing.commitRange(range, selected)}
         />
-      ) : null}
-      <ReviewEditRangeFields
-        key={`${selected.id}:${advanced.ui.mode}`}
-        edit={selected}
-        edits={resource.session.getSnapshot().document.edits}
-        duration={resource.source.duration}
-        boundaries={
-          advanced.ui.mode === 'advanced' ? undefined : editing.exporter.index?.boundaries
-        }
-        onApply={(range) => editing.commitRange(range, selected)}
-      />
+      </div>
       <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.deleteSelected')}
