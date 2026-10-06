@@ -15,7 +15,7 @@ it('cancels obsolete titles, ignores late results and retries a failed decode', 
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const pending: {
     signal: AbortSignal;
-    resolve(image: HTMLImageElement): void;
+    resolve(image: ImageBitmap): void;
     reject(error: Error): void;
   }[] = [];
   vi.mocked(loadReviewWindowHeader).mockImplementation(
@@ -33,19 +33,24 @@ it('cancels obsolete titles, ignores late results and retries a failed decode', 
     await act(async () => root.render(<Harness title="first" url="https://site.test" />));
     expect(result!.url).toBe('first|https://site.test');
     expect(pending[0]!.signal.aborted).toBe(true);
-    const stale = document.createElement('img'),
-      current = document.createElement('img');
+    const stale = { width: 931, height: 86, close: vi.fn() },
+      current = { width: 931, height: 86, close: vi.fn() };
+    const retried = { width: 931, height: 86, close: vi.fn() };
     await act(async () => pending[0]!.resolve(stale));
     expect(result!.image).toBeNull();
+    expect(stale.close).toHaveBeenCalledOnce();
     await act(async () => pending[1]!.resolve(current));
     expect(result!.image).toBe(current);
     await act(async () => root.render(<Harness title="third" />));
+    expect(current.close).toHaveBeenCalledOnce();
     await act(async () => pending[2]!.reject(new Error('decode')));
     expect(result!.failed).toBe(true);
     await act(async () => result!.retry());
     expect(result!.failed).toBe(false);
-    await act(async () => pending[3]!.resolve(current));
-    expect(result!.image).toBe(current);
+    await act(async () => pending[3]!.resolve(retried));
+    expect(result!.image).toBe(retried);
+    await act(async () => root.render(null));
+    expect(retried.close).toHaveBeenCalledOnce();
   } finally {
     await act(async () => root.unmount());
     host.remove();

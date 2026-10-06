@@ -24,21 +24,29 @@ export function useReviewWindowHeader(header: QuickEditWindowHeader | undefined,
     [title, address, width]
   );
   const [attempt, setAttempt] = useState(0);
-  const [loaded, setLoaded] = useState<{ url: string; image: HTMLImageElement } | null>(null);
+  const [loaded, setLoaded] = useState<{ url: string; image: ImageBitmap } | null>(null);
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
+    let owned: ImageBitmap | null = null;
     setFailedUrl(null);
     setLoaded(null);
     if (url)
       void loadReviewWindowHeader(url, controller.signal)
         .then((image) => {
-          if (!controller.signal.aborted) setLoaded({ url, image });
+          if (controller.signal.aborted) image.close();
+          else {
+            owned = image;
+            setLoaded({ url, image });
+          }
         })
         .catch(() => {
           if (!controller.signal.aborted) setFailedUrl(url);
         });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      owned?.close();
+    };
   }, [url, attempt]);
   return {
     url,

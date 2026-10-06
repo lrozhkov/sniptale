@@ -5,7 +5,7 @@ import type { ReviewEdit } from '../../features/video/review/types';
 vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
 vi.mock('./window-header', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./window-header')>()),
-  loadReviewWindowHeader: vi.fn(async () => ({ naturalWidth: 1904, naturalHeight: 86 })),
+  loadReviewWindowHeader: vi.fn(async () => ({ width: 1904, height: 86, close: vi.fn() })),
 }));
 
 const state = vi.hoisted(() => ({

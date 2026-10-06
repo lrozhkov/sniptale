@@ -247,7 +247,7 @@ export async function writeReviewFrames(args: {
     webcam?.dispose();
     transitionFrames?.dispose();
     source?.image?.close();
-    if (source?.headerImage) source.headerImage.src = '';
+    source?.headerImage?.close();
     args.signal.removeEventListener('abort', dispose);
     input.dispose();
   }
@@ -336,7 +336,7 @@ interface ReviewRenderSource {
   sampleRate: number;
   sceneScale: number;
   baseCanvas: { width: number; height: number };
-  headerImage: HTMLImageElement | null;
+  headerImage: ImageBitmap | null;
   canvas: HTMLCanvasElement;
   sourceSize: { width: number; height: number };
   context: CanvasRenderingContext2D;

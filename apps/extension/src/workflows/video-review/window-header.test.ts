@@ -24,12 +24,18 @@ it('releases image listeners after load, failure and abort', async () => {
       }
     }
   );
+  const bitmap = { width: 784, height: 86, close: vi.fn() };
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => bitmap)
+  );
   const url = reviewWindowHeaderUrl({ kind: 'browser', title: 'Example' }, 160);
   const controller = new AbortController();
   const success = loadReviewWindowHeader(url, controller.signal);
   const image = images.at(-1)!;
   image.dispatchEvent(new Event('load'));
-  expect(await success).toBe(image);
+  expect(await success).toBe(bitmap);
+  expect(image.getAttribute('src')).toBe('');
   expect(image.onload).toBeNull();
   const failure = loadReviewWindowHeader(url, controller.signal);
   const failed = expect(failure).rejects.toThrow('Window header is unavailable');
@@ -62,4 +68,40 @@ it('renders supplied addresses as inert escaped text and keeps empty addresses b
   expect(decodeURIComponent(reviewWindowHeaderUrl({ ...header, url: '  ' }, 1920))).not.toContain(
     'example.com'
   );
+});
+
+it('closes a raster that finishes after cancellation and propagates rasterization failure', async () => {
+  const image = document.createElement('img');
+  vi.stubGlobal(
+    'Image',
+    class {
+      constructor() {
+        return image;
+      }
+    }
+  );
+  let resolve!: (value: ImageBitmap) => void;
+  const rasterize = vi.fn(
+    () =>
+      new Promise<ImageBitmap>((done) => {
+        resolve = done;
+      })
+  );
+  vi.stubGlobal('createImageBitmap', rasterize);
+  const controller = new AbortController();
+  const pending = loadReviewWindowHeader('data:image/svg+xml,test', controller.signal);
+  image.dispatchEvent(new Event('load'));
+  await Promise.resolve();
+  controller.abort();
+  const bitmap = { width: 931, height: 86, close: vi.fn() };
+  const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+  resolve(bitmap);
+  await rejected;
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(image.getAttribute('src')).toBe('');
+  rasterize.mockRejectedValue(new Error('raster unavailable'));
+  const failure = loadReviewWindowHeader('data:image/svg+xml,test', new AbortController().signal);
+  image.dispatchEvent(new Event('load'));
+  await expect(failure).rejects.toThrow('raster unavailable');
+  expect(image.getAttribute('src')).toBe('');
 });

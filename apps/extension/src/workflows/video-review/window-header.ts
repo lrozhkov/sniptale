@@ -19,11 +19,11 @@ export function reviewWindowHeaderUrl(header: QuickEditWindowHeader, width: numb
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fitted)}`;
 }
 
-/** The caller owns cancellation and the decoded image; no URL or persisted asset is acquired. */
+/** Rasterize the complete SVG once; the caller owns the bitmap and must close it. */
 export async function loadReviewWindowHeader(
   url: string,
   signal: AbortSignal
-): Promise<HTMLImageElement> {
+): Promise<ImageBitmap> {
   signal.throwIfAborted();
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
@@ -48,6 +48,17 @@ export async function loadReviewWindowHeader(
     signal.addEventListener('abort', abort, { once: true });
     image.src = url;
   });
-  signal.throwIfAborted();
-  return image;
+  try {
+    signal.throwIfAborted();
+    // Re-rasterizing nested SVG viewports for each fractional zoom opens antialiased
+    // slice edges. A fixed raster shares the video sampling path and keeps joins opaque.
+    const bitmap = await createImageBitmap(image);
+    if (signal.aborted) {
+      bitmap.close();
+      signal.throwIfAborted();
+    }
+    return bitmap;
+  } finally {
+    image.src = '';
+  }
 }
