@@ -1,5 +1,4 @@
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
-import { EXACT_BROWSER_FRAME_TOKENS } from '../../features/browser-frame/assets';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { ReviewBorderOverlay } from './border-overlay';
 import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-overlay';
@@ -118,7 +117,11 @@ export function ReviewStage(props: ReviewStageProps) {
     active: false,
     frame: null,
   });
-  const header = useReviewWindowHeader(props.scene?.windowHeader, props.source.width);
+  const header = useReviewWindowHeader(
+    props.scene?.windowHeader,
+    props.source.width,
+    props.source.height
+  );
   const {
     size,
     sceneLayout,
@@ -151,16 +154,7 @@ export function ReviewStage(props: ReviewStageProps) {
       className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]
           bg-[var(--sniptale-color-surface-canvas)]"
     >
-      {header.failed ? (
-        <div
-          role="alert"
-          className="absolute inset-x-0 top-0 z-20 flex items-center gap-2
-            bg-[var(--sniptale-color-surface-panel)] p-2 text-xs"
-        >
-          <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
-          <ReviewButton label={translate('gallery.videoReview.retry')} onClick={header.retry} />
-        </div>
-      ) : null}
+      <ReviewHeaderFailure failed={header.failed} retry={header.retry} />
       <div
         data-ui="gallery.videoReview.stage"
         className="absolute overflow-hidden bg-black"
@@ -441,7 +435,7 @@ function ReviewWindowHeader({
         style={{
           ...common,
           height: 2,
-          background: EXACT_BROWSER_FRAME_TOKENS.bodyFill,
+          background: header.joinColor,
           transform: `${transform} translateY(-1px)`,
         }}
       />
@@ -628,4 +622,19 @@ function useReviewStageGeometry(
     borders,
     overlayClip,
   };
+}
+
+/** Header loading has its own recoverable notice above the rendered scene. */
+function ReviewHeaderFailure(props: { failed: boolean; retry(): void }) {
+  if (!props.failed) return null;
+  return (
+    <div
+      role="alert"
+      className="absolute inset-x-0 top-0 z-20 flex items-center gap-2
+        bg-[var(--sniptale-color-surface-panel)] p-2 text-xs"
+    >
+      <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
+      <ReviewButton label={translate('gallery.videoReview.retry')} onClick={props.retry} />
+    </div>
+  );
 }

@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -458,6 +459,7 @@ it.each(['fixed', 'follow-video'] as const)(
   'keeps the DOM header attached through camera changes with %s background',
   (zoomBehavior) => {
     vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
+      joinColor: '#ffffff',
       url: 'data:image/svg+xml,header',
       image: { width: 800, height: 86, close: vi.fn() },
       failed: false,
@@ -476,7 +478,7 @@ it.each(['fixed', 'follow-video'] as const)(
           scene: {
             background,
             camera: { scale, centerX: center, centerY: center },
-            windowHeader: { kind: 'browser', title: 'Browser' },
+            windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Browser' },
           },
         });
         const header = host.querySelector('img')!;
@@ -493,6 +495,7 @@ it.each(['fixed', 'follow-video'] as const)(
 
 it('recomputes the decorated pan plane and top boundary across header and background switches', () => {
   vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
+    joinColor: '#ffffff',
     url: 'data:image/svg+xml,header',
     image: { width: 800, height: 86, close: vi.fn() },
     failed: false,
@@ -509,9 +512,9 @@ it('recomputes the decorated pan plane and top boundary across header and backgr
   };
   for (const zoomBehavior of ['fixed', 'follow-video', 'fixed'] as const) {
     for (const windowHeader of [
-      { kind: 'browser' as const, title: '' },
+      { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
       undefined,
-      { kind: 'browser' as const, title: '' },
+      { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
     ]) {
       const { video } = renderStage({
         scene: {

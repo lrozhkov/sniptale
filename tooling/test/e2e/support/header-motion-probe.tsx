@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ReviewStage } from '../../../../apps/extension/src/gallery/video-review/stage';
@@ -49,7 +50,12 @@ export async function show(url: string, time: number, follows: boolean) {
         drawing={false}
         region={undefined}
         scene={{
-          windowHeader: { kind: 'browser', title: 'Alignment', url: 'https://example.test' },
+          windowHeader: {
+            ...DEFAULT_WINDOW_HEADER,
+            kind: 'browser' as const,
+            title: 'Alignment',
+            url: 'https://example.test',
+          },
           background: {
             enabled: true,
             type: 'solid',

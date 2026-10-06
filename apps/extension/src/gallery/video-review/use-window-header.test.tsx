@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -25,7 +26,11 @@ it('cancels obsolete titles, ignores late results and retries a failed decode', 
     root = createRoot(host);
   let result: ReturnType<typeof useReviewWindowHeader>;
   function Harness({ title, url = '' }: { title: string; url?: string }) {
-    result = useReviewWindowHeader({ kind: 'browser', title, url }, 1920);
+    result = useReviewWindowHeader(
+      { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title, url },
+      1920,
+      1080
+    );
     return null;
   }
   try {

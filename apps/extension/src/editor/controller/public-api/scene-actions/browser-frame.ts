@@ -1,7 +1,10 @@
 import type { FabricObject } from 'fabric';
 import { useEditorStore } from '../../../state/useEditorStore';
 import type { BrowserFrameState } from '../../../../features/editor/document/types';
-import { applyEditorBrowserFrameSettings } from '../../public-actions';
+import {
+  applyEditorBrowserFrameSettings,
+  removeEditorBrowserFrameSettings,
+} from '../../public-actions';
 import type { EditorBrowserFrameApi } from './contracts';
 import { createEditorSceneStoreBridge } from './store';
 
@@ -21,7 +24,9 @@ function createBrowserFrameRelayout(controller: Pick<EditorBrowserFrameApi, 'rel
 }
 
 function createEditorBrowserFrameArgs(controller: EditorBrowserFrameApi) {
+  const token = controller.createLayerMutationToken();
   return {
+    isMutationCurrent: () => controller.isLayerMutationTokenCurrent(token),
     canvas: controller.canvas,
     source: controller.source,
     store: createEditorSceneStoreBridge(),
@@ -54,8 +59,10 @@ export async function previewEditorControllerBrowserFrame(
   return;
 }
 
-export async function removeEditorControllerBrowserFrame(_controller: object): Promise<void> {
-  return;
+export async function removeEditorControllerBrowserFrame(
+  controller: EditorBrowserFrameApi
+): Promise<void> {
+  await removeEditorBrowserFrameSettings(createEditorBrowserFrameArgs(controller));
 }
 
 export async function previewRemoveEditorControllerBrowserFrame(

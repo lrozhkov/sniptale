@@ -1,5 +1,6 @@
+import { WindowHeaderSettings } from '../../workflows/browser-frame/settings';
 import { translate } from '../../platform/i18n';
-import { SelectField, TextField } from '../../ui/compact-inspector-controls';
+import { SelectField } from '../../ui/compact-inspector-controls';
 import { ReviewNumberRow } from './number-row';
 import { reviewSelectFieldClassName } from './controls';
 import { quickEditCanvasPreset } from '../../features/video/review/advanced/canvas';
@@ -133,43 +134,8 @@ export function ReviewWindowHeaderSettings(props: {
   onChange?: ((header: QuickEditWindowHeader | undefined) => void) | undefined;
 }) {
   return (
-    <section className="review-inspector-columns" data-ui="gallery.videoReview.windowHeader">
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.windowHeader')}
-        value={props.header?.kind ?? 'none'}
-        options={[
-          { value: 'none', label: translate('gallery.videoReview.windowHeaderNone') },
-          { value: 'browser', label: translate('gallery.videoReview.windowHeaderBrowser') },
-        ]}
-        onChange={(value) =>
-          props.onChange?.(value === 'browser' ? { kind: 'browser', title: '' } : undefined)
-        }
-      />
-      {props.header ? (
-        <div className="min-w-0 space-y-2">
-          <TextField
-            label={translate('gallery.videoReview.windowHeaderTitle')}
-            value={props.header.title}
-            onChange={(event) =>
-              props.onChange?.({
-                ...props.header!,
-                title: event.target.value.slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
-              })
-            }
-          />
-          <TextField
-            label={translate('gallery.videoReview.windowHeaderUrl')}
-            value={props.header.url ?? ''}
-            onChange={(event) =>
-              props.onChange?.({
-                ...props.header!,
-                url: event.target.value.slice(0, 2048).replace(/[\uD800-\uDFFF]/gu, ''),
-              })
-            }
-          />
-        </div>
-      ) : null}
+    <section data-ui="gallery.videoReview.windowHeader">
+      <WindowHeaderSettings header={props.header} onChange={(header) => props.onChange?.(header)} />
     </section>
   );
 }

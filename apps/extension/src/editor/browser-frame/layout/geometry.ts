@@ -1,3 +1,5 @@
+import { windowHeaderGeometry } from '../../../features/browser-frame/header';
+import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
@@ -51,7 +53,10 @@ function createSceneContentRect(
     left: frame.paddingLeft,
     top: frame.paddingTop + headerHeight,
     width: roundSize(canvas.width - frame.paddingLeft - frame.paddingRight),
-    height: roundSize(canvas.height - frame.paddingTop - frame.paddingBottom - headerHeight),
+    height: Math.max(
+      MIN_CANVAS_SIZE,
+      canvas.height - frame.paddingTop - frame.paddingBottom - headerHeight
+    ),
   };
 }
 
@@ -95,6 +100,8 @@ function resolveFittedSourceRect(args: {
   frame: EditorFrameSettings;
   hasBrowserFrame: boolean;
   source: Size;
+  browserFrame: BrowserFrameState;
+  headerHeight: number;
 }) {
   const { content, fitSourceToContent, frame, hasBrowserFrame, source } = args;
   let sourceWidth = source.width;
@@ -103,13 +110,38 @@ function resolveFittedSourceRect(args: {
   let sourceTop = content.top;
 
   if (fitSourceToContent) {
-    const scale = Math.min(content.width / source.width, content.height / source.height);
+    const availableHeight = content.height + (hasBrowserFrame ? args.headerHeight : 0);
+    let lower = 0;
+    let upper = Math.min(content.width / source.width, availableHeight / source.height);
+    if (hasBrowserFrame) {
+      const header = resolveEditorWindowHeader(args.browserFrame);
+      for (let iteration = 0; iteration < 40; iteration += 1) {
+        const candidate = (lower + upper) / 2;
+        const headerHeight = windowHeaderGeometry(header, {
+          width: source.width * candidate,
+          height: source.height * candidate,
+        }).height;
+        if (source.height * candidate + headerHeight <= availableHeight) lower = candidate;
+        else upper = candidate;
+      }
+    }
+    const scale = hasBrowserFrame ? lower : upper;
     const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
-    sourceWidth = roundSize(source.width * safeScale);
-    sourceHeight = roundSize(source.height * safeScale);
+    sourceWidth = hasBrowserFrame
+      ? Math.max(MIN_CANVAS_SIZE, Math.floor(source.width * safeScale + 1e-7))
+      : roundSize(source.width * safeScale);
+    sourceHeight = hasBrowserFrame
+      ? Math.max(MIN_CANVAS_SIZE, Math.floor(source.height * safeScale + 1e-7))
+      : roundSize(source.height * safeScale);
+    const headerHeight = hasBrowserFrame
+      ? windowHeaderGeometry(resolveEditorWindowHeader(args.browserFrame), {
+          width: sourceWidth,
+          height: sourceHeight,
+        }).height
+      : 0;
     sourceLeft = content.left + Math.round((content.width - sourceWidth) / 2);
     sourceTop = hasBrowserFrame
-      ? content.top
+      ? frame.paddingTop + headerHeight
       : frame.paddingTop + Math.round((content.height - sourceHeight) / 2);
   }
 
@@ -178,10 +210,15 @@ function resolveEditorSceneLayoutState(args: ResolveEditorSceneLayoutGeometryArg
     frame: args.frame,
     hasBrowserFrame,
     source: safeSource,
+    browserFrame: args.browserFrame,
+    headerHeight: args.headerHeight,
   });
+  const headerHeight = hasBrowserFrame
+    ? windowHeaderGeometry(resolveEditorWindowHeader(args.browserFrame), source).height
+    : 0;
   const canvas = resolveAdaptiveCanvasSize({
     frame: args.frame,
-    headerHeight: args.headerHeight,
+    headerHeight,
     preserveCanvasSize: args.preserveCanvasSize,
     reserveCanvasHeader: initialCanvas.reserveCanvasHeader,
     source,
@@ -191,8 +228,9 @@ function resolveEditorSceneLayoutState(args: ResolveEditorSceneLayoutGeometryArg
 
   return {
     canvas,
-    content,
+    content: { ...content, top: args.frame.paddingTop + headerHeight },
     hasBrowserFrame,
+    headerHeight,
     source,
   };
 }
@@ -207,7 +245,7 @@ export function resolveEditorSceneLayoutGeometry(
       state.canvas.width,
       state.canvas.height,
       args.frame,
-      args.headerHeight,
+      state.headerHeight,
       state.content
     ),
     source: {
@@ -219,7 +257,7 @@ export function resolveEditorSceneLayoutGeometry(
     header: buildSceneHeaderRect(
       state.hasBrowserFrame,
       args.frame,
-      args.headerHeight,
+      state.headerHeight,
       state.source
     ),
   };

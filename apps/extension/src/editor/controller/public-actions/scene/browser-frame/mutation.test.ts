@@ -20,7 +20,7 @@ vi.mock('../../../browser-frame/source-state', () => ({
   readCurrentBrowserFrameSourceState: mocks.readCurrentBrowserFrameSourceState,
 }));
 
-import { applyEditorBrowserFrameSettings } from './mutation';
+import { applyEditorBrowserFrameSettings, removeEditorBrowserFrameSettings } from './mutation';
 
 function createCanvas(objects: unknown[]) {
   const canvas = {
@@ -143,4 +143,47 @@ it('finds and replaces an existing browser-frame layer at its sibling index', as
   );
   expect(canvas.remove).toHaveBeenCalledWith(existingLayer);
   expect(canvas.moveObjectTo).toHaveBeenCalledWith(nextLayer, 1);
+});
+
+it.each(['resize', 'keep-size'] as const)(
+  'removes the real header through scene lifecycle with %s canvas behavior',
+  async (canvasMode) => {
+    const header = { sniptaleType: 'browser-frame' };
+    const canvas = createCanvas([header]);
+    const { options, effects } = createOptions(canvas);
+    options.store.getBrowserFrame = () => ({ ...DEFAULT_BROWSER_FRAME_STATE, canvasMode });
+    await removeEditorBrowserFrameSettings(options);
+    expect(canvas.remove).toHaveBeenCalledWith(header);
+    expect(canvas.getObjects()).toHaveLength(0);
+    expect(options.relayoutScene).toHaveBeenCalledWith(expect.anything(), {
+      hasBrowserFrame: false,
+      preserveCanvasSize: canvasMode === 'keep-size',
+      fitSourceToContent: false,
+    });
+    expect(effects.ensureBrowserFrameOnTop).toHaveBeenCalledOnce();
+    expect(effects.commitHistory).toHaveBeenCalledOnce();
+    expect(effects.syncRuntimeState).toHaveBeenCalledOnce();
+    expect(options.store.setBrowserFrame).not.toHaveBeenCalled();
+  }
+);
+
+it('does not reinstall a header after its owner mutation token becomes stale', async () => {
+  const canvas = createCanvas([]);
+  const { options, effects } = createOptions(canvas);
+  let current = true;
+  options.isMutationCurrent = () => current;
+  mocks.readCurrentBrowserFrameSourceState.mockReturnValue({
+    displayHeight: 300,
+    displayWidth: 400,
+    left: 10,
+    top: 40,
+  });
+  mocks.createBrowserFrameLayerObject.mockImplementation(async () => {
+    current = false;
+    return { setCoords: vi.fn() };
+  });
+  await applyEditorBrowserFrameSettings(options);
+  expect(canvas.add).not.toHaveBeenCalled();
+  expect(options.relayoutScene).not.toHaveBeenCalled();
+  expect(effects.commitHistory).not.toHaveBeenCalled();
 });

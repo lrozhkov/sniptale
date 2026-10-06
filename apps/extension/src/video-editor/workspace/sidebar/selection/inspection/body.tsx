@@ -77,6 +77,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onUpdateMediaClipFitScalePercent'
     | 'onUpdateMediaClipShadowIntensity'
     | 'onUpdateMediaClipShadowMode'
+    | 'onUpdateMediaClipWindowHeader'
     | 'onApplyMediaClipVisualsToTrack'
     | 'onConvertTextClipToAnnotation'
     | 'onRenameTrack'
@@ -159,6 +160,7 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     onUpdateMediaClipFitScalePercent: props.onUpdateMediaClipFitScalePercent,
     onUpdateMediaClipShadowIntensity: props.onUpdateMediaClipShadowIntensity,
     onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode,
+    onUpdateMediaClipWindowHeader: props.onUpdateMediaClipWindowHeader,
     onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack,
     ...createSelectionAnnotationUpdateDefaults(props),
     onRenameTrack: props.onRenameTrack,

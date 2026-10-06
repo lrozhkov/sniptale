@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
 import { expect, it } from 'vitest';
 import {
   createAnnotationClip,
@@ -15,6 +16,7 @@ import { createVideoProjectCursorTrack } from '../defaults';
 import { createVideoProjectMotionRegion } from '../motion/index';
 import {
   VideoTrackKind,
+  VideoProjectTrackRole,
   type VideoProject,
   type VideoProjectActionEvent,
   type VideoProjectAsset,
@@ -453,4 +455,105 @@ it('accepts detailed audio envelopes but rejects oversized or invalid peak paylo
   expect(isHydratableVideoProject(project)).toBe(false);
   asset.metadata.audioPeaks = [NaN];
   expect(isHydratableVideoProject(project)).toBe(false);
+});
+
+for (const type of [VideoProjectAssetType.VIDEO, VideoProjectAssetType.IMAGE]) {
+  it(`retains ${type} window appearances and embedded favicon through project admission`, () => {
+    const project = createEmptyVideoProject('Window admission');
+    const asset = createAssetWithSource(type, { kind: 'project-asset', projectAssetId: 'media' });
+    const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720);
+    project.assets = [asset];
+    project.clips = [clip];
+    const undecorated: unknown = JSON.parse(JSON.stringify(project));
+    expect(parseHydratableVideoProject(undecorated)).toEqual(project);
+    expect(parseHydratableVideoProject(undecorated)?.clips[0]).not.toHaveProperty('windowHeader');
+    const faviconDataUrl =
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+    for (const kind of ['browser', 'application'] as const) {
+      for (const style of ['windows', 'macos', 'linux'] as const) {
+        for (const theme of ['light', 'dark'] as const) {
+          const windowHeader = {
+            ...DEFAULT_WINDOW_HEADER,
+            kind,
+            style,
+            theme,
+            title: 'Saved & <authored> title',
+            url: 'https://example.test/path?a=1&b=2',
+            faviconEnabled: true,
+            faviconDataUrl,
+          };
+          const saved = { ...project, clips: [{ ...clip, windowHeader }] };
+          const restored: unknown = JSON.parse(JSON.stringify(saved));
+          expect(parseHydratableVideoProject(restored)).toEqual(saved);
+          expect(isExportReadyVideoProject(restored)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it(`rejects malformed present ${type} window headers without silently dropping them`, () => {
+    const project = createEmptyVideoProject('Invalid header');
+    const asset = createAssetWithSource(type, { kind: 'project-asset', projectAssetId: 'media' });
+    const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720);
+    project.assets = [asset];
+    for (const windowHeader of [
+      null,
+      {},
+      { ...DEFAULT_WINDOW_HEADER, theme: 'system' },
+      { ...DEFAULT_WINDOW_HEADER, style: 'unknown' },
+      { ...DEFAULT_WINDOW_HEADER, faviconEnabled: 'true' },
+      { ...DEFAULT_WINDOW_HEADER, title: 'x'.repeat(513) },
+      {
+        ...DEFAULT_WINDOW_HEADER,
+        faviconEnabled: true,
+        faviconDataUrl: 'https://example.test/icon.png',
+      },
+    ]) {
+      const saved = { ...project, clips: [{ ...clip, windowHeader }] };
+      expect(isHydratableVideoProject(saved)).toBe(false);
+      expect(parseHydratableVideoProject(saved)).toBeNull();
+      expect(saved.clips[0]?.windowHeader).toBe(windowHeader);
+    }
+  });
+}
+
+it('retains decorated source media alongside an independently animated camera on project restore', () => {
+  const project = createProject();
+  const original = project.clips[0]!;
+  if (original.type !== 'VIDEO') throw new Error('Expected source video fixture');
+  const windowHeader = { ...DEFAULT_WINDOW_HEADER, title: 'Recorded browser' };
+  const cameraTrack = {
+    ...createVideoProjectTrack('Camera', 1, VideoTrackKind.PRIMARY),
+    role: VideoProjectTrackRole.CAMERA,
+  };
+  const cameraAsset = createAssetWithSource(VideoProjectAssetType.VIDEO, {
+    kind: 'project-asset',
+    projectAssetId: 'camera-recording',
+  });
+  const camera = createVideoClipFromAsset(
+    cameraTrack.id,
+    cameraAsset,
+    project.width,
+    project.height
+  );
+  if (camera.type !== 'VIDEO') throw new Error('Expected camera video fixture');
+  camera.cameraPositions = [
+    {
+      id: 'camera-corner',
+      sourceTime: 2,
+      fitMode: camera.fitMode,
+      transform: { x: 900, y: 500, width: 320, height: 180, rotation: 0, opacity: 1 },
+      transition: { kind: 'smooth', duration: 0.5 },
+    },
+  ];
+  project.tracks.push(cameraTrack);
+  project.assets.push(cameraAsset);
+  project.clips = [{ ...original, windowHeader }, camera];
+  const serialized: unknown = JSON.parse(JSON.stringify(project));
+  const restored = parseHydratableVideoProject(serialized);
+  expect(restored).toEqual(project);
+  expect(isExportReadyVideoProject(restored)).toBe(true);
+  expect(restored?.clips[0]).toHaveProperty('windowHeader', windowHeader);
+  expect(restored?.clips[1]).toHaveProperty('cameraPositions', camera.cameraPositions);
+  expect(restored?.clips[1]).not.toHaveProperty('windowHeader');
 });

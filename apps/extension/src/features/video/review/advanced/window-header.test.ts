@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
 import { describe, expect, it } from 'vitest';
 import {
   computeQuickEditSceneSize,
@@ -15,6 +16,7 @@ import type { QuickEditBackgroundSettings } from './types';
 
 const source = { width: 1920, height: 1080 };
 const windowHeader = {
+  ...DEFAULT_WINDOW_HEADER,
   kind: 'browser' as const,
   title: 'Example & <title>',
   url: 'https://sniptale.test/?a=1&b=2',
@@ -25,10 +27,10 @@ describe('decorated original video', () => {
   it('adds rows without refitting source pixels, accumulates no height and restores identity', () => {
     const settings = { source, background: { enabled: false } as const, windowHeader };
     const size = computeQuickEditSceneSize(settings);
-    expect(size).toEqual({ width: 1920, height: 1166, headerHeight: 86 });
+    expect(size).toEqual({ width: 1920, height: 1184, headerHeight: 104 });
     const layout = computeQuickEditSceneLayout({ ...settings, output: size, camera: identity });
-    expect(layout.videoRect).toEqual({ x: 0, y: 86, ...source });
-    expect(layout.windowRect).toEqual({ x: 0, y: 0, width: 1920, height: 1166 });
+    expect(layout.videoRect).toEqual({ x: 0, y: 104, ...source });
+    expect(layout.windowRect).toEqual({ x: 0, y: 0, width: 1920, height: 1184 });
     expect(computeQuickEditSceneSize(settings)).toEqual(size);
     const off = computeQuickEditSceneSize({ ...settings, windowHeader: undefined });
     expect(off).toEqual({ ...source, headerHeight: 0 });
@@ -68,15 +70,17 @@ describe('decorated original video', () => {
     const small = { width: 160, height: 90 };
     expect(
       computeQuickEditSceneSize({ source: small, windowHeader, background: { enabled: false } })
-    ).toEqual({ width: 160, height: 108, headerHeight: 18 });
+    ).toEqual({ width: 160, height: 100, headerHeight: 10 });
   });
   it('parses persisted content and rejects invalid header contracts without modifying legacy content', () => {
     const state = { ...createQuickEditAdvancedState(), windowHeader };
     expect(loadQuickEditAdvancedState(state)?.windowHeader).toEqual(windowHeader);
     expect(
-      loadQuickEditAdvancedState({ ...state, windowHeader: { kind: 'browser', title: '' } })
-        ?.windowHeader
-    ).toEqual({ kind: 'browser', title: '' });
+      loadQuickEditAdvancedState({
+        ...state,
+        windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
+      })?.windowHeader
+    ).toEqual({ ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' });
     const content = reviewAdvancedContentBaseline(state);
     expect(loadQuickEditAdvancedContentState(content)).toEqual(content);
     expect(
@@ -85,8 +89,8 @@ describe('decorated original video', () => {
     for (const invalid of [
       null,
       { kind: 'os', title: '' },
-      { kind: 'browser', title: 1 },
-      { kind: 'browser', title: 'x'.repeat(513) },
+      { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 1 },
+      { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'x'.repeat(513) },
       { ...windowHeader, url: 1 },
       { ...windowHeader, url: 'x'.repeat(2049) },
       { ...windowHeader, url: '\uD800' },

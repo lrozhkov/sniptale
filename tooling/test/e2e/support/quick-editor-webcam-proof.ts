@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import type { Page } from '@playwright/test';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import {
@@ -91,7 +92,12 @@ export async function seedWebcamComposition(page: Page) {
         zoomBehavior: 'follow-video',
         layout: { padding: 8, cornerRadius: 12, shadow: { color: '#000000ff', intensity: 50 } },
       },
-      windowHeader: { kind: 'browser', title: 'Camera parity', url: 'https://example.test' },
+      windowHeader: {
+        ...DEFAULT_WINDOW_HEADER,
+        kind: 'browser' as const,
+        title: 'Camera parity',
+        url: 'https://example.test',
+      },
       zoom: {
         enabled: true,
         regions: [

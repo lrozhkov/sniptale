@@ -86,15 +86,15 @@ it('creates a browser-header layer object with preserved metadata', async () => 
   expect(mocks.renderExactBrowserFrameToDataUrlMock).toHaveBeenCalledWith(
     expect.objectContaining({
       width: 320,
-      height: BROWSER_HEADER_HEIGHT,
-      headerHeight: BROWSER_HEADER_HEIGHT,
+      height: (86 * 320) / 900,
+      headerHeight: (86 * 320) / 900,
     })
   );
   expect(image.set).toHaveBeenCalledWith({
     left: 24,
     top: 16,
     scaleX: 320 / 200,
-    scaleY: 1,
+    scaleY: 320 / 900,
   });
   expect(prepareObject).toHaveBeenCalledWith(image);
   expect(prepared.sniptaleId).toBe('browser-frame-1');
@@ -125,7 +125,7 @@ it('creates a fresh browser-header layer when no previous object exists', async 
     expect(image.set).toHaveBeenCalledWith(
       expect.objectContaining({
         scaleX: 1 / 200,
-        scaleY: 1,
+        scaleY: 86 / 900 / 86,
       })
     );
     expect(prepared.sniptaleId).toBe('11111111-1111-4111-8111-111111111111');

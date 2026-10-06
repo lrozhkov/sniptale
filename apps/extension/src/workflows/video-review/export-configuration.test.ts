@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import type { ReviewMediaIndex } from './media-index';
@@ -72,7 +73,11 @@ it('does not require an audio encoder for silent output and preserves compatible
 
 it('explains an oversized decorated output and accepts a smaller export preset', () => {
   const args = fixture();
-  args.advanced.windowHeader = { kind: 'browser', title: 'Browser' };
+  args.advanced.windowHeader = {
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'browser' as const,
+    title: 'Browser',
+  };
   args.advanced.canvas = { width: 7680, height: 4320 };
   expect(configuredReviewExportPlan(args)).toEqual({
     kind: 'unavailable',

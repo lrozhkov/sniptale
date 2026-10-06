@@ -162,7 +162,7 @@ function runInsertBrowserHeaderLayerSuite() {
         browserFrame: mutation.options.browserFrame,
         left: 48,
         nextLabelIndex: 3,
-        top: 48,
+        top: expect.closeTo(48, 8),
         width: 1104,
       })
     );
@@ -184,7 +184,7 @@ function runNoSourceBrowserHeaderLayerSuite() {
 }
 
 function runExistingBrowserHeaderLayerSuite() {
-  it('reuses the current browser-header width and layer slot when updating an existing layer', async () => {
+  it('realigns the joined header to the fitted source and reuses its layer slot', async () => {
     const existingLayer = {
       getScaledWidth: vi.fn(() => 480),
       left: 30,
@@ -204,8 +204,8 @@ function runExistingBrowserHeaderLayerSuite() {
     expect(mocks.createBrowserFrameLayerObjectMock).toHaveBeenCalledWith(
       expect.objectContaining({
         existingObject: existingLayer,
-        left: 54,
-        top: 54,
+        left: 48,
+        top: expect.closeTo(48, 8),
         width: 1104,
       })
     );

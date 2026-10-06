@@ -204,7 +204,7 @@ function createResetDocumentCanvasState(
     frame: DEFAULT_EDITOR_FRAME_SETTINGS,
     browserFrame: {
       ...DEFAULT_BROWSER_FRAME_STATE,
-      faviconDataUrl: state.browserFrame.faviconDataUrl ?? null,
+      faviconDataUrl: null,
       url: state.browserFrame.url,
     },
     workspace: createWorkspaceSettingsFromDefaults(state.workspaceDefaults),

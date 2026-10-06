@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import { createElement } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
@@ -50,7 +51,7 @@ function sceneProbe() {
     color: '#777777',
     layout: { padding: 8, cornerRadius: 14, shadow: { intensity: 80, color: '#000000ff' } },
   };
-  const windowHeader = { kind: 'browser' as const, title: 'Browser' };
+  const windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Browser' };
   const output = computeQuickEditSceneSize({ source, background, windowHeader });
   const canvas = Object.assign(document.createElement('canvas'), output);
   const context = canvas.getContext('2d')!;

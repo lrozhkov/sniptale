@@ -17,6 +17,12 @@ import {
 } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { MediaFrameControls } from './media-frame';
+import { DEFAULT_WINDOW_HEADER } from '../../../../../features/browser-frame/header';
+import { acquireWindowHeaderFavicon } from '../../../../../workflows/browser-frame/favicon';
+
+vi.mock('../../../../../workflows/browser-frame/favicon', () => ({
+  acquireWindowHeaderFavicon: vi.fn(),
+}));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -59,7 +65,8 @@ function setInputValue(input: HTMLInputElement, value: string) {
 
 async function renderHarness(
   handlers: Partial<WorkspaceSidebarSelectionPanelProps> = {},
-  locked = false
+  locked = false,
+  clip = createClip()
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -67,7 +74,6 @@ async function renderHarness(
     root = createRoot(container);
   }
 
-  const clip = createClip();
   const project = createEmptyVideoProject();
   project.assets = [
     {
@@ -99,6 +105,7 @@ async function renderHarness(
         onUpdateMediaClipFitScalePercent={handlers.onUpdateMediaClipFitScalePercent ?? vi.fn()}
         onUpdateMediaClipShadowIntensity={handlers.onUpdateMediaClipShadowIntensity ?? vi.fn()}
         onUpdateMediaClipShadowMode={handlers.onUpdateMediaClipShadowMode ?? vi.fn()}
+        onUpdateMediaClipWindowHeader={handlers.onUpdateMediaClipWindowHeader ?? vi.fn()}
       />
     );
   });
@@ -202,4 +209,34 @@ it('applies a framing preset with one command and keeps exact controls folded', 
     88
   );
   expect(container?.querySelector('details')?.open).toBe(false);
+});
+
+it('cancels a pending favicon when selection changes to another clip with the same URL', async () => {
+  let finish: ((icon: string) => void) | undefined;
+  vi.mocked(acquireWindowHeaderFavicon).mockImplementation(
+    () =>
+      new Promise<string>((resolve) => {
+        finish = resolve;
+      })
+  );
+  const onUpdateMediaClipWindowHeader = vi.fn();
+  const first = {
+    ...createClip(),
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true, url: 'https://example.org' },
+  };
+  await renderHarness({ onUpdateMediaClipWindowHeader }, false, first);
+  await act(async () => {
+    container
+      ?.querySelector<HTMLInputElement>('input[placeholder="example.com"]')
+      ?.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+  expect(acquireWindowHeaderFavicon).toHaveBeenCalledOnce();
+  const signal = vi.mocked(acquireWindowHeaderFavicon).mock.calls[0]?.[1];
+  expect(signal?.aborted).toBe(false);
+  await renderHarness({ onUpdateMediaClipWindowHeader }, false, { ...first, id: 'clip-2' });
+  expect(signal?.aborted).toBe(true);
+  await act(async () => {
+    finish?.('data:image/png;base64,late-icon');
+  });
+  expect(onUpdateMediaClipWindowHeader).not.toHaveBeenCalled();
 });

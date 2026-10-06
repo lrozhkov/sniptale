@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
 import { expect, it } from 'vitest';
 import {
   computeQuickEditSceneLayout,
@@ -25,9 +26,9 @@ it.each(['fixed', 'follow-video'] as const)(
           layout: { padding: 40, cornerRadius: 24, shadow: { intensity: 40, color: '#000000ff' } },
         };
         for (const windowHeader of [
-          { kind: 'browser' as const, title: '' },
+          { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
           undefined,
-          { kind: 'browser' as const, title: '' },
+          { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
         ]) {
           const settings = { source, canvas, background, windowHeader };
           const output = computeQuickEditSceneSize(settings);
@@ -69,7 +70,7 @@ it('keeps the header top stationary while animating a top-edge target', () => {
   const settings = {
     source: { width: 1920, height: 1080 },
     background: { enabled: false } as const,
-    windowHeader: { kind: 'browser' as const, title: '' },
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
   };
   const output = computeQuickEditSceneSize(settings);
   for (const time of [0, 0.05, 0.1, 0.2, 1, 3.9]) {

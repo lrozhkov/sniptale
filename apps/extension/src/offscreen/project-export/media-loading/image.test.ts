@@ -33,6 +33,13 @@ vi.mock('../../../features/video/project/scene/background', async (importOrigina
 }));
 
 import { loadImagesForProject } from './image';
+import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
+import { windowHeaderImageKey } from '../../../features/video/composition/draw/window-header';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../features/video/project/factories/creation';
+import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -193,4 +200,38 @@ it('stops image preload when the export aborts before image readiness', async ()
   await expect(loadPromise).rejects.toThrow('PROJECT_EXPORT_CANCELLED');
   expect(job.assetUrls).toEqual([]);
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:5');
+});
+
+it('preloads a self-contained header for video export without acquiring network or storage resources', async () => {
+  const project = createEmptyVideoProject();
+  const asset = createVideoProjectAsset(
+    'Video',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'video' },
+    {
+      width: 1920,
+      height: 1080,
+      duration: 3,
+      mimeType: 'video/mp4',
+      size: 100,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = {
+    ...createVideoClipFromAsset(project.tracks[0]!.id, asset, project.width, project.height),
+    windowHeader: DEFAULT_WINDOW_HEADER,
+  };
+  project.assets = [asset];
+  project.clips = [clip];
+  const job = { assetUrls: [] as string[] };
+  const images = await loadImagesForProject(project, job);
+  expect(images[windowHeaderImageKey(clip.id, DEFAULT_WINDOW_HEADER)]?.src).toMatch(
+    /^data:image\/svg\+xml/
+  );
+  expect(getProjectAssetMock).not.toHaveBeenCalled();
+  expect(job.assetUrls).toEqual([]);
+  const controller = new AbortController();
+  controller.abort();
+  await expect(loadImagesForProject(project, job, controller.signal)).rejects.toThrow();
 });

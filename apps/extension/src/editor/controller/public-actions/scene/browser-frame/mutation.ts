@@ -31,7 +31,25 @@ export async function applyEditorBrowserFrameSettings(
 
 export async function previewEditorBrowserFrameSettings(_options?: unknown): Promise<void> {}
 
-export async function removeEditorBrowserFrameSettings(_options?: unknown): Promise<void> {}
+export async function removeEditorBrowserFrameSettings(
+  options: BrowserFrameActionOptions
+): Promise<void> {
+  const canvas = options.canvas;
+  if (!canvas) return;
+  const header = findBrowserFrameLayer(canvas);
+  if (!header) return;
+  const browserFrame = options.store.getBrowserFrame();
+  canvas.remove(header);
+  options.relayoutScene(browserFrame, {
+    hasBrowserFrame: false,
+    preserveCanvasSize: browserFrame.canvasMode === 'keep-size',
+    fitSourceToContent: false,
+  });
+  options.ensureBrowserFrameOnTop();
+  canvas.requestRenderAll();
+  options.commitHistory();
+  options.syncRuntimeState();
+}
 
 export async function previewRemoveEditorBrowserFrameSettings(_options?: unknown): Promise<void> {}
 
@@ -58,6 +76,7 @@ async function upsertBrowserFrameLayer(
   });
   const position = resolveNextBrowserFramePosition({
     currentSource,
+    browserFrame,
     existingLayer,
     nextSource: nextScene.source,
   });
@@ -69,6 +88,7 @@ async function upsertBrowserFrameLayer(
     nextLabelIndex: options.nextLabelIndex?.('browser-frame') ?? 1,
     prepareObject: options.prepareObject ?? (() => undefined),
     top: position.top,
+    sourceHeight: nextScene.source.height,
     width: resolveNextBrowserFrameWidth({
       currentSource,
       existingLayer,
@@ -76,6 +96,7 @@ async function upsertBrowserFrameLayer(
     }),
   });
 
+  if (options.isMutationCurrent && !options.isMutationCurrent()) return false;
   options.relayoutScene(browserFrame, relayoutOptions);
   replaceBrowserFrameLayer(canvas, existingLayer, nextLayer);
   options.ensureBrowserFrameOnTop();

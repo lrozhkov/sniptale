@@ -1,4 +1,3 @@
-import { useAppLocale, translate } from '../../platform/i18n';
 import { useEffect, useState, useMemo } from 'react';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 import {
@@ -7,21 +6,14 @@ import {
 } from '../../workflows/video-review/window-header';
 
 /** A title or address change cannot publish an obsolete decoded header into the current preview. */
-export function useReviewWindowHeader(header: QuickEditWindowHeader | undefined, width: number) {
-  const locale = useAppLocale();
-  const title = header
-    ? header.title.trim() || translate('editor.runtime.newTab', locale)
-    : undefined;
-  const address = header?.url;
+export function useReviewWindowHeader(
+  header: QuickEditWindowHeader | undefined,
+  width: number,
+  height: number
+) {
   const url = useMemo(
-    () =>
-      title === undefined
-        ? null
-        : reviewWindowHeaderUrl(
-            { kind: 'browser', title, ...(address === undefined ? {} : { url: address }) },
-            width
-          ),
-    [title, address, width]
+    () => (header ? reviewWindowHeaderUrl(header, width, height) : null),
+    [header, width, height]
   );
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<{ url: string; image: ImageBitmap } | null>(null);
@@ -50,6 +42,20 @@ export function useReviewWindowHeader(header: QuickEditWindowHeader | undefined,
   }, [url, attempt]);
   return {
     url,
+    joinColor:
+      header?.theme === 'dark'
+        ? header.kind === 'browser'
+          ? '#35363a'
+          : header.style === 'windows'
+            ? '#202020'
+            : '#303030'
+        : header?.kind === 'browser'
+          ? '#ffffff'
+          : header?.style === 'windows'
+            ? '#f3f3f3'
+            : header?.style === 'linux'
+              ? '#ebebeb'
+              : '#ededed',
     image: loaded?.url === url ? loaded.image : null,
     failed: url !== null && failedUrl === url,
     retry: () => setAttempt((value) => value + 1),

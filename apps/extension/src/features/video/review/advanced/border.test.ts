@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../browser-frame/header';
 import { createQuickEditAdvancedState } from './defaults';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { expect, it } from 'vitest';
@@ -310,7 +311,9 @@ it('keeps all style geometry finite for tiny edge annotations and decorated came
         source: { width: 100, height: 100 },
         background: { enabled: false },
         camera: { scale: 2, centerX: 0.5, centerY: 0.5 },
-        ...(header ? { windowHeader: { kind: 'browser' as const, title: 'Test' } } : {}),
+        ...(header
+          ? { windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Test' } }
+          : {}),
       });
       const frame = evaluateQuickEditBordersAtTime({
         ...geometry,

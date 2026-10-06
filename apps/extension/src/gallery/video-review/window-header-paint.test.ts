@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import { paintZoomPreview, computeZoomPreviewArea } from './zoom-preview-paint';
@@ -42,7 +43,7 @@ it.each(['fixed', 'follow-video'] as const)(
     const settings = {
       source,
       background,
-      windowHeader: { kind: 'browser' as const, title: 'Test' },
+      windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Test' },
     };
     const output = computeQuickEditSceneSize(settings);
     const header = document.createElement('canvas');

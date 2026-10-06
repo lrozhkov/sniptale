@@ -1,3 +1,4 @@
+import { projectWindowHeaderImages } from '../../../features/video/composition/draw/window-header';
 import { getAssetById } from '../../../features/video/project/timeline';
 import { getProjectSceneBackgroundImageAssetId } from '../../../features/video/project/scene/background';
 import type { VideoProject } from '../../../features/video/project/types';
@@ -55,6 +56,15 @@ export async function loadImagesForProject(
     })
   );
 
+  await Promise.all(
+    projectWindowHeaderImages(project).map(async ({ key, src }) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.src = src;
+      await waitForImageReady(image, signal ? { signal } : undefined);
+      result[key] = image;
+    })
+  );
   return result;
 }
 

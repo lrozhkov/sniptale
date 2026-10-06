@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { ReviewStageFocusControl } from './stage-focus';
 import {
   computeQuickEditSceneLayout,
@@ -426,7 +427,11 @@ for (const type of ['border', 'spotlight'] as const) {
       };
       const onChange = vi.fn();
       const source = { width: 200, height: 100 };
-      const header: QuickEditWindowHeader = { kind: 'browser', title: 'Header' };
+      const header: QuickEditWindowHeader = {
+        ...DEFAULT_WINDOW_HEADER,
+        kind: 'browser' as const,
+        title: 'Header',
+      };
       for (const windowHeader of [header, undefined, header]) {
         for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
           const background: QuickEditBackgroundSettings = {

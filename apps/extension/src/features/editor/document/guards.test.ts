@@ -41,7 +41,8 @@ function createEditorDocumentFixture() {
     browserFrame: {
       title: 'Example',
       url: 'https://example.com',
-      faviconDataUrl: 'data:image/png;base64,favicon',
+      faviconEnabled: true,
+      faviconDataUrl: TEST_IMAGE_DATA_URL,
       canvasMode: 'resize' as const,
       contentMode: 'fit-content' as const,
     },
@@ -286,4 +287,42 @@ it('accepts legacy captions and validates the optional editable display name', (
   expect(isEditorDocument({ ...document, displayName: 'Схема.png' })).toBe(true);
   for (const displayName of [null, 42, {}, []])
     expect(isEditorDocument({ ...document, displayName })).toBe(false);
+});
+
+it('admits all shared window header kinds and rejects unsafe or disabled favicon bytes', () => {
+  const document = createEditorDocumentFixture();
+  for (const kind of ['browser', 'application'])
+    for (const style of ['windows', 'macos', 'linux']) {
+      expect(
+        isEditorDocument({
+          ...document,
+          browserFrame: { ...document.browserFrame, kind, style, theme: 'dark' },
+        })
+      ).toBe(true);
+    }
+  for (const patch of [
+    { style: 'unknown' },
+    { kind: 'dialog' },
+    { theme: 'automatic' },
+    { faviconDataUrl: 'https://example.com/favicon.png' },
+    { faviconDataUrl: 'data:image/svg+xml,<svg/>' },
+    { faviconEnabled: false, faviconDataUrl: TEST_IMAGE_DATA_URL },
+  ])
+    expect(
+      isEditorDocument({ ...document, browserFrame: { ...document.browserFrame, ...patch } })
+    ).toBe(false);
+});
+
+it('retains image provenance strings even when they exceed window header display limits', () => {
+  const document = createEditorDocumentFixture();
+  expect(
+    isEditorDocument({
+      ...document,
+      browserFrame: {
+        ...document.browserFrame,
+        title: 'a'.repeat(600),
+        url: 'https://example.com/' + 'q'.repeat(2100),
+      },
+    })
+  ).toBe(true);
 });

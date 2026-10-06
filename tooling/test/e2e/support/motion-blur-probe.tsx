@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,
@@ -181,7 +182,12 @@ export function quickSceneExposure() {
         output: canvas,
         camera,
         background,
-        windowHeader: { kind: 'browser', title: 'Proof', url: '' },
+        windowHeader: {
+          ...DEFAULT_WINDOW_HEADER,
+          kind: 'browser' as const,
+          title: 'Proof',
+          url: '',
+        },
       });
       const paint = (blurred: boolean) => {
         drawReviewSceneFrame(context, {

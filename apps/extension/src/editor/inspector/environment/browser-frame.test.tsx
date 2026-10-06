@@ -1,273 +1,163 @@
 // @vitest-environment jsdom
-
-import { act } from 'react';
-import { createRoot, type Root } from 'react-dom/client';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { act, useState } from 'react';
+import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
-  translate: (key: string) => {
-    if (key === 'editor.compact.urlPlaceholder') {
-      return 'Enter page URL';
-    }
-
-    return key;
-  },
-  useAppLocale: () => 'en',
+const acquisition = vi.hoisted(() => ({ acquire: vi.fn() }));
+vi.mock('../../../workflows/browser-frame/favicon', () => ({
+  acquireWindowHeaderFavicon: acquisition.acquire,
 }));
+import type { BrowserFrameState } from '../../../features/editor/document/types';
+import { DEFAULT_BROWSER_FRAME_STATE } from '../../../features/editor/document/constants';
+import { useEditorStore } from '../../state/useEditorStore';
+import { translate } from '../../../platform/i18n';
+import {
+  EditorWindowHeaderSettings,
+  EditorInspectorBrowserFramePanelContent,
+} from './browser-frame';
 
-import { EditorInspectorBrowserFramePanelContent } from './browser-frame';
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-const browserFramePanelOptions = {
-  browserCanvasModeOptions: [
-    { label: 'Resize', value: 'resize' },
-    { label: 'Keep size', value: 'keep-size' },
-  ],
-  browserContentModeOptions: [
-    { label: 'Push down', value: 'push-down' },
-    { label: 'Fit', value: 'fit-content' },
-  ],
-} as const;
-
-type TestBrowserFrameState = {
-  canvasMode: 'resize' | 'keep-size';
-  contentMode: 'push-down' | 'fit-content';
-  title: string;
-  url: string;
-};
-
-afterEach(() => {
-  act(() => {
-    root?.unmount();
+it('offers shared browser and application settings with explicit image insertion and no mount fetch', async () => {
+  useEditorStore.setState({
+    browserFrame: { ...DEFAULT_BROWSER_FRAME_STATE, enabled: true },
+    layers: [{ type: 'source-image', id: 'source-one' }] as never,
   });
-  root = null;
-  container?.remove();
-  container = null;
-});
-
-function createBrowserFramePanelProps(
-  browserFrame: TestBrowserFrameState,
-  syncBrowserFrame: (updates: unknown) => Promise<void> | void,
-  insertOrUpdateBrowserFrame = vi.fn()
-) {
-  return {
-    browserCanvasModeOptions: [...browserFramePanelOptions.browserCanvasModeOptions],
-    browserContentModeOptions: [...browserFramePanelOptions.browserContentModeOptions],
-    browserFrame,
-    insertOrUpdateBrowserFrame,
-    syncBrowserFrame,
-  };
-}
-
-async function renderBrowserFramePanel(
-  browserFrame: TestBrowserFrameState,
-  syncBrowserFrame = vi.fn(),
-  insertOrUpdateBrowserFrame = vi.fn()
-) {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
-  await act(async () => {
-    root?.render(
-      <EditorInspectorBrowserFramePanelContent
-        {...createBrowserFramePanelProps(
-          browserFrame,
-          syncBrowserFrame,
-          insertOrUpdateBrowserFrame
-        )}
-      />
-    );
-  });
-
-  return { insertOrUpdateBrowserFrame, syncBrowserFrame };
-}
-
-function updateInputValue(input: HTMLInputElement | null, value: string) {
-  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, value);
-  input?.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-function blurInput(input: HTMLInputElement | null) {
-  input?.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-}
-
-it('reads the browser-frame URL placeholder from the shared i18n seam and forwards updates', async () => {
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
   const syncBrowserFrame = vi.fn();
-  await renderBrowserFramePanel(
-    {
-      canvasMode: 'resize',
-      contentMode: 'push-down',
-      title: '',
-      url: '',
-    },
-    syncBrowserFrame
-  );
-  const titleInput =
-    container?.querySelector<HTMLInputElement>(
-      'input[placeholder="editor.compact.pageTitlePlaceholder"]'
-    ) ?? null;
-  const urlInput =
-    container?.querySelector<HTMLInputElement>('input[placeholder="Enter page URL"]') ?? null;
+  const insert = vi.fn();
+  const fetch = vi.spyOn(globalThis, 'fetch');
+  try {
+    await act(async () =>
+      root.render(
+        <EditorInspectorBrowserFramePanelContent
+          browserCanvasModeOptions={[{ label: 'Resize', value: 'resize' }]}
+          browserContentModeOptions={[{ label: 'Push down', value: 'push-down' }]}
+          browserFrame={{
+            ...DEFAULT_BROWSER_FRAME_STATE,
+            title: 'Saved title',
+            url: 'example.com',
+          }}
+          syncBrowserFrame={syncBrowserFrame}
+          insertOrUpdateBrowserFrame={insert}
+        />
+      )
+    );
+    expect(container.querySelector('[data-ui="window-header-settings"]')).not.toBeNull();
+    expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
+    expect(Array.from(container.querySelectorAll('input')).map((input) => input.value)).toEqual([
+      'Saved title',
+      'example.com',
+    ]);
+    const application = Array.from(container.querySelectorAll('button')).find((button) =>
+      /Application|Приложение/.test(button.textContent ?? '')
+    );
+    expect(application).toBeDefined();
+    await act(async () => application?.click());
+    expect(syncBrowserFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'application', title: 'Saved title', faviconDataUrl: null })
+    );
+    expect(fetch).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+    fetch.mockRestore();
+  }
+});
 
-  expect(urlInput).not.toBeNull();
-  expect(
-    container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.text-field"]')
-  ).toHaveLength(2);
-  expect(titleInput?.getAttribute('aria-label')).toBe('editor.compact.browserTabTitle');
-  expect(urlInput?.getAttribute('aria-label')).toBe('editor.compact.pageUrl');
+afterEach(() => useEditorStore.setState({ sessionId: null, layers: [] }));
 
-  await act(async () => {
-    updateInputValue(titleInput, 'Updated title');
-    updateInputValue(urlInput, 'https://sniptale.dev');
-    blurInput(titleInput);
-    blurInput(urlInput);
-    await Promise.resolve();
-    await Promise.resolve();
+it('routes Off to existing removal and activates a header from Off without persisting another flag', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const sync = vi.fn();
+  try {
+    useEditorStore.setState({
+      browserFrame: { ...DEFAULT_BROWSER_FRAME_STATE, enabled: true },
+      layers: [{ type: 'source-image', id: 'source' }] as never,
+    });
+    await act(async () =>
+      root.render(
+        <EditorWindowHeaderSettings
+          browserFrame={DEFAULT_BROWSER_FRAME_STATE}
+          syncBrowserFrame={sync}
+        />
+      )
+    );
+    const off = Array.from(container.querySelectorAll('button')).find((button) =>
+      /^(Off|Нет|Выкл|Выключено)/.test(button.textContent ?? '')
+    );
+    expect(off).toBeDefined();
+    await act(async () => off?.click());
+    expect(sync).toHaveBeenLastCalledWith({ enabled: false });
+    await act(async () =>
+      useEditorStore.setState({
+        browserFrame: { ...DEFAULT_BROWSER_FRAME_STATE, enabled: false },
+        layers: [],
+      })
+    );
+    expect(container.querySelectorAll('input')).toHaveLength(0);
+    const browser = Array.from(container.querySelectorAll('button')).find((button) =>
+      /Browser|Браузер/.test(button.textContent ?? '')
+    );
+    await act(async () => browser?.click());
+    expect(sync).toHaveBeenLastCalledWith(
+      expect.objectContaining({ enabled: true, kind: 'browser' })
+    );
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it('aborts pending favicon acquisition when a different document has the same URL', async () => {
+  let resolve: (value: string) => void = () => undefined;
+  let signal: AbortSignal | undefined;
+  acquisition.acquire.mockImplementation((_url, requestSignal) => {
+    signal = requestSignal;
+    return new Promise<string>((done) => {
+      resolve = done;
+    });
   });
-
-  expect(syncBrowserFrame).toHaveBeenCalledWith({ title: 'Updated title' });
-  expect(syncBrowserFrame).toHaveBeenCalledWith({ url: 'https://sniptale.dev' });
-});
-
-it('hides the browser profile section and routes the apply action', async () => {
-  const { insertOrUpdateBrowserFrame } = await renderBrowserFramePanel({
-    canvasMode: 'resize',
-    contentMode: 'push-down',
-    title: '',
-    url: '',
-  });
-
-  await act(async () => {
-    Array.from(container?.querySelectorAll<HTMLButtonElement>('button[type="button"]') ?? [])
-      .find((button) => button.textContent?.includes('editor.compact.apply'))
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-
-  expect(insertOrUpdateBrowserFrame).toHaveBeenCalledOnce();
-  expect(container?.textContent).not.toContain('editor.compact.browserPreset');
-  expect(container?.textContent).not.toContain('editor.compact.browserPresetCanonical');
-  expect(container?.textContent).not.toContain('editor.compact.browserFrameAction');
-});
-
-it('keeps tab title and URL values only inside inputs', async () => {
-  await renderBrowserFramePanel({
-    canvasMode: 'resize',
-    contentMode: 'push-down',
-    title: 'Full title',
-    url: 'https://sniptale.dev/full/path',
-  });
-
-  expect(container?.textContent).not.toContain('Full title');
-  expect(container?.textContent).not.toContain('https://sniptale.dev/full/path');
-  expect(container?.textContent).toContain('editor.compact.browserTabTitle');
-  expect(container?.textContent).toContain('editor.compact.pageUrl');
-  expect(
-    container?.querySelector<HTMLInputElement>(
-      'input[placeholder="editor.compact.pageTitlePlaceholder"]'
-    )?.value
-  ).toBe('Full title');
-  expect(
-    container?.querySelector<HTMLInputElement>('input[placeholder="Enter page URL"]')?.value
-  ).toBe('https://sniptale.dev/full/path');
-});
-
-it('does not render legacy variant or os/theme selectors', async () => {
-  await renderBrowserFramePanel({
-    canvasMode: 'resize',
-    contentMode: 'push-down',
-    title: '',
-    url: '',
-  });
-
-  expect(container?.querySelector('button[aria-label="editor.compact.browserVariant"]')).toBeNull();
-  expect(
-    container?.querySelector('button[aria-label="editor.compact.browserHeaderTheme"]')
-  ).toBeNull();
-  expect(
-    container?.querySelector('button[aria-label="editor.compact.browserHeaderMode"]')
-  ).toBeNull();
-  expect(
-    container?.querySelector('button[aria-label="editor.compact.browserAppearance"]')
-  ).toBeNull();
-});
-
-it('always renders header title and url controls for the insert/update flow', async () => {
-  const markup = renderToStaticMarkup(
-    <EditorInspectorBrowserFramePanelContent
-      browserCanvasModeOptions={[]}
-      browserContentModeOptions={[]}
-      browserFrame={{
-        canvasMode: 'resize',
-        contentMode: 'push-down',
-        title: '',
-        url: '',
-      }}
-      insertOrUpdateBrowserFrame={vi.fn()}
-      syncBrowserFrame={vi.fn()}
-    />
-  );
-
-  expect(markup).toContain('Enter page URL');
-});
-
-it('blocks an overlong page address with localized inline guidance', async () => {
-  const insertOrUpdateBrowserFrame = vi.fn();
-  await renderBrowserFramePanel(
-    {
-      canvasMode: 'resize',
-      contentMode: 'push-down',
-      title: '',
-      url: 'x'.repeat(2049),
-    },
-    vi.fn(),
-    insertOrUpdateBrowserFrame
-  );
-
-  const applyButton = Array.from(
-    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
-  ).find((button) => button.textContent === 'editor.compact.apply');
-  expect(applyButton?.disabled).toBe(true);
-  expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
-    'editor.compact.browserFrameUrlTooLong'
-  );
-  const urlInput = container?.querySelector<HTMLInputElement>(
-    'input[placeholder="Enter page URL"]'
-  );
-  expect(urlInput?.getAttribute('aria-invalid')).toBe('true');
-  expect(urlInput?.getAttribute('aria-describedby')).toBe('editor-browser-frame-url-error');
-});
-
-it('uses a no-op insert action when the browser frame owner omits it', async () => {
-  container = document.createElement('div');
-  document.body.appendChild(container);
-  root = createRoot(container);
-
-  await act(async () => {
-    root?.render(
-      <EditorInspectorBrowserFramePanelContent
-        browserCanvasModeOptions={[]}
-        browserContentModeOptions={[]}
-        browserFrame={{
-          canvasMode: 'resize',
-          contentMode: 'push-down',
-          title: '',
-          url: '',
+  const writes = vi.fn();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  function Harness() {
+    const [frame, setFrame] = useState<BrowserFrameState>({
+      ...DEFAULT_BROWSER_FRAME_STATE,
+      url: 'example.com',
+    });
+    return (
+      <EditorWindowHeaderSettings
+        browserFrame={frame}
+        syncBrowserFrame={(patch) => {
+          writes(patch);
+          setFrame((previous) => ({ ...previous, ...patch }));
         }}
-        syncBrowserFrame={vi.fn()}
       />
     );
-  });
-
-  await act(async () => {
-    Array.from(container?.querySelectorAll<HTMLButtonElement>('button[type="button"]') ?? [])
-      .find((button) => button.textContent?.includes('editor.compact.apply'))
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-
-  expect(container?.textContent).toContain('editor.compact.apply');
+  }
+  try {
+    useEditorStore.setState({
+      browserFrame: { ...DEFAULT_BROWSER_FRAME_STATE, enabled: true },
+      sessionId: 'document-one',
+      layers: [{ type: 'source-image', id: 'source' }] as never,
+    });
+    await act(async () => root.render(<Harness />));
+    const toggle = container.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('windowHeader.favicon')}"]`
+    );
+    expect(toggle).not.toBeNull();
+    await act(async () => toggle?.click());
+    expect(acquisition.acquire).toHaveBeenCalled();
+    await act(async () => useEditorStore.setState({ sessionId: 'document-two' }));
+    expect(signal?.aborted).toBe(true);
+    const writesBeforeResolution = writes.mock.calls.length;
+    await act(async () =>
+      resolve(
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII='
+      )
+    );
+    expect(writes).toHaveBeenCalledTimes(writesBeforeResolution);
+  } finally {
+    act(() => root.unmount());
+  }
 });

@@ -1,3 +1,8 @@
+import {
+  DEFAULT_WINDOW_HEADER,
+  isWindowHeaderFavicon,
+  type WindowHeader,
+} from '../../browser-frame/header';
 import type {
   BrowserFrameState,
   EditorFrameSettings,
@@ -55,6 +60,7 @@ function normalizeEditorBackgroundBlurAmount(value: unknown): number {
 }
 
 export const DEFAULT_BROWSER_FRAME_STATE = {
+  ...DEFAULT_WINDOW_HEADER,
   title: '',
   url: '',
   faviconDataUrl: null,
@@ -74,10 +80,12 @@ export function normalizeBrowserFrameState(
   browserFrame: Partial<BrowserFrameState> | null | undefined,
   frame?: Partial<EditorFrameSettings> | null
 ): BrowserFrameState {
+  const header = resolveEditorWindowHeader(browserFrame);
   return {
+    ...header,
     title: browserFrame?.title ?? frame?.browserTitle ?? DEFAULT_BROWSER_FRAME_STATE.title,
     url: browserFrame?.url ?? frame?.browserUrl ?? DEFAULT_BROWSER_FRAME_STATE.url,
-    faviconDataUrl: browserFrame?.faviconDataUrl ?? DEFAULT_BROWSER_FRAME_STATE.faviconDataUrl,
+    faviconDataUrl: header.faviconDataUrl ?? null,
     canvasMode: browserFrame?.canvasMode ?? DEFAULT_BROWSER_FRAME_STATE.canvasMode,
     contentMode: normalizeBrowserFrameContentMode(browserFrame?.contentMode),
   };
@@ -139,5 +147,22 @@ export function normalizeEditorFrameSettings(
     layoutMode: frame?.layoutMode ?? DEFAULT_EDITOR_FRAME_SETTINGS.layoutMode,
     browserTitle: frame?.browserTitle ?? DEFAULT_EDITOR_FRAME_SETTINGS.browserTitle,
     browserUrl: frame?.browserUrl ?? DEFAULT_EDITOR_FRAME_SETTINGS.browserUrl,
+  };
+}
+
+/** Project image settings projected into the shared, renderer-neutral header contract. */
+export function resolveEditorWindowHeader(
+  frame: Partial<BrowserFrameState> | null | undefined
+): WindowHeader {
+  const faviconEnabled = frame?.faviconEnabled ?? false;
+  const faviconDataUrl = frame?.faviconDataUrl;
+  return {
+    kind: frame?.kind ?? DEFAULT_WINDOW_HEADER.kind,
+    style: frame?.style ?? DEFAULT_WINDOW_HEADER.style,
+    theme: frame?.theme ?? DEFAULT_WINDOW_HEADER.theme,
+    title: (frame?.title ?? '').slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
+    url: (frame?.url ?? '').slice(0, 2048).replace(/[\uD800-\uDFFF]/gu, ''),
+    faviconEnabled,
+    ...(faviconEnabled && isWindowHeaderFavicon(faviconDataUrl) ? { faviconDataUrl } : {}),
   };
 }

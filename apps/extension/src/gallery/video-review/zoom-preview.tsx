@@ -53,7 +53,7 @@ export function ReviewZoomPreview(props: {
 }) {
   const { loadFrame, region, sourceTime } = props;
   const image = useReviewBackgroundImage(props.background);
-  const header = useReviewWindowHeader(props.windowHeader, props.source.width);
+  const header = useReviewWindowHeader(props.windowHeader, props.source.width, props.source.height);
   const [zoomView, setView] = useState<'area' | 'result'>('area');
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
   const overlay = !!(region.spotlight || region.border);

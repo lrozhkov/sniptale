@@ -36,6 +36,7 @@ export function buildEditorCanvasDocument(options: {
     throw new Error(translate('editor.runtime.editorNotInitialized'));
   }
 
+  const { enabled: _runtimePresence, ...browserFrame } = options.browserFrame;
   return {
     version: 2,
     sourceImageData: options.source.dataUrl,
@@ -50,7 +51,7 @@ export function buildEditorCanvasDocument(options: {
     sourceDisplayWidth: options.source.displayWidth,
     sourceDisplayHeight: options.source.displayHeight,
     frame: normalizeEditorFrameSettings(options.frame),
-    browserFrame: { ...options.browserFrame },
+    browserFrame,
     canvasJson: serializeCanvasObjects(options.canvas),
     richShapes: collectRichShapeDocumentObjects(options.canvas),
   };

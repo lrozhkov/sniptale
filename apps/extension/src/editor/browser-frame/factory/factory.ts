@@ -28,6 +28,7 @@ async function createBrowserMockupImage(options: FrameOptions): Promise<FabricOb
   const renderOptions = {
     browserFrame: options.browserFrame,
     height: layout.chrome.height,
+    sourceHeight: options.source.height,
     headerHeight: layout.headerHeight,
     radius: layout.radius,
     width: layout.chrome.width,

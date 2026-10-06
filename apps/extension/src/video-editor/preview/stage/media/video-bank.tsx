@@ -1,3 +1,4 @@
+import { projectWindowHeaderImages } from '../../../../features/video/composition/draw/window-header';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getProjectSceneBackgroundImageAssetId } from '../../../../features/video/project/scene/background';
 import { isVideoClip } from '../../../../features/video/project/timeline';
@@ -117,13 +118,19 @@ export function usePreviewStageImageBank(
   );
 
   useEffect(() => {
+    const headerImages = projectWindowHeaderImages(project, activeClips);
+    const sources = {
+      ...assetUrls,
+      ...Object.fromEntries(headerImages.map(({ key, src }) => [key, src])),
+    };
     const activeImageAssetIds = resolveActiveImageAssetIds(project, activeClips);
+    headerImages.forEach(({ key }) => activeImageAssetIds.add(key));
     pruneInactiveImages(cacheRef, activeImageAssetIds);
     setImages({ ...cacheRef.current });
 
     let cancelled = false;
     activeImageAssetIds.forEach((assetId) => {
-      const src = assetUrls[assetId];
+      const src = sources[assetId];
       if (!src || cacheRef.current[assetId]?.src === src) {
         return;
       }
@@ -137,6 +144,13 @@ export function usePreviewStageImageBank(
         cacheRef.current[assetId] = image;
         setImages({ ...cacheRef.current });
       };
+      if (headerImages.some(({ key }) => key === assetId)) {
+        image.onerror = () => {
+          if (cancelled) return;
+          cacheRef.current[assetId] = image;
+          setImages({ ...cacheRef.current });
+        };
+      }
       image.src = src;
     });
 

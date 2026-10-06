@@ -174,13 +174,8 @@ export interface QuickEditOriginalAudio {
   volume: number;
 }
 
-/** Browser is the only supported window decoration; original source coordinates stay unchanged. */
-export interface QuickEditWindowHeader {
-  kind: 'browser';
-  title: string;
-  /** Display text only; missing addresses remain blank for legacy headers. */
-  url?: string;
-}
+/** Source coordinates remain independent of the decorated window. */
+export type QuickEditWindowHeader = import('../../../browser-frame/header').WindowHeader;
 
 /** An explicit base canvas size; absence means native source dimensions. */
 export interface QuickEditCanvasSize {

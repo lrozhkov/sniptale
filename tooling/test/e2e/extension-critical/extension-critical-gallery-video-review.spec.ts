@@ -9,7 +9,7 @@ import {
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createHash } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { ALL_FORMATS, BlobSource, Input } from 'mediabunny';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -3593,17 +3593,51 @@ for (const variant of [
         key: 'gallery.videoReview.windowHeaderNone' | 'gallery.videoReview.windowHeaderBrowser'
       ) => {
         await section
-          .getByRole('button', { name: label('gallery.videoReview.windowHeader'), exact: true })
+          .getByRole('button', {
+            name: label(
+              key === 'gallery.videoReview.windowHeaderBrowser'
+                ? 'windowHeader.browser'
+                : 'windowHeader.none'
+            ),
+            exact: true,
+          })
           .click();
-        await page.getByRole('option', { name: label(key), exact: true }).click();
       };
       await choose('gallery.videoReview.windowHeaderBrowser');
+      const segmentGeometry = await section.getByRole('button').evaluateAll(
+        (buttons, labels) =>
+          buttons
+            .filter((button) => labels.includes(button.textContent ?? ''))
+            .map((button) => {
+              const css = getComputedStyle(button);
+              return {
+                label: button.textContent,
+                height: button.getBoundingClientRect().height,
+                paddingTop: css.paddingTop,
+                paddingBottom: css.paddingBottom,
+                lineHeight: css.lineHeight,
+                fontSize: css.fontSize,
+              };
+            }),
+        ['Windows', 'macOS', 'Linux', label('windowHeader.light'), label('windowHeader.dark')]
+      );
+      await writeFile(
+        info.outputPath('window-header-segment-geometry.json'),
+        JSON.stringify(segmentGeometry, null, 2)
+      );
+      expect(segmentGeometry).toHaveLength(5);
+      for (const geometry of segmentGeometry) {
+        expect(geometry.height).toBe(segmentGeometry[0]!.height);
+        expect(geometry.paddingTop).toBe(segmentGeometry[0]!.paddingTop);
+        expect(geometry.paddingBottom).toBe(segmentGeometry[0]!.paddingBottom);
+        expect(geometry.lineHeight).toBe(segmentGeometry[0]!.lineHeight);
+      }
       const title = section.getByRole('textbox', {
-        name: label('gallery.videoReview.windowHeaderTitle'),
+        name: label('windowHeader.tabTitle'),
         exact: true,
       });
       const address = section.getByRole('textbox', {
-        name: label('gallery.videoReview.windowHeaderUrl'),
+        name: label('windowHeader.address'),
         exact: true,
       });
       await expect(address).toHaveValue('');
@@ -3619,7 +3653,7 @@ for (const variant of [
       await expect
         .poll(async () => {
           const box = (await stage.boundingBox())!;
-          return Math.abs(box.width / box.height - 160 / 108);
+          return Math.abs(box.width / box.height - 160 / 100);
         })
         .toBeLessThan(0.02);
       const artwork = async () =>
@@ -3718,7 +3752,7 @@ for (const variant of [
       try {
         const video = (await input.getPrimaryVideoTrack())!;
         expect(await video.getDisplayWidth()).toBe(160);
-        expect(await video.getDisplayHeight()).toBe(108);
+        expect(await video.getDisplayHeight()).toBe(100);
       } finally {
         input.dispose();
       }
@@ -3787,12 +3821,8 @@ for (const locale of ['en', 'ru'] as const) {
       await expect
         .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
         .not.toBe('none');
-      await button('gallery.videoReview.windowHeader').click();
-      await page
-        .getByRole('option', {
-          name: label('gallery.videoReview.windowHeaderBrowser'),
-          exact: true,
-        })
+      await dialog
+        .getByRole('button', { name: label('windowHeader.browser'), exact: true })
         .click();
       await expect(stage.locator('img')).toHaveCount(1);
       await button('gallery.videoReview.back').click();
@@ -3906,14 +3936,9 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
       await corners.fill('0');
       await corners.press('Enter');
       const chooseHeader = async (on: boolean) => {
-        await button('gallery.videoReview.windowHeader').click();
-        await page
-          .getByRole('option', {
-            name: label(
-              on
-                ? 'gallery.videoReview.windowHeaderBrowser'
-                : 'gallery.videoReview.windowHeaderNone'
-            ),
+        await dialog
+          .getByRole('button', {
+            name: label(on ? 'windowHeader.browser' : 'windowHeader.none'),
             exact: true,
           })
           .click();

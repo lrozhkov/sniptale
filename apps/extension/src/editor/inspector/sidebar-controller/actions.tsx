@@ -13,9 +13,19 @@ import {
 } from './workspace-color-action';
 import type { SidebarActionArgs } from './types';
 
-function createBrowserFrameSyncAction(args: SidebarActionArgs) {
+function createBrowserFrameSyncAction(
+  args: SidebarActionArgs,
+  controller: ReturnType<typeof useEditorController>
+) {
   return async (updates: Partial<BrowserFrameState>) => {
-    args.setBrowserFrame({ ...useEditorStore.getState().browserFrame, ...updates });
+    const { enabled, ...draft } = updates;
+    if (enabled === false) {
+      await controller.removeBrowserFrame();
+      return;
+    }
+    const next = { ...useEditorStore.getState().browserFrame, ...draft };
+    args.setBrowserFrame(next);
+    if (enabled === true) await controller.applyBrowserFrame(next);
   };
 }
 
@@ -29,7 +39,7 @@ export function useEditorInspectorSidebarActions(args: SidebarActionArgs, hasIma
     controller,
     selectionSettingsEnabled,
   });
-  const syncBrowserFrame = createBrowserFrameSyncAction(args);
+  const syncBrowserFrame = createBrowserFrameSyncAction(args, controller);
 
   const patchStep = (patch: Parameters<typeof args.updateStepSettings>[0]) => {
     if (args.selection.selectedObjectType === 'step') {

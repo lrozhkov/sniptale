@@ -1,3 +1,4 @@
+import type { WindowHeader } from '../../../../features/browser-frame/header';
 import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { VideoEditorSessionActions } from '../../../contracts/commands/session';
@@ -145,6 +146,7 @@ export interface WorkspaceSidebarProps {
   onUpdateMediaClipFitScalePercent?: (clipId: string, fitScalePercent: number) => void;
   onUpdateMediaClipShadowIntensity?: (clipId: string, shadowIntensity: number) => void;
   onUpdateMediaClipShadowMode?: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
+  onUpdateMediaClipWindowHeader?: (clipId: string, windowHeader: WindowHeader | undefined) => void;
   onApplyMediaClipVisualsToTrack?: (clipId: string) => void;
   onConvertTextClipToAnnotation?: (
     clipId: string,

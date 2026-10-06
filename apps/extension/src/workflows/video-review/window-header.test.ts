@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
 import {
@@ -9,7 +10,11 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 it('encodes title as inert XML text and includes no invented address', () => {
-  const url = reviewWindowHeaderUrl({ kind: 'browser', title: '<img>&"' }, 1920);
+  const url = reviewWindowHeaderUrl(
+    { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '<img>&"' },
+    1920,
+    1080
+  );
   const svg = decodeURIComponent(url.split(',')[1]!);
   expect(svg).toContain('&lt;img&gt;&amp;&quot;');
   expect(svg).not.toContain('<img>');
@@ -33,7 +38,11 @@ it('releases image listeners after load, failure and abort', async () => {
     'createImageBitmap',
     vi.fn(async () => bitmap)
   );
-  const url = reviewWindowHeaderUrl({ kind: 'browser', title: 'Example' }, 160);
+  const url = reviewWindowHeaderUrl(
+    { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Example' },
+    160,
+    90
+  );
   const controller = new AbortController();
   const success = loadReviewWindowHeader(url, controller.signal);
   const image = images.at(-1)!;
@@ -55,23 +64,28 @@ it('releases image listeners after load, failure and abort', async () => {
 
 it('renders a long Unicode tab title without splitting an emoji during truncation', () => {
   expect(() =>
-    reviewWindowHeaderUrl({ kind: 'browser', title: 'a' + '😀'.repeat(40) }, 1920)
+    reviewWindowHeaderUrl(
+      { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'a' + '😀'.repeat(40) },
+      1920,
+      1080
+    )
   ).not.toThrow();
 });
 
 it('renders supplied addresses as inert escaped text and keeps empty addresses blank', () => {
   const header = {
+    ...DEFAULT_WINDOW_HEADER,
     kind: 'browser' as const,
     title: 'Tab',
     url: 'https://site.test/<img>?a="b"&c=1',
   };
-  const svg = decodeURIComponent(reviewWindowHeaderUrl(header, 1920).split(',')[1]!);
+  const svg = decodeURIComponent(reviewWindowHeaderUrl(header, 1920, 1080).split(',')[1]!);
   expect(svg).toContain('https://site.test/&lt;img&gt;?a=&quot;b&quot;&amp;c=1');
   expect(svg).not.toContain('<img>');
   expect(svg).not.toMatch(/(?:href|src)="https:\/\/site\.test/);
-  expect(decodeURIComponent(reviewWindowHeaderUrl({ ...header, url: '  ' }, 1920))).not.toContain(
-    'example.com'
-  );
+  expect(
+    decodeURIComponent(reviewWindowHeaderUrl({ ...header, url: '  ' }, 1920, 1080))
+  ).not.toContain('example.com');
 });
 
 it('closes a raster that finishes after cancellation and propagates rasterization failure', async () => {

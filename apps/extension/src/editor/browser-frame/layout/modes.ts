@@ -2,7 +2,8 @@ import type {
   BrowserFrameState,
   EditorFrameSettings,
 } from '../../../features/editor/document/types';
-import { BROWSER_HEADER_HEIGHT } from '../../document/model';
+import { windowHeaderGeometry } from '../../../features/browser-frame/header';
+import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 
 type BrowserFrameActiveStateInput = boolean | Pick<BrowserFrameState, 'enabled'>;
 
@@ -17,9 +18,15 @@ function resolveBrowserFrameActiveState(
   return hasBrowserFrame ?? Boolean(browserFrameOrActive.enabled);
 }
 
-export function getBrowserHeaderHeight(browserFrameOrActive: BrowserFrameActiveStateInput): number {
+export function getBrowserHeaderHeight(
+  browserFrameOrActive: BrowserFrameActiveStateInput,
+  browserFrame?: BrowserFrameState,
+  source: { width: number; height: number } = { width: 900, height: 900 }
+): number {
   const hasBrowserFrame = resolveBrowserFrameActiveState(browserFrameOrActive);
-  return hasBrowserFrame ? BROWSER_HEADER_HEIGHT : 0;
+  return hasBrowserFrame
+    ? windowHeaderGeometry(resolveEditorWindowHeader(browserFrame), source).height
+    : 0;
 }
 
 export function shouldPreserveCanvasForBrowserFrame(

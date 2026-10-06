@@ -1,3 +1,4 @@
+import { projectWindowHeaderImages } from '../../../features/video/composition/draw/window-header';
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
   getVideoClipSourceTime,
@@ -218,6 +219,11 @@ function createMaterializerMediaState(
     const image = params.ownerDocument.createElement('img');
     image.src = src;
     state.imageBank[asset.id] = image;
+  }
+  for (const { key, src } of projectWindowHeaderImages(params.project)) {
+    const image = params.ownerDocument.createElement('img');
+    image.src = src;
+    state.imageBank[key] = image;
   }
   return state;
 }

@@ -76,6 +76,10 @@ export function resolveVideoCompositionActionSourceMapping(
   return {
     frame: clip.transform,
     fitMode: clip.fitMode,
+    ...(clip.windowHeader &&
+    !project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+      ? { windowHeader: clip.windowHeader }
+      : {}),
     sourceWidth: asset.metadata.width,
     sourceHeight: asset.metadata.height,
     renderState: resolveClipTransitionVisualState(project, clip, currentTime),

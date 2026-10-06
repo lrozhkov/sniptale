@@ -1,7 +1,8 @@
 import type { FabricObject } from 'fabric';
 import type { BrowserFrameState } from '../../../../../features/editor/document/types';
 import { resolveEditorSceneLayout } from '../../../../browser-frame/layout';
-import { BROWSER_HEADER_HEIGHT } from '../../../../document/model';
+import { windowHeaderGeometry } from '../../../../../features/browser-frame/header';
+import { resolveEditorWindowHeader } from '../../../../../features/editor/document/constants';
 
 import type { SourceState } from '../../../../document/model/source-state';
 import type { RelayoutOptions } from '../helpers';
@@ -24,23 +25,14 @@ export function hasBrowserFrameSourceSizeChange(args: {
 export function resolveNextBrowserFramePosition(args: {
   currentSource: SourceState;
   existingLayer: FabricObject | null;
-  nextSource: { left: number; top: number };
+  browserFrame?: BrowserFrameState;
+  nextSource: { left: number; top: number; width?: number; height?: number };
 }) {
-  if (!args.existingLayer) {
-    return {
-      left: args.nextSource.left,
-      top: Math.max(0, args.nextSource.top - BROWSER_HEADER_HEIGHT),
-    };
-  }
-
-  return {
-    left:
-      (args.existingLayer.left ?? args.currentSource.left) +
-      (args.nextSource.left - args.currentSource.left),
-    top:
-      (args.existingLayer.top ?? Math.max(0, args.currentSource.top - BROWSER_HEADER_HEIGHT)) +
-      (args.nextSource.top - args.currentSource.top),
-  };
+  const height = windowHeaderGeometry(resolveEditorWindowHeader(args.browserFrame), {
+    width: args.nextSource.width ?? args.currentSource.displayWidth,
+    height: args.nextSource.height ?? args.currentSource.displayHeight,
+  }).height;
+  return { left: args.nextSource.left, top: args.nextSource.top - height };
 }
 
 export function resolveNextBrowserFrameWidth(args: {

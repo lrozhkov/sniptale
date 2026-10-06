@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import {
   reviewWindowHeaderUrl,
   loadReviewWindowHeader,
@@ -57,7 +58,7 @@ function paintJoin(args: {
     output,
     source: video,
     background,
-    windowHeader: { kind: 'browser', title: '' },
+    windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
     camera,
   });
   drawReviewSceneFrame(context, {
@@ -118,7 +119,11 @@ export async function probeHeaderSeams() {
   const results = [];
   for (const width of [784, 931, 1920]) {
     const image = await loadReviewWindowHeader(
-      reviewWindowHeaderUrl({ kind: 'browser', title: 'Header', url: '' }, width),
+      reviewWindowHeaderUrl(
+        { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Header', url: '' },
+        width,
+        height
+      ),
       new AbortController().signal
     );
     try {

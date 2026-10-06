@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
 import {
@@ -335,7 +336,8 @@ it('persists and removes a browser header through the existing content history',
   const { session, deps, build } = setup();
   act(() =>
     advanced.setWindowHeader({
-      kind: 'browser',
+      ...DEFAULT_WINDOW_HEADER,
+      kind: 'browser' as const,
       title: 'A <browser> & title',
       url: 'https://site.test/?a=1&b=2',
     })
@@ -343,7 +345,8 @@ it('persists and removes a browser header through the existing content history',
   await act(async () => advanced.flush());
   const reopened = createVideoReviewSession(build(), deps);
   expect(reopened.getSnapshot().document.advancedContent.windowHeader).toEqual({
-    kind: 'browser',
+    ...DEFAULT_WINDOW_HEADER,
+    kind: 'browser' as const,
     title: 'A <browser> & title',
     url: 'https://site.test/?a=1&b=2',
   });
@@ -354,6 +357,13 @@ it('persists and removes a browser header through the existing content history',
   const operation = session.getSnapshot().snapshot.workspace.history.at(-1);
   expect(operation).toMatchObject({
     target: 'advancedContent',
-    before: { windowHeader: { kind: 'browser' } },
+    before: {
+      windowHeader: {
+        ...DEFAULT_WINDOW_HEADER,
+        kind: 'browser' as const,
+        title: 'A <browser> & title',
+        url: 'https://site.test/?a=1&b=2',
+      },
+    },
   });
 });

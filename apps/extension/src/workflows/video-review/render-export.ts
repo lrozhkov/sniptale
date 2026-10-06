@@ -432,7 +432,11 @@ async function openReviewRenderSource(
       baseCanvas: scene.canvas,
       headerImage: preparation.effective.windowHeader
         ? await loadReviewWindowHeader(
-            reviewWindowHeaderUrl(preparation.effective.windowHeader, sourceSize.width),
+            reviewWindowHeaderUrl(
+              preparation.effective.windowHeader,
+              sourceSize.width,
+              sourceSize.height
+            ),
             signal
           )
         : null,

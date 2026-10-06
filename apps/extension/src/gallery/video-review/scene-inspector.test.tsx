@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -112,7 +113,8 @@ it('edits browser title and address independently and bounds Unicode text safely
   const changed = vi.fn();
   function Harness() {
     const [header, setHeader] = useState<QuickEditWindowHeader>({
-      kind: 'browser',
+      ...DEFAULT_WINDOW_HEADER,
+      kind: 'browser' as const,
       title: 'Legacy',
     });
     return (
@@ -126,7 +128,7 @@ it('edits browser title and address independently and bounds Unicode text safely
     );
   }
   const edit = async (index: number, value: string) => {
-    const field = host.querySelectorAll('input')[index]!;
+    const field = host.querySelectorAll<HTMLInputElement>('input:not([type=checkbox])')[index]!;
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value);
       field.dispatchEvent(new Event('input', { bubbles: true }));
@@ -134,16 +136,20 @@ it('edits browser title and address independently and bounds Unicode text safely
   };
   try {
     await act(async () => root.render(<Harness />));
-    expect(host.querySelectorAll('input')[1]!.value).toBe('');
+    expect(host.querySelectorAll<HTMLInputElement>('input:not([type=checkbox])')[1]!.value).toBe(
+      ''
+    );
     await edit(1, 'https://site.test/😀');
     expect(changed).toHaveBeenLastCalledWith({
-      kind: 'browser',
+      ...DEFAULT_WINDOW_HEADER,
+      kind: 'browser' as const,
       title: 'Legacy',
       url: 'https://site.test/😀',
     });
     await edit(0, 'New title');
     expect(changed).toHaveBeenLastCalledWith({
-      kind: 'browser',
+      ...DEFAULT_WINDOW_HEADER,
+      kind: 'browser' as const,
       title: 'New title',
       url: 'https://site.test/😀',
     });
@@ -153,7 +159,8 @@ it('edits browser title and address independently and bounds Unicode text safely
     expect(changed.mock.lastCall?.[0].title).toBe('t'.repeat(511));
     await edit(1, '');
     expect(changed.mock.lastCall?.[0]).toEqual({
-      kind: 'browser',
+      ...DEFAULT_WINDOW_HEADER,
+      kind: 'browser' as const,
       title: 't'.repeat(511),
       url: '',
     });

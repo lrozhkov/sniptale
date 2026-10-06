@@ -14,7 +14,7 @@ export function resolveEditorSceneLayout(input: ResolveEditorSceneLayoutInput): 
     preserveCanvasSize,
     fitSourceToContent,
   } = input;
-  const headerHeight = getBrowserHeaderHeight(hasBrowserFrame);
+  const headerHeight = getBrowserHeaderHeight(hasBrowserFrame, browserFrame, input.source);
 
   return resolveEditorSceneLayoutGeometry({
     browserFrame,

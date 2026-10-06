@@ -106,9 +106,9 @@ function createEditorCanvasDocumentOptions() {
 }
 
 function expectBuiltEditorDocument(document: ReturnType<typeof buildEditorCanvasDocument>) {
+  expect(document.browserFrame).not.toHaveProperty('enabled');
   expect(document).toMatchObject({
     browserFrame: {
-      enabled: true,
       title: 'Browser frame',
     },
     canvasHeight: 100,

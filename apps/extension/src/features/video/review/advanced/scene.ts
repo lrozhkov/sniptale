@@ -1,6 +1,6 @@
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
-import { quickEditWindowHeaderSize } from './window-header';
+import { windowHeaderGeometry } from '../../../browser-frame/header';
 import { fitVideoRect } from '../geometry';
 import type {
   QuickEditBackgroundSettings,
@@ -63,8 +63,8 @@ export function computeQuickEditSceneSize(input: Omit<SceneInput, 'output' | 'ca
   const fitted = fitVideoRect(content, input.source);
   const headerHeight = input.windowHeader
     ? Math.ceil(
-        (quickEditWindowHeaderSize(input.source.width).height * fitted.width) /
-          quickEditWindowHeaderSize(input.source.width).width /
+        (windowHeaderGeometry(input.windowHeader, input.source).height * fitted.width) /
+          input.source.width /
           2
       ) * 2
     : 0;

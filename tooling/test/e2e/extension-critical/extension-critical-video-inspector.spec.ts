@@ -1,8 +1,12 @@
+import { writeFile } from 'node:fs/promises';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
 import { expect } from '@playwright/test';
 import { test } from '../support/extension-fixture';
 import { applyHarnessBootstrap, VIDEO_EDITOR_HARNESS_PATH } from '../extension-critical.helpers';
+import { createVideoClipFromAsset } from '../../../../apps/extension/src/features/video/project/factories/clip';
+import { VideoProjectAssetType } from '../../../../apps/extension/src/features/video/project/types';
+import { createVideoProjectAsset } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
@@ -297,4 +301,169 @@ for (const locale of ['ru', 'en'] as const) {
       }
     });
   }
+}
+
+for (const viewport of [
+  { width: 1280, height: 560 },
+  { width: 1920, height: 900 },
+  { width: 1100, height: 560 },
+]) {
+  test(`video window header controls ${viewport.width}x${viewport.height}`, async ({
+    page,
+    hostOrigin,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ colorScheme: 'dark' });
+    const project = createEmptyVideoProject('Window header proof');
+    const asset = createVideoProjectAsset(
+      'Landscape',
+      VideoProjectAssetType.IMAGE,
+      { kind: 'recording', recordingId: 'header-image' },
+      {
+        width: 1280,
+        height: 720,
+        duration: 5,
+        mimeType: 'image/svg+xml',
+        size: 200,
+        hasAudio: false,
+        audioPeaks: null,
+      }
+    );
+    project.assets.push(asset);
+    const first = createVideoClipFromAsset(
+      project.tracks[0]!.id,
+      asset,
+      project.width,
+      project.height
+    );
+    const second = createVideoClipFromAsset(
+      project.tracks[0]!.id,
+      asset,
+      project.width,
+      project.height,
+      6
+    );
+    project.clips.push(first, second);
+    await applyHarnessBootstrap(page, {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [project],
+      recordings: [
+        {
+          id: 'header-image',
+          filename: 'landscape.svg',
+          mimeType: 'image/svg+xml',
+          bytes:
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720"><rect width="1280" height="720" fill="#286b8a"/><circle cx="640" cy="360" r="160" fill="#edc777"/></svg>',
+        },
+      ],
+      storage: { 'sniptale-locale-preference': 'en', 'sniptale-theme-preference': 'dark' },
+    });
+    await page.addInitScript(() => localStorage.setItem('sniptale-locale-preference', 'en'));
+    await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}&theme=dark`);
+    await page.locator(`[data-project-timeline-clip="${first.id}"]`).click();
+    const settings = page.locator('[data-ui="window-header-settings"]');
+    await expect(settings).toBeVisible();
+    await expect(settings.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await settings.getByRole('button', { name: 'Browser', exact: true }).click();
+    const segmentGeometry = await settings.getByRole('button').evaluateAll((buttons) =>
+      buttons
+        .filter((button) =>
+          ['Windows', 'macOS', 'Linux', 'Light', 'Dark'].includes(button.textContent ?? '')
+        )
+        .map((button) => {
+          const css = getComputedStyle(button);
+          return {
+            label: button.textContent,
+            height: button.getBoundingClientRect().height,
+            paddingTop: css.paddingTop,
+            paddingBottom: css.paddingBottom,
+            lineHeight: css.lineHeight,
+            fontSize: css.fontSize,
+            minHeight: css.minHeight,
+          };
+        })
+    );
+    await writeFile(
+      info.outputPath('window-header-segment-geometry.json'),
+      JSON.stringify(segmentGeometry, null, 2)
+    );
+    expect(segmentGeometry).toHaveLength(5);
+    for (const geometry of segmentGeometry) {
+      expect(geometry.height).toBe(segmentGeometry[0]!.height);
+      expect(geometry.paddingTop).toBe(segmentGeometry[0]!.paddingTop);
+      expect(geometry.paddingBottom).toBe(segmentGeometry[0]!.paddingBottom);
+      expect(geometry.lineHeight).toBe(segmentGeometry[0]!.lineHeight);
+    }
+
+    await settings
+      .getByRole('textbox', { name: 'Tab title', exact: true })
+      .fill('Full editor browser');
+    await settings
+      .getByRole('textbox', { name: 'Website address', exact: true })
+      .fill('example.com');
+    await expect(
+      settings.getByRole('button', { name: 'Use website icon', exact: true })
+    ).toHaveAttribute('aria-pressed', 'false');
+    await settings.getByRole('button', { name: 'macOS', exact: true }).click();
+    await settings.getByRole('button', { name: 'Light', exact: true }).click();
+    await expect(settings.getByRole('button', { name: 'Light', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    await settings
+      .getByRole('textbox', { name: 'Website address', exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({ path: info.outputPath('window-header-browser.png'), fullPage: false });
+    await page.locator(`[data-project-timeline-clip="${second.id}"]`).click();
+    await expect(settings.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await page.locator(`[data-project-timeline-clip="${first.id}"]`).click();
+    await expect(settings.getByRole('textbox', { name: 'Tab title', exact: true })).toHaveValue(
+      'Full editor browser'
+    );
+    await settings.getByRole('button', { name: 'Application', exact: true }).click();
+    await expect(
+      settings.getByRole('textbox', { name: 'Website address', exact: true })
+    ).toHaveCount(0);
+    await expect(
+      settings.getByRole('button', { name: 'Use website icon', exact: true })
+    ).toHaveCount(0);
+    await settings
+      .getByRole('textbox', { name: 'Window title', exact: true })
+      .fill('Full editor application');
+    await settings.getByRole('button', { name: 'Linux', exact: true }).click();
+    await settings.getByRole('button', { name: 'Dark', exact: true }).click();
+    await settings
+      .getByRole('textbox', { name: 'Window title', exact: true })
+      .scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: info.outputPath('window-header-application.png'),
+      fullPage: false,
+    });
+    await expect
+      .poll(() => settings.evaluate((node) => node.scrollWidth - node.clientWidth))
+      .toBeLessThanOrEqual(1);
+    if (viewport.width < 1280) {
+      const scrollOwner = page.locator('[data-ui="video-editor.workspace.root"]');
+      await expect
+        .poll(() => scrollOwner.evaluate((node) => node.scrollWidth))
+        .toBeGreaterThan(viewport.width);
+      await scrollOwner.evaluate((node) => {
+        node.scrollLeft = node.scrollWidth;
+      });
+      await expect.poll(() => scrollOwner.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+      await page.screenshot({
+        path: info.outputPath('window-header-horizontal-scroll.png'),
+        fullPage: false,
+      });
+    }
+    await settings.getByRole('button', { name: 'Off', exact: true }).click();
+    await expect(settings.getByRole('textbox')).toHaveCount(0);
+  });
 }

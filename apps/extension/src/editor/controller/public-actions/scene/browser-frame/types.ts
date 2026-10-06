@@ -6,6 +6,7 @@ import type { EditorSceneStoreBridge, RelayoutOptions } from '../helpers';
 
 export type BrowserFrameActionOptions = {
   canvas: Canvas | null;
+  isMutationCurrent?: () => boolean;
   canvasDocumentSize: { width: number; height: number };
   source: SourceState | null;
   store: Pick<EditorSceneStoreBridge, 'getBrowserFrame' | 'getFrame' | 'setBrowserFrame'>;

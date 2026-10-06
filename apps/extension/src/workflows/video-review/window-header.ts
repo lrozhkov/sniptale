@@ -1,20 +1,16 @@
 import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
-import { quickEditWindowHeaderSize } from '../../features/video/review/advanced/window-header';
-import { composeExactBrowserFrameSvg } from '../../features/browser-frame/compositor';
+
+import { composeWindowHeaderSvg } from '../../features/browser-frame/appearance';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 
 /** Local artwork only: title and address are escaped by the shared compositor, with no remote resources. */
-export function reviewWindowHeaderUrl(header: QuickEditWindowHeader, width: number): string {
-  const size = quickEditWindowHeaderSize(width);
-  const svg = composeExactBrowserFrameSvg({
-    ...size,
-    headerHeight: size.height,
-    contentHeight: 0,
-    radius: 0,
-    title: header.title,
-    url: header.url?.trim() || null,
-  });
+export function reviewWindowHeaderUrl(
+  header: QuickEditWindowHeader,
+  width: number,
+  height: number
+): string {
+  const svg = composeWindowHeaderSvg(header, { width, height });
   // Even output rows and preview snapping can stretch the header slightly. Fill that
   // exact rectangle so SVG aspect fitting cannot open a seam above the video.
   const fitted = svg.replace('<svg ', '<svg preserveAspectRatio="none" ');

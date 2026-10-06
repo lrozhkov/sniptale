@@ -1,3 +1,4 @@
+import { parseWindowHeader } from '../../../../features/browser-frame/header';
 import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import {
   activeCameraPosition,
@@ -33,6 +34,7 @@ export function createClipMediaStyleActions(
   | 'updateMediaClipFitScalePercent'
   | 'updateMediaClipShadowIntensity'
   | 'updateMediaClipShadowMode'
+  | 'updateMediaClipWindowHeader'
   | 'applyMediaClipVisualsToTrack'
 > {
   return {
@@ -64,6 +66,28 @@ export function createClipMediaStyleActions(
         applyProjectUpdate(state, (project) =>
           updateMediaClipVisuals(project, clipId, { shadowMode })
         )
+      ),
+    updateMediaClipWindowHeader: (clipId, windowHeader) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const clip = project.clips.find((item) => item.id === clipId);
+          if (
+            !isMediaClip(clip) ||
+            !areClipTracksEditable(project, [clipId]) ||
+            project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+          )
+            return project;
+          const header = windowHeader === undefined ? undefined : parseWindowHeader(windowHeader);
+          if (header === null || JSON.stringify(header) === JSON.stringify(clip.windowHeader))
+            return project;
+          return applyVideoProjectMutationPatch(project, {
+            clips: project.clips.map((item) => {
+              if (item.id !== clipId || !isMediaClip(item)) return item;
+              const { windowHeader: _previous, ...rest } = item;
+              return header === undefined ? rest : { ...rest, windowHeader: header };
+            }),
+          });
+        })
       ),
     applyMediaClipVisualsToTrack: (clipId) =>
       set((state) =>

@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { describe, expect, it } from 'vitest';
 import {
   resolveVideoTargetBitrate,
@@ -58,7 +59,7 @@ describe('calibrated quick-edit export profile', () => {
 it('fits the complete decorated scene and reports source encoder budget overflow', () => {
   const state = createQuickEditAdvancedState();
   state.ui.mode = 'advanced';
-  state.windowHeader = { kind: 'browser', title: 'Browser' };
+  state.windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Browser' };
   const source = { ...index, width: 1920, height: 1080 };
   expect(
     resolveReviewOutputProfile(source, state, {
@@ -66,14 +67,14 @@ it('fits the complete decorated scene and reports source encoder budget overflow
       frameRate: 30,
       resolution: '1080P',
     })
-  ).toMatchObject({ width: 1778, height: 1080, dimensionsSupported: true });
+  ).toMatchObject({ width: 1750, height: 1080, dimensionsSupported: true });
   expect(
     resolveReviewOutputProfile(source, state, {
       quality: 'HIGH',
       frameRate: 30,
       resolution: '720P',
     })
-  ).toMatchObject({ width: 1184, height: 720 });
+  ).toMatchObject({ width: 1166, height: 720 });
   state.canvas = { width: 7680, height: 4320 };
   expect(resolveReviewOutputProfile(source, state)).toMatchObject({ dimensionsSupported: false });
   expect(

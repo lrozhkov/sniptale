@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { expect, it, vi } from 'vitest';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 
@@ -18,7 +19,7 @@ it.each(['fixed', 'follow-video'] as const)(
       source: { width: 640, height: 360 },
       output: { width: 640, height: 426 },
       background,
-      windowHeader: { kind: 'browser', title: '' },
+      windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
       camera: { scale: 2, centerX: 0.4, centerY: 0.5 },
     });
     const motion = computeQuickEditSceneCamera(layout, background);

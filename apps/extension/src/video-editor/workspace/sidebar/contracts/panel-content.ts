@@ -61,6 +61,7 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onUpdateMediaClipFitScalePercent'
   | 'onUpdateMediaClipShadowIntensity'
   | 'onUpdateMediaClipShadowMode'
+  | 'onUpdateMediaClipWindowHeader'
   | 'onUpdateMotionRegion'
   | 'onUpdateShapeStyle'
   | 'onUpdateSubtitleTrackStyle'

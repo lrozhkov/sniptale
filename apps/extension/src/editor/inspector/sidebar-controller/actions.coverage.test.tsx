@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   controller: {
     applyActiveSettingsToSelection: vi.fn(),
     applyBrowserFrame: vi.fn(async () => undefined),
+    removeBrowserFrame: vi.fn(async () => undefined),
     applyFrameSettings: vi.fn(),
     applyTextSelectionStyle: vi.fn(),
     commitHistory: vi.fn(),
@@ -118,7 +119,7 @@ it('routes selected image and step changes through selection history', async () 
   expect(mocks.controller.applyActiveSettingsToSelection).toHaveBeenCalledTimes(2);
   expect(mocks.controller.commitHistory).toHaveBeenCalledOnce();
   expect(imageArgs.setBrowserFrame).toHaveBeenCalledWith({
-    enabled: true,
+    enabled: false,
     style: 'browser',
   });
   expect(mocks.controller.applyBrowserFrame).toHaveBeenCalled();
@@ -157,4 +158,13 @@ it('routes tool defaults, no-image guards, and copy failures', async () => {
   await expect(failing.result.editorActions.onCopyRenderedImage()).rejects.toThrow('copy failed');
   expect(toast.error).toHaveBeenCalledWith('editor.runtime.copyImageFailed');
   failing.root.unmount();
+});
+
+it('routes Off to controller removal without storing an independent activation flag', async () => {
+  const args = createArgs(null, false);
+  const view = renderActions(args, true);
+  await view.result.editorActions.syncBrowserFrame({ enabled: false });
+  expect(mocks.controller.removeBrowserFrame).toHaveBeenCalledOnce();
+  expect(args.setBrowserFrame).not.toHaveBeenCalled();
+  view.root.unmount();
 });

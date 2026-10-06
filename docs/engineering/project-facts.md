@@ -147,6 +147,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/aggregate-editor-presence`
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`
+- `apps/extension/src/workflows/browser-frame`
 - `apps/extension/src/workflows/editor`
 - `apps/extension/src/workflows/file-naming`
 - `apps/extension/src/workflows/media-hub`

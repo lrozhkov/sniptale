@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { VideoSample } from 'mediabunny';
 import { createQuickEditBorder } from '../../features/video/review/advanced/border';
@@ -51,9 +52,9 @@ it.each(['fixed', 'follow-video'] as const)(
       zoomBehavior,
     };
     const sourceSize = { width: 320, height: 180 };
-    const windowHeader = { kind: 'browser' as const, title: 'Header' };
+    const windowHeader = { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Header' };
     const canvas = computeQuickEditSceneSize({ source: sourceSize, background, windowHeader });
-    const area = { x: 0.2, y: 0, width: 0.5, height: 0.1 };
+    const area = { x: 0.2, y: 0, width: 0.5, height: 0.05 };
     const region = {
       ...createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2 }),
       enter: { type: 'none' as const, duration: 0 },

@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { drawReviewSceneFrame } from './scene-frame';
 import { state, contextFixture, argsFixture } from './render-export.test-support';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
@@ -586,7 +587,12 @@ it.each([false, true])(
     state.sourceHeight = 1064;
     state.encoded.length = 0;
     const args = argsFixture({ frameRate: 40 });
-    if (header) args.advanced.windowHeader = { kind: 'browser', title: 'Header' };
+    if (header)
+      args.advanced.windowHeader = {
+        ...DEFAULT_WINDOW_HEADER,
+        kind: 'browser' as const,
+        title: 'Header',
+      };
     const { resolveReviewOutputProfile } = await import('./render-settings');
     const index = {
       ...args.index,

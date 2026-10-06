@@ -131,40 +131,43 @@ it('ignores non-user and managed background objects', () => {
   expect(backgroundObject.set).not.toHaveBeenCalled();
 });
 
-it('uses safe geometry fallbacks for sparse user and browser-frame objects', () => {
-  const sparseUserObject = {
-    kind: 'user',
-    left: 10,
-    set: vi.fn(),
-    setCoords: vi.fn(),
-    top: 20,
-  };
-  const sparseBrowserFrame = {
-    getScaledHeight: vi.fn(() => undefined),
-    getScaledWidth: vi.fn(() => undefined),
-    kind: 'user',
-    sniptaleType: 'browser-frame',
-    set: vi.fn(),
-    setCoords: vi.fn(),
-  };
+it.each([undefined, Number.NaN, 0])(
+  'uses safe geometry fallbacks for sparse user and browser-frame objects (%s)',
+  (dimension) => {
+    const sparseUserObject = {
+      kind: 'user',
+      left: 10,
+      set: vi.fn(),
+      setCoords: vi.fn(),
+      top: 20,
+    };
+    const sparseBrowserFrame = {
+      getScaledHeight: vi.fn(() => dimension),
+      getScaledWidth: vi.fn(() => dimension),
+      kind: 'user',
+      sniptaleType: 'browser-frame',
+      set: vi.fn(),
+      setCoords: vi.fn(),
+    };
 
-  updateUserObjectLayout({
-    canvas: { getObjects: () => [sparseUserObject, sparseBrowserFrame] } as never,
-    currentSource: { ...createSourceState(), displayHeight: 0, displayWidth: 0 } as never,
-    layoutSource: { height: 100, left: 40, top: 60, width: 200 },
-    sourceSizeChanged: true,
-  });
+    updateUserObjectLayout({
+      canvas: { getObjects: () => [sparseUserObject, sparseBrowserFrame] } as never,
+      currentSource: { ...createSourceState(), displayHeight: 0, displayWidth: 0 } as never,
+      layoutSource: { height: 100, left: 40, top: 60, width: 200 },
+      sourceSizeChanged: true,
+    });
 
-  expect(sparseUserObject.set).toHaveBeenCalledWith(
-    expect.objectContaining({
-      scaleX: 200,
-      scaleY: 100,
-    })
-  );
-  expect(sparseBrowserFrame.set).toHaveBeenCalledWith(
-    expect.objectContaining({
-      scaleX: 1,
-      scaleY: 1,
-    })
-  );
-});
+    expect(sparseUserObject.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scaleX: 200,
+        scaleY: 100,
+      })
+    );
+    expect(sparseBrowserFrame.set).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scaleX: 1,
+        scaleY: 1,
+      })
+    );
+  }
+);
