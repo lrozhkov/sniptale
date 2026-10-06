@@ -186,3 +186,57 @@ it('converges after a sustained twofold speedup without holding minutes of stale
   expect(previous).toBeGreaterThanOrEqual(110);
   expect(previous).toBeLessThanOrEqual(120);
 });
+
+function completionText() {
+  return host.querySelectorAll('span')[1]?.textContent ?? '';
+}
+
+it('keeps completion fixed between clock ticks despite parent progress rerenders', () => {
+  vi.setSystemTime(new Date(2026, 9, 6, 15, 0, 0));
+  render({ remainingMs: 179_600 });
+  const initial = completionText();
+  expect(initial).toContain('03:02');
+  monotonic = 500;
+  vi.setSystemTime(new Date(2026, 9, 6, 15, 0, 0, 500));
+  render({ remainingMs: 179_100 });
+  expect(completionText()).toBe(initial);
+});
+
+it('holds the completion minute through small sustained revisions on both sides of its boundary', () => {
+  vi.setSystemTime(new Date(2026, 9, 6, 15, 0, 0));
+  render({ remainingMs: 357_000 });
+  for (let second = 1; second <= 60; second++) {
+    const deadline = Math.floor((second - 1) / 15) % 2 ? 357_000 : 363_000;
+    step(deadline - second * 1000);
+    expect(completionText()).toContain('03:05');
+  }
+  for (let second = 61; second <= 90; second++) step(380_000 - second * 1000);
+  expect(completionText()).toContain('03:06');
+});
+
+it('retains the later minute for a small earlier correction but accepts a meaningful one', () => {
+  vi.setSystemTime(new Date(2026, 9, 6, 15, 0, 0));
+  render({ remainingMs: 363_000 });
+  for (let second = 1; second <= 30; second++) {
+    step(357_000 - second * 1000);
+    expect(completionText()).toContain('03:06');
+  }
+  for (let second = 31; second <= 60; second++) step(340_000 - second * 1000);
+  expect(completionText()).toContain('03:05');
+});
+
+it('uses the same stable minute for the date label and releases it once that minute is past', () => {
+  vi.setSystemTime(new Date(2026, 9, 6, 23, 58, 0));
+  render({ remainingMs: 117_000 });
+  for (let second = 1; second <= 30; second++) {
+    step(123_000 - second * 1000);
+    expect(completionText()).toContain('11:59');
+    expect(completionText()).not.toContain('timeTomorrow');
+  }
+  monotonic = 120_000;
+  vi.setSystemTime(new Date(2026, 9, 7, 0, 0, 0));
+  act(() => vi.advanceTimersByTime(1000));
+  expect(completionText()).toContain('12:00');
+  expect(completionText()).not.toContain('11:59');
+  expect(completionText()).not.toContain('timeTomorrow');
+});

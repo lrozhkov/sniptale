@@ -24,10 +24,10 @@ function durationLabel(milliseconds: number, locale: AppLocale): string {
   return parts.join(' ');
 }
 
-function completionLabel(remainingMs: number, locale: AppLocale): string | null {
+function completionLabel(nowMs: number, finishMs: number, locale: AppLocale): string | null {
   try {
-    const now = new Date(Date.now());
-    const finish = new Date(now.getTime() + remainingMs);
+    const now = new Date(nowMs);
+    const finish = new Date(finishMs);
     if (!Number.isFinite(now.getTime()) || !Number.isFinite(finish.getTime())) return null;
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -47,6 +47,30 @@ function completionLabel(remainingMs: number, locale: AppLocale): string | null 
   } catch {
     return null;
   }
+}
+
+interface ForecastDisplay {
+  remaining: number;
+  wallNow: number;
+  completionMinute: number | null;
+}
+
+/** One clock sample for both labels; a ten-second margin prevents minute-boundary flicker. */
+function sampleDisplay(
+  remaining: number,
+  previousMinute: number | null,
+  wallNow = Date.now()
+): ForecastDisplay {
+  const finish = wallNow + remaining;
+  if (!Number.isFinite(finish) || !Number.isFinite(wallNow) || !(remaining > 0))
+    return { remaining, wallNow, completionMinute: null };
+  const minute = Math.floor(finish / 60_000) * 60_000;
+  const retain =
+    previousMinute !== null &&
+    wallNow < previousMinute + 60_000 &&
+    finish >= previousMinute - 10_000 &&
+    finish < previousMinute + 70_000;
+  return { remaining, wallNow, completionMinute: retain ? previousMinute : minute };
 }
 
 interface ForecastClock {
@@ -97,7 +121,11 @@ export function VideoExportTimeHint({
   const locale = useAppLocale();
   const clock = useRef<ForecastClock | null>(null);
   const pending = useRef<number | null>(null);
-  const [remaining, setRemaining] = useState(NaN);
+  const [display, setDisplay] = useState<ForecastDisplay>({
+    remaining: NaN,
+    wallNow: NaN,
+    completionMinute: null,
+  });
   const enabled = active && !finishing && !!estimate;
   useEffect(() => {
     const now = performance.now();
@@ -105,7 +133,7 @@ export function VideoExportTimeHint({
     if (!enabled || !Number.isFinite(now) || !Number.isFinite(duration) || !(duration! > 0)) {
       clock.current = null;
       pending.current = null;
-      setRemaining(NaN);
+      setDisplay(sampleDisplay(NaN, null));
       return;
     }
     pending.current = now + duration!;
@@ -117,7 +145,7 @@ export function VideoExportTimeHint({
         samples: [{ at: now, deadline: pending.current }],
       };
       pending.current = null;
-      setRemaining(duration!);
+      setDisplay(sampleDisplay(duration!, null));
     }
   }, [enabled, estimate]);
   useEffect(() => {
@@ -125,20 +153,24 @@ export function VideoExportTimeHint({
     const timer = setInterval(() => {
       const now = performance.now();
       if (!clock.current || !Number.isFinite(now) || now < clock.current.updatedAt) {
-        setRemaining(NaN);
+        setDisplay(sampleDisplay(NaN, null));
         return;
       }
       if (now - clock.current.updatedAt >= 1000) {
         clock.current = advanceForecast(clock.current, now, pending.current);
         pending.current = null;
       }
-      setRemaining(clock.current.deadline - now);
+      const remaining = clock.current.deadline - now;
+      const wallNow = Date.now();
+      setDisplay((previous) => sampleDisplay(remaining, previous.completionMinute, wallNow));
     }, 1000);
     return () => clearInterval(timer);
   }, [enabled]);
   if (!active || finishing) return null;
+  const { remaining, wallNow, completionMinute } = display;
   const valid = Number.isFinite(remaining) && remaining > 0;
-  const completion = valid ? completionLabel(remaining, locale) : null;
+  const completion =
+    valid && completionMinute !== null ? completionLabel(wallNow, completionMinute, locale) : null;
   return (
     <div
       data-ui="video.exportTimeEstimate"
