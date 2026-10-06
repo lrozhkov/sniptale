@@ -400,8 +400,9 @@ it('retains the projected source phase clock in Border Result after cut and spee
     output,
     [
       expect.objectContaining({
-        start: expect.closeTo(7.5 / (284 + Math.PI), 10),
-        end: expect.closeTo(7.5 / (284 + Math.PI) + 0.25, 10),
+        // Dashed corners use four chords per quarter-circle (radius 0.5).
+        start: expect.closeTo(7.5 / (284 + 16 * Math.sin(Math.PI / 16)), 10),
+        end: expect.closeTo(7.5 / (284 + 16 * Math.sin(Math.PI / 16)) + 0.25, 10),
         dashOffset: -7.5,
         opacity: 1,
       }),

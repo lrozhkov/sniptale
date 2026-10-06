@@ -252,6 +252,9 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Не удалось завершить экспорт. Исходник и правки сохранены. Проверьте галерею перед повтором.',
     en: 'Export could not finish. The original and edits are preserved. Check the gallery before retrying.',
   },
+  exportFinished: { ru: 'Завершён', en: 'Completed' },
+  exportCompleted: { ru: 'Экспорт успешно завершён.', en: 'Export completed successfully.' },
+  openExportInLibrary: { ru: 'Открыть в библиотеке', en: 'Open in library' },
   exportAdded: {
     ru: 'Готовая копия добавлена в галерею.',
     en: 'Exported copy added to the gallery.',

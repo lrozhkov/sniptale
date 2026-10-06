@@ -6,6 +6,12 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+// These integration fixtures contain synthetic bytes, not a decodable media stream.
+vi.mock('./use-zoom-preview-source', async (original) => ({
+  ...(await original<typeof import('./use-zoom-preview-source')>()),
+  useZoomPreviewSource: () => null,
+}));
+
 const integration = vi.hoisted(() => ({
   load: vi.fn(),
   index: vi.fn(),
@@ -201,6 +207,7 @@ it('keeps Scene and Export after the accompanying draft context reset', async ()
 it.each(['success', 'cancel', 'failure'] as const)(
   'keeps Export available during playback and releases the editor after %s',
   async (outcome) => {
+    vi.useFakeTimers();
     const fixture = createEditorFixture(integration);
     integration.index.mockResolvedValue({
       duration: 4,
@@ -232,6 +239,7 @@ it.each(['success', 'cancel', 'failure'] as const)(
       );
       await fixture.click('advancedEditing');
       await fixture.click('zoomAdd');
+      await act(async () => vi.advanceTimersByTimeAsync(300));
       await fixture.click('exportSection');
       await fixture.click('play');
       expect(fixture.button('exportVideo').disabled).toBe(false);
@@ -259,6 +267,7 @@ it.each(['success', 'cancel', 'failure'] as const)(
     } finally {
       finish?.();
       await fixture.cleanup();
+      vi.useRealTimers();
     }
   }
 );

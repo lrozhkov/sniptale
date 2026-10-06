@@ -113,6 +113,7 @@ it('serializes the export button, honors cancellation, and leaves no false succe
     });
     expect(fixture.hook.failed).toBe(false);
     expect(fixture.hook.result).toBeNull();
+    expect(fixture.hook.completion).toBeNull();
     expect(fixture.hook.phase).toBe('idle');
   } finally {
     await fixture.cleanup();
@@ -178,6 +179,7 @@ it('downloads a selection without replacing the full-result report receipt', asy
       expect.any(Function)
     );
     expect(fixture.hook.result).toBe(full);
+    expect(fixture.hook.completion).toEqual({ destination: 'download', mediaId: null });
     expect(fixture.hook.phase).toBe('idle');
   } finally {
     await fixture.cleanup();
@@ -436,6 +438,77 @@ it('binds time estimates to the current attempt and clears them on cancel and pu
     });
     expect(fixture.hook.phase).toBe('idle');
     expect(fixture.hook.timeEstimate).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('retains completion metadata until dismissal or the next attempt, without clearing the report receipt', async () => {
+  const fixture = setup();
+  const value = {
+    file: new File(['copy'], 'copy.webm'),
+    receipt: { filename: 'copy.webm', mediaId: 'recording:copy' },
+  };
+  mocks.export.mockResolvedValue(value);
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () => fixture.hook.start());
+    expect(fixture.hook.completion).toEqual({ destination: 'gallery', mediaId: 'recording:copy' });
+    expect(fixture.hook.progress).toBe(100);
+    expect(fixture.hook.timeEstimate).toBeNull();
+    act(() => fixture.hook.dismissCompletion());
+    expect(fixture.hook.completion).toBeNull();
+    expect(fixture.hook.result).toBe(value);
+    await act(async () => fixture.hook.start());
+    let finish!: (value: unknown) => void;
+    mocks.export.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = fixture.hook.start();
+    });
+    expect(fixture.hook.completion).toBeNull();
+    act(() => mocks.export.mock.calls.at(-1)![0].onProgress(1));
+    expect(fixture.hook.completion).toBeNull();
+    act(() => fixture.hook.dismissCompletion());
+    await act(async () => {
+      finish(value);
+      await pending;
+    });
+    expect(fixture.hook.completion).toBeNull();
+    mocks.export.mockRejectedValue(new Error('failed'));
+    await act(async () => fixture.hook.start());
+    expect(fixture.hook.completion).toBeNull();
+    expect(fixture.hook.failed).toBe(true);
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('reports direct downloads and ignores cleanup errors from an older completed download', async () => {
+  const fixture = setup();
+  const value = {
+    file: new File(['copy'], 'copy.webm'),
+    receipt: { filename: 'copy.webm', mediaId: null },
+    release: vi.fn(),
+  };
+  mocks.export.mockResolvedValue(value);
+  mocks.download.mockImplementation(() => undefined);
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () => fixture.hook.start('download'));
+    const oldCleanupError = mocks.download.mock.calls.at(-1)![3];
+    expect(fixture.hook.completion).toEqual({ destination: 'download', mediaId: null });
+    await act(async () => fixture.hook.download());
+    expect(fixture.hook.completion).toEqual({ destination: 'download', mediaId: null });
+    expect(fixture.hook.progress).toBe(100);
+    act(() => oldCleanupError(new Error('old cleanup')));
+    expect(fixture.hook.failed).toBe(false);
+    expect(fixture.hook.completion).not.toBeNull();
   } finally {
     await fixture.cleanup();
   }

@@ -12,6 +12,12 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+// These integration fixtures contain synthetic bytes, not a decodable media stream.
+vi.mock('./use-zoom-preview-source', async (original) => ({
+  ...(await original<typeof import('./use-zoom-preview-source')>()),
+  useZoomPreviewSource: () => null,
+}));
+
 const integration = vi.hoisted(() => ({
   load: vi.fn(),
   index: vi.fn(),

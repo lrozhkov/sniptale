@@ -189,6 +189,8 @@ export function ReviewEditActions(props: {
   timeEstimate?: VideoProjectExportTimeEstimate | null;
   failed: boolean;
   hasResult: boolean;
+  completion?: ReturnType<typeof import('./use-export').useReviewExport>['completion'];
+  onOpenResult?: (mediaId: string) => void;
   settings?: ReactNode;
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
@@ -197,24 +199,30 @@ export function ReviewEditActions(props: {
   onDownload(): void;
 }) {
   const running = props.phase !== 'idle';
+  const completion = !running && !props.failed ? props.completion : null;
+  const displayedProgress = completion || props.phase === 'publishing' ? 100 : props.progress;
   const blocked = !!props.advancedBlockers?.length;
   const actionDivider = props.settings
     ? 'border-t border-[var(--sniptale-color-border-soft)] pt-2'
     : '';
   return (
     <div className="space-y-2">
-      {running ? (
+      {running || completion ? (
         <div
-          className="sticky top-0 z-10 space-y-1 bg-[var(--sniptale-color-surface-panel)] py-2"
+          className={`sticky top-0 z-10 space-y-1 py-2
+            bg-[rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]
+            ${props.settings ? 'border-b border-[var(--sniptale-color-border-soft)]' : ''}`}
           data-ui="gallery.videoReview.exportProgress"
         >
           <div className="flex items-center justify-between gap-2 text-xs" role="status">
             <span>
               {props.phase === 'publishing'
                 ? translate('gallery.videoReview.publishing')
-                : `${translate('gallery.videoReview.exporting')} ${props.progress}%`}
+                : `${translate('gallery.videoReview.exporting')} ${displayedProgress}%`}
             </span>
-            {props.phase === 'exporting' ? (
+            {completion ? (
+              <span>{translate('gallery.videoReview.exportFinished')}</span>
+            ) : props.phase === 'exporting' ? (
               <ReviewButton
                 label={translate('gallery.videoReview.cancelExport')}
                 className={reviewTextButtonClassName}
@@ -227,19 +235,38 @@ export function ReviewEditActions(props: {
             aria-label={translate('gallery.videoReview.exporting')}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={props.phase === 'publishing' ? 100 : props.progress}
+            aria-valuenow={displayedProgress}
             className="h-1 overflow-hidden rounded-sm bg-[var(--sniptale-color-border-soft)]"
           >
             <div
               className="h-full bg-[var(--sniptale-color-accent)]"
-              style={{ width: `${props.phase === 'publishing' ? 100 : props.progress}%` }}
+              style={{ width: `${displayedProgress}%` }}
             />
           </div>
-          <VideoExportTimeHint
-            estimate={props.timeEstimate}
-            active={props.phase === 'exporting'}
-            finishing={props.progress >= 100}
-          />
+          {completion ? (
+            <div className="space-y-1 text-xs" role="status">
+              <p>
+                {translate(
+                  completion.destination === 'gallery'
+                    ? 'gallery.videoReview.exportAdded'
+                    : 'gallery.videoReview.exportCompleted'
+                )}
+              </p>
+              {completion.mediaId && props.onOpenResult ? (
+                <ReviewButton
+                  label={translate('gallery.videoReview.openExportInLibrary')}
+                  className={`${reviewTextButtonClassName} !h-auto !min-h-0 !px-0 text-xs underline underline-offset-2`}
+                  onClick={() => props.onOpenResult?.(completion.mediaId!)}
+                />
+              ) : null}
+            </div>
+          ) : (
+            <VideoExportTimeHint
+              estimate={props.timeEstimate}
+              active={props.phase === 'exporting'}
+              finishing={props.progress >= 100}
+            />
+          )}
         </div>
       ) : null}
       {props.settings}
@@ -445,6 +472,8 @@ export function ReviewInspectorActions({
   busy,
   composerBusy,
   onExport,
+  onOpenResult,
+  toolKey,
 }: {
   exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'];
   advanced: boolean;
@@ -452,7 +481,11 @@ export function ReviewInspectorActions({
   busy: boolean;
   composerBusy: boolean;
   onExport(): void;
+  onOpenResult(mediaId: string): void;
+  toolKey: string;
 }) {
+  const { dismissCompletion } = exporter;
+  useEffect(() => () => dismissCompletion(), [dismissCompletion, toolKey]);
   const exportPlan = exporter.plan();
   const checkingCodecs = exporter.checkingCodecs;
   const settings = advanced ? (
@@ -473,6 +506,8 @@ export function ReviewInspectorActions({
         timeEstimate={exporter.timeEstimate}
         failed={exporter.failed}
         hasResult={!!exporter.result}
+        completion={exporter.completion}
+        onOpenResult={onOpenResult}
         advancedBlockers={
           checkingCodecs
             ? null

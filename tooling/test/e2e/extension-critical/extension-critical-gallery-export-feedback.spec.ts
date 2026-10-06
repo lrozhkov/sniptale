@@ -59,6 +59,7 @@ for (const variant of [
       for (const outcome of ['complete', 'cancel', 'error'] as const) {
         if (outcome === 'cancel') {
           await button('gallery.videoReview.scene').click();
+          await expect(dialog.getByRole('progressbar')).toHaveCount(0);
           const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
           const box = (await ruler.boundingBox())!;
           await page.mouse.move(box.x + box.width * 0.2, box.y + 12);
@@ -101,7 +102,16 @@ for (const variant of [
           document.body.dataset.exportFailure = String(outcome === 'error');
           window.dispatchEvent(new Event('release-review-export'));
         }, outcome);
-        await expect(dialog.getByRole('progressbar')).toHaveCount(0);
+        if (outcome === 'complete') {
+          await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+          await expect(
+            dialog.getByRole('status').filter({ hasText: label('gallery.videoReview.exportAdded') })
+          ).toBeVisible();
+          await expect(button('gallery.videoReview.openExportInLibrary')).toBeInViewport();
+          await expect(dialog.locator('[data-ui="video.exportTimeEstimate"]')).toHaveCount(0);
+          await expect(button('gallery.videoReview.cancelExport')).toHaveCount(0);
+          await page.screenshot({ path: info.outputPath('export-completed.png'), fullPage: false });
+        } else await expect(dialog.getByRole('progressbar')).toHaveCount(0);
         await expect(button('gallery.videoReview.play')).toBeEnabled();
         await expect(button('gallery.videoReview.advancedEditing')).toBeEnabled();
         await expect(button('gallery.videoReview.exportVideo')).toBeEnabled();

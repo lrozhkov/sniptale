@@ -3,7 +3,7 @@ import { useReviewSizeEstimate } from './use-size-estimate';
 import { useReviewExportSettings } from './use-review-export-settings';
 import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
 import { createReviewFragment } from '../../features/video/review/fragment';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   inspectReviewMedia,
   type ReviewMediaIndex,
@@ -104,6 +104,74 @@ function useReviewSourceIndex(file: File) {
   return { sourceIndex, indexing };
 }
 
+/** Keeps dismissible feedback independent from the retained report receipt. */
+function useReviewExportCompletion({
+  setProgress,
+  setTimeEstimate,
+}: Pick<ReturnType<typeof useReviewExportProgress>, 'setProgress' | 'setTimeEstimate'>) {
+  const [failed, setFailed] = useState(false);
+  const [completion, setCompletion] = useState<{
+    destination: 'gallery' | 'download';
+    mediaId: string | null;
+  } | null>(null);
+  const completionGeneration = useRef(0);
+  const dismissCompletion = useCallback(() => {
+    completionGeneration.current++;
+    setCompletion(null);
+  }, []);
+  const showCompletion = (
+    value: NonNullable<typeof completion>,
+    generation = completionGeneration.current
+  ) => {
+    if (completionGeneration.current !== generation) return;
+    setProgress(100);
+    setTimeEstimate(null);
+    setCompletion(value);
+  };
+  const beginAttempt = () => {
+    dismissCompletion();
+    setFailed(false);
+    return completionGeneration.current;
+  };
+  return {
+    completion,
+    completionGeneration,
+    dismissCompletion,
+    showCompletion,
+    failed,
+    setFailed,
+    beginAttempt,
+  };
+}
+
+function useReviewExportLifetime(
+  file: File,
+  setResult: (value: null) => void,
+  dismissCompletion: () => void,
+  clearTimeEstimate: (value: null) => void
+) {
+  const active = useRef<AbortController | null>(null);
+  const publishing = useRef(false);
+  const mounted = useRef(true);
+  const abortActive = useCallback(() => active.current?.abort(), []);
+  useEffect(() => {
+    mounted.current = true;
+    setResult(null);
+    dismissCompletion();
+    return () => {
+      mounted.current = false;
+      abortActive();
+    };
+  }, [file, setResult, dismissCompletion, abortActive]);
+  const cancel = () => {
+    if (!publishing.current) {
+      abortActive();
+      clearTimeEstimate(null);
+    }
+  };
+  return { active, publishing, mounted, cancel };
+}
+
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
   const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
@@ -117,21 +185,17 @@ export function useReviewExport(resource: LoadedReview) {
   );
   const { phase, progress, timeEstimate, changePhase, setProgress, setTimeEstimate } =
     useReviewExportProgress();
-  const [failed, setFailed] = useState(false);
+  const feedback = useReviewExportCompletion({ setProgress, setTimeEstimate });
+  const { completionGeneration, dismissCompletion } = feedback;
   const context = reviewExportContext(resource, renderSettings);
   const [blocked, setBlocked] = useState<ReviewExportBlocker | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
-  const active = useRef<AbortController | null>(null);
-  const publishing = useRef(false);
-  const mounted = useRef(true);
-  useEffect(() => {
-    mounted.current = true;
-    setResult(null);
-    return () => {
-      mounted.current = false;
-      active.current?.abort();
-    };
-  }, [resource.file]);
+  const { active, publishing, mounted, cancel } = useReviewExportLifetime(
+    resource.file,
+    setResult,
+    dismissCompletion,
+    setTimeEstimate
+  );
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
     reviewExportPlan(resource, index, renderSettings, selection);
@@ -147,6 +211,7 @@ export function useReviewExport(resource: LoadedReview) {
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
     if (active.current || !index || checkingCodecs) return;
+    const generation = feedback.beginAttempt();
     sizeEstimate.cancel();
     const attemptContext = reviewExportContext(resource, renderSettings);
     const currentPlan = plan(selection);
@@ -161,7 +226,6 @@ export function useReviewExport(resource: LoadedReview) {
     const controller = new AbortController();
     active.current = controller;
     publishing.current = false;
-    setFailed(false);
     changePhase('exporting');
     try {
       const value = await exportReviewedVideo({
@@ -187,15 +251,22 @@ export function useReviewExport(resource: LoadedReview) {
       else {
         if (destination === 'download')
           downloadGalleryBlob(value.file, value.receipt.filename, value.release, () => {
-            if (mounted.current) setFailed(true);
+            if (mounted.current && completionGeneration.current === generation) {
+              dismissCompletion();
+              feedback.setFailed(true);
+            }
           });
         if (!selection) setResult(value);
+        feedback.showCompletion(
+          { destination, mediaId: destination === 'gallery' ? value.receipt.mediaId : null },
+          generation
+        );
       }
     } catch (error) {
       if (error instanceof QuickEditExportUnavailable) {
         if (mounted.current && !controller.signal.aborted)
           setBlocked({ context: attemptContext, reasons: error.reasons });
-      } else if (mounted.current && !controller.signal.aborted) setFailed(true);
+      } else if (mounted.current && !controller.signal.aborted) feedback.setFailed(true);
     } finally {
       active.current = null;
       publishing.current = false;
@@ -208,12 +279,14 @@ export function useReviewExport(resource: LoadedReview) {
     phase,
     progress,
     timeEstimate,
-    failed,
+    failed: feedback.failed,
     blocked: blocked?.context === context ? blocked.reasons : null,
     checkingCodecs,
     sizeEstimate: sizeEstimate.status,
     setSizeEstimateVisible: sizeEstimate.setVisible,
     result,
+    completion: feedback.completion,
+    dismissCompletion,
     plan,
     renderSettings,
     setRenderSettings,
@@ -223,20 +296,19 @@ export function useReviewExport(resource: LoadedReview) {
     },
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
       start('download', selection),
-    cancel: () => {
-      if (!publishing.current) {
-        active.current?.abort();
-        setTimeEstimate(null);
-      }
-    },
-    download: () =>
-      downloadReviewExport({
+    cancel,
+    download: async () => {
+      if (active.current) return;
+      feedback.beginAttempt();
+      await downloadReviewExport({
         resource,
         renderSettings,
         plan: plan(),
         setBlocked,
         render: () => start('download'),
-      }),
+        onCopy: () => feedback.showCompletion({ destination: 'download', mediaId: null }),
+      });
+    },
   };
 }
 
@@ -296,6 +368,7 @@ async function downloadReviewExport(args: {
   plan: QuickEditExportPlan;
   setBlocked(value: ReviewExportBlocker): void;
   render(): Promise<void>;
+  onCopy(): void;
 }) {
   const { resource, renderSettings, plan } = args;
   if (plan.kind === 'unavailable') {
@@ -308,6 +381,8 @@ async function downloadReviewExport(args: {
   const state = resource.session.getSnapshot();
   const applied =
     plan.video === 'render' || plan.audio === 'process' || state.document.edits.length > 0;
-  if (!applied) downloadGalleryBlob(resource.file, resource.filename);
-  else await args.render();
+  if (!applied) {
+    downloadGalleryBlob(resource.file, resource.filename);
+    args.onCopy();
+  } else await args.render();
 }

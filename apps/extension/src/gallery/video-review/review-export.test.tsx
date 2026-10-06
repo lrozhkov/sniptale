@@ -15,6 +15,10 @@ const integration = vi.hoisted(() => ({
   advanced: vi.fn(),
   download: vi.fn(),
   export: vi.fn(),
+  openGallery: vi.fn(async () => undefined),
+}));
+vi.mock('../../platform/navigation/extension-pages', () => ({
+  openGalleryPage: integration.openGallery,
 }));
 vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
@@ -208,5 +212,50 @@ it('marks the export opener active only while its inspector panel is shown', asy
   } finally {
     await fixture.cleanup();
     vi.useRealTimers();
+  }
+});
+
+it('opens the completed copy and dismisses feedback on tool or inspector changes', async () => {
+  const fixture = createEditorFixture(integration);
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    processedVideoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  integration.export.mockResolvedValue({ receipt: { mediaId: 'recording:exported-copy' } });
+  integration.openGallery.mockClear();
+  const progress = () => fixture.host.querySelector('[role="progressbar"]');
+  try {
+    await act(async () =>
+      fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+    );
+    await fixture.click('advancedEditing');
+    await fixture.click('exportSection');
+    await fixture.click('exportVideo');
+    expect(progress()?.getAttribute('aria-valuenow')).toBe('100');
+    await fixture.click('openExportInLibrary');
+    expect(integration.openGallery).toHaveBeenCalledWith({ mediaId: 'recording:exported-copy' });
+    expect(progress()).not.toBeNull();
+    await fixture.click('cutMode');
+    expect(progress()).toBeNull();
+    await fixture.click('exportVideo');
+    expect(progress()).not.toBeNull();
+    await act(async () =>
+      Array.from(
+        fixture.host.querySelectorAll<HTMLButtonElement>(
+          '[data-ui="gallery.videoReview.inspectorNavigation"] button'
+        )
+      )
+        .find((node) => node.textContent === 'gallery.videoReview.scene')!
+        .click()
+    );
+    await fixture.click('exportSection');
+    expect(progress()).toBeNull();
+  } finally {
+    await fixture.cleanup();
   }
 });

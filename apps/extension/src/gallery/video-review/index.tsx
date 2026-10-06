@@ -1,3 +1,4 @@
+import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
 import { ReviewPreviewFrame } from './preview-frame';
 import { reviewStagePickRegions } from './stage-focus';
@@ -133,6 +134,10 @@ function ReviewInspectorBinding({
         actions={
           <ReviewInspectorActions
             exporter={editing.exporter}
+            toolKey={`${editing.mode}:${state.zoom.drawing}:${state.zoom.insertionType}:${audio.originalTool}`}
+            onOpenResult={(mediaId) => {
+              void run(() => openGalleryPage({ mediaId }));
+            }}
             advanced={snapshot.snapshot.workspace.advanced.ui.mode === 'advanced'}
             hasEdits={snapshot.document.edits.length > 0}
             busy={busy}

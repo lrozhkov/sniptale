@@ -99,6 +99,50 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
     act(() => root.render(<ReviewEditActions {...props} phase="publishing" />));
     expect(button('gallery.videoReview.cancelExport')).toBeNull();
     expect(button('gallery.videoReview.exportVideo')?.disabled).toBe(true);
+    const open = vi.fn();
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          phase="idle"
+          completion={{ destination: 'gallery', mediaId: 'recording:copy' }}
+          settings={<div>Settings</div>}
+          timeEstimate={{ remainingMs: 5000 }}
+          onOpenResult={open}
+        />
+      )
+    );
+    expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe('100');
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(
+      `${translate('gallery.videoReview.exporting')} 100%${translate('gallery.videoReview.exportFinished')}`
+    );
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportProgress"]')?.className
+    ).toContain('border-b');
+    expect(host.textContent).toContain(translate('gallery.videoReview.exportAdded'));
+    const notice = host.querySelectorAll('[role="status"]')[1]!;
+    expect(
+      host.querySelector('[role="progressbar"]')!.compareDocumentPosition(notice) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+    expect(button('gallery.videoReview.cancelExport')).toBeNull();
+    expect(host.querySelector('[data-ui="video.exportTimeEstimate"]')).toBeNull();
+    act(() => button('gallery.videoReview.openExportInLibrary')!.click());
+    expect(open).toHaveBeenCalledWith('recording:copy');
+    act(() =>
+      root.render(
+        <ReviewEditActions
+          {...props}
+          phase="idle"
+          completion={{ destination: 'download', mediaId: null }}
+        />
+      )
+    );
+    expect(
+      host.querySelector('[data-ui="gallery.videoReview.exportProgress"]')?.className
+    ).not.toContain('border-b');
+    expect(host.textContent).toContain(translate('gallery.videoReview.exportCompleted'));
+    expect(button('gallery.videoReview.openExportInLibrary')).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
@@ -296,6 +340,8 @@ it('applies export frame rate and quality options without adding section divider
     failed: false,
     blocked: [],
     result: null,
+    completion: null,
+    dismissCompletion: vi.fn(),
     plan: () => ({ kind: 'ready', video: 'render', audio: 'copy', reasons: [] }),
     renderSettings: { frameRate: 0, quality: 'HIGH' },
     setRenderSettings: vi.fn(),
