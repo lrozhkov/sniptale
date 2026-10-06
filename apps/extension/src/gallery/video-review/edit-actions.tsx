@@ -198,6 +198,40 @@ export function ReviewEditActions(props: {
     : '';
   return (
     <div className="space-y-2">
+      {running ? (
+        <div
+          className="sticky top-0 z-10 space-y-1 bg-[var(--sniptale-color-surface-panel)] py-2"
+          data-ui="gallery.videoReview.exportProgress"
+        >
+          <div className="flex items-center justify-between gap-2 text-xs" role="status">
+            <span>
+              {props.phase === 'publishing'
+                ? translate('gallery.videoReview.publishing')
+                : `${translate('gallery.videoReview.exporting')} ${props.progress}%`}
+            </span>
+            {props.phase === 'exporting' ? (
+              <ReviewButton
+                label={translate('gallery.videoReview.cancelExport')}
+                className={reviewTextButtonClassName}
+                onClick={props.onCancel}
+              />
+            ) : null}
+          </div>
+          <div
+            role="progressbar"
+            aria-label={translate('gallery.videoReview.exporting')}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={props.phase === 'publishing' ? 100 : props.progress}
+            className="h-1 overflow-hidden rounded-sm bg-[var(--sniptale-color-border-soft)]"
+          >
+            <div
+              className="h-full bg-[var(--sniptale-color-accent)]"
+              style={{ width: `${props.phase === 'publishing' ? 100 : props.progress}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
       {props.settings}
       <div
         data-ui="gallery.videoReview.exportActions"
@@ -228,22 +262,6 @@ export function ReviewEditActions(props: {
           <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
       </div>
-      {running ? (
-        <div className="flex items-center justify-between gap-2 text-xs" role="status">
-          <span>
-            {props.phase === 'publishing'
-              ? translate('gallery.videoReview.publishing')
-              : `${translate('gallery.videoReview.exporting')} ${props.progress}%`}
-          </span>
-          {props.phase === 'exporting' ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.cancelExport')}
-              className={reviewTextButtonClassName}
-              onClick={props.onCancel}
-            />
-          ) : null}
-        </div>
-      ) : null}
       {props.failed ? (
         <p role="alert" className="text-xs">
           {translate('gallery.videoReview.exportFailed')}

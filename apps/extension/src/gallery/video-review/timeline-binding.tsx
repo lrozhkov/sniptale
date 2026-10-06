@@ -223,9 +223,11 @@ function ReviewTimelineToolsBinding(
         telemetryAvailable={props.telemetryAvailable}
         setTrackVisibility={props.setTrackVisibility}
         setMode={props.setMode}
-        onDownloadFragment={() =>
-          range.kind === 'range' ? props.editing.exporter.downloadSelection(range) : undefined
-        }
+        onDownloadFragment={() => {
+          if (range.kind !== 'range') return;
+          props.onOpenExport?.();
+          void props.editing.exporter.downloadSelection(range);
+        }}
       />
     </fieldset>
   );

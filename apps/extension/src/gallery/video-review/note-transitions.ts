@@ -30,12 +30,11 @@ export function createReviewNoteTransitions(args: {
     });
   };
   const perform = <T>(action: () => T): T | Promise<T | undefined> | undefined => {
-    if (pending || args.isActive?.() === false) return;
+    if (pending || args.blocked?.() || args.isActive?.() === false) return;
     if (!args.isNew()) {
       failed = false;
       return action();
     }
-    if (args.blocked?.()) return;
     pending = true;
     failed = false;
     args.onPending(true);

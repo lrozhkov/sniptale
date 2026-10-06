@@ -25,13 +25,15 @@ type ExportResult = Awaited<ReturnType<typeof exportReviewedVideo>>;
 export function prepareReviewExporter(
   exporter: ReturnType<typeof useReviewExport>,
   run: (action: () => Promise<unknown>) => Promise<unknown>,
-  flushPending: () => Promise<void>
+  flushPending: () => Promise<void>,
+  pause: () => void
 ): ReturnType<typeof useReviewExport> {
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
     await run(async () => {
+      pause();
       await flushPending();
       await exporter.start(destination, selection);
     });
@@ -42,6 +44,7 @@ export function prepareReviewExporter(
     downloadSelection: (selection) => start('download', selection),
     download: async () => {
       await run(async () => {
+        pause();
         await flushPending();
         await exporter.download();
       });

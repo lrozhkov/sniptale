@@ -139,7 +139,9 @@ export function useReviewEditorWiring(args: {
     flushPendingContent: history.flush,
     moveHistory: history.run,
     removeSelection,
-    exporter: prepareReviewExporter(args.exporter, args.run, history.flush),
+    exporter: prepareReviewExporter(args.exporter, args.run, history.flush, () =>
+      args.video.current?.pause()
+    ),
   };
 }
 

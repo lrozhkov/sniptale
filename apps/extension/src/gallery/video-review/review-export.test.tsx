@@ -126,10 +126,12 @@ it('blocks history and destructive shortcuts while the export controls are disab
         )!
         .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     );
-    const disabledPreview = fixture.host.querySelector<HTMLCanvasElement>(
-      '[data-ui="gallery.videoReview.zoomPreview"] canvas'
-    )!;
-    expect(disabledPreview.tabIndex).toBe(-1);
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.zoomPreview"] canvas')
+    ).toBeNull();
+    expect(
+      fixture.host.querySelector('[data-ui="gallery.videoReview.exportSection"]')
+    ).not.toBeNull();
     expect(target()).toBeNull();
     expect(fixture.button('exportSection').disabled).toBe(false);
     await fixture.click('exportSection');
@@ -139,11 +141,6 @@ it('blocks history and destructive shortcuts while the export controls are disab
       expect(fixture.button(label).matches(':disabled')).toBe(true);
     integration.history.mockClear();
     integration.commit.mockClear();
-    await act(async () =>
-      disabledPreview.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })
-      )
-    );
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(integration.commit).not.toHaveBeenCalled();
     for (const key of ['z', 'y'])

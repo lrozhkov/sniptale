@@ -88,6 +88,9 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
     expect(
       host.querySelector('[data-ui="gallery.videoReview.exportActions"]')?.className
     ).toContain('border-t');
+    const progress = host.querySelector('[role="progressbar"]');
+    expect(progress).not.toBeNull();
+    expect(progress?.getAttribute('aria-valuenow')).toBe('25');
     expect(button('gallery.videoReview.applyCut')).toBeNull();
     expect(button('gallery.videoReview.downloadVideo')?.disabled).toBe(true);
     act(() => button('gallery.videoReview.cancelExport')!.click());

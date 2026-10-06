@@ -180,7 +180,6 @@ function ReviewInspectorBinding({
             busy={busy}
             composerBusy={!!composer.before}
             onExport={() => {
-              video.current?.pause();
               void editing.exporter.start();
             }}
           />
@@ -494,10 +493,13 @@ function ReviewPreviewBinding({
               );
             }}
             onPlaying={(playing) => {
-              if (playing) state.setActiveSelection({ kind: 'none' });
+              if (playing)
+                state.setActiveSelection((current) =>
+                  current.kind === 'none' ? current : { kind: 'none' }
+                );
               state.setPlaying(playing);
             }}
-            onEnded={state.onEnded}
+            onEnded={() => state.beforeAction(state.onEnded)}
             onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
           />
         )}
@@ -611,7 +613,7 @@ function ReviewEditor({
             }}
             onComment={state.selectComment}
             onSeek={state.seek}
-            onPlay={state.play}
+            onPlay={() => state.beforeAction(state.play)}
           />
         </div>
       </div>

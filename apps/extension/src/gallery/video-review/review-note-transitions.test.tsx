@@ -197,3 +197,68 @@ it('keeps Scene and Export after the accompanying draft context reset', async ()
     await fixture.cleanup();
   }
 });
+
+it.each(['success', 'cancel', 'failure'] as const)(
+  'keeps Export available during playback and releases the editor after %s',
+  async (outcome) => {
+    const fixture = createEditorFixture(integration);
+    integration.index.mockResolvedValue({
+      duration: 4,
+      width: 320,
+      height: 180,
+      boundaries: [0, 2, 4],
+      videoCodec: 'vp8',
+      audioCodec: null,
+      container: 'webm',
+      rotation: 0,
+      processedVideoCodec: 'vp9',
+    });
+    let finish!: () => void;
+    integration.export.mockImplementation(
+      () =>
+        new Promise((resolve, reject) => {
+          finish = () =>
+            outcome === 'success'
+              ? resolve({
+                  file: new File(['copy'], 'copy.webm'),
+                  receipt: { filename: 'copy.webm' },
+                })
+              : reject(new Error(outcome));
+        })
+    );
+    try {
+      await act(async () =>
+        fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
+      );
+      await fixture.click('advancedEditing');
+      await fixture.click('zoomAdd');
+      await fixture.click('exportSection');
+      await fixture.click('play');
+      expect(fixture.button('exportVideo').disabled).toBe(false);
+      await fixture.click('exportVideo');
+      expect(fixture.button('play').disabled).toBe(true);
+      expect(fixture.button('advancedEditing').disabled).toBe(true);
+      const calls = vi.mocked(HTMLMediaElement.prototype.play).mock.calls.length;
+      await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })));
+      expect(HTMLMediaElement.prototype.play).toHaveBeenCalledTimes(calls);
+      const revision = fixture.snapshot.workspace.revision;
+      await act(async () =>
+        window.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true })
+        )
+      );
+      expect(fixture.snapshot.workspace.revision).toBe(revision);
+      if (outcome === 'cancel') await fixture.click('cancelExport');
+      await act(async () => finish());
+      expect(fixture.button('play').disabled).toBe(false);
+      expect(fixture.button('advancedEditing').disabled).toBe(false);
+      expect(fixture.button('exportVideo').disabled).toBe(false);
+      expect(fixture.host.textContent?.includes('gallery.videoReview.exportFailed')).toBe(
+        outcome === 'failure'
+      );
+    } finally {
+      finish?.();
+      await fixture.cleanup();
+    }
+  }
+);

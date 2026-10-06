@@ -260,10 +260,13 @@ it('flushes pending edits before the download entry point', async () => {
       },
       async () => {
         order.push('flush');
+      },
+      () => {
+        order.push('pause');
       }
     );
     await act(async () => exporter.download());
-    expect(order).toEqual(['flush', 'download']);
+    expect(order).toEqual(['pause', 'flush', 'download']);
   } finally {
     await fixture.cleanup();
   }
@@ -318,3 +321,52 @@ it('keeps export failure visible when pending edits were flushed after the last 
     await fixture.cleanup();
   }
 });
+
+it.each(['gallery', 'fragment'] as const)(
+  'pauses before awaiting pending content for %s export',
+  async (entry) => {
+    const fixture = setup();
+    const order: string[] = [];
+    let release!: () => void;
+    const flushing = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    mocks.export.mockImplementation(async () => {
+      order.push('export');
+      return { file: new File(['copy'], 'copy.webm'), receipt: { filename: 'copy.webm' } };
+    });
+    try {
+      await act(async () => fixture.root.render(<fixture.Harness />));
+      const exporter = prepareReviewExporter(
+        fixture.hook,
+        async (action) => action(),
+        async () => {
+          order.push('flush');
+          await flushing;
+        },
+        () => {
+          order.push('pause');
+        }
+      );
+      let operation!: Promise<void>;
+      await act(async () => {
+        operation =
+          entry === 'gallery'
+            ? exporter.start()
+            : exporter.downloadSelection({ kind: 'range', start: 2, end: 4 });
+        await Promise.resolve();
+      });
+      expect(order).toEqual(['pause', 'flush']);
+      expect(mocks.export).not.toHaveBeenCalled();
+      await act(async () => {
+        release();
+        await operation;
+      });
+      expect(order).toEqual(['pause', 'flush', 'export']);
+      expect(fixture.hook.phase).toBe('idle');
+    } finally {
+      release();
+      await fixture.cleanup();
+    }
+  }
+);

@@ -340,6 +340,7 @@ function useReviewActionStatus(composer: ReturnType<typeof useReviewComposer>) {
     }
   };
   const canStart = () => {
+    if (busyRef.current) return false;
     const current = composer.getCurrent();
     if (!current.annotation || !current.before) return true;
     setMessage(translate('gallery.videoReview.finishComment'));

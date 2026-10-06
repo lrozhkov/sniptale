@@ -148,7 +148,9 @@ export function useReviewEditorShortcuts(args: {
     time: args.time,
     navigation: args.navigation,
     seek: (...values) => admit(() => args.seek(...values)),
-    play: () => admit(args.play),
+    play: () => {
+      if (!args.busy && !exportBlocked) admit(args.play);
+    },
     cancelDrawing: args.cancelDrawing,
     undo: () => {
       if (!editingBlocked && !exportBlocked) void args.run(args.undo);

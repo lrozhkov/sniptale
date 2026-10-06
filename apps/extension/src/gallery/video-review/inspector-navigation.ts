@@ -51,13 +51,22 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     previousExportRequest.current = props.exportRequest ?? 0;
     const explicit = explicitSection.current;
     explicitSection.current = null;
+    const preserveExport = !modeChanged && props.contextSelection?.kind === 'none';
     if (exportRequested && exportAvailable) updateContext('export');
-    else if (!explicit) updateContext(contextSection === 'selected' ? 'selected' : null);
+    else if (!explicit)
+      updateContext((current) =>
+        preserveExport && current === 'export'
+          ? current
+          : contextSection === 'selected'
+            ? 'selected'
+            : null
+      );
     updateSection((current) =>
       exportRequested && exportAvailable
         ? 'export'
         : (explicit ??
-          (!modeChanged && contextSection === 'scene' && current === 'comments'
+          ((preserveExport && current === 'export') ||
+          (!modeChanged && contextSection === 'scene' && current === 'comments')
             ? current
             : contextSection))
     );

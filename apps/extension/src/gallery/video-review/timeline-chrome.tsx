@@ -186,6 +186,7 @@ export function ReviewToolbar(props: {
             props.playing ? 'gallery.videoReview.pause' : 'gallery.videoReview.play'
           )}
           onClick={props.onPlay}
+          disabled={props.busy}
           className={plain}
           aria-pressed={props.playing}
         >

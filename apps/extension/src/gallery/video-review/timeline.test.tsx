@@ -710,3 +710,13 @@ it('admits wheel zoom through the existing pending-note gate', () => {
   act(() => accept?.());
   expect(slider.valueAsNumber).toBeCloseTo(5);
 });
+
+it('blocks playback while an export transaction owns the busy timeline', () => {
+  const { host, props } = renderTimeline({ busy: true });
+  const play = host.querySelector<HTMLButtonElement>(
+    'button[aria-label="gallery.videoReview.play"]'
+  )!;
+  expect(play.disabled).toBe(true);
+  act(() => play.click());
+  expect(props.onPlay).not.toHaveBeenCalled();
+});
