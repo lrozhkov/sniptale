@@ -174,6 +174,7 @@ export async function writeReviewFrames(args: {
         createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal),
         args.signal
       );
+    const sourceTimeResolution = await source.video.getTimeResolution();
     for (const window of preparation.windows) {
       const segment = window.segment;
       args.signal.throwIfAborted();
@@ -209,6 +210,7 @@ export async function writeReviewFrames(args: {
         context: source.context,
         image: source.image,
         frameSink,
+        sourceTimeResolution,
         transitions,
         transitionFrames,
         videoOut,
@@ -494,6 +496,7 @@ export async function renderRenderWindowFrames(args: {
   context: CanvasRenderingContext2D;
   image: ImageBitmap | null;
   frameSink: Pick<VideoSampleSink, 'samplesAtTimestamps'>;
+  sourceTimeResolution?: number;
   transitions?: readonly ReviewCutTransitionPlan[];
   transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
@@ -517,8 +520,15 @@ export async function renderRenderWindowFrames(args: {
     scratch.width = canvas.width;
     scratch.height = canvas.height;
   }
+  // Container ticks can round a frame PTS above its ideal CFR time (e.g. 2/30 → .067).
+  // Quantize lookups to that clock, but never sample a frame belonging to the next edit.
+  const resolution = args.sourceTimeResolution ?? 1_000_000;
+  const lastTick = (Math.ceil(window.segment.sourceEnd * resolution) - 1) / resolution;
+  const sampleTimes = window.sourceTimes.map((time) =>
+    Math.min(lastTick, Math.round(time * resolution) / resolution)
+  );
   let frame = 0;
-  for await (const sample of args.frameSink.samplesAtTimestamps(window.sourceTimes)) {
+  for await (const sample of args.frameSink.samplesAtTimestamps(sampleTimes)) {
     if (!sample) {
       signal.throwIfAborted();
       throw new Error('Source frame is unavailable.');
