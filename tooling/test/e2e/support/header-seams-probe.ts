@@ -3,7 +3,10 @@ import {
   loadReviewWindowHeader,
 } from '../../../../apps/extension/src/workflows/video-review/window-header';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
-import { computeQuickEditSceneLayout } from '../../../../apps/extension/src/features/video/review/advanced/scene';
+import {
+  computeQuickEditSceneLayout,
+  computeQuickEditVideoTransform,
+} from '../../../../apps/extension/src/features/video/review/advanced/scene';
 
 function measureSlices(image: ImageBitmap, context: CanvasRenderingContext2D) {
   let minAlpha = 255;
@@ -130,4 +133,95 @@ export async function probeHeaderSeams() {
     }
   }
   return results;
+}
+
+/** Compare a boundary stroke with the same stroke embedded in a single source image. */
+export function probeHeaderJoinFiltering() {
+  const source = { width: 931, height: 520 };
+  const header = document.createElement('canvas');
+  header.width = source.width;
+  header.height = 86;
+  const head = header.getContext('2d')!;
+  head.fillStyle = '#ffffff';
+  head.fillRect(0, 0, header.width, header.height);
+  head.fillStyle = '#606060';
+  head.fillRect(0, 85, header.width, 1);
+  const video = document.createElement('canvas');
+  video.width = source.width;
+  video.height = source.height;
+  const body = video.getContext('2d')!;
+  body.fillStyle = '#ffffff';
+  body.fillRect(0, 0, video.width, video.height);
+  const joined = document.createElement('canvas');
+  joined.width = source.width;
+  joined.height = 606;
+  const joint = joined.getContext('2d')!;
+  joint.drawImage(header, 0, 0);
+  joint.drawImage(video, 0, 86);
+  const actual = document.createElement('canvas'),
+    expected = document.createElement('canvas');
+  actual.width = expected.width = 1011;
+  actual.height = expected.height = 686;
+  document.body.append(actual, expected);
+  const context = actual.getContext('2d', { willReadFrequently: true })!,
+    reference = expected.getContext('2d', { willReadFrequently: true })!;
+  context.imageSmoothingQuality = reference.imageSmoothingQuality = 'high';
+  let maxDifference = 0;
+  let worst = null;
+  for (let frame = 0; frame < 90; frame++) {
+    const scale = 1.15 + frame / 300;
+    const background = {
+      enabled: true,
+      type: 'solid',
+      color: '#000000',
+      layout: { padding: 40, cornerRadius: 0 },
+    } as const;
+    const videoRect = { x: 40, y: 126, width: 931, height: 520 };
+    const windowRect = { x: 40, y: 40, width: 931, height: 606 };
+    const layout = {
+      videoRect,
+      windowRect,
+      contentRect: windowRect,
+      videoTransform: computeQuickEditVideoTransform({
+        videoRect,
+        windowRect,
+        camera: { scale, centerX: 0.5, centerY: 0 },
+      }),
+    };
+    drawReviewSceneFrame(context, {
+      canvas: actual,
+      layout,
+      background,
+      image: null,
+      headerImage: header,
+      sample: { draw: (ctx, x, y, width, height) => ctx.drawImage(video, x, y, width, height) },
+    });
+    reference.fillStyle = '#000000';
+    reference.fillRect(0, 0, expected.width, expected.height);
+    reference.drawImage(
+      joined,
+      layout.videoTransform.x,
+      layout.videoTransform.y - 86 * scale,
+      931 * scale,
+      606 * scale
+    );
+    const y = Math.floor(layout.videoTransform.y) - 3;
+    const a = context.getImageData(400, y, 20, 7).data,
+      b = reference.getImageData(400, y, 20, 7).data;
+    for (let index = 0; index < a.length; index++) {
+      const difference = Math.abs(a[index]! - b[index]!);
+      if (difference > maxDifference) {
+        maxDifference = difference;
+        worst = {
+          frame,
+          scale,
+          difference,
+          videoRect: layout.videoRect,
+          windowRect: layout.windowRect,
+          videoTransform: layout.videoTransform,
+        };
+      }
+    }
+  }
+  return { maxDifference, worst };
 }

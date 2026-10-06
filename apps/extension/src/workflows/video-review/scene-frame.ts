@@ -1,3 +1,4 @@
+import { createReviewWindowRaster } from './window-header';
 import { createVideoCompositionPassBuffer } from '../../features/video/composition/canvas/pass-buffer';
 import {
   computeQuickEditSceneCamera,
@@ -21,6 +22,27 @@ export function drawReviewSceneFrame(
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
   }
 ) {
+  const windowRaster =
+    args.headerImage && args.layout.windowRect
+      ? createReviewWindowRaster({
+          header: args.headerImage,
+          videoRect: args.layout.videoRect,
+          windowRect: args.layout.windowRect,
+          draw: args.sample.draw,
+        })
+      : null;
+  try {
+    drawReviewSceneExposure(context, args, windowRaster);
+  } finally {
+    windowRaster?.release();
+  }
+}
+
+function drawReviewSceneExposure(
+  context: CanvasRenderingContext2D,
+  args: Parameters<typeof drawReviewSceneFrame>[1],
+  windowRaster: ReturnType<typeof createReviewWindowRaster> | null
+) {
   const passes = args.motionBlur;
   if (passes && passes.length > 1) {
     const buffer = createVideoCompositionPassBuffer({
@@ -34,22 +56,26 @@ export function drawReviewSceneFrame(
     try {
       for (const pass of passes)
         buffer.drawPass(pass.alpha, (target) =>
-          drawReviewSceneSample(target, {
-            ...args,
-            layout: {
-              ...args.layout,
-              videoTransform: computeQuickEditVideoTransform({
+          drawReviewSceneSample(
+            target,
+            {
+              ...args,
+              layout: {
                 ...args.layout,
-                camera: pass.camera,
-              }),
+                videoTransform: computeQuickEditVideoTransform({
+                  ...args.layout,
+                  camera: pass.camera,
+                }),
+              },
             },
-          })
+            windowRaster
+          )
         );
       buffer.flush();
     } finally {
       buffer.dispose();
     }
-  } else drawReviewSceneSample(context, args);
+  } else drawReviewSceneSample(context, args, windowRaster);
   if (!args.comments?.length) return;
   const { canvas, layout, background, comments, sourceTime } = args;
   context.save();
@@ -124,7 +150,8 @@ function drawReviewSceneSample(
     sourceTime?: number;
     cameraScale?: number;
     sceneScale?: number;
-  }
+  },
+  windowRaster: ReturnType<typeof createReviewWindowRaster> | null
 ) {
   const { canvas, layout, background, image, sample } = args;
   context.fillStyle = '#000000';
@@ -155,23 +182,27 @@ function drawReviewSceneSample(
   );
   context.save();
   clipReviewScene(context, layout, background);
-  if (args.headerImage) {
+  if (windowRaster) {
     const window = computeQuickEditWindowTransform(layout);
     context.drawImage(
-      args.headerImage,
+      windowRaster.image,
+      0,
+      0,
+      windowRaster.width,
+      windowRaster.height,
       window.x,
       window.y,
       window.width,
-      layout.videoTransform.y - window.y
+      window.height
     );
-  }
-  sample.draw(
-    context,
-    layout.videoTransform.x,
-    layout.videoTransform.y,
-    layout.videoTransform.width,
-    layout.videoTransform.height
-  );
+  } else
+    sample.draw(
+      context,
+      layout.videoTransform.x,
+      layout.videoTransform.y,
+      layout.videoTransform.width,
+      layout.videoTransform.height
+    );
   context.restore();
 }
 

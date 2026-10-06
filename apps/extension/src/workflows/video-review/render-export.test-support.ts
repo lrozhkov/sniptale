@@ -129,6 +129,8 @@ const realCreateImageBitmap = globalThis.createImageBitmap;
 export function contextFixture() {
   return {
     translate: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
     scale: vi.fn(),
     fillStyle: '',
     globalAlpha: 1,

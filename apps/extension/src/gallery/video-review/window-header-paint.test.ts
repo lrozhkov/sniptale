@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { paintZoomPreview, computeZoomPreviewArea } from './zoom-preview-paint';
 import { drawReviewSceneFrame } from '../../workflows/video-review/scene-frame';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
+  computeQuickEditWindowTransform,
 } from '../../features/video/review/advanced/scene';
 
 function context() {
   return {
     clearRect: vi.fn(),
+    setTransform: vi.fn(),
     fillRect: vi.fn(),
     save: vi.fn(),
     restore: vi.fn(),
@@ -23,9 +25,12 @@ function context() {
   } as unknown as CanvasRenderingContext2D;
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 it.each(['fixed', 'follow-video'] as const)(
   'paints the same joined window in the inspector and export with %s background',
   (zoomBehavior) => {
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => context());
     const source = { width: 1920, height: 1080 };
     const background = {
       enabled: true as const,
@@ -75,10 +80,10 @@ it.each(['fixed', 'follow-video'] as const)(
         expect(vi.mocked(inspector.roundRect).mock.calls).toEqual(
           vi.mocked(exporter.roundRect).mock.calls
         );
-        const [head, frame] = vi.mocked(exporter.drawImage).mock.calls;
-        expect(Number(head![2]) + Number(head![4])).toBeCloseTo(Number(frame![2]));
-        expect(head![1]).toBe(frame![1]);
-        expect(head![3]).toBe(frame![3]);
+        const [windowDraw] = vi.mocked(exporter.drawImage).mock.calls;
+        expect(vi.mocked(exporter.drawImage).mock.calls).toHaveLength(1);
+        const window = computeQuickEditWindowTransform(layout);
+        expect(windowDraw!.slice(5)).toEqual([window.x, window.y, window.width, window.height]);
         if (scale === 1) {
           const area = computeZoomPreviewArea(layout, background, output);
           if (zoomBehavior === 'fixed') expect(area.y).toBeCloseTo(0);

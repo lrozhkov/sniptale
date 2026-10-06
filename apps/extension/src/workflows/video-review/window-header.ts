@@ -1,3 +1,5 @@
+import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
+import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 import { quickEditWindowHeaderSize } from '../../features/video/review/advanced/window-header';
 import { composeExactBrowserFrameSvg } from '../../features/browser-frame/compositor';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
@@ -61,4 +63,55 @@ export async function loadReviewWindowHeader(
   } finally {
     image.src = '';
   }
+}
+
+/** One source plane lets filtering cross the header/video join. Caller releases the scratch lease. */
+export function createReviewWindowRaster(args: {
+  header: CanvasImageSource;
+  videoRect: QuickEditRect;
+  windowRect: QuickEditRect;
+  draw(
+    context: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void;
+}) {
+  const width =
+    'width' in args.header && typeof args.header.width === 'number' && args.header.width > 0
+      ? args.header.width
+      : args.windowRect.width;
+  const scale = width / args.windowRect.width;
+  const height = args.windowRect.height * scale;
+  const lease = acquireVideoCompositionBuffer(width, height);
+  const context = lease?.canvas.getContext('2d') as CanvasRenderingContext2D | null | undefined;
+  if (!lease || !context) {
+    lease?.release();
+    throw new Error('Window composition canvas is unavailable.');
+  }
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.clearRect(0, 0, lease.canvas.width, lease.canvas.height);
+    context.globalAlpha = 1;
+    context.globalCompositeOperation = 'source-over';
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = 'high';
+    const headerHeight = (args.videoRect.y - args.windowRect.y) * scale;
+    context.drawImage(args.header, 0, 0, width, headerHeight);
+    args.draw(
+      context,
+      (args.videoRect.x - args.windowRect.x) * scale,
+      headerHeight,
+      args.videoRect.width * scale,
+      args.videoRect.height * scale
+    );
+  } catch (error) {
+    lease.release();
+    throw error;
+  } finally {
+    context.restore();
+  }
+  return { image: lease.canvas, width, height, release: lease.release };
 }

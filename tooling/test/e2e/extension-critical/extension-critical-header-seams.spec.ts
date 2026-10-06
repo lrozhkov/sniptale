@@ -31,3 +31,26 @@ test('browser header slices and video join stay opaque through fractional zoom',
       expect.soft(seam.leak, JSON.stringify({ width: sample.width, ...seam })).toBe(0);
   }
 });
+
+test('header boundary stroke filters like an internal line during zoom', async ({ page }, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/header-seams-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+    loader: { '.svg': 'text' },
+    define: { 'process.env.NODE_ENV': '"production"' },
+  });
+  const result = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return (await import(url)).probeHeaderJoinFiltering();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  await writeFile(info.outputPath('join-filtering.json'), JSON.stringify(result, null, 2));
+  await page.screenshot({ path: info.outputPath('join-filtering.png'), fullPage: false });
+  expect(result.maxDifference, JSON.stringify(result.worst)).toBeLessThanOrEqual(1);
+});

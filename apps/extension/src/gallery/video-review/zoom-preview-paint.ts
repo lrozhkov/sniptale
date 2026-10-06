@@ -1,3 +1,4 @@
+import { createReviewWindowRaster } from '../../workflows/video-review/window-header';
 import { drawReviewSceneShadow } from '../../workflows/video-review/scene-shadow';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import {
@@ -59,14 +60,42 @@ export function paintZoomPreview(
   const target = args.view === 'area' ? videoRect : videoTransform;
   const window =
     args.view === 'area' ? args.layout.windowRect : computeQuickEditWindowTransform(args.layout);
-  if (args.headerImage)
-    context.drawImage(args.headerImage, window.x, window.y, window.width, target.y - window.y);
-  if (args.frame)
-    context.drawImage(args.frame.image, target.x, target.y, target.width, target.height);
-  else {
-    context.fillStyle = '#000000';
-    context.fillRect(target.x, target.y, target.width, target.height);
-  }
+  const drawVideo = (
+    targetContext: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ) => {
+    if (args.frame) targetContext.drawImage(args.frame.image, x, y, width, height);
+    else {
+      targetContext.fillStyle = '#000000';
+      targetContext.fillRect(x, y, width, height);
+    }
+  };
+  if (args.headerImage) {
+    const raster = createReviewWindowRaster({
+      header: args.headerImage,
+      videoRect: args.layout.videoRect,
+      windowRect: args.layout.windowRect,
+      draw: drawVideo,
+    });
+    try {
+      context.drawImage(
+        raster.image,
+        0,
+        0,
+        raster.width,
+        raster.height,
+        window.x,
+        window.y,
+        window.width,
+        window.height
+      );
+    } finally {
+      raster.release();
+    }
+  } else drawVideo(context, target.x, target.y, target.width, target.height);
   context.restore();
   if (args.view !== 'area' || args.showControls === false) return;
   const visible = computeZoomPreviewArea(args.layout, args.background ?? { enabled: false }, args);

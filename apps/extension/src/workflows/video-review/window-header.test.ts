@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
+import {
+  loadReviewWindowHeader,
+  reviewWindowHeaderUrl,
+  createReviewWindowRaster,
+} from './window-header';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -104,4 +108,49 @@ it('closes a raster that finishes after cancellation and propagates rasterizatio
   image.dispatchEvent(new Event('load'));
   await expect(failure).rejects.toThrow('raster unavailable');
   expect(image.getAttribute('src')).toBe('');
+});
+
+it('reuses a joined window surface after drawing fails and releases each lease', () => {
+  let allocations = 0;
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+  };
+  vi.stubGlobal(
+    'OffscreenCanvas',
+    class {
+      constructor(
+        public width: number,
+        public height: number
+      ) {
+        allocations++;
+      }
+      getContext() {
+        return context;
+      }
+    }
+  );
+  const header = document.createElement('canvas');
+  header.width = 931;
+  header.height = 86;
+  const args = {
+    header,
+    videoRect: { x: 0, y: 86, width: 931, height: 520 },
+    windowRect: { x: 0, y: 0, width: 931, height: 606 },
+    draw: vi.fn(),
+  };
+  args.draw.mockImplementationOnce(() => {
+    throw new Error('frame failed');
+  });
+  expect(() => createReviewWindowRaster(args)).toThrow('frame failed');
+  const raster = createReviewWindowRaster(args);
+  expect(raster.width).toBe(931);
+  expect(raster.height).toBe(606);
+  expect(args.draw).toHaveBeenLastCalledWith(context, 0, 86, 931, 520);
+  raster.release();
+  expect(allocations).toBe(1);
+  expect(context.restore).toHaveBeenCalledTimes(2);
 });
