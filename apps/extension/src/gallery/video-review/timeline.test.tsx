@@ -662,3 +662,51 @@ it('defers zoom and its scroll change until the existing before-action gate acce
   expect(viewport.scrollLeft).toBeGreaterThan(0);
   expect(props.onSeek).not.toHaveBeenCalled();
 });
+
+it('zooms with normalized wheel input, clamps the thumb and contains handled gestures', () => {
+  const { host, props } = renderTimeline();
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  const parentWheel = vi.fn();
+  host.addEventListener('wheel', parentWheel);
+  const wheel = (options: WheelEventInit) => {
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...options });
+    act(() => slider.dispatchEvent(event));
+    return event;
+  };
+  expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+  expect(wheel({ deltaY: 1, deltaMode: 1 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(3);
+  wheel({ deltaY: 1, deltaMode: 2 });
+  expect(slider.valueAsNumber).toBeCloseTo(0);
+  expect(wheel({ deltaY: 100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(0);
+  changeZoom(host, '100');
+  expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(100);
+  expect(parentWheel).not.toHaveBeenCalled();
+  expect(wheel({ deltaY: -100, ctrlKey: true }).defaultPrevented).toBe(false);
+  expect(wheel({ deltaY: 0 }).defaultPrevented).toBe(false);
+  wheel({ deltaX: 20 });
+  expect(slider.valueAsNumber).toBeCloseTo(99);
+  expect(props.onSeek).not.toHaveBeenCalled();
+  act(() => environment.root!.render(null));
+  expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(false);
+});
+
+it('admits wheel zoom through the existing pending-note gate', () => {
+  let accept: (() => void) | undefined;
+  const { host } = renderTimeline({
+    beforeAction: (action) => {
+      accept = action;
+    },
+  });
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  act(() =>
+    slider.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, bubbles: true, cancelable: true }))
+  );
+  expect(slider.valueAsNumber).toBeCloseTo(0);
+  expect(accept).toBeDefined();
+  act(() => accept?.());
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+});

@@ -20,7 +20,14 @@ import {
   StickyNote,
   FileVideo,
 } from 'lucide-react';
-import { useState, type ReactNode, type CSSProperties, type HTMLAttributes } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+  type HTMLAttributes,
+} from 'react';
 import { CompactRange } from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import { reviewIconButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
@@ -227,23 +234,7 @@ export function ReviewToolbar(props: {
         >
           {props.historyControls}
         </div>
-        <CompactRange
-          aria-label={translate('videoEditor.timeline.zoom')}
-          title={translate('videoEditor.timeline.zoom')}
-          min={0}
-          max={100}
-          step={0.1}
-          value={Math.log2(props.zoom) * 25}
-          onChange={(event) => props.onZoom(2 ** (event.currentTarget.valueAsNumber / 25))}
-          style={
-            {
-              width: 80,
-              minWidth: 80,
-              '--sniptale-range-track-height': '3px',
-              '--sniptale-color-accent': 'var(--sniptale-color-text-dim)',
-            } as CSSProperties
-          }
-        />
+        <ReviewZoomSlider value={props.zoom} onChange={props.onZoom} />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}
           toolbarPriority={0}
@@ -271,6 +262,50 @@ export function ReviewToolbar(props: {
         ) : null}
       </div>
     </div>
+  );
+}
+
+/** Native non-passive wheel handling keeps zoom gestures out of parent scroll containers. */
+function ReviewZoomSlider(props: { value: number; onChange(value: number): void }) {
+  const { value, onChange } = props;
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const wheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey || node.disabled) return;
+      const delta = event.deltaY || event.deltaX;
+      if (!Number.isFinite(delta) || delta === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const pixels = delta * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 100 : 1);
+      const step = Math.sign(pixels) * Math.max(0.1, Math.min(5, Math.abs(pixels) / 20));
+      const current = Math.log2(value) * 25;
+      const next = Math.max(0, Math.min(100, Math.round((current - step) * 10) / 10));
+      if (next !== current) onChange(2 ** (next / 25));
+    };
+    node.addEventListener('wheel', wheel, { passive: false });
+    return () => node.removeEventListener('wheel', wheel);
+  }, [value, onChange]);
+  return (
+    <CompactRange
+      ref={ref}
+      aria-label={translate('videoEditor.timeline.zoom')}
+      title={translate('videoEditor.timeline.zoom')}
+      min={0}
+      max={100}
+      step={0.1}
+      value={Math.log2(props.value) * 25}
+      onChange={(event) => props.onChange(2 ** (event.currentTarget.valueAsNumber / 25))}
+      style={
+        {
+          width: 80,
+          minWidth: 80,
+          '--sniptale-range-track-height': '3px',
+          '--sniptale-color-accent': 'var(--sniptale-color-text-dim)',
+        } as CSSProperties
+      }
+    />
   );
 }
 
