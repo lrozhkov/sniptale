@@ -263,13 +263,6 @@ function ReviewZoomAnimation(props: {
   const duration = interval.end - interval.start;
   return (
     <>
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate(
-          region.sourceAnchor
-            ? 'gallery.videoReview.zoomSourceTimingHint'
-            : 'gallery.videoReview.zoomTimingHint'
-        )}
-      </p>
       <ReviewInspectorColumns>
         <ZoomTransitionSection
           label={translate('gallery.videoReview.zoomTransitionIn')}

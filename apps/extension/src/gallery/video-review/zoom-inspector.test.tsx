@@ -344,7 +344,6 @@ it('offers five source seconds on the slider and retains valid longer typed phas
   await type(duration, '12');
   await commit(duration);
   expect(change).toHaveBeenLastCalledWith({ enter: { type: 'ease-in-out', duration: 12 } });
-  expect(host.textContent).toContain('gallery.videoReview.zoomSourceTimingHint');
 });
 
 it('displays fitted legacy phases without emitting a persistence change on mount', async () => {
