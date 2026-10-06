@@ -14,7 +14,6 @@ import type {
   QuickEditZoomRegion,
 } from '../../features/video/review/advanced/types';
 import {
-  evaluateQuickEditCameraAtTime,
   computeQuickEditSceneCamera,
   computeQuickEditWindowTransform,
   computeQuickEditSceneLayout,
@@ -55,11 +54,12 @@ export function ReviewZoomPreview(props: {
   const { loadFrame, region, sourceTime } = props;
   const image = useReviewBackgroundImage(props.background);
   const header = useReviewWindowHeader(props.windowHeader, props.source.width);
-  const [view, setView] = useState<'area' | 'result'>('area');
+  const [zoomView, setView] = useState<'area' | 'result'>('area');
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
   const overlay = !!(region.spotlight || region.border);
+  const view = overlay ? 'area' : zoomView;
   const playback = props.playback;
-  const camera = resolvePreviewCamera(props, view);
+  const camera = resolvePreviewCamera(props);
 
   const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
   const previewStatus = playback ? 'ready' : status;
@@ -97,7 +97,7 @@ export function ReviewZoomPreview(props: {
                 : 'gallery.videoReview.zoomPreview'
           )}
         </h5>
-        {
+        {!overlay && (
           <SegmentedSwitch<'area' | 'result'>
             dataAttribute={{ 'data-ui': 'gallery.videoReview.previewMode' }}
             ariaLabel={translate('gallery.videoReview.zoomPreview')}
@@ -109,7 +109,7 @@ export function ReviewZoomPreview(props: {
             ]}
             onChange={setView}
           />
-        }
+        )}
       </div>
       <div
         {...previewInteractionHandlers(interactive, sourceTime, props.onInteract)}
@@ -122,7 +122,7 @@ export function ReviewZoomPreview(props: {
             key={region.id}
             region={region}
             focus={props.focus}
-            view={playback ? 'result' : view}
+            view="area"
             scale={previewScale}
             onChange={props.onChange}
           />
@@ -173,17 +173,11 @@ export function ReviewZoomPreview(props: {
   );
 }
 
-/** Framing uses the full source; results use the independently sampled camera. */
-function resolvePreviewCamera(
-  props: Parameters<typeof ReviewZoomPreview>[0],
-  view: 'area' | 'result'
-) {
-  if (props.playback) return props.playback.camera;
-  if (!props.region.spotlight && !props.region.border) return props.region.transform;
-  if (view === 'area') return { scale: 1, centerX: 0.5, centerY: 0.5 };
-  return props.focus
-    ? evaluateQuickEditCameraAtTime(props.focus.regions, props.focus.time)
-    : props.region.transform;
+/** Overlay framing stays unzoomed; Zoom follows the sampled playback camera. */
+function resolvePreviewCamera(props: Parameters<typeof ReviewZoomPreview>[0]) {
+  if (props.region.spotlight || props.region.border)
+    return { scale: 1, centerX: 0.5, centerY: 0.5 };
+  return props.playback?.camera ?? props.region.transform;
 }
 
 /** Results composite all sampled masks before source-attached strokes in the same window. */

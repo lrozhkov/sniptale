@@ -296,6 +296,9 @@ for (const variant of [
         .filter({ hasText: label('gallery.videoReview.zoomRegionLabel') })
         .first()
         .click();
+      await inspector
+        .getByRole('button', { name: label('gallery.videoReview.zoomPreviewResult'), exact: true })
+        .click();
       const zoomScale = inspector.getByRole('textbox', {
         name: label('gallery.videoReview.zoomScale'),
         exact: true,
@@ -320,6 +323,12 @@ for (const variant of [
             Math.abs((await frame.boundingBox())!.y - (await header.boundingBox())!.y)
           )
           .toBeLessThan(1);
+        await expect(inspector.locator('[data-ui="gallery.videoReview.previewMode"]')).toHaveCount(
+          0
+        );
+        await expect(
+          inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]')
+        ).toHaveAttribute('data-view', 'area');
         const areaFrame = inspector.locator(
           '[data-ui="gallery.videoReview.zoomPreview"] [data-focus-frame]'
         );
