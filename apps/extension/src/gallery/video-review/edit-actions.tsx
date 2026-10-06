@@ -1,3 +1,4 @@
+import { VideoExportSizeHint } from '../../ui/video-export/size-estimate';
 import {
   type VideoQuality,
   VideoResolutionPreset,
@@ -6,7 +7,7 @@ import { reviewOutputCodecs } from '../../workflows/video-review/render-settings
 import { SelectField } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { createReviewFragment } from '../../features/video/review/fragment';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
@@ -337,6 +338,11 @@ export function ReviewRenderOptions({
   exporter: ReturnType<typeof import('./use-export').useReviewExport>;
   busy: boolean;
 }) {
+  const { setSizeEstimateVisible } = exporter;
+  useEffect(() => {
+    setSizeEstimateVisible?.(!busy);
+    return () => setSizeEstimateVisible?.(false);
+  }, [setSizeEstimateVisible, busy]);
   if (!exporter.index || !exporter.renderSettings) return null;
   const settings = exporter.renderSettings;
   const format = settings.format ?? exporter.index.container;
@@ -418,6 +424,7 @@ export function ReviewRenderOptions({
           />
         </div>
       </fieldset>
+      <VideoExportSizeHint status={exporter.sizeEstimate ?? null} />
     </div>
   );
 }

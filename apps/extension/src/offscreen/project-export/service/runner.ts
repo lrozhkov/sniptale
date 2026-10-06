@@ -2,7 +2,7 @@ import { cleanupJob, sendProgress } from '../runtime';
 import { loadImagesForProject } from '../media';
 import { translate } from '../../../platform/i18n';
 import { renderCompositeExport } from '../render';
-import { resolveProjectRenderScope } from '../scope';
+import { resolveProjectRenderScope } from '../../../features/video/project/export/render-scope';
 import type { ExportJobState } from '../types';
 import {
   VideoProjectExportPhase,

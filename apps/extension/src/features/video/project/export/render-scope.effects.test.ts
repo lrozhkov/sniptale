@@ -1,4 +1,4 @@
-import { createVideoProjectTrack } from '../../features/video/project/factories/creation';
+import { createVideoProjectTrack } from '../factories/creation';
 import { expect, it } from 'vitest';
 
 import {
@@ -7,10 +7,14 @@ import {
   VideoTransitionEasing,
   VideoTransitionKind,
   type VideoProject,
-} from '../../features/video/project/types';
-import { createEffectHostClip } from '../../features/video/project/factories/overlay-clip';
-import { resolveProjectRenderScope } from './scope';
-import { createScopeClip, createScopeProject, createScopeSettings } from './scope.test-support';
+} from '../types';
+import { createEffectHostClip } from '../factories/overlay-clip';
+import { resolveProjectRenderScope } from './render-scope';
+import {
+  createScopeClip,
+  createScopeProject,
+  createScopeSettings,
+} from './render-scope.test-support';
 
 it('projects transitions and EffectV1 references as a closed selected-clip graph', () => {
   const project = createScopeProject([

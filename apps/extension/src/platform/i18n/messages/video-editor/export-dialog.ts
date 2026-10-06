@@ -100,6 +100,13 @@ export const videoEditorExportDialogMessages = defineMessageSource({
     ru: 'FPS',
     en: 'FPS',
   },
+  estimatedSize: { ru: 'Примерный размер файла:', en: 'Estimated file size:' },
+  sizeEstimating: { ru: 'Оцениваем размер файла…', en: 'Estimating file size…' },
+  sizeUnavailable: { ru: 'Оценка размера недоступна', en: 'Size estimate unavailable' },
+  sizeEstimateHint: {
+    ru: 'Прогноз по нескольким фрагментам. Итоговый размер может отличаться.',
+    en: 'Based on sampled sections. The final size may differ.',
+  },
   capabilityLoading: {
     ru: 'Проверяем доступные кодеки MP4…',
     en: 'Checking available MP4 codecs…',

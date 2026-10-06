@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reviewRenderFrameSchedule } from './render-export';
+import { reviewRenderFrameSchedule } from './render-schedule';
 
 function cutEdit(start: number, end: number) {
   return {
@@ -75,4 +75,17 @@ describe('reviewRenderFrameSchedule', () => {
     expect(windows[0]!.timestamps).toHaveLength(3);
     expect(() => reviewRenderFrameSchedule(1, [], 0)).toThrow('Render frame rate is invalid.');
   });
+});
+
+it('selects bounded sample windows on the same output clock without allocating the full video', () => {
+  const sampled = reviewRenderFrameSchedule(36000, [], 60, [
+    { start: 0, end: 2 },
+    { start: 17999, end: 18001 },
+    { start: 35998, end: 36000 },
+  ]);
+  expect(sampled.flatMap((window) => window.timestamps)).toHaveLength(360);
+  expect(sampled[1]!.sourceTimes[0]).toBe(17999);
+  const sped = reviewRenderFrameSchedule(10, [speedEdit(2, 6)], 30, [{ start: 3, end: 4 }]);
+  expect(sped.flatMap((window) => window.timestamps)).toHaveLength(30);
+  expect(sped[0]!.sourceTimes[0]).toBe(2.5);
 });

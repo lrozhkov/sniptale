@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import {
   ExportCommandContext,
+  RuntimePreviewContext,
   WorkspaceDialogsContext,
   WorkspacePlaybackRangeContext,
 } from './contexts';
@@ -35,17 +36,27 @@ it('keeps export range availability synchronized with timeline selection', () =>
   function render(playbackRange: VideoEditorPlaybackRange | null) {
     act(() =>
       root.render(
-        <WorkspaceDialogsContext.Provider value={dialogs}>
-          <WorkspacePlaybackRangeContext.Provider
-            value={{ playbackRange, clearPlaybackRange: noop, setPlaybackRange: noop }}
-          >
-            <ExportCommandContext.Provider
-              value={{ handleStartExport: noop, handleCancelExport: noop }}
+        <RuntimePreviewContext.Provider
+          value={{
+            assetUrls: {},
+            registerPreviewRuntime: noop,
+            setTimelinePreviewSuspended: noop,
+            setTimelinePreviewViewport: noop,
+            timelinePreviews: {},
+          }}
+        >
+          <WorkspaceDialogsContext.Provider value={dialogs}>
+            <WorkspacePlaybackRangeContext.Provider
+              value={{ playbackRange, clearPlaybackRange: noop, setPlaybackRange: noop }}
             >
-              <Probe />
-            </ExportCommandContext.Provider>
-          </WorkspacePlaybackRangeContext.Provider>
-        </WorkspaceDialogsContext.Provider>
+              <ExportCommandContext.Provider
+                value={{ handleStartExport: noop, handleCancelExport: noop }}
+              >
+                <Probe />
+              </ExportCommandContext.Provider>
+            </WorkspacePlaybackRangeContext.Provider>
+          </WorkspaceDialogsContext.Provider>
+        </RuntimePreviewContext.Provider>
       )
     );
   }

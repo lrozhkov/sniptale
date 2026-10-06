@@ -1,3 +1,4 @@
+import { useReviewSizeEstimate } from './use-size-estimate';
 import { useReviewExportSettings } from './use-review-export-settings';
 import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
 import { createReviewFragment } from '../../features/video/review/fragment';
@@ -98,11 +99,19 @@ export function useReviewExport(resource: LoadedReview) {
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
     reviewExportPlan(resource, index, renderSettings, selection);
+  const sizeEstimate = useReviewSizeEstimate({
+    resource,
+    index,
+    renderSettings,
+    context,
+    enabled: !checkingCodecs && phase === 'idle' && plan().kind !== 'unavailable',
+  });
   const start = async (
     destination: 'gallery' | 'download' = 'gallery',
     selection?: Extract<ReviewAnchor, { kind: 'range' }>
   ) => {
     if (active.current || !index || checkingCodecs) return;
+    sizeEstimate.cancel();
     const attemptContext = reviewExportContext(resource, renderSettings);
     const currentPlan = plan(selection);
     if (currentPlan.kind === 'unavailable') {
@@ -162,6 +171,8 @@ export function useReviewExport(resource: LoadedReview) {
     failed,
     blocked: blocked?.context === context ? blocked.reasons : null,
     checkingCodecs,
+    sizeEstimate: sizeEstimate.status,
+    setSizeEstimateVisible: sizeEstimate.setVisible,
     result,
     plan,
     renderSettings,
@@ -175,23 +186,14 @@ export function useReviewExport(resource: LoadedReview) {
     cancel: () => {
       if (!publishing.current) active.current?.abort();
     },
-    download: async () => {
-      const currentPlan = plan();
-      if (currentPlan.kind === 'unavailable') {
-        setBlocked({
-          context: reviewExportContext(resource, renderSettings),
-          reasons: currentPlan.reasons,
-        });
-        return;
-      }
-      const state = resource.session.getSnapshot();
-      const applied =
-        currentPlan.video === 'render' ||
-        currentPlan.audio === 'process' ||
-        state.document.edits.length > 0;
-      if (!applied) downloadGalleryBlob(resource.file, resource.filename);
-      else await start('download');
-    },
+    download: () =>
+      downloadReviewExport({
+        resource,
+        renderSettings,
+        plan: plan(),
+        setBlocked,
+        render: () => start('download'),
+      }),
   };
 }
 
@@ -242,4 +244,27 @@ function reviewExportContext(resource: LoadedReview, settings: ReviewRenderSetti
     workspace.advanced.ui.mode,
     settings,
   ]);
+}
+
+/** Download keeps copy-through admission separate from rendered export execution. */
+async function downloadReviewExport(args: {
+  resource: LoadedReview;
+  renderSettings: ReviewRenderSettings;
+  plan: QuickEditExportPlan;
+  setBlocked(value: ReviewExportBlocker): void;
+  render(): Promise<void>;
+}) {
+  const { resource, renderSettings, plan } = args;
+  if (plan.kind === 'unavailable') {
+    args.setBlocked({
+      context: reviewExportContext(resource, renderSettings),
+      reasons: plan.reasons,
+    });
+    return;
+  }
+  const state = resource.session.getSnapshot();
+  const applied =
+    plan.video === 'render' || plan.audio === 'process' || state.document.edits.length > 0;
+  if (!applied) downloadGalleryBlob(resource.file, resource.filename);
+  else await args.render();
 }

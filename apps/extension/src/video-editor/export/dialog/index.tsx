@@ -1,3 +1,7 @@
+import { useVideoExportSizeEstimate } from '../../../ui/video-export/use-size-estimate';
+import { VideoExportSizeHint } from '../../../ui/video-export/size-estimate';
+import { estimateProjectExportSize } from '../estimate-size';
+import type { VideoProject } from '../../../features/video/project/types';
 import React, { useId, useRef } from 'react';
 import { Download, FileOutput } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -20,6 +24,7 @@ import { ExportDialogFields } from './fields';
 import { useExportDialogFocus } from './focus';
 
 interface ExportDialogProps {
+  estimateContext?: { project: VideoProject; assetUrls: Record<string, string> } | undefined;
   selectedClipAvailable?: boolean;
   selectedRangeAvailable?: boolean;
   settings: VideoProjectExportSettings;
@@ -128,6 +133,7 @@ function ExportDialogActions(props: {
 }
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({
+  estimateContext,
   selectedClipAvailable = false,
   selectedRangeAvailable = false,
   settings,
@@ -151,6 +157,8 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
       capabilities.mp4Codecs.some(
         (entry) => entry.codec === settings.mp4VideoCodec && entry.available
       ));
+
+  const estimate = useExportSizeEstimate(estimateContext, settings, canExport);
 
   return (
     <div ref={rootRef} className="contents">
@@ -183,14 +191,85 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
           />
           <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
         </ProductModalBody>
-        <ProductModalFooter compact className="shrink-0">
-          <span className="mr-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-            {translate('videoEditor.exportDialog.outputSizeLabel')}: {settings.width} ×{' '}
-            {settings.height}
-          </span>
-          <ExportDialogActions disabled={!canExport} onClose={onClose} onExport={onExport} />
-        </ProductModalFooter>
+        <ExportDialogFooter
+          settings={settings}
+          estimate={estimate}
+          disabled={!canExport}
+          onClose={onClose}
+          onExport={onExport}
+        />
       </ProductModal>
     </div>
   );
 };
+
+/** The cache identity includes only content and settings that change encoded bytes. */
+function useExportSizeEstimate(
+  estimateContext: ExportDialogProps['estimateContext'],
+  settings: VideoProjectExportSettings,
+  canExport: boolean
+) {
+  const estimateKey =
+    canExport && estimateContext
+      ? JSON.stringify([
+          estimateContext.project,
+          estimateContext.assetUrls,
+          settings.format,
+          settings.mp4VideoCodec,
+          settings.webmVideoCodec,
+          settings.width,
+          settings.height,
+          settings.fps,
+          settings.quality,
+          settings.scope,
+          settings.selectedClipIds,
+          settings.burnInSubtitles,
+          settings.rangeStartSeconds,
+          settings.rangeEndSeconds,
+        ])
+      : null;
+  const estimate = useVideoExportSizeEstimate(estimateKey, (signal) => {
+    if (!estimateContext) return Promise.reject(new Error('No export source'));
+    return estimateProjectExportSize({ ...estimateContext, settings, signal });
+  });
+
+  return estimate;
+}
+
+/** Advisory result and actions share a fixed footer while settings keep their own scroll area. */
+function ExportDialogFooter({
+  settings,
+  estimate,
+  disabled,
+  onClose,
+  onExport,
+}: {
+  settings: VideoProjectExportSettings;
+  estimate: ReturnType<typeof useExportSizeEstimate>;
+  disabled: boolean;
+  onClose(): void;
+  onExport(): void;
+}) {
+  return (
+    <ProductModalFooter compact className="shrink-0 flex-col !items-stretch gap-3">
+      <VideoExportSizeHint status={estimate.status} />
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="mr-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.exportDialog.outputSizeLabel')}: {settings.width} ×{' '}
+          {settings.height}
+        </span>
+        <ExportDialogActions
+          disabled={disabled}
+          onClose={() => {
+            estimate.cancel();
+            onClose();
+          }}
+          onExport={() => {
+            estimate.cancel();
+            onExport();
+          }}
+        />
+      </div>
+    </ProductModalFooter>
+  );
+}

@@ -142,6 +142,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/popup-shell`
 - `apps/extension/src/ui/surface-style-selector`
 - `apps/extension/src/ui/theme`
+- `apps/extension/src/ui/video-export`
 - `apps/extension/src/workflows/aggregate-editor-presence`
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`

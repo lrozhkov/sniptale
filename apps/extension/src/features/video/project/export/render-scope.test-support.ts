@@ -8,8 +8,8 @@ import {
   type VideoProject,
   type VideoProjectClip,
   type VideoProjectExportSettings,
-} from '../../features/video/project/types';
-import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
+} from '../types';
+import { createEmptyVideoProject } from '../factories/creation';
 
 type ScopeClipType =
   | typeof VideoProjectClipType.AUDIO

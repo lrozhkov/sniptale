@@ -30,6 +30,7 @@ export function createVideoEditorShellController(
 
 export function createVideoEditorOverlaysController(args: {
   actions: Pick<VideoEditorActionHandlers, 'handleCancelExport' | 'handleStartExport'>;
+  assetUrls?: Record<string, string>;
   store: ExportPort &
     Pick<ProjectLifecyclePort, 'project'> &
     Pick<ClipSelectionPort, 'selectedClipId'>;
@@ -41,6 +42,9 @@ export function createVideoEditorOverlaysController(args: {
     onConfirmDialogConfirm: args.workspace.confirm.onConfirm,
     exportDialog: {
       isOpen: args.store.exportState.dialogOpen,
+      ...(args.store.project && args.assetUrls
+        ? { estimateContext: { project: args.store.project, assetUrls: args.assetUrls } }
+        : {}),
       onChange: args.store.updateExportSettings,
       onClose: args.store.closeExportDialog,
       onExport: args.actions.handleStartExport,

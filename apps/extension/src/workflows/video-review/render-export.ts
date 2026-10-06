@@ -1,3 +1,5 @@
+import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
+import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { drawReviewBorders } from './render-border';
 import { createReviewWebcamRenderer } from './render-webcam';
@@ -61,36 +63,6 @@ import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './a
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
 type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
 
-interface ReviewFrameWindow {
-  segment: Segment;
-  /** Output timestamps of the window's frames, on the fps lattice. */
-  timestamps: number[];
-  /** Source positions sampled for each output timestamp. */
-  sourceTimes: number[];
-}
-
-/** Output frame schedule over kept segments; the last frame never passes the segment end. */
-export function reviewRenderFrameSchedule(
-  duration: number,
-  edits: readonly ReviewEdit[],
-  fps: number
-): ReviewFrameWindow[] {
-  if (!Number.isFinite(fps) || fps <= 0) throw new Error('Render frame rate is invalid.');
-  return buildReviewTimeMap(duration, edits)
-    .filter((part) => part.kind !== 'cut')
-    .map((segment) => {
-      const count = Math.max(1, Math.ceil((segment.resultEnd - segment.resultStart) * fps - 1e-9));
-      return {
-        segment,
-        timestamps: Array.from({ length: count }, (_, k) => segment.resultStart + k / fps),
-        sourceTimes: Array.from(
-          { length: count },
-          (_, k) => segment.sourceStart + (k / fps) * segment.rate
-        ),
-      };
-    });
-}
-
 /**
  * Full frame render for pixel-changing effects: decodes source frames, draws the
  * shared scene layout (background, camera zoom), and encodes the output at the
@@ -99,6 +71,8 @@ export function reviewRenderFrameSchedule(
  */
 export async function writeReviewFrames(args: {
   renderSettings?: ReviewRenderSettings | undefined;
+  /** Read-only bounded probe sink; bypasses muxing, audio rendering and writer use. */
+  frameProbe?: { add(sample: VideoSample): Promise<void> };
   file: Blob;
   index: ReviewMediaIndex;
   /** Fragment-local edits; `fragmentOffset` maps local time back to global output time. */
@@ -141,41 +115,49 @@ export async function writeReviewFrames(args: {
     };
     const clock = { time: 0 };
     const clipRenderer = createReviewAudioClipRenderer();
-    const tracks = createReviewMediaOutput({
-      index: args.index,
-      container: preparation.container,
-      processedAudio: source.processedAudio,
-      writer: args.writer,
-      signal: args.signal,
-      ...(args.provenance ? { provenance: args.provenance } : {}),
-      sampleVideo: {
-        codec: preparation.codec,
-        quality: preparation.quality,
-        fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
-          width: source.canvas.width,
-          height: source.canvas.height,
-          fps: preparation.fps,
-        }).codec,
-        frameRate: preparation.fps,
-        bitrate: resolveReviewRenderBitrate(
-          {
-            fps: preparation.fps,
-            width: source.canvas.width,
-            height: source.canvas.height,
+    const tracks = args.frameProbe
+      ? null
+      : createReviewMediaOutput({
+          index: args.index,
+          container: preparation.container,
+          processedAudio: source.processedAudio,
+          writer: args.writer,
+          signal: args.signal,
+          ...(args.provenance ? { provenance: args.provenance } : {}),
+          sampleVideo: {
+            codec: preparation.codec,
+            quality: preparation.quality,
+            fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
+              width: source.canvas.width,
+              height: source.canvas.height,
+              fps: preparation.fps,
+            }).codec,
+            frameRate: preparation.fps,
+            bitrate: resolveReviewRenderBitrate(
+              {
+                fps: preparation.fps,
+                width: source.canvas.width,
+                height: source.canvas.height,
+              },
+              args.renderSettings?.quality
+            ),
           },
-          args.renderSettings?.quality
-        ),
-      },
-      onAudioPacket: (packet) => {
-        receipt.audioPackets++;
-        clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
-      },
-    });
-    output = tracks.output;
-    if (tracks.video.kind !== 'sample') throw new Error('Video output configuration changed.');
-    const videoOut = tracks.video.source;
-    const audioOut = tracks.audio;
-    await tracks.output.start();
+          onAudioPacket: (packet) => {
+            receipt.audioPackets++;
+            clock.time = Math.max(clock.time, packet.timestamp + packet.duration);
+          },
+        });
+    output = tracks?.output ?? null;
+    if (tracks && tracks.video.kind !== 'sample')
+      throw new Error('Video output configuration changed.');
+    const videoOut = args.frameProbe
+      ? { add: args.frameProbe.add, close() {} }
+      : tracks?.video.kind === 'sample'
+        ? tracks.video.source
+        : null;
+    if (!videoOut) throw new Error('Video output configuration changed.');
+    const audioOut = tracks?.audio ?? null;
+    await output?.start();
     const frameSink = createReviewDecodedSampleSink(new VideoSampleSink(source.video), args.signal);
     const transitions = planReviewCutTransitions(args.index.duration, args.edits);
     if (transitions.length)
@@ -187,22 +169,23 @@ export async function writeReviewFrames(args: {
     for (const window of preparation.windows) {
       const segment = window.segment;
       args.signal.throwIfAborted();
-      await drainSegmentAudio({
-        segment,
-        track: source.audio,
-        sink: source.audioSink,
-        audioOut,
-        processedAudio: source.processedAudio,
-        audioConfig: source.audioConfig,
-        muted: segmentAudioMuted(args.edits, segment, args.exportAudio),
-        exportAudio: args.exportAudio,
-        clipRenderer,
-        sampleRate: source.sampleRate,
-        audioCodec: args.index.audioCodec,
-        clock,
-        receipt,
-        signal: args.signal,
-      });
+      if (!args.frameProbe)
+        await drainSegmentAudio({
+          segment,
+          track: source.audio,
+          sink: source.audioSink,
+          audioOut,
+          processedAudio: source.processedAudio,
+          audioConfig: source.audioConfig,
+          muted: segmentAudioMuted(args.edits, segment, args.exportAudio),
+          exportAudio: args.exportAudio,
+          clipRenderer,
+          sampleRate: source.sampleRate,
+          audioCodec: args.index.audioCodec,
+          clock,
+          receipt,
+          signal: args.signal,
+        });
       receipt.videoPackets += await renderRenderWindowFrames({
         window,
         fps: preparation.fps,
@@ -232,7 +215,7 @@ export async function writeReviewFrames(args: {
     videoOut.close();
     audioOut?.source.close();
     args.signal.throwIfAborted();
-    await output.finalize();
+    await output?.finalize();
     args.signal.throwIfAborted();
     receipt.resultDuration = Math.max(receipt.resultDuration, clock.time);
     args.onProgress?.(1);
@@ -262,6 +245,7 @@ interface ReviewRenderPreparation {
 
 /** Frame rendering validates ranges, while packet copying alone requires keyframes. */
 function prepareReviewRender(args: {
+  frameProbe?: { add(sample: VideoSample): Promise<void> };
   renderSettings?: ReviewRenderSettings | undefined;
   index: ReviewMediaIndex;
   edits: readonly ReviewEdit[];
@@ -286,7 +270,13 @@ function prepareReviewRender(args: {
     (args.index.frameRate && Number.isFinite(args.index.frameRate) && args.index.frameRate > 0
       ? args.index.frameRate
       : 30);
-  const windows = reviewRenderFrameSchedule(args.index.duration, args.edits, fps);
+  const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;
+  const windows = reviewRenderFrameSchedule(
+    args.index.duration,
+    args.edits,
+    fps,
+    args.frameProbe ? videoExportSampleWindows(duration, fps) : undefined
+  );
   if (!windows.length) throw new Error('The edited video is empty.');
   return {
     codec,

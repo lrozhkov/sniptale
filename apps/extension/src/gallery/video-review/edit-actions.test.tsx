@@ -297,6 +297,11 @@ it('applies export frame rate and quality options without adding section divider
     plan: () => ({ kind: 'ready', video: 'render', audio: 'copy', reasons: [] }),
     renderSettings: { frameRate: 0, quality: 'HIGH' },
     setRenderSettings: vi.fn(),
+    sizeEstimate: {
+      kind: 'ready',
+      estimate: { bytes: 1000000, lowerBytes: 750000, upperBytes: 1350000, sampledSeconds: 2 },
+    },
+    setSizeEstimateVisible: vi.fn(),
     start: vi.fn(async () => {}),
     retryAssetAvailability: vi.fn(),
     downloadSelection: vi.fn(async () => {}),
@@ -305,6 +310,8 @@ it('applies export frame rate and quality options without adding section divider
   };
   try {
     await act(async () => root.render(<ReviewRenderOptions exporter={exporter} busy={false} />));
+    expect(exporter.setSizeEstimateVisible).toHaveBeenCalledWith(true);
+    expect(host.querySelector('[data-ui="video.exportSizeEstimate"]')?.textContent).toContain('≈');
     const [, , , rate, quality] = host.querySelectorAll<HTMLButtonElement>(
       '[aria-haspopup="listbox"]'
     );

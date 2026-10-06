@@ -97,7 +97,6 @@ export const AUDIT_OWNER_MAPPINGS = [
     exclusive: true,
     reason: 'Offscreen project export changes are covered by focused export suites.',
     testFiles: [
-      'apps/extension/src/offscreen/project-export/scope.test.ts',
       'apps/extension/src/offscreen/project-export/service/lifecycle.test.ts',
     ],
   },

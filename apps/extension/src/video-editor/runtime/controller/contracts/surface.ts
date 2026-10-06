@@ -9,6 +9,12 @@ export interface VideoEditorOverlaysController {
   confirmDialog: VideoEditorWorkspaceState['confirm']['dialog'];
   exportDialog: {
     isOpen: boolean;
+    estimateContext?: {
+      project: NonNullable<
+        import('../../../contracts/controller-store').ProjectLifecyclePort['project']
+      >;
+      assetUrls: Record<string, string>;
+    };
     onChange: VideoEditorExportActions['updateExportSettings'];
     onClose: VideoEditorExportActions['closeExportDialog'];
     onExport: VideoEditorActionHandlers['handleStartExport'];

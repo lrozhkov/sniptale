@@ -1,12 +1,8 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
-import { createVideoClip } from '../../features/video/project/timeline/project-meta.test.helpers';
-import {
-  VideoExportScope,
-  VideoExportFormat,
-  VideoExportQualityPreset,
-} from '../../features/video/project/types';
-import { resolveProjectRenderScope } from './scope';
+import { createEmptyVideoProject } from '../factories/creation';
+import { createVideoClip } from '../timeline/project-meta.test.helpers';
+import { VideoExportScope, VideoExportFormat, VideoExportQualityPreset } from '../types';
+import { resolveProjectRenderScope } from './render-scope';
 it('keeps applicable global and track FX while excluding unrelated track chains in selected-clip exports', () => {
   const project = createEmptyVideoProject('Selected effects');
   const track = project.tracks[0]!;

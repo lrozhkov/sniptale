@@ -1,11 +1,11 @@
-import { isSubtitleClip } from '../../features/video/project/timeline/presentation';
+import { isSubtitleClip } from '../timeline/presentation';
 import {
   VideoProjectClipType,
   VideoExportScope,
   type VideoProject,
   type VideoProjectEffectClip,
   type VideoProjectExportSettings,
-} from '../../features/video/project/types';
+} from '../types';
 
 export function resolveProjectRenderScope(
   project: VideoProject,

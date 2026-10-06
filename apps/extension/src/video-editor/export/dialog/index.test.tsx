@@ -1,3 +1,5 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import * as sizeEstimator from '../estimate-size';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -333,4 +335,30 @@ it('preserves selected HEVC and blocks submission until it is supported', () => 
   });
   renderDialog({ settings });
   expect(submit.disabled).toBe(false);
+});
+
+it('keeps export enabled while size estimation is pending and cancels the debounced probe on submit', async () => {
+  vi.useFakeTimers();
+  const calculate = vi
+    .spyOn(sizeEstimator, 'estimateProjectExportSize')
+    .mockResolvedValue({ bytes: 100, lowerBytes: 75, upperBytes: 135, sampledSeconds: 1 });
+  try {
+    const { onExport } = renderDialog({
+      estimateContext: { project: { ...createEmptyVideoProject(), duration: 5 }, assetUrls: {} },
+    });
+    expect(container!.textContent).toContain('videoEditor.exportDialog.sizeEstimating');
+    const submit = Array.from(container!.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('videoEditor.exportDialog.submit')
+    )!;
+    expect(submit.disabled).toBe(false);
+    act(() => submit.click());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(calculate).not.toHaveBeenCalled();
+  } finally {
+    calculate.mockRestore();
+    vi.useRealTimers();
+  }
 });
