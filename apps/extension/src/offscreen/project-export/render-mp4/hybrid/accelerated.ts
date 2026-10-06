@@ -48,7 +48,7 @@ function getVisibleVideoClipsAtTime(
   return result;
 }
 
-function canUseWebmFrameProvider(
+function canUseDecodedFrameProvider(
   project: VideoProject,
   settings: VideoProjectExportSettings,
   clip: VideoProjectVideoClip
@@ -57,7 +57,8 @@ function canUseWebmFrameProvider(
   return Boolean(
     asset &&
     settings.format === VideoExportFormat.MP4 &&
-    isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.WEBM) &&
+    (isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.WEBM) ||
+      isMimeTypeCompatibleWithFormat(asset.metadata.mimeType, VideoExportFormat.MP4)) &&
     nearlyEqual(clip.playbackRate ?? 1, 1, PLAYBACK_RATE_EPSILON)
   );
 }
@@ -72,12 +73,12 @@ export function createAcceleratedCompositeSpan(
   for (const time of getSampleTimes(start, end)) {
     const clips = getVisibleVideoClipsAtTime(project, time);
     hasVideoClip ||= clips.length > 0;
-    if (!clips.every((clip) => canUseWebmFrameProvider(project, settings, clip))) {
+    if (!clips.every((clip) => canUseDecodedFrameProvider(project, settings, clip))) {
       return null;
     }
   }
 
   return hasVideoClip
-    ? { end, kind: 'accelerated-composite', reason: 'webm-frame-provider', start }
+    ? { end, kind: 'accelerated-composite', reason: 'decoded-frame-provider', start }
     : null;
 }

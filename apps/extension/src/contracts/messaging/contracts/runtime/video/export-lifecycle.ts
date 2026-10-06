@@ -26,13 +26,26 @@ const lifecycleOwnerFields = {
   targetSenderUrl: isString,
 };
 
+function isProgressStatus(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value['timeEstimate'] === undefined) return true;
+  const estimate = value['timeEstimate'];
+  return (
+    isRecord(estimate) &&
+    typeof estimate['remainingMs'] === 'number' &&
+    Number.isFinite(estimate['remainingMs']) &&
+    estimate['remainingMs'] >= 0 &&
+    estimate['remainingMs'] <= Number.MAX_SAFE_INTEGER
+  );
+}
+
 export const runtimeVideoExportLifecycleContracts = {
   [V.PROJECT_EXPORT_PROGRESS]: {
     parseRequest: createGuardParser(
       'runtime PROJECT_EXPORT_PROGRESS message',
       createMessageGuard({
         type: V.PROJECT_EXPORT_PROGRESS,
-        required: { jobId: isString, status: isRecord },
+        required: { jobId: isString, status: isProgressStatus },
         optional: lifecycleOwnerFields,
       })
     ),

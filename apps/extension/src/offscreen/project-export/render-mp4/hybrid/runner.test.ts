@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const encodeCleanSourceMp4SpanMock = vi.hoisted(() => vi.fn());
@@ -43,7 +44,7 @@ function createArgs() {
     job: { cancelled: false, jobId: 'job-1' },
     loadedImages: {},
     pipeline: {},
-    project: { duration: 4 },
+    project: { ...createEmptyVideoProject('Export'), duration: 4 },
     settings: { fps: 30, format: 'MP4' },
     throwIfPipelineFailed: vi.fn(),
     videoEncoder: { encode: vi.fn() },
@@ -243,4 +244,27 @@ it('weights unequal spans by duration and clears their progress range after rend
   ]);
   expect(args.job).not.toHaveProperty('renderProgressRange');
   expect(sendProgressMock).toHaveBeenLastCalledWith('job-1', 'RENDERING', 100, expect.any(String));
+});
+
+it('does not retry an accelerated span after a frame has entered the output encoder', async () => {
+  planMp4VideoRenderSpansMock.mockReturnValue([
+    { kind: 'accelerated-composite', reason: 'webm-frame-provider', start: 0, end: 1 },
+  ]);
+  renderAcceleratedCompositeWebmSpanMock.mockImplementationOnce(async (request) => {
+    request.onFrameSubmitted?.();
+    throw new Error('Decoder failed after the first output frame');
+  });
+  await expect(runMp4HybridVideoPipeline(createArgs() as never)).rejects.toThrow(
+    'Decoder failed after the first output frame'
+  );
+  expect(runFrameDrivenCompositeRenderLoopMock).not.toHaveBeenCalled();
+});
+
+it('can retry an accelerated decoder failure before any output is submitted', async () => {
+  planMp4VideoRenderSpansMock.mockReturnValue([
+    { kind: 'accelerated-composite', reason: 'decoded-frame-provider', start: 0, end: 1 },
+  ]);
+  renderAcceleratedCompositeWebmSpanMock.mockRejectedValueOnce(new Error('Decoder unavailable'));
+  await runMp4HybridVideoPipeline(createArgs() as never);
+  expect(runFrameDrivenCompositeRenderLoopMock).toHaveBeenCalledOnce();
 });

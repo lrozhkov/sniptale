@@ -172,7 +172,7 @@ it('classifies same-size contained video and explicit export ranges as clean sou
   ]);
 });
 
-it('classifies WebM composition as accelerated and rejects composite-only states', () => {
+it('accelerates MP4 and WebM composition while retaining playback-rate fallback', () => {
   resolveVideoCompositionRenderPassesMock.mockImplementationOnce(() => ({
     overlayFrame: {
       actions: [],
@@ -183,7 +183,7 @@ it('classifies WebM composition as accelerated and rejects composite-only states
     visualPasses: [{ transitionOverlays: [] }],
   }));
   expect(planMp4VideoRenderSpans(createProject(), createSettings() as never)[0]).toEqual(
-    expect.objectContaining({ kind: 'composite', reason: 'cursor-overlay' })
+    expect.objectContaining({ kind: 'accelerated-composite', reason: 'decoded-frame-provider' })
   );
 
   const playbackProject = createProject({
@@ -217,7 +217,7 @@ it('classifies WebM composition as accelerated and rejects composite-only states
   );
 });
 
-it('falls back to composite for unsupported assets, hidden tracks, and resized exports', () => {
+it('retains fallback for unsupported and hidden sources while accelerating resized composition', () => {
   const unsupportedProject = createProject({
     assets: [
       {
@@ -239,7 +239,7 @@ it('falls back to composite for unsupported assets, hidden tracks, and resized e
 
   expect(
     planMp4VideoRenderSpans(createProject(), createSettings({ width: 640 }) as never)[0]?.kind
-  ).toBe('composite');
+  ).toBe('accelerated-composite');
 });
 
 it('merges adjacent composite spans after timeline boundary splitting', () => {

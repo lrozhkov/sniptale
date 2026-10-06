@@ -1,3 +1,4 @@
+import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { useReviewSizeEstimate } from './use-size-estimate';
 import { useReviewExportSettings } from './use-review-export-settings';
 import { configuredReviewExportPlan } from '../../workflows/video-review/export-configuration';
@@ -55,9 +56,57 @@ export function prepareReviewExporter(
   };
 }
 
+type ReviewExportProgress = {
+  phase: 'idle' | 'exporting' | 'publishing';
+  progress: number;
+  timeEstimate: VideoProjectExportTimeEstimate | null;
+};
+
+/** Phase transitions invalidate advisory timing; progress is disposable presentation state. */
+function useReviewExportProgress() {
+  const [state, setState] = useState<ReviewExportProgress>({
+    phase: 'idle',
+    progress: 0,
+    timeEstimate: null,
+  });
+  return {
+    ...state,
+    changePhase: (phase: ReviewExportProgress['phase']) =>
+      setState((current) => ({
+        phase,
+        progress: phase === 'exporting' ? 0 : current.progress,
+        timeEstimate: null,
+      })),
+    setProgress: (progress: number) => setState((current) => ({ ...current, progress })),
+    setTimeEstimate: (timeEstimate: VideoProjectExportTimeEstimate | null) =>
+      setState((current) => ({ ...current, timeEstimate })),
+  };
+}
+
+/** Media inspection has its own cancellable lifetime, independent of an export attempt. */
+function useReviewSourceIndex(file: File) {
+  const [sourceIndex, setIndex] = useState<ReviewMediaIndex | null>(null);
+  const [indexing, setIndexing] = useState(true);
+  useEffect(() => {
+    const controller = new AbortController();
+    setIndex(null);
+    setIndexing(true);
+    void inspectReviewMedia(file, controller.signal)
+      .then((value) => {
+        if (!controller.signal.aborted) setIndex(value);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (!controller.signal.aborted) setIndexing(false);
+      });
+    return () => controller.abort();
+  }, [file]);
+  return { sourceIndex, indexing };
+}
+
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
-  const [sourceIndex, setIndex] = useState<ReviewMediaIndex | null>(null);
+  const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
   const state = resource.session.getSnapshot();
   const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
     sourceIndex,
@@ -66,9 +115,8 @@ export function useReviewExport(resource: LoadedReview) {
       ...state.document.advancedContent,
     }
   );
-  const [indexing, setIndexing] = useState(true);
-  const [phase, setPhase] = useState<'idle' | 'exporting' | 'publishing'>('idle');
-  const [progress, setProgress] = useState(0);
+  const { phase, progress, timeEstimate, changePhase, setProgress, setTimeEstimate } =
+    useReviewExportProgress();
   const [failed, setFailed] = useState(false);
   const context = reviewExportContext(resource, renderSettings);
   const [blocked, setBlocked] = useState<ReviewExportBlocker | null>(null);
@@ -78,21 +126,9 @@ export function useReviewExport(resource: LoadedReview) {
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
-    const controller = new AbortController();
     setResult(null);
-    setIndex(null);
-    setIndexing(true);
-    void inspectReviewMedia(resource.file, controller.signal)
-      .then((value) => {
-        if (!controller.signal.aborted) setIndex(value);
-      })
-      .catch(() => undefined)
-      .finally(() => {
-        if (!controller.signal.aborted) setIndexing(false);
-      });
     return () => {
       mounted.current = false;
-      controller.abort();
       active.current?.abort();
     };
   }, [resource.file]);
@@ -126,8 +162,7 @@ export function useReviewExport(resource: LoadedReview) {
     active.current = controller;
     publishing.current = false;
     setFailed(false);
-    setPhase('exporting');
-    setProgress(0);
+    changePhase('exporting');
     try {
       const value = await exportReviewedVideo({
         renderSettings,
@@ -139,9 +174,13 @@ export function useReviewExport(resource: LoadedReview) {
         onProgress: (fraction) => {
           if (mounted.current) setProgress(Math.round(fraction * 100));
         },
+        onTimeEstimate: (estimate) => {
+          if (active.current === controller && !controller.signal.aborted && !publishing.current)
+            setTimeEstimate(estimate);
+        },
         onPublishing: () => {
           publishing.current = true;
-          if (mounted.current) setPhase('publishing');
+          if (mounted.current) changePhase('publishing');
         },
       });
       if (!mounted.current || controller.signal.aborted) await value.release?.();
@@ -160,7 +199,7 @@ export function useReviewExport(resource: LoadedReview) {
     } finally {
       active.current = null;
       publishing.current = false;
-      if (mounted.current) setPhase('idle');
+      if (mounted.current) changePhase('idle');
     }
   };
   return {
@@ -168,6 +207,7 @@ export function useReviewExport(resource: LoadedReview) {
     indexing,
     phase,
     progress,
+    timeEstimate,
     failed,
     blocked: blocked?.context === context ? blocked.reasons : null,
     checkingCodecs,
@@ -184,7 +224,10 @@ export function useReviewExport(resource: LoadedReview) {
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
       start('download', selection),
     cancel: () => {
-      if (!publishing.current) active.current?.abort();
+      if (!publishing.current) {
+        active.current?.abort();
+        setTimeEstimate(null);
+      }
     },
     download: () =>
       downloadReviewExport({

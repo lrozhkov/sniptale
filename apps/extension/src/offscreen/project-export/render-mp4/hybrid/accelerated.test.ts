@@ -60,7 +60,7 @@ it('allows accelerated composite for centered WebM sources with non-matching sou
   expect(createAcceleratedCompositeSpan(createProject(), settings, 0, 4)).toEqual({
     end: 4,
     kind: 'accelerated-composite',
-    reason: 'webm-frame-provider',
+    reason: 'decoded-frame-provider',
     start: 0,
   });
 });

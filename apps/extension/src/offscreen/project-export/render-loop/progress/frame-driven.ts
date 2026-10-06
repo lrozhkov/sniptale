@@ -1,3 +1,4 @@
+import type { VideoProjectExportTimeEstimate } from '../../../../features/video/project/types/export';
 import { translate } from '../../../../platform/i18n';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
 import { sendProgress } from '../../runtime';
@@ -7,7 +8,8 @@ export function sendFrameDrivenProgress(
   frameIndex: number,
   totalFrames: number,
   messageDetail?: string,
-  range = { start: 0, end: 100 }
+  range = { start: 0, end: 100 },
+  timeEstimate?: VideoProjectExportTimeEstimate | null
 ): Promise<void> {
   const messageParts: Array<string | number> = [
     translate('offscreenExport.frameDrivenRenderPrefix'),
@@ -23,6 +25,7 @@ export function sendFrameDrivenProgress(
     jobId,
     VideoProjectExportPhase.RENDERING,
     range.start + ((frameIndex + 1) / totalFrames) * (range.end - range.start),
-    messageParts.join(' ')
+    messageParts.join(' '),
+    ...(timeEstimate ? [timeEstimate] : [])
   );
 }

@@ -1,3 +1,4 @@
+import { VideoExportTimeHint } from '../../../ui/video-export/time-estimate';
 import React, { useId, useRef } from 'react';
 import { Ban, Check } from 'lucide-react';
 import { translate, useAppLocale } from '../../../platform/i18n';
@@ -21,6 +22,8 @@ const PHASE_MESSAGES = {
   CANCELLED: 'videoEditor.progress.cancelled',
 } as const;
 
+const STAGES = ['PREPARING', 'RENDERING', 'TRANSCODING', 'SAVING'] as const;
+
 interface ExportProgressOverlayProps {
   cancellationFailed?: boolean;
   status: VideoProjectExportStatus;
@@ -38,9 +41,8 @@ export const ExportProgressOverlay: React.FC<ExportProgressOverlayProps> = ({
   useExportDialogFocus(rootRef);
   const progress = Math.round(Math.max(0, Math.min(100, status.progress)));
   const phase = translate(PHASE_MESSAGES[status.phase]);
-  const stages = ['PREPARING', 'RENDERING', 'TRANSCODING', 'SAVING'] as const;
   const activeStage =
-    status.phase === 'DONE' ? stages.length : stages.findIndex((stage) => stage === status.phase);
+    status.phase === 'DONE' ? STAGES.length : STAGES.findIndex((stage) => stage === status.phase);
 
   return (
     <div ref={rootRef} className="contents">
@@ -75,8 +77,12 @@ export const ExportProgressOverlay: React.FC<ExportProgressOverlayProps> = ({
               style={{ width: `${progress}%` }}
             />
           </div>
+          <VideoExportTimeHint
+            estimate={status.timeEstimate}
+            active={status.phase === 'PREPARING' || status.phase === 'RENDERING'}
+          />
           <ol className="grid grid-cols-4 gap-2 text-[11px] text-[var(--sniptale-color-text-muted)]">
-            {stages.map((stage, index) => (
+            {STAGES.map((stage, index) => (
               <li
                 key={stage}
                 aria-current={index === activeStage ? 'step' : undefined}

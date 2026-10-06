@@ -630,3 +630,54 @@ it.each([false, true])(
     });
   }
 );
+
+it('publishes a warmed estimate during rendering and clears it before returning', async () => {
+  const args = argsFixture();
+  const onTimeEstimate = vi.fn();
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => state.encoded.length * 1000);
+  state.encoded.length = 0;
+  try {
+    await writeReviewFrames({
+      ...args,
+      onTimeEstimate,
+      renderSettings: { quality: 'MEDIUM', frameRate: 24 },
+    });
+    expect(onTimeEstimate.mock.calls.some(([estimate]) => estimate?.remainingMs > 0)).toBe(true);
+    expect(onTimeEstimate).toHaveBeenLastCalledWith(null);
+  } finally {
+    clock.mockRestore();
+  }
+});
+
+it('does not publish a render time estimate for the size-only frame probe', async () => {
+  const onTimeEstimate = vi.fn();
+  await writeReviewFrames({
+    ...argsFixture(),
+    onTimeEstimate,
+    frameProbe: { add: async () => undefined },
+  });
+  expect(onTimeEstimate.mock.calls.every(([estimate]) => estimate === null)).toBe(true);
+});
+
+it('clears a render estimate on cancellation without retaining machine state', async () => {
+  const controller = new AbortController();
+  const onTimeEstimate = vi.fn();
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => state.encoded.length * 1000);
+  state.encoded.length = 0;
+  try {
+    await expect(
+      writeReviewFrames({
+        ...argsFixture(),
+        signal: controller.signal,
+        onTimeEstimate,
+        renderSettings: { quality: 'MEDIUM', frameRate: 24 },
+        onProgress: () => {
+          if (state.encoded.length >= 5) controller.abort();
+        },
+      })
+    ).rejects.toThrow();
+    expect(onTimeEstimate).toHaveBeenLastCalledWith(null);
+  } finally {
+    clock.mockRestore();
+  }
+});

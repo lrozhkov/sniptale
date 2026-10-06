@@ -117,8 +117,14 @@ export type VideoProjectExportSettingsPatch = Partial<VideoProjectExportSettings
   webmVideoCodec?: VideoWebmCodec | undefined;
 };
 
+/** Advisory snapshot measured by the active export; never persisted as job authority. */
+export interface VideoProjectExportTimeEstimate {
+  remainingMs: number;
+}
+
 export interface VideoProjectExportStatus {
   phase: VideoProjectExportPhase;
   progress: number;
   message: string;
+  timeEstimate?: VideoProjectExportTimeEstimate;
 }

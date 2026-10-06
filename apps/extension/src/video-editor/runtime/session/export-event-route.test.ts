@@ -135,3 +135,26 @@ it('ignores malformed export messages without claiming a response contract', () 
   ).toBeNull();
   expect(handlers.completeExport).not.toHaveBeenCalled();
 });
+
+it('forwards time snapshots only to the active job and replaces them at finalization', () => {
+  const handlers = createHandlers();
+  const base = {
+    type: VideoMessageType.PROJECT_EXPORT_PROGRESS,
+    ...createEditorEventTarget(),
+    jobId: 'job-1',
+  };
+  const status = {
+    phase: 'RENDERING' as const,
+    progress: 50,
+    message: '',
+    timeEstimate: { remainingMs: 6000 },
+  };
+  routeProjectExportRuntimeEvent({ ...base, status }, handlers, () => 'job-1');
+  expect(handlers.updateExportStatus).toHaveBeenCalledWith(status);
+  vi.mocked(handlers.updateExportStatus).mockClear();
+  routeProjectExportRuntimeEvent({ ...base, jobId: 'old-job', status }, handlers, () => 'job-1');
+  expect(handlers.updateExportStatus).not.toHaveBeenCalled();
+  const finalizing = { phase: 'TRANSCODING' as const, progress: 90, message: '' };
+  routeProjectExportRuntimeEvent({ ...base, status: finalizing }, handlers, () => 'job-1');
+  expect(handlers.updateExportStatus).toHaveBeenCalledWith(finalizing);
+});

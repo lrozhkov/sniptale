@@ -1,3 +1,4 @@
+import type { ExportTimeEstimator } from '../../../../features/video/project/export/time-estimate';
 import type { ProjectExportMediaState } from '../../media';
 
 /**
@@ -8,6 +9,7 @@ export type RenderLoopJobState = Pick<
   'clipMediaElements' | 'clipAudioNodes'
 > & {
   cancelled: boolean;
+  timeEstimator?: ExportTimeEstimator;
   renderProgressRange?: { start: number; end: number };
   jobId: string;
 };

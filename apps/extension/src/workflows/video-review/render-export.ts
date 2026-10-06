@@ -1,3 +1,5 @@
+import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
+import { createReviewRenderTimeTracking } from './time-estimate-plan';
 import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
 import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
@@ -87,6 +89,7 @@ export async function writeReviewFrames(args: {
   exportAudio?: ReviewExportClipPlan;
   readProjectAsset(assetId: string): Promise<Blob | null>;
   onProgress?(fraction: number): void;
+  onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
 }): Promise<ReviewPacketReceipt> {
   const preparation = prepareReviewRender(args);
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
@@ -166,9 +169,21 @@ export async function writeReviewFrames(args: {
         args.signal
       );
     const sourceTimeResolution = await source.video.getTimeResolution();
+    const timeTracking = createReviewRenderTimeTracking(
+      {
+        duration: receipt.resultDuration,
+        fragmentOffset: args.fragmentOffset,
+        zoomRegions: preparation.effective.zoomRegions,
+        transitions,
+        webcam: !!webcam,
+      },
+      args.frameProbe ? undefined : args.onTimeEstimate,
+      args.onProgress
+    );
     for (const window of preparation.windows) {
       const segment = window.segment;
       args.signal.throwIfAborted();
+      timeTracking?.startAudio();
       if (!args.frameProbe)
         await drainSegmentAudio({
           segment,
@@ -186,6 +201,7 @@ export async function writeReviewFrames(args: {
           receipt,
           signal: args.signal,
         });
+      timeTracking?.finishAudio(segment);
       receipt.videoPackets += await renderRenderWindowFrames({
         window,
         fps: preparation.fps,
@@ -208,13 +224,14 @@ export async function writeReviewFrames(args: {
         webcam,
         videoOut,
         resultDuration: receipt.resultDuration,
-        onProgress: args.onProgress ?? undefined,
+        onProgress: timeTracking?.renderProgress ?? args.onProgress,
         signal: args.signal,
       });
     }
     videoOut.close();
     audioOut?.source.close();
     args.signal.throwIfAborted();
+    args.onTimeEstimate?.(null);
     await output?.finalize();
     args.signal.throwIfAborted();
     receipt.resultDuration = Math.max(receipt.resultDuration, clock.time);
@@ -224,6 +241,7 @@ export async function writeReviewFrames(args: {
     await output?.cancel().catch(() => undefined);
     throw error;
   } finally {
+    args.onTimeEstimate?.(null);
     webcam?.dispose();
     transitionFrames?.dispose();
     source?.image?.close();

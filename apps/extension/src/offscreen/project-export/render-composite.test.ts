@@ -206,3 +206,26 @@ it('throws when the canvas 2d context cannot be created', async () => {
     renderCompositeExport(createJob(), createEmptyVideoProject('No canvas'), createSettings(), {})
   ).rejects.toThrow('offscreenExport.canvasContextError');
 });
+
+it('owns a fresh estimator for the selected range of each actual export', async () => {
+  const { renderCompositeExport } = await import('./render');
+  const project = { ...createEmptyVideoProject('ETA'), duration: 10 };
+  const job = createJob();
+  const settings = { ...createSettings(), rangeStartSeconds: 4, rangeEndSeconds: 8 };
+  let clock = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => clock);
+  vi.stubGlobal('document', createDocumentStub({}));
+  renderCompositeToMp4Mock.mockImplementation(async () => {
+    expect(job.timeEstimator?.snapshot()).toBeNull();
+    for (let i = 1; i <= 3; i++) {
+      clock += 1000;
+      job.timeEstimator?.observe(4 + i / 2);
+    }
+    expect(job.timeEstimator?.snapshot()?.remainingMs).toBeCloseTo(5000);
+    return new Blob(['mp4'], { type: 'video/mp4' });
+  });
+  await renderCompositeExport(job, project, settings, {});
+  const first = job.timeEstimator;
+  await renderCompositeExport(job, project, settings, {});
+  expect(job.timeEstimator).not.toBe(first);
+});

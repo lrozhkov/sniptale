@@ -59,6 +59,7 @@ it('prevents invalid cuts and keeps cancellation reachable only before publicati
   const cancel = vi.fn();
   const props = {
     indexing: false,
+    timeEstimate: null,
     checkingCodecs: false,
     available: true,
     cutting: true,
@@ -288,6 +289,7 @@ it('applies export frame rate and quality options without adding section divider
       processedVideoCodec: 'avc',
     },
     indexing: false,
+    timeEstimate: null,
     checkingCodecs: false,
     phase: 'idle',
     progress: 0,

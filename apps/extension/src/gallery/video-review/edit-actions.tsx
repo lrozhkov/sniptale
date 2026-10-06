@@ -1,3 +1,5 @@
+import { VideoExportTimeHint } from '../../ui/video-export/time-estimate';
+import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { VideoExportSizeHint } from '../../ui/video-export/size-estimate';
 import {
   type VideoQuality,
@@ -184,6 +186,7 @@ export function ReviewEditActions(props: {
   busy: boolean;
   phase: 'idle' | 'exporting' | 'publishing';
   progress: number;
+  timeEstimate?: VideoProjectExportTimeEstimate | null;
   failed: boolean;
   hasResult: boolean;
   settings?: ReactNode;
@@ -232,6 +235,11 @@ export function ReviewEditActions(props: {
               style={{ width: `${props.phase === 'publishing' ? 100 : props.progress}%` }}
             />
           </div>
+          <VideoExportTimeHint
+            estimate={props.timeEstimate}
+            active={props.phase === 'exporting'}
+            finishing={props.progress >= 100}
+          />
         </div>
       ) : null}
       {props.settings}
@@ -462,6 +470,7 @@ export function ReviewInspectorActions({
         busy={busy || composerBusy || checkingCodecs}
         phase={exporter.phase}
         progress={exporter.progress}
+        timeEstimate={exporter.timeEstimate}
         failed={exporter.failed}
         hasResult={!!exporter.result}
         advancedBlockers={

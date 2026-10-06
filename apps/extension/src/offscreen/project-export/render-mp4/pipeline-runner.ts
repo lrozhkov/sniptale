@@ -1,3 +1,6 @@
+import { sendProgress } from '../runtime';
+import { VideoProjectExportPhase } from '../../../features/video/project/types/export';
+import { translate } from '../../../platform/i18n';
 import type { LoadedImagesMap } from '../renderer';
 import { type VideoProjectExportSettings } from '../../../features/video/project/types/export';
 import { type VideoProject } from '../../../features/video/project/types/model';
@@ -23,6 +26,12 @@ export async function runMp4EncodingPipeline(args: {
   await runMp4HybridVideoPipeline(args);
   args.throwIfPipelineFailed();
 
+  await sendProgress(
+    args.job.jobId,
+    VideoProjectExportPhase.TRANSCODING,
+    0,
+    translate('videoEditor.progress.transcoding')
+  );
   await encodeMp4AudioIfPresent({
     audioEncoder: args.audioEncoder,
     pipeline: args.pipeline,

@@ -391,3 +391,52 @@ it.each(['gallery', 'fragment'] as const)(
     }
   }
 );
+
+it('binds time estimates to the current attempt and clears them on cancel and publication', async () => {
+  const fixture = setup();
+  let reject!: (error: Error) => void;
+  mocks.export.mockImplementation(
+    () =>
+      new Promise((_, failure) => {
+        reject = failure;
+      })
+  );
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    let pending!: Promise<void>;
+    await act(async () => {
+      pending = fixture.hook.start();
+      await Promise.resolve();
+    });
+    const first = mocks.export.mock.calls[0]![0];
+    act(() => first.onTimeEstimate({ remainingMs: 12_000 }));
+    expect(fixture.hook.timeEstimate).toEqual({ remainingMs: 12_000 });
+    act(() => fixture.hook.cancel());
+    act(() => first.onTimeEstimate({ remainingMs: 99_000 }));
+    expect(fixture.hook.timeEstimate).toBeNull();
+    await act(async () => {
+      reject(new Error('aborted'));
+      await pending;
+    });
+    await act(async () => {
+      pending = fixture.hook.start();
+      await Promise.resolve();
+    });
+    expect(fixture.hook.timeEstimate).toBeNull();
+    act(() => first.onTimeEstimate({ remainingMs: 99_000 }));
+    expect(fixture.hook.timeEstimate).toBeNull();
+    const second = mocks.export.mock.calls[1]![0];
+    act(() => second.onTimeEstimate({ remainingMs: 5000 }));
+    act(() => second.onPublishing());
+    act(() => second.onTimeEstimate({ remainingMs: 9000 }));
+    expect(fixture.hook.timeEstimate).toBeNull();
+    await act(async () => {
+      reject(new Error('publication failed'));
+      await pending;
+    });
+    expect(fixture.hook.phase).toBe('idle');
+    expect(fixture.hook.timeEstimate).toBeNull();
+  } finally {
+    await fixture.cleanup();
+  }
+});

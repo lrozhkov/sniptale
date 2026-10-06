@@ -1,3 +1,5 @@
+import { createExportTimeEstimator } from '../../features/video/project/export/time-estimate';
+import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import {
   ALL_FORMATS,
   BlobSource,
@@ -44,6 +46,7 @@ export async function writeReviewPackets(args: {
   provenance?: string;
   exportAudio?: ReviewExportClipPlan;
   onProgress?(fraction: number): void;
+  onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
 }): Promise<ReviewPacketReceipt> {
   const { index, signal } = args;
   signal.throwIfAborted();
@@ -100,6 +103,19 @@ export async function writeReviewPackets(args: {
     const videoSource = tracks.video.source;
     let videoEnd = 0;
     await output.start();
+    const timeEstimator = createExportTimeEstimator([
+      { start: 0, end: receipt.resultDuration, cost: 1, route: 'copy' },
+    ]);
+    let lastEstimateAt = performance.now();
+    const reportProgress = (fraction: number) => {
+      const estimate = timeEstimator.observe(fraction * receipt.resultDuration);
+      const now = performance.now();
+      if (now - lastEstimateAt >= 500) {
+        args.onTimeEstimate?.(estimate);
+        lastEstimateAt = now;
+      }
+      args.onProgress?.(fraction);
+    };
     for (const segment of segments) {
       signal.throwIfAborted();
       const videoPackets = await segmentVideoPackets(
@@ -142,13 +158,14 @@ export async function writeReviewPackets(args: {
           audioConfig,
           receipt,
           signal,
-          onProgress: args.onProgress,
+          onProgress: reportProgress,
         })
       );
     }
     videoSource.close();
     tracks.audio?.source.close();
     signal.throwIfAborted();
+    args.onTimeEstimate?.(null);
     await output.finalize();
     signal.throwIfAborted();
     receipt.resultDuration = Math.max(videoEnd, clock.time);
@@ -158,6 +175,7 @@ export async function writeReviewPackets(args: {
     await output?.cancel().catch(() => undefined);
     throw error;
   } finally {
+    args.onTimeEstimate?.(null);
     signal.removeEventListener('abort', dispose);
     input.dispose();
   }

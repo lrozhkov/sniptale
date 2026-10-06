@@ -1,3 +1,5 @@
+import { createExportTimeEstimator } from '../../features/video/project/export/time-estimate';
+import { planProjectExportTime } from '../../features/video/project/export/time-estimate-plan';
 import { preloadClipVideos } from './media';
 import { finalizeExport } from './persistence';
 import { type LoadedImagesMap } from './renderer';
@@ -78,6 +80,7 @@ export async function renderCompositeExport(
   job.exportAbortController = abortController;
   await preloadClipVideos(project, job, container, abortController.signal);
 
+  job.timeEstimator = createExportTimeEstimator(planProjectExportTime(project, settings));
   const outputBlob =
     settings.format === VideoExportFormat.MP4
       ? await renderCompositeToMp4(job, project, settings, loadedImages, canvas, context)

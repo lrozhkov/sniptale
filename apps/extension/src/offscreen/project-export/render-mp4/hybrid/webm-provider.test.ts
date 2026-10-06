@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -6,6 +7,20 @@ import {
 } from '../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType, VideoTrackKind } from '../../../../features/video/project/types';
+
+const prepareDecodedVideoSampleMock = vi.hoisted(() => vi.fn());
+
+vi.mock('../../../../features/video/composition/draw/decoded-sample', async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import('../../../../features/video/composition/draw/decoded-sample')
+    >();
+  return {
+    prepareDecodedVideoSample: prepareDecodedVideoSampleMock.mockImplementation(
+      original.prepareDecodedVideoSample
+    ),
+  };
+});
 
 const getDecoderConfigMock = vi.hoisted(() => vi.fn());
 const canDecodeMock = vi.hoisted(() => vi.fn());
@@ -32,6 +47,7 @@ vi.mock('mediabunny', () => ({
     samplesAtTimestamps = samplesAtTimestampsMock;
   },
   WEBM: {},
+  MP4: {},
 }));
 
 vi.mock('../../media', async (importOriginal) => ({
@@ -44,6 +60,9 @@ import { createWebmFrameProviders, prepareWebmProviderFrames } from './webm-prov
 function createSample() {
   return {
     close: vi.fn(),
+    codedWidth: 1280,
+    codedHeight: 720,
+    rotation: 0,
     displayHeight: 720,
     displayWidth: 1280,
     draw: vi.fn(),
@@ -94,6 +113,7 @@ beforeEach(() => {
   inputDisposeMocks.length = 0;
   getPrimaryVideoTrackMock.mockResolvedValue({
     canDecode: canDecodeMock,
+    getTimeResolution: vi.fn().mockResolvedValue(1_000_000),
     getDecoderConfig: getDecoderConfigMock,
   });
   getDecoderConfigMock.mockResolvedValue({
@@ -117,8 +137,10 @@ it('creates sequential WebM frame providers and releases prepared samples', asyn
   expect(samplesAtTimestampsMock).toHaveBeenCalledWith([0, 0.5]);
   const frames = await prepareWebmProviderFrames(providers!, 0);
   expect(frames).toHaveLength(1);
-  frames[0]!.source.draw({} as CanvasRenderingContext2D, 1, 2, 3, 4);
-  expect(sample.draw).toHaveBeenCalledWith({}, 1, 2, 3, 4);
+  const target = { drawImage: vi.fn() };
+  frames[0]!.source.draw(target as unknown as CanvasRenderingContext2D, 1, 2, 3, 4);
+  expect(target.drawImage).toHaveBeenCalledWith(expect.any(HTMLCanvasElement), 1, 2, 3, 4);
+  expect(sample.draw).toHaveBeenCalledWith(expect.anything(), 0, 0, 1280, 720);
   frames[0]!.release();
   expect(sample.close).toHaveBeenCalledOnce();
   providers![0]!.dispose();
@@ -200,4 +222,132 @@ it('releases the input when decoder metadata cannot be read', async () => {
     'Invalid color metadata'
   );
   expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
+});
+
+it('quantizes MP4 requests to container ticks without crossing the clip endpoint', async () => {
+  getPrimaryVideoTrackMock.mockResolvedValueOnce({
+    canDecode: canDecodeMock,
+    getDecoderConfig: async () => ({ codec: 'avc1.64002a' }),
+    getTimeResolution: async () => 1000,
+  });
+  const project = createProject();
+  project.assets[0]!.metadata.mimeType = 'video/mp4';
+  project.clips = [{ ...project.clips[0]!, duration: 0.067 }];
+  const providers = await createWebmFrameProviders(project, [0, 1 / 30, 2 / 30]);
+  expect(samplesAtTimestampsMock).toHaveBeenLastCalledWith([0, 0.033, 0.066]);
+  providers?.forEach((provider) => provider.dispose());
+});
+
+it('cancels the active decoder input and releases a late sample exactly once', async () => {
+  const sample = createSample();
+  const controller = new AbortController();
+  samplesAtTimestampsMock.mockReturnValue(
+    (async function* () {
+      controller.abort();
+      yield sample;
+    })()
+  );
+  const project = { ...createProject(), clips: [createProject().clips[0]!] };
+  const providers = await createWebmFrameProviders(project, [0], controller.signal);
+  await expect(prepareWebmProviderFrames(providers!, 0)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+  expect(sample.close).toHaveBeenCalledOnce();
+  providers?.forEach((provider) => provider.dispose());
+  expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
+});
+
+it('reuses one raster across samples and releases its pixels on disposal', async () => {
+  const samples = [createSample(), createSample()];
+  samplesAtTimestampsMock.mockReturnValue(createSamples(samples));
+  const project = { ...createProject(), clips: [createProject().clips[0]!] };
+  const providers = await createWebmFrameProviders(project, [0, 0.5]);
+  const target = { drawImage: vi.fn() };
+  for (const index of [0, 1]) {
+    const frames = await prepareWebmProviderFrames(providers!, index);
+    frames[0]!.source.draw(target as unknown as CanvasRenderingContext2D, 0, 0, 1280, 720);
+    frames[0]!.release();
+  }
+  const raster = target.drawImage.mock.calls[0]![0];
+  expect(target.drawImage.mock.calls[1]![0]).toBe(raster);
+  expect(raster.width).toBe(1280);
+  providers![0]!.dispose();
+  expect(raster.width).toBe(0);
+  expect(raster.height).toBe(0);
+  for (const sample of samples) expect(sample.close).toHaveBeenCalledOnce();
+});
+
+it('retains display aspect while staging rotated native pixels without resampling', async () => {
+  const sample = {
+    ...createSample(),
+    codedWidth: 16,
+    codedHeight: 10,
+    displayWidth: 10,
+    displayHeight: 32,
+    rotation: 90,
+  };
+  samplesAtTimestampsMock.mockReturnValue(createSamples([sample]));
+  const providers = await createWebmFrameProviders(
+    { ...createProject(), clips: [createProject().clips[0]!] },
+    [0]
+  );
+  const frames = await prepareWebmProviderFrames(providers!, 0);
+  expect(sample.draw).toHaveBeenCalledWith(expect.anything(), 0, 0, 10, 16);
+  expect(frames[0]!.source).toMatchObject({ sourceWidth: 10, sourceHeight: 32 });
+  frames[0]!.release();
+  providers![0]!.dispose();
+});
+
+it('closes the normalized sample when staging its pixels fails', async () => {
+  const sample = createSample();
+  sample.draw.mockImplementation(() => {
+    throw new Error('Raster paint failed');
+  });
+  samplesAtTimestampsMock.mockReturnValue(createSamples([sample]));
+  const providers = await createWebmFrameProviders(
+    { ...createProject(), clips: [createProject().clips[0]!] },
+    [0]
+  );
+  await expect(prepareWebmProviderFrames(providers!, 0)).rejects.toThrow('Raster paint failed');
+  expect(sample.close).toHaveBeenCalledOnce();
+  providers![0]!.dispose();
+});
+
+it('does not recreate a disposed raster when cancellation follows normalization', async () => {
+  const sample = createSample();
+  let finish: (value: ReturnType<typeof createSample>) => void = () => {
+    throw new Error('Normalization was not started');
+  };
+  prepareDecodedVideoSampleMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  samplesAtTimestampsMock.mockReturnValue(createSamples([sample]));
+  const controller = new AbortController();
+  const raster = document.createElement('canvas');
+  const create = vi.spyOn(document, 'createElement').mockReturnValueOnce(raster);
+  const getContext = vi.spyOn(raster, 'getContext');
+  try {
+    const providers = await createWebmFrameProviders(
+      { ...createProject(), clips: [createProject().clips[0]!] },
+      [0],
+      controller.signal
+    );
+    const pending = prepareWebmProviderFrames(providers!, 0);
+    await vi.waitFor(() => expect(prepareDecodedVideoSampleMock).toHaveBeenCalledOnce());
+    finish(sample);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    expect(sample.close).toHaveBeenCalledOnce();
+    expect(raster.width).toBe(0);
+    expect(raster.height).toBe(0);
+    expect(getContext).not.toHaveBeenCalled();
+    providers![0]!.dispose();
+    expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
+  } finally {
+    create.mockRestore();
+    getContext.mockRestore();
+  }
 });

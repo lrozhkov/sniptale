@@ -1,3 +1,4 @@
+import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoProjectExportPhase } from '../../features/video/project/types';
 import { VideoWebmCodec } from '../../features/video/project/types';
@@ -34,7 +35,8 @@ export async function sendProgress(
   jobId: string,
   phase: VideoProjectExportPhase,
   progress: number,
-  message: string
+  message: string,
+  timeEstimate?: VideoProjectExportTimeEstimate | null
 ): Promise<void> {
   const local = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
   const bands = {
@@ -58,6 +60,7 @@ export async function sendProgress(
         phase,
         progress: overall,
         message,
+        ...(timeEstimate ? { timeEstimate } : {}),
       },
     },
   });

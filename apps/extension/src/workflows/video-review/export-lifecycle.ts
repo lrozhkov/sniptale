@@ -1,3 +1,4 @@
+import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { summarizeRecordingMetadata } from '../../features/media-hub/recording-metadata';
 import { createOutputFilename } from '../file-naming/index';
 import { configuredReviewExportPlan } from './export-configuration';
@@ -122,6 +123,7 @@ export async function exportReviewedVideo(
     destination?: 'gallery' | 'download';
     selection?: Extract<ReviewAnchor, { kind: 'range' }>;
     onProgress?(fraction: number): void;
+    onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
     onPublishing?(): void;
   },
   deps = persistence
@@ -245,6 +247,7 @@ export async function exportReviewedVideo(
             readProjectAsset: deps.readProjectAsset,
             ...(exportAudio ? { exportAudio } : {}),
             ...(args.onProgress ? { onProgress: args.onProgress } : {}),
+            ...(args.onTimeEstimate ? { onTimeEstimate: args.onTimeEstimate } : {}),
           })
         : await deps.writeReviewPackets({
             file: original.file,
@@ -255,8 +258,10 @@ export async function exportReviewedVideo(
             provenance,
             ...(exportAudio ? { exportAudio } : {}),
             ...(args.onProgress ? { onProgress: args.onProgress } : {}),
+            ...(args.onTimeEstimate ? { onTimeEstimate: args.onTimeEstimate } : {}),
           });
     signal.throwIfAborted();
+    args.onTimeEstimate?.(null);
     const prepared = await writer.finalize();
     const file = await deps.readAssetFile(prepared.ref, filename);
     signal.throwIfAborted();
@@ -314,5 +319,7 @@ export async function exportReviewedVideo(
       );
     }
     throw error;
+  } finally {
+    args.onTimeEstimate?.(null);
   }
 }

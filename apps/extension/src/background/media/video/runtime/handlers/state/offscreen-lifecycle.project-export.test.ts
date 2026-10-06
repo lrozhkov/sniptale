@@ -320,3 +320,24 @@ it('forwards the committed percentage when a retry reports earlier progress', as
     })
   );
 });
+
+it('relays the advisory time snapshot without persisting it in the export ledger', async () => {
+  const status = {
+    message: 'Rendering',
+    phase: 'RENDERING' as const,
+    progress: 25,
+    timeEstimate: { remainingMs: 4000 },
+  };
+  handleProjectExportLifecycleMessage(
+    { type: VideoMessageType.PROJECT_EXPORT_PROGRESS, jobId: 'job-1', status },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(expect.objectContaining({ status }));
+  expect(upsertLedgerMock).toHaveBeenCalledWith({
+    jobId: 'job-1',
+    projectId: 'project-1',
+    phase: 'RENDERING',
+    progress: 25,
+  });
+});

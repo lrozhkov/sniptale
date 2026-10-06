@@ -126,8 +126,12 @@ export async function runFrameDrivenCompositeRenderLoop(
 async function renderFrameDrivenLoopFrames(args: FrameDrivenLoopFramesArgs): Promise<void> {
   let lastProgressFrame = -1;
   await pauseRenderLoopMediaElements(args.job);
+  args.job.timeEstimator?.resume();
   for (let frameIndex = 0; frameIndex < args.totalFrames; frameIndex += 1) {
     await renderFrameDrivenLoopFrame({ ...args, frameIndex });
+    args.job.timeEstimator?.observe(
+      args.exportStart + Math.min(args.duration, (frameIndex + 1) / args.fps)
+    );
     lastProgressFrame = await sendLoopProgress({
       fps: args.fps,
       frameIndex,
