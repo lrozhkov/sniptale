@@ -88,3 +88,83 @@ it('does not restore a late favicon after the user disables it', async () => {
     host.remove();
   }
 });
+
+it('keeps typing local until blur or Enter and cancels an edit with Escape', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const changed = vi.fn();
+  function Harness() {
+    const [header, setHeader] = useState<WindowHeader | undefined>(DEFAULT_WINDOW_HEADER);
+    return (
+      <WindowHeaderSettings
+        header={header}
+        onChange={(next) => {
+          changed(next);
+          setHeader(next);
+        }}
+      />
+    );
+  }
+  const input = () => host.querySelector<HTMLInputElement>('input')!;
+  const type = async (value: string) => {
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        input(),
+        value
+      );
+      input().dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  try {
+    await act(async () => root.render(<Harness />));
+    await act(async () => input().focus());
+    await type('A');
+    await type('A title');
+    expect(input().value).toBe('A title');
+    expect(changed).not.toHaveBeenCalled();
+    await act(async () => input().blur());
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'A title' }));
+    await act(async () => input().focus());
+    await type('Cancel');
+    await act(async () =>
+      input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(input().value).toBe('A title');
+    await act(async () => input().focus());
+    await type('Accepted');
+    await act(async () =>
+      input().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    expect(changed).toHaveBeenCalledTimes(2);
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+  }
+});
+
+it('does not start favicon acquisition after an async image edit outlives its inspector', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  await act(async () =>
+    root.render(
+      <WindowHeaderSettings
+        header={{ ...DEFAULT_WINDOW_HEADER, url: 'example.test' }}
+        onChange={() => pending}
+      />
+    )
+  );
+  const buttons = host.querySelectorAll<HTMLButtonElement>('button');
+  await act(async () => buttons.item(buttons.length - 1).click());
+  await act(async () => root.unmount());
+  await act(async () => finish());
+  expect(acquire).not.toHaveBeenCalled();
+});

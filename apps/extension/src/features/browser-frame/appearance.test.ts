@@ -78,3 +78,33 @@ it('contains wide browser labels inside their own fixed viewports, away from cap
     { x: 157, right: 1450, overflow: 'hidden' },
   ]);
 });
+
+it('does not show a browser globe in a Windows application caption', () => {
+  const svg = composeWindowHeaderSvg(
+    { ...DEFAULT_WINDOW_HEADER, kind: 'application' },
+    { width: 1600, height: 900 }
+  );
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  expect(doc.querySelector('ellipse')).toBeNull();
+  expect(doc.querySelector('text')?.getAttribute('x')).toBe('16');
+});
+
+it('lets the SVG font layout fill the tab label and fades its trailing edge', () => {
+  const title = 'iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii';
+  const svg = composeWindowHeaderSvg(
+    { ...DEFAULT_WINDOW_HEADER, title },
+    { width: 1600, height: 900 }
+  );
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  expect(doc.querySelector('text')?.textContent).toBe(title);
+  expect(doc.querySelector('mask linearGradient, defs linearGradient')).not.toBeNull();
+});
+
+it('aligns the tab title baseline with the 20-unit favicon center', () => {
+  const svg = composeWindowHeaderSvg(
+    { ...DEFAULT_WINDOW_HEADER, title: 'Sniptale' },
+    { width: 1600, height: 900 }
+  );
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  expect(doc.querySelector('text')?.getAttribute('y')).toBe('23.5');
+});

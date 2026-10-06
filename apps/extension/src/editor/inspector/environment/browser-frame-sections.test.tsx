@@ -49,7 +49,7 @@ vi.mock('./shared', () => ({
   panelButtonClassName: 'panel-button',
 }));
 
-import { BrowserFrameBehaviorSections, BrowserFrameInsertSection } from './browser-frame-sections';
+import { BrowserFrameBehaviorSections, BrowserFrameResetSection } from './browser-frame-sections';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -119,12 +119,10 @@ it('renders alternate labels for keep-size and fit-content browser behavior', ()
 });
 
 it('routes insert or update through the async action boundary', async () => {
-  const insertOrUpdateBrowserFrame = vi.fn();
+  const resetBrowserFrame = vi.fn();
 
   act(() => {
-    root?.render(
-      <BrowserFrameInsertSection insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
-    );
+    root?.render(<BrowserFrameResetSection resetBrowserFrame={resetBrowserFrame} />);
   });
 
   await act(async () => {
@@ -133,29 +131,25 @@ it('routes insert or update through the async action boundary', async () => {
     await Promise.resolve();
   });
 
-  expect(insertOrUpdateBrowserFrame).toHaveBeenCalledOnce();
+  expect(resetBrowserFrame).toHaveBeenCalledOnce();
   expect(container?.textContent).not.toContain('editor.compact.browserFrameAction');
-  expect(container?.textContent).toContain('editor.compact.apply');
+  expect(container?.textContent).toContain('windowHeader.reset');
 });
 
 it('keeps disabled apply inert and exposes a localized async failure', async () => {
-  const insertOrUpdateBrowserFrame = vi.fn(async () => {
+  const resetBrowserFrame = vi.fn(async () => {
     throw new Error('Frame failed');
   });
 
   act(() => {
-    root?.render(
-      <BrowserFrameInsertSection disabled insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
-    );
+    root?.render(<BrowserFrameResetSection disabled resetBrowserFrame={resetBrowserFrame} />);
   });
 
   expect(container?.querySelector('button')?.disabled).toBe(true);
   expect(container?.querySelector('[role="alert"]')).toBeNull();
 
   act(() => {
-    root?.render(
-      <BrowserFrameInsertSection insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame} />
-    );
+    root?.render(<BrowserFrameResetSection resetBrowserFrame={resetBrowserFrame} />);
   });
 
   await act(async () => {

@@ -890,7 +890,15 @@ for (const variant of [
           await expect(settings).toBeVisible();
           const button = (key: Parameters<typeof translate>[0]) =>
             settings.getByRole('button', { name: label(key), exact: true });
+          const artwork = () =>
+            page.evaluate(() => {
+              const src = window.__sniptaleEditorHarness
+                ?.getCanvasObjects()
+                .find((object) => object['sniptaleType'] === 'browser-frame')?.['src'];
+              return typeof src === 'string' ? decodeURIComponent(src) : '';
+            });
           await button('windowHeader.application').click();
+          await expect.poll(artwork).toContain('application win');
           const segmentGeometry = await settings.getByRole('button').evaluateAll(
             (buttons, labels) =>
               buttons
@@ -927,19 +935,21 @@ for (const variant of [
             .fill('Image application header');
           await settings.getByRole('button', { name: 'macOS', exact: true }).click();
           await button('windowHeader.dark').click();
-          const apply = page.getByRole('button', {
-            name: label('editor.compact.apply'),
+          await expect(
+            page.getByRole('button', { name: label('editor.compact.apply'), exact: true })
+          ).toHaveCount(0);
+          const reset = page.getByRole('button', {
+            name: label('windowHeader.reset'),
             exact: true,
           });
-          await apply.scrollIntoViewIfNeeded();
-          await expect(apply).toBeInViewport();
-          await apply.click();
+          await reset.scrollIntoViewIfNeeded();
+          await expect(reset).toBeInViewport();
           await expect.poll(hasHeader).toBe(true);
           await page.screenshot({
             path: info.outputPath('image-application-header.png'),
             fullPage: false,
           });
-          await button('windowHeader.none').click();
+          await reset.click();
           await expect.poll(hasHeader).toBe(false);
           await page
             .getByRole('button', { name: label('editor.toolbar.undo'), exact: true })

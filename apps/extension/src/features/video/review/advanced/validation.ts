@@ -30,6 +30,25 @@ import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';
 import type { ReviewTimeSegment } from '../timeline';
 
+/** Unreleased text-only headers cannot render with the new artwork; retain the rest of the edit. */
+function parseStoredWindowHeader(value: unknown) {
+  if (value === undefined) return undefined;
+  if (
+    isRecord(value) &&
+    value['kind'] === 'browser' &&
+    Object.keys(value).every((key) => key === 'kind' || key === 'title' || key === 'url') &&
+    typeof value['title'] === 'string' &&
+    value['title'].length <= 512 &&
+    !/[\uD800-\uDFFF]/u.test(value['title']) &&
+    (value['url'] === undefined ||
+      (typeof value['url'] === 'string' &&
+        value['url'].length <= 2048 &&
+        !/[\uD800-\uDFFF]/u.test(value['url'])))
+  )
+    return undefined;
+  return parseWindowHeader(value);
+}
+
 /** Renderer-consistent camera magnification bounds, matching video project scale limits. */
 const MAX_QUICK_EDIT_CAMERA_SCALE = 4;
 const MIN_QUICK_EDIT_CAMERA_SCALE = 1;
@@ -380,8 +399,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
-  const windowHeader =
-    raw['windowHeader'] === undefined ? undefined : parseWindowHeader(raw['windowHeader']);
+  const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
   if (canvas === null || windowHeader === null || webcam === null) return null;
   if (!zoom || !background || !audio) return null;
@@ -431,8 +449,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
-  const windowHeader =
-    raw['windowHeader'] === undefined ? undefined : parseWindowHeader(raw['windowHeader']);
+  const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
   if (canvas === null || windowHeader === null || webcam === null) return null;
   const recovery = raw['recoveryV1'];

@@ -25,7 +25,7 @@ function createBrowserFrameSyncAction(
     }
     const next = { ...useEditorStore.getState().browserFrame, ...draft };
     args.setBrowserFrame(next);
-    if (enabled === true) await controller.applyBrowserFrame(next);
+    if (enabled === true || next.enabled) await controller.applyBrowserFrame(next);
   };
 }
 

@@ -417,6 +417,9 @@ it('renders chrome and source through one rounded window contour and outer borde
     shadowOffsetY: 5,
     stroke: vi.fn(),
   };
+  const planeContext = { drawImage: vi.fn(), save: vi.fn(), restore: vi.fn(), translate: vi.fn() };
+  const plane = { getContext: () => planeContext, width: 0, height: 0 };
+  vi.stubGlobal('document', { createElement: () => plane });
   applyImageSettings(image as never, {
     ...DEFAULT_EDITOR_IMAGE_SETTINGS,
     radius: 12,
@@ -428,10 +431,20 @@ it('renders chrome and source through one rounded window contour and outer borde
   image._render(context as never);
   expect(context.drawImage).toHaveBeenCalledOnce();
   expect(baseRender).toHaveBeenCalledOnce();
-  expect(context.clip).toHaveBeenCalledTimes(2);
+  expect(context.clip).toHaveBeenCalledTimes(3);
   expect(context.clip).toHaveBeenCalledWith('evenodd');
   expect(context.roundRect).toHaveBeenCalledWith(-80, -232, 160, 292, 12);
   expect(context.fill).toHaveBeenCalledOnce();
   expect(context.moveTo).toHaveBeenCalledWith(-68, -232);
   expect(context.stroke).toHaveBeenCalledOnce();
+  image._render(context as never);
+  expect(baseRender).toHaveBeenCalledOnce();
+  expect(planeContext.drawImage).toHaveBeenCalledOnce();
+  Object.assign(image, { getElement: () => ({ width: 160, height: 120 }) });
+  image._render(context as never);
+  expect(baseRender).toHaveBeenCalledTimes(2);
+  attachBrowserHeaderToImage(image as never, null, 0);
+  image._render(context as never);
+  expect(baseRender).toHaveBeenCalledTimes(3);
+  vi.unstubAllGlobals();
 });

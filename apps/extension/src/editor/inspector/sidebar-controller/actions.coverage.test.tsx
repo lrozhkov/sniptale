@@ -168,3 +168,17 @@ it('routes Off to controller removal without storing an independent activation f
   expect(args.setBrowserFrame).not.toHaveBeenCalled();
   view.root.unmount();
 });
+
+it('applies existing header edits immediately rather than keeping an unapplied draft', async () => {
+  mocks.storeState.browserFrame.enabled = true;
+  const view = renderActions(createArgs(null, false), true);
+  try {
+    await view.result.editorActions.syncBrowserFrame({ theme: 'dark', kind: 'application' });
+    expect(mocks.controller.applyBrowserFrame).toHaveBeenCalledWith(
+      expect.objectContaining({ theme: 'dark', kind: 'application' })
+    );
+  } finally {
+    mocks.storeState.browserFrame.enabled = false;
+    view.root.unmount();
+  }
+});

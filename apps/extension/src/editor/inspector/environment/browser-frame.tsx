@@ -5,7 +5,7 @@ import { WindowHeaderSettings } from '../../../workflows/browser-frame/settings'
 import { useEditorStore } from '../../state/useEditorStore';
 import { resolveEditorWindowHeader } from '../../../features/editor/document/constants';
 import { EditorInspectorDetails } from '../grouped';
-import { BrowserFrameBehaviorSections, BrowserFrameInsertSection } from './browser-frame-sections';
+import { BrowserFrameBehaviorSections, BrowserFrameResetSection } from './browser-frame-sections';
 
 /** Layer presence owns activation; document identity owns pending favicon acquisition. */
 export function EditorWindowHeaderSettings(props: {
@@ -42,13 +42,7 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
   browserFrame: BrowserFrameState;
   insertOrUpdateBrowserFrame?: () => Promise<void> | void;
   syncBrowserFrame: (updates: Partial<BrowserFrameState>) => Promise<void> | void;
-}> = ({
-  browserCanvasModeOptions,
-  browserContentModeOptions,
-  browserFrame,
-  insertOrUpdateBrowserFrame,
-  syncBrowserFrame,
-}) => {
+}> = ({ browserCanvasModeOptions, browserContentModeOptions, browserFrame, syncBrowserFrame }) => {
   useAppLocale();
 
   return (
@@ -65,9 +59,7 @@ export const EditorInspectorBrowserFramePanelContent: React.FC<{
           syncBrowserFrame={syncBrowserFrame}
         />
       </EditorInspectorDetails>
-      <BrowserFrameInsertSection
-        insertOrUpdateBrowserFrame={insertOrUpdateBrowserFrame ?? (() => undefined)}
-      />
+      <BrowserFrameResetSection resetBrowserFrame={() => syncBrowserFrame({ enabled: false })} />
     </div>
   );
 };

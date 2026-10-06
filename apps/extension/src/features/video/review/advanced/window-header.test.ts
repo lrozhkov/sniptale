@@ -117,3 +117,30 @@ describe('decorated original video', () => {
     ).toMatchObject({ kind: 'unavailable' });
   });
 });
+
+it('drops only the known pre-style browser header when admitting state and history content', () => {
+  const baseline = createQuickEditAdvancedState();
+  for (const legacy of [
+    { kind: 'browser', title: 'Old tab' },
+    { kind: 'browser', title: 'Old tab', url: 'https://example.test' },
+  ]) {
+    expect(loadQuickEditAdvancedState({ ...baseline, windowHeader: legacy })).toEqual(baseline);
+    const content = reviewAdvancedContentBaseline(baseline);
+    expect(loadQuickEditAdvancedContentState({ ...content, windowHeader: legacy })).toEqual(
+      content
+    );
+  }
+  expect(
+    loadQuickEditAdvancedState({
+      ...baseline,
+      windowHeader: { kind: 'browser', title: 'bad', theme: 'invalid' },
+    })
+  ).toBeNull();
+  expect(
+    loadQuickEditAdvancedState({
+      ...baseline,
+      windowHeader: { kind: 'browser', title: 'old' },
+      zoom: null,
+    })
+  ).toBeNull();
+});

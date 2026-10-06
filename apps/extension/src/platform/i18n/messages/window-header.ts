@@ -1,6 +1,7 @@
 import { defineMessageSource } from './source';
 export const windowHeaderMessages = defineMessageSource({
   enabled: { en: 'Window header', ru: 'Шапка окна' },
+  reset: { en: 'Reset', ru: 'Сбросить' },
   none: { en: 'Off', ru: 'Выключено' },
   type: { en: 'Type', ru: 'Тип' },
   browser: { en: 'Browser', ru: 'Браузер' },

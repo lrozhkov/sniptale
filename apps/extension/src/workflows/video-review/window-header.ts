@@ -1,6 +1,7 @@
 import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
+import { windowHeaderGeometry } from '../../features/browser-frame/header';
 import { composeWindowHeaderSvg } from '../../features/browser-frame/appearance';
 import type { QuickEditWindowHeader } from '../../features/video/review/advanced/types';
 
@@ -10,11 +11,11 @@ export function reviewWindowHeaderUrl(
   width: number,
   height: number
 ): string {
-  const svg = composeWindowHeaderSvg(header, { width, height });
-  // Even output rows and preview snapping can stretch the header slightly. Fill that
-  // exact rectangle so SVG aspect fitting cannot open a seam above the video.
-  const fitted = svg.replace('<svg ', '<svg preserveAspectRatio="none" ');
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(fitted)}`;
+  const source = { width, height };
+  const rasterHeight = Math.max(2, Math.ceil(windowHeaderGeometry(header, source).height / 2) * 2);
+  // Encoder rows extend the toolbar surface; glyphs keep the same scale on both axes.
+  const svg = composeWindowHeaderSvg(header, source, rasterHeight);
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 /** Rasterize the complete SVG once; the caller owns the bitmap and must close it. */
@@ -96,6 +97,8 @@ export function createReviewWindowRaster(args: {
     context.imageSmoothingQuality = 'high';
     const headerHeight = (args.videoRect.y - args.windowRect.y) * scale;
     context.drawImage(args.header, 0, 0, width, headerHeight);
+    // Sum coverage at the shared edge without backing transparent source pixels.
+    context.globalCompositeOperation = 'lighter';
     args.draw(
       context,
       (args.videoRect.x - args.windowRect.x) * scale,

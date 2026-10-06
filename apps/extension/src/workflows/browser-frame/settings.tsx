@@ -14,13 +14,20 @@ interface WindowHeaderSettingsProps {
 
 /** Explicit edit gestures own acquisition; mounting a saved project never performs network I/O. */
 function useWindowHeaderEditing({ header, onChange, disabled = false }: WindowHeaderSettingsProps) {
+  const active = useRef(true);
   const latest = useRef(header);
   latest.current = header;
   const request = useRef<AbortController | null>(null);
   const requestAddress = useRef<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+      request.current?.abort();
+    };
+  }, []);
   useEffect(() => {
     if (
       request.current &&
@@ -36,8 +43,10 @@ function useWindowHeaderEditing({ header, onChange, disabled = false }: WindowHe
     latest.current = next;
     try {
       await onChange(next);
+      return active.current;
     } catch {
-      setError(translate('windowHeader.updateFailed'));
+      if (active.current) setError(translate('windowHeader.updateFailed'));
+      return false;
     }
   }
   function patch(update: Partial<WindowHeader>) {
@@ -45,6 +54,13 @@ function useWindowHeaderEditing({ header, onChange, disabled = false }: WindowHe
     void commit({ ...latest.current, ...update });
   }
   async function acquire(next: WindowHeader) {
+    if (
+      !active.current ||
+      latest.current?.kind !== 'browser' ||
+      !latest.current.faviconEnabled ||
+      latest.current.url !== next.url
+    )
+      return;
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -79,8 +95,8 @@ function useWindowHeaderEditing({ header, onChange, disabled = false }: WindowHe
     setError(null);
     const { faviconDataUrl: _icon, ...rest } = header;
     const next = { ...rest, faviconEnabled: !header.faviconEnabled };
-    void commit(next).then(() => {
-      if (next.faviconEnabled) void acquire(next);
+    void commit(next).then((applied) => {
+      if (applied && next.faviconEnabled) void acquire(next);
     });
   }
   function changeKind(kind: 'none' | WindowHeader['kind']) {
@@ -91,15 +107,16 @@ function useWindowHeaderEditing({ header, onChange, disabled = false }: WindowHe
       kind === 'none' ? undefined : { ...(latest.current ?? DEFAULT_WINDOW_HEADER), kind }
     );
   }
-  function changeAddress(value: string) {
-    if (!header) return;
+  async function changeAddress(value: string) {
+    if (!header || disabled) return;
     request.current?.abort();
     const { faviconDataUrl: _icon, ...rest } = header;
-    void commit({ ...rest, url: value.slice(0, 2048).replace(/[\uD800-\uDFFF]/gu, '') });
+    if (await commit({ ...rest, url: value })) acquireMissingFavicon();
   }
   function acquireMissingFavicon() {
     const current = latest.current;
-    if (current?.faviconEnabled && !current.faviconDataUrl) void acquire(current);
+    if (current?.kind === 'browser' && current.faviconEnabled && !current.faviconDataUrl)
+      void acquire(current);
   }
   return { busy, error, patch, changeKind, changeAddress, acquireMissingFavicon, toggleFavicon };
 }
@@ -146,27 +163,22 @@ export function WindowHeaderSettings({
             ]}
             onChange={(theme) => editing.patch({ theme })}
           />
-          <TextField
+          <HeaderTextField
             label={translate(
               header.kind === 'browser' ? 'windowHeader.tabTitle' : 'windowHeader.windowTitle'
             )}
             value={header.title}
             maxLength={512}
-            onChange={(event) =>
-              editing.patch({
-                title: event.target.value.slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
-              })
-            }
+            onCommit={(title) => editing.patch({ title })}
           />
           {header.kind === 'browser' ? (
             <div className="flex min-w-0 items-end gap-1.5">
-              <TextField
+              <HeaderTextField
                 label={translate('windowHeader.address')}
                 value={header.url}
                 maxLength={2048}
                 placeholder="example.com"
-                onChange={(event) => editing.changeAddress(event.target.value)}
-                onBlur={editing.acquireMissingFavicon}
+                onCommit={editing.changeAddress}
               />
               <button
                 type="button"
@@ -233,5 +245,49 @@ function HeaderSegments<T extends string>({
         onChange={onChange}
       />
     </div>
+  );
+}
+
+/** A field owns its disposable draft; expensive artwork updates only on completion. */
+function HeaderTextField({
+  label,
+  value,
+  maxLength,
+  placeholder,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  maxLength: number;
+  placeholder?: string;
+  onCommit: (value: string) => void | Promise<void>;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <TextField
+      label={label}
+      value={draft}
+      maxLength={maxLength}
+      placeholder={placeholder}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={(event) => {
+        const next = event.target.value.slice(0, maxLength).replace(/[\uD800-\uDFFF]/gu, '');
+        if (next !== value) void onCommit(next);
+      }}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.nativeEvent.isComposing) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.currentTarget.value = value;
+          setDraft(value);
+          event.currentTarget.blur();
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          event.currentTarget.blur();
+        }
+      }}
+    />
   );
 }

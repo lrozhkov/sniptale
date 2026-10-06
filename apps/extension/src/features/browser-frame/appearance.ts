@@ -124,7 +124,7 @@ function favicon(x: number, y: number, c: string, header: WindowHeader) {
     return `<image x="${x}" y="${y}" width="16" height="16" href="${esc(header.faviconDataUrl)}"/>`;
   return (
     `<g fill="none" stroke="${c}" stroke-width="1.1"><circle cx="${x + 8}" cy="${y + 8}" ` +
-    `r="6"/><ellipse cx="${x + 8}" cy="${y + 8}" rx="2.8" ry="6"/><path d="M${x + 2} ` +
+    `r="6"/><ellipse cx="${x + 8}" cy="${y + 8}" rx="3.4" ry="6"/><path d="M${x + 2} ` +
     `${y + 8}h12"/></g>`
   );
 }
@@ -148,39 +148,40 @@ function controls(os: string, w: number, y: number, c: string, dark: boolean) {
     icon('min', w - 115, y, c, 1) + icon('max', w - 69, y, c, 1) + icon('close', w - 23, y, c, 1)
   );
 }
-function fit(value: string, width: number, size = 12, _bold = false) {
-  const chars = Array.from(value);
-  const capacity = Math.max(0, Math.floor(width / (size * 0.65)));
-  return chars.length <= capacity
-    ? value
-    : chars.slice(0, Math.max(0, capacity - 1)).join('') + '…';
-}
 /** Self-contained SVG: no external resources and one continuous tab/toolbar surface. */
 export function composeWindowHeaderSvg(
   header: WindowHeader,
-  source: { width: number; height: number }
+  source: { width: number; height: number },
+  rasterHeight?: number
 ): string {
   const geometry = windowHeaderGeometry(header, source);
   const { kind, title } = header;
   const os = header.style === 'windows' ? 'win' : header.style === 'macos' ? 'mac' : 'linux';
   const dark = header.theme === 'dark';
   const w = geometry.layoutWidth;
-  let h = kind === 'browser' ? 86 : os === 'win' ? 32 : os === 'mac' ? 28 : 46;
+  const outputHeight = rasterHeight ?? geometry.height;
+  const h = outputHeight / geometry.scale;
   let s =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${geometry.width}" ` +
-    `height="${geometry.height}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${kind} ` +
+    `height="${outputHeight}" viewBox="0 0 ${w} ${h}" role="img" aria-label="${kind} ` +
     `${os} ${dark ? 'dark' : 'light'}"><title>${esc(title)}</title>` +
     `<style>${headerFontCss}text{font-family:WindowHeaderFont,sans-serif}</style>`;
   s +=
     kind === 'browser'
-      ? composeBrowserChrome(header, w, os, dark)
+      ? composeBrowserChrome(header, w, h, os, dark)
       : composeApplicationChrome(header, w, h, os, dark);
   s += `<path d="M0 ${h - 0.5}H${w}" stroke="#000" stroke-opacity="${dark ? '.4' : '.12'}"/></svg>`;
   return s;
 }
 
 /** Tab strip and address toolbar reflow together around fixed-size browser controls. */
-function composeBrowserChrome(header: WindowHeader, w: number, os: string, dark: boolean) {
+function composeBrowserChrome(
+  header: WindowHeader,
+  w: number,
+  h: number,
+  os: string,
+  dark: boolean
+) {
   const { title, url } = header;
   let fg = dark ? '#e3e3e3' : '#242424',
     top = dark ? '#202124' : '#dfe1e6',
@@ -193,9 +194,9 @@ function composeBrowserChrome(header: WindowHeader, w: number, os: string, dark:
   let tx = os === 'mac' ? 88 : 40,
     tw = Math.min(233, w - tx - (os === 'win' ? 180 : 80));
   s +=
-    `<rect width="${w}" height="86" fill="${top}"/><path d="M${tx - 10} 40Q${tx} 40 ${tx} ` +
+    `<rect width="${w}" height="${h}" fill="${top}"/><path d="M${tx - 10} 40Q${tx} 40 ${tx} ` +
     `30V14Q${tx} 6 ${tx + 8} 6H${tx + tw - 8}Q${tx + tw} 6 ${tx + tw} 14V30Q${tx + tw} 40 ` +
-    `${tx + tw + 10} 40H${w}V86H0V40Z" fill="${base}"/>`;
+    `${tx + tw + 10} 40H${w}V${h}H0V40Z" fill="${base}"/>`;
   s += controls(os, w, os === 'win' ? 17 : 20, captionColor, dark);
   if (os !== 'mac')
     s +=
@@ -204,8 +205,8 @@ function composeBrowserChrome(header: WindowHeader, w: number, os: string, dark:
   s +=
     favicon(tx + 14, 12, fg, header) +
     clipHeaderLabel(
-      `<text x="${tx + 38}" y="24.5" font-family="Arial,sans-serif" font-size="13" ` +
-        `fill="${fg}">${esc(fit(title, tw - 67, 13))}</text>`,
+      `<text x="${tx + 38}" y="23.5" font-family="Arial,sans-serif" font-size="13" ` +
+        `fill="${fg}">${esc(title)}</text>`,
       tx + 38,
       tw - 67,
       40
@@ -221,7 +222,7 @@ function composeBrowserChrome(header: WindowHeader, w: number, os: string, dark:
     icon('tune', 137, 63, iconColor) +
     clipHeaderLabel(
       `<text x="157" y="68" font-family="Arial,sans-serif" font-size="14" ` +
-        `fill="${fg}">${esc(fit(url, w - 307, 14))}</text>`,
+        `fill="${fg}">${esc(url)}</text>`,
       157,
       w - 307,
       86
@@ -263,20 +264,18 @@ function composeApplicationChrome(
           : '#f3f3f3';
   s += `<rect width="${w}" height="${h}" fill="${bg}"/>` + controls(os, w, h / 2, fg, dark);
   if (os === 'win')
-    s +=
-      favicon(16, 8, fg, { ...header, faviconEnabled: false }) +
-      clipHeaderLabel(
-        `<text x="48" y="20" font-family="Segoe UI Variable,Segoe UI,Arial,sans-serif" ` +
-          `font-size="12" fill="${fg}">${esc(fit(title, w - 200))}</text>`,
-        48,
-        w - 200,
-        h
-      );
+    s += clipHeaderLabel(
+      `<text x="16" y="20" font-family="Segoe UI Variable,Segoe UI,Arial,sans-serif" ` +
+        `font-size="12" fill="${fg}">${esc(title)}</text>`,
+      16,
+      w - 168,
+      h
+    );
   else
     s += clipHeaderLabel(
       `<text x="${w / 2}" y="${h / 2 + 4.5}" text-anchor="middle" ` +
         `font-family="${os === 'linux' ? 'Cantarell,' : ' '}Arial,sans-serif" font-size="13" ` +
-        `font-weight="600" fill="${fg}">${esc(fit(title, w - 180, 13, true))}</text>`,
+        `font-weight="600" fill="${fg}">${esc(title)}</text>`,
       90,
       w - 180,
       h
@@ -284,10 +283,16 @@ function composeApplicationChrome(
   return s;
 }
 
-/** Font fallback and wide glyphs must never paint over neighboring window controls. */
+/** Text uses the actual font advance; a trailing alpha fade protects neighboring controls. */
 function clipHeaderLabel(markup: string, x: number, width: number, height: number) {
+  const id = `label-${x}-${height}`;
   return (
     `<svg x="${x}" y="0" width="${width}" height="${height}" overflow="hidden">` +
-    `<g transform="translate(${-x} 0)">${markup}</g></svg>`
+    `<defs><linearGradient id="${id}-fade" gradientUnits="userSpaceOnUse" ` +
+    `x1="${Math.max(0, width - 14)}" x2="${width}"><stop stop-color="white"/>` +
+    `<stop offset="1" stop-color="white" stop-opacity="0"/></linearGradient>` +
+    `<mask id="${id}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}">` +
+    `<rect width="${width}" height="${height}" fill="url(#${id}-fade)"/></mask></defs>` +
+    `<g mask="url(#${id})"><g transform="translate(${-x} 0)">${markup}</g></g></svg>`
   );
 }

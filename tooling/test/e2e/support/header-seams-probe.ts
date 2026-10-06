@@ -1,12 +1,21 @@
+import { FabricImage, filters } from 'fabric';
+import {
+  attachImageStyleRenderer,
+  attachBrowserHeaderToImage,
+} from '../../../../apps/extension/src/editor/objects/image-frame';
+import { composeWindowHeaderSvg } from '../../../../apps/extension/src/features/browser-frame/appearance';
+import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../../../apps/extension/src/features/editor/document/constants';
 import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import {
   reviewWindowHeaderUrl,
   loadReviewWindowHeader,
+  createReviewWindowRaster,
 } from '../../../../apps/extension/src/workflows/video-review/window-header';
 import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditVideoTransform,
+  computeQuickEditWindowTransform,
 } from '../../../../apps/extension/src/features/video/review/advanced/scene';
 
 function measureSlices(image: ImageBitmap, context: CanvasRenderingContext2D) {
@@ -39,7 +48,7 @@ function paintJoin(args: {
   image: ImageBitmap;
   video: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
-  color: string;
+  color: string | null;
   zoomBehavior: 'fixed' | 'follow-video';
   blurred: boolean;
   scale: number;
@@ -50,7 +59,7 @@ function paintJoin(args: {
   const background = {
     enabled: true,
     type: 'solid',
-    color,
+    color: color ?? '#000000',
     zoomBehavior,
     layout: { padding: 40, cornerRadius: 18 },
   } as const;
@@ -61,22 +70,47 @@ function paintJoin(args: {
     windowHeader: { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: '' },
     camera,
   });
-  drawReviewSceneFrame(context, {
-    canvas: output,
-    layout,
-    background,
-    image: null,
-    headerImage: image,
-    ...(blurred
-      ? {
-          motionBlur: [
-            { camera: { ...camera, scale: camera.scale - 0.001 }, alpha: 0.5 },
-            { camera: { ...camera, scale: camera.scale + 0.001 }, alpha: 0.5 },
-          ],
-        }
-      : {}),
-    sample: { draw: (ctx, x, y, width, height) => ctx.drawImage(video, x, y, width, height) },
-  });
+  if (color === null) {
+    const plane = createReviewWindowRaster({
+      header: image,
+      videoRect: layout.videoRect,
+      windowRect: layout.windowRect,
+      draw: (ctx, x, y, width, height) => ctx.drawImage(video, x, y, width, height),
+    });
+    try {
+      context.clearRect(0, 0, output.width, output.height);
+      const window = computeQuickEditWindowTransform(layout);
+      context.drawImage(
+        plane.image,
+        0,
+        0,
+        plane.width,
+        plane.height,
+        window.x,
+        window.y,
+        window.width,
+        window.height
+      );
+    } finally {
+      plane.release();
+    }
+  } else
+    drawReviewSceneFrame(context, {
+      canvas: output,
+      layout,
+      background,
+      image: null,
+      headerImage: image,
+      ...(blurred
+        ? {
+            motionBlur: [
+              { camera: { ...camera, scale: camera.scale - 0.001 }, alpha: 0.5 },
+              { camera: { ...camera, scale: camera.scale + 0.001 }, alpha: 0.5 },
+            ],
+          }
+        : {}),
+      sample: { draw: (ctx, x, y, width, height) => ctx.drawImage(video, x, y, width, height) },
+    });
   return context.getImageData(400, Math.floor(layout.videoTransform.y) - 2, 20, 5).data;
 }
 
@@ -93,6 +127,7 @@ function measureJoin(
   videoContext.fillStyle = '#dbdcdd';
   videoContext.fillRect(0, 0, video.width, video.height);
   let leak = 0;
+  let minAlpha = 255;
   let example = null;
   for (let frame = 0; frame < 90; frame++) {
     const scale = 1.15 + frame / 300;
@@ -100,13 +135,16 @@ function measureJoin(
     // Interior window pixels must be independent of the background, including antialiasing.
     const dark = paintJoin({ ...args, color: '#000000' }),
       light = paintJoin({ ...args, color: '#ffffff' });
+    const transparent = paintJoin({ ...args, color: null });
+    for (let index = 3; index < transparent.length; index += 4)
+      minAlpha = Math.min(minAlpha, transparent[index]!);
     for (let index = 0; index < dark.length; index++)
       if (Math.abs(dark[index]! - light[index]!) > leak) {
         leak = Math.abs(dark[index]! - light[index]!);
         example = { frame, scale, difference: leak };
       }
   }
-  return { zoomBehavior, blurred, leak, example };
+  return { zoomBehavior, blurred, leak, minAlpha, example };
 }
 
 export async function probeHeaderSeams() {
@@ -122,7 +160,7 @@ export async function probeHeaderSeams() {
       reviewWindowHeaderUrl(
         { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title: 'Header', url: '' },
         width,
-        height
+        520
       ),
       new AbortController().signal
     );
@@ -229,4 +267,99 @@ export function probeHeaderJoinFiltering() {
     }
   }
   return { maxDifference, worst };
+}
+
+/** Real Fabric source rendering must filter the joined image without exposing the backdrop. */
+export async function probeImageHeaderJoin() {
+  const source = document.createElement('canvas');
+  source.width = 931;
+  source.height = 601;
+  source.getContext('2d')!.fillRect(0, 0, source.width, source.height);
+  class ProbeImage extends FabricImage {
+    renderPlane(context: CanvasRenderingContext2D) {
+      this._render(context);
+    }
+  }
+  const object = new ProbeImage(source);
+  object.sniptaleType = 'source-image';
+  attachImageStyleRenderer(object, () => ({
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    radius: 0,
+    strokeWidth: 0,
+  }));
+  const header = new Image();
+  header.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg(DEFAULT_WINDOW_HEADER, source))}`;
+  await header.decode();
+  attachBrowserHeaderToImage(object, header, (86 * 601) / 900);
+  const canvas = document.createElement('canvas');
+  canvas.width = 1400;
+  canvas.height = 1000;
+  document.body.append(canvas);
+  const context = canvas.getContext('2d', { willReadFrequently: true })!;
+  let minAlpha = 255;
+  for (let frame = 0; frame < 80; frame++) {
+    const scale = 0.7 + frame / 100;
+    context.resetTransform();
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.translate(700.37, 550.23);
+    context.scale(scale, scale);
+    object.renderPlane(context);
+    const y = 550.23 - (601 * scale) / 2;
+    const pixels = context.getImageData(690, Math.floor(y) - 2, 20, 5).data;
+    for (let index = 3; index < pixels.length; index += 4)
+      minAlpha = Math.min(minAlpha, pixels[index]!);
+  }
+  return { minAlpha, scales: 80 };
+}
+
+/** Transparent source rows and repeated filter previews retain their original content. */
+export async function probeImageHeaderContent() {
+  const source = document.createElement('canvas');
+  source.width = 160;
+  source.height = 90;
+  const paint = source.getContext('2d')!;
+  paint.fillStyle = '#646464';
+  paint.fillRect(0, 2, 160, 88);
+  paint.fillStyle = 'rgba(100,100,100,0.5)';
+  paint.fillRect(0, 1, 160, 1);
+  class ProbeImage extends FabricImage {
+    renderPlane(context: CanvasRenderingContext2D) {
+      this._render(context);
+    }
+  }
+  const object = new ProbeImage(source);
+  object.sniptaleType = 'source-image';
+  attachImageStyleRenderer(object, () => ({
+    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+    radius: 0,
+    strokeWidth: 0,
+  }));
+  const header = document.createElement('canvas');
+  header.width = 160;
+  header.height = 86;
+  header.getContext('2d')!.fillRect(0, 0, 160, 86);
+  attachBrowserHeaderToImage(object, header, 86);
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 176;
+  const context = canvas.getContext('2d', { willReadFrequently: true })!;
+  const render = () => {
+    context.resetTransform();
+    context.clearRect(0, 0, 160, 176);
+    context.translate(80, 131);
+    object.renderPlane(context);
+    return context.getImageData(80, 86, 1, 3).data;
+  };
+  const rows = render();
+  const alpha = [rows[3], rows[7], rows[11]];
+  object.filters = [new filters.Brightness({ brightness: 0.2 })];
+  object.applyFilters();
+  render();
+  const first = context.getImageData(80, 100, 1, 1).data[0]!;
+  const element = object.getElement();
+  object.filters = [new filters.Brightness({ brightness: 0.4 })];
+  object.applyFilters();
+  render();
+  const second = context.getImageData(80, 100, 1, 1).data[0]!;
+  return { alpha, first, second, reusedFilterElement: element === object.getElement() };
 }

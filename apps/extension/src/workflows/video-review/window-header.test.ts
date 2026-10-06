@@ -168,3 +168,16 @@ it('reuses a joined window surface after drawing fails and releases each lease',
   expect(allocations).toBe(1);
   expect(context.restore).toHaveBeenCalledTimes(2);
 });
+
+it('extends even export rows without distorting small-source glyphs', () => {
+  const svg = decodeURIComponent(
+    reviewWindowHeaderUrl(DEFAULT_WINDOW_HEADER, 160, 90).split(',')[1]!
+  );
+  const root = new DOMParser().parseFromString(svg, 'image/svg+xml').documentElement;
+  const [, , width, height] = root.getAttribute('viewBox')!.split(' ').map(Number);
+  expect(Number(root.getAttribute('width')) / width!).toBeCloseTo(
+    Number(root.getAttribute('height')) / height!
+  );
+  expect(root.getAttribute('height')).toBe('10');
+  expect(root.getAttribute('preserveAspectRatio')).not.toBe('none');
+});
