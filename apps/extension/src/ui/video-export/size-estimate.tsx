@@ -7,10 +7,6 @@ import type { VideoExportSizeStatus } from './use-size-estimate';
 export function VideoExportSizeHint({ status }: { status: VideoExportSizeStatus | null }) {
   useAppLocale();
   if (!status) return null;
-  const range =
-    status.kind === 'ready'
-      ? `${formatBytes(status.estimate.lowerBytes, 0)}–${formatBytes(status.estimate.upperBytes, 0)}`
-      : null;
   return (
     <div
       className="min-w-0 space-y-1 whitespace-normal break-words text-xs text-[var(--sniptale-color-text-muted)]"
@@ -21,7 +17,7 @@ export function VideoExportSizeHint({ status }: { status: VideoExportSizeStatus 
           ? translate('videoEditor.exportDialog.sizeEstimating')
           : status.kind === 'unavailable'
             ? translate('videoEditor.exportDialog.sizeUnavailable')
-            : `${translate('videoEditor.exportDialog.estimatedSize')} ≈ ${range}`}
+            : `${translate('videoEditor.exportDialog.estimatedSize')} ≈ ${formatBytes(status.estimate.bytes, 0)}`}
       </p>
       {status.kind === 'ready' ? (
         <p className="text-[11px] leading-relaxed">
