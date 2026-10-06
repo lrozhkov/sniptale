@@ -17,6 +17,7 @@ interface QuickEditEffectiveFeatures {
   actionsTrackVisible: boolean;
   zoomTrackVisible: boolean;
   audioTrackVisible: boolean;
+  webcamTrackVisible: boolean;
   /** In-frame comments follow the advanced-mode overlay visibility control. */
   overlaysVisible: boolean;
   /** Advanced effects are suppressed while the editor is in basic mode. */
@@ -40,6 +41,7 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
+    webcamTrackVisible: advanced && !!state.webcam?.enabled,
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
@@ -58,6 +60,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   background: QuickEditBackgroundSettings;
   canvas: QuickEditCanvasSize | undefined;
   windowHeader: QuickEditAdvancedState['windowHeader'];
+  webcam: QuickEditAdvancedState['webcam'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -78,6 +81,7 @@ export function resolveQuickEditEffectiveState(
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
+    webcam: features.webcamTrackVisible ? state.webcam : undefined,
     originalAudio: state.audio.original,
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
@@ -101,6 +105,7 @@ export function resolveQuickEditEffectiveState(
 export type QuickEditExportReason =
   | 'canvas'
   | 'window-header'
+  | 'webcam'
   | 'canvas-size'
   | 'precise-edits'
   | 'cut-transition'
@@ -164,6 +169,7 @@ export function resolveQuickEditExportPlan(args: {
     audio.push('original-audio');
   if (effective.canvas) visual.push('canvas');
   if (effective.windowHeader) visual.push('window-header');
+  if (effective.webcam) visual.push('webcam');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
   if (
@@ -196,6 +202,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
   return (
     !!state.canvas ||
     !!state.windowHeader ||
+    !!state.webcam?.enabled ||
     state.zoom.regions.length > 0 ||
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||

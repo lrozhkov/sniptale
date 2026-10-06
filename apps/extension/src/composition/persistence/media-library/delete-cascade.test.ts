@@ -6,6 +6,9 @@ import {
 } from './delete-cascade';
 import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 
 it('atomically removes placements, library metadata and the last physical owner', async () => {
   const project = [...rows.get('video_projects')!.values()][0] as ReturnType<
@@ -142,6 +145,69 @@ it.each(['music', 'voiceover'] as const)(
     expect(review.revision).toBe(2);
   }
 );
+
+it('detaches a disabled webcam held only by redo history when its Library origin is deleted', async () => {
+  const source = { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' };
+  const before = createQuickEditAdvancedContent();
+  const webcam = {
+    ...createQuickEditWebcam('project-asset:private-camera', source, source),
+    enabled: false,
+  };
+  rows.get('project_assets')!.set('private-camera', {
+    id: 'private-camera',
+    assetId: 'camera-body',
+    mimeType: 'video/webm',
+    size: 5,
+    createdAt: 1,
+    originMediaId: mediaId,
+  });
+  rows.get('asset_refs')!.set('camera-body', { assetId: 'camera-body' });
+  rows.get('asset_owners')!.set(JSON.stringify(['project-asset', 'private-camera', 'body']), {
+    ownerKind: 'project-asset',
+    ownerId: 'private-camera',
+    role: 'body',
+    assetId: 'camera-body',
+  });
+  rows.set(
+    'video_workspaces',
+    new Map([
+      [
+        'recording:other',
+        {
+          aggregateId: 'recording:other',
+          formatVersion: 1,
+          sourceAssetId: 'primary-physical',
+          source,
+          revision: 1,
+          cursor: 0,
+          advanced: createQuickEditAdvancedState(),
+          createdAt: 1,
+          updatedAt: 1,
+          history: [
+            {
+              id: 'attach',
+              at: 1,
+              target: 'advancedContent',
+              before,
+              after: { ...before, webcam },
+            },
+          ],
+        },
+      ],
+    ])
+  );
+  rows.get('video_projects')!.clear();
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
+  ]);
+  const review = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+  expect(review).not.toBeNull();
+  expect(review!.history).toEqual([]);
+  expect(review!.advanced.webcam).toBeUndefined();
+  expect(review!.cursor).toBe(0);
+  expect(rows.get('project_assets')!.has('private-camera')).toBe(false);
+  expect(rows.get('asset_refs')!.has('camera-body')).toBe(false);
+});
 
 it('deletes the media own quick-edit workspace together with its root', async () => {
   rows.get('video_projects')!.clear();

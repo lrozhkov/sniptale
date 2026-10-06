@@ -12,6 +12,8 @@ import { useReviewTransport } from './use-review-transport';
 import { reviewSelectionSourceTime, useReviewSelection } from './use-review-selection';
 import { useReviewEditorWiring } from './use-review-wiring';
 import { useReviewEditingTools } from './use-review-editing';
+import { useReviewWebcamEditor } from './webcam-editor';
+import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 
 export function useReviewEditorState(resource: LoadedReview) {
   const core = useReviewEditorCore(resource);
@@ -74,7 +76,28 @@ export function useReviewEditorState(resource: LoadedReview) {
 function useReviewEditorCore(resource: LoadedReview) {
   const base = useReviewEditorBase(resource);
   const timeline = useReviewEditorTimeline(resource, base);
-  return { ...base, ...timeline };
+  const webcam = useReviewWebcamEditor({
+    session: base.session,
+    advanced: base.advancedState,
+    scene: computeQuickEditSceneSize({
+      source: resource.source,
+      background: base.features.background,
+      canvas: base.features.canvas,
+      windowHeader: base.features.windowHeader,
+    }),
+    sourceDuration: resource.source.duration,
+    time: timeline.time,
+    selection: base.activeSelection,
+    select: base.setActiveSelection,
+    pause: () => timeline.video.current?.pause(),
+    seek: (time) => timeline.seek(time, false),
+    allowed: () =>
+      !base.busy &&
+      base.exporter.phase === 'idle' &&
+      !base.composer.getCurrent().annotation &&
+      base.advanced.ui.mode === 'advanced',
+  });
+  return { ...base, ...timeline, webcam, busy: base.busy || webcam.pending };
 }
 
 /** Owns the review session and local selection state. */

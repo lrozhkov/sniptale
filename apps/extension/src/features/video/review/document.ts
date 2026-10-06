@@ -39,6 +39,7 @@ export function reviewAdvancedContentBaseline(state: {
   audio: QuickEditAdvancedContent['audio'];
   canvas?: QuickEditAdvancedContent['canvas'];
   windowHeader?: QuickEditAdvancedContent['windowHeader'];
+  webcam?: QuickEditAdvancedContent['webcam'];
 }): QuickEditAdvancedContent {
   return {
     schemaVersion: state.schemaVersion,
@@ -47,6 +48,7 @@ export function reviewAdvancedContentBaseline(state: {
     audio: state.audio,
     ...(state.canvas ? { canvas: state.canvas } : {}),
     ...(state.windowHeader ? { windowHeader: state.windowHeader } : {}),
+    ...(state.webcam ? { webcam: state.webcam } : {}),
   };
 }
 

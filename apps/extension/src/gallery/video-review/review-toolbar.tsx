@@ -19,7 +19,7 @@ import {
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import { ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
-import { Activity, AudioLines, Focus, PanelsTopLeft, Volume2 } from 'lucide-react';
+import { Activity, AudioLines, Camera, Focus, PanelsTopLeft, Volume2 } from 'lucide-react';
 import type { useReviewEdits } from './use-edits';
 
 const plain = reviewIconButtonClassName;
@@ -243,6 +243,7 @@ function ReviewModeControl(props: {
 
 /** Compact lane switches live in the sticky gutter beside the time ruler. */
 export function ReviewTrackControls(props: {
+  webcam?: { available: boolean; enabled: boolean; toggle(): void } | undefined;
   advanced: QuickEditAdvancedState;
   telemetryAvailable: boolean;
   busy: boolean;
@@ -278,6 +279,16 @@ export function ReviewTrackControls(props: {
           >
             <AudioLines size={14} aria-hidden="true" />
           </ReviewButton>
+          {props.webcam?.available ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.webcam')}
+              aria-pressed={props.webcam.enabled}
+              className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
+              onClick={props.webcam.toggle}
+            >
+              <Camera size={14} aria-hidden />
+            </ReviewButton>
+          ) : null}
         </>
       ) : null}
     </fieldset>

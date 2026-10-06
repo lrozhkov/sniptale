@@ -42,6 +42,17 @@ export function reviewSelectionExists(
   markers: readonly ReviewTelemetryMarker[] = []
 ): boolean {
   if (selection.kind === 'none') return false;
+  if (selection.kind === 'webcam') return !!advanced.webcam?.enabled;
+  if (selection.kind === 'webcam-position')
+    return (
+      !!advanced.webcam?.enabled &&
+      advanced.webcam.positions.some((item) => item.id === selection.id)
+    );
+  if (selection.kind === 'webcam-hidden')
+    return (
+      !!advanced.webcam?.enabled &&
+      advanced.webcam.hiddenRanges.some((item) => item.id === selection.id)
+    );
   if (selection.kind === 'telemetry')
     return markers.some(
       (marker) => marker.ref.kind === selection.ref.kind && marker.ref.id === selection.ref.id
@@ -86,6 +97,9 @@ export function useReviewSelectionLifecycle(args: {
   deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
   deleteOriginalAudio?(id: string): void;
+  deleteWebcam?(
+    selection: Extract<ReviewSelection, { kind: 'webcam' | 'webcam-position' | 'webcam-hidden' }>
+  ): void;
   clearAnnotation(): void;
 }) {
   const remove = () => {
@@ -97,6 +111,12 @@ export function useReviewSelectionLifecycle(args: {
     else if (args.selection.kind === 'zoom-link') args.deleteZoomLink(args.selection.id);
     else if (args.selection.kind === 'original-audio')
       args.deleteOriginalAudio?.(args.selection.id);
+    else if (
+      args.selection.kind === 'webcam' ||
+      args.selection.kind === 'webcam-position' ||
+      args.selection.kind === 'webcam-hidden'
+    )
+      args.deleteWebcam?.(args.selection);
     else if (args.selection.kind === 'audio')
       args.deleteAudio(args.selection.lane, args.selection.id);
     args.setSelection({ kind: 'none' });
@@ -129,6 +149,12 @@ export function reviewSelectionSourceTime(
   switch (selection.kind) {
     case 'none':
       return null;
+    case 'webcam':
+      return null;
+    case 'webcam-position':
+      return advanced.webcam?.positions.find((item) => item.id === selection.id)?.time ?? null;
+    case 'webcam-hidden':
+      return midpoint(advanced.webcam?.hiddenRanges.find((item) => item.id === selection.id));
     case 'edit':
       return midpoint(document.edits.find((item) => item.id === selection.id));
     case 'annotation': {
@@ -194,6 +220,10 @@ function selectionTrackVisible(
 ) {
   const features = resolveQuickEditEffectiveFeatures(advanced);
   switch (selection.kind) {
+    case 'webcam':
+    case 'webcam-position':
+    case 'webcam-hidden':
+      return features.webcamTrackVisible;
     case 'zoom':
       return features.zoomTrackVisible;
     case 'zoom-link':

@@ -3,6 +3,8 @@ import type { AssetReadyJournal } from '../assets/contracts';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
 import { createVideoReviewSession } from '../../../workflows/video-review/session';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
 
 const harness = vi.hoisted(() => ({ database: vi.fn(), journals: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
@@ -244,3 +246,58 @@ it('rejects a disappeared private origin and malformed source without changing t
     expect((await readVideoWorkspace(id))?.workspace.advanced.background.enabled).toBe(false);
   }
 });
+
+it.each([false, true])(
+  'checks webcam private origin in the attachment transaction (purged=%s)',
+  async (purged) => {
+    const { commitVideoWorkspace } = await import('./store');
+    const originId = 'recording:webcam';
+    const main = rows.get('media_library')!.get(id);
+    if (!main || typeof main !== 'object') throw new Error('Missing fixture source');
+    rows.get('media_library')!.set(originId, {
+      ...main,
+      id: originId,
+      source: { kind: 'recording', recordingId: 'webcam' },
+    });
+    const videoEntry = { ...entry, mimeType: 'video/webm', originMediaId: originId };
+    const journal = readyJournal();
+    journal.assetRefs[0] = { ...journal.assetRefs[0]!, mimeType: 'video/webm' };
+    journal.payload = {
+      entry: videoEntry,
+      filename: 'camera.webm',
+      expectedAssetId: null,
+      publishToLibrary: false,
+      requiredReview: { aggregateId: id, clipId: 'webcam' },
+    };
+    journals.push(journal);
+    const opened = await openVideoWorkspace(id, source);
+    if (purged) rows.get('media_library')!.delete(originId);
+    const before = createQuickEditAdvancedContent();
+    const result = commitVideoWorkspace({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      operation: {
+        id: 'attach-webcam',
+        at: 1,
+        target: 'advancedContent',
+        before,
+        after: {
+          ...before,
+          webcam: createQuickEditWebcam('project-asset:background', source, source),
+        },
+      },
+    });
+    if (purged) {
+      await expect(result).rejects.toMatchObject({ code: 'missing-media' });
+      expect(await readVideoWorkspace(id)).toEqual(opened);
+    } else {
+      const saved = await result;
+      expect(saved.workspace.history[0]?.after).toHaveProperty(
+        'webcam.assetId',
+        'project-asset:background'
+      );
+      expect(rows.get('project_assets')!.size).toBe(0);
+    }
+  }
+);

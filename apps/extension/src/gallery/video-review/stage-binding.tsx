@@ -21,6 +21,7 @@ import type { ReviewStageFocus, ReviewStageFocusPicker } from './stage-focus';
 import { useReviewBackgroundImage } from './use-review-background';
 import { ReviewButton } from './controls';
 import { translate } from '../../platform/i18n';
+import type { ReviewWebcamStageBinding } from './webcam-overlay';
 
 /**
  * One stage binding: the applied scene (background plus the camera at the represented
@@ -28,6 +29,7 @@ import { translate } from '../../platform/i18n';
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 export function ReviewStageBinding(props: {
+  webcam?: ReviewWebcamStageBinding | undefined;
   backgroundPending?: boolean;
   cutPreview?: ReviewCutPreviewBinding | undefined;
   url: string;
@@ -123,6 +125,7 @@ export function ReviewStageBinding(props: {
         </div>
       ) : null}
       <ReviewStage
+        webcam={props.webcam}
         focusPicker={props.focusPicker}
         backgroundImageUrl={image.url}
         cutPreview={props.cutPreview}

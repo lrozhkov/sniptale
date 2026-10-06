@@ -155,6 +155,14 @@ export function useReviewAdvancedContent(
         const { windowHeader: _previous, ...rest } = content;
         return windowHeader ? { ...rest, windowHeader } : rest;
       }),
+    setWebcam: (
+      update: (webcam: QuickEditAdvancedState['webcam']) => QuickEditAdvancedState['webcam']
+    ) =>
+      stage((content) => {
+        const { webcam: previous, ...rest } = content;
+        const webcam = update(previous);
+        return webcam ? { ...rest, webcam } : rest;
+      }),
     setCanvas: (canvas: QuickEditAdvancedState['canvas']) =>
       stage((content) => {
         const { canvas: _previous, ...rest } = content;

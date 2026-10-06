@@ -9,6 +9,9 @@ import { createQuickEditAdvancedState } from '../../../features/video/review/adv
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
 import type { QuickEditAdvancedState } from '../../../features/video/review/advanced/types';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
+import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
+import { assertPortableReviewAssetRefs } from './asset-refs';
 
 vi.mock('../infrastructure/indexed-db/core', () => ({}));
 
@@ -26,6 +29,66 @@ const advanced = (patch: Partial<QuickEditAdvancedState>): QuickEditAdvancedStat
 });
 
 afterEach(() => vi.clearAllMocks());
+
+it('retains disabled webcam references in every history and recovery position and remaps portable refs', () => {
+  const webcam = (id: string) => ({
+    ...createQuickEditWebcam(
+      `project-asset:${id}`,
+      { width: 640, height: 480 },
+      { width: 1920, height: 1080 }
+    ),
+    enabled: false,
+  });
+  const baseline = advanced({ webcam: webcam('base') });
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: { ...baseline, recoveryV1: JSON.stringify({ webcam: webcam('recovery') }) },
+      history: [
+        {
+          id: 'attach',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), webcam: webcam('after') },
+        },
+      ],
+    },
+  };
+  const references = ['base', 'recovery', 'after'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}`))
+  );
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset id');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  expect(JSON.stringify(portable.workspace.advanced.webcam)).toContain('assetRef');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow('unresolved');
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(references.map((id) => [id, `${id}-restored`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}-restored`))
+  );
+  expect(snapshot.workspace.advanced.webcam?.assetId).toBe('project-asset:base');
+});
 
 describe('collectReviewAssetReferences', () => {
   it('collects every audio lane reference and recovery copy reference', () => {

@@ -14,6 +14,7 @@ import type { ReviewOperation } from '../../features/video/review/types';
 import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
+import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
 
 let root: Root;
 let host: HTMLDivElement;
@@ -303,6 +304,31 @@ it('rejects malformed staged content without losing the pending edit and allows 
     height: 1080,
   });
   expect(advanced.saveFailed).toBe(false);
+});
+
+it('keeps webcam edits in content history and restores them on reopen', async () => {
+  const { session, deps, build } = setup();
+  const webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 320, height: 180 }
+  );
+  act(() => advanced.setWebcam(() => webcam));
+  await act(async () => advanced.flush());
+  const reopened = createVideoReviewSession(build(), deps);
+  expect(reopened.getSnapshot().document.advancedContent.webcam).toEqual(webcam);
+  act(() =>
+    advanced.setWebcam((current) => (current ? { ...current, enabled: false } : undefined))
+  );
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.webcam).toMatchObject({
+    enabled: false,
+    assetId: webcam.assetId,
+  });
+  act(() => advanced.setWebcam(() => undefined));
+  await act(async () => advanced.flush());
+  expect(advanced.advanced.webcam).toBeUndefined();
+  expect(session.getSnapshot().document.advancedContent.webcam).toBeUndefined();
 });
 
 it('persists and removes a browser header through the existing content history', async () => {

@@ -12,6 +12,8 @@ import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { ReviewTimelineToolbar, ReviewTrackControls } from './review-toolbar';
 import { ReviewZoomTrack } from './zoom-track';
 import { ReviewAudioTrack } from './audio-track';
+import { ReviewWebcamTrack } from './webcam-track';
+import type { useReviewWebcamEditor } from './webcam-editor';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import type {
@@ -125,6 +127,7 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  webcam?: ReturnType<typeof useReviewWebcamEditor>;
   fillHeight?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
   onPlaybackRange?: ((range: ReviewPlaybackRange | null) => void) | undefined;
@@ -274,19 +277,16 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       originalRangeTool={props.audio.originalTool}
       snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
       trackControls={
-        <ReviewTrackControls
-          advanced={props.advanced}
-          setMode={(mode) =>
-            (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))
-          }
-          telemetryAvailable={props.telemetryAvailable}
-          setTrackVisibility={(track, visible) =>
-            (props.beforeAction ?? ((action) => action()))(() =>
-              props.setTrackVisibility(track, visible)
-            )
-          }
-          busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
-        />
+        <ReviewTimelineTrackControls props={props} webcamVisible={features.webcamTrackVisible} />
+      }
+      webcamTrack={
+        features.webcamTrackVisible && props.webcam ? (
+          <ReviewWebcamTrack
+            editor={props.webcam}
+            projection={projection}
+            beforeAction={props.beforeAction}
+          />
+        ) : null
       }
 
       {...(features.zoomTrackVisible
@@ -570,4 +570,37 @@ function reviewCursorPlacementHints(props: TimelineBindingProps, focus: string |
       })
     ),
   };
+}
+
+/** Applies the shared action admission policy to every track visibility control. */
+function ReviewTimelineTrackControls({
+  props,
+  webcamVisible,
+}: {
+  props: TimelineBindingProps;
+  webcamVisible: boolean;
+}) {
+  return (
+    <ReviewTrackControls
+      webcam={
+        props.webcam
+          ? {
+              available: props.webcam.available,
+              enabled: webcamVisible,
+              toggle: () =>
+                (props.beforeAction ?? ((action) => action()))(() => void props.webcam!.toggle()),
+            }
+          : undefined
+      }
+      advanced={props.advanced}
+      setMode={(mode) => (props.beforeAction ?? ((action) => action()))(() => props.setMode(mode))}
+      telemetryAvailable={props.telemetryAvailable}
+      setTrackVisibility={(track, visible) =>
+        (props.beforeAction ?? ((action) => action()))(() =>
+          props.setTrackVisibility(track, visible)
+        )
+      }
+      busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
+    />
+  );
 }

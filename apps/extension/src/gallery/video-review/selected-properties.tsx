@@ -30,8 +30,12 @@ import { ReviewZoomPreview } from './zoom-preview';
 import { useZoomPreviewSource } from './use-zoom-preview-source';
 import { ReviewCanvasCommentsSection } from './comment-editor';
 import type { useCanvasComments } from './use-canvas-comments';
+import { ReviewWebcamInspector } from './webcam-inspector';
+import type { useReviewWebcamEditor } from './webcam-editor';
 
 type SelectedPropertiesProps = {
+  webcam?: ReturnType<typeof useReviewWebcamEditor>;
+  webcamRange?: { start: number; end: number } | undefined;
   selection: ReviewSelection;
   advanced: QuickEditAdvancedState;
   editing: ReturnType<typeof useReviewEdits> & { exporter: ReturnType<typeof useReviewExport> };
@@ -71,7 +75,13 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
   return (
     <>
       <fieldset disabled={busy || editing.exporter.phase !== 'idle'} className="min-w-0 space-y-3">
-        {selection.kind === 'canvas-comment' && advanced.ui.mode === 'advanced' ? (
+        {(selection.kind === 'webcam' ||
+          selection.kind === 'webcam-position' ||
+          selection.kind === 'webcam-hidden') &&
+        advanced.ui.mode === 'advanced' &&
+        props.webcam ? (
+          <ReviewWebcamInspector editor={props.webcam} range={props.webcamRange} />
+        ) : selection.kind === 'canvas-comment' && advanced.ui.mode === 'advanced' ? (
           <ReviewCanvasCommentsSection
             view="selected"
             {...props.canvasComments}

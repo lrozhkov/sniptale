@@ -22,7 +22,7 @@ import {
 import { ReviewComposer } from './composer';
 import { useLoadedReview, type LoadedReview } from './use-session';
 import { exportReviewReport } from './report-actions';
-import { ReviewRenderOptions, ReviewEditActions } from './edit-actions';
+import { ReviewInspectorActions } from './edit-actions';
 import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
@@ -33,6 +33,7 @@ import { useReviewEditorState } from './use-editor-state';
 type InspectorState = Pick<
   ReturnType<typeof useReviewEditorState>,
   | 'selection'
+  | 'playbackRange'
   | 'advancedPending'
   | 'advancedFailed'
   | 'retryAdvanced'
@@ -66,6 +67,7 @@ type InspectorState = Pick<
   | 'add'
   | 'advanced'
   | 'zoom'
+  | 'webcam'
   | 'timeline'
   | 'setBackground'
   | 'setCanvas'
@@ -74,55 +76,6 @@ type InspectorState = Pick<
   | 'resetAdvanced'
   | 'flushAdvanced'
 >;
-
-/** Export control strip: one presentation owner for phase, progress, and blocker hints. */
-function ReviewInspectorActions({
-  editing,
-  snapshot,
-  busy,
-  composerBusy,
-  onExport,
-}: {
-  editing: InspectorState['editing'];
-  snapshot: InspectorState['snapshot'];
-  busy: boolean;
-  composerBusy: boolean;
-  onExport(): void;
-}) {
-  const exportPlan = editing.exporter.plan();
-  const checkingCodecs = editing.exporter.checkingCodecs;
-  const settings =
-    snapshot.snapshot.workspace.advanced.ui.mode === 'advanced' ? (
-      <ReviewRenderOptions
-        exporter={editing.exporter}
-        busy={busy || composerBusy || checkingCodecs || editing.exporter.phase !== 'idle'}
-      />
-    ) : null;
-  return (
-    <>
-      <ReviewEditActions
-        settings={settings}
-        available={!!editing.exporter.index && editing.exporter.index.boundaries.length >= 2}
-        hasEdits={snapshot.document.edits.length > 0}
-        busy={busy || composerBusy || checkingCodecs}
-        phase={editing.exporter.phase}
-        progress={editing.exporter.progress}
-        failed={editing.exporter.failed}
-        hasResult={!!editing.exporter.result}
-        advancedBlockers={
-          checkingCodecs
-            ? null
-            : exportPlan.kind === 'unavailable'
-              ? exportPlan.reasons
-              : editing.exporter.blocked
-        }
-        onExport={onExport}
-        onCancel={editing.exporter.cancel}
-        onDownload={editing.exporter.download}
-      />
-    </>
-  );
-}
 
 function reviewErrorMessage(error: ReturnType<typeof useReviewEditorState>['snapshot']['error']) {
   if (error === 'conflict') return translate('gallery.videoReview.conflict');
@@ -179,8 +132,9 @@ function ReviewInspectorBinding({
         busy={busy || editing.exporter.phase !== 'idle'}
         actions={
           <ReviewInspectorActions
-            editing={editing}
-            snapshot={snapshot}
+            exporter={editing.exporter}
+            advanced={snapshot.snapshot.workspace.advanced.ui.mode === 'advanced'}
+            hasEdits={snapshot.document.edits.length > 0}
             busy={busy}
             composerBusy={!!composer.before}
             onExport={() => {
@@ -202,30 +156,12 @@ function ReviewInspectorBinding({
           (state.advanced.ui.mode === 'advanced' &&
             (state.activeSelection.kind === 'zoom' ||
               state.activeSelection.kind === 'canvas-comment' ||
-              state.activeSelection.kind === 'audio'))
+              state.activeSelection.kind === 'audio' ||
+              state.activeSelection.kind === 'webcam' ||
+              state.activeSelection.kind === 'webcam-position'))
         }
         scene={
-          <ReviewSceneProperties
-            background={state.advanced.background}
-            canvas={state.advanced.canvas}
-            source={resource.source}
-            onCanvas={state.setCanvas}
-            windowHeader={state.advanced.windowHeader}
-            onWindowHeader={state.setWindowHeader}
-            audio={state.advanced.audio}
-            hasOriginalAudio={
-              editing.exporter.index === null || !!editing.exporter.index.audioCodec
-            }
-            onOriginalVolume={(volume) => audio.setOriginal({ volume })}
-            onLaneVolume={audio.setLaneVolume}
-            busy={busy || editing.exporter.phase !== 'idle'}
-            pending={state.backgroundImport.pending}
-            failed={state.backgroundImport.failed}
-            onImportImage={(file) =>
-              state.beforeAction(() => void state.backgroundImport.importImage(file))
-            }
-            setBackground={state.setBackground}
-          />
+          <ReviewScenePropertiesBinding state={state} source={resource.source} audio={audio} />
         }
         saveStatus={
           state.advancedFailed
@@ -245,6 +181,10 @@ function ReviewInspectorBinding({
         {...reviewInspectorNoteActions(state, resource)}
       >
         <ReviewSelectedProperties
+          webcam={state.webcam}
+          webcamRange={
+            state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
+          }
           advanced={state.advanced}
           selection={state.activeSelection}
           editing={state.editing}
@@ -407,6 +347,26 @@ function ReviewPreviewBinding({
   const { busy, features, composer, snapshot, canvasComments, audio } = state;
   return (
     <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
+      {state.webcam.failed || state.webcam.pending ? (
+        <div
+          role={state.webcam.failed ? 'alert' : 'status'}
+          className="flex items-center gap-2 text-xs"
+        >
+          <span>
+            {translate(
+              state.webcam.failed
+                ? 'gallery.videoReview.webcamFailed'
+                : 'gallery.videoReview.webcamLoading'
+            )}
+          </span>
+          {state.webcam.failed ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.retry')}
+              onClick={state.webcam.retry}
+            />
+          ) : null}
+        </div>
+      ) : null}
       <ReviewFeedback
         message={state.message}
         originalFeedback={audio.originalFeedback}
@@ -433,6 +393,20 @@ function ReviewPreviewBinding({
       >
         {(fullscreen) => (
           <ReviewStageBinding
+            webcam={
+              features.webcam && !state.webcam.pending
+                ? {
+                    settings: features.webcam,
+                    editor: state.webcam,
+                    onResourceReady: state.exporter.retryAssetAvailability,
+                    disabled:
+                      state.playing ||
+                      busy ||
+                      state.editing.exporter.phase !== 'idle' ||
+                      !!composer.annotation,
+                  }
+                : undefined
+            }
             cutPreview={{
               file: resource.file,
               duration: state.source.duration,
@@ -587,6 +561,7 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              webcam={state.webcam}
               fillHeight={panels.timelineHeight !== null}
               playbackRange={state.playbackRange}
               onPlaybackRange={state.setPlaybackRange}
@@ -700,6 +675,12 @@ function reviewInspectorContext(state: InspectorState): string {
 
 function reviewSelectionLabel(state: InspectorState): string | undefined {
   const selection = state.activeSelection;
+  if (
+    selection.kind === 'webcam' ||
+    selection.kind === 'webcam-position' ||
+    selection.kind === 'webcam-hidden'
+  )
+    return translate('gallery.videoReview.webcam');
   if (selection.kind === 'telemetry') {
     const marker = state.projected.markers.find(
       (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
@@ -765,4 +746,38 @@ function focusRecordedAction(
   state.video.current?.pause();
   const time = state.timeline.timeMap.timelineToSource((region.start + region.end) / 2);
   if (time !== null) state.seek(time, false);
+}
+
+/** Scene controls share busy admission and the existing scene/audio writers. */
+function ReviewScenePropertiesBinding({
+  state,
+  source,
+  audio,
+}: {
+  state: InspectorState;
+  source: LoadedReview['source'];
+  audio: ReturnType<typeof useReviewAudio>;
+}) {
+  const { busy, editing } = state;
+  return (
+    <ReviewSceneProperties
+      background={state.advanced.background}
+      canvas={state.advanced.canvas}
+      source={source}
+      onCanvas={state.setCanvas}
+      windowHeader={state.advanced.windowHeader}
+      onWindowHeader={state.setWindowHeader}
+      audio={state.advanced.audio}
+      hasOriginalAudio={editing.exporter.index === null || !!editing.exporter.index.audioCodec}
+      onOriginalVolume={(volume) => audio.setOriginal({ volume })}
+      onLaneVolume={audio.setLaneVolume}
+      busy={busy || editing.exporter.phase !== 'idle'}
+      pending={state.backgroundImport.pending}
+      failed={state.backgroundImport.failed}
+      onImportImage={(file) =>
+        state.beforeAction(() => void state.backgroundImport.importImage(file))
+      }
+      setBackground={state.setBackground}
+    />
+  );
 }

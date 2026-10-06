@@ -10,7 +10,7 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
   content: T,
   assetId: string
 ): T {
-  return {
+  const result = {
     ...content,
     background:
       content.background.enabled &&
@@ -24,6 +24,8 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
       music: content.audio.music.filter((clip) => clip.assetId !== assetId),
     },
   };
+  if (result.webcam?.assetId === assetId) delete result.webcam;
+  return result;
 }
 
 function stripRecovery(value: string | undefined, assetId: string): string | undefined {
@@ -32,6 +34,14 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
     const raw: unknown = JSON.parse(value);
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return value;
     const content = raw as Record<string, unknown>;
+    const webcam = content['webcam'];
+    if (
+      typeof webcam === 'object' &&
+      webcam !== null &&
+      'assetId' in webcam &&
+      webcam.assetId === assetId
+    )
+      delete content['webcam'];
     const audio = content['audio'];
     const nextAudio =
       typeof audio === 'object' && audio !== null && !Array.isArray(audio)
@@ -80,21 +90,28 @@ export function stripReviewAssetReference(
     throw new Error('The required quick-edit source cannot be removed.');
   const advanced = stripContent(workspace.advanced, assetId);
   const recoveryV1 = stripRecovery(workspace.advanced.recoveryV1, assetId);
+  let cursor = workspace.cursor;
+  const history = workspace.history.flatMap<VideoWorkspace['history'][number]>(
+    (operation, index) => {
+      if (operation.target !== 'advancedContent') return [operation];
+      const before = stripContent(operation.before, assetId);
+      const after = stripContent(operation.after, assetId);
+      // A source-only edit becomes a no-op; replay rejects it unless its cursor slot is removed.
+      if (JSON.stringify(before) === JSON.stringify(after)) {
+        if (index < workspace.cursor) cursor--;
+        return [];
+      }
+      return [{ ...operation, before, after }];
+    }
+  );
   const candidate = {
     ...workspace,
     advanced: {
       ...advanced,
       ...(recoveryV1 === undefined ? {} : { recoveryV1 }),
     },
-    history: workspace.history.map((operation) =>
-      operation.target === 'advancedContent'
-        ? {
-            ...operation,
-            before: stripContent(operation.before, assetId),
-            after: stripContent(operation.after, assetId),
-          }
-        : operation
-    ),
+    history,
+    cursor,
     revision: workspace.revision + 1,
     updatedAt,
   } satisfies VideoWorkspace;

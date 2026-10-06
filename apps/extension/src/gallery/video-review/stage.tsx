@@ -1,5 +1,6 @@
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { ReviewBorderOverlay } from './border-overlay';
+import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-overlay';
 import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { ReviewButton } from './controls';
 import { useReviewWindowHeader } from './use-window-header';
@@ -80,8 +81,8 @@ function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
   return size;
 }
 
-/** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
-export function ReviewStage(props: {
+type ReviewStageProps = {
+  webcam?: ReviewWebcamStageBinding | undefined;
   backgroundImageUrl?: string | undefined;
   cutPreview?: ReviewCutPreviewBinding | undefined;
   url: string;
@@ -101,7 +102,10 @@ export function ReviewStage(props: {
   onPlaying(value: boolean): void;
   onEnded?: (() => void) | undefined;
   onError(): void;
-}) {
+};
+
+/** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
+export function ReviewStage(props: ReviewStageProps) {
   const host = useRef<HTMLDivElement>(null);
   const header = useReviewWindowHeader(props.scene?.windowHeader, props.source.width);
   const {
@@ -225,6 +229,9 @@ export function ReviewStage(props: {
             layout={zoomLayout}
             output={size}
           />
+        ) : null}
+        {props.webcam ? (
+          <ReviewWebcamOverlay binding={props.webcam} main={props.video} output={size} />
         ) : null}
       </div>
     </div>

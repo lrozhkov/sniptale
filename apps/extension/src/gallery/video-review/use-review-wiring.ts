@@ -22,6 +22,7 @@ import { useReviewEditorShortcuts } from './use-review-shortcuts';
 import { reviewTimelineNavigationBounds } from './track-projection';
 import { useReviewSelectionLifecycle } from './use-review-selection';
 import type { useReviewZoomEditor } from './zoom-editor';
+import { removeReviewWebcamItem } from './webcam-editor';
 
 type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
@@ -118,6 +119,10 @@ export function useReviewEditorWiring(args: {
     deleteZoomLink: (id) => args.zoom.change(id, { linkTo: null }),
     deleteAudio: audio.removeClip,
     deleteOriginalAudio: audio.removeOriginal,
+    deleteWebcam: (selection) =>
+      args.advancedState.setWebcam((camera) =>
+        camera ? removeReviewWebcamItem(camera, selection) : camera
+      ),
     clearAnnotation: () => args.clearAnnotation(null),
   });
   const history = createReviewHistoryActions({

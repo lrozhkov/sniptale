@@ -303,6 +303,27 @@ it('allows recovery from unavailable export settings after the profile changes',
   }
 });
 
+it.each([false, true])(
+  'clears recovered asset failure while preserving other blockers (%s)',
+  async (encoderFailure) => {
+    const fixture = setup();
+    try {
+      await act(async () => fixture.root.render(<fixture.Harness />));
+      mocks.export.mockRejectedValueOnce(
+        new QuickEditExportUnavailable(
+          encoderFailure ? ['asset-missing', 'video-encoder'] : ['asset-missing']
+        )
+      );
+      await act(async () => fixture.hook.start());
+      expect(fixture.hook.blocked).toContain('asset-missing');
+      await act(async () => fixture.hook.retryAssetAvailability());
+      expect(fixture.hook.blocked).toEqual(encoderFailure ? ['video-encoder'] : null);
+    } finally {
+      await fixture.cleanup();
+    }
+  }
+);
+
 it('keeps export failure visible when pending edits were flushed after the last render', async () => {
   const fixture = setup();
   try {

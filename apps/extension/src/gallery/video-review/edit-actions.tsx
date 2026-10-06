@@ -30,6 +30,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   canvas: 'gallery.videoReview.canvas',
   'canvas-size': 'gallery.videoReview.exportBlockerCanvasSize',
   'window-header': 'gallery.videoReview.windowHeader',
+  webcam: 'gallery.videoReview.webcam',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
   'cut-transition': 'gallery.videoReview.cutTransition',
   'transition-frames': 'gallery.videoReview.cutTransitionFramesUnavailable',
@@ -418,5 +419,55 @@ export function ReviewRenderOptions({
         </div>
       </fieldset>
     </div>
+  );
+}
+
+/** Export control strip: one presentation owner for phase, progress, and blocker hints. */
+export function ReviewInspectorActions({
+  exporter,
+  advanced,
+  hasEdits,
+  busy,
+  composerBusy,
+  onExport,
+}: {
+  exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'];
+  advanced: boolean;
+  hasEdits: boolean;
+  busy: boolean;
+  composerBusy: boolean;
+  onExport(): void;
+}) {
+  const exportPlan = exporter.plan();
+  const checkingCodecs = exporter.checkingCodecs;
+  const settings = advanced ? (
+    <ReviewRenderOptions
+      exporter={exporter}
+      busy={busy || composerBusy || checkingCodecs || exporter.phase !== 'idle'}
+    />
+  ) : null;
+  return (
+    <>
+      <ReviewEditActions
+        settings={settings}
+        available={!!exporter.index && exporter.index.boundaries.length >= 2}
+        hasEdits={hasEdits}
+        busy={busy || composerBusy || checkingCodecs}
+        phase={exporter.phase}
+        progress={exporter.progress}
+        failed={exporter.failed}
+        hasResult={!!exporter.result}
+        advancedBlockers={
+          checkingCodecs
+            ? null
+            : exportPlan.kind === 'unavailable'
+              ? exportPlan.reasons
+              : exporter.blocked
+        }
+        onExport={onExport}
+        onCancel={exporter.cancel}
+        onDownload={exporter.download}
+      />
+    </>
   );
 }

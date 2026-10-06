@@ -25,6 +25,7 @@ import {
 } from './types';
 import { parseQuickEditCanvas } from './canvas';
 import { parseQuickEditWindowHeader } from './window-header';
+import { parseQuickEditWebcam } from './webcam';
 import { createQuickEditAdvancedState } from './defaults';
 import { migrateQuickEditAdvancedV1 } from './migration';
 import type { ReviewTimeSegment } from '../timeline';
@@ -347,6 +348,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION && raw['schemaVersion'] !== 2) ||
+    (raw['webcam'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION) ||
     'ui' in raw
   )
     return null;
@@ -359,7 +361,8 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader =
     raw['windowHeader'] === undefined ? undefined : parseQuickEditWindowHeader(raw['windowHeader']);
-  if (canvas === null || windowHeader === null) return null;
+  const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
+  if (canvas === null || windowHeader === null || webcam === null) return null;
   if (!zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
@@ -368,6 +371,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     audio,
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
+    ...(webcam ? { webcam } : {}),
   };
 }
 
@@ -396,6 +400,8 @@ export function loadQuickEditAdvancedState(
 
 /** Parses the current shape; the recovery copy is an opaque string. */
 function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedState | null {
+  if (raw['webcam'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+    return null;
   const ui = parseUiState(raw['ui']);
   const zoom = parseZoomState(
     raw['zoom'],
@@ -406,7 +412,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader =
     raw['windowHeader'] === undefined ? undefined : parseQuickEditWindowHeader(raw['windowHeader']);
-  if (canvas === null || windowHeader === null) return null;
+  const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
+  if (canvas === null || windowHeader === null || webcam === null) return null;
   const recovery = raw['recoveryV1'];
   if (recovery !== undefined && typeof recovery !== 'string') return null;
   if (!ui || !zoom || !background || !audio) return null;
@@ -418,6 +425,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     background,
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
+    ...(webcam ? { webcam } : {}),
     audio,
   };
 }

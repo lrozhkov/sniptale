@@ -19,6 +19,8 @@ import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
+type ReviewExportBlocker = { context: string; reasons: readonly QuickEditExportReason[] };
+
 type ExportResult = Awaited<ReturnType<typeof exportReviewedVideo>>;
 
 /** Export starts only after debounced editor content reaches the shared session. */
@@ -68,10 +70,7 @@ export function useReviewExport(resource: LoadedReview) {
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
   const context = reviewExportContext(resource, renderSettings);
-  const [blocked, setBlocked] = useState<{
-    context: string;
-    reasons: readonly QuickEditExportReason[];
-  } | null>(null);
+  const [blocked, setBlocked] = useState<ReviewExportBlocker | null>(null);
   const [result, setResult] = useState<ExportResult | null>(null);
   const active = useRef<AbortController | null>(null);
   const publishing = useRef(false);
@@ -168,6 +167,9 @@ export function useReviewExport(resource: LoadedReview) {
     renderSettings,
     setRenderSettings,
     start,
+    retryAssetAvailability: () => {
+      if (!active.current) setBlocked(clearMissingAssetBlocker);
+    },
     downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
       start('download', selection),
     cancel: () => {
@@ -191,6 +193,13 @@ export function useReviewExport(resource: LoadedReview) {
       else await start('download');
     },
   };
+}
+
+/** Successful resource recovery clears only the corresponding export reason. */
+function clearMissingAssetBlocker(current: ReviewExportBlocker | null) {
+  if (!current?.reasons.includes('asset-missing')) return current;
+  const reasons = current.reasons.filter((reason) => reason !== 'asset-missing');
+  return reasons.length ? { ...current, reasons } : null;
 }
 
 /** One applied-state capability plan for all export entry points. */

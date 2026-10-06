@@ -1,4 +1,5 @@
 import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { expect, it, vi } from 'vitest';
 import {
@@ -152,6 +153,62 @@ function snapshotDatabase(raw: unknown, rawDraft: unknown) {
     }),
   };
 }
+
+it('roundtrips disabled webcam settings, redo history and recovery through portable asset remapping', async () => {
+  const webcam = {
+    ...createQuickEditWebcam('project-asset:camera', workspace.source, workspace.source),
+    enabled: false,
+    offsetSeconds: -0.25,
+    hiddenRanges: [{ id: 'hidden', start: 0.5, end: 1.5 }],
+  };
+  const before = createQuickEditAdvancedContent();
+  const stored: VideoWorkspace = {
+    ...workspace,
+    advanced: { ...workspace.advanced, webcam, recoveryV1: JSON.stringify({ webcam }) },
+    cursor: 0,
+    history: [
+      {
+        id: 'camera-position',
+        at: 1,
+        target: 'advancedContent',
+        before: { ...before, webcam },
+        after: { ...before, webcam: { ...webcam, mirrored: true } },
+      },
+    ],
+  };
+  const exported = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(exported!);
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([['camera', 'new-camera']]),
+  });
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:new-camera'])
+  );
+  expect(restored.workspace.advanced.webcam).toEqual({
+    ...webcam,
+    assetId: 'project-asset:new-camera',
+  });
+  expect(restored.workspace.history[0]?.after).toHaveProperty('webcam.mirrored', true);
+  expect(restored.workspace.cursor).toBe(0);
+  expect(JSON.parse(restored.workspace.advanced.recoveryV1!)).toHaveProperty(
+    'webcam.assetId',
+    'project-asset:new-camera'
+  );
+  const workspaces = { put: vi.fn() },
+    drafts = { put: vi.fn(), delete: vi.fn() };
+  await putVideoReviewRestore({ review: restored, workspaces, drafts });
+  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+});
 
 it('backs up disabled image history and restores it with newly allocated asset references', async () => {
   const initial = createQuickEditAdvancedState();

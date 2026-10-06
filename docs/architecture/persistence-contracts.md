@@ -67,10 +67,10 @@ Scenario HTML is a separate export catalogue, not a Library source kind. Its imm
 | Scenario guide | Resource membership, step image/document IDs, saved project history | Scenario child/content/history mutation |
 | Scenario tour | Images, navigation backgrounds, audio resources and slide/object narration, saved history | Same scenario owner |
 | Montage | Every asset source, primary origin/base recording, including assets without clips | Montage source remover: placements, transitions, effects and anchors |
-| Quick video edit | Voiceover/music/background assets in current, undo/redo, advanced and recovery state | Review reference collector/remover |
+| Quick video edit | Voiceover/music/background/webcam assets in current, undo/redo, advanced and recovery state | Review reference collector/remover |
 | Image/scenario document | Immutable document bindings | Document byte-ownership owner |
 
-Guides/tours admit image and audio resources, not direct video, Web or HTML sources. Quick edit admits video roots and auxiliary audio/image assets; image editing admits image objects. Conversions yielding an image are separate image acquisitions with explicit provenance. Unsupported combinations remain unsupported.
+Guides/tours admit image and audio resources, not direct video, Web or HTML sources. Quick edit admits video roots and auxiliary audio/image assets plus an explicitly enabled webcam from the same recording group; image editing admits image objects. Conversions yielding an image are separate image acquisitions with explicit provenance. Unsupported combinations remain unsupported.
 
 ## Dependencies and deletion
 

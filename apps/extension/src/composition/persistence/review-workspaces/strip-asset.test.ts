@@ -6,9 +6,58 @@ import {
 import type { VideoWorkspace } from './contracts';
 import { collectReviewAssetReferences } from './asset-refs';
 import { stripReviewAssetReference } from './strip-asset';
+import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 
 const removed = 'project-asset:voice-old';
 const retained = 'project-asset:music-new';
+
+it.each([0, 1])(
+  'removes a webcam-only operation without corrupting history cursor %i',
+  (cursor) => {
+    const workspace = makeWorkspace();
+    const before = createQuickEditAdvancedContent();
+    const after = {
+      ...before,
+      webcam: createQuickEditWebcam(
+        removed,
+        { width: 640, height: 480 },
+        { width: 640, height: 360 }
+      ),
+    };
+    workspace.advanced = createQuickEditAdvancedState();
+    workspace.history = [{ id: 'camera', at: 1, target: 'advancedContent', before, after }];
+    workspace.cursor = cursor;
+    const result = stripReviewAssetReference(workspace, removed, 2);
+    expect(result.history).toEqual([]);
+    expect(result.cursor).toBe(0);
+    expect(collectReviewAssetReferences(result).size).toBe(0);
+  }
+);
+
+it('detaches disabled camera from baseline, undo/redo and recovery without resurrection', () => {
+  const workspace = makeWorkspace();
+  const webcam = {
+    ...createQuickEditWebcam(removed, { width: 640, height: 480 }, { width: 640, height: 360 }),
+    enabled: false,
+  };
+  workspace.advanced.webcam = webcam;
+  workspace.advanced.recoveryV1 = JSON.stringify({ webcam });
+  for (const operation of workspace.history) {
+    if (operation.target !== 'advancedContent') continue;
+    operation.before.webcam = webcam;
+    operation.after.webcam = { ...webcam, offsetSeconds: 1 };
+  }
+  const result = stripReviewAssetReference(workspace, removed, 2);
+  expect(result.advanced).not.toHaveProperty('webcam');
+  expect(JSON.parse(result.advanced.recoveryV1!)).not.toHaveProperty('webcam');
+  expect(collectReviewAssetReferences(result)).toEqual(new Set([retained]));
+  for (const operation of result.history) {
+    if (operation.target !== 'advancedContent') continue;
+    expect(operation.before).not.toHaveProperty('webcam');
+    expect(operation.after).not.toHaveProperty('webcam');
+  }
+  expect(workspace.advanced.webcam).toEqual(webcam);
+});
 
 function makeWorkspace(): VideoWorkspace {
   const before = createQuickEditAdvancedContent();

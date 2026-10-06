@@ -1,5 +1,6 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
+import type { QuickEditWebcam } from './webcam';
 
 export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 3;
 
@@ -203,6 +204,7 @@ export interface QuickEditAdvancedState {
   background: QuickEditBackgroundSettings;
   canvas?: QuickEditCanvasSize;
   windowHeader?: QuickEditWindowHeader;
+  webcam?: QuickEditWebcam;
   audio: QuickEditAudioState;
   /** Raw v1 payload retained by the deterministic load-time migration. */
   recoveryV1?: string;
@@ -220,5 +222,6 @@ export interface QuickEditAdvancedContent {
   background: QuickEditBackgroundSettings;
   canvas?: QuickEditCanvasSize;
   windowHeader?: QuickEditWindowHeader;
+  webcam?: QuickEditWebcam;
   audio: QuickEditAudioState;
 }

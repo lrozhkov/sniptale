@@ -60,7 +60,8 @@ function loadFailureReason(error: unknown): ReviewLoadReason {
   return 'unknown';
 }
 
-async function readOriginal(source: MediaAssetSource) {
+/** Reads validated Library source locators without publishing or changing their ownership. */
+export async function readReviewMediaOriginal(source: MediaAssetSource) {
   if (source.kind === 'recording') return getRecording(source.recordingId);
   if (source.kind === 'project-export') return getProjectExport(source.exportId);
   if (source.kind === 'project-asset') {
@@ -70,7 +71,8 @@ async function readOriginal(source: MediaAssetSource) {
   return undefined;
 }
 
-async function inspectVideo(file: File, signal: AbortSignal) {
+/** Inspects one immutable video source, releasing the decoder on cancellation and failure. */
+export async function inspectReviewVideo(file: File, signal: AbortSignal) {
   signal.throwIfAborted();
   const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
@@ -113,10 +115,10 @@ export async function loadVideoReviewSource(aggregateId: string, signal: AbortSi
     if (!media?.mimeType.startsWith('video/'))
       throw new VideoReviewLoadError('library', 'unavailable');
     stage = 'source';
-    const original = await readOriginal(media.source);
+    const original = await readReviewMediaOriginal(media.source);
     if (!original) throw new VideoReviewLoadError('source', 'unavailable');
     stage = 'metadata';
-    const { source, provenance } = await inspectVideo(original.file, signal);
+    const { source, provenance } = await inspectReviewVideo(original.file, signal);
     stage = 'telemetry';
     const telemetry =
       media.source.kind === 'recording' && !media.recordingMetadata

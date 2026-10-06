@@ -97,6 +97,96 @@ export async function seedReviewVideo(
   );
 }
 
+/** Linked immutable recording bodies exercise first camera acquisition, not a prefilled project. */
+export async function seedReviewWebcamBundle(
+  page: Page,
+  cameraFilename = 'review-webcam-clock.webm'
+) {
+  await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+  const bytes = await readFile(new URL(`../fixtures/${cameraFilename}`, import.meta.url));
+  await page.evaluate(
+    async ({ fixture, encoded }) => {
+      const body = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
+      const objects = await (
+        await (await navigator.storage.getDirectory()).getDirectoryHandle('sniptale-assets')
+      ).getDirectoryHandle('objects');
+      const writer = await (
+        await objects.getFileHandle('webcam-clock-asset', { create: true })
+      ).createWritable();
+      await writer.write(body);
+      await writer.close();
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(fixture.databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = db.transaction(
+        ['recordings', 'media_library', 'asset_refs', 'asset_owners'],
+        'readwrite'
+      );
+      const done = new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+      });
+      for (const store of ['recordings', 'media_library']) {
+        const request = transaction
+          .objectStore(store)
+          .get(store === 'recordings' ? 'beta-v1-recording' : 'recording:beta-v1-recording');
+        request.onsuccess = () =>
+          transaction.objectStore(store).put({
+            ...request.result,
+            recordingGroup: {
+              groupId: 'webcam-proof',
+              role: 'display',
+              order: 0,
+              sourceLabel: 'Screen',
+            },
+          });
+      }
+      const recordingGroup = {
+        groupId: 'webcam-proof',
+        role: 'webcam',
+        order: 1,
+        sourceLabel: 'Camera clock',
+      };
+      transaction.objectStore('recordings').put({
+        ...fixture.records.recordings[0],
+        id: 'webcam-clock',
+        assetId: 'webcam-clock-asset',
+        filename: 'camera-clock.webm',
+        size: body.length,
+        recordingGroup,
+      });
+      transaction.objectStore('media_library').put({
+        ...fixture.records.media_library[0],
+        id: 'recording:webcam-clock',
+        filename: 'camera-clock.webm',
+        originalFilename: 'camera-clock.webm',
+        source: { kind: 'recording', recordingId: 'webcam-clock' },
+        recordingGroup,
+        width: 160,
+        height: 90,
+        duration: 12,
+        size: body.length,
+      });
+      transaction.objectStore('asset_refs').put({
+        ...fixture.records.asset_refs[0],
+        assetId: 'webcam-clock-asset',
+        location: { kind: 'opfs', objectKey: 'objects/webcam-clock-asset' },
+        size: body.length,
+      });
+      transaction.objectStore('asset_owners').put({
+        ...fixture.records.asset_owners[0],
+        assetId: 'webcam-clock-asset',
+        ownerId: 'webcam-clock',
+      });
+      await done;
+      db.close();
+    },
+    { fixture: betaV1Fixture, encoded: bytes.toString('base64') }
+  );
+}
+
 async function withAudioGaps(bytes: Uint8Array) {
   const input = new Input({
     source: new BlobSource(new Blob([Uint8Array.from(bytes)])),

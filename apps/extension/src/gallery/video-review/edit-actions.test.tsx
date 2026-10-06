@@ -298,6 +298,7 @@ it('applies export frame rate and quality options without adding section divider
     renderSettings: { frameRate: 0, quality: 'HIGH' },
     setRenderSettings: vi.fn(),
     start: vi.fn(async () => {}),
+    retryAssetAvailability: vi.fn(),
     downloadSelection: vi.fn(async () => {}),
     cancel: vi.fn(),
     download: vi.fn(async () => {}),

@@ -1,5 +1,6 @@
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { drawReviewBorders } from './render-border';
+import { createReviewWebcamRenderer } from './render-webcam';
 import { drawReviewSceneShadow } from './scene-shadow';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
@@ -120,8 +121,15 @@ export async function writeReviewFrames(args: {
   let output: Output | null = null;
   let source: ReviewRenderSource | null = null;
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
+  let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
   try {
     source = await openReviewRenderSource(args, input, preparation);
+    if (preparation.effective.webcam)
+      webcam = await createReviewWebcamRenderer(
+        preparation.effective.webcam,
+        args.readProjectAsset,
+        args.signal
+      );
     const receipt: ReviewPacketReceipt = {
       videoPackets: 0,
       audioPackets: 0,
@@ -213,6 +221,7 @@ export async function writeReviewFrames(args: {
         sourceTimeResolution,
         transitions,
         transitionFrames,
+        webcam,
         videoOut,
         resultDuration: receipt.resultDuration,
         onProgress: args.onProgress ?? undefined,
@@ -231,6 +240,7 @@ export async function writeReviewFrames(args: {
     await output?.cancel().catch(() => undefined);
     throw error;
   } finally {
+    webcam?.dispose();
     transitionFrames?.dispose();
     source?.image?.close();
     if (source?.headerImage) source.headerImage.src = '';
@@ -384,14 +394,19 @@ async function openReviewRenderSource(
   if (!context) throw new Error('Canvas context is unavailable.');
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
-  const backgroundImage =
-    preparation.effective.background.enabled && preparation.effective.background.type === 'image'
-      ? await loadBackgroundImage(
-          preparation.effective.background.assetId,
-          args.readProjectAsset,
-          signal
-        )
-      : null;
+  const background = preparation.effective.background;
+  let backgroundImage: ImageBitmap | null = null;
+  if (background.enabled && background.type === 'image') {
+    if (!background.assetId) throw new QuickEditExportUnavailable(['asset-missing']);
+    const blob = await args.readProjectAsset(background.assetId);
+    signal.throwIfAborted();
+    if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
+    try {
+      backgroundImage = await createImageBitmap(blob);
+    } catch {
+      throw new QuickEditExportUnavailable(['asset-missing']);
+    }
+  }
   try {
     return {
       video,
@@ -499,6 +514,7 @@ export async function renderRenderWindowFrames(args: {
   sourceTimeResolution?: number;
   transitions?: readonly ReviewCutTransitionPlan[];
   transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
+  webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
   resultDuration: number;
   onProgress: ((fraction: number) => void) | undefined;
@@ -528,116 +544,118 @@ export async function renderRenderWindowFrames(args: {
     Math.min(lastTick, Math.round(time * resolution) / resolution)
   );
   let frame = 0;
-  for await (const sample of args.frameSink.samplesAtTimestamps(sampleTimes)) {
-    if (!sample) {
-      signal.throwIfAborted();
-      throw new Error('Source frame is unavailable.');
-    }
-    const timestamp = window.timestamps[frame]!;
-    try {
-      signal.throwIfAborted();
-      const camera = evaluateQuickEditCameraAtTime(
-        args.zoomRegions,
-        timestamp + args.fragmentOffset
-      );
-      const layout = computeQuickEditSceneLayout({
-        output: canvas,
-        source: args.sourceSize,
-        canvas: args.baseCanvas ?? canvas,
-        windowHeader: args.windowHeader,
-        background: args.background,
-        camera,
-      });
-      const burned = args.comments.filter(
-        (comment) =>
-          comment.renderToVideo &&
-          isCanvasCommentVisibleAt(comment, window.sourceTimes[frame] ?? window.segment.sourceStart)
-      );
-      const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
-      if (blend) {
-        const frames = await args.transitionFrames?.load(blend.plan);
+  const webcamFrames = args.webcam?.frames(window.sourceTimes);
+  try {
+    for await (const sample of args.frameSink.samplesAtTimestamps(sampleTimes)) {
+      if (!sample) {
         signal.throwIfAborted();
-        if (!frames) throw new QuickEditExportUnavailable(['transition-frames']);
-        paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
-      } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
-      drawReviewSceneFrame(context, {
-        canvas,
-        layout,
-        background: args.background,
-        image: args.image,
-        headerImage: args.headerImage,
-        sample: {
-          draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
-        },
-        comments: burned,
-        sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
-        cameraScale: camera.scale,
-        sceneScale: args.sceneScale ?? 1,
-      });
-      const motion = computeQuickEditSceneCamera(layout, args.background);
-      drawReviewSpotlights(
-        context,
-        canvas,
-        scratch,
-        evaluateQuickEditSpotlightsAtTime({
-          regions: args.zoomRegions,
-          time: timestamp + args.fragmentOffset,
-          output: canvas,
-          video: computeQuickEditWindowTransform(layout),
-          scale: (args.sceneScale ?? 1) * camera.scale,
-        }),
-        {
-          rect: motion.windowClip,
-          radius: args.background.enabled ? args.background.layout.cornerRadius * motion.scale : 0,
-        }
-      );
-      drawReviewBorders(
-        context,
-        canvas,
-        evaluateQuickEditBordersAtTime({
-          regions: args.zoomRegions,
-          time: timestamp + args.fragmentOffset,
-          output: canvas,
-          video: computeQuickEditWindowTransform(layout),
-          scale: (args.sceneScale ?? 1) * camera.scale,
-        }),
-        {
-          rect: motion.windowClip,
-          radius: args.background.enabled ? args.background.layout.cornerRadius * motion.scale : 0,
-        }
-      );
-      const encoded = new VideoSample(canvas, {
-        timestamp,
-        duration: Math.min(1 / fps, window.segment.resultEnd - timestamp),
-      });
-      try {
-        await videoOut.add(encoded);
-      } finally {
-        encoded.close();
+        throw new Error('Source frame is unavailable.');
       }
-    } finally {
-      sample.close();
+      const timestamp = window.timestamps[frame]!;
+      try {
+        signal.throwIfAborted();
+        const camera = evaluateQuickEditCameraAtTime(
+          args.zoomRegions,
+          timestamp + args.fragmentOffset
+        );
+        const layout = computeQuickEditSceneLayout({
+          output: canvas,
+          source: args.sourceSize,
+          canvas: args.baseCanvas ?? canvas,
+          windowHeader: args.windowHeader,
+          background: args.background,
+          camera,
+        });
+        const burned = args.comments.filter(
+          (comment) =>
+            comment.renderToVideo &&
+            isCanvasCommentVisibleAt(
+              comment,
+              window.sourceTimes[frame] ?? window.segment.sourceStart
+            )
+        );
+        const blend = reviewCutTransitionAt(timestamp, args.transitions ?? []);
+        if (blend) {
+          const frames = await args.transitionFrames?.load(blend.plan);
+          signal.throwIfAborted();
+          if (!frames) throw new QuickEditExportUnavailable(['transition-frames']);
+          paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
+        } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
+        drawReviewSceneFrame(context, {
+          canvas,
+          layout,
+          background: args.background,
+          image: args.image,
+          headerImage: args.headerImage,
+          sample: {
+            draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
+          },
+          comments: burned,
+          sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
+          cameraScale: camera.scale,
+          sceneScale: args.sceneScale ?? 1,
+        });
+        const motion = computeQuickEditSceneCamera(layout, args.background);
+        drawReviewSpotlights(
+          context,
+          canvas,
+          scratch,
+          evaluateQuickEditSpotlightsAtTime({
+            regions: args.zoomRegions,
+            time: timestamp + args.fragmentOffset,
+            output: canvas,
+            video: computeQuickEditWindowTransform(layout),
+            scale: (args.sceneScale ?? 1) * camera.scale,
+          }),
+          {
+            rect: motion.windowClip,
+            radius: args.background.enabled
+              ? args.background.layout.cornerRadius * motion.scale
+              : 0,
+          }
+        );
+        drawReviewBorders(
+          context,
+          canvas,
+          evaluateQuickEditBordersAtTime({
+            regions: args.zoomRegions,
+            time: timestamp + args.fragmentOffset,
+            output: canvas,
+            video: computeQuickEditWindowTransform(layout),
+            scale: (args.sceneScale ?? 1) * camera.scale,
+          }),
+          {
+            rect: motion.windowClip,
+            radius: args.background.enabled
+              ? args.background.layout.cornerRadius * motion.scale
+              : 0,
+          }
+        );
+        if (webcamFrames) {
+          const cameraFrame = await webcamFrames.next();
+          signal.throwIfAborted();
+          if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
+          cameraFrame.value?.draw(context, canvas);
+        }
+        const encoded = new VideoSample(canvas, {
+          timestamp,
+          duration: Math.min(1 / fps, window.segment.resultEnd - timestamp),
+        });
+        try {
+          await videoOut.add(encoded);
+        } finally {
+          encoded.close();
+        }
+      } finally {
+        sample.close();
+      }
+      args.onProgress?.(Math.min(1, (timestamp + 1 / fps) / args.resultDuration));
+      frame++;
     }
-    args.onProgress?.(Math.min(1, (timestamp + 1 / fps) / args.resultDuration));
-    frame++;
+  } finally {
+    await webcamFrames?.return(undefined);
   }
   return frame;
-}
-
-async function loadBackgroundImage(
-  assetId: string,
-  readProjectAsset: (assetId: string) => Promise<Blob | null>,
-  signal: AbortSignal
-): Promise<ImageBitmap | null> {
-  if (!assetId) throw new QuickEditExportUnavailable(['asset-missing']);
-  const blob = await readProjectAsset(assetId);
-  signal.throwIfAborted();
-  if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
-  try {
-    return await createImageBitmap(blob);
-  } catch {
-    throw new QuickEditExportUnavailable(['asset-missing']);
-  }
 }
 
 /**

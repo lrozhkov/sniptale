@@ -8,6 +8,38 @@ import {
 } from './effective';
 import { createCanvasComment } from '../comments';
 import type { QuickEditAdvancedState } from './types';
+import { createQuickEditWebcam } from './webcam';
+
+it('uses one camera gate for track and rendering while retaining authored content in Basic', () => {
+  const state = createQuickEditAdvancedState();
+  state.webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 1920, height: 1080 }
+  );
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    webcamTrackVisible: true,
+    webcam: state.webcam,
+  });
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'render',
+    reasons: ['webcam'],
+  });
+  state.webcam.enabled = false;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({ webcamTrackVisible: false });
+  expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
+    video: 'copy',
+  });
+  expect(state.webcam.assetId).toBe('project-asset:camera');
+});
 
 const advancedWithContent = (): QuickEditAdvancedState => ({
   ...createQuickEditAdvancedState(),

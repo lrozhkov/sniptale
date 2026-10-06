@@ -73,6 +73,6 @@ describe('source audio automation', () => {
     advanced.ui.mode = 'basic';
     expect(
       resolveQuickEditExportPlan({ advanced, document: { edits: [], canvasComments: [] } })
-    ).toEqual({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+    ).toEqual({ kind: 'ready', video: 'copy', audio: 'process', reasons: ['original-audio'] });
   });
 });

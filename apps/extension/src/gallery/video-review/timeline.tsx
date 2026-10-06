@@ -47,6 +47,7 @@ type TimelineProps = {
   trackControls?: ReactNode;
   expandedTools?: boolean;
   zoomTrack?: ReactNode;
+  webcamTrack?: ReactNode;
   audioTrack?: ReactNode;
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
@@ -205,6 +206,7 @@ export function ReviewTimeline(props: TimelineProps) {
           />
           <div inert={props.busy}>
             {props.zoomTrack}
+            {props.webcamTrack}
             {props.audioTrack}
           </div>
         </div>

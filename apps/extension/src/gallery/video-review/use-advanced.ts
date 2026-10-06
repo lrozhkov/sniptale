@@ -102,7 +102,12 @@ export function useReviewAdvanced(session: Session) {
     }
   }, [contentState, session]);
   const content = contentState.content;
-  const { canvas: _baselineCanvas, windowHeader: _baselineHeader, ...workspaceState } = persisted;
+  const {
+    canvas: _baselineCanvas,
+    windowHeader: _baselineHeader,
+    webcam: _baselineWebcam,
+    ...workspaceState
+  } = persisted;
   const advanced: QuickEditAdvancedState = {
     ...workspaceState,
     ui: optimistic?.value.ui ?? persisted.ui,
@@ -115,17 +120,7 @@ export function useReviewAdvanced(session: Session) {
     retry: () => Promise.all([flush(), contentState.flush()]),
     setMode: (mode: 'basic' | 'advanced') => {
       if (mode === 'advanced') contentState.setZoom((zoom) => ({ ...zoom, enabled: true }));
-      stage((current) => ({
-        ...current,
-        ui: {
-          ...current.ui,
-          mode,
-          tracks:
-            mode === 'advanced'
-              ? { ...current.ui.tracks, zoom: true, audio: true }
-              : current.ui.tracks,
-        },
-      }));
+      stage((current) => reviewAdvancedMode(current, mode));
     },
     setTrackVisibility: (track: 'actions' | 'zoom' | 'audio', visible: boolean) =>
       stage((current) => ({
@@ -137,6 +132,7 @@ export function useReviewAdvanced(session: Session) {
     setZoom: contentState.setZoom,
     setCanvas: contentState.setCanvas,
     setWindowHeader: contentState.setWindowHeader,
+    setWebcam: contentState.setWebcam,
     setBackground: contentState.setBackground,
     setAudio: contentState.setAudio,
     flush: async () => {
@@ -144,5 +140,18 @@ export function useReviewAdvanced(session: Session) {
       await contentState.flush();
     },
     reset,
+  };
+}
+
+/** Advanced mode reveals its edit lanes without changing saved Basic track preferences. */
+function reviewAdvancedMode(current: QuickEditAdvancedState, mode: 'basic' | 'advanced') {
+  return {
+    ...current,
+    ui: {
+      ...current.ui,
+      mode,
+      tracks:
+        mode === 'advanced' ? { ...current.ui.tracks, zoom: true, audio: true } : current.ui.tracks,
+    },
   };
 }
