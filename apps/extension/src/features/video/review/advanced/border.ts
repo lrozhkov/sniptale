@@ -84,8 +84,39 @@ export interface QuickEditBorderFrame {
   dashOffset?: number;
 }
 
-/** Clockwise circular-corner path, starting at top-center away from corner tangents. */
-export function quickEditBorderPath(rect: QuickEditRect, radius: number) {
+function patternedBorderPath(rect: QuickEditRect, radius: number) {
+  const { x, y, width, height } = rect;
+  const points = [{ x: x + width / 2, y }];
+  // Canvas measures curve lengths coarsely when dashing. Explicit chords keep
+  // closure phase exact, with less than 0.025 output pixels of radial deviation.
+  const steps = Math.max(4, Math.ceil((Math.PI / 2) * Math.sqrt(radius / 0.2)));
+  const centers = [
+    { x: x + width - radius, y: y + radius },
+    { x: x + width - radius, y: y + height - radius },
+    { x: x + radius, y: y + height - radius },
+    { x: x + radius, y: y + radius },
+  ];
+  for (const [corner, center] of centers.entries()) {
+    for (let step = 0; step <= steps; step++) {
+      const angle = ((corner - 1 + step / steps) * Math.PI) / 2;
+      points.push({
+        x: center.x + radius * Math.cos(angle),
+        y: center.y + radius * Math.sin(angle),
+      });
+    }
+  }
+  points.push(points[0]!);
+  let perimeter = 0;
+  for (let i = 1; i < points.length; i++)
+    perimeter += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
+  return {
+    path: points.map((point, i) => `${i ? 'L' : 'M'}${point.x} ${point.y}`).join('') + 'Z',
+    perimeter,
+  };
+}
+
+/** Clockwise rounded path from top-center; patterned chords keep Canvas dash measurement exact. */
+export function quickEditBorderPath(rect: QuickEditRect, radius: number, patterned = false) {
   const { x, y, width: w, height: h } = rect;
   const r = Math.max(0, Math.min(radius, w / 2, h / 2));
   // Chromium resets stroke dashes at degenerate arcs, so square corners use lines.
@@ -94,6 +125,7 @@ export function quickEditBorderPath(rect: QuickEditRect, radius: number) {
       path: `M${x + w / 2} ${y}H${x + w}V${y + h}H${x}V${y}H${x + w / 2}Z`,
       perimeter: 2 * (w + h),
     };
+  if (patterned) return patternedBorderPath(rect, r);
   return {
     path:
       `M${x + w / 2} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}` +
@@ -202,7 +234,8 @@ export function evaluateQuickEditBordersAtTime(args: {
       };
       const path = quickEditBorderPath(
         rect,
-        Math.max(0, Math.min(area.width, area.height) * border.roundness - inset)
+        Math.max(0, Math.min(area.width, area.height) * border.roundness - inset),
+        border.style !== 'solid'
       );
       const phase = borderPhase(region, border, args.time, { width, perimeter: path.perimeter });
       return {

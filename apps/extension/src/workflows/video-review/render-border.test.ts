@@ -59,7 +59,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 it.each([
   { style: 'dashed' as const, dash: [12, 8], cap: 'butt' },
-  { style: 'dotted' as const, dash: [0, 8], cap: 'round' },
+  { style: 'dotted' as const, dash: [0.01, 7.99], cap: 'round' },
 ])('reveals a wrapping $style segment without moving its pattern phase', ({ style, dash, cap }) => {
   const { destination, layer, mask } = compositor();
   drawReviewBorders(target(destination.context), output, [
@@ -163,4 +163,32 @@ it.each([
   expect(layer.context.lineDashOffset).toBeCloseTo(-start * frame.perimeter);
   expect(mask.context.stroke).not.toHaveBeenCalled();
   expect(layer.context.drawImage).not.toHaveBeenCalled();
+});
+
+it.each(['dashed', 'dotted'] as const)(
+  'fits %s repeats to arbitrary closed perimeters',
+  (style) => {
+    for (const perimeter of [3, 317, 321.125, 1000 + 35 * Math.PI]) {
+      const { destination, layer } = compositor();
+      drawReviewBorders(target(destination.context), output, [
+        { ...frame, style, perimeter, dashOffset: -17.5 },
+      ]);
+      const pattern = layer.context.setLineDash.mock.calls[0]![0];
+      const pitch = pattern[0] + pattern[1];
+      const repeats = perimeter / pitch;
+      expect(repeats).toBeCloseTo(Math.round(repeats), 10);
+      expect(repeats).toBeGreaterThanOrEqual(1);
+      if (style === 'dashed') expect(pattern[0] / pitch).toBeCloseTo(0.6);
+      else expect(pattern[0]).toBeGreaterThan(0);
+      expect(layer.context.lineDashOffset).toBe(-17.5);
+    }
+  }
+);
+
+it('does not introduce a reveal seam for a full perimeter with floating-point subtraction', () => {
+  const { destination, mask } = compositor();
+  drawReviewBorders(target(destination.context), output, [
+    { ...frame, style: 'dotted', start: 0.1, end: 1.1 - Number.EPSILON },
+  ]);
+  expect(mask.context.stroke).not.toHaveBeenCalled();
 });

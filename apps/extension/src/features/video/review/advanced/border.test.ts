@@ -424,7 +424,7 @@ it('draws and erases from either end and moves a full patterned stroke without c
     b = sample(2.5),
     exit = sample(9),
     later = sample(9.5);
-  expect(a.end - a.start).toBe(1);
+  expect(a.end - a.start).toBeCloseTo(1);
   expect(b.end - b.start).toBeCloseTo(1);
   expect(b.dashOffset).toBeLessThan(a.dashOffset!);
   expect(later.dashOffset).toBe(exit.dashOffset);
@@ -544,3 +544,23 @@ it.each(['solid', 'dashed', 'dotted'] as const)(
     expect(sample(9).opacity).toBeCloseTo(0.35);
   }
 );
+
+it('uses exact chord lengths for patterned corners while retaining circular solid paths', () => {
+  const rect = { x: 20.25, y: 30.5, width: 363.125, height: 153.75 };
+  const solid = quickEditBorderPath(rect, 17.5);
+  const patterned = quickEditBorderPath(rect, 17.5, true);
+  expect(solid.path).toContain('A17.5 17.5');
+  expect(patterned.path).not.toContain('A');
+  const points = [...patterned.path.matchAll(/[ML]([\d.e+-]+) ([\d.e+-]+)/g)].map((match) => ({
+    x: Number(match[1]),
+    y: Number(match[2]),
+  }));
+  expect(points[0]).toEqual(points.at(-1));
+  let length = 0;
+  for (let i = 1; i < points.length; i++)
+    length += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
+  expect(patterned.perimeter).toBe(length);
+  expect(solid.perimeter - patterned.perimeter).toBeGreaterThan(0);
+  expect(solid.perimeter - patterned.perimeter).toBeLessThan(0.2);
+  expect(quickEditBorderPath(rect, 0, true)).toEqual(quickEditBorderPath(rect, 0));
+});

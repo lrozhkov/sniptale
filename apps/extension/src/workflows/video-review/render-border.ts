@@ -26,7 +26,8 @@ export function drawReviewBorders(
     context.clip();
   }
   for (const frame of frames) {
-    const length = Math.min(1, Math.max(0, frame.end - frame.start));
+    const span = frame.end - frame.start;
+    const length = span >= 1 - 1e-9 ? 1 : Math.max(0, span);
     if (!length || !frame.opacity) continue;
     stroke.clearRect(0, 0, layer.width, layer.height);
     stroke.save();
@@ -34,11 +35,18 @@ export function drawReviewBorders(
     stroke.lineWidth = frame.width;
     stroke.strokeStyle = frame.color;
     stroke.lineCap = frame.style === 'dotted' ? 'round' : 'butt';
+    // A closed contour needs whole pattern repeats; otherwise its join cuts a dash
+    // on every rotation. Preserve the dash/gap ratio while fitting the perimeter.
+    const nominalPitch = frame.width * (frame.style === 'dashed' ? 5 : 2);
+    const repeats = Math.max(1, Math.round(frame.perimeter / nominalPitch));
+    const pitch = frame.perimeter / repeats;
+    // A tiny nonzero dot avoids duplicate round caps at the closed-path seam.
+    const dotLength = Math.min(0.01, pitch / 2);
     stroke.setLineDash(
       frame.style === 'dashed'
-        ? [3 * frame.width, 2 * frame.width]
+        ? [pitch * 0.6, pitch * 0.4]
         : frame.style === 'dotted'
-          ? [0, 2 * frame.width]
+          ? [dotLength, pitch - dotLength]
           : []
     );
     stroke.lineDashOffset = frame.dashOffset ?? 0;
