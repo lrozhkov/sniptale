@@ -80,36 +80,41 @@ it('starts clockwise at top-center with analytic circular perimeter', () => {
   expect(path.path.startsWith('M10 0H18')).toBe(true);
   expect(path.perimeter).toBeCloseTo(44 + 4 * Math.PI);
 });
-it('preserves source-clock phase across cut and speed slices and strips no authored fields', () => {
-  const region = border();
-  region.border = {
-    ...region.border,
-    style: 'dashed',
-    loop: true,
-    reveal: 'draw',
-    exitReveal: 'erase',
-  };
-  const map = buildReviewTimeMap(10, [
-    {
-      id: 'speed',
-      kind: 'speed',
-      start: 0,
-      end: 5,
-      requestedStart: 0,
-      requestedEnd: 5,
-      rate: 2,
-      audio: 'speed',
-    },
-    { id: 'cut', kind: 'cut', start: 5, end: 7, requestedStart: 5, requestedEnd: 7 },
-  ]);
-  const projected = projectReviewFocus([region], map);
-  const actual = evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time: 3 });
-  const expected = evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time: 7.5 });
-  expect(actual[0]).toEqual({ ...expected[0], id: actual[0]!.id });
-  expect(evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time: 3 })).toEqual(
-    actual
-  );
-});
+it.each(['clockwise', 'ripple'] as const)(
+  'preserves %s source-clock phase across cut and speed slices',
+  (motion) => {
+    const region = border();
+    region.border = {
+      ...region.border,
+      style: 'dashed',
+      loop: true,
+      motion,
+      reveal: 'draw',
+      exitReveal: 'erase',
+    };
+    const map = buildReviewTimeMap(10, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 0,
+        end: 5,
+        requestedStart: 0,
+        requestedEnd: 5,
+        rate: 2,
+        audio: 'speed',
+      },
+      { id: 'cut', kind: 'cut', start: 5, end: 7, requestedStart: 5, requestedEnd: 7 },
+    ]);
+    const projected = projectReviewFocus([region], map);
+    const actual = evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time: 3 });
+    const expected = evaluateQuickEditBordersAtTime({ ...geometry, regions: [region], time: 7.5 });
+    expect(actual).toHaveLength(expected.length);
+    actual.forEach((frame, index) => expect(frame).toEqual({ ...expected[index], id: frame.id }));
+    expect(evaluateQuickEditBordersAtTime({ ...geometry, regions: projected, time: 3 })).toEqual(
+      actual
+    );
+  }
+);
 it('holds a full line initially, shrinks to a quarter and exits without a segment flash', () => {
   const region = border();
   region.border = {
@@ -564,3 +569,54 @@ it('uses exact chord lengths for patterned corners while retaining circular soli
   expect(solid.perimeter - patterned.perimeter).toBeLessThan(0.2);
   expect(quickEditBorderPath(rect, 0, true)).toEqual(quickEditBorderPath(rect, 0));
 });
+
+it('admits Ripple without changing legacy color pulses and rejects unknown motions', () => {
+  const value = { ...createQuickEditBorder(), loop: true, motion: 'ripple' as const };
+  expect(parseQuickEditBorder(value)).toEqual(value);
+  expect(parseQuickEditBorder({ ...value, motion: 'pulse' })?.motion).toBe('pulse');
+  expect(parseQuickEditBorder({ ...value, motion: 'ripple-unknown' })).toBeNull();
+  const state = createQuickEditAdvancedState();
+  state.zoom = { enabled: true, regions: [{ ...border(), border: value }] };
+  expect(
+    loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.zoom.regions[0]?.border
+  ).toEqual(value);
+});
+
+it.each(['solid', 'dashed', 'dotted'] as const)(
+  'expands a fading %s outline during hold while keeping its base fixed',
+  (style) => {
+    const region = {
+      ...border(),
+      border: { ...createQuickEditBorder(), style, loop: true, motion: 'ripple' as const },
+      enter: { type: 'linear' as const, duration: 1 },
+      exit: { type: 'linear' as const, duration: 1 },
+    };
+    const sample = (time: number, scale = 1) =>
+      evaluateQuickEditBordersAtTime({
+        ...geometry,
+        video: { x: 0, y: 0, width: 100 * scale, height: 100 * scale },
+        scale,
+        regions: [region],
+        time,
+      });
+    for (const time of [0.5, 1, 3, 9, 9.5]) expect(sample(time)).toHaveLength(1);
+    const a = sample(1.5),
+      b = sample(2.5);
+    expect(a).toHaveLength(2);
+    expect(a[0]).toEqual(b[0]);
+    expect(a[1]!.perimeter).toBeGreaterThan(a[0]!.perimeter);
+    expect(b[1]!.perimeter).toBeGreaterThan(a[1]!.perimeter);
+    expect(a[1]!.opacity).toBeCloseTo(b[1]!.opacity);
+    expect(a[1]).toMatchObject({ style, start: 0, end: 1, dashOffset: 0 });
+    expect(sample(2.9999)[1]!.opacity).toBeLessThan(0.001);
+    expect(sample(8.9999)[1]!.opacity).toBeLessThan(0.001);
+    expect(sample(1.0001)[1]!.opacity).toBeLessThan(0.001);
+    const doubled = sample(1.5, 2);
+    expect(doubled[1]!.width).toBe(a[1]!.width * 2);
+    expect(doubled[1]!.opacity).toBe(a[1]!.opacity);
+    region.border.period = 1;
+    expect(sample(1.25)[1]!.path).toEqual(a[1]!.path);
+    region.border.loop = false;
+    expect(sample(2)).toHaveLength(1);
+  }
+);

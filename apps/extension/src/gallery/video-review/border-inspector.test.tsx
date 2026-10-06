@@ -29,6 +29,10 @@ afterEach(() => {
 });
 const field = (name: string, scope: ParentNode = host) =>
   scope.querySelector<HTMLInputElement>(`[aria-label="gallery.videoReview.${name}"]`)!;
+const hold = () =>
+  [...host.querySelectorAll('fieldset')].find(
+    (node) => node.querySelector('legend')?.textContent === 'gallery.videoReview.borderHold'
+  )!;
 async function input(node: HTMLInputElement, value: string) {
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(node, value);
@@ -111,7 +115,12 @@ it('uses source-time coupled duration budgets and exposes rotation speed only wh
   const render = () =>
     root.render(<ReviewBorderAnimation region={region} onChange={change} onPreview={preview} />);
   act(render);
-  const phases = () => host.querySelectorAll('fieldset');
+  const phases = () => [...host.querySelectorAll('fieldset')].filter((node) => node !== hold());
+  expect([...host.querySelectorAll('legend')].map((node) => node.textContent)).toEqual([
+    'gallery.videoReview.zoomTransitionIn',
+    'gallery.videoReview.borderHold',
+    'gallery.videoReview.zoomTransitionOut',
+  ]);
   await choose('focusReveal', 'borderDraw', phases()[0]);
   await choose('focusReveal', 'borderErase', phases()[1]);
   expect(region.border).toMatchObject({ reveal: 'draw', exitReveal: 'erase' });
@@ -134,7 +143,7 @@ it('uses source-time coupled duration budgets and exposes rotation speed only wh
   await choose('focusReveal', 'focusFade', phases()[1]);
   expect(region.border).toMatchObject({ reveal: 'fade', exitReveal: 'fade' });
   expect(field('borderSpeed')).toBeNull();
-  await choose('borderHold', 'borderRotateClockwise');
+  await choose('focusReveal', 'borderRotateClockwise', hold());
   expect(field('borderSegmentPercent').value).toBe('100');
   await scrub('borderSegmentPercent', '35');
   expect(region.border.segmentPercent).toBe(35);
@@ -160,13 +169,16 @@ it('uses source-time coupled duration budgets and exposes rotation speed only wh
   expect(region.border.period).toBe(20);
   await enter(field('borderSpeed'), '10');
   expect(region.border.period).toBe(0.5);
-  await choose('borderHold', 'borderRotateCounterclockwise');
+  await choose('focusReveal', 'borderRotateCounterclockwise', hold());
   expect(region.border.motion).toBe('counterclockwise');
-  await choose('borderHold', 'borderPulse');
+  await choose('focusReveal', 'borderPulse', hold());
   expect(region.border.motion).toBe('pulse');
   expect(field('borderSegmentPercent')).toBeNull();
   expect(preview).toHaveBeenLastCalledWith(null);
-  await choose('borderHold', 'borderStill');
+  await choose('focusReveal', 'borderRipple', hold());
+  expect(region.border.motion).toBe('ripple');
+  expect(field('borderSegmentPercent')).toBeNull();
+  await choose('focusReveal', 'borderStill', hold());
   expect(region.border.loop).toBe(false);
   expect(field('borderSpeed')).toBeNull();
 });
@@ -213,9 +225,13 @@ it('offers no rotating hold for a solid stroke', async () => {
     border: createQuickEditBorder(),
   };
   act(() => root.render(<ReviewBorderAnimation region={region} onChange={vi.fn()} />));
-  act(() => field('borderHold').click());
+  act(() => field('focusReveal', hold()).click());
   const options = [...document.querySelectorAll('[role="option"]')].map((node) => node.textContent);
-  expect(options).toEqual(['gallery.videoReview.borderStill', 'gallery.videoReview.borderPulse']);
+  expect(options).toEqual([
+    'gallery.videoReview.borderStill',
+    'gallery.videoReview.borderPulse',
+    'gallery.videoReview.borderRipple',
+  ]);
 });
 
 it('stops rotation when switching to solid but retains pulse for all stroke styles', async () => {
@@ -237,29 +253,39 @@ it('stops rotation when switching to solid but retains pulse for all stroke styl
   await choose('borderStyle', 'borderStyle_dotted');
   await choose('borderStyle', 'borderStyle_solid');
   expect(value).toMatchObject({ loop: true, motion: 'pulse', style: 'solid' });
+  value = { ...value, motion: 'ripple' };
+  act(render);
+  await choose('borderStyle', 'borderStyle_dashed');
+  await choose('borderStyle', 'borderStyle_solid');
+  expect(value).toMatchObject({ loop: true, motion: 'ripple', style: 'solid' });
 });
 
-it('previews pulse speed and cancels Escape without committing', async () => {
-  const region = {
-    ...createQuickEditZoomRegion({ id: 'pulse', at: 0 }),
-    border: { ...createQuickEditBorder(), motion: 'pulse' as const, loop: true },
-  };
-  const onChange = vi.fn();
-  const onPreview = vi.fn();
-  act(() =>
-    root.render(<ReviewBorderAnimation region={region} onChange={onChange} onPreview={onPreview} />)
-  );
-  expect(field('borderSpeed').value).toBe('1');
-  expect(field('borderSegmentPercent')).toBeNull();
-  const slider = field('borderSpeed range');
-  act(() => slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
-  await input(slider, '2');
-  expect(onPreview).toHaveBeenLastCalledWith({ border: { ...region.border, period: 1 } });
-  act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
-  act(() => slider.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
-  expect(onChange).not.toHaveBeenCalled();
-  expect(onPreview).toHaveBeenLastCalledWith(null);
-});
+it.each(['pulse', 'ripple'] as const)(
+  'previews %s speed and cancels Escape without committing',
+  async (motion) => {
+    const region = {
+      ...createQuickEditZoomRegion({ id: 'pulse', at: 0 }),
+      border: { ...createQuickEditBorder(), motion, loop: true },
+    };
+    const onChange = vi.fn();
+    const onPreview = vi.fn();
+    act(() =>
+      root.render(
+        <ReviewBorderAnimation region={region} onChange={onChange} onPreview={onPreview} />
+      )
+    );
+    expect(field('borderSpeed').value).toBe('1');
+    expect(field('borderSegmentPercent')).toBeNull();
+    const slider = field('borderSpeed range');
+    act(() => slider.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    await input(slider, '2');
+    expect(onPreview).toHaveBeenLastCalledWith({ border: { ...region.border, period: 1 } });
+    act(() => slider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    act(() => slider.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+  }
+);
 
 it('shows legacy Solid rotation as still without rewriting saved state', () => {
   const region = {
@@ -268,7 +294,7 @@ it('shows legacy Solid rotation as still without rewriting saved state', () => {
   };
   const onChange = vi.fn();
   act(() => root.render(<ReviewBorderAnimation region={region} onChange={onChange} />));
-  expect(field('borderHold').textContent).toContain('gallery.videoReview.borderStill');
+  expect(field('focusReveal', hold()).textContent).toContain('gallery.videoReview.borderStill');
   expect(field('borderSpeed')).toBeNull();
   expect(field('borderSegmentPercent')).toBeNull();
   expect(onChange).not.toHaveBeenCalled();

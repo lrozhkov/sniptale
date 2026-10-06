@@ -56,7 +56,9 @@ export function ReviewBorderInspector(props: {
           onChange({
             ...value,
             style,
-            loop: value.loop && (style !== 'solid' || value.motion === 'pulse'),
+            loop:
+              value.loop &&
+              (style !== 'solid' || value.motion === 'pulse' || value.motion === 'ripple'),
           })
         }
       />
@@ -132,7 +134,14 @@ export function ReviewBorderAnimation(props: {
   const interval = region.sourceAnchor ?? region;
   return (
     <div className="review-inspector-columns">
-      {(['enter', 'exit'] as const).map((phase) => {
+      {(['enter', 'hold', 'exit'] as const).map((phase) => {
+        if (phase === 'hold')
+          return (
+            <fieldset key={phase} className="review-inspector-phase min-w-0 space-y-2">
+              <legend>{translate('gallery.videoReview.borderHold')}</legend>
+              <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
+            </fieldset>
+          );
         const clock = region[phase];
         const reveal = phase === 'enter' ? border.reveal : border.exitReveal;
         return (
@@ -213,9 +222,6 @@ export function ReviewBorderAnimation(props: {
           </fieldset>
         );
       })}
-      <div className="min-w-0 space-y-3">
-        <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
-      </div>
     </div>
   );
 }
@@ -227,13 +233,14 @@ function BorderHold(props: {
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 }) {
   const { border, onChange } = props;
-  const moving = border.loop && (border.style !== 'solid' || border.motion === 'pulse');
+  const rotating = border.motion === 'clockwise' || border.motion === 'counterclockwise';
+  const moving = border.loop && (!rotating || border.style !== 'solid');
   return (
     <>
       <SelectField<QuickEditBorder['motion'] | 'still'>
         className={reviewSelectFieldClassName}
         selectClassName={borderAnimationSelectClassName}
-        label={translate('gallery.videoReview.borderHold')}
+        label={translate('gallery.videoReview.focusReveal')}
         value={moving ? border.motion : 'still'}
         options={[
           { value: 'still', label: translate('gallery.videoReview.borderStill') },
@@ -250,6 +257,7 @@ function BorderHold(props: {
                 },
               ]),
           { value: 'pulse', label: translate('gallery.videoReview.borderPulse') },
+          { value: 'ripple', label: translate('gallery.videoReview.borderRipple') },
         ]}
         onChange={(value) =>
           onChange({
@@ -263,7 +271,7 @@ function BorderHold(props: {
       />
       {moving ? (
         <>
-          {border.motion !== 'pulse' ? (
+          {rotating ? (
             <BorderNumberRow
               label={translate('gallery.videoReview.borderSegmentPercent')}
               min={1}
@@ -283,9 +291,11 @@ function BorderHold(props: {
           <BorderNumberRow
             label={translate('gallery.videoReview.borderSpeed')}
             title={translate(
-              border.motion === 'pulse'
-                ? 'gallery.videoReview.borderPulseSpeedHint'
-                : 'gallery.videoReview.borderRotationSpeedHint'
+              border.motion === 'ripple'
+                ? 'gallery.videoReview.borderRippleSpeedHint'
+                : border.motion === 'pulse'
+                  ? 'gallery.videoReview.borderPulseSpeedHint'
+                  : 'gallery.videoReview.borderRotationSpeedHint'
             )}
             min={0.1}
             max={4}

@@ -459,7 +459,7 @@ it.each(['fixed', 'follow-video'] as const)(
   (zoomBehavior) => {
     vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
       url: 'data:image/svg+xml,header',
-      image: document.createElement('img'),
+      image: { width: 800, height: 86, close: vi.fn() },
       failed: false,
       retry: vi.fn(),
     });
@@ -494,7 +494,7 @@ it.each(['fixed', 'follow-video'] as const)(
 it('recomputes the decorated pan plane and top boundary across header and background switches', () => {
   vi.spyOn(headerPreview, 'useReviewWindowHeader').mockReturnValue({
     url: 'data:image/svg+xml,header',
-    image: document.createElement('img'),
+    image: { width: 800, height: 86, close: vi.fn() },
     failed: false,
     retry: vi.fn(),
   });

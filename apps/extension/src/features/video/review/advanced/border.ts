@@ -42,7 +42,8 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     ('motion' in value &&
       value['motion'] !== 'clockwise' &&
       value['motion'] !== 'counterclockwise' &&
-      value['motion'] !== 'pulse') ||
+      value['motion'] !== 'pulse' &&
+      value['motion'] !== 'ripple') ||
     typeof value['loop'] !== 'boolean' ||
     (value['style'] !== 'solid' && value['style'] !== 'dashed' && value['style'] !== 'dotted') ||
     (value['reveal'] !== 'fade' && value['reveal'] !== 'draw' && value['reveal'] !== 'draw-ccw') ||
@@ -61,7 +62,9 @@ export function parseQuickEditBorder(value: unknown): QuickEditBorder | null {
     // Retain authored history: normalizing this flag can collapse a stored toggle into a no-op.
     loop: value['loop'],
     motion:
-      value['motion'] === 'pulse' || value['motion'] === 'counterclockwise'
+      value['motion'] === 'pulse' ||
+      value['motion'] === 'ripple' ||
+      value['motion'] === 'counterclockwise'
         ? value['motion']
         : 'clockwise',
     style: value['style'],
@@ -158,7 +161,10 @@ function borderPhase(
   const hold = Math.max(0, duration - enterDuration - exitDuration);
   const elapsed = Math.max(0, Math.min(t, duration - exitDuration) - enterDuration);
   const active = border.loop && hold > 0;
-  const rotation = active && border.motion !== 'pulse' && border.style !== 'solid';
+  const rotation =
+    active &&
+    (border.motion === 'clockwise' || border.motion === 'counterclockwise') &&
+    border.style !== 'solid';
   const direction = border.motion === 'counterclockwise' ? -1 : 1;
   const pitch = geometry.width * (border.style === 'dashed' ? 5 : 2);
   const movement = rotation ? direction * elapsed * (2 / border.period) * pitch : 0;
@@ -189,12 +195,20 @@ function borderPhase(
       else opacity *= 1 - p;
     }
   }
+  const ripple = (elapsed / border.period) % 1;
+  const edgeDuration = Math.min(0.2, hold / 2);
+  const rippleEnvelope =
+    active && border.motion === 'ripple' && edgeDuration > 0
+      ? Math.max(0, Math.min(1, elapsed / edgeDuration, (hold - elapsed) / edgeDuration))
+      : 0;
   const offset = Math.floor(start);
   return {
     start: start - offset,
     end: end - offset,
     opacity,
     movement,
+    ripple,
+    rippleOpacity: Math.sin(Math.PI * ripple) * 0.6 * rippleEnvelope,
   };
 }
 
@@ -216,7 +230,7 @@ export function evaluateQuickEditBordersAtTime(args: {
         (a.sourceAnchor?.start ?? a.start) - (b.sourceAnchor?.start ?? b.start) ||
         a.id.localeCompare(b.id)
     )
-    .map((region) => {
+    .flatMap((region) => {
       const border = region.border!;
       const area = {
         x: args.video.x + border.area.x * args.video.width,
@@ -232,13 +246,10 @@ export function evaluateQuickEditBordersAtTime(args: {
         width: Math.max(0, area.width - width),
         height: Math.max(0, area.height - width),
       };
-      const path = quickEditBorderPath(
-        rect,
-        Math.max(0, Math.min(area.width, area.height) * border.roundness - inset),
-        border.style !== 'solid'
-      );
+      const radius = Math.max(0, Math.min(area.width, area.height) * border.roundness - inset);
+      const path = quickEditBorderPath(rect, radius, border.style !== 'solid');
       const phase = borderPhase(region, border, args.time, { width, perimeter: path.perimeter });
-      return {
+      const primary: QuickEditBorderFrame = {
         id: region.id,
         ...path,
         width,
@@ -249,5 +260,28 @@ export function evaluateQuickEditBordersAtTime(args: {
         opacity: phase.opacity,
         dashOffset: 0 - phase.movement,
       };
+      if (phase.rippleOpacity <= 0) return [primary];
+      const spread = phase.ripple * Math.max(12 * args.scale, width * 4);
+      const outline = quickEditBorderPath(
+        {
+          x: rect.x - spread,
+          y: rect.y - spread,
+          width: rect.width + 2 * spread,
+          height: rect.height + 2 * spread,
+        },
+        radius + spread,
+        border.style !== 'solid'
+      );
+      return [
+        primary,
+        {
+          ...primary,
+          ...outline,
+          id: `${region.id}:ripple`,
+          start: 0,
+          end: 1,
+          opacity: phase.rippleOpacity,
+        },
+      ];
     });
 }

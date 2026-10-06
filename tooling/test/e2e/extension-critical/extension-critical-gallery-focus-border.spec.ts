@@ -160,10 +160,12 @@ for (const variant of [
         path: info.outputPath('border-counterclockwise-label.png'),
         fullPage: false,
       });
-      const hold = inspector.getByRole('button', {
-        name: label('gallery.videoReview.borderHold'),
-        exact: true,
-      });
+      const hold = inspector
+        .getByRole('group', { name: label('gallery.videoReview.borderHold'), exact: true })
+        .getByRole('button', {
+          name: label('gallery.videoReview.focusReveal'),
+          exact: true,
+        });
       await hold.click();
       await expect(
         page.getByRole('option', {
@@ -346,6 +348,52 @@ for (const variant of [
       await expect(segmentSize).toHaveValue('65');
       await expect(speed).toHaveValue('0.5');
       await expect(hold).toContainText(label('gallery.videoReview.borderRotateCounterclockwise'));
+      await hold.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.borderRipple'), exact: true })
+        .click();
+      await expect(hold).toContainText(label('gallery.videoReview.borderRipple'));
+      await expect(segmentSize).toHaveCount(0);
+      await button('gallery.videoReview.undo').click();
+      await expect(hold).toContainText(label('gallery.videoReview.borderRotateCounterclockwise'));
+      await button('gallery.videoReview.redo').click();
+      await expect(hold).toContainText(label('gallery.videoReview.borderRipple'));
+      await hold.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('border-ripple-controls.png'),
+        fullPage: false,
+      });
+      if (page.viewportSize()!.width === 1920) {
+        const scroll = dialog.locator('.review-inspector-scroll');
+        const handle = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+        for (const target of [523, 524, 525]) {
+          const contentWidth = () =>
+            scroll.evaluate((node) => {
+              const style = getComputedStyle(node);
+              return (
+                node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+              );
+            });
+          const current = await contentWidth();
+          const box = (await handle.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(box.x + box.width / 2 - (target - current), box.y + box.height / 2);
+          await page.mouse.up();
+          await expect.poll(contentWidth).toBe(target);
+          await hold.scrollIntoViewIfNeeded();
+          await expect(hold).toBeVisible();
+          await page.screenshot({
+            path: info.outputPath(`border-ripple-inspector-${target}.png`),
+            fullPage: false,
+          });
+        }
+      }
+
+      await button('gallery.videoReview.back').click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
+      await expect(hold).toContainText(label('gallery.videoReview.borderRipple'));
       const downloading = page.waitForEvent('download');
       await clickReviewExport(button, 'gallery.videoReview.downloadVideo');
       const download = await downloading;
@@ -466,4 +514,31 @@ test('Focus compositor produces union holes and a partial clockwise Border in Ch
     expect(stroke.partial).toBeGreaterThan(0);
     expect(stroke.full).toBeGreaterThan(stroke.partial * 2);
   }
+});
+
+test('Ripple keeps the original border fixed while an outline expands and fades', async ({
+  page,
+}, info) => {
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/focus-render-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+  });
+  const samples = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      return (await import(url)).probeRipple();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  expect(samples.map((sample: { base: number }) => sample.base)).toEqual([255, 255, 255, 255, 255]);
+  expect(samples.map((sample: { frames: number }) => sample.frames)).toEqual([1, 2, 2, 2, 1]);
+  expect(samples[1].outermost).toBeGreaterThan(samples[2].outermost);
+  expect(samples[2].outermost).toBeGreaterThan(samples[3].outermost);
+  expect(samples[2].echo).toBeGreaterThan(samples[1].echo);
+  expect(samples[2].echo).toBeGreaterThan(samples[3].echo);
+  await page.screenshot({ path: info.outputPath('border-ripple.png'), fullPage: false });
 });

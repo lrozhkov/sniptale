@@ -101,7 +101,12 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Вращение против часовой стрелки',
     en: 'Rotate counterclockwise',
   },
-  borderPulse: { ru: 'Пульсация', en: 'Pulse' },
+  borderPulse: { ru: 'Пульсация цвета', en: 'Color pulse' },
+  borderRipple: { ru: 'Рябь', en: 'Ripple' },
+  borderRippleSpeedHint: {
+    ru: 'При 1× один расходящийся контур появляется каждые 2 секунды видео.',
+    en: 'At 1×, an expanding outline repeats every 2 video seconds.',
+  },
   borderSpeed: { ru: 'Скорость', en: 'Speed' },
   borderRotationSpeedHint: {
     ru: 'При 1× узор сдвигается на один шаг штриха или точки за секунду видео.',

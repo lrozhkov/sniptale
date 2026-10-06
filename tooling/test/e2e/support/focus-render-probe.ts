@@ -228,3 +228,56 @@ function probeBorderStart() {
     return { reveal, samples };
   });
 }
+
+/** Real Canvas pixels distinguish a fixed border from its outward fading echo. */
+export function probeRipple() {
+  const output = { width: 160, height: 160 };
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 160;
+  const context = canvas.getContext('2d')!;
+  const preview = document.createElement('canvas');
+  preview.width = 800;
+  preview.height = 160;
+  document.body.append(preview);
+  const display = preview.getContext('2d')!;
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'ripple', at: 0, duration: 6 }),
+    border: {
+      ...createQuickEditBorder(),
+      motion: 'ripple' as const,
+      loop: true,
+      width: 4,
+      roundness: 0,
+      color: '#ff8800ff',
+      area: { x: 0.25, y: 0.25, width: 0.5, height: 0.5 },
+    },
+    enter: { type: 'linear' as const, duration: 1 },
+    exit: { type: 'linear' as const, duration: 1 },
+  };
+  return [1, 1.5, 2, 2.5, 3].map((time, index) => {
+    context.clearRect(0, 0, 160, 160);
+    const frames = evaluateQuickEditBordersAtTime({
+      regions: [region],
+      time,
+      output,
+      video: { x: 0, y: 0, ...output },
+      scale: 1,
+    });
+    drawReviewBorders(context, output, frames);
+    display.drawImage(canvas, index * 160, 0);
+    const alpha = (y: number) => context.getImageData(80, y, 1, 1).data[3]!;
+    let outermost = 160;
+    for (let y = 0; y < 40; y++)
+      if (alpha(y) > 10) {
+        outermost = y;
+        break;
+      }
+    return {
+      time,
+      base: alpha(41),
+      outermost,
+      echo: alpha(42 - (time - 1) * 8),
+      frames: frames.length,
+    };
+  });
+}
