@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  webcamCircle: { ru: 'Круг', en: 'Circle' },
+  webcamDiameter: { ru: 'Диаметр', en: 'Diameter' },
+  webcamShadow: { ru: 'Тень', en: 'Shadow' },
+  webcamShadowColor: { ru: 'Цвет тени', en: 'Shadow color' },
   webcam: { ru: 'Веб-камера', en: 'Webcam' },
   webcamLayout: { ru: 'Размещение', en: 'Layout' },
   webcamAppearance: { ru: 'Внешний вид', en: 'Appearance' },

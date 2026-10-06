@@ -18,6 +18,8 @@ type FocusAreaProps = {
   /** Transformed decorated window, including the optional header. */
   video: QuickEditRect;
   disabled?: boolean;
+  /** Optional pixel aspect; omitted for freely sized Focus areas. */
+  aspectRatio?: number | undefined;
   /** Inspector framing stays visible; the stage retains interaction-only controls. */
   alwaysVisible?: boolean;
   onInteract?(): void;
@@ -83,7 +85,15 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     const dy = (event.clientY - active.y) / active.height;
     const area = clampQuickEditSpotlightArea(
       active.resize
-        ? resizeSpotlightArea(active.area, active.resize, dx, dy)
+        ? resizeSpotlightArea(
+            active.area,
+            active.resize,
+            dx,
+            dy,
+            props.aspectRatio
+              ? (props.aspectRatio * props.video.height) / props.video.width
+              : undefined
+          )
         : { ...active.area, x: active.area.x + dx, y: active.area.y + dy }
     );
     drag.current!.pending = area;
@@ -173,12 +183,22 @@ function resizeSpotlightArea(
   area: QuickEditSpotlight['area'],
   corner: FocusCorner,
   dx: number,
-  dy: number
+  dy: number,
+  ratio?: number
 ) {
   const west = corner.endsWith('w'),
     north = corner.startsWith('n');
   const right = area.x + area.width,
     bottom = area.y + area.height;
+  if (ratio) {
+    const horizontal = area.width + (west ? -dx : dx);
+    const vertical = (area.height + (north ? -dy : dy)) * ratio;
+    const preferred = Math.abs(dx) >= Math.abs(dy * ratio) ? horizontal : vertical;
+    const maximum = Math.min(west ? right : 1 - area.x, (north ? bottom : 1 - area.y) * ratio);
+    const width = Math.min(maximum, Math.max(Math.max(0.01, 0.01 * ratio), preferred));
+    const height = width / ratio;
+    return { x: west ? right - width : area.x, y: north ? bottom - height : area.y, width, height };
+  }
   const x = west ? Math.max(0, Math.min(right - 0.01, area.x + dx)) : area.x;
   const y = north ? Math.max(0, Math.min(bottom - 0.01, area.y + dy)) : area.y;
   return {

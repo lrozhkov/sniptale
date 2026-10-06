@@ -53,6 +53,8 @@ for (const variant of [
       const overlay = dialog.locator('[data-ui="gallery.videoReview.webcamOverlay"]');
       const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
       await expect(track).toBeVisible();
+      await expect(track).toHaveCSS('height', '40px');
+      await button('gallery.videoReview.compactTrackHeight').click();
       await expect(track).toHaveCSS('height', '28px');
       await expect(inspector).toBeVisible();
       await expect(overlay.getByRole('alert')).toHaveCount(0);
@@ -256,6 +258,104 @@ for (const variant of [
           video.currentTime = 3.7;
         });
       await expect.poll(async () => (await painted())[3]).toBe(255);
+      await button('gallery.videoReview.webcamSettings').click();
+      const shape = inspector.getByRole('button', {
+        name: label('videoEditor.sidebar.cameraShape'),
+        exact: true,
+      });
+      await shape.click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.webcamCircle'), exact: true })
+        .click();
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('videoEditor.sidebar.cameraRoundness'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      const diameter = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamDiameter'),
+        exact: true,
+      });
+      await diameter.fill('30');
+      await diameter.press('Enter');
+      const circle = overlay.getByRole('group', {
+        name: label('gallery.videoReview.webcamSettings'),
+        exact: true,
+      });
+      await expect
+        .poll(async () => {
+          const rect = (await circle.boundingBox())!;
+          return Math.abs(rect.width - rect.height);
+        })
+        .toBeLessThanOrEqual(1);
+      const cameraPixel = async (outside: boolean) => {
+        const box = (await circle.boundingBox())!;
+        return overlay.locator('canvas').evaluate(
+          (canvas, point) => {
+            const rect = canvas.getBoundingClientRect();
+            return [
+              ...canvas
+                .getContext('2d')!
+                .getImageData(
+                  Math.floor(((point.x - rect.x) * canvas.width) / rect.width),
+                  Math.floor(((point.y - rect.y) * canvas.height) / rect.height),
+                  1,
+                  1
+                ).data,
+            ];
+          },
+          { x: outside ? box.x - 3 : box.x + box.width / 2, y: box.y + box.height / 2 }
+        );
+      };
+      await expect.poll(async () => (await cameraPixel(false))[3]).toBe(255);
+      expect((await cameraPixel(true))[3]).toBe(0);
+      const centerBeforeShadow = await cameraPixel(false);
+      const shadow = inspector.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamShadow'),
+        exact: true,
+      });
+      await shadow.fill('60');
+      await shadow.press('Enter');
+      await button('gallery.videoReview.webcamShadowColor').click();
+      const color = page.getByRole('textbox', {
+        name: label('gallery.videoReview.webcamShadowColor'),
+        exact: true,
+      });
+      await color.fill('#123456ff');
+      await color.press('Enter');
+      await page.keyboard.press('Escape');
+      await expect
+        .poll(async () => {
+          const workspace = await readWebcamWorkspace(page);
+          const operation = workspace?.history
+            .slice(0, workspace.cursor)
+            .findLast((item) => item.target === 'advancedContent');
+          return operation?.target === 'advancedContent'
+            ? operation.after.webcam?.shadow?.color
+            : null;
+        })
+        .toBe('#123456ff');
+      await expect.poll(async () => (await cameraPixel(true))[3]).toBeGreaterThan(0);
+      expect(await cameraPixel(false)).toEqual(centerBeforeShadow);
+      await shadow.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('webcam-circle-shadow.png'), fullPage: false });
+      await page.reload();
+      await page.getByRole('button', { name: /: Screen$/ }).click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await button('gallery.videoReview.webcamSettings').click();
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.webcamDiameter'),
+          exact: true,
+        })
+      ).toHaveValue('30');
+      await expect(
+        inspector.getByRole('textbox', {
+          name: label('gallery.videoReview.webcamShadow'),
+          exact: true,
+        })
+      ).toHaveValue('60');
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
@@ -303,24 +403,24 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
         .poll(() =>
           target.evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(' ').length)
         )
-        .toBe(size < 604 ? 1 : 2);
+        .toBe(size < 524 ? 1 : 2);
     };
     for (const fullHeight of [false, true]) {
       if (fullHeight) await button('videoEditor.app.panelFullHeight').click();
-      for (const size of [603, 604, 605]) await resize(sections, size);
+      for (const size of [523, 524, 525]) await resize(sections, size);
       await button('scenario.editor.inspectorShowSections').click();
       await inspector
         .getByRole('button', { name: label('gallery.videoReview.webcamLayout'), exact: true })
         .click();
       const layout = inspector.locator('[data-section="webcam-layout"] .review-inspector-columns');
-      for (const size of [603, 604, 605]) await resize(layout, size);
+      for (const size of [523, 524, 525]) await resize(layout, size);
       await inspector
         .getByRole('button', { name: label('gallery.videoReview.webcamAppearance'), exact: true })
         .click();
       const appearance = inspector.locator(
         '[data-section="webcam-appearance"] .review-inspector-columns'
       );
-      for (const size of [603, 604, 605]) await resize(appearance, size);
+      for (const size of [523, 524, 525]) await resize(appearance, size);
       const select = async (
         key: Parameters<typeof translate>[0],
         option: Parameters<typeof translate>[0]
@@ -373,7 +473,7 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
         fullPage: false,
       });
       await button('scenario.editor.inspectorShowAll').click();
-      await expect(sections.locator(':scope > section')).toHaveCount(3);
+      await expect(sections.locator('.review-inspector-section')).toHaveCount(3);
       await button('gallery.videoReview.webcamDisable').scrollIntoViewIfNeeded();
       await expect(button('gallery.videoReview.webcamDisable')).toBeInViewport();
     }

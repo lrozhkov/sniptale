@@ -12,6 +12,8 @@ const state = vi.hoisted(() => ({
   samples: [] as { close: ReturnType<typeof vi.fn>; draw: ReturnType<typeof vi.fn> }[],
   missing: false,
   stats: vi.fn(),
+  declaredDuration: 3,
+  actualDuration: 3,
 }));
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
@@ -21,6 +23,7 @@ vi.mock('mediabunny', () => ({
     async getPrimaryVideoTrack() {
       return {
         canDecode: async () => true,
+        computeDuration: async () => state.actualDuration,
         getDisplayWidth: async () => 640,
         getDisplayHeight: async () => 480,
         getTimeResolution: async () => 1000,
@@ -28,7 +31,7 @@ vi.mock('mediabunny', () => ({
       };
     }
     async getDurationFromMetadata() {
-      return 3;
+      return state.declaredDuration;
     }
   },
   VideoSampleSink: class {
@@ -62,12 +65,17 @@ const context = () => ({
   beginPath: vi.fn(),
   roundRect: vi.fn(),
   clip: vi.fn(),
+  moveTo: vi.fn(),
+  lineTo: vi.fn(),
+  closePath: vi.fn(),
 });
 beforeEach(() => {
   vi.clearAllMocks();
   state.samples.length = 0;
   state.times.length = 0;
   state.missing = false;
+  state.declaredDuration = 3;
+  state.actualDuration = 3;
   state.stats.mockResolvedValue({ averagePacketRate: 10 });
 });
 
@@ -165,4 +173,41 @@ it('aborts outstanding camera work and rejects subsequent frames', async () => {
   expect(state.samples[0]!.close).toHaveBeenCalledOnce();
   expect(state.disposed).toHaveBeenCalled();
   renderer.dispose();
+});
+
+it.each([1 / 30, 30])(
+  'uses actual video coverage instead of declared container duration %s',
+  async (declared) => {
+    state.declaredDuration = declared;
+    const renderer = await createReviewWebcamRenderer(webcam(), read, new AbortController().signal);
+    const visible: boolean[] = [];
+    for await (const frame of renderer.frames([0, 0.5, 2.5, 3])) visible.push(!!frame);
+    expect(visible).toEqual([true, true, true, false]);
+    expect(state.times).toEqual([0, 0.5, 2.5]);
+    renderer.dispose();
+  }
+);
+
+it('draws a centered pixel circle with a cover crop instead of stretching the camera to an oval', () => {
+  const camera = webcam();
+  camera.appearance.shape = 'circle';
+  const ctx = context();
+  const draw = vi.fn();
+  drawReviewWebcam(
+    ctx as unknown as CanvasRenderingContext2D,
+    { width: 1000, height: 500 },
+    camera,
+    { x: 0.1, y: 0.1, width: 0.4, height: 0.4 },
+    { width: 640, height: 480 },
+    { draw }
+  );
+  expect(ctx.translate).toHaveBeenCalledWith(200, 50);
+  const points = [...ctx.moveTo.mock.calls, ...ctx.lineTo.mock.calls];
+  const extent = (axis: number) =>
+    Math.max(...points.map((point) => point[axis])) -
+    Math.min(...points.map((point) => point[axis]));
+  expect(extent(0)).toBeCloseTo(200);
+  expect(extent(1)).toBeCloseTo(200);
+  expect(draw.mock.calls[0]![3]).toBeCloseTo(800 / 3);
+  expect(draw.mock.calls[0]![4]).toBe(200);
 });

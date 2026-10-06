@@ -8,6 +8,7 @@ import {
   parseQuickEditWebcam,
   quickEditWebcamFrameAt,
   quickEditWebcamPlacementAt,
+  quickEditWebcamBounds,
 } from './webcam';
 
 const camera = () =>
@@ -58,6 +59,11 @@ describe('persisted boundary', () => {
     },
     { positions: Array.from({ length: 513 }, () => ({})) },
     { appearance: { ...camera().appearance, zoom: 5 } },
+    { shadow: { intensity: 101, color: '#000000ff' } },
+    { shadow: { intensity: NaN, color: '#000000ff' } },
+    { shadow: { intensity: 30, color: 'url(https://example.test)' } },
+    { shadow: null },
+    { appearance: { ...camera().appearance, shape: 'circle', zoom: 0 } },
   ])('rejects malformed camera content without dropping it: %j', (patch) => {
     const webcam = { ...camera(), ...patch };
     expect(parseQuickEditWebcam(webcam)).toBeNull();
@@ -161,4 +167,35 @@ it('fits extreme camera aspect ratios inside the complete scene without stretchi
   expect(parseQuickEditWebcam(webcam)).toEqual(webcam);
   expect(webcam.placement.height).toBeCloseTo(0.94);
   expect((webcam.placement.width * 1920) / (webcam.placement.height * 1080)).toBeCloseTo(90 / 1600);
+});
+
+it('roundtrips circle and colored shadow through existing history without changing legacy camera content', () => {
+  const original = createQuickEditAdvancedState();
+  const webcam = {
+    ...camera(),
+    appearance: { ...camera().appearance, shape: 'circle' as const },
+    shadow: { intensity: 45, color: '#12345680' },
+  };
+  const advanced = { ...original, webcam };
+  expect(loadQuickEditAdvancedState(advanced)).toEqual(advanced);
+  const before = reviewAdvancedContentBaseline(original);
+  const after = reviewAdvancedContentBaseline(advanced);
+  const source = { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 };
+  const history = [{ id: 'appearance', at: 1, target: 'advancedContent' as const, before, after }];
+  expect(replayReviewHistory(history, 0, source, before).advancedContent).toEqual(before);
+  expect(replayReviewHistory(history, 1, source, before).advancedContent.webcam).toEqual(webcam);
+  expect(parseQuickEditWebcam(camera())).not.toHaveProperty('shadow');
+});
+
+it.each([
+  { width: 1920, height: 1080 },
+  { width: 600, height: 1000 },
+  { width: 1000, height: 1000 },
+])('keeps circle bounds square in pixels and centered for scene %j', (output) => {
+  const placement = { x: 0.1, y: 0.2, width: 0.4, height: 0.5 };
+  const bounds = quickEditWebcamBounds(placement, output, 'circle');
+  expect(bounds.width * output.width).toBeCloseTo(bounds.height * output.height);
+  expect(bounds.x + bounds.width / 2).toBeCloseTo(placement.x + placement.width / 2);
+  expect(bounds.y + bounds.height / 2).toBeCloseTo(placement.y + placement.height / 2);
+  expect(quickEditWebcamBounds(placement, output, 'ellipse')).toBe(placement);
 });

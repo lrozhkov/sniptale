@@ -1,8 +1,12 @@
 import { ALL_FORMATS, BlobSource, Input, VideoSampleSink } from 'mediabunny';
 import { cameraContentFrame } from '../../features/video/project/camera/appearance';
-import { traceCameraShape } from '../../features/video/composition/draw/media-shadow';
+import {
+  drawMediaFrameShadow,
+  traceCameraShape,
+} from '../../features/video/composition/draw/media-shadow';
 import {
   quickEditWebcamFrameAt,
+  quickEditWebcamBounds,
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
@@ -52,13 +56,30 @@ export function drawReviewWebcam(
   source: Size,
   drawable: WebcamDrawable
 ): void {
+  placement = quickEditWebcamBounds(placement, output, webcam.appearance.shape);
+  const appearance = {
+    ...webcam.appearance,
+    shape: webcam.appearance.shape === 'circle' ? ('ellipse' as const) : webcam.appearance.shape,
+  };
   const width = placement.width * output.width;
   const height = placement.height * output.height;
-  const crop = cameraContentFrame(width, height, source.width, source.height, webcam.appearance);
+  const crop = cameraContentFrame(width, height, source.width, source.height, appearance);
   context.save();
   try {
     context.translate(placement.x * output.width, placement.y * output.height);
-    traceCameraShape(context, { x: 0, y: 0, width, height }, webcam.appearance);
+    if (webcam.shadow?.intensity) {
+      drawMediaFrameShadow(
+        context,
+        webcam.shadow.intensity,
+        undefined,
+        { x: 0, y: 0, width, height },
+        Math.min(output.width, output.height) / 720,
+        appearance,
+        true,
+        webcam.shadow.color
+      );
+    }
+    traceCameraShape(context, { x: 0, y: 0, width, height }, appearance);
     context.clip();
     if (webcam.mirrored) {
       context.translate(width, 0);
@@ -98,7 +119,8 @@ export async function createReviewWebcamRenderer(
     const track = await input.getPrimaryVideoTrack();
     if (!track || !(await track.canDecode()))
       throw new QuickEditExportUnavailable(['asset-missing']);
-    const duration = (await input.getDurationFromMetadata()) ?? (await input.computeDuration());
+    // Container duration can describe only an initial fragment, or outlive the video track.
+    const duration = await track.computeDuration();
     const source = { width: await track.getDisplayWidth(), height: await track.getDisplayHeight() };
     const resolution = await track.getTimeResolution();
     if (

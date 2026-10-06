@@ -1,6 +1,6 @@
 import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { SelectField } from '../../ui/compact-inspector-controls';
+import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
 import { ReviewInspectorSections } from './inspector-sections';
 import { ReviewNumberRow } from './number-row';
 import {
@@ -155,7 +155,6 @@ export function ReviewWebcamInspector({
 
 function WebcamLayout({ editor }: { editor: Editor }) {
   const camera = editor.camera!;
-  const placement = editor.placement!;
   const position = editor.selectedPosition;
   const index = position ? camera.positions.findIndex((item) => item.id === position.id) : -1;
   const updatePosition = (patch: Partial<NonNullable<Editor['selectedPosition']>>) => {
@@ -193,63 +192,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         <span>{translate('gallery.videoReview.webcamAddPosition')}</span>
       </ReviewButton>
       <div className="review-inspector-columns">
-        <div className="space-y-2">
-          <SelectField
-            className={reviewSelectFieldClassName}
-            label={translate('gallery.videoReview.webcamPlacement')}
-            value={placementPreset(placement)}
-            options={[
-              { value: 'custom', label: translate('videoEditor.sidebar.cameraLayoutCustom') },
-              ...(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'full'] as const).map(
-                (id) => ({
-                  value: id,
-                  label: translate(`gallery.videoReview.webcamPlacement_${id}`),
-                })
-              ),
-            ]}
-            onChange={(id) => {
-              if (id === 'full') editor.place({ x: 0, y: 0, width: 1, height: 1 });
-              else if (id !== 'custom') {
-                const width =
-                  placement.width === 1 && placement.height === 1 ? 0.24 : placement.width;
-                const height =
-                  placement.width === 1 && placement.height === 1 ? 0.24 : placement.height;
-                editor.place({
-                  width,
-                  height,
-                  x: id.endsWith('left') ? Math.min(0.03, 1 - width) : Math.max(0, 0.97 - width),
-                  y: id.startsWith('top') ? Math.min(0.03, 1 - height) : Math.max(0, 0.97 - height),
-                });
-              }
-            }}
-          />
-          {(['x', 'y', 'width', 'height'] as const).map((key) => (
-            <ReviewNumberRow
-              key={key}
-              label={translate(`gallery.videoReview.webcam_${key}`)}
-              value={placement[key] * 100}
-              min={key === 'width' || key === 'height' ? 1 : 0}
-              max={
-                key === 'x'
-                  ? (1 - placement.width) * 100
-                  : key === 'y'
-                    ? (1 - placement.height) * 100
-                    : 100
-              }
-              step={0.1}
-              precision={1}
-              unit="%"
-              onChange={(value) => {
-                const next = { ...placement, [key]: value / 100 };
-                editor.place({
-                  ...next,
-                  x: Math.min(next.x, 1 - next.width),
-                  y: Math.min(next.y, 1 - next.height),
-                });
-              }}
-            />
-          ))}
-        </div>
+        <WebcamPlacement editor={editor} />
         {position ? (
           <div className="space-y-2">
             <ReviewNumberRow
@@ -299,9 +242,86 @@ function WebcamLayout({ editor }: { editor: Editor }) {
   );
 }
 
+function WebcamPlacement({ editor }: { editor: Editor }) {
+  const camera = editor.camera!;
+  const placement = editor.placement!;
+  return (
+    <div className="space-y-2">
+      <SelectField
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.webcamPlacement')}
+        value={placementPreset(placement)}
+        options={[
+          { value: 'custom', label: translate('videoEditor.sidebar.cameraLayoutCustom') },
+          ...(['top-left', 'top-right', 'bottom-left', 'bottom-right', 'full'] as const).map(
+            (id) => ({
+              value: id,
+              label: translate(`gallery.videoReview.webcamPlacement_${id}`),
+            })
+          ),
+        ]}
+        onChange={(id) => {
+          if (id === 'full') editor.place({ x: 0, y: 0, width: 1, height: 1 });
+          else if (id !== 'custom') {
+            const width = placement.width === 1 && placement.height === 1 ? 0.24 : placement.width;
+            const height =
+              placement.width === 1 && placement.height === 1 ? 0.24 : placement.height;
+            editor.place({
+              width,
+              height,
+              x: id.endsWith('left') ? Math.min(0.03, 1 - width) : Math.max(0, 0.97 - width),
+              y: id.startsWith('top') ? Math.min(0.03, 1 - height) : Math.max(0, 0.97 - height),
+            });
+          }
+        }}
+      />
+      {(['x', 'y', 'width', 'height'] as const)
+        .filter((key) => camera.appearance.shape !== 'circle' || key !== 'height')
+        .map((key) => (
+          <ReviewNumberRow
+            key={key}
+            label={translate(
+              camera.appearance.shape === 'circle' && key === 'width'
+                ? 'gallery.videoReview.webcamDiameter'
+                : `gallery.videoReview.webcam_${key}`
+            )}
+            value={placement[key] * 100}
+            min={key === 'width' || key === 'height' ? 1 : 0}
+            max={
+              key === 'x'
+                ? (1 - placement.width) * 100
+                : key === 'y'
+                  ? (1 - placement.height) * 100
+                  : camera.appearance.shape === 'circle' && key === 'width'
+                    ? Math.min(1, placement.width / placement.height) * 100
+                    : 100
+            }
+            step={0.1}
+            precision={1}
+            unit="%"
+            onChange={(value) => {
+              const next = { ...placement, [key]: value / 100 };
+              if (camera.appearance.shape === 'circle' && key === 'width')
+                next.height = (next.width * placement.height) / placement.width;
+              editor.place({
+                ...next,
+                x: Math.min(next.x, 1 - next.width),
+                y: Math.min(next.y, 1 - next.height),
+              });
+            }}
+          />
+        ))}
+    </div>
+  );
+}
+
 function WebcamAppearance({ editor }: { editor: Editor }) {
   const camera = editor.camera!;
   const appearance = camera.appearance;
+  const changeShadowColor = (color: string) =>
+    editor.patch({
+      shadow: { intensity: camera.shadow?.intensity ?? 0, color },
+    });
   return (
     <div className="review-inspector-columns">
       <div className="space-y-2">
@@ -313,13 +333,19 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
             { value: 'rounded', label: translate('videoEditor.sidebar.cameraShapeRounded') },
             { value: 'soft', label: translate('videoEditor.sidebar.cameraShapeSoft') },
             { value: 'ellipse', label: translate('videoEditor.sidebar.cameraShapeEllipse') },
+            { value: 'circle', label: translate('gallery.videoReview.webcamCircle') },
           ]}
           onChange={(shape) => {
-            if (shape === 'rounded' || shape === 'soft' || shape === 'ellipse')
+            if (
+              shape === 'rounded' ||
+              shape === 'soft' ||
+              shape === 'ellipse' ||
+              shape === 'circle'
+            )
               editor.patch({ appearance: { ...appearance, shape } });
           }}
         />
-        {appearance.shape !== 'ellipse' ? (
+        {appearance.shape !== 'ellipse' && appearance.shape !== 'circle' ? (
           <ReviewNumberRow
             label={translate('videoEditor.sidebar.cameraRoundness')}
             value={appearance.roundness}
@@ -367,6 +393,32 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
             }
           />
         ))}
+      </div>
+      <div className="space-y-2">
+        <ReviewNumberRow
+          label={translate('gallery.videoReview.webcamShadow')}
+          value={camera.shadow?.intensity ?? 0}
+          min={0}
+          max={100}
+          step={1}
+          unit="%"
+          onChange={(intensity) =>
+            editor.patch({
+              shadow: {
+                color: camera.shadow?.color ?? '#000000ff',
+                intensity,
+              },
+            })
+          }
+        />
+        <ColorField
+          label={translate('gallery.videoReview.webcamShadowColor')}
+          title={translate('gallery.videoReview.webcamShadowColor')}
+          value={camera.shadow?.color ?? '#000000ff'}
+          onChange={changeShadowColor}
+          onPreviewChange={changeShadowColor}
+          onPreviewReset={changeShadowColor}
+        />
       </div>
     </div>
   );

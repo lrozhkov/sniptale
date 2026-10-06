@@ -113,6 +113,8 @@ export async function seedWebcamComposition(page: Page) {
       },
       webcam: {
         ...before.webcam,
+        appearance: { ...before.webcam.appearance, shape: 'circle' },
+        shadow: { intensity: 60, color: '#123456ff' },
         offsetSeconds: 1,
         placement: { x: 0.73, y: 0.73, width: 0.24, height: 0.24 },
         positions: [

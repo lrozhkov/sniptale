@@ -209,3 +209,32 @@ it.each(['rounded', 'soft', 'ellipse'] as const)(
     expect(mask.restore).toHaveBeenCalledTimes(3);
   }
 );
+
+it('applies the authored color and intensity to an exterior-only camera shadow', () => {
+  const context = createContext();
+  context.globalAlpha = 1;
+  const mask = context.__maskContext;
+  Object.assign(mask, {
+    fill: vi.fn(),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    moveTo: vi.fn(),
+    lineTo: vi.fn(),
+    closePath: vi.fn(),
+  });
+  drawMediaFrameShadow(
+    context,
+    40,
+    undefined,
+    { x: 0, y: 0, width: 100, height: 100 },
+    1,
+    { shape: 'ellipse', roundness: 0, zoom: 1, panX: 0, panY: 0 },
+    true,
+    '#11223380'
+  );
+  expect(mask.shadowColor).toBe('#11223380');
+  expect(context.globalAlpha).toBe(0.4);
+  expect(mask.globalCompositeOperation).toBe('destination-out');
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  expect(context.fillRect).not.toHaveBeenCalled();
+});

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import {
   quickEditWebcamFrameAt,
+  quickEditWebcamBounds,
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
@@ -87,7 +88,12 @@ export function ReviewWebcamOverlay(props: {
       ) : null}
       {frame && ready && !disabled ? (
         <ReviewFocusArea
-          area={placement ?? frame.placement}
+          area={quickEditWebcamBounds(
+            placement ?? frame.placement,
+            props.output,
+            settings.appearance.shape
+          )}
+          aspectRatio={settings.appearance.shape === 'circle' ? 1 : undefined}
           output={props.output}
           video={{ x: 0, y: 0, width: props.output.width, height: props.output.height }}
           label={translate('gallery.videoReview.webcamSettings')}

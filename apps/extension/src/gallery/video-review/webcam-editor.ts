@@ -3,6 +3,7 @@ import {
   createQuickEditWebcam,
   parseQuickEditWebcam,
   quickEditWebcamPlacementAt,
+  quickEditWebcamBounds,
   type QuickEditWebcam,
   type QuickEditWebcamPlacement,
 } from '../../features/video/review/advanced/webcam';
@@ -79,7 +80,11 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
   const hidden = camera?.hiddenRanges.find(
     (item) => args.selection.kind === 'webcam-hidden' && item.id === args.selection.id
   );
-  const placement = selectedPosition?.placement ?? camera?.placement;
+  const authoredPlacement = selectedPosition?.placement ?? camera?.placement;
+  const placement =
+    camera && authoredPlacement
+      ? quickEditWebcamBounds(authoredPlacement, args.scene, camera.appearance.shape)
+      : undefined;
   const canHide = (range: { start: number; end: number }, replace = false) =>
     !!camera &&
     range.start >= 0 &&

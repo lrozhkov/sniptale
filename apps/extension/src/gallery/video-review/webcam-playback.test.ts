@@ -170,7 +170,7 @@ it('does not seek an aligned running decoder just because its frame callback is 
   main.state.time = 1.18;
   camera.state.time = 1.18;
   tick();
-  expect(paint).toHaveBeenLastCalledWith(null);
+  expect(paint.mock.lastCall?.[0]?.time).toBe(1);
   expect(camera.seeks).toHaveLength(seeks);
   expect(camera.state.paused).toBe(false);
   camera.decode(1.18);
@@ -178,7 +178,7 @@ it('does not seek an aligned running decoder just because its frame callback is 
   expect(paint.mock.lastCall?.[0]?.time).toBe(1.18);
 });
 
-it('keeps two presentation frames visible at 2x but hides a stalled frame and stays strict when paused', () => {
+it('bridges short presentation jitter but hides sustained stalls and stays strict when paused', () => {
   const { main, camera, paint } = setup();
   main.state.paused = false;
   main.state.rate = 2;
@@ -194,6 +194,9 @@ it('keeps two presentation frames visible at 2x but hides a stalled frame and st
   main.state.time = 1.18;
   camera.state.time = 1.18;
   tick();
+  expect(paint.mock.lastCall?.[0]?.time).toBe(1.1);
+  main.state.time = 1.7;
+  tick(260);
   expect(paint).toHaveBeenLastCalledWith(null);
   camera.decode(1.1);
   main.state.paused = true;
@@ -343,4 +346,42 @@ it('waits for a frame delivered after seeked instead of continually restarting t
   camera.decode(2);
   tick();
   expect(paint.mock.lastCall?.[0]?.time).toBe(2);
+});
+
+it('clears a retained jitter frame immediately on an explicit main seek', () => {
+  const { main, camera, paint } = setup();
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  main.state.time = 1.1;
+  camera.state.time = 1.1;
+  tick();
+  expect(paint.mock.lastCall?.[0]).not.toBeNull();
+  main.node.dispatchEvent(new Event('seeking'));
+  expect(paint).toHaveBeenLastCalledWith(null);
+});
+
+it('retains the accepted raster during a brief camera decoder underflow', () => {
+  const { main, camera, paint } = setup();
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  camera.state.ready = 1;
+  main.state.time = 1.08;
+  tick();
+  expect(paint.mock.lastCall?.[0]?.time).toBe(1);
+  main.state.time = 1.4;
+  tick(260);
+  expect(paint).toHaveBeenLastCalledWith(null);
+  camera.state.ready = 2;
+  camera.state.time = 1.4;
+  camera.decode(1.4);
+  tick();
+  expect(paint.mock.lastCall?.[0]?.time).toBe(1.4);
 });

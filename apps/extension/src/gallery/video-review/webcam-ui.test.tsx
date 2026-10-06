@@ -139,6 +139,13 @@ it('edits camera placement, appearance and signed timing through inspector contr
   expect(editor.addPosition).toHaveBeenCalledOnce();
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeEllipse');
   expect(field('videoEditor.sidebar.cameraRoundness')).toBeNull();
+  await choose('videoEditor.sidebar.cameraShape', label('webcamCircle'));
+  expect(field('videoEditor.sidebar.cameraRoundness')).toBeNull();
+  expect(field(label('webcam_height'))).toBeNull();
+  await enter(label('webcamDiameter'), '30');
+  expect(editor.placement!.width).toBe(0.3);
+  await enter(label('webcamShadow'), '60');
+  expect(editor.camera?.shadow).toEqual({ intensity: 60, color: '#000000ff' });
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
   await enter('videoEditor.sidebar.cameraRoundness', '35');
   await choose('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeRounded');

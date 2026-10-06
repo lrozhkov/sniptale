@@ -16,7 +16,8 @@ type PlaybackArgs = {
 
 /**
  * Reconciles one muted native decoder with the main source clock. Camera events
- * never advance main time; late decoded frames remain invisible until they match.
+ * never advance main time. Brief presentation jitter retains the last accepted raster;
+ * seeks, visibility boundaries and sustained drift clear it.
  */
 export function createReviewWebcamPlayback(args: PlaybackArgs) {
   const { main, camera } = args;
@@ -25,17 +26,17 @@ export function createReviewWebcamPlayback(args: PlaybackArgs) {
   let callback = 0;
   let generation = 0;
   let decoded: number | null = null;
+  const raster = createWebcamRaster(args.paint);
+  const clear = raster.clear;
   const frameDuration = args.frameDuration ?? 1 / 30;
   let seeking = false;
   let requestedTime: number | null = null;
   let seekStarted = 0;
   let seekLatency = 0;
-  let waiting = false;
-  let lastMainTime = main.currentTime;
-  let lastMainAdvance = performance.now();
   const hasFrameCallback = typeof camera.requestVideoFrameCallback === 'function';
   const transport = createWebcamTransport(camera, args.failed);
   const { play, pause } = transport;
+  const clock = createSourcePlaybackClock(main, pause);
   const requestFrame = () => {
     if (!hasFrameCallback || disposed) return;
     const expected = generation;
@@ -59,17 +60,17 @@ export function createReviewWebcamPlayback(args: PlaybackArgs) {
   const reconcile = () => {
     if (disposed) return;
     const now = performance.now();
-    if (main.currentTime !== lastMainTime) {
-      lastMainTime = main.currentTime;
-      lastMainAdvance = now;
-    }
-    const frame = quickEditWebcamFrameAt(args.settings(), main.currentTime, camera.duration);
-    const running =
-      !main.paused && !main.ended && !main.seeking && !waiting && now - lastMainAdvance < 100;
+    const settings = args.settings();
+    const frame = quickEditWebcamFrameAt(settings, main.currentTime, camera.duration);
+    const running = clock.running(now);
+    const bridge = running && frame && raster.canRetain(frame, settings, now, main.playbackRate);
     if (!running) pause();
-    if (!frame || camera.readyState < 2 || main.seeking) {
+    if (!frame || main.seeking) {
       pause();
-      args.paint(null);
+      clear();
+    } else if (camera.readyState < 2) {
+      pause();
+      if (!bridge) clear();
     } else {
       camera.playbackRate = main.playbackRate;
       const tolerance = frameDuration * 2;
@@ -84,10 +85,10 @@ export function createReviewWebcamPlayback(args: PlaybackArgs) {
         Math.abs(represented - frame.time) <= presentationTolerance;
       if (ready) {
         requestedTime = null;
-        args.paint(frame);
+        raster.paint(frame, settings, now);
         if (running) play();
       } else {
-        args.paint(null);
+        if (!bridge) clear();
         if (
           running &&
           !seeking &&
@@ -119,27 +120,22 @@ export function createReviewWebcamPlayback(args: PlaybackArgs) {
     seeking = false;
     if (!hasFrameCallback) decoded = camera.currentTime;
   };
-  const onWaiting = () => {
-    waiting = true;
-    pause();
-  };
-  const onPlaying = () => {
-    waiting = false;
-    lastMainAdvance = performance.now();
-  };
   const onPause = () => pause();
+  const onSeeking = () => {
+    pause();
+    clear();
+  };
   const onError = () => {
     pause();
-    args.paint(null);
+    clear();
     args.failed();
   };
-  camera.addEventListener('seeked', onSeeked);
-  camera.addEventListener('error', onError);
-  main.addEventListener('waiting', onWaiting);
-  main.addEventListener('playing', onPlaying);
-  main.addEventListener('pause', onPause);
-  main.addEventListener('seeking', onPause);
-  main.addEventListener('ended', onPause);
+  const events = new AbortController();
+  camera.addEventListener('seeked', onSeeked, { signal: events.signal });
+  camera.addEventListener('error', onError, { signal: events.signal });
+  main.addEventListener('pause', onPause, { signal: events.signal });
+  main.addEventListener('seeking', onSeeking, { signal: events.signal });
+  main.addEventListener('ended', onPause, { signal: events.signal });
   requestFrame();
   animation = requestAnimationFrame(reconcile);
   return () => {
@@ -147,13 +143,8 @@ export function createReviewWebcamPlayback(args: PlaybackArgs) {
     generation++;
     cancelAnimationFrame(animation);
     if (hasFrameCallback) camera.cancelVideoFrameCallback(callback);
-    camera.removeEventListener('seeked', onSeeked);
-    camera.removeEventListener('error', onError);
-    main.removeEventListener('waiting', onWaiting);
-    main.removeEventListener('playing', onPlaying);
-    main.removeEventListener('pause', onPause);
-    main.removeEventListener('seeking', onPause);
-    main.removeEventListener('ended', onPause);
+    events.abort();
+    clock.dispose();
     transport.dispose();
   };
 }
@@ -188,5 +179,62 @@ function createWebcamTransport(camera: HTMLVideoElement, failed: () => void) {
       disposed = true;
       pause();
     },
+  };
+}
+
+/** Owns the bounded lifetime of the last accepted presentation raster. */
+function createWebcamRaster(paint: PlaybackArgs['paint']) {
+  let accepted: { at: number; time: number; settings: QuickEditWebcam } | null = null;
+  return {
+    clear() {
+      accepted = null;
+      paint(null);
+    },
+    paint(frame: Frame, settings: QuickEditWebcam, now: number) {
+      accepted = { at: now, time: frame.time, settings };
+      paint(frame);
+    },
+    canRetain(frame: Frame, settings: QuickEditWebcam, now: number, rate: number) {
+      return (
+        accepted?.settings === settings &&
+        now - accepted.at <= 250 &&
+        frame.time >= accepted.time &&
+        frame.time - accepted.time <= 0.25 * Math.max(1, rate)
+      );
+    },
+  };
+}
+
+/** Tracks whether the authoritative source clock is actually advancing. */
+function createSourcePlaybackClock(main: HTMLVideoElement, pause: () => void) {
+  let waiting = false;
+  let time = main.currentTime;
+  let advanced = performance.now();
+  const events = new AbortController();
+  main.addEventListener(
+    'waiting',
+    () => {
+      waiting = true;
+      pause();
+    },
+    { signal: events.signal }
+  );
+  main.addEventListener(
+    'playing',
+    () => {
+      waiting = false;
+      advanced = performance.now();
+    },
+    { signal: events.signal }
+  );
+  return {
+    running(now: number) {
+      if (main.currentTime !== time) {
+        time = main.currentTime;
+        advanced = now;
+      }
+      return !main.paused && !main.ended && !main.seeking && !waiting && now - advanced < 100;
+    },
+    dispose: () => events.abort(),
   };
 }
