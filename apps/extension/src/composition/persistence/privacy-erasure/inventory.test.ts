@@ -47,6 +47,7 @@ it('preserves preferences and AI provider secrets for the default delete-data mo
   expect(plan.local).not.toContain(AI_PROVIDER_SECRETS_KEY);
   expect(plan.local).not.toContain(AI_LOCAL_SECRET_KEY_STORAGE_KEY);
   expect(plan.local).toContain('llm_request_history');
+  expect(plan.local).toContain('sniptale_export_time_history');
   expect(plan.local).toContain('sniptale_prompt_templates');
   expect(plan.local).toContain('sniptale.gallery.command-palette');
   expect(plan.local).toContain('sniptale.settings.command-palette');

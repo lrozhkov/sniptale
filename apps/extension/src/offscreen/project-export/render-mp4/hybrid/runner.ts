@@ -235,7 +235,9 @@ export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs
       ? { ...item, cost: 1, route: 'clean' }
       : { ...item, route: span?.kind === 'accelerated-composite' ? 'accelerated' : 'composite' };
   });
-  args.job.timeEstimator = createExportTimeEstimator(workPlan);
+  if (args.job.timeEstimator) args.job.timeEstimator.replacePlan(workPlan);
+  else args.job.timeEstimator = createExportTimeEstimator(workPlan);
+  args.job.timeEstimator.resume();
   const applyCompositeFallback = (span: Mp4VideoRenderSpan) => {
     for (const [index, item] of workPlan.entries()) {
       if (item.start >= span.start && item.start < span.end)

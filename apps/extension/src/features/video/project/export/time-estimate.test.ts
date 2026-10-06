@@ -133,3 +133,27 @@ it('dilutes one slow initialization frame instead of retaining its per-frame rat
   expect(remaining).toBeGreaterThan(3500);
   expect(remaining).toBeLessThan(6000);
 });
+
+it('applies the optional calibration to snapshots and forwards warmup and completion nulls', () => {
+  let clock = 0;
+  const seen: Array<number | null> = [];
+  const estimator = createExportTimeEstimator(
+    [{ start: 0, end: 4, cost: 1 }],
+    () => clock,
+    (raw) => {
+      seen.push(raw?.remainingMs ?? null);
+      return raw ? { remainingMs: raw.remainingMs * 1.2 } : null;
+    }
+  );
+  expect(estimator.snapshot()).toBeNull();
+  for (let i = 1; i <= 3; i++) {
+    clock += 1000;
+    estimator.observe(i);
+  }
+  expect(estimator.snapshot()?.remainingMs).toBeCloseTo(1200);
+  clock += 1000;
+  expect(estimator.observe(4)).toBeNull();
+  expect(seen[0]).toBeNull();
+  expect(seen).toContain(1000);
+  expect(seen.at(-1)).toBeNull();
+});

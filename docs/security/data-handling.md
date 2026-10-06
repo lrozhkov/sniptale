@@ -37,6 +37,8 @@ Raw voice transcripts and recognition results are session-only. Send them only t
 
 LLM request history may retain only timestamp, model ID, request kind, result count, status, and fixed error code. Normalize legacy prompt-bearing records before returning them. Before model egress, disclose the provider, model, prompt inclusion, page-data classes, and metadata-only history.
 
+Export-time calibration retains only numeric prediction-error ratios, completion timestamps and constrained codec/render-profile buckets in local browser storage under `sniptale_export_time_history`. The advisory owner keeps at most 100 observations, ten per profile, for 30 days. It excludes media, filenames, project identities, content and device fingerprints, and is excluded from sync, backup, export, diagnostics and traces. Reads do not renew retention or repair storage. Only successful rendering records an observation; unavailable storage or coordination discards it. Abort checks and nonqueued persistence permits protect writes during local-data erasure, whose inventory removes and verifies the key even when preferences are preserved.
+
 ## Network egress
 
 - Resolve AI secrets and build authorization headers only in the registered background transport.

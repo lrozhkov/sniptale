@@ -1,3 +1,8 @@
+import { createExportTimeHistory } from '../../composition/persistence/export-time-history';
+import {
+  createExportTimeCalibration,
+  createExportTimeProfile,
+} from '../../features/video/project/export/time-calibration';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { summarizeRecordingMetadata } from '../../features/media-hub/recording-metadata';
 import { createOutputFilename } from '../file-naming/index';
@@ -110,6 +115,48 @@ async function buildReviewExportClipPlan(args: {
       ? { originalRanges: args.advanced.audio.original.ranges }
       : {}),
     originalMuted: args.advanced.audio.original.muted,
+  };
+}
+
+/** Timing history observes renderer success, independently of the publication transaction. */
+function createReviewExportTiming(
+  outputProfile: ReturnType<typeof resolveReviewOutputProfile>,
+  index: ReviewMediaIndex,
+  advanced: QuickEditAdvancedState,
+  renderSettings: ReviewRenderSettings | undefined,
+  rendering: boolean,
+  signal: AbortSignal,
+  report: ((estimate: VideoProjectExportTimeEstimate | null) => void) | undefined
+) {
+  const calibration = createExportTimeCalibration();
+  const history = createExportTimeHistory();
+  const effective = resolveQuickEditEffectiveState(advanced);
+  const profile = createExportTimeProfile({
+    editor: 'review',
+    route: rendering ? 'render' : 'copy',
+    container: outputProfile.format,
+    codec: rendering ? (outputProfile.codec ?? index.videoCodec) : index.videoCodec,
+    width: outputProfile.width,
+    height: outputProfile.height,
+    fps: outputProfile.fps,
+    quality: renderSettings?.quality ?? 'HIGH',
+    complexity:
+      1 +
+      (effective.zoomRegions.some((region) => region.spotlight?.effect === 'blur') ? 1 : 0) +
+      (effective.webcam ? 1 : 0),
+  });
+  void history
+    .read(profile, signal)
+    .then((ratios) => {
+      if (!signal.aborted) calibration.setHistory(ratios);
+    })
+    .catch(() => undefined);
+  return {
+    onTimeEstimate: (raw: VideoProjectExportTimeEstimate | null) =>
+      report?.(calibration.estimate(raw)),
+    finish: () => {
+      void history.record(profile, calibration.finish(), signal).catch(() => undefined);
+    },
   };
 }
 
@@ -227,6 +274,15 @@ export async function exportReviewedVideo(
   const writer = await deps.createSeekableAssetObjectWriter({
     mimeType: `video/${outputProfile.format}`,
   });
+  const timing = createReviewExportTiming(
+    outputProfile,
+    index,
+    advanced,
+    renderSettings,
+    plan.video === 'render',
+    signal,
+    args.onTimeEstimate
+  );
   let publishing = false;
   try {
     const packetReceipt =
@@ -247,7 +303,7 @@ export async function exportReviewedVideo(
             readProjectAsset: deps.readProjectAsset,
             ...(exportAudio ? { exportAudio } : {}),
             ...(args.onProgress ? { onProgress: args.onProgress } : {}),
-            ...(args.onTimeEstimate ? { onTimeEstimate: args.onTimeEstimate } : {}),
+            ...(args.onTimeEstimate ? { onTimeEstimate: timing.onTimeEstimate } : {}),
           })
         : await deps.writeReviewPackets({
             file: original.file,
@@ -258,9 +314,10 @@ export async function exportReviewedVideo(
             provenance,
             ...(exportAudio ? { exportAudio } : {}),
             ...(args.onProgress ? { onProgress: args.onProgress } : {}),
-            ...(args.onTimeEstimate ? { onTimeEstimate: args.onTimeEstimate } : {}),
+            ...(args.onTimeEstimate ? { onTimeEstimate: timing.onTimeEstimate } : {}),
           });
     signal.throwIfAborted();
+    timing.finish();
     args.onTimeEstimate?.(null);
     const prepared = await writer.finalize();
     const file = await deps.readAssetFile(prepared.ref, filename);

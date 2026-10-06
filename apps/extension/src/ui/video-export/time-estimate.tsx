@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatDateTime, formatNumber, translate, useAppLocale } from '../../platform/i18n';
 import type { AppLocale } from '../../platform/i18n';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
@@ -49,7 +49,42 @@ function completionLabel(remainingMs: number, locale: AppLocale): string | null 
   }
 }
 
-/** Disposable local display clock; only the export producer estimates the remaining work. */
+interface ForecastClock {
+  deadline: number;
+  updatedAt: number;
+  upwardSince: number | null;
+  samples: { at: number; deadline: number }[];
+}
+
+/** Smooth deadlines, not remaining durations: elapsed time must not become forecast noise. */
+function advanceForecast(
+  clock: ForecastClock,
+  now: number,
+  deadline: number | null
+): ForecastClock {
+  const samples = clock.samples.filter((sample) => now - sample.at < 8000);
+  if (deadline !== null) samples.push({ at: now, deadline });
+  const ordered = samples.map((sample) => sample.deadline).sort((left, right) => left - right);
+  const middle = Math.floor(ordered.length / 2);
+  const target = ordered.length
+    ? ordered.length % 2
+      ? ordered[middle]!
+      : (ordered[middle - 1]! + ordered[middle]!) / 2
+    : clock.deadline;
+  const difference = target - clock.deadline;
+  const upwardSince = difference > 2000 ? (clock.upwardSince ?? now) : null;
+  // A delayed/background timer must not spend a large correction budget in one visible jump.
+  const elapsed = Math.min(1000, Math.max(0, now - clock.updatedAt));
+  const correction =
+    difference < -2000
+      ? Math.max(difference, -elapsed * 2)
+      : upwardSince !== null && now - upwardSince >= 3000
+        ? Math.min(difference, elapsed * 2)
+        : 0;
+  return { deadline: clock.deadline + correction, updatedAt: now, upwardSince, samples };
+}
+
+/** Disposable display policy shared by both editors; no additional encoding or storage. */
 export function VideoExportTimeHint({
   estimate,
   active,
@@ -60,20 +95,49 @@ export function VideoExportTimeHint({
   finishing?: boolean;
 }) {
   const locale = useAppLocale();
-  const sample = useMemo(
-    () => ({ estimate: active ? estimate : null, receivedAt: performance.now() }),
-    [estimate, active]
-  );
-  const [, tick] = useState(0);
+  const clock = useRef<ForecastClock | null>(null);
+  const pending = useRef<number | null>(null);
+  const [remaining, setRemaining] = useState(NaN);
+  const enabled = active && !finishing && !!estimate;
   useEffect(() => {
-    if (!active || finishing || !estimate) return;
-    const timer = setInterval(() => tick((value) => value + 1), 1000);
+    const now = performance.now();
+    const duration = estimate?.remainingMs;
+    if (!enabled || !Number.isFinite(now) || !Number.isFinite(duration) || !(duration! > 0)) {
+      clock.current = null;
+      pending.current = null;
+      setRemaining(NaN);
+      return;
+    }
+    pending.current = now + duration!;
+    if (!clock.current || clock.current.deadline <= now) {
+      clock.current = {
+        deadline: pending.current,
+        updatedAt: now,
+        upwardSince: null,
+        samples: [{ at: now, deadline: pending.current }],
+      };
+      pending.current = null;
+      setRemaining(duration!);
+    }
+  }, [enabled, estimate]);
+  useEffect(() => {
+    if (!enabled) return;
+    const timer = setInterval(() => {
+      const now = performance.now();
+      if (!clock.current || !Number.isFinite(now) || now < clock.current.updatedAt) {
+        setRemaining(NaN);
+        return;
+      }
+      if (now - clock.current.updatedAt >= 1000) {
+        clock.current = advanceForecast(clock.current, now, pending.current);
+        pending.current = null;
+      }
+      setRemaining(clock.current.deadline - now);
+    }, 1000);
     return () => clearInterval(timer);
-  }, [active, finishing, estimate]);
+  }, [enabled]);
   if (!active || finishing) return null;
-  const elapsed = performance.now() - sample.receivedAt;
-  const remaining = sample.estimate ? sample.estimate.remainingMs - Math.max(0, elapsed) : NaN;
-  const valid = Number.isFinite(remaining) && remaining > 0 && Number.isFinite(elapsed);
+  const valid = Number.isFinite(remaining) && remaining > 0;
   const completion = valid ? completionLabel(remaining, locale) : null;
   return (
     <div

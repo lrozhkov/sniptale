@@ -60,6 +60,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/editor-presets`
 - `apps/extension/src/composition/persistence/effect-bundles`
 - `apps/extension/src/composition/persistence/export-ledger`
+- `apps/extension/src/composition/persistence/export-time-history`
 - `apps/extension/src/composition/persistence/frame-annotation-raster-jobs`
 - `apps/extension/src/composition/persistence/gallery-saved-views`
 - `apps/extension/src/composition/persistence/gradient-presets`

@@ -1,4 +1,4 @@
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import {
   VideoExportFormat,
@@ -9,17 +9,25 @@ import {
 import type { ExportJobState } from './types';
 
 const {
+  historyReadMock,
+  historyRecordMock,
   finalizeExportMock,
   preloadClipVideosMock,
   renderCompositeToMp4Mock,
   renderCompositeToWebmMock,
   sendProgressMock,
 } = vi.hoisted(() => ({
+  historyReadMock: vi.fn(async (): Promise<readonly number[]> => []),
+  historyRecordMock: vi.fn(async () => undefined),
   finalizeExportMock: vi.fn(),
   preloadClipVideosMock: vi.fn(),
   renderCompositeToMp4Mock: vi.fn(),
   renderCompositeToWebmMock: vi.fn(),
   sendProgressMock: vi.fn(),
+}));
+
+vi.mock('../../composition/persistence/export-time-history', () => ({
+  createExportTimeHistory: () => ({ read: historyReadMock, record: historyRecordMock }),
 }));
 
 vi.mock('./media', async (importOriginal) => ({
@@ -116,6 +124,11 @@ function createDocumentStub(context: object | null) {
     }),
   };
 }
+
+beforeEach(() => {
+  historyReadMock.mockReset().mockResolvedValue([]);
+  historyRecordMock.mockReset().mockResolvedValue(undefined);
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -221,7 +234,7 @@ it('owns a fresh estimator for the selected range of each actual export', async 
       clock += 1000;
       job.timeEstimator?.observe(4 + i / 2);
     }
-    expect(job.timeEstimator?.snapshot()?.remainingMs).toBeCloseTo(5000);
+    expect(job.timeEstimator?.snapshot()?.remainingMs).toBeCloseTo(5625);
     return new Blob(['mp4'], { type: 'video/mp4' });
   });
   await renderCompositeExport(job, project, settings, {});
@@ -229,3 +242,77 @@ it('owns a fresh estimator for the selected range of each actual export', async 
   await renderCompositeExport(job, project, settings, {});
   expect(job.timeEstimator).not.toBe(first);
 });
+
+it('starts rendering while history is pending and records the raw error without the reserve', async () => {
+  const { renderCompositeExport } = await import('./render');
+  let clock = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => clock);
+  vi.stubGlobal('document', createDocumentStub({}));
+  const job = createJob();
+  historyReadMock.mockReturnValue(new Promise(() => undefined));
+  renderCompositeToMp4Mock.mockImplementation(async () => {
+    for (let i = 1; i <= 3; i++) {
+      clock += 1000;
+      job.timeEstimator?.observe(i);
+    }
+    expect(job.timeEstimator?.snapshot()?.remainingMs).toBeCloseTo(1050);
+    clock = 4000;
+    job.timeEstimator?.observe(4);
+    return new Blob(['mp4']);
+  });
+  await renderCompositeExport(
+    job,
+    { ...createEmptyVideoProject('ETA'), duration: 4 },
+    createSettings(),
+    {}
+  );
+  expect(renderCompositeToMp4Mock).toHaveBeenCalledOnce();
+  expect(historyRecordMock).toHaveBeenCalledWith(
+    expect.stringContaining('project-render-'),
+    [1],
+    expect.any(AbortSignal)
+  );
+});
+
+it.each(['failure', 'cancelled', 'aborted'] as const)(
+  'never trains on a %s render or applies history after abort',
+  async (outcome) => {
+    const { renderCompositeExport } = await import('./render');
+    let clock = 0;
+    let resolveHistory!: (ratios: readonly number[]) => void;
+    historyReadMock.mockReturnValue(
+      new Promise((resolve) => {
+        resolveHistory = resolve;
+      })
+    );
+    vi.spyOn(performance, 'now').mockImplementation(() => clock);
+    vi.stubGlobal('document', createDocumentStub({}));
+    const job = createJob();
+    renderCompositeToMp4Mock.mockImplementation(async () => {
+      for (let i = 1; i <= 3; i++) {
+        clock += 1000;
+        job.timeEstimator?.observe(i);
+      }
+      const before = job.timeEstimator?.snapshot();
+      if (outcome === 'failure') throw new Error('render failed');
+      if (outcome === 'cancelled') job.cancelled = true;
+      else {
+        job.exportAbortController?.abort();
+        resolveHistory(Array(10).fill(4));
+        await Promise.resolve();
+        expect(job.timeEstimator?.snapshot()).toEqual(before);
+      }
+      return new Blob(['mp4']);
+    });
+    await expect(
+      renderCompositeExport(
+        job,
+        { ...createEmptyVideoProject('ETA'), duration: 4 },
+        createSettings(),
+        {}
+      )
+    ).rejects.toThrow();
+    expect(historyRecordMock).not.toHaveBeenCalled();
+    expect(finalizeExportMock).not.toHaveBeenCalled();
+  }
+);

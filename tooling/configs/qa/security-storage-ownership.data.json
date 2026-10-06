@@ -267,6 +267,20 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/export-time-history/index.ts",
+      "owner": "export-time-history",
+      "justification": "Bounded local advisory numeric export-time calibration history.",
+      "reviewNote": "At most 100 observations, ten per constrained non-identifying profile, 30 days; no media, names, IDs, content or device fingerprints. Excluded from sync, backup, export and diagnostics. Read operations do not write. Successful rendering only; abort-aware nonqueued mutation permits and cross-context locks prevent pending erasure writes. Verified local-data erasure removes the exact key.",
+      "storageWrites": [
+        {
+          "sink": "browserStorage.local.set",
+          "keys": [
+            "EXPORT_TIME_HISTORY_KEY"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [

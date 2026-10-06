@@ -41,7 +41,10 @@ export function planExportTimeWork(
 /** Learns this export's throughput from elapsed producer time, including codec backpressure. */
 export function createExportTimeEstimator(
   initialPlan: readonly ExportTimeWorkInterval[],
-  now: () => number = () => performance.now()
+  now: () => number = () => performance.now(),
+  transform: (
+    raw: VideoProjectExportTimeEstimate | null
+  ) => VideoProjectExportTimeEstimate | null = (raw) => raw
 ) {
   let plan = initialPlan.slice(0, MAX_INTERVALS);
   let completed = plan[0]?.start ?? 0;
@@ -70,7 +73,7 @@ export function createExportTimeEstimator(
 
   function snapshot(): VideoProjectExportTimeEstimate | null {
     if (elapsed < MIN_MEASURED_MS || observations < 3 || measuredUnits < 0.5 || base.units <= 0)
-      return null;
+      return transform(null);
     const baseRate = base.elapsedMs / base.units;
     let remainingMs = additionalRemainingMs;
     for (const item of plan) {
@@ -82,7 +85,7 @@ export function createExportTimeEstimator(
         (learned ? learned.elapsedMs / learned.units : 0) * confidence;
       remainingMs += units * rate;
     }
-    return Number.isFinite(remainingMs) && remainingMs > 0 ? { remainingMs } : null;
+    return transform(Number.isFinite(remainingMs) && remainingMs > 0 ? { remainingMs } : null);
   }
 
   return {

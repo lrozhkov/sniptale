@@ -88,3 +88,101 @@ it.each([NaN, Infinity, -1, 0])('does not show invalid estimate %s', (remainingM
   expect(host.textContent).not.toContain('timeCompletion');
   expect(host.textContent).not.toContain('NaN');
 });
+
+function displayedSeconds(): number {
+  const text = host.querySelector('span')?.textContent ?? '';
+  const minutes = Number(text.match(/(\d+) videoEditor.progress.timeMinute/)?.[1] ?? 0);
+  const seconds = Number(text.match(/(\d+) videoEditor.progress.timeSecond/)?.[1] ?? 0);
+  return minutes * 60 + seconds;
+}
+it('keeps a multi-minute forecast steady through a transient 40 second revision', () => {
+  render({ remainingMs: 240_000 });
+  monotonic = 1000;
+  render({ remainingMs: 190_000 });
+  act(() => vi.advanceTimersByTime(1000));
+  expect(displayedSeconds()).toBeGreaterThanOrEqual(230);
+  monotonic = 2000;
+  render({ remainingMs: 230_000 });
+  act(() => vi.advanceTimersByTime(1000));
+  expect(displayedSeconds()).toBeGreaterThanOrEqual(230);
+});
+
+function step(remainingMs: number, updates = 1) {
+  monotonic += 1000;
+  for (let index = 0; index < updates; index++) render({ remainingMs });
+  act(() => vi.advanceTimersByTime(1000));
+  return displayedSeconds();
+}
+it('bounds every visible revision during two minutes of alternating noisy forecasts', () => {
+  render({ remainingMs: 480_000 });
+  let previous = displayedSeconds();
+  for (let second = 1; second <= 120; second++) {
+    const current = step(480_000 - second * 1000 + (second % 2 ? -40_000 : 40_000));
+    expect(Math.abs(current - previous)).toBeLessThanOrEqual(10);
+    previous = current;
+  }
+  expect(previous).toBeGreaterThanOrEqual(340);
+  expect(previous).toBeLessThanOrEqual(380);
+});
+it('eventually follows a sustained slowdown without a sudden upward jump', () => {
+  render({ remainingMs: 240_000 });
+  let previous = displayedSeconds();
+  for (let second = 1; second <= 30; second++) {
+    const current = step(360_000 - second * 1000);
+    expect(current - previous).toBeLessThanOrEqual(10);
+    previous = current;
+  }
+  expect(previous).toBeGreaterThan(240);
+});
+it('follows sustained acceleration gradually instead of dropping forty seconds at once', () => {
+  render({ remainingMs: 240_000 });
+  let previous = displayedSeconds();
+  for (let second = 1; second <= 30; second++) {
+    const current = step(180_000 - second * 1000);
+    expect(previous - current).toBeLessThanOrEqual(10);
+    previous = current;
+  }
+  expect(previous).toBeLessThan(210);
+  expect(previous).toBeGreaterThan(150);
+});
+it('does not give repeated renders extra votes in the median', () => {
+  render({ remainingMs: 240_000 });
+  const once: number[] = [];
+  for (let second = 1; second <= 20; second++) once.push(step(300_000 - second * 1000));
+  render(null);
+  monotonic = 0;
+  render({ remainingMs: 240_000 });
+  const many: number[] = [];
+  for (let second = 1; second <= 20; second++) many.push(step(300_000 - second * 1000, 20));
+  expect(many).toEqual(once);
+});
+it.each(['inactive', 'finishing', 'unknown'])('starts a fresh forecast after %s', (reset) => {
+  render({ remainingMs: 480_000 });
+  step(600_000);
+  render(
+    reset === 'unknown' ? null : { remainingMs: 480_000 },
+    reset !== 'inactive',
+    reset === 'finishing'
+  );
+  render({ remainingMs: 20_000 });
+  expect(displayedSeconds()).toBe(20);
+});
+it('hides both numbers when the monotonic clock becomes invalid', () => {
+  render({ remainingMs: 120_000 });
+  monotonic = NaN;
+  act(() => vi.advanceTimersByTime(1000));
+  expect(host.textContent).toContain('timeRefining');
+  expect(host.textContent).not.toContain('timeCompletion');
+});
+
+it('converges after a sustained twofold speedup without holding minutes of stale reserve', () => {
+  render({ remainingMs: 480_000 });
+  let previous = displayedSeconds();
+  for (let second = 1; second <= 130; second++) {
+    const current = step(240_000 - second * 1000);
+    expect(Math.abs(current - previous)).toBeLessThanOrEqual(10);
+    previous = current;
+  }
+  expect(previous).toBeGreaterThanOrEqual(110);
+  expect(previous).toBeLessThanOrEqual(120);
+});
