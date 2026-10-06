@@ -4,7 +4,6 @@ import type {
   VideoExportCapabilities,
   VideoMp4Codec as VideoMp4CodecType,
 } from '../../../features/video/project/types';
-import { getAvailableMp4VideoCodecs } from '../../../features/video/project/export/capabilities';
 
 function getMp4CodecLabel(codec: VideoMp4CodecType): string {
   switch (codec) {
@@ -17,9 +16,14 @@ function getMp4CodecLabel(codec: VideoMp4CodecType): string {
   }
 }
 
-export function getMp4CodecOptions(capabilities: VideoExportCapabilities) {
-  return getAvailableMp4VideoCodecs(capabilities).map((codec) => ({
-    value: codec,
-    label: getMp4CodecLabel(codec),
-  }));
+export function getMp4CodecOptions(
+  capabilities: VideoExportCapabilities,
+  selected?: VideoMp4CodecType
+) {
+  return capabilities.mp4Codecs
+    .filter((entry) => entry.available || entry.codec === selected)
+    .map(({ codec }) => ({
+      value: codec,
+      label: getMp4CodecLabel(codec),
+    }));
 }

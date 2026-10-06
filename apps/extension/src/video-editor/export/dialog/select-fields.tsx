@@ -1,10 +1,8 @@
+import { resolveVideoExportDimensions } from '../../../features/video/project/export/output-dimensions';
 import { FileVideo, SlidersHorizontal } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { NumericRow, SelectField, StatusRow } from '../../../ui/compact-inspector-controls';
-import {
-  resolveVideoOutputDimensions,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   VideoExportCapabilities,
   VideoProjectExportSettings,
@@ -183,7 +181,7 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
   );
   const currentScope = settings.scope ?? VideoExportScope.PROJECT;
   const formatOptions = getExportFormatOptions(capabilities);
-  const codecOptions = capabilities ? getMp4CodecOptions(capabilities) : [];
+  const codecOptions = capabilities ? getMp4CodecOptions(capabilities, settings.mp4VideoCodec) : [];
   const currentCodec = settings.mp4VideoCodec ?? codecOptions[0]?.value ?? VideoMp4Codec.AVC;
   const currentResolution = settings.resolution;
 
@@ -233,7 +231,7 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
           label={translate('videoEditor.exportDialog.resolutionLabel')}
           value={currentResolution}
           onChange={(resolution) => {
-            const dimensions = resolveVideoOutputDimensions(
+            const dimensions = resolveVideoExportDimensions(
               sourceDimensions.width,
               sourceDimensions.height,
               resolution

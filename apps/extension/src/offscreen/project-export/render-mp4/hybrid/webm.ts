@@ -1,3 +1,4 @@
+import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
 import { translate } from '../../../../platform/i18n';
 import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
@@ -86,6 +87,7 @@ async function encodeRenderedWebmFrame(args: {
       args.request.signal
     );
     args.request.videoEncoder.encode(frame, {
+      ...getProjectExportFrameOptions(args.request.settings),
       keyFrame: args.frameIndex === 0 || args.frameIndex % args.keyframeInterval === 0,
     });
   } finally {

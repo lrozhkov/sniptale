@@ -1,5 +1,8 @@
+import { getVideoExportQuantizer } from '../../features/video/project/export/encoding-quality';
+import type { VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
 import {
   Output,
+  Quality,
   StreamTarget,
   Mp4OutputFormat,
   WebMOutputFormat,
@@ -26,7 +29,13 @@ export function createReviewMediaOutput(args: {
   writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
   signal: AbortSignal;
   provenance?: string;
-  sampleVideo?: { codec: VideoCodec; fullCodecString: string; frameRate: number; bitrate: number };
+  sampleVideo?: {
+    codec: VideoCodec;
+    fullCodecString: string;
+    frameRate: number;
+    bitrate: number;
+    quality?: VideoQuality;
+  };
   onAudioPacket(packet: EncodedPacket): void;
 }) {
   const { index, signal } = args;
@@ -47,13 +56,19 @@ export function createReviewMediaOutput(args: {
         : new WebMOutputFormat({ minimumClusterDuration: 1 }),
   });
   if (args.provenance) output.setMetadataTags({ comment: args.provenance });
+  const quantizer = args.sampleVideo
+    ? getVideoExportQuantizer(args.sampleVideo.codec, args.sampleVideo.quality ?? 'HIGH')
+    : null;
   const video = args.sampleVideo
     ? {
         kind: 'sample' as const,
         source: new VideoSampleSource({
           codec: args.sampleVideo.codec,
           fullCodecString: args.sampleVideo.fullCodecString,
-          bitrate: args.sampleVideo.bitrate,
+          quality: new Quality({
+            bitrate: args.sampleVideo.bitrate,
+            ...(quantizer === null ? {} : { quantizer }),
+          }),
           bitrateMode: 'variable',
           latencyMode: 'quality',
           hardwareAcceleration: 'no-preference',

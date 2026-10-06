@@ -1,4 +1,8 @@
 import {
+  getVideoExportConfigCandidates,
+  supportsVideoExportConfig,
+} from '../../features/video/project/export/encoding-quality';
+import {
   AudioBufferSource,
   BufferTarget,
   EncodedPacket,
@@ -19,14 +23,24 @@ export async function createWebmEncoding(settings: VideoProjectExportSettings, h
   const state = createPacketWriter(source);
   const videoEncoder = new VideoEncoder({ output: state.write, error: state.fail });
   try {
-    videoEncoder.configure({
+    const requested: VideoEncoderConfig = {
       codec: codec === 'vp8' ? 'vp8' : 'vp09.00.10.08',
       width: settings.width,
       height: settings.height,
       framerate: settings.fps,
       bitrate: resolveExportTargetBitrate(settings),
       bitrateMode: 'variable',
-    });
+    };
+    let selected: VideoEncoderConfig | null = null;
+    for (const config of getVideoExportConfigCandidates(requested)) {
+      const support = await VideoEncoder.isConfigSupported(config).catch(() => null);
+      if (support && supportsVideoExportConfig(config, support)) {
+        selected = config;
+        break;
+      }
+    }
+    if (!selected) throw new Error('WEBM_VIDEO_ENCODER_UNSUPPORTED');
+    videoEncoder.configure(selected);
     await output.start();
   } catch (error) {
     closeEncoderQuietly(videoEncoder);

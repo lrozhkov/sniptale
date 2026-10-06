@@ -1,3 +1,7 @@
+import {
+  getVideoExportConfigCandidates,
+  supportsVideoExportConfig,
+} from '../../features/video/project/export/encoding-quality';
 import { resolveReviewVideoEncoderConfig, type ReviewOutputCodec } from './render-codec';
 import type {
   VideoQuality,
@@ -54,22 +58,17 @@ export async function supportedReviewVideoCodecs(
     container === 'mp4' ? (['avc', 'hevc', 'vp9'] as const) : (['vp9', 'vp8'] as const);
   const supported: ReviewOutputCodec[] = [];
   for (const codec of candidates) {
-    const requested = resolveReviewVideoEncoderConfig(codec, dimensions);
-    try {
-      const { supported: available, config } = await VideoEncoder.isConfigSupported(requested);
-      if (
-        available &&
-        config &&
-        config.codec === requested.codec &&
-        config.width === requested.width &&
-        config.height === requested.height &&
-        config.framerate === requested.framerate &&
-        config.bitrate === requested.bitrate &&
-        config.bitrateMode === 'variable'
-      )
-        supported.push(codec);
-    } catch {
-      // Codec availability is independent; a rejected family must not hide other formats.
+    const base = resolveReviewVideoEncoderConfig(codec, dimensions);
+    for (const requested of getVideoExportConfigCandidates(base)) {
+      try {
+        const result = await VideoEncoder.isConfigSupported(requested);
+        if (supportsVideoExportConfig(requested, result)) {
+          supported.push(codec);
+          break;
+        }
+      } catch {
+        // A rejected rate-control mode must not hide the codec's supported fallback.
+      }
     }
   }
   return supported;
@@ -136,18 +135,24 @@ export async function inspectReviewMedia(
       throw new Error('The first video packet is not an independent source entry point.');
     const container =
       videoCodec === 'avc' || videoCodec === 'hevc' || audioCodec === 'aac' ? 'mp4' : 'webm';
-    const [mp4Audio, webmAudio, mp4Video, webmVideo, packetStats] = await Promise.all([
+    const packetStats = await video.computePacketStats(Infinity, { metadataOnly: true });
+    const frameRate =
+      Number.isFinite(packetStats.averagePacketRate) && packetStats.averagePacketRate > 0
+        ? Math.min(120, Math.max(1, Math.round(packetStats.averagePacketRate)))
+        : 30;
+    const [mp4Audio, webmAudio, mp4Video, webmVideo] = await Promise.all([
       chooseReviewAudioCodec(audio ?? null, 'mp4'),
       chooseReviewAudioCodec(audio ?? null, 'webm'),
       supportedReviewVideoCodecs('mp4', {
         width: await video.getDisplayWidth(),
         height: await video.getDisplayHeight(),
+        fps: frameRate,
       }),
       supportedReviewVideoCodecs('webm', {
         width: await video.getDisplayWidth(),
         height: await video.getDisplayHeight(),
+        fps: frameRate,
       }),
-      video.computePacketStats(Infinity, { metadataOnly: true }),
     ]);
     signal.throwIfAborted();
     const supportedVideoCodecs = container === 'mp4' ? mp4Video : webmVideo;
@@ -164,10 +169,7 @@ export async function inspectReviewMedia(
       outputCodecs: { mp4: mp4Video, webm: webmVideo },
       processedVideoCodec: supportedVideoCodecs[0] ?? null,
       supportedVideoCodecs,
-      frameRate:
-        Number.isFinite(packetStats.averagePacketRate) && packetStats.averagePacketRate > 0
-          ? Math.min(120, Math.max(1, Math.round(packetStats.averagePacketRate)))
-          : 30,
+      frameRate,
       rotation: await video.getRotation(),
     };
   } finally {

@@ -137,14 +137,20 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
   onExport,
 }) => {
   const { capabilities, capabilitiesPending, capabilityError } = useExportDialogCapabilities({
-    onChange,
     settings,
   });
 
   const rootRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
   useExportDialogFocus(rootRef);
-  const canExport = !capabilitiesPending;
+  const canExport =
+    !capabilitiesPending &&
+    !capabilityError &&
+    !!capabilities?.formats.some((entry) => entry.format === settings.format && entry.available) &&
+    (settings.format !== VideoExportFormat.MP4 ||
+      capabilities.mp4Codecs.some(
+        (entry) => entry.codec === settings.mp4VideoCodec && entry.available
+      ));
 
   return (
     <div ref={rootRef} className="contents">

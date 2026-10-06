@@ -1,3 +1,4 @@
+import { resolveVideoExportDimensions } from './output-dimensions';
 import {
   VideoExportFormat,
   VideoExportQualityPreset,
@@ -8,10 +9,7 @@ import {
   type VideoProject,
   type VideoProjectExportSettings,
 } from '../types/index';
-import {
-  resolveVideoOutputDimensions,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 
 const MAX_EXPORT_DIMENSION_PX = 7680;
 const MAX_EXPORT_FPS = 120;
@@ -122,7 +120,7 @@ function isVideoProjectExportSettingsCompatibleWithProject(
     return false;
   }
 
-  const dimensions = resolveVideoOutputDimensions(
+  const dimensions = resolveVideoExportDimensions(
     project.width,
     project.height,
     settings.resolution

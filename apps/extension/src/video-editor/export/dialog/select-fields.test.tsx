@@ -220,9 +220,9 @@ it('fits an arbitrary source into the selected standard resolution without disto
   });
 
   expect(onChange).toHaveBeenCalledWith({
-    height: 1080,
+    height: 500,
     resolution: VideoResolutionPreset.P1080,
-    width: 2346,
+    width: 1086,
   });
 });
 
@@ -270,29 +270,29 @@ it('resolves every selection from immutable source dimensions without sequential
   renderFields(settings);
   await selectResolution('480p');
   expect(onChange).toHaveBeenLastCalledWith({
-    height: 480,
+    height: 478,
     resolution: VideoResolutionPreset.P480,
-    width: 854,
+    width: 852,
   });
 
   renderFields({
     ...settings,
-    height: 480,
+    height: 478,
     resolution: VideoResolutionPreset.P480,
-    width: 854,
+    width: 852,
   });
   await selectResolution('1080p');
   expect(onChange).toHaveBeenLastCalledWith({
-    height: 1080,
+    height: 478,
     resolution: VideoResolutionPreset.P1080,
-    width: 1924,
+    width: 852,
   });
 
   renderFields({
     ...settings,
-    height: 1080,
+    height: 478,
     resolution: VideoResolutionPreset.P1080,
-    width: 1924,
+    width: 852,
   });
   await selectResolution('videoEditor.exportDialog.resolutionSource');
   expect(onChange).toHaveBeenLastCalledWith({

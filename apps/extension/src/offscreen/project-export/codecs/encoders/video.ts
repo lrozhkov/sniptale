@@ -1,3 +1,7 @@
+import {
+  getVideoExportConfigCandidates,
+  supportsVideoExportConfig,
+} from '../../../../features/video/project/export/encoding-quality';
 import { resolveVideoCodecLevel } from '../../../../features/video/project/export/codec-level';
 import {
   type VideoMp4Codec as VideoMp4CodecType,
@@ -50,27 +54,6 @@ function createSupportedEncoder(params: {
   };
 }
 
-function getValidatedEffectiveVideoEncoderConfig(
-  requested: VideoEncoderConfig,
-  support: VideoEncoderSupportResult
-): VideoEncoderConfig | null {
-  const effective = support.config;
-  if (
-    !support.supported ||
-    !effective ||
-    effective.codec !== requested.codec ||
-    effective.width !== requested.width ||
-    effective.height !== requested.height ||
-    effective.framerate !== requested.framerate ||
-    effective.bitrate !== requested.bitrate ||
-    effective.bitrateMode !== 'variable'
-  ) {
-    return null;
-  }
-
-  return effective;
-}
-
 async function probeSupportedMp4VideoEncoder(
   settings: VideoProjectExportSettings,
   codec: VideoMp4CodecType
@@ -81,18 +64,19 @@ async function probeSupportedMp4VideoEncoder(
 
   for (const candidate of candidates) {
     const label = translate(candidate.labelKey);
-    const config = createVideoEncoderConfig({ bitrate, candidate, settings });
+    const base = createVideoEncoderConfig({ bitrate, candidate, settings });
 
-    try {
-      const support: VideoEncoderSupportResult = await VideoEncoder.isConfigSupported(config);
-      const effectiveConfig = getValidatedEffectiveVideoEncoderConfig(config, support);
-      if (effectiveConfig) {
-        return createSupportedEncoder({ candidate, codec, config: effectiveConfig, label });
+    for (const config of getVideoExportConfigCandidates(base)) {
+      try {
+        const support: VideoEncoderSupportResult = await VideoEncoder.isConfigSupported(config);
+        if (supportsVideoExportConfig(config, support)) {
+          return createSupportedEncoder({ candidate, codec, config, label });
+        }
+
+        recordEncoderAttemptFailure(attempts, label, candidate.codec);
+      } catch (error) {
+        recordEncoderAttemptFailure(attempts, label, candidate.codec, error);
       }
-
-      recordEncoderAttemptFailure(attempts, label, candidate.codec);
-    } catch (error) {
-      recordEncoderAttemptFailure(attempts, label, candidate.codec, error);
     }
   }
 

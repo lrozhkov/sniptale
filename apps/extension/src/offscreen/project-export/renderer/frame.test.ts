@@ -1,8 +1,6 @@
+import { resolveVideoExportDimensions } from '../../../features/video/project/export/output-dimensions';
 import { afterEach, expect, it, vi } from 'vitest';
-import {
-  resolveVideoOutputDimensions,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
   VideoExportFormat,
@@ -144,7 +142,7 @@ function createExportSettings(
   resolution: VideoResolutionPreset
 ): VideoProjectExportSettings {
   return {
-    ...resolveVideoOutputDimensions(project.width, project.height, resolution),
+    ...resolveVideoExportDimensions(project.width, project.height, resolution),
     downloadAfterExport: false,
     format: VideoExportFormat.MP4,
     fps: 30,
@@ -192,23 +190,24 @@ it('contains a rounded standard output without stretching or cropping project co
 
   drawProjectFrame(context, roundedProject, roundedSettings, 0, loadedImages, new Map());
 
+  const scale = Math.min(
+    roundedSettings.width / roundedProject.width,
+    roundedSettings.height / roundedProject.height
+  );
+  const offsetX = (roundedSettings.width - roundedProject.width * scale) / 2;
   expect(drawCompositionLayerMock).toHaveBeenCalledWith(
     context,
     frame.visualLayers[0],
-    expect.closeTo(roundedSettings.width / roundedProject.width),
-    expect.closeTo(roundedSettings.width / roundedProject.width),
+    expect.closeTo(scale),
+    expect.closeTo(scale),
     loadedImages,
     expect.any(Map),
     1
   );
   expect(context.translate).toHaveBeenNthCalledWith(
     1,
-    0,
-    expect.closeTo(
-      (roundedSettings.height -
-        roundedProject.height * (roundedSettings.width / roundedProject.width)) /
-        2
-    )
+    expect.closeTo(offsetX),
+    expect.closeTo((roundedSettings.height - roundedProject.height * scale) / 2)
   );
   expect(clipTranslations).toEqual([0]);
   expect(transitionTranslations).toEqual([0]);

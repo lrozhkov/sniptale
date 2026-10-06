@@ -295,3 +295,42 @@ it('leaves a portaled select for the adjacent form control on Tab in either dire
     expect(document.querySelector('[role="listbox"]')).toBeNull();
   }
 });
+
+it('preserves selected HEVC and blocks submission until it is supported', () => {
+  const settings = mergeVideoProjectExportSettings(createSettings(), {
+    format: VideoExportFormat.MP4,
+    mp4VideoCodec: VideoMp4Codec.HEVC,
+  });
+  useExportDialogCapabilitiesMock.mockReturnValue({
+    capabilities: {
+      formats: [{ format: VideoExportFormat.MP4, available: true }],
+      mp4Codecs: [
+        { codec: VideoMp4Codec.AVC, available: true },
+        { codec: VideoMp4Codec.HEVC, available: false },
+      ],
+      defaultMp4VideoCodec: VideoMp4Codec.AVC,
+    },
+    capabilitiesPending: false,
+    capabilityError: null,
+  });
+  const { onExport, onChange } = renderDialog({ settings });
+  const submit = Array.from(container!.querySelectorAll('button')).find((b) =>
+    b.textContent?.includes('videoEditor.exportDialog.submit')
+  )!;
+  expect(submit.disabled).toBe(true);
+  act(() => submit.click());
+  expect(onExport).not.toHaveBeenCalled();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(container!.textContent).toContain('videoEditor.exportDialog.codecHevcLabel');
+  useExportDialogCapabilitiesMock.mockReturnValue({
+    capabilities: {
+      formats: [{ format: VideoExportFormat.MP4, available: true }],
+      mp4Codecs: [{ codec: VideoMp4Codec.HEVC, available: true }],
+      defaultMp4VideoCodec: VideoMp4Codec.HEVC,
+    },
+    capabilitiesPending: false,
+    capabilityError: null,
+  });
+  renderDialog({ settings });
+  expect(submit.disabled).toBe(false);
+});

@@ -10,13 +10,18 @@ import {
   drawReviewSceneFrame,
   drainSegmentAudio,
   renderRenderWindowFrames,
-  reviewRenderFrameSchedule,
   writeReviewFrames,
 } from './render-export';
 
 vi.mock('./render-spotlight', () => ({ drawReviewSpotlights: vi.fn() }));
+vi.mock('./window-header', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./window-header')>()),
+  loadReviewWindowHeader: vi.fn(async () => ({ naturalWidth: 1904, naturalHeight: 86 })),
+}));
 
 const state = vi.hoisted(() => ({
+  sourceWidth: 320,
+  sourceHeight: 180,
   configurations: [] as unknown[],
   encoded: [] as {
     timestamp: number;
@@ -34,7 +39,8 @@ const state = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('mediabunny', () => {
+vi.mock('mediabunny', async (importOriginal) => {
+  const { Quality } = await importOriginal<typeof import('mediabunny')>();
   class VideoSample {
     timestamp: number;
     duration: number;
@@ -76,8 +82,8 @@ vi.mock('mediabunny', () => {
         codec: 'vp9',
         getTimeResolution: async () => 1000,
         canDecode: async () => true,
-        getDisplayWidth: async () => 320,
-        getDisplayHeight: async () => 180,
+        getDisplayWidth: async () => state.sourceWidth,
+        getDisplayHeight: async () => state.sourceHeight,
       };
     }
     async getPrimaryAudioTrack() {
@@ -109,6 +115,7 @@ vi.mock('mediabunny', () => {
     close(): void {}
   }
   return {
+    Quality,
     ALL_FORMATS: [],
     BlobSource: class {},
     Input,
@@ -172,6 +179,15 @@ afterAll(() => {
   globalThis.createImageBitmap = realCreateImageBitmap;
 });
 
+afterEach(() => {
+  state.encoded.length = 0;
+  state.drawn.length = 0;
+  state.audioTrack = null;
+  state.sourceWidth = 320;
+  state.sourceHeight = 180;
+  vi.unstubAllGlobals();
+});
+
 function writerFixture() {
   return { writeAt: vi.fn(async () => undefined) };
 }
@@ -229,71 +245,6 @@ function cutEdit(start: number, end: number) {
     requestedEnd: end,
   };
 }
-
-function speedEdit(start: number, end: number) {
-  return {
-    id: `speed-${start}`,
-    kind: 'speed' as const,
-    start,
-    end,
-    requestedStart: start,
-    requestedEnd: end,
-    rate: 0.5 as const,
-    audio: 'speed' as const,
-  };
-}
-
-describe('reviewRenderFrameSchedule', () => {
-  it('covers an unedited duration exactly on the fps lattice', () => {
-    const windows = reviewRenderFrameSchedule(2.5, [], 10);
-    expect(windows).toHaveLength(1);
-    expect(windows[0]!.timestamps).toHaveLength(25);
-    expect(windows[0]!.timestamps[0]).toBe(0);
-    expect(windows[0]!.timestamps.at(-1)).toBe(2.4);
-    expect(windows[0]!.sourceTimes[0]).toBe(0);
-    expect(windows[0]!.sourceTimes.at(-1)).toBeCloseTo(2.4, 9);
-  });
-
-  it('shifts timestamps across cuts and resamples speed segments', () => {
-    const windows = reviewRenderFrameSchedule(10, [cutEdit(1, 3), speedEdit(5, 7)], 2);
-    expect(windows).toHaveLength(4);
-    expect(windows[0]!.segment).toMatchObject({ sourceStart: 0, sourceEnd: 1, resultStart: 0 });
-    expect(windows[1]!.segment).toMatchObject({ sourceStart: 3, sourceEnd: 5, resultStart: 1 });
-    expect(windows[2]!.segment).toMatchObject({
-      sourceStart: 5,
-      sourceEnd: 7,
-      resultStart: 3,
-      rate: 0.5,
-    });
-    expect(windows[3]!.segment).toMatchObject({ sourceStart: 7, sourceEnd: 10, resultStart: 7 });
-    expect(windows[2]!.timestamps).toHaveLength(8);
-    expect(windows[2]!.timestamps[0]).toBe(3);
-    expect(windows[2]!.sourceTimes[2]).toBeCloseTo(5.5, 9);
-  });
-
-  it('renders both visible speed fragments around a cut with a continuous output clock', () => {
-    const windows = reviewRenderFrameSchedule(10, [speedEdit(1, 7), cutEdit(3, 5)], 2);
-    expect(
-      windows.map((window) => ({
-        start: window.segment.sourceStart,
-        end: window.segment.sourceEnd,
-        kind: window.segment.kind,
-        resultStart: window.segment.resultStart,
-      }))
-    ).toEqual([
-      { start: 0, end: 1, kind: 'keep', resultStart: 0 },
-      { start: 1, end: 3, kind: 'speed', resultStart: 1 },
-      { start: 5, end: 7, kind: 'speed', resultStart: 5 },
-      { start: 7, end: 10, kind: 'keep', resultStart: 9 },
-    ]);
-  });
-
-  it('keeps frames over a sub-frame tail and rejects invalid frame rates', () => {
-    const windows = reviewRenderFrameSchedule(0.1, [], 30);
-    expect(windows[0]!.timestamps).toHaveLength(3);
-    expect(() => reviewRenderFrameSchedule(1, [], 0)).toThrow('Render frame rate is invalid.');
-  });
-});
 
 describe('drawReviewSceneFrame', () => {
   const layout = {
@@ -466,12 +417,6 @@ describe('drainSegmentAudio', () => {
 });
 
 describe('writeReviewFrames', () => {
-  afterEach(() => {
-    state.encoded.length = 0;
-    state.drawn.length = 0;
-    state.audioTrack = null;
-  });
-
   it('blocks the render without a probed video encoder', async () => {
     await expect(
       writeReviewFrames(argsFixture({ processedVideoCodec: null }))
@@ -532,12 +477,6 @@ describe('writeReviewFrames', () => {
 });
 
 describe('writeReviewFrames background lifecycle', () => {
-  afterEach(() => {
-    state.encoded.length = 0;
-    state.drawn.length = 0;
-    state.audioTrack = null;
-  });
-
   it('closes a decoded background image after a successful render', async () => {
     const bitmap = { close: vi.fn() } as unknown as ImageBitmap;
     vi.stubGlobal(
@@ -712,7 +651,7 @@ it('isolates the visible source pixels before filtering a scaled composition', a
   );
 });
 
-it('passes the calibrated variable-rate quality profile to the actual encoder source', async () => {
+it('passes constant quality with the calibrated VBR fallback to the actual encoder source', async () => {
   const args = argsFixture({ frameRate: 30 });
   args.advanced.canvas = { width: 1920, height: 1080 };
   await writeReviewFrames({
@@ -721,7 +660,7 @@ it('passes the calibrated variable-rate quality profile to the actual encoder so
   });
   expect(state.configurations.at(-1)).toMatchObject({
     codec: 'vp9',
-    bitrate: 5_000_000,
+    quality: expect.objectContaining({ _quantizer: 24, _bitrate: 5_000_000 }),
     bitrateMode: 'variable',
     latencyMode: 'quality',
     hardwareAcceleration: 'no-preference',
@@ -844,3 +783,60 @@ it('ends the final rendered frame at the exact retained duration instead of addi
   const last = state.encoded.at(-1)!;
   expect(last.timestamp + last.duration).toBeCloseTo(2.03, 8);
 });
+
+it.each([false, true])(
+  'uses identical probe and rendered HEVC parameters at explicit 30fps (header=%s)',
+  async (header) => {
+    const probe = vi.fn(async (config: VideoEncoderConfig) => ({
+      config,
+      supported:
+        config.codec.startsWith('hvc1') &&
+        config.framerate === 30 &&
+        config.width <= 1920 &&
+        config.height <= 1080,
+    }));
+    vi.stubGlobal('VideoEncoder', { isConfigSupported: probe });
+    state.sourceWidth = 1904;
+    state.sourceHeight = 1064;
+    state.encoded.length = 0;
+    const args = argsFixture({ frameRate: 40 });
+    if (header) args.advanced.windowHeader = { kind: 'browser', title: 'Header' };
+    const { resolveReviewOutputProfile } = await import('./render-settings');
+    const index = {
+      ...args.index,
+      width: 1904,
+      height: 1064,
+      outputCodecs: { mp4: ['hevc' as const], webm: [] },
+    };
+    const renderSettings = {
+      format: 'mp4' as const,
+      codec: 'hevc' as const,
+      resolution: '1080P' as const,
+      quality: 'HIGH' as const,
+      frameRate: 30 as const,
+    };
+    const profile = resolveReviewOutputProfile(index, args.advanced, renderSettings);
+    await writeReviewFrames({ ...args, index, renderSettings });
+    expect(profile.width).toBeLessThanOrEqual(1920);
+    expect(profile.height).toBeLessThanOrEqual(1080);
+    if (!header) expect(profile).toMatchObject({ width: 1904, height: 1064 });
+    expect(probe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: profile.width,
+        height: profile.height,
+        framerate: 30,
+        bitrateMode: 'quantizer',
+      })
+    );
+    expect(state.encoded).toHaveLength(60);
+    for (const frame of state.encoded) {
+      expect(frame.width).toBe(profile.width);
+      expect(frame.height).toBe(profile.height);
+      expect(frame.duration).toBeCloseTo(1 / 30);
+    }
+    expect(state.configurations.at(-1)).toMatchObject({
+      codec: 'hevc',
+      quality: expect.objectContaining({ _quantizer: 20 }),
+    });
+  }
+);

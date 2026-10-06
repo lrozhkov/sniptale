@@ -1,3 +1,4 @@
+import { resolveVideoExportDimensions } from '../export/output-dimensions';
 import { getEffectClipLabel } from '../effect-instance/presentation';
 import { translate } from '../../../../platform/i18n';
 import { applyVideoProjectMutationPatch } from '../mutation';
@@ -13,14 +14,11 @@ import {
   VideoProjectClipType,
   VideoProjectShapeType,
 } from '../types';
-import {
-  resolveVideoOutputDimensions,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 
 export function getDefaultExportSettings(project: VideoProject): VideoProjectExportSettings {
   const resolution = VideoResolutionPreset.SOURCE;
-  const dimensions = resolveVideoOutputDimensions(project.width, project.height, resolution);
+  const dimensions = resolveVideoExportDimensions(project.width, project.height, resolution);
   return {
     width: dimensions.width,
     height: dimensions.height,

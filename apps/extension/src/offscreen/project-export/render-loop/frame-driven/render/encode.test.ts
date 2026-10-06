@@ -42,7 +42,7 @@ it('adds the optional timestamp offset for segmented composite rendering', async
     keyframeInterval: 3,
     loadedImages: { image: 'loaded' } as never,
     project: { duration: 10 } as never,
-    settings: { fps: 30 } as never,
+    settings: { fps: 30, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' } as never,
     throwIfPipelineFailed: vi.fn(),
     timestampOffsetUs: 1_000_000,
     videoEncoder: { encode: encodeMock } as never,
@@ -66,7 +66,7 @@ it('encodes a frame with keyframe metadata', async () => {
     keyframeInterval: 3,
     loadedImages: { image: 'loaded' } as never,
     project: { duration: 10 } as never,
-    settings: { fps: 30 } as never,
+    settings: { fps: 30, format: 'MP4', mp4VideoCodec: 'AVC', quality: 'HIGH' } as never,
     throwIfPipelineFailed: vi.fn(),
     videoEncoder: { encode: encodeMock } as never,
   });
@@ -77,7 +77,10 @@ it('encodes a frame with keyframe metadata', async () => {
     undefined
   );
   expect(encodeMock).toHaveBeenCalledTimes(1);
-  expect(encodeMock).toHaveBeenCalledWith(FakeVideoFrame.instances[0], { keyFrame: true });
+  expect(encodeMock).toHaveBeenCalledWith(FakeVideoFrame.instances[0], {
+    keyFrame: true,
+    avc: { quantizer: 20 },
+  });
   expect(FakeVideoFrame.instances[0]?.init).toEqual({ duration: 4_000, timestamp: 12_000 });
   expect(FakeVideoFrame.instances[0]?.close).toHaveBeenCalledTimes(1);
 });

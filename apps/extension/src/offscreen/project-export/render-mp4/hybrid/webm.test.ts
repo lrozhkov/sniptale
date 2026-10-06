@@ -146,6 +146,10 @@ it('renders decoded WebM samples into canvas frames and forwards them to the enc
   mediaMap?.get('clip-1')?.draw(args.context);
   expect(samples[0]!.draw).toHaveBeenCalled();
   expect(args.videoEncoder.encode).toHaveBeenCalledTimes(2);
+  expect(args.videoEncoder.encode).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ avc: { quantizer: 24 } })
+  );
   expect(args.videoEncoder.encode.mock.calls.map(([frame]) => frame)).toEqual([
     expect.objectContaining({ init: expect.objectContaining({ timestamp: 0 }) }),
     expect.objectContaining({ init: expect.objectContaining({ timestamp: 500_000 }) }),

@@ -150,6 +150,7 @@ export async function writeReviewFrames(args: {
       ...(args.provenance ? { provenance: args.provenance } : {}),
       sampleVideo: {
         codec: preparation.codec,
+        quality: preparation.quality,
         fullCodecString: resolveReviewVideoEncoderConfig(preparation.codec, {
           width: source.canvas.width,
           height: source.canvas.height,

@@ -1,11 +1,8 @@
+import { resolveVideoExportDimensions } from '../../features/video/project/export/output-dimensions';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { parseQuickEditCanvas } from '../../features/video/review/advanced/canvas';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import {
-  resolveVideoOutputDimensions,
-  VideoQuality,
-  VideoResolutionPreset,
-} from '@sniptale/runtime-contracts/video/types/types';
+import { VideoQuality, VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type { ReviewMediaIndex, ReviewRenderSettings } from './media-index';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import { resolveReviewRenderBitrate, type ReviewOutputCodec } from './render-codec';
@@ -63,7 +60,7 @@ export function reviewOutputCodecs(
   return allowed.filter((codec) => probed.includes(codec));
 }
 
-/** Resolve the base preset first; decoration adds rows rather than shrinking the original video. */
+/** Fit the complete scene, including decoration, before probing or allocating the encoder canvas. */
 export function resolveReviewSceneOutput(
   source: { width: number; height: number },
   settings: {
@@ -74,8 +71,15 @@ export function resolveReviewSceneOutput(
   resolution: VideoResolutionPreset
 ) {
   const base = settings.canvas ?? source;
-  const canvas = resolveVideoOutputDimensions(base.width, base.height, resolution);
-  const scale = canvas.width / base.width;
+  const scene = computeQuickEditSceneSize({
+    source,
+    canvas: base,
+    background: settings.background,
+    windowHeader: settings.windowHeader,
+  });
+  const output = resolveVideoExportDimensions(scene.width, scene.height, resolution);
+  const scale = output.width / base.width;
+  const canvas = { width: output.width, height: base.height * scale };
   const background = settings.background.enabled
     ? {
         ...settings.background,
@@ -86,13 +90,6 @@ export function resolveReviewSceneOutput(
         },
       }
     : settings.background;
-  const scene = computeQuickEditSceneSize({
-    source,
-    canvas,
-    background,
-    windowHeader: settings.windowHeader,
-  });
-  const output = { width: scene.width, height: scene.height };
   return {
     canvas,
     output,

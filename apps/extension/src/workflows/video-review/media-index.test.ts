@@ -51,7 +51,7 @@ it('admits the same AVC level and 60fps configuration as the primary editor', as
       })
     ).toContain('avc');
     expect(isConfigSupported).toHaveBeenCalledWith(
-      expect.objectContaining({ codec: 'avc1.64002a', framerate: 60, bitrateMode: 'variable' })
+      expect.objectContaining({ codec: 'avc1.64002a', framerate: 60, bitrateMode: 'quantizer' })
     );
   } finally {
     vi.unstubAllGlobals();
@@ -72,6 +72,46 @@ it('rejects normalized-away timing and isolates unsupported codec families', asy
     expect(await supportedReviewVideoCodecs('mp4', { width: 1920, height: 1080, fps: 60 })).toEqual(
       ['vp9']
     );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('retains HEVC with the exact VBR fallback when quantizer mode is unavailable', async () => {
+  const probe = vi.fn(async (config: VideoEncoderConfig) => ({
+    config,
+    supported: config.codec.startsWith('hvc1') && config.bitrateMode === 'variable',
+  }));
+  vi.stubGlobal('VideoEncoder', { isConfigSupported: probe });
+  try {
+    expect(
+      await supportedReviewVideoCodecs('mp4', {
+        width: 1920,
+        height: 1080,
+        fps: 30,
+        bitrate: 8_000_000,
+      })
+    ).toEqual(['hevc']);
+    expect(probe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codec: 'hvc1.1.6.L123.B0',
+        bitrate: 8_000_000,
+        bitrateMode: 'variable',
+      })
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});
+
+it('uses measured source FPS for the initial encoder capability probe', async () => {
+  const probe = vi.fn(async (config: VideoEncoderConfig) => ({ config, supported: true }));
+  vi.stubGlobal('VideoEncoder', { isConfigSupported: probe });
+  try {
+    const bytes = await readFile('tooling/test/e2e/fixtures/review-avc-aac.mp4');
+    const index = await inspectReviewMedia(new Blob([bytes]), new AbortController().signal);
+    expect(probe).toHaveBeenCalled();
+    for (const [config] of probe.mock.calls) expect(config.framerate).toBe(index.frameRate);
   } finally {
     vi.unstubAllGlobals();
   }

@@ -1,3 +1,4 @@
+import { getProjectExportFrameOptions } from '../../../../../features/video/project/export/encoding-quality';
 import { waitForEncoderQueueCapacity } from '../../../codecs';
 import type { RenderFrameDrivenCompositeFrameArgs } from './types';
 
@@ -31,6 +32,7 @@ export async function encodeFrameDrivenCompositeFrame(
   try {
     await waitForEncoderQueueCapacityFrame(videoEncoder, MP4_QUEUE_CAPACITY, signal);
     videoEncoder.encode(frame, {
+      ...getProjectExportFrameOptions(args.settings),
       keyFrame: frameIndex === 0 || frameIndex % keyframeInterval === 0,
     });
   } finally {

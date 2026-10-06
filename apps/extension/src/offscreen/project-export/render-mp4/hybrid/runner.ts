@@ -1,3 +1,4 @@
+import { getProjectExportFrameOptions } from '../../../../features/video/project/export/encoding-quality';
 import { translate } from '../../../../platform/i18n';
 import { VideoProjectExportPhase } from '../../../../features/video/project/types/export';
 import { runFrameDrivenCompositeRenderLoop } from '../../render-loop';
@@ -150,6 +151,7 @@ async function tryRenderCleanSourceSpan(
 ): Promise<boolean> {
   try {
     const encoded = await encodeCleanSourceMp4Span({
+      encodeOptions: getProjectExportFrameOptions(args.settings),
       span,
       throwIfPipelineFailed: args.throwIfPipelineFailed,
       videoEncoder: args.videoEncoder,

@@ -44,7 +44,7 @@ describe('calibrated quick-edit export profile', () => {
     expect(profile).toMatchObject({
       format: 'webm',
       codec: 'vp9',
-      width: 406,
+      width: 404,
       height: 720,
       fps: 30,
     });
@@ -55,7 +55,7 @@ describe('calibrated quick-edit export profile', () => {
   });
 });
 
-it('adds browser header after the selected output preset and reports encoder budget overflow', () => {
+it('fits the complete decorated scene and reports source encoder budget overflow', () => {
   const state = createQuickEditAdvancedState();
   state.ui.mode = 'advanced';
   state.windowHeader = { kind: 'browser', title: 'Browser' };
@@ -66,14 +66,14 @@ it('adds browser header after the selected output preset and reports encoder bud
       frameRate: 30,
       resolution: '1080P',
     })
-  ).toMatchObject({ width: 1920, height: 1166, dimensionsSupported: true });
+  ).toMatchObject({ width: 1778, height: 1080, dimensionsSupported: true });
   expect(
     resolveReviewOutputProfile(source, state, {
       quality: 'HIGH',
       frameRate: 30,
       resolution: '720P',
     })
-  ).toMatchObject({ width: 1280, height: 778 });
+  ).toMatchObject({ width: 1184, height: 720 });
   state.canvas = { width: 7680, height: 4320 };
   expect(resolveReviewOutputProfile(source, state)).toMatchObject({ dimensionsSupported: false });
   expect(
@@ -83,4 +83,19 @@ it('adds browser header after the selected output preset and reports encoder bud
       resolution: '1080P',
     })
   ).toMatchObject({ dimensionsSupported: true });
+});
+
+it('keeps a 1904x1064 source inside 1080p without upscaling and honors explicit 30fps', () => {
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  const source = { ...index, width: 1904, height: 1064, frameRate: 40 };
+  expect(
+    resolveReviewOutputProfile(source, advanced, {
+      format: 'mp4',
+      codec: 'hevc',
+      resolution: '1080P',
+      quality: 'HIGH',
+      frameRate: 30,
+    })
+  ).toMatchObject({ width: 1904, height: 1064, fps: 30, codec: 'hevc' });
 });
