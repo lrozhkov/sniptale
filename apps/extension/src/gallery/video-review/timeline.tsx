@@ -27,7 +27,6 @@ import { createReviewTimeMap } from '../../features/video/review/timeline';
 type TimelineProps = {
   fillHeight?: boolean | undefined;
   sourceCompact?: boolean | undefined;
-  onToggleSourceHeight?: (() => void) | undefined;
   placementHints?: ReviewPlacementHints | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   busy?: boolean;

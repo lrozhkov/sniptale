@@ -47,6 +47,31 @@ for (const variant of [
       await button('videoEditor.app.panelRestoreHeight').click();
       await button('gallery.videoReview.advancedEditing').click();
       await expect(width).toBeVisible();
+      for (const handle of [width, height]) {
+        await handle.hover();
+        const feedback = await handle.evaluate((node) => {
+          const animation = node.getAnimations()[0]!;
+          animation.pause();
+          animation.currentTime = 35;
+          const early = getComputedStyle(node).cursor;
+          animation.currentTime = 70;
+          return { early, ready: getComputedStyle(node).cursor };
+        });
+        expect(feedback.early).toBe('default');
+        expect(feedback.ready).toBe(handle === width ? 'col-resize' : 'row-resize');
+        await page.mouse.move(1, 1);
+        await expect(handle).toHaveCSS('cursor', 'default');
+      }
+      const seam = (await inspector.boundingBox())!.x;
+      const resizeBox = (await width.boundingBox())!;
+      expect(Math.abs(resizeBox.x + resizeBox.width / 2 - seam)).toBeLessThanOrEqual(1);
+      // The left half remains reachable outside the inspector, not clipped by its scroll owner.
+      expect(
+        await width.evaluate((node) => {
+          const rect = node.getBoundingClientRect();
+          return document.elementFromPoint(rect.x + 1, rect.y + 20) === node;
+        })
+      ).toBe(true);
       await width.focus();
       const time = await dialog
         .locator('[data-ui="gallery.videoReview.timePlane"]')
@@ -123,7 +148,7 @@ for (const variant of [
       if ((await sections.getAttribute('data-presentation')) !== 'all')
         await button('scenario.editor.inspectorShowAll').click();
       const sectionIds = await sections
-        .locator(':scope > section')
+        .locator('.review-inspector-section')
         .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')));
       expect(sectionIds).toEqual(['canvas', 'window-header', 'background', 'audio']);
       const resizeContent = async (target: typeof sections, size: number) => {
@@ -135,22 +160,24 @@ for (const variant of [
         await page.mouse.up();
         await expect.poll(async () => Math.round((await target.boundingBox())!.width)).toBe(size);
       };
-      for (const size of [603, 604, 605]) {
+      const tabs = inspector.locator('.review-inspector-navigation > [role="group"]');
+      for (const size of [523, 524, 525]) {
         await resizeContent(sections, size);
         const columns = await sections.evaluate(
           (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
         );
-        expect(columns).toBe(size < 604 ? 1 : 2);
+        expect(columns).toBe(size < 524 ? 1 : 2);
+        const nav = (await tabs.boundingBox())!;
+        const first = (await sections.locator('.review-inspector-section').first().boundingBox())!;
+        expect(Math.abs(nav.width - first.width)).toBeLessThanOrEqual(1);
+        expect(Math.abs(nav.x - first.x)).toBeLessThanOrEqual(1);
       }
-      const tabs = inspector.locator('.review-inspector-navigation > [role="group"]');
-      expect((await tabs.boundingBox())!.width).toBeLessThan(
-        (await inspector.boundingBox())!.width - 40
-      );
+
       for (const fullHeight of [true, false]) {
         if (!fullHeight) await button('videoEditor.app.panelRestoreHeight').click();
         await button('scenario.editor.inspectorShowSections').click();
         const canvas = inspector.locator('[data-section="canvas"] .review-inspector-columns');
-        for (const size of [603, 604, 605]) {
+        for (const size of [523, 524, 525]) {
           await resizeContent(canvas, size);
           await expect
             .poll(() =>
@@ -158,12 +185,37 @@ for (const variant of [
                 (node) => getComputedStyle(node).gridTemplateColumns.split(' ').length
               )
             )
-            .toBe(size < 604 ? 1 : 2);
+            .toBe(size < 524 ? 1 : 2);
         }
         await button('scenario.editor.inspectorShowAll').click();
-        await expect(sections.locator(':scope > section')).toHaveCount(4);
+        await expect(sections.locator('.review-inspector-section')).toHaveCount(4);
       }
       await width.press('End');
+      const sectionNodes = sections.locator('.review-inspector-section');
+      const firstBox = (await sectionNodes.first().boundingBox())!;
+      const boxes = await sectionNodes.evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const rect = node.getBoundingClientRect();
+          return { x: rect.x, y: rect.y };
+        })
+      );
+      const nextLeft = sectionNodes.nth(
+        boxes.findIndex((box, index) => index > 0 && Math.abs(box.x - firstBox.x) < 1)
+      );
+      const beforeCollapse = (await nextLeft.boundingBox())!.y;
+      const disclosure = sectionNodes.first().locator('summary').first();
+      await disclosure.click();
+      await expect
+        .poll(async () => {
+          const collapsed = (await sectionNodes.first().boundingBox())!;
+          return Math.abs(
+            beforeCollapse -
+              (await nextLeft.boundingBox())!.y -
+              (firstBox.height - collapsed.height)
+          );
+        })
+        .toBeLessThanOrEqual(1);
+      await disclosure.click();
       await page.screenshot({ path: info.outputPath('resized-panels.png'), fullPage: false });
       await button('videoEditor.app.panelFullHeight').click();
       await height.press('Home');
@@ -200,6 +252,26 @@ for (const variant of [
         ).toHaveCSS('display', 'grid');
         await button('scenario.editor.inspectorShowAll').click();
       }
+      const interval = focus.locator('[data-ui="gallery.videoReview.interval"]');
+      const reset = button('gallery.videoReview.zoomResetPosition');
+      const copy = button('gallery.videoReview.focusDuplicate');
+      const remove = button('gallery.videoReview.zoomDelete');
+      await remove.scrollIntoViewIfNeeded();
+      const a = (await reset.boundingBox())!;
+      const b = (await remove.boundingBox())!;
+      expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(1);
+      expect(b.x - a.x - a.width).toBeCloseTo(12, 0);
+      expect(b.y).toBeCloseTo(a.y, 0);
+      expect((await copy.boundingBox())!.x).toBeCloseTo(a.x, 0);
+      expect((await interval.boundingBox())!.width).toBeCloseTo(a.width, 0);
+      await page.screenshot({ path: info.outputPath('wide-actions.png'), fullPage: false });
+      await width.press('Home');
+      expect((await remove.boundingBox())!.x).toBeCloseTo((await reset.boundingBox())!.x, 0);
+      await width.press('End');
+      const fullscreen = dialog.locator('[data-ui="gallery.videoReview.fullscreen"]');
+      await expect(fullscreen).toHaveCSS('width', '32px');
+      await expect(fullscreen).toHaveCSS('height', '32px');
+      await expect(fullscreen.locator('svg')).toHaveClass(/lucide-maximize$/);
       const transport = dialog.locator('[data-toolbar-transport]');
       expect(
         await transport.evaluate((node) => node.scrollWidth - node.clientWidth)

@@ -1,3 +1,4 @@
+import { ReviewTrackHeightButton } from './track-row';
 import { reviewOriginalAudioPlacementIssue } from './range-placement';
 import type { ReviewFocusType } from './zoom-editor';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -243,6 +244,7 @@ function ReviewModeControl(props: {
 
 /** Compact lane switches live in the sticky gutter beside the time ruler. */
 export function ReviewTrackControls(props: {
+  density?: { compact: boolean; onToggle(): void };
   webcam?: { available: boolean; enabled: boolean; toggle(): void } | undefined;
   advanced: QuickEditAdvancedState;
   telemetryAvailable: boolean;
@@ -252,15 +254,24 @@ export function ReviewTrackControls(props: {
 }) {
   const advanced = props.advanced;
   const features = resolveQuickEditEffectiveFeatures(advanced);
-  if (features.mode !== 'advanced') return null;
+  if (features.mode !== 'advanced' && !props.density) return null;
   return (
     <fieldset
       disabled={props.busy}
       data-ui="gallery.videoReview.trackControls"
       className="flex items-center gap-1"
     >
-      <ReviewModeControl advanced={advanced} busy={props.busy} setMode={props.setMode} compact />
-      <ReviewHistoryTrackControl {...props} compact />
+      {features.mode === 'advanced' ? (
+        <>
+          <ReviewModeControl
+            advanced={advanced}
+            busy={props.busy}
+            setMode={props.setMode}
+            compact
+          />
+          <ReviewHistoryTrackControl {...props} compact />
+        </>
+      ) : null}
       {features.mode === 'advanced' ? (
         <>
           <ReviewButton
@@ -291,6 +302,7 @@ export function ReviewTrackControls(props: {
           ) : null}
         </>
       ) : null}
+      {props.density ? <ReviewTrackHeightButton {...props.density} /> : null}
     </fieldset>
   );
 }

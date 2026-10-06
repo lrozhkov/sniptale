@@ -231,7 +231,7 @@ it('keeps camera markers on the source axis and creates hide intervals through a
     root.render(<ReviewWebcamTrack editor={editor} projection={createTrackProjection(12, [])} />);
   act(render);
   const track = host.querySelector<HTMLDivElement>('[data-ui="gallery.videoReview.webcamTrack"]')!;
-  expect(track.style.height).toBe('28px');
+  expect(track.style.height).toBe('40px');
   click('webcamSettings');
   expect(editor.select).toHaveBeenCalledWith({ kind: 'webcam' });
   const markers = track.querySelectorAll<HTMLButtonElement>('button');
@@ -249,12 +249,13 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   pointer(track, 'pointerdown', 500);
   pointer(track, 'pointerup', 500);
   expect(editor.hide).toHaveBeenCalledTimes(1);
-  const heightButton = host.querySelector<HTMLButtonElement>(
-    '[aria-label="gallery.videoReview.compactTrackHeight"]'
+  expect(host.querySelector('[aria-label="gallery.videoReview.compactTrackHeight"]')).toBeNull();
+  act(() =>
+    root.render(
+      <ReviewWebcamTrack compact editor={editor} projection={createTrackProjection(12, [])} />
+    )
   );
-  expect(heightButton).not.toBeNull();
-  act(() => heightButton!.click());
-  expect(track.style.height).toBe('40px');
+  expect(track.style.height).toBe('28px');
   editor.selection = { kind: 'webcam-position', id: 'position' };
   act(render);
   editor.selection = { kind: 'webcam-hidden', id: 'hidden' };

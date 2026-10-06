@@ -299,7 +299,7 @@
 /* Whole semantic groups flow in DOM order; nested groups fall back to one column. */
 .review-inspector-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 296px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 256px), 1fr));
   gap: 12px;
   align-items: start;
   min-width: 0;
@@ -315,17 +315,59 @@
   container: review-inspector-content / inline-size;
 }
 
-@container review-inspector-content (min-width: 604px) {
+.review-inspector-section-column {
+  display: contents;
+}
+.review-inspector-section-column
+  + .review-inspector-section-column
+  > .review-inspector-section:first-child {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+
+@container review-inspector-content (min-width: 524px) {
   [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all'] {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     align-items: start;
   }
-  [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all']
-    > .review-inspector-section {
+  .review-inspector-section-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+  }
+  .review-inspector-section-column > .review-inspector-section,
+  .review-inspector-section-column
+    + .review-inspector-section-column
+    > .review-inspector-section:first-child {
     margin: 0;
     padding: 0;
     border: 0;
+  }
+}
+
+/* Footer actions retain the same column geometry as inspector sections. */
+.review-inspector-actions {
+  display: grid;
+  gap: 8px;
+}
+@container review-inspector-content (min-width: 524px) {
+  [data-ui='gallery.videoReview.interval'] {
+    width: calc((100cqw - 12px) / 2);
+    max-width: 100%;
+  }
+  .review-inspector-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 12px;
+  }
+  .review-inspector-actions > button {
+    grid-column: 1;
+  }
+  .review-inspector-actions > .review-inspector-danger {
+    grid-column: 2;
+    grid-row: 1;
   }
 }

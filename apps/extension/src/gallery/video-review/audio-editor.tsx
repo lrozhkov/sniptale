@@ -118,7 +118,7 @@ export function ReviewAudioClipEditor(props: {
           },
         ]}
       />
-      <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.audioClipDelete')}
           disabled={props.busy}

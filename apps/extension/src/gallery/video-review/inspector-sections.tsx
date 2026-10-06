@@ -50,19 +50,28 @@ export function ReviewInspectorSections({ sections }: { sections: readonly Revie
           )}
         />
       ) : (
-        sections.map(({ id, label, icon, content }) => (
-          <section key={id} data-section={id} className="review-inspector-section">
-            <ReviewDetails
-              preferenceId={`section:${id}`}
-              label={label}
-              icon={icon}
-              level="section"
-              initiallyOpen
-            >
-              {content}
-            </ReviewDetails>
-          </section>
-        ))
+        [
+          sections.slice(0, Math.ceil(sections.length / 2)),
+          sections.slice(Math.ceil(sections.length / 2)),
+        ]
+          .filter((column) => column.length > 0)
+          .map((column, index) => (
+            <div className="review-inspector-section-column" key={index}>
+              {column.map(({ id, label, icon, content }) => (
+                <section key={id} data-section={id} className="review-inspector-section">
+                  <ReviewDetails
+                    preferenceId={`section:${id}`}
+                    label={label}
+                    icon={icon}
+                    level="section"
+                    initiallyOpen
+                  >
+                    {content}
+                  </ReviewDetails>
+                </section>
+              ))}
+            </div>
+          ))
       )}
     </div>
   );

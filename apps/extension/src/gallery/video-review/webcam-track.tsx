@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { Camera, Diamond, EyeOff, Settings2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ReviewTrackCuts, ReviewTrackHeightButton, ReviewTrackRow } from './track-row';
+import { ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import {
   ReviewButton,
   reviewCompactTrackButtonClassName,
@@ -23,13 +23,14 @@ type Drag = {
 
 /** Camera uses source-axis intervals; hiding it never cuts or changes the main transport. */
 export function ReviewWebcamTrack(props: {
+  compact?: boolean;
   editor: ReturnType<typeof useReviewWebcamEditor>;
   projection: ReviewTrackProjection;
   beforeAction?: ReviewBeforeAction | undefined;
 }) {
   const { editor, projection } = props;
   const camera = editor.camera;
-  const [compact, setCompact] = useState(true);
+  const compact = props.compact ?? false;
   const [preview, setPreview] = useState<Range | null>(null);
   const drag = useRef<Drag | null>(null);
   const clear = () => setPreview(null);
@@ -78,10 +79,6 @@ export function ReviewWebcamTrack(props: {
           >
             <Settings2 size={14} aria-hidden />
           </ReviewButton>
-          <ReviewTrackHeightButton
-            compact={compact}
-            onToggle={() => setCompact((value) => !value)}
-          />
         </>
       }
     >
@@ -157,6 +154,7 @@ function ReviewWebcamTrackMarkers({
   duration,
   admit,
 }: {
+  compact?: boolean;
   editor: ReturnType<typeof useReviewWebcamEditor>;
   duration: number;
   admit: ReviewBeforeAction;

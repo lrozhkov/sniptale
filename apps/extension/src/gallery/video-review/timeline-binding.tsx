@@ -33,7 +33,6 @@ type Exporter = ReturnType<typeof useReviewExport>;
 /** Zoom lane on the result-time scale with shared snap candidates. */
 function ReviewZoomLane(props: {
   compact: boolean;
-  onToggleHeight(): void;
   beforeAction?: ReviewBeforeAction | undefined;
   advanced: QuickEditAdvancedState;
   projection?: ReviewTrackProjection;
@@ -49,7 +48,6 @@ function ReviewZoomLane(props: {
   return (
     <ReviewZoomTrack
       compact={props.compact}
-      onToggleHeight={props.onToggleHeight}
       beforeAction={props.beforeAction}
       projection={props.projection}
       sourceSelection={props.sourceSelection}
@@ -239,8 +237,7 @@ function ReviewTimelineToolsBinding(
 
 /** One timeline binding: tools, zoom track, edit lanes, and the selection contract. */
 export function ReviewTimelineBinding(props: TimelineBindingProps) {
-  const [sourceCompact, setSourceCompact] = useState(false);
-  const [focusCompact, setFocusCompact] = useState(false);
+  const [compact, setCompact] = useState(false);
   const projection = useMemo(
     () => createTrackProjection(props.source.duration, props.edits),
     [props.source.duration, props.edits]
@@ -251,8 +248,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   return (
     <ReviewTimeline
       fillHeight={props.fillHeight}
-      sourceCompact={sourceCompact}
-      onToggleSourceHeight={() => setSourceCompact((value) => !value)}
+      sourceCompact={compact}
       playbackRange={props.playbackRange}
       onPlaybackRange={props.onPlaybackRange}
       sourceRangeTool={!!props.editing.mode}
@@ -277,11 +273,16 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       originalRangeTool={props.audio.originalTool}
       snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
       trackControls={
-        <ReviewTimelineTrackControls props={props} webcamVisible={features.webcamTrackVisible} />
+        <ReviewTimelineTrackControls
+          props={props}
+          webcamVisible={features.webcamTrackVisible}
+          density={{ compact, onToggle: () => setCompact((value) => !value) }}
+        />
       }
       webcamTrack={
         features.webcamTrackVisible && props.webcam ? (
           <ReviewWebcamTrack
+            compact={compact}
             editor={props.webcam}
             projection={projection}
             beforeAction={props.beforeAction}
@@ -293,8 +294,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? {
             zoomTrack: (
               <ReviewZoomLane
-                compact={focusCompact}
-                onToggleHeight={() => setFocusCompact((value) => !value)}
+                compact={compact}
                 beforeAction={props.beforeAction}
                 projection={projection}
                 sourceSelection={focus.tool.active ? (focus.preview ?? undefined) : undefined}
@@ -576,12 +576,15 @@ function reviewCursorPlacementHints(props: TimelineBindingProps, focus: string |
 function ReviewTimelineTrackControls({
   props,
   webcamVisible,
+  density,
 }: {
   props: TimelineBindingProps;
   webcamVisible: boolean;
+  density: { compact: boolean; onToggle(): void };
 }) {
   return (
     <ReviewTrackControls
+      density={density}
       webcam={
         props.webcam
           ? {

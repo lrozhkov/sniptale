@@ -68,7 +68,7 @@ export function ReviewInspector(props: {
   return (
     <aside
       data-ui="gallery.videoReview.inspector"
-      className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 overflow-hidden border-l
+      className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
           props.fullHeight ? 'col-start-2 row-start-1 row-span-2' : ''
         }`}

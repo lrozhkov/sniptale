@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Maximize2, Minimize2, Pause, Play, X } from 'lucide-react';
+import { Maximize, Minimize, Pause, Play, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import { useLibraryFullscreen } from '../../composition/library-preview/viewport';
@@ -49,7 +49,8 @@ export function ReviewPreviewFrame(props: {
         <ContentToolbarButton
           ref={fullscreen.fullscreenButton}
           dataUi="gallery.videoReview.fullscreen"
-          className="!absolute right-2 top-2 z-20 !bg-[var(--sniptale-color-surface-panel)]
+          tone="utility"
+          className="!absolute !h-8 !min-h-8 !w-8 !p-0 right-2 top-2 z-20 !bg-[var(--sniptale-color-surface-panel)]
             opacity-70 hover:opacity-100 focus-visible:opacity-100"
           title={label}
           aria-label={label}
@@ -61,9 +62,9 @@ export function ReviewPreviewFrame(props: {
           }}
         >
           {fullscreen.fullscreen ? (
-            <Minimize2 size={16} aria-hidden />
+            <Minimize size={18} aria-hidden />
           ) : (
-            <Maximize2 size={16} aria-hidden />
+            <Maximize size={18} aria-hidden />
           )}
         </ContentToolbarButton>
       </div>

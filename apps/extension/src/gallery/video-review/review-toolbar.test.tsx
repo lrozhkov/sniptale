@@ -261,3 +261,44 @@ it('shows the Focus type only while Focus is active and retains the insertion ch
     vi.unstubAllGlobals();
   }
 });
+
+it('keeps one global density control available in both editing modes without toggling tracks', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  const advanced = createQuickEditAdvancedState();
+  const onToggle = vi.fn();
+  const setTrackVisibility = vi.fn();
+  try {
+    for (const mode of ['basic', 'advanced'] as const) {
+      advanced.ui.mode = mode;
+      for (const compact of [false, true]) {
+        await act(async () =>
+          root.render(
+            <ReviewTrackControls
+              advanced={advanced}
+              busy={false}
+              setMode={vi.fn()}
+              setTrackVisibility={setTrackVisibility}
+              telemetryAvailable
+              density={{ compact, onToggle }}
+            />
+          )
+        );
+        const buttons = host.querySelectorAll<HTMLButtonElement>(
+          `[aria-label="${translate('gallery.videoReview.compactTrackHeight')}"]`
+        );
+        expect(buttons).toHaveLength(1);
+        expect(buttons[0]!.getAttribute('aria-pressed')).toBe(String(compact));
+        await act(async () => buttons[0]!.click());
+      }
+    }
+    expect(onToggle).toHaveBeenCalledTimes(4);
+    expect(setTrackVisibility).not.toHaveBeenCalled();
+  } finally {
+    await act(async () => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

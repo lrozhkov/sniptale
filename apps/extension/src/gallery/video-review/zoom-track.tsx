@@ -28,7 +28,7 @@ import {
   reviewTimeLabel,
 } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
-import { ReviewTrackRow, ReviewTrackCuts, ReviewTrackHeightButton } from './track-row';
+import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewDragEscape } from './timeline-drag';
 
 type FocusRange = Pick<QuickEditZoomRegion, 'start' | 'end' | 'sourceAnchor'>;
@@ -36,7 +36,6 @@ type FocusAxis = Pick<ReviewTrackProjection, 'duration' | 'source' | 'output'>;
 
 type ZoomTrackProps = {
   compact?: boolean | undefined;
-  onToggleHeight?: (() => void) | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   sourceSelection?: ReviewAnchor | undefined;
   projection?: ReviewTrackProjection | undefined;
@@ -214,9 +213,6 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       icon={<Focus size={14} aria-hidden="true" />}
       controls={
         <>
-          {props.onToggleHeight ? (
-            <ReviewTrackHeightButton compact={!!props.compact} onToggle={props.onToggleHeight} />
-          ) : null}
           <ReviewButton
             label={translate('gallery.videoReview.zoomAdd')}
             title={props.addHint ?? translate('gallery.videoReview.zoomAdd')}

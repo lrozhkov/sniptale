@@ -6,14 +6,13 @@ import { Film, Scissors, Gauge } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import { reviewTimeLabel } from './controls';
-import { ReviewTrackRow, ReviewTrackHeightButton } from './track-row';
+import { ReviewTrackRow } from './track-row';
 import { ReviewCommentMarkers } from './timeline-comment-markers';
 import { useReviewDragEscape } from './timeline-drag';
 import { snapReviewEditDrag } from './timeline-edit-snap';
 
 type SelectionProps = {
   sourceCompact?: boolean | undefined;
-  onToggleSourceHeight?: (() => void) | undefined;
   beforeAction?: ReviewBeforeAction | undefined;
   rangeEnabled?: boolean;
   duration: number;
@@ -35,22 +34,16 @@ const percent = (time: number, duration: number) => `${(time / duration) * 100}%
 /** One source lane; existing edits can be moved or resized directly. */
 export function ReviewSourceLane(props: SelectionProps) {
   const [guide, setGuide] = useState<number | null>(null);
+  const stacked = props.edits?.some((edit) => hasReviewEditOverlap(edit, props.edits));
+  const height = stacked ? 'h-[60px]' : props.sourceCompact ? 'h-8' : 'h-12';
   return (
     <ReviewTrackRow
       label={translate('gallery.videoReview.sourceVideo')}
       icon={<Film size={14} aria-hidden="true" />}
-      controls={
-        props.onToggleSourceHeight ? (
-          <ReviewTrackHeightButton
-            compact={!!props.sourceCompact}
-            onToggle={props.onToggleSourceHeight}
-          />
-        ) : undefined
-      }
     >
       <div
         data-ui="gallery.videoReview.sourceLane"
-        className={`relative ${props.sourceCompact ? 'h-8' : 'h-12'} rounded bg-[var(--sniptale-color-surface-hover)]
+        className={`relative ${height} rounded bg-[var(--sniptale-color-surface-hover)]
           ${props.annotations.length ? 'mt-6' : 'mt-1'}`}
       >
         {guide !== null ? (
@@ -227,13 +220,18 @@ function ReviewEditBlock(
   );
 }
 
+function hasReviewEditOverlap(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
+  return (
+    edits?.some(
+      (item) => item.kind !== edit.kind && item.start < edit.end && item.end > edit.start
+    ) ?? false
+  );
+}
+
 /** Source-lane cut/speed geometry keeps both edit kinds selectable during an overlap. */
 function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] | undefined) {
   const { name, value, label } = reviewEditCaption(edit);
-  const overlap =
-    edits?.some(
-      (item) => item.kind !== edit.kind && item.start < edit.end && item.end > edit.start
-    ) ?? false;
+  const overlap = hasReviewEditOverlap(edit, edits);
   const covered =
     edit.kind === 'speed'
       ? (edits?.filter(
@@ -243,8 +241,8 @@ function reviewEditPresentation(edit: ReviewEdit, edits: readonly ReviewEdit[] |
   const hint = covered.length ? ` · ${translate('gallery.videoReview.cutOverlapHint')}` : '';
   const position = overlap
     ? edit.kind === 'cut'
-      ? 'top-1 bottom-[52%] z-[6]'
-      : 'top-[52%] bottom-1 z-[5]'
+      ? 'top-1 h-6 z-[6]'
+      : 'top-8 h-6 z-[5]'
     : 'inset-y-1 z-[5]';
   return {
     name,

@@ -38,22 +38,22 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       const source = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
       const focus = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
-      const header = (name: Parameters<typeof translate>[0]) =>
-        dialog
-          .locator('[data-ui="gallery.videoReview.trackHeader"]')
-          .filter({ has: page.locator('[data-track-label]', { hasText: label(name) }) });
-      const sourceHeight = header('gallery.videoReview.sourceVideo').getByRole('button', {
-        name: label('gallery.videoReview.compactTrackHeight'),
-        exact: true,
-      });
-      const focusHeight = header('gallery.videoReview.zoomTrack').getByRole('button', {
-        name: label('gallery.videoReview.compactTrackHeight'),
-        exact: true,
-      });
+      const density = dialog
+        .locator('[data-ui="gallery.videoReview.trackControls"]')
+        .getByRole('button', {
+          name: label('gallery.videoReview.compactTrackHeight'),
+          exact: true,
+        });
+      await expect(
+        dialog.getByRole('button', {
+          name: label('gallery.videoReview.compactTrackHeight'),
+          exact: true,
+        })
+      ).toHaveCount(1);
       await expect(source).toHaveCSS('height', '48px');
-      await sourceHeight.click();
+      await density.click();
       await expect(source).toHaveCSS('height', '32px');
-      await expect(sourceHeight).toHaveAttribute('aria-pressed', 'true');
+      await expect(density).toHaveAttribute('aria-pressed', 'true');
       const sourceRect = (await source.boundingBox())!;
       await page.mouse.move(sourceRect.x + sourceRect.width * 0.2, sourceRect.y + 16);
       await page.mouse.down();
@@ -76,6 +76,7 @@ for (const variant of [
         );
         await page.mouse.click(rect.x + (rect.width * time) / duration, rect.y + 12);
       };
+      await density.click();
       await seek(0.5);
       await button('gallery.videoReview.zoomAdd').click();
       await seek(6);
@@ -102,7 +103,7 @@ for (const variant of [
       const leftBefore = await blocks
         .last()
         .evaluate((node) => ({ left: node.style.left, width: node.style.width }));
-      await focusHeight.click();
+      await density.click();
       await expect(focus).toHaveCSS('height', '52px');
       await expect(blocks.last()).toHaveCSS('height', '24px');
       await expect(link).toHaveCSS('height', '20px');
@@ -111,10 +112,10 @@ for (const variant of [
         await blocks.last().evaluate((node) => ({ left: node.style.left, width: node.style.width }))
       ).toEqual(leftBefore);
       await expect(blocks.last()).toHaveAttribute('aria-pressed', 'true');
-      await sourceHeight.click();
+      await density.click();
       await expect(source).toHaveCSS('height', '48px');
-      await expect(focusHeight).toHaveAttribute('aria-pressed', 'true');
-      await sourceHeight.click();
+      await expect(focus).toHaveCSS('height', '68px');
+      await density.click();
       const visibility = dialog
         .locator('[data-ui="gallery.videoReview.trackControls"]')
         .getByRole('button', { name: label('gallery.videoReview.zoomTrack'), exact: true });
@@ -131,7 +132,7 @@ for (const variant of [
           name: label('gallery.videoReview.compactTrackHeight'),
           exact: true,
         })
-      ).toHaveCount(2);
+      ).toHaveCount(1);
       await blocks.last().scrollIntoViewIfNeeded();
       const before = (await persistedFocus(page))!.sourceAnchor!.start;
       const block = (await blocks.last().boundingBox())!;
@@ -152,7 +153,29 @@ for (const variant of [
       ).toBeVisible();
       await expect(link).toHaveAttribute('aria-pressed', 'true');
       await page.screenshot({ path: info.outputPath('compact-track-height.png'), fullPage: false });
-      for (const control of [sourceHeight, focusHeight]) {
+      const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      const selectRange = async (start: number, end: number) => {
+        await ruler.scrollIntoViewIfNeeded();
+        const rect = (await ruler.boundingBox())!;
+        await page.mouse.move(rect.x + (rect.width * start) / 12.01, rect.y + 12);
+        await page.mouse.down();
+        await page.mouse.move(rect.x + (rect.width * end) / 12.01, rect.y + 12, { steps: 5 });
+        await page.mouse.up();
+      };
+      await selectRange(8, 11);
+      await button('gallery.videoReview.speedMode').click();
+      await selectRange(9, 10);
+      await button('gallery.videoReview.cutMode').click();
+      const edits = source.locator('[data-ui="gallery.videoReview.editBlock"]');
+      await expect(edits).toHaveCount(2);
+      for (const edit of await edits.all()) await expect(edit).toHaveCSS('height', '24px');
+      await expect(source).toHaveCSS('height', '60px');
+      await page.screenshot({ path: info.outputPath('compact-overlap.png'), fullPage: false });
+      await density.click();
+      await expect(source).toHaveCSS('height', '60px');
+      for (const edit of await edits.all()) await expect(edit).toHaveCSS('height', '24px');
+      await expect(focus).toHaveCSS('height', '68px');
+      for (const control of [density]) {
         const fit = await control.evaluate((node) => {
           const rect = node.getBoundingClientRect();
           const parent = node

@@ -1,3 +1,4 @@
+import './panel-layout.css';
 import {
   useCallback,
   useEffect,
@@ -212,12 +213,10 @@ export function ReviewPanelResizeHandle({ resize }: { resize: PanelResize }) {
       aria-valuenow={Math.round(size)}
       title={translate('gallery.videoReview.resizePanelHint')}
       tabIndex={0}
-      className={`absolute z-20 touch-none outline-offset-[-2px]
-        hover:bg-[var(--sniptale-color-surface-hover)] focus-visible:outline focus-visible:outline-2
+      className={`review-panel-resize absolute z-20 touch-none outline-offset-[-2px]
+        focus-visible:outline focus-visible:outline-2
         focus-visible:outline-[var(--sniptale-color-focus-ring)] ${
-          panel === 'inspector'
-            ? 'inset-y-0 left-0 w-2 cursor-col-resize'
-            : 'inset-x-0 -top-1 h-2 cursor-row-resize'
+          panel === 'inspector' ? 'inset-y-0 -left-1 w-2' : 'inset-x-0 -top-1 h-2'
         }`}
     />
   );

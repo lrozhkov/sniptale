@@ -61,7 +61,7 @@ export function ReviewTrackCuts({
   ));
 }
 
-/** Per-track density is a view preference, separate from enabled/editing state. */
+/** Timeline density is a view preference, separate from enabled/editing state. */
 export function ReviewTrackHeightButton(props: { compact: boolean; onToggle(): void }) {
   return (
     <ReviewButton
@@ -72,7 +72,7 @@ export function ReviewTrackHeightButton(props: { compact: boolean; onToggle(): v
           : 'gallery.videoReview.compactTrackHeight'
       )}
       aria-pressed={props.compact}
-      className={`${reviewCompactTrackButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+      className={`${reviewCompactTrackButtonClassName} !h-6 !min-h-6 !w-6 !px-1`}
       onClick={props.onToggle}
     >
       {props.compact ? (

@@ -362,7 +362,7 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
           },
         ]}
       />
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.overlayDelete')}
           disabled={props.busy}

@@ -213,7 +213,7 @@ function ReviewFocusActions(props: {
 }) {
   const { region } = props;
   return (
-    <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+    <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
       <ReviewButton
         label={translate('gallery.videoReview.zoomResetPosition')}
         className={`${reviewTextButtonClassName} !w-full justify-start`}
@@ -347,7 +347,7 @@ export function ReviewZoomLinkInspector(props: {
           {reviewTimeLabel(gap)}
         </span>
       </div>
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.zoomLinkRemove')}
           className={`${reviewDeleteButtonClassName} !w-full justify-start`}

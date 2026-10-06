@@ -237,7 +237,7 @@ function SelectedEdit(
           onApply={(range) => editing.commitRange(range, selected)}
         />
       </div>
-      <div className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.deleteSelected')}
           className={`${reviewDeleteButtonClassName} !w-full justify-start`}
