@@ -1,3 +1,4 @@
+import { EXACT_BROWSER_FRAME_TOKENS } from '../../features/browser-frame/assets';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { ReviewBorderOverlay } from './border-overlay';
 import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-overlay';
@@ -297,8 +298,6 @@ function ReviewSceneVideo(props: {
     props.previewScale * (motion?.scale ?? 1)
   );
   const videoClip = motion?.windowClip ?? props.layout?.windowRect;
-  const header = props.header;
-  const window = props.layout ? computeQuickEditWindowTransform(props.layout) : null;
   const translation = props.layout
     ? {
         x: props.layout.videoTransform.x - (videoClip?.x ?? 0),
@@ -324,21 +323,7 @@ function ReviewSceneVideo(props: {
           : undefined,
       }}
     >
-      {header.image && window && props.layout ? (
-        <img
-          alt=""
-          src={header.url ?? undefined}
-          draggable={false}
-          className="pointer-events-none absolute"
-          style={{
-            left: window.x - (videoClip?.x ?? 0),
-            top: window.y - (videoClip?.y ?? 0),
-            width: window.width,
-            height: props.layout.videoTransform.y - window.y,
-            maxWidth: 'none',
-          }}
-        />
-      ) : null}
+      <ReviewWindowHeader header={props.header} layout={props.layout} transform={videoTransform} />
       <video
         ref={props.video}
         src={props.url}
@@ -401,6 +386,52 @@ function ReviewSceneVideo(props: {
         />
       ) : null}
     </div>
+  );
+}
+
+/** Artwork and its opaque join ride the same transform as the native video. */
+function ReviewWindowHeader({
+  header,
+  layout,
+  transform,
+}: {
+  header: ReturnType<typeof useReviewWindowHeader>;
+  layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
+  transform: string;
+}) {
+  if (!header.image || !layout) return null;
+  const common = {
+    position: 'absolute' as const,
+    left: 0,
+    top: 0,
+    width: layout.videoRect.width,
+    transformOrigin: '0 0',
+    pointerEvents: 'none' as const,
+  };
+  return (
+    <>
+      {/* Back both sides of the join; independently antialiased textures can otherwise expose the scene. */}
+      <div
+        style={{
+          ...common,
+          height: 2,
+          background: EXACT_BROWSER_FRAME_TOKENS.bodyFill,
+          transform: `${transform} translateY(-1px)`,
+        }}
+      />
+      <img
+        alt=""
+        src={header.url ?? undefined}
+        draggable={false}
+        style={{
+          ...common,
+          height: layout.videoRect.y - layout.windowRect.y,
+          // Layout-sized zooming rounds each edge separately and rerasterizes the SVG each frame.
+          transform: `${transform} translateY(-100%)`,
+          maxWidth: 'none',
+        }}
+      />
+    </>
   );
 }
 

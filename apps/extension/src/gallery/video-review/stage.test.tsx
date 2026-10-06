@@ -480,14 +480,11 @@ it.each(['fixed', 'follow-video'] as const)(
           },
         });
         const header = host.querySelector('img')!;
-        const translation = video.style.transform.match(/translate3d\(([^,]+)px, ([^,]+)px/)!;
-        expect(Number.parseFloat(header.style.left)).toBeCloseTo(Number(translation[1]));
-        expect(
-          Number.parseFloat(header.style.top) + Number.parseFloat(header.style.height)
-        ).toBeCloseTo(Number(translation[2]));
-        expect(Number.parseFloat(header.style.width)).toBeCloseTo(
-          Number.parseFloat(video.style.width) * scale
-        );
+        expect(header.style.left).toBe('0px');
+        expect(header.style.top).toBe('0px');
+        expect(header.style.transform).toBe(`${video.style.transform} translateY(-100%)`);
+        expect(header.style.transformOrigin).toBe(video.style.transformOrigin);
+        expect(header.style.width).toBe(video.style.width);
         expect(header.parentElement).toBe(video.parentElement);
         expect(video.parentElement!.style.overflow).toBe('hidden');
       }
