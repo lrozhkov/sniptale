@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  motionBlur: { ru: 'Размытие движения', en: 'Motion blur' },
+  motionBlurOff: { ru: 'Выключено', en: 'Off' },
+  motionBlurOn: { ru: 'Включено', en: 'On' },
+  motionBlurStrength: { ru: 'Сила размытия', en: 'Blur strength' },
   webcamCircle: { ru: 'Круг', en: 'Circle' },
   webcamDiameter: { ru: 'Диаметр', en: 'Diameter' },
   webcamShadow: { ru: 'Тень', en: 'Shadow' },

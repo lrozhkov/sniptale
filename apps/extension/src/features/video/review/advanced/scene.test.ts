@@ -415,3 +415,90 @@ it.each(['none', 'linear', 'ease-in-out'] as const)(
     }
   }
 );
+
+it.each(['linear', 'ease-in-out'] as const)(
+  'keeps 30 FPS camera geometry continuous across entrance, hold, linked zoom-out and exit (%s)',
+  (type) => {
+    const regions = [
+      region({
+        id: 'a',
+        start: 0,
+        end: 3,
+        linkTo: 'b',
+        linkEasing: type,
+        transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+        enter: { type, duration: 1 },
+        exit: { type, duration: 1 },
+      }),
+      region({
+        id: 'b',
+        start: 6,
+        end: 9,
+        transform: { scale: 1.15, centerX: 0.5, centerY: 0.5 },
+        enter: { type, duration: 1 },
+        exit: { type, duration: 1 },
+      }),
+    ];
+    for (const boundary of [1, 3, 6, 8, 9]) {
+      const left = evaluateQuickEditCameraAtTime(regions, boundary - 1e-7);
+      const right = evaluateQuickEditCameraAtTime(regions, boundary + 1e-7);
+      expect(Math.abs(left.scale - right.scale)).toBeLessThan(1e-6);
+    }
+    const fractions = [];
+    for (let n = 0; n <= 270; n++) {
+      const time = n / 30;
+      const camera = evaluateQuickEditCameraAtTime(regions, time);
+      const layout = computeQuickEditSceneLayout({
+        output: { width: 1904, height: 1064 },
+        source: { width: 1904, height: 1064 },
+        background: { enabled: false },
+        camera,
+      });
+      expect(layout.videoTransform.x + layout.videoTransform.width / 2).toBeCloseTo(952, 10);
+      expect(layout.videoTransform.y + layout.videoTransform.height / 2).toBeCloseTo(532, 10);
+      if (time > 3 && time < 6) fractions.push(layout.videoTransform.x);
+    }
+    expect(new Set(fractions).size).toBe(fractions.length);
+    expect(fractions.some((value) => Math.abs(value - Math.round(value)) > 0.1)).toBe(true);
+  }
+);
+
+it('preserves continuous off-center camera paths in both zoom directions at 30 FPS', () => {
+  for (const scales of [
+    [1.15, 1.5],
+    [1.5, 1.15],
+  ]) {
+    const regions = [
+      region({
+        id: 'a',
+        start: 0,
+        end: 3,
+        linkTo: 'b',
+        linkEasing: 'linear',
+        transform: { scale: scales[0]!, centerX: 0.3, centerY: 0.7 },
+      }),
+      region({
+        id: 'b',
+        start: 6,
+        end: 9,
+        transform: { scale: scales[1]!, centerX: 0.7, centerY: 0.3 },
+      }),
+    ];
+    for (let n = 0; n <= 90; n++) {
+      const camera = evaluateQuickEditCameraAtTime(regions, 3 + n / 30);
+      const progress = n / 90;
+      expect(camera.scale).toBeCloseTo(scales[0]! + (scales[1]! - scales[0]!) * progress, 10);
+      const rendered = (transform: typeof camera) =>
+        computeQuickEditSceneLayout({
+          output: { width: 1904, height: 1064 },
+          source: { width: 1904, height: 1064 },
+          background: { enabled: false },
+          camera: transform,
+        }).videoTransform;
+      const start = rendered(regions[0]!.transform),
+        end = rendered(regions[1]!.transform);
+      expect(rendered(camera).x).toBeCloseTo(start.x + (end.x - start.x) * progress, 9);
+      expect(rendered(camera).y).toBeCloseTo(start.y + (end.y - start.y) * progress, 9);
+    }
+  }
+});

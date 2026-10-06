@@ -203,7 +203,7 @@ function expectMultiPassLockedOverlayDraws(params: {
     1,
     {},
     expect.any(Map),
-    0.4
+    1
   );
   expect(drawCompositionVisualLayerMock).toHaveBeenNthCalledWith(
     2,
@@ -213,7 +213,7 @@ function expectMultiPassLockedOverlayDraws(params: {
     1,
     {},
     expect.any(Map),
-    0.6
+    1
   );
   expect(drawCompositionVisualLayerMock).toHaveBeenNthCalledWith(
     3,

@@ -506,3 +506,79 @@ it('explains why cameras and unresolved placements cannot be copied', () => {
   }
   expect(duplicate).not.toHaveBeenCalled();
 });
+
+it('configures entrance and exit blur separately, starts disabled and retains the other phase', async () => {
+  const change = vi.fn();
+  renderInspector(change);
+  expect(host.querySelectorAll('[data-ui="gallery.videoReview.motionBlurSettings"]')).toHaveLength(
+    2
+  );
+  expect(host.querySelector('[aria-label="gallery.videoReview.motionBlurStrength"]')).toBeNull();
+  const enter = host.querySelector<HTMLButtonElement>(
+    '[data-phase="enter"] [aria-label="gallery.videoReview.motionBlur"]'
+  )!;
+  await act(async () => enter.click());
+  await act(async () =>
+    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
+  );
+  expect(change).toHaveBeenLastCalledWith({
+    motionBlur: { enter: { enabled: true, strength: 0.5 } },
+  });
+  const configured = {
+    ...region,
+    motionBlur: {
+      enter: { enabled: true, strength: 0.2 },
+      exit: { enabled: false, strength: 0.8 },
+    },
+  };
+  act(() =>
+    root.render(
+      <ReviewZoomInspector
+        region={configured}
+        onChange={change}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const exit = host.querySelector<HTMLButtonElement>(
+    '[data-phase="exit"] [aria-label="gallery.videoReview.motionBlur"]'
+  )!;
+  await act(async () => exit.click());
+  await act(async () =>
+    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
+  );
+  expect(change).toHaveBeenLastCalledWith({
+    motionBlur: { enter: configured.motionBlur.enter, exit: { enabled: true, strength: 0.8 } },
+  });
+});
+
+it('edits only outgoing link exposure in the selected transition inspector', async () => {
+  const change = vi.fn();
+  const source = {
+    ...region,
+    id: 'a',
+    end: 4,
+    linkTo: 'b',
+    motionBlur: { enter: { enabled: true, strength: 0.2 } },
+  };
+  const target = { ...region, id: 'b', start: 6, end: 9 };
+  act(() =>
+    root.render(
+      <ReviewZoomLinkInspector link={{ source, target }} onChange={change} onRemove={vi.fn()} />
+    )
+  );
+  expect(host.querySelectorAll('[data-ui="gallery.videoReview.motionBlurSettings"]')).toHaveLength(
+    1
+  );
+  const toggle = host.querySelector<HTMLButtonElement>(
+    '[data-phase="link"] [aria-label="gallery.videoReview.motionBlur"]'
+  )!;
+  await act(async () => toggle.click());
+  await act(async () =>
+    document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
+  );
+  expect(change).toHaveBeenLastCalledWith({
+    motionBlur: { enter: source.motionBlur.enter, link: { enabled: true, strength: 0.5 } },
+  });
+});

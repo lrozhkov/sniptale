@@ -87,6 +87,7 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  motionBlur?: QuickEditZoomRegion['motionBlur'];
   spotlight?: QuickEditSpotlight | null;
   border?: QuickEditBorder | null;
   start?: number;
@@ -130,6 +131,7 @@ export function updateQuickEditZoomRegion(
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
     const updated = {
       ...rest,
+      ...(patch.motionBlur ? { motionBlur: normalizeMotionBlur(patch.motionBlur) } : {}),
       ...(spotlight ? { spotlight } : {}),
       ...(border ? { border } : {}),
       ...(linkTo ? { linkTo } : {}),
@@ -320,4 +322,17 @@ export function trimQuickEditZoomRegion(args: {
     start: region.start,
     end: Math.max(region.start + MIN_REGION_SECONDS, Math.min(args.time, windowEnd)),
   };
+}
+
+function normalizeMotionBlur(value: NonNullable<QuickEditZoomRegion['motionBlur']>) {
+  const result: NonNullable<QuickEditZoomRegion['motionBlur']> = {};
+  for (const phase of ['enter', 'exit', 'link'] as const) {
+    const setting = value[phase];
+    if (setting)
+      result[phase] = {
+        enabled: setting.enabled,
+        strength: Number.isFinite(setting.strength) ? clampUnit(setting.strength) : 0,
+      };
+  }
+  return result;
 }

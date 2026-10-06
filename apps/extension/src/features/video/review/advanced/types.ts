@@ -66,6 +66,8 @@ export interface QuickEditBorder {
 }
 
 export interface QuickEditZoomRegion {
+  /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
+  motionBlur?: Partial<Record<'enter' | 'exit' | 'link', { enabled: boolean; strength: number }>>;
   border?: QuickEditBorder;
   /** Derived only; parser drops this projection clock before persistence admission. */
   borderClock?: {

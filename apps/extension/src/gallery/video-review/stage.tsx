@@ -1,3 +1,4 @@
+import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { EXACT_BROWSER_FRAME_TOKENS } from '../../features/browser-frame/assets';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { ReviewBorderOverlay } from './border-overlay';
@@ -5,7 +6,11 @@ import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-ove
 import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
 import { ReviewButton } from './controls';
 import { useReviewWindowHeader } from './use-window-header';
-import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
+import {
+  ReviewCutTransitionPreview,
+  type ReviewCutPreviewBinding,
+  type ReviewCutPreviewRaster,
+} from './cut-transition-preview';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import {
@@ -86,6 +91,7 @@ type ReviewStageProps = {
   webcam?: ReviewWebcamStageBinding | undefined;
   backgroundImageUrl?: string | undefined;
   cutPreview?: ReviewCutPreviewBinding | undefined;
+  onCutRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
   url: string;
   source: ReviewSource;
   video: RefObject<HTMLVideoElement | null>;
@@ -108,6 +114,10 @@ type ReviewStageProps = {
 /** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
 export function ReviewStage(props: ReviewStageProps) {
   const host = useRef<HTMLDivElement>(null);
+  const [cutRaster, setCutRaster] = useState<ReviewCutPreviewRaster>({
+    active: false,
+    frame: null,
+  });
   const header = useReviewWindowHeader(props.scene?.windowHeader, props.source.width);
   const {
     size,
@@ -190,6 +200,7 @@ export function ReviewStage(props: ReviewStageProps) {
         <ReviewSceneVideo
           url={props.url}
           cutPreview={props.cutPreview}
+          onCutRaster={setCutRaster}
           video={props.video}
           {...(props.scene ? { scene: props.scene } : {})}
           layout={sceneLayout}
@@ -203,6 +214,19 @@ export function ReviewStage(props: ReviewStageProps) {
           onEnded={props.onEnded}
           onError={props.onError}
         />
+        {!props.drawing && props.scene && sceneLayout ? (
+          <ReviewMotionBlurPreview
+            focus={props.scene.focus}
+            camera={props.scene.camera}
+            layout={sceneLayout}
+            output={size}
+            background={props.scene.background}
+            imageUrl={props.backgroundImageUrl}
+            headerImage={header.image}
+            sceneScale={size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)}
+            getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
+          />
+        ) : null}
         <ReviewSpotlightOverlay output={size} frames={spotlight} clip={overlayClip} />
         <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
         {props.comments && props.comments.items.length ? (
@@ -267,6 +291,7 @@ function ReviewStageComments(props: {
 /** One composition-space video: fitted inside the padded content rect, cropped by the clip. */
 function ReviewSceneVideo(props: {
   cutPreview?: ReviewCutPreviewBinding | undefined;
+  onCutRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
   url: string;
   video: RefObject<HTMLVideoElement | null>;
   scene?: {
@@ -365,6 +390,7 @@ function ReviewSceneVideo(props: {
       {props.cutPreview && props.layout ? (
         <ReviewCutTransitionPreview
           binding={props.cutPreview}
+          onRaster={props.onCutRaster}
           video={props.video}
           style={{
             position: 'absolute',

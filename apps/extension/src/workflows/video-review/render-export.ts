@@ -1,3 +1,8 @@
+import { drawReviewSceneFrame } from './scene-frame';
+import {
+  hasQuickEditMotionBlur,
+  quickEditMotionBlurCameras,
+} from '../../features/video/review/advanced/motion-blur';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { createReviewRenderTimeTracking } from './time-estimate-plan';
 import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
@@ -5,7 +10,6 @@ import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-sche
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { drawReviewBorders } from './render-border';
 import { createReviewWebcamRenderer } from './render-webcam';
-import { drawReviewSceneShadow } from './scene-shadow';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
 import {
@@ -52,8 +56,6 @@ import {
   type CanvasCommentExport,
 } from '../../features/video/review/comments';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
-import { drawReviewComments } from './render-comments';
 import { supportedReviewVideoCodecs, type ReviewMediaIndex } from './media-index';
 import { createReviewMediaOutput } from './media-output';
 import { chooseReviewAudioCodec, renderReviewAudio } from './audio-render';
@@ -552,6 +554,7 @@ export async function renderRenderWindowFrames(args: {
   const sampleTimes = window.sourceTimes.map((time) =>
     Math.min(lastTick, Math.round(time * resolution) / resolution)
   );
+  const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
   let frame = 0;
   const webcamFrames = args.webcam?.frames(window.sourceTimes);
   try {
@@ -602,6 +605,9 @@ export async function renderRenderWindowFrames(args: {
           comments: burned,
           sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
           cameraScale: camera.scale,
+          motionBlur: blurEnabled
+            ? quickEditMotionBlurCameras(args.zoomRegions, timestamp + args.fragmentOffset)
+            : undefined,
           sceneScale: args.sceneScale ?? 1,
         });
         const motion = computeQuickEditSceneCamera(layout, args.background);
@@ -665,135 +671,4 @@ export async function renderRenderWindowFrames(args: {
     await webcamFrames?.return(undefined);
   }
   return frame;
-}
-
-/**
- * One scene draw for export: full-canvas paint, rounded content clip, and the
- * camera-transformed frame. Content-attached overlays burn inside the content
- * clip; viewport-attached ones burn onto the composition frame after the clip.
- * Mirrors the preview stage so decoded frames and preview stay comparable.
- */
-export function drawReviewSceneFrame(
-  context: CanvasRenderingContext2D,
-  args: {
-    canvas: { width: number; height: number };
-    layout: Omit<ReturnType<typeof computeQuickEditSceneLayout>, 'windowRect'> & {
-      windowRect?: ReturnType<typeof computeQuickEditSceneLayout>['windowRect'];
-    };
-    background: QuickEditAdvancedState['background'];
-    image: ImageBitmap | null;
-    headerImage?: CanvasImageSource | null | undefined;
-    sample: {
-      draw(
-        context: CanvasRenderingContext2D,
-        x: number,
-        y: number,
-        width: number,
-        height: number
-      ): void;
-    };
-    comments?: readonly CanvasCommentExport[];
-    sourceTime?: number;
-    cameraScale?: number;
-    sceneScale?: number;
-  }
-) {
-  const { canvas, layout, background, image, sample, comments, sourceTime } = args;
-  context.fillStyle = '#000000';
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  const motion = computeQuickEditSceneCamera(layout, background);
-  if (motion.scale !== 1) {
-    context.save();
-    context.translate(motion.x, motion.y);
-    context.scale(motion.scale, motion.scale);
-  }
-  if (background.enabled) {
-    if (background.type === 'solid') {
-      context.fillStyle = background.color;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (background.type === 'gradient') {
-      drawSceneGradient(context, background.gradient, canvas.width, canvas.height);
-    } else if (image) {
-      drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
-    }
-  }
-  if (motion.scale !== 1) context.restore();
-  drawReviewSceneShadow(
-    context,
-    background,
-    motion.windowClip,
-    background.enabled ? background.layout.cornerRadius * motion.scale : 0,
-    (args.sceneScale ?? 1) * motion.scale
-  );
-  context.save();
-  context.beginPath();
-  const videoClip = motion.windowClip;
-  const clip = background.enabled ? background.layout : null;
-  if (clip && clip.cornerRadius > 0) {
-    context.roundRect(
-      videoClip.x,
-      videoClip.y,
-      videoClip.width,
-      videoClip.height,
-      Math.min(clip.cornerRadius * motion.scale, Math.min(videoClip.width, videoClip.height) / 2)
-    );
-  } else {
-    context.rect(videoClip.x, videoClip.y, videoClip.width, videoClip.height);
-  }
-  context.clip();
-  if (args.headerImage) {
-    const window = computeQuickEditWindowTransform(layout);
-    context.drawImage(
-      args.headerImage,
-      window.x,
-      window.y,
-      window.width,
-      layout.videoTransform.y - window.y
-    );
-  }
-  sample.draw(
-    context,
-    layout.videoTransform.x,
-    layout.videoTransform.y,
-    layout.videoTransform.width,
-    layout.videoTransform.height
-  );
-  const cameraScale = args.cameraScale ?? 1;
-  drawReviewComments(context, comments ?? [], {
-    attachment: 'content',
-    canvas,
-    videoTransform: layout.videoTransform,
-    scale: cameraScale,
-    sourceTime,
-  });
-  context.restore();
-  drawReviewComments(context, comments ?? [], {
-    attachment: 'viewport',
-    canvas,
-    videoTransform: null,
-    scale: 1,
-    sourceTime,
-  });
-}
-
-function drawFittedImage(
-  context: CanvasRenderingContext2D,
-  image: ImageBitmap,
-  width: number,
-  height: number,
-  fit: 'cover' | 'contain'
-) {
-  const scale =
-    fit === 'cover'
-      ? Math.max(width / image.width, height / image.height)
-      : Math.min(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  context.drawImage(
-    image,
-    (width - drawWidth) / 2,
-    (height - drawHeight) / 2,
-    drawWidth,
-    drawHeight
-  );
 }

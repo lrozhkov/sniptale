@@ -276,7 +276,9 @@ function ReviewZoomAnimation(props: {
               phase="enter"
               onChange={(spotlight) => onChange({ spotlight })}
             />
-          ) : null}
+          ) : (
+            <ReviewMotionBlurSettings phase="enter" region={region} onChange={onChange} />
+          )}
         </ZoomTransitionSection>
         <ZoomTransitionSection
           label={translate('gallery.videoReview.zoomTransitionOut')}
@@ -290,7 +292,9 @@ function ReviewZoomAnimation(props: {
               phase="exit"
               onChange={(spotlight) => onChange({ spotlight })}
             />
-          ) : null}
+          ) : (
+            <ReviewMotionBlurSettings phase="exit" region={region} onChange={onChange} />
+          )}
         </ZoomTransitionSection>
       </ReviewInspectorColumns>
     </>
@@ -340,6 +344,13 @@ export function ReviewZoomLinkInspector(props: {
           {reviewTimeLabel(gap)}
         </span>
       </div>
+      {quickEditFocusType(props.link.source) === 'zoom' ? (
+        <ReviewMotionBlurSettings
+          phase="link"
+          region={props.link.source}
+          onChange={props.onChange}
+        />
+      ) : null}
       <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
         <ReviewButton
           label={translate('gallery.videoReview.zoomLinkRemove')}
@@ -397,6 +408,58 @@ function ReviewFocusType({
         <p role="status" className="w-full text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.focusZoomConflict')}
         </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** Blur is independent of easing and keeps its strength when disabled. */
+function ReviewMotionBlurSettings(props: {
+  phase: 'enter' | 'exit' | 'link';
+  region: QuickEditZoomRegion;
+  onChange(patch: QuickEditZoomRegionPatch): void;
+}) {
+  const value = props.region.motionBlur?.[props.phase] ?? { enabled: false, strength: 0.5 };
+  return (
+    <div
+      className="min-w-0 space-y-2"
+      data-ui="gallery.videoReview.motionBlurSettings"
+      data-phase={props.phase}
+    >
+      <SelectField<'off' | 'on'>
+        className={reviewSelectFieldClassName}
+        label={translate('gallery.videoReview.motionBlur')}
+        value={value.enabled ? 'on' : 'off'}
+        options={[
+          { value: 'off', label: translate('gallery.videoReview.motionBlurOff') },
+          { value: 'on', label: translate('gallery.videoReview.motionBlurOn') },
+        ]}
+        onChange={(enabled) =>
+          props.onChange({
+            motionBlur: {
+              ...props.region.motionBlur,
+              [props.phase]: { ...value, enabled: enabled === 'on' },
+            },
+          })
+        }
+      />
+      {value.enabled ? (
+        <ReviewNumberRow
+          label={translate('gallery.videoReview.motionBlurStrength')}
+          unit="%"
+          min={0}
+          max={100}
+          step={1}
+          value={value.strength * 100}
+          onChange={(strength) =>
+            props.onChange({
+              motionBlur: {
+                ...props.region.motionBlur,
+                [props.phase]: { ...value, strength: strength / 100 },
+              },
+            })
+          }
+        />
       ) : null}
     </div>
   );

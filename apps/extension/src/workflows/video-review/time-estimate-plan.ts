@@ -1,3 +1,7 @@
+import {
+  hasQuickEditMotionBlur,
+  quickEditMotionBlurCameras,
+} from '../../features/video/review/advanced/motion-blur';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import {
   createExportTimeEstimator,
@@ -14,6 +18,7 @@ export function planReviewExportTime(args: {
   transitions: readonly ReviewCutTransitionPlan[];
   webcam: boolean;
 }) {
+  const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
   const boundaries = [0, args.duration];
   for (const region of args.zoomRegions) {
     boundaries.push(
@@ -28,6 +33,8 @@ export function planReviewExportTime(args: {
   return planExportTimeWork(0, args.duration, boundaries, (time) => {
     const globalTime = time + args.fragmentOffset;
     let cost = args.webcam ? 1.5 : 1;
+    if (blurEnabled)
+      cost += (quickEditMotionBlurCameras(args.zoomRegions, globalTime).length - 1) * 0.5;
     for (const region of args.zoomRegions) {
       if (region.dormant || globalTime < region.start || globalTime >= region.end) continue;
       if (region.spotlight?.effect === 'blur') cost += 1;

@@ -2,7 +2,7 @@ import { createGradientPaint } from '@sniptale/foundation/paint';
 import { expect, it, vi } from 'vitest';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { parseReviewOperation } from '../../features/video/review/validation';
-import { drawReviewSceneFrame } from './render-export';
+import { drawReviewSceneFrame } from './scene-frame';
 
 function contextFixture() {
   return {

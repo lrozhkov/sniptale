@@ -308,3 +308,26 @@ it('preserves valid five-second phases, zeroes none and derives legacy values wi
       .duration
   ).toBe(10);
 });
+
+it('preserves independent exposure settings while changing timing and clamps authored strength', () => {
+  const original = {
+    ...region('a', 1, 8),
+    motionBlur: {
+      enter: { enabled: true, strength: 0.2 },
+      exit: { enabled: false, strength: 0.8 },
+    },
+  };
+  const updated = updateQuickEditZoomRegion([original], 'a', {
+    motionBlur: { ...original.motionBlur, link: { enabled: true, strength: 2 } },
+  });
+  expect(updated[0]?.motionBlur).toEqual({
+    ...original.motionBlur,
+    link: { enabled: true, strength: 1 },
+  });
+  const timed = updateQuickEditZoomRegion(updated, 'a', {
+    end: 6,
+    enter: { type: 'linear', duration: 2 },
+  });
+  expect(timed[0]?.motionBlur).toEqual(updated[0]?.motionBlur);
+  expect(original.motionBlur.enter.strength).toBe(0.2);
+});

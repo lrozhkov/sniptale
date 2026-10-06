@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { expect, it, vi } from 'vitest';
 import { paintZoomPreview, computeZoomPreviewArea } from './zoom-preview-paint';
-import { drawReviewSceneFrame } from '../../workflows/video-review/render-export';
+import { drawReviewSceneFrame } from '../../workflows/video-review/scene-frame';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,

@@ -217,18 +217,21 @@ function drawPreviewUnlockedLayerGroup(params: {
 
   try {
     for (const pass of params.passes) {
-      drawPreparedPreviewVisualPass({
-        clipMediaElements: params.clipMediaElements,
-        effectRuntimeFrames: getEffectRuntimeVisualPassFrames(
-          params.effectRuntimeFrames,
-          pass.time
-        ),
-        effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
-        imageBank: params.imageBank,
-        layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
-        pass,
-        prepared: groupedPrepared,
-      });
+      const paint = (context: CanvasRenderingContext2D) =>
+        drawPreparedPreviewVisualPass({
+          clipMediaElements: params.clipMediaElements,
+          effectRuntimeFrames: getEffectRuntimeVisualPassFrames(
+            params.effectRuntimeFrames,
+            pass.time
+          ),
+          effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
+          imageBank: params.imageBank,
+          layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
+          pass: passTarget.drawPass ? { ...pass, alpha: 1 } : pass,
+          prepared: { ...groupedPrepared, context },
+        });
+      if (passTarget.drawPass) passTarget.drawPass(pass.alpha, paint);
+      else paint(groupedPrepared.context);
     }
 
     passTarget.flush();

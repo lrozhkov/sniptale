@@ -85,11 +85,13 @@ function mount() {
       },
     ],
   };
+  const onRaster = vi.fn();
   const render = async (file = binding.file) => {
     await act(async () =>
       root.render(
         <ReviewCutTransitionPreview
           binding={{ ...binding, file }}
+          onRaster={onRaster}
           video={video}
           style={{ width: 100, height: 60 }}
         />
@@ -97,7 +99,7 @@ function mount() {
     );
   };
   cleanup = () => act(() => root.unmount());
-  return { host, render, video, callbacks, context, binding };
+  return { host, render, video, callbacks, context, binding, onRaster };
 }
 
 it('conceals loading, rejects a stale removed native frame, and releases decoder resources', async () => {
@@ -218,4 +220,25 @@ it('keeps transition phase on the result clock when a VFR frame began before the
   expect(left.draw).not.toHaveBeenCalled();
   expect(right.draw).toHaveBeenCalledOnce();
   expect(view.context.globalAlpha).toBe(0.25);
+});
+
+it('publishes only the ready cut raster and clears it outside the transition', async () => {
+  let resolve!: (value: ReviewTransitionSample) => void;
+  state.sample.mockReturnValue(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  state.right.mockReturnValue(sample(4.1));
+  const view = mount();
+  await view.render();
+  expect(view.onRaster).toHaveBeenLastCalledWith({ active: true, frame: null });
+  await act(async () => resolve(sample(1.9)));
+  expect(view.onRaster).toHaveBeenLastCalledWith({
+    active: true,
+    frame: view.host.querySelector('canvas'),
+  });
+  view.binding.time = 0;
+  await view.render();
+  expect(view.onRaster).toHaveBeenLastCalledWith({ active: false, frame: null });
 });

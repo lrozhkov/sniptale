@@ -31,13 +31,16 @@ export interface ReviewCutPreviewBinding {
   time: number;
 }
 
+export type ReviewCutPreviewRaster = { active: boolean; frame: HTMLCanvasElement | null };
+
 /** Conceals the native raster while composing a transition, including pending seeks and loads. */
 export function ReviewCutTransitionPreview(props: {
   binding: ReviewCutPreviewBinding;
   video: RefObject<HTMLVideoElement | null>;
   style: CSSProperties;
+  onRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
 }) {
-  const { binding } = props;
+  const { binding, onRaster } = props;
   const plans = useMemo(
     () => planReviewCutTransitions(binding.duration, binding.edits),
     [binding.duration, binding.edits]
@@ -79,6 +82,14 @@ export function ReviewCutTransitionPreview(props: {
   const paintRef = useRef(paint);
   paintRef.current = paint;
   useLayoutEffect(() => paintRef.current(), [blend, current]);
+  const activeBlend = Boolean(blend);
+  useLayoutEffect(() => {
+    onRaster?.({
+      active: activeBlend,
+      frame: activeBlend && current?.frames ? canvas.current : null,
+    });
+  }, [activeBlend, current, onRaster]);
+  useLayoutEffect(() => () => onRaster?.({ active: false, frame: null }), [onRaster]);
   useEffect(() => {
     mediaTime.current = NaN;
     nativeRaster.current = null;

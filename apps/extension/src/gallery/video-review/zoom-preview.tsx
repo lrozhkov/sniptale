@@ -1,3 +1,4 @@
+import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { ReviewBorderOverlay } from './border-overlay';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
@@ -134,6 +135,19 @@ export function ReviewZoomPreview(props: {
             onCenter={props.onChange}
           />
         )}
+        {!overlay && (view === 'result' || playback) ? (
+          <ReviewMotionBlurPreview
+            focus={props.focus}
+            camera={camera}
+            layout={layout}
+            output={output}
+            background={background}
+            imageUrl={image.url}
+            headerImage={header.image}
+            sceneScale={previewScale}
+            getFrame={() => playback?.video ?? frame?.image ?? null}
+          />
+        ) : null}
         {!overlay && (view === 'result' || playback) ? (
           <ZoomResultOverlays
             region={region}

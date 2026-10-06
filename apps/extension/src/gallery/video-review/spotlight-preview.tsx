@@ -1,3 +1,4 @@
+import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { useEffect, useRef, useState } from 'react';
 import { ReviewFocusArea } from './focus-area';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
@@ -88,6 +89,19 @@ export function ReviewSpotlightPreview(props: {
         ) : null}
       </div>
       <SpotlightSourceFrame {...props} />
+      {!framing ? (
+        <ReviewMotionBlurPreview
+          focus={props.focus}
+          camera={props.camera}
+          layout={props.layout}
+          output={props.output}
+          background={props.background ?? { enabled: false }}
+          imageUrl={props.imageUrl}
+          headerImage={props.headerImage}
+          sceneScale={props.scale}
+          getFrame={() => props.frame?.image ?? null}
+        />
+      ) : null}
       <ReviewSpotlightOverlay
         output={props.output}
         frames={evaluateQuickEditSpotlightsAtTime(args)}

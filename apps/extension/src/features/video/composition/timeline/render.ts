@@ -1,5 +1,5 @@
 import type { VideoProject } from '../../project/types/index';
-import { clampNumber } from '../../project/hydration';
+import { motionBlurSamples } from '../motion/blur';
 import { resolveTransitionOverlays } from '../../project/transition/presentation';
 import {
   createVideoCompositionTimelineIndex,
@@ -8,61 +8,15 @@ import {
 } from './frame/index';
 import type { VideoCompositionFrame, VideoCompositionVisualPass } from '../types';
 
-const MIN_MOTION_BLUR_WINDOW_SECONDS = 1 / 120;
-const MAX_MOTION_BLUR_WINDOW_SECONDS = 1 / 24;
-const MAX_MOTION_BLUR_SAMPLES = 5;
-const MIN_MEANINGFUL_VIEWPORT_DELTA = 0.35;
-const MIN_MEANINGFUL_SCALE_DELTA = 0.0025;
-
-function resolveMotionBlurSampleCount(amount: number): number {
-  return Math.max(1, Math.min(MAX_MOTION_BLUR_SAMPLES, 1 + Math.round(amount * 2) * 2));
-}
-
-function resolveMotionBlurWindowSeconds(amount: number): number {
-  return clampNumber(amount * 0.08, MIN_MOTION_BLUR_WINDOW_SECONDS, MAX_MOTION_BLUR_WINDOW_SECONDS);
-}
-
-function buildMotionBlurSampleTimes(project: VideoProject, currentTime: number, amount: number) {
-  const sampleCount = resolveMotionBlurSampleCount(amount);
-  if (sampleCount <= 1 || amount <= 0) {
-    return [currentTime];
-  }
-
-  const shutterWindowSeconds = resolveMotionBlurWindowSeconds(amount);
-  const halfWindowSeconds = shutterWindowSeconds / 2;
-
-  return Array.from({ length: sampleCount }, (_, index) => {
-    const progress = sampleCount === 1 ? 0 : index / (sampleCount - 1);
-    const offset = -halfWindowSeconds + progress * shutterWindowSeconds;
-    return clampNumber(currentTime + offset, 0, Math.max(project.duration, currentTime));
-  });
-}
-
-function buildMotionBlurPassAlphas(sampleCount: number): number[] {
-  if (sampleCount <= 1) {
-    return [1];
-  }
-
-  const midpoint = (sampleCount - 1) / 2;
-  const weights = Array.from(
-    { length: sampleCount },
-    (_, index) => midpoint + 1 - Math.abs(index - midpoint)
-  );
-  const totalWeight = weights.reduce((sum, value) => sum + value, 0);
-  return weights.map((value) => value / totalWeight);
-}
-
 function hasMeaningfulMotionBlurSpread(
   overlayFrame: VideoCompositionFrame,
   passes: VideoCompositionVisualPass[]
 ) {
   return passes.some(
     ({ frame }) =>
-      Math.abs(frame.camera.scale - overlayFrame.camera.scale) > MIN_MEANINGFUL_SCALE_DELTA ||
-      Math.abs(frame.camera.viewportX - overlayFrame.camera.viewportX) >
-        MIN_MEANINGFUL_VIEWPORT_DELTA ||
-      Math.abs(frame.camera.viewportY - overlayFrame.camera.viewportY) >
-        MIN_MEANINGFUL_VIEWPORT_DELTA
+      Math.abs(frame.camera.scale - overlayFrame.camera.scale) > 1e-7 ||
+      Math.abs(frame.camera.viewportX - overlayFrame.camera.viewportX) > 1e-7 ||
+      Math.abs(frame.camera.viewportY - overlayFrame.camera.viewportY) > 1e-7
   );
 }
 
@@ -135,11 +89,15 @@ export function resolveVideoCompositionRenderPasses(
     return createSingleVisualPassResult({ currentTime, frameOptions, overlayFrame, project });
   }
 
-  const sampleTimes = buildMotionBlurSampleTimes(project, currentTime, motionBlurAmount);
-  const passAlphas = buildMotionBlurPassAlphas(sampleTimes.length);
-  const visualPasses = sampleTimes.map((time, index) =>
+  const samples = motionBlurSamples(
+    currentTime,
+    motionBlurAmount,
+    0,
+    Math.max(project.duration, currentTime)
+  );
+  const visualPasses = samples.map(({ time, alpha }) =>
     createVisualPass({
-      alpha: passAlphas[index] ?? 0,
+      alpha,
       currentTime: time,
       frameOptions,
       project,

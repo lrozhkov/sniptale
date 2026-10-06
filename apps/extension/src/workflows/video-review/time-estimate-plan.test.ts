@@ -75,3 +75,33 @@ it('does not construct tracking without a consumer and preserves one update budg
   expect(estimates).toHaveLength(4);
   expect(estimates.some((estimate) => estimate !== null && estimate > 0)).toBe(true);
 });
+
+it('charges additional camera passes only in the separately enabled phase including linked gaps', () => {
+  const region: QuickEditZoomRegion = {
+    id: 'a',
+    start: 0,
+    end: 3,
+    linkTo: 'b',
+    transform: { scale: 1.5, centerX: 0.5, centerY: 0.5 },
+    enter: { type: 'linear', duration: 1 },
+    exit: { type: 'linear', duration: 1 },
+    motionBlur: { link: { enabled: true, strength: 0.5 } },
+  };
+  const second = {
+    ...region,
+    id: 'b',
+    start: 6,
+    end: 9,
+    transform: { ...region.transform, scale: 1.15 },
+  };
+  delete second.linkTo;
+  const plan = planReviewExportTime({
+    duration: 9,
+    fragmentOffset: 0,
+    zoomRegions: [region, second],
+    transitions: [],
+    webcam: false,
+  });
+  expect(plan.find((part) => part.start === 3)?.cost).toBeGreaterThan(2);
+  expect(plan.find((part) => part.start === 1)?.cost).toBe(1);
+});

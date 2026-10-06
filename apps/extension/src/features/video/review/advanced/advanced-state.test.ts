@@ -525,3 +525,39 @@ it('retains explicit audio tempo across storage parsing and rejects malformed te
   content.audio.music = [{ ...clip, tempo: 2 }];
   expect(loadQuickEditAdvancedContentState(content)).toBeNull();
 });
+
+it('round-trips independent blur phases without enabling old workspaces and rejects malformed exposure', () => {
+  const motionBlur = {
+    enter: { enabled: true, strength: 0.15 },
+    exit: { enabled: false, strength: 0.8 },
+    link: { enabled: true, strength: 0.4 },
+  };
+  const payload = {
+    ...advanced(),
+    zoom: { enabled: true, regions: [{ ...zoomRegion('a', 0, 2), motionBlur }] },
+  };
+  const parsed = loadQuickEditAdvancedState(payload);
+  expect(parsed?.zoom.regions[0]?.motionBlur).toEqual(motionBlur);
+  expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(parsed)))).toEqual(parsed);
+  const legacy = loadQuickEditAdvancedState({
+    ...advanced(),
+    zoom: { enabled: true, regions: [zoomRegion('a', 0, 2)] },
+  });
+  expect(legacy?.zoom.regions[0]?.motionBlur).toBeUndefined();
+  for (const value of [
+    null,
+    true,
+    { enter: null },
+    { exit: { enabled: 1, strength: 0.5 } },
+    { link: { enabled: true, strength: -1 } },
+    { enter: { enabled: true, strength: 1.01 } },
+    { enter: { enabled: true, strength: NaN } },
+  ]) {
+    expect(
+      loadQuickEditAdvancedState({
+        ...payload,
+        zoom: { enabled: true, regions: [{ ...zoomRegion('a', 0, 2), motionBlur: value }] },
+      })
+    ).toBeNull();
+  }
+});

@@ -213,16 +213,20 @@ function drawUnlockedOverlayGroup(
 
   try {
     for (const pass of params.renderPasses.visualPasses) {
-      beginExportCameraPass(drawContext, pass, params);
-      drawVisualPassLayers(
-        drawContext,
-        resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
-        pass,
-        params,
-        getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
-        resolveExportEffectDrawState(effectRuntimeStates, pass.time)
-      );
-      drawContext.restore();
+      const paint = (drawContext: CanvasRenderingContext2D) => {
+        beginExportCameraPass(drawContext, pass, params);
+        drawVisualPassLayers(
+          drawContext,
+          resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
+          passBuffer ? { ...pass, alpha: 1 } : pass,
+          params,
+          getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
+          resolveExportEffectDrawState(effectRuntimeStates, pass.time)
+        );
+        drawContext.restore();
+      };
+      if (passBuffer) passBuffer.drawPass(pass.alpha, paint);
+      else paint(drawContext);
     }
 
     passBuffer?.flush();

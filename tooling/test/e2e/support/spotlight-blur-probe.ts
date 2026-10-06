@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { ReviewSpotlightOverlay } from '../../../../apps/extension/src/gallery/video-review/spotlight-overlay';
 import { createReviewSpotlightMasks } from '../../../../apps/extension/src/workflows/video-review/render-spotlight';
-import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/render-export';
+import { drawReviewSceneFrame } from '../../../../apps/extension/src/workflows/video-review/scene-frame';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,

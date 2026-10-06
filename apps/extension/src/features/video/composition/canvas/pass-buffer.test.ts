@@ -183,3 +183,49 @@ it('releases the lease when composing into the target fails', () => {
   expect(allocations).toBe(1);
   next.dispose();
 });
+
+it('reuses both exposure surfaces after a sample paint failure', () => {
+  let allocations = 0;
+  class Surface {
+    constructor(
+      public width: number,
+      public height: number
+    ) {
+      allocations++;
+    }
+    getContext() {
+      return {
+        save: vi.fn(),
+        restore: vi.fn(),
+        setTransform: vi.fn(),
+        clearRect: vi.fn(),
+        drawImage: vi.fn(),
+      };
+    }
+  }
+  vi.stubGlobal('OffscreenCanvas', Surface);
+  const params = {
+    bufferWidth: 911,
+    bufferHeight: 513,
+    drawWidth: 911,
+    drawHeight: 513,
+    targetContext: { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D,
+  };
+  const failed = createVideoCompositionPassBuffer(params)!;
+  try {
+    expect(() =>
+      failed.drawPass(0.5, () => {
+        throw new Error('sample failed');
+      })
+    ).toThrow('sample failed');
+  } finally {
+    failed.dispose();
+  }
+  const next = createVideoCompositionPassBuffer(params)!;
+  next.drawPass(0.5, (context) => {
+    expect(context.globalAlpha).toBe(1);
+    expect(context.globalCompositeOperation).toBe('source-over');
+  });
+  next.flush();
+  expect(allocations).toBe(2);
+});

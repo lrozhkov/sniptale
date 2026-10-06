@@ -1,3 +1,4 @@
+import { drawReviewSceneFrame } from './scene-frame';
 import { state, contextFixture, argsFixture } from './render-export.test-support';
 import { computeQuickEditSceneLayout } from '../../features/video/review/advanced/scene';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
@@ -7,12 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
-import {
-  drawReviewSceneFrame,
-  drainSegmentAudio,
-  renderRenderWindowFrames,
-  writeReviewFrames,
-} from './render-export';
+import { drainSegmentAudio, renderRenderWindowFrames, writeReviewFrames } from './render-export';
 
 function segmentStub(sourceStart: number, sourceEnd: number) {
   return {
