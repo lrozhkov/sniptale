@@ -609,7 +609,7 @@ it('repacks transient overlapping overlay ranges and restores rows on Escape', a
   expect(commit).not.toHaveBeenCalled();
 });
 
-it('keeps a Spotlight link tied to its target across an independent overlay', async () => {
+it('offers the immediate Spotlight neighbor instead of a stored link across it', async () => {
   const overlay = (id: string, start: number, end: number) => ({
     ...zoom(id, start, end),
     spotlight: createQuickEditSpotlight(),
@@ -624,15 +624,24 @@ it('keeps a Spotlight link tied to its target across an independent overlay', as
     { onLink, onSelectLink }
   );
   const link = host.querySelector<HTMLButtonElement>(
-    '[data-ui="gallery.videoReview.zoomLink"][data-connected="true"]'
+    '[data-ui="gallery.videoReview.zoomLink"][data-connected="false"]'
   )!;
+  expect(
+    host.querySelector('[data-ui="gallery.videoReview.zoomLink"][data-connected="true"]')
+  ).toBeNull();
   expect(link.style.left).toBe('20%');
-  expect(link.style.width).toBe('40%');
+  expect(Number.parseFloat(link.style.width)).toBeCloseTo(10);
   expect(track.blocks[0]!.style.top).toBe(track.blocks[2]!.style.top);
-  expect(track.blocks[0]!.style.top).not.toBe(track.blocks[1]!.style.top);
+  expect(track.blocks[0]!.style.top).toBe(track.blocks[1]!.style.top);
   await act(async () => link.click());
   expect(onSelectLink).toHaveBeenCalledWith('a');
-  expect(onLink).not.toHaveBeenCalled();
+  expect(onLink).toHaveBeenCalledWith('a', 'c');
+  const incoming = [
+    ...host.querySelectorAll<HTMLButtonElement>('[data-ui="gallery.videoReview.zoomLink"]'),
+  ].find((button) => button.style.left === '40%')!;
+  expect(incoming).toBeDefined();
+  await act(async () => incoming.click());
+  expect(onLink).toHaveBeenCalledWith('c', 'b');
 });
 
 it('offers no Border links or camera link across an intervening camera', async () => {
@@ -672,3 +681,36 @@ it('uses one visible row for adjacent Zoom, Spotlight and Border intervals', asy
   expect(new Set(track.blocks.map((block) => block.style.top)).size).toBe(1);
   expect(track.lane.style.height).toBe('32px');
 });
+
+it.each(['zoom', 'spotlight'] as const)(
+  'does not offer a %s link across an installed focus of another type',
+  async (kind) => {
+    const { createQuickEditBorder } = await import('../../features/video/review/advanced/border');
+    const endpoint = (id: string, start: number, end: number) => ({
+      ...zoom(id, start, end),
+      ...(kind === 'spotlight' ? { spotlight: createQuickEditSpotlight() } : {}),
+    });
+    for (const middle of [
+      { ...zoom('middle', 3, 4), border: createQuickEditBorder() },
+      {
+        ...zoom('middle', 3, 4),
+        ...(kind === 'zoom' ? { spotlight: createQuickEditSpotlight() } : {}),
+      },
+    ]) {
+      for (const connected of [false, true]) {
+        renderTrack(
+          [
+            { ...endpoint('a', 0, 2), ...(connected ? { linkTo: 'b' } : {}) },
+            middle,
+            endpoint('b', 6, 8),
+          ],
+          vi.fn(),
+          vi.fn(),
+          null,
+          { onLink: vi.fn(), onSelectLink: vi.fn() }
+        );
+        expect(host.querySelector('[data-ui="gallery.videoReview.zoomLink"]')).toBeNull();
+      }
+    }
+  }
+);

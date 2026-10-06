@@ -104,7 +104,8 @@ export function evaluateQuickEditSpotlightAtTime(args: {
 }): QuickEditSpotlightFrame | null {
   const sample = sampleQuickEditFocusAtTime(
     args.regions.filter((region) => region.spotlight),
-    args.time
+    args.time,
+    args.regions
   );
   if (!sample?.to.spotlight) return null;
   const end = targetFrame(sample.to.spotlight, args.video, args.scale);
@@ -183,7 +184,7 @@ export function evaluateQuickEditSpotlightsAtTime(
   const regions = args.regions.filter((region) => !region.dormant && region.spotlight);
   const frames: QuickEditSpotlightFrame[] = [];
   for (const region of regions) {
-    const link = resolveQuickEditFocusLink(regions, region.id);
+    const link = resolveQuickEditFocusLink(args.regions, region.id);
     if (link && args.time >= region.end && args.time < link.target.start) {
       const frame = evaluateQuickEditSpotlightAtTime({ ...args, regions: [region, link.target] });
       if (frame)
@@ -198,7 +199,7 @@ export function evaluateQuickEditSpotlightsAtTime(
     }
     if (args.time < region.start || args.time >= region.end) continue;
     const incoming = regions.find(
-      (item) => resolveQuickEditFocusLink(regions, item.id)?.target.id === region.id
+      (item) => resolveQuickEditFocusLink(args.regions, item.id)?.target.id === region.id
     );
     const connected = [...(incoming ? [incoming] : []), region, ...(link ? [link.target] : [])];
     const sample = sampleQuickEditFocusAtTime(connected, args.time);

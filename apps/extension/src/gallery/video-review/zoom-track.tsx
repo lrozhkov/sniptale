@@ -632,7 +632,7 @@ function ReviewZoomRegionBlock(
   );
 }
 
-/** Same-kind identity resolution keeps overlay insertion from hiding valid links. */
+/** The shared resolver rejects every intervening focus, including other types. */
 function nextFocusLink(regions: readonly QuickEditZoomRegion[], region: QuickEditZoomRegion) {
   if (quickEditFocusType(region) === 'border') return undefined;
   const linked = resolveQuickEditFocusLink(regions, region.id);

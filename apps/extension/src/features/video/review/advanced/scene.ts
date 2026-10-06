@@ -225,10 +225,12 @@ function interpolateCamera(
 /**
  * Camera at a timeline time over validated (ascending, non-overlapping) zoom regions.
  * Regions are half-open [start, end): adjacent regions hand over exactly at the boundary.
+ * Type-filtered callers retain the complete topology for intervening-focus validation.
  */
 export function sampleQuickEditFocusAtTime(
   regions: readonly QuickEditZoomRegion[],
-  timelineTime: number
+  timelineTime: number,
+  topology: readonly QuickEditZoomRegion[] = regions
 ): {
   from: QuickEditZoomRegion | null;
   to: QuickEditZoomRegion;
@@ -240,10 +242,10 @@ export function sampleQuickEditFocusAtTime(
     .toSorted((a, b) => a.start - b.start || a.id.localeCompare(b.id));
   for (let index = 0; index < active.length; index++) {
     const region = active[index]!;
-    const next = resolveQuickEditFocusLink(active, region.id)?.target;
+    const next = resolveQuickEditFocusLink(topology, region.id)?.target;
     const linkedNext = !!next;
     const linkedPrevious = active.some(
-      (item) => resolveQuickEditFocusLink(active, item.id)?.target.id === region.id
+      (item) => resolveQuickEditFocusLink(topology, item.id)?.target.id === region.id
     );
     if (linkedNext && next && timelineTime >= region.end && timelineTime < next.start) {
       const progress = easing(
@@ -273,7 +275,8 @@ export function evaluateQuickEditCameraAtTime(
 ): QuickEditCameraTransform {
   const sample = sampleQuickEditFocusAtTime(
     regions.filter((region) => quickEditFocusType(region) === 'zoom'),
-    timelineTime
+    timelineTime,
+    regions
   );
   if (!sample || sample.to.spotlight) return QUICK_EDIT_IDENTITY_CAMERA;
   return interpolateCamera(

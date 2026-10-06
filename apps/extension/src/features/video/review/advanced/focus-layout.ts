@@ -10,7 +10,7 @@ function quickEditFocusInterval(region: QuickEditZoomRegion) {
   return region.sourceAnchor ?? region;
 }
 
-/** Resolve identity and same-kind topology independently of array ordering or other overlays. */
+/** Resolve compatible neighbors without crossing any active focus interval. */
 export function resolveQuickEditFocusLink(
   regions: readonly QuickEditZoomRegion[],
   id: string,
@@ -31,11 +31,10 @@ export function resolveQuickEditFocusLink(
         !region.dormant &&
         region.id !== source.id &&
         region.id !== target.id &&
-        quickEditFocusType(region) === quickEditFocusType(source) &&
-        ((quickEditFocusType(source) === 'zoom' &&
-          interval(region).start < b.start &&
-          interval(region).end > a.end) ||
-          region.linkTo === target.id)
+        ((interval(region).start < b.start && interval(region).end > a.end) ||
+          (interval(region).end === a.end &&
+            quickEditFocusType(region) === quickEditFocusType(source) &&
+            region.linkTo === target.id))
     )
   )
     return null;
