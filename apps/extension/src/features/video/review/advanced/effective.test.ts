@@ -55,7 +55,7 @@ it('keeps track visibility independent of mode and suppresses effects in basic m
     overlaysVisible: false,
     zoomApplied: false,
     backgroundApplied: false,
-    originalAudioApplied: false,
+    originalAudioApplied: true,
   });
 });
 
@@ -83,7 +83,7 @@ it('returns the applied configuration for stage, mixer, and exporter (R04)', () 
   const basic = resolveQuickEditEffectiveState({ ...stored, ui: { ...stored.ui, mode: 'basic' } });
   expect(basic.zoomRegions).toEqual([]);
   expect(basic.background).toEqual({ enabled: false });
-  expect(basic.originalAudio).toEqual({ muted: false, volume: 1 });
+  expect(basic.originalAudio).toEqual(stored.audio.original);
   expect(basic.voiceover).toEqual([]);
   expect(basic.music).toEqual([]);
 
@@ -407,3 +407,53 @@ it.each(['basic', 'advanced'] as const)(
     });
   }
 );
+
+it('applies Basic original gain independently of suppressed visuals and added audio', () => {
+  const state = advancedWithContent();
+  state.ui.mode = 'basic';
+  state.audio.original = {
+    muted: false,
+    volume: 0.5,
+    ranges: [{ id: 'quiet', start: 1, end: 2, volume: 0 }],
+  };
+  state.audio.music = [musicStub()];
+  state.audio.voiceover = [voiceClipStub()];
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    originalAudio: state.audio.original,
+    voiceover: [],
+    music: [],
+    zoomRegions: [],
+    background: { enabled: false },
+  });
+  expect(
+    resolveQuickEditExportPlan({ document, advanced: state, videoRenderAvailable: false })
+  ).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'process',
+    reasons: ['original-audio'],
+  });
+  expect(
+    resolveQuickEditExportPlan({ document, advanced: state, audioProcessingAvailable: false })
+  ).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  const originalOnly = createQuickEditAdvancedState();
+  originalOnly.audio.original = state.audio.original;
+  expect(hasSuppressedAdvancedFeatures(originalOnly)).toBe(false);
+  originalOnly.audio.original = { muted: false, volume: 1 };
+  expect(
+    resolveQuickEditExportPlan({
+      document,
+      advanced: originalOnly,
+      audioProcessingAvailable: false,
+    })
+  ).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});

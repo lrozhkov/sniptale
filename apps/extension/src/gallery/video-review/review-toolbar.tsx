@@ -147,7 +147,7 @@ export function ReviewTimelineToolbar(props: ToolbarProps) {
         {advanced.ui.mode === 'advanced' && props.focusTool ? (
           <ReviewFocusToolControl tool={props.focusTool} busy={busy} admit={admit} />
         ) : null}
-        {advanced.ui.mode === 'advanced' && props.originalAudioEditor ? (
+        {props.originalAudioEditor ? (
           <ReviewToolGroup
             active={props.originalAudioEditor.originalTool && sourceAudioReady}
             label={translate('gallery.videoReview.volume')}

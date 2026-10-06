@@ -195,11 +195,11 @@ function ReviewInspectorBinding({
         selectionLabel={reviewSelectionLabel(state)}
         selectionPreferenceScope={state.activeSelection.kind}
         selectionHasSections={
-          state.advanced.ui.mode === 'advanced' &&
-          (state.activeSelection.kind === 'zoom' ||
-            state.activeSelection.kind === 'canvas-comment' ||
-            state.activeSelection.kind === 'audio' ||
-            state.activeSelection.kind === 'original-audio')
+          state.activeSelection.kind === 'original-audio' ||
+          (state.advanced.ui.mode === 'advanced' &&
+            (state.activeSelection.kind === 'zoom' ||
+              state.activeSelection.kind === 'canvas-comment' ||
+              state.activeSelection.kind === 'audio'))
         }
         scene={
           <ReviewSceneProperties
@@ -534,7 +534,7 @@ function ReviewEditor({
     resource.file,
     state.source.duration,
     { voiceover: features.voiceover, music: features.music },
-    features.mode === 'advanced',
+    features.mode === 'advanced' || !!editing.exporter.index?.audioCodec,
     editing.exporter.index === null || !!editing.exporter.index.audioCodec
   );
   return (
@@ -668,6 +668,7 @@ function reviewInspectorContext(state: InspectorState): string {
   if (selection.kind === 'annotation') return `comments:${selection.id}`;
   if (selection.kind === 'telemetry') return `action:${selection.ref.kind}:${selection.ref.id}`;
   if (selection.kind === 'edit') return `edit:${selection.id}`;
+  if (selection.kind === 'original-audio') return `settings:original-audio:${selection.id}`;
   if (state.advanced.ui.mode !== 'advanced') return 'comments';
   const id = 'id' in selection ? selection.id : '';
   return `settings:${selection.kind}:${id}`;

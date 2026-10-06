@@ -267,7 +267,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       }
       onFocusRangeCommit={focus.tool.active ? focus.commit : undefined}
       onFocusRangePreview={focus.setPreview}
-      originalRangeTool={features.mode === 'advanced' && props.audio.originalTool}
+      originalRangeTool={props.audio.originalTool}
       snapRangePreview={props.advanced.ui.mode !== 'advanced' && props.editing.cutting}
       trackControls={
         <ReviewTrackControls
@@ -309,10 +309,9 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
         ? { boundaries: props.editing.exporter.index.boundaries }
         : {})}
-      {...(features.mode === 'advanced' &&
-      (features.audioTrackVisible ||
-        props.editing.exporter.index === null ||
-        !!props.editing.exporter.index.audioCodec)
+      {...(features.audioTrackVisible ||
+      (features.mode === 'advanced' && props.editing.exporter.index === null) ||
+      !!props.editing.exporter.index?.audioCodec
         ? {
             audioTrack: (
               <ReviewAudioLane
@@ -393,14 +392,13 @@ function reviewTimelineSourceSelection(props: TimelineBindingProps): ReviewAncho
     : props.selection;
 }
 
-/** Drawing availability follows the existing advanced audio capability. */
+/** Drawing availability follows detected source audio in either editing mode. */
 function useOriginalAudioPlacement(props: TimelineBindingProps) {
-  const mode = props.advanced.ui.mode;
   const audioCodec = props.editing.exporter.index?.audioCodec;
   const { setOriginalTool } = props.audio;
   useEffect(() => {
-    if (mode !== 'advanced' || audioCodec === null) setOriginalTool(false);
-  }, [mode, audioCodec, setOriginalTool]);
+    if (audioCodec === null) setOriginalTool(false);
+  }, [audioCodec, setOriginalTool]);
 }
 
 /** The focus drawing tool uses source-axis ranges and the existing result-time insertion owner. */

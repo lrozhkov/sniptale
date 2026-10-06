@@ -294,31 +294,51 @@ async function fillWindow(
   const codec = track.codec;
   if (codec !== 'aac' && codec !== 'opus') throw new Error('Unsupported processed audio codec.');
   const packets = new EncodedPacketSink(track);
-  let packet = (await packets.getPacket(bounds.start)) ?? (await packets.getFirstPacket());
+  // Opus needs decoder preroll after seeking; discard it rather than mixing it across edits.
+  const decodeStart = codec === 'opus' ? Math.max(0, bounds.start - 0.08) : bounds.start;
+  let packet = (await packets.getPacket(decodeStart)) ?? (await packets.getFirstPacket());
   let run: { start: number; end: number } | null = null;
   while (packet && packet.timestamp < bounds.end) {
     bounds.signal.throwIfAborted();
     const duration = audioPacketDuration(packet, codec, pcm.sampleRate);
-    if (packet.timestamp + duration > bounds.start) {
+    if (packet.timestamp + duration > decodeStart) {
       if (run && packet.timestamp - run.end > duration / 2) {
         // Chromium can smooth discontinuous audio timestamps. Restart decoding across real packet gaps.
-        await fillRun(sink, pcm, { ...bounds, ...run });
+        await fillRun(sink, pcm, {
+          ...bounds,
+          decodeStart: run.start,
+          start: Math.max(bounds.start, run.start),
+          end: run.end,
+        });
         run = null;
       }
-      run ??= { start: Math.max(bounds.start, packet.timestamp), end: bounds.start };
+      run ??= { start: Math.max(decodeStart, packet.timestamp), end: decodeStart };
       run.end = Math.min(bounds.end, packet.timestamp + duration);
     }
     packet = await packets.getNextPacket(packet);
   }
-  if (run) await fillRun(sink, pcm, { ...bounds, ...run });
+  if (run)
+    await fillRun(sink, pcm, {
+      ...bounds,
+      decodeStart: run.start,
+      start: Math.max(bounds.start, run.start),
+      end: run.end,
+    });
 }
 
 async function fillRun(
   sink: AudioSampleSink,
   pcm: AudioBuffer,
-  bounds: { windowStart: number; start: number; end: number; signal: AbortSignal }
+  bounds: {
+    windowStart: number;
+    decodeStart: number;
+    start: number;
+    end: number;
+    signal: AbortSignal;
+  }
 ) {
-  for await (const sample of sink.samples(bounds.start, bounds.end)) {
+  if (bounds.end <= bounds.start) return;
+  for await (const sample of sink.samples(bounds.decodeStart, bounds.end)) {
     try {
       bounds.signal.throwIfAborted();
       if (sample.sampleRate !== pcm.sampleRate || sample.numberOfChannels !== pcm.numberOfChannels)

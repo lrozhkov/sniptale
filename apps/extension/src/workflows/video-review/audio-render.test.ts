@@ -257,6 +257,35 @@ it('decodes discontinuous packet runs separately and leaves the missing source i
   }
 });
 
+it.each([false, true])(
+  'prerolls Opus without copying pre-cut samples or crossing a gap (%s)',
+  async (gap) => {
+    const fixture = await audioFixture();
+    audioMock.packets = Array.from({ length: 10 }, (_, index) => 0.92 + index * 0.02)
+      .filter((time) => !gap || time < 0.96 || time >= 1)
+      .map((timestamp) => ({ timestamp, duration: 0.02, data: new Uint8Array([0xf8, 0]) }));
+    audioMock.samples.mockImplementation((start: number, end: number) => [
+      decodedSample(start, end - start),
+    ]);
+    try {
+      for await (const sample of renderReviewAudio(
+        fixture.track,
+        { sourceStart: 1, sourceEnd: 1.1, resultStart: 0, resultEnd: 0.1, rate: 1, kind: 'keep' },
+        false,
+        new AbortController().signal
+      ))
+        expect(sample.timestamp).toBe(0);
+      expect(audioMock.samples).toHaveBeenCalledTimes(1);
+      expect(audioMock.samples.mock.calls[0]![0]).toBeCloseTo(gap ? 1 : 0.92);
+      const pcm = fixture.windows[0]!.input!.getChannelData(0);
+      expect(pcm.subarray(0, 960).every((value) => value === 0)).toBe(true);
+      expect(pcm[1000]).toBe(0.25);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);
+
 it('bounds accelerated windows and emits a short final chunk without a whole-source buffer', async () => {
   const fixture = await audioFixture();
   try {

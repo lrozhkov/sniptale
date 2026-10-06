@@ -92,7 +92,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
               if (plan?.focus) props.onFocus(plan.focus);
             }}
           />
-        ) : selection.kind === 'original-audio' && advanced.ui.mode === 'advanced' ? (
+        ) : selection.kind === 'original-audio' ? (
           <SelectedOriginalAudio audio={audio} resource={resource} advanced={advanced} />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
           <ReviewAudioInspectorSection audio={audio} busy={busy} />

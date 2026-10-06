@@ -570,3 +570,47 @@ it('publishes the chosen container, resolution and matching filename for a conve
   ]);
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();
 });
+
+it('copies Basic video with source gain while ignoring stored external audio', async () => {
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.audio.original = {
+    muted: false,
+    volume: 0.5,
+    ranges: [{ id: 'quiet', start: 0, end: 1, volume: 0 }],
+  };
+  advanced.audio.music = [
+    {
+      id: 'hidden',
+      assetId: 'missing',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 1,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  vi.stubGlobal('OfflineAudioContext', class {});
+  try {
+    await exportReviewedVideo(
+      { ...args, destination: 'download', selection: { kind: 'range', start: 0, end: 6 } },
+      deps
+    );
+    expect(deps.writeReviewFrames).not.toHaveBeenCalled();
+    expect(deps.readProjectAsset).not.toHaveBeenCalled();
+    expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+      expect.objectContaining({
+        exportAudio: expect.objectContaining({
+          originalVolume: 0.5,
+          originalMuted: false,
+          originalRanges: advanced.audio.original.ranges,
+          entries: [],
+        }),
+      })
+    );
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

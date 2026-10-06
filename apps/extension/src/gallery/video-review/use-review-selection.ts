@@ -205,7 +205,7 @@ function selectionTrackVisible(
     case 'canvas-comment':
       return features.overlaysVisible;
     case 'original-audio':
-      return features.mode === 'advanced' && originalAudioVisible;
+      return originalAudioVisible;
     default:
       return true;
   }

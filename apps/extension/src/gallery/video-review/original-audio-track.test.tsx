@@ -330,7 +330,9 @@ it('keeps audio placement feedback state without inserting messages into the tra
 it('shows zero master volume as muted and restores actual playback through positive volume', () => {
   const f = setup();
   try {
-    const control = f.host.querySelector<HTMLButtonElement>('[data-track-controls] button')!;
+    const control = f.host.querySelector<HTMLButtonElement>(
+      '[data-track-controls] button[aria-pressed]'
+    )!;
     const video = f.host.querySelector('video')!;
     act(() => f.editor.setOriginal({ volume: 0 }));
     expect(video.muted).toBe(true);
@@ -364,7 +366,9 @@ it('shows zero master volume as muted and restores actual playback through posit
 it('renders legacy zero-volume snapshots as muted without changing document state', () => {
   const f = setup(0);
   try {
-    const control = f.host.querySelector<HTMLButtonElement>('[data-track-controls] button')!;
+    const control = f.host.querySelector<HTMLButtonElement>(
+      '[data-track-controls] button[aria-pressed]'
+    )!;
     expect(control.getAttribute('aria-pressed')).toBe('false');
     expect(control.title).toBe(translate('gallery.videoReview.restoreSourceAudio'));
     expect(f.lane.dataset['audioMuted']).toBe('true');

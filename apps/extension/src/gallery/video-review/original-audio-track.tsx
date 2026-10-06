@@ -1,3 +1,4 @@
+import { NumericValueField } from '../../ui/compact-inspector-controls';
 import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
@@ -67,21 +68,12 @@ export function ReviewOriginalAudioTrack(props: {
         muted ? <VolumeX size={14} aria-hidden="true" /> : <Volume2 size={14} aria-hidden="true" />
       }
       controls={
-        <ReviewButton
-          label={translate(
-            muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
-          )}
-          aria-pressed={!muted}
-          disabled={props.busy}
-          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-          onClick={() =>
-            (props.beforeAction ?? ((action) => action()))(() =>
-              props.onOriginal({ muted: !muted })
-            )
-          }
-        >
-          {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
-        </ReviewButton>
+        <OriginalAudioControls
+          original={props.original}
+          busy={props.busy}
+          beforeAction={props.beforeAction}
+          onOriginal={props.onOriginal}
+        />
       }
     >
       <div className="min-w-0">
@@ -166,6 +158,50 @@ export function ReviewOriginalAudioTrack(props: {
         </div>
       </div>
     </ReviewTrackRow>
+  );
+}
+
+/** Master gain and mute share the source track's existing mutation admission. */
+function OriginalAudioControls(props: {
+  original: QuickEditOriginalAudio;
+  busy: boolean;
+  beforeAction?: ReviewBeforeAction | undefined;
+  onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
+}) {
+  const muted = props.original.muted || props.original.volume === 0;
+  return (
+    <>
+      <NumericValueField
+        label={translate('gallery.videoReview.sourceAudioVolume')}
+        unit="%"
+        value={Math.round(props.original.volume * 100)}
+        min={0}
+        max={200}
+        step={1}
+        precision={0}
+        disabled={props.busy}
+        className="!h-7 !w-20"
+        onPreviewValue={() => undefined}
+        onCommitValue={(value) =>
+          (props.beforeAction ?? ((action) => action()))(() =>
+            props.onOriginal({ volume: value / 100 })
+          )
+        }
+      />
+      <ReviewButton
+        label={translate(
+          muted ? 'gallery.videoReview.restoreSourceAudio' : 'gallery.videoReview.muteSourceAudio'
+        )}
+        aria-pressed={!muted}
+        disabled={props.busy}
+        className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+        onClick={() =>
+          (props.beforeAction ?? ((action) => action()))(() => props.onOriginal({ muted: !muted }))
+        }
+      >
+        {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+      </ReviewButton>
+    </>
   );
 }
 

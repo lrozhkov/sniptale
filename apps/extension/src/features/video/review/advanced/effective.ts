@@ -43,7 +43,7 @@ export function resolveQuickEditEffectiveFeatures(
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
-    originalAudioApplied: advanced,
+    originalAudioApplied: true,
     voiceoverApplied: advanced && state.ui.tracks.audio,
     musicApplied: advanced && state.ui.tracks.audio,
   };
@@ -78,7 +78,7 @@ export function resolveQuickEditEffectiveState(
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
-    originalAudio: advanced ? state.audio.original : { muted: false, volume: 1 },
+    originalAudio: state.audio.original,
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
       state.audio.voiceoverSegments
@@ -144,13 +144,6 @@ export function resolveQuickEditExportPlan(args: {
   const transitions = args.document.edits.some((edit) => edit.kind === 'cut' && edit.transition);
   const visual: QuickEditExportReason[] = preciseEdits ? ['precise-edits'] : [];
   if (transitions) visual.push('cut-transition');
-  if (args.advanced.ui.mode !== 'advanced') {
-    if (visual.length)
-      return args.videoRenderAvailable === false
-        ? { kind: 'unavailable', reasons: ['video-encoder'] }
-        : { kind: 'ready', video: 'render', audio: 'copy', reasons: visual };
-    return { kind: 'ready', video: 'copy', audio: 'copy', reasons: [] };
-  }
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
   const effective = resolveQuickEditEffectiveState(args.advanced);
   const audio: QuickEditExportReason[] = [];
@@ -169,10 +162,10 @@ export function resolveQuickEditExportPlan(args: {
     )
   )
     audio.push('original-audio');
-  if (args.advanced.canvas) visual.push('canvas');
-  if (args.advanced.windowHeader) visual.push('window-header');
+  if (effective.canvas) visual.push('canvas');
+  if (effective.windowHeader) visual.push('window-header');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
-  if (args.advanced.background.enabled) visual.push('background');
+  if (features.backgroundApplied) visual.push('background');
   if (
     features.overlaysVisible &&
     args.document.canvasComments.some((comment) => comment.visible && comment.renderToVideo)
@@ -206,9 +199,6 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     state.zoom.regions.length > 0 ||
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||
-    state.audio.music.length > 0 ||
-    state.audio.original.muted ||
-    state.audio.original.volume !== 1 ||
-    !!state.audio.original.ranges?.length
+    state.audio.music.length > 0
   );
 }

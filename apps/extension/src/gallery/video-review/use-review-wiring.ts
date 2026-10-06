@@ -101,7 +101,7 @@ export function useReviewEditorWiring(args: {
     onSelectionChange: (value) =>
       args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),
   });
-  useOriginalAudioToolLifecycle(args.advanced.ui.mode, args.activeSelection.kind, audio);
+  useOriginalAudioToolLifecycle(args.activeSelection.kind, audio);
   const removeSelection = useReviewSelectionLifecycle({
     selection: args.activeSelection,
     markers: projected.markers,
@@ -195,16 +195,14 @@ function selectReviewPointer(
 
 /** Clear the source-audio gesture target when another editor context takes over. */
 function useOriginalAudioToolLifecycle(
-  mode: QuickEditAdvancedState['ui']['mode'],
   selectionKind: ReviewSelection['kind'],
   { setOriginalTool, setOriginalRangeSelected }: ReturnType<typeof useReviewAudio>
 ) {
   useEffect(() => {
-    if (mode === 'advanced' && (selectionKind === 'none' || selectionKind === 'original-audio'))
-      return;
+    if (selectionKind === 'none' || selectionKind === 'original-audio') return;
     setOriginalTool(false);
     setOriginalRangeSelected(false);
-  }, [mode, selectionKind, setOriginalTool, setOriginalRangeSelected]);
+  }, [selectionKind, setOriginalTool, setOriginalRangeSelected]);
 }
 
 /** Flush staged content before the atomic reset, then restore disposable editor tools. */
