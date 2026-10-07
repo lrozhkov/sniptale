@@ -231,6 +231,14 @@ export function createEditorFixture(
     back,
     button,
     click,
+    key(event: KeyboardEvent) {
+      const surface = host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.previewFrame"]'
+      )!;
+      surface.tabIndex = -1;
+      surface.focus();
+      window.dispatchEvent(event);
+    },
     fill,
     show,
     close,

@@ -148,7 +148,7 @@ it('deletes the unified selection: cut stays when audio is selected, undo restor
     await act(async () =>
       clip.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 0, button: 0 }))
     );
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Delete' })));
     await act(async () => new Promise((resolve) => setTimeout(resolve, 400)));
     expect([musicCount(), cutCount()]).toEqual([0, 1]);
     await click('undo');
@@ -181,7 +181,7 @@ it('selects captured actions without creating notes and clears the selection on 
     expect(action.getAttribute('aria-pressed')).toBe('true');
     expect(fixture.snapshot.draft).toBeNull();
     expect(integration.draft).not.toHaveBeenCalled();
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete' })));
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Delete' })));
     expect(action.getAttribute('aria-pressed')).toBe('true');
     expect(fixture.snapshot.workspace.history).toHaveLength(1);
     const plane = fixture.host.querySelector<HTMLElement>(
@@ -474,7 +474,9 @@ it('creates edits from recorded actions, selects their properties and recalculat
       '[data-ui="gallery.videoReview.actionProperties"]'
     )!;
     expect(properties.textContent).toContain('gallery.videoReview.actionRemoved');
-    expect(properties.querySelectorAll('button')).toHaveLength(0);
+    expect(
+      properties.querySelectorAll('button:not([aria-label="gallery.videoReview.historyOpen"])')
+    ).toHaveLength(0);
     expect(fixture.snapshot.draft).toBeNull();
   } finally {
     await fixture.cleanup();

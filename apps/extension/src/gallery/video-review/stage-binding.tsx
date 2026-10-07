@@ -29,6 +29,9 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 export function ReviewStageBinding(props: {
+  clickCues?:
+    | readonly import('../../features/video/review/click-animation').ReviewClickCue[]
+    | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
   backgroundPending?: boolean;
   cutPreview?: ReviewCutPreviewBinding | undefined;
@@ -125,6 +128,7 @@ export function ReviewStageBinding(props: {
         </div>
       ) : null}
       <ReviewStage
+        clickCues={props.clickCues}
         webcam={props.webcam}
         focusPicker={props.focusPicker}
         backgroundImageUrl={image.url}

@@ -44,7 +44,8 @@ it('shows recorded target metadata as text and tolerates a disappearing selectio
       )
     );
     expect(host.textContent).toContain('<button>Save</button>');
-    expect(host.querySelectorAll('button')).toHaveLength(3);
+    expect(host.querySelectorAll('button')).toHaveLength(0);
+    expect(host.textContent).not.toContain('Focus on action');
     expect(host.querySelectorAll('button:disabled')).toHaveLength(0);
     act(() =>
       root.render(

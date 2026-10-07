@@ -1,7 +1,11 @@
+import { useState } from 'react';
+import { ReviewButton, reviewIconButtonClassName } from './controls';
+import { isReviewClick } from '../../features/video/review/click-animation';
+import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity } from 'lucide-react';
+import { Activity, List, Filter } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -25,6 +29,8 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  onOpenHistory?: (() => void) | undefined;
+  clickAnimations?: readonly ReviewClickAnimation[] | undefined;
   fillHeight?: boolean | undefined;
   sourceCompact?: boolean | undefined;
   placementHints?: ReviewPlacementHints | undefined;
@@ -221,25 +227,60 @@ export function ReviewTimeline(props: TimelineProps) {
 function ReviewTimelineEvents(
   props: Pick<
     TimelineProps,
-    'markers' | 'duration' | 'time' | 'selectedTelemetryRef' | 'onMarker'
+    | 'markers'
+    | 'duration'
+    | 'time'
+    | 'selectedTelemetryRef'
+    | 'onMarker'
+    | 'onOpenHistory'
+    | 'clickAnimations'
   > & { width: number; zoom: number }
 ) {
+  const [animatedOnly, setAnimatedOnly] = useState(false);
+  const animated = new Set(
+    (props.clickAnimations ?? []).filter((item) => item.effect !== 'off').map((item) => item.id)
+  );
+  const markers = animatedOnly
+    ? props.markers.filter((marker) => isReviewClick(marker) && animated.has(marker.ref.id))
+    : props.markers;
   return props.markers.length ? (
     <ReviewTrackRow
       label={translate('gallery.videoReview.telemetry')}
       icon={<Activity size={14} aria-hidden="true" />}
+      controls={
+        <>
+          <ReviewButton
+            label={translate('gallery.videoReview.historyOpen')}
+            className={reviewIconButtonClassName}
+            onClick={props.onOpenHistory}
+          >
+            <List size={14} aria-hidden="true" />
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.historyAnimatedOnly')}
+            className={reviewIconButtonClassName}
+            aria-pressed={animatedOnly}
+            onClick={() => setAnimatedOnly((value) => !value)}
+          >
+            <Filter size={14} aria-hidden="true" />
+          </ReviewButton>
+        </>
+      }
     >
-      <ReviewTelemetryStrip
-        markers={props.markers}
-        duration={props.duration}
-        time={props.time}
-        width={props.width}
-        zoom={props.zoom}
-        {...(props.selectedTelemetryRef
-          ? { selectedTelemetryRef: props.selectedTelemetryRef }
-          : {})}
-        onMarker={props.onMarker}
-      />
+      <div className="min-h-7">
+        <ReviewTelemetryStrip
+          markers={markers}
+          animatedIds={animated}
+          duration={props.duration}
+          time={props.time}
+          width={props.width}
+          zoom={props.zoom}
+          {...(props.selectedTelemetryRef
+            ? { selectedTelemetryRef: props.selectedTelemetryRef }
+            : {})}
+          onMarker={props.onMarker}
+        />
+      </div>
     </ReviewTrackRow>
   ) : null;
 }

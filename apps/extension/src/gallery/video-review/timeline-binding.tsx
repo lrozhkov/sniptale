@@ -167,6 +167,7 @@ type TimelineBindingProps = {
   onComment(annotation: ReviewAnnotation): void;
   onSeek(value: number): void;
   onPlay(): void;
+  onOpenHistory?(): void;
   onOpenExport(): void;
   exportActive?: boolean | undefined;
 };
@@ -360,6 +361,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       onEdit={props.editing.select}
       selectedEditId={props.editing.selected?.id}
       annotations={props.annotations}
+      onOpenHistory={props.onOpenHistory}
+      clickAnimations={props.advanced.clickAnimations}
       markers={props.markers}
       {...(props.selectedTelemetryRef ? { selectedTelemetryRef: props.selectedTelemetryRef } : {})}
       onSeek={props.onSeek}

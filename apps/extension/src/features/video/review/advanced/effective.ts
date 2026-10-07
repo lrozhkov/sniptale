@@ -113,6 +113,7 @@ export type QuickEditExportReason =
   | 'zoom'
   | 'background'
   | 'comments'
+  | 'click-animations'
   | 'voiceover'
   | 'music'
   | 'original-audio'
@@ -167,6 +168,11 @@ export function resolveQuickEditExportPlan(args: {
     )
   )
     audio.push('original-audio');
+  if (
+    features.mode === 'advanced' &&
+    args.advanced.clickAnimations?.some((item) => item.effect !== 'off')
+  )
+    visual.push('click-animations');
   if (effective.canvas) visual.push('canvas');
   if (effective.windowHeader) visual.push('window-header');
   if (effective.webcam) visual.push('webcam');
@@ -200,6 +206,7 @@ export function resolveQuickEditExportPlan(args: {
 /** Non-empty advanced content worth a "saved and temporarily not applied" hint. */
 export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): boolean {
   return (
+    !!state.clickAnimations?.some((item) => item.effect !== 'off') ||
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||

@@ -76,6 +76,14 @@ function drawReviewSceneExposure(
       buffer.dispose();
     }
   } else drawReviewSceneSample(context, args, windowRaster);
+  if (!args.deferComments) drawReviewSceneComments(context, args);
+}
+
+/** Final sharp comment pass, optionally deferred until focus/click overlays are painted. */
+export function drawReviewSceneComments(
+  context: CanvasRenderingContext2D,
+  args: Parameters<typeof drawReviewSceneFrame>[1]
+) {
   if (!args.comments?.length) return;
   const { canvas, layout, background, comments, sourceTime } = args;
   context.save();
@@ -146,6 +154,7 @@ function drawReviewSceneSample(
         height: number
       ): void;
     };
+    deferComments?: boolean;
     comments?: readonly CanvasCommentExport[];
     sourceTime?: number;
     cameraScale?: number;

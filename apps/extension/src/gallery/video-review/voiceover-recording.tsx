@@ -1,3 +1,4 @@
+import type { useReviewEditorState } from './use-editor-state';
 import { useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { AudioTrimRange } from '../../composition/audio-recording/session-types';
@@ -201,6 +202,25 @@ export function useReviewEditorAudio(args: {
     ...(args.onOpenChange ? { onOpenChange: args.onOpenChange } : {}),
     guard,
     flushAdvanced: args.flushAdvanced,
+  });
+  return { onImportAudioFile, voiceover };
+}
+
+export function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
+  const { onImportAudioFile, voiceover } = useReviewEditorAudio({
+    busy: state.busy,
+    canStart: state.canStart,
+    time: state.time,
+    resultDuration: state.timeline.resultDuration,
+    segments: state.timeline.timeMap.getSegments(),
+    toOutputTime: state.timeline.toOutputTime,
+    onCutPlacement: () => state.setMessage(translate('gallery.videoReview.placementOnCut')),
+    video: state.video,
+    onOpenChange: state.setVoiceoverSilent,
+    run: state.run,
+    flushAdvanced: state.flushAdvanced,
+    audio: state.audio,
+    session: state.session,
   });
   return { onImportAudioFile, voiceover };
 }

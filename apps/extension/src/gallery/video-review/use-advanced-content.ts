@@ -143,6 +143,12 @@ export function useReviewAdvancedContent(
     pending: pending.current !== null,
     flush,
     reset,
+    setClickAnimations: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['clickAnimations']>
+      ) => NonNullable<QuickEditAdvancedContent['clickAnimations']>
+    ) =>
+      stage((content) => ({ ...content, clickAnimations: update(content.clickAnimations ?? []) })),
     setZoom: (update: (zoom: QuickEditAdvancedState['zoom']) => QuickEditAdvancedState['zoom']) =>
       stage((content) => ({ ...content, zoom: update(content.zoom) })),
     setBackground: (

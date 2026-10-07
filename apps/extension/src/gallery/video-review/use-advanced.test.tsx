@@ -1,3 +1,4 @@
+import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { reviewAdvancedContentBaseline } from '../../features/video/review/document';
@@ -366,4 +367,25 @@ it('persists and removes a browser header through the existing content history',
       },
     },
   });
+});
+
+it('persists one bulk click patch through history and keeps failed drafts retryable', async () => {
+  const { session, deps } = setup();
+  deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('write failed'));
+  act(() =>
+    advanced.setClickAnimations((current) =>
+      patchReviewClicks(current, ['one', 'two'], { effect: 'ripple' })
+    )
+  );
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  expect(advanced.saveFailed).toBe(true);
+  expect(advanced.advanced.clickAnimations).toHaveLength(2);
+  expect(session.getSnapshot().document.advancedContent.clickAnimations).toBeUndefined();
+  await act(async () => {
+    await advanced.retry();
+  });
+  expect(advanced.saveFailed).toBe(false);
+  expect(session.getSnapshot().snapshot.workspace.history).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(2);
+  expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
 });

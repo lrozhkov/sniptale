@@ -1,17 +1,22 @@
+import { ReviewActionHistory } from './action-history';
+import {
+  patchReviewClicks,
+  type ReviewClickStyle,
+} from '../../features/video/review/advanced/click-animation';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
 import { ReviewPreviewFrame } from './preview-frame';
 import { reviewStagePickRegions } from './stage-focus';
 import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
-import { ReviewFeedback } from './feedback';
+import { ReviewFeedback, ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
-import { ReviewSelectedProperties } from './selected-properties';
+import { ReviewSelectedProperties, reviewSelectionLabel } from './selected-properties';
 import { useState, type ReactNode } from 'react';
 import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
-import { ReviewButton, reviewEventLabel } from './controls';
+import { ReviewButton } from './controls';
 import { useReviewWaveforms } from './audio-waveform';
 import { ReviewStageBinding } from './stage-binding';
 import { ReviewTimelineBinding } from './timeline-binding';
@@ -27,7 +32,7 @@ import { ReviewInspectorActions } from './edit-actions';
 import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
-import { useReviewEditorAudio } from './voiceover-recording';
+import { useReviewAudioWiring } from './voiceover-recording';
 import { ReviewVoiceoverLayer } from './voiceover-panel';
 import { useReviewEditorState } from './use-editor-state';
 
@@ -70,6 +75,7 @@ type InspectorState = Pick<
   | 'zoom'
   | 'webcam'
   | 'timeline'
+  | 'setClickAnimations'
   | 'setBackground'
   | 'setCanvas'
   | 'setWindowHeader'
@@ -77,13 +83,6 @@ type InspectorState = Pick<
   | 'resetAdvanced'
   | 'flushAdvanced'
 >;
-
-function reviewErrorMessage(error: ReturnType<typeof useReviewEditorState>['snapshot']['error']) {
-  if (error === 'conflict') return translate('gallery.videoReview.conflict');
-  if (error === 'changed-source') return translate('gallery.videoReview.sourceChanged');
-  if (error === 'missing-media') return translate('gallery.videoReview.missingMedia');
-  return translate('gallery.videoReview.saveFailed');
-}
 
 function ReviewInspectorBinding({
   resource,
@@ -147,6 +146,22 @@ function ReviewInspectorBinding({
             }}
           />
         }
+        actionHistory={
+          <ReviewActionHistory
+            markers={state.projected.markers}
+            animations={state.advanced.clickAnimations ?? []}
+            busy={busy || editing.exporter.phase !== 'idle'}
+            onChange={(ids, patch) => changeRecordedClicks(state, ids, patch)}
+            onSelect={(marker) =>
+              state.beforeAction(() => {
+                video.current?.pause();
+                state.seek(marker.start, false);
+                state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
+                navigation.setSection('selected');
+              })
+            }
+          />
+        }
         settingsAvailable={state.advanced.ui.mode === 'advanced'}
         editingId={composer.annotation?.id}
         composer={
@@ -154,7 +169,12 @@ function ReviewInspectorBinding({
             <ReviewCommentComposer state={state} annotation={composer.annotation} />
           ) : null
         }
-        selectionLabel={reviewSelectionLabel(state)}
+        selectionLabel={reviewSelectionLabel({
+          selection: state.activeSelection,
+          markers: state.projected.markers,
+          advanced: state.advanced,
+          editing: state.editing,
+        })}
         selectionPreferenceScope={state.activeSelection.kind}
         selectionHasSections={
           state.activeSelection.kind === 'original-audio' ||
@@ -185,38 +205,12 @@ function ReviewInspectorBinding({
         onHover={state.setHovered}
         {...reviewInspectorNoteActions(state, resource)}
       >
-        <ReviewSelectedProperties
-          webcam={state.webcam}
-          webcamRange={
-            state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
-          }
-          advanced={state.advanced}
-          selection={state.activeSelection}
-          editing={state.editing}
-          zoom={state.zoom}
-          busy={state.busy}
-          markers={state.projected.markers}
-          onFocus={(region) => focusRecordedAction(state, region)}
-          onPreviewFrame={(time) => {
-            video.current?.pause();
-            state.seek(time, false);
-          }}
-          focusTime={state.timeline.sceneOutputTime}
-          playback={
-            state.playing && video.current
-              ? {
-                  video: video.current,
-                  camera: evaluateQuickEditCameraAtTime(
-                    state.features.zoomRegions,
-                    state.timeline.sceneOutputTime
-                  ),
-                }
-              : undefined
-          }
-          toSourceTime={state.timeline.timeMap.timelineToSource}
+        <ReviewSelectionBinding
+          state={state}
           resource={resource}
           audio={audio}
           canvasComments={canvasComments}
+          navigation={navigation}
         />
       </ReviewInspector>
     </ReviewIntervalMap.Provider>
@@ -291,25 +285,6 @@ function ReviewCommentComposer({
 }
 
 /** Audio lane wiring: import and the recorder reuse the state-owned audio selection. */
-function useReviewAudioWiring(state: ReturnType<typeof useReviewEditorState>) {
-  const { onImportAudioFile, voiceover } = useReviewEditorAudio({
-    busy: state.busy,
-    canStart: state.canStart,
-    time: state.time,
-    resultDuration: state.timeline.resultDuration,
-    segments: state.timeline.timeMap.getSegments(),
-    toOutputTime: state.timeline.toOutputTime,
-    onCutPlacement: () => state.setMessage(translate('gallery.videoReview.placementOnCut')),
-    video: state.video,
-    onOpenChange: state.setVoiceoverSilent,
-    run: state.run,
-    flushAdvanced: state.flushAdvanced,
-    audio: state.audio,
-    session: state.session,
-  });
-  return { onImportAudioFile, voiceover };
-}
-
 function ReviewHistoryControlBinding({
   state,
 }: {
@@ -398,6 +373,7 @@ function ReviewPreviewBinding({
       >
         {(fullscreen) => (
           <ReviewStageBinding
+            clickCues={state.clickCues}
             webcam={
               features.webcam && !state.webcam.pending
                 ? {
@@ -509,7 +485,12 @@ function ReviewEditor({
     beforeAction: state.beforeAction,
     contextKey: reviewInspectorContext(state),
     contextSelection: state.activeSelection,
-    selectionLabel: reviewSelectionLabel(state),
+    selectionLabel: reviewSelectionLabel({
+      selection: state.activeSelection,
+      markers: state.projected.markers,
+      advanced: state.advanced,
+      editing: state.editing,
+    }),
     settingsAvailable: state.advanced.ui.mode === 'advanced',
     exportAvailable: true,
     exportRequest,
@@ -566,6 +547,7 @@ function ReviewEditor({
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              onOpenHistory={() => navigation.setSection('history')}
               webcam={state.webcam}
               fillHeight={panels.timelineHeight !== null}
               playbackRange={state.playbackRange}
@@ -653,19 +635,6 @@ export function VideoReview({
   );
 }
 
-/** Load feedback distinguishes saved editing state from source acquisition. */
-function ReviewLoadStatus({ failure }: { failure: ReturnType<typeof useLoadedReview>['failed'] }) {
-  if (!failure) return <p role="status">{translate('gallery.videoReview.loading')}</p>;
-  const workspace = failure.stage === 'workspace' || failure.stage === 'session';
-  return (
-    <p role="alert">
-      {translate(
-        workspace ? 'gallery.videoReview.workspaceLoadFailed' : 'gallery.videoReview.loadFailed'
-      )}
-    </p>
-  );
-}
-
 function reviewInspectorContext(state: InspectorState): string {
   if (state.composer.annotation) return `comments:${state.composer.annotation.id}`;
   const selection = state.activeSelection;
@@ -676,49 +645,6 @@ function reviewInspectorContext(state: InspectorState): string {
   if (state.advanced.ui.mode !== 'advanced') return 'comments';
   const id = 'id' in selection ? selection.id : '';
   return `settings:${selection.kind}:${id}`;
-}
-
-function reviewSelectionLabel(state: InspectorState): string | undefined {
-  const selection = state.activeSelection;
-  if (
-    selection.kind === 'webcam' ||
-    selection.kind === 'webcam-position' ||
-    selection.kind === 'webcam-hidden'
-  )
-    return translate('gallery.videoReview.webcam');
-  if (selection.kind === 'telemetry') {
-    const marker = state.projected.markers.find(
-      (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
-    );
-    return reviewEventLabel(marker?.eventType ?? '');
-  }
-  if (selection.kind === 'zoom') {
-    const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
-    return translate(
-      region?.border
-        ? 'gallery.videoReview.focusBorder'
-        : region?.spotlight
-          ? 'gallery.videoReview.focusSpotlight'
-          : 'gallery.videoReview.zoomRegionLabel'
-    );
-  }
-  if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
-  if (selection.kind === 'canvas-comment') return translate('gallery.videoReview.overlayComments');
-  if (selection.kind === 'original-audio')
-    return translate('gallery.videoReview.originalAudioRange');
-  if (selection.kind === 'audio')
-    return translate(
-      selection.lane === 'voiceover'
-        ? 'gallery.videoReview.audioVoiceover'
-        : 'gallery.videoReview.audioMusic'
-    );
-  if (selection.kind === 'edit' && state.editing.selected)
-    return translate(
-      state.editing.selected.kind === 'cut'
-        ? 'gallery.videoReview.cutLabel'
-        : 'gallery.videoReview.speedMode'
-    );
-  return undefined;
 }
 
 /** The selected focus shares one edit transaction between the inspector and the stage. */
@@ -783,6 +709,79 @@ function ReviewScenePropertiesBinding({
         state.beforeAction(() => void state.backgroundImport.importImage(file, originMediaId))
       }
       setBackground={state.setBackground}
+    />
+  );
+}
+
+/** Both single and bulk edits use the existing advanced-content transaction and admission. */
+function changeRecordedClicks(
+  state: InspectorState,
+  ids: readonly string[],
+  patch: Partial<ReviewClickStyle> | null
+) {
+  if (state.busy || state.editing.exporter.phase !== 'idle' || !state.canStart()) return;
+  try {
+    patchReviewClicks(state.advanced.clickAnimations ?? [], ids, patch);
+    state.setClickAnimations((current) => patchReviewClicks(current, ids, patch));
+    if (patch?.effect && patch.effect !== 'off' && state.advanced.ui.mode !== 'advanced') {
+      state.setMode('advanced');
+      state.setActiveSelection(state.activeSelection);
+    }
+  } catch {
+    state.setMessage(translate('gallery.videoReview.clickLimit'));
+  }
+}
+
+/** Wires selected-object controls to the existing state writers and preview clock. */
+function ReviewSelectionBinding({
+  state,
+  resource,
+  audio,
+  canvasComments,
+  navigation,
+}: {
+  state: InspectorState;
+  resource: LoadedReview;
+  audio: ReturnType<typeof useReviewAudio>;
+  canvasComments: ReturnType<typeof useCanvasComments>;
+  navigation: ReviewInspectorNavigation;
+}) {
+  const video = state.video;
+  return (
+    <ReviewSelectedProperties
+      webcam={state.webcam}
+      webcamRange={
+        state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)
+      }
+      advanced={state.advanced}
+      selection={state.activeSelection}
+      editing={state.editing}
+      zoom={state.zoom}
+      busy={state.busy}
+      onClickAnimation={(ids, patch) => changeRecordedClicks(state, ids, patch)}
+      onOpenHistory={() => navigation.setSection('history')}
+      markers={state.projected.markers}
+      onFocus={(region) => focusRecordedAction(state, region)}
+      onPreviewFrame={(time) => {
+        video.current?.pause();
+        state.seek(time, false);
+      }}
+      focusTime={state.timeline.sceneOutputTime}
+      playback={
+        state.playing && video.current
+          ? {
+              video: video.current,
+              camera: evaluateQuickEditCameraAtTime(
+                state.features.zoomRegions,
+                state.timeline.sceneOutputTime
+              ),
+            }
+          : undefined
+      }
+      toSourceTime={state.timeline.timeMap.timelineToSource}
+      resource={resource}
+      audio={audio}
+      canvasComments={canvasComments}
     />
   );
 }

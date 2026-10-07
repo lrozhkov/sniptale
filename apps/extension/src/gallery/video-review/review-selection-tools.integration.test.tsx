@@ -142,9 +142,7 @@ it('creates a source-audio mute from a range, opens properties and restores it t
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.sourceRange"]')).toBeNull();
     expect(fixture.host.textContent).toContain('gallery.videoReview.muteAudioRange');
     expect(fixture.host.querySelectorAll('[data-audio-edge]')).toHaveLength(2);
-    await act(async () =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC' }))
-    );
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC' })));
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.cutRegion"]')).toBeNull();
     expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('true');
     expect(
@@ -161,7 +159,7 @@ it('creates a source-audio mute from a range, opens properties and restores it t
     expect(restored).not.toBeNull();
     await act(async () => restored.click());
     await act(async () =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', code: 'Delete' }))
+      fixture.key(new KeyboardEvent('keydown', { key: 'Delete', code: 'Delete' }))
     );
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.originalAudioRange"]')
@@ -307,7 +305,7 @@ it('draws focus in source coordinates, selects it and keeps drawing tools mutual
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('false');
     await act(async () =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'м', code: 'KeyV', bubbles: true }))
+      fixture.key(new KeyboardEvent('keydown', { key: 'м', code: 'KeyV', bubbles: true }))
     );
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
     expect(fixture.button('pointerTool').getAttribute('aria-pressed')).toBe('true');
@@ -391,7 +389,7 @@ it('rejects focus over a cut and applies the focus tool immediately to an availa
     await dragRange(fixture.host, { lane: 'zoomLane' });
     expect(fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')).toBeNull();
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('true');
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'Escape' })));
     expect(fixture.button('focusRangeTool').getAttribute('aria-pressed')).toBe('false');
     await dragRange(fixture.host);
     expect(fixture.button('focusRangeTool').disabled).toBe(true);

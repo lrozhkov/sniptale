@@ -105,9 +105,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
     expect(show).toHaveBeenCalled();
     expect(createUrl).toHaveBeenCalledOnce();
-    await act(async () =>
-      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
-    );
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'ArrowRight' })));
     expect(host.querySelector('video')!.currentTime).toBe(0.1);
     await click('play');
     await act(async () => host.querySelector('video')!.dispatchEvent(new Event('pause')));
@@ -140,7 +138,10 @@ it('integrates selection, recoverable text, drawing, history and report actions 
       pointer('pointerdown', 10, 10);
       pointer('pointercancel', 20, 20);
     });
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+    await act(async () => {
+      host.querySelector('textarea')!.focus();
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    });
     expect(back).not.toHaveBeenCalled();
     await click('removeRegion');
     await act(async () => {
@@ -344,7 +345,7 @@ it('commits safe cuts, skips excluded playback and preserves exact comment navig
   });
   const key = async (key: string) =>
     act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+      fixture.key(new KeyboardEvent('keydown', { key }));
     });
   try {
     await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
@@ -611,10 +612,10 @@ it('ignores the comment shortcut while report copying disables the comment contr
     );
     await fixture.click('copyReport');
     expect(fixture.button('addComment').disabled).toBe(true);
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })));
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'm' })));
     expect(fixture.host.querySelector('textarea')).toBeNull();
     await act(async () => finish());
-    await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'm' })));
+    await act(async () => fixture.key(new KeyboardEvent('keydown', { key: 'm' })));
     expect(fixture.host.querySelector('textarea')).not.toBeNull();
   } finally {
     await act(async () => finish?.());

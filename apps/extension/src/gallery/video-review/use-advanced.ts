@@ -103,6 +103,7 @@ export function useReviewAdvanced(session: Session) {
   }, [contentState, session]);
   const content = contentState.content;
   const {
+    clickAnimations: _baselineClicks,
     canvas: _baselineCanvas,
     windowHeader: _baselineHeader,
     webcam: _baselineWebcam,
@@ -129,6 +130,7 @@ export function useReviewAdvanced(session: Session) {
       })),
     setOverlaysVisible: (visible: boolean) =>
       stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
+    setClickAnimations: contentState.setClickAnimations,
     setZoom: contentState.setZoom,
     setCanvas: contentState.setCanvas,
     setWindowHeader: contentState.setWindowHeader,

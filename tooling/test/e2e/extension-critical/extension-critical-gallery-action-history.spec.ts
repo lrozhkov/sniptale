@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
@@ -90,6 +91,107 @@ for (const variant of [
       );
     }
   });
+  test(`manual click history editing and filter (${variant.locale}, narrow=${variant.narrow})`, async ({
+    page,
+  }, info) => {
+    if (variant.narrow) await page.setViewportSize({ width: 1200, height: 560 });
+    const server = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', {
+        width: 160,
+        height: 90,
+        duration: 12.01,
+      });
+      await seedHistory(page);
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+        .click();
+      const history = dialog.locator('[data-ui="gallery.videoReview.actionHistory"]');
+      await expect(history.locator('li')).toHaveCount(8);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historySelectAll'), exact: true })
+        .click();
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+        .click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.click_ripple'), exact: true })
+        .click();
+      await expect(history).toBeVisible();
+      const animated = dialog.locator('button[data-animated="true"]');
+      await expect(animated).toHaveCount(6);
+      await dialog
+        .getByRole('button', {
+          name: label('gallery.videoReview.historyAnimatedOnly'),
+          exact: true,
+        })
+        .click();
+      await expect(dialog.locator('button[data-animated]')).toHaveCount(6);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.clickReset'), exact: true })
+        .click();
+      await expect(animated).toHaveCount(0);
+      await expect(
+        dialog.getByRole('button', {
+          name: label('gallery.videoReview.historyAnimatedOnly'),
+          exact: true,
+        })
+      ).toBeVisible();
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
+        .click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.click_press'), exact: true })
+        .click();
+      await expect(animated).toHaveCount(6);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historyClear'), exact: true })
+        .click();
+      await animated.first().click();
+      const properties = dialog.locator('[data-ui="gallery.videoReview.actionProperties"]');
+      await expect(properties.locator('[data-ui="gallery.videoReview.clickFields"]')).toBeVisible();
+      await expect(
+        properties.getByRole('button', {
+          name: label('gallery.videoReview.actionFocus'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await expect(dialog.locator('[data-ui="gallery.videoReview.clickAnimation"]')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('click-properties.png'), fullPage: false });
+      if (variant.locale === 'en' && !variant.narrow)
+        await verifyClickExport(page, info.outputPath('click-export.webm'));
+
+      await properties
+        .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+        .click();
+      await page.screenshot({ path: info.outputPath('click-history.png'), fullPage: false });
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
+        .click();
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await expect(page.locator('button[data-animated="true"]')).toHaveCount(6);
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        server.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
 }
 
 async function seedHistory(page: Page) {
@@ -137,4 +239,60 @@ async function seedHistory(page: Page) {
     await done;
     db.close();
   }, betaV1Fixture);
+}
+
+async function verifyClickExport(page: Page, path: string) {
+  const expected = await page.evaluate(() => {
+    const overlay = document.querySelector<HTMLCanvasElement>(
+      '[data-ui="gallery.videoReview.clickAnimation"]'
+    )!;
+    const video = document.querySelector<HTMLVideoElement>('dialog video')!;
+    const canvas = Object.assign(document.createElement('canvas'), { width: 160, height: 90 });
+    const context = canvas.getContext('2d')!;
+    context.drawImage(video, 0, 0, 160, 90);
+    context.drawImage(overlay, 0, 0, 160, 90);
+    return Array.from(context.getImageData(40, 30, 1, 1).data);
+  });
+  const dialog = page.locator('dialog');
+  await dialog
+    .getByRole('button', {
+      name: translate('gallery.videoReview.exportSection', 'en'),
+      exact: true,
+    })
+    .click();
+  const downloading = page.waitForEvent('download');
+  await dialog
+    .getByRole('button', {
+      name: translate('gallery.videoReview.downloadVideo', 'en'),
+      exact: true,
+    })
+    .click();
+  const download = await downloading;
+  await download.saveAs(path);
+  const bytes = await readFile(path);
+  const actual = await page.evaluate(async (base64) => {
+    const video = document.createElement('video');
+    video.src = `data:video/webm;base64,${base64}`;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('decode failed'));
+    });
+    await new Promise<void>((resolve) => {
+      video.onseeked = () => resolve();
+      video.currentTime = 1;
+    });
+    const canvas = Object.assign(document.createElement('canvas'), {
+      width: video.videoWidth,
+      height: video.videoHeight,
+    });
+    const context = canvas.getContext('2d')!;
+    context.drawImage(video, 0, 0);
+    return Array.from(
+      context.getImageData(Math.floor(canvas.width * 0.25), Math.floor(canvas.height * 0.33), 1, 1)
+        .data
+    );
+  }, bytes.toString('base64'));
+  for (let channel = 0; channel < 3; channel++)
+    expect(Math.abs(actual[channel]! - expected[channel]!)).toBeLessThan(25);
+  await dialog.locator('button[data-animated="true"]').first().click();
 }

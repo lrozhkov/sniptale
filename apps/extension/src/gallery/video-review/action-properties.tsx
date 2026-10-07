@@ -1,3 +1,11 @@
+import { isReviewClick } from '../../features/video/review/click-animation';
+import {
+  REVIEW_CLICK_DEFAULT,
+  type ReviewClickAnimation,
+  type ReviewClickStyle,
+} from '../../features/video/review/advanced/click-animation';
+import { ReviewClickFields } from './click-animation-fields';
+import { reviewTimeLabel } from './controls';
 import { Focus, Gauge, Scissors } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -18,6 +26,11 @@ export function ReviewActionProperties(props: {
   marker: ReviewTelemetryMarker | undefined;
   plan: Plan | null;
   busy: boolean;
+  animations?: readonly ReviewClickAnimation[] | undefined;
+  onOpenHistory?: (() => void) | undefined;
+  onClickAnimation?:
+    | ((ids: readonly string[], patch: Partial<ReviewClickStyle> | null) => void)
+    | undefined;
   onEdit(kind: 'cut' | 'speed'): void;
   onFocus(): void;
 }) {
@@ -25,71 +38,112 @@ export function ReviewActionProperties(props: {
   if (!marker || !plan) return null;
   return (
     <div className="space-y-3 text-xs" data-ui="gallery.videoReview.actionProperties">
-      <ReviewInterval start={marker.start} end={marker.end} />
+      {props.onOpenHistory ? (
+        <ReviewButton
+          className={reviewTextButtonClassName}
+          label={translate('gallery.videoReview.historyOpen')}
+          onClick={props.onOpenHistory}
+        />
+      ) : null}
+      {isReviewClick(marker) || marker.end <= marker.start ? (
+        <p>
+          {translate('gallery.videoReview.clickRecordedAt')}: {reviewTimeLabel(marker.start)}
+        </p>
+      ) : (
+        <ReviewInterval start={marker.start} end={marker.end} />
+      )}
+      {isReviewClick(marker) ? (
+        marker.focusPoint ? (
+          <ReviewClickFields
+            values={[
+              props.animations?.find((item) => item.id === marker.ref.id) ?? REVIEW_CLICK_DEFAULT,
+            ]}
+            onChange={(patch) => props.onClickAnimation?.([marker.ref.id], patch)}
+          />
+        ) : (
+          <p role="status">{translate('gallery.videoReview.clickNoPoint')}</p>
+        )
+      ) : null}
       {marker.target ? (
         <p className="break-words text-[var(--sniptale-color-text-secondary)]">{marker.target}</p>
       ) : null}
-      {!plan.removed ? (
-        <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
-          {plan.contextual ? (
-            <p className="text-[var(--sniptale-color-text-muted)]">
-              {translate('gallery.videoReview.actionContextInterval')}
-            </p>
-          ) : null}
-          {plan.contextual ? (
-            <ReviewInterval start={plan.range.start} end={plan.range.end} />
-          ) : null}
-          {(
-            [
-              {
-                kind: 'cut',
-                label: 'gallery.videoReview.actionCut',
-                icon: Scissors,
-                ready: !!plan.cut,
-                reason: plan.editReason,
-                run: () => props.onEdit('cut'),
-              },
-              {
-                kind: 'speed',
-                label: 'gallery.videoReview.actionSpeed',
-                icon: Gauge,
-                ready: !!plan.speed,
-                reason: plan.editReason,
-                run: () => props.onEdit('speed'),
-              },
-              {
-                kind: 'focus',
-                label: 'gallery.videoReview.actionFocus',
-                icon: Focus,
-                ready: !!plan.focus,
-                reason: plan.focusReason,
-                run: props.onFocus,
-              },
-            ] as const
-          ).map(({ kind, label, icon: Icon, ready, reason, run }) => (
-            <div key={kind}>
-              <ReviewButton
-                label={translate(label)}
-                disabled={props.busy || !ready}
-                className={`${reviewTextButtonClassName} !w-full justify-start`}
-                onClick={run}
-              >
-                <Icon size={15} aria-hidden="true" />
-                <span>{translate(label)}</span>
-              </ReviewButton>
-              {!ready ? (
-                <p className="px-2 text-[var(--sniptale-color-text-muted)]">
-                  {translate(reasonKeys[reason])}
-                </p>
-              ) : null}
-            </div>
-          ))}
-        </div>
-      ) : (
+      {!isReviewClick(marker) && marker.end > marker.start && !plan.removed ? (
+        <ReviewActionShortcuts
+          plan={plan}
+          busy={props.busy}
+          onEdit={props.onEdit}
+          onFocus={props.onFocus}
+        />
+      ) : plan.removed ? (
         <p className="text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.actionRemoved')}
         </p>
-      )}
+      ) : null}
+    </div>
+  );
+}
+
+/** Interval editing stays separate from point-action presentation. */
+function ReviewActionShortcuts(props: {
+  plan: Plan;
+  busy: boolean;
+  onEdit(kind: 'cut' | 'speed'): void;
+  onFocus(): void;
+}) {
+  const { plan } = props;
+  return (
+    <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+      {plan.contextual ? (
+        <p className="text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.actionContextInterval')}
+        </p>
+      ) : null}
+      {plan.contextual ? <ReviewInterval start={plan.range.start} end={plan.range.end} /> : null}
+      {(
+        [
+          {
+            kind: 'cut',
+            label: 'gallery.videoReview.actionCut',
+            icon: Scissors,
+            ready: !!plan.cut,
+            reason: plan.editReason,
+            run: () => props.onEdit('cut'),
+          },
+          {
+            kind: 'speed',
+            label: 'gallery.videoReview.actionSpeed',
+            icon: Gauge,
+            ready: !!plan.speed,
+            reason: plan.editReason,
+            run: () => props.onEdit('speed'),
+          },
+          {
+            kind: 'focus',
+            label: 'gallery.videoReview.actionFocus',
+            icon: Focus,
+            ready: !!plan.focus,
+            reason: plan.focusReason,
+            run: props.onFocus,
+          },
+        ] as const
+      ).map(({ kind, label, icon: Icon, ready, reason, run }) => (
+        <div key={kind}>
+          <ReviewButton
+            label={translate(label)}
+            disabled={props.busy || !ready}
+            className={`${reviewTextButtonClassName} !w-full justify-start`}
+            onClick={run}
+          >
+            <Icon size={15} aria-hidden="true" />
+            <span>{translate(label)}</span>
+          </ReviewButton>
+          {!ready ? (
+            <p className="px-2 text-[var(--sniptale-color-text-muted)]">
+              {translate(reasonKeys[reason])}
+            </p>
+          ) : null}
+        </div>
+      ))}
     </div>
   );
 }

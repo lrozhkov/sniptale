@@ -1,3 +1,4 @@
+import { parseReviewClickAnimations } from './click-animation';
 import { parseQuickEditBorder } from './border';
 import { quickEditFocusConflicts } from './focus-layout';
 import { parseOriginalAudioRanges } from './original-audio';
@@ -398,6 +399,8 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
+  if (clickAnimations === null) return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
@@ -408,6 +411,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     zoom,
     background,
     audio,
+    ...(clickAnimations ? { clickAnimations } : {}),
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),
@@ -448,6 +452,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
+  if (clickAnimations === null) return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
@@ -461,6 +467,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ui,
     zoom,
     background,
+    ...(clickAnimations ? { clickAnimations } : {}),
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),

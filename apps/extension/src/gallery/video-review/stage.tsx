@@ -1,3 +1,5 @@
+import { ReviewClickOverlay } from './click-animation-overlay';
+import type { ReviewClickCue } from '../../features/video/review/click-animation';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { ReviewBorderOverlay } from './border-overlay';
@@ -87,6 +89,7 @@ function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
 }
 
 type ReviewStageProps = {
+  clickCues?: readonly ReviewClickCue[] | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
   backgroundImageUrl?: string | undefined;
   cutPreview?: ReviewCutPreviewBinding | undefined;
@@ -171,26 +174,7 @@ export function ReviewStage(props: ReviewStageProps) {
         onPointerUp={plane.onPointerUp}
         onPointerCancel={plane.onPointerCancel}
       >
-        <div
-          data-ui="gallery.videoReview.backgroundPlane"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background: backgroundPaint ?? undefined,
-            transformOrigin: '0 0',
-            transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.scale})`,
-          }}
-        >
-          {props.backgroundImageUrl &&
-          props.scene?.background.enabled &&
-          props.scene.background.type === 'image' ? (
-            <img
-              src={props.backgroundImageUrl}
-              alt=""
-              className="pointer-events-none absolute inset-0 h-full w-full"
-              style={{ objectFit: props.scene.background.imageFit }}
-            />
-          ) : null}
-        </div>
+        <ReviewStageBackground props={props} motion={motion} paint={backgroundPaint} />
         <ReviewSceneVideo
           url={props.url}
           cutPreview={props.cutPreview}
@@ -223,14 +207,20 @@ export function ReviewStage(props: ReviewStageProps) {
         ) : null}
         <ReviewSpotlightOverlay output={size} frames={spotlight} clip={overlayClip} />
         <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
-        {props.comments && props.comments.items.length ? (
-          <ReviewStageComments
-            comments={props.comments}
-            output={size}
-            source={props.source}
-            layout={sceneLayout}
-          />
-        ) : null}
+        <ReviewClickOverlay
+          cues={props.clickCues}
+          time={props.scene?.focus?.time ?? 0}
+          output={size}
+          video={sceneLayout?.videoTransform}
+          sourceWidth={props.source.width}
+          clip={overlayClip}
+        />
+        <ReviewStageComments
+          comments={props.comments}
+          output={size}
+          source={props.source}
+          layout={sceneLayout}
+        />
         {props.focusPicker && sceneLayout ? (
           <ReviewStageFocusTargets
             picker={props.focusPicker}
@@ -259,11 +249,12 @@ export function ReviewStage(props: ReviewStageProps) {
 
 /** Overlay comment stack using the shared scene geometry. */
 function ReviewStageComments(props: {
-  comments: ReviewStageCommentBinding;
+  comments: ReviewStageCommentBinding | undefined;
   layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
   output: { width: number; height: number };
   source: ReviewSource;
 }) {
+  if (!props.comments?.items.length) return null;
   return (
     <ReviewCommentOverlay
       layout={props.layout ?? undefined}
@@ -635,6 +626,40 @@ function ReviewHeaderFailure(props: { failed: boolean; retry(): void }) {
     >
       <span>{translate('gallery.videoReview.windowHeaderFailed')}</span>
       <ReviewButton label={translate('gallery.videoReview.retry')} onClick={props.retry} />
+    </div>
+  );
+}
+
+/** Background moves as its own scene plane, below all content overlays. */
+function ReviewStageBackground({
+  props,
+  motion,
+  paint,
+}: {
+  props: ReviewStageProps;
+  motion: { x: number; y: number; scale: number };
+  paint: string | null;
+}) {
+  return (
+    <div
+      data-ui="gallery.videoReview.backgroundPlane"
+      className="pointer-events-none absolute inset-0"
+      style={{
+        background: paint ?? undefined,
+        transformOrigin: '0 0',
+        transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.scale})`,
+      }}
+    >
+      {props.backgroundImageUrl &&
+      props.scene?.background.enabled &&
+      props.scene.background.type === 'image' ? (
+        <img
+          src={props.backgroundImageUrl}
+          alt=""
+          className="pointer-events-none absolute inset-0 h-full w-full"
+          style={{ objectFit: props.scene.background.imageFit }}
+        />
+      ) : null}
     </div>
   );
 }

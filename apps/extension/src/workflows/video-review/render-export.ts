@@ -1,4 +1,9 @@
-import { drawReviewSceneFrame } from './scene-frame';
+import {
+  evaluateReviewClicks,
+  type ReviewClickCue,
+} from '../../features/video/review/click-animation';
+import { drawReviewClicks } from './render-click-animation';
+import { drawReviewSceneFrame, drawReviewSceneComments } from './scene-frame';
 import {
   hasQuickEditMotionBlur,
   quickEditMotionBlurCameras,
@@ -74,6 +79,7 @@ type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
  * ranges keep camera and audio on global output time while timestamps start at zero.
  */
 export async function writeReviewFrames(args: {
+  clickCues?: readonly ReviewClickCue[];
   renderSettings?: ReviewRenderSettings | undefined;
   /** Read-only bounded probe sink; bypasses muxing, audio rendering and writer use. */
   frameProbe?: { add(sample: VideoSample): Promise<void> };
@@ -210,6 +216,7 @@ export async function writeReviewFrames(args: {
         fragmentOffset: args.fragmentOffset,
         zoomRegions: preparation.effective.zoomRegions,
         background: preparation.effective.background,
+        clickCues: args.clickCues,
         comments: args.comments ?? [],
         canvas: source.canvas,
         sourceSize: source.sourceSize,
@@ -511,6 +518,7 @@ export async function drainSegmentAudio(args: {
 
 /** One window's frames: draws the scene and encodes at the fps lattice; returns the count. */
 export async function renderRenderWindowFrames(args: {
+  clickCues?: readonly ReviewClickCue[] | undefined;
   window: ReviewFrameWindow;
   fps: number;
   fragmentOffset: number;
@@ -606,6 +614,7 @@ export async function renderRenderWindowFrames(args: {
           sample: {
             draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
           },
+          deferComments: true,
           comments: burned,
           sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
           cameraScale: camera.scale,
@@ -650,6 +659,28 @@ export async function renderRenderWindowFrames(args: {
               : 0,
           }
         );
+        drawReviewClicks(
+          context,
+          evaluateReviewClicks(args.clickCues ?? [], timestamp + args.fragmentOffset),
+          layout.videoTransform,
+          args.sourceSize.width,
+          {
+            rect: motion.windowClip,
+            radius: args.background.enabled
+              ? args.background.layout.cornerRadius * motion.scale
+              : 0,
+          }
+        );
+        drawReviewSceneComments(context, {
+          canvas,
+          layout,
+          background: args.background,
+          image: args.image,
+          sample,
+          comments: burned,
+          sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
+          cameraScale: camera.scale,
+        });
         if (webcamFrames) {
           const cameraFrame = await webcamFrames.next();
           signal.throwIfAborted();

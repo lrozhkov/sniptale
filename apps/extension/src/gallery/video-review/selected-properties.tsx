@@ -22,7 +22,12 @@ import { ReviewEditRangeFields } from './edit-range-fields';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
 import { Trash2 } from 'lucide-react';
-import { ReviewButton, ReviewInterval, reviewDeleteButtonClassName } from './controls';
+import {
+  ReviewButton,
+  ReviewInterval,
+  reviewDeleteButtonClassName,
+  reviewEventLabel,
+} from './controls';
 import { ReviewActionProperties } from './action-properties';
 import { ReviewAudioInspectorSection } from './audio-editor';
 import { ReviewAdvancedPanels } from './advanced-panels';
@@ -42,6 +47,13 @@ type SelectedPropertiesProps = {
   zoom: ReturnType<typeof useReviewZoomEditor>;
   busy: boolean;
   markers: readonly ReviewTelemetryMarker[];
+  onOpenHistory?(): void;
+  onClickAnimation?(
+    ids: readonly string[],
+    patch: Partial<
+      import('../../features/video/review/advanced/click-animation').ReviewClickStyle
+    > | null
+  ): void;
   onFocus(region: QuickEditZoomRegion): void;
   onPreviewFrame?(time: number): void;
   focusTime?: number | undefined;
@@ -93,6 +105,9 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         ) : selection.kind === 'telemetry' ? (
           <ReviewActionProperties
             marker={marker}
+            animations={advanced.clickAnimations}
+            onOpenHistory={props.onOpenHistory}
+            onClickAnimation={props.onClickAnimation}
             plan={plan}
             busy={busy || editing.exporter.phase !== 'idle'}
             onEdit={(kind) => {
@@ -362,4 +377,49 @@ function CutTransitionFields(props: {
       </fieldset>
     </ReviewDetails>
   );
+}
+
+export function reviewSelectionLabel(
+  state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
+): string | undefined {
+  const selection = state.selection;
+  if (
+    selection.kind === 'webcam' ||
+    selection.kind === 'webcam-position' ||
+    selection.kind === 'webcam-hidden'
+  )
+    return translate('gallery.videoReview.webcam');
+  if (selection.kind === 'telemetry') {
+    const marker = state.markers.find(
+      (item) => item.ref.kind === selection.ref.kind && item.ref.id === selection.ref.id
+    );
+    return reviewEventLabel(marker?.eventType ?? '');
+  }
+  if (selection.kind === 'zoom') {
+    const region = state.advanced.zoom.regions.find((item) => item.id === selection.id);
+    return translate(
+      region?.border
+        ? 'gallery.videoReview.focusBorder'
+        : region?.spotlight
+          ? 'gallery.videoReview.focusSpotlight'
+          : 'gallery.videoReview.zoomRegionLabel'
+    );
+  }
+  if (selection.kind === 'zoom-link') return translate('gallery.videoReview.zoomLinkSettings');
+  if (selection.kind === 'canvas-comment') return translate('gallery.videoReview.overlayComments');
+  if (selection.kind === 'original-audio')
+    return translate('gallery.videoReview.originalAudioRange');
+  if (selection.kind === 'audio')
+    return translate(
+      selection.lane === 'voiceover'
+        ? 'gallery.videoReview.audioVoiceover'
+        : 'gallery.videoReview.audioMusic'
+    );
+  if (selection.kind === 'edit' && state.editing.selected)
+    return translate(
+      state.editing.selected.kind === 'cut'
+        ? 'gallery.videoReview.cutLabel'
+        : 'gallery.videoReview.speedMode'
+    );
+  return undefined;
 }

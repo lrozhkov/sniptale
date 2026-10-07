@@ -1,8 +1,10 @@
+import { isReviewClick } from '../../features/video/review/click-animation';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone } from './controls';
 import { useMemo } from 'react';
 import {
   Activity,
+  Sparkles,
   MousePointer2,
   MousePointerClick,
   Command,
@@ -25,6 +27,7 @@ const ACTION_LANE_PITCH_PX = ACTION_MARKER_HEIGHT_PX + ACTION_LANE_GAP_PX;
 const ACTION_LANE_MAX_VISIBLE = 3;
 
 type TelemetryStripProps = {
+  animatedIds?: ReadonlySet<string>;
   markers: readonly ReviewTelemetryMarker[];
   duration: number;
   time: number;
@@ -59,16 +62,19 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           props.selectedTelemetryRef !== undefined &&
           marker.ref.kind === props.selectedTelemetryRef.kind &&
           marker.ref.id === props.selectedTelemetryRef.id;
+        const animated = isReviewClick(marker) && props.animatedIds?.has(marker.ref.id);
         const tone = reviewTimelineItemTone(selected);
         return (
           <button
             key={`${marker.ref.kind}:${marker.ref.id}`}
             type="button"
             aria-pressed={selected}
+            data-animated={animated ? 'true' : 'false'}
             aria-label={[
               translate('gallery.videoReview.telemetry'),
               reviewEventLabel(marker.eventType),
               marker.target,
+              animated ? translate('gallery.videoReview.clickAnimation') : undefined,
               `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
             ]
               .filter(Boolean)
@@ -76,6 +82,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
             title={[
               reviewEventLabel(marker.eventType),
               marker.target,
+              animated ? translate('gallery.videoReview.clickAnimation') : undefined,
               `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
             ]
               .filter(Boolean)
@@ -85,6 +92,9 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
               'rounded-sm border text-[10px] transition-colors',
               tone,
+              animated && !selected
+                ? '!bg-[color-mix(in_srgb,var(--sniptale-color-info)_15%,transparent)]'
+                : '',
             ].join(' ')}
             style={{
               left: item.left,
@@ -93,6 +103,13 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               height: ACTION_MARKER_HEIGHT_PX,
             }}
           >
+            {animated ? (
+              <Sparkles
+                size={10}
+                aria-label={translate('gallery.videoReview.clickAnimation')}
+                className="shrink-0"
+              />
+            ) : null}
             <ReviewTimelineLabel
               icon={<ReviewEventIcon kind={marker.eventType} />}
               name={reviewEventLabel(marker.eventType)}

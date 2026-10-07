@@ -42,6 +42,7 @@ export function ReviewInspector(props: {
   message: string | null;
   recovery?: ReactNode;
   scene?: ReactNode;
+  actionHistory?: ReactNode;
   selectionLabel?: string | undefined;
   selectionHasSections?: boolean;
   selectionPreferenceScope?: string;
@@ -63,7 +64,7 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  type Section = 'scene' | 'selected' | 'comments' | 'export';
+  type Section = 'scene' | 'selected' | 'comments' | 'export' | 'history';
   const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
   return (
     <aside
@@ -102,6 +103,9 @@ export function ReviewInspector(props: {
               ...(context === 'selected' && props.selectionLabel
                 ? [{ id: 'selected' as const, label: props.selectionLabel }]
                 : []),
+              ...(context === 'history' && props.actionHistory
+                ? [{ id: 'history' as const, label: translate('gallery.videoReview.telemetry') }]
+                : []),
               ...(context === 'export' && props.actions
                 ? [
                     {
@@ -124,7 +128,9 @@ export function ReviewInspector(props: {
           section={shown}
           selectionScope={props.selectionPreferenceScope}
         >
-          {shown === 'export' ? (
+          {shown === 'history' ? (
+            props.actionHistory
+          ) : shown === 'export' ? (
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
               {props.actions}
             </section>
@@ -305,7 +311,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    section: 'scene' | 'selected' | 'comments' | 'export';
+    section: 'scene' | 'selected' | 'comments' | 'export' | 'history';
     onTogglePresentation(): void;
   }
 ) {

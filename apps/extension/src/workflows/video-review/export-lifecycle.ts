@@ -1,3 +1,5 @@
+import { projectReviewTelemetry } from '../../features/video/review/telemetry';
+import { scheduleReviewClicks } from '../../features/video/review/click-animation';
 import { createExportTimeHistory } from '../../composition/persistence/export-time-history';
 import {
   createExportTimeCalibration,
@@ -293,6 +295,12 @@ export async function exportReviewedVideo(
             index,
             edits,
             advanced,
+            clickCues: reviewExportClicks(
+              original.telemetry,
+              advanced,
+              index.duration,
+              document.edits
+            ),
             comments: resolveQuickEditEffectiveFeatures(advanced).overlaysVisible
               ? resolveOverlayComments(document)
               : [],
@@ -340,12 +348,7 @@ export async function exportReviewedVideo(
         id,
         filename,
         preparedAsset: prepared,
-        ...(() => {
-          const recordingMetadata =
-            original.recordingMetadata ??
-            (original.telemetry ? summarizeRecordingMetadata(original.telemetry) : undefined);
-          return recordingMetadata ? { recordingMetadata } : {};
-        })(),
+        ...reviewRecordingMetadata(original),
         mediaMetadata: {
           kind: 'video',
           width: outputSize.width,
@@ -379,4 +382,28 @@ export async function exportReviewedVideo(
   } finally {
     args.onTimeEstimate?.(null);
   }
+}
+
+/** Join fresh source facts before fragment slicing; all animation clocks remain global. */
+function reviewExportClicks(
+  telemetry: Awaited<ReturnType<typeof loadVideoReviewSource>>['telemetry'],
+  advanced: QuickEditAdvancedState,
+  duration: number,
+  edits: Parameters<typeof buildReviewTimeMap>[1]
+) {
+  return advanced.ui.mode === 'advanced' && telemetry
+    ? scheduleReviewClicks(
+        projectReviewTelemetry(telemetry, duration).markers,
+        advanced.clickAnimations ?? [],
+        buildReviewTimeMap(duration, edits)
+      )
+    : [];
+}
+
+/** Preserve source summary when present, otherwise derive it from admitted telemetry. */
+function reviewRecordingMetadata(original: Awaited<ReturnType<typeof loadVideoReviewSource>>) {
+  const recordingMetadata =
+    original.recordingMetadata ??
+    (original.telemetry ? summarizeRecordingMetadata(original.telemetry) : undefined);
+  return recordingMetadata ? { recordingMetadata } : {};
 }

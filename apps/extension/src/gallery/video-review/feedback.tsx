@@ -1,3 +1,5 @@
+import type { useReviewEditorState } from './use-editor-state';
+import type { useLoadedReview } from './use-session';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { CircleAlert, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
@@ -65,5 +67,31 @@ export function ReviewFeedback({
         <X size={16} aria-hidden="true" />
       </ContentToolbarButton>
     </div>
+  );
+}
+
+export function reviewErrorMessage(
+  error: ReturnType<typeof useReviewEditorState>['snapshot']['error']
+) {
+  if (error === 'conflict') return translate('gallery.videoReview.conflict');
+  if (error === 'changed-source') return translate('gallery.videoReview.sourceChanged');
+  if (error === 'missing-media') return translate('gallery.videoReview.missingMedia');
+  return translate('gallery.videoReview.saveFailed');
+}
+
+/** Load feedback distinguishes saved editing state from source acquisition. */
+export function ReviewLoadStatus({
+  failure,
+}: {
+  failure: ReturnType<typeof useLoadedReview>['failed'];
+}) {
+  if (!failure) return <p role="status">{translate('gallery.videoReview.loading')}</p>;
+  const workspace = failure.stage === 'workspace' || failure.stage === 'session';
+  return (
+    <p role="alert">
+      {translate(
+        workspace ? 'gallery.videoReview.workspaceLoadFailed' : 'gallery.videoReview.loadFailed'
+      )}
+    </p>
   );
 }

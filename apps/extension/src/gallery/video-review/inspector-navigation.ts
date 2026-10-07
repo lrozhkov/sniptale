@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewSelection } from '../../features/video/review/types';
 
-type Section = 'scene' | 'selected' | 'comments' | 'export';
+type Section = 'scene' | 'selected' | 'comments' | 'export' | 'history';
 type ReviewInspectorNavigationInput = {
   beforeAction?: ReviewBeforeAction | undefined;
   contextKey?: string;
@@ -25,7 +25,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       : props.settingsAvailable
         ? 'scene'
         : 'comments';
-  const [context, updateContext] = useState<'selected' | 'export' | null>(
+  const [context, updateContext] = useState<'selected' | 'export' | 'history' | null>(
     props.selectionLabel ? 'selected' : null
   );
   const [section, updateSection] = useState<Section>(contextSection);
@@ -33,7 +33,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
   const setSection = (value: Section) => {
     (props.beforeAction ?? ((action) => action()))(() => {
       explicitSection.current = value;
-      if (value === 'export' || value === 'selected') updateContext(value);
+      if (value === 'export' || value === 'selected' || value === 'history') updateContext(value);
       updateSection(value);
     });
   };
@@ -55,7 +55,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     if (exportRequested && exportAvailable) updateContext('export');
     else if (!explicit)
       updateContext((current) =>
-        preserveExport && current === 'export'
+        (preserveExport && current === 'export') ||
+        (current === 'history' && props.contextSelection?.kind === 'none')
           ? current
           : contextSection === 'selected'
             ? 'selected'
@@ -66,6 +67,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
         ? 'export'
         : (explicit ??
           ((preserveExport && current === 'export') ||
+          (current === 'history' && props.contextSelection?.kind === 'none') ||
           (!modeChanged && contextSection === 'scene' && current === 'comments')
             ? current
             : contextSection))
