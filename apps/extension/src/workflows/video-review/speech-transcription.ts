@@ -143,7 +143,10 @@ export async function transcribeReviewSpeech(
       : {
           identity,
           completed: new Set<string>(),
-          chunks: await planReviewSpeechChunks(clip.assetId, ranges, signal),
+          chunks: await planReviewSpeechChunks(clip.assetId, ranges, signal).catch(() => {
+            signal.throwIfAborted();
+            throw new Error('decode-failed');
+          }),
         };
   incomplete.set(session, progress);
   const chunks = progress.chunks;

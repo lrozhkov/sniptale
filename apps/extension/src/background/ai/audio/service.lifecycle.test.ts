@@ -290,3 +290,17 @@ it('retries retained upload cleanup during erasure after a completed request cle
   reservation.release();
   await job.connection.disconnect();
 });
+
+it('cleans the authorized transcription upload after a network failure without retrying', async () => {
+  const job = setup();
+  job.deps.request.mockRejectedValueOnce(new Error('network-failed'));
+  await authorized(job);
+  execute(job);
+  await vi.waitFor(() =>
+    expect(job.messages).toContainEqual({ type: 'failure', requestId: 'r', code: 'network-failed' })
+  );
+  expect(job.deps.discard).toHaveBeenCalledOnce();
+  expect(job.deps.write).not.toHaveBeenCalled();
+  expect(job.deps.request).toHaveBeenCalledOnce();
+  await job.connection.disconnect();
+});

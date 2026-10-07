@@ -36,7 +36,7 @@ export async function resolveAudioModelConfig(request: AudioJobStart): Promise<A
   if (!(await chrome.permissions.contains({ origins: [`${new URL(url).origin}/*`] })))
     throw new Error('permission-denied');
   const apiKey = await activateStoredAIProviderSecretForUse(provider);
-  if (!apiKey) throw new Error('model-unavailable');
+  if (!apiKey) throw new Error('secret-unavailable');
   return {
     url,
     apiKey,

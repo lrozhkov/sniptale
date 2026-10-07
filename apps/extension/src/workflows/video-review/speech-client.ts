@@ -80,6 +80,9 @@ export function runReviewSpeechJob(
         authorized = true;
         void options
           .prepareInput(controller.signal)
+          .catch(() => {
+            throw new Error('decode-failed');
+          })
           .then(async (blob) => {
             const staged = await writeAudioStaging({
               id: message.ticket,
@@ -100,8 +103,17 @@ export function runReviewSpeechJob(
               throw error;
             }
           })
-          .catch(() =>
-            finish(undefined, new Error(controller.signal.aborted ? 'cancelled' : 'storage-failed'))
+          .catch((error: unknown) =>
+            finish(
+              undefined,
+              new Error(
+                controller.signal.aborted
+                  ? 'cancelled'
+                  : error instanceof Error && error.message === 'decode-failed'
+                    ? 'decode-failed'
+                    : 'storage-failed'
+              )
+            )
           );
       }
     });

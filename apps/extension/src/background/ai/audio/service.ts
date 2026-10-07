@@ -1,5 +1,6 @@
 import {
   AUDIO_JOB_TIMEOUT_MS,
+  parseAudioJobFailureCode,
   type AudioJobClientMessage,
   type AudioJobFailureCode,
   type AudioJobServerMessage,
@@ -16,26 +17,8 @@ import { resolveAudioModelConfig, type AudioModelConfig } from './model-config';
 import { requestAudio } from './request';
 import { validateAudioUpload } from './response';
 
-const failureCodes = new Set<AudioJobFailureCode>([
-  'invalid-request',
-  'unauthorized',
-  'stale',
-  'model-unavailable',
-  'permission-denied',
-  'cancelled',
-  'timeout',
-  'provider-auth',
-  'provider-rate-limit',
-  'provider-failed',
-  'invalid-response',
-  'too-large',
-  'storage-failed',
-  'interrupted',
-]);
 function failure(error: unknown): AudioJobFailureCode {
-  for (const code of failureCodes)
-    if (error instanceof Error && error.message === code) return code;
-  return 'provider-failed';
+  return (error instanceof Error && parseAudioJobFailureCode(error.message)) || 'provider-failed';
 }
 interface AudioJobDependencies {
   authorize: typeof authorizeAudioJob;

@@ -77,3 +77,24 @@ it('rejects ASCII control characters in identifiers without excluding printable 
     parseAudioJobClientMessage({ ...start, requestId: `r${String.fromCharCode(127)}` })
   ).not.toBeNull();
 });
+
+it.each([
+  'network-failed',
+  'provider-request',
+  'provider-not-found',
+  'secret-unavailable',
+  'decode-failed',
+] as const)('accepts the fixed diagnostic code %s across the audio Port', (code) => {
+  expect(parseAudioJobServerMessage({ type: 'failure', requestId: 'r', code })).toEqual({
+    type: 'failure',
+    requestId: 'r',
+    code,
+  });
+  expect(
+    parseAudioJobServerMessage({
+      type: 'failure',
+      requestId: 'r',
+      code: `${code}: private provider body`,
+    })
+  ).toBeNull();
+});

@@ -52,6 +52,11 @@ function run(request = speech, config = speechConfig) {
 }
 
 it.each([
+  [400, 'provider-request'],
+  [422, 'provider-request'],
+  [404, 'provider-not-found'],
+  [405, 'provider-not-found'],
+  [413, 'too-large'],
   [401, 'provider-auth'],
   [403, 'provider-auth'],
   [429, 'provider-rate-limit'],
@@ -206,6 +211,15 @@ it('rejects a malformed Content-Length and propagates a failed stream without re
       { headers: { 'Content-Type': 'audio/mpeg' } }
     )
   );
-  await expect(run()).rejects.toThrow('stream failed');
+  await expect(run()).rejects.toThrow(/^network-failed$/);
   expect(fetchMock).toHaveBeenCalledTimes(2);
+});
+
+it('reports a fixed network failure without retrying or exposing the raw exception', async () => {
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockRejectedValue(new TypeError('private endpoint detail'));
+  vi.stubGlobal('fetch', fetchMock);
+  await expect(run()).rejects.toThrow(/^network-failed$/);
+  expect(fetchMock).toHaveBeenCalledOnce();
 });

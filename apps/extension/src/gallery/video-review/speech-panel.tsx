@@ -124,6 +124,23 @@ function SpeechFeedback({ speech }: { speech: Controller }) {
     'partial-replacement': 'gallery.videoReview.speechPartialReplacement',
     stale: 'gallery.videoReview.speechChanged',
     failed: 'gallery.videoReview.speechFailed',
+    timeout: 'gallery.videoReview.speechInterrupted',
+    cancelled: 'gallery.videoReview.speechCanceled',
+    'provider-auth': 'gallery.videoReview.speechProviderAuth',
+    'provider-rate-limit': 'gallery.videoReview.speechProviderRateLimit',
+    'provider-request': 'gallery.videoReview.speechProviderRequest',
+    'provider-not-found': 'gallery.videoReview.speechProviderNotFound',
+    'provider-failed': 'gallery.videoReview.speechProviderFailed',
+    'network-failed': 'gallery.videoReview.speechNetworkFailed',
+    'permission-denied': 'gallery.videoReview.speechPermissionDenied',
+    'model-unavailable': 'gallery.videoReview.speechModelUnavailable',
+    'secret-unavailable': 'gallery.videoReview.speechSecretUnavailable',
+    'invalid-response': 'gallery.videoReview.speechInvalidResponse',
+    'storage-failed': 'gallery.videoReview.speechStorageFailed',
+    'decode-failed': 'gallery.videoReview.speechDecodeFailed',
+    unauthorized: 'gallery.videoReview.speechUnauthorized',
+    'invalid-request': 'gallery.videoReview.speechInvalidRequest',
+    'too-large': 'gallery.videoReview.speechTooLarge',
   } as const;
   return (
     <>

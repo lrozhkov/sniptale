@@ -1,6 +1,66 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  speechProviderAuth: {
+    ru: 'Провайдер отклонил авторизацию (HTTP 401/403). Проверьте API-ключ и доступ к модели в настройках подключения.',
+    en: 'Provider rejected authorization (HTTP 401/403). Check the API key and model access in connection settings.',
+  },
+  speechProviderRateLimit: {
+    ru: 'Провайдер ограничил запрос (HTTP 429). Проверьте баланс и лимиты; повторите позже.',
+    en: 'Provider limited the request (HTTP 429). Check your balance and limits; try again later.',
+  },
+  speechProviderRequest: {
+    ru: 'Провайдер отклонил параметры (HTTP 400/422). Проверьте ID модели, язык, формат ответа и временные метки.',
+    en: 'Provider rejected the parameters (HTTP 400/422). Check the model ID, language, response format and timestamps.',
+  },
+  speechProviderNotFound: {
+    ru: 'Аудио-эндпоинт или модель недоступны (HTTP 404/405). Проверьте Base URL и поддержку выбранной операции у провайдера.',
+    en: 'Audio endpoint or model unavailable (HTTP 404/405). Check the Base URL and provider support for this operation.',
+  },
+  speechProviderFailed: {
+    ru: 'Провайдер не завершил запрос. Проверьте состояние сервиса и повторите действие позже.',
+    en: 'Provider could not complete the request. Check service availability and try again later.',
+  },
+  speechNetworkFailed: {
+    ru: 'Не удалось получить ответ по сети. Проверьте соединение и Base URL; результат запроса неизвестен.',
+    en: 'Could not receive a network response. Check your connection and Base URL; the request outcome is unknown.',
+  },
+  speechPermissionDenied: {
+    ru: 'Нет разрешения расширения на доступ к провайдеру. Разрешите доступ к его сайту в настройках подключения.',
+    en: 'Extension permission to access the provider is missing. Allow access to its site in connection settings.',
+  },
+  speechModelUnavailable: {
+    ru: 'Модель или подключение недоступны. Проверьте назначение модели, Base URL и наличие сохранённого ключа, затем обновите список моделей.',
+    en: 'Model or connection unavailable. Check the model operation, Base URL and saved key, then reload models.',
+  },
+  speechSecretUnavailable: {
+    ru: 'Не удалось открыть сохранённый API-ключ. Разблокируйте ключи в настройках; если это не помогает, сохраните ключ подключения заново.',
+    en: 'Could not open the saved API key. Unlock keys in Settings; if that does not help, save the connection key again.',
+  },
+  speechInvalidResponse: {
+    ru: 'Ответ провайдера имеет неподдерживаемый формат или временные метки. Проверьте формат ответа и параметры модели.',
+    en: 'Provider response has unsupported data or timestamps. Check the response format and model settings.',
+  },
+  speechStorageFailed: {
+    ru: 'Не удалось подготовить или сохранить временное аудио. Проверьте доступное место и повторите действие.',
+    en: 'Could not prepare or save temporary audio. Check available storage and try again.',
+  },
+  speechDecodeFailed: {
+    ru: 'Не удалось прочитать аудио выбранной записи. Проверьте, что запись воспроизводится и содержит звуковую дорожку.',
+    en: 'Could not decode the selected recording. Check that it plays and contains an audio track.',
+  },
+  speechUnauthorized: {
+    ru: 'Выбранный фрагмент недоступен для обработки. Выберите клип заново и проверьте его границы.',
+    en: 'Selected interval is unavailable for processing. Select the clip again and check its boundaries.',
+  },
+  speechInvalidRequest: {
+    ru: 'Не удалось подготовить запрос для выбранного фрагмента. Проверьте границы записи и параметры модели.',
+    en: 'Could not prepare the selected interval request. Check recording boundaries and model settings.',
+  },
+  speechTooLarge: {
+    ru: 'Аудио или ответ превышают допустимый размер. Выберите более короткий фрагмент.',
+    en: 'Audio or response exceeds the size limit. Select a shorter interval.',
+  },
   speechInterrupted: {
     ru: 'Запрос прерван. Результат неизвестен; повторный запуск может быть оплачен повторно.',
     en: 'Request interrupted. Its outcome is unknown; running it again may incur another charge.',
@@ -49,8 +109,8 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
     en: 'The phrase changed. Repeat the action for the current version.',
   },
   speechFailed: {
-    ru: 'Не удалось завершить действие. Проверьте подключение, разблокируйте ключи в настройках при необходимости и повторите.',
-    en: 'The action failed. Check the connection, unlock keys in Settings if needed, and retry.',
+    ru: 'Не удалось завершить действие. Повторите его; если ошибка сохраняется, откройте запись заново.',
+    en: 'The action failed. Try again; if the error persists, reopen the recording.',
   },
   speechMissingModel: {
     ru: 'Модель недоступна. Выберите замену для новых запросов.',

@@ -193,3 +193,22 @@ it('discards a stage completed after worker disconnect rather than sending execu
   await vi.waitFor(() => expect(staging.discard).toHaveBeenCalled());
   expect(job.postMessage).toHaveBeenCalledTimes(1);
 });
+
+it.each(['decode-failed', 'storage-failed'] as const)(
+  'distinguishes %s before upload',
+  async (code) => {
+    const job = connectedJob();
+    const id = '11111111-1111-4111-8111-111111111111';
+    const prepareInput = vi.fn(async () => new Blob(['pcm'], { type: 'audio/wav' }));
+    if (code === 'decode-failed')
+      prepareInput.mockRejectedValueOnce(new Error('private decoder detail'));
+    else staging.write.mockRejectedValueOnce(new Error('private storage detail'));
+    const pending = runReviewSpeechJob(job.start, {
+      signal: new AbortController().signal,
+      prepareInput,
+    });
+    job.receive({ type: 'authorized', requestId: 'r', ticket: id, scope: job.start.scope });
+    await expect(pending).rejects.toThrow(code);
+    expect(job.postMessage).toHaveBeenCalledTimes(1);
+  }
+);

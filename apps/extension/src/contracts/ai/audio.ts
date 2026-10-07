@@ -46,21 +46,33 @@ export type AudioJobClientMessage =
   | { type: 'execute'; requestId: string; ticket: string; staged: AudioStagedHandle }
   | { type: 'cancel'; requestId: string };
 
-export type AudioJobFailureCode =
-  | 'invalid-request'
-  | 'unauthorized'
-  | 'stale'
-  | 'model-unavailable'
-  | 'permission-denied'
-  | 'cancelled'
-  | 'timeout'
-  | 'provider-auth'
-  | 'provider-rate-limit'
-  | 'provider-failed'
-  | 'invalid-response'
-  | 'too-large'
-  | 'storage-failed'
-  | 'interrupted';
+export const AUDIO_JOB_FAILURE_CODES = [
+  'invalid-request',
+  'unauthorized',
+  'stale',
+  'model-unavailable',
+  'permission-denied',
+  'cancelled',
+  'timeout',
+  'provider-auth',
+  'provider-rate-limit',
+  'provider-failed',
+  'invalid-response',
+  'too-large',
+  'storage-failed',
+  'interrupted',
+  'network-failed',
+  'provider-request',
+  'provider-not-found',
+  'secret-unavailable',
+  'decode-failed',
+] as const;
+export type AudioJobFailureCode = (typeof AUDIO_JOB_FAILURE_CODES)[number];
+
+/** Admits only fixed diagnostic categories, never provider text or raw exceptions. */
+export function parseAudioJobFailureCode(value: unknown): AudioJobFailureCode | null {
+  return AUDIO_JOB_FAILURE_CODES.find((code) => code === value) ?? null;
+}
 
 export interface AudioTranscriptTiming {
   text: string;
@@ -245,24 +257,8 @@ export function parseAudioJobServerMessage(value: unknown): AudioJobServerMessag
     return staged ? { type: 'audio', requestId, staged } : null;
   }
   if (value['type'] === 'failure') {
-    const codes: AudioJobFailureCode[] = [
-      'invalid-request',
-      'unauthorized',
-      'stale',
-      'model-unavailable',
-      'permission-denied',
-      'cancelled',
-      'timeout',
-      'provider-auth',
-      'provider-rate-limit',
-      'provider-failed',
-      'invalid-response',
-      'too-large',
-      'storage-failed',
-      'interrupted',
-    ];
-    for (const code of codes)
-      if (value['code'] === code) return { type: 'failure', requestId, code };
+    const code = parseAudioJobFailureCode(value['code']);
+    return code ? { type: 'failure', requestId, code } : null;
   }
   return null;
 }

@@ -27,7 +27,10 @@ async function readBounded(
   try {
     for (;;) {
       signal.throwIfAborted();
-      const next = await reader.read();
+      const next = await reader.read().catch(() => {
+        signal.throwIfAborted();
+        throw new Error('network-failed');
+      });
       if (next.done) break;
       size += next.value.byteLength;
       if (size > limit) throw new Error('too-large');
@@ -79,6 +82,9 @@ async function assertResponseStatus(response: Response): Promise<void> {
   if (response.ok) return;
   await response.body?.cancel().catch(() => undefined);
   if (response.status === 401 || response.status === 403) throw new Error('provider-auth');
+  if (response.status === 400 || response.status === 422) throw new Error('provider-request');
+  if (response.status === 404 || response.status === 405) throw new Error('provider-not-found');
+  if (response.status === 413) throw new Error('too-large');
   if (response.status === 429) throw new Error('provider-rate-limit');
   throw new Error('provider-failed');
 }
@@ -134,6 +140,9 @@ export async function requestAudio(args: AudioRequest) {
     credentials: 'omit',
     cache: 'no-store',
     referrerPolicy: 'no-referrer',
+  }).catch(() => {
+    args.signal.throwIfAborted();
+    throw new Error('network-failed');
   });
   await assertResponseStatus(response);
   args.onReceiving();

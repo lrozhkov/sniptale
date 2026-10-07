@@ -1,3 +1,4 @@
+import { parseAudioJobFailureCode, type AudioJobFailureCode } from '../../contracts/ai/audio';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { AIModelSelectionBootstrapPayload } from '../../contracts/messaging/ai-settings-runtime';
 import { requestAIModelSelectionBootstrap } from '../../workflows/ai-settings/query';
@@ -14,6 +15,7 @@ import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { useSpeechEdits } from './use-speech-edits';
 import { useSpeechPreviews } from './use-speech-previews';
 type Failure =
+  | AudioJobFailureCode
   | 'interrupted'
   | 'canceled'
   | 'failed'
@@ -32,7 +34,7 @@ function failure(error: unknown): Failure {
       error.message === 'partial-replacement' ||
       error.message === 'invalid')
     ? error.message
-    : 'failed';
+    : (error instanceof Error && parseAudioJobFailureCode(error.message)) || 'failed';
 }
 
 /** Coordinates configured model discovery and cancellable remote speech operations. */

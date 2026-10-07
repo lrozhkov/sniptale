@@ -69,20 +69,20 @@ vi.mock('./speech-audio', () => ({
   extractReviewSpeechWav: workflow.extract,
   planReviewSpeechChunks: workflow.plan,
 }));
-function speechSession() {
+function speechSession(duration = 2) {
   const clip: QuickEditAudioClip = {
     id: 'clip',
     assetId: 'project-asset:original',
     timelineStart: 0,
     sourceOffset: 0,
-    duration: 2,
+    duration,
     volume: 1,
     muted: false,
     fadeIn: 0,
     fadeOut: 0,
   };
   const state = {
-    snapshot: { workspace: { aggregateId: 'workspace', revision: 1, source: { duration: 2 } } },
+    snapshot: { workspace: { aggregateId: 'workspace', revision: 1, source: { duration } } },
     document: { edits: [], advancedContent: { audio: { voiceover: [clip] } } },
   };
   const saveSpeechTranscript = vi.fn(
@@ -166,3 +166,27 @@ it('normalizes segment-only responses and rejects overlapping supplied times', (
     )
   ).toThrow('invalid-response');
 });
+
+it.each([false, true])(
+  'reports local planning failure for a long clip, cancellation=%s',
+  async (cancelled) => {
+    const { session, saveSpeechTranscript } = speechSession(75);
+    const controller = new AbortController();
+    workflow.job.mockReset();
+    workflow.plan.mockClear();
+    workflow.plan.mockImplementationOnce(async () => {
+      if (cancelled) controller.abort();
+      throw new Error('private decoder failure');
+    });
+    const pending = transcribeReviewSpeech(session, 'clip', 'model', controller.signal);
+    if (cancelled) await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    else await expect(pending).rejects.toThrow(/^decode-failed$/);
+    expect(workflow.plan).toHaveBeenCalledWith(
+      'project-asset:original',
+      [{ start: 0, end: 75 }],
+      controller.signal
+    );
+    expect(workflow.job).not.toHaveBeenCalled();
+    expect(saveSpeechTranscript).not.toHaveBeenCalled();
+  }
+);

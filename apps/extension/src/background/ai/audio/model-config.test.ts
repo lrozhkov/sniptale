@@ -164,7 +164,7 @@ describe('audio model operation and credential admission', () => {
     await expect(resolveAudioModelConfig(request)).rejects.toThrow('Permission state unavailable');
     expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
     vi.mocked(activateStoredAIProviderSecretForUse).mockResolvedValue(null);
-    await expect(resolveAudioModelConfig(request)).rejects.toThrow('model-unavailable');
+    await expect(resolveAudioModelConfig(request)).rejects.toThrow('secret-unavailable');
   });
 });
 

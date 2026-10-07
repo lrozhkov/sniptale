@@ -385,3 +385,25 @@ it('flushes pending typing before an explicit remote command and suppresses it w
   expect(current.transcript.phrases[0]?.text).toBe('Retained on failure');
   expect(current.dirty).toBe(true);
 });
+
+it.each([
+  'provider-auth',
+  'provider-rate-limit',
+  'permission-denied',
+  'model-unavailable',
+  'invalid-response',
+  'storage-failed',
+  'unauthorized',
+  'too-large',
+] as const)(
+  'preserves actionable audio failure %s instead of blaming connection and keys',
+  async (code) => {
+    const { Harness } = fixture();
+    await act(async () => root?.render(<Harness />));
+    await act(async () => current.setModelId('transcription'));
+    mocks.transcribe.mockRejectedValueOnce(new Error(code));
+    await act(async () => current.recognize());
+    expect(current.error).toBe(code);
+    expect(mocks.transcribe).toHaveBeenCalledOnce();
+  }
+);

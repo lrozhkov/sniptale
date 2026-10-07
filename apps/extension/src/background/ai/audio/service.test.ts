@@ -313,3 +313,28 @@ it('returns bounded binary speech and honours an abort while reading its respons
     })
   ).rejects.toThrow();
 });
+
+it.each([
+  [new Error('network-failed'), 'network-failed'],
+  [new Error('provider-request'), 'provider-request'],
+  [new Error('provider-not-found'), 'provider-not-found'],
+  [new Error('secret-unavailable'), 'secret-unavailable'],
+  [new Error('private upstream detail'), 'provider-failed'],
+  [{ secret: 'private rejected payload' }, 'provider-failed'],
+] as const)('sends only admitted diagnostic codes on failure %#', async (cause, code) => {
+  const post = vi.fn().mockRejectedValue(cause);
+  const messages: AudioJobServerMessage[] = [];
+  const service = createAudioJobService({
+    authorize: vi.fn(async () => undefined),
+    resolveModel: vi.fn(async () => config),
+    request: post,
+  });
+  const connection = service.connect((message) => messages.push(message));
+  connection.receive(request);
+  await vi.waitFor(() =>
+    expect(messages).toContainEqual({ type: 'failure', requestId: 'request', code })
+  );
+  expect(JSON.stringify(messages)).not.toContain('private');
+  expect(post).toHaveBeenCalledOnce();
+  await connection.disconnect();
+});
