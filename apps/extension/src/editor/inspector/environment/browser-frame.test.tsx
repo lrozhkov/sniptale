@@ -44,10 +44,11 @@ it('offers shared browser and application settings with explicit image insertion
     );
     expect(container.querySelector('[data-ui="window-header-settings"]')).not.toBeNull();
     expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-    expect(Array.from(container.querySelectorAll('input')).map((input) => input.value)).toEqual([
-      'Saved title',
-      'example.com',
-    ]);
+    expect(
+      Array.from(container.querySelectorAll<HTMLInputElement>('input:not([type="file"])')).map(
+        (input) => input.value
+      )
+    ).toEqual(['Saved title', 'example.com']);
     const application = Array.from(container.querySelectorAll('button')).find((button) =>
       /Application|Приложение/.test(button.textContent ?? '')
     );
@@ -95,7 +96,9 @@ it('routes Off to existing removal and activates a header from Off without persi
         layers: [],
       })
     );
-    expect(container.querySelectorAll('input')).toHaveLength(0);
+    expect(container.querySelectorAll<HTMLInputElement>('input:not([type="file"])')).toHaveLength(
+      0
+    );
     const browser = Array.from(container.querySelectorAll('button')).find((button) =>
       /Browser|Браузер/.test(button.textContent ?? '')
     );
@@ -157,6 +160,43 @@ it('aborts pending favicon acquisition when a different document has the same UR
       )
     );
     expect(writes).toHaveBeenCalledTimes(writesBeforeResolution);
+  } finally {
+    act(() => root.unmount());
+  }
+});
+
+it('clears a file source explicitly through the image partial-patch adapter', async () => {
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const sync = vi.fn();
+  const browserFrame = {
+    ...DEFAULT_BROWSER_FRAME_STATE,
+    enabled: true,
+    faviconEnabled: true,
+    faviconSource: 'file' as const,
+    faviconDataUrl:
+      'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=',
+  };
+  try {
+    useEditorStore.setState({
+      browserFrame,
+      layers: [{ type: 'source-image', id: 'source' }] as never,
+    });
+    await act(async () =>
+      root.render(
+        <EditorWindowHeaderSettings browserFrame={browserFrame} syncBrowserFrame={sync} />
+      )
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>(
+          `button[aria-label="${translate('windowHeader.fileIcon')}"]`
+        )!
+        .click()
+    );
+    expect(sync).toHaveBeenLastCalledWith(
+      expect.objectContaining({ faviconEnabled: false, faviconDataUrl: null, faviconSource: null })
+    );
   } finally {
     act(() => root.unmount());
   }

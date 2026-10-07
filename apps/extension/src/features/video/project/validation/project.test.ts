@@ -481,6 +481,7 @@ for (const type of [VideoProjectAssetType.VIDEO, VideoProjectAssetType.IMAGE]) {
             url: 'https://example.test/path?a=1&b=2',
             faviconEnabled: true,
             faviconDataUrl,
+            faviconSource: 'file' as const,
           };
           const saved = { ...project, clips: [{ ...clip, windowHeader }] };
           const restored: unknown = JSON.parse(JSON.stringify(saved));

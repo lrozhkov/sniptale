@@ -198,3 +198,22 @@ it('bounds header display text without mutating image provenance', () => {
   expect(header.title).toHaveLength(512);
   expect(header.url).toHaveLength(2048);
 });
+
+it('keeps custom icon provenance across image normalization and clears it for website/off', () => {
+  const faviconDataUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+  const local = {
+    ...DEFAULT_BROWSER_FRAME_STATE,
+    faviconEnabled: true,
+    faviconSource: 'file' as const,
+    faviconDataUrl,
+  };
+  expect(normalizeBrowserFrameState(local).faviconSource).toBe('file');
+  expect(resolveEditorWindowHeader(local).faviconSource).toBe('file');
+  expect(
+    normalizeBrowserFrameState({ ...local, faviconSource: null }).faviconSource
+  ).toBeUndefined();
+  expect(
+    normalizeBrowserFrameState({ ...local, faviconEnabled: false }).faviconSource
+  ).toBeUndefined();
+});

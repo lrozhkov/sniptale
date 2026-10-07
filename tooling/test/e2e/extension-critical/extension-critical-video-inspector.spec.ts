@@ -1,3 +1,4 @@
+import { checkLocalWindowIcon, checkRenderedWindowIcon } from '../support/window-header-local-icon';
 import { writeFile } from 'node:fs/promises';
 import { checkInspectorUtility, checkInspectorLabels } from '../support/inspector-utilities';
 import { createVideoProjectMotionRegion } from '../../../../apps/extension/src/features/video/project/motion';
@@ -417,6 +418,12 @@ for (const viewport of [
     await settings
       .getByRole('textbox', { name: 'Website address', exact: true })
       .scrollIntoViewIfNeeded();
+    await checkLocalWindowIcon(page, settings, 'en');
+    await checkRenderedWindowIcon(
+      page,
+      page.locator('[data-preview-stage-canvas]'),
+      info.outputPath('full-icon-detail.png')
+    );
     await page.screenshot({ path: info.outputPath('window-header-browser.png'), fullPage: false });
     await page.locator(`[data-project-timeline-clip="${second.id}"]`).click();
     await expect(settings.getByRole('button', { name: 'Off', exact: true })).toHaveAttribute(
@@ -427,6 +434,9 @@ for (const viewport of [
     await expect(settings.getByRole('textbox', { name: 'Tab title', exact: true })).toHaveValue(
       'Full editor browser'
     );
+    await expect(
+      settings.getByRole('button', { name: 'Upload icon from computer', exact: true })
+    ).toHaveAttribute('aria-pressed', 'true');
     await settings.getByRole('button', { name: 'Application', exact: true }).click();
     await expect(
       settings.getByRole('textbox', { name: 'Website address', exact: true })

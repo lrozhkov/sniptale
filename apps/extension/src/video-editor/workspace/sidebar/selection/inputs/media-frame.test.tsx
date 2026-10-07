@@ -225,11 +225,10 @@ it('cancels a pending favicon when selection changes to another clip with the sa
     windowHeader: { ...DEFAULT_WINDOW_HEADER, faviconEnabled: true, url: 'https://example.org' },
   };
   await renderHarness({ onUpdateMediaClipWindowHeader }, false, first);
-  await act(async () => {
-    container
-      ?.querySelector<HTMLInputElement>('input[placeholder="example.com"]')
-      ?.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
-  });
+  const address = container!.querySelector<HTMLInputElement>('input[placeholder="example.com"]')!;
+  await act(async () => setInputValue(address, 'https://other.example.org'));
+  await act(async () => address.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+
   expect(acquireWindowHeaderFavicon).toHaveBeenCalledOnce();
   const signal = vi.mocked(acquireWindowHeaderFavicon).mock.calls[0]?.[1];
   expect(signal?.aborted).toBe(false);
@@ -238,5 +237,5 @@ it('cancels a pending favicon when selection changes to another clip with the sa
   await act(async () => {
     finish?.('data:image/png;base64,late-icon');
   });
-  expect(onUpdateMediaClipWindowHeader).not.toHaveBeenCalled();
+  expect(onUpdateMediaClipWindowHeader).toHaveBeenCalledTimes(1);
 });

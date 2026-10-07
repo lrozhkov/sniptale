@@ -163,6 +163,9 @@ export function resolveEditorWindowHeader(
     title: (frame?.title ?? '').slice(0, 512).replace(/[\uD800-\uDFFF]/gu, ''),
     url: (frame?.url ?? '').slice(0, 2048).replace(/[\uD800-\uDFFF]/gu, ''),
     faviconEnabled,
+    ...(faviconEnabled && (frame?.faviconSource === 'site' || frame?.faviconSource === 'file')
+      ? { faviconSource: frame.faviconSource }
+      : {}),
     ...(faviconEnabled && isWindowHeaderFavicon(faviconDataUrl) ? { faviconDataUrl } : {}),
   };
 }

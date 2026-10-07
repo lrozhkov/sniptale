@@ -56,6 +56,7 @@ export interface BrowserFrameState extends Partial<
   title: string;
   url: string;
   faviconDataUrl?: string | null;
+  faviconSource?: WindowHeader['faviconSource'] | null;
   canvasMode: BrowserFrameCanvasMode;
   contentMode: BrowserFrameContentMode;
 }

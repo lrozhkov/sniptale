@@ -113,6 +113,7 @@ function isBrowserFrameState(value: unknown): boolean {
       title: '',
       url: '',
       faviconDataUrl: value['faviconDataUrl'] ?? undefined,
+      faviconSource: value['faviconSource'] ?? undefined,
     }) !== null &&
     (value['canvasMode'] === 'resize' || value['canvasMode'] === 'keep-size') &&
     (value['contentMode'] === 'push-down' || value['contentMode'] === 'fit-content')

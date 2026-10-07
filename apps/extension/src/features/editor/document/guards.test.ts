@@ -300,7 +300,15 @@ it('admits all shared window header kinds and rejects unsafe or disabled favicon
         })
       ).toBe(true);
     }
+  expect(
+    isEditorDocument({
+      ...document,
+      browserFrame: { ...document.browserFrame, faviconSource: 'file' },
+    })
+  ).toBe(true);
   for (const patch of [
+    { faviconSource: 'other' },
+    { faviconSource: 'file', faviconDataUrl: null },
     { style: 'unknown' },
     { kind: 'dialog' },
     { theme: 'automatic' },

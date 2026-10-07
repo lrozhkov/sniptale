@@ -17,6 +17,13 @@ export const windowHeaderMessages = defineMessageSource({
   windowTitle: { en: 'Window title', ru: 'Заголовок окна' },
   address: { en: 'Website address', ru: 'Адрес сайта' },
   favicon: { en: 'Use website icon', ru: 'Использовать иконку сайта' },
+  fileIcon: { en: 'Upload icon from computer', ru: 'Загрузить иконку с компьютера' },
+  fileRemove: { en: 'Remove uploaded icon', ru: 'Убрать загруженную иконку' },
+  fileLoading: { en: 'Loading icon…', ru: 'Загрузка иконки…' },
+  fileUnavailable: {
+    en: 'Could not load the icon. Choose an ICO, PNG, SVG, WebP or JPEG file up to 2 MB and 4096 × 4096 px.',
+    ru: 'Не удалось загрузить иконку. Выберите ICO, PNG, SVG, WebP или JPEG до 2 МБ и 4096 × 4096 пикселей.',
+  },
   loading: { en: 'Loading website icon…', ru: 'Загрузка иконки сайта…' },
   unavailable: {
     en: 'Could not load the website icon. Check the address and turn the icon off and on to retry.',

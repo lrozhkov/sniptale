@@ -66,6 +66,23 @@ describe('decorated original video', () => {
         }
     }
   );
+  it('retains a file icon in saved advanced state and replay content', () => {
+    const header = {
+      ...windowHeader,
+      faviconEnabled: true,
+      faviconSource: 'file' as const,
+      faviconDataUrl:
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=',
+    };
+    const state = { ...createQuickEditAdvancedState(), windowHeader: header };
+    expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.windowHeader).toEqual(
+      header
+    );
+    const content = reviewAdvancedContentBaseline(state);
+    expect(
+      loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))?.windowHeader
+    ).toEqual(header);
+  });
   it('rounds narrow-video header rows and preserves the source size', () => {
     const small = { width: 160, height: 90 };
     expect(

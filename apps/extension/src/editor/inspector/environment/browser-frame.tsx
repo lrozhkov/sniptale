@@ -27,6 +27,7 @@ export function EditorWindowHeaderSettings(props: {
             ? {
                 ...header,
                 faviconDataUrl: header.faviconDataUrl ?? null,
+                faviconSource: header.faviconSource ?? null,
                 ...(!hasHeader ? { enabled: true } : {}),
               }
             : { enabled: false }

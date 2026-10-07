@@ -49,3 +49,25 @@ describe('window header project contract', () => {
     ).toBeNull();
   });
 });
+
+it('retains explicit file provenance, accepts legacy site headers, and rejects inconsistent sources', () => {
+  const faviconDataUrl =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlH0H8AAAAASUVORK5CYII=';
+  const saved = {
+    ...DEFAULT_WINDOW_HEADER,
+    faviconEnabled: true,
+    faviconSource: 'file',
+    faviconDataUrl,
+  };
+  expect(parseWindowHeader(saved)).toEqual(saved);
+  expect(parseWindowHeader({ ...saved, faviconSource: undefined })?.faviconDataUrl).toBe(
+    faviconDataUrl
+  );
+  for (const patch of [
+    { faviconSource: 'invalid' },
+    { faviconSource: null },
+    { faviconEnabled: false },
+    { faviconDataUrl: undefined },
+  ])
+    expect(parseWindowHeader({ ...saved, ...patch })).toBeNull();
+});

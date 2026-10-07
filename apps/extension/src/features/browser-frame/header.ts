@@ -8,6 +8,8 @@ export interface WindowHeader {
   title: string;
   url: string;
   faviconEnabled: boolean;
+  /** Missing source in older projects means website acquisition. */
+  faviconSource?: 'site' | 'file';
   faviconDataUrl?: string;
 }
 
@@ -47,7 +49,7 @@ export function isWindowHeaderFavicon(value: unknown): value is string {
 /** Parse at project admission; malformed present settings are never silently discarded. */
 export function parseWindowHeader(value: unknown): WindowHeader | null {
   if (!isRecord(value)) return null;
-  const { kind, style, theme, title, url, faviconEnabled, faviconDataUrl } = value;
+  const { kind, style, theme, title, url, faviconEnabled, faviconDataUrl, faviconSource } = value;
   if (
     (kind !== 'browser' && kind !== 'application') ||
     (style !== 'windows' && style !== 'macos' && style !== 'linux') ||
@@ -60,7 +62,9 @@ export function parseWindowHeader(value: unknown): WindowHeader | null {
     /[\uD800-\uDFFF]/u.test(url) ||
     typeof faviconEnabled !== 'boolean' ||
     (faviconDataUrl !== undefined && !isWindowHeaderFavicon(faviconDataUrl)) ||
-    (!faviconEnabled && faviconDataUrl !== undefined)
+    (faviconSource !== undefined && faviconSource !== 'site' && faviconSource !== 'file') ||
+    (!faviconEnabled && (faviconDataUrl !== undefined || faviconSource !== undefined)) ||
+    (faviconSource === 'file' && faviconDataUrl === undefined)
   )
     return null;
   return {
@@ -70,6 +74,7 @@ export function parseWindowHeader(value: unknown): WindowHeader | null {
     title,
     url,
     faviconEnabled,
+    ...(faviconSource === undefined ? {} : { faviconSource }),
     ...(faviconDataUrl === undefined ? {} : { faviconDataUrl }),
   };
 }
