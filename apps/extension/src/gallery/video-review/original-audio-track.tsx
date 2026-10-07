@@ -174,7 +174,7 @@ function OriginalAudioControls(props: {
       <NumericValueField
         label={translate('gallery.videoReview.sourceAudioVolume')}
         unit="%"
-        value={Math.round(props.original.volume * 100)}
+        value={muted ? 0 : Math.round(props.original.volume * 100)}
         min={0}
         max={200}
         step={1}
