@@ -7,8 +7,13 @@ import { useReviewWindowHeader } from './use-window-header';
 import { loadReviewWindowHeader } from '../../workflows/video-review/window-header';
 
 vi.mock('../../workflows/video-review/window-header', () => ({
-  reviewWindowHeaderUrl: (header: { title: string; url?: string }) =>
-    `${header.title}|${header.url ?? ''}`,
+  reviewWindowHeaderUrl: (
+    header: { title: string; url?: string },
+    _width: number,
+    _height: number,
+    displayHeight?: number
+  ) =>
+    `${header.title}|${header.url ?? ''}${displayHeight === undefined ? '' : `|${displayHeight}`}`,
   loadReviewWindowHeader: vi.fn(),
 }));
 
@@ -25,11 +30,20 @@ it('cancels obsolete titles, ignores late results and retries a failed decode', 
   const host = document.createElement('div'),
     root = createRoot(host);
   let result: ReturnType<typeof useReviewWindowHeader>;
-  function Harness({ title, url = '' }: { title: string; url?: string }) {
+  function Harness({
+    title,
+    url = '',
+    displayHeight,
+  }: {
+    title: string;
+    url?: string;
+    displayHeight?: number;
+  }) {
     result = useReviewWindowHeader(
       { ...DEFAULT_WINDOW_HEADER, kind: 'browser' as const, title, url },
       1920,
-      1080
+      1080,
+      displayHeight
     );
     return null;
   }
@@ -46,6 +60,13 @@ it('cancels obsolete titles, ignores late results and retries a failed decode', 
     expect(stale.close).toHaveBeenCalledOnce();
     await act(async () => pending[1]!.resolve(current));
     expect(result!.image).toBe(current);
+    await act(async () =>
+      root.render(<Harness title="first" url="https://site.test" displayHeight={105.25} />)
+    );
+    expect(result!.url).toBe('first|https://site.test|105.25');
+    expect(result!.image).toBe(current);
+    expect(pending).toHaveLength(2);
+    expect(current.close).not.toHaveBeenCalled();
     await act(async () => root.render(<Harness title="third" />));
     expect(current.close).toHaveBeenCalledOnce();
     await act(async () => pending[2]!.reject(new Error('decode')));

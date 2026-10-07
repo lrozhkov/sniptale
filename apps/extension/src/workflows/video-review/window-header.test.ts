@@ -181,3 +181,20 @@ it('extends even export rows without distorting small-source glyphs', () => {
   expect(root.getAttribute('height')).toBe('10');
   expect(root.getAttribute('preserveAspectRatio')).not.toBe('none');
 });
+
+it('matches a fitted DOM allocation without changing glyph scale or the encoder default', () => {
+  const header = { ...DEFAULT_WINDOW_HEADER, title: 'Browser' };
+  const displayHeight = (14 * 320) / 260;
+  const svg = decodeURIComponent(
+    reviewWindowHeaderUrl(header, 320, 180, displayHeight).split(',')[1]!
+  );
+  const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
+  expect(Number(doc.documentElement.getAttribute('height'))).toBe(displayHeight);
+  const viewBox = doc.documentElement.getAttribute('viewBox')!.split(' ').map(Number);
+  expect(320 / viewBox[2]!).toBeCloseTo(displayHeight / viewBox[3]!);
+  expect(doc.querySelector('text')?.getAttribute('y')).toBe('24.75');
+  const encoded = decodeURIComponent(reviewWindowHeaderUrl(header, 320, 180).split(',')[1]!);
+  expect(
+    new DOMParser().parseFromString(encoded, 'image/svg+xml').documentElement.getAttribute('height')
+  ).toBe('18');
+});

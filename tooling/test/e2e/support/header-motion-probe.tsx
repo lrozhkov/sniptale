@@ -39,7 +39,7 @@ const regions = [
     exit: { type: 'none' as const, duration: 0 },
   },
 ];
-export async function show(url: string, time: number, follows: boolean) {
+export async function show(url: string, time: number, follows: boolean, padding = 40) {
   const { host, root, video } = (surface ??= createSurface());
   flushSync(() =>
     root.render(
@@ -61,7 +61,7 @@ export async function show(url: string, time: number, follows: boolean) {
             type: 'solid',
             color: '#ff00ffff',
             zoomBehavior: follows ? 'follow-video' : 'fixed',
-            layout: { padding: 40, cornerRadius: 0 },
+            layout: { padding, cornerRadius: 0 },
           },
           camera: evaluateQuickEditCameraAtTime(regions, time),
         }}
@@ -81,6 +81,7 @@ export async function show(url: string, time: number, follows: boolean) {
     video: video.current?.getBoundingClientRect().toJSON(),
     header: image?.getBoundingClientRect().toJSON(),
     headerWidth: image?.style.width,
+    clip: video.current?.parentElement?.getBoundingClientRect().toJSON(),
   };
 }
 
@@ -91,4 +92,52 @@ export async function motion(url: string, follows: boolean) {
     frames.push(boxes);
   }
   return frames;
+}
+
+export async function labelMetrics() {
+  const { composeWindowHeaderSvg } =
+    await import('../../../../apps/extension/src/features/browser-frame/appearance');
+  const rows = [];
+  for (const style of ['windows', 'macos', 'linux'] as const) {
+    for (const theme of ['light', 'dark'] as const) {
+      const image = new Image();
+      image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg({ ...DEFAULT_WINDOW_HEADER, style, theme, title: 'HЖ' }, { width: 1600, height: 900 }))}`;
+      await image.decode();
+
+      const canvas = document.createElement('canvas');
+      canvas.width = 6400;
+      canvas.style.width = '1600px';
+      canvas.height = 344;
+      canvas.style.height = '86px';
+      const context = canvas.getContext('2d')!;
+      context.drawImage(image, 0, 0, 6400, 344);
+      const x = style === 'macos' ? 126 : 78;
+      let top = 35,
+        bottom = 0;
+      let weightedY = 0,
+        ink = 0;
+      const started = performance.now();
+      do {
+        context.drawImage(image, 0, 0, 6400, 344);
+        const pixels = context.getImageData(x * 4, 36, 140, 92).data;
+        weightedY = 0;
+        ink = 0;
+        for (let y = 0; y < 92; y++)
+          for (let col = 0; col < 140; col++) {
+            const value = pixels[(y * 140 + col) * 4]!;
+            const weight = Math.max(0, theme === 'light' ? 255 - value : value - 53);
+            weightedY += ((y + 36.5) / 4) * weight;
+            ink += weight;
+            if (theme === 'light' ? value < 128 : value > 150) {
+              top = Math.min(top, (y + 36) / 4);
+              bottom = Math.max(bottom, (y + 36) / 4);
+            }
+          }
+        if (bottom === 0) await new Promise(requestAnimationFrame);
+      } while (bottom === 0 && performance.now() - started < 3000);
+      rows.push({ style, theme, top, bottom, center: weightedY / ink });
+      document.body.append(canvas);
+    }
+  }
+  return rows;
 }

@@ -9,11 +9,20 @@ import {
 export function useReviewWindowHeader(
   header: QuickEditWindowHeader | undefined,
   width: number,
-  height: number
+  height: number,
+  displayHeight?: number
 ) {
   const url = useMemo(
     () => (header ? reviewWindowHeaderUrl(header, width, height) : null),
     [header, width, height]
+  );
+  // DOM SVG uses the fitted viewport; canvas consumers retain the stable integer-row bitmap.
+  const displayUrl = useMemo(
+    () =>
+      header && displayHeight !== undefined
+        ? reviewWindowHeaderUrl(header, width, height, displayHeight)
+        : url,
+    [header, width, height, displayHeight, url]
   );
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<{ url: string; image: ImageBitmap } | null>(null);
@@ -41,7 +50,7 @@ export function useReviewWindowHeader(
     };
   }, [url, attempt]);
   return {
-    url,
+    url: displayUrl,
     joinColor:
       header?.theme === 'dark'
         ? header.kind === 'browser'

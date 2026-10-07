@@ -120,11 +120,6 @@ export function ReviewStage(props: ReviewStageProps) {
     active: false,
     frame: null,
   });
-  const header = useReviewWindowHeader(
-    props.scene?.windowHeader,
-    props.source.width,
-    props.source.height
-  );
   const {
     size,
     sceneLayout,
@@ -135,6 +130,21 @@ export function ReviewStage(props: ReviewStageProps) {
     borders,
     overlayClip,
   } = useReviewStageGeometry(props, host);
+  // Match the SVG viewport to the fitted header allocation, including its rounded toolbar rows.
+  // A source-rounded SVG in a differently shaped img box otherwise gains internal letterboxing.
+  const headerDisplayHeight = sceneLayout
+    ? Math.round(
+        (((sceneLayout.videoRect.y - sceneLayout.windowRect.y) * props.source.width) /
+          sceneLayout.videoRect.width) *
+          1e6
+      ) / 1e6
+    : undefined;
+  const header = useReviewWindowHeader(
+    props.scene?.windowHeader,
+    props.source.width,
+    props.source.height,
+    headerDisplayHeight
+  );
   const motion =
     sceneLayout && props.scene
       ? computeQuickEditSceneCamera(sceneLayout, props.scene.background)

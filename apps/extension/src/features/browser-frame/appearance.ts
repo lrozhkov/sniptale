@@ -205,7 +205,7 @@ function composeBrowserChrome(
   s +=
     favicon(tx + 14, 12, fg, header) +
     clipHeaderLabel(
-      `<text x="${tx + 38}" y="23.5" font-family="Arial,sans-serif" font-size="13" ` +
+      `<text x="${tx + 38}" y="24.75" font-family="Arial,sans-serif" font-size="13" ` +
         `fill="${fg}">${esc(title)}</text>`,
       tx + 38,
       tw - 67,

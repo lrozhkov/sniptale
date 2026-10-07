@@ -9,10 +9,12 @@ import type { QuickEditWindowHeader } from '../../features/video/review/advanced
 export function reviewWindowHeaderUrl(
   header: QuickEditWindowHeader,
   width: number,
-  height: number
+  height: number,
+  displayHeight?: number
 ): string {
   const source = { width, height };
-  const rasterHeight = Math.max(2, Math.ceil(windowHeaderGeometry(header, source).height / 2) * 2);
+  const rasterHeight =
+    displayHeight ?? Math.max(2, Math.ceil(windowHeaderGeometry(header, source).height / 2) * 2);
   // Encoder rows extend the toolbar surface; glyphs keep the same scale on both axes.
   const svg = composeWindowHeaderSvg(header, source, rasterHeight);
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

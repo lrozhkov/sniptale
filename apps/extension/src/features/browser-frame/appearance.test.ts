@@ -106,5 +106,5 @@ it('aligns the tab title baseline with the 20-unit favicon center', () => {
     { width: 1600, height: 900 }
   );
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
-  expect(doc.querySelector('text')?.getAttribute('y')).toBe('23.5');
+  expect(doc.querySelector('text')?.getAttribute('y')).toBe('24.75');
 });
