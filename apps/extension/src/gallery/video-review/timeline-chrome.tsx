@@ -1,3 +1,4 @@
+import { ReviewKeyboardHelp } from './keyboard-help';
 import { reviewWheelZoom } from './timeline-geometry';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReviewPlaybackRange } from './playback-range';
@@ -236,6 +237,7 @@ export function ReviewToolbar(props: {
         >
           {props.historyControls}
         </div>
+        <ReviewKeyboardHelp />
         <ReviewZoomSlider value={props.zoom} onChange={props.onZoom} />
         <ReviewButton
           label={translate('gallery.videoReview.fit')}

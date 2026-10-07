@@ -1,6 +1,25 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  keyboardRegions: { ru: 'Превью → таймлайн → инспектор', en: 'Preview → timeline → inspector' },
+  keyboardControls: { ru: 'Перейти между элементами управления', en: 'Move between controls' },
+  keyboardActivate: { ru: 'Нажать кнопку с фокусом', en: 'Activate the focused button' },
+  keyboardPlayback: { ru: 'Воспроизведение / пауза', en: 'Play / pause' },
+  keyboardSeek: { ru: 'Перемотать на 0,1 с', en: 'Seek by 0.1 s' },
+  keyboardRange: {
+    ru: 'Выделить интервал на линейке времени',
+    en: 'Select a range on the time ruler',
+  },
+  keyboardSeekLarge: { ru: 'Вне линейки: перемотать на 1 с', en: 'Outside the ruler: seek by 1 s' },
+  keyboardEdges: { ru: 'Начало / конец видео', en: 'Start / end of video' },
+  keyboardDelete: { ru: 'Удалить выбранный элемент', en: 'Delete selected item' },
+  keyboardCut: { ru: 'Инструмент вырезания', en: 'Cut tool' },
+  keyboardPointer: { ru: 'Инструмент выбора', en: 'Selection tool' },
+  keyboardCancel: { ru: 'Отменить выделение или рисование', en: 'Cancel selection or drawing' },
+  keyboardContext: {
+    ru: 'Команды работают, когда фокус находится в редакторе. Поля, кнопки, меню и диалоги сохраняют свои клавиши. При вырезании стрелки переходят между ключевыми кадрами. Для изменения масштаба таймлайна используйте его ползунок или Ctrl + прокрутку.',
+    en: 'Commands work while focus is in the editor. Fields, buttons, menus and dialogs keep their own keys. With the cut tool, arrows move between keyframes. Use the timeline slider or Ctrl + scroll to zoom the timeline.',
+  },
   motionBlur: { ru: 'Размытие движения', en: 'Motion blur' },
   motionBlurOff: { ru: 'Выключено', en: 'Off' },
   motionBlurOn: { ru: 'Включено', en: 'On' },

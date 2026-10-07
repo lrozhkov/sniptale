@@ -132,7 +132,11 @@ it('saves before Home, a tool shortcut and history while existing edits stay exp
   const fixture = createEditorFixture(integration);
   const key = async (key: string, code = key, ctrlKey = false) =>
     act(async () => {
-      window.dispatchEvent(new KeyboardEvent('keydown', { key, code, ctrlKey }));
+      const plane = fixture.host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.timePlane"]'
+      )!;
+      plane.focus();
+      plane.dispatchEvent(new KeyboardEvent('keydown', { key, code, ctrlKey, bubbles: true }));
     });
   try {
     await act(async () =>

@@ -7,7 +7,10 @@ import { useReviewEditorShortcuts } from './use-review-shortcuts';
 it('uses physical shortcut keys across layouts and leaves text editing alone', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
+  host.dataset['ui'] = 'gallery.videoReview.dialog';
+  host.tabIndex = -1;
   document.body.append(host);
+  host.focus();
   const root = createRoot(host);
   const undo = vi.fn(async () => {});
   const redo = vi.fn(async () => {});
@@ -37,10 +40,12 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
     return (
       <>
         <textarea />
-        <div role="dialog">
+        <button data-toolbar-action>Toolbar action</button>
+        <div role="slider" aria-valuenow={0} data-custom-slider tabIndex={0} />
+        <div role="dialog" hidden>
           <button>Recorder action</button>
         </div>
-        <div role="alertdialog">
+        <div role="alertdialog" hidden>
           <button>Keep recording</button>
         </div>
         <div
@@ -77,6 +82,16 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
       expect(event.defaultPrevented).toBe(false);
     }
     expect(play).not.toHaveBeenCalled();
+    const sliderEvent = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    host.querySelector('[data-custom-slider]')!.dispatchEvent(sliderEvent);
+    expect(sliderEvent.defaultPrevented).toBe(false);
+    expect(seek).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', code: 'KeyC', repeat: true }));
+    expect(toggleCut).toHaveBeenCalledTimes(1);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
     expect(play).toHaveBeenCalledTimes(1);
     window.dispatchEvent(
@@ -112,6 +127,93 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
         new KeyboardEvent('keydown', { bubbles: true, key: 'я', code: 'KeyZ', ctrlKey: true })
       );
     expect(undo).toHaveBeenCalledTimes(1);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('blocks repeats, IME, outside focus and mutations during busy/export states', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  host.dataset['ui'] = 'gallery.videoReview.dialog';
+  host.tabIndex = -1;
+  document.body.append(host);
+  const root = createRoot(host);
+  const add = vi.fn();
+  const remove = vi.fn();
+  const seek = vi.fn();
+  const undo = vi.fn(async () => {});
+  const play = vi.fn();
+  function Harness({
+    busy = false,
+    phase = 'idle',
+  }: {
+    busy?: boolean;
+    phase?: 'idle' | 'exporting' | 'publishing';
+  }) {
+    useReviewEditorShortcuts({
+      time: 5,
+      navigation: { start: 0, end: 10 },
+      seek,
+      play,
+      composerAnnotation: null,
+      busy,
+      exporterPhase: phase,
+      exporterAvailable: true,
+      boundaries: undefined,
+      run: async (action) => action(),
+      undo,
+      redo: undo,
+      cancelDrawing: vi.fn(),
+      pointTool: vi.fn(),
+      remove,
+      addComment: add,
+      toggleCut: vi.fn(),
+    });
+    return null;
+  }
+  const key = (key: string, options: KeyboardEventInit = {}) =>
+    host.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true, ...options })
+    );
+  try {
+    act(() => root.render(<Harness />));
+    for (const options of [{ repeat: true }, { isComposing: true }]) {
+      key('m', options);
+      key('Delete', options);
+      key('z', { ...options, ctrlKey: true });
+    }
+    expect(add).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(undo).not.toHaveBeenCalled();
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'm', bubbles: true }));
+    expect(add).not.toHaveBeenCalled();
+    key('m');
+    key('Delete');
+    key('z', { ctrlKey: true });
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(undo).toHaveBeenCalledTimes(1);
+    for (const props of [
+      { busy: true },
+      { phase: 'exporting' as const },
+      { phase: 'publishing' as const },
+    ]) {
+      act(() => root.render(<Harness {...props} />));
+      key('m');
+      key('Delete');
+      key('z', { ctrlKey: true });
+      key('ArrowRight');
+      key('Home');
+      key(' ');
+    }
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(undo).toHaveBeenCalledTimes(1);
+    expect(seek).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     host.remove();

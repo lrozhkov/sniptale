@@ -146,7 +146,8 @@ export function ReviewTimeline(props: TimelineProps) {
           aria-valuemax={props.duration}
           aria-valuenow={props.time}
           aria-valuetext={reviewTimeLabel(props.time)}
-          className="group/plane relative overflow-clip pb-2 outline-none"
+          className="group/plane relative overflow-clip pb-2 outline-none focus-visible:ring-1
+            focus-visible:ring-inset focus-visible:ring-[var(--sniptale-color-accent)]"
           style={
             {
               // CSS follows the resized viewport before ResizeObserver can update ruler measurements.

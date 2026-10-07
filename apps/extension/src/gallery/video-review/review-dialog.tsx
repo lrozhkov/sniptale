@@ -1,4 +1,5 @@
 import './playback-focus.css';
+import { focusReviewRegion, reviewKeyboardTarget, reviewOwnsNavigation } from './keyboard-context';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
 
@@ -15,32 +16,35 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
       ref={dialog}
       data-ui="gallery.videoReview.dialog"
       onKeyDownCapture={(event) => {
-        const target = event.target;
-        const localControl =
-          target instanceof HTMLElement &&
-          target.closest(
-            '[data-ui="gallery.videoReview.inspector"] :is(button,summary), ' +
-              '[data-ui="gallery.videoReview.feedback"] button, [data-review-panel-resize]'
-          );
+        const target = reviewKeyboardTarget(event.nativeEvent);
+        if (!target) {
+          delete event.currentTarget.dataset['playbackFocus'];
+          return;
+        }
         if (
-          localControl &&
-          [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
-            event.key
-          )
+          event.key === 'F6' &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.nativeEvent.isComposing
         ) {
+          if (focusReviewRegion(target, event.shiftKey)) {
+            event.preventDefault();
+            delete event.currentTarget.dataset['playbackFocus'];
+          }
+          return;
+        }
+        if (event.key === 'Tab' || reviewOwnsNavigation(target)) {
           delete event.currentTarget.dataset['playbackFocus'];
         } else if (
           [' ', 'ArrowLeft', 'ArrowRight'].includes(event.key) &&
           !event.altKey &&
           !event.ctrlKey &&
           !event.metaKey &&
-          !event.nativeEvent.isComposing &&
-          target instanceof HTMLElement &&
-          !target.closest('input,textarea,select') &&
-          !target.isContentEditable
+          !event.nativeEvent.isComposing
         ) {
           event.currentTarget.dataset['playbackFocus'] = 'true';
-        } else if (event.key === 'Tab') delete event.currentTarget.dataset['playbackFocus'];
+        }
       }}
       onPointerDownCapture={(event) => {
         event.currentTarget.dataset['playbackFocus'] = 'true';
