@@ -17,7 +17,6 @@ for (const variant of [
     const button = (key: Parameters<typeof translate>[0]) =>
       dialog.getByRole('button', { name: label(key), exact: true });
     try {
-      await page.setViewportSize({ width: 1280, height: 720 });
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
         storage: {
@@ -41,6 +40,22 @@ for (const variant of [
       await page.screenshot({ path: testInfo.outputPath('solid-selection.png') });
       await button('gallery.videoReview.backgroundGradient').click();
       const presets = dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button');
+      const more = dialog.getByRole('button', {
+        name: label('settings.editor.backgrounds.showMore'),
+        exact: true,
+      });
+      await more.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: testInfo.outputPath('gradient-more.png'), fullPage: false });
+      await more.hover();
+      await page.screenshot({
+        path: testInfo.outputPath('gradient-more-hover.png'),
+        fullPage: false,
+      });
+      await more.focus();
+      await page.keyboard.press('Tab');
+      await page.keyboard.press('Shift+Tab');
+      await expect(more).toBeFocused();
+      await expect(more).toHaveCSS('outline-width', '2px');
       const selected = presets.first();
       await selected.click();
       await page.mouse.move(10, 10);
