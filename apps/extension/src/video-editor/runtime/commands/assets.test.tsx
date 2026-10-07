@@ -545,7 +545,7 @@ describe('recording into an explicit audio track', () => {
   );
 });
 
-it('imports a background image in one project update without adding a timeline clip', async () => {
+it('imports a fresh background privately in one project update without adding a timeline clip', async () => {
   const params = createParams();
   const project = params.getCurrentProject()!;
   const asset = { ...(await importProjectAssetMock()), type: VideoProjectAssetType.IMAGE };
@@ -560,6 +560,11 @@ it('imports a background image in one project update without adding a timeline c
   const update = vi.mocked(params.updateProject).mock.calls[0]![0];
   const next = update(project);
   expect(next.assets).toContainEqual(asset);
+  expect(importProjectAssetMock).toHaveBeenCalledWith(
+    expect.any(File),
+    VideoProjectAssetType.IMAGE,
+    { publishToLibrary: false }
+  );
   expect(next.sceneBackground).toEqual({ kind: 'image', assetId: asset.id });
   expect(next.clips).toEqual(project.clips);
   expect(params.addAssetClip).not.toHaveBeenCalled();

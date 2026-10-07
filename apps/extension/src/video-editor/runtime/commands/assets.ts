@@ -84,9 +84,13 @@ async function importProjectAssetFile(
     placement?.destination === 'background' && assetType === VideoProjectAssetType.IMAGE
       ? placement.backgroundOriginMediaId
       : undefined;
-  const asset = originMediaId
-    ? await importProjectAsset(file, assetType, { publishToLibrary: false, originMediaId })
-    : await importProjectAsset(file, assetType);
+  const asset =
+    placement?.destination === 'background'
+      ? await importProjectAsset(file, assetType, {
+          publishToLibrary: false,
+          ...(originMediaId ? { originMediaId } : {}),
+        })
+      : await importProjectAsset(file, assetType);
   if (originMediaId && asset.source.kind === 'project-asset')
     asset.source.originMediaId = originMediaId;
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {

@@ -33,12 +33,22 @@ afterEach(() => {
 });
 const file = () => new File(['image'], 'background.png', { type: 'image/png' });
 
-it('publishes only after attaching the durable background reference', async () => {
+it('retains a fresh background privately after attaching the durable reference', async () => {
   const attach = vi.fn(async () => {
     expect(asset.publish).not.toHaveBeenCalled();
     expect(asset.protect).toHaveBeenCalledOnce();
   });
   await importReviewBackgroundImage({ file: file(), signal: new AbortController().signal, attach });
+  expect(asset.prepare).toHaveBeenCalledWith(
+    expect.any(File),
+    'image/png',
+    'background.png',
+    undefined,
+    undefined,
+    undefined,
+    { publishToLibrary: false }
+  );
+  expect(asset.changed).not.toHaveBeenCalled();
   expect(attach).toHaveBeenCalledWith('project-asset:image');
   expect(asset.publish).toHaveBeenCalledOnce();
   expect(asset.cancel).not.toHaveBeenCalled();

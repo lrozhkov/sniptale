@@ -1,6 +1,5 @@
 import { prepareBackgroundImage } from '../background-images/intake';
 import { prepareProjectAsset } from '../../composition/persistence/projects';
-import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
 
 /** Validates a raster, then attaches its staged bytes through the review history owner. */
 export async function importReviewBackgroundImage(args: {
@@ -18,7 +17,10 @@ export async function importReviewBackgroundImage(args: {
     undefined,
     undefined,
     undefined,
-    args.originMediaId ? { publishToLibrary: false, originMediaId: args.originMediaId } : {}
+    {
+      publishToLibrary: false,
+      ...(args.originMediaId ? { originMediaId: args.originMediaId } : {}),
+    }
   );
   let attached = false;
   try {
@@ -28,8 +30,6 @@ export async function importReviewBackgroundImage(args: {
     await args.attach(`project-asset:${prepared.id}`);
     attached = true;
     await prepared.publish();
-    if (!args.originMediaId)
-      publishMediaHubLibraryChanged('create', [`project-asset:${prepared.id}`]);
   } finally {
     // Once referenced, a failed publication retains the existing recovery journal.
     if (!attached) await prepared.cancel();
