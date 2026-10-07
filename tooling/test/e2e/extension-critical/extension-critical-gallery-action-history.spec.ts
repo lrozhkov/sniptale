@@ -14,7 +14,13 @@ for (const variant of [
   test(`action history rows stay stable through zoom (${variant.locale}, narrow=${variant.narrow})`, async ({
     page,
   }, info) => {
-    if (variant.narrow) await page.setViewportSize({ width: 1200, height: 560 });
+    await page.setViewportSize(
+      variant.narrow
+        ? { width: 1200, height: 560 }
+        : variant.locale === 'ru'
+          ? { width: 1280, height: 560 }
+          : { width: 1920, height: 900 }
+    );
     const server = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
@@ -32,7 +38,7 @@ for (const variant of [
         height: 90,
         duration: 12.01,
       });
-      await seedHistory(page);
+      await seedHistory(page, false, 6, 0.03);
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -40,48 +46,43 @@ for (const variant of [
       const markers = dialog.locator(
         `button[aria-label^="${label('gallery.videoReview.telemetry')} ·"]`
       );
-      await expect(markers).toHaveCount(8);
-      const strip = markers.first().locator('..');
-      const rows = () =>
-        markers.evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).top));
-      const initialRows = await rows();
+      const strip = dialog.locator('[data-ui="gallery.videoReview.historyStrip"]');
+      const cluster = strip.locator('[data-ui="gallery.videoReview.historyCluster"] button');
+      await expect(cluster).toHaveCount(1);
       const height = (await strip.boundingBox())!.height;
       expect(height).toBe(68);
-      await markers.first().click();
-      await expect(markers.first()).toHaveAttribute('aria-pressed', 'true');
+      await cluster.click();
+      const options = page.getByRole('option');
+      await expect(options).toHaveCount(5);
+      await options.last().click();
+      await expect(cluster).toHaveAttribute('aria-pressed', 'true');
+      await page.screenshot({ path: info.outputPath('fit-history.png'), fullPage: false });
       const zoom = dialog.getByRole('slider', {
         name: label('videoEditor.timeline.zoom'),
         exact: true,
       });
-      for (const value of ['0.1', '6.7', '19.3', '25', '41.7', '75', '100', '37.1', '0']) {
-        await zoom.fill(value);
-        await zoom.dispatchEvent('input');
-        await expect.poll(rows).toEqual(initialRows);
-        expect((await strip.boundingBox())!.height).toBe(height);
-        await expect(markers.first()).toHaveAttribute('aria-pressed', 'true');
-      }
-      await zoom.fill('50');
+      await zoom.fill('100');
       await zoom.dispatchEvent('input');
-      const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
-      await viewport.evaluate((node) => {
-        node.scrollLeft = node.scrollWidth / 2;
-      });
-      await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
-      await page.screenshot({ path: info.outputPath('zoomed-history.png'), fullPage: false });
-      await dialog
-        .getByRole('button', { name: label('gallery.videoReview.fit'), exact: true })
-        .click();
-      await expect.poll(rows).toEqual(initialRows);
-      // Dense tail stays keyboard/click reachable within its own scroll owner.
+      await expect(cluster).toHaveCount(0);
+      await expect(markers).toHaveCount(8);
+      expect((await strip.boundingBox())!.height).toBe(height);
+      expect(await strip.evaluate((node) => node.scrollHeight)).toBe(68);
       const tail = markers.filter({ hasText: label('gallery.videoReview.eventClick') }).last();
       await tail.focus();
       await tail.press('Enter');
       await expect(tail).toHaveAttribute('aria-pressed', 'true');
-      await expect.poll(() => strip.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
-      await strip.evaluate((node) => {
-        node.scrollTop = 0;
-      });
-      await page.screenshot({ path: info.outputPath('fit-history.png'), fullPage: false });
+      await page.screenshot({ path: info.outputPath('zoomed-history.png'), fullPage: false });
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.fit'), exact: true })
+        .click();
+      await expect(cluster).toHaveCount(1);
+      expect((await strip.boundingBox())!.height).toBe(height);
+      await expect(cluster).toHaveAttribute('aria-pressed', 'true');
+      await cluster.focus();
+      await cluster.press('Enter');
+      await expect(page.getByRole('option')).toHaveCount(5);
+      await page.screenshot({ path: info.outputPath('history-group-menu.png'), fullPage: false });
+      await page.keyboard.press('Escape');
       await expect(
         dialog.getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
       ).toBeInViewport();
@@ -254,7 +255,7 @@ for (const variant of [
         .click();
       await expect(history).toBeVisible();
       const animated = dialog.locator('button[data-animated="true"]');
-      await expect(animated).toHaveCount(6);
+      await expectAnimatedHistory(page, 6);
       await verifyClickFields(history, page, info.outputPath('batch-click-fields.png'));
       await dialog
         .getByRole('button', {
@@ -262,7 +263,8 @@ for (const variant of [
           exact: true,
         })
         .click();
-      await expect(dialog.locator('button[data-animated]')).toHaveCount(6);
+      await expectAnimatedHistory(page, 6);
+      expect(await dialog.locator('button[data-animated]').count()).toBeLessThanOrEqual(3);
       await history
         .getByRole('button', { name: label('gallery.videoReview.clickReset'), exact: true })
         .click();
@@ -279,7 +281,7 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.click_press'), exact: true })
         .click();
-      await expect(animated).toHaveCount(6);
+      await expectAnimatedHistory(page, 6);
       await history
         .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
         .click();
@@ -362,7 +364,7 @@ for (const variant of [
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
-      await expect(page.locator('button[data-animated="true"]')).toHaveCount(6);
+      await expectAnimatedHistory(page, 6);
       await seedHistory(page, true, 60);
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
@@ -424,9 +426,31 @@ for (const variant of [
   });
 }
 
-async function seedHistory(page: Page, detailed = false, clickCount = 6) {
+/** Count represented animated identities, including members behind a compact group. */
+async function expectAnimatedHistory(page: Page, count: number) {
+  const strip = page.locator('[data-ui="gallery.videoReview.historyStrip"]');
+  await expect(strip.locator('button[data-animated="true"]').first()).toBeVisible();
+  const buttons = strip.locator('button[data-animated="true"]');
+  expect(await buttons.count()).toBeLessThanOrEqual(3);
+  let represented = 0;
+  for (const button of await buttons.all()) {
+    const grouped = await button.evaluate((node) =>
+      Boolean(node.closest('[data-ui="gallery.videoReview.historyCluster"]'))
+    );
+    if (grouped) {
+      await button.click();
+      const options = page.getByRole('option');
+      await expect(options.first()).toBeVisible();
+      represented += await options.count();
+      await page.keyboard.press('Escape');
+    } else represented++;
+  }
+  expect(represented).toBe(count);
+}
+
+async function seedHistory(page: Page, detailed = false, clickCount = 6, timeStep = 0.01) {
   await page.evaluate(
-    async ({ fixture, detailed, clickCount }) => {
+    async ({ fixture, detailed, clickCount, timeStep }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(fixture.databaseName);
         request.onsuccess = () => resolve(request.result);
@@ -480,7 +504,7 @@ async function seedHistory(page: Page, detailed = false, clickCount = 6) {
         actionEvents: Array.from({ length: clickCount }, (_, index) => ({
           id: `click-${index}`,
           kind: 'CLICK',
-          time: 1 + index * 0.01,
+          time: 1 + index * timeStep,
           duration: 0,
           point: { x: 40, y: 30 },
           recordingPoint: { x: 0.25, y: 0.33 },
@@ -492,7 +516,7 @@ async function seedHistory(page: Page, detailed = false, clickCount = 6) {
       await done;
       db.close();
     },
-    { fixture: betaV1Fixture, detailed, clickCount }
+    { fixture: betaV1Fixture, detailed, clickCount, timeStep }
   );
 }
 

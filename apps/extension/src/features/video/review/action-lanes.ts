@@ -1,11 +1,12 @@
 import type { ReviewTelemetryMarker } from './telemetry';
 
-/** Visual floor for point events; fit-scale collisions reserve separate lanes. */
-export const REVIEW_ACTION_MIN_POINT_WIDTH_PX = 14;
+/** Readable hit target and count floor for both points and overflow groups. */
+export const REVIEW_ACTION_MIN_POINT_WIDTH_PX = 32;
 const CURSOR_BUCKET_DENSITY = 120;
 
 interface ReviewActionLaneItem {
   marker: ReviewTelemetryMarker;
+  members: ReviewTelemetryMarker[];
   lane: number;
   left: number;
   width: number;
@@ -16,12 +17,8 @@ interface ReviewActionLaneLayout {
   laneCount: number;
 }
 
-/**
- * Assign lanes at Fit and project their geometry at the requested zoom. Source-time
- * endpoints keep adjacent intervals together without pixel-rounding collisions.
- * The fit-scale point floor and cursor buckets reserve stable rows while zooming;
- * all action/signal markers remain clickable in the bounded scrolling strip.
- */
+/** Pack screen-space targets into at most three rows; the third row groups overflow.
+ * Members retain source identity so coarse-scale aggregation never loses actions. */
 export function layoutReviewActionLanes(
   markers: readonly ReviewTelemetryMarker[],
   viewport: { duration: number; width: number; zoom: number }
@@ -37,11 +34,7 @@ export function layoutReviewActionLanes(
     throw new Error('Action lane viewport is invalid.');
   const planeWidth = viewport.width * viewport.zoom;
   const items: ReviewActionLaneItem[] = [];
-  const laneEnds: number[] = [];
-  const minimumSpan = Math.min(
-    viewport.duration,
-    (REVIEW_ACTION_MIN_POINT_WIDTH_PX * viewport.duration) / viewport.width
-  );
+  const lanes: ReviewActionLaneItem[] = [];
   const cursorBuckets = new Set<number>();
   const sorted = [...markers].sort((a, b) => a.start - b.start || a.ref.id.localeCompare(b.ref.id));
   for (const marker of sorted) {
@@ -58,21 +51,22 @@ export function layoutReviewActionLanes(
     );
     const item: ReviewActionLaneItem = {
       marker,
+      members: [marker],
       lane: 0,
       left,
       width,
     };
-    const fitStart = Math.max(0, Math.min(marker.start, viewport.duration - minimumSpan));
-    const fitEnd = Math.min(viewport.duration, Math.max(marker.end, fitStart + minimumSpan));
-    let lane = laneEnds.findIndex((end) => fitStart >= end);
+    let lane = lanes.findIndex((last) => left + 1e-7 >= last.left + last.width);
+    if (lane === -1 && lanes.length < 3) lane = lanes.length;
     if (lane === -1) {
-      lane = laneEnds.length;
-      laneEnds.push(fitEnd);
+      const group = lanes[2]!;
+      group.members.push(marker);
+      group.width = Math.max(group.left + group.width, left + width) - group.left;
     } else {
-      laneEnds[lane] = fitEnd;
+      item.lane = lane;
+      lanes[lane] = item;
+      items.push(item);
     }
-    item.lane = lane;
-    items.push(item);
   }
-  return { items, laneCount: laneEnds.length };
+  return { items, laneCount: lanes.length };
 }

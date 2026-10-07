@@ -23,6 +23,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -70,11 +71,13 @@ it('separates colliding markers into disjoint lanes with a consistent pitch', ()
   expect(new Set(laneTops).size).toBe(laneTops.length);
 });
 
-it('keeps every dense marker clickable in a bounded scrollable strip', async () => {
-  const markers = [0, 1, 2, 3].map((value) => marker('action', `e${value}`, 1 + value / 50));
-  markers.push(marker('signal', 's1', 1.02));
+it('groups overflow within three rows and exposes every member for selection', async () => {
+  const markers = Array.from({ length: 10 }, (_, i) => ({
+    ...marker('action', String(i), 1),
+    eventType: 'CLICK',
+  }));
   const onMarker = vi.fn();
-  act(() => {
+  act(() =>
     root.render(
       <ReviewTelemetryStrip
         markers={markers}
@@ -82,25 +85,27 @@ it('keeps every dense marker clickable in a bounded scrollable strip', async () 
         time={0}
         width={1000}
         zoom={1}
+        selectedTelemetryRef={markers[8]!.ref}
+        animatedIds={new Set([markers[8]!.ref.id])}
         onMarker={onMarker}
       />
-    );
-  });
-  // All five markers render; the lane stack height stays capped at three rows.
+    )
+  );
   const strip = host.firstElementChild as HTMLDivElement;
   expect(strip.style.height).toBe('68px');
-  expect(strip.className).toContain('overflow-y-auto');
-  const buttons = [...strip.querySelectorAll<HTMLButtonElement>('button')];
-  expect(buttons).toHaveLength(5);
-  expect(strip.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
-  await act(async () => {
-    for (const button of buttons) button.click();
-  });
-  expect(onMarker).toHaveBeenCalledTimes(5);
-  const seen = new Set(
-    onMarker.mock.calls.map(([clicked]) => `${(clicked as ReviewTelemetryMarker).ref.id}`)
-  );
-  for (const entry of markers) expect(seen.has(entry.ref.id)).toBe(true);
+  expect(strip.className).not.toContain('overflow-y-auto');
+  const cluster = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.historyCluster"] button'
+  )!;
+  expect(cluster.getAttribute('aria-pressed')).toBe('true');
+  expect(cluster.getAttribute('data-animated')).toBe('true');
+  await act(async () => cluster.click());
+  const options = [...document.querySelectorAll<HTMLButtonElement>('[role=option]')];
+  expect(options).toHaveLength(8);
+  expect(options[0]!.textContent).toContain('0:01.000');
+  expect(options[6]!.textContent).toContain('gallery.videoReview.clickAnimation');
+  await act(async () => options[6]!.click());
+  expect(onMarker).toHaveBeenCalledWith(markers[8]);
 });
 
 it('reserves no lane space for an empty history', () => {
@@ -123,16 +128,10 @@ it('describes the captured target and full interval in the action hint', () => {
   expect(button.getAttribute('aria-label')).toContain('Search projects');
 });
 
-it('keeps history height, rows and selection stable while zooming and returning to Fit', () => {
-  const markers = [
-    marker('signal', 'idle1', 0.13, 3.27),
-    marker('signal', 'idle2', 3.27, 6.41),
-    marker('action', 'click1', 1),
-    marker('action', 'click2', 1.05),
-  ];
-  const onMarker = vi.fn();
-  let geometry: string[] | undefined;
-  for (const zoom of [1, 1.3, 2, 8, 40, 2, 1]) {
+it('holds groups during zoom then repacks without changing height or selected identity', async () => {
+  vi.useFakeTimers();
+  const markers = Array.from({ length: 10 }, (_, i) => marker('action', String(i), 1 + i / 100));
+  const show = (zoom: number) =>
     act(() =>
       root.render(
         <ReviewTelemetryStrip
@@ -141,19 +140,30 @@ it('keeps history height, rows and selection stable while zooming and returning 
           time={0}
           width={1000}
           zoom={zoom}
-          selectedTelemetryRef={markers[1]!.ref}
-          onMarker={onMarker}
+          selectedTelemetryRef={markers[8]!.ref}
+          onMarker={vi.fn()}
         />
       )
     );
-    const strip = host.firstElementChild as HTMLDivElement;
-    const buttons = [...strip.querySelectorAll<HTMLButtonElement>('button')];
-    const current = [strip.style.height, ...buttons.map((button) => button.style.top)];
-    if (!geometry) geometry = current;
-    expect(current).toEqual(geometry);
-    expect(strip.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
-    expect(buttons.at(-1)?.getAttribute('aria-pressed')).toBe('true');
-    act(() => buttons.at(-1)!.click());
-  }
-  expect(onMarker).toHaveBeenCalledTimes(7);
+  show(1);
+  const strip = host.firstElementChild as HTMLDivElement;
+  expect(strip.style.height).toBe('68px');
+  expect(host.querySelectorAll('button')).toHaveLength(3);
+  show(50);
+  expect(host.querySelectorAll('button')).toHaveLength(3);
+  await act(async () => vi.advanceTimersByTime(200));
+  show(100);
+  await act(async () => vi.advanceTimersByTime(100));
+  expect(host.querySelectorAll('button')).toHaveLength(3);
+  await act(async () => vi.advanceTimersByTime(150));
+  expect(host.querySelectorAll('button')).toHaveLength(10);
+  expect(new Set([...host.querySelectorAll('button')].map((button) => button.style.top))).toEqual(
+    new Set(['0px'])
+  );
+  expect(strip.style.height).toBe('68px');
+  expect(host.querySelectorAll('[aria-pressed=true]')).toHaveLength(1);
+  show(1);
+  await act(async () => vi.advanceTimersByTime(250));
+  expect(host.querySelectorAll('button')).toHaveLength(3);
+  expect(strip.style.height).toBe('68px');
 });
