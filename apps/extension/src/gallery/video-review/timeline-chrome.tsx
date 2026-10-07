@@ -1,3 +1,4 @@
+import { ReviewTrackRow } from './track-row';
 import { ReviewKeyboardHelp } from './keyboard-help';
 import { reviewWheelZoom } from './timeline-geometry';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -83,6 +84,39 @@ export function ReviewRuler({
   );
 }
 
+/** Sticky ruler chrome shares the track coordinate system and keeps its marker above scrolled lanes. */
+export function ReviewRulerRow(props: {
+  time: number;
+  duration: number;
+  gutter: number;
+  width: number;
+  controls: ReactNode;
+  interaction: HTMLAttributes<HTMLDivElement>;
+}) {
+  return (
+    <div
+      data-ui="gallery.videoReview.rulerRow"
+      className="sticky top-0 z-40 bg-[var(--sniptale-color-surface-canvas)]
+        [&_[data-ui='gallery.videoReview.trackHeader']]:bg-[var(--sniptale-color-surface-canvas)]"
+    >
+      <ReviewTrackRow label="" icon={props.controls}>
+        <ReviewRuler
+          duration={props.duration}
+          width={props.width}
+          interaction={props.interaction}
+        />
+      </ReviewTrackRow>
+      <ReviewPlayhead
+        ruler
+        time={props.time}
+        duration={props.duration}
+        gutter={props.gutter}
+        width={props.width}
+      />
+    </div>
+  );
+}
+
 const plain = reviewIconButtonClassName;
 
 function playbackTime(value: number): string {
@@ -127,6 +161,7 @@ function ReviewLoopSummary(props: {
 
 /** Source-time cursor shared by all timeline lanes. */
 export function ReviewPlayhead(props: {
+  ruler?: boolean;
   time: number;
   duration: number;
   gutter: number;
@@ -135,7 +170,7 @@ export function ReviewPlayhead(props: {
   return (
     <div
       aria-hidden="true"
-      data-ui="gallery.videoReview.playhead"
+      data-ui={props.ruler ? 'gallery.videoReview.rulerPlayhead' : 'gallery.videoReview.playhead'}
       className="pointer-events-none absolute bottom-2 top-0 z-20
         bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125"
       style={{

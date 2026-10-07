@@ -779,3 +779,14 @@ it('defers Ctrl+wheel zoom until the pending-note gate accepts', () => {
   act(() => accept?.());
   expect(slider.valueAsNumber).toBeCloseTo(5);
 });
+
+it('keeps a separate ruler marker aligned with the scrolling source playhead', () => {
+  const { host } = renderTimeline({ time: 1.5, duration: 4 });
+  const ruler = host.querySelector('[data-ui="gallery.videoReview.rulerRow"]')!;
+  const cap = ruler.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
+  const head = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
+  expect(cap.style.left).toBe(head.style.left);
+  renderTimeline({ time: 3, duration: 4 });
+  expect(cap.style.left).toBe(head.style.left);
+  expect(ruler.contains(head)).toBe(false);
+});

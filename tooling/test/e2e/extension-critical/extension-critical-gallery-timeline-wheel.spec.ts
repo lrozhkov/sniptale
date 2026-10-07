@@ -89,4 +89,84 @@ for (const variant of [
       );
     }
   });
+
+  test(`time ruler stays fixed during vertical track scroll (${variant.locale}${'viewport' in variant ? ', narrow' : ''})`, async ({
+    page,
+  }, info) => {
+    if ('viewport' in variant) await page.setViewportSize(variant.viewport);
+    const host = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      const height = dialog.getByRole('separator', {
+        name: label('gallery.videoReview.resizeTimeline'),
+      });
+      await height.focus();
+      await height.press('Home');
+      const viewport = dialog.locator('[data-ui="gallery.videoReview.timelineViewport"]');
+      const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      const controls = dialog.locator('[data-ui="gallery.videoReview.trackControls"]');
+      const before = (await ruler.boundingBox())!;
+      const controlsBefore = (await controls.boundingBox())!;
+      await viewport.evaluate((node) => {
+        node.scrollTop = node.scrollHeight;
+      });
+      await expect.poll(() => viewport.evaluate((node) => node.scrollTop)).toBeGreaterThan(20);
+      await expect.poll(async () => (await ruler.boundingBox())!.y).toBeCloseTo(before.y, 0);
+      expect((await controls.boundingBox())!.y).toBeCloseTo(controlsBefore.y, 0);
+      const slider = dialog.getByRole('slider', {
+        name: label('videoEditor.timeline.zoom'),
+        exact: true,
+      });
+      await slider.focus();
+      await slider.press('End');
+      await viewport.evaluate((node) => {
+        node.scrollLeft = 200;
+        node.scrollTop = node.scrollHeight;
+      });
+      await expect.poll(() => viewport.evaluate((node) => node.scrollLeft)).toBeGreaterThan(100);
+      expect((await controls.boundingBox())!.x).toBeCloseTo(controlsBefore.x, 0);
+      const headerColor = await controls.evaluate(
+        (node) =>
+          getComputedStyle(node.closest('[data-ui="gallery.videoReview.trackHeader"]')!)
+            .backgroundColor
+      );
+      expect(headerColor).toMatch(/^rgb\(/);
+      expect((await ruler.boundingBox())!.y).toBeCloseTo(before.y, 0);
+      const y = before.y + before.height / 2;
+      const x = controlsBefore.x + controlsBefore.width + 120;
+      await page.mouse.click(x, y);
+      const head = dialog.locator('[data-ui="gallery.videoReview.playhead"]');
+      const cap = dialog.locator('[data-ui="gallery.videoReview.rulerPlayhead"]');
+      await expect(cap).toBeVisible();
+      expect((await cap.boundingBox())!.x).toBeCloseTo((await head.boundingBox())!.x, 0);
+      expect((await cap.boundingBox())!.y).toBeCloseTo(before.y, 0);
+      await page.mouse.move(x, y);
+      await page.mouse.down();
+      await page.mouse.move(x + 240, y, { steps: 5 });
+      await page.mouse.up();
+      await expect(dialog.locator('[data-ui="gallery.videoReview.loopSummary"]')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('sticky-ruler.png'), fullPage: false });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
 }

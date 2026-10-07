@@ -3,7 +3,7 @@ import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
 import { Activity } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
-import { ReviewPlayhead, ReviewRuler, ReviewToolbar } from './timeline-chrome';
+import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
 import type { ReactNode, CSSProperties } from 'react';
 import { translate } from '../../platform/i18n';
@@ -184,13 +184,14 @@ export function ReviewTimeline(props: TimelineProps) {
             gutter={gutter}
             width={width}
           />
-          <ReviewTrackRow label="" icon={props.trackControls}>
-            <ReviewRuler
-              duration={props.duration}
-              width={Math.max(1, width * zoom)}
-              interaction={ruler.interaction}
-            />
-          </ReviewTrackRow>
+          <ReviewRulerRow
+            controls={props.trackControls}
+            interaction={ruler.interaction}
+            time={props.time}
+            duration={props.duration}
+            gutter={gutter}
+            width={Math.max(1, width * zoom)}
+          />
           <div inert={props.busy}>
             <ReviewTimelineEvents {...props} width={width} zoom={zoom} />
             <ReviewSourceLane
