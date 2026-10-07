@@ -685,7 +685,7 @@ it('zooms with normalized wheel input, clamps the thumb and contains handled ges
   expect(wheel({ deltaY: -100 }).defaultPrevented).toBe(true);
   expect(slider.valueAsNumber).toBeCloseTo(100);
   expect(parentWheel).not.toHaveBeenCalled();
-  expect(wheel({ deltaY: -100, ctrlKey: true }).defaultPrevented).toBe(false);
+  expect(wheel({ deltaY: -100, ctrlKey: true }).defaultPrevented).toBe(true);
   expect(wheel({ deltaY: 0 }).defaultPrevented).toBe(false);
   wheel({ deltaX: 20 });
   expect(slider.valueAsNumber).toBeCloseTo(99);
@@ -719,4 +719,63 @@ it('blocks playback while an export transaction owns the busy timeline', () => {
   expect(play.disabled).toBe(true);
   act(() => play.click());
   expect(props.onPlay).not.toHaveBeenCalled();
+});
+
+it('owns Ctrl+wheel throughout the timeline without changing playback or ordinary scrolling', () => {
+  const { host, props } = renderTimeline();
+  const timeline = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timeline"]')!;
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  const parentWheel = vi.fn();
+  host.addEventListener('wheel', parentWheel);
+  const wheel = (target: Element, options: WheelEventInit) => {
+    const event = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...options });
+    act(() => target.dispatchEvent(event));
+    return event;
+  };
+  expect(wheel(viewport, { ctrlKey: true, deltaY: -100 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(5);
+  expect(wheel(timeline, { ctrlKey: true, deltaY: 1, deltaMode: 1 }).defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBeCloseTo(3);
+  wheel(slider, { ctrlKey: true, deltaY: 1, deltaMode: 2 });
+  expect(slider.valueAsNumber).toBe(0);
+  expect(wheel(viewport, { ctrlKey: true, deltaY: 100 }).defaultPrevented).toBe(true);
+  expect(parentWheel).not.toHaveBeenCalled();
+  expect(wheel(viewport, { deltaY: -100 }).defaultPrevented).toBe(false);
+  expect(wheel(viewport, { ctrlKey: true, deltaY: 0 }).defaultPrevented).toBe(false);
+  expect(wheel(viewport, { ctrlKey: true, metaKey: true, deltaY: -100 }).defaultPrevented).toBe(
+    false
+  );
+  expect(slider.valueAsNumber).toBe(0);
+  expect(props.onSeek).not.toHaveBeenCalled();
+  expect(props.onSelect).not.toHaveBeenCalled();
+  act(() => environment.root!.render(null));
+  expect(wheel(timeline, { ctrlKey: true, deltaY: -100 }).defaultPrevented).toBe(false);
+});
+
+it('defers Ctrl+wheel zoom until the pending-note gate accepts', () => {
+  let accept: (() => void) | undefined;
+  const { host } = renderTimeline({
+    beforeAction: (action) => {
+      accept = action;
+    },
+  });
+  const viewport = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.timelineViewport"]'
+  )!;
+  const slider = host.querySelector<HTMLInputElement>('[aria-label="videoEditor.timeline.zoom"]')!;
+  const event = new WheelEvent('wheel', {
+    ctrlKey: true,
+    deltaY: -100,
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => viewport.dispatchEvent(event));
+  expect(event.defaultPrevented).toBe(true);
+  expect(slider.valueAsNumber).toBe(0);
+  expect(accept).toBeDefined();
+  act(() => accept?.());
+  expect(slider.valueAsNumber).toBeCloseTo(5);
 });

@@ -77,7 +77,7 @@ export function ReviewTimeline(props: TimelineProps) {
     zoomVisible,
     props.markers.length
   );
-  const { zoom, navigation, navigate, onZoom } = useReviewTimelineNavigation(props, {
+  const { zoom, navigation, navigate, onZoom, wheelTarget } = useReviewTimelineNavigation(props, {
     viewport,
     gutter,
     width,
@@ -108,6 +108,7 @@ export function ReviewTimeline(props: TimelineProps) {
   });
   return (
     <section
+      ref={wheelTarget}
       data-ui="gallery.videoReview.timeline"
       className={`@container flex min-h-0 ${
         props.fillHeight ? 'h-full' : 'max-h-[min(42dvh,calc(100dvh-420px))]'

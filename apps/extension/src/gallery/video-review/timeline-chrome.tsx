@@ -1,3 +1,4 @@
+import { reviewWheelZoom } from './timeline-geometry';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { ReviewPlaybackRange } from './playback-range';
 import { ReviewResetControl } from './reset-control';
@@ -275,15 +276,11 @@ function ReviewZoomSlider(props: { value: number; onChange(value: number): void 
     if (!node) return;
     const wheel = (event: WheelEvent) => {
       if (event.ctrlKey || event.metaKey || node.disabled) return;
-      const delta = event.deltaY || event.deltaX;
-      if (!Number.isFinite(delta) || delta === 0) return;
+      const next = reviewWheelZoom(value, event);
+      if (next === null) return;
       event.preventDefault();
       event.stopPropagation();
-      const pixels = delta * (event.deltaMode === 1 ? 40 : event.deltaMode === 2 ? 100 : 1);
-      const step = Math.sign(pixels) * Math.max(0.1, Math.min(5, Math.abs(pixels) / 20));
-      const current = Math.log2(value) * 25;
-      const next = Math.max(0, Math.min(100, Math.round((current - step) * 10) / 10));
-      if (next !== current) onChange(2 ** (next / 25));
+      if (next !== value) onChange(next);
     };
     node.addEventListener('wheel', wheel, { passive: false });
     return () => node.removeEventListener('wheel', wheel);
