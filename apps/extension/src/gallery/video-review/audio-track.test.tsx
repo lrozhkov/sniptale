@@ -73,12 +73,14 @@ const renderTrack = (
   assets?: Parameters<typeof ReviewAudioTrack>[0]['assets'],
   projection?: Parameters<typeof ReviewAudioTrack>[0]['projection'],
   waveforms?: Parameters<typeof ReviewAudioTrack>[0]['waveforms'],
-  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction']
+  beforeAction?: Parameters<typeof ReviewAudioTrack>[0]['beforeAction'],
+  onOpenMusic?: Parameters<typeof ReviewAudioTrack>[0]['onOpenMusic']
 ) => {
   act(() => {
     root.render(
       <ReviewAudioTrack
         beforeAction={beforeAction}
+        onOpenMusic={onOpenMusic}
         projection={projection}
         waveforms={waveforms}
         assets={assets}
@@ -221,17 +223,6 @@ it('splits the displayed music at cuts while keeping continuous sample offsets',
   expect(blocks.map((block) => block.dataset['musicOffset'])).toEqual(['0', '1']);
   expect(blocks[0]!.querySelector('[data-audio-edge="end"]')).toBeNull();
   expect(blocks[1]!.querySelector('[data-audio-edge="start"]')).toBeNull();
-});
-
-it('imports audio through the hidden file picker', async () => {
-  renderTrack();
-  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-  expect(input.accept).toBe('audio/*');
-  Object.defineProperty(input, 'files', {
-    value: [new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' })],
-  });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(onImportFile).toHaveBeenCalled();
 });
 
 function dispatchDrag(
@@ -763,3 +754,41 @@ it.each(['voiceover', 'music'] as const)(
     }
   }
 );
+
+it('opens music after note admission and imports voiceover through the file picker', async () => {
+  const openMusic = vi.fn();
+  let admit!: () => void;
+  renderTrack(
+    undefined,
+    false,
+    [],
+    true,
+    undefined,
+    undefined,
+    undefined,
+    (action) => {
+      admit = action;
+    },
+    openMusic
+  );
+  const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const pickFile = vi.spyOn(fileInput, 'click');
+  const music = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.musicLibrary"]'
+  )!;
+  act(() => music.click());
+  expect(openMusic).not.toHaveBeenCalled();
+  expect(pickFile).not.toHaveBeenCalled();
+  act(() => admit());
+  expect(openMusic).toHaveBeenCalledExactlyOnceWith(music);
+  const voiceover = host.querySelector<HTMLButtonElement>(
+    '[aria-label="gallery.videoReview.audioImport"]'
+  )!;
+  act(() => voiceover.click());
+  expect(pickFile).toHaveBeenCalledTimes(1);
+  expect(fileInput.accept).toBe('audio/*');
+  const file = new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' });
+  Object.defineProperty(fileInput, 'files', { value: [file] });
+  await act(async () => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(onImportFile).toHaveBeenCalledExactlyOnceWith(file, 'voiceover');
+});

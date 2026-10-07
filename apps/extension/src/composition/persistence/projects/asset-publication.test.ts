@@ -587,3 +587,34 @@ it('rejects a retained own review before standalone export replacement writes', 
   expect(writes).toEqual([]);
   expect(mocks.completeDelete).not.toHaveBeenCalled();
 });
+
+it('validates marked Library claims without weakening legacy publication payloads', async () => {
+  const { parseProjectAssetPayload } = await import('./asset-publication-payload');
+  const entry = { id: 'audio', assetId: 'bytes', createdAt: 1, mimeType: 'audio/webm', size: 5 };
+  const direct = {
+    entry,
+    filename: 'music.webm',
+    librarySourceId: 'project-asset:audio',
+    expectedAssetId: 'bytes',
+    requiredReview: { aggregateId: 'main', clipId: 'music' },
+  };
+  expect(parseProjectAssetPayload(direct)).toEqual(direct);
+  const privateClaim = {
+    ...direct,
+    entry: { ...entry, id: 'private', originMediaId: 'stored:audio' },
+    librarySourceId: 'stored:audio',
+    expectedAssetId: null,
+    publishToLibrary: false,
+  };
+  expect(parseProjectAssetPayload(privateClaim)).toEqual(privateClaim);
+  for (const invalid of [
+    { ...direct, expectedAssetId: null },
+    { ...direct, publishToLibrary: false },
+    { ...direct, requiredReview: undefined },
+    { ...direct, requiredReview: { aggregateId: 'main', clipId: '' } },
+    { ...direct, entry: { ...entry, mimeType: 'video/webm' } },
+    { ...privateClaim, publishToLibrary: true },
+    { ...privateClaim, librarySourceId: 'unrelated' },
+  ])
+    expect(parseProjectAssetPayload(invalid)).toBeNull();
+});

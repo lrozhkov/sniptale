@@ -3,7 +3,10 @@ export type {
   ProjectAssetPublicationOptions,
   ProjectAssetPublicationPayload,
 } from './asset-publication-payload';
-import { collectReviewAssetReferences } from '../review-workspaces/asset-refs';
+import {
+  collectReviewAssetReferences,
+  reviewWorkspaceHasAudioClip,
+} from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
 import {
@@ -241,7 +244,11 @@ async function recoverProjectAssetJournal(
     const assetId = `project-asset:${payload.entry.id}`;
     return tryVoiceoverAttachmentLock(assetId, async () => {
       const review = await readVideoWorkspace(payload.requiredReview!.aggregateId);
-      const referenced = !!review && collectReviewAssetReferences(review.workspace).has(assetId);
+      const referenced =
+        !!review &&
+        (payload.librarySourceId
+          ? reviewWorkspaceHasAudioClip(review.workspace, payload.requiredReview!.clipId, assetId)
+          : collectReviewAssetReferences(review.workspace).has(assetId));
       if (!referenced) {
         throw new SupersededAssetPublicationError();
       }

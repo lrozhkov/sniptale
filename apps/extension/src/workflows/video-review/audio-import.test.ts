@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   UnsupportedAudioFileError,
+  reviewAudioRestriction,
+  inspectReviewAudio,
   importReviewAudio,
   importedAudioClip,
   prepareReviewAudio,
@@ -349,4 +351,27 @@ describe('importedAudioClip', () => {
     expect(clip.timelineStart).toBe(4);
     expect(clip.duration).toBe(6);
   });
+});
+
+it('admits picker metadata without decoding unknown duration and applies existing import limits', () => {
+  expect(reviewAudioRestriction({ mimeType: 'audio/webm', size: 8, duration: null })).toBeNull();
+  expect(reviewAudioRestriction({ mimeType: 'video/webm', size: 8 })).toBe('type');
+  expect(reviewAudioRestriction({ mimeType: 'audio/webm', size: 64 * 1024 * 1024 + 1 })).toBe(
+    'size'
+  );
+  expect(reviewAudioRestriction({ mimeType: 'audio/webm', size: 8, duration: 3601 })).toBe(
+    'duration'
+  );
+  expect(reviewAudioRestriction({ mimeType: 'audio/webm', size: 8, duration: 0 })).toBe('duration');
+});
+it('validates selected library bytes without staging or publishing a duplicate asset', async () => {
+  stubDuration(12);
+  expect(
+    await inspectReviewAudio(
+      new Blob(['audio'], { type: 'audio/webm' }),
+      new AbortController().signal
+    )
+  ).toBe(12);
+  expect(storeMocks.writeBlobToAsset).not.toHaveBeenCalled();
+  expect(storeMocks.createAssetPublicationJournal).not.toHaveBeenCalled();
 });

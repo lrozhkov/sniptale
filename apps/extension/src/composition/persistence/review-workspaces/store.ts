@@ -138,7 +138,7 @@ async function mutate<T>(
         throw error;
       }
     });
-  if (!admitsSources) return execute(new Map());
+  if (!admitsSources) return execute({ assets: new Map(), libraryAudioClaims: [] });
   await initDB();
   return runWithDurableAssetLifecycleLock(async () =>
     execute(await readReviewReadySources(aggregateId))
@@ -204,7 +204,7 @@ async function requireSnapshot(
 async function putWorkspace(
   tx: WriteTransaction,
   workspace: VideoWorkspace,
-  prepared: ReviewReadySources = new Map()
+  prepared: ReviewReadySources = { assets: new Map(), libraryAudioClaims: [] }
 ): Promise<VideoWorkspace> {
   const next = parseVideoWorkspace({
     ...workspace,

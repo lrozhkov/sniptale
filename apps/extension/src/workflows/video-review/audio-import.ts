@@ -27,6 +27,34 @@ export class UnsupportedAudioFileError extends Error {
   }
 }
 
+/** Cheap metadata admission for picker rows; unknown duration is checked after selection. */
+export function reviewAudioRestriction(value: {
+  mimeType: string;
+  size: number;
+  duration?: number | null;
+}): UnsupportedAudioFileError['reason'] | null {
+  if (value.mimeType && !value.mimeType.startsWith('audio/')) return 'type';
+  if (value.size > IMPORTED_AUDIO_MAX_BYTES) return 'size';
+  if (
+    value.duration != null &&
+    (!Number.isFinite(value.duration) ||
+      value.duration < IMPORTED_AUDIO_MIN_SECONDS ||
+      value.duration > IMPORTED_AUDIO_MAX_SECONDS)
+  )
+    return 'duration';
+  return null;
+}
+
+/** Admission reads selected bytes only and does not acquire persistent ownership. */
+export async function inspectReviewAudio(blob: Blob, signal: AbortSignal): Promise<number> {
+  signal.throwIfAborted();
+  const restriction = reviewAudioRestriction({ mimeType: blob.type, size: blob.size });
+  if (restriction) throw new UnsupportedAudioFileError(restriction);
+  const duration = await decodeAudioDuration(blob);
+  signal.throwIfAborted();
+  return duration;
+}
+
 async function decodeAudioDuration(blob: Blob): Promise<number> {
   const context = new AudioContext();
   try {
@@ -63,11 +91,7 @@ export async function prepareReviewAudio(
   signal: AbortSignal,
   requiredReview?: { aggregateId: string; clipId: string }
 ): Promise<PreparedReviewAudio> {
-  if (file.type && !file.type.startsWith('audio/')) throw new UnsupportedAudioFileError('type');
-  if (file.size > IMPORTED_AUDIO_MAX_BYTES) throw new UnsupportedAudioFileError('size');
-  signal.throwIfAborted();
-  const duration = await decodeAudioDuration(file);
-  signal.throwIfAborted();
+  const duration = await inspectReviewAudio(file, signal);
   const prepared: PreparedProjectAsset = await prepareProjectAsset(
     file,
     file.type.startsWith('audio/') ? file.type : 'audio/mpeg',

@@ -116,6 +116,7 @@ type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
+  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
 };
 
@@ -123,6 +124,7 @@ type ReviewClipLanesProps = ReviewAudioTimelineProps & {
   audio: QuickEditAudioState;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
+  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
   pickerLane: RefObject<ReviewAudioLane | null>;
   pickerInput: RefObject<HTMLInputElement | null>;
@@ -521,6 +523,7 @@ export function ReviewAudioTrack(props: ReviewAudioTrackProps) {
           onTrimClip={props.onTrimClip}
           onImportFile={props.onImportFile}
           onRecordVoiceover={props.onRecordVoiceover}
+          onOpenMusic={props.onOpenMusic}
           pickerLane={picker}
           pickerInput={input}
         />
@@ -577,10 +580,21 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
                 </ReviewButton>
               )}
               <ReviewButton
-                label={translate('gallery.videoReview.audioImport')}
+                label={translate(
+                  lane.key === 'music' && props.onOpenMusic
+                    ? 'gallery.videoReview.musicLibrary'
+                    : 'gallery.videoReview.audioImport'
+                )}
                 disabled={props.busy}
                 className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-                onClick={() => {
+                onClick={(event) => {
+                  if (lane.key === 'music' && props.onOpenMusic) {
+                    const trigger = event.currentTarget;
+                    (props.beforeAction ?? ((action) => action()))(() =>
+                      props.onOpenMusic?.(trigger)
+                    );
+                    return;
+                  }
                   props.pickerLane.current = lane.key;
                   props.pickerInput.current?.click();
                 }}

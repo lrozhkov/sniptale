@@ -68,6 +68,7 @@ export async function createAssetPublicationJournal<TPayload>(args: {
   domain: string;
   operationId?: string;
   payload: TPayload;
+  lifecyclePermit?: DurableAssetLifecyclePermit;
 }): Promise<AssetReadyJournal<TPayload>> {
   const journal: AssetReadyJournal<TPayload> = {
     assetRefs: args.assetRefs,
@@ -77,7 +78,7 @@ export async function createAssetPublicationJournal<TPayload>(args: {
     ...(args.operationId ? { operationId: args.operationId } : {}),
     payload: args.payload,
   };
-  await runWithDurableAssetLifecycleLock(() => writeReadyJournal(journal));
+  await runWithDurableAssetLifecycleLock(() => writeReadyJournal(journal), args.lifecyclePermit);
   return journal;
 }
 

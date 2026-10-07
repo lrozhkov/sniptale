@@ -591,3 +591,32 @@ it('roundtrips speech assets across current, history and recovery with portable 
   expect(parsed?.history).toEqual(snapshot.workspace.history);
   expect(parsed?.advanced.audio.voiceover[0]?.transcript).toEqual(speech('generated'));
 });
+
+it('finds the exact audio clip in current, history and recovery without confusing shared assets', async () => {
+  const { reviewWorkspaceHasAudioClip } = await import('./asset-refs');
+  const { createQuickEditAudioClip } =
+    await import('../../../features/video/review/advanced/audio');
+  const clip = createQuickEditAudioClip({
+    id: 'selected',
+    assetId: 'project-asset:shared',
+    timelineStart: 0,
+    duration: 1,
+    endMax: 12,
+  });
+  const current = advanced({});
+  const content = reviewAdvancedContentBaseline(current);
+  const withClip = { ...content, audio: { ...content.audio, music: [clip] } };
+  const cases: Pick<VideoWorkspace, 'advanced' | 'history'>[] = [
+    { advanced: { ...current, audio: withClip.audio }, history: [] },
+    {
+      advanced: current,
+      history: [{ id: 'op', at: 1, target: 'advancedContent', before: content, after: withClip }],
+    },
+    { advanced: { ...current, recoveryV1: JSON.stringify(withClip) }, history: [] },
+  ];
+  for (const workspace of cases) {
+    expect(reviewWorkspaceHasAudioClip(workspace, 'selected', 'project-asset:shared')).toBe(true);
+    expect(reviewWorkspaceHasAudioClip(workspace, 'other', 'project-asset:shared')).toBe(false);
+    expect(reviewWorkspaceHasAudioClip(workspace, 'selected', 'project-asset:other')).toBe(false);
+  }
+});

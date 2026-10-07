@@ -1,3 +1,4 @@
+import { galleryVideoReviewMusicMessages } from './video-review-music';
 import { galleryVideoReviewTargetMessages } from './video-review-targets';
 import { galleryVideoReviewSpeechMessages } from './video-review-speech';
 import { galleryVideoReviewKeyMessages } from './video-review-keys';
@@ -5,6 +6,7 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewMusicMessages,
   ...galleryVideoReviewTargetMessages,
   ...galleryVideoReviewSpeechMessages,
   ...galleryVideoReviewSpatialMessages,
@@ -758,8 +760,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Часть под вырезанием временно не применяется. Правка сохранена.',
     en: 'The portion under a cut is temporarily inactive. The edit is saved.',
   },
-  audioMusic: { ru: 'Музыка', en: 'Music' },
-  audioImport: { ru: 'Добавить аудиофайл', en: 'Add audio file' },
   audioEmpty: { ru: 'Перетащите сюда аудиофайл', en: 'Drop an audio file here' },
   audioClipMute: { ru: 'Без звука', en: 'Mute audio' },
   voiceoverTempo: { ru: 'Скорость озвучки', en: 'Voiceover speed' },

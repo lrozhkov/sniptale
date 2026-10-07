@@ -95,6 +95,7 @@ function ReviewAudioLane(props: {
   busy: boolean;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
+  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
 }) {
   return (
     <ReviewAudioTrack
@@ -121,6 +122,7 @@ function ReviewAudioLane(props: {
       onOriginal={props.audio.setOriginal}
       onImportFile={props.onImportFile}
       onRecordVoiceover={props.onRecordVoiceover}
+      onOpenMusic={props.onOpenMusic}
     />
   );
 }
@@ -163,6 +165,7 @@ type TimelineBindingProps = {
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
+  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
   onMarker(marker: ReviewTelemetryMarker): void;
   onClearSelection(): void;
   selectedObject: boolean;
@@ -346,6 +349,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 busy={props.busy}
                 onImportFile={props.onImportAudioFile}
                 onRecordVoiceover={props.onRecordVoiceover}
+                onOpenMusic={props.onOpenMusic}
               />
             ),
           }

@@ -233,6 +233,40 @@ function requireMappedAssetId(assetIdMap: ReadonlyMap<string, string>, reference
   return mapped;
 }
 
+/** Exact audio placement identity retained by current content, undo/redo or recovery. */
+export function reviewWorkspaceHasAudioClip(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  clipId: string,
+  assetId: string
+): boolean {
+  const matches = (content: unknown, recovery = true): boolean => {
+    if (!isRecord(content)) return false;
+    const audio = content['audio'];
+    if (isRecord(audio)) {
+      for (const lane of LANES) {
+        const clips = audio[lane];
+        if (
+          Array.isArray(clips) &&
+          clips.some(
+            (clip: unknown) =>
+              isRecord(clip) && clip['id'] === clipId && clip['assetId'] === assetId
+          )
+        )
+          return true;
+      }
+    }
+    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+  };
+  return (
+    matches(workspace.advanced) ||
+    workspace.history.some(
+      (operation) =>
+        operation.target === 'advancedContent' &&
+        (matches(operation.before) || matches(operation.after))
+    )
+  );
+}
+
 /** Collects every project-asset reference the review keeps, including history ops. */
 export function collectReviewAssetReferences(
   workspace: Pick<VideoWorkspace, 'advanced' | 'history'>

@@ -11,6 +11,8 @@ export interface ProjectAssetPublicationOptions {
 export interface ProjectAssetPublicationPayload extends ProjectAssetPublicationOptions {
   entry: StoredProjectAssetEntry;
   filename: string;
+  /** Existing Library acquisition; admission is scoped to the required audio clip. */
+  librarySourceId?: string;
   expectedAssetId?: string | null;
   requiredReview?: { aggregateId: string; clipId: string };
 }
@@ -38,6 +40,26 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
         ? { aggregateId: required['aggregateId'], clipId: required['clipId'] }
         : null;
   if (requiredReview === null) return null;
+  const librarySourceId = value['librarySourceId'];
+  if (librarySourceId !== undefined) {
+    if (
+      typeof librarySourceId !== 'string' ||
+      !librarySourceId ||
+      !requiredReview?.aggregateId ||
+      !requiredReview.clipId ||
+      !entry.mimeType.startsWith('audio/')
+    )
+      return null;
+    if (entry.originMediaId) {
+      if (
+        entry.originMediaId !== librarySourceId ||
+        value['publishToLibrary'] !== false ||
+        value['expectedAssetId'] !== null
+      )
+        return null;
+    } else if (value['publishToLibrary'] === false || value['expectedAssetId'] !== entry.assetId)
+      return null;
+  }
   return {
     entry,
     filename: value['filename'],
@@ -48,5 +70,6 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
       ? { publishToLibrary: value['publishToLibrary'] }
       : {}),
     ...(requiredReview ? { requiredReview } : {}),
+    ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
   };
 }

@@ -158,6 +158,7 @@ it('promotes the canonical mirror of an accepted project asset', async () => {
   expect(put).toHaveBeenCalledWith({
     ...media,
     workspaceRevision: 0,
+    imageContentState: 'original',
     lifecycle: { storageClass: 'library', savedAt: 50, updatedAt: 50 },
   });
 });

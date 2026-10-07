@@ -1,3 +1,5 @@
+import { useReviewMusicImport } from './music-import';
+import { MusicLibraryDrawer } from './music-library';
 import { changeRecordedClicks, changeRecordedKeys } from './action-presentation';
 import { ReviewActionHistory } from './action-history';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
@@ -505,6 +507,7 @@ function ReviewEditor({
     exportRequest,
   });
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
+  const music = useReviewMusicImport(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
     state;
   const waveforms = useReviewWaveforms(
@@ -604,6 +607,7 @@ function ReviewEditor({
               waveforms={waveforms}
               onImportAudioFile={(...args) => state.beforeAction(() => onImportAudioFile(...args))}
               onRecordVoiceover={() => state.beforeAction(voiceover.open)}
+              onOpenMusic={music.open}
               onClearSelection={() => state.setActiveSelection({ kind: 'none' })}
               selectedObject={state.activeSelection.kind !== 'none'}
               onMarker={(marker) => {
@@ -619,6 +623,7 @@ function ReviewEditor({
         </div>
       </div>
       <ReviewVoiceoverLayer voiceover={voiceover} />
+      {music.drawer && <MusicLibraryDrawer {...music.drawer} />}
     </>
   );
 }
