@@ -18,7 +18,11 @@ it('keeps focused control outlines visible for keyboard activation and navigatio
       root.render(
         <ReviewDialog>
           <button>Tool</button>
-          <textarea />
+          <textarea
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+            }}
+          />
           <div data-review-panel-resize="timeline" role="separator" tabIndex={0} />
           <aside data-ui="gallery.videoReview.inspector">
             <details>
@@ -45,6 +49,18 @@ it('keeps focused control outlines visible for keyboard activation and navigatio
     button.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
     expect(dialog.dataset['playbackFocus']).toBe('true');
+    const input = host.querySelector('textarea')!;
+    input.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    input.focus();
+    for (const key of ['1', 'ArrowLeft', 'Enter']) {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      expect(dialog.dataset['playbackFocus']).toBe('true');
+    }
+    expect(document.activeElement).toBe(dialog);
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(dialog.dataset['playbackFocus']).toBeUndefined();
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(dialog.dataset['playbackFocus']).toBeUndefined();
     button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(dialog.dataset['playbackFocus']).toBeUndefined();
     button.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));

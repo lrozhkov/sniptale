@@ -1,4 +1,10 @@
-import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
+import { useEffect, useState } from 'react';
+import {
+  ColorField,
+  NumericRow,
+  SelectField,
+  type NumericRowProps,
+} from '../../ui/compact-inspector-controls';
 import { translate } from '../../platform/i18n';
 import {
   REVIEW_CLICK_BOUNDS,
@@ -10,6 +16,37 @@ import {
   reviewSelectFieldClassName,
   reviewTextButtonClassName,
 } from './controls';
+
+// Slider limits are deliberately narrower than the persisted/manual-input bounds.
+const CLICK_SCRUB = {
+  radius: [2, 80, 1],
+  stroke: [0.5, 8, 0.5],
+  opacity: [0, 1, 0.01],
+  before: [0, 0.5, 0.01],
+  after: [0.05, 1.5, 0.01],
+  offset: [-0.25, 0.25, 0.01],
+  x: [-0.25, 0.25, 0.01],
+  y: [-0.25, 0.25, 0.01],
+  pulses: [1, 5, 1],
+} as const;
+
+/** Keep a drag local until release; batch editing must not write history for every tick. */
+function ClickNumberRow(props: Omit<NumericRowProps, 'onPreviewValue'>) {
+  const [draft, setDraft] = useState<number>();
+  useEffect(() => setDraft(undefined), [props.value]);
+  return (
+    <NumericRow
+      {...props}
+      enterBehavior="blur"
+      value={draft ?? props.value}
+      onPreviewValue={setDraft}
+      onCommitValue={(value) => {
+        setDraft(undefined);
+        props.onCommitValue(value);
+      }}
+    />
+  );
+}
 
 /** Mixed batch fields patch only the changed value, preserving every other click setting. */
 export function ReviewClickFields(props: {
@@ -30,8 +67,9 @@ export function ReviewClickFields(props: {
   ) => {
     const value = common(key);
     const [min, max] = REVIEW_CLICK_BOUNDS[key];
+    const [scrubMin, scrubMax, scrubStep] = CLICK_SCRUB[key];
     return (
-      <NumericRow
+      <ClickNumberRow
         key={key}
         appearance="plain"
         focusAppearance="accent-box"
@@ -43,7 +81,7 @@ export function ReviewClickFields(props: {
         step={key === 'stroke' ? 0.5 : 1}
         precision={key === 'stroke' ? 1 : 0}
         unit={unit}
-        onPreviewValue={() => undefined}
+        scrub={{ min: scrubMin * factor, max: scrubMax * factor, step: scrubStep * factor }}
         onCommitValue={(next) => props.onChange({ [key]: next / factor })}
       />
     );

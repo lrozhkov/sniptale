@@ -328,6 +328,34 @@ async function verifyClickFields(owner: Locator, page: Page, screenshot: string)
       contained: true,
     });
   }
+  await expect(fields.locator('input[type="range"]')).toHaveCount(9);
+  const radiusRow = rows.first();
+  const radiusInput = radiusRow.getByRole('textbox');
+  const originalRadius = await radiusInput.inputValue();
+  await radiusRow.hover();
+  const radiusRange = radiusRow.locator('input[type="range"]');
+  await expect(radiusRange).toHaveAttribute('max', '80');
+  const box = (await radiusRange.boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  expect(Number.parseFloat(await radiusInput.inputValue())).toBeGreaterThan(40);
+  await radiusInput.click();
+  await radiusInput.fill('150');
+  await radiusInput.press('Enter');
+  await expect(radiusInput).toHaveValue('150');
+  const dialog = page.locator('dialog');
+  await expect(dialog).toHaveAttribute('data-playback-focus', 'true');
+  await expect(fields.locator('input:focus')).toHaveCount(0);
+  await expect(dialog).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog).not.toHaveAttribute('data-playback-focus');
+  await radiusInput.click();
+  await radiusInput.fill(originalRadius);
+  await radiusInput.press('Enter');
+  await radiusRow.hover();
+  await page.screenshot({ path: screenshot.replace('.png', '-slider.png'), fullPage: false });
   const last = rows.last().getByRole('textbox');
   await last.scrollIntoViewIfNeeded();
   await last.focus();

@@ -324,3 +324,45 @@ it.each([false, true])('keeps only current numeric focus (shadow root: %s)', (sh
     host.remove();
   }
 });
+
+it('commits once and exits on Enter when blur behavior is requested', () => {
+  const onCommitValue = vi.fn();
+  const onPreviewValue = vi.fn();
+  container = document.createElement('div');
+  document.body.appendChild(container);
+  root = createRoot(container);
+
+  act(() => {
+    root?.render(
+      <div>
+        <NumericRow
+          enterBehavior="blur"
+          label="Width"
+          value={20}
+          unit="px"
+          onPreviewValue={onPreviewValue}
+          onCommitValue={onCommitValue}
+        />
+        <NumericRow
+          label="Opacity"
+          value={40}
+          unit="%"
+          onPreviewValue={() => undefined}
+          onCommitValue={() => undefined}
+        />
+      </div>
+    );
+  });
+  const inputs = container.querySelectorAll<HTMLInputElement>(
+    '[data-ui="shared.ui.compact-inspector.numeric-value-field"] input'
+  );
+
+  act(() => {
+    inputs[0]?.focus();
+    setInputValue(inputs[0]!, '28');
+    inputs[0]?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+  });
+
+  expect(onCommitValue).toHaveBeenCalledExactlyOnceWith(28);
+  expect(container.contains(document.activeElement)).toBe(false);
+});

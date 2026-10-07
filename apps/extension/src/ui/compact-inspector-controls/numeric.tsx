@@ -11,6 +11,8 @@ import { useNumericValueFieldState } from './numeric-value-state';
 import { TextWithOverflowHint } from './overflow-hint';
 
 export interface NumericValueFieldProps {
+  /** Enter commits then advances by default; blur ends an isolated inspector edit. */
+  enterBehavior?: 'next' | 'blur' | undefined;
   className?: string | undefined;
   disabled?: boolean | undefined;
   /** Focus presentation: 'accent-box' draws an accent border box, 'quiet' a thin accent line. */
@@ -35,6 +37,7 @@ export function NumericValueField(props: NumericValueFieldProps) {
   const step = props.step ?? 1;
   const unit = props.unit ?? '';
   const state = useNumericValueFieldState({
+    enterBehavior: props.enterBehavior,
     max: props.max,
     min: props.min,
     normalizeValue: props.normalizeValue,

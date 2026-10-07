@@ -6,6 +6,7 @@ import { translate } from '../../platform/i18n';
 /** Modal lifecycle and keyboard modality belong to the editor surface. */
 export function ReviewDialog({ children }: { children: ReactNode }) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const committingField = useRef(false);
   useEffect(() => {
     const node = dialog.current;
     node?.showModal();
@@ -14,8 +15,10 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
   return (
     <dialog
       ref={dialog}
+      tabIndex={-1}
       data-ui="gallery.videoReview.dialog"
       onKeyDownCapture={(event) => {
+        committingField.current = false;
         const target = reviewKeyboardTarget(event.nativeEvent);
         if (!target) {
           delete event.currentTarget.dataset['playbackFocus'];
@@ -34,6 +37,19 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
           }
           return;
         }
+        // Typing/committing a mouse-focused field does not start keyboard navigation.
+        const editingText = target.closest(
+          [
+            'textarea,input:not([type])',
+            'input:is([type="text"],[type="number"],[type="search"],[type="email"])',
+            'input:is([type="url"],[type="tel"],[type="password"])',
+            '[contenteditable]:not([contenteditable="false"])',
+          ].join(',')
+        );
+        if (editingText && event.key !== 'Tab') {
+          committingField.current = event.key === 'Enter';
+          return;
+        }
         if (event.key === 'Tab' || reviewOwnsNavigation(target)) {
           delete event.currentTarget.dataset['playbackFocus'];
         } else if (
@@ -46,7 +62,17 @@ export function ReviewDialog({ children }: { children: ReactNode }) {
           event.currentTarget.dataset['playbackFocus'] = 'true';
         }
       }}
+      onKeyUpCapture={() => {
+        committingField.current = false;
+      }}
+      onBlurCapture={(event) => {
+        const restore = committingField.current && event.relatedTarget === null;
+        committingField.current = false;
+        // An Enter commit exits the field but keeps subsequent editor shortcuts in the modal.
+        if (restore) event.currentTarget.focus({ preventScroll: true });
+      }}
       onPointerDownCapture={(event) => {
+        committingField.current = false;
         event.currentTarget.dataset['playbackFocus'] = 'true';
       }}
       aria-label={translate('gallery.videoReview.title')}
