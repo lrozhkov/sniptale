@@ -17,6 +17,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   historyBack: { ru: 'К списку', en: 'Back to list' },
   historySearchClear: { ru: 'Очистить поиск', en: 'Clear search' },
   historyOpen: { ru: 'Открыть историю действий', en: 'Open action history' },
+  historyEffectsEnabled: { ru: 'Применять анимации действий', en: 'Apply action animations' },
+  webcamApply: { ru: 'Показывать камеру в видео', en: 'Show camera in video' },
   historyAnimatedOnly: { ru: 'Только с анимацией', en: 'Only animated actions' },
   historySearch: { ru: 'Поиск действий', en: 'Search actions' },
   historyAll: { ru: 'Все действия', en: 'All actions' },

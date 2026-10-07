@@ -639,6 +639,7 @@ it('toggles the persisted advanced mode and restores it after reopening the edit
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(fixture.snapshot.workspace.advanced.ui).toEqual({
       mode: 'advanced',
+      advancedTracksInitialized: true,
       tracks: { actions: true, zoom: true, audio: true },
       overlaysVisible: true,
     });

@@ -1,6 +1,6 @@
 import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Camera, EyeOff, Settings2 } from 'lucide-react';
+import { Camera, Eye, EyeOff, Settings2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import {
@@ -51,7 +51,7 @@ export function ReviewWebcamTrack(props: {
       drag.current?.admission.cancel();
     };
   }, []);
-  if (!camera?.enabled) return null;
+  if (!camera) return null;
   const admit = props.beforeAction ?? ((action: () => void) => action());
   const timeAt = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -69,6 +69,7 @@ export function ReviewWebcamTrack(props: {
   };
   return (
     <ReviewTrackRow
+      muted={!camera.enabled}
       label={translate('gallery.videoReview.webcam')}
       icon={<Camera size={14} aria-hidden />}
       controls={
@@ -79,6 +80,14 @@ export function ReviewWebcamTrack(props: {
             onClick={() => admit(() => editor.select({ kind: 'webcam' }))}
           >
             <Settings2 size={14} aria-hidden />
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.webcamApply')}
+            className={reviewCompactTrackButtonClassName}
+            aria-pressed={camera.enabled}
+            onClick={() => admit(() => void editor.toggle())}
+          >
+            {camera.enabled ? <Eye size={14} /> : <EyeOff size={14} />}
           </ReviewButton>
         </>
       }

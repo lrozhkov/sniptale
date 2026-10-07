@@ -393,7 +393,7 @@ function reviewExportPresentations(
   edits: Parameters<typeof buildReviewTimeMap>[1]
 ) {
   const markers =
-    advanced.ui.mode === 'advanced' && telemetry
+    resolveQuickEditEffectiveFeatures(advanced).actionsApplied && telemetry
       ? projectReviewTelemetry(telemetry, duration).markers
       : [];
   const segments = buildReviewTimeMap(duration, edits);

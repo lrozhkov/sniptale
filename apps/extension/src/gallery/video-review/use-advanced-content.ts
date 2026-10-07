@@ -143,6 +143,15 @@ export function useReviewAdvancedContent(
     pending: pending.current !== null,
     flush,
     reset,
+    commands: reviewContentCommands(stage),
+  };
+}
+
+/** Authored mutations share the debounced history writer, independent of its React lifecycle. */
+function reviewContentCommands(stage: (mutation: ContentMutation) => void) {
+  return {
+    setActionsEnabled: (actionsEnabled: boolean) =>
+      stage((content) => ({ ...content, actionsEnabled })),
     setKeyAnimations: (
       update: (
         current: NonNullable<QuickEditAdvancedContent['keyAnimations']>

@@ -580,6 +580,14 @@ function ReviewEditor({
               onCutPlacement={() =>
                 state.setMessage(translate('gallery.videoReview.placementOnCut'))
               }
+              onToggleActions={
+                advanced.ui.mode === 'advanced'
+                  ? () =>
+                      state.beforeAction(() =>
+                        state.setActionsEnabled(advanced.actionsEnabled === false)
+                      )
+                  : undefined
+              }
               setTrackVisibility={state.setTrackVisibility}
               setMode={state.setMode}
               telemetryAvailable={state.projected.markers.length > 0}

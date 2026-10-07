@@ -147,7 +147,7 @@ it('semantic double click produces one identity/effect without changing captured
   expect(input).toEqual(copy);
 });
 
-it('undo/redo and baseline restore click settings; hidden lane does not disable export', () => {
+it('undo/redo and baseline restore click settings; hidden lane suppresses export without losing settings', () => {
   const before = createQuickEditAdvancedContent();
   const after = { ...before, clickAnimations: animations };
   const history = [{ id: 'op', at: 1, target: 'advancedContent' as const, before, after }];
@@ -162,6 +162,10 @@ it('undo/redo and baseline restore click settings; hidden lane does not disable 
   });
   state.ui.mode = 'advanced';
   state.ui.tracks.actions = false;
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  state.ui.tracks.actions = true;
   expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
     video: 'render',
     reasons: ['click-animations'],

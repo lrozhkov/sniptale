@@ -37,6 +37,7 @@ export function reviewAdvancedContentBaseline(state: {
   zoom: QuickEditAdvancedContent['zoom'];
   background: QuickEditAdvancedContent['background'];
   audio: QuickEditAdvancedContent['audio'];
+  actionsEnabled?: boolean;
   keyAnimations?: QuickEditAdvancedContent['keyAnimations'];
   clickAnimations?: QuickEditAdvancedContent['clickAnimations'];
   canvas?: QuickEditAdvancedContent['canvas'];
@@ -48,6 +49,7 @@ export function reviewAdvancedContentBaseline(state: {
     zoom: state.zoom,
     background: state.background,
     audio: state.audio,
+    ...(state.actionsEnabled === undefined ? {} : { actionsEnabled: state.actionsEnabled }),
     ...(state.keyAnimations ? { keyAnimations: state.keyAnimations } : {}),
     ...(state.clickAnimations ? { clickAnimations: state.clickAnimations } : {}),
     ...(state.canvas ? { canvas: state.canvas } : {}),

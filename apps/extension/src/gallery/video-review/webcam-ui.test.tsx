@@ -286,7 +286,10 @@ it('keeps camera markers on the source axis and creates hide intervals through a
   act(render);
   editor.camera!.enabled = false;
   act(render);
-  expect(host.textContent).toBe('');
+  expect(host.querySelector('[data-ui="gallery.videoReview.webcamTrack"]')).not.toBeNull();
+  expect(field(label('webcamApply')).getAttribute('aria-pressed')).toBe('false');
+  click('webcamApply');
+  expect(editor.toggle).toHaveBeenCalledOnce();
 });
 
 it('cancels camera range drags on Escape, pointer cancellation and blur without committing', () => {

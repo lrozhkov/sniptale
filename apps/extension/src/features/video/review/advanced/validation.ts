@@ -86,19 +86,28 @@ function parseTrackVisibility(value: unknown): QuickEditTrackVisibility | null {
     !isRecord(value) ||
     typeof value['actions'] !== 'boolean' ||
     typeof value['zoom'] !== 'boolean' ||
-    typeof value['audio'] !== 'boolean'
+    typeof value['audio'] !== 'boolean' ||
+    (value['webcam'] !== undefined && typeof value['webcam'] !== 'boolean')
   )
     return null;
-  return { actions: value['actions'], zoom: value['zoom'], audio: value['audio'] };
+  return {
+    actions: value['actions'],
+    zoom: value['zoom'],
+    audio: value['audio'],
+    ...(value['webcam'] === undefined ? {} : { webcam: value['webcam'] }),
+  };
 }
 
 function parseUiState(value: unknown): QuickEditUiState | null {
   if (!isRecord(value) || (value['mode'] !== 'basic' && value['mode'] !== 'advanced')) return null;
+  const initialized = value['advancedTracksInitialized'];
+  if (initialized !== undefined && typeof initialized !== 'boolean') return null;
   const tracks = parseTrackVisibility(value['tracks']);
   if (!tracks) return null;
   // Pre-overlay workspaces omit the display toggle; missing or invalid falls back on.
   return {
     mode: value['mode'],
+    ...(initialized === undefined ? {} : { advancedTracksInitialized: initialized }),
     tracks,
     overlaysVisible: value['overlaysVisible'] === false ? false : true,
   };
@@ -421,6 +430,8 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const actionsEnabled = raw['actionsEnabled'];
+  if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
   if (keyAnimations === null) return null;
   const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
@@ -435,6 +446,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     zoom,
     background,
     audio,
+    ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
     ...(canvas ? { canvas } : {}),
@@ -477,6 +489,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const actionsEnabled = raw['actionsEnabled'];
+  if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
   if (keyAnimations === null) return null;
   const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
@@ -494,6 +508,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ui,
     zoom,
     background,
+    ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
     ...(canvas ? { canvas } : {}),

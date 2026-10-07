@@ -9,12 +9,15 @@ export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
 
 export interface QuickEditTrackVisibility {
   actions: boolean;
+  webcam?: boolean;
   zoom: boolean;
   audio: boolean;
 }
 
 export interface QuickEditUiState {
   mode: 'basic' | 'advanced';
+  /** First entry reveals editing lanes; later mode switches preserve their settings. */
+  advancedTracksInitialized?: boolean;
   tracks: QuickEditTrackVisibility;
   /** Editor-only overlay display; the data and the export flag are untouched. */
   overlaysVisible: boolean;
@@ -203,6 +206,8 @@ export interface QuickEditAudioState {
 
 /** Advanced quick-editor state persisted beside the edit history in the same workspace record. */
 export interface QuickEditAdvancedState {
+  /** Missing on older projects means enabled. */
+  actionsEnabled?: boolean;
   keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('./click-animation').ReviewClickAnimation[];
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
@@ -223,6 +228,8 @@ export interface QuickEditAdvancedState {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  /** Missing on older projects means enabled. */
+  actionsEnabled?: boolean;
   keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('./click-animation').ReviewClickAnimation[];
   /** Version travels with each history payload so persisted operations are fixed-point parseable. */

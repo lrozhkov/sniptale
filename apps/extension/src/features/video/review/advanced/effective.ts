@@ -21,6 +21,8 @@ interface QuickEditEffectiveFeatures {
   /** In-frame comments follow the advanced-mode overlay visibility control. */
   overlaysVisible: boolean;
   /** Advanced effects are suppressed while the editor is in basic mode. */
+  actionsApplied: boolean;
+  webcamApplied: boolean;
   zoomApplied: boolean;
   backgroundApplied: boolean;
   originalAudioApplied: boolean;
@@ -41,7 +43,9 @@ export function resolveQuickEditEffectiveFeatures(
     actionsTrackVisible: state.ui.tracks.actions,
     zoomTrackVisible: advanced && state.ui.tracks.zoom,
     audioTrackVisible: advanced && state.ui.tracks.audio,
-    webcamTrackVisible: advanced && !!state.webcam?.enabled,
+    webcamTrackVisible: advanced && !!state.webcam && state.ui.tracks.webcam !== false,
+    webcamApplied: advanced && !!state.webcam?.enabled && state.ui.tracks.webcam !== false,
+    actionsApplied: advanced && state.ui.tracks.actions && state.actionsEnabled !== false,
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
     backgroundApplied: advanced && state.background.enabled,
@@ -81,7 +85,7 @@ export function resolveQuickEditEffectiveState(
     background: advanced ? state.background : { enabled: false },
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
-    webcam: features.webcamTrackVisible ? state.webcam : undefined,
+    webcam: features.webcamApplied ? state.webcam : undefined,
     originalAudio: state.audio.original,
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
@@ -170,11 +174,11 @@ export function resolveQuickEditExportPlan(args: {
   )
     audio.push('original-audio');
   if (
-    features.mode === 'advanced' &&
+    features.actionsApplied &&
     args.advanced.clickAnimations?.some((item) => item.effect !== 'off')
   )
     visual.push('click-animations');
-  if (features.mode === 'advanced' && args.advanced.keyAnimations?.some((item) => item.enabled))
+  if (features.actionsApplied && args.advanced.keyAnimations?.some((item) => item.enabled))
     visual.push('key-animations');
   if (effective.canvas) visual.push('canvas');
   if (effective.windowHeader) visual.push('window-header');

@@ -262,7 +262,10 @@ function useReviewWebcamAcquisition(
             });
           },
         });
-      if (!abort.signal.aborted && !recoverAssetId) latest.current.select({ kind: 'webcam' });
+      if (!abort.signal.aborted && !recoverAssetId) {
+        latest.current.advanced.setTrackVisibility('webcam', true);
+        latest.current.select({ kind: 'webcam' });
+      }
     } catch {
       if (!abort.signal.aborted) setFailed(true);
     } finally {

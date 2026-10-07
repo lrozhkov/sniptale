@@ -103,6 +103,7 @@ export function useReviewAdvanced(session: Session) {
   }, [contentState, session]);
   const content = contentState.content;
   const {
+    actionsEnabled: _baselineActionsEnabled,
     keyAnimations: _baselineKeys,
     clickAnimations: _baselineClicks,
     canvas: _baselineCanvas,
@@ -116,29 +117,12 @@ export function useReviewAdvanced(session: Session) {
     ...content,
   };
   return {
+    ...contentState.commands,
     advanced,
     saveFailed: saveFailed || contentState.saveFailed,
     pending: optimistic !== null || contentState.pending,
     retry: () => Promise.all([flush(), contentState.flush()]),
-    setMode: (mode: 'basic' | 'advanced') => {
-      if (mode === 'advanced') contentState.setZoom((zoom) => ({ ...zoom, enabled: true }));
-      stage((current) => reviewAdvancedMode(current, mode));
-    },
-    setTrackVisibility: (track: 'actions' | 'zoom' | 'audio', visible: boolean) =>
-      stage((current) => ({
-        ...current,
-        ui: { ...current.ui, tracks: { ...current.ui.tracks, [track]: visible } },
-      })),
-    setOverlaysVisible: (visible: boolean) =>
-      stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
-    setKeyAnimations: contentState.setKeyAnimations,
-    setClickAnimations: contentState.setClickAnimations,
-    setZoom: contentState.setZoom,
-    setCanvas: contentState.setCanvas,
-    setWindowHeader: contentState.setWindowHeader,
-    setWebcam: contentState.setWebcam,
-    setBackground: contentState.setBackground,
-    setAudio: contentState.setAudio,
+    ...reviewAdvancedUiCommands(stage, () => currentRef.current, contentState.commands),
     flush: async () => {
       await flush();
       await contentState.flush();
@@ -147,15 +131,46 @@ export function useReviewAdvanced(session: Session) {
   };
 }
 
-/** Advanced mode reveals its edit lanes without changing saved Basic track preferences. */
-function reviewAdvancedMode(current: QuickEditAdvancedState, mode: 'basic' | 'advanced') {
+/** Coordinates lane visibility with authored application without dropping stored settings. */
+function reviewAdvancedUiCommands(
+  stage: (update: (state: QuickEditAdvancedState) => QuickEditAdvancedState) => void,
+  current: () => QuickEditAdvancedState,
+  commands: ReturnType<typeof useReviewAdvancedContent>['commands']
+) {
   return {
-    ...current,
-    ui: {
-      ...current.ui,
-      mode,
-      tracks:
-        mode === 'advanced' ? { ...current.ui.tracks, zoom: true, audio: true } : current.ui.tracks,
+    setMode: (mode: 'basic' | 'advanced') => {
+      const firstEntry =
+        mode === 'advanced' &&
+        current().ui.mode === 'basic' &&
+        !current().ui.advancedTracksInitialized;
+      if (firstEntry) commands.setZoom((zoom) => ({ ...zoom, enabled: true }));
+      stage((current) => ({
+        ...current,
+        ui: {
+          ...current.ui,
+          mode,
+          advancedTracksInitialized:
+            current.ui.advancedTracksInitialized ||
+            current.ui.mode === 'advanced' ||
+            mode === 'advanced',
+          tracks: firstEntry
+            ? { ...current.ui.tracks, zoom: true, audio: true }
+            : current.ui.tracks,
+        },
+      }));
     },
+    setTrackVisibility: (track: 'actions' | 'zoom' | 'audio' | 'webcam', visible: boolean) => {
+      if (track === 'actions' && current().ui.mode === 'advanced')
+        commands.setActionsEnabled(visible);
+      if (track === 'zoom') commands.setZoom((zoom) => ({ ...zoom, enabled: visible }));
+      if (track === 'webcam')
+        commands.setWebcam((camera) => (camera ? { ...camera, enabled: visible } : camera));
+      stage((current) => ({
+        ...current,
+        ui: { ...current.ui, tracks: { ...current.ui.tracks, [track]: visible } },
+      }));
+    },
+    setOverlaysVisible: (visible: boolean) =>
+      stage((current) => ({ ...current, ui: { ...current.ui, overlaysVisible: visible } })),
   };
 }

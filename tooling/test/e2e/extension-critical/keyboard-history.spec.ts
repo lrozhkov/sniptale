@@ -92,6 +92,32 @@ for (const [width, height, locale, theme] of [
           })
         )
         .toBe(true);
+      const effects = button('gallery.videoReview.historyEffectsEnabled');
+      const hasCaption = () =>
+        page.locator('[data-ui="gallery.videoReview.keyAnimation"]').evaluate((element) => {
+          const canvas = element as HTMLCanvasElement;
+          return canvas
+            .getContext('2d')!
+            .getImageData(0, 0, canvas.width, canvas.height)
+            .data.some((value) => value > 0);
+        });
+      await effects.click();
+      await expect(effects).toHaveAttribute('aria-pressed', 'false');
+      await expect(marker).toBeVisible();
+      await expect.poll(hasCaption).toBe(false);
+      await page.screenshot({
+        path: info.outputPath('history-disabled-lane.png'),
+        fullPage: false,
+      });
+      await effects.click();
+      await expect.poll(hasCaption).toBe(true);
+      await button('gallery.videoReview.telemetry').click();
+      await expect(marker).toHaveCount(0);
+      await expect.poll(hasCaption).toBe(false);
+      await button('gallery.videoReview.telemetry').click();
+      await expect(marker).toBeVisible();
+      await expect(effects).toHaveAttribute('aria-pressed', 'true');
+      await expect.poll(hasCaption).toBe(true);
       await amount.scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('keyboard-inspector.png'), fullPage: false });
       await button('gallery.videoReview.clickReset').scrollIntoViewIfNeeded();

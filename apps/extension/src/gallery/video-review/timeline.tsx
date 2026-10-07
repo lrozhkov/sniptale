@@ -1,10 +1,14 @@
 import { useState } from 'react';
-import { ReviewButton, reviewIconButtonClassName } from './controls';
+import {
+  ReviewButton,
+  reviewIconButtonClassName,
+  reviewCompactTrackButtonClassName,
+} from './controls';
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, List, Filter } from 'lucide-react';
+import { Activity, List, Filter, Eye, EyeOff } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -28,6 +32,8 @@ import { reviewTimeLabel } from './controls';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
+  actionsEnabled?: boolean | undefined;
+  onToggleActions?: (() => void) | undefined;
   onOpenHistory?: (() => void) | undefined;
   keyAnimations?:
     | readonly import('../../features/video/review/advanced/key-animation').ReviewKeyAnimation[]
@@ -233,6 +239,8 @@ function ReviewTimelineEvents(
     | 'selectedTelemetryRef'
     | 'onMarker'
     | 'onOpenHistory'
+    | 'actionsEnabled'
+    | 'onToggleActions'
     | 'keyAnimations'
     | 'clickAnimations'
   > & { width: number; zoom: number }
@@ -247,6 +255,7 @@ function ReviewTimelineEvents(
     : props.markers;
   return props.markers.length ? (
     <ReviewTrackRow
+      muted={props.actionsEnabled === false}
       label={translate('gallery.videoReview.telemetry')}
       icon={<Activity size={14} aria-hidden="true" />}
       controls={
@@ -258,6 +267,16 @@ function ReviewTimelineEvents(
           >
             <List size={14} aria-hidden="true" />
           </ReviewButton>
+          {props.onToggleActions ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.historyEffectsEnabled')}
+              className={reviewCompactTrackButtonClassName}
+              aria-pressed={props.actionsEnabled !== false}
+              onClick={props.onToggleActions}
+            >
+              {props.actionsEnabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
+            </ReviewButton>
+          ) : null}
           <ReviewButton
             label={translate('gallery.videoReview.historyAnimatedOnly')}
             className={reviewIconButtonClassName}

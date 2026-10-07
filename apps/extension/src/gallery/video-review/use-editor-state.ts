@@ -71,23 +71,24 @@ export function useReviewEditorState(resource: LoadedReview) {
     timelineSelection: selection,
     cuts,
   });
+  const actionsApplied = resolveQuickEditEffectiveState(advanced).actionsApplied;
   const clickCues = useMemo(
     () =>
       scheduleReviewClicks(
         wiring.projected.markers,
-        advanced.ui.mode === 'advanced' ? (advanced.clickAnimations ?? []) : [],
+        actionsApplied ? (advanced.clickAnimations ?? []) : [],
         core.timeline.timeMap.getSegments()
       ),
-    [wiring.projected.markers, advanced.ui.mode, advanced.clickAnimations, core.timeline.timeMap]
+    [wiring.projected.markers, actionsApplied, advanced.clickAnimations, core.timeline.timeMap]
   );
   const keyCues = useMemo(
     () =>
       scheduleReviewKeys(
         wiring.projected.markers,
-        advanced.ui.mode === 'advanced' ? (advanced.keyAnimations ?? []) : [],
+        actionsApplied ? (advanced.keyAnimations ?? []) : [],
         core.timeline.timeMap.getSegments()
       ),
-    [wiring.projected.markers, advanced.ui.mode, advanced.keyAnimations, core.timeline.timeMap]
+    [wiring.projected.markers, actionsApplied, advanced.keyAnimations, core.timeline.timeMap]
   );
   return { ...assembleReviewEditorState(core, wiring), clickCues, keyCues };
 }
@@ -350,6 +351,7 @@ function reviewAdvancedControls(
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setKeyAnimations: advancedState.setKeyAnimations,
+    setActionsEnabled: advancedState.setActionsEnabled,
     setClickAnimations: advancedState.setClickAnimations,
     setBackground: advancedState.setBackground,
     setCanvas: advancedState.setCanvas,

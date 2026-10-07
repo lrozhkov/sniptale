@@ -389,3 +389,58 @@ it('persists one bulk click patch through history and keeps failed drafts retrya
   expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(2);
   expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
 });
+
+it('keeps disabled lanes visible, preserves settings, and top-level hide/show restores application', async () => {
+  const { session } = setup();
+  act(() => {
+    advanced.setMode('advanced');
+    advanced.setTrackVisibility('actions', true);
+    advanced.setTrackVisibility('zoom', true);
+    advanced.setClickAnimations(() => patchReviewClicks([], ['click'], { effect: 'ripple' }));
+    advanced.setWebcam(() =>
+      createQuickEditWebcam(
+        'project-asset:camera',
+        { width: 640, height: 480 },
+        { width: 1920, height: 1080 }
+      )
+    );
+  });
+  await act(async () => advanced.flush());
+  act(() => {
+    advanced.setActionsEnabled(false);
+    advanced.setZoom((zoom) => ({ ...zoom, enabled: false }));
+    advanced.setWebcam((camera) => (camera ? { ...camera, enabled: false } : camera));
+  });
+  await act(async () => advanced.flush());
+  expect(advanced.advanced.ui.tracks.actions).toBe(true);
+  expect(advanced.advanced.ui.tracks.zoom).toBe(true);
+  act(() => advanced.setMode('basic'));
+  await act(async () => advanced.flush());
+  act(() => advanced.setMode('advanced'));
+  await act(async () => advanced.flush());
+  expect(advanced.advanced.actionsEnabled).toBe(false);
+  expect(advanced.advanced.zoom.enabled).toBe(false);
+  act(() => advanced.setMode('basic'));
+  act(() => advanced.setTrackVisibility('actions', false));
+  act(() => advanced.setTrackVisibility('actions', true));
+  await act(async () => advanced.flush());
+  expect(advanced.advanced.actionsEnabled).toBe(false);
+  act(() => advanced.setMode('advanced'));
+  await act(async () => advanced.flush());
+  for (const track of ['actions', 'zoom', 'webcam'] as const) {
+    act(() => advanced.setTrackVisibility(track, false));
+    await act(async () => advanced.flush());
+    expect(advanced.advanced.ui.tracks[track]).toBe(false);
+    act(() => advanced.setTrackVisibility(track, true));
+    await act(async () => advanced.flush());
+    expect(advanced.advanced.ui.tracks[track]).toBe(true);
+  }
+  expect(advanced.advanced.actionsEnabled).toBe(true);
+  expect(advanced.advanced.zoom.enabled).toBe(true);
+  expect(advanced.advanced.webcam).toMatchObject({
+    enabled: true,
+    assetId: 'project-asset:camera',
+  });
+  expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(1);
+  expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);
+});

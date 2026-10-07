@@ -1,3 +1,5 @@
+import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
+import { reviewAdvancedContentBaseline } from '../document';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from './defaults';
 import {
@@ -10,7 +12,7 @@ import { createCanvasComment } from '../comments';
 import type { QuickEditAdvancedState } from './types';
 import { createQuickEditWebcam } from './webcam';
 
-it('uses one camera gate for track and rendering while retaining authored content in Basic', () => {
+it('keeps the camera lane visible when application is disabled and retains its asset', () => {
   const state = createQuickEditAdvancedState();
   state.webcam = createQuickEditWebcam(
     'project-asset:camera',
@@ -33,7 +35,7 @@ it('uses one camera gate for track and rendering while retaining authored conten
     reasons: ['webcam'],
   });
   state.webcam.enabled = false;
-  expect(resolveQuickEditEffectiveState(state)).toMatchObject({ webcamTrackVisible: false });
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({ webcamTrackVisible: true });
   expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
   expect(resolveQuickEditExportPlan({ document, advanced: state })).toMatchObject({
     video: 'copy',
@@ -488,4 +490,78 @@ it('applies Basic original gain independently of suppressed visuals and added au
     audio: 'copy',
     reasons: [],
   });
+});
+
+it('suppresses action presentations independently of their visible lane and keeps legacy defaults', () => {
+  const state = advancedWithContent();
+  state.background = { enabled: false };
+  expect(resolveQuickEditEffectiveFeatures(state).actionsApplied).toBe(true);
+  state.actionsEnabled = false;
+  expect(resolveQuickEditEffectiveFeatures(state)).toMatchObject({
+    actionsApplied: false,
+    actionsTrackVisible: true,
+  });
+  state.actionsEnabled = true;
+  state.ui.tracks.actions = false;
+  expect(resolveQuickEditEffectiveFeatures(state)).toMatchObject({
+    actionsApplied: false,
+    actionsTrackVisible: false,
+  });
+  state.ui.tracks.actions = true;
+  state.ui.mode = 'basic';
+  expect(resolveQuickEditEffectiveFeatures(state).actionsApplied).toBe(false);
+});
+
+it('hidden camera is not rendered even if its authored enablement is true', () => {
+  const state = advancedWithContent();
+  state.webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 1920, height: 1080 }
+  );
+  state.ui.tracks.webcam = false;
+  expect(resolveQuickEditEffectiveState(state)).toMatchObject({
+    webcamTrackVisible: false,
+    webcamApplied: false,
+  });
+  expect(resolveQuickEditEffectiveState(state).webcam).toBeUndefined();
+  state.ui.tracks.webcam = true;
+  expect(resolveQuickEditEffectiveState(state).webcam).toEqual(state.webcam);
+});
+
+it('validates optional track flags and preserves the absent legacy history shape', () => {
+  const state = createQuickEditAdvancedState();
+  expect(loadQuickEditAdvancedState(state)).toEqual(state);
+  expect(
+    loadQuickEditAdvancedContentState(reviewAdvancedContentBaseline(state))
+  ).not.toHaveProperty('actionsEnabled');
+  state.actionsEnabled = false;
+  state.ui.tracks.webcam = false;
+  state.ui.advancedTracksInitialized = true;
+  expect(loadQuickEditAdvancedState(state)).toEqual(state);
+  expect(loadQuickEditAdvancedContentState(reviewAdvancedContentBaseline(state))).toHaveProperty(
+    'actionsEnabled',
+    false
+  );
+  for (const invalid of [null, 'false', 0, {}]) {
+    expect(loadQuickEditAdvancedState({ ...state, actionsEnabled: invalid })).toBeNull();
+    expect(
+      loadQuickEditAdvancedState({
+        ...state,
+        ui: { ...state.ui, advancedTracksInitialized: invalid },
+      })
+    ).toBeNull();
+    expect(
+      loadQuickEditAdvancedContentState({
+        ...reviewAdvancedContentBaseline(state),
+        actionsEnabled: invalid,
+      })
+    ).toBeNull();
+    expect(
+      loadQuickEditAdvancedState({
+        ...state,
+        ui: { ...state.ui, tracks: { ...state.ui.tracks, webcam: invalid } },
+      })
+    ).toBeNull();
+  }
 });

@@ -31,9 +31,10 @@ let root: Root | null;
 let editor: ReturnType<typeof useReviewWebcamEditor>;
 let allowed: boolean;
 
-function setup(webcam?: QuickEditWebcam) {
+function setup(webcam?: QuickEditWebcam, trackVisible?: boolean) {
   const advanced = createQuickEditAdvancedState();
   advanced.ui.mode = 'advanced';
+  if (trackVisible !== undefined) advanced.ui.tracks.webcam = trackVisible;
   if (webcam) advanced.webcam = webcam;
   const history: ReviewOperation[] = [];
   const events: string[] = [];
@@ -61,13 +62,14 @@ function setup(webcam?: QuickEditWebcam) {
     history.push(operation);
     return snapshot();
   });
+  const saveAdvanced = vi.fn(async () => snapshot());
   const session = createVideoReviewSession(snapshot(), {
     commitVideoWorkspace: commit,
     saveVideoWorkspaceSnapshot: async () => snapshot(),
     saveVideoWorkspaceDraft: async () => snapshot(),
     readVideoWorkspace: async () => snapshot(),
     moveVideoWorkspaceHistory: async () => snapshot(),
-    saveVideoWorkspaceAdvanced: async () => snapshot(),
+    saveVideoWorkspaceAdvanced: saveAdvanced,
   });
   function Harness() {
     const advanced = useReviewAdvanced(session);
@@ -96,6 +98,7 @@ function setup(webcam?: QuickEditWebcam) {
   act(() => root!.render(<Harness />));
   return {
     session,
+    saveAdvanced,
     commit,
     history,
     events,
@@ -331,4 +334,26 @@ it('keeps crop local to the selected point and moves that point through the hist
   allowed = false;
   await act(async () => editor.movePosition('p', 6));
   expect(editor.selectedPosition!.time).toBe(4);
+});
+
+it('reveals a new attachment even when an earlier camera lane preference was hidden', async () => {
+  const { session, saveAdvanced } = setup(undefined, false);
+  await act(async () => {});
+  await act(async () => editor.toggle());
+  expect(editor.camera?.enabled).toBe(true);
+  expect(session.getSnapshot().document.advancedContent.webcam?.assetId).toBe(
+    'project-asset:camera'
+  );
+  expect(io.attach).toHaveBeenCalledOnce();
+  await act(async () => {
+    await vi.waitFor(() =>
+      expect(saveAdvanced).toHaveBeenCalledWith(
+        expect.objectContaining({
+          advanced: expect.objectContaining({
+            ui: expect.objectContaining({ tracks: expect.objectContaining({ webcam: true }) }),
+          }),
+        })
+      )
+    );
+  });
 });

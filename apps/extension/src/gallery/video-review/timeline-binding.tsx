@@ -35,6 +35,7 @@ function ReviewZoomLane(props: {
   compact: boolean;
   beforeAction?: ReviewBeforeAction | undefined;
   advanced: QuickEditAdvancedState;
+  onToggleActions?: (() => void) | undefined;
   projection?: ReviewTrackProjection;
   resultDuration: number;
   outputTime: number | null;
@@ -148,7 +149,8 @@ type TimelineBindingProps = {
   selection: ReviewAnchor;
   setSelection(value: ReviewAnchor): void;
   advanced: QuickEditAdvancedState;
-  setTrackVisibility(track: 'actions' | 'zoom' | 'audio', visible: boolean): void;
+  onToggleActions?: (() => void) | undefined;
+  setTrackVisibility(track: 'actions' | 'zoom' | 'audio' | 'webcam', visible: boolean): void;
   setMode(mode: 'basic' | 'advanced'): void;
   telemetryAvailable: boolean;
   time: number;
@@ -362,6 +364,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       selectedEditId={props.editing.selected?.id}
       annotations={props.annotations}
       onOpenHistory={props.onOpenHistory}
+      actionsEnabled={props.advanced.actionsEnabled !== false}
+      onToggleActions={props.onToggleActions}
       keyAnimations={props.advanced.keyAnimations}
       clickAnimations={props.advanced.clickAnimations}
       markers={props.markers}
@@ -595,7 +599,11 @@ function ReviewTimelineTrackControls({
               available: props.webcam.available,
               enabled: webcamVisible,
               toggle: () =>
-                (props.beforeAction ?? ((action) => action()))(() => void props.webcam!.toggle()),
+                (props.beforeAction ?? ((action) => action()))(() =>
+                  props.webcam!.camera
+                    ? props.setTrackVisibility('webcam', !webcamVisible)
+                    : void props.webcam!.toggle()
+                ),
             }
           : undefined
       }
