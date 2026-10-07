@@ -4,21 +4,27 @@ import { writeReviewFrames } from './render-export';
 
 const frames = vi.hoisted(() => ({
   rows: [] as Array<[number, number]>,
+  budgets: [] as unknown[],
   flush: vi.fn(),
   dispose: vi.fn(),
 }));
 vi.mock('../../features/video/project/export/adaptive-frames', () => ({
-  createAdaptiveFrameWriter: () => ({
-    add: async (time: number, duration: number) => {
-      frames.rows.push([time, duration]);
-    },
-    flush: frames.flush,
-    dispose: frames.dispose,
-  }),
+  createAdaptiveComparisonBudget: () => ({}),
+  createAdaptiveFrameWriter: (...inputs: unknown[]) => {
+    frames.budgets.push(inputs[3]);
+    return {
+      add: async (time: number, duration: number) => {
+        frames.rows.push([time, duration]);
+      },
+      flush: frames.flush,
+      dispose: frames.dispose,
+    };
+  },
 }));
 
 it('keeps rounded adjacent cut/speed windows contiguous, clips the tail and flushes each window', async () => {
   frames.rows = [];
+  frames.budgets = [];
   frames.flush.mockReset();
   frames.dispose.mockReset();
   const args = argsFixture();
@@ -53,6 +59,9 @@ it('keeps rounded adjacent cut/speed windows contiguous, clips the tail and flus
   const last = frames.rows.at(-1)!;
   expect(last[0] + last[1]).toBe(341_000);
   expect(frames.rows.every(([, duration]) => duration > 0 && duration <= 16667)).toBe(true);
+  expect(frames.budgets).toHaveLength(4);
+  expect(frames.budgets[0]).toBeDefined();
+  expect(new Set(frames.budgets).size).toBe(1);
   expect(frames.flush).toHaveBeenCalledTimes(4);
   expect(frames.dispose).toHaveBeenCalledTimes(4);
   expect(state.encoded).toHaveLength(0);

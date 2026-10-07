@@ -1,18 +1,24 @@
 const MAX_HOLD_US = 200_000;
 
-type PendingFrame = { pixels: ImageData; start: number; end: number };
+type PendingFrame = { frame: VideoFrame; pixelsReady: boolean; start: number; end: number };
 
-/** Coalesces exact final pixels, retaining a bounded snapshot until its duration is known. */
+/** Exact VFR coalescing. The emitted native frame is borrowed until emit resolves. */
 export function createAdaptiveFrameWriter(
   context: CanvasRenderingContext2D,
-  emit: (canvas: HTMLCanvasElement, timestampUs: number, durationUs: number) => Promise<void>,
-  signal?: AbortSignal
+  emit: (frame: VideoFrame, timestampUs: number, durationUs: number) => Promise<void>,
+  signal?: AbortSignal,
+  budget = createAdaptiveComparisonBudget()
 ) {
-  const canvas = context.canvas.ownerDocument.createElement('canvas');
-  canvas.width = context.canvas.width;
-  canvas.height = context.canvas.height;
-  const snapshot = canvas.getContext('2d', { colorSpace: 'srgb' });
-  if (!snapshot) throw new Error('Adaptive export canvas is unavailable.');
+  const { width, height } = context.canvas;
+  // Reuse two buffers instead of allocating a full ImageData on every tick. Native
+  // frames retain the accelerated canvas without forcing its renderer into readback mode.
+  let retainedPixels = new Uint8Array(width * height * 4);
+  let currentPixels = new Uint8Array(retainedPixels.length);
+  const copyOptions: VideoFrameCopyToOptions = {
+    format: 'RGBA',
+    colorSpace: 'srgb',
+    layout: [{ offset: 0, stride: width * 4 }],
+  };
   let pending: PendingFrame | null = null;
   let lastEnd = -1;
   let disposed = false;
@@ -22,12 +28,15 @@ export function createAdaptiveFrameWriter(
   };
   const flush = async () => {
     check();
-    const frame = pending;
-    if (!frame) return;
+    const held = pending;
+    if (!held) return;
     pending = null;
-    snapshot.putImageData(frame.pixels, 0, 0);
-    await emit(canvas, frame.start, frame.end - frame.start);
-    check();
+    try {
+      await emit(held.frame, held.start, held.end - held.start);
+      check();
+    } finally {
+      held.frame.close();
+    }
   };
   return {
     async add(timestampUs: number, durationUs: number) {
@@ -41,37 +50,97 @@ export function createAdaptiveFrameWriter(
         timestampUs < lastEnd
       )
         throw new Error('Invalid adaptive export frame timing.');
-      if (context.canvas.width !== canvas.width || context.canvas.height !== canvas.height)
+      if (context.canvas.width !== width || context.canvas.height !== height)
         throw new Error('Adaptive export dimensions changed.');
-      const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
-      const end = timestampUs + durationUs;
-      if (
-        pending &&
-        pending.end === timestampUs &&
-        end - pending.start <= MAX_HOLD_US &&
-        samePixels(pending.pixels.data, pixels.data)
-      ) {
-        pending.end = end;
-      } else {
+      budget.begin();
+      const frame = new VideoFrame(context.canvas, { timestamp: timestampUs });
+      let retained = false;
+      try {
+        const end = timestampUs + durationUs;
+        let pixelsReady = false;
+        if (
+          pending &&
+          pending.end === timestampUs &&
+          end - pending.start <= MAX_HOLD_US &&
+          budget.available()
+        ) {
+          const comparisonStart = performance.now();
+          let equal = false;
+          try {
+            if (!pending.pixelsReady) {
+              await pending.frame.copyTo(retainedPixels, copyOptions);
+              check();
+              pending.pixelsReady = true;
+            }
+            await frame.copyTo(currentPixels, copyOptions);
+            check();
+            pixelsReady = true;
+            equal = samePixels(retainedPixels, currentPixels);
+          } finally {
+            budget.charge(performance.now() - comparisonStart);
+          }
+          if (equal) {
+            pending.end = end;
+            lastEnd = end;
+            return;
+          }
+        }
         await flush();
-        pending = { pixels, start: timestampUs, end };
+        check();
+        if (pixelsReady) [retainedPixels, currentPixels] = [currentPixels, retainedPixels];
+        pending = { frame, pixelsReady, start: timestampUs, end };
+        retained = true;
+        lastEnd = end;
+      } finally {
+        if (!retained) frame.close();
+        budget.end();
       }
-      lastEnd = end;
     },
     flush,
     dispose() {
       disposed = true;
+      pending?.frame.close();
       pending = null;
-      canvas.width = 0;
-      canvas.height = 0;
+      retainedPixels = new Uint8Array(0);
+      currentPixels = new Uint8Array(0);
     },
   };
 }
 
-function samePixels(left: Uint8ClampedArray, right: Uint8ClampedArray): boolean {
-  if (left.length !== right.length) return false;
+function samePixels(left: Uint8Array, right: Uint8Array): boolean {
   const a = new Uint32Array(left.buffer, left.byteOffset, left.byteLength / 4);
   const b = new Uint32Array(right.buffer, right.byteOffset, right.byteLength / 4);
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
+}
+
+/** Best-effort analysis: retain unexamined frames instead of spending unbounded time deduplicating. */
+export function createAdaptiveComparisonBudget() {
+  let balance = 0;
+  let estimate = 0;
+  let lastEnd = performance.now();
+  let started = lastEnd;
+  let analysis = 0;
+  const credit = (work: number) => {
+    // Bound credit from pauses/encoder stalls; one slow comparison may overshoot,
+    // but its full cost remains debt before another attempt is admitted.
+    balance = Math.min(64, balance + Math.max(0, Math.min(work, 250)) * 0.25);
+  };
+  return {
+    begin() {
+      started = performance.now();
+      credit(started - lastEnd);
+      analysis = 0;
+    },
+    available: () => balance >= Math.min(estimate, 64),
+    charge(cost: number) {
+      analysis += cost;
+      balance -= cost;
+      estimate = cost;
+    },
+    end() {
+      lastEnd = performance.now();
+      credit(lastEnd - started - analysis);
+    },
+  };
 }

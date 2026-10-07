@@ -5,8 +5,8 @@ export const videoEditorExportDialogMessages = defineMessageSource({
   frameRateConstant: { ru: 'Постоянная', en: 'Constant' },
   frameRateAdaptive: { ru: 'Адаптивная', en: 'Adaptive' },
   frameRateAdaptiveHint: {
-    ru: '5 FPS на неподвижных кадрах, до 60 FPS при изменениях. Для дальнейшего монтажа выбирайте постоянную частоту.',
-    en: '5 FPS for unchanged frames, up to 60 FPS for changes. Choose constant frame rate for further editing.',
+    ru: 'До 60 FPS. Сокращает повторяющиеся кадры с приоритетом скорости экспорта. Для дальнейшего монтажа выбирайте постоянную частоту.',
+    en: 'Up to 60 FPS. Reduces duplicate frames while prioritizing export speed. Choose constant frame rate for further editing.',
   },
   fileSection: { ru: 'Файл', en: 'File' },
   pictureSection: { ru: 'Изображение', en: 'Picture' },

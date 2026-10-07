@@ -41,8 +41,9 @@ function surface(width = 160, height = 90) {
   return { canvas, context };
 }
 
-async function sourceVideo(withAudio: boolean) {
-  const { canvas, context } = surface();
+async function sourceVideo(withAudio: boolean, width = 160, height = 90) {
+  const { canvas, context } = surface(width, height);
+  context.scale(width / 160, height / 90);
   const output = new Output({ format: new WebMOutputFormat(), target: new BufferTarget() });
   const video = new CanvasSource(canvas, { codec: 'vp9', bitrate: 1_000_000 });
   const audio = withAudio ? new AudioBufferSource({ codec: 'opus', bitrate: 64_000 }) : null;
@@ -116,9 +117,11 @@ async function fullExport(
   format: 'mp4' | 'webm',
   adaptive: boolean,
   fragment: boolean,
-  withAudio: boolean
+  withAudio: boolean,
+  width = 160,
+  height = 90
 ) {
-  const project = createEmptyVideoProject('Adaptive proof', 160, 90);
+  const project = createEmptyVideoProject('Adaptive proof', width, height);
   project.duration = DURATION;
   for (const i of [60, ...Array.from({ length: 24 }, (_, k) => k + 84)]) {
     const shape = createShapeClip(
@@ -131,10 +134,10 @@ async function fullExport(
     shape.duration = 1 / 60;
     shape.transform = {
       ...shape.transform,
-      x: i === 60 ? 50 : 20 + i - 84,
-      y: 25,
-      width: 40,
-      height: 40,
+      x: ((i === 60 ? 50 : 20 + i - 84) * width) / 160,
+      y: (25 * height) / 90,
+      width: (40 * width) / 160,
+      height: (40 * height) / 90,
     };
     shape.style = { ...shape.style, fillColor: '#ff2020', strokeWidth: 0 };
     project.clips.push(shape);
@@ -162,8 +165,8 @@ async function fullExport(
     project.clips.push(createAudioClipFromAsset(track.id, asset));
   }
   const common = {
-    width: 160,
-    height: 90,
+    width,
+    height,
     fps: 60,
     quality: 'HIGH' as const,
     resolution: 'SOURCE' as const,
@@ -191,7 +194,7 @@ async function fullExport(
     exportAbortController: new AbortController(),
     exportStream: null,
   };
-  const { canvas, context } = surface();
+  const { canvas, context } = surface(width, height);
   return format === 'mp4'
     ? renderCompositeToMp4(job, project, settings, {}, canvas, context)
     : renderCompositeToWebm(job, project, settings, {}, context, canvas);
@@ -237,13 +240,15 @@ export async function adaptiveExportProof(
   editor: 'quick' | 'full',
   format: 'mp4' | 'webm',
   fragment: boolean,
-  withAudio: boolean
+  withAudio: boolean,
+  width = 160,
+  height = 90
 ) {
-  const file = await sourceVideo(withAudio);
+  const file = await sourceVideo(withAudio, width, height);
   const run = (adaptive: boolean) =>
     editor === 'quick'
       ? quickExport(file, format, adaptive, fragment)
-      : fullExport(file, format, adaptive, fragment, withAudio);
+      : fullExport(file, format, adaptive, fragment, withAudio, width, height);
   const started = performance.now();
   const adaptive = await run(true);
   const adaptiveMs = performance.now() - started;
@@ -259,6 +264,7 @@ export async function adaptiveExportProof(
 }
 
 export async function adaptiveReadbackProof() {
+  await proveAdaptiveNativePixels();
   const rows = [];
   for (const moving of [false, true]) {
     const { canvas, context } = surface(3840, 2160);
@@ -280,4 +286,47 @@ export async function adaptiveReadbackProof() {
     writer.dispose();
   }
   return rows;
+}
+
+async function proveAdaptiveNativePixels() {
+  const canvas = document.createElement('canvas');
+  canvas.width = 17;
+  canvas.height = 9;
+  const context = canvas.getContext('2d', { colorSpace: 'srgb', willReadFrequently: true })!;
+  const expected: number[][] = [];
+  const emitted: number[][] = [];
+  const writer = createAdaptiveFrameWriter(context, async (frame) => {
+    const data = new Uint8Array(canvas.width * canvas.height * 4);
+    await frame.copyTo(data, { format: 'RGBA', colorSpace: 'srgb' });
+    emitted.push([...data]);
+  });
+  try {
+    const pixel = context.createImageData(1, 1);
+    for (const [i, rgba] of [
+      [0, 0, 0, 0],
+      [80, 120, 160, 127],
+      [0, 0, 0, 0],
+      [127, 80, 40, 255],
+      [128, 80, 40, 255],
+    ].entries()) {
+      pixel.data.set(rgba);
+      context.putImageData(pixel, 16, 8);
+      // Compare with the ordinary WebCodecs snapshot path; native frame bytes may
+      // be premultiplied, unlike getImageData's unpremultiplied representation.
+      const reference = new VideoFrame(canvas, { timestamp: i * 1000 });
+      try {
+        const data = new Uint8Array(canvas.width * canvas.height * 4);
+        await reference.copyTo(data, { format: 'RGBA', colorSpace: 'srgb' });
+        expected.push([...data]);
+      } finally {
+        reference.close();
+      }
+      await writer.add(i * 1000, 1000);
+    }
+    await writer.flush();
+    if (JSON.stringify(emitted) !== JSON.stringify(expected))
+      throw new Error('Adaptive native-frame comparison lost an edge pixel, alpha or ABA change.');
+  } finally {
+    writer.dispose();
+  }
 }

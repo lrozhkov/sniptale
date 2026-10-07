@@ -42,7 +42,7 @@ export async function encodeFrameDrivenCompositeFrame(
 }
 
 export async function encodeCompositeCanvasFrame(args: {
-  canvas: HTMLCanvasElement;
+  canvas: HTMLCanvasElement | VideoFrame;
   timestamp: number;
   duration: number;
   keyFrame: boolean;

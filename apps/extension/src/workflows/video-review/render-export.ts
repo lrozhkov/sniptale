@@ -1,4 +1,7 @@
-import { createAdaptiveFrameWriter } from '../../features/video/project/export/adaptive-frames';
+import {
+  createAdaptiveFrameWriter,
+  createAdaptiveComparisonBudget,
+} from '../../features/video/project/export/adaptive-frames';
 import {
   evaluateReviewClicks,
   type ReviewClickCue,
@@ -109,6 +112,7 @@ export async function writeReviewFrames(args: {
   const dispose = () => input.dispose();
   args.signal.addEventListener('abort', dispose, { once: true });
   let output: Output | null = null;
+  const adaptiveBudget = createAdaptiveComparisonBudget();
   let source: ReviewRenderSource | null = null;
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
   let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
@@ -218,6 +222,7 @@ export async function writeReviewFrames(args: {
       timeTracking?.finishAudio(segment);
       receipt.videoPackets += await renderRenderWindowFrames({
         window,
+        adaptiveBudget,
         adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
         fps: preparation.fps,
         fragmentOffset: args.fragmentOffset,
@@ -534,6 +539,7 @@ export async function renderRenderWindowFrames(args: {
   clickCues?: readonly ReviewClickCue[] | undefined;
   window: ReviewFrameWindow;
   adaptive?: boolean;
+  adaptiveBudget?: ReturnType<typeof createAdaptiveComparisonBudget>;
   fps: number;
   fragmentOffset: number;
   zoomRegions: readonly QuickEditZoomRegion[];
@@ -588,6 +594,7 @@ export async function renderRenderWindowFrames(args: {
     videoOut,
     signal,
     adaptive: args.adaptive,
+    adaptiveBudget: args.adaptiveBudget,
   });
   const webcamFrames = args.webcam?.frames(window.sourceTimes);
   try {
@@ -735,9 +742,14 @@ function createReviewFrameWriter(args: {
   videoOut: { add(sample: VideoSample): Promise<void> };
   signal: AbortSignal;
   adaptive: boolean | undefined;
+  adaptiveBudget: ReturnType<typeof createAdaptiveComparisonBudget> | undefined;
 }) {
   let emitted = 0;
-  const emit = async (canvas: HTMLCanvasElement, timestamp: number, duration: number) => {
+  const emit = async (
+    canvas: HTMLCanvasElement | VideoFrame,
+    timestamp: number,
+    duration: number
+  ) => {
     const sample = new VideoSample(canvas, { timestamp, duration });
     try {
       await args.videoOut.add(sample);
@@ -749,8 +761,10 @@ function createReviewFrameWriter(args: {
   const adaptive = args.adaptive
     ? createAdaptiveFrameWriter(
         args.context,
-        (canvas, timestampUs, durationUs) => emit(canvas, timestampUs / 1e6, durationUs / 1e6),
-        args.signal
+        (frame, timestampUs, durationUs) =>
+          emit(frame.clone(), timestampUs / 1e6, durationUs / 1e6),
+        args.signal,
+        args.adaptiveBudget
       )
     : null;
   return {
