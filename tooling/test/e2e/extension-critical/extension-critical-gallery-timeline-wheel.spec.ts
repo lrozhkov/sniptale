@@ -123,7 +123,14 @@ for (const variant of [
       const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
       const controls = dialog.locator('[data-ui="gallery.videoReview.trackControls"]');
       const before = (await ruler.boundingBox())!;
+      const rowBefore = (await dialog
+        .locator('[data-ui="gallery.videoReview.rulerRow"]')
+        .boundingBox())!;
       const controlsBefore = (await controls.boundingBox())!;
+      const initialCap = (await dialog
+        .locator('[data-ui="gallery.videoReview.rulerPlayhead"]')
+        .boundingBox())!;
+      expect.soft(initialCap.y + initialCap.height).toBeCloseTo(rowBefore.y + rowBefore.height, 0);
       await viewport.evaluate((node) => {
         node.scrollTop = node.scrollHeight;
       });
@@ -147,7 +154,23 @@ for (const variant of [
           getComputedStyle(node.closest('[data-ui="gallery.videoReview.trackHeader"]')!)
             .backgroundColor
       );
-      expect(headerColor).toMatch(/^rgb\(/);
+      const panelColor = await controls.evaluate((node) => {
+        const header = node.closest('[data-ui="gallery.videoReview.trackHeader"]')!;
+        const probe = document.createElement('div');
+        probe.style.backgroundColor = 'var(--sniptale-color-surface-panel)';
+        header.append(probe);
+        const color = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return color;
+      });
+      expect.soft(headerColor).toBe(panelColor);
+      expect
+        .soft(
+          await dialog
+            .locator('[data-ui="gallery.videoReview.rulerRow"]')
+            .evaluate((node) => getComputedStyle(node).backgroundColor)
+        )
+        .toBe(panelColor);
       expect((await ruler.boundingBox())!.y).toBeCloseTo(before.y, 0);
       const y = before.y + before.height / 2;
       const x = controlsBefore.x + controlsBefore.width + 120;
@@ -157,6 +180,8 @@ for (const variant of [
       await expect(cap).toBeVisible();
       expect((await cap.boundingBox())!.x).toBeCloseTo((await head.boundingBox())!.x, 0);
       expect((await cap.boundingBox())!.y).toBeCloseTo(before.y, 0);
+      const capBox = (await cap.boundingBox())!;
+      expect.soft(capBox.y + capBox.height).toBeCloseTo(rowBefore.y + rowBefore.height, 0);
       await page.mouse.move(x, y);
       await page.mouse.down();
       await page.mouse.move(x + 240, y, { steps: 5 });

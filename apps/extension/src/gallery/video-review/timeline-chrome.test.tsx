@@ -2,7 +2,13 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewHistoryControls, ReviewRuler, ReviewToolbar } from './timeline-chrome';
+import {
+  ReviewHistoryControls,
+  ReviewRuler,
+  ReviewRulerRow,
+  ReviewPlayhead,
+  ReviewToolbar,
+} from './timeline-chrome';
 
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
@@ -163,6 +169,42 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
   } finally {
     act(() => root.unmount());
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps ruler and lane markers aligned across source-time bounds without capturing input', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    for (const [time, left] of [
+      [-1, 187],
+      [5, 587],
+      [11, 987],
+    ]) {
+      const geometry = { time: time!, duration: 10, gutter: 192, width: 800 };
+      act(() =>
+        root.render(
+          <>
+            <ReviewRulerRow {...geometry} controls={<button>Tracks</button>} interaction={{}} />
+            <ReviewPlayhead {...geometry} />
+          </>
+        )
+      );
+      const cap = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.rulerPlayhead"]')!;
+      const lane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.playhead"]')!;
+      expect(cap.style.left).toBe(`${left}px`);
+      expect(lane.style.left).toBe(cap.style.left);
+      expect(cap.classList.contains('bottom-0')).toBe(true);
+      expect(lane.classList.contains('bottom-2')).toBe(true);
+      for (const marker of [cap, lane]) {
+        expect(marker.getAttribute('aria-hidden')).toBe('true');
+        expect(marker.classList.contains('pointer-events-none')).toBe(true);
+      }
+    }
+  } finally {
+    act(() => root.unmount());
     vi.unstubAllGlobals();
   }
 });

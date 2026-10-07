@@ -96,8 +96,7 @@ export function ReviewRulerRow(props: {
   return (
     <div
       data-ui="gallery.videoReview.rulerRow"
-      className="sticky top-0 z-40 bg-[var(--sniptale-color-surface-canvas)]
-        [&_[data-ui='gallery.videoReview.trackHeader']]:bg-[var(--sniptale-color-surface-canvas)]"
+      className="sticky top-0 z-40 bg-[var(--sniptale-color-surface-panel)]"
     >
       <ReviewTrackRow label="" icon={props.controls}>
         <ReviewRuler
@@ -171,8 +170,8 @@ export function ReviewPlayhead(props: {
     <div
       aria-hidden="true"
       data-ui={props.ruler ? 'gallery.videoReview.rulerPlayhead' : 'gallery.videoReview.playhead'}
-      className="pointer-events-none absolute bottom-2 top-0 z-20
-        bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125"
+      className={`pointer-events-none absolute ${props.ruler ? 'bottom-0' : 'bottom-2'} top-0 z-20
+        bg-[var(--sniptale-color-accent-emphasis)] group-focus-visible/plane:brightness-125`}
       style={{
         left:
           props.gutter + Math.max(0, Math.min(1, props.time / props.duration)) * props.width - 5,
