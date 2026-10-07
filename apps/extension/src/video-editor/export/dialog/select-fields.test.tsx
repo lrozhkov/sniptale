@@ -337,3 +337,48 @@ it('offers a selected timeline range independently of clip selection', async () 
   await act(async () => option!.click());
   expect(onChange).toHaveBeenCalledWith({ scope: 'selected-range' });
 });
+
+it('selects adaptive60 atomically and restores the editable constant rate', async () => {
+  let settings: VideoProjectExportSettings = {
+    format: 'WEBM',
+    webmVideoCodec: 'VP9',
+    width: 160,
+    height: 90,
+    fps: 24,
+    quality: 'HIGH',
+    resolution: 'SOURCE',
+    downloadAfterExport: false,
+  };
+  const render = () =>
+    root!.render(
+      <ExportDialogSelectFields
+        settings={settings}
+        capabilities={null}
+        selectedClipAvailable={false}
+        sourceDimensions={settings}
+        onChange={(patch) => {
+          settings = { ...settings, ...patch } as VideoProjectExportSettings;
+          render();
+        }}
+      />
+    );
+  await act(async () => render());
+  const choose = async (index: number) => {
+    await act(async () =>
+      container!
+        .querySelector<HTMLButtonElement>('[aria-label="videoEditor.exportDialog.frameRateMode"]')!
+        .click()
+    );
+    await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[index]!.click()
+    );
+  };
+  await choose(1);
+  expect(settings).toMatchObject({ fps: 60, frameRateMode: 'adaptive' });
+  expect(container!.querySelector('[aria-label="videoEditor.exportDialog.fpsLabel"]')).toBeNull();
+  await choose(0);
+  expect(settings).toMatchObject({ fps: 60, frameRateMode: 'constant' });
+  expect(
+    container!.querySelector('[aria-label="videoEditor.exportDialog.fpsLabel"]')
+  ).not.toBeNull();
+});

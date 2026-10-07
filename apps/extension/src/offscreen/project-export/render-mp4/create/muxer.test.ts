@@ -80,3 +80,20 @@ it('omits audio muxer options when the pipeline has no audio profile', () => {
     },
   });
 });
+
+it('omits fixed-rate timing for adaptive frames while retaining dimensions', () => {
+  buildMp4Muxer(
+    {
+      audioProfile: null,
+      fallbackNotes: [],
+      mixedAudio: null,
+      videoProfile: { muxerCodec: 'avc' } as never,
+    },
+    { fps: 60, frameRateMode: 'adaptive', width: 1280, height: 720 } as never
+  );
+  expect(muxerInstances[0]?.options).toMatchObject({
+    video: { codec: 'avc', width: 1280, height: 720 },
+    fastStart: 'fragmented',
+  });
+  expect(muxerInstances[0]?.options).not.toHaveProperty('video.frameRate');
+});

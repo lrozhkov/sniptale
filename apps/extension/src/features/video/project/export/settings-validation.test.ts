@@ -110,3 +110,27 @@ it('validates selected clips and subtitle sidecars alongside fitted output dimen
     ).toThrow('Invalid video project export settings');
   }
 });
+
+it('admits adaptive sampling only at 60 fps and preserves legacy constant settings', () => {
+  for (const patch of [{}, { frameRateMode: 'constant' }, { frameRateMode: 'adaptive', fps: 60 }]) {
+    expect(() =>
+      assertVideoProjectExportSettingsCompatibleWithProject(project, {
+        ...createSettings(),
+        ...patch,
+      })
+    ).not.toThrow();
+  }
+  for (const patch of [
+    { frameRateMode: 'adaptive' },
+    { frameRateMode: 'adaptive', fps: 120 },
+    { frameRateMode: 'unknown' },
+    { frameRateMode: null },
+  ]) {
+    expect(() =>
+      assertVideoProjectExportSettingsCompatibleWithProject(project, {
+        ...createSettings(),
+        ...patch,
+      })
+    ).toThrow('Invalid video project export settings');
+  }
+});

@@ -105,6 +105,9 @@ export function isBoundedVideoProjectExportSettings(
     settings['width'] % 2 === 0 &&
     settings['height'] % 2 === 0 &&
     isPositiveInteger(settings['fps'], MAX_EXPORT_FPS) &&
+    (settings['frameRateMode'] === undefined ||
+      settings['frameRateMode'] === 'constant' ||
+      (settings['frameRateMode'] === 'adaptive' && settings['fps'] === 60)) &&
     hasCanonicalOutputSettings(settings) &&
     hasValidRangeShape(settings) &&
     hasValidSelectedClipShape(settings) &&

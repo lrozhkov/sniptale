@@ -376,7 +376,7 @@ it('clears the hover guide even when a camera child intercepts pointer movement'
   hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 400);
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).not.toBeNull();
   const camera = document.createElement('div');
-  camera.dataset.ui = 'gallery.videoReview.webcamTrack';
+  camera.dataset['ui'] = 'gallery.videoReview.webcamTrack';
   camera.addEventListener('pointermove', (event) => event.stopPropagation());
   plane.append(camera);
   hoverAt(camera, 450);

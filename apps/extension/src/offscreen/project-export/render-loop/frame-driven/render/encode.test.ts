@@ -84,3 +84,18 @@ it('encodes a frame with keyframe metadata', async () => {
   expect(FakeVideoFrame.instances[0]?.init).toEqual({ duration: 4_000, timestamp: 12_000 });
   expect(FakeVideoFrame.instances[0]?.close).toHaveBeenCalledTimes(1);
 });
+
+it('submits final composition timing to the adaptive writer without encoding the mutable canvas', async () => {
+  const add = vi.fn();
+  const encode = vi.fn();
+  await encodeFrameDrivenCompositeFrame({
+    frameTimestampUs: 16667,
+    frameDurationUs: 16666,
+    frameIndex: 1,
+    adaptiveFrameWriter: { add },
+    videoEncoder: { encode },
+  } as never);
+  expect(add).toHaveBeenCalledWith(16667, 16666);
+  expect(encode).not.toHaveBeenCalled();
+  expect(FakeVideoFrame.instances).toHaveLength(0);
+});

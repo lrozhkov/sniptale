@@ -9,6 +9,8 @@ import { writeReviewFrames } from './render-export';
 export async function estimateReviewExportSize(
   args: Omit<Parameters<typeof writeReviewFrames>[0], 'writer' | 'frameProbe' | 'onProgress'>
 ) {
+  if (args.renderSettings?.frameRateMode === 'adaptive')
+    throw new Error('Adaptive export size estimate is unavailable.');
   const profile = resolveReviewOutputProfile(args.index, args.advanced, args.renderSettings);
   if (!profile.codec || !profile.dimensionsSupported) throw new Error('Size estimate unavailable');
   const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;

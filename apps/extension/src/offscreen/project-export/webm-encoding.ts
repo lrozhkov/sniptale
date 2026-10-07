@@ -17,7 +17,10 @@ export async function createWebmEncoding(settings: VideoProjectExportSettings, h
   const codec = settings.webmVideoCodec === 'VP8' ? 'vp8' : 'vp9';
   const output = new Output({ format: new WebMOutputFormat(), target: new BufferTarget() });
   const source = new EncodedVideoPacketSource(codec);
-  output.addVideoTrack(source, { frameRate: settings.fps });
+  output.addVideoTrack(
+    source,
+    settings.frameRateMode === 'adaptive' ? {} : { frameRate: settings.fps }
+  );
   const audio = hasAudio ? new AudioBufferSource({ codec: 'opus', bitrate: 128_000 }) : null;
   if (audio) output.addAudioTrack(audio);
   const state = createPacketWriter(source);

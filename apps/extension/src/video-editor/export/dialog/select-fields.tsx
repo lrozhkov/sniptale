@@ -247,14 +247,33 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
           onChange={(quality) => onChange({ quality })}
           options={getExportQualityOptions()}
         />
-        <ExportDialogNumberField
-          label={translate('videoEditor.exportDialog.fpsLabel')}
-          min={12}
-          max={60}
-          step={1}
-          value={settings.fps}
-          onChange={(fps) => onChange({ fps })}
-        />
+        <div title={translate('videoEditor.exportDialog.frameRateAdaptiveHint')}>
+          <SelectField<'constant' | 'adaptive'>
+            className={EXPORT_FIELD_CLASS_NAME}
+            label={translate('videoEditor.exportDialog.frameRateMode')}
+            value={settings.frameRateMode ?? 'constant'}
+            options={[
+              { value: 'constant', label: translate('videoEditor.exportDialog.frameRateConstant') },
+              {
+                value: 'adaptive',
+                label: translate('videoEditor.exportDialog.frameRateAdaptive'),
+              },
+            ]}
+            onChange={(frameRateMode) =>
+              onChange({ frameRateMode, fps: frameRateMode === 'adaptive' ? 60 : settings.fps })
+            }
+          />
+        </div>
+        {settings.frameRateMode !== 'adaptive' && (
+          <ExportDialogNumberField
+            label={translate('videoEditor.exportDialog.fpsLabel')}
+            min={12}
+            max={60}
+            step={1}
+            value={settings.fps}
+            onChange={(fps) => onChange({ fps })}
+          />
+        )}
       </section>
     </>
   );

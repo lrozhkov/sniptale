@@ -19,6 +19,10 @@ export function resolveReviewOutputProfile(
     settings &&
     (!Object.values(VideoQuality).includes(settings.quality) ||
       ![0, 24, 30, 60].includes(settings.frameRate) ||
+      (settings.frameRateMode !== undefined &&
+        settings.frameRateMode !== 'constant' &&
+        settings.frameRateMode !== 'adaptive') ||
+      (settings.frameRateMode === 'adaptive' && settings.frameRate !== 60) ||
       (settings.resolution !== undefined &&
         !Object.values(VideoResolutionPreset).includes(settings.resolution)) ||
       (settings.format !== undefined && settings.format !== 'mp4' && settings.format !== 'webm'))

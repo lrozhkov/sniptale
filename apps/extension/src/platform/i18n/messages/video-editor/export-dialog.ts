@@ -1,6 +1,13 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorExportDialogMessages = defineMessageSource({
+  frameRateMode: { ru: 'Частота кадров', en: 'Frame rate' },
+  frameRateConstant: { ru: 'Постоянная', en: 'Constant' },
+  frameRateAdaptive: { ru: 'Адаптивная', en: 'Adaptive' },
+  frameRateAdaptiveHint: {
+    ru: '5 FPS на неподвижных кадрах, до 60 FPS при изменениях. Для дальнейшего монтажа выбирайте постоянную частоту.',
+    en: '5 FPS for unchanged frames, up to 60 FPS for changes. Choose constant frame rate for further editing.',
+  },
   fileSection: { ru: 'Файл', en: 'File' },
   pictureSection: { ru: 'Изображение', en: 'Picture' },
   codecUnavailable: {

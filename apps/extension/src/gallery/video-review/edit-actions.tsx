@@ -430,21 +430,37 @@ export function ReviewRenderOptions({
             }))}
             onChange={(resolution) => exporter.setRenderSettings({ ...settings, resolution })}
           />
-          <SelectField
-            className={reviewSelectFieldClassName}
-            label={translate('gallery.videoReview.exportFrameRate')}
-            disabled={busy}
-            value={String(settings.frameRate)}
-            options={[
-              { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
-              ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
-            ]}
-            onChange={(value) => {
-              const frameRate = Number(value);
-              if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
-                exporter.setRenderSettings({ ...settings, frameRate });
-            }}
-          />
+          <div title={translate('videoEditor.exportDialog.frameRateAdaptiveHint')}>
+            <SelectField
+              className={reviewSelectFieldClassName}
+              label={translate('gallery.videoReview.exportFrameRate')}
+              disabled={busy}
+              value={
+                settings.frameRateMode === 'adaptive' ? 'adaptive' : String(settings.frameRate)
+              }
+              options={[
+                { value: '0', label: translate('gallery.videoReview.exportSourceRate') },
+                {
+                  value: 'adaptive',
+                  label: translate('videoEditor.exportDialog.frameRateAdaptive'),
+                },
+                ...[24, 30, 60].map((fps) => ({ value: String(fps), label: String(fps) })),
+              ]}
+              onChange={(value) => {
+                if (value === 'adaptive') {
+                  exporter.setRenderSettings({
+                    ...settings,
+                    frameRate: 60,
+                    frameRateMode: 'adaptive',
+                  });
+                  return;
+                }
+                const frameRate = Number(value);
+                if (frameRate === 0 || frameRate === 24 || frameRate === 30 || frameRate === 60)
+                  exporter.setRenderSettings({ ...settings, frameRate, frameRateMode: 'constant' });
+              }}
+            />
+          </div>
           <SelectField<VideoQuality>
             className={reviewSelectFieldClassName}
             label={translate('gallery.videoReview.exportQuality')}

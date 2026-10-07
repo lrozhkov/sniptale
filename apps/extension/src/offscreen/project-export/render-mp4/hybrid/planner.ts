@@ -53,7 +53,7 @@ function mergeAdjacentSpans(spans: Mp4VideoRenderSpan[]): Mp4VideoRenderSpan[] {
 }
 
 export function canUseHybridMp4VideoPipeline(settings: VideoProjectExportSettings): boolean {
-  return settings.format === VideoExportFormat.MP4;
+  return settings.format === VideoExportFormat.MP4 && settings.frameRateMode !== 'adaptive';
 }
 
 export function planMp4VideoRenderSpans(

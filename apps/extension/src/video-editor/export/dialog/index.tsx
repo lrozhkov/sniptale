@@ -210,7 +210,7 @@ function useExportSizeEstimate(
   canExport: boolean
 ) {
   const estimateKey =
-    canExport && estimateContext
+    canExport && estimateContext && settings.frameRateMode !== 'adaptive'
       ? JSON.stringify([
           estimateContext.project,
           estimateContext.assetUrls,

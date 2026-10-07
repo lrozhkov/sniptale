@@ -362,3 +362,51 @@ it('keeps export enabled while size estimation is pending and cancels the deboun
     vi.useRealTimers();
   }
 });
+
+it.each(['ready', 'pending'])(
+  'clears the %s constant-rate size estimate when adaptive is selected',
+  async (phase) => {
+    vi.useFakeTimers();
+    let resolve!: (value: {
+      bytes: number;
+      lowerBytes: number;
+      upperBytes: number;
+      sampledSeconds: number;
+    }) => void;
+    const calculate = vi.spyOn(sizeEstimator, 'estimateProjectExportSize').mockImplementation(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    const estimateContext = {
+      project: { ...createEmptyVideoProject(), duration: 5 },
+      assetUrls: {},
+    };
+    try {
+      renderDialog({ estimateContext });
+      await act(async () => vi.advanceTimersByTimeAsync(1000));
+      const signal = calculate.mock.calls[0]![0].signal;
+      if (phase === 'ready')
+        await act(async () =>
+          resolve({ bytes: 100, lowerBytes: 75, upperBytes: 135, sampledSeconds: 1 })
+        );
+      renderDialog({
+        estimateContext,
+        settings: { ...createSettings(), fps: 60, frameRateMode: 'adaptive' },
+      });
+      expect(container!.querySelector('[data-ui="video.exportSizeEstimate"]')).toBeNull();
+      if (phase === 'pending') {
+        expect(signal.aborted).toBe(true);
+        await act(async () =>
+          resolve({ bytes: 100, lowerBytes: 75, upperBytes: 135, sampledSeconds: 1 })
+        );
+      }
+      await act(async () => vi.advanceTimersByTimeAsync(2000));
+      expect(calculate).toHaveBeenCalledOnce();
+    } finally {
+      calculate.mockRestore();
+      vi.useRealTimers();
+    }
+  }
+);

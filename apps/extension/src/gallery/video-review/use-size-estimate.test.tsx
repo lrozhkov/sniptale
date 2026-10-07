@@ -50,6 +50,7 @@ it.each(['overlays', 'zoom', 'audio'] as const)(
     const originalDocument = resource.session.getSnapshot().document;
     const root = createRoot(document.createElement('div'));
     let state!: ReturnType<typeof useReviewSizeEstimate>;
+    let adaptive = false;
     function Harness() {
       state = useReviewSizeEstimate({
         resource,
@@ -66,7 +67,12 @@ it.each(['overlays', 'zoom', 'audio'] as const)(
           height: 90,
           frameRate: 30,
         },
-        renderSettings: { codec: 'vp9', frameRate: 30, quality: 'HIGH' },
+        renderSettings: {
+          codec: 'vp9',
+          frameRate: adaptive ? 60 : 30,
+          quality: 'HIGH',
+          frameRateMode: adaptive ? 'adaptive' : 'constant',
+        },
       });
       return null;
     }
@@ -85,10 +91,22 @@ it.each(['overlays', 'zoom', 'audio'] as const)(
       expect(resource.session.getSnapshot().snapshot.workspace.revision).toBe(1);
       expect(resource.session.getSnapshot().document).toEqual(originalDocument);
       expect(state.status?.kind).toBe('pending');
+      adaptive = true;
+      await act(async () => root.render(<Harness />));
+      expect(state.status).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(2000));
+      expect(mocks.estimate).toHaveBeenCalledOnce();
+      adaptive = false;
+      await act(async () => root.render(<Harness />));
       await act(async () => vi.advanceTimersByTimeAsync(1000));
       expect(mocks.estimate).toHaveBeenCalledTimes(2);
       expect(mocks.estimate.mock.lastCall?.[0].advanced.ui).toEqual(updated.ui);
       expect(state.status?.kind).toBe('ready');
+      adaptive = true;
+      await act(async () => root.render(<Harness />));
+      expect(state.status).toBeNull();
+      await act(async () => vi.advanceTimersByTimeAsync(2000));
+      expect(mocks.estimate).toHaveBeenCalledTimes(2);
     } finally {
       await act(async () => root.unmount());
       vi.useRealTimers();

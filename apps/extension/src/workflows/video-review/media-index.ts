@@ -20,6 +20,7 @@ export interface ReviewRenderSettings {
   resolution?: VideoResolutionPreset;
   quality: VideoQuality;
   frameRate: 0 | 24 | 30 | 60;
+  frameRateMode?: 'constant' | 'adaptive';
 }
 
 export interface ReviewMediaIndex {

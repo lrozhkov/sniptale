@@ -21,9 +21,11 @@ export function buildMp4Muxer(
       codec: profiles.videoProfile.muxerCodec,
       width: settings.width,
       height: settings.height,
-      frameRate: settings.fps,
+      ...(settings.frameRateMode === 'adaptive' ? {} : { frameRate: settings.fps }),
     },
-    fastStart: 'in-memory' as const,
+    // Fragment sample durations preserve the final VFR hold; the flat stts writer repeats the preceding delta.
+    fastStart:
+      settings.frameRateMode === 'adaptive' ? ('fragmented' as const) : ('in-memory' as const),
     firstTimestampBehavior: 'offset' as const,
     ...(profiles.audioProfile && profiles.mixedAudio
       ? {

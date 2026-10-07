@@ -33,6 +33,7 @@ export function createReviewMediaOutput(args: {
     codec: VideoCodec;
     fullCodecString: string;
     frameRate: number;
+    frameRateMode?: 'constant' | 'adaptive' | undefined;
     bitrate: number;
     quality?: VideoQuality;
   };
@@ -78,7 +79,11 @@ export function createReviewMediaOutput(args: {
     : { kind: 'copy' as const, source: new EncodedVideoPacketSource(index.videoCodec) };
   output.addVideoTrack(
     video.source,
-    args.sampleVideo ? { frameRate: args.sampleVideo.frameRate } : { rotation: index.rotation }
+    args.sampleVideo
+      ? args.sampleVideo.frameRateMode === 'adaptive'
+        ? {}
+        : { frameRate: args.sampleVideo.frameRate }
+      : { rotation: index.rotation }
   );
   const audio = args.processedAudio
     ? {

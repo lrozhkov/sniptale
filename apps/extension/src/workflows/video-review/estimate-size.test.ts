@@ -116,3 +116,26 @@ it('rejects an unavailable profile before rendering', async () => {
   expect(mocks.write).not.toHaveBeenCalled();
   expect(mocks.measure).not.toHaveBeenCalled();
 });
+
+it('does not estimate adaptive output from constant-rate samples', async () => {
+  await expect(
+    estimateReviewExportSize({
+      file: new Blob(),
+      index: {
+        duration: 1,
+        boundaries: [0, 1],
+        container: 'webm',
+        videoCodec: 'vp9',
+        audioCodec: null,
+        rotation: 0,
+      },
+      advanced: createQuickEditAdvancedState(),
+      edits: [],
+      fragmentOffset: 0,
+      readProjectAsset: async () => null,
+      signal: new AbortController().signal,
+      renderSettings: { frameRate: 60, frameRateMode: 'adaptive', quality: 'HIGH' },
+    })
+  ).rejects.toThrow('Adaptive');
+  expect(mocks.measure).not.toHaveBeenCalled();
+});

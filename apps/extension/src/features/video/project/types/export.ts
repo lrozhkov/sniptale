@@ -86,6 +86,7 @@ interface VideoProjectExportSettingsBase {
   width: number;
   height: number;
   fps: number;
+  frameRateMode?: 'constant' | 'adaptive';
   quality: VideoExportQualityPreset;
   resolution: VideoResolutionPreset;
   scope?: VideoExportScope;

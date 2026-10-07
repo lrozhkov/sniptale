@@ -16,7 +16,7 @@ vi.mock('../../../../features/video/composition/timeline/render', async (importO
   resolveVideoCompositionRenderPasses: resolveVideoCompositionRenderPassesMock,
 }));
 
-import { planMp4VideoRenderSpans } from './planner';
+import { canUseHybridMp4VideoPipeline, planMp4VideoRenderSpans } from './planner';
 
 function createProject(overrides: Partial<VideoProject> = {}): VideoProject {
   return {
@@ -283,4 +283,15 @@ it('merges adjacent clean spans split by an audio-only boundary', () => {
   expect(planMp4VideoRenderSpans(project, createSettings() as never)).toEqual([
     expect.objectContaining({ end: 4, kind: 'clean-source', sourceEnd: 4, start: 0 }),
   ]);
+});
+
+it('requires full composition for adaptive MP4 even with a clean source', () => {
+  const settings = { format: VideoExportFormat.MP4, fps: 60, frameRateMode: 'adaptive' as const };
+  expect(canUseHybridMp4VideoPipeline(settings as never)).toBe(false);
+  expect(planMp4VideoRenderSpans(createProject(), settings as never)).toEqual([
+    { kind: 'composite', reason: 'non-mp4-asset', start: 0, end: 4 },
+  ]);
+  expect(canUseHybridMp4VideoPipeline({ ...settings, frameRateMode: 'constant' } as never)).toBe(
+    true
+  );
 });

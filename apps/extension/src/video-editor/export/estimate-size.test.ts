@@ -139,3 +139,25 @@ it.each([
     expect(mocks.dispose).toHaveBeenCalledOnce();
   }
 );
+
+it('does not estimate adaptive output from constant-rate samples', async () => {
+  await expect(
+    estimateProjectExportSize({
+      project: createEmptyVideoProject(),
+      assetUrls: {},
+      signal: new AbortController().signal,
+      settings: {
+        format: 'WEBM',
+        webmVideoCodec: 'VP9',
+        fps: 60,
+        frameRateMode: 'adaptive',
+        width: 160,
+        height: 90,
+        quality: 'HIGH',
+        resolution: 'SOURCE',
+        downloadAfterExport: false,
+      },
+    })
+  ).rejects.toThrow('Adaptive');
+  expect(mocks.measure).not.toHaveBeenCalled();
+});

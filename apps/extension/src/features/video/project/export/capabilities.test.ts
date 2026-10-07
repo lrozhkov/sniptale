@@ -102,3 +102,14 @@ it('drops MP4 codec state when MP4 is unavailable or not selected', () => {
     width: 1920,
   });
 });
+
+it('preserves adaptive mode through codec normalization and container switching', () => {
+  const adaptive = { ...createSettings(), fps: 60, frameRateMode: 'adaptive' as const };
+  expect(normalizeVideoProjectExportSettings(adaptive)).toMatchObject({
+    fps: 60,
+    frameRateMode: 'adaptive',
+  });
+  expect(
+    mergeVideoProjectExportSettings(adaptive, { format: VideoExportFormat.WEBM })
+  ).toMatchObject({ fps: 60, frameRateMode: 'adaptive', webmVideoCodec: VideoWebmCodec.VP9 });
+});

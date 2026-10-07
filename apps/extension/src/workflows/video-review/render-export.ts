@@ -1,3 +1,4 @@
+import { createAdaptiveFrameWriter } from '../../features/video/project/export/adaptive-frames';
 import {
   evaluateReviewClicks,
   type ReviewClickCue,
@@ -144,6 +145,7 @@ export async function writeReviewFrames(args: {
               fps: preparation.fps,
             }).codec,
             frameRate: preparation.fps,
+            frameRateMode: args.renderSettings?.frameRateMode,
             bitrate: resolveReviewRenderBitrate(
               {
                 fps: preparation.fps,
@@ -212,6 +214,7 @@ export async function writeReviewFrames(args: {
       timeTracking?.finishAudio(segment);
       receipt.videoPackets += await renderRenderWindowFrames({
         window,
+        adaptive: !args.frameProbe && args.renderSettings?.frameRateMode === 'adaptive',
         fps: preparation.fps,
         fragmentOffset: args.fragmentOffset,
         zoomRegions: preparation.effective.zoomRegions,
@@ -290,7 +293,13 @@ function prepareReviewRender(args: {
   const codec = args.renderSettings?.codec ?? supported[0];
   if (!codec || !supported.includes(codec)) throw new QuickEditExportUnavailable(['video-encoder']);
   const requestedFps = args.renderSettings?.frameRate;
-  if (requestedFps !== undefined && ![0, 24, 30, 60].includes(requestedFps))
+  if (
+    (requestedFps !== undefined && ![0, 24, 30, 60].includes(requestedFps)) ||
+    (args.renderSettings?.frameRateMode !== undefined &&
+      args.renderSettings.frameRateMode !== 'constant' &&
+      args.renderSettings.frameRateMode !== 'adaptive') ||
+    (args.renderSettings?.frameRateMode === 'adaptive' && requestedFps !== 60)
+  )
     throw new Error('Unsupported render frame rate.');
   const fps =
     requestedFps ||
@@ -520,6 +529,7 @@ export async function drainSegmentAudio(args: {
 export async function renderRenderWindowFrames(args: {
   clickCues?: readonly ReviewClickCue[] | undefined;
   window: ReviewFrameWindow;
+  adaptive?: boolean;
   fps: number;
   fragmentOffset: number;
   zoomRegions: readonly QuickEditZoomRegion[];
@@ -568,6 +578,13 @@ export async function renderRenderWindowFrames(args: {
   );
   const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
   let frame = 0;
+  const writer = createReviewFrameWriter({
+    canvas,
+    context,
+    videoOut,
+    signal,
+    adaptive: args.adaptive,
+  });
   const webcamFrames = args.webcam?.frames(window.sourceTimes);
   try {
     for await (const sample of args.frameSink.samplesAtTimestamps(sampleTimes)) {
@@ -687,23 +704,62 @@ export async function renderRenderWindowFrames(args: {
           if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
           cameraFrame.value?.draw(context, canvas);
         }
-        const encoded = new VideoSample(canvas, {
+        await writer.add(
           timestamp,
-          duration: Math.min(1 / fps, window.segment.resultEnd - timestamp),
-        });
-        try {
-          await videoOut.add(encoded);
-        } finally {
-          encoded.close();
-        }
+          Math.min(window.segment.resultEnd, window.timestamps[frame + 1] ?? timestamp + 1 / fps),
+          Math.min(1 / fps, window.segment.resultEnd - timestamp)
+        );
       } finally {
         sample.close();
       }
       args.onProgress?.(Math.min(1, (timestamp + 1 / fps) / args.resultDuration));
       frame++;
     }
+    await writer.flush();
   } finally {
+    writer.dispose();
     await webcamFrames?.return(undefined);
   }
-  return frame;
+  return writer.count();
+}
+
+/** Owns sample lifetime and optional VFR retention after scene composition is complete. */
+function createReviewFrameWriter(args: {
+  canvas: HTMLCanvasElement;
+  context: CanvasRenderingContext2D;
+  videoOut: { add(sample: VideoSample): Promise<void> };
+  signal: AbortSignal;
+  adaptive: boolean | undefined;
+}) {
+  let emitted = 0;
+  const emit = async (canvas: HTMLCanvasElement, timestamp: number, duration: number) => {
+    const sample = new VideoSample(canvas, { timestamp, duration });
+    try {
+      await args.videoOut.add(sample);
+      emitted++;
+    } finally {
+      sample.close();
+    }
+  };
+  const adaptive = args.adaptive
+    ? createAdaptiveFrameWriter(
+        args.context,
+        (canvas, timestampUs, durationUs) => emit(canvas, timestampUs / 1e6, durationUs / 1e6),
+        args.signal
+      )
+    : null;
+  return {
+    async add(timestamp: number, end: number, constantDuration: number) {
+      if (!adaptive) {
+        await emit(args.canvas, timestamp, constantDuration);
+        return;
+      }
+      const startUs = Math.round(timestamp * 1e6);
+      const endUs = Math.round(end * 1e6);
+      if (endUs > startUs) await adaptive.add(startUs, endUs - startUs);
+    },
+    flush: () => adaptive?.flush(),
+    dispose: () => adaptive?.dispose(),
+    count: () => emitted,
+  };
 }

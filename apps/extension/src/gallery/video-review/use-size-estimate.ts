@@ -31,7 +31,11 @@ export function useReviewSizeEstimate({
     ...state.document.advancedContent,
   };
   const sizeEstimate = useVideoExportSizeEstimate(
-    visible && index && enabled && estimateAdvanced.ui.mode === 'advanced'
+    visible &&
+      index &&
+      enabled &&
+      estimateAdvanced.ui.mode === 'advanced' &&
+      renderSettings.frameRateMode !== 'adaptive'
       ? JSON.stringify([context, state.document, estimateAdvanced.ui, renderSettings])
       : null,
     (signal) => {

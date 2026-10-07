@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoProjectExportSettings } from '../../features/video/project/types';
 const mocks = vi.hoisted(() => ({
   add: vi.fn(),
+  track: vi.fn(),
   audio: vi.fn(),
   finalize: vi.fn(),
   cancel: vi.fn(),
@@ -27,7 +28,7 @@ vi.mock('mediabunny', () => ({
   Output: class {
     state = 'started';
     target = { buffer: new ArrayBuffer(4) };
-    addVideoTrack() {}
+    addVideoTrack = mocks.track;
     addAudioTrack() {}
     start = mocks.start;
     async finalize() {
@@ -129,4 +130,16 @@ it('rejects unsupported WebM configuration and releases its resources', async ()
   expect(mocks.configure).not.toHaveBeenCalled();
   expect(mocks.close).toHaveBeenCalledOnce();
   expect(mocks.cancel).toHaveBeenCalledOnce();
+});
+
+it('omits timestamp-snapping track metadata only for adaptive output', async () => {
+  const constant = await createWebmEncoding(settings, false);
+  expect(mocks.track).toHaveBeenLastCalledWith(expect.anything(), { frameRate: 30 });
+  await constant.dispose();
+  const adaptive = await createWebmEncoding(
+    { ...settings, fps: 60, frameRateMode: 'adaptive' },
+    false
+  );
+  expect(mocks.track).toHaveBeenLastCalledWith(expect.anything(), {});
+  await adaptive.dispose();
 });

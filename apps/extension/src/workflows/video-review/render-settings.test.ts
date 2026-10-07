@@ -100,3 +100,21 @@ it('keeps a 1904x1064 source inside 1080p without upscaling and honors explicit 
     })
   ).toMatchObject({ width: 1904, height: 1064, fps: 30, codec: 'hevc' });
 });
+
+it('admits adaptive60 and rejects unsupported modes or incompatible rates', () => {
+  const advanced = createQuickEditAdvancedState();
+  expect(
+    resolveReviewOutputProfile(index, advanced, {
+      quality: 'HIGH',
+      frameRate: 60,
+      frameRateMode: 'adaptive',
+    }).fps
+  ).toBe(60);
+  expect(() =>
+    resolveReviewOutputProfile(index, advanced, {
+      quality: 'HIGH',
+      frameRate: 30,
+      frameRateMode: 'adaptive',
+    })
+  ).toThrow('Invalid');
+});

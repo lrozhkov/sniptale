@@ -365,9 +365,22 @@ it('applies export frame rate and quality options without adding section divider
     );
     await act(async () => rate!.click());
     await act(async () =>
+      document.querySelectorAll<HTMLButtonElement>('[role="option"]')[2]!.click()
+    );
+    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
+      frameRate: 24,
+      quality: 'HIGH',
+      frameRateMode: 'constant',
+    });
+    await act(async () => rate!.click());
+    await act(async () =>
       document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1]!.click()
     );
-    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({ frameRate: 24, quality: 'HIGH' });
+    expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({
+      frameRate: 60,
+      quality: 'HIGH',
+      frameRateMode: 'adaptive',
+    });
     await act(async () => quality!.click());
     await act(async () => document.querySelector<HTMLButtonElement>('[role="option"]')!.click());
     expect(exporter.setRenderSettings).toHaveBeenLastCalledWith({

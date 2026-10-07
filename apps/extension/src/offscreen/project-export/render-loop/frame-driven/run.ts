@@ -1,4 +1,6 @@
 import type { LoadedImagesMap } from '../../renderer';
+import { createAdaptiveFrameWriter } from '../../../../features/video/project/export/adaptive-frames';
+import { encodeCompositeCanvasFrame } from './render/encode';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { createVideoCompositionTimelineIndex } from '../../../../features/video/composition/timeline/frame/index';
 import { type VideoProjectExportSettings } from '../../../../features/video/project/types/export';
@@ -22,6 +24,7 @@ interface FrameDrivenLoopFrameArgs {
   fps: number;
   frameDurationUs: number;
   frameIndex: number;
+  adaptiveFrameWriter?: ReturnType<typeof createAdaptiveFrameWriter>;
   job: RenderLoopJobState;
   keyframeInterval: number;
   loadedImages: LoadedImagesMap;
@@ -70,10 +73,19 @@ function getLoopCurrentTime(
 
 function createFrameDrivenLoopModel(project: VideoProject, settings: VideoProjectExportSettings) {
   const exportRange = resolveProjectExportRange(project, settings);
+  const timing = getFrameDrivenRenderTiming(exportRange.duration, settings.fps);
+  if (settings.frameRateMode === 'adaptive') {
+    timing.duration = exportRange.end - exportRange.start;
+    // Include only lattice timestamps strictly before the rounded microsecond end.
+    timing.totalFrames = Math.max(
+      0,
+      Math.ceil(((Math.round(timing.duration * 1_000_000) - 0.5) * timing.fps) / 1_000_000)
+    );
+  }
   return {
     compositionIndex: createVideoCompositionTimelineIndex(project),
     exportRange,
-    timing: getFrameDrivenRenderTiming(exportRange.duration, settings.fps),
+    timing,
   };
 }
 
@@ -96,9 +108,37 @@ export async function runFrameDrivenCompositeRenderLoop(
     ownerDocument: canvas.ownerDocument,
   });
 
+  let lastKeyframeTimestamp: number | undefined;
+  let adaptiveFrameWriter: ReturnType<typeof createAdaptiveFrameWriter> | undefined;
   try {
+    adaptiveFrameWriter =
+      settings.frameRateMode === 'adaptive'
+        ? createAdaptiveFrameWriter(
+            context,
+            async (retainedCanvas, timestamp, frameDuration) => {
+              signal?.throwIfAborted();
+              if (job.cancelled) throw new Error('PROJECT_EXPORT_CANCELLED');
+              throwIfPipelineFailed();
+              const keyFrame =
+                lastKeyframeTimestamp === undefined ||
+                timestamp - lastKeyframeTimestamp >= 2_000_000;
+              await encodeCompositeCanvasFrame({
+                canvas: retainedCanvas,
+                timestamp,
+                duration: frameDuration,
+                keyFrame,
+                settings,
+                videoEncoder,
+                ...(signal === undefined ? {} : { signal }),
+              });
+              if (keyFrame) lastKeyframeTimestamp = timestamp;
+            },
+            signal
+          )
+        : undefined;
     await renderFrameDrivenLoopFrames({
       canvas,
+      ...(adaptiveFrameWriter === undefined ? {} : { adaptiveFrameWriter }),
       compositionIndex,
       context,
       duration,
@@ -118,7 +158,9 @@ export async function runFrameDrivenCompositeRenderLoop(
       ...(progressMessageDetail === undefined ? {} : { progressMessageDetail }),
       ...(signal === undefined ? {} : { signal }),
     });
+    await adaptiveFrameWriter?.flush();
   } finally {
+    adaptiveFrameWriter?.dispose();
     effectRuntime.dispose();
   }
 }
@@ -152,7 +194,17 @@ async function renderFrameDrivenLoopFrame(args: FrameDrivenLoopFrameArgs): Promi
     compositionIndex: args.compositionIndex,
     currentTime: getLoopCurrentTime(args.exportStart, args.frameIndex, args.fps, args.duration),
     effectRuntime: args.effectRuntime,
-    frameDurationUs: args.frameDurationUs,
+    frameDurationUs: args.adaptiveFrameWriter
+      ? Math.round(Math.min(args.duration, (args.frameIndex + 1) / args.fps) * 1_000_000) -
+        Math.round((args.frameIndex / args.fps) * 1_000_000)
+      : args.frameDurationUs,
+    ...(args.adaptiveFrameWriter === undefined
+      ? {}
+      : {
+          adaptiveFrameWriter: args.adaptiveFrameWriter,
+          frameTimestampUs:
+            args.timestampOffsetUs + Math.round((args.frameIndex / args.fps) * 1_000_000),
+        }),
     frameIndex: args.frameIndex,
     job: args.job,
     keyframeInterval: args.keyframeInterval,
