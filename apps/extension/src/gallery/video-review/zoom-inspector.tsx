@@ -1,3 +1,4 @@
+import { ReviewSpatialInspector } from './spatial-inspector';
 import { useContext } from 'react';
 import { ReviewIntervalMap } from './interval-timing';
 import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
@@ -172,6 +173,11 @@ export function ReviewZoomInspector(props: {
                           onChange={(value) => onChange({ centerY: value / 100 })}
                         />
                       </ReviewDetails>
+                      <ReviewSpatialInspector
+                        region={region}
+                        onChange={onChange}
+                        onPreview={props.onPreview}
+                      />
                     </>
                   )}
                 </div>

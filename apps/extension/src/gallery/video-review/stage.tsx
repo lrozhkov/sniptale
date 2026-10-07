@@ -1,3 +1,8 @@
+import {
+  quickEditPlaneProjection,
+  quickEditProjectionCss,
+  invertQuickEditProjection,
+} from '../../features/video/review/advanced/spatial-geometry';
 import { ReviewClickOverlay } from './click-animation-overlay';
 import type { ReviewClickCue } from '../../features/video/review/click-animation';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
@@ -34,6 +39,7 @@ import type {
 } from '../../features/video/review/types';
 import {
   computeQuickEditSceneLayout,
+  computeQuickEditSpatialWindow,
   computeQuickEditSceneSize,
   computeQuickEditWindowTransform,
   computeQuickEditSceneCamera,
@@ -69,6 +75,9 @@ type ReviewStageCommentBinding = {
   /** Reports the stage geometry for attachment switching; null hides overlays. */
   onGeometry?(geometry: {
     output: { width: number; height: number };
+    projection?:
+      | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+      | undefined;
     videoTransform: { x: number; y: number; width: number; height: number } | null;
   }): void;
 };
@@ -150,7 +159,17 @@ export function ReviewStage(props: ReviewStageProps) {
     sceneLayout && props.scene
       ? computeQuickEditSceneCamera(sceneLayout, props.scene.background)
       : { x: 0, y: 0, scale: 1 };
+  const window = sceneLayout
+    ? computeQuickEditSpatialWindow(sceneLayout, props.scene?.background ?? { enabled: false })
+    : null;
+  const projection =
+    sceneLayout?.spatial && window
+      ? quickEditPlaneProjection(window, window, sceneLayout.spatial)
+      : undefined;
   const plane = useReviewDrawingPlane({
+    inverseProjection: projection
+      ? (invertQuickEditProjection(projection) ?? undefined)
+      : undefined,
     drawing: props.drawing,
     content,
     region: props.region,
@@ -203,7 +222,7 @@ export function ReviewStage(props: ReviewStageProps) {
           onEnded={props.onEnded}
           onError={props.onError}
         />
-        {!props.drawing && props.scene && sceneLayout ? (
+        {(!props.drawing || sceneLayout?.spatial) && props.scene && sceneLayout ? (
           <ReviewMotionBlurPreview
             focus={props.scene.focus}
             camera={props.scene.camera}
@@ -216,40 +235,25 @@ export function ReviewStage(props: ReviewStageProps) {
             getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
           />
         ) : null}
-        <ReviewSpotlightOverlay output={size} frames={spotlight} clip={overlayClip} />
-        <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
-        <ReviewClickOverlay
-          cues={props.clickCues}
-          time={props.scene?.focus?.time ?? 0}
+        <ReviewSpotlightOverlay
+          projection={projection}
           output={size}
-          video={sceneLayout?.videoTransform}
-          sourceWidth={props.source.width}
+          frames={spotlight}
           clip={overlayClip}
+        />
+        <ReviewStageContent
+          props={props}
+          geometry={{ size, sceneLayout, zoomLayout, borders, overlayClip }}
+          projection={projection}
+          projected={projected}
         />
         <ReviewStageComments
           comments={props.comments}
+          attachment="viewport"
           output={size}
           source={props.source}
           layout={sceneLayout}
         />
-        {props.focusPicker && sceneLayout ? (
-          <ReviewStageFocusTargets
-            picker={props.focusPicker}
-            clip={overlayClip}
-            output={size}
-            selectedId={props.zoom?.region.id}
-            video={computeQuickEditWindowTransform(sceneLayout)}
-          />
-        ) : null}
-        {props.zoom && zoomLayout ? (
-          <ReviewStageFocusControl
-            key={props.zoom.region.id}
-            focus={props.zoom}
-            behindTargets={!!props.focusPicker}
-            layout={zoomLayout}
-            output={size}
-          />
-        ) : null}
         {props.webcam ? (
           <ReviewWebcamOverlay binding={props.webcam} main={props.video} output={size} />
         ) : null}
@@ -259,8 +263,88 @@ export function ReviewStage(props: ReviewStageProps) {
   );
 }
 
+/** Sharp content overlays and interaction targets share one projected plane. */
+function ReviewStageContent({
+  props,
+  geometry,
+  projection,
+  projected,
+}: {
+  props: ReviewStageProps;
+  geometry: Pick<
+    ReturnType<typeof useReviewStageGeometry>,
+    'size' | 'sceneLayout' | 'zoomLayout' | 'borders' | 'overlayClip'
+  >;
+  projection:
+    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | undefined;
+  projected: ReturnType<typeof projectVideoRegion> | null;
+}) {
+  const { size, sceneLayout, zoomLayout, borders, overlayClip } = geometry;
+  return (
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={
+        projection
+          ? { transformOrigin: '0 0', transform: quickEditProjectionCss(projection) }
+          : undefined
+      }
+    >
+      {sceneLayout?.spatial && projected ? (
+        <ReviewRegionOverlay
+          drawing={props.drawing}
+          projected={projected}
+          offset={{ x: 0, y: 0 }}
+        />
+      ) : null}
+      <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
+      <ReviewClickOverlay
+        cues={props.clickCues}
+        time={props.scene?.focus?.time ?? 0}
+        output={size}
+        video={sceneLayout?.videoTransform}
+        sourceWidth={props.source.width}
+        clip={overlayClip}
+      />
+      <ReviewStageComments
+        comments={props.comments}
+        attachment="content"
+        clip={projection ? overlayClip : undefined}
+        projection={projection}
+        output={size}
+        source={props.source}
+        layout={sceneLayout}
+      />
+      {props.focusPicker && sceneLayout ? (
+        <ReviewStageFocusTargets
+          picker={props.focusPicker}
+          clip={overlayClip}
+          output={size}
+          selectedId={props.zoom?.region.id}
+          video={computeQuickEditWindowTransform(sceneLayout)}
+        />
+      ) : null}
+      {props.zoom && zoomLayout ? (
+        <ReviewStageFocusControl
+          projection={projection}
+          key={props.zoom.region.id}
+          focus={props.zoom}
+          behindTargets={!!props.focusPicker}
+          layout={zoomLayout}
+          output={size}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 /** Overlay comment stack using the shared scene geometry. */
 function ReviewStageComments(props: {
+  clip?: Parameters<typeof ReviewCommentOverlay>[0]['clip'];
+  attachment: CanvasComment['attachment'];
+  projection?:
+    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | undefined;
   comments: ReviewStageCommentBinding | undefined;
   layout: ReturnType<typeof computeQuickEditSceneLayout> | null;
   output: { width: number; height: number };
@@ -269,8 +353,10 @@ function ReviewStageComments(props: {
   if (!props.comments?.items.length) return null;
   return (
     <ReviewCommentOverlay
+      clip={props.clip}
+      projection={props.projection}
       layout={props.layout ?? undefined}
-      comments={props.comments.items}
+      comments={props.comments.items.filter((c) => c.attachment === props.attachment)}
       annotations={props.comments.annotations}
       output={props.output}
       source={props.source}
@@ -579,9 +665,22 @@ function useReviewStageGeometry(
     if (reportGeometry && sceneLayout)
       reportGeometry({
         output: size,
+        projection: sceneLayout.spatial
+          ? quickEditPlaneProjection(
+              computeQuickEditSpatialWindow(
+                sceneLayout,
+                props.scene?.background ?? { enabled: false }
+              ),
+              computeQuickEditSpatialWindow(
+                sceneLayout,
+                props.scene?.background ?? { enabled: false }
+              ),
+              sceneLayout.spatial
+            )
+          : undefined,
         videoTransform: sceneLayout.videoTransform,
       });
-  }, [size, sceneLayout, reportGeometry]);
+  }, [size, sceneLayout, reportGeometry, props.scene?.background]);
   const spotlight =
     sceneLayout && props.scene?.focus
       ? evaluateQuickEditSpotlightsAtTime({
@@ -611,7 +710,8 @@ function useReviewStageGeometry(
           radius: props.scene.background.enabled
             ? ((props.scene.background.layout.cornerRadius * size.width) /
                 Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
-              computeQuickEditSceneCamera(sceneLayout, props.scene.background).scale
+              (computeQuickEditSceneCamera(sceneLayout, props.scene.background).windowClip.width /
+                sceneLayout.windowRect.width)
             : 0,
         }
       : undefined;

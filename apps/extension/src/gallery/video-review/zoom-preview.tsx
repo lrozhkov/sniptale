@@ -1,3 +1,8 @@
+import {
+  quickEditPlaneProjection,
+  quickEditProjectionCss,
+} from '../../features/video/review/advanced/spatial-geometry';
+import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
 import { ReviewBorderOverlay } from './border-overlay';
@@ -15,6 +20,7 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneCamera,
+  computeQuickEditSpatialWindow,
   computeQuickEditWindowTransform,
   computeQuickEditSceneLayout,
   computeQuickEditSceneSize,
@@ -137,6 +143,7 @@ export function ReviewZoomPreview(props: {
         )}
         {!overlay && (view === 'result' || playback) ? (
           <ReviewMotionBlurPreview
+            hasSpatialBase={view === 'result'}
             focus={props.focus}
             camera={camera}
             layout={layout}
@@ -177,7 +184,7 @@ export function ReviewZoomPreview(props: {
 function resolvePreviewCamera(props: Parameters<typeof ReviewZoomPreview>[0]) {
   if (props.region.spotlight || props.region.border)
     return { scale: 1, centerX: 0.5, centerY: 0.5 };
-  return props.playback?.camera ?? props.region.transform;
+  return props.playback?.camera ?? quickEditSpatialTargetCamera(props.region);
 }
 
 /** Results composite all sampled masks before source-attached strokes in the same window. */
@@ -198,19 +205,36 @@ function ZoomResultOverlays(props: {
     scale: props.scale,
   };
   const motion = computeQuickEditSceneCamera(props.layout, props.background);
-  const clip = { rect: motion.windowClip, radius: props.cornerRadius * motion.scale };
+  const clip = {
+    rect: motion.windowClip,
+    radius: props.cornerRadius * (motion.windowClip.width / props.layout.windowRect.width),
+  };
+  const window = computeQuickEditSpatialWindow(props.layout, props.background);
+  const projection = props.layout.spatial
+    ? quickEditPlaneProjection(window, window, props.layout.spatial)
+    : undefined;
   return (
     <>
       <ReviewSpotlightOverlay
+        projection={projection}
         output={props.output}
         frames={evaluateQuickEditSpotlightsAtTime(sample)}
         clip={clip}
       />
-      <ReviewBorderOverlay
-        output={props.output}
-        frames={evaluateQuickEditBordersAtTime(sample)}
-        clip={clip}
-      />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={
+          projection
+            ? { transformOrigin: '0 0', transform: quickEditProjectionCss(projection) }
+            : undefined
+        }
+      >
+        <ReviewBorderOverlay
+          output={props.output}
+          frames={evaluateQuickEditBordersAtTime(sample)}
+          clip={clip}
+        />
+      </div>
     </>
   );
 }

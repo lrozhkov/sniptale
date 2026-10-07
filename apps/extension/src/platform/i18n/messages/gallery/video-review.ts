@@ -1,6 +1,8 @@
+import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewSpatialMessages,
   clickMilliseconds: { ru: 'мс', en: 'ms' },
   historyFilters: { ru: 'Фильтры', en: 'Filters' },
   historyFiltersActive: { ru: 'Фильтры применены', en: 'Filters applied' },

@@ -1,3 +1,4 @@
+import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
 import { parseReviewClickAnimations } from './click-animation';
 import { parseQuickEditBorder } from './border';
 import { quickEditFocusConflicts } from './focus-layout';
@@ -150,6 +151,9 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
     value['start'] >= value['end']
   )
     return null;
+  const perspective = parseQuickEditPerspective(value['perspective']);
+  const depthOfField = parseQuickEditDepth(value['depthOfField']);
+  if (perspective === null || depthOfField === null) return null;
   const motionBlur = parseMotionBlur(value['motionBlur']);
   if (motionBlur === null) return null;
   const spotlight =
@@ -183,6 +187,8 @@ function parseZoomRegion(value: unknown): QuickEditZoomRegion | null {
   )
     return null;
   return {
+    ...(perspective ? { perspective } : {}),
+    ...(depthOfField ? { depthOfField } : {}),
     ...(motionBlur ? { motionBlur } : {}),
     ...(spotlight ? { spotlight } : {}),
     ...(border ? { border } : {}),

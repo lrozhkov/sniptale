@@ -50,7 +50,7 @@ const renderStage = (
   props: Partial<
     Pick<
       Parameters<typeof ReviewStage>[0],
-      'scene' | 'zoom' | 'backgroundImageUrl' | 'drawing' | 'region'
+      'scene' | 'zoom' | 'backgroundImageUrl' | 'drawing' | 'region' | 'comments'
     >
   >
 ) => {
@@ -62,6 +62,7 @@ const renderStage = (
         video={{ current: null }}
         drawing={props.drawing ?? false}
         region={props.region}
+        {...(props.comments ? { comments: props.comments } : {})}
         backgroundImageUrl={props.backgroundImageUrl}
         {...(props.scene ? { scene: props.scene } : {})}
         {...(props.zoom ? { zoom: props.zoom } : {})}
@@ -543,4 +544,42 @@ it('recomputes the decorated pan plane and top boundary across header and backgr
         );
     }
   }
+});
+
+it('uses the scene canvas scale for projected comments at rounded window corners', async () => {
+  const { createCanvasComment } = await import('../../features/video/review/comments');
+  const { createQuickEditZoomRegion } = await import('../../features/video/review/advanced/zoom');
+  const { quickEditSpatialTargetCamera, DEFAULT_QUICK_EDIT_PERSPECTIVE } =
+    await import('../../features/video/review/advanced/spatial');
+  const background = {
+    enabled: true as const,
+    type: 'solid' as const,
+    color: '#333333',
+    layout: { padding: 20, cornerRadius: 24 },
+  };
+  const camera = quickEditSpatialTargetCamera({
+    ...createQuickEditZoomRegion({ id: 'z', at: 0 }),
+    perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true, rotateY: 35 },
+  });
+  renderStage({
+    scene: { background, camera, canvas: { width: 640, height: 360 } },
+    comments: {
+      items: [
+        { ...createCanvasComment({ id: 'corner' }), text: 'Corner', position: { x: 0, y: 0 } },
+      ],
+      annotations: [],
+      time: 0,
+      background,
+      camera,
+      selectedId: null,
+      busy: false,
+      onSelect: vi.fn(),
+      onMove: vi.fn(),
+    },
+  });
+  const overlay = host.querySelector<HTMLElement>(
+    '[data-ui="gallery.videoReview.commentOverlay"]'
+  )!;
+  // 24px scene radius * (800 output / 640 canvas) * 1.5 outer zoom = 45px, not75px from source320.
+  expect(overlay.style.clipPath).toContain('round 45px');
 });

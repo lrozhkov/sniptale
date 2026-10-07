@@ -1,3 +1,6 @@
+import { ReviewButton } from './controls';
+import { createReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
+import { translate } from '../../platform/i18n';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   hasQuickEditMotionBlur,
@@ -16,6 +19,8 @@ import type {
 import { drawReviewSceneFrame } from '../../workflows/video-review/scene-frame';
 
 type Props = {
+  /** Target mini-preview already paints its spatial base; only temporal exposure adds a pass. */
+  hasSpatialBase?: boolean;
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
   camera: QuickEditCameraTransform;
   layout: ReturnType<typeof computeQuickEditSceneLayout>;
@@ -32,19 +37,41 @@ export function ReviewMotionBlurPreview(props: Props) {
   const focus = props.focus;
   const enabled = useMemo(() => hasQuickEditMotionBlur(focus?.regions ?? []), [focus?.regions]);
   if (
-    !enabled ||
+    (!enabled && !props.camera.spatial) ||
     !focus ||
     !sameQuickEditCamera(props.camera, evaluateQuickEditCameraAtTime(focus.regions, focus.time))
   )
     return null;
   const passes = quickEditMotionBlurCameras(focus.regions, focus.time);
-  return passes.length > 1 ? <MotionBlurCanvas {...props} passes={passes} /> : null;
+  return passes.length > 1 || (props.camera.spatial && !props.hasSpatialBase) ? (
+    <MotionBlurCanvas {...props} passes={passes} />
+  ) : null;
 }
 
 function MotionBlurCanvas(
   props: Props & { passes: ReturnType<typeof quickEditMotionBlurCameras> }
 ) {
   const canvas = useRef<HTMLCanvasElement>(null);
+  const [failed, setFailed] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const renderer = useRef<ReturnType<typeof createReviewSpatialRenderer> | null>(null);
+  const spatialEnabled = !!props.camera.spatial;
+  useLayoutEffect(() => {
+    if (!spatialEnabled) {
+      setFailed(false);
+      return;
+    }
+    try {
+      renderer.current = createReviewSpatialRenderer(() => setFailed(true));
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    }
+    return () => {
+      renderer.current?.dispose();
+      renderer.current = null;
+    };
+  }, [spatialEnabled, retry]);
   const [loaded, setLoaded] = useState<{ url: string; image: HTMLImageElement } | null>(null);
   useEffect(() => {
     if (!props.imageUrl) return;
@@ -75,26 +102,32 @@ function MotionBlurCanvas(
       if (pending || !frame) return;
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
-      drawReviewSceneFrame(context, {
-        canvas: props.output,
-        layout: props.layout,
-        background: props.background.enabled
-          ? {
-              ...props.background,
-              layout: {
-                ...props.background.layout,
-                cornerRadius: props.background.layout.cornerRadius * props.sceneScale,
-              },
-            }
-          : props.background,
-        image,
-        headerImage: props.headerImage,
-        sample: {
-          draw: (target, x, y, width, height) => target.drawImage(frame, x, y, width, height),
-        },
-        sceneScale: props.sceneScale,
-        motionBlur: props.passes,
-      });
+      try {
+        drawReviewSceneFrame(context, {
+          spatialRenderer: renderer.current ?? undefined,
+          canvas: props.output,
+          layout: props.layout,
+          background: props.background.enabled
+            ? {
+                ...props.background,
+                layout: {
+                  ...props.background.layout,
+                  cornerRadius: props.background.layout.cornerRadius * props.sceneScale,
+                },
+              }
+            : props.background,
+          image,
+          headerImage: props.headerImage,
+          sample: {
+            draw: (target, x, y, width, height) => target.drawImage(frame, x, y, width, height),
+          },
+          sceneScale: props.sceneScale,
+          motionBlur: props.passes,
+        });
+      } catch {
+        setFailed(true);
+        node.style.visibility = 'hidden';
+      }
     };
     paint();
     const frame = props.getFrame();
@@ -105,15 +138,30 @@ function MotionBlurCanvas(
       frame.removeEventListener('loadeddata', paint);
       frame.removeEventListener('seeked', paint);
     };
-  }, [props, loaded]);
+  }, [props, loaded, retry]);
   return (
-    <canvas
-      ref={canvas}
-      width={Math.max(1, Math.round(props.output.width))}
-      height={Math.max(1, Math.round(props.output.height))}
-      data-ui="gallery.videoReview.motionBlurCanvas"
-      aria-hidden="true"
-      className="pointer-events-none absolute inset-0 h-full w-full"
-    />
+    <>
+      {failed ? (
+        <div
+          role="alert"
+          className="absolute inset-0 z-20 flex items-center justify-center
+          bg-[var(--sniptale-color-surface-panel)] p-3 text-sm"
+        >
+          <span>{translate('gallery.videoReview.spatialUnavailable')}</span>
+          <ReviewButton
+            label={translate('gallery.videoReview.retry')}
+            onClick={() => setRetry((v) => v + 1)}
+          />
+        </div>
+      ) : null}
+      <canvas
+        ref={canvas}
+        width={Math.max(1, Math.round(props.output.width))}
+        height={Math.max(1, Math.round(props.output.height))}
+        data-ui="gallery.videoReview.motionBlurCanvas"
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full"
+      />
+    </>
   );
 }

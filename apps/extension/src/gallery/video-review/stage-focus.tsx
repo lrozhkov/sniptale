@@ -1,3 +1,4 @@
+import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import type { ReviewTimeSegment } from '../../features/video/review/timeline';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
@@ -19,6 +20,7 @@ export type ReviewStageFocus = {
 
 /** Direct scene manipulation uses the same normalized area and camera gesture as the inspector. */
 export function ReviewStageFocusControl(props: {
+  projection?: QuickEditHomography | undefined;
   focus: ReviewStageFocus;
   layout: ZoomPreviewLayout;
   output: { width: number; height: number };
@@ -26,6 +28,7 @@ export function ReviewStageFocusControl(props: {
 }) {
   const { focus, layout, output } = props;
   const gesture = useReviewCameraGesture({
+    pointerProjection: props.projection ? { matrix: props.projection, output } : undefined,
     camera: focus.region.transform,
     videoRect: { ...layout.windowRect, x: 0, y: 0 },
     output: layout.windowRect,
@@ -38,6 +41,7 @@ export function ReviewStageFocusControl(props: {
   if (overlay)
     return (
       <ReviewFocusArea
+        projection={props.projection}
         area={overlay.area}
         label={translate(
           focus.region.border

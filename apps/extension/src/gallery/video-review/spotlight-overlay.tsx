@@ -1,3 +1,4 @@
+import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import {
   createReviewSpotlightMasks,
@@ -13,6 +14,7 @@ import {
 
 /** Pixel clipping keeps the backdrop filter outside the opening, including in resized previews. */
 function SingleSpotlightOverlay(props: {
+  projection?: QuickEditHomography | undefined;
   output: { width: number; height: number };
   frame: QuickEditSpotlightFrame | null;
   clip?: ReviewSpotlightClip | undefined;
@@ -89,6 +91,7 @@ function singleSpotlightSvg(
 
 /** Independent channel masks implement union, including mixed strengths and blur radii. */
 export function ReviewSpotlightOverlay(props: {
+  projection?: QuickEditHomography | undefined;
   output: { width: number; height: number };
   frame?: QuickEditSpotlightFrame | null;
   frames?: readonly QuickEditSpotlightFrame[];
@@ -96,14 +99,22 @@ export function ReviewSpotlightOverlay(props: {
 }) {
   const frames = props.frames ?? (props.frame ? [props.frame] : []);
   if (!frames.length) return null;
-  if (frames.length === 1)
+  if (!props.projection && frames.length === 1)
     return (
       <SingleSpotlightOverlay output={props.output} frame={frames[0] ?? null} clip={props.clip} />
     );
-  return <CombinedSpotlightOverlay output={props.output} frames={frames} clip={props.clip} />;
+  return (
+    <CombinedSpotlightOverlay
+      projection={props.projection}
+      output={props.output}
+      frames={frames}
+      clip={props.clip}
+    />
+  );
 }
 
 function CombinedSpotlightOverlay(props: {
+  projection?: QuickEditHomography | undefined;
   output: { width: number; height: number };
   frames: readonly QuickEditSpotlightFrame[];
   clip?: ReviewSpotlightClip | undefined;
@@ -120,13 +131,24 @@ function CombinedSpotlightOverlay(props: {
     return () => observer.disconnect();
   }, []);
   // Fresh transport samples have new object identities even while the mask is stationary.
-  const key = JSON.stringify([props.output.width, props.output.height, props.frames, props.clip]);
+  const key = JSON.stringify([
+    props.output.width,
+    props.output.height,
+    props.frames,
+    props.clip,
+    props.projection,
+  ]);
   const cache = useRef<{
     key: string;
     masks: { dim: string; blur: string; radius: number };
   } | null>(null);
   if (cache.current?.key !== key) {
-    const result = createReviewSpotlightMasks(props.output, props.frames, props.clip);
+    const result = createReviewSpotlightMasks(
+      props.output,
+      props.frames,
+      props.clip,
+      props.projection
+    );
     cache.current = {
       key,
       masks: { dim: result.dim.toDataURL(), blur: result.blur.toDataURL(), radius: result.radius },

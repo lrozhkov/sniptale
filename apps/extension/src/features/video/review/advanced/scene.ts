@@ -1,3 +1,4 @@
+import { interpolateQuickEditSpatial, quickEditSpatialSpan } from './spatial';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
 import { fitQuickEditZoomTransitions } from './zoom';
 import { windowHeaderGeometry } from '../../../browser-frame/header';
@@ -104,6 +105,7 @@ export function computeQuickEditSceneLayout(input: SceneInput) {
     height: videoRect.height + headerHeight,
   };
   return {
+    ...(input.camera.spatial ? { spatial: input.camera.spatial } : {}),
     contentRect: {
       x: content.x,
       y: content.y,
@@ -279,34 +281,64 @@ export function evaluateQuickEditCameraAtTime(
     regions
   );
   if (!sample || sample.to.spotlight) return QUICK_EDIT_IDENTITY_CAMERA;
-  return interpolateCamera(
+  const camera = interpolateCamera(
     sample.from?.transform ?? QUICK_EDIT_IDENTITY_CAMERA,
     sample.to.transform,
     sample.progress
   );
+  if (
+    quickEditSpatialSpan(regions, timelineTime) ||
+    sample.from?.depthOfField?.enabled ||
+    sample.to.depthOfField?.enabled
+  )
+    return {
+      ...camera,
+      spatial: {
+        ...interpolateQuickEditSpatial(sample.from, sample.to, sample.progress),
+        lockBackground: quickEditSpatialSpan(regions, timelineTime),
+      },
+    };
+  return camera;
 }
 
 /** Shared camera bounds: following backgrounds and rounded video edges move together. */
 export function computeQuickEditSceneCamera(
-  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect; windowRect?: QuickEditRect },
+  layout: {
+    videoRect: QuickEditRect;
+    videoTransform: QuickEditRect;
+    windowRect?: QuickEditRect;
+    spatial?: QuickEditCameraTransform['spatial'];
+  },
   background: QuickEditBackgroundSettings
 ) {
-  const follows = background.enabled && background.zoomBehavior === 'follow-video';
+  const follows =
+    !layout.spatial?.lockBackground &&
+    background.enabled &&
+    background.zoomBehavior === 'follow-video';
   const scale = follows ? layout.videoTransform.width / layout.videoRect.width : 1;
+  const base = layout.windowRect ?? layout.videoRect;
+  const windowClip = layout.spatial
+    ? computeQuickEditSpatialWindow(layout, background)
+    : follows
+      ? computeQuickEditWindowTransform(layout)
+      : base;
   return {
     scale,
     x: follows ? layout.videoTransform.x - scale * layout.videoRect.x : 0,
     y: follows ? layout.videoTransform.y - scale * layout.videoRect.y : 0,
     videoClip: follows ? layout.videoTransform : layout.videoRect,
-    windowClip: follows
-      ? computeQuickEditWindowTransform(layout)
-      : (layout.windowRect ?? layout.videoRect),
+    windowClip,
   };
 }
 
 /** Visible video crop in normalized source coordinates, shared by Area paint and hit-testing. */
 export function computeQuickEditVisibleSourceRect(
-  layout: { videoRect: QuickEditRect; videoTransform: QuickEditRect; windowRect?: QuickEditRect },
+  layout: {
+    videoRect: QuickEditRect;
+    videoTransform: QuickEditRect;
+    windowRect?: QuickEditRect;
+    spatial?: QuickEditCameraTransform['spatial'];
+  },
   background: QuickEditBackgroundSettings,
   output: { width: number; height: number }
 ): QuickEditRect {
@@ -318,5 +350,51 @@ export function computeQuickEditVisibleSourceRect(
     y: (top - layout.videoTransform.y) / layout.videoTransform.height,
     width: (Math.min(output.width, clip.x + clip.width) - left) / layout.videoTransform.width,
     height: (Math.min(output.height, clip.y + clip.height) - top) / layout.videoTransform.height,
+  };
+}
+
+/** Window geometry blends to the ordinary crop at link endpoints, independently of the background. */
+export function computeQuickEditSpatialWindow(
+  layout: {
+    videoRect: QuickEditRect;
+    videoTransform: QuickEditRect;
+    windowRect?: QuickEditRect;
+    spatial?: QuickEditCameraTransform['spatial'];
+  },
+  background: QuickEditBackgroundSettings
+): QuickEditRect {
+  const base = layout.windowRect ?? layout.videoRect;
+  const target = computeQuickEditWindowTransform(layout);
+  const follows =
+    !layout.spatial?.lockBackground &&
+    background.enabled &&
+    background.zoomBehavior === 'follow-video';
+  const weight = follows ? 1 : (layout.spatial?.windowMotion ?? 0);
+  return {
+    x: lerp(base.x, target.x, weight),
+    y: lerp(base.y, target.y, weight),
+    width: lerp(base.width, target.width, weight),
+    height: lerp(base.height, target.height, weight),
+  };
+}
+
+/** Raster-local framing removes only the outer projected window transform, preserving inner zoom. */
+export function computeQuickEditSpatialRasterLayout(
+  layout: ReturnType<typeof computeQuickEditSceneLayout>,
+  background: QuickEditBackgroundSettings
+) {
+  const target = computeQuickEditSpatialWindow(layout, background);
+  const base = layout.windowRect;
+  const scale = target.width / base.width;
+  const video = layout.videoTransform;
+  const { spatial: _spatial, ...flat } = layout;
+  return {
+    ...flat,
+    videoTransform: {
+      x: base.x + (video.x - target.x) / scale,
+      y: base.y + (video.y - target.y) / scale,
+      width: video.width / scale,
+      height: video.height / scale,
+    },
   };
 }

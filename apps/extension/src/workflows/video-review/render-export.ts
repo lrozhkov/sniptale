@@ -1,13 +1,12 @@
+import { drawReviewSceneOverlays } from './render-scene-overlays';
+import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
+import { createReviewSpatialRenderer } from './spatial-renderer';
 import {
   createAdaptiveFrameWriter,
   createAdaptiveComparisonBudget,
 } from '../../features/video/project/export/adaptive-frames';
-import {
-  evaluateReviewClicks,
-  type ReviewClickCue,
-} from '../../features/video/review/click-animation';
-import { drawReviewClicks } from './render-click-animation';
-import { drawReviewSceneFrame, drawReviewSceneComments } from './scene-frame';
+import type { ReviewClickCue } from '../../features/video/review/click-animation';
+import { drawReviewSceneFrame } from './scene-frame';
 import {
   hasQuickEditMotionBlur,
   quickEditMotionBlurCameras,
@@ -16,8 +15,6 @@ import type { VideoProjectExportTimeEstimate } from '../../features/video/projec
 import { createReviewRenderTimeTracking } from './time-estimate-plan';
 import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
 import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
-import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
-import { drawReviewBorders } from './render-border';
 import { createReviewWebcamRenderer } from './render-webcam';
 import { createReviewDecodedSampleSink } from './decoded-video-sample';
 import { loadReviewWindowHeader, reviewWindowHeaderUrl } from './window-header';
@@ -31,8 +28,6 @@ import {
   paintReviewCutTransition,
   paintReviewCutBlackout,
 } from './cut-transition-frames';
-import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
-import { drawReviewSpotlights } from './render-spotlight';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type { ReviewOutputCodec, ReviewRenderSettings } from './media-index';
 import {
@@ -60,8 +55,6 @@ import type {
 } from '../../features/video/review/advanced/types';
 import {
   computeQuickEditSceneLayout,
-  computeQuickEditSceneCamera,
-  computeQuickEditWindowTransform,
   evaluateQuickEditCameraAtTime,
 } from '../../features/video/review/advanced/scene';
 import {
@@ -587,6 +580,14 @@ export async function renderRenderWindowFrames(args: {
     Math.min(lastTick, Math.round(time * resolution) / resolution)
   );
   const blurEnabled = hasQuickEditMotionBlur(args.zoomRegions);
+  const spatialRenderer = args.zoomRegions.some(
+    (r) =>
+      !r.dormant &&
+      quickEditFocusType(r) === 'zoom' &&
+      (r.perspective?.enabled || r.depthOfField?.enabled)
+  )
+    ? createReviewSpatialRenderer()
+    : undefined;
   let frame = 0;
   const writer = createReviewFrameWriter({
     canvas,
@@ -634,6 +635,7 @@ export async function renderRenderWindowFrames(args: {
           paintReviewCutTransition(rasterContext, raster, blend, frames, sample);
         } else sample.draw(rasterContext, 0, 0, raster.width, raster.height);
         drawReviewSceneFrame(context, {
+          spatialRenderer,
           canvas,
           layout,
           background: args.background,
@@ -651,63 +653,26 @@ export async function renderRenderWindowFrames(args: {
             : undefined,
           sceneScale: args.sceneScale ?? 1,
         });
-        const motion = computeQuickEditSceneCamera(layout, args.background);
-        drawReviewSpotlights(
+        drawReviewSceneOverlays({
+          scene: {
+            canvas,
+            layout,
+            background: args.background,
+            image: args.image,
+            sample,
+            comments: burned,
+            sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
+            sceneScale: args.sceneScale ?? 1,
+          },
+          renderer: spatialRenderer,
           context,
           canvas,
-          scratch,
-          evaluateQuickEditSpotlightsAtTime({
-            regions: args.zoomRegions,
-            time: timestamp + args.fragmentOffset,
-            output: canvas,
-            video: computeQuickEditWindowTransform(layout),
-            scale: (args.sceneScale ?? 1) * camera.scale,
-          }),
-          {
-            rect: motion.windowClip,
-            radius: args.background.enabled
-              ? args.background.layout.cornerRadius * motion.scale
-              : 0,
-          }
-        );
-        drawReviewBorders(
-          context,
-          canvas,
-          evaluateQuickEditBordersAtTime({
-            regions: args.zoomRegions,
-            time: timestamp + args.fragmentOffset,
-            output: canvas,
-            video: computeQuickEditWindowTransform(layout),
-            scale: (args.sceneScale ?? 1) * camera.scale,
-          }),
-          {
-            rect: motion.windowClip,
-            radius: args.background.enabled
-              ? args.background.layout.cornerRadius * motion.scale
-              : 0,
-          }
-        );
-        drawReviewClicks(
-          context,
-          evaluateReviewClicks(args.clickCues ?? [], timestamp + args.fragmentOffset),
-          layout.videoTransform,
-          args.sourceSize.width,
-          {
-            rect: motion.windowClip,
-            radius: args.background.enabled
-              ? args.background.layout.cornerRadius * motion.scale
-              : 0,
-          }
-        );
-        drawReviewSceneComments(context, {
-          canvas,
-          layout,
-          background: args.background,
-          image: args.image,
-          sample,
-          comments: burned,
-          sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
+          spotlightScratch: scratch,
+          regions: args.zoomRegions,
+          globalResultTime: timestamp + args.fragmentOffset,
           cameraScale: camera.scale,
+          sourceWidth: args.sourceSize.width,
+          clicks: args.clickCues,
         });
         if (webcamFrames) {
           const cameraFrame = await webcamFrames.next();
@@ -729,6 +694,7 @@ export async function renderRenderWindowFrames(args: {
     }
     await writer.flush();
   } finally {
+    spatialRenderer?.dispose();
     writer.dispose();
     await webcamFrames?.return(undefined);
   }

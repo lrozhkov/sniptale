@@ -1,3 +1,4 @@
+import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
 import {
   quickEditFocusType,
   quickEditFocusConflicts,
@@ -87,6 +88,8 @@ export function createQuickEditZoomRegion(args: {
 }
 
 export type QuickEditZoomRegionPatch = {
+  perspective?: QuickEditZoomRegion['perspective'];
+  depthOfField?: QuickEditZoomRegion['depthOfField'];
   motionBlur?: QuickEditZoomRegion['motionBlur'];
   spotlight?: QuickEditSpotlight | null;
   border?: QuickEditBorder | null;
@@ -107,6 +110,11 @@ export function updateQuickEditZoomRegion(
   id: string,
   patch: QuickEditZoomRegionPatch
 ): QuickEditZoomRegion[] {
+  if (
+    parseQuickEditPerspective(patch.perspective) === null ||
+    parseQuickEditDepth(patch.depthOfField) === null
+  )
+    return [...regions];
   const changesPhases = Boolean(patch.enter || patch.exit);
   const changesTiming = changesPhases || patch.start !== undefined || patch.end !== undefined;
   const updated = regions.map((region) => {
@@ -131,6 +139,8 @@ export function updateQuickEditZoomRegion(
     const linkTo = patch.linkTo === undefined ? previousLink : patch.linkTo;
     const updated = {
       ...rest,
+      ...(patch.perspective ? { perspective: patch.perspective } : {}),
+      ...(patch.depthOfField ? { depthOfField: patch.depthOfField } : {}),
       ...(patch.motionBlur ? { motionBlur: normalizeMotionBlur(patch.motionBlur) } : {}),
       ...(spotlight ? { spotlight } : {}),
       ...(border ? { border } : {}),

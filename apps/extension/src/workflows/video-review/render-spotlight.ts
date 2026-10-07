@@ -1,3 +1,7 @@
+import {
+  projectQuickEditPoint,
+  type QuickEditHomography,
+} from '../../features/video/review/advanced/spatial-geometry';
 import { drawReviewBlurredScene } from './spotlight-blur';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
@@ -80,7 +84,8 @@ function maskCanvas(output: { width: number; height: number }) {
 export function createReviewSpotlightMasks(
   output: { width: number; height: number },
   frames: readonly QuickEditSpotlightFrame[],
-  clip?: ReviewSpotlightClip
+  clip?: ReviewSpotlightClip,
+  projection?: QuickEditHomography
 ) {
   const dim = maskCanvas(output),
     blur = maskCanvas(output),
@@ -94,19 +99,26 @@ export function createReviewSpotlightMasks(
     hole.context.clearRect(0, 0, hole.canvas.width, hole.canvas.height);
     hole.context.save();
     if (bounds && clipped) {
-      hole.context.beginPath();
-      hole.context.roundRect(
-        bounds.rect.x,
-        bounds.rect.y,
-        bounds.rect.width,
-        bounds.rect.height,
-        bounds.radius
-      );
-      hole.context.clip();
+      if (projection) hole.context.clip(projectedOpening(bounds.rect, bounds.radius, projection));
+      else {
+        hole.context.beginPath();
+        hole.context.roundRect(
+          bounds.rect.x,
+          bounds.rect.y,
+          bounds.rect.width,
+          bounds.rect.height,
+          bounds.radius
+        );
+        hole.context.clip();
+      }
     }
     // Draw the positive opening once. Subtracting its inverse under an antialiased clip
     // applies edge coverage twice and leaves a translucent ring around the whole window.
-    hole.context.fill(new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius })));
+    hole.context.fill(
+      projection
+        ? projectedOpening(rect, radius, projection)
+        : new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius }))
+    );
     hole.context.restore();
     return hole.context.getImageData(0, 0, hole.canvas.width, hole.canvas.height).data;
   };
@@ -161,14 +173,19 @@ export function drawReviewSpotlights(
   canvas: HTMLCanvasElement,
   scratch: HTMLCanvasElement | null,
   frames: readonly QuickEditSpotlightFrame[],
-  clip?: ReviewSpotlightClip
+  clip?: ReviewSpotlightClip,
+  projection?: QuickEditHomography
 ) {
-  if (frames.length <= 1 && (!frames[0] || !reviewSpotlightNeedsClip(frames[0], clip))) {
+  if (
+    !projection &&
+    frames.length <= 1 &&
+    (!frames[0] || !reviewSpotlightNeedsClip(frames[0], clip))
+  ) {
     drawReviewSpotlight(context, canvas, scratch, frames[0] ?? null);
     return;
   }
   if (!frames.length) return;
-  const masks = createReviewSpotlightMasks(canvas, frames, clip);
+  const masks = createReviewSpotlightMasks(canvas, frames, clip, projection);
   if (masks.radius > 0) {
     const layer = maskCanvas(canvas);
     drawReviewBlurredScene(
@@ -182,4 +199,32 @@ export function drawReviewSpotlights(
     context.drawImage(layer.canvas, 0, 0);
   }
   context.drawImage(masks.dim, 0, 0);
+}
+
+/** Rounded openings become a bounded polygon in the same projected space as the window. */
+function projectedOpening(rect: QuickEditRect, radius: number, matrix: QuickEditHomography) {
+  const path = new Path2D();
+  const r = Math.max(0, Math.min(radius, rect.width / 2, rect.height / 2));
+  const corners = [
+    [rect.x + rect.width - r, rect.y + r],
+    [rect.x + rect.width - r, rect.y + rect.height - r],
+    [rect.x + r, rect.y + rect.height - r],
+    [rect.x + r, rect.y + r],
+  ];
+  let first = true;
+  for (let corner = 0; corner < 4; corner++)
+    for (let step = 0; step <= 12; step++) {
+      const angle = ((corner - 1 + step / 12) * Math.PI) / 2;
+      const point = projectQuickEditPoint(matrix, {
+        x: corners[corner]![0]! + r * Math.cos(angle),
+        y: corners[corner]![1]! + r * Math.sin(angle),
+      });
+      if (!point) continue;
+      if (first) {
+        path.moveTo(point.x, point.y);
+        first = false;
+      } else path.lineTo(point.x, point.y);
+    }
+  path.closePath();
+  return path;
 }

@@ -1,7 +1,10 @@
+import type { ReviewSpatialRenderer } from './spatial-renderer';
 import { createReviewWindowRaster } from './window-header';
 import { createVideoCompositionPassBuffer } from '../../features/video/composition/canvas/pass-buffer';
 import {
   computeQuickEditSceneCamera,
+  computeQuickEditSpatialWindow,
+  computeQuickEditSpatialRasterLayout,
   computeQuickEditWindowTransform,
   computeQuickEditVideoTransform,
   type computeQuickEditSceneLayout,
@@ -19,6 +22,7 @@ import { drawReviewSceneShadow } from './scene-shadow';
 export function drawReviewSceneFrame(
   context: CanvasRenderingContext2D,
   args: Parameters<typeof drawReviewSceneSample>[1] & {
+    spatialRenderer?: ReviewSpatialRenderer | undefined;
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
   }
 ) {
@@ -32,9 +36,87 @@ export function drawReviewSceneFrame(
         })
       : null;
   try {
-    drawReviewSceneExposure(context, args, windowRaster);
+    if (args.layout.spatial) drawSpatialScene(context, args, windowRaster);
+    else drawReviewSceneExposure(context, args, windowRaster);
   } finally {
     windowRaster?.release();
+  }
+}
+
+/** A background-independent decorated plane, projected with the exact export/preview GPU pass. */
+function drawSpatialScene(
+  context: CanvasRenderingContext2D,
+  args: Parameters<typeof drawReviewSceneFrame>[1],
+  windowRaster: ReturnType<typeof createReviewWindowRaster> | null
+) {
+  const renderer = args.spatialRenderer;
+  const spatial = args.layout.spatial;
+  if (!renderer || !spatial) throw new Error('Perspective renderer is unavailable.');
+  const baseWindow = args.layout.windowRect ?? args.layout.videoRect;
+  const fullLayout = { ...args.layout, windowRect: baseWindow };
+  const baseLayout = computeQuickEditSpatialRasterLayout(fullLayout, args.background);
+  const fixed = { ...args.background, zoomBehavior: 'fixed' as const };
+  drawReviewSceneSample(
+    context,
+    {
+      ...args,
+      background: spatial.lockBackground ? fixed : args.background,
+      sample: { draw() {} },
+      backgroundOnly: true,
+    },
+    null
+  );
+  const passes = args.motionBlur?.length ? args.motionBlur : [{ camera: null, alpha: 1 }];
+  const exposure = renderer.surface('exposure', args.canvas.width, args.canvas.height);
+  for (const pass of passes) {
+    const layout = pass.camera
+      ? {
+          ...fullLayout,
+          spatial: pass.camera.spatial ?? spatial,
+          videoTransform: computeQuickEditVideoTransform({ ...args.layout, camera: pass.camera }),
+        }
+      : fullLayout;
+    const plane = renderer.surface('plane', args.canvas.width, args.canvas.height);
+    const rasterLayout = computeQuickEditSpatialRasterLayout(layout, args.background);
+    drawReviewSceneSample(
+      plane.context,
+      { ...args, layout: rasterLayout, background: fixed, planeOnly: true },
+      windowRaster
+    );
+    exposure.context.save();
+    exposure.context.globalCompositeOperation = 'lighter';
+    exposure.context.globalAlpha = pass.alpha;
+    renderer.draw(
+      exposure.context,
+      plane.canvas,
+      baseWindow,
+      computeQuickEditSpatialWindow(layout, args.background),
+      pass.camera?.spatial ?? spatial
+    );
+    exposure.context.restore();
+  }
+  context.drawImage(exposure.canvas, 0, 0);
+  if (!args.deferComments && args.comments?.length) {
+    const overlay = renderer.surface('overlay', args.canvas.width, args.canvas.height);
+    drawReviewSceneComments(overlay.context, {
+      ...args,
+      layout: baseLayout,
+      background: fixed,
+      cameraScale: 1,
+      comments: args.comments.filter((c) => c.attachment === 'content'),
+    });
+    renderer.draw(
+      context,
+      overlay.canvas,
+      baseWindow,
+      computeQuickEditSpatialWindow(args.layout, args.background),
+      spatial,
+      true
+    );
+    drawReviewSceneComments(context, {
+      ...args,
+      comments: args.comments.filter((c) => c.attachment === 'viewport'),
+    });
   }
 }
 
@@ -154,6 +236,8 @@ function drawReviewSceneSample(
         height: number
       ): void;
     };
+    planeOnly?: boolean;
+    backgroundOnly?: boolean;
     deferComments?: boolean;
     comments?: readonly CanvasCommentExport[];
     sourceTime?: number;
@@ -162,26 +246,10 @@ function drawReviewSceneSample(
   },
   windowRaster: ReturnType<typeof createReviewWindowRaster> | null
 ) {
-  const { canvas, layout, background, image, sample } = args;
-  context.fillStyle = '#000000';
-  context.fillRect(0, 0, canvas.width, canvas.height);
+  const { layout, background, sample } = args;
+  if (!args.planeOnly) drawReviewSceneBackground(context, args);
+  if (args.backgroundOnly) return;
   const motion = computeQuickEditSceneCamera(layout, background);
-  if (motion.scale !== 1) {
-    context.save();
-    context.translate(motion.x, motion.y);
-    context.scale(motion.scale, motion.scale);
-  }
-  if (background.enabled) {
-    if (background.type === 'solid') {
-      context.fillStyle = background.color;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (background.type === 'gradient') {
-      drawSceneGradient(context, background.gradient, canvas.width, canvas.height);
-    } else if (image) {
-      drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
-    }
-  }
-  if (motion.scale !== 1) context.restore();
   drawReviewSceneShadow(
     context,
     background,
@@ -213,6 +281,32 @@ function drawReviewSceneSample(
       layout.videoTransform.height
     );
   context.restore();
+}
+
+/** Background owns its follow-video policy independently of the decorated plane. */
+function drawReviewSceneBackground(
+  context: CanvasRenderingContext2D,
+  { canvas, layout, background, image }: Parameters<typeof drawReviewSceneSample>[1]
+) {
+  context.fillStyle = '#000000';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  const motion = computeQuickEditSceneCamera(layout, background);
+  if (motion.scale !== 1) {
+    context.save();
+    context.translate(motion.x, motion.y);
+    context.scale(motion.scale, motion.scale);
+  }
+  if (background.enabled) {
+    if (background.type === 'solid') {
+      context.fillStyle = background.color;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    } else if (background.type === 'gradient') {
+      drawSceneGradient(context, background.gradient, canvas.width, canvas.height);
+    } else if (image) {
+      drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
+    }
+  }
+  if (motion.scale !== 1) context.restore();
 }
 
 function drawFittedImage(

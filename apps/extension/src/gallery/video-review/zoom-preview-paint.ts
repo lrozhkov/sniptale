@@ -1,8 +1,11 @@
+import type { ReviewSpatialRenderer } from '../../workflows/video-review/spatial-renderer';
 import { createReviewWindowRaster } from '../../workflows/video-review/window-header';
 import { drawReviewSceneShadow } from '../../workflows/video-review/scene-shadow';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import {
   computeQuickEditSceneCamera,
+  computeQuickEditSpatialWindow,
+  computeQuickEditSpatialRasterLayout,
   computeQuickEditWindowTransform,
   computeQuickEditVisibleSourceRect,
 } from '../../features/video/review/advanced/scene';
@@ -22,6 +25,7 @@ export type ZoomPreviewLayout = ReturnType<typeof computeQuickEditSceneLayout>;
 export function paintZoomPreview(
   context: CanvasRenderingContext2D,
   args: {
+    spatialRenderer?: ReviewSpatialRenderer | undefined;
     background?: QuickEditBackgroundSettings;
     headerImage?: CanvasImageSource | null | undefined;
     accent: string;
@@ -36,6 +40,30 @@ export function paintZoomPreview(
     showControls?: boolean;
   }
 ) {
+  if (args.view === 'result' && args.camera.spatial) {
+    if (!args.spatialRenderer) throw new Error('Perspective renderer is unavailable.');
+    const plane = args.spatialRenderer.surface('plane', args.width, args.height);
+    paintZoomPreview(plane.context, {
+      ...args,
+      view: 'result',
+      showControls: false,
+      layout: computeQuickEditSpatialRasterLayout(
+        args.layout,
+        args.background ?? { enabled: false }
+      ),
+      background: { ...(args.background ?? { enabled: false }), zoomBehavior: 'fixed' },
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
+    context.clearRect(0, 0, args.width, args.height);
+    args.spatialRenderer.draw(
+      context,
+      plane.canvas,
+      args.layout.windowRect,
+      computeQuickEditSpatialWindow(args.layout, args.background ?? { enabled: false }),
+      args.camera.spatial
+    );
+    return;
+  }
   const { videoRect, videoTransform } = args.layout;
   const motion = computeQuickEditSceneCamera(args.layout, args.background ?? { enabled: false });
   const clip = args.view === 'area' ? args.layout.windowRect : motion.windowClip;

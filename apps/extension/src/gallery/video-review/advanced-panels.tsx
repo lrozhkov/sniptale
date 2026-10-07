@@ -1,3 +1,5 @@
+import { quickEditSpatialSpan } from '../../features/video/review/advanced/spatial';
+import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { Scan, Paintbrush, AudioLines, PanelTop } from 'lucide-react';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
@@ -87,6 +89,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
 
 /** Scene controls are independent of the selected zoom and its property panel. */
 export function ReviewSceneProperties(props: {
+  focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
   background: QuickEditAdvancedState['background'];
   canvas: QuickEditAdvancedState['canvas'];
   windowHeader?: QuickEditAdvancedState['windowHeader'];
@@ -141,6 +144,14 @@ export function ReviewSceneProperties(props: {
             icon: Paintbrush,
             content: (
               <ReviewBackgroundInspector
+                perspectiveFixed={
+                  props.focus
+                    ? quickEditSpatialSpan(
+                        resolveQuickEditEffectiveState(props.focus.advanced).zoomRegions,
+                        props.focus.time
+                      )
+                    : false
+                }
                 background={props.background}
                 pending={props.pending}
                 onImportImage={props.onImportImage}

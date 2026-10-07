@@ -96,16 +96,23 @@ export function ReviewStageBinding(props: {
     : { scale: 1, centerX: 0.5, centerY: 0.5 };
   const geometryRef = useRef<{
     output: { width: number; height: number };
+    projection?:
+      | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+      | undefined;
     videoTransform: { x: number; y: number; width: number; height: number } | null;
   } | null>(null);
   const onGeometry = useCallback(
     (geometry: {
       output: { width: number; height: number };
+      projection?:
+        | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+        | undefined;
       videoTransform: { x: number; y: number; width: number; height: number } | null;
     }) => {
       const previous = geometryRef.current;
       if (
         previous &&
+        JSON.stringify(previous.projection) === JSON.stringify(geometry.projection) &&
         previous.output.width === geometry.output.width &&
         previous.output.height === geometry.output.height &&
         previous.videoTransform?.x === geometry.videoTransform?.x &&

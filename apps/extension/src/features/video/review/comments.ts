@@ -1,3 +1,8 @@
+import {
+  projectQuickEditPoint,
+  invertQuickEditProjection,
+  type QuickEditHomography,
+} from './advanced/spatial-geometry';
 import { createSolidPaint } from '@sniptale/foundation/paint';
 import type { CanvasComment, ReviewAnnotation, ReviewDocument } from './types';
 import {
@@ -198,15 +203,28 @@ export function clampCanvasCommentTimes(
 export function switchCanvasCommentAttachment(
   comment: CanvasComment,
   attachment: CanvasComment['attachment'],
-  geometry: { output: { width: number; height: number }; videoTransform: QuickEditRect | null }
+  geometry: {
+    output: { width: number; height: number };
+    videoTransform: QuickEditRect | null;
+    projection?: QuickEditHomography | undefined;
+  }
 ): { position: { x: number; y: number } } | null {
-  const canvasPoint =
+  let canvasPoint =
     comment.attachment === 'content' && geometry.videoTransform
       ? quickEditContentPointToCanvas(comment.position, geometry.videoTransform)
       : {
           x: comment.position.x * geometry.output.width,
           y: comment.position.y * geometry.output.height,
         };
+  if (geometry.projection) {
+    const matrix =
+      attachment === 'viewport'
+        ? geometry.projection
+        : invertQuickEditProjection(geometry.projection);
+    const mapped = matrix ? projectQuickEditPoint(matrix, canvasPoint) : null;
+    if (!mapped) return null;
+    canvasPoint = mapped;
+  }
   if (attachment === 'viewport') {
     return {
       position: {

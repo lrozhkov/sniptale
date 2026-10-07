@@ -1,9 +1,14 @@
+import {
+  projectQuickEditPoint,
+  type QuickEditHomography,
+} from '../../features/video/review/advanced/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import { normalizeVideoPoint, regionFromPoints } from '../../features/video/review/geometry';
 import type { ReviewRegion } from '../../features/video/review/types';
 
 /** Annotation-region drawing: refs, escape restore, and pointer handlers live in one hook. */
 export function useReviewDrawingPlane(args: {
+  inverseProjection?: QuickEditHomography | undefined;
   drawing: boolean;
   content: { x: number; y: number; width: number; height: number };
   region: ReviewRegion | undefined;
@@ -43,7 +48,10 @@ export function useReviewDrawingPlane(args: {
   };
   const planePoint = (event: React.PointerEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
-    return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+    return args.inverseProjection
+      ? (projectQuickEditPoint(args.inverseProjection, point) ?? point)
+      : point;
   };
   return {
     drag,

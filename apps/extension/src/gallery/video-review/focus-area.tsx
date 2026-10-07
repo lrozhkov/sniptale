@@ -1,3 +1,5 @@
+import { captureReviewSpatialPointer } from './spatial-pointer';
+import type { QuickEditHomography } from '../../features/video/review/advanced/spatial-geometry';
 import { useRef, type PointerEvent, type KeyboardEvent } from 'react';
 import { useCapturedPreview } from './captured-preview';
 import { translate } from '../../platform/i18n';
@@ -12,6 +14,7 @@ import {
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
 type FocusAreaProps = {
+  projection?: QuickEditHomography | undefined;
   area: QuickEditSpotlight['area'];
   label?: string;
   output: { width: number; height: number };
@@ -55,6 +58,7 @@ export function ReviewFocusArea(props: FocusAreaProps) {
 }
 
 type SpotlightCapture = {
+  pointer: ReturnType<typeof captureReviewSpatialPointer>;
   id: number;
   x: number;
   y: number;
@@ -81,8 +85,8 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     trackPointer(event);
     const active = drag.current;
     if (!active || active.id !== event.pointerId) return;
-    const dx = (event.clientX - active.x) / active.width;
-    const dy = (event.clientY - active.y) / active.height;
+    const dx = (active.pointer(event).x - active.x) / active.width;
+    const dy = (active.pointer(event).y - active.y) / active.height;
     const area = clampQuickEditSpotlightArea(
       active.resize
         ? resizeSpotlightArea(
@@ -115,16 +119,23 @@ function useSpotlightAreaGesture(props: FocusAreaProps) {
     event.currentTarget.focus();
     trackPointer(event);
     props.onInteract?.();
+    const pointer = captureReviewSpatialPointer(host.current, props.projection, props.output);
+    const point = pointer(event);
     drag.current = {
+      pointer,
       id: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
+      x: point.x,
+      y: point.y,
       area: props.area,
       pending: null,
       resize: focusCorner(event.target),
       node: host.current,
-      width: (bounds.width * props.video.width) / props.output.width,
-      height: (bounds.height * props.video.height) / props.output.height,
+      width: props.projection
+        ? props.video.width
+        : (bounds.width * props.video.width) / props.output.width,
+      height: props.projection
+        ? props.video.height
+        : (bounds.height * props.video.height) / props.output.height,
     };
     setDraft(props.area);
     host.current.setPointerCapture(event.pointerId);

@@ -28,6 +28,7 @@ function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
 
 /** Canvas background owner: kind, paint, and layout belong to the whole frame. */
 export function ReviewBackgroundInspector(props: {
+  perspectiveFixed?: boolean | undefined;
   pending?: boolean;
   onImportImage?: ((file: File, originMediaId?: string) => void) | undefined;
   background: QuickEditBackgroundSettings;
@@ -121,7 +122,11 @@ export function ReviewBackgroundInspector(props: {
         ) : null}
       </div>
       {background.enabled ? (
-        <ReviewBackgroundLayoutControls background={background} onChange={onChange} />
+        <ReviewBackgroundLayoutControls
+          perspectiveFixed={props.perspectiveFixed}
+          background={background}
+          onChange={onChange}
+        />
       ) : null}
     </div>
   );
@@ -129,9 +134,11 @@ export function ReviewBackgroundInspector(props: {
 
 /** Frame geometry and camera participation, independent of the selected paint kind. */
 function ReviewBackgroundLayoutControls({
+  perspectiveFixed,
   background,
   onChange,
 }: {
+  perspectiveFixed?: boolean | undefined;
   background: Extract<QuickEditBackgroundSettings, { enabled: true }>;
   onChange(patch: QuickEditBackgroundPatch): void;
 }) {
@@ -159,7 +166,8 @@ function ReviewBackgroundLayoutControls({
       <SelectField
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.backgroundZoom')}
-        value={background.zoomBehavior ?? 'fixed'}
+        disabled={perspectiveFixed}
+        value={perspectiveFixed ? 'fixed' : (background.zoomBehavior ?? 'fixed')}
         options={[
           { value: 'fixed', label: translate('gallery.videoReview.backgroundZoomFixed') },
           {
@@ -168,10 +176,15 @@ function ReviewBackgroundLayoutControls({
           },
         ]}
         onChange={(zoomBehavior) => {
-          if (zoomBehavior === 'fixed' || zoomBehavior === 'follow-video')
+          if (!perspectiveFixed && (zoomBehavior === 'fixed' || zoomBehavior === 'follow-video'))
             onChange({ zoomBehavior });
         }}
       />
+      {perspectiveFixed ? (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.perspectiveBackground')}
+        </p>
+      ) : null}
       {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
       {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
       <ReviewNumberRow

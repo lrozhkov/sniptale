@@ -14,6 +14,9 @@ type Session = ReturnType<
 /** Geometry the stage observes; attachment switching maps points through it. */
 interface ReviewCommentGeometry {
   output: { width: number; height: number };
+  projection?:
+    | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
+    | undefined;
   videoTransform: { x: number; y: number; width: number; height: number } | null;
 }
 

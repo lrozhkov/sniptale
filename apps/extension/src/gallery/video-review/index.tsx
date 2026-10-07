@@ -699,6 +699,7 @@ function ReviewScenePropertiesBinding({
   const { busy, editing } = state;
   return (
     <ReviewSceneProperties
+      focus={{ advanced: state.advanced, time: state.timeline.sceneOutputTime }}
       background={state.advanced.background}
       canvas={state.advanced.canvas}
       source={source}

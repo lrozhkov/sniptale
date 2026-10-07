@@ -474,6 +474,8 @@ function focusRevision(region: QuickEditZoomRegion | undefined): string {
     region.end,
     region.dormant,
     region.border,
+    region.perspective,
+    region.depthOfField,
     region.linkTo,
     region.linkEasing,
     camera.scale,

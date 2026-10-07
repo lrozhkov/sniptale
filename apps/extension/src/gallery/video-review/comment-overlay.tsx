@@ -1,3 +1,8 @@
+import {
+  invertQuickEditProjection,
+  projectQuickEditPoint,
+  type QuickEditHomography,
+} from '../../features/video/review/advanced/spatial-geometry';
 import { useEffect, useRef, useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { translate } from '../../platform/i18n';
@@ -71,6 +76,7 @@ function OverlayCommentBubble(props: {
 
 /** One overlay bubble with its media-time pulse and pointer drag commit. */
 function OverlayComment(props: {
+  projection?: QuickEditHomography | undefined;
   comment: CanvasComment;
   resolvedText: string;
   scale: number;
@@ -113,6 +119,14 @@ function OverlayComment(props: {
     };
     dragPositionRef.current = next;
     setDragPosition(next);
+  };
+  const pointer = (event: React.PointerEvent<HTMLElement>) => {
+    const stage = event.currentTarget
+      .closest('[data-ui="gallery.videoReview.stage"]')
+      ?.getBoundingClientRect();
+    const point = { x: event.clientX - (stage?.left ?? 0), y: event.clientY - (stage?.top ?? 0) };
+    const inverse = props.projection ? invertQuickEditProjection(props.projection) : null;
+    return inverse ? (projectQuickEditPoint(inverse, point) ?? point) : point;
   };
   const finish = () => {
     origin.current = null;
@@ -163,7 +177,7 @@ function OverlayComment(props: {
           event.stopPropagation();
           event.currentTarget.setPointerCapture(event.pointerId);
           origin.current = {
-            pointer: { x: event.clientX, y: event.clientY },
+            pointer: pointer(event),
             position: { ...props.comment.position },
           };
         }}
@@ -171,8 +185,8 @@ function OverlayComment(props: {
           if (!origin.current) return;
           event.preventDefault();
           preview(
-            event.clientX - origin.current.pointer.x,
-            event.clientY - origin.current.pointer.y
+            pointer(event).x - origin.current.pointer.x,
+            pointer(event).y - origin.current.pointer.y
           );
         }}
         onPointerUp={(event) => {
@@ -205,6 +219,10 @@ function OverlayComment(props: {
  * phase is a function of media time, so a paused seek and the export agree.
  */
 export function ReviewCommentOverlay(props: {
+  clip?:
+    | { rect: { x: number; y: number; width: number; height: number }; radius: number }
+    | undefined;
+  projection?: QuickEditHomography | undefined;
   comments: readonly CanvasComment[];
   layout?: ReturnType<typeof computeQuickEditSceneLayout> | undefined;
   annotations?: readonly ReviewAnnotation[];
@@ -226,8 +244,24 @@ export function ReviewCommentOverlay(props: {
       background: props.background,
       camera: props.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 },
     });
+  const clip = props.projection ? props.clip?.rect : null;
+  const radius = props.clip?.radius ?? 0;
   return (
     <div
+      style={
+        clip
+          ? {
+              clipPath: `inset(${[
+                clip.y,
+                props.output.width - clip.x - clip.width,
+                props.output.height - clip.y - clip.height,
+                clip.x,
+              ]
+                .map((v) => `${v}px`)
+                .join(' ')} round ${radius}px)`,
+            }
+          : undefined
+      }
       data-ui="gallery.videoReview.commentOverlay"
       className="pointer-events-none absolute inset-0 overflow-hidden"
     >
@@ -238,6 +272,7 @@ export function ReviewCommentOverlay(props: {
           return (
             <OverlayComment
               key={comment.id}
+              projection={content ? props.projection : undefined}
               comment={comment}
               resolvedText={canvasCommentText(comment, props.annotations ?? [])}
               videoTransform={content ? layout.videoTransform : null}

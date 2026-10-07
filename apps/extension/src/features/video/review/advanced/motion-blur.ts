@@ -41,6 +41,7 @@ export function quickEditMotionBlurCameras(regions: readonly QuickEditZoomRegion
 /** Suppresses the exposure during explicit target/gesture overrides as well as static holds. */
 export function sameQuickEditCamera(a: QuickEditCameraTransform, b: QuickEditCameraTransform) {
   return (
+    JSON.stringify(a.spatial) === JSON.stringify(b.spatial) &&
     Math.abs(a.scale - b.scale) < 1e-7 &&
     Math.abs(a.centerX - b.centerX) < 1e-7 &&
     Math.abs(a.centerY - b.centerY) < 1e-7

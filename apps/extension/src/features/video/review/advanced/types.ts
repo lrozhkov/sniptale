@@ -30,6 +30,8 @@ export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
 
 /** Camera target normalized over the whole window (video plus optional header), excluding background. */
 export interface QuickEditCameraTransform {
+  /** Evaluated only; storage parsers discard this renderer state. */
+  spatial?: import('./spatial').QuickEditSpatialFrame;
   scale: number;
   centerX: number;
   centerY: number;
@@ -66,6 +68,8 @@ export interface QuickEditBorder {
 }
 
 export interface QuickEditZoomRegion {
+  perspective?: import('./spatial').QuickEditPerspective;
+  depthOfField?: import('./spatial').QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
   motionBlur?: Partial<Record<'enter' | 'exit' | 'link', { enabled: boolean; strength: number }>>;
   border?: QuickEditBorder;
