@@ -6,7 +6,7 @@ export const settingsEditorMessages = defineMessageSource({
     add: { en: 'Add background', ru: 'Добавить фон' },
     upload: { en: 'From computer', ru: 'С компьютера' },
     library: { en: 'From Library', ru: 'Из библиотеки' },
-    showMore: { en: 'Show 30 more', ru: 'Показать ещё 30' },
+    showMore: { en: 'Show more', ru: 'Показать ещё' },
     unavailable: { en: 'Image unavailable', ru: 'Изображение недоступно' },
     failed: {
       en: 'Could not load or save the background. Try again.',

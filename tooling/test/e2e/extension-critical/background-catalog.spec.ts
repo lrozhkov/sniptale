@@ -160,7 +160,7 @@ for (const viewport of [
         .click();
       const picker = page.locator('[data-ui="background.image.picker"]');
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(9);
-      await picker.getByRole('button', { name: 'Show 30 more', exact: true }).click();
+      await picker.getByRole('button', { name: 'Show more', exact: true }).click();
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(20);
       let release!: () => void;
       const hold = new Promise<void>((resolve) => {
@@ -239,7 +239,7 @@ for (const viewport of [
         .click();
       const picker = page.locator('[data-ui="background.image.picker"]');
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(9);
-      await picker.getByRole('button', { name: 'Show 30 more', exact: true }).click();
+      await picker.getByRole('button', { name: 'Show more', exact: true }).click();
       await picker.getByRole('button', { name: 'Blue Hour', exact: true }).click();
       await expect(picker.getByRole('button', { name: 'Blue Hour', exact: true })).toHaveAttribute(
         'aria-pressed',
@@ -277,7 +277,7 @@ for (const viewport of [
       await page.getByRole('option', { name: 'Image', exact: true }).click();
       const picker = page.locator('[data-ui="background.image.picker"]');
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(9);
-      await picker.getByRole('button', { name: 'Show 30 more', exact: true }).click();
+      await picker.getByRole('button', { name: 'Show more', exact: true }).click();
       await picker.getByRole('button', { name: 'Blue Hour', exact: true }).click();
       await expect(picker.getByRole('button', { name: 'Blue Hour', exact: true })).toHaveAttribute(
         'aria-pressed',
