@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { expect, test, type Page, type Locator } from '@playwright/test';
-import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { translate, formatNumber } from '../../../../apps/extension/src/platform/i18n';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -112,7 +112,7 @@ for (const variant of [
         height: 90,
         duration: 12.01,
       });
-      await seedHistory(page);
+      await seedHistory(page, true);
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -121,10 +121,103 @@ for (const variant of [
         .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
         .click();
       const history = dialog.locator('[data-ui="gallery.videoReview.actionHistory"]');
-      await expect(history.locator('li')).toHaveCount(8);
+      await expect(history.locator('li')).toHaveCount(10);
+      const configure = history.getByRole('button', {
+        name: label('gallery.videoReview.historyConfigure'),
+        exact: true,
+      });
+      await expect(configure).toBeDisabled();
+      const search = history.getByRole('searchbox');
+      await expect(search).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      expect((await search.boundingBox())!.height).toBeGreaterThanOrEqual(28);
+      await search.focus();
+      expect(await search.evaluate((node) => getComputedStyle(node, '::placeholder').color)).toBe(
+        'rgba(0, 0, 0, 0)'
+      );
+      await search.fill('not found');
+      await expect(history.locator('li')).toHaveCount(0);
+      await expect(history.getByRole('checkbox')).toBeDisabled();
       await history
-        .getByRole('button', { name: label('gallery.videoReview.historySelectAll'), exact: true })
+        .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
         .click();
+      await expect(search).toBeFocused();
+      await expect(history.locator('li')).toHaveCount(10);
+      await history.locator('li input[type="checkbox"]').first().check();
+      const master = history.getByRole('checkbox', {
+        name: label('gallery.videoReview.historySelectAll'),
+        exact: true,
+      });
+      await expect(master).toBeChecked({ indeterminate: true });
+      await search.fill(label('gallery.videoReview.eventCursorIdle'));
+      await expect(history.locator('li')).toHaveCount(2);
+      await expect(history).toContainText(label('gallery.videoReview.historyHiddenSelected'));
+      await configure.click();
+      await expect(history.locator('ol')).toHaveCount(0);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
+        .click();
+      await expect(search).toHaveValue(label('gallery.videoReview.eventCursorIdle'));
+      await expect(configure).toBeFocused();
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
+        .click();
+      await page.screenshot({
+        path: info.outputPath('history-list-selection.png'),
+        fullPage: false,
+      });
+      const filters = history.locator('details').filter({
+        has: page.getByText(label('gallery.videoReview.historyFilters'), { exact: true }),
+      });
+      await filters.locator('summary').click();
+      const selectType = async (key: Parameters<typeof translate>[0]) => {
+        await history
+          .getByRole('button', { name: label('gallery.videoReview.historyType'), exact: true })
+          .click();
+        await page.getByRole('option', { name: label(key), exact: true }).click();
+      };
+      await selectType('gallery.videoReview.eventStatic');
+      await expect(history.locator('li')).toHaveCount(1);
+      const longer = history.getByRole('textbox', {
+        name: label('gallery.videoReview.historyLonger'),
+        exact: true,
+      });
+      await longer.fill('2');
+      await longer.press('Enter');
+      await expect(history.locator('li')).toHaveCount(0);
+      await selectType('gallery.videoReview.eventTyping');
+      await longer.fill('5');
+      await longer.press('Enter');
+      await expect(history.locator('li')).toHaveCount(1);
+      await expect(history.locator('li')).toContainText('Search field');
+      await expect(history.locator('li')).toContainText(
+        label('gallery.videoReview.intervalSeconds').replace(
+          '{value}',
+          formatNumber(5.51, { maximumFractionDigits: 2 }, variant.locale)
+        )
+      );
+      await history.locator('li').scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('history-typing-filter.png'),
+        fullPage: false,
+      });
+      await longer.fill('0');
+      await longer.press('Enter');
+      await selectType('gallery.videoReview.historyAll');
+      await filters.locator('summary').click();
+      await search.fill('Save recording');
+      await expect(history.locator('li')).toHaveCount(6);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
+        .click();
+      await history
+        .getByRole('checkbox', { name: label('gallery.videoReview.historySelectAll'), exact: true })
+        .click();
+      const listScroll = await history.evaluate((node) => {
+        const scroll = node.closest('.review-inspector-scroll')!;
+        scroll.scrollTop = 24;
+        return scroll.scrollTop;
+      });
+      await configure.click();
       await history
         .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
         .click();
@@ -159,6 +252,12 @@ for (const variant of [
         .getByRole('option', { name: label('gallery.videoReview.click_press'), exact: true })
         .click();
       await expect(animated).toHaveCount(6);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
+        .click();
+      await expect
+        .poll(() => history.evaluate((node) => node.closest('.review-inspector-scroll')!.scrollTop))
+        .toBe(listScroll);
       await history
         .getByRole('button', { name: label('gallery.videoReview.historyClear'), exact: true })
         .click();
@@ -195,51 +294,76 @@ for (const variant of [
   });
 }
 
-async function seedHistory(page: Page) {
-  await page.evaluate(async (fixture) => {
-    const db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(fixture.databaseName);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-    const transaction = db.transaction('recording_telemetry', 'readwrite');
-    const done = new Promise<void>((resolve, reject) => {
-      transaction.oncomplete = () => resolve();
-      transaction.onabort = () => reject(transaction.error);
-    });
-    transaction.objectStore('recording_telemetry').put({
-      recordingId: fixture.records.recordings[0].id,
-      captureMode: 'TAB',
-      createdAt: 1,
-      updatedAt: 1,
-      viewport: null,
-      cursorTrack: null,
-      signals: [
-        [0.13, 3.27],
-        [3.27, 6.41],
-      ].map(([startTime, endTime], index) => ({
-        id: `idle-${index}`,
-        kind: 'cursor-idle',
-        startTime,
-        endTime,
-        point: null,
-        data: {},
-      })),
-      actionEvents: Array.from({ length: 6 }, (_, index) => ({
-        id: `click-${index}`,
-        kind: 'CLICK',
-        time: 1 + index * 0.01,
-        duration: 0,
-        point: { x: 40, y: 30 },
-        recordingPoint: { x: 0.25, y: 0.33 },
-        label: '',
-        data: {},
-        preset: 'NONE',
-      })),
-    });
-    await done;
-    db.close();
-  }, betaV1Fixture);
+async function seedHistory(page: Page, detailed = false) {
+  await page.evaluate(
+    async ({ fixture, detailed }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open(fixture.databaseName);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = db.transaction('recording_telemetry', 'readwrite');
+      const done = new Promise<void>((resolve, reject) => {
+        transaction.oncomplete = () => resolve();
+        transaction.onabort = () => reject(transaction.error);
+      });
+      transaction.objectStore('recording_telemetry').put({
+        recordingId: fixture.records.recordings[0].id,
+        captureMode: 'TAB',
+        createdAt: 1,
+        updatedAt: 1,
+        viewport: null,
+        cursorTrack: null,
+        signals: [
+          ...[
+            [0.13, 3.27],
+            [3.27, 6.41],
+          ].map(([startTime, endTime], index) => ({
+            id: `idle-${index}`,
+            kind: 'cursor-idle',
+            startTime,
+            endTime,
+            point: null,
+            data: {},
+          })),
+          ...(detailed
+            ? [
+                {
+                  id: 'static',
+                  kind: 'static-frame',
+                  startTime: 7,
+                  endTime: 9,
+                  point: null,
+                  data: {},
+                },
+                {
+                  id: 'typing',
+                  kind: 'typing',
+                  startTime: 6.5,
+                  endTime: 12.01,
+                  point: null,
+                  data: { targetName: 'Search field' },
+                },
+              ]
+            : []),
+        ],
+        actionEvents: Array.from({ length: 6 }, (_, index) => ({
+          id: `click-${index}`,
+          kind: 'CLICK',
+          time: 1 + index * 0.01,
+          duration: 0,
+          point: { x: 40, y: 30 },
+          recordingPoint: { x: 0.25, y: 0.33 },
+          label: detailed ? 'Save recording' : '',
+          data: {},
+          preset: 'NONE',
+        })),
+      });
+      await done;
+      db.close();
+    },
+    { fixture: betaV1Fixture, detailed }
+  );
 }
 
 async function verifyClickExport(page: Page, path: string) {

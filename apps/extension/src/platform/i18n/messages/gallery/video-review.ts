@@ -2,6 +2,15 @@ import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
   clickMilliseconds: { ru: 'мс', en: 'ms' },
+  historyFilters: { ru: 'Фильтры', en: 'Filters' },
+  historyType: { ru: 'Тип действия', en: 'Action type' },
+  historyLonger: { ru: 'Дольше', en: 'Longer than' },
+  historyStatus: { ru: 'Показывать', en: 'Show' },
+  historySelectedOnly: { ru: 'Только выбранные щелчки', en: 'Selected clicks only' },
+  historyHiddenSelected: { ru: 'скрыто фильтром', en: 'hidden by filter' },
+  historyConfigure: { ru: 'Настроить щелчки', en: 'Configure clicks' },
+  historyBack: { ru: 'К списку', en: 'Back to list' },
+  historySearchClear: { ru: 'Очистить поиск', en: 'Clear search' },
   historyOpen: { ru: 'Открыть историю действий', en: 'Open action history' },
   historyAnimatedOnly: { ru: 'Только с анимацией', en: 'Only animated actions' },
   historySearch: { ru: 'Поиск действий', en: 'Search actions' },

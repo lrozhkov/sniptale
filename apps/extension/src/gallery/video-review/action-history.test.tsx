@@ -66,20 +66,28 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     target: `Target ${i}`,
     focusPoint: { x: 0.5, y: 0.5 },
   }));
-  const render = (animated = false) =>
+  const render = (animated = false, busy = false) =>
     act(() =>
       root.render(
         <ReviewActionHistory
           markers={[
             ...markers,
-            { ref: { kind: 'action', id: 'idle' }, eventType: 'CURSOR_IDLE', start: 56, end: 58 },
+            { ref: { kind: 'action', id: 'unlocated' }, eventType: 'CLICK', start: 55, end: 55 },
+            { ref: { kind: 'signal', id: 'idle' }, eventType: 'static-frame', start: 56, end: 58 },
+            {
+              ref: { kind: 'signal', id: 'typing' },
+              eventType: 'typing',
+              target: 'Search field',
+              start: 60,
+              end: 66,
+            },
           ]}
           animations={
             animated
               ? [{ ...REVIEW_CLICK_DEFAULT, id: 'c0', effect: 'ripple', color: '#ff0000ff' }]
               : []
           }
-          busy={false}
+          busy={busy}
           onChange={onChange}
           onSelect={onSelect}
         />
@@ -107,8 +115,41 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     render();
     expect(host.querySelectorAll('li')).toHaveLength(50);
     click('historyMore');
-    expect(host.querySelectorAll('li')).toHaveLength(56);
+    expect(host.querySelectorAll('li')).toHaveLength(58);
+    expect(
+      host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.historyConfigure"]')
+        ?.disabled
+    ).toBe(true);
+    act(() => host.querySelector<HTMLInputElement>('li input[type="checkbox"]')!.click());
+    change('historySearch', 'Target 1');
     click('historySelectAll');
+    expect(host.textContent).toContain('gallery.videoReview.historyHiddenSelected');
+    click('historySelectAll');
+    click('historyConfigure');
+    change('clickEffect', 'ripple');
+    expect(onChange).toHaveBeenLastCalledWith(['c0'], { effect: 'ripple' });
+    click('historyBack');
+    click('historySearchClear');
+    expect(
+      host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.historySelectAll"]')!
+        .indeterminate
+    ).toBe(true);
+    change('historyStatus', 'selected');
+    expect(host.querySelectorAll('li')).toHaveLength(1);
+    change('historyStatus', 'all');
+    click('historyClear');
+    render(false, true);
+    click('historySelectAll');
+    expect(
+      host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.historySelectAll"]')!
+        .checked
+    ).toBe(false);
+    render();
+    click('historyMore');
+    click('historySelectAll');
+    expect(host.querySelector('[data-ui="gallery.videoReview.clickFields"]')).toBeNull();
+    click('historyConfigure');
+    expect(host.querySelector('ol')).toBeNull();
     change('clickEffect', 'ripple');
     expect(onChange).toHaveBeenLastCalledWith(
       markers.map((m) => m.ref.id),
@@ -126,17 +167,36 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { color: '#00ff00' });
     click('clickReset');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), null);
+    click('historyBack');
+    expect(host.querySelectorAll('li')).toHaveLength(58);
     click('historyClear');
     act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
     act(() => host.querySelector<HTMLInputElement>('input[type="checkbox"]')!.click());
-    change('telemetry', 'animated');
+    change('historyStatus', 'animated');
     expect(host.querySelectorAll('li')).toHaveLength(1);
     act(() => host.querySelector<HTMLButtonElement>('li button')!.click());
     expect(onSelect).toHaveBeenCalledWith(markers[0]);
-    change('telemetry', 'clicks');
+    change('historyStatus', 'all');
+    change('historyType', 'clicks');
     expect(host.querySelectorAll('li')).toHaveLength(50);
     change('historySearch', 'not found');
     expect(host.textContent).toContain('gallery.videoReview.historyEmpty');
+    expect(
+      host.querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.historySelectAll"]')!
+        .disabled
+    ).toBe(true);
+    click('historySearchClear');
+    change('historyType', 'static-frame');
+    expect(host.querySelectorAll('li')).toHaveLength(1);
+    change('historyLonger', '2');
+    expect(host.querySelectorAll('li')).toHaveLength(0);
+    change('historyType', 'typing');
+    change('historyLonger', '5');
+    expect(host.querySelectorAll('li')).toHaveLength(1);
+    expect(host.querySelector('li')!.textContent).toContain('Search field');
+    expect(host.querySelector('li input')).toBeNull();
+    act(() => host.querySelector<HTMLButtonElement>('li button')!.click());
+    expect(onSelect).toHaveBeenLastCalledWith(expect.objectContaining({ eventType: 'typing' }));
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();
