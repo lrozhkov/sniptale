@@ -174,6 +174,22 @@ for (const variant of [
       expect((await ruler.boundingBox())!.y).toBeCloseTo(before.y, 0);
       const y = before.y + before.height / 2;
       const x = controlsBefore.x + controlsBefore.width + 120;
+      await page.mouse.move(x, y);
+      const hoverGuide = dialog.locator('[data-ui="gallery.videoReview.hoverTime"]');
+      await expect(hoverGuide).toBeVisible();
+      const guideStyle = await hoverGuide.evaluate((node) => ({
+        z: Number(getComputedStyle(node).zIndex),
+        pointerEvents: getComputedStyle(node).pointerEvents,
+      }));
+      const rulerZ = await dialog
+        .locator('[data-ui="gallery.videoReview.rulerRow"]')
+        .evaluate((node) => Number(getComputedStyle(node).zIndex));
+      expect(guideStyle.pointerEvents).toBe('none');
+      expect(guideStyle.z).toBeGreaterThan(rulerZ);
+      await page.screenshot({
+        path: info.outputPath('hover-above-sticky-ruler.png'),
+        fullPage: false,
+      });
       await page.mouse.click(x, y);
       const head = dialog.locator('[data-ui="gallery.videoReview.playhead"]');
       const cap = dialog.locator('[data-ui="gallery.videoReview.rulerPlayhead"]');

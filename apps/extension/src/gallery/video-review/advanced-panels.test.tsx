@@ -89,8 +89,13 @@ function Harness() {
   );
 }
 
-const button = (key: string) =>
-  host.querySelector<HTMLButtonElement>(`[aria-label="${key}"]`) as HTMLButtonElement;
+const button = (key: string) => {
+  const match = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.getAttribute('aria-label') === key || node.textContent === key
+  );
+  if (!match) throw new Error(`Missing button: ${key}`);
+  return match;
+};
 
 it('shows the same authored source seconds as the focus block under Speed', () => {
   const region = {

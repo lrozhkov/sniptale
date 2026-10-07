@@ -102,7 +102,7 @@ export function useReviewTimelineHover(options: HoverOptions) {
   };
 }
 
-/** Preview marker stays over the plane and never captures input. */
+/** Preview marker stays above the sticky ruler (z-40) and never captures input. */
 export function ReviewTimelineHoverGuide(props: {
   hover: Hover | null;
   viewport: RefObject<HTMLDivElement | null>;
@@ -119,7 +119,7 @@ export function ReviewTimelineHoverGuide(props: {
       data-ui="gallery.videoReview.hoverTime"
       aria-hidden="true"
       data-snapped={hover.snapped ? 'true' : undefined}
-      className="pointer-events-none absolute bottom-2 top-0 z-[19] w-px bg-[var(--sniptale-color-accent-emphasis)]/70"
+      className="pointer-events-none absolute bottom-2 top-0 z-[41] w-px bg-[var(--sniptale-color-accent-emphasis)]/70"
       style={{ left: hover.x }}
     >
       <span
