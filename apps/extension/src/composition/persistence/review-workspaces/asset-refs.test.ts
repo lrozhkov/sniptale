@@ -426,3 +426,61 @@ it('retains and portably remaps images in current content, undo history, and rec
   );
   expect(collectReviewAssetReferences(snapshot.workspace)).toContain('project-asset:current');
 });
+
+it('retains inactive background references in every history and recovery position and remaps portable refs', () => {
+  const background = (id: string) => ({
+    enabled: false as const,
+    rememberedImage: { assetId: `project-asset:${id}`, imageFit: 'contain' as const },
+  });
+  const baseline = advanced({ background: background('base') });
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: { ...baseline, recoveryV1: JSON.stringify({ background: background('recovery') }) },
+      history: [
+        {
+          id: 'attach',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), background: background('after') },
+        },
+      ],
+    },
+  };
+  const references = ['base', 'recovery', 'after'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}`))
+  );
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset id');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  expect(JSON.stringify(portable.workspace.advanced.background)).toContain('assetRef');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow('unresolved');
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(references.map((id) => [id, `${id}-restored`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(references.map((id) => `project-asset:${id}-restored`))
+  );
+  expect(snapshot.workspace.advanced.background.rememberedImage?.assetId).toBe(
+    'project-asset:base'
+  );
+});

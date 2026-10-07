@@ -110,3 +110,40 @@ it('preserves background motion across paint, layout, disable and re-enable chan
     'fixed'
   );
 });
+
+it('restores the same image and fit after inactive paint changes without importing again', () => {
+  const image: QuickEditBackgroundSettings = {
+    enabled: true,
+    type: 'image',
+    assetId: 'project-asset:custom',
+    imageFit: 'contain',
+    layout: { padding: 40, cornerRadius: 12 },
+  };
+  let background: QuickEditBackgroundSettings = image;
+  for (const patch of [
+    { type: 'gradient' as const },
+    { type: 'solid' as const },
+    { enabled: false },
+  ]) {
+    background = updateQuickEditBackground(background, patch);
+    expect(updateQuickEditBackground(background, { enabled: true, type: 'image' })).toMatchObject({
+      enabled: true,
+      type: 'image',
+      assetId: image.assetId,
+      imageFit: 'contain',
+    });
+  }
+});
+
+it('replaces the remembered image with the latest choice without retaining an extra reference', () => {
+  const first = updateQuickEditBackground({ enabled: false }, { type: 'image', assetId: 'first' });
+  const inactive = updateQuickEditBackground(first, { type: 'solid' });
+  const second = updateQuickEditBackground(inactive, { type: 'image', assetId: 'second' });
+  expect(second).not.toHaveProperty('rememberedImage');
+  const restored = updateQuickEditBackground(
+    updateQuickEditBackground(second, { enabled: false }),
+    { type: 'image' }
+  );
+  expect(restored).toMatchObject({ type: 'image', assetId: 'second' });
+  expect(restored).not.toHaveProperty('rememberedImage');
+});

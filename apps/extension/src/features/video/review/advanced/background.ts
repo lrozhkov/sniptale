@@ -41,7 +41,12 @@ export function updateQuickEditBackground(
 ): QuickEditBackgroundSettings {
   const zoomBehavior = patch.zoomBehavior ?? background.zoomBehavior;
   const motion = zoomBehavior ? { zoomBehavior } : {};
-  if (patch.enabled === false) return { enabled: false, ...motion };
+  const image =
+    background.enabled && background.type === 'image'
+      ? { assetId: background.assetId, imageFit: background.imageFit }
+      : background.rememberedImage;
+  const retained = image ? { rememberedImage: image } : {};
+  if (patch.enabled === false) return { enabled: false, ...motion, ...retained };
   const layout = patch.layout
     ? clampLayout(patch.layout)
     : background.enabled
@@ -52,6 +57,7 @@ export function updateQuickEditBackground(
   if (type === 'solid')
     return {
       ...motion,
+      ...retained,
       enabled: true,
       type,
       color: patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR),
@@ -60,21 +66,21 @@ export function updateQuickEditBackground(
   if (type === 'gradient') {
     const gradient =
       patch.gradient ?? (active && active.type === 'gradient' ? active.gradient : null);
-    if (gradient) return { enabled: true, type, gradient, layout, ...motion };
+    if (gradient) return { enabled: true, type, gradient, layout, ...motion, ...retained };
     // A paint switch must turn the background on even without stored gradient
     // data: derive a ready two-stop default from the previous paint color.
     const fallbackColor =
       patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR);
     const fallback = createGradientPaint(fallbackColor, () => crypto.randomUUID(), 'linear');
     if (fallback.kind !== 'gradient') return { enabled: false };
-    return { enabled: true, type, gradient: fallback.gradient, layout, ...motion };
+    return { enabled: true, type, gradient: fallback.gradient, layout, ...motion, ...retained };
   }
   return {
     enabled: true,
     ...motion,
     type: 'image',
-    assetId: patch.assetId ?? (active && active.type === 'image' ? active.assetId : ''),
-    imageFit: patch.imageFit ?? (active && active.type === 'image' ? active.imageFit : 'cover'),
+    assetId: patch.assetId ?? image?.assetId ?? '',
+    imageFit: patch.imageFit ?? image?.imageFit ?? 'cover',
     layout,
   };
 }

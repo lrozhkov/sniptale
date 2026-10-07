@@ -226,3 +226,26 @@ it('offers the fixed legacy default and commits following motion from the backgr
   );
   expect(host.querySelector('[aria-label="gallery.videoReview.backgroundZoom"]')).toBeNull();
 });
+
+it('restores a saved image when choosing Image without asking for another import', async () => {
+  const change = vi.fn();
+  const onImportImage = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{
+          enabled: false,
+          rememberedImage: { assetId: 'project-asset:custom', imageFit: 'contain' },
+        }}
+        onChange={change}
+        onImportImage={onImportImage}
+      />
+    )
+  );
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.backgroundImage"]')!.click()
+  );
+  expect(change).toHaveBeenCalledExactlyOnceWith({ enabled: true, type: 'image' });
+  expect(onImportImage).not.toHaveBeenCalled();
+  expect(host.querySelector('input[type="file"]')).not.toBeNull();
+});

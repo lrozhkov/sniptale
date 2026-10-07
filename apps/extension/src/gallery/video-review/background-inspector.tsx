@@ -49,7 +49,10 @@ export function ReviewBackgroundInspector(props: {
             value={imageRequested ? 'image' : background.enabled ? background.type : 'none'}
             onChange={(kind) => {
               setImageRequested(kind === 'image');
-              if (kind === 'image') return;
+              if (kind === 'image') {
+                if (background.rememberedImage) onChange({ enabled: true, type: 'image' });
+                return;
+              }
               onChange(
                 kind === 'none'
                   ? { enabled: false }

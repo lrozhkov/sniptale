@@ -561,3 +561,26 @@ it('round-trips independent blur phases without enabling old workspaces and reje
     ).toBeNull();
   }
 });
+
+it('round trips inactive image choices in state and history content, rejecting malformed references', () => {
+  const rememberedImage = { assetId: 'project-asset:background', imageFit: 'contain' as const };
+  for (const background of [
+    { enabled: false as const, rememberedImage },
+    { ...advanced().background, rememberedImage },
+  ]) {
+    const state = { ...advanced(), background };
+    expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+    const content = { ...createQuickEditAdvancedContent(), background };
+    expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))).toEqual(content);
+  }
+  for (const rememberedImage of [
+    null,
+    {},
+    { assetId: '', imageFit: 'cover' },
+    { assetId: 'a', imageFit: 'stretch' },
+  ]) {
+    expect(
+      loadQuickEditAdvancedState({ ...advanced(), background: { enabled: false, rememberedImage } })
+    ).toBeNull();
+  }
+});

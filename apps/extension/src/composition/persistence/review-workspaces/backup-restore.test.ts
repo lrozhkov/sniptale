@@ -271,45 +271,53 @@ it('backs up disabled image history and restores it with newly allocated asset r
   expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
 });
 
-it('rejects local asset ids hidden in portable current, history, and recovery state', () => {
-  const content = createQuickEditAdvancedContent();
-  const rawImage = {
-    enabled: true as const,
-    type: 'image' as const,
-    imageFit: 'cover' as const,
-    assetId: 'project-asset:local-secret',
-    layout: { padding: 0, cornerRadius: 0 },
-  };
-  const cases = [
-    { advanced: { ...workspace.advanced, background: rawImage } },
-    {
-      history: [
-        {
-          id: 'raw-history',
-          at: 1,
-          target: 'advancedContent' as const,
-          before: content,
-          after: { ...content, background: rawImage },
-        },
-      ],
-    },
-    {
-      advanced: {
-        ...workspace.advanced,
-        recoveryV1: JSON.stringify({ ...content, background: rawImage }),
+it.each([false, true])(
+  'rejects local asset ids hidden in portable current, history, and recovery state (remembered=%s)',
+  (remembered) => {
+    const content = createQuickEditAdvancedContent();
+    const rawImage = remembered
+      ? {
+          enabled: false,
+          rememberedImage: { assetId: 'project-asset:local-secret', imageFit: 'cover' },
+        }
+      : {
+          enabled: true as const,
+          type: 'image' as const,
+          imageFit: 'cover' as const,
+          assetId: 'project-asset:local-secret',
+          layout: { padding: 0, cornerRadius: 0 },
+        };
+    const cases = [
+      { advanced: { ...workspace.advanced, background: rawImage } },
+      {
+        history: [
+          {
+            id: 'raw-history',
+            at: 1,
+            target: 'advancedContent' as const,
+            before: content,
+            after: { ...content, background: rawImage },
+          },
+        ],
       },
-    },
-  ];
-  const { sourceAssetId: _local, ...portableWorkspace } = workspace;
-  for (const patch of cases) {
-    expect(() =>
-      parsePortableVideoReview(
-        { workspace: { ...portableWorkspace, ...patch }, draft: null },
-        workspace.aggregateId
-      )
-    ).toThrow('Portable video review contains a local asset id.');
+      {
+        advanced: {
+          ...workspace.advanced,
+          recoveryV1: JSON.stringify({ ...content, background: rawImage }),
+        },
+      },
+    ];
+    const { sourceAssetId: _local, ...portableWorkspace } = workspace;
+    for (const patch of cases) {
+      expect(() =>
+        parsePortableVideoReview(
+          { workspace: { ...portableWorkspace, ...patch }, draft: null },
+          workspace.aggregateId
+        )
+      ).toThrow('Portable video review contains a local asset id.');
+    }
   }
-});
+);
 
 it('rejects every portable asset reference that was not restored', () => {
   const advanced = createQuickEditAdvancedState();
@@ -339,4 +347,69 @@ it('rejects every portable asset reference that was not restored', () => {
       assetIdMap: new Map([['unrelated', 'restored-unrelated']]),
     })
   ).toThrow('Portable video review asset reference is unresolved.');
+});
+
+it('transfers an inactive image choice even without history', async () => {
+  const initial = createQuickEditAdvancedState();
+  const baseline = createQuickEditAdvancedContent();
+  const image = {
+    ...baseline,
+    zoom: {
+      enabled: true,
+      regions: [
+        {
+          ...createQuickEditZoomRegion({ id: 'focus', at: 0 }),
+          spotlight: createQuickEditSpotlight(),
+        },
+      ],
+    },
+    canvas: { width: 1080, height: 1920 },
+    audio: { ...baseline.audio, laneVolumes: { voiceover: 0.5, music: 0.3 } },
+    background: {
+      enabled: true as const,
+      type: 'image' as const,
+      imageFit: 'cover' as const,
+      assetId: 'project-asset:background',
+      layout: { padding: 8, cornerRadius: 12 },
+    },
+  };
+  const stored: VideoWorkspace = {
+    ...workspace,
+    advanced: {
+      ...initial,
+      background: {
+        enabled: false,
+        rememberedImage: { assetId: image.background.assetId, imageFit: image.background.imageFit },
+      },
+    },
+    cursor: 0,
+    history: [],
+  };
+  const review = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(review!);
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:restored',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([['background', 'new-background']]),
+  });
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:new-background'])
+  );
+  expect(restored.workspace.cursor).toBe(0);
+  expect(restored.workspace.advanced.background).toEqual({
+    enabled: false,
+    rememberedImage: { assetId: 'project-asset:new-background', imageFit: 'cover' },
+  });
+  const workspaces = { put: vi.fn() },
+    drafts = { put: vi.fn(), delete: vi.fn() };
+  await putVideoReviewRestore({ review: restored, workspaces, drafts });
+  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
 });

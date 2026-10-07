@@ -1,3 +1,4 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
   QuickEditAdvancedContent,
   QuickEditAdvancedState,
@@ -6,18 +7,23 @@ import type { VideoWorkspace } from './contracts';
 import { collectReviewAssetReferences } from './asset-refs';
 import { parseVideoWorkspace } from './parser';
 
+function stripBackground<T>(background: T, assetId: string): T | { enabled: false } {
+  if (!isRecord(background)) return background;
+  if (background['type'] === 'image' && background['assetId'] === assetId)
+    return { enabled: false };
+  const remembered = background['rememberedImage'];
+  if (!isRecord(remembered) || remembered['assetId'] !== assetId) return background;
+  const { rememberedImage: _removed, ...rest } = background;
+  return rest as T;
+}
+
 function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedState>(
   content: T,
   assetId: string
 ): T {
   const result = {
     ...content,
-    background:
-      content.background.enabled &&
-      content.background.type === 'image' &&
-      content.background.assetId === assetId
-        ? { enabled: false }
-        : content.background,
+    background: stripBackground(content.background, assetId),
     audio: {
       ...content.audio,
       voiceover: content.audio.voiceover.filter((clip) => clip.assetId !== assetId),
@@ -64,15 +70,7 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
     return JSON.stringify({
       ...content,
       ...(nextAudio === undefined ? {} : { audio: nextAudio }),
-      background:
-        typeof background === 'object' &&
-        background !== null &&
-        'type' in background &&
-        background.type === 'image' &&
-        'assetId' in background &&
-        background.assetId === assetId
-          ? { enabled: false }
-          : background,
+      background: stripBackground(background, assetId),
     });
   } catch {
     return value;

@@ -106,6 +106,8 @@ export interface QuickEditBackgroundLayout {
 }
 
 export type QuickEditBackgroundSettings = {
+  /** Last image retained while another background kind is active; reuses its project asset. */
+  rememberedImage?: { assetId: string; imageFit: 'cover' | 'contain' };
   /** Absent on legacy workspaces means a stationary background. */
   zoomBehavior?: 'fixed' | 'follow-video';
 } & (

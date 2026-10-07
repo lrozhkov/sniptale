@@ -154,3 +154,31 @@ it('preserves unreadable legacy recovery while stripping valid current and histo
   expect(result.advanced.recoveryV1).toBe('{invalid');
   expect([...collectReviewAssetReferences(result)]).toEqual([retained]);
 });
+
+it('removes remembered backgrounds from current, history and recovery while keeping visible paint', () => {
+  const workspace = makeWorkspace();
+  const background = {
+    enabled: true as const,
+    type: 'solid' as const,
+    color: '#000000ff',
+    layout: { padding: 40, cornerRadius: 12 },
+    rememberedImage: { assetId: removed, imageFit: 'contain' as const },
+  };
+  workspace.advanced.background = background;
+  workspace.advanced.recoveryV1 = JSON.stringify({ background });
+  for (const operation of workspace.history) {
+    if (operation.target !== 'advancedContent') continue;
+    operation.before.background = background;
+    operation.after.background = background;
+  }
+  const result = stripReviewAssetReference(workspace, removed, 2);
+  expect(result.advanced.background).toEqual({
+    enabled: true,
+    type: 'solid',
+    color: '#000000ff',
+    layout: background.layout,
+  });
+  expect(collectReviewAssetReferences(result)).toEqual(new Set([retained]));
+  expect(JSON.parse(result.advanced.recoveryV1!).background).not.toHaveProperty('rememberedImage');
+  expect(workspace.advanced.background).toEqual(background);
+});

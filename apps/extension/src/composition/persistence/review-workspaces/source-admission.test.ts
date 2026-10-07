@@ -301,3 +301,22 @@ it.each([false, true])(
     }
   }
 );
+
+it('refuses missing remembered images before saving and preserves the previous workspace', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  await expect(
+    saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      advanced: {
+        ...opened.workspace.advanced,
+        background: {
+          enabled: false,
+          rememberedImage: { assetId: 'project-asset:missing', imageFit: 'cover' },
+        },
+      },
+    })
+  ).rejects.toMatchObject({ code: 'missing-media' });
+  expect(await readVideoWorkspace(id)).toEqual(opened);
+});

@@ -10,7 +10,12 @@ const LOCAL_ASSET_ERROR = 'Portable video review contains a local asset id.';
 const UNRESOLVED_ASSET_ERROR = 'Portable video review asset reference is unresolved.';
 
 function assertNoLocalImageRef(background: unknown): void {
-  if (isRecord(background) && background['type'] === 'image' && 'assetId' in background) {
+  if (!isRecord(background)) return;
+  const remembered = background['rememberedImage'];
+  if (
+    (background['type'] === 'image' && 'assetId' in background) ||
+    (isRecord(remembered) && 'assetId' in remembered)
+  ) {
     throw new Error(LOCAL_ASSET_ERROR);
   }
 }
@@ -132,13 +137,17 @@ function renameContentRefs(
   }
   if (isRecord(content['audio'])) next['audio'] = renameLaneRef(content['audio'], from, to);
   const background = content['background'];
-  if (
-    isRecord(background) &&
-    background['type'] === 'image' &&
-    typeof background[from] === 'string'
-  ) {
-    const { [from]: reference, ...rest } = background;
-    next['background'] = { ...rest, [to]: reference };
+  if (isRecord(background)) {
+    const rename = (value: Record<string, unknown>) => {
+      if (typeof value[from] !== 'string') return value;
+      const { [from]: reference, ...rest } = value;
+      return { ...rest, [to]: reference };
+    };
+    const remembered = background['rememberedImage'];
+    next['background'] = {
+      ...(background['type'] === 'image' ? rename(background) : background),
+      ...(isRecord(remembered) ? { rememberedImage: rename(remembered) } : {}),
+    };
   }
   if (recovery && typeof content['recoveryV1'] === 'string') {
     try {
@@ -212,7 +221,7 @@ function collectContentReferences(
   into: Set<string>
 ): void {
   collectImageReference(content.background, into);
-  collectWebcamReference(content.webcam, into);
+  collectAssetReference(content.webcam, into);
   for (const lane of LANES) {
     for (const clip of content.audio[lane]) {
       if (clip.assetId.startsWith(ASSET_PREFIX)) into.add(clip.assetId);
@@ -220,7 +229,7 @@ function collectContentReferences(
   }
 }
 
-function collectWebcamReference(webcam: unknown, into: Set<string>): void {
+function collectAssetReference(webcam: unknown, into: Set<string>): void {
   if (
     isRecord(webcam) &&
     typeof webcam['assetId'] === 'string' &&
@@ -229,37 +238,31 @@ function collectWebcamReference(webcam: unknown, into: Set<string>): void {
     into.add(webcam['assetId']);
 }
 
-function remapWebcamReference<T>(webcam: T, assetIdMap: ReadonlyMap<string, string>): T {
+function remapAssetReference<T>(webcam: T, assetIdMap: ReadonlyMap<string, string>): T {
   if (!isRecord(webcam) || typeof webcam['assetId'] !== 'string') return webcam;
   return { ...webcam, assetId: requireMappedAssetId(assetIdMap, webcam['assetId']) };
 }
 
 function collectImageReference(background: unknown, into: Set<string>): void {
-  if (
-    isRecord(background) &&
-    background['type'] === 'image' &&
-    typeof background['assetId'] === 'string' &&
-    background['assetId'].startsWith(ASSET_PREFIX)
-  )
-    into.add(background['assetId']);
+  if (!isRecord(background)) return;
+  if (background['type'] === 'image') collectAssetReference(background, into);
+  collectAssetReference(background['rememberedImage'], into);
 }
 
 function remapImageReference<T>(background: T, assetIdMap: ReadonlyMap<string, string>): T {
-  if (
-    !isRecord(background) ||
-    background['type'] !== 'image' ||
-    typeof background['assetId'] !== 'string'
-  )
-    return background;
-  const assetId = requireMappedAssetId(assetIdMap, background['assetId']);
-  return { ...background, assetId };
+  if (!isRecord(background)) return background;
+  const active =
+    background['type'] === 'image' ? remapAssetReference(background, assetIdMap) : background;
+  const remembered = remapAssetReference(background['rememberedImage'], assetIdMap);
+  if (active === background && remembered === background['rememberedImage']) return background;
+  return { ...active, ...(remembered === undefined ? {} : { rememberedImage: remembered }) };
 }
 
 function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void {
   try {
     const parsed: unknown = JSON.parse(recoveryV1);
     if (!isRecord(parsed)) return;
-    collectWebcamReference(parsed['webcam'], into);
+    collectAssetReference(parsed['webcam'], into);
     collectImageReference(parsed['background'], into);
     if (!isRecord(parsed['audio'])) return;
     const recoveryAudio = parsed['audio'];
@@ -295,7 +298,7 @@ function remapContentReferences(
     });
   }
   const background = remapImageReference(content.background, assetIdMap);
-  const webcam = remapWebcamReference(content.webcam, assetIdMap);
+  const webcam = remapAssetReference(content.webcam, assetIdMap);
   return changed || background !== content.background || webcam !== content.webcam
     ? { ...content, audio, background, ...(webcam ? { webcam } : {}) }
     : content;
@@ -312,7 +315,7 @@ function remapRecoveryReferences(
     return null;
   }
   if (!isRecord(parsed)) return null;
-  const webcam = remapWebcamReference(parsed['webcam'], assetIdMap);
+  const webcam = remapAssetReference(parsed['webcam'], assetIdMap);
   const background = remapImageReference(parsed['background'], assetIdMap);
   let changed = background !== parsed['background'] || webcam !== parsed['webcam'];
   if (background !== parsed['background']) parsed['background'] = background;

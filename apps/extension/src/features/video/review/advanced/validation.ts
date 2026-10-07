@@ -252,9 +252,20 @@ function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | 
   if (!isRecord(value)) return null;
   const behavior = value['zoomBehavior'];
   if (behavior !== undefined && behavior !== 'fixed' && behavior !== 'follow-video') return null;
-  const motion: Pick<QuickEditBackgroundSettings, 'zoomBehavior'> = behavior
+  const motion: Pick<QuickEditBackgroundSettings, 'zoomBehavior' | 'rememberedImage'> = behavior
     ? { zoomBehavior: behavior }
     : {};
+  const remembered = value['rememberedImage'];
+  if (remembered !== undefined) {
+    if (
+      !isRecord(remembered) ||
+      !identity(remembered['assetId']) ||
+      (remembered['imageFit'] !== 'cover' && remembered['imageFit'] !== 'contain') ||
+      value['type'] === 'image'
+    )
+      return null;
+    motion.rememberedImage = { assetId: remembered['assetId'], imageFit: remembered['imageFit'] };
+  }
   if (value['enabled'] === false) return { enabled: false, ...motion };
   if (value['enabled'] !== true) return null;
   const layout = parseBackgroundLayout(value['layout']);
