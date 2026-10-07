@@ -112,6 +112,9 @@ function MotionBlurCanvas(
                 ...props.background,
                 layout: {
                   ...props.background.layout,
+                  ...(props.background.layout.blur === undefined
+                    ? {}
+                    : { blur: props.background.layout.blur * props.sceneScale }),
                   cornerRadius: props.background.layout.cornerRadius * props.sceneScale,
                 },
               }

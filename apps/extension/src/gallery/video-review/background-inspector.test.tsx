@@ -249,3 +249,45 @@ it('restores a saved image when choosing Image without asking for another import
   expect(onImportImage).not.toHaveBeenCalled();
   expect(host.querySelector('input[type="file"]')).not.toBeNull();
 });
+
+it('offers blur for images and commits the complete layout using the standard numeric field', async () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{
+          enabled: true,
+          type: 'image',
+          assetId: 'test',
+          imageFit: 'cover',
+          layout: { padding: 40, cornerRadius: 12 },
+        }}
+        onChange={change}
+      />
+    )
+  );
+  const field = host.querySelector<HTMLInputElement>(
+    'input[aria-label="editor.scene.backgroundBlurAmount"]'
+  )!;
+  expect(field.value).toBe('0');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '12');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+  });
+  expect(change).toHaveBeenLastCalledWith({ layout: { padding: 40, cornerRadius: 12, blur: 12 } });
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{
+          enabled: true,
+          type: 'solid',
+          color: '#000000ff',
+          layout: { padding: 40, cornerRadius: 12, blur: 12 },
+        }}
+        onChange={change}
+      />
+    )
+  );
+  expect(host.querySelector('input[aria-label="editor.scene.backgroundBlurAmount"]')).toBeNull();
+});

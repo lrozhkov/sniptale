@@ -185,6 +185,17 @@ function ReviewBackgroundLayoutControls({
           {translate('gallery.videoReview.perspectiveBackground')}
         </p>
       ) : null}
+      {background.type !== 'solid' ? (
+        <ReviewNumberRow
+          label={translate('editor.scene.backgroundBlurAmount')}
+          unit="px"
+          min={0}
+          max={25}
+          step={1}
+          value={background.layout.blur ?? 0}
+          onChange={(blur) => onChange({ layout: { ...background.layout, blur } })}
+        />
+      ) : null}
       {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
       {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
       <ReviewNumberRow

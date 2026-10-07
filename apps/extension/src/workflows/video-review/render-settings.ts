@@ -89,6 +89,9 @@ export function resolveReviewSceneOutput(
         ...settings.background,
         layout: {
           ...settings.background.layout,
+          ...(settings.background.layout.blur === undefined
+            ? {}
+            : { blur: settings.background.layout.blur * scale }),
           padding: settings.background.layout.padding * scale,
           cornerRadius: settings.background.layout.cornerRadius * scale,
         },

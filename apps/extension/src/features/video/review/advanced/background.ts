@@ -16,6 +16,7 @@ const clampLayout = (layout: QuickEditBackgroundLayout): QuickEditBackgroundLayo
         },
       }
     : {}),
+  ...(layout.blur === undefined ? {} : { blur: Math.max(0, Math.min(25, layout.blur)) }),
   padding: Math.max(0, Math.min(MAX_BACKGROUND_SIZE, layout.padding)),
   cornerRadius: Math.max(0, Math.min(MAX_BACKGROUND_SIZE, layout.cornerRadius)),
 });

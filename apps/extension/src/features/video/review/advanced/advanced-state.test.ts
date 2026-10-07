@@ -584,3 +584,28 @@ it('round trips inactive image choices in state and history content, rejecting m
     ).toBeNull();
   }
 });
+
+it('round-trips optional background blur without rewriting legacy history layouts', () => {
+  for (const blur of [undefined, 0, 12, 25]) {
+    const state = advanced();
+    if (!state.background.enabled) throw new Error('Expected background fixture');
+    if (blur !== undefined) state.background.layout.blur = blur;
+    expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(state)))?.background).toEqual(
+      state.background
+    );
+    const content = { ...createQuickEditAdvancedContent(), background: state.background };
+    expect(
+      loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))?.background
+    ).toEqual(state.background);
+  }
+  for (const blur of [-1, 26, NaN, Infinity, '12', null]) {
+    const state = advanced();
+    if (!state.background.enabled) throw new Error('Expected background fixture');
+    expect(
+      loadQuickEditAdvancedState({
+        ...state,
+        background: { ...state.background, layout: { ...state.background.layout, blur } },
+      })
+    ).toBeNull();
+  }
+});

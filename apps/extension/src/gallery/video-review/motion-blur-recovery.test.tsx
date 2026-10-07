@@ -36,7 +36,12 @@ it('recovers from spatial failure while ordinary temporal exposure keeps the sam
     const camera = evaluateQuickEditCameraAtTime([region], 0.1);
     expect(quickEditMotionBlurCameras([region], 0.1).length).toBeGreaterThan(1);
     const output = { width: 800, height: 450 };
-    const background = { enabled: false as const };
+    const background = {
+      enabled: true as const,
+      type: 'solid' as const,
+      color: '#000000ff',
+      layout: { padding: 0, cornerRadius: 0, blur: 12 },
+    };
     const layout = computeQuickEditSceneLayout({ output, source: output, background, camera });
     act(() =>
       root.render(
@@ -46,7 +51,7 @@ it('recovers from spatial failure while ordinary temporal exposure keeps the sam
           output={output}
           layout={layout}
           background={background}
-          sceneScale={1}
+          sceneScale={0.5}
           getFrame={() => source}
         />
       )
@@ -59,6 +64,8 @@ it('recovers from spatial failure while ordinary temporal exposure keeps the sam
     render(false);
     expect(host.querySelector('canvas')).toBe(canvas);
     expect(host.querySelector('[role="alert"]')).toBeNull();
+    const painted = vi.mocked(drawReviewSceneFrame).mock.calls.at(-1)![1].background;
+    expect(painted.enabled && painted.layout.blur).toBe(6);
     expect(
       vi.mocked(drawReviewSceneFrame).mock.calls.at(-1)![1].motionBlur!.length
     ).toBeGreaterThan(1);

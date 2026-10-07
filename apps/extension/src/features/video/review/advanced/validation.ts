@@ -240,6 +240,9 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
     !isBoundedNumber(value['cornerRadius'], 0, MAX_QUICK_EDIT_BACKGROUND_SIZE)
   )
     return null;
+  const blur = value['blur'];
+  if (blur !== undefined && !isBoundedNumber(blur, 0, 25)) return null;
+  const blurSetting = blur === undefined ? {} : { blur };
   const shadow = value['shadow'];
   if (shadow !== undefined) {
     if (!isRecord(shadow) || !isBoundedNumber(shadow['intensity'], 0, 100)) return null;
@@ -249,9 +252,10 @@ function parseBackgroundLayout(value: unknown): QuickEditBackgroundLayout | null
       padding: value['padding'],
       cornerRadius: value['cornerRadius'],
       shadow: { intensity: shadow['intensity'], color },
+      ...blurSetting,
     };
   }
-  return { padding: value['padding'], cornerRadius: value['cornerRadius'] };
+  return { padding: value['padding'], cornerRadius: value['cornerRadius'], ...blurSetting };
 }
 
 function parseBackgroundSettings(value: unknown): QuickEditBackgroundSettings | null {

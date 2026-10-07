@@ -147,3 +147,15 @@ it('replaces the remembered image with the latest choice without retaining an ex
   expect(restored).toMatchObject({ type: 'image', assetId: 'second' });
   expect(restored).not.toHaveProperty('rememberedImage');
 });
+
+it('preserves blur between paints, clamps updates and leaves legacy layouts untouched', () => {
+  const blurred = updateQuickEditBackground(solid, { layout: { ...solid.layout, blur: 12 } });
+  const image = updateQuickEditBackground(blurred, { type: 'image', assetId: 'test' });
+  expect(image.enabled && image.layout.blur).toBe(12);
+  const high = updateQuickEditBackground(image, { layout: { ...solid.layout, blur: 100 } });
+  expect(high.enabled && high.layout.blur).toBe(25);
+  const low = updateQuickEditBackground(image, { layout: { ...solid.layout, blur: -5 } });
+  expect(low.enabled && low.layout.blur).toBe(0);
+  const legacy = updateQuickEditBackground(solid, { layout: solid.layout });
+  expect(legacy.enabled && legacy.layout).not.toHaveProperty('blur');
+});

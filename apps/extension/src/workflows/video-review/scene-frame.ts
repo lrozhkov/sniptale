@@ -14,7 +14,7 @@ import type {
   QuickEditCameraTransform,
 } from '../../features/video/review/advanced/types';
 import type { CanvasCommentExport } from '../../features/video/review/comments';
-import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
+import { drawReviewBackgroundPaint } from './scene-background';
 import { drawReviewComments } from './render-comments';
 import { drawReviewSceneShadow } from './scene-shadow';
 
@@ -26,6 +26,7 @@ export function drawReviewSceneFrame(
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
   }
 ) {
+  args = { ...args, backgroundCacheContext: args.backgroundCacheContext ?? context };
   const windowRaster =
     args.headerImage && args.layout.windowRect
       ? createReviewWindowRaster({
@@ -236,6 +237,7 @@ function drawReviewSceneSample(
         height: number
       ): void;
     };
+    backgroundCacheContext?: CanvasRenderingContext2D;
     planeOnly?: boolean;
     backgroundOnly?: boolean;
     deferComments?: boolean;
@@ -286,7 +288,13 @@ function drawReviewSceneSample(
 /** Background owns its follow-video policy independently of the decorated plane. */
 function drawReviewSceneBackground(
   context: CanvasRenderingContext2D,
-  { canvas, layout, background, image }: Parameters<typeof drawReviewSceneSample>[1]
+  {
+    canvas,
+    layout,
+    background,
+    image,
+    backgroundCacheContext,
+  }: Parameters<typeof drawReviewSceneSample>[1]
 ) {
   context.fillStyle = '#000000';
   context.fillRect(0, 0, canvas.width, canvas.height);
@@ -296,37 +304,10 @@ function drawReviewSceneBackground(
     context.translate(motion.x, motion.y);
     context.scale(motion.scale, motion.scale);
   }
-  if (background.enabled) {
-    if (background.type === 'solid') {
-      context.fillStyle = background.color;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (background.type === 'gradient') {
-      drawSceneGradient(context, background.gradient, canvas.width, canvas.height);
-    } else if (image) {
-      drawFittedImage(context, image, canvas.width, canvas.height, background.imageFit);
-    }
-  }
-  if (motion.scale !== 1) context.restore();
-}
-
-function drawFittedImage(
-  context: CanvasRenderingContext2D,
-  image: CanvasImageSource & { width: number; height: number },
-  width: number,
-  height: number,
-  fit: 'cover' | 'contain'
-) {
-  const scale =
-    fit === 'cover'
-      ? Math.max(width / image.width, height / image.height)
-      : Math.min(width / image.width, height / image.height);
-  const drawWidth = image.width * scale;
-  const drawHeight = image.height * scale;
-  context.drawImage(
-    image,
-    (width - drawWidth) / 2,
-    (height - drawHeight) / 2,
-    drawWidth,
-    drawHeight
+  drawReviewBackgroundPaint(
+    context,
+    { background, image, width: canvas.width, height: canvas.height },
+    backgroundCacheContext
   );
+  if (motion.scale !== 1) context.restore();
 }

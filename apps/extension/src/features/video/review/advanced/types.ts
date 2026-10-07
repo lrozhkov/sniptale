@@ -104,6 +104,8 @@ export interface QuickEditZoomState {
 }
 
 export interface QuickEditBackgroundLayout {
+  /** Source-canvas pixels; absent in older workspaces means no blur. */
+  blur?: number;
   padding: number;
   cornerRadius: number;
   shadow?: { intensity: number; color: string };

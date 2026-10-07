@@ -1,3 +1,4 @@
+import { ReviewBackgroundBlurPreview } from './background-blur-preview';
 import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
@@ -752,6 +753,12 @@ function ReviewStageBackground({
   motion: { x: number; y: number; scale: number };
   paint: string | null;
 }) {
+  const background = props.scene?.background;
+  const blurred =
+    background?.enabled && background.type !== 'solid' && (background.layout.blur ?? 0) > 0;
+  const sceneSize = props.scene
+    ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
+    : props.source;
   return (
     <div
       data-ui="gallery.videoReview.backgroundPlane"
@@ -762,9 +769,16 @@ function ReviewStageBackground({
         transform: `translate3d(${motion.x}px, ${motion.y}px, 0) scale(${motion.scale})`,
       }}
     >
-      {props.backgroundImageUrl &&
-      props.scene?.background.enabled &&
-      props.scene.background.type === 'image' ? (
+      {blurred ? (
+        <ReviewBackgroundBlurPreview
+          background={background}
+          imageUrl={props.backgroundImageUrl}
+          width={sceneSize.width}
+          height={sceneSize.height}
+        />
+      ) : props.backgroundImageUrl &&
+        props.scene?.background.enabled &&
+        props.scene.background.type === 'image' ? (
         <img
           src={props.backgroundImageUrl}
           alt=""
