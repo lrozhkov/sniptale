@@ -131,7 +131,7 @@ it('shows an exact range-start guide only over drawing zones, with neutral seek 
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
 
-it('shows the focus cursor on a lane descendant but clears it over row padding and gaps', () => {
+it('keeps advisory time visible across gaps without offering a focus insertion cursor', () => {
   const { host } = renderTimeline({
     onFocusRangeCommit: vi.fn(),
     zoomTrack: (
@@ -148,12 +148,12 @@ it('shows the focus cursor on a lane descendant but clears it over row padding a
   const rowPadding = host.querySelector('[data-ui="gallery.videoReview.zoomLane"]')?.parentElement;
   hoverAt(rowPadding!, 180);
   expect(plane.style.cursor).toBe('default');
-  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).not.toBeNull();
   hoverAt(host.querySelector('[data-ui="focus-lane-child"]')!, 180);
   expect(plane.style.cursor).toContain('4 16, cell');
   hoverAt(plane, 180);
   expect(plane.style.cursor).toBe('default');
-  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).not.toBeNull();
 });
 
 it('leaves selection, seeking and pointer capture untouched when a gesture starts in a row gap', () => {
@@ -368,4 +368,17 @@ it('removes the add cursor and explains blocked selected-range placement', () =>
   hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 100);
   expect(plane.style.cursor).toBe('crosshair');
   expect(plane.title).toBe('Range already occupied');
+});
+
+it('clears the hover guide even when a camera child intercepts pointer movement', () => {
+  const { host } = renderTimeline();
+  const plane = planeWithMetrics(host);
+  hoverAt(host.querySelector('[data-ui="gallery.videoReview.sourceLane"]')!, 400);
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).not.toBeNull();
+  const camera = document.createElement('div');
+  camera.dataset.ui = 'gallery.videoReview.webcamTrack';
+  camera.addEventListener('pointermove', (event) => event.stopPropagation());
+  plane.append(camera);
+  hoverAt(camera, 450);
+  expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });

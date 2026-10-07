@@ -211,3 +211,32 @@ it('draws a centered pixel circle with a cover crop instead of stretching the ca
   expect(draw.mock.calls[0]![3]).toBeCloseTo(800 / 3);
   expect(draw.mock.calls[0]![4]).toBe(200);
 });
+
+it('exports the evaluated per-point crop using the same painter as live preview', async () => {
+  const camera = webcam();
+  camera.positions = [
+    {
+      id: 'p',
+      time: 1,
+      placement: camera.placement,
+      crop: { zoom: 2, panX: 0.5, panY: -0.5 },
+      transition: { type: 'none', duration: 0 },
+    },
+  ];
+  const renderer = await createReviewWebcamRenderer(camera, read, new AbortController().signal);
+  const ctx = context();
+  const reference = vi.fn();
+  for await (const frame of renderer.frames([2]))
+    frame!.draw(ctx as unknown as CanvasRenderingContext2D, { width: 1000, height: 1000 });
+  drawReviewWebcam(
+    ctx as unknown as CanvasRenderingContext2D,
+    { width: 1000, height: 1000 },
+    camera,
+    camera.placement,
+    { width: 640, height: 480 },
+    { draw: reference },
+    camera.positions[0]!.crop
+  );
+  expect(state.samples[0]!.draw.mock.calls[0]).toEqual(reference.mock.calls[0]);
+  renderer.dispose();
+});

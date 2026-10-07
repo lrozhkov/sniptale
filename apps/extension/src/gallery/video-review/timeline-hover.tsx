@@ -54,12 +54,22 @@ export function useReviewTimelineHover(options: HoverOptions) {
       setHover(null);
       return;
     }
-    const lane =
-      activeLane ?? reviewPlaneLane(event.target, options.focusEnabled, options.originalEnabled);
-    if (lane === 'control' || lane === 'item' || lane === 'gap') {
+    if (
+      event.target instanceof Element &&
+      event.target.closest(
+        '[data-ui="gallery.videoReview.webcamTrack"],[data-ui="gallery.videoReview.historyTrack"]'
+      )
+    ) {
       setHover(null);
       return;
     }
+    const hit =
+      activeLane ?? reviewPlaneLane(event.target, options.focusEnabled, options.originalEnabled);
+    if (hit === 'control' || hit === 'item') {
+      setHover(null);
+      return;
+    }
+    const lane = hit === 'gap' ? 'seek' : hit;
     const pointerTime = planeTime(event, options.duration, options.gutter);
     const time =
       lane === 'source' && options.snapRangePreview && options.boundaries?.length

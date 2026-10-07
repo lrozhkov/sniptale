@@ -47,6 +47,11 @@ export function ReviewWebcamOverlay(props: {
         output: latest.current.output,
         settings: latest.current.binding.settings,
         placement: latest.current.placement,
+        crop:
+          !latest.current.binding.disabled &&
+          ['webcam', 'webcam-position'].includes(latest.current.binding.editor.selection.kind)
+            ? latest.current.binding.editor.crop
+            : undefined,
       }),
       {
         ready: (visible) => setReady((previous) => (previous === visible ? previous : visible)),

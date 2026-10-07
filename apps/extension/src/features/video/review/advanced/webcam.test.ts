@@ -9,6 +9,8 @@ import {
   quickEditWebcamFrameAt,
   quickEditWebcamPlacementAt,
   quickEditWebcamBounds,
+  quickEditWebcamCropAt,
+  moveQuickEditWebcamPosition,
 } from './webcam';
 
 const camera = () =>
@@ -198,4 +200,52 @@ it.each([
   expect(bounds.x + bounds.width / 2).toBeCloseTo(placement.x + placement.width / 2);
   expect(bounds.y + bounds.height / 2).toBeCloseTo(placement.y + placement.height / 2);
   expect(quickEditWebcamBounds(placement, output, 'ellipse')).toBe(placement);
+});
+
+it('retains bounded per-position crop and shrink transitions through persistence', () => {
+  const value = camera();
+  value.positions = [
+    {
+      id: 'a',
+      time: 2,
+      placement: { ...value.placement, x: 0.1 },
+      crop: { zoom: 2, panX: 0.5, panY: -0.5 },
+      transition: { type: 'shrink', duration: 2 },
+    },
+  ];
+  expect(parseQuickEditWebcam(value)).toEqual(value);
+  const middle = quickEditWebcamPlacementAt(value, 3);
+  expect(middle.width).toBeCloseTo(value.placement.width * 0.45);
+  expect(middle.x + middle.width / 2).toBeCloseTo(
+    (value.placement.x + 0.1) / 2 + value.placement.width / 2
+  );
+  expect(quickEditWebcamCropAt(value, 3)).toEqual({ zoom: 1.5, panX: 0.25, panY: -0.25 });
+  expect(quickEditWebcamFrameAt(value, 4, 12)?.crop).toEqual(value.positions[0]!.crop);
+  expect(quickEditWebcamPlacementAt(value, 4)).toEqual(value.positions[0]!.placement);
+  for (const crop of [{ zoom: 5, panX: 0, panY: 0 }, { zoom: 2, panX: NaN, panY: 0 }, {}])
+    expect(
+      parseQuickEditWebcam({ ...value, positions: [{ ...value.positions[0], crop }] })
+    ).toBeNull();
+  const legacy = {
+    ...value,
+    positions: value.positions.map(({ crop: _crop, ...position }) => position),
+  };
+  expect(parseQuickEditWebcam(legacy)).toEqual(legacy);
+  expect(quickEditWebcamCropAt(legacy, 4)).toMatchObject({ zoom: 1, panX: 0, panY: 0 });
+});
+
+it('clamps marker movement between neighbours, retaining identity, crop and transitions', () => {
+  const value = camera();
+  value.positions = [2, 4, 6].map((time, i) => ({
+    id: String(i),
+    time,
+    placement: value.placement,
+    transition: { type: 'none', duration: 0 },
+  }));
+  expect(moveQuickEditWebcamPosition(value, '1', 9, 12).positions[1]!.time).toBe(5.999);
+  expect(moveQuickEditWebcamPosition(value, '1', -1, 12).positions[1]!.time).toBe(2.001);
+  expect(moveQuickEditWebcamPosition(value, '1', 4.12345, 12).positions[1]!.time).toBe(4.123);
+  expect(moveQuickEditWebcamPosition(value, 'missing', 1, 12)).toBe(value);
+  expect(moveQuickEditWebcamPosition(value, '1', NaN, 12)).toBe(value);
+  expect(value.positions[1]!.time).toBe(4);
 });

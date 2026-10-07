@@ -164,10 +164,8 @@ export function ReviewTimeline(props: TimelineProps) {
           }
           onPointerDownCapture={hover.clear}
           onPointerDown={plane.onPointerDown}
-          onPointerMove={(event) => {
-            plane.onPointerMove(event);
-            hover.move(event, plane.activeLane());
-          }}
+          onPointerMoveCapture={(event) => hover.move(event, plane.activeLane())}
+          onPointerMove={plane.onPointerMove}
           onPointerUp={(event) => {
             plane.onPointerUp(event);
             hover.clear();
@@ -267,7 +265,7 @@ function ReviewTimelineEvents(
         </>
       }
     >
-      <div className="min-h-7">
+      <div className="min-h-7" data-ui="gallery.videoReview.historyTrack">
         <ReviewTelemetryStrip
           markers={markers}
           animatedIds={animated}

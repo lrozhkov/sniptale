@@ -2,7 +2,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
+import {
+  createQuickEditWebcam,
+  moveQuickEditWebcamPosition,
+} from '../../features/video/review/advanced/webcam';
 import type { useReviewWebcamEditor } from './webcam-editor';
 import { ReviewWebcamInspector } from './webcam-inspector';
 import { ReviewWebcamTrack } from './webcam-track';
@@ -14,6 +17,7 @@ vi.mock('../../platform/i18n', async (original) => ({
   ...(await original<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
+vi.mock('./webcam-crop-preview', () => ({ ReviewWebcamCropPreview: () => null }));
 vi.mock('./webcam-preview', () => ({ mountReviewWebcamPreview: vi.fn() }));
 type Editor = ReturnType<typeof useReviewWebcamEditor>;
 let host: HTMLDivElement;
@@ -62,6 +66,19 @@ beforeEach(() => {
     selectedPosition: undefined,
     hidden: undefined,
     placement: camera.placement,
+    scene: source,
+    crop: {
+      zoom: camera.appearance.zoom,
+      panX: camera.appearance.panX,
+      panY: camera.appearance.panY,
+    },
+    setCrop: vi.fn((crop) => {
+      editor.crop = crop;
+      editor.patch({ appearance: { ...editor.camera!.appearance, ...crop } });
+    }),
+    movePosition: vi.fn((id, time) =>
+      editor.patch(moveQuickEditWebcamPosition(editor.camera!, id, time, editor.duration))
+    ),
     select: vi.fn(),
     selectVisible: vi.fn(),
     patch: vi.fn((patch) => {
@@ -369,4 +386,32 @@ it('does not acquire camera resources before the main media element exists', () 
     )
   );
   expect(mountReviewWebcamPreview).not.toHaveBeenCalled();
+});
+
+it('drags position markers once, cancels with Escape, and offers keyboard nudges', () => {
+  editor.camera!.positions = [2, 8].map((time, index) => ({
+    id: `p${index}`,
+    time,
+    placement: editor.camera!.placement,
+    transition: { type: 'none', duration: 0 },
+  }));
+  render = () =>
+    root.render(<ReviewWebcamTrack editor={editor} projection={createTrackProjection(12, [])} />);
+  act(render);
+  const marker = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.webcamPosition"]')!;
+  pointer(marker, 'pointerdown', 200);
+  pointer(marker, 'pointermove', 400);
+  expect(editor.movePosition).not.toHaveBeenCalled();
+  pointer(marker, 'pointerup', 400);
+  expect(editor.movePosition).toHaveBeenCalledExactlyOnceWith('p0', 4);
+  vi.mocked(editor.movePosition).mockClear();
+  pointer(marker, 'pointerdown', 400);
+  pointer(marker, 'pointermove', 700);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  pointer(marker, 'pointerup', 700);
+  expect(editor.movePosition).not.toHaveBeenCalled();
+  act(() =>
+    marker.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(editor.movePosition).toHaveBeenCalledExactlyOnceWith('p0', 4.1);
 });

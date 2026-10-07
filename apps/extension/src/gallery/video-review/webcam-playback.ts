@@ -116,7 +116,7 @@ export function createReviewWebcamPlayback(args: PlaybackArgs) {
     animation = requestAnimationFrame(reconcile);
   };
   const onSeeked = () => {
-    if (seeking) seekLatency = Math.min(0.1, Math.max(0, performance.now() - seekStarted) / 1000);
+    if (seeking) seekLatency = Math.min(1, Math.max(0, performance.now() - seekStarted) / 1000);
     seeking = false;
     if (!hasFrameCallback) decoded = camera.currentTime;
   };
@@ -232,6 +232,7 @@ function createSourcePlaybackClock(main: HTMLVideoElement, pause: () => void) {
       if (main.currentTime !== time) {
         time = main.currentTime;
         advanced = now;
+        waiting = false;
       }
       return !main.paused && !main.ended && !main.seeking && !waiting && now - advanced < 100;
     },

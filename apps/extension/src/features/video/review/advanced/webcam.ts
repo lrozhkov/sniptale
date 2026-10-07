@@ -15,12 +15,15 @@ export interface QuickEditWebcamPlacement {
   height: number;
 }
 
+export type QuickEditWebcamCrop = Pick<CameraAppearance, 'zoom' | 'panX' | 'panY'>;
+
 interface QuickEditWebcamPosition {
   id: string;
   /** Original main-video seconds; cuts and speeds never rewrite this anchor. */
   time: number;
   placement: QuickEditWebcamPlacement;
-  transition: { type: 'none' | 'ease-in-out'; duration: number };
+  crop?: QuickEditWebcamCrop;
+  transition: { type: 'none' | 'ease-in-out' | 'shrink'; duration: number };
 }
 
 interface QuickEditWebcamHiddenRange {
@@ -79,11 +82,16 @@ function parsePosition(value: unknown): QuickEditWebcamPosition | null {
   if (
     !placement ||
     !isRecord(transition) ||
-    (transition['type'] !== 'none' && transition['type'] !== 'ease-in-out') ||
+    (transition['type'] !== 'none' &&
+      transition['type'] !== 'ease-in-out' &&
+      transition['type'] !== 'shrink') ||
     !isBoundedNumber(transition['duration'], 0, 60)
   )
     return null;
+  const crop = value['crop'];
+  if (crop !== undefined && !isWebcamCrop(crop)) return null;
   return {
+    ...(crop === undefined ? {} : { crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY } }),
     id: value['id'],
     time: value['time'],
     placement,
@@ -205,12 +213,23 @@ export function quickEditWebcamPlacementAt(webcam: QuickEditWebcam, sourceTime: 
     current.transition.type === 'none' || duration === 0
       ? 1
       : Math.min(1, Math.max(0, (sourceTime - current.time) / duration));
+  if (progress === 1) return current.placement;
+  if (progress === 0) return previous;
   const eased = progress * progress * (3 - 2 * progress);
+  const mix = (a: number, b: number) => a + (b - a) * eased;
+  const scale =
+    current.transition.type === 'shrink' ? 1 - 0.55 * Math.sin(Math.PI * progress) ** 2 : 1;
+  const width = mix(previous.width, current.placement.width) * scale;
+  const height = mix(previous.height, current.placement.height) * scale;
   return {
-    x: previous.x + (current.placement.x - previous.x) * eased,
-    y: previous.y + (current.placement.y - previous.y) * eased,
-    width: previous.width + (current.placement.width - previous.width) * eased,
-    height: previous.height + (current.placement.height - previous.height) * eased,
+    x:
+      mix(previous.x + previous.width / 2, current.placement.x + current.placement.width / 2) -
+      width / 2,
+    y:
+      mix(previous.y + previous.height / 2, current.placement.y + current.placement.height / 2) -
+      height / 2,
+    width,
+    height,
   };
 }
 
@@ -219,7 +238,7 @@ export function quickEditWebcamFrameAt(
   webcam: QuickEditWebcam,
   sourceTime: number,
   cameraDuration: number
-): { time: number; placement: QuickEditWebcamPlacement } | null {
+): { time: number; placement: QuickEditWebcamPlacement; crop?: QuickEditWebcamCrop } | null {
   const time = sourceTime - webcam.offsetSeconds;
   if (
     !webcam.enabled ||
@@ -231,7 +250,11 @@ export function quickEditWebcamFrameAt(
     webcam.hiddenRanges.some((range) => sourceTime >= range.start && sourceTime < range.end)
   )
     return null;
-  return { time, placement: quickEditWebcamPlacementAt(webcam, sourceTime) };
+  return {
+    time,
+    placement: quickEditWebcamPlacementAt(webcam, sourceTime),
+    crop: quickEditWebcamCropAt(webcam, sourceTime),
+  };
 }
 
 function parseWebcamAppearance(value: unknown): WebcamAppearance | null {
@@ -257,5 +280,64 @@ export function quickEditWebcamBounds(
     y: placement.y + (placement.height - height) / 2,
     width,
     height,
+  };
+}
+
+/** Optional per-position framing inherits the base crop in existing projects. */
+function isWebcamCrop(value: unknown): value is QuickEditWebcamCrop {
+  return (
+    isRecord(value) &&
+    isBoundedNumber(value['zoom'], 1, 4) &&
+    isBoundedNumber(value['panX'], -1, 1) &&
+    isBoundedNumber(value['panY'], -1, 1)
+  );
+}
+
+/** Crop follows the same source-clock transition as the camera's scene placement. */
+export function quickEditWebcamCropAt(webcam: QuickEditWebcam, time: number): QuickEditWebcamCrop {
+  const index = webcam.positions.findLastIndex((position) => position.time <= time);
+  const current = webcam.positions[index];
+  const base = {
+    zoom: webcam.appearance.zoom,
+    panX: webcam.appearance.panX,
+    panY: webcam.appearance.panY,
+  };
+  if (!current) return base;
+  const previous = webcam.positions[index - 1]?.crop ?? base;
+  const next = current.crop ?? base;
+  const duration = Math.min(
+    current.transition.duration,
+    (webcam.positions[index + 1]?.time ?? Infinity) - current.time
+  );
+  const progress =
+    current.transition.type === 'none' || !duration
+      ? 1
+      : Math.min(1, Math.max(0, (time - current.time) / duration));
+  const eased = progress * progress * (3 - 2 * progress);
+  return {
+    zoom: previous.zoom + (next.zoom - previous.zoom) * eased,
+    panX: previous.panX + (next.panX - previous.panX) * eased,
+    panY: previous.panY + (next.panY - previous.panY) * eased,
+  };
+}
+
+/** Move one anchor without crossing adjacent anchors or changing its content. */
+export function moveQuickEditWebcamPosition(
+  camera: QuickEditWebcam,
+  id: string,
+  time: number,
+  duration: number
+): QuickEditWebcam {
+  const index = camera.positions.findIndex((position) => position.id === id);
+  if (index < 0 || !Number.isFinite(time)) return camera;
+  const min = (camera.positions[index - 1]?.time ?? 0) + 0.001;
+  const max = (camera.positions[index + 1]?.time ?? duration) - 0.001;
+  const bounded = Math.max(min, Math.min(max, Math.round(time * 1000) / 1000));
+  if (bounded === camera.positions[index]!.time || max < min) return camera;
+  return {
+    ...camera,
+    positions: camera.positions.map((position) =>
+      position.id === id ? { ...position, time: bounded } : position
+    ),
   };
 }

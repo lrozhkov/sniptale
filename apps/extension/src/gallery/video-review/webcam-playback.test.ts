@@ -385,3 +385,36 @@ it('retains the accepted raster during a brief camera decoder underflow', () => 
   tick();
   expect(paint.mock.lastCall?.[0]?.time).toBe(1.4);
 });
+
+it('recovers after waiting when the source clock resumes without another playing event', async () => {
+  const { main, camera, paint } = setup();
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  await Promise.resolve();
+  await Promise.resolve();
+  main.node.dispatchEvent(new Event('waiting'));
+  expect(camera.state.paused).toBe(true);
+  main.state.time = 1.03;
+  camera.state.time = 1.03;
+  camera.decode(1.03);
+  tick();
+  expect(camera.state.paused).toBe(false);
+  expect(paint.mock.lastCall?.[0]?.time).toBe(1.03);
+});
+
+it('accounts for slow camera seeks rather than endlessly chasing the advancing source', () => {
+  const { main, camera } = setup();
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  main.state.time = 1.3;
+  tick(300);
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  expect(camera.seeks.at(-1)).toBeGreaterThanOrEqual(1.59);
+});

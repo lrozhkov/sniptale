@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   createQuickEditWebcam,
+  quickEditWebcamCropAt,
+  moveQuickEditWebcamPosition,
+  type QuickEditWebcamCrop,
   parseQuickEditWebcam,
   quickEditWebcamPlacementAt,
   quickEditWebcamBounds,
@@ -109,6 +112,20 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     selectedPosition,
     hidden,
     placement,
+    scene: args.scene,
+    crop:
+      selectedPosition?.crop ??
+      (camera
+        ? {
+            zoom: camera.appearance.zoom,
+            panX: camera.appearance.panX,
+            panY: camera.appearance.panY,
+          }
+        : undefined),
+    setCrop: (crop: QuickEditWebcamCrop) =>
+      mutate((current) => frameReviewWebcam(current, selectedPosition?.id, { crop })),
+    movePosition: (id: string, time: number) =>
+      mutate((current) => moveQuickEditWebcamPosition(current, id, time, args.sourceDuration)),
     select: choose,
     selectVisible: () => {
       const position = camera?.positions.findLast((item) => item.time <= args.time);
@@ -116,16 +133,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
     },
     patch: (patch: Partial<QuickEditWebcam>) => mutate((current) => ({ ...current, ...patch })),
     place: (placement: QuickEditWebcamPlacement) =>
-      mutate((current) =>
-        selectedPosition
-          ? {
-              ...current,
-              positions: current.positions.map((item) =>
-                item.id === selectedPosition.id ? { ...item, placement } : item
-              ),
-            }
-          : { ...current, placement }
-      ),
+      mutate((current) => frameReviewWebcam(current, selectedPosition?.id, { placement })),
     addPosition: () => {
       if (!camera || !latest.current.allowed()) return;
       const time = Math.round(args.time * 1000) / 1000;
@@ -144,6 +152,7 @@ export function useReviewWebcamEditor(args: WebcamEditorArgs) {
             id,
             time,
             placement: quickEditWebcamPlacementAt(current, time),
+            crop: quickEditWebcamCropAt(current, time),
             transition: { type: 'ease-in-out' as const, duration: 0.5 },
           },
         ].sort((a, b) => a.time - b.time),
@@ -273,5 +282,23 @@ function useReviewWebcamAcquisition(
       setFailed(false);
       retry((value) => value + 1);
     },
+  };
+}
+
+/** Framing updates target one anchor or the base without rewriting timing or the other frame properties. */
+function frameReviewWebcam(
+  camera: QuickEditWebcam,
+  id: string | undefined,
+  patch: { placement?: QuickEditWebcamPlacement; crop?: QuickEditWebcamCrop }
+): QuickEditWebcam {
+  if (id)
+    return {
+      ...camera,
+      positions: camera.positions.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    };
+  return {
+    ...camera,
+    placement: patch.placement ?? camera.placement,
+    appearance: patch.crop ? { ...camera.appearance, ...patch.crop } : camera.appearance,
   };
 }

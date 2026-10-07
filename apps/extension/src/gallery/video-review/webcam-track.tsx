@@ -1,5 +1,6 @@
+import { ReviewWebcamPositionMarker } from './webcam-position-marker';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Camera, Diamond, EyeOff, Settings2 } from 'lucide-react';
+import { Camera, EyeOff, Settings2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ReviewTrackCuts, ReviewTrackRow } from './track-row';
 import {
@@ -185,21 +186,13 @@ function ReviewWebcamTrackMarkers({
         </button>
       ))}
       {camera.positions.map((position, index) => (
-        <button
-          type="button"
+        <ReviewWebcamPositionMarker
           key={position.id}
-          className={
-            'absolute inset-y-0 z-20 flex w-5 -translate-x-1/2 items-center justify-center ' +
-            (editor.selection.kind === 'webcam-position' && editor.selection.id === position.id
-              ? 'text-[var(--sniptale-color-accent)]'
-              : 'text-[var(--sniptale-color-text-secondary)]')
-          }
-          style={{ left: `${(position.time / duration) * 100}%` }}
-          aria-label={`${translate('gallery.videoReview.webcamPosition')} ${index + 1} · ${position.time} s`}
-          onClick={() => admit(() => editor.navigate(position.id))}
-        >
-          <Diamond size={12} aria-hidden />
-        </button>
+          editor={editor}
+          index={index}
+          duration={duration}
+          admit={admit}
+        />
       ))}
     </>
   );

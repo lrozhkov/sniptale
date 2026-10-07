@@ -1,3 +1,4 @@
+import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
@@ -193,6 +194,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
       </ReviewButton>
       <div className="review-inspector-columns">
         <WebcamPlacement editor={editor} />
+        <WebcamCrop editor={editor} />
         {position ? (
           <div className="space-y-2">
             <ReviewNumberRow
@@ -203,7 +205,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
               step={0.01}
               precision={3}
               unit="s"
-              onChange={(time) => updatePosition({ time })}
+              onChange={(time) => editor.movePosition(position.id, time)}
             />
             <SelectField
               className={reviewSelectFieldClassName}
@@ -212,9 +214,10 @@ function WebcamLayout({ editor }: { editor: Editor }) {
               options={[
                 { value: 'none', label: translate('gallery.videoReview.webcamInstant') },
                 { value: 'ease-in-out', label: translate('gallery.videoReview.webcamSmooth') },
+                { value: 'shrink', label: translate('videoEditor.sidebar.cameraTransitionShrink') },
               ]}
               onChange={(type) => {
-                if (type === 'none' || type === 'ease-in-out')
+                if (type === 'none' || type === 'ease-in-out' || type === 'shrink')
                   updatePosition({ transition: { ...position.transition, type } });
               }}
             />
@@ -369,33 +372,6 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
       </div>
       <div className="space-y-2">
         <ReviewNumberRow
-          label={translate('videoEditor.sidebar.cameraCropZoom')}
-          value={appearance.zoom}
-          min={1}
-          max={4}
-          step={0.05}
-          precision={2}
-          onChange={(zoom) => editor.patch({ appearance: { ...appearance, zoom } })}
-        />
-        {(['panX', 'panY'] as const).map((key) => (
-          <ReviewNumberRow
-            key={key}
-            label={translate(
-              key === 'panX' ? 'gallery.videoReview.webcamCropX' : 'gallery.videoReview.webcamCropY'
-            )}
-            value={appearance[key] * 100}
-            min={-100}
-            max={100}
-            step={1}
-            unit="%"
-            onChange={(value) =>
-              editor.patch({ appearance: { ...appearance, [key]: value / 100 } })
-            }
-          />
-        ))}
-      </div>
-      <div className="space-y-2">
-        <ReviewNumberRow
           label={translate('gallery.videoReview.webcamShadow')}
           value={camera.shadow?.intensity ?? 0}
           min={0}
@@ -420,6 +396,48 @@ function WebcamAppearance({ editor }: { editor: Editor }) {
           onPreviewReset={changeShadowColor}
         />
       </div>
+    </div>
+  );
+}
+
+/** Framing is authored for the selected position, while silhouette and shadow stay camera-wide. */
+function WebcamCrop({ editor }: { editor: Editor }) {
+  const camera = editor.camera!,
+    crop = editor.crop!,
+    placement = editor.placement!;
+  return (
+    <div className="space-y-2">
+      <ReviewWebcamCropPreview
+        camera={camera}
+        crop={crop}
+        time={editor.selectedPosition?.time ?? Math.max(0, camera.offsetSeconds)}
+        width={placement.width * editor.scene.width}
+        height={placement.height * editor.scene.height}
+        onChange={editor.setCrop}
+      />
+      <ReviewNumberRow
+        label={translate('videoEditor.sidebar.cameraCropZoom')}
+        value={crop.zoom}
+        min={1}
+        max={4}
+        step={0.05}
+        precision={2}
+        onChange={(zoom) => editor.setCrop({ ...crop, zoom })}
+      />
+      {(['panX', 'panY'] as const).map((key) => (
+        <ReviewNumberRow
+          key={key}
+          label={translate(
+            key === 'panX' ? 'gallery.videoReview.webcamCropX' : 'gallery.videoReview.webcamCropY'
+          )}
+          value={crop[key] * 100}
+          min={-100}
+          max={100}
+          step={1}
+          unit="%"
+          onChange={(value) => editor.setCrop({ ...crop, [key]: value / 100 })}
+        />
+      ))}
     </div>
   );
 }

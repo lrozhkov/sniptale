@@ -14,6 +14,7 @@ type PreviewView = {
   output: { width: number; height: number };
   settings: QuickEditWebcam;
   placement: QuickEditWebcamPlacement | undefined;
+  crop?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'> | undefined;
 };
 type PreviewEvents = {
   ready(visible: boolean): void;
@@ -113,6 +114,9 @@ function createWebcamPainter(
       width,
       height,
       frame?.time,
+      current.crop?.zoom ?? frame?.crop?.zoom,
+      current.crop?.panX ?? frame?.crop?.panX,
+      current.crop?.panY ?? frame?.crop?.panY,
       placement?.x,
       placement?.y,
       placement?.width,
@@ -137,7 +141,8 @@ function createWebcamPainter(
         current.settings,
         current.placement ?? frame.placement,
         { width: video.videoWidth, height: video.videoHeight },
-        { draw: (context, x, y, width, height) => context.drawImage(video, x, y, width, height) }
+        { draw: (context, x, y, width, height) => context.drawImage(video, x, y, width, height) },
+        current.crop ?? frame.crop
       );
   };
 }

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { seedReviewWebcamBundle } from '../support/quick-editor-media-fixture';
@@ -84,6 +84,7 @@ for (const variant of [
           name: new RegExp(`${label('gallery.videoReview.webcamPosition')} 1`),
         })
       ).toBeVisible();
+      await refineCameraPoint(page, variant.locale, info);
       await toggle().click();
       await expect(track).toHaveCount(0);
       await expect(overlay).toHaveCount(0);
@@ -126,6 +127,11 @@ for (const variant of [
         .locator('video')
         .first()
         .evaluate((video) => video.play());
+      // Recovery must follow source clock progress even without a second native playing event.
+      await dialog
+        .locator('video')
+        .first()
+        .evaluate((video) => video.dispatchEvent(new Event('waiting')));
       await expect.poll(async () => (await painted())[3]).toBe(255);
       await expect.poll(async () => (await painted())[0]).toBeGreaterThan(30);
       await dialog
@@ -437,6 +443,9 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
       ).toHaveCount(0);
       await select('videoEditor.sidebar.cameraShape', 'videoEditor.sidebar.cameraShapeSoft');
       await select('gallery.videoReview.webcamMirror', 'gallery.videoReview.webcamMirrorOn');
+      await inspector
+        .getByRole('button', { name: label('gallery.videoReview.webcamLayout'), exact: true })
+        .click();
       const zoom = inspector.getByRole('textbox', {
         name: label('videoEditor.sidebar.cameraCropZoom'),
         exact: true,
@@ -492,3 +501,72 @@ test('webcam inspector preserves controls across adaptive columns and panel heig
     );
   }
 });
+
+/** Actual pointer ownership, crop preview and per-point persistence in the short-height inspector. */
+async function refineCameraPoint(page: Page, locale: 'en' | 'ru', info: TestInfo) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const dialog = page.locator('dialog');
+  const track = dialog.locator('[data-ui="gallery.videoReview.webcamTrack"]');
+  await track.scrollIntoViewIfNeeded();
+  const marker = track.locator('[data-ui="gallery.videoReview.webcamPosition"]').first();
+  const before = (await marker.boundingBox())!;
+  await marker.hover();
+  await page.mouse.down();
+  await page.mouse.move(before.x + before.width / 2 - 45, before.y + before.height / 2, {
+    steps: 5,
+  });
+  await page.mouse.up();
+  await expect.poll(async () => (await marker.boundingBox())!.x).toBeLessThan(before.x - 30);
+  const moved = (await marker.boundingBox())!;
+  await marker.hover();
+  await page.mouse.down();
+  await page.mouse.move(moved.x + 35, moved.y + moved.height / 2, { steps: 3 });
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  expect((await marker.boundingBox())!.x).toBeCloseTo(moved.x, 0);
+  const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+  await ruler.hover({ position: { x: 400, y: 10 } });
+  await expect(dialog.locator('[data-ui="gallery.videoReview.hoverTime"]')).toBeVisible();
+  await track.hover({ position: { x: 100, y: 10 } });
+  await expect(dialog.locator('[data-ui="gallery.videoReview.hoverTime"]')).toHaveCount(0);
+  await marker.click();
+  const inspector = dialog.locator('[data-ui="gallery.videoReview.webcamInspector"]');
+  const zoom = inspector.getByRole('textbox', {
+    name: label('videoEditor.sidebar.cameraCropZoom'),
+    exact: true,
+  });
+  await zoom.fill('2');
+  await zoom.press('Enter');
+  const crop = inspector.locator('[data-ui="gallery.videoReview.webcamCrop"] button').first();
+  await expect(crop).toBeEnabled();
+  await crop.scrollIntoViewIfNeeded();
+  const box = (await crop.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 12, box.y + box.height / 2 + 8, { steps: 3 });
+  await page.mouse.up();
+  const pan = inspector.getByRole('textbox', {
+    name: label('gallery.videoReview.webcamCropX'),
+    exact: true,
+  });
+  await expect(pan).not.toHaveValue('0');
+  await inspector
+    .getByRole('button', { name: label('gallery.videoReview.webcamTransition'), exact: true })
+    .click();
+  await page
+    .getByRole('option', { name: label('videoEditor.sidebar.cameraTransitionShrink'), exact: true })
+    .click();
+  await crop.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath('webcam-crop-position.png'), fullPage: false });
+  await expect
+    .poll(async () => {
+      const workspace = await readWebcamWorkspace(page);
+      const last = workspace?.history
+        .slice(0, workspace.cursor)
+        .findLast((operation) => operation.target === 'advancedContent');
+      return last?.target === 'advancedContent'
+        ? last.after.webcam?.positions[0]?.crop?.zoom
+        : undefined;
+    })
+    .toBe(2);
+}

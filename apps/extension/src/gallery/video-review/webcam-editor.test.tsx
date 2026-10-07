@@ -299,3 +299,36 @@ it('admits one explicit recovery, exposes failure and retries without changing h
   expect(fixture.commit).not.toHaveBeenCalled();
   expect(io.attach).not.toHaveBeenCalled();
 });
+
+it('keeps crop local to the selected point and moves that point through the history writer', async () => {
+  const camera = createQuickEditWebcam('project-asset:camera', source, source);
+  camera.positions = [
+    {
+      id: 'p',
+      time: 2,
+      placement: camera.placement,
+      transition: { type: 'shrink', duration: 0.5 },
+    },
+  ];
+  const fixture = setup(camera);
+  await act(async () => editor.navigate('p'));
+  await act(async () => editor.setCrop({ zoom: 2, panX: 0.3, panY: -0.2 }));
+  expect(editor.camera!.appearance.zoom).toBe(1);
+  expect(editor.selectedPosition!.crop).toEqual({ zoom: 2, panX: 0.3, panY: -0.2 });
+  await act(async () => editor.movePosition('p', 4));
+  expect(editor.selectedPosition).toMatchObject({
+    time: 4,
+    crop: { zoom: 2 },
+    transition: { type: 'shrink' },
+  });
+  await act(async () =>
+    vi.waitFor(() =>
+      expect(
+        fixture.session.getSnapshot().document.advancedContent.webcam?.positions[0]
+      ).toMatchObject({ time: 4 })
+    )
+  );
+  allowed = false;
+  await act(async () => editor.movePosition('p', 6));
+  expect(editor.selectedPosition!.time).toBe(4);
+});

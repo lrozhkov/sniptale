@@ -54,11 +54,13 @@ export function drawReviewWebcam(
   webcam: QuickEditWebcam,
   placement: QuickEditWebcamPlacement,
   source: Size,
-  drawable: WebcamDrawable
+  drawable: WebcamDrawable,
+  cropSettings?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'>
 ): void {
   placement = quickEditWebcamBounds(placement, output, webcam.appearance.shape);
   const appearance = {
     ...webcam.appearance,
+    ...cropSettings,
     shape: webcam.appearance.shape === 'circle' ? ('ellipse' as const) : webcam.appearance.shape,
   };
   const width = placement.width * output.width;
@@ -156,7 +158,15 @@ export async function createReviewWebcamRenderer(
               signal.throwIfAborted();
               yield {
                 draw: (context, output) =>
-                  drawReviewWebcam(context, output, webcam, frame.placement, source, sample),
+                  drawReviewWebcam(
+                    context,
+                    output,
+                    webcam,
+                    frame.placement,
+                    source,
+                    sample,
+                    frame.crop
+                  ),
               };
             } finally {
               sample.close();
