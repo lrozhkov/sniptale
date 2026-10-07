@@ -357,3 +357,67 @@ it('refreshes a paused lens when its target frame finishes decoding without a Re
     vi.unstubAllGlobals();
   }
 });
+
+it('configures recorded keys without pointer locations, separately from selected clicks', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host);
+  const onChange = vi.fn(),
+    onKeyChange = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionHistory
+          markers={[
+            {
+              ref: { kind: 'action', id: 'key' },
+              eventType: 'KEY',
+              target: 'Ctrl+C',
+              start: 1,
+              end: 1.55,
+            },
+            {
+              ref: { kind: 'action', id: 'click' },
+              eventType: 'CLICK',
+              start: 2,
+              end: 2,
+              focusPoint: { x: 0.5, y: 0.5 },
+            },
+          ]}
+          animations={[]}
+          busy={false}
+          onChange={onChange}
+          onKeyChange={onKeyChange}
+          onSelect={() => undefined}
+        />
+      )
+    );
+    expect(host.querySelectorAll('li input')).toHaveLength(2);
+    act(() =>
+      host
+        .querySelector<HTMLInputElement>('[aria-label="gallery.videoReview.historySelectAll"]')!
+        .click()
+    );
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.historyConfigure"]')!
+        .click()
+    );
+    expect(host.querySelector('[data-ui="gallery.videoReview.clickFields"]')).not.toBeNull();
+    const select = host.querySelector<HTMLSelectElement>(
+      '[aria-label="gallery.videoReview.keyDisplay"]'
+    )!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!.call(
+        select,
+        'on'
+      );
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onKeyChange).toHaveBeenCalledExactlyOnceWith(['key'], { enabled: true });
+    expect(onChange).not.toHaveBeenCalled();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

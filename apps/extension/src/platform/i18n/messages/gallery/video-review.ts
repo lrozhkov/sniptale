@@ -1,17 +1,19 @@
+import { galleryVideoReviewKeyMessages } from './video-review-keys';
 import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
   ...galleryVideoReviewSpatialMessages,
+  ...galleryVideoReviewKeyMessages,
   clickMilliseconds: { ru: 'мс', en: 'ms' },
   historyFilters: { ru: 'Фильтры', en: 'Filters' },
   historyFiltersActive: { ru: 'Фильтры применены', en: 'Filters applied' },
   historyType: { ru: 'Тип действия', en: 'Action type' },
   historyLonger: { ru: 'Дольше', en: 'Longer than' },
   historyStatus: { ru: 'Показывать', en: 'Show' },
-  historySelectedOnly: { ru: 'Только выбранные щелчки', en: 'Selected clicks only' },
+  historySelectedOnly: { ru: 'Только выбранные действия', en: 'Selected actions only' },
   historyHiddenSelected: { ru: 'скрыто фильтром', en: 'hidden by filter' },
-  historyConfigure: { ru: 'Настроить щелчки', en: 'Configure clicks' },
+  historyConfigure: { ru: 'Настроить действия', en: 'Configure actions' },
   historyBack: { ru: 'К списку', en: 'Back to list' },
   historySearchClear: { ru: 'Очистить поиск', en: 'Clear search' },
   historyOpen: { ru: 'Открыть историю действий', en: 'Open action history' },

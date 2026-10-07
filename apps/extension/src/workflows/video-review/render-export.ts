@@ -1,3 +1,5 @@
+import type { ReviewKeyCue } from '../../features/video/review/key-animation';
+import { drawReviewKeys } from './render-key-animation';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { createReviewSpatialRenderer } from './spatial-renderer';
@@ -80,6 +82,7 @@ type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
  * ranges keep camera and audio on global output time while timestamps start at zero.
  */
 export async function writeReviewFrames(args: {
+  keyCues?: readonly ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[];
   renderSettings?: ReviewRenderSettings | undefined;
   /** Read-only bounded probe sink; bypasses muxing, audio rendering and writer use. */
@@ -221,6 +224,7 @@ export async function writeReviewFrames(args: {
         fragmentOffset: args.fragmentOffset,
         zoomRegions: preparation.effective.zoomRegions,
         background: preparation.effective.background,
+        keyCues: args.keyCues,
         clickCues: args.clickCues,
         comments: args.comments ?? [],
         canvas: source.canvas,
@@ -529,6 +533,7 @@ export async function drainSegmentAudio(args: {
 
 /** One window's frames: draws the scene and encodes at the fps lattice; returns the count. */
 export async function renderRenderWindowFrames(args: {
+  keyCues?: readonly ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[] | undefined;
   window: ReviewFrameWindow;
   adaptive?: boolean;
@@ -682,6 +687,7 @@ export async function renderRenderWindowFrames(args: {
           if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
           cameraFrame.value?.draw(context, canvas);
         }
+        drawReviewKeys(context, args.keyCues ?? [], timestamp + args.fragmentOffset, canvas);
         paintReviewCutBlackout(context, canvas, blend);
         await writer.add(
           timestamp,

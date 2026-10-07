@@ -140,3 +140,62 @@ it.each([false, true])('invalidates resize-back even while paused=%s', (paused) 
     viewportObservation: { initial: { width: initialWidth }, stable: false },
   });
 });
+
+it('captures keyboard commands once and excludes paused time across resume and stop', () => {
+  let now = 1000;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const controller = createVideoTelemetryController();
+  const key = (value: string, time: number) => {
+    const event = new KeyboardEvent('keydown', { key: value, bubbles: true });
+    Object.defineProperty(event, 'timeStamp', { value: time });
+    document.dispatchEvent(event);
+  };
+  try {
+    key('F1', 1100);
+    controller.enable('keys', 2);
+    key('F2', 1500);
+    now = 2000;
+    controller.pause();
+    key('F3', 4000);
+    now = 5000;
+    controller.resume();
+    controller.resume();
+    key('F4', 5500);
+    now = 6000;
+    const snapshot = controller.disable();
+    key('F5', 6500);
+    expect(
+      snapshot?.actionEvents.map((event) => ({ label: event.label, time: event.time }))
+    ).toEqual([
+      { label: 'F2', time: 2.5 },
+      { label: 'F4', time: 3.5 },
+    ]);
+    expect(controller.disable()).toBeNull();
+  } finally {
+    controller.disable();
+    clock.mockRestore();
+  }
+});
+
+it('does not turn a recording pause into cursor idle activity after resume', () => {
+  let now = 1000;
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const controller = createVideoTelemetryController();
+  try {
+    controller.enable('idle-pause');
+    const event = createPointerLikeEvent(40, 60);
+    Object.defineProperty(event, 'timeStamp', { value: 1100 });
+    document.dispatchEvent(event);
+    now = 1200;
+    controller.pause();
+    now = 10000;
+    controller.resume();
+    now = 10010;
+    vi.advanceTimersByTime(250);
+    const snapshot = controller.disable();
+    expect(snapshot?.signals.filter((signal) => signal.kind === 'cursor-idle')).toEqual([]);
+  } finally {
+    controller.disable();
+    clock.mockRestore();
+  }
+});

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { ReviewButton, reviewIconButtonClassName } from './controls';
-import { isReviewClick } from '../../features/video/review/click-animation';
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
@@ -30,6 +29,9 @@ import { createReviewTimeMap } from '../../features/video/review/timeline';
 
 type TimelineProps = {
   onOpenHistory?: (() => void) | undefined;
+  keyAnimations?:
+    | readonly import('../../features/video/review/advanced/key-animation').ReviewKeyAnimation[]
+    | undefined;
   clickAnimations?: readonly ReviewClickAnimation[] | undefined;
   fillHeight?: boolean | undefined;
   sourceCompact?: boolean | undefined;
@@ -231,15 +233,17 @@ function ReviewTimelineEvents(
     | 'selectedTelemetryRef'
     | 'onMarker'
     | 'onOpenHistory'
+    | 'keyAnimations'
     | 'clickAnimations'
   > & { width: number; zoom: number }
 ) {
   const [animatedOnly, setAnimatedOnly] = useState(false);
-  const animated = new Set(
-    (props.clickAnimations ?? []).filter((item) => item.effect !== 'off').map((item) => item.id)
-  );
+  const animated = new Set([
+    ...(props.clickAnimations ?? []).filter((item) => item.effect !== 'off').map((item) => item.id),
+    ...(props.keyAnimations ?? []).filter((item) => item.enabled).map((item) => item.id),
+  ]);
   const markers = animatedOnly
-    ? props.markers.filter((marker) => isReviewClick(marker) && animated.has(marker.ref.id))
+    ? props.markers.filter((marker) => marker.ref.kind === 'action' && animated.has(marker.ref.id))
     : props.markers;
   return props.markers.length ? (
     <ReviewTrackRow

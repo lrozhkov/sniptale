@@ -1,3 +1,10 @@
+import { isReviewKey } from '../../features/video/review/key-animation';
+import {
+  REVIEW_KEY_DEFAULT,
+  type ReviewKeyAnimation,
+  type ReviewKeyPatch,
+} from '../../features/video/review/advanced/key-animation';
+import { ReviewKeyFields } from './key-animation-fields';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ArrowLeft, Search, SlidersHorizontal, X } from 'lucide-react';
@@ -21,13 +28,16 @@ import {
 import './action-history.css';
 
 /** Search and selection belong to this inspector, independently of recorded project facts. */
-export function ReviewActionHistory(props: {
+type ReviewActionHistoryProps = {
   markers: readonly ReviewTelemetryMarker[];
   animations: readonly ReviewClickAnimation[];
+  keyAnimations?: readonly ReviewKeyAnimation[];
+  onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
   busy: boolean;
   onSelect(marker: ReviewTelemetryMarker): void;
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
-}) {
+};
+export function ReviewActionHistory(props: ReviewActionHistoryProps) {
   const locale = useAppLocale();
   const [filters, setFilters] = useState<HistoryFilterValues>({
     query: '',
@@ -46,12 +56,20 @@ export function ReviewActionHistory(props: {
     () => new Map(props.animations.map((item) => [item.id, item])),
     [props.animations]
   );
+  const keySettings = useMemo(
+    () => new Map((props.keyAnimations ?? []).map((item) => [item.id, item])),
+    [props.keyAnimations]
+  );
   const { ids, filtered, matching, checked } = queryHistory(
     props.markers,
     settings,
     filters,
-    selected
+    selected,
+    keySettings
   );
+  const keyIdentities = new Set(props.markers.filter(isReviewKey).map((marker) => marker.ref.id));
+  const keyIds = ids.filter((id) => keyIdentities.has(id));
+  const clickIds = ids.filter((id) => !keyIds.includes(id));
   const hidden = ids.length - checked;
   const changeView = (next: boolean) => {
     const scroll = list.current;
@@ -88,11 +106,12 @@ export function ReviewActionHistory(props: {
               {formatNumber(ids.length, {}, locale)}
             </span>
           </div>
-          <ReviewClickFields
-            values={ids.map((id) => settings.get(id) ?? REVIEW_CLICK_DEFAULT)}
-            onChange={(patch) => {
-              if (ids.length) props.onChange(ids, patch);
-            }}
+          <HistoryAnimationFields
+            clickIds={clickIds}
+            keyIds={keyIds}
+            settings={settings}
+            keySettings={keySettings}
+            {...props}
           />
         </div>
       ) : (
@@ -140,8 +159,9 @@ export function ReviewActionHistory(props: {
                 <ReviewHistoryRow
                   key={`${marker.ref.kind}:${marker.ref.id}`}
                   marker={marker}
+                  keyStyle={isReviewKey(marker) ? keySettings.get(marker.ref.id) : undefined}
                   style={isReviewClick(marker) ? settings.get(marker.ref.id) : undefined}
-                  selected={isReviewClick(marker) && ids.includes(marker.ref.id)}
+                  selected={ids.includes(marker.ref.id)}
                   onSelect={() => props.onSelect(marker)}
                   onCheck={(value) =>
                     setSelected((current) =>
@@ -172,6 +192,38 @@ interface HistoryFilterValues {
   type: string;
   status: string;
   longer: number;
+}
+
+/** Selected click and key settings remain separate even in a mixed batch. */
+function HistoryAnimationFields(props: {
+  keySettings: ReadonlyMap<string, ReviewKeyAnimation>;
+  clickIds: readonly string[];
+  keyIds: readonly string[];
+  settings: ReadonlyMap<string, ReviewClickAnimation>;
+  keyAnimations?: readonly ReviewKeyAnimation[];
+  onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
+  onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
+}) {
+  const { clickIds, keyIds, settings } = props;
+  return (
+    <>
+      {' '}
+      {clickIds.length ? (
+        <ReviewClickFields
+          values={clickIds.map((id) => settings.get(id) ?? REVIEW_CLICK_DEFAULT)}
+          onChange={(patch) => {
+            if (clickIds.length) props.onChange(clickIds, patch);
+          }}
+        />
+      ) : null}
+      {keyIds.length ? (
+        <ReviewKeyFields
+          values={keyIds.map((id) => props.keySettings.get(id) ?? REVIEW_KEY_DEFAULT)}
+          onChange={(patch) => props.onKeyChange?.(keyIds, patch)}
+        />
+      ) : null}
+    </>
+  );
 }
 
 /** Controlled search/filter presentation; the history owner retains values across settings navigation. */
@@ -297,11 +349,12 @@ function queryHistory(
   markers: readonly ReviewTelemetryMarker[],
   settings: ReadonlyMap<string, ReviewClickAnimation>,
   filters: HistoryFilterValues,
-  selected: readonly string[]
+  selected: readonly string[],
+  keyAnimations: ReadonlyMap<string, ReviewKeyAnimation>
 ) {
   const eligible = new Set(
     markers
-      .filter((marker) => isReviewClick(marker) && marker.focusPoint)
+      .filter((marker) => (isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker))
       .map((marker) => marker.ref.id)
   );
   const ids = selected.filter((id) => eligible.has(id));
@@ -314,8 +367,9 @@ function queryHistory(
         (filters.type === 'clicks' ? isReviewClick(marker) : marker.eventType === filters.type)) &&
       (filters.status === 'all' ||
         (filters.status === 'animated'
-          ? !!animation && animation.effect !== 'off'
-          : isReviewClick(marker) && selectedIds.has(marker.ref.id))) &&
+          ? (!!animation && animation.effect !== 'off') ||
+            (isReviewKey(marker) && !!keyAnimations.get(marker.ref.id)?.enabled)
+          : selectedIds.has(marker.ref.id))) &&
       (!filters.longer || marker.end - marker.start > filters.longer) &&
       `${reviewEventLabel(marker.eventType)} ${marker.target ?? ''}`
         .toLocaleLowerCase()
@@ -324,7 +378,7 @@ function queryHistory(
   });
   const matching = new Set(
     filtered
-      .filter((marker) => isReviewClick(marker) && marker.focusPoint)
+      .filter((marker) => (isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker))
       .map((marker) => marker.ref.id)
   );
   const checked = ids.filter((id) => matching.has(id)).length;

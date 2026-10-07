@@ -1,3 +1,4 @@
+import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
 import { useReviewNoteTransitions } from './note-transitions';
 import { useMemo, useRef, useState } from 'react';
@@ -79,7 +80,16 @@ export function useReviewEditorState(resource: LoadedReview) {
       ),
     [wiring.projected.markers, advanced.ui.mode, advanced.clickAnimations, core.timeline.timeMap]
   );
-  return { ...assembleReviewEditorState(core, wiring), clickCues };
+  const keyCues = useMemo(
+    () =>
+      scheduleReviewKeys(
+        wiring.projected.markers,
+        advanced.ui.mode === 'advanced' ? (advanced.keyAnimations ?? []) : [],
+        core.timeline.timeMap.getSegments()
+      ),
+    [wiring.projected.markers, advanced.ui.mode, advanced.keyAnimations, core.timeline.timeMap]
+  );
+  return { ...assembleReviewEditorState(core, wiring), clickCues, keyCues };
 }
 
 /** Combines session state with the timeline transport and editing controls. */
@@ -339,6 +349,7 @@ function reviewAdvancedControls(
     },
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
+    setKeyAnimations: advancedState.setKeyAnimations,
     setClickAnimations: advancedState.setClickAnimations,
     setBackground: advancedState.setBackground,
     setCanvas: advancedState.setCanvas,

@@ -4,7 +4,9 @@ import type { VideoCompositionActionState } from '../../types';
 /** Positions key labels inside the visible frame; source cursor coordinates do not place captions. */
 export function drawKeystroke(
   context: CanvasRenderingContext2D,
-  action: VideoCompositionActionState,
+  action: Pick<VideoCompositionActionState, 'progress' | 'keyStyle'> & {
+    event: Pick<VideoCompositionActionState['event'], 'label'>;
+  },
   sizeScale: number,
   bounds?: { x: number; y: number; width: number; height: number }
 ): void {

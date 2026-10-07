@@ -203,6 +203,7 @@ export interface QuickEditAudioState {
 
 /** Advanced quick-editor state persisted beside the edit history in the same workspace record. */
 export interface QuickEditAdvancedState {
+  keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('./click-animation').ReviewClickAnimation[];
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;
   ui: QuickEditUiState;
@@ -222,6 +223,7 @@ export interface QuickEditAdvancedState {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
   clickAnimations?: import('./click-animation').ReviewClickAnimation[];
   /** Version travels with each history payload so persisted operations are fixed-point parseable. */
   schemaVersion: typeof QUICK_EDIT_ADVANCED_SCHEMA_VERSION;

@@ -1,3 +1,4 @@
+import { ReviewKeyOverlay } from './key-animation-overlay';
 import { ReviewBackgroundBlurPreview } from './background-blur-preview';
 import {
   quickEditPlaneProjection,
@@ -100,6 +101,7 @@ function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
 }
 
 type ReviewStageProps = {
+  keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[] | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
   backgroundImageUrl?: string | undefined;
@@ -259,6 +261,7 @@ export function ReviewStage(props: ReviewStageProps) {
         {props.webcam ? (
           <ReviewWebcamOverlay binding={props.webcam} main={props.video} output={size} />
         ) : null}
+        <ReviewKeyOverlay cues={props.keyCues} time={props.scene?.focus?.time ?? 0} output={size} />
         <ReviewCutBlackout binding={props.cutPreview} />
       </div>
     </div>

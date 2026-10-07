@@ -1,3 +1,5 @@
+import { isReviewKey } from '../../features/video/review/key-animation';
+import type { ReviewKeyAnimation } from '../../features/video/review/advanced/key-animation';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, Minus, Clock3, Sparkles, X } from 'lucide-react';
 import { useLayoutEffect, useRef, type RefObject } from 'react';
@@ -45,6 +47,7 @@ function HistoryCheckbox(props: {
 export function ReviewHistoryRow(props: {
   marker: ReviewTelemetryMarker;
   style: ReviewClickAnimation | undefined;
+  keyStyle?: ReviewKeyAnimation | undefined;
   selected: boolean;
   onSelect(): void;
   onCheck(checked: boolean): void;
@@ -54,7 +57,7 @@ export function ReviewHistoryRow(props: {
   const duration = marker.end - marker.start;
   return (
     <li className="review-history-row" data-selected={props.selected || undefined}>
-      {isReviewClick(marker) && marker.focusPoint ? (
+      {(isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker) ? (
         <HistoryCheckbox
           label={`${translate('gallery.videoReview.historySelect')} ${reviewTimeLabel(marker.start)}`}
           checked={props.selected}
@@ -76,7 +79,7 @@ export function ReviewHistoryRow(props: {
             {marker.target}
           </span>
         ) : null}
-        {duration > 0 ? (
+        {duration > 0 && !isReviewKey(marker) ? (
           <span
             className="flex items-center gap-1 tabular-nums text-[var(--sniptale-color-text-primary)]"
             title={translate('gallery.videoReview.sourceInterval')}
@@ -86,6 +89,17 @@ export function ReviewHistoryRow(props: {
               '{value}',
               formatNumber(duration, { maximumFractionDigits: 2 }, locale)
             )}
+          </span>
+        ) : null}
+        {props.keyStyle?.enabled ? (
+          <span className="block text-[var(--sniptale-color-text-secondary)]">
+            {translate('gallery.videoReview.keyCaption')} ·{' '}
+            {formatNumber(
+              Math.round((props.keyStyle.before + props.keyStyle.after) * 1000),
+              {},
+              locale
+            )}{' '}
+            {translate('gallery.videoReview.clickMilliseconds')}
           </span>
         ) : null}
         {style && style.effect !== 'off' ? (

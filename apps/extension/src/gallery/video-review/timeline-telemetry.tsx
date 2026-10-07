@@ -1,4 +1,3 @@
-import { isReviewClick } from '../../features/video/review/click-animation';
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone } from './controls';
 import { useEffect, useMemo, useState } from 'react';
@@ -82,7 +81,7 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
           props.selectedTelemetryRef !== undefined &&
           marker.ref.kind === props.selectedTelemetryRef.kind &&
           marker.ref.id === props.selectedTelemetryRef.id;
-        const animated = isReviewClick(marker) && props.animatedIds?.has(marker.ref.id);
+        const animated = marker.ref.kind === 'action' && props.animatedIds?.has(marker.ref.id);
         const tone = reviewTimelineItemTone(selected);
         if (item.members.length > 1)
           return (
@@ -187,7 +186,7 @@ function ReviewHistoryCluster(props: {
       props.selectedRef?.kind === marker.ref.kind && props.selectedRef.id === marker.ref.id
   );
   const animated = props.members.some(
-    (marker) => isReviewClick(marker) && props.animatedIds?.has(marker.ref.id)
+    (marker) => marker.ref.kind === 'action' && props.animatedIds?.has(marker.ref.id)
   );
   return (
     <div className="absolute" style={{ left: props.left, width: props.width, top: props.top }}>
@@ -231,7 +230,7 @@ function ReviewHistoryCluster(props: {
               : `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
             reviewEventLabel(marker.eventType),
             marker.target,
-            isReviewClick(marker) && props.animatedIds?.has(marker.ref.id)
+            marker.ref.kind === 'action' && props.animatedIds?.has(marker.ref.id)
               ? translate('gallery.videoReview.clickAnimation')
               : undefined,
           ]

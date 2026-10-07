@@ -239,3 +239,42 @@ it('ends a raw typing burst at each pointer-down before short fragments can accu
   expect(state.signals).toEqual([]);
   expect(state.typingTarget).toBeNull();
 });
+
+it('admits navigation and function commands without modifier-only or composition noise', () => {
+  const state = createSignalState();
+  for (const key of ['ArrowLeft', 'F5', 'Home', 'PageDown', ' '])
+    recordKeyboardShortcut(state, createShortcutEvent(key, 100));
+  for (const key of ['Control', 'Alt', 'Meta', 'Shift', 'Dead', 'Process', 'Unidentified'])
+    recordKeyboardShortcut(state, createShortcutEvent(key, 200, { ctrlKey: true }));
+  recordKeyboardShortcut(
+    state,
+    createShortcutEvent('k', 200, { ctrlKey: true, isComposing: true })
+  );
+  recordKeyboardShortcut(
+    state,
+    createShortcutEvent('@', 200, {
+      ctrlKey: true,
+      altKey: true,
+      getModifierState: (key) => key === 'AltGraph',
+    })
+  );
+  expect(state.actionEvents.map((event) => event.label)).toEqual([
+    'Left',
+    'F5',
+    'Home',
+    'PageDown',
+    'Space',
+  ]);
+});
+
+it('does not record keys from sensitive inputs or space used as text input', () => {
+  const state = createSignalState();
+  const password = document.createElement('input');
+  password.type = 'password';
+  const text = document.createElement('textarea');
+  recordKeyboardShortcut(state, createShortcutEvent('c', 100, { ctrlKey: true, target: password }));
+  recordKeyboardShortcut(state, createShortcutEvent(' ', 200, { target: text }));
+  expect(state.actionEvents).toEqual([]);
+  recordKeyboardShortcut(state, createShortcutEvent('c', 300, { ctrlKey: true, target: text }));
+  expect(state.actionEvents.map((event) => event.label)).toEqual(['Ctrl+C']);
+});

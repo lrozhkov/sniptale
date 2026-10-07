@@ -28,7 +28,8 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  * frame), the selected focus handle, and the overlay stack. Effective regions already
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
-export function ReviewStageBinding(props: {
+type ReviewStageBindingProps = {
+  keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
   clickCues?:
     | readonly import('../../features/video/review/click-animation').ReviewClickCue[]
     | undefined;
@@ -63,7 +64,8 @@ export function ReviewStageBinding(props: {
   onPlaying(value: boolean): void;
   onEnded?: (() => void) | undefined;
   onError(): void;
-}) {
+};
+export function ReviewStageBinding(props: ReviewStageBindingProps) {
   const image = useReviewBackgroundImage(props.background, props.backgroundPending);
   const selected = props.zoomOverlay?.region;
   const projected = selected ? projectReviewFocus([selected], props.focusTimeMap) : [];
@@ -135,6 +137,7 @@ export function ReviewStageBinding(props: {
         </div>
       ) : null}
       <ReviewStage
+        keyCues={props.keyCues}
         clickCues={props.clickCues}
         webcam={props.webcam}
         focusPicker={props.focusPicker}

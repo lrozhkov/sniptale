@@ -143,6 +143,11 @@ export function useReviewAdvancedContent(
     pending: pending.current !== null,
     flush,
     reset,
+    setKeyAnimations: (
+      update: (
+        current: NonNullable<QuickEditAdvancedContent['keyAnimations']>
+      ) => NonNullable<QuickEditAdvancedContent['keyAnimations']>
+    ) => stage((content) => ({ ...content, keyAnimations: update(content.keyAnimations ?? []) })),
     setClickAnimations: (
       update: (
         current: NonNullable<QuickEditAdvancedContent['clickAnimations']>

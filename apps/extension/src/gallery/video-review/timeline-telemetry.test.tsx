@@ -167,3 +167,23 @@ it('holds groups during zoom then repacks without changing height or selected id
   expect(host.querySelectorAll('button')).toHaveLength(3);
   expect(strip.style.height).toBe('68px');
 });
+
+it('tints an authored keyboard event without tinting a signal with the same local id', () => {
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        markers={[
+          { ...marker('action', 'shared', 1), eventType: 'KEY' },
+          { ...marker('signal', 'shared', 5, 6), eventType: 'static-frame' },
+        ]}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={vi.fn()}
+        animatedIds={new Set(['shared'])}
+      />
+    )
+  );
+  expect(host.querySelectorAll('button[data-animated="true"]')).toHaveLength(1);
+});

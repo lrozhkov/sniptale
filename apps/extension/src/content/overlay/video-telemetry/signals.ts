@@ -101,17 +101,47 @@ function resolveKeyboardShortcutLabel(event: KeyboardEvent): string {
 }
 
 function shouldRecordKeyboardShortcut(event: KeyboardEvent): boolean {
-  if (event.repeat) {
+  if (
+    event.repeat ||
+    event.isComposing ||
+    event.getModifierState?.('AltGraph') ||
+    ['Control', 'Meta', 'Alt', 'AltGraph', 'Shift', 'Dead', 'Process', 'Unidentified', ''].includes(
+      event.key
+    )
+  )
     return false;
-  }
-
+  const target = describeTelemetryTarget(event).element;
+  if (
+    target?.closest(
+      'input[type="password"],input[autocomplete="one-time-code"],input[autocomplete^="cc-"]'
+    )
+  )
+    return false;
+  const editable = target?.closest(
+    'input,textarea,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'
+  );
   return (
     event.metaKey ||
     event.ctrlKey ||
     event.altKey ||
-    event.key === 'Tab' ||
-    event.key === 'Escape' ||
-    event.key === 'Enter'
+    [
+      'Tab',
+      'Escape',
+      'Enter',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'Home',
+      'End',
+      'PageUp',
+      'PageDown',
+      'Insert',
+      'Delete',
+      'Backspace',
+    ].includes(event.key) ||
+    /^F(?:[1-9]|1[0-9]|2[0-4])$/.test(event.key) ||
+    (event.key === ' ' && !editable)
   );
 }
 

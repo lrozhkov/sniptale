@@ -64,3 +64,36 @@ it('shows recorded target metadata as text and tolerates a disappearing selectio
     vi.unstubAllGlobals();
   }
 });
+
+vi.mock('./key-animation-fields', () => ({
+  ReviewKeyFields: (props: { onChange(patch: { enabled: boolean }): void }) => (
+    <button onClick={() => props.onChange({ enabled: true })}>Enable key caption</button>
+  ),
+}));
+it('configures keyboard points without offering interval focus edits', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div'),
+    root = createRoot(host),
+    onKeyAnimation = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionProperties
+          marker={{ ...marker, eventType: 'KEY', target: 'Ctrl+C', end: 1.55 }}
+          plan={plan}
+          busy={false}
+          onEdit={vi.fn()}
+          onFocus={vi.fn()}
+          onKeyAnimation={onKeyAnimation}
+        />
+      )
+    );
+    expect(host.textContent).toContain('Ctrl+C');
+    expect(host.textContent).not.toContain('Focus on action');
+    act(() => host.querySelector('button')!.click());
+    expect(onKeyAnimation).toHaveBeenCalledExactlyOnceWith(['click'], { enabled: true });
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

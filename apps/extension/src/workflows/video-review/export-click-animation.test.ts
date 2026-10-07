@@ -1,3 +1,4 @@
+import { patchReviewKeys } from '../../features/video/review/advanced/key-animation';
 import { expect, it } from 'vitest';
 import { createReviewExportFixture } from './export-lifecycle.test-support';
 import { exportReviewedVideo } from './export-lifecycle';
@@ -61,6 +62,57 @@ it('joins freshly loaded semantic actions before fragment slicing, independently
           point: { x: 0.25, y: 0.5 },
         }),
       ],
+    })
+  );
+  expect(deps.writeReviewPackets).not.toHaveBeenCalled();
+});
+
+it('exports key captions from source facts without pointer coordinates, using global fragment time', async () => {
+  const { args, deps } = createReviewExportFixture();
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.advanced.keyAnimations = patchReviewKeys([], ['key'], { enabled: true });
+  args.index.processedVideoCodec = 'vp9';
+  args.index.frameRate = 30;
+  const original = await deps.loadVideoReviewSource();
+  deps.loadVideoReviewSource.mockResolvedValue({
+    ...original,
+    telemetry: {
+      recordingId: 'original',
+      captureMode: 'TAB',
+      viewport: null,
+      cursorTrack: null,
+      signals: [],
+      createdAt: 1,
+      updatedAt: 1,
+      actionEvents: [
+        {
+          id: 'key',
+          kind: 'KEY',
+          time: 4.5,
+          duration: 0.55,
+          point: null,
+          label: 'Ctrl+C',
+          data: {},
+          preset: 'NONE',
+        },
+      ],
+    },
+  });
+  deps.writeReviewFrames.mockResolvedValue({
+    videoPackets: 30,
+    audioPackets: 0,
+    resultDuration: 1,
+    audioRanges: [],
+    videoReencoded: true,
+  });
+  await exportReviewedVideo(
+    { ...args, destination: 'download', selection: { kind: 'range', start: 4, end: 5 } },
+    deps
+  );
+  expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+    expect.objectContaining({
+      fragmentOffset: 2,
+      keyCues: [expect.objectContaining({ label: 'Ctrl+C', start: 2.5, end: 3.7 })],
     })
   );
   expect(deps.writeReviewPackets).not.toHaveBeenCalled();

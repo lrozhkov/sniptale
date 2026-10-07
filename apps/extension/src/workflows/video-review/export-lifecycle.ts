@@ -1,3 +1,4 @@
+import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
 import { createExportTimeHistory } from '../../composition/persistence/export-time-history';
@@ -295,7 +296,7 @@ export async function exportReviewedVideo(
             index,
             edits,
             advanced,
-            clickCues: reviewExportClicks(
+            ...reviewExportPresentations(
               original.telemetry,
               advanced,
               index.duration,
@@ -384,20 +385,22 @@ export async function exportReviewedVideo(
   }
 }
 
-/** Join fresh source facts before fragment slicing; all animation clocks remain global. */
-function reviewExportClicks(
+/** Join fresh source facts once before slicing; all authored animation clocks remain global. */
+function reviewExportPresentations(
   telemetry: Awaited<ReturnType<typeof loadVideoReviewSource>>['telemetry'],
   advanced: QuickEditAdvancedState,
   duration: number,
   edits: Parameters<typeof buildReviewTimeMap>[1]
 ) {
-  return advanced.ui.mode === 'advanced' && telemetry
-    ? scheduleReviewClicks(
-        projectReviewTelemetry(telemetry, duration).markers,
-        advanced.clickAnimations ?? [],
-        buildReviewTimeMap(duration, edits)
-      )
-    : [];
+  const markers =
+    advanced.ui.mode === 'advanced' && telemetry
+      ? projectReviewTelemetry(telemetry, duration).markers
+      : [];
+  const segments = buildReviewTimeMap(duration, edits);
+  return {
+    keyCues: scheduleReviewKeys(markers, advanced.keyAnimations ?? [], segments),
+    clickCues: scheduleReviewClicks(markers, advanced.clickAnimations ?? [], segments),
+  };
 }
 
 /** Preserve source summary when present, otherwise derive it from admitted telemetry. */

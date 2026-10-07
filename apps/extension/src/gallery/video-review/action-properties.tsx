@@ -1,3 +1,10 @@
+import { isReviewKey } from '../../features/video/review/key-animation';
+import {
+  REVIEW_KEY_DEFAULT,
+  type ReviewKeyAnimation,
+  type ReviewKeyPatch,
+} from '../../features/video/review/advanced/key-animation';
+import { ReviewKeyFields } from './key-animation-fields';
 import { isReviewClick } from '../../features/video/review/click-animation';
 import {
   REVIEW_CLICK_DEFAULT,
@@ -26,6 +33,8 @@ export function ReviewActionProperties(props: {
   marker: ReviewTelemetryMarker | undefined;
   plan: Plan | null;
   busy: boolean;
+  keyAnimations?: readonly ReviewKeyAnimation[] | undefined;
+  onKeyAnimation?: ((ids: readonly string[], patch: ReviewKeyPatch | null) => void) | undefined;
   animations?: readonly ReviewClickAnimation[] | undefined;
   onOpenHistory?: (() => void) | undefined;
   onClickAnimation?:
@@ -48,7 +57,7 @@ export function ReviewActionProperties(props: {
           {translate('gallery.videoReview.historyBack')}
         </ReviewButton>
       ) : null}
-      {isReviewClick(marker) || marker.end <= marker.start ? (
+      {isReviewClick(marker) || isReviewKey(marker) || marker.end <= marker.start ? (
         <div className="flex min-h-8 items-center justify-between gap-2 text-xs tabular-nums">
           <span className="font-medium text-[var(--sniptale-color-text-secondary)]">
             {translate('gallery.videoReview.clickRecordedAt')}
@@ -70,10 +79,21 @@ export function ReviewActionProperties(props: {
           <p role="status">{translate('gallery.videoReview.clickNoPoint')}</p>
         )
       ) : null}
+      {isReviewKey(marker) ? (
+        <ReviewKeyFields
+          values={[
+            props.keyAnimations?.find((item) => item.id === marker.ref.id) ?? REVIEW_KEY_DEFAULT,
+          ]}
+          onChange={(patch) => props.onKeyAnimation?.([marker.ref.id], patch)}
+        />
+      ) : null}
       {marker.target ? (
         <p className="break-words text-[var(--sniptale-color-text-secondary)]">{marker.target}</p>
       ) : null}
-      {!isReviewClick(marker) && marker.end > marker.start && !plan.removed ? (
+      {!isReviewClick(marker) &&
+      !isReviewKey(marker) &&
+      marker.end > marker.start &&
+      !plan.removed ? (
         <ReviewActionShortcuts
           plan={plan}
           busy={props.busy}

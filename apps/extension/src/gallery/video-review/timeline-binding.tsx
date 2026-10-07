@@ -362,6 +362,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       selectedEditId={props.editing.selected?.id}
       annotations={props.annotations}
       onOpenHistory={props.onOpenHistory}
+      keyAnimations={props.advanced.keyAnimations}
       clickAnimations={props.advanced.clickAnimations}
       markers={props.markers}
       {...(props.selectedTelemetryRef ? { selectedTelemetryRef: props.selectedTelemetryRef } : {})}

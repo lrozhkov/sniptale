@@ -65,6 +65,10 @@ function resumeTelemetryState(state: TelemetryState): void {
   clearLegacyControlledCursorArtifacts();
   state.isPaused = false;
   state.segmentStartedAtTimestamp = performance.now();
+  // Pause time is not cursor inactivity in the recorded result.
+  state.pointerStationaryStartedAtMs = state.pointerStationaryPosition
+    ? state.segmentStartedAtTimestamp
+    : null;
   attachListeners(state);
   if (!state.viewportObserver) attachViewportObserver(state);
   observeViewportGeometry(state);

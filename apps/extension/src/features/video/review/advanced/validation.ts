@@ -1,3 +1,4 @@
+import { parseReviewKeyAnimations } from './key-animation';
 import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
 import { parseReviewClickAnimations } from './click-animation';
 import { parseQuickEditBorder } from './border';
@@ -420,6 +421,8 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
+  if (keyAnimations === null) return null;
   const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
   if (clickAnimations === null) return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
@@ -432,6 +435,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     zoom,
     background,
     audio,
+    ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
@@ -473,6 +477,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
+  const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
+  if (keyAnimations === null) return null;
   const clickAnimations = parseReviewClickAnimations(raw['clickAnimations']);
   if (clickAnimations === null) return null;
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
@@ -488,6 +494,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ui,
     zoom,
     background,
+    ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),

@@ -32,6 +32,7 @@ import {
 const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0]> = {
   canvas: 'gallery.videoReview.canvas',
   'canvas-size': 'gallery.videoReview.exportBlockerCanvasSize',
+  'key-animations': 'gallery.videoReview.keyDisplay',
   'click-animations': 'gallery.videoReview.clickAnimation',
   'window-header': 'gallery.videoReview.windowHeader',
   webcam: 'gallery.videoReview.webcam',
