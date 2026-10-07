@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
+import { createReviewSpatialTextures } from './spatial-textures';
 import { createReviewSpatialRenderer } from './spatial-renderer';
 import {
   DEFAULT_QUICK_EDIT_DEPTH,
@@ -26,7 +27,7 @@ function graphics() {
     getProgramParameter: vi.fn(() => true),
     deleteProgram: vi.fn(),
     createBuffer: vi.fn(() => ({})),
-    createTexture: vi.fn(() => ({})),
+    createTexture: vi.fn<() => object | null>(() => ({})),
     bindBuffer: vi.fn(),
     bufferData: vi.fn(),
     useProgram: vi.fn(),
@@ -34,6 +35,8 @@ function graphics() {
     enableVertexAttribArray: vi.fn(),
     vertexAttribPointer: vi.fn(),
     bindTexture: vi.fn(),
+    activeTexture: vi.fn(),
+    uniform1i: vi.fn(),
     texParameteri: vi.fn(),
     pixelStorei: vi.fn(),
     getUniformLocation: vi.fn((_program: unknown, name: string) => name),
@@ -45,7 +48,16 @@ function graphics() {
     uniformMatrix3fv: vi.fn(),
     uniform2f: vi.fn(),
     uniform4f: vi.fn(),
-    texImage2D: vi.fn(),
+    texImage2D: vi.fn(
+      (
+        _target: number,
+        _level: number,
+        _internal: number,
+        _format: number,
+        _type: number,
+        _source: HTMLCanvasElement
+      ) => {}
+    ),
     drawArrays: vi.fn(),
     getError: vi.fn(() => 0),
     deleteTexture: vi.fn(),
@@ -100,13 +112,14 @@ it('reuses surfaces, projects premultiplied pixels, keeps sharp overlays unblurr
   gpu().dispatchEvent(new Event('webglcontextlost'));
   expect(lost).toHaveBeenCalledTimes(1);
   expect(loseContext).toHaveBeenCalledTimes(1);
-  expect(gl.deleteTexture).toHaveBeenCalledTimes(1);
+  expect(gl.deleteTexture).toHaveBeenCalledTimes(8);
   expect(plane.canvas.width).toBe(1);
   expect(() => renderer.draw(context, plane.canvas, rect, rect, frame)).toThrow('context was lost');
 });
 
 it('rejects unsupported sizes and lost/failed contexts instead of drawing an untransformed frame', () => {
-  const { gl, context } = graphics();
+  const { gl } = graphics();
+  const context = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
   const renderer = createReviewSpatialRenderer();
   const source = renderer.surface('plane', 320, 180).canvas;
   gl.getParameter.mockReturnValueOnce(100);
@@ -130,3 +143,49 @@ it.each(['compile', 'link', 'unavailable'] as const)(
     expect(loseContext).toHaveBeenCalledTimes(stage === 'unavailable' ? 0 : 1);
   }
 );
+
+it('filters odd-sized levels, reuses their allocations and releases partial allocation failures', () => {
+  const { gl, context } = graphics();
+  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext);
+  const source = document.createElement('canvas');
+  source.width = 963;
+  source.height = 587;
+  textures.upload(source);
+  const uploaded = gl.texImage2D.mock.calls.map((call) => call[5] as HTMLCanvasElement);
+  expect(uploaded.map((canvas) => [canvas.width, canvas.height])).toEqual([
+    [963, 587],
+    [482, 294],
+    [241, 147],
+    [121, 74],
+    [61, 37],
+    [31, 19],
+    [16, 10],
+    [8, 5],
+  ]);
+  textures.upload(source);
+  expect(gl.createTexture).toHaveBeenCalledTimes(8);
+  expect(gl.texImage2D.mock.calls[9]![5]).toBe(uploaded[1]);
+  expect(context.imageSmoothingEnabled).toBe(true);
+  expect(context.imageSmoothingQuality).toBe('high');
+  source.width = 1;
+  source.height = 1;
+  textures.upload(source);
+  expect(uploaded.every((canvas) => canvas.width === 1 && canvas.height === 1)).toBe(true);
+  textures.dispose();
+  textures.dispose();
+  expect(gl.deleteTexture).toHaveBeenCalledTimes(8);
+  gl.createTexture.mockReturnValueOnce({}).mockReturnValueOnce(null);
+  expect(() => createReviewSpatialTextures(gl as unknown as WebGLRenderingContext)).toThrow(
+    'texture'
+  );
+  expect(gl.deleteTexture).toHaveBeenCalledTimes(9);
+});
+
+it('reports missing low-pass surface instead of using stale pixels', () => {
+  const { gl, getContext } = graphics();
+  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext);
+  getContext.mockReturnValue(null);
+  const source = document.createElement('canvas');
+  expect(() => textures.upload(source)).toThrow('filter surface');
+  textures.dispose();
+});

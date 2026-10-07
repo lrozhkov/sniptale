@@ -12,7 +12,15 @@ void main() {
 
 export const REVIEW_SPATIAL_FRAGMENT = `
 precision highp float;
-uniform sampler2D surface;
+uniform sampler2D surface0;
+uniform sampler2D surface1;
+uniform sampler2D surface2;
+uniform sampler2D surface3;
+uniform sampler2D surface4;
+uniform sampler2D surface5;
+uniform sampler2D surface6;
+uniform sampler2D surface7;
+uniform mat3 inverseProjection;
 uniform vec2 outputSize;
 uniform vec4 windowRect;
 uniform vec2 depthAxis;
@@ -27,19 +35,27 @@ float blurAmount(vec4 focus, float softness, float mode) {
   float distance = mode < 0.5 ? length(delta) : abs(dot(delta, depthAxis));
   return smoothstep(focus.z * 0.5, focus.z * 0.5 + max(0.005, softness), distance) * focus.w;
 }
+// Interpolated low-pass levels remove sparse-tap ghosts and the retained sharp center.
+vec4 filtered(float level) {
+  if (level < 1.0) return mix(texture2D(surface0, uv), texture2D(surface1, uv), level);
+  if (level < 2.0) return mix(texture2D(surface1, uv), texture2D(surface2, uv), level - 1.0);
+  if (level < 3.0) return mix(texture2D(surface2, uv), texture2D(surface3, uv), level - 2.0);
+  if (level < 4.0) return mix(texture2D(surface3, uv), texture2D(surface4, uv), level - 3.0);
+  if (level < 5.0) return mix(texture2D(surface4, uv), texture2D(surface5, uv), level - 4.0);
+  if (level < 6.0) return mix(texture2D(surface5, uv), texture2D(surface6, uv), level - 5.0);
+  return mix(texture2D(surface6, uv), texture2D(surface7, uv), min(1.0, level - 6.0));
+}
+vec2 sourcePoint(vec2 point) {
+  vec3 p = inverseProjection * vec3(point, 1.0);
+  return p.xy / p.z;
+}
 void main() {
   float blur = blurAmount(focusA, blurSettings.x, modes.x) + blurAmount(focusB, blurSettings.y, modes.y);
   float radius = blur * 24.0 * outputSize.x / 1920.0;
-  vec4 color = texture2D(surface, uv);
-  if (radius > 0.05) {
-    color *= 4.0;
-    for (int i = 0; i < 16; i++) {
-      float angle = float(i) * 2.39996323;
-      float ring = sqrt((float(i) + 0.5) / 16.0);
-      vec2 offset = vec2(cos(angle), sin(angle)) * ring * radius / outputSize;
-      color += texture2D(surface, clamp(uv + offset, vec2(0.0), vec2(1.0)));
-    }
-    color /= 20.0;
-  }
-  gl_FragColor = color;
+  vec2 point = vec2(gl_FragCoord.x, outputSize.y - gl_FragCoord.y);
+  vec2 center = sourcePoint(point);
+  float footprint = max(length(sourcePoint(point + vec2(1.0, 0.0)) - center),
+                        length(sourcePoint(point + vec2(0.0, 1.0)) - center));
+  float level = log2(max(1.0, max(footprint, radius)));
+  gl_FragColor = filtered(level);
 }`;

@@ -1,9 +1,11 @@
 import {
   quickEditPlaneProjection,
+  invertQuickEditProjection,
   quickEditRotationMatrix,
 } from '../../features/video/review/advanced/spatial-geometry';
 import type { QuickEditSpatialFrame } from '../../features/video/review/advanced/spatial';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
+import { createReviewSpatialTextures } from './spatial-textures';
 import { REVIEW_SPATIAL_VERTEX, REVIEW_SPATIAL_FRAGMENT } from './spatial-shaders';
 
 /** One explicit GPU owner per preview/export session; callers dispose on close or cancellation. */
@@ -40,9 +42,8 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
       gl.deleteProgram(program);
       throw new Error('Perspective program linking failed.');
     }
-    const buffer = gl.createBuffer(),
-      texture = gl.createTexture();
-    if (!buffer || !texture) throw new Error('Perspective buffers are unavailable.');
+    const buffer = gl.createBuffer();
+    if (!buffer) throw new Error('Perspective buffers are unavailable.');
     gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
     gl.bufferData(
       gl.ARRAY_BUFFER,
@@ -53,11 +54,9 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
     const position = gl.getAttribLocation(program, 'position');
     gl.enableVertexAttribArray(position);
     gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    const textures = createReviewSpatialTextures(gl);
+    for (let index = 0; index < 8; index++)
+      gl.uniform1i(gl.getUniformLocation(program, `surface${index}`), index);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     const locations = new Map<string, WebGLUniformLocation | null>();
     const uniform = (name: string) => {
@@ -112,6 +111,23 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
           false,
           new Float32Array([m[0], m[3], m[6], m[1], m[4], m[7], m[2], m[5], m[8]])
         );
+        const inverse = invertQuickEditProjection(m);
+        if (!inverse) throw new Error('Perspective projection is unavailable.');
+        gl.uniformMatrix3fv(
+          uniform('inverseProjection'),
+          false,
+          new Float32Array([
+            inverse[0],
+            inverse[3],
+            inverse[6],
+            inverse[1],
+            inverse[4],
+            inverse[7],
+            inverse[2],
+            inverse[5],
+            inverse[8],
+          ])
+        );
         gl.uniform2f(uniform('outputSize'), canvas.width, canvas.height);
         gl.uniform4f(uniform('windowRect'), base.x, base.y, base.width, base.height);
         const rotation = quickEditRotationMatrix(frame.rotation);
@@ -139,7 +155,7 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
           focuses[0]?.settings.mode === 'depth' ? 1 : 0,
           focuses[1]?.settings.mode === 'depth' ? 1 : 0
         );
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
+        textures.upload(source);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         if (gl.getError() !== gl.NO_ERROR) throw new Error('Perspective rendering failed.');
         context.drawImage(canvas, 0, 0);
@@ -148,7 +164,7 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
         if (disposed) return;
         disposed = true;
         canvas.removeEventListener('webglcontextlost', lost);
-        gl.deleteTexture(texture);
+        textures.dispose();
         gl.deleteBuffer(buffer);
         gl.deleteProgram(program);
         gl.getExtension('WEBGL_lose_context')?.loseContext();
