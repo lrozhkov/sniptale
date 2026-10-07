@@ -27,8 +27,37 @@ function assertNoLocalAudioRefs(audio: unknown): void {
     if (!Array.isArray(clips)) continue;
     for (const clip of clips) {
       if (isRecord(clip) && 'assetId' in clip) throw new Error(LOCAL_ASSET_ERROR);
+      if (speechReplacements(clip).some((entry) => isRecord(entry) && 'assetId' in entry))
+        throw new Error(LOCAL_ASSET_ERROR);
     }
   }
+}
+
+function speechReplacements(clip: unknown): unknown[] {
+  if (!isRecord(clip) || !isRecord(clip['transcript'])) return [];
+  const replacements = clip['transcript']['replacements'];
+  return Array.isArray(replacements) ? replacements : [];
+}
+
+function mapSpeechReferences<T>(
+  clip: T,
+  transform: (value: Record<string, unknown>) => Record<string, unknown>
+): T {
+  if (
+    !isRecord(clip) ||
+    !isRecord(clip['transcript']) ||
+    !Array.isArray(clip['transcript']['replacements'])
+  )
+    return clip;
+  return {
+    ...clip,
+    transcript: {
+      ...clip['transcript'],
+      replacements: speechReplacements(clip).map((entry) =>
+        isRecord(entry) ? transform(entry) : entry
+      ),
+    },
+  };
 }
 
 function parseRecoveryContent(value: unknown): unknown {
@@ -176,7 +205,11 @@ function renameLaneRef(
       const reference = clip[sourceKey];
       if (typeof reference !== 'string') return clip;
       const { [sourceKey]: _renamed, ...rest } = clip;
-      return { ...rest, [targetKey]: reference };
+      return mapSpeechReferences({ ...rest, [targetKey]: reference }, (entry) => {
+        if (typeof entry[sourceKey] !== 'string') return entry;
+        const { [sourceKey]: nested, ...fields } = entry;
+        return { ...fields, [targetKey]: nested };
+      });
     });
   }
   return next;
@@ -225,6 +258,8 @@ function collectContentReferences(
   for (const lane of LANES) {
     for (const clip of content.audio[lane]) {
       if (clip.assetId.startsWith(ASSET_PREFIX)) into.add(clip.assetId);
+      for (const replacement of clip.transcript?.replacements ?? [])
+        collectAssetReference(replacement, into);
     }
   }
 }
@@ -276,6 +311,8 @@ function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void 
           clip['assetId'].startsWith(ASSET_PREFIX)
         )
           into.add(clip['assetId']);
+        for (const replacement of speechReplacements(clip))
+          collectAssetReference(replacement, into);
       }
     }
   } catch {
@@ -294,7 +331,21 @@ function remapContentReferences(
     audio[lane] = content.audio[lane].map((clip) => {
       const remapped = requireMappedAssetId(assetIdMap, clip.assetId);
       changed = true;
-      return { ...clip, assetId: remapped };
+      return {
+        ...clip,
+        assetId: remapped,
+        ...(clip.transcript
+          ? {
+              transcript: {
+                ...clip.transcript,
+                replacements: clip.transcript.replacements.map((entry) => ({
+                  ...entry,
+                  assetId: requireMappedAssetId(assetIdMap, entry.assetId),
+                })),
+              },
+            }
+          : {}),
+      };
     });
   }
   const background = remapImageReference(content.background, assetIdMap);
@@ -330,7 +381,9 @@ function remapRecoveryReferences(
       if (typeof assetId !== 'string') return clip;
       const remapped = requireMappedAssetId(assetIdMap, assetId);
       changed = true;
-      return { ...clip, assetId: remapped };
+      return mapSpeechReferences({ ...clip, assetId: remapped }, (entry) =>
+        remapAssetReference(entry, assetIdMap)
+      );
     });
   }
   return changed ? JSON.stringify(parsed) : null;

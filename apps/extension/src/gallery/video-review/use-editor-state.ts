@@ -1,3 +1,4 @@
+import { createReviewSpeechEditGuard } from './speech-edit-guard';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
 import { useReviewNoteTransitions } from './note-transitions';
@@ -136,7 +137,7 @@ function useReviewEditorBase(resource: LoadedReview) {
   const [selected, setSelected] = useState<ReviewAnnotation | null>(null);
   const [hovered, setHovered] = useState<ReviewAnnotation | null>(null);
   const [voiceoverSilent, setVoiceoverSilent] = useState(false);
-  const { selection: activeSelection, setSelection: setActiveSelection } = useReviewSelection();
+  const { selection: activeSelection, setSelection: selectActive } = useReviewSelection();
   const {
     actionBusy,
     isBusy,
@@ -153,8 +154,19 @@ function useReviewEditorBase(resource: LoadedReview) {
     leaveAllowed: () => !snapshot.error,
     onFailure: () => setMessage(translate('gallery.videoReview.saveFailed')),
   });
+  const speechGuardRef = useRef<ReturnType<typeof createReviewSpeechEditGuard> | null>(null);
+  speechGuardRef.current ??= createReviewSpeechEditGuard(() =>
+    setMessage(translate('gallery.videoReview.saveFailed'))
+  );
+  const speechGuard = speechGuardRef.current;
+  const beforeAction: typeof transitions.beforeAction = (action) => {
+    void speechGuard.perform(() => transitions.beforeAction(action));
+  };
+  const setActiveSelection: typeof selectActive = (next) => {
+    void speechGuard.perform(() => selectActive(next));
+  };
   const run = (action: () => Promise<unknown>, success?: string) =>
-    Promise.resolve(transitions.perform(() => raw(action, success)));
+    Promise.resolve(speechGuard.perform(() => transitions.perform(() => raw(action, success))));
   const backgroundImport = useReviewBackgroundImport({
     advanced: advancedState,
     session,
@@ -191,7 +203,9 @@ function useReviewEditorBase(resource: LoadedReview) {
     setMessage,
     run,
     runComposer: raw,
-    beforeAction: transitions.beforeAction,
+    beforeAction,
+    registerSpeechFlush: speechGuard.register,
+    flushSpeech: speechGuard.flush,
     leaveNewNote: transitions.leave,
     canStart,
   };
@@ -318,7 +332,7 @@ function assembleReviewEditorState(
     audio,
     canvasComments,
     telemetry,
-    ...reviewAdvancedControls(advancedState, setActiveSelection),
+    ...reviewAdvancedControls(advancedState, setActiveSelection, core.beforeAction),
     projected,
     selectComment: (annotation: ReviewAnnotation) => {
       core.beforeAction(() => {
@@ -341,13 +355,15 @@ function assembleReviewEditorState(
 /** Keeps mode changes and the controls for dormant advanced content together. */
 function reviewAdvancedControls(
   advancedState: ReturnType<typeof useReviewAdvanced>,
-  setActiveSelection: ReturnType<typeof useReviewSelection>['setSelection']
+  setActiveSelection: ReturnType<typeof useReviewSelection>['setSelection'],
+  beforeAction: ReturnType<typeof useReviewNoteTransitions>['beforeAction']
 ) {
   return {
-    setMode: (mode: 'basic' | 'advanced') => {
-      setActiveSelection({ kind: 'none' });
-      advancedState.setMode(mode);
-    },
+    setMode: (mode: 'basic' | 'advanced') =>
+      beforeAction(() => {
+        setActiveSelection({ kind: 'none' });
+        advancedState.setMode(mode);
+      }),
     setTrackVisibility: advancedState.setTrackVisibility,
     setOverlaysVisible: advancedState.setOverlaysVisible,
     setKeyAnimations: advancedState.setKeyAnimations,

@@ -160,7 +160,9 @@ it('uses target protection with animation presence and full presence for linked 
 
 it('normalizes legacy state and admits overlay overlap while rejecting exclusive payloads and camera overlap', () => {
   const defaults = createQuickEditAdvancedState();
-  expect(loadQuickEditAdvancedState({ ...defaults, schemaVersion: 2 })?.schemaVersion).toBe(3);
+  expect(loadQuickEditAdvancedState({ ...defaults, schemaVersion: 2 })?.schemaVersion).toBe(
+    defaults.schemaVersion
+  );
   const z = camera('z', 0, 10),
     b = border();
   const state = { ...defaults, zoom: { enabled: true, regions: [b, z] } };

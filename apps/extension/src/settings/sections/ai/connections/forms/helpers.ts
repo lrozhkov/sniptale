@@ -14,6 +14,7 @@ const PROVIDER_FORM_ERROR_KEYS: Record<string, Parameters<typeof translate>[0]> 
 };
 
 const MODEL_FORM_ERROR_KEYS: Record<string, Parameters<typeof translate>[0]> = {
+  'settings.aiProviders.modelAudioInvalid': 'settings.aiProviders.modelAudioInvalid',
   'validation.schemas.max10000Characters': 'settings.aiProviders.modelPromptTooLong',
   'validation.schemas.max100Characters': 'settings.aiProviders.modelNameTooLong',
   'validation.schemas.max200Characters': 'settings.aiProviders.modelCodeTooLong',

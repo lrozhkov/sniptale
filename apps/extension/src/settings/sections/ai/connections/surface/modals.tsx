@@ -62,6 +62,8 @@ export function ModelFormModal({ model, providers, onClose, onSave }: ModelModal
     handleChange,
     handleProviderChange,
     handleResizeStart,
+    handleOperationChange,
+    handleAudioChange,
     handleSubmit,
     isEditing,
     isSaving,
@@ -76,6 +78,8 @@ export function ModelFormModal({ model, providers, onClose, onSave }: ModelModal
         modelCode: formData.modelCode,
         providerId: formData.providerId,
         systemPrompt: formData.systemPrompt ?? '',
+        ...(formData.operation === undefined ? {} : { operation: formData.operation }),
+        ...(formData.audio === undefined ? {} : { audio: formData.audio }),
       }}
       isEditing={isEditing}
       isSaving={isSaving}
@@ -84,6 +88,8 @@ export function ModelFormModal({ model, providers, onClose, onSave }: ModelModal
       onModelCodeChange={handleChange('modelCode')}
       onProviderChange={handleProviderChange}
       onResizeStart={handleResizeStart}
+      onOperationChange={handleOperationChange}
+      onAudioChange={handleAudioChange}
       onSubmit={(event) => void handleSubmit(event, onSave)}
       onSystemPromptChange={handleChange('systemPrompt')}
       providers={providers}

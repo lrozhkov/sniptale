@@ -80,6 +80,7 @@ type InspectorState = Pick<
   | 'setOverlaysVisible'
   | 'resetAdvanced'
   | 'flushAdvanced'
+  | 'registerSpeechFlush'
 >;
 
 function ReviewInspectorBinding({
@@ -141,7 +142,7 @@ function ReviewInspectorBinding({
             busy={busy}
             composerBusy={!!composer.before}
             onExport={() => {
-              void editing.exporter.start();
+              state.beforeAction(() => void editing.exporter.start());
             }}
           />
         }
@@ -747,6 +748,9 @@ function ReviewSelectionBinding({
   const video = state.video;
   return (
     <ReviewSelectedProperties
+      registerSpeechFlush={state.registerSpeechFlush}
+      beforeSpeechAction={state.beforeAction}
+      flushAdvanced={state.flushAdvanced}
       webcam={state.webcam}
       webcamRange={
         state.playbackRange ?? (state.selection.kind === 'range' ? state.selection : undefined)

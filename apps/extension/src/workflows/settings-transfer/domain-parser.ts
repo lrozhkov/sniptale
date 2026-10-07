@@ -1,3 +1,4 @@
+import { getAIModelOperation } from '../../contracts/settings/model-operation';
 import { z } from 'zod';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type {
@@ -235,6 +236,12 @@ function parseAiDomain(
         value['defaultModelId'] !== null &&
         value['defaultModelId'] !== undefined &&
         typeof value['defaultModelId'] !== 'string'
+      )
+        failSettingsTransferDomain(domainId);
+      if (
+        items.some(
+          (model) => model.id === value['defaultModelId'] && getAIModelOperation(model) !== 'text'
+        )
       )
         failSettingsTransferDomain(domainId);
       return json({ items, defaultModelId: value['defaultModelId'] ?? null });

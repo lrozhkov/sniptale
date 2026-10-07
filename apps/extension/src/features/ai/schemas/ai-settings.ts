@@ -1,3 +1,7 @@
+import {
+  isValidAIModelOperationConfiguration,
+  type AIModelAudioParameters,
+} from '../../../contracts/settings/model-operation';
 import { z } from 'zod';
 
 import { resolveAIProviderBaseUrlPolicy } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
@@ -34,22 +38,40 @@ export const AIProviderSchema = z.object({
   createdAt: z.number(),
 });
 
-export const AIModelSchema = z.object({
-  id: z.string().uuid(),
-  providerId: z.string().uuid(schemaMessageKey('validation.schemas.selectProvider')),
-  modelCode: z
-    .string()
-    .min(1, schemaMessageKey('validation.schemas.modelCodeRequired'))
-    .max(200, schemaMessageKey('validation.schemas.max200Characters')),
-  displayName: z
-    .string()
-    .min(1, schemaMessageKey('validation.schemas.nameRequired'))
-    .max(100, schemaMessageKey('validation.schemas.max100Characters')),
-  systemPrompt: z
-    .string()
-    .max(10000, schemaMessageKey('validation.schemas.max10000Characters'))
+const operationFields = {
+  operation: z.enum(['text', 'transcription', 'speech']).optional(),
+  audio: z
+    .custom<AIModelAudioParameters>(
+      (value) =>
+        isValidAIModelOperationConfiguration({ operation: 'transcription', audio: value }) ||
+        isValidAIModelOperationConfiguration({ operation: 'speech', audio: value }),
+      { message: 'settings.aiProviders.modelAudioInvalid' }
+    )
     .optional(),
-});
+};
+
+export const AIModelSchema = z
+  .object({
+    ...operationFields,
+    id: z.string().uuid(),
+    providerId: z.string().uuid(schemaMessageKey('validation.schemas.selectProvider')),
+    modelCode: z
+      .string()
+      .min(1, schemaMessageKey('validation.schemas.modelCodeRequired'))
+      .max(200, schemaMessageKey('validation.schemas.max200Characters')),
+    displayName: z
+      .string()
+      .min(1, schemaMessageKey('validation.schemas.nameRequired'))
+      .max(100, schemaMessageKey('validation.schemas.max100Characters')),
+    systemPrompt: z
+      .string()
+      .max(10000, schemaMessageKey('validation.schemas.max10000Characters'))
+      .optional(),
+  })
+  .refine(isValidAIModelOperationConfiguration, {
+    message: 'settings.aiProviders.modelAudioInvalid',
+    path: ['audio'],
+  });
 
 export const AISettingsSchema = z.object({
   chromeAiEnabled: z.boolean(),
@@ -73,21 +95,27 @@ export const ProviderFormSchema = z.object({
   baseUrl: createAIProviderBaseUrlSchema(),
 });
 
-export const ModelFormSchema = z.object({
-  providerId: z.string().min(1, schemaMessageKey('validation.schemas.selectProvider')),
-  displayName: z
-    .string()
-    .min(1, schemaMessageKey('validation.schemas.nameRequired'))
-    .max(100, schemaMessageKey('validation.schemas.max100Characters')),
-  modelCode: z
-    .string()
-    .min(1, schemaMessageKey('validation.schemas.modelCodeRequired'))
-    .max(200, schemaMessageKey('validation.schemas.max200Characters')),
-  systemPrompt: z
-    .string()
-    .max(10000, schemaMessageKey('validation.schemas.max10000Characters'))
-    .optional(),
-});
+export const ModelFormSchema = z
+  .object({
+    ...operationFields,
+    providerId: z.string().min(1, schemaMessageKey('validation.schemas.selectProvider')),
+    displayName: z
+      .string()
+      .min(1, schemaMessageKey('validation.schemas.nameRequired'))
+      .max(100, schemaMessageKey('validation.schemas.max100Characters')),
+    modelCode: z
+      .string()
+      .min(1, schemaMessageKey('validation.schemas.modelCodeRequired'))
+      .max(200, schemaMessageKey('validation.schemas.max200Characters')),
+    systemPrompt: z
+      .string()
+      .max(10000, schemaMessageKey('validation.schemas.max10000Characters'))
+      .optional(),
+  })
+  .refine(isValidAIModelOperationConfiguration, {
+    message: 'settings.aiProviders.modelAudioInvalid',
+    path: ['audio'],
+  });
 
 export interface ProviderFormData extends z.infer<typeof ProviderFormSchema> {
   apiKey?: string;

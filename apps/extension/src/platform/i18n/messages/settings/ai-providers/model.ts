@@ -1,6 +1,33 @@
 import { defineMessageSource } from '../../source';
 
 export const settingsAiProvidersModelMessages = defineMessageSource({
+  modelAudioVerboseJson: { ru: 'Подробный JSON', en: 'Verbose JSON' },
+  modelOperationLabel: { ru: 'Назначение', en: 'Purpose' },
+  modelOperationText: { ru: 'Текст', en: 'Text' },
+  modelOperationTranscription: { ru: 'Распознавание речи', en: 'Transcription' },
+  modelOperationSpeech: { ru: 'Озвучка', en: 'Speech generation' },
+  modelAudioLanguage: { ru: 'Язык (код ISO)', en: 'Language (ISO code)' },
+  modelAudioAuto: { ru: 'Автоматически', en: 'Automatic' },
+  modelAudioFormat: { ru: 'Формат ответа', en: 'Response format' },
+  modelAudioTimestamps: { ru: 'Временные метки', en: 'Timestamps' },
+  modelAudioTimestampsNone: { ru: 'Без меток', en: 'None' },
+  modelAudioTimestampsSegment: { ru: 'Сегменты', en: 'Segments' },
+  modelAudioTimestampsWord: { ru: 'Слова', en: 'Words' },
+  modelAudioPrompt: {
+    ru: 'Словарь и подсказка (необязательно)',
+    en: 'Vocabulary and prompt (optional)',
+  },
+  modelAudioVoice: { ru: 'Идентификатор голоса', en: 'Voice ID' },
+  modelAudioSpeed: { ru: 'Скорость (необязательно, 0.25–4)', en: 'Speed (optional, 0.25–4)' },
+  modelAudioInstructions: {
+    ru: 'Подача (если поддерживается моделью)',
+    en: 'Delivery instructions (if supported)',
+  },
+  modelAudioInvalid: {
+    ru: 'Проверьте параметры: язык — код ISO, голос обязателен, скорость — от 0.25 до 4.',
+    en: 'Check parameters: use an ISO language code, specify a voice, and keep speed between 0.25 and 4.',
+  },
+
   modelsEmptyTitle: {
     ru: 'Нет моделей',
     en: 'No models',

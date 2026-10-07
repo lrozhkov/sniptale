@@ -177,3 +177,17 @@ describe('background/llm/model-config', () => {
     await verifySecretResolutionUsesExactProviderBinding();
   });
 });
+
+it('rejects audio model IDs before activating credentials for a text request', async () => {
+  resetResolveModelConfigMocks();
+  mockResolvedModelConfigState();
+  loadAIModelsMock.mockResolvedValue([
+    {
+      ...createModel('audio'),
+      operation: 'speech',
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+    },
+  ]);
+  await expect(resolveModelConfig('audio')).rejects.toThrow('does not support text');
+  expect(activateStoredAIProviderSecretForUseMock).not.toHaveBeenCalled();
+});

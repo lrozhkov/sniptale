@@ -127,3 +127,20 @@ describe('ai storage guards secret parsing', () => {
     });
   });
 });
+
+it('retains valid persisted audio defaults and drops malformed operation entries', () => {
+  const base = { id: 'audio', providerId: 'provider', modelCode: 'custom', displayName: 'Audio' };
+  const valid = {
+    ...base,
+    operation: 'transcription',
+    audio: { transcription: { responseFormat: 'verbose_json', timestampGranularity: 'word' } },
+  };
+  expect(
+    parseStoredAIModels([
+      base,
+      valid,
+      { ...valid, operation: 'text' },
+      { ...base, operation: 'speech' },
+    ])
+  ).toEqual({ hasInvalidRoot: false, invalidEntryCount: 2, value: [base, valid] });
+});

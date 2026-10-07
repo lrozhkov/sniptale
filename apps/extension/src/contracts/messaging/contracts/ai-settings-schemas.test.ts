@@ -190,3 +190,28 @@ it('accepts bounded model reorder commands and rejects extra fields', () => {
     })
   ).toThrow(/unexpected/);
 });
+
+it('admits configured audio models over settings IPC and rejects mismatched or unknown parameters', () => {
+  const model = {
+    id: '00000000-0000-4000-8000-000000000001',
+    providerId: '00000000-0000-4000-8000-000000000002',
+    modelCode: 'custom',
+    displayName: 'Speech',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  };
+  const message = { type: MessageType.AI_SETTINGS_MUTATION, operation: 'add-model', model };
+  expect(aiSettingsMutationMessageSchema.parse(message)).toEqual(message);
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      ...message,
+      model: { ...model, operation: 'transcription' },
+    }).success
+  ).toBe(false);
+  expect(
+    aiSettingsMutationMessageSchema.safeParse({
+      ...message,
+      model: { ...model, audio: { speech: { ...model.audio.speech, unexpected: true } } },
+    }).success
+  ).toBe(false);
+});

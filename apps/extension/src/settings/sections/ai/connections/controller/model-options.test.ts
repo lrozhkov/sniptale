@@ -33,3 +33,20 @@ it('keeps model option labels stable', () => {
     { value: 'model-2', label: 'Ollama local / Phi 4' },
   ]);
 });
+
+it('excludes audio models from the global text default options', () => {
+  const audio: AIModel = {
+    id: 'audio',
+    providerId: 'provider',
+    modelCode: 'custom',
+    displayName: 'Speech',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+  };
+  expect(
+    buildAiProvidersModelOptions({
+      getProviderName: () => 'Provider',
+      models: [audio, ...MODELS],
+    }).map((option) => option.value)
+  ).toEqual(['', 'model-1', 'model-2']);
+});

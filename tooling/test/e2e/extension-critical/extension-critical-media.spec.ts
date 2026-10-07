@@ -5,7 +5,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
-import { betaV3Fixture as currentPersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v3';
+import { betaV5Fixture as currentPersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v5';
 import { test } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 import {

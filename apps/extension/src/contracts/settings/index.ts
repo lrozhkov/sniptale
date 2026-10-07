@@ -1,3 +1,4 @@
+import type { AIModelAudioParameters, AIModelOperation } from './model-operation';
 import type { CaptureActionType } from '@sniptale/runtime-contracts/capture/action';
 import type { ViewportPreset } from '../../features/viewport-presets/contracts';
 import type { FullPageCapturePreferences, FullPageQualityPolicy } from '../full-page-capture';
@@ -163,6 +164,8 @@ export interface AIProvider {
 }
 
 export interface AIModel {
+  operation?: AIModelOperation | undefined;
+  audio?: AIModelAudioParameters | undefined;
   id: string;
   providerId: string;
   modelCode: string;

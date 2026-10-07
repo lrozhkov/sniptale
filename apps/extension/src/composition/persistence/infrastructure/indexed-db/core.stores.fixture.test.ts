@@ -74,3 +74,12 @@ it('pins the complete released beta fixture to the database and domain registrie
     if (migration.risk === 'destructive') expect(migration.backupCoverage).toBe('full');
   }
 });
+
+it('retains the source fixture data and object bytes across speech contract admission', () => {
+  const source = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 4)!;
+  const target = SUPPORTED_BETA_DATABASE_FIXTURES.find((fixture) => fixture.databaseVersion === 5)!;
+  expect(target.records).toEqual(source.records);
+  expect(target.opfsObjects).toEqual(source.opfsObjects);
+  expect(target.stores).toEqual(source.stores);
+  expect(target.indexes).toEqual(source.indexes);
+});

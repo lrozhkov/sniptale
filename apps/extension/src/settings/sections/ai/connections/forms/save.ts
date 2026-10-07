@@ -151,24 +151,22 @@ async function persistModelForm(args: {
   isEditing: boolean;
   model?: AIModel | null;
 }): Promise<void> {
-  if (args.isEditing && args.model) {
-    await updateAIModel({
-      ...args.model,
-      providerId: args.formData.providerId,
-      displayName: args.formData.displayName,
-      modelCode: args.formData.modelCode,
-      ...(args.formData.systemPrompt ? { systemPrompt: args.formData.systemPrompt } : {}),
-    });
-    return;
-  }
-
-  await addAIModel({
-    id: crypto.randomUUID(),
+  const nextModel: AIModel = {
+    id: args.model?.id ?? crypto.randomUUID(),
     providerId: args.formData.providerId,
     displayName: args.formData.displayName,
     modelCode: args.formData.modelCode,
-    ...(args.formData.systemPrompt ? { systemPrompt: args.formData.systemPrompt } : {}),
-  });
+    ...(args.formData.operation === undefined ? {} : { operation: args.formData.operation }),
+    ...(args.formData.audio === undefined ? {} : { audio: args.formData.audio }),
+    ...((args.formData.operation ?? 'text') === 'text' && args.formData.systemPrompt
+      ? { systemPrompt: args.formData.systemPrompt }
+      : {}),
+  };
+  if (args.isEditing && args.model) {
+    await updateAIModel(nextModel);
+    return;
+  }
+  await addAIModel(nextModel);
 }
 
 export type ModelFormSaveParams = {

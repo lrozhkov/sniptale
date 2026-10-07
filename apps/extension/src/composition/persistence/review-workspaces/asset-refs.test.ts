@@ -484,3 +484,110 @@ it('retains inactive background references in every history and recovery positio
     'project-asset:base'
   );
 });
+
+it('roundtrips speech assets across current, history and recovery with portable keys', async () => {
+  const { reviewSpeechTextSignature } =
+    await import('../../../features/video/review/speech-transcript');
+  const { parseVideoWorkspace } = await import('./parser');
+  const profile = { modelId: 'speech', voiceId: 'alloy', responseFormat: 'mp3' as const };
+  const speech = (id: string) => ({
+    version: 1 as const,
+    profile,
+    phrases: [
+      {
+        id: 'p',
+        start: 0,
+        end: 2,
+        originalText: 'Original',
+        text: 'Edited',
+        revision: 1,
+        alignment: 'manual' as const,
+      },
+    ],
+    replacements: [
+      {
+        id: 'take',
+        start: 0,
+        end: 2,
+        duration: 1,
+        assetId: `project-asset:${id}`,
+        phraseId: 'p',
+        revision: 1,
+        text: 'Edited',
+        textSignature: reviewSpeechTextSignature('Edited', profile),
+        profile,
+      },
+    ],
+  });
+  const state = createQuickEditAdvancedState();
+  state.audio.voiceover.push({
+    id: 'voice',
+    assetId: 'project-asset:original',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 4,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    transcript: speech('generated'),
+  });
+  const before = reviewAdvancedContentBaseline(state);
+  const after = structuredClone(before);
+  after.audio.voiceover[0]!.transcript = speech('history');
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      aggregateId: 'recording:speech',
+      formatVersion: 1,
+      sourceAssetId: 'source',
+      source: { duration: 10, width: 640, height: 360, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 1,
+      advanced: {
+        ...state,
+        recoveryV1: JSON.stringify({
+          audio: {
+            voiceover: [{ assetId: 'project-asset:original', transcript: speech('recovery') }],
+            music: [],
+          },
+        }),
+      },
+      history: [{ id: 'apply', at: 1, target: 'advancedContent', before, after }],
+    },
+  };
+  const expected = ['original', 'generated', 'history', 'recovery'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(expected.map((id) => `project-asset:${id}`))
+  );
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(JSON.stringify(portable)).not.toContain('"assetId"');
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  const forged = structuredClone(portable.workspace);
+  forged.advanced.audio.voiceover[0]!.transcript!.replacements[0]!.assetId =
+    'project-asset:injected';
+  expect(() => assertPortableReviewAssetRefs(forged)).toThrow('local asset id');
+  expect(() => remapReviewAssetReferences(snapshot, new Map([['original', 'mapped']]))).toThrow(
+    'unresolved'
+  );
+  const remapped = remapReviewAssetReferences(
+    snapshot,
+    new Map(expected.map((id) => [id, `${id}-restored`]))
+  );
+  expect(collectReviewAssetReferences(remapped.workspace)).toEqual(
+    new Set(expected.map((id) => `project-asset:${id}-restored`))
+  );
+  const parsed = parseVideoWorkspace(snapshot.workspace);
+  expect(parsed?.history).toEqual(snapshot.workspace.history);
+  expect(parsed?.advanced.audio.voiceover[0]?.transcript).toEqual(speech('generated'));
+});

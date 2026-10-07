@@ -40,6 +40,7 @@ interface StorageCleanupPort {
 }
 
 export interface PrivacyErasurePorts {
+  audioJobs: PopupExportExclusionPort;
   diagnostics: DiagnosticsCleanupPort;
   media: MediaCleanupPort;
   nativeIngestion: NativeIngestionCleanupPort;

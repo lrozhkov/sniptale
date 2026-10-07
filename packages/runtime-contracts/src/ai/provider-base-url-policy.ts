@@ -71,3 +71,15 @@ export function resolveAIProviderChatCompletionsUrl(baseUrl: string): string | n
   parsed.pathname = `${basePath}/chat/completions`;
   return parsed.toString();
 }
+
+/** Operation paths remain beneath the explicitly configured provider base path. */
+export function resolveAIProviderAudioUrl(
+  baseUrl: string,
+  operation: 'transcription' | 'speech'
+): string | null {
+  if (!isAllowedAIProviderBaseUrl(baseUrl)) return null;
+  const parsed = new URL(baseUrl);
+  const endpoint = operation === 'transcription' ? 'transcriptions' : 'speech';
+  parsed.pathname = `${parsed.pathname.replace(/\/+$/u, '')}/audio/${endpoint}`;
+  return parsed.toString();
+}

@@ -14,6 +14,12 @@
       "owner": "background-llm-transport",
       "justification": "The background LLM transport is the only canonical outbound network seam that assembles Authorization headers from resolved model config.",
       "reviewNote": "Secret-bearing headers must not drift into UI, hooks, storage, or orchestration modules."
+    },
+    {
+      "file": "apps/extension/src/background/ai/audio/request.ts",
+      "owner": "background-gallery-audio-transport",
+      "justification": "Gallery explicitly requests bounded transcription or speech using its configured provider connection.",
+      "reviewNote": "Only this owner constructs bearer headers. Require Gallery operation ticket, durable scope and phrase admission, optional host access, credentials omit, redirect error, bounded body and deadline. No retries, provider response logs or binary IPC."
     }
   ],
   "credentialedFetchOwners": [

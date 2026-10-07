@@ -88,6 +88,50 @@
       "reviewDate": "2026-10-04",
       "astHash": "2b8968699df53d14e6a37cf9fc1e15f69f6f85b2431b173fc9f3aadb61ca8856",
       "signatureHash": "a2e7b978385578d8defe4646c0f15ffb22b2295ce641c6d881e0925898b7fbb6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/session.ts",
+      "symbol": "createVideoReviewSession",
+      "owner": "extension:app-core:workflows",
+      "reason": "tool-noise: This factory owns one serialized review session: one queue, snapshot, durable buffer, pending/error state and retry policy. Speech saves must construct history after the same queue flush and distinguish retry of their own failed save from unrelated failed history. Durable-reference queries use that same persisted history projection. Domain validation remains outside the factory; no UI, provider transport, staging or second persistence authority is implemented here. The sole blocking metric is 250 lines above the orchestration cap; score1/delta0,10 outer statements, cyclomatic1,cognitive0 and cohesion1.00. Splitting closure state or rewriting it as a class solely to shorten the factory would hide its single transaction receiver. Exact behavior is covered by save failure/retry, unrelated failed history, dirty buffer, no-op and asset-reference proof.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver or recovery policy. Remove when the analyzer recognizes this cohesive serialized transaction factory. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-07",
+      "astHash": "ee7a893e36145d94be02ed3465f35ac4d312afb543e0249e562b21071808b1c1",
+      "signatureHash": "aed89eba9c2e167caeeaf39979c18b16f68ed33f8a375440b08514c8a3e1a7cb"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/platform/i18n/messages/gallery/video-review.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:platform",
+      "reason": "tool-noise: This file is the typed static RU/EN Gallery Video Review message catalog. It has no state, effects, runtime authority or branching; its consumers retain one public locale contract. Independently changing speech vocabulary already has its own source, alongside spatial and keyboard vocabularies. Composing that source adds two lines to the existing 799-line catalog, crossing the800-line cap with unchanged score2/delta0 and cohesion1.00. Further splitting unrelated literals or removing whitespace solely to cross the threshold would not resolve an ownership defect.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess new behavior, state or mixed message ownership. Remove when the analyzer distinguishes static locale data from runtime modules. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-07",
+      "astHash": "553153ca932eaf6ba48de51a5e59ded167c172b0ce20124592362a287e3164b6",
+      "signatureHash": "7af0c082c0ed47e99926dd9ddaf8170ac6f6b2c23d3e3105cb8b860b32778ec0"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-speech-edits.ts",
+      "symbol": "useSpeechEdits",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This hook owns one local edit transaction: optimistic transformations, durable rebase/save, retry/discard, invalid profile draft, and navigation/unload protection. Phrase edit/split/merge/restore callbacks admit operations to that same queue and share transcript/invalidation authority. Persistence remains in the existing workflow/session; domain transformations are external pure functions. After independent preview lifecycle extraction, the remaining209-line hook has27 statements,CC5,cognitive4,nesting1 and cohesion0.83. Extracting closures just to satisfy length would pass the same edit authority through forwarding layers. The coalescing correction keeps this same queue and operation authority: unattempted consecutive text is grouped, attempted saves stay immutable, and navigation/explicit actions await the existing flush. Real session/history proof covers one commit per typing burst, Undo, forced flush, in-flight typing and failed retry. Reassessment found no independent authority introduced; renewed independent architecture review is required.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent state receiver, runtime, durable writer or recovery policy. Remove when the analyzer models cohesive hook lifecycles. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-07",
+      "astHash": "2c8779c975d63b8b249595b044507e8d90be6dc66a0979bed66ad9c304a2e210",
+      "signatureHash": "64a4729babdc707fc158f283c56d39ee7c2b39513e925d5ded0574819bd226cd"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-speech.ts",
+      "symbol": "useReviewSpeech",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This hook owns one configured remote-operation lifecycle: model discovery/selection, abort controller, beforeAction/flush admission, recognize/generate/apply sequencing and bounded error state. Independent durable draft and disposable preview lifecycles have concrete hooks. The remaining141-line coordinator has19 statements,CC3,cognitive2,nesting1 and cohesion0.73; it introduces no provider fetch or persistence writer. Splitting its admission and cancellation closures solely to satisfy length would distribute one active-operation lifetime. The coalescing correction keeps this same queue and operation authority: unattempted consecutive text is grouped, attempted saves stay immutable, and navigation/explicit actions await the existing flush. Real session/history proof covers one commit per typing burst, Undo, forced flush, in-flight typing and failed retry. Reassessment found no independent authority introduced; renewed independent architecture review is required.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent state receiver, runtime, durable writer or recovery policy. Remove when the analyzer models cohesive hook lifecycles. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-10-07",
+      "astHash": "5ed73c28d90d9dfe45124c411d0f76ccdce9d7e8bc17ca50ec649ed151d626d4",
+      "signatureHash": "5efd9d0c809937dc02ec92b8460eeaf7d66c78a927bec6616b85f3d39f65a758"
     }
   ]
 }

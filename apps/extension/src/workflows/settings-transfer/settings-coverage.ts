@@ -40,6 +40,18 @@ export const SETTINGS_TRANSFER_VIEW_COVERAGE = {
   },
 } as const;
 
+// docs/security/data-handling.md, "Background preset metadata": this local catalog is
+// explicitly excluded from settings transfer; Library image bytes keep their separate owner.
+export const SETTINGS_TRANSFER_EXCLUDED_VIEW_COVERAGE = {
+  'editor-resources': {
+    backgrounds: {
+      storageKey: 'sniptale_background_presets',
+      policy: 'docs/security/data-handling.md',
+      reason: 'Local-only background preset metadata is excluded from settings transfer.',
+    },
+  },
+} as const;
+
 export const SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE = {} as const;
 
 type SettingsTransferExcludedControlId = keyof typeof SETTINGS_TRANSFER_EXCLUDED_CONTROL_COVERAGE;

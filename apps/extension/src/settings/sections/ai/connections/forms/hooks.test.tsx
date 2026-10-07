@@ -252,3 +252,29 @@ it('omits optional provider and model params from save calls in create mode', as
   expect(saveProviderFormMock).toHaveBeenCalledTimes(1);
   expect(saveModelFormMock).toHaveBeenCalledTimes(1);
 });
+
+it('switches purpose without keeping incompatible audio defaults', async () => {
+  await renderModelHarness(MODEL);
+  await act(async () => {
+    latestModelState?.handleOperationChange('speech');
+  });
+  expect(latestModelState?.formData.audio).toEqual({
+    speech: { voiceId: '', responseFormat: 'mp3' },
+  });
+  await act(async () => {
+    latestModelState?.handleAudioChange({
+      speech: { voiceId: 'custom', responseFormat: 'wav', speed: 1.2 },
+    });
+  });
+  expect(latestModelState?.formData.audio?.speech?.voiceId).toBe('custom');
+  await act(async () => {
+    latestModelState?.handleOperationChange('transcription');
+  });
+  expect(latestModelState?.formData.audio).toEqual({
+    transcription: { responseFormat: 'verbose_json', timestampGranularity: 'word' },
+  });
+  await act(async () => {
+    latestModelState?.handleOperationChange('text');
+  });
+  expect(latestModelState?.formData.audio).toBeUndefined();
+});

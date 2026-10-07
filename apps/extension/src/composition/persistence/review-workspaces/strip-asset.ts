@@ -1,4 +1,5 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import type { QuickEditAudioClip } from '../../../features/video/review/advanced/types';
 import type {
   QuickEditAdvancedContent,
   QuickEditAdvancedState,
@@ -17,6 +18,42 @@ function stripBackground<T>(background: T, assetId: string): T | { enabled: fals
   return rest as T;
 }
 
+function stripAudioClips(clips: QuickEditAudioClip[], assetId: string): QuickEditAudioClip[] {
+  return clips
+    .filter((clip) => clip.assetId !== assetId)
+    .map((clip) =>
+      clip.transcript
+        ? {
+            ...clip,
+            transcript: {
+              ...clip.transcript,
+              replacements: clip.transcript.replacements.filter(
+                (entry) => entry.assetId !== assetId
+              ),
+            },
+          }
+        : clip
+    );
+}
+
+function stripRecoverySpeech(clip: unknown, assetId: string): unknown {
+  if (
+    !isRecord(clip) ||
+    !isRecord(clip['transcript']) ||
+    !Array.isArray(clip['transcript']['replacements'])
+  )
+    return clip;
+  return {
+    ...clip,
+    transcript: {
+      ...clip['transcript'],
+      replacements: clip['transcript']['replacements'].filter(
+        (entry: unknown) => !isRecord(entry) || entry['assetId'] !== assetId
+      ),
+    },
+  };
+}
+
 function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedState>(
   content: T,
   assetId: string
@@ -26,8 +63,8 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
     background: stripBackground(content.background, assetId),
     audio: {
       ...content.audio,
-      voiceover: content.audio.voiceover.filter((clip) => clip.assetId !== assetId),
-      music: content.audio.music.filter((clip) => clip.assetId !== assetId),
+      voiceover: stripAudioClips(content.audio.voiceover, assetId),
+      music: stripAudioClips(content.audio.music, assetId),
     },
   };
   if (result.webcam?.assetId === assetId) delete result.webcam;
@@ -55,13 +92,15 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
             Object.entries(audio).map(([key, clips]) => [
               key,
               (key === 'voiceover' || key === 'music') && Array.isArray(clips)
-                ? clips.filter(
-                    (clip: unknown) =>
-                      typeof clip !== 'object' ||
-                      clip === null ||
-                      !('assetId' in clip) ||
-                      clip.assetId !== assetId
-                  )
+                ? clips
+                    .filter(
+                      (clip: unknown) =>
+                        typeof clip !== 'object' ||
+                        clip === null ||
+                        !('assetId' in clip) ||
+                        clip.assetId !== assetId
+                    )
+                    .map((clip: unknown) => stripRecoverySpeech(clip, assetId))
                 : clips,
             ])
           )

@@ -1,34 +1,19 @@
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { quickEditFocusType, resolveQuickEditFocusLink } from './focus-layout';
-import type { QuickEditCameraTransform, QuickEditZoomRegion } from './types';
-
-export interface QuickEditPerspective {
-  enabled: boolean;
-  rotateX: number;
-  rotateY: number;
-  rotateZ: number;
-  strength: number;
-}
-
-export interface QuickEditDepthOfField {
-  enabled: boolean;
-  mode: 'area' | 'depth';
-  x: number;
-  y: number;
-  width: number;
-  softness: number;
-  strength: number;
-}
-
-export type SpatialQuaternion = readonly [number, number, number, number];
-/** Disposable evaluated pose; never admitted from persisted camera objects. */
-export interface QuickEditSpatialFrame {
-  rotation: SpatialQuaternion;
-  perspective: number;
-  windowMotion: number;
-  lockBackground: boolean;
-  focus: readonly { settings: QuickEditDepthOfField; weight: number }[];
-}
+import type {
+  QuickEditCameraTransform,
+  QuickEditDepthOfField,
+  QuickEditPerspective,
+  QuickEditSpatialFrame,
+  QuickEditZoomRegion,
+  SpatialQuaternion,
+} from './types';
+export type {
+  QuickEditDepthOfField,
+  QuickEditPerspective,
+  QuickEditSpatialFrame,
+  SpatialQuaternion,
+} from './types';
 
 export const DEFAULT_QUICK_EDIT_PERSPECTIVE: QuickEditPerspective = {
   enabled: false,

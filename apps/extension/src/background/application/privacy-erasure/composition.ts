@@ -1,3 +1,4 @@
+import type { AudioJobService } from '../../ai/audio/service';
 import type { LocalDataErasureMessage } from '../../../contracts/messaging/privacy-erasure';
 import { createPrivacyErasureStorageCleanupAdapter } from '../../../composition/persistence/privacy-erasure/cleanup';
 import { diagnosticsPrivacyErasureCleanupAdapter } from '../../diagnostics/privacy-erasure/cleanup';
@@ -33,7 +34,17 @@ const nativeIngestionCleanupProxy: NativeIngestionCleanupPort = {
   reserveErasureExclusion: () => nativeIngestionCleanupPort.reserveErasureExclusion(),
 };
 
+let audioJobs: Pick<AudioJobService, 'reserveErasureExclusion' | 'cancelActiveJob'> | undefined;
+export function configureAudioJobPrivacyErasurePort(port: AudioJobService): void {
+  audioJobs = port;
+}
+
 const privacyErasureUseCase = new PrivacyErasureUseCase({
+  audioJobs: {
+    cancelActiveJob: () => audioJobs?.cancelActiveJob() ?? Promise.resolve(),
+    reserveErasureExclusion: () =>
+      audioJobs?.reserveErasureExclusion() ?? { release() {}, async waitForActiveMutations() {} },
+  },
   diagnostics: diagnosticsPrivacyErasureCleanupAdapter,
   media: mediaPrivacyErasureCleanupAdapter,
   nativeIngestion: nativeIngestionCleanupProxy,

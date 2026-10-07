@@ -1,3 +1,4 @@
+import { parseReviewSpeechTranscript } from '../speech-validation';
 import { parseReviewKeyAnimations } from './key-animation';
 import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
 import { parseReviewClickAnimations } from './click-animation';
@@ -334,9 +335,14 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     value['sourceAnchor'] === undefined
       ? undefined
       : parseVoiceoverAnchors(value['sourceAnchor'], value['timelineStart'], value['duration']);
-  if (sourceAnchor === null) return null;
+  const transcript =
+    value['transcript'] === undefined
+      ? undefined
+      : parseReviewSpeechTranscript(value['transcript']);
+  if (sourceAnchor === null || transcript === null) return null;
   return {
     ...(sourceAnchor ? { sourceAnchor } : {}),
+    ...(transcript ? { transcript } : {}),
     ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
     id: value['id'],
     assetId: value['assetId'],
@@ -419,14 +425,18 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
 export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvancedContent | null {
   if (
     !isRecord(raw) ||
-    (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION && raw['schemaVersion'] !== 2) ||
-    (raw['webcam'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION) ||
+    (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 3 &&
+      raw['schemaVersion'] !== 2) ||
+    (raw['webcam'] !== undefined &&
+      raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 3) ||
     'ui' in raw
   )
     return null;
   const zoom = parseZoomState(
     raw['zoom'],
-    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || raw['schemaVersion'] === 3
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
@@ -467,7 +477,7 @@ export function loadQuickEditAdvancedState(
   if (raw === undefined) return createQuickEditAdvancedState();
   if (!isRecord(raw)) return null;
   const version = raw['schemaVersion'];
-  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || version === 2)
+  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || version === 3 || version === 2)
     return parseAdvancedFields(raw);
   if (version === QUICK_EDIT_ADVANCED_SCHEMA_V1 && segments) {
     const parsed = parseAdvancedFields(raw);
@@ -480,12 +490,16 @@ export function loadQuickEditAdvancedState(
 
 /** Parses the current shape; the recovery copy is an opaque string. */
 function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedState | null {
-  if (raw['webcam'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+  if (
+    raw['webcam'] !== undefined &&
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 3
+  )
     return null;
   const ui = parseUiState(raw['ui']);
   const zoom = parseZoomState(
     raw['zoom'],
-    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || raw['schemaVersion'] === 3
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);

@@ -113,7 +113,7 @@ describe('migrates v1 source-time placements to result time (R03)', () => {
       },
     };
     const migrated = loadQuickEditAdvancedState(legacy, segments);
-    expect(migrated?.schemaVersion).toBe(3);
+    expect(migrated?.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
     expect(migrated?.zoom.regions[0]).toMatchObject({ start: 4, end: 6 });
     // Source 2 maps to the start of the sped segment at result time 0.
     expect(migrated?.audio.voiceover[0]).toMatchObject({ timelineStart: 0 });
@@ -194,7 +194,10 @@ describe('rejects malformed persisted state', () => {
     expect(loadQuickEditAdvancedState(null)).toBeNull();
     expect(loadQuickEditAdvancedState('state')).toBeNull();
     expect(
-      loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 4 })
+      loadQuickEditAdvancedState({
+        ...structuredClone(advanced()),
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1,
+      })
     ).toBeNull();
     expect(
       loadQuickEditAdvancedState({ ...structuredClone(advanced()), schemaVersion: 0 })
@@ -411,7 +414,7 @@ it('loads content snapshots and rejects ui leakage or schema drift', () => {
   const content = { zoom: state.zoom, background: state.background, audio: state.audio };
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 2 })).toEqual({
     ...content,
-    schemaVersion: 3,
+    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
   });
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 1 })).toBeNull();
   expect(loadQuickEditAdvancedContentState({ ...state, schemaVersion: 2 })).toBeNull();

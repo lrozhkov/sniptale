@@ -18,9 +18,10 @@ vi.mock('@sniptale/ui/product-form-controls', async (importOriginal) => ({
     onChange: (value: string) => void;
     options: Array<{ label: string; value: string }>;
     value: string;
+    'aria-label'?: string;
   }) => (
     <select
-      aria-label="provider-select"
+      aria-label={props['aria-label'] ?? 'provider-select'}
       value={props.value}
       onChange={(event) => props.onChange(event.currentTarget.value)}
     >
@@ -233,7 +234,7 @@ function verifyModelFormInteractions() {
   expect(props.onSystemPromptChange).toHaveBeenCalled();
   expect(props.onResizeStart).toHaveBeenCalled();
   expect(props.onSubmit).toHaveBeenCalled();
-  expect(container?.querySelectorAll('label')).toHaveLength(4);
+  expect(container?.querySelectorAll('label')).toHaveLength(5);
 }
 
 function verifySubmitErrorNotice() {
@@ -274,3 +275,42 @@ function runModelFormModalContentSuite() {
 }
 
 describe('ModelFormModalContent', runModelFormModalContentSuite);
+
+it('shows speech controls and forwards voice changes without exposing the text prompt', () => {
+  const onAudioChange = vi.fn();
+  const base = createProps();
+  renderContent({
+    onAudioChange,
+    formData: {
+      ...base.formData,
+      operation: 'speech',
+      audio: { speech: { voiceId: 'voice', responseFormat: 'mp3' } },
+    },
+  });
+  expect(container?.textContent).not.toContain(translate('settings.aiProviders.modelPromptLabel'));
+  const voiceInput = Array.from(container?.querySelectorAll<HTMLInputElement>('input') ?? []).find(
+    (input) => input.value === 'voice'
+  );
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(
+      voiceInput,
+      'new-voice'
+    );
+    voiceInput?.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(voiceInput?.getAttribute('aria-label')).toBe(
+    translate('settings.aiProviders.modelAudioVoice')
+  );
+  expect(container?.querySelector('select[aria-label]')?.getAttribute('aria-label')).toBe(
+    'provider-select'
+  );
+  expect(
+    Array.from(container?.querySelectorAll('select') ?? []).some(
+      (select) =>
+        select.getAttribute('aria-label') === translate('settings.aiProviders.modelOperationLabel')
+    )
+  ).toBe(true);
+  expect(onAudioChange).toHaveBeenCalledWith({
+    speech: { voiceId: 'new-voice', responseFormat: 'mp3' },
+  });
+});

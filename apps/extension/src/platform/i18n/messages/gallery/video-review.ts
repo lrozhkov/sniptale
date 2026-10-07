@@ -1,8 +1,10 @@
+import { galleryVideoReviewSpeechMessages } from './video-review-speech';
 import { galleryVideoReviewKeyMessages } from './video-review-keys';
 import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewSpeechMessages,
   ...galleryVideoReviewSpatialMessages,
   ...galleryVideoReviewKeyMessages,
   clickMilliseconds: { ru: 'мс', en: 'ms' },

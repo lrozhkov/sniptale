@@ -1,3 +1,4 @@
+import { getAIModelOperation } from '../../../contracts/settings/model-operation';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import { loadAIModels, loadAIProviders, loadDefaultModelId } from './core';
 import {
@@ -27,7 +28,10 @@ function assertModelGraphInvariants(
     modelIds.add(model.id);
   }
 
-  if (defaultModelId && !modelIds.has(defaultModelId)) {
+  if (
+    defaultModelId &&
+    !models.some((model) => model.id === defaultModelId && getAIModelOperation(model) === 'text')
+  ) {
     throw new Error(`Default AI model ${defaultModelId} not found`);
   }
 

@@ -1,8 +1,9 @@
 import type { Gradient } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
+import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 3;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 4;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -31,10 +32,38 @@ export interface QuickEditZoomTransition {
 /** Easing of an outgoing zoom link; absent on legacy documents means the smooth default. */
 export type QuickEditZoomLinkEasing = 'linear' | 'ease-in-out';
 
+export interface QuickEditPerspective {
+  enabled: boolean;
+  rotateX: number;
+  rotateY: number;
+  rotateZ: number;
+  strength: number;
+}
+
+export interface QuickEditDepthOfField {
+  enabled: boolean;
+  mode: 'area' | 'depth';
+  x: number;
+  y: number;
+  width: number;
+  softness: number;
+  strength: number;
+}
+
+export type SpatialQuaternion = readonly [number, number, number, number];
+/** Disposable evaluated pose; never admitted from persisted camera objects. */
+export interface QuickEditSpatialFrame {
+  rotation: SpatialQuaternion;
+  perspective: number;
+  windowMotion: number;
+  lockBackground: boolean;
+  focus: readonly { settings: QuickEditDepthOfField; weight: number }[];
+}
+
 /** Camera target normalized over the whole window (video plus optional header), excluding background. */
 export interface QuickEditCameraTransform {
   /** Evaluated only; storage parsers discard this renderer state. */
-  spatial?: import('./spatial').QuickEditSpatialFrame;
+  spatial?: QuickEditSpatialFrame;
   scale: number;
   centerX: number;
   centerY: number;
@@ -71,8 +100,8 @@ export interface QuickEditBorder {
 }
 
 export interface QuickEditZoomRegion {
-  perspective?: import('./spatial').QuickEditPerspective;
-  depthOfField?: import('./spatial').QuickEditDepthOfField;
+  perspective?: QuickEditPerspective;
+  depthOfField?: QuickEditDepthOfField;
   /** Optional camera exposure; absent or disabled leaves legacy rendering unchanged. */
   motionBlur?: Partial<Record<'enter' | 'exit' | 'link', { enabled: boolean; strength: number }>>;
   border?: QuickEditBorder;
@@ -151,6 +180,8 @@ export interface QuickEditVoiceoverAnchor {
 }
 
 export interface QuickEditAudioClip {
+  /** Optional native-asset transcript and immutable accepted speech replacements. */
+  transcript?: ReviewSpeechTranscript;
   /** Native sample tempo, independent of video Speed; absent means 1x. */
   tempo?: number;
   /** Lossless source-video placement; audio offsets remain relative to the intact recording. */

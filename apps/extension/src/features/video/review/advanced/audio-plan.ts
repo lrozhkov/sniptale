@@ -1,3 +1,4 @@
+import { projectReviewSpeechReplacements } from '../speech-projection';
 import type { QuickEditAudioClip } from './types';
 
 /** One scheduled external-audio entry in output time; consumed by preview and export. */
@@ -24,19 +25,21 @@ export function buildQuickEditAudioPlan(args: {
   music: readonly QuickEditAudioClip[];
 }): readonly QuickEditAudioPlanEntry[] {
   return (['voiceover', 'music'] as const).flatMap((lane) =>
-    args[lane].map((clip) => ({
-      lane,
-      clipId: clip.id,
-      assetId: clip.assetId,
-      timelineStart: clip.timelineStart,
-      duration: clip.duration,
-      sourceOffset: clip.sourceOffset,
-      volume: clip.muted ? 0 : clip.volume,
-      fadeIn: clip.fadeIn,
-      fadeOut: clip.fadeOut,
-      ...(clip.playbackRate ? { playbackRate: clip.playbackRate } : {}),
-      ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
-    }))
+    (lane === 'voiceover' ? args[lane].flatMap(projectReviewSpeechReplacements) : args[lane]).map(
+      (clip) => ({
+        lane,
+        clipId: clip.id,
+        assetId: clip.assetId,
+        timelineStart: clip.timelineStart,
+        duration: clip.duration,
+        sourceOffset: clip.sourceOffset,
+        volume: clip.muted ? 0 : clip.volume,
+        fadeIn: clip.fadeIn,
+        fadeOut: clip.fadeOut,
+        ...(clip.playbackRate ? { playbackRate: clip.playbackRate } : {}),
+        ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
+      })
+    )
   );
 }
 

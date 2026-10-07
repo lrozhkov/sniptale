@@ -1,3 +1,4 @@
+import { isValidAIModelOperationConfiguration } from '../../../contracts/settings/model-operation';
 import type { AIModel, AIProvider } from '../../../contracts/settings';
 import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
 import {
@@ -54,6 +55,7 @@ function isAIModel(value: unknown): value is AIModel {
     isString(value['providerId']) &&
     isString(value['modelCode']) &&
     isString(value['displayName']) &&
+    isValidAIModelOperationConfiguration(value) &&
     (value['systemPrompt'] === undefined || isString(value['systemPrompt']))
   );
 }

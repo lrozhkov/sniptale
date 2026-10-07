@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stores.ts';
+import { describe, expect, it, vi } from 'vitest';
+import { DB_VERSION, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stores.ts';
+import { handleDatabaseUpgrade } from './upgrade/core';
+import { betaV4Fixture } from './fixtures/beta-v4';
 import {
   CURRENT_SCHEMA_CONTRACTS,
   PERSISTENCE_DOMAIN_REGISTRY,
@@ -84,5 +86,71 @@ it('requires a complete supported upgrade chain and rejects malformed persisted 
     { domainId: 'scenarioProjects', schemaVersion: '2' },
   ]) {
     expect(parseStoredSchemaContracts([invalid, ...CURRENT_SCHEMA_CONTRACTS.slice(1)])).toBeNull();
+  }
+});
+
+it('admits speech without rewriting workspace history or the durable asset graph', async () => {
+  const names = new Set<string>(betaV4Fixture.stores);
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: vi.fn(),
+    deleteObjectStore: vi.fn(),
+  };
+  const transaction = {
+    abort: vi.fn(),
+    objectStore: vi.fn((_name: string) => ({
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  names.delete('video_workspace_drafts');
+  expect(() => handleDatabaseUpgrade(db, 4, DB_VERSION, transaction)).toThrow('unavailable');
+  expect(transaction.abort).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
+
+  names.add('video_workspace_drafts');
+  handleDatabaseUpgrade(db, 4, DB_VERSION, transaction);
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  const plan = buildDatabaseMigrationPlan(4, DB_VERSION)!;
+  expect(plan).toHaveLength(1);
+  expect(plan[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 3, to: 4 }]);
+  expect(await plan[0]?.estimateAdditionalBytes()).toBe(64 * 1024);
+  expect(plan[0]?.risk).toBe('additive');
+  expect(buildDatabaseMigrationPlan(DB_VERSION, 4)).toBeNull();
+  expect(buildDatabaseMigrationPlan(1, DB_VERSION)).toHaveLength(4);
+});
+
+it('upgrades each retained source contract only after all required stores validate', async () => {
+  for (const migration of buildDatabaseMigrationPlan(1, DB_VERSION)!) {
+    const names = new Set<string>(EXPECTED_STORES);
+    const createIndex = vi.fn();
+    const db = {
+      objectStoreNames: { contains: (name: string) => names.has(name) },
+      createObjectStore: vi.fn((name: string) => {
+        names.add(name);
+        return { createIndex, put: vi.fn() };
+      }),
+      deleteObjectStore: vi.fn(),
+    };
+    const transaction = { abort: vi.fn(), objectStore: vi.fn() };
+    expect(migration.migrate(db, transaction)).toBeUndefined();
+    expect(migration.validate(db, transaction)).toBeUndefined();
+    expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);
+    if (migration.fromDatabaseVersion === 1) {
+      expect(db.createObjectStore.mock.calls.map(([name]) => name)).toEqual([
+        'video_workspaces',
+        'video_workspace_drafts',
+      ]);
+      expect(createIndex).toHaveBeenCalledWith('updatedAt', 'updatedAt');
+    } else expect(db.createObjectStore).not.toHaveBeenCalled();
+    names.clear();
+    expect(() => migration.validate(db, transaction)).toThrow();
+    expect(db.deleteObjectStore).not.toHaveBeenCalled();
   }
 });

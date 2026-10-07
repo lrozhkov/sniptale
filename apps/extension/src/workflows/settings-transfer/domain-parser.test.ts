@@ -79,3 +79,23 @@ it('round trips independent new material destinations without dropping categorie
   expect(parseSettingsTransferDomains(input)).toEqual(input);
   expect(parseSettingsTransferDomains(parseSettingsTransferDomains(input))).toEqual(input);
 });
+
+it('round trips audio model parameters while rejecting an audio text default', () => {
+  const model = {
+    id: 'audio',
+    providerId: 'provider',
+    modelCode: 'custom',
+    displayName: 'Speech',
+    operation: 'speech',
+    audio: { speech: { voiceId: 'voice', responseFormat: 'mp3', speed: 1 } },
+  };
+  const payload = {
+    'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: null } },
+  };
+  expect(parseSettingsTransferDomains(payload)).toEqual(payload);
+  expect(() =>
+    parseSettingsTransferDomains({
+      'ai.models': { schemaVersion: 1, data: { items: [model], defaultModelId: 'audio' } },
+    })
+  ).toThrow();
+});

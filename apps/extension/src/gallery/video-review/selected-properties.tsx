@@ -1,3 +1,6 @@
+import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
+import { ReviewSpeechPanel } from './speech-panel';
+import type { ReviewBeforeAction } from './note-transitions';
 import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
@@ -39,6 +42,9 @@ import { ReviewWebcamInspector } from './webcam-inspector';
 import type { useReviewWebcamEditor } from './webcam-editor';
 
 type SelectedPropertiesProps = {
+  registerSpeechFlush?: (owner: ReviewSpeechFlushRegistration) => () => void;
+  beforeSpeechAction?: ReviewBeforeAction;
+  flushAdvanced?: () => Promise<void>;
   webcam?: ReturnType<typeof useReviewWebcamEditor>;
   webcamRange?: { start: number; end: number } | undefined;
   selection: ReviewSelection;
@@ -126,7 +132,24 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
         ) : selection.kind === 'original-audio' ? (
           <SelectedOriginalAudio audio={audio} resource={resource} advanced={advanced} />
         ) : selection.kind === 'audio' && advanced.ui.mode === 'advanced' ? (
-          <ReviewAudioInspectorSection audio={audio} busy={busy} />
+          <>
+            <ReviewAudioInspectorSection audio={audio} busy={busy} />
+            {selection.lane === 'voiceover' &&
+            audio.selected?.lane === 'voiceover' &&
+            props.beforeSpeechAction &&
+            props.flushAdvanced &&
+            props.registerSpeechFlush ? (
+              <ReviewSpeechPanel
+                key={audio.selected.clip.id}
+                session={resource.session}
+                clipId={audio.selected.clip.id}
+                beforeAction={props.beforeSpeechAction}
+                flushAdvanced={props.flushAdvanced}
+                registerSpeechFlush={props.registerSpeechFlush}
+                tempo={audio.selected.clip.tempo ?? 1}
+              />
+            ) : null}
+          </>
         ) : selection.kind === 'edit' && editing.selected ? (
           <SelectedEdit editing={editing} advanced={advanced} resource={resource} busy={busy} />
         ) : selection.kind === 'zoom' || selection.kind === 'zoom-link' ? (

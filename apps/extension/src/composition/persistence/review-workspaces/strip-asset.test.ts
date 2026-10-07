@@ -182,3 +182,70 @@ it('removes remembered backgrounds from current, history and recovery while keep
   expect(JSON.parse(result.advanced.recoveryV1!).background).not.toHaveProperty('rememberedImage');
   expect(workspace.advanced.background).toEqual(background);
 });
+
+it('removes generated audio from all snapshots while preserving original audio and text', async () => {
+  const { reviewSpeechTextSignature } =
+    await import('../../../features/video/review/speech-transcript');
+  const profile = { modelId: 'speech', voiceId: 'alloy', responseFormat: 'mp3' as const };
+  const transcript = {
+    version: 1 as const,
+    profile,
+    phrases: [
+      {
+        id: 'p',
+        start: 0,
+        end: 1,
+        originalText: 'Original',
+        text: 'Edited',
+        revision: 1,
+        alignment: 'manual' as const,
+      },
+    ],
+    replacements: [
+      {
+        id: 'take',
+        start: 0,
+        end: 1,
+        duration: 0.5,
+        assetId: removed,
+        phraseId: 'p',
+        revision: 1,
+        text: 'Edited',
+        textSignature: reviewSpeechTextSignature('Edited', profile),
+        profile,
+      },
+    ],
+  };
+  const voice = {
+    id: 'voice',
+    assetId: retained,
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+    transcript,
+  };
+  const workspace = makeWorkspace();
+  workspace.advanced.audio.voiceover = [voice];
+  workspace.advanced.recoveryV1 = JSON.stringify({ audio: { voiceover: [voice], music: [] } });
+  const before = createQuickEditAdvancedContent();
+  before.audio.voiceover = [voice];
+  const after = structuredClone(before);
+  after.audio.voiceover[0]!.transcript!.replacements = [];
+  workspace.history = [{ id: 'restore', at: 1, target: 'advancedContent', before, after }];
+  const result = stripReviewAssetReference(workspace, removed, 2);
+  expect(result.advanced.audio.voiceover[0]).toMatchObject({
+    assetId: retained,
+    transcript: { phrases: transcript.phrases, replacements: [] },
+  });
+  expect(
+    JSON.parse(result.advanced.recoveryV1!).audio.voiceover[0].transcript.replacements
+  ).toEqual([]);
+  expect(result.history).toEqual([]);
+  expect(result.cursor).toBe(0);
+  expect(collectReviewAssetReferences(result)).toEqual(new Set([retained]));
+  expect(workspace.advanced.audio.voiceover[0]!.transcript!.replacements).toHaveLength(1);
+});

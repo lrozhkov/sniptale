@@ -348,3 +348,17 @@ it('reissues every idempotent phase in a fresh use case after storage interrupti
   expect(ports.runtime.cleanup).toHaveBeenCalledTimes(2);
   expect(ports.storage.cleanup).toHaveBeenCalledTimes(2);
 });
+
+it('reserves audio exclusion and cancels audio before persistent erasure', async () => {
+  const ports = createPorts();
+  const release = vi.fn();
+  const waitForActiveMutations = vi.fn(async () => undefined);
+  ports.audioJobs.reserveErasureExclusion = vi.fn(() => ({ release, waitForActiveMutations }));
+  await new PrivacyErasureUseCase(ports).execute(createErasureRequest());
+  expect(ports.audioJobs.reserveErasureExclusion).toHaveBeenCalledBefore(
+    vi.mocked(ports.audioJobs.cancelActiveJob)
+  );
+  expect(ports.audioJobs.cancelActiveJob).toHaveBeenCalledBefore(vi.mocked(ports.storage.cleanup));
+  expect(waitForActiveMutations).toHaveBeenCalledBefore(vi.mocked(ports.storage.cleanup));
+  expect(release).toHaveBeenCalledOnce();
+});

@@ -1,3 +1,4 @@
+import { filterAIModelsByOperation } from '../../../../../contracts/settings/model-operation';
 import { translate } from '../../../../../platform/i18n';
 import type { AIModel } from '../../../../../contracts/settings';
 
@@ -14,7 +15,7 @@ export function buildAiProvidersModelOptions(props: {
 }) {
   return [
     { value: '', label: translate('settings.aiProviders.defaultModelUnsetOption') },
-    ...props.models.map((model) => ({
+    ...filterAIModelsByOperation(props.models, 'text').map((model) => ({
       value: model.id,
       label: buildAiProvidersModelOptionLabel({
         getProviderName: props.getProviderName,

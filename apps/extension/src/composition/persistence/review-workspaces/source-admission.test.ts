@@ -320,3 +320,91 @@ it('refuses missing remembered images before saving and preserves the previous w
   ).rejects.toMatchObject({ code: 'missing-media' });
   expect(await readVideoWorkspace(id)).toEqual(opened);
 });
+
+it.each(['missing', 'ready', 'durable'] as const)(
+  'admits a nested generated asset only with %s source authority',
+  async (authority) => {
+    const { reviewSpeechTextSignature } =
+      await import('../../../features/video/review/speech-transcript');
+    const opened = await openVideoWorkspace(id, source);
+    const original = {
+      ...entry,
+      id: 'original',
+      assetId: 'original-bytes',
+      mimeType: 'audio/mpeg',
+    };
+    rows.get('project_assets')!.set(original.id, original);
+    const profile = { modelId: 'speech', voiceId: 'alloy', responseFormat: 'mp3' as const };
+    const advanced = structuredClone(opened.workspace.advanced);
+    advanced.audio.voiceover.push({
+      id: 'voice',
+      assetId: 'project-asset:original',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+      transcript: {
+        version: 1,
+        profile,
+        phrases: [
+          {
+            id: 'p',
+            start: 0,
+            end: 2,
+            text: 'Speech',
+            originalText: 'Original',
+            revision: 1,
+            alignment: 'manual',
+          },
+        ],
+        replacements: [
+          {
+            id: 'take',
+            start: 0,
+            end: 2,
+            duration: 1,
+            phraseId: 'p',
+            revision: 1,
+            text: 'Speech',
+            profile,
+            textSignature: reviewSpeechTextSignature('Speech', profile),
+            assetId: 'project-asset:background',
+          },
+        ],
+      },
+    });
+    const generated = { ...entry, mimeType: 'audio/mpeg' };
+    if (authority === 'durable') rows.get('project_assets')!.set(generated.id, generated);
+    if (authority === 'ready') {
+      const journal = readyJournal();
+      journal.assetRefs[0] = { ...journal.assetRefs[0]!, mimeType: generated.mimeType };
+      journal.payload = {
+        entry: generated,
+        filename: 'speech.mp3',
+        expectedAssetId: null,
+        requiredReview: { aggregateId: id, clipId: 'voice' },
+        publishToLibrary: false,
+      };
+      journals.push(journal);
+    }
+    const saving = saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      advanced,
+    });
+    if (authority === 'missing') {
+      await expect(saving).rejects.toMatchObject({ code: 'missing-media' });
+      expect(await readVideoWorkspace(id)).toEqual(opened);
+    } else {
+      const saved = await saving;
+      expect(saved.workspace.advanced.audio.voiceover[0]!.transcript).toEqual(
+        advanced.audio.voiceover[0]!.transcript
+      );
+      expect(rows.get('project_assets')!.has(entry.id)).toBe(authority === 'durable');
+    }
+  }
+);

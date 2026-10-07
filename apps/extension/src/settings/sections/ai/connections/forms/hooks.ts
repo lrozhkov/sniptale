@@ -1,3 +1,7 @@
+import type {
+  AIModelOperation,
+  AIModelAudioParameters,
+} from '../../../../../contracts/settings/model-operation';
 import { useRef, useState } from 'react';
 import type { AIModel, AIProvider } from '../../../../../contracts/settings';
 import {
@@ -165,6 +169,8 @@ export function useModelFormState(model?: AIModel | null) {
     displayName: model?.displayName || '',
     modelCode: model?.modelCode || '',
     systemPrompt: model?.systemPrompt || '',
+    ...(model?.operation === undefined ? {} : { operation: model.operation }),
+    ...(model?.audio === undefined ? {} : { audio: structuredClone(model.audio) }),
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -183,6 +189,32 @@ export function useModelFormState(model?: AIModel | null) {
     clearFieldError(errors, setErrors, 'providerId');
   };
 
+  const handleOperationChange = (operation: AIModelOperation) => {
+    setFormData((previous) => {
+      const { audio: _audio, ...base } = previous;
+      return {
+        ...base,
+        operation,
+        ...(operation === 'transcription'
+          ? {
+              audio: {
+                transcription: {
+                  responseFormat: 'verbose_json' as const,
+                  timestampGranularity: 'word' as const,
+                },
+              },
+            }
+          : operation === 'speech'
+            ? { audio: { speech: { voiceId: '', responseFormat: 'mp3' as const } } }
+            : {}),
+      };
+    });
+    clearFieldError(errors, setErrors, 'audio');
+  };
+  const handleAudioChange = (audio: AIModelAudioParameters) => {
+    setFormData((previous) => ({ ...previous, audio }));
+    clearFieldError(errors, setErrors, 'audio');
+  };
   const handleResizeStart = createTextareaResizeStartHandler(textareaRef);
 
   const handleSubmit = async (event: React.FormEvent, onSave: () => void | Promise<void>) => {
@@ -199,6 +231,8 @@ export function useModelFormState(model?: AIModel | null) {
     handleChange,
     handleProviderChange,
     handleResizeStart,
+    handleOperationChange,
+    handleAudioChange,
     handleSubmit,
     isEditing,
     isSaving,

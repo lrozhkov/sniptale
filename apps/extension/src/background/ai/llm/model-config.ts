@@ -1,3 +1,4 @@
+import { getAIModelOperation } from '../../../contracts/settings/model-operation';
 import { translate } from '../../../platform/i18n';
 import { isAllowedAIProviderBaseUrl } from '@sniptale/runtime-contracts/ai/provider-base-url-policy';
 import {
@@ -28,6 +29,10 @@ export async function resolveModelConfig(modelId: string): Promise<ResolvedLlmMo
   const model = models.find((current) => current.id === modelId);
   if (!model) {
     throw new Error(`Model ${modelId} not found`);
+  }
+
+  if (getAIModelOperation(model) !== 'text') {
+    throw new Error('Selected AI model does not support text requests');
   }
 
   const provider = providers.find((current) => current.id === model.providerId);

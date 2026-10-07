@@ -1,3 +1,4 @@
+import { getAIModelOperation } from '../../../../../contracts/settings/model-operation';
 import { useState } from 'react';
 
 import { translate } from '../../../../../platform/i18n';
@@ -11,24 +12,36 @@ import { getAiModelPromptLabel } from './helpers';
 
 export function AIProvidersModelsCard(props: { state: AiProvidersSectionState }) {
   const [movingModelId, setMovingModelId] = useState<string | null>(null);
-  const items: readonly SettingsCollectionItem[] = props.state.models.map((model) => ({
-    id: model.id,
-    title: model.displayName,
-    meta: `${props.state.getProviderName(model.providerId)} · ${model.modelCode} · ${getAiModelPromptLabel(model)}`,
-    isDefault: props.state.defaultModelId === model.id,
-    busy: movingModelId === model.id,
-    capabilities: {
-      edit: true,
-      setDefault: props.state.defaultModelId !== model.id,
-      delete: true,
-      reorder: movingModelId === null,
-    },
-  }));
+  const items: readonly SettingsCollectionItem[] = props.state.models.map((model) => {
+    const purpose =
+      getAIModelOperation(model) === 'text'
+        ? getAiModelPromptLabel(model)
+        : translate(
+            model.operation === 'transcription'
+              ? 'settings.aiProviders.modelOperationTranscription'
+              : 'settings.aiProviders.modelOperationSpeech'
+          );
+    return {
+      id: model.id,
+      title: model.displayName,
+      meta: `${props.state.getProviderName(model.providerId)} · ${model.modelCode} · ${purpose}`,
+      isDefault: props.state.defaultModelId === model.id,
+      busy: movingModelId === model.id,
+      capabilities: {
+        edit: true,
+        setDefault:
+          getAIModelOperation(model) === 'text' && props.state.defaultModelId !== model.id,
+        delete: true,
+        reorder: movingModelId === null,
+      },
+    };
+  });
   const byId = new Map(props.state.models.map((model) => [model.id, model]));
   const onAction = (action: SettingsCollectionAction) => {
     const model = byId.get(action.itemId);
     if (!model) return;
-    if (action.type === 'set-default') void props.state.catalogActions.setDefaultModel(model.id);
+    if (action.type === 'set-default' && getAIModelOperation(model) === 'text')
+      void props.state.catalogActions.setDefaultModel(model.id);
     if (action.type === 'edit') props.state.modals.openModelModal(model);
     if (action.type === 'delete')
       props.state.modals.setConfirmDelete({ type: 'model', item: model });

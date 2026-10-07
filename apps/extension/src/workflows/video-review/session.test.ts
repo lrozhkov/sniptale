@@ -2,6 +2,8 @@ import { expect, it, vi } from 'vitest';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createVideoReviewSession } from './session';
+import type { ReviewOperation } from '../../features/video/review/types';
+import { saveReviewSpeechTranscript } from './speech-publication';
 
 const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 1 } };
 function initial(): VideoWorkspaceSnapshot {
@@ -295,4 +297,80 @@ it('keeps an existing conflict visible when autosave is toggled without a local 
   session.setAutosaveEnabled(true);
   expect(session.getSnapshot().error).toBe('conflict');
   expect(deps.saveVideoWorkspaceSnapshot).not.toHaveBeenCalled();
+});
+
+it('retries the same failed speech save using fresh queued history and durable revision', async () => {
+  const snapshot = initial();
+  snapshot.workspace.advanced.audio.voiceover = [
+    {
+      id: 'voice',
+      assetId: 'project-asset:original',
+      timelineStart: 0,
+      sourceOffset: 0,
+      duration: 2,
+      volume: 1,
+      muted: false,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ];
+  let stored = snapshot;
+  const commitVideoWorkspace = vi.fn(
+    async (
+      args: Parameters<
+        typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspace
+      >[0]
+    ) => {
+      stored = {
+        ...stored,
+        workspace: {
+          ...stored.workspace,
+          revision: stored.workspace.revision + 1,
+          history: [...stored.workspace.history, args.operation as ReviewOperation],
+          cursor: stored.workspace.cursor + 1,
+        },
+      };
+      return stored;
+    }
+  );
+  commitVideoWorkspace.mockRejectedValueOnce(new Error('storage failed'));
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => stored),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => stored),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => stored),
+    commitVideoWorkspace,
+    readVideoWorkspace: vi.fn(async () => stored),
+    moveVideoWorkspaceHistory: vi.fn(async () => stored),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  const transcript = {
+    version: 1 as const,
+    phrases: [],
+    replacements: [],
+    profile: { modelId: 'model', voiceId: 'voice', responseFormat: 'wav' as const },
+  };
+  await expect(saveReviewSpeechTranscript(session, 'voice', transcript)).rejects.toThrow(
+    'storage failed'
+  );
+  await expect(session.flush()).rejects.toThrow('storage');
+  await saveReviewSpeechTranscript(session, 'voice', transcript);
+  await expect(session.flush()).resolves.toBeUndefined();
+  expect(session.getSnapshot().document.advancedContent.audio.voiceover[0]?.transcript).toEqual(
+    transcript
+  );
+  expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
+  expect(commitVideoWorkspace.mock.calls[1]?.[0].expectedRevision).toBe(1);
+  expect(stored.workspace.history).toHaveLength(1);
+  await saveReviewSpeechTranscript(session, 'voice', structuredClone(transcript));
+  await saveReviewSpeechTranscript(session, 'voice', {
+    ...transcript,
+    profile: { responseFormat: 'wav', voiceId: 'voice', modelId: 'model' },
+  });
+  expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
+  expect(stored.workspace.history).toHaveLength(1);
+  deps.moveVideoWorkspaceHistory.mockRejectedValueOnce(new Error('history failed'));
+  await expect(session.history('undo')).rejects.toThrow('history failed');
+  await expect(saveReviewSpeechTranscript(session, 'voice', transcript)).rejects.toThrow('storage');
+  await expect(saveReviewSpeechTranscript(session, 'voice', transcript)).rejects.toThrow('storage');
+  expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
 });

@@ -14,6 +14,8 @@ Retain a browser fixture and a contiguous migration descriptor for every release
 
 Run lossless IndexedDB changes in one versionchange transaction. Publish domain versions only after validation. Migration descriptors must enqueue work synchronously and return `undefined`. Use transaction abort for interruption recovery. Keep OPFS source objects until a restartable journal records the new graph as durable. Refuse destructive durable-data migration without complete source-version backup coverage.
 
+Gallery voiceover transcripts and accepted generated-phrase references require physical version 5 and the mediaLibrary logical contract 4. The additive 4→5 migration retains existing workspace rows, history, recovery drafts, asset references and OPFS objects without rewriting them. Domain parsers admit legacy advanced versions 2 and 3 and emit version 4; generated references participate in the review owner's history, backup and deletion graph. Earlier application versions refuse the newer database before ordinary mutations, preventing legacy parsers from discarding speech references.
+
 ## Alpha reset and recovery
 
 Use `sniptale-video-db` only in alpha-reset and privacy-erasure inventories. Under the persistent-data barrier, Gallery records a browser-storage journal, removes alpha IndexedDB and OPFS data plus preview cache, verifies absence, and clears the journal. Resume an interrupted reset from that journal. Do not migrate or export alpha data.

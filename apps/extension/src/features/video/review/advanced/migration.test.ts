@@ -67,7 +67,7 @@ const v1State = (): QuickEditAdvancedState => {
 
 it('converts v1 placements from source time to result time', () => {
   const migrated = migrateQuickEditAdvancedV1(v1State(), segments);
-  expect(migrated.schemaVersion).toBe(3);
+  expect(migrated.schemaVersion).toBe(4);
   expect(migrated.zoom.regions[0]).toMatchObject({ start: 4, end: 6, dormant: false });
   expect(migrated.audio.voiceover[0]).toMatchObject({ timelineStart: 4, dormant: false });
 });
