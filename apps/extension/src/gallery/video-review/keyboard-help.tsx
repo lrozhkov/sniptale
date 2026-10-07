@@ -24,7 +24,7 @@ function KeyboardHelpDialog({ anchor, onClose }: { anchor: HTMLButtonElement; on
   const commands = [
     [translate('gallery.videoReview.keyboardRegions'), 'F6 / Shift+F6'],
     [translate('gallery.videoReview.keyboardControls'), 'Tab / Shift+Tab'],
-    [translate('gallery.videoReview.keyboardActivate'), 'Enter / Space'],
+    [translate('gallery.videoReview.keyboardActivate'), 'Enter'],
     [translate('gallery.videoReview.keyboardPlayback'), 'Space'],
     [translate('gallery.videoReview.keyboardSeek'), '← / →'],
     [translate('gallery.videoReview.keyboardRange'), 'Shift+← / Shift+→'],

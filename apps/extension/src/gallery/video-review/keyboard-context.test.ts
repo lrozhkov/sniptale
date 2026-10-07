@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { expect, it } from 'vitest';
-import { focusReviewRegion, reviewKeyboardTarget, reviewOwnsKeys } from './keyboard-context';
+import {
+  focusReviewRegion,
+  reviewKeyboardTarget,
+  reviewOwnsKeys,
+  reviewOwnsPlaybackKeys,
+} from './keyboard-context';
 
 it('limits editor keys to its surface and yields to open layers including native dialogs', () => {
   const editor = document.createElement('div');
@@ -77,4 +82,21 @@ it('preserves input, composite and resize control ownership', () => {
   const child = document.createElement('span');
   field.append(child);
   expect(reviewOwnsKeys(child)).toBe(true);
+});
+
+it('reserves playback Space for command surfaces while preserving editing and open widgets', () => {
+  for (const type of ['text', 'number', 'checkbox', 'radio']) {
+    const input = document.createElement('input');
+    input.type = type;
+    expect(reviewOwnsPlaybackKeys(input)).toBe(true);
+  }
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  expect(reviewOwnsPlaybackKeys(slider)).toBe(false);
+  const trigger = document.createElement('button');
+  trigger.setAttribute('aria-haspopup', 'listbox');
+  trigger.setAttribute('aria-expanded', 'false');
+  expect(reviewOwnsPlaybackKeys(trigger)).toBe(false);
+  trigger.setAttribute('aria-expanded', 'true');
+  expect(reviewOwnsPlaybackKeys(trigger)).toBe(true);
 });

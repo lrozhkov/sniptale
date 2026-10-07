@@ -63,8 +63,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   keyboardPointer: { ru: 'Инструмент выбора', en: 'Selection tool' },
   keyboardCancel: { ru: 'Отменить выделение или рисование', en: 'Cancel selection or drawing' },
   keyboardContext: {
-    ru: 'Команды работают, когда фокус находится в редакторе. Поля, кнопки, меню и диалоги сохраняют свои клавиши. При вырезании стрелки переходят между ключевыми кадрами. Для изменения масштаба таймлайна используйте его ползунок или Ctrl + прокрутку.',
-    en: 'Commands work while focus is in the editor. Fields, buttons, menus and dialogs keep their own keys. With the cut tool, arrows move between keyframes. Use the timeline slider or Ctrl + scroll to zoom the timeline.',
+    ru: 'Команды работают, когда фокус находится в редакторе. Пробел управляет воспроизведением, в том числе на кнопках и ползунках. Enter нажимает кнопку. Поля ввода, открытые меню и диалоги сохраняют свои клавиши. При вырезании стрелки переходят между ключевыми кадрами. Для изменения масштаба таймлайна используйте его ползунок или Ctrl + прокрутку.',
+    en: 'Commands work while focus is in the editor. Space controls playback, including on buttons and sliders. Enter activates a button. Input fields, open menus and dialogs keep their own keys. With the cut tool, arrows move between keyframes. Use the timeline slider or Ctrl + scroll to zoom the timeline.',
   },
   motionBlur: { ru: 'Размытие движения', en: 'Motion blur' },
   motionBlurOff: { ru: 'Выключено', en: 'Off' },

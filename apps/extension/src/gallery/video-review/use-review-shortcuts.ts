@@ -1,8 +1,13 @@
 import type { ReviewBeforeAction } from './note-transitions';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 
-import { reviewKeyboardTarget, reviewOwnsKeys, reviewOwnsNavigation } from './keyboard-context';
+import {
+  reviewKeyboardTarget,
+  reviewOwnsKeys,
+  reviewOwnsNavigation,
+  reviewOwnsPlaybackKeys,
+} from './keyboard-context';
 
 function handleBoundaryShortcut(
   event: KeyboardEvent,
@@ -44,7 +49,36 @@ function useReviewKeys({
   add(): void;
   tool(key: 'c' | 'v'): void;
 }) {
+  const playbackSpace = useRef(false);
   useEffect(() => {
+    // Capture before focused buttons/selects consume Space or schedule their native click.
+    const onPlaybackKeyDown = (event: KeyboardEvent) => {
+      if (event.code !== 'Space' && event.key !== ' ') return;
+      if (
+        event.defaultPrevented ||
+        event.isComposing ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey
+      )
+        return;
+      const target = reviewKeyboardTarget(event);
+      if (!target || reviewOwnsPlaybackKeys(target)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      playbackSpace.current = true;
+      if (!event.repeat) play();
+    };
+    const onPlaybackKeyUp = (event: KeyboardEvent) => {
+      if (!playbackSpace.current || (event.code !== 'Space' && event.key !== ' ')) return;
+      playbackSpace.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    const clearPlaybackKey = () => {
+      playbackSpace.current = false;
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.isComposing) return;
       const target = reviewKeyboardTarget(event);
@@ -71,12 +105,6 @@ function useReviewKeys({
       }
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (handleBoundaryShortcut(event, navigation, seek)) return;
-      if (event.key === ' ') {
-        if (reviewOwnsNavigation(target)) return;
-        event.preventDefault();
-        if (!event.repeat) play();
-        return;
-      }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
         if (!event.repeat) remove();
@@ -104,8 +132,16 @@ function useReviewKeys({
         seek(next ?? time);
       }
     };
+    window.addEventListener('keydown', onPlaybackKeyDown, true);
+    window.addEventListener('keyup', onPlaybackKeyUp, true);
+    window.addEventListener('blur', clearPlaybackKey);
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onPlaybackKeyDown, true);
+      window.removeEventListener('keyup', onPlaybackKeyUp, true);
+      window.removeEventListener('blur', clearPlaybackKey);
+      window.removeEventListener('keydown', onKeyDown);
+    };
   });
 }
 

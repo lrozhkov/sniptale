@@ -25,6 +25,7 @@ it('opens local help as a native modal and restores the trigger after cancellati
     expect(trigger.getAttribute('aria-expanded')).toBe('true');
     const dialog = host.querySelector('dialog')!;
     expect(dialog.textContent).toContain('F6');
+    expect(dialog.textContent).not.toContain('Enter / Space');
     act(() => dialog.dispatchEvent(new Event('cancel', { cancelable: true })));
     expect(host.querySelector('dialog')).toBeNull();
     expect(close).toHaveBeenCalledTimes(1);

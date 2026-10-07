@@ -166,7 +166,7 @@ for (const variant of [
       await expect(summary).toContainText('0:03.00');
       await expect(video).toHaveJSProperty('paused', false);
       await button('gallery.videoReview.pause').click();
-      await button('gallery.videoReview.clearPlaybackRange').press('Space');
+      await button('gallery.videoReview.clearPlaybackRange').press('Enter');
       await expect(summary).toHaveCount(0);
       await expect(overlay).toHaveCount(0);
       await expect(button('gallery.videoReview.undo')).toBeDisabled();
@@ -328,10 +328,13 @@ for (const variant of [
       await button('gallery.videoReview.clearPlaybackRange').click();
       // Existing source-lane drawing still creates an edit.
       await button('gallery.videoReview.speedMode').click();
+      await source.scrollIntoViewIfNeeded();
       const sourceRect = (await source.boundingBox())!;
-      await page.mouse.move(sourceRect.x + sourceRect.width * 0.65, sourceRect.y + 20);
+      // The sticky ruler can cover the upper part of a scrolled source row.
+      const sourceY = sourceRect.y + sourceRect.height - 8;
+      await page.mouse.move(sourceRect.x + sourceRect.width * 0.65, sourceY);
       await page.mouse.down();
-      await page.mouse.move(sourceRect.x + sourceRect.width * 0.8, sourceRect.y + 20, { steps: 5 });
+      await page.mouse.move(sourceRect.x + sourceRect.width * 0.8, sourceY, { steps: 5 });
       await page.mouse.up();
       await expect(dialog.locator('[data-ui="gallery.videoReview.editBlock"]')).toHaveCount(2);
       await rulerDrag(page, 11, 11.5);
@@ -360,3 +363,77 @@ for (const variant of [
     }
   });
 }
+
+test('quick editor Space keeps transport priority after buttons and closed selectors', async ({
+  page,
+}) => {
+  const server = await startHostServer();
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
+  try {
+    await applyHarnessBootstrap(page, {
+      preserveMediaLibrary: true,
+      storage: { 'sniptale-locale-preference': 'en' },
+    });
+    await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}`);
+    await page.locator('[data-ui="gallery.page.root"]').waitFor();
+    await seedReviewVideo(page, 'review-vp8-opus.webm', {
+      width: 160,
+      height: 90,
+      duration: 12.01,
+    });
+    await page.reload();
+    await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+    await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+    const dialog = page.locator('[data-ui="gallery.videoReview.dialog"]');
+    const video = dialog.locator('video').first();
+    const button = (key: Parameters<typeof translate>[0]) =>
+      dialog.getByRole('button', { name: label(key), exact: true });
+    await expect.poll(() => video.evaluate((node) => node.readyState)).toBeGreaterThan(1);
+    const speed = button('gallery.videoReview.speedMode');
+    await speed.click();
+    await expect(speed).toBeFocused();
+    await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', false);
+    await expect(speed).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', true);
+    const rate = button('gallery.videoReview.speedRate');
+    await rate.focus();
+    await page.keyboard.down('Space');
+    await expect(video).toHaveJSProperty('paused', false);
+    await page.keyboard.down('Space');
+    await page.keyboard.up('Space');
+    await expect(video).toHaveJSProperty('paused', false);
+    await expect(rate).toBeFocused();
+    await expect(rate).toHaveAttribute('aria-expanded', 'false');
+    await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', true);
+    await rate.press('Enter');
+    await expect(page.getByRole('listbox')).toBeVisible();
+    await page.keyboard.press('Space');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await expect(video).toHaveJSProperty('paused', true);
+    const zoom = dialog.getByRole('slider', {
+      name: label('videoEditor.timeline.zoom'),
+      exact: true,
+    });
+    const value = await zoom.inputValue();
+    await zoom.focus();
+    await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', false);
+    await expect(zoom).toHaveValue(value);
+    await page.keyboard.press('Space');
+    await expect(video).toHaveJSProperty('paused', true);
+    await button('gallery.keyboard.title').click();
+    const help = dialog.locator('[data-ui="gallery.videoReview.keyboardHelp"]');
+    await help.getByRole('button').press('Space');
+    await expect(help).toHaveCount(0);
+    await expect(video).toHaveJSProperty('paused', true);
+    await button('gallery.videoReview.back').click();
+    await expect(dialog).toHaveCount(0);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      server.server.close((error) => (error ? reject(error) : resolve()))
+    );
+  }
+});

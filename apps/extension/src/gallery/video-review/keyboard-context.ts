@@ -30,7 +30,14 @@ export function reviewOwnsKeys(target: HTMLElement): boolean {
   );
 }
 
-/** Buttons retain Space activation and navigation; editor surfaces retain transport keys. */
+/** Playback owns Space on commands and sliders; editing and open widgets keep it. */
+export function reviewOwnsPlaybackKeys(target: HTMLElement): boolean {
+  if (target.closest('[aria-haspopup][aria-expanded="true"],[role="checkbox"],[role="radio"]'))
+    return true;
+  return reviewOwnsKeys(target) && !target.closest('input[type="range"],[role="slider"]');
+}
+
+/** Button navigation stays local; Space transport is handled separately. */
 export function reviewOwnsNavigation(target: HTMLElement): boolean {
   return (
     reviewOwnsKeys(target) ||

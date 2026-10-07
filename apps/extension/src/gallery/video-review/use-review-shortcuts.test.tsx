@@ -16,6 +16,7 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
   const redo = vi.fn(async () => {});
   const toggleCut = vi.fn();
   const play = vi.fn();
+  const openSelector = vi.fn();
   const seek = vi.fn();
   function Harness() {
     useReviewEditorShortcuts({
@@ -41,6 +42,18 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
       <>
         <textarea />
         <button data-toolbar-action>Toolbar action</button>
+        <button
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          onKeyDown={(event) => {
+            if (event.key === ' ') {
+              event.preventDefault();
+              openSelector();
+            }
+          }}
+        >
+          Closed selector
+        </button>
         <div role="slider" aria-valuenow={0} data-custom-slider tabIndex={0} />
         <div role="dialog" hidden>
           <button>Recorder action</button>
@@ -76,11 +89,35 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
     expect(redo).toHaveBeenCalledTimes(1);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'с', code: 'KeyC' }));
     expect(toggleCut).toHaveBeenCalledTimes(1);
-    for (const control of host.querySelectorAll('summary, button')) {
-      const event = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    const controls = Array.from(host.querySelectorAll('summary, button')).filter(
+      (node) => !node.closest('[hidden]')
+    );
+    for (const control of controls) {
+      const event = new KeyboardEvent('keydown', {
+        key: ' ',
+        code: 'Space',
+        bubbles: true,
+        cancelable: true,
+      });
       control.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
     }
+    expect(play).toHaveBeenCalledTimes(controls.length);
+    const release = new KeyboardEvent('keyup', { key: ' ', bubbles: true, cancelable: true });
+    controls[0]!.dispatchEvent(release);
+    expect(release.defaultPrevented).toBe(true);
+    expect(openSelector).not.toHaveBeenCalled();
+    play.mockClear();
+    for (const control of host.querySelectorAll('input[type="range"], [data-custom-slider]')) {
+      control.dispatchEvent(
+        new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+      );
+    }
+    expect(play).toHaveBeenCalledTimes(2);
+    play.mockClear();
+    host
+      .querySelector('textarea')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
     expect(play).not.toHaveBeenCalled();
     const sliderEvent = new KeyboardEvent('keydown', {
       key: 'ArrowRight',
@@ -181,6 +218,7 @@ it('blocks repeats, IME, outside focus and mutations during busy/export states',
   try {
     act(() => root.render(<Harness />));
     for (const options of [{ repeat: true }, { isComposing: true }]) {
+      key(' ', options);
       key('m', options);
       key('Delete', options);
       key('z', { ...options, ctrlKey: true });
@@ -213,6 +251,8 @@ it('blocks repeats, IME, outside focus and mutations during busy/export states',
     expect(remove).toHaveBeenCalledTimes(1);
     expect(undo).toHaveBeenCalledTimes(1);
     expect(seek).not.toHaveBeenCalled();
+    for (const modifier of ['ctrlKey', 'altKey', 'metaKey', 'shiftKey'])
+      key(' ', { [modifier]: true });
     expect(play).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
