@@ -296,3 +296,64 @@ it('keeps legacy transparency visible in the color field and removes its multipl
     vi.unstubAllGlobals();
   }
 });
+
+it('refreshes a paused lens when its target frame finishes decoding without a React update', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const context = {
+    clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    arc: vi.fn(),
+    stroke: vi.fn(),
+    fill: vi.fn(),
+    drawImage: vi.fn(),
+  };
+  const get = vi
+    .spyOn(HTMLCanvasElement.prototype, 'getContext')
+    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  const source = document.createElement('video');
+  let readyState = 1;
+  Object.defineProperty(source, 'readyState', { get: () => readyState });
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const rect = { x: 0, y: 0, width: 640, height: 360 };
+  try {
+    act(() =>
+      root.render(
+        <ReviewClickOverlay
+          cues={[
+            {
+              settings: { ...REVIEW_CLICK_DEFAULT, effect: 'magnify' },
+              point: { x: 0.5, y: 0.5 },
+              anchor: 1,
+              start: 0.5,
+              end: 1.6,
+            },
+          ]}
+          time={1}
+          output={rect}
+          video={rect}
+          sourceWidth={640}
+          clip={{ rect, radius: 0 }}
+          getFrame={() => source}
+        />
+      )
+    );
+    expect(context.drawImage).not.toHaveBeenCalled();
+    readyState = 2;
+    act(() => source.dispatchEvent(new Event('loadeddata')));
+    expect(context.drawImage).toHaveBeenCalledOnce();
+    act(() => source.dispatchEvent(new Event('seeked')));
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+    act(() => root.unmount());
+    source.dispatchEvent(new Event('seeked'));
+    expect(context.drawImage).toHaveBeenCalledTimes(2);
+  } finally {
+    get.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});

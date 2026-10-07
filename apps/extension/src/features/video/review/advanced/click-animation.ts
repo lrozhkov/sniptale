@@ -4,7 +4,10 @@ import { isBoundedNumber } from '../../project/validation/primitives';
 
 /** Authored presentation only; recorded time, coordinates and cursor samples stay immutable. */
 export interface ReviewClickStyle {
-  effect: 'off' | 'ripple' | 'press' | 'glow';
+  effect: 'off' | 'ripple' | 'press' | 'glow' | 'magnify';
+  magnification?: number;
+  lensShape?: 'circle' | 'rounded';
+  lensShadow?: number;
   color: string;
   radius: number;
   stroke: number;
@@ -80,7 +83,7 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
   const color = typeof raw['color'] === 'string' ? normalizePaintColor(raw['color']) : null;
   if (
     !color ||
-    !['off', 'ripple', 'press', 'glow'].some((value) => effect === value) ||
+    !['off', 'ripple', 'press', 'glow', 'magnify'].some((value) => effect === value) ||
     !['linear', 'ease-out', 'ease-in-out'].some((value) => easing === value)
   )
     return null;
@@ -93,11 +96,30 @@ function parseClick(raw: unknown): ReviewClickAnimation | null {
     numbers[key] = value;
   }
   if (
-    (effect !== 'off' && effect !== 'ripple' && effect !== 'press' && effect !== 'glow') ||
+    (effect !== 'off' &&
+      effect !== 'ripple' &&
+      effect !== 'press' &&
+      effect !== 'glow' &&
+      effect !== 'magnify') ||
     (easing !== 'linear' && easing !== 'ease-out' && easing !== 'ease-in-out')
   )
     return null;
-  return { id: raw['id'], ...numbers, effect, easing, color };
+  const magnification = raw['magnification'];
+  const lensShadow = raw['lensShadow'];
+  const lensShape = raw['lensShape'];
+  if (magnification !== undefined && !isBoundedNumber(magnification, 1, 3)) return null;
+  if (lensShadow !== undefined && !isBoundedNumber(lensShadow, 0, 100)) return null;
+  if (lensShape !== undefined && lensShape !== 'circle' && lensShape !== 'rounded') return null;
+  return {
+    id: raw['id'],
+    ...numbers,
+    effect,
+    easing,
+    color,
+    ...(magnification === undefined ? {} : { magnification }),
+    ...(lensShadow === undefined ? {} : { lensShadow }),
+    ...(lensShape === undefined ? {} : { lensShape }),
+  };
 }
 
 /** One functional batch patch preserves untouched fields and never mutates recorded events. */

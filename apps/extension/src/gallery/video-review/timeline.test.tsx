@@ -306,14 +306,14 @@ it('groups cursor telemetry and deduplicates dense cursor samples', () => {
   ];
   expect(cursorButtons).toHaveLength(3);
   // Point events render at the shared screen-space floor width.
-  for (const button of cursorButtons) expect(button.style.width).toBe('14px');
+  for (const button of cursorButtons) expect(button.style.width).toBe('34px');
   act(() =>
     host.querySelector<HTMLButtonElement>('[title^="gallery.videoReview.eventClick"]')!.click()
   );
   expect(props.onMarker).toHaveBeenCalledWith(action);
 });
 
-it('splits colliding actions into lanes and scrolls the dense tail inside a bounded strip', () => {
+it('groups colliding actions into three lanes without losing dense tail selection', async () => {
   const markers = [0, 1, 2, 3, 4].map((index) => ({
     ref: { kind: 'action' as const, id: `click${index}` },
     eventType: 'CLICK',
@@ -322,19 +322,21 @@ it('splits colliding actions into lanes and scrolls the dense tail inside a boun
   }));
   const { host, props } = renderTimeline({ markers });
   const strip = host.querySelector<HTMLElement>('div.relative.mb-1')!;
-  // The lane stack is capped at three visible 20px lanes with 4px gaps; the rest scrolls.
+  // The lane stack stays at three visible rows; overflow remains selectable in the group.
   expect(strip.style.height).toBe('68px');
-  expect(strip.className).toContain('overflow-y-auto');
+  expect(strip.className).toContain('overflow-hidden');
   const markerButtons = [
     ...strip.querySelectorAll<HTMLButtonElement>('button[title^="gallery.videoReview.eventClick"]'),
   ];
-  // Every marker stays rendered and clickable; no overflow selector exists.
-  expect(markerButtons).toHaveLength(5);
+  expect(markerButtons).toHaveLength(2);
   for (const button of markerButtons) expect(button.style.height).toBe('20px');
-  const tops = new Set(markerButtons.map((button) => button.style.top));
-  expect(tops.size).toBe(5);
-  expect(strip.querySelector('[data-ui="gallery.videoReview.actionOverflow"]')).toBeNull();
-  act(() => markerButtons.at(-1)!.click());
+  const cluster = strip.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.historyCluster"] button'
+  )!;
+  await act(async () => cluster.click());
+  const options = [...document.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+  expect(options).toHaveLength(3);
+  await act(async () => options.at(-1)!.click());
   expect(props.onMarker).toHaveBeenCalledWith(markers.at(-1));
 });
 

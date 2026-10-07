@@ -23,6 +23,7 @@ export interface ReviewClickFrame {
   radius: number;
   stroke: number;
   opacity: number;
+  lens?: { scale: number; shape: 'circle' | 'rounded'; shadow: number };
 }
 
 /** Resolve once per edit revision, in global result time; only cuts bound the lifetime. */
@@ -66,7 +67,7 @@ export function evaluateReviewClicks(
   cues: readonly ReviewClickCue[],
   time: number
 ): ReviewClickFrame[] {
-  return cues.flatMap((cue) => {
+  return cues.flatMap<ReviewClickFrame>((cue) => {
     const s = cue.settings;
     if (time < cue.start || time >= cue.end || s.effect === 'off') return [];
     const before = time < cue.anchor;
@@ -79,6 +80,31 @@ export function evaluateReviewClicks(
         : s.easing === 'ease-out'
           ? 1 - (1 - progress) ** 3
           : progress * progress * (3 - 2 * progress);
+    if (s.effect === 'magnify') {
+      // A single identity-to-identity pulse, independent of decorative ripple count.
+      const phase = before
+        ? (time - cue.start) / Math.max(0.001, cue.anchor - cue.start)
+        : 1 - (time - cue.anchor) / Math.max(0.001, cue.end - cue.anchor);
+      const p = Math.max(0, Math.min(1, phase));
+      const strength =
+        s.easing === 'linear'
+          ? p
+          : s.easing === 'ease-out'
+            ? 1 - (1 - p) ** 3
+            : p * p * (3 - 2 * p);
+      const scale = 1 + ((s.magnification ?? 1.6) - 1) * strength;
+      return [
+        {
+          effect: s.effect,
+          point: cue.point,
+          color: s.color,
+          radius: s.radius * scale,
+          stroke: s.stroke,
+          opacity: strength * s.opacity,
+          lens: { scale, shape: s.lensShape ?? 'circle', shadow: (s.lensShadow ?? 20) * strength },
+        },
+      ];
+    }
     const radius = before
       ? s.radius * (0.2 + 0.1 * eased)
       : s.effect === 'ripple'

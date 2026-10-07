@@ -95,7 +95,8 @@ export function drawReviewSceneOverlays(args: {
     {
       rect: motion.windowClip,
       radius: background.enabled ? background.layout.cornerRadius * motion.scale : 0,
-    }
+    },
+    scene.sample
   );
   drawReviewSceneComments(overlayContext, {
     ...scene,

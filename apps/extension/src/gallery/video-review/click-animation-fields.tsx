@@ -19,7 +19,14 @@ import {
 } from './controls';
 
 // Slider limits are deliberately narrower than the persisted/manual-input bounds.
+const CLICK_BOUNDS = {
+  ...REVIEW_CLICK_BOUNDS,
+  magnification: [1, 3],
+  lensShadow: [0, 100],
+} as const;
 const CLICK_SCRUB = {
+  magnification: [1, 2.5, 0.1],
+  lensShadow: [0, 50, 1],
   radius: [2, 80, 1],
   stroke: [0.5, 8, 0.5],
   opacity: [0, 1, 0.01],
@@ -54,11 +61,16 @@ export function ReviewClickFields(props: {
   values: readonly ReviewClickStyle[];
   onChange(patch: Partial<ReviewClickStyle> | null): void;
 }) {
+  const values = props.values.map((value) => ({
+    magnification: 1.6,
+    lensShadow: 20,
+    lensShape: 'circle' as const,
+    ...value,
+  }));
+  const magnify = values.every((value) => value.effect === 'magnify');
   const common = <K extends keyof ReviewClickStyle>(key: K): ReviewClickStyle[K] | null => {
-    const first = props.values[0]?.[key];
-    return first !== undefined && props.values.every((value) => value[key] === first)
-      ? first
-      : null;
+    const first = values[0]?.[key];
+    return first !== undefined && values.every((value) => value[key] === first) ? first : null;
   };
   // Legacy projects keep their multiplier until the color is explicitly edited.
   const colors = props.values.map((style) => {
@@ -68,29 +80,20 @@ export function ReviewClickFields(props: {
   });
   const color = colors.every((value) => value === colors[0]) ? colors[0] : undefined;
   const number = (
-    key: keyof typeof REVIEW_CLICK_BOUNDS,
+    key: keyof typeof CLICK_BOUNDS,
     label: Parameters<typeof translate>[0],
     factor = 1,
-    unit: '%' | 'px' | '' = ''
+    unit: '%' | 'px' | 'x' | '' = ''
   ) => {
-    const value = common(key);
-    const [min, max] = REVIEW_CLICK_BOUNDS[key];
-    const [scrubMin, scrubMax, scrubStep] = CLICK_SCRUB[key];
     return (
-      <ClickNumberRow
-        key={key}
-        appearance="plain"
-        focusAppearance="accent-box"
-        className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
-        label={translate(label)}
-        value={value === null ? null : value * factor}
-        min={min * factor}
-        max={max * factor}
-        step={key === 'stroke' ? 0.5 : key === 'x' || key === 'y' ? 0.1 : 1}
-        precision={key === 'stroke' || key === 'x' || key === 'y' ? 1 : 0}
+      <ClickSettingNumber
+        field={key}
+        value={common(key)}
+        label={label}
+        factor={factor}
         unit={unit}
-        scrub={{ min: scrubMin * factor, max: scrubMax * factor, step: scrubStep * factor }}
-        onCommitValue={(next) => props.onChange({ [key]: next / factor })}
+        magnify={magnify}
+        onChange={props.onChange}
       />
     );
   };
@@ -100,11 +103,17 @@ export function ReviewClickFields(props: {
         className={reviewSelectFieldClassName}
         label={translate('gallery.videoReview.clickEffect')}
         value={common('effect') ?? ''}
-        options={(['off', 'ripple', 'press', 'glow'] as const).map((value) => ({
+        options={(['off', 'ripple', 'press', 'glow', 'magnify'] as const).map((value) => ({
           value,
           label: translate(`gallery.videoReview.click_${value}`),
         }))}
-        onChange={(effect: ReviewClickStyle['effect']) => props.onChange({ effect })}
+        onChange={(effect: ReviewClickStyle['effect']) =>
+          props.onChange(
+            effect === 'magnify'
+              ? { effect, radius: 100, before: 0.45, after: 0.6, easing: 'ease-in-out' }
+              : { effect }
+          )
+        }
       />
       {common('effect') !== 'off' ? (
         <>
@@ -112,19 +121,39 @@ export function ReviewClickFields(props: {
             preferenceId="click-appearance"
             label={translate('gallery.videoReview.clickAppearance')}
           >
+            {magnify ? (
+              <>
+                {number('magnification', 'gallery.videoReview.clickMagnification', 1, 'x')}
+                <SelectField
+                  className={reviewSelectFieldClassName}
+                  label={translate('gallery.videoReview.clickLensShape')}
+                  value={common('lensShape') ?? ''}
+                  options={(['circle', 'rounded'] as const).map((value) => ({
+                    value,
+                    label: translate(`gallery.videoReview.clickLens_${value}`),
+                  }))}
+                  onChange={(lensShape: 'circle' | 'rounded') => props.onChange({ lensShape })}
+                />
+                {number('lensShadow', 'gallery.videoReview.clickLensShadow', 1, '%')}
+              </>
+            ) : null}
             {color === undefined ? (
               <p className="text-xs text-[var(--sniptale-color-text-muted)]">
                 {translate('gallery.videoReview.clickMixed')}
               </p>
             ) : null}
             <ColorField
-              label={translate('gallery.videoReview.clickColor')}
-              title={translate('gallery.videoReview.clickColor')}
+              label={translate(
+                magnify ? 'gallery.videoReview.clickLensBorder' : 'gallery.videoReview.clickColor'
+              )}
+              title={translate(
+                magnify ? 'gallery.videoReview.clickLensBorder' : 'gallery.videoReview.clickColor'
+              )}
               value={color ?? '#ffffff'}
               onChange={(color) => props.onChange({ color, opacity: 1 })}
             />
             {number('radius', 'gallery.videoReview.clickRadius', 1, 'px')}
-            {props.values.some((value) => value.effect === 'ripple')
+            {props.values.some((value) => value.effect === 'ripple' || value.effect === 'magnify')
               ? number('stroke', 'gallery.videoReview.clickStroke', 1, 'px')
               : null}
           </ReviewDetails>
@@ -134,7 +163,7 @@ export function ReviewClickFields(props: {
           >
             {number('before', 'gallery.videoReview.clickBefore', 1000)}
             {number('after', 'gallery.videoReview.clickAfter', 1000)}
-            {number('pulses', 'gallery.videoReview.clickPulses')}
+            {!magnify ? number('pulses', 'gallery.videoReview.clickPulses') : null}
             <SelectField
               className={reviewSelectFieldClassName}
               label={translate('gallery.videoReview.clickEasing')}
@@ -162,5 +191,46 @@ export function ReviewClickFields(props: {
         onClick={() => props.onChange(null)}
       />
     </div>
+  );
+}
+
+/** Numeric policy is shared by single and batch click editing, including lens-only fields. */
+function ClickSettingNumber(props: {
+  field: keyof typeof CLICK_BOUNDS;
+  value: number | null | undefined;
+  label: Parameters<typeof translate>[0];
+  factor: number;
+  unit: '%' | 'px' | 'x' | '';
+  magnify: boolean;
+  onChange(patch: Partial<ReviewClickStyle> | null): void;
+}) {
+  const { field: key, value, label, factor, unit, magnify } = props;
+  const [min, max] = CLICK_BOUNDS[key];
+  const [scrubMin, scrubMax, scrubStep] =
+    key === 'radius' && magnify ? [20, 160, 1] : CLICK_SCRUB[key];
+  return (
+    <ClickNumberRow
+      key={key}
+      appearance="plain"
+      focusAppearance="accent-box"
+      className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
+      label={translate(label)}
+      value={value === null || value === undefined ? null : value * factor}
+      min={min * factor}
+      max={max * factor}
+      step={
+        key === 'magnification'
+          ? 0.1
+          : key === 'stroke'
+            ? 0.5
+            : key === 'x' || key === 'y'
+              ? 0.1
+              : 1
+      }
+      precision={key === 'magnification' || key === 'stroke' || key === 'x' || key === 'y' ? 1 : 0}
+      unit={unit}
+      scrub={{ min: scrubMin * factor, max: scrubMax * factor, step: scrubStep * factor }}
+      onCommitValue={(next) => props.onChange({ [key]: next / factor })}
+    />
   );
 }

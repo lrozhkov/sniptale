@@ -659,7 +659,9 @@ export async function renderRenderWindowFrames(args: {
             layout,
             background: args.background,
             image: args.image,
-            sample,
+            sample: {
+              draw: (target, x, y, width, height) => target.drawImage(raster, x, y, width, height),
+            },
             comments: burned,
             sourceTime: window.sourceTimes[frame] ?? window.segment.sourceStart,
             sceneScale: args.sceneScale ?? 1,

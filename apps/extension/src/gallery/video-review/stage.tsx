@@ -243,6 +243,7 @@ export function ReviewStage(props: ReviewStageProps) {
           clip={overlayClip}
         />
         <ReviewStageContent
+          getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
           props={props}
           geometry={{ size, sceneLayout, zoomLayout, borders, overlayClip }}
           projection={projection}
@@ -266,11 +267,13 @@ export function ReviewStage(props: ReviewStageProps) {
 
 /** Sharp content overlays and interaction targets share one projected plane. */
 function ReviewStageContent({
+  getFrame,
   props,
   geometry,
   projection,
   projected,
 }: {
+  getFrame(): CanvasImageSource | null;
   props: ReviewStageProps;
   geometry: Pick<
     ReturnType<typeof useReviewStageGeometry>,
@@ -300,6 +303,7 @@ function ReviewStageContent({
       ) : null}
       <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
       <ReviewClickOverlay
+        getFrame={getFrame}
         cues={props.clickCues}
         time={props.scene?.focus?.time ?? 0}
         output={size}

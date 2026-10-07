@@ -89,3 +89,25 @@ it('exposes only effective appearance controls and preserves fractional position
     expect(field('clickStroke')).toBeNull();
   }
 });
+
+it('shows lens controls with fractional magnification and no repeated pulses', () => {
+  const change = vi.fn();
+  act(() =>
+    root.render(<ReviewClickFields values={[{ ...click, effect: 'magnify' }]} onChange={change} />)
+  );
+  expect(field('clickMagnification').value).toBe('1.6');
+  expect(field('clickRadius', 'range').max).toBe('160');
+  expect(field('clickPulses')).toBeNull();
+  expect(field('clickLensShadow').value).toBe('20');
+  expect(field('clickStroke')).not.toBeNull();
+  act(() => {
+    field('clickMagnification').focus();
+    input(field('clickMagnification'), '2.3');
+  });
+  act(() =>
+    field('clickMagnification').dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })
+    )
+  );
+  expect(change).toHaveBeenCalledWith({ magnification: 2.3 });
+});

@@ -104,3 +104,53 @@ it('renders press and glow fills, and skips an empty frame without touching the 
   expect(context.createRadialGradient).toHaveBeenCalledOnce();
   expect(gradient.addColorStop).toHaveBeenCalledWith(1, 'transparent');
 });
+
+it.each(['circle', 'rounded'] as const)(
+  'samples original video opaquely inside a %s lens and restores drawing state',
+  (shape) => {
+    const context = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      globalAlpha: 0.3,
+    };
+    const draw = vi.fn(() => expect(context.globalAlpha).toBe(1));
+    const video = { x: 20, y: 60, width: 640, height: 360 };
+    const frame = {
+      effect: 'magnify' as const,
+      point: { x: 0.5, y: 0.5 },
+      radius: 160,
+      stroke: 2,
+      color: '#fff',
+      opacity: 0.8,
+      lens: { scale: 2, shape, shadow: 20 },
+    };
+    drawReviewClicks(
+      context as unknown as CanvasRenderingContext2D,
+      [frame],
+      video,
+      640,
+      { rect: video, radius: 12 },
+      { draw }
+    );
+    expect(draw).toHaveBeenCalledWith(context, -300, -120, 1280, 720);
+    expect(context.rect).toHaveBeenCalledWith(20, 60, 640, 360);
+    expect(context.save.mock.calls.length).toBe(context.restore.mock.calls.length);
+    draw.mockClear();
+    drawReviewClicks(
+      context as unknown as CanvasRenderingContext2D,
+      [{ ...frame, lens: { ...frame.lens, scale: 1 } }],
+      video,
+      640,
+      { rect: video, radius: 0 },
+      { draw }
+    );
+    expect(draw).not.toHaveBeenCalled();
+  }
+);

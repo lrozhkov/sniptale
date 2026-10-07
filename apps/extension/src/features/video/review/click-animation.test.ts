@@ -217,3 +217,49 @@ it.each(['ripple', 'press', 'glow'] as const)(
     expect(evaluateReviewClicks(earlier, 2.2)[0]!.radius).toBeCloseTo(after.radius);
   }
 );
+
+it('roundtrips optional lens parameters without rewriting legacy click styles', () => {
+  expect(parseReviewClickAnimations(animations)).toEqual(animations);
+  expect(parseReviewClickAnimations(animations)![0]).not.toHaveProperty('magnification');
+  const lens = patchReviewClicks([], ['click'], {
+    effect: 'magnify',
+    magnification: 2,
+    lensShape: 'rounded',
+    lensShadow: 30,
+  });
+  expect(parseReviewClickAnimations(lens)).toEqual(lens);
+  for (const patch of [
+    { magnification: NaN },
+    { magnification: 0.5 },
+    { magnification: 4 },
+    { lensShadow: -1 },
+    { lensShadow: 101 },
+    { lensShape: 'triangle' },
+  ])
+    expect(parseReviewClickAnimations([{ ...lens[0], ...patch }])).toBeNull();
+  const content = { ...createQuickEditAdvancedContent(), clickAnimations: lens };
+  expect(loadQuickEditAdvancedContentState(JSON.parse(JSON.stringify(content)))).toEqual(content);
+});
+
+it('magnifies once around the click, returns to identity, and ignores decorative pulse count', () => {
+  const settings = {
+    ...REVIEW_CLICK_DEFAULT,
+    effect: 'magnify' as const,
+    magnification: 2,
+    radius: 80,
+    before: 1,
+    after: 1,
+    pulses: 5,
+  };
+  const cues = [{ settings, point: { x: 0.5, y: 0.5 }, anchor: 2, start: 1, end: 3 }];
+  expect(evaluateReviewClicks(cues, 0.9)).toEqual([]);
+  expect(evaluateReviewClicks(cues, 1)[0]!.lens!.scale).toBe(1);
+  expect(evaluateReviewClicks(cues, 2)[0]).toMatchObject({ radius: 160, lens: { scale: 2 } });
+  expect(evaluateReviewClicks(cues, 2.5)[0]!.lens!.scale).toBeGreaterThan(1);
+  expect(evaluateReviewClicks(cues, 2.999)[0]!.lens!.scale).toBeCloseTo(1, 2);
+  expect(evaluateReviewClicks(cues, 3)).toEqual([]);
+  // A cut bounds the ramp, without extending the effect across the cut.
+  expect(
+    evaluateReviewClicks([{ ...cues[0]!, start: 1.5, end: 2.5 }], 2.4999)[0]!.lens!.scale
+  ).toBeCloseTo(1, 2);
+});
