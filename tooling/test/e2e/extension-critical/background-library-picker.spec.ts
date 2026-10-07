@@ -121,19 +121,53 @@ for (const variant of [
       await expect.soft(card.locator('img')).toHaveCSS('object-fit', 'contain');
       const search = drawer.getByRole('searchbox');
       const searchY = (await search.boundingBox())!.y;
+      const controls = drawer.locator('[data-ui="background.library.controls"]');
+      expect((await controls.boundingBox())!.y).toBeLessThan((await list.boundingBox())!.y);
+      const searchShell = drawer.locator('[data-ui="background.library.search"]');
+      expect(
+        (await controls
+          .getByRole('button', { name: label('settings.editor.backgrounds.filter') })
+          .boundingBox())!.height
+      ).toBe((await searchShell.boundingBox())!.height);
+      const idleWidth = (await searchShell.boundingBox())!.width;
+      await search.focus();
+      await expect
+        .poll(async () => (await searchShell.boundingBox())!.width)
+        .toBeGreaterThan(idleWidth + 30);
+      expect((await searchShell.boundingBox())!.width).toBeLessThan(260);
+      expect(await search.evaluate((el) => getComputedStyle(el, '::placeholder').color)).toBe(
+        'rgba(0, 0, 0, 0)'
+      );
+      await page.screenshot({
+        path: info.outputPath('library-search-focused.png'),
+        fullPage: false,
+      });
       await list.evaluate((node) => {
         node.scrollTop = node.scrollHeight;
       });
       await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
       expect((await search.boundingBox())!.y).toBeCloseTo(searchY, 0);
       await drawer
-        .getByRole('combobox', { name: label('settings.editor.backgrounds.filter') })
-        .selectOption('backgrounds');
+        .getByRole('button', { name: label('settings.editor.backgrounds.filter') })
+        .click();
+      await page.screenshot({ path: info.outputPath('library-filter.png'), fullPage: false });
+      await page.keyboard.press('Escape');
+      await expect(drawer).toBeVisible();
+      await expect(page.getByRole('listbox')).toHaveCount(0);
+      await drawer
+        .getByRole('button', { name: label('settings.editor.backgrounds.filter') })
+        .press('ArrowDown');
+      await page.getByRole('option', { name: 'Backgrounds', exact: true }).click();
       await expect(list.getByRole('button')).toHaveCount(18);
       await search.fill('Background 1.');
       await expect(list.getByRole('button')).toHaveCount(0);
       await expect(drawer.getByText(label('settings.editor.backgrounds.noResults'))).toBeVisible();
-      await drawer.getByRole('combobox').selectOption('');
+      await drawer
+        .getByRole('button', { name: label('settings.editor.backgrounds.filter') })
+        .click();
+      await page
+        .getByRole('option', { name: label('settings.editor.backgrounds.allImages'), exact: true })
+        .click();
       await expect(list.getByRole('button')).toHaveCount(1);
       await search.clear();
       await expect(list.getByRole('button')).toHaveCount(36);

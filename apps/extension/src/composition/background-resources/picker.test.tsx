@@ -79,6 +79,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 async function click(name: string) {
@@ -139,6 +140,7 @@ it('selects from Library, filters search, owns thumbnail URLs and closes the dra
     visible([{ isIntersecting: true }] as IntersectionObserverEntry[], {} as IntersectionObserver)
   );
   expect(document.querySelector('img[src="blob:preview"]')).not.toBeNull();
+  vi.useFakeTimers();
   const search = document.querySelector('input[type=search]')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
@@ -147,11 +149,15 @@ it('selects from Library, filters search, owns thumbnail URLs and closes the dra
     );
     search.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  expect(document.querySelector('button[title="My image.png"]')).not.toBeNull();
+  await act(async () => vi.advanceTimersByTime(250));
   expect(document.querySelector('button[title="My image.png"]')).toBeNull();
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'My');
     search.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await act(async () => vi.advanceTimersByTime(250));
+  expect(io.list).toHaveBeenCalledOnce();
   await click('My image.png');
   expect(select).toHaveBeenCalled();
   expect(document.querySelector('dialog')).toBeNull();
@@ -200,28 +206,23 @@ it('combines image saved filters with search and clears empty results without ch
   ]);
   await act(async () => root.render(<BackgroundImagePicker onSelect={vi.fn()} />));
   await click(translate('settings.editor.backgrounds.library'));
-  const filter = document.querySelector('select')!;
-  expect([...filter.options].map((option) => option.text)).toEqual([
-    translate('settings.editor.backgrounds.allImages'),
-    'Backgrounds',
-    'All backgrounds',
-  ]);
-  await act(async () => {
-    filter.value = 'image';
-    filter.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await click(translate('settings.editor.backgrounds.filter'));
+  expect(
+    [...document.querySelectorAll('[role=option]')].map((option) => option.textContent)
+  ).toEqual([translate('settings.editor.backgrounds.allImages'), 'Backgrounds', 'All backgrounds']);
+  await click('Backgrounds');
   expect(document.querySelector('button[title="Blue.png"]')).not.toBeNull();
   expect(document.querySelector('button[title="Red.png"]')).toBeNull();
+  vi.useFakeTimers();
   const search = document.querySelector('input[type=search]')!;
   await act(async () => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'Red');
     search.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await act(async () => vi.advanceTimersByTime(250));
   expect(document.body.textContent).toContain(translate('settings.editor.backgrounds.noResults'));
-  await act(async () => {
-    filter.value = '';
-    filter.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await click(translate('settings.editor.backgrounds.filter'));
+  await act(async () => document.querySelector<HTMLButtonElement>('[role=option]')!.click());
   expect(document.querySelector('button[title="Red.png"]')).not.toBeNull();
 });
 
@@ -250,4 +251,40 @@ it('keeps loading on the chosen thumbnail through acquisition and parent import'
   await act(async () => root.render(<BackgroundImagePicker onSelect={select} pending={false} />));
   expect(chosen.getAttribute('aria-busy')).toBe('false');
   expect(chosen.querySelector('[role="status"]')).toBeNull();
+});
+
+it('debounces the latest search, commits Enter immediately and cancels pending work on close', async () => {
+  await act(async () => root.render(<BackgroundImagePicker onSelect={vi.fn()} />));
+  await click(translate('settings.editor.backgrounds.library'));
+  vi.useFakeTimers();
+  const search = document.querySelector<HTMLInputElement>('input[type=search]')!;
+  const input = async (value: string) =>
+    act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        search,
+        value
+      );
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  await input('absent');
+  await act(async () => vi.advanceTimersByTime(200));
+  await input('My');
+  await act(async () => vi.advanceTimersByTime(100));
+  expect(document.querySelector('button[title="My image.png"]')).not.toBeNull();
+  await input('absent');
+  await act(async () =>
+    search.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(document.querySelector('button[title="My image.png"]')).toBeNull();
+  await input('My');
+  await act(async () =>
+    search.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true })
+    )
+  );
+  expect(document.querySelector('button[title="My image.png"]')).toBeNull();
+  await click(translate('common.actions.close'));
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(document.querySelector('dialog')).toBeNull();
+  expect(io.list).toHaveBeenCalledOnce();
 });

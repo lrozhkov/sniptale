@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Filter, Search, CornerDownRight, X } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
@@ -102,11 +105,6 @@ export function BackgroundLibraryDrawer(props: {
         ].join(' ')}
       >
         <div className="flex h-full min-h-0 flex-col" data-ui="background.library.drawer">
-          <ProductModalHeader
-            title={title}
-            onClose={props.onClose}
-            closeTitle={translate('common.actions.close')}
-          />
           <BackgroundLibraryContent {...props} />
         </div>
       </ProductModal>
@@ -116,11 +114,15 @@ export function BackgroundLibraryDrawer(props: {
 }
 
 /** Library listing owns its read/search/retry lifecycle independently of modal placement. */
-function BackgroundLibraryContent(props: { onSelect(id: string): void; busy: boolean }) {
+function BackgroundLibraryContent(props: {
+  onSelect(id: string): void;
+  onClose(): void;
+  busy: boolean;
+}) {
   const [items, setItems] = useState<MediaLibraryItem[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [attempt, setAttempt] = useState(0);
-  const [query, setQuery] = useState('');
+  const [appliedQuery, setAppliedQuery] = useState('');
   const [views, setViews] = useState<GallerySavedView[]>([]);
   const [viewId, setViewId] = useState('');
   useEffect(() => {
@@ -152,80 +154,144 @@ function BackgroundLibraryContent(props: { onSelect(id: string): void; busy: boo
   const selected = views.find((view) => view.id === viewId);
   const visibleItems = items.filter(
     (item) =>
-      item.filename.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) &&
+      item.filename.toLocaleLowerCase().includes(appliedQuery.trim().toLocaleLowerCase()) &&
       (!selected || matchesLibraryFilters(item, selected.filters, Date.now()))
   );
   const title = translate('settings.editor.backgrounds.library');
   return (
-    <div className="flex min-h-0 flex-1 p-4">
-      <MaterialBrowser
-        labels={{ list: title, show: title, hide: title }}
-        listClassName="auto-rows-max"
-        search={
-          <div className="flex min-w-0 items-center gap-2">
-            {views.length > 0 && (
-              <select
-                aria-label={translate('settings.editor.backgrounds.filter')}
-                className="h-9 w-44 shrink-0 rounded border px-2 text-xs
-                  border-[var(--sniptale-color-border-subtle)] bg-[var(--sniptale-color-surface-panel)]"
-                value={viewId}
-                onChange={(event) => setViewId(event.target.value)}
-              >
-                <option value="">{translate('settings.editor.backgrounds.allImages')}</option>
-                {views.map((view) => (
-                  <option key={view.id} value={view.id}>
-                    {view.name}
-                  </option>
-                ))}
-              </select>
-            )}
+    <>
+      <BackgroundLibraryHeader
+        views={views}
+        viewId={viewId}
+        onViewChange={setViewId}
+        onQuery={setAppliedQuery}
+        onClose={props.onClose}
+      />
+      <div className="flex min-h-0 flex-1 p-4">
+        <MaterialBrowser
+          labels={{ list: title, show: title, hide: title }}
+          listClassName="auto-rows-max"
+          status={
+            status === 'loading' ? (
+              <p>{translate('settings.editor.backgrounds.loading')}</p>
+            ) : status === 'failed' ? (
+              <button onClick={() => setAttempt((n) => n + 1)}>
+                {translate('settings.editor.backgrounds.retry')}
+              </button>
+            ) : items.length === 0 ? (
+              <p>{translate('settings.editor.backgrounds.empty')}</p>
+            ) : visibleItems.length === 0 ? (
+              <p>{translate('settings.editor.backgrounds.noResults')}</p>
+            ) : undefined
+          }
+        >
+          {visibleItems.map((item) => (
+            <button
+              type="button"
+              key={item.id}
+              disabled={props.busy}
+              title={item.filename}
+              onClick={() => props.onSelect(item.id)}
+              className={[
+                'flex min-h-0 flex-col overflow-hidden rounded border text-left',
+                'border-[var(--sniptale-color-border-subtle)]',
+                'hover:border-[var(--sniptale-color-text-secondary)] disabled:opacity-50',
+              ].join(' ')}
+            >
+              <span className="block h-44 w-full shrink-0 bg-[var(--sniptale-color-surface-canvas)]">
+                <BackgroundLibraryThumbnail mediaId={item.id} fit="contain" />
+              </span>
+              <span className="block w-full shrink-0 truncate p-2 text-xs">{item.filename}</span>
+            </button>
+          ))}
+        </MaterialBrowser>
+      </div>
+    </>
+  );
+}
+
+/** Header owns transient typing; applied filters remain with the listing. */
+function BackgroundLibraryHeader(props: {
+  views: GallerySavedView[];
+  viewId: string;
+  onViewChange(id: string): void;
+  onQuery(query: string): void;
+  onClose(): void;
+}) {
+  const [query, setQuery] = useState('');
+  const { onQuery } = props;
+  useEffect(() => {
+    const timer = setTimeout(() => onQuery(query), 250);
+    return () => clearTimeout(timer);
+  }, [query, onQuery]);
+  return (
+    <ProductModalHeader
+      title={translate('settings.editor.backgrounds.library')}
+      actions={
+        <div className="flex shrink-0 items-center gap-3" data-ui="background.library.controls">
+          <ProductSelect
+            aria-label={translate('settings.editor.backgrounds.filter')}
+            containerClassName="!w-48 shrink-0"
+            style={{
+              minHeight: 32,
+              height: 32,
+              paddingTop: 4,
+              paddingBottom: 4,
+              borderRadius: 6,
+            }}
+            controlSize="sm"
+            value={props.viewId}
+            onChange={props.onViewChange}
+            menuWidth={280}
+            menuClassName="[&_[role=option]:not(:first-child)]:pl-7"
+            options={[
+              {
+                value: '',
+                label: translate('settings.editor.backgrounds.allImages'),
+                icon: <Filter size={16} aria-hidden="true" />,
+              },
+              ...props.views.map((view) => ({
+                value: view.id,
+                label: view.name,
+                icon: <CornerDownRight size={16} aria-hidden="true" />,
+              })),
+            ]}
+          />
+          <div
+            className="flex h-8 w-48 shrink-0 items-center gap-1.5 rounded-[6px] border
+              border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] px-2
+              transition-[width] duration-200 focus-within:w-60 motion-reduce:transition-none"
+            data-ui="background.library.search"
+          >
+            <Search
+              className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]"
+              aria-hidden="true"
+            />
             <input
               type="search"
-              className={[
-                'h-9 min-w-0 flex-1 rounded border bg-transparent px-3 text-xs',
-                'border-[var(--sniptale-color-border-subtle)]',
-              ].join(' ')}
+              className="min-w-0 flex-1 bg-transparent text-sm outline-none
+                  placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent"
               aria-label={translate('settings.editor.backgrounds.search')}
               placeholder={translate('settings.editor.backgrounds.search')}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                  event.preventDefault();
+                  props.onQuery(query);
+                }
+              }}
             />
           </div>
-        }
-        status={
-          status === 'loading' ? (
-            <p>{translate('settings.editor.backgrounds.loading')}</p>
-          ) : status === 'failed' ? (
-            <button onClick={() => setAttempt((n) => n + 1)}>
-              {translate('settings.editor.backgrounds.retry')}
-            </button>
-          ) : items.length === 0 ? (
-            <p>{translate('settings.editor.backgrounds.empty')}</p>
-          ) : visibleItems.length === 0 ? (
-            <p>{translate('settings.editor.backgrounds.noResults')}</p>
-          ) : undefined
-        }
-      >
-        {visibleItems.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            disabled={props.busy}
-            title={item.filename}
-            onClick={() => props.onSelect(item.id)}
-            className={[
-              'flex min-h-0 flex-col overflow-hidden rounded border text-left',
-              'border-[var(--sniptale-color-border-subtle)]',
-              'hover:border-[var(--sniptale-color-text-secondary)] disabled:opacity-50',
-            ].join(' ')}
+          <ContentToolbarButton
+            onClick={props.onClose}
+            aria-label={translate('common.actions.close')}
+            title={translate('common.actions.close')}
           >
-            <span className="block h-44 w-full shrink-0 bg-[var(--sniptale-color-surface-canvas)]">
-              <BackgroundLibraryThumbnail mediaId={item.id} fit="contain" />
-            </span>
-            <span className="block w-full shrink-0 truncate p-2 text-xs">{item.filename}</span>
-          </button>
-        ))}
-      </MaterialBrowser>
-    </div>
+            <X size={14} aria-hidden="true" />
+          </ContentToolbarButton>
+        </div>
+      }
+    />
   );
 }
