@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { translate } from '../../platform/i18n';
 import { QuickEditExportUnavailable } from '../../workflows/video-review/export-lifecycle';
 import { createQuickEditZoomRegion } from '../../features/video/review/advanced/zoom';
 import { ReviewRenderOptions } from './edit-actions';
@@ -227,20 +228,28 @@ it('passes the selected render options through the real export hook', async () =
     await act(async () => fixture.root.render(<fixture.Harness />));
     const selects = fixture.host.querySelectorAll<HTMLButtonElement>('[aria-haspopup="listbox"]');
     expect(selects).toHaveLength(5);
-    for (const [index, option] of [
-      [1, 0],
-      [3, 1],
-      [4, 1],
-    ] as const) {
-      await act(async () => selects[index]!.click());
-      await act(async () =>
-        document.querySelectorAll<HTMLButtonElement>('[role="option"]')[option]!.click()
-      );
+    for (const [label, option] of [
+      [translate('gallery.videoReview.exportCodec'), 'VP9'],
+      [translate('gallery.videoReview.exportFrameRate'), '24'],
+      [
+        translate('gallery.videoReview.exportQuality'),
+        translate('videoEditor.exportDialog.qualityMedium'),
+      ],
+    ]) {
+      const trigger = Array.from(selects).find(
+        (node) => node.getAttribute('aria-label') === label
+      )!;
+      await act(async () => trigger.click());
+      const choice = Array.from(
+        document.querySelectorAll<HTMLButtonElement>('[role="option"]')
+      ).find((node) => node.textContent?.trim() === option)!;
+      await act(async () => choice.click());
     }
     await act(async () => fixture.hook.start());
     expect(mocks.export.mock.calls[0]![0].renderSettings).toEqual({
       codec: 'vp9',
       frameRate: 24,
+      frameRateMode: 'constant',
       quality: 'MEDIUM',
     });
   } finally {

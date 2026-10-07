@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { startHostServer } from '../support/host-server';
@@ -134,6 +134,7 @@ for (const variant of [
       await expect(history).toBeVisible();
       const animated = dialog.locator('button[data-animated="true"]');
       await expect(animated).toHaveCount(6);
+      await verifyClickFields(history, page, info.outputPath('batch-click-fields.png'));
       await dialog
         .getByRole('button', {
           name: label('gallery.videoReview.historyAnimatedOnly'),
@@ -171,7 +172,7 @@ for (const variant of [
         })
       ).toHaveCount(0);
       await expect(dialog.locator('[data-ui="gallery.videoReview.clickAnimation"]')).toBeVisible();
-      await page.screenshot({ path: info.outputPath('click-properties.png'), fullPage: false });
+      await verifyClickFields(properties, page, info.outputPath('click-properties.png'));
       if (variant.locale === 'en' && !variant.narrow)
         await verifyClickExport(page, info.outputPath('click-export.webm'));
 
@@ -295,4 +296,43 @@ async function verifyClickExport(page: Page, path: string) {
   for (let channel = 0; channel < 3; channel++)
     expect(Math.abs(actual[channel]! - expected[channel]!)).toBeLessThan(25);
   await dialog.locator('button[data-animated="true"]').first().click();
+}
+
+/** Open the actual inspector disclosures; closed summaries cannot prove field design. */
+async function verifyClickFields(owner: Locator, page: Page, screenshot: string) {
+  const fields = owner.locator('[data-ui="gallery.videoReview.clickFields"]');
+  for (const disclosure of await fields.locator('details').all()) {
+    if (!(await disclosure.evaluate((node) => (node as HTMLDetailsElement).open)))
+      await disclosure.locator('summary').click();
+  }
+  const rows = fields.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]');
+  await expect(rows).toHaveCount(9);
+  await rows.first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: screenshot, fullPage: false });
+  for (const row of await rows.all()) {
+    const metrics = await row.evaluate((node) => {
+      const css = getComputedStyle(node);
+      const box = node.getBoundingClientRect();
+      const input = node.querySelector('input')!.getBoundingClientRect();
+      return {
+        height: box.height,
+        border: css.borderTopWidth,
+        background: css.backgroundColor,
+        contained: input.left >= box.left && input.right <= box.right,
+      };
+    });
+    expect(metrics).toEqual({
+      height: 36,
+      border: '0px',
+      background: 'rgba(0, 0, 0, 0)',
+      contained: true,
+    });
+  }
+  const last = rows.last().getByRole('textbox');
+  await last.scrollIntoViewIfNeeded();
+  await last.focus();
+  await expect(last).toBeFocused();
+  await expect(last).toBeInViewport();
+  await last.press('Escape');
+  await rows.first().scrollIntoViewIfNeeded();
 }

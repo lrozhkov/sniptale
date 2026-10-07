@@ -33,6 +33,9 @@ export function ReviewClickFields(props: {
     return (
       <NumericRow
         key={key}
+        appearance="plain"
+        focusAppearance="accent-box"
+        className="min-h-8! w-full grid-cols-[minmax(0,1fr)_auto]! py-0!"
         label={translate(label)}
         value={value === null ? null : value * factor}
         min={min * factor}
