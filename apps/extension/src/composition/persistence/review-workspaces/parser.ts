@@ -1,7 +1,7 @@
+import { isDiscardedHeaderChange, replayStoredReviewHistory } from './legacy-header-history';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   ReviewHistoryError,
-  replayReviewHistory,
   reviewAdvancedContentBaseline,
 } from '../../../features/video/review/document';
 import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
@@ -59,9 +59,10 @@ function parseWorkspaceHistory(
   raw: unknown[],
   source: ReviewSource,
   report: Report
-): ReviewOperation[] | null {
+): { history: ReviewOperation[]; discardedHeaderChanges: Set<number> } | null {
   const history: ReviewOperation[] = [];
   const ids = new Set<string>();
+  const discardedHeaderChanges = new Set<number>();
   for (const [index, value] of raw.entries()) {
     const operation = parseReviewOperation(value, source.duration);
     if (!operation || ids.has(operation.id)) {
@@ -73,9 +74,10 @@ function parseWorkspaceHistory(
       return null;
     }
     ids.add(operation.id);
+    if (isDiscardedHeaderChange(value, operation)) discardedHeaderChanges.add(index);
     history.push(operation);
   }
-  return history;
+  return { history, discardedHeaderChanges };
 }
 
 /** Replays current and legacy baselines, returning only a fixed-point workspace state. */
@@ -84,23 +86,28 @@ function parseWorkspaceDocument(args: {
   cursor: number;
   source: ReviewSource;
   rawAdvanced: unknown;
+  discardedHeaderChanges: ReadonlySet<number>;
   report: Report;
-}): { document: ReviewDocument; advanced: QuickEditAdvancedState } | null {
+}): {
+  document: ReviewDocument;
+  advanced: QuickEditAdvancedState;
+  history: ReviewOperation[];
+  cursor: number;
+} | null {
   const currentAdvanced = loadQuickEditAdvancedState(args.rawAdvanced);
   const baseline = currentAdvanced
     ? reviewAdvancedContentBaseline(currentAdvanced)
     : createQuickEditAdvancedContent();
-  let document: ReviewDocument;
+  let replayed: ReturnType<typeof replayStoredReviewHistory>;
   try {
-    replayReviewHistory(args.history, args.history.length, args.source, baseline);
-    document = replayReviewHistory(args.history, args.cursor, args.source, baseline);
+    replayed = replayStoredReviewHistory({ ...args, baseline });
   } catch (error) {
     args.report(replayFailure(error));
     return null;
   }
   let segments;
   try {
-    segments = buildReviewTimeMap(args.source.duration, document.edits);
+    segments = buildReviewTimeMap(args.source.duration, replayed.document.edits);
   } catch {
     args.report({ check: 'timeline', reason: 'invalid' });
     return null;
@@ -113,14 +120,13 @@ function parseWorkspaceDocument(args: {
   if (!currentAdvanced) {
     const migratedBaseline = reviewAdvancedContentBaseline(advanced);
     try {
-      replayReviewHistory(args.history, args.history.length, args.source, migratedBaseline);
-      document = replayReviewHistory(args.history, args.cursor, args.source, migratedBaseline);
+      replayed = replayStoredReviewHistory({ ...args, baseline: migratedBaseline });
     } catch (error) {
       args.report(replayFailure(error));
       return null;
     }
   }
-  return { document, advanced };
+  return { ...replayed, advanced };
 }
 
 /** Rejects corrupt history, including invalid operations in the unapplied redo suffix. */
@@ -146,17 +152,17 @@ function parseWorkspace(value: unknown, report: Report): VideoWorkspace | null {
     report({ check: 'source-metadata', reason: 'invalid' });
     return null;
   }
-  const history = parseWorkspaceHistory(value['history'], source, report);
-  if (!history) return null;
+  const admitted = parseWorkspaceHistory(value['history'], source, report);
+  if (!admitted) return null;
   const parsed = parseWorkspaceDocument({
-    history,
+    ...admitted,
     cursor: value['cursor'],
     source,
     rawAdvanced: value['advanced'],
     report,
   });
   if (!parsed) return null;
-  const { advanced } = parsed;
+  const { advanced, history, cursor } = parsed;
   return {
     aggregateId: value['aggregateId'],
     formatVersion: 1,
@@ -164,14 +170,14 @@ function parseWorkspace(value: unknown, report: Report): VideoWorkspace | null {
     sourceAssetId: value['sourceAssetId'],
     revision: value['revision'],
     history,
-    cursor: value['cursor'],
+    cursor,
     advanced,
     createdAt: value['createdAt'],
     updatedAt: value['updatedAt'],
   };
 }
 
-/** Parses without repairing data, retaining a bounded diagnostic for rejected workspaces. */
+/** Normalizes supported legacy history without writing storage, retaining a bounded diagnostic for rejected workspaces. */
 export function inspectVideoWorkspace(value: unknown) {
   let failure: VideoWorkspaceDiagnostic = { check: 'workspace-envelope', reason: 'invalid' };
   const workspace = parseWorkspace(value, (detail) => {

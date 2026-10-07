@@ -738,3 +738,46 @@ it('preserves a focus drag under Cut through undo, redo and reopen', async () =>
     derive(committed.workspace)
   );
 });
+
+it('recovers legacy header history read-only, then commits and reopens normalized undo/redo', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  const content = createQuickEditAdvancedContent();
+  const legacyHeader = { kind: 'browser', title: 'Old browser', url: 'https://example.test' };
+  const legacy = {
+    ...opened.workspace,
+    advanced: { ...opened.workspace.advanced, windowHeader: legacyHeader },
+    cursor: 1,
+    history: [
+      {
+        id: 'old-header',
+        at: 1,
+        target: 'advancedContent',
+        before: content,
+        after: { ...content, windowHeader: legacyHeader },
+      },
+    ],
+  };
+  rows.get('video_workspaces')!.set(id, structuredClone(legacy));
+  const recovered = await readVideoWorkspace(id);
+  expect(recovered?.workspace.history).toEqual([]);
+  expect(recovered?.workspace.cursor).toBe(0);
+  expect(recovered?.workspace.advanced.windowHeader).toBeUndefined();
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(legacy);
+  expect(await openVideoWorkspace(id, source)).toEqual(recovered);
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(legacy);
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    operation,
+  });
+  expect(committed.workspace.history).toEqual([operation]);
+  const undone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedRevision: committed.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    direction: 'undo',
+  });
+  expect(undone.workspace.cursor).toBe(0);
+  expect((await readVideoWorkspace(id))?.workspace.history).toEqual([operation]);
+});

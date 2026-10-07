@@ -1,3 +1,4 @@
+import { DEFAULT_WINDOW_HEADER } from '../../../features/browser-frame/header';
 import { expect, it } from 'vitest';
 import {
   createQuickEditAdvancedContent,
@@ -81,4 +82,99 @@ it('bounds diagnostic counts and never copies arbitrary values', () => {
     historyLength: 0,
   });
   expect(JSON.stringify(result.failure)).not.toContain('PRIVATE_CONTENT');
+});
+
+it('opens legacy header history at every undo position without losing unrelated content', () => {
+  const content = createQuickEditAdvancedContent();
+  const first = { ...content, windowHeader: { kind: 'browser', title: 'Old tab' } };
+  const renamed = { ...content, windowHeader: { kind: 'browser', title: 'Renamed tab' } };
+  const changed = {
+    ...renamed,
+    audio: { ...content.audio, original: { ...content.audio.original, volume: 0.5 } },
+  };
+  const withoutHeader = { ...content, audio: changed.audio };
+  const history = [
+    { id: 'header-add', at: 1, target: 'advancedContent', before: content, after: first },
+    { id: 'header-title', at: 2, target: 'advancedContent', before: first, after: renamed },
+    { id: 'volume', at: 3, target: 'advancedContent', before: renamed, after: changed },
+    {
+      id: 'header-remove',
+      at: 4,
+      target: 'advancedContent',
+      before: changed,
+      after: withoutHeader,
+    },
+  ];
+  for (let cursor = 0; cursor <= history.length; cursor++) {
+    const raw = { ...workspace(), cursor, history };
+    const original = structuredClone(raw);
+    const result = inspectVideoWorkspace(raw);
+    expect(result.failure).toBeNull();
+    expect(result.workspace?.history.map((op) => op.id)).toEqual(['volume']);
+    expect(result.workspace?.cursor).toBe(cursor >= 3 ? 1 : 0);
+    expect(inspectVideoWorkspace(result.workspace).workspace).toEqual(result.workspace);
+    expect(raw).toEqual(original);
+  }
+});
+
+it('does not hide corrupt before-values or unrelated no-ops behind a discarded header', () => {
+  const content = createQuickEditAdvancedContent();
+  const legacy = { ...content, windowHeader: { kind: 'browser', title: 'Old' } };
+  const operation = {
+    id: 'header',
+    at: 1,
+    target: 'advancedContent',
+    before: content,
+    after: legacy,
+  };
+  const stale = {
+    ...content,
+    audio: { ...content.audio, original: { ...content.audio.original, volume: 0.3 } },
+  };
+  expect(
+    inspectVideoWorkspace({
+      ...workspace(),
+      history: [
+        { ...operation, before: stale, after: { ...stale, windowHeader: legacy.windowHeader } },
+      ],
+    }).failure
+  ).toMatchObject({ check: 'history-replay', reason: 'before-mismatch', operationIndex: 0 });
+  expect(
+    inspectVideoWorkspace({ ...workspace(), history: [{ ...operation, before: legacy }] }).failure
+  ).toMatchObject({ check: 'history-replay', reason: 'no-change' });
+  expect(
+    inspectVideoWorkspace({
+      ...workspace(),
+      history: [operation, { ...operation, id: 'corrupt', before: content, after: content }],
+    }).failure
+  ).toMatchObject({ check: 'history-replay', reason: 'no-change', operationIndex: 1 });
+  expect(
+    inspectVideoWorkspace({ ...workspace(), history: [operation, operation] }).failure
+  ).toMatchObject({ reason: 'duplicate-operation', operationIndex: 1 });
+  expect(
+    inspectVideoWorkspace({
+      ...workspace(),
+      history: [
+        {
+          ...operation,
+          after: { ...legacy, windowHeader: { ...legacy.windowHeader, theme: 'invalid' } },
+        },
+      ],
+    }).failure
+  ).toMatchObject({ check: 'history-operation', operationIndex: 0 });
+});
+
+it('retains current header operations and the baseline header when reopening', () => {
+  const content = createQuickEditAdvancedContent();
+  const after = { ...content, windowHeader: { ...DEFAULT_WINDOW_HEADER, title: 'Current' } };
+  const operation = { id: 'modern', at: 1, target: 'advancedContent', before: content, after };
+  const parsed = inspectVideoWorkspace({ ...workspace(), cursor: 1, history: [operation] });
+  expect(parsed.failure).toBeNull();
+  expect(parsed.workspace?.history).toEqual([operation]);
+  expect(parsed.workspace?.cursor).toBe(1);
+  const baseline = inspectVideoWorkspace({
+    ...workspace(),
+    advanced: { ...workspace().advanced, windowHeader: after.windowHeader },
+  });
+  expect(baseline.workspace?.advanced.windowHeader).toEqual(after.windowHeader);
 });
