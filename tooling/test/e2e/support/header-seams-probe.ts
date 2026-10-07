@@ -3,8 +3,12 @@ import {
   attachImageStyleRenderer,
   attachBrowserHeaderToImage,
 } from '../../../../apps/extension/src/editor/objects/image-frame';
-import { composeWindowHeaderSvg } from '../../../../apps/extension/src/features/browser-frame/appearance';
-import { DEFAULT_EDITOR_IMAGE_SETTINGS } from '../../../../apps/extension/src/features/editor/document/constants';
+import { renderExactBrowserFrameToDataUrl } from '../../../../apps/extension/src/editor/browser-frame/factory/exact/renderer';
+import { windowHeaderGeometry } from '../../../../apps/extension/src/features/browser-frame/header';
+import {
+  DEFAULT_BROWSER_FRAME_STATE,
+  DEFAULT_EDITOR_IMAGE_SETTINGS,
+} from '../../../../apps/extension/src/features/editor/document/constants';
 import { DEFAULT_WINDOW_HEADER } from '../../../../apps/extension/src/features/browser-frame/header';
 import {
   reviewWindowHeaderUrl,
@@ -271,45 +275,69 @@ export function probeHeaderJoinFiltering() {
 
 /** Real Fabric source rendering must filter the joined image without exposing the backdrop. */
 export async function probeImageHeaderJoin() {
-  const source = document.createElement('canvas');
-  source.width = 931;
-  source.height = 601;
-  source.getContext('2d')!.fillRect(0, 0, source.width, source.height);
-  class ProbeImage extends FabricImage {
-    renderPlane(context: CanvasRenderingContext2D) {
-      this._render(context);
-    }
-  }
-  const object = new ProbeImage(source);
-  object.sniptaleType = 'source-image';
-  attachImageStyleRenderer(object, () => ({
-    ...DEFAULT_EDITOR_IMAGE_SETTINGS,
-    radius: 0,
-    strokeWidth: 0,
-  }));
-  const header = new Image();
-  header.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(composeWindowHeaderSvg(DEFAULT_WINDOW_HEADER, source))}`;
-  await header.decode();
-  attachBrowserHeaderToImage(object, header, (86 * 601) / 900);
   const canvas = document.createElement('canvas');
   canvas.width = 1400;
   canvas.height = 1000;
   document.body.append(canvas);
   const context = canvas.getContext('2d', { willReadFrequently: true })!;
-  let minAlpha = 255;
-  for (let frame = 0; frame < 80; frame++) {
-    const scale = 0.7 + frame / 100;
-    context.resetTransform();
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.translate(700.37, 550.23);
-    context.scale(scale, scale);
-    object.renderPlane(context);
-    const y = 550.23 - (601 * scale) / 2;
-    const pixels = context.getImageData(690, Math.floor(y) - 2, 20, 5).data;
-    for (let index = 3; index < pixels.length; index += 4)
-      minAlpha = Math.min(minAlpha, pixels[index]!);
+  class ProbeImage extends FabricImage {
+    renderPlane(context: CanvasRenderingContext2D) {
+      this._render(context);
+    }
   }
-  return { minAlpha, scales: 80 };
+  const results = [];
+  for (const size of [
+    { width: 320, height: 181 },
+    { width: 931, height: 601 },
+    { width: 1280, height: 720 },
+    { width: 1920, height: 1081 },
+  ]) {
+    const source = document.createElement('canvas');
+    source.width = size.width;
+    source.height = size.height;
+    source.getContext('2d')!.fillRect(0, 0, source.width, source.height);
+    const object = new ProbeImage(source);
+    object.sniptaleType = 'source-image';
+    attachImageStyleRenderer(object, () => ({
+      ...DEFAULT_EDITOR_IMAGE_SETTINGS,
+      radius: 0,
+      strokeWidth: 0,
+    }));
+    for (const kind of ['browser', 'application'] as const)
+      for (const style of ['windows', 'macos', 'linux'] as const)
+        for (const theme of ['light', 'dark'] as const) {
+          const settings = { ...DEFAULT_BROWSER_FRAME_STATE, kind, style, theme };
+          const height = windowHeaderGeometry(settings, source).height;
+          const header = new Image();
+          header.src = await renderExactBrowserFrameToDataUrl({
+            browserFrame: settings,
+            width: source.width,
+            sourceHeight: source.height,
+            headerHeight: height,
+            height,
+            radius: 0,
+          });
+          await header.decode();
+          attachBrowserHeaderToImage(object, header, height);
+          let minAlpha = 255;
+          let worst = null;
+          for (const scale of [1, 2, 3, ...Array.from({ length: 80 }, (_, i) => 0.7 + i / 100)]) {
+            context.resetTransform();
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.translate(700.37, 200.23 + (source.height * scale) / 2);
+            context.scale(scale, scale);
+            object.renderPlane(context);
+            const pixels = context.getImageData(690, 198, 20, 5).data;
+            for (let index = 3; index < pixels.length; index += 4)
+              if (pixels[index]! < minAlpha) {
+                minAlpha = pixels[index]!;
+                worst = { scale, alpha: minAlpha };
+              }
+          }
+          results.push({ source: size, kind, style, theme, headerHeight: height, minAlpha, worst });
+        }
+  }
+  return results;
 }
 
 /** Transparent source rows and repeated filter previews retain their original content. */
@@ -352,6 +380,9 @@ export async function probeImageHeaderContent() {
   };
   const rows = render();
   const alpha = [rows[3], rows[7], rows[11]];
+  attachBrowserHeaderToImage(object, header, 86.4);
+  const fractionalRows = render();
+  const fractionalAlpha = [fractionalRows[3], fractionalRows[7], fractionalRows[11]];
   object.filters = [new filters.Brightness({ brightness: 0.2 })];
   object.applyFilters();
   render();
@@ -361,5 +392,11 @@ export async function probeImageHeaderContent() {
   object.applyFilters();
   render();
   const second = context.getImageData(80, 100, 1, 1).data[0]!;
-  return { alpha, first, second, reusedFilterElement: element === object.getElement() };
+  return {
+    alpha,
+    fractionalAlpha,
+    first,
+    second,
+    reusedFilterElement: element === object.getElement(),
+  };
 }

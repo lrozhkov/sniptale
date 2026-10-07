@@ -129,7 +129,7 @@ function renderClippedImageContent(
       ctx.beginPath();
       ctx.rect(-width / 2, -height / 2 - headerHeight, width, height + headerHeight);
       ctx.clip();
-      ctx.drawImage(plane, -width / 2, -height / 2 - headerHeight);
+      ctx.drawImage(plane, -width / 2, -height / 2 - Math.ceil(headerHeight));
       ctx.restore();
     } else {
       if (object.sniptaleBrowserHeader) {
@@ -189,12 +189,12 @@ function getJoinedImagePlane(
   canvas.height = Math.ceil(height + headerHeight);
   const context = canvas.getContext('2d');
   if (!context) return null;
-  context.drawImage(header.image, 0, 0, width, headerHeight);
+  // SVG edges antialias, while the source bitmap edge snaps to a pixel row.
+  // Align their shared boundary to an integer row, retaining the fractional top inset.
+  const join = Math.ceil(headerHeight);
+  context.drawImage(header.image, 0, join - headerHeight, width, headerHeight);
   context.save();
-  context.translate(width / 2, headerHeight + height / 2);
-  // Adjacent edges share fractional pixels: add their premultiplied coverage once.
-  // Source-over would multiply the two edge coverages and expose the background.
-  context.globalCompositeOperation = 'lighter';
+  context.translate(width / 2, join + height / 2);
   object.sniptaleImageBaseRender?.(context);
   context.restore();
   object.sniptaleJoinedPlane = { key, canvas };

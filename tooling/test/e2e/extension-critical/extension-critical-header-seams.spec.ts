@@ -80,7 +80,7 @@ test('image header join stays opaque across fractional zoom', async ({ page }, i
   }, bundle.outputFiles[0]!.text);
   await writeFile(info.outputPath('image-header-join.json'), JSON.stringify(result, null, 2));
   await page.screenshot({ path: info.outputPath('image-header-join.png'), fullPage: false });
-  expect(result.minAlpha).toBe(255);
+  for (const sample of result) expect.soft(sample.minAlpha, JSON.stringify(sample)).toBe(255);
 });
 
 test('image header preserves transparent rows and consecutive filter changes', async ({
@@ -105,6 +105,7 @@ test('image header preserves transparent rows and consecutive filter changes', a
   }, bundle.outputFiles[0]!.text);
   await writeFile(info.outputPath('image-header-content.json'), JSON.stringify(result, null, 2));
   expect.soft(result.alpha).toEqual([0, 128, 255]);
+  expect.soft(result.fractionalAlpha).toEqual([0, 128, 255]);
   expect(result.reusedFilterElement).toBe(true);
   expect(result.second - result.first).toBeGreaterThan(40);
 });
