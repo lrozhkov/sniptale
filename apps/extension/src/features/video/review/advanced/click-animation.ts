@@ -8,6 +8,7 @@ export interface ReviewClickStyle {
   color: string;
   radius: number;
   stroke: number;
+  /** Legacy multiplier retained for history replay; new colors carry their own alpha. */
   opacity: number;
   before: number;
   after: number;
@@ -23,10 +24,10 @@ export interface ReviewClickAnimation extends ReviewClickStyle {
 const REVIEW_CLICK_LIMIT = 10_000;
 export const REVIEW_CLICK_DEFAULT: Readonly<ReviewClickStyle> = {
   effect: 'off',
-  color: '#ffffffff',
+  color: '#ffffffcc',
   radius: 32,
   stroke: 2,
-  opacity: 0.8,
+  opacity: 1,
   before: 0,
   after: 0.6,
   offset: 0,

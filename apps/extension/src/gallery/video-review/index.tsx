@@ -108,6 +108,7 @@ function ReviewInspectorBinding({
   onClose(): void;
 }) {
   const { editing, session, snapshot, composer, video, busy, run } = state;
+  const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
   const leave = (done: () => void) => {
     video.current?.pause();
     void run(async () => {
@@ -156,7 +157,9 @@ function ReviewInspectorBinding({
               state.beforeAction(() => {
                 video.current?.pause();
                 state.seek(marker.start, false);
-                state.setActiveSelection({ kind: 'telemetry', ref: marker.ref });
+                const selection = { kind: 'telemetry' as const, ref: marker.ref };
+                setHistorySelection(selection);
+                state.setActiveSelection(selection);
                 navigation.setSection('selected');
               })
             }
@@ -206,11 +209,15 @@ function ReviewInspectorBinding({
         {...reviewInspectorNoteActions(state, resource)}
       >
         <ReviewSelectionBinding
+          onBackToHistory={
+            state.activeSelection === historySelection
+              ? () => navigation.setSection('history')
+              : undefined
+          }
           state={state}
           resource={resource}
           audio={audio}
           canvasComments={canvasComments}
-          navigation={navigation}
         />
       </ReviewInspector>
     </ReviewIntervalMap.Provider>
@@ -734,17 +741,17 @@ function changeRecordedClicks(
 
 /** Wires selected-object controls to the existing state writers and preview clock. */
 function ReviewSelectionBinding({
+  onBackToHistory,
   state,
   resource,
   audio,
   canvasComments,
-  navigation,
 }: {
   state: InspectorState;
   resource: LoadedReview;
   audio: ReturnType<typeof useReviewAudio>;
   canvasComments: ReturnType<typeof useCanvasComments>;
-  navigation: ReviewInspectorNavigation;
+  onBackToHistory?: (() => void) | undefined;
 }) {
   const video = state.video;
   return (
@@ -759,7 +766,7 @@ function ReviewSelectionBinding({
       zoom={state.zoom}
       busy={state.busy}
       onClickAnimation={(ids, patch) => changeRecordedClicks(state, ids, patch)}
-      onOpenHistory={() => navigation.setSection('history')}
+      {...(onBackToHistory ? { onOpenHistory: onBackToHistory } : {})}
       markers={state.projected.markers}
       onFocus={(region) => focusRecordedAction(state, region)}
       onPreviewFrame={(time) => {

@@ -142,6 +142,31 @@ for (const variant of [
         .click();
       await expect(search).toBeFocused();
       await expect(history.locator('li')).toHaveCount(10);
+      const filterToggle = history.getByRole('button', {
+        name: label('gallery.videoReview.historyFilters'),
+        exact: true,
+      });
+      await filterToggle.click();
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
+        .click();
+      await page
+        .getByRole('option', {
+          name: label('gallery.videoReview.historySelectedOnly'),
+          exact: true,
+        })
+        .click();
+      await expect(history.locator('li')).toHaveCount(0);
+      await expect(filterToggle).toHaveAttribute('data-active', 'true');
+      await expect(search).toBeVisible();
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
+        .click();
+      await page
+        .getByRole('option', { name: label('gallery.videoReview.historyAll'), exact: true })
+        .click();
+      await expect(history.locator('li')).toHaveCount(10);
+      await filterToggle.click();
       await history.locator('li input[type="checkbox"]').first().check();
       const master = history.getByRole('checkbox', {
         name: label('gallery.videoReview.historySelectAll'),
@@ -165,10 +190,11 @@ for (const variant of [
         path: info.outputPath('history-list-selection.png'),
         fullPage: false,
       });
-      const filters = history.locator('details').filter({
-        has: page.getByText(label('gallery.videoReview.historyFilters'), { exact: true }),
+      const filters = history.getByRole('button', {
+        name: label('gallery.videoReview.historyFilters'),
+        exact: true,
       });
-      await filters.locator('summary').click();
+      await filters.click();
       const selectType = async (key: Parameters<typeof translate>[0]) => {
         await history
           .getByRole('button', { name: label('gallery.videoReview.historyType'), exact: true })
@@ -203,7 +229,7 @@ for (const variant of [
       await longer.fill('0');
       await longer.press('Enter');
       await selectType('gallery.videoReview.historyAll');
-      await filters.locator('summary').click();
+      await filters.click();
       await search.fill('Save recording');
       await expect(history.locator('li')).toHaveCount(6);
       await history
@@ -212,11 +238,13 @@ for (const variant of [
       await history
         .getByRole('checkbox', { name: label('gallery.videoReview.historySelectAll'), exact: true })
         .click();
+      const toolbarY = (await search.boundingBox())!.y;
       const listScroll = await history.evaluate((node) => {
-        const scroll = node.closest('.review-inspector-scroll')!;
+        const scroll = node.querySelector('[data-ui="gallery.videoReview.historyResults"]')!;
         scroll.scrollTop = 24;
         return scroll.scrollTop;
       });
+      expect((await search.boundingBox())!.y).toBe(toolbarY);
       await configure.click();
       await history
         .getByRole('button', { name: label('gallery.videoReview.clickEffect'), exact: true })
@@ -256,7 +284,12 @@ for (const variant of [
         .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
         .click();
       await expect
-        .poll(() => history.evaluate((node) => node.closest('.review-inspector-scroll')!.scrollTop))
+        .poll(() =>
+          history.evaluate(
+            (node) =>
+              node.querySelector('[data-ui="gallery.videoReview.historyResults"]')!.scrollTop
+          )
+        )
         .toBe(listScroll);
       await history
         .getByRole('button', { name: label('gallery.videoReview.historyClear'), exact: true })
@@ -271,13 +304,57 @@ for (const variant of [
         })
       ).toHaveCount(0);
       await expect(dialog.locator('[data-ui="gallery.videoReview.clickAnimation"]')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('click-properties-top.png'), fullPage: false });
       await verifyClickFields(properties, page, info.outputPath('click-properties.png'));
       if (variant.locale === 'en' && !variant.narrow)
         await verifyClickExport(page, info.outputPath('click-export.webm'));
 
-      await properties
+      const setTiming = async (key: Parameters<typeof translate>[0], value: string) => {
+        const input = properties.getByRole('textbox', { name: label(key), exact: true });
+        await input.fill(value);
+        await input.press('Enter');
+      };
+      const seek = async (time: number) => {
+        await dialog
+          .locator('video')
+          .first()
+          .evaluate((video: HTMLVideoElement, time) => {
+            video.currentTime = time;
+          }, time);
+      };
+      const overlay = dialog.locator('[data-ui="gallery.videoReview.clickAnimation"]');
+      await setTiming('gallery.videoReview.clickBefore', '400');
+      await setTiming('gallery.videoReview.clickAfter', '1500');
+      await setTiming('gallery.videoReview.clickOffset', '-200');
+      await seek(0.5);
+      await expect(overlay).toBeVisible();
+      await setTiming('gallery.videoReview.clickBefore', '0');
+      await expect(overlay).toHaveCount(0);
+      await seek(2);
+      await expect(overlay).toBeVisible();
+      await setTiming('gallery.videoReview.clickAfter', '600');
+      await expect(overlay).toHaveCount(0);
+      await setTiming('gallery.videoReview.clickOffset', '500');
+      await expect(overlay).toBeVisible();
+      await seek(2.2);
+      await expect(overlay).toHaveCount(0);
+      await expect(
+        properties.getByRole('button', {
+          name: label('gallery.videoReview.historyBack'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await dialog
         .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
         .click();
+      await history.getByRole('searchbox').fill('Save recording');
+      const savedQuery = await history.getByRole('searchbox').inputValue();
+      await history.locator('li button').first().click();
+      await properties
+        .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
+        .click();
+      await expect(history.getByRole('searchbox')).toHaveValue(savedQuery);
+      await expect(history.locator('li')).toHaveCount(6);
       await page.screenshot({ path: info.outputPath('click-history.png'), fullPage: false });
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
@@ -286,6 +363,59 @@ for (const variant of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(page.locator('button[data-animated="true"]')).toHaveCount(6);
+      await seedHistory(page, true, 60);
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+        .click();
+      await history.getByRole('searchbox').fill('Save recording');
+      await expect(history.locator('li')).toHaveCount(50);
+      await history
+        .getByRole('button', { name: label('gallery.videoReview.historyMore'), exact: true })
+        .click();
+      await expect(history.locator('li')).toHaveCount(60);
+      const results = history.locator('[data-ui="gallery.videoReview.historyResults"]');
+      await history.locator('li button').nth(55).scrollIntoViewIfNeeded();
+      const savedScroll = await results.evaluate((node) => node.scrollTop);
+      expect(savedScroll).toBeGreaterThan(0);
+      await history.locator('li button').nth(55).click();
+      await properties
+        .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
+        .click();
+      await expect(history.getByRole('searchbox')).toHaveValue('Save recording');
+      await expect(history.locator('li')).toHaveCount(60);
+      await expect.poll(() => results.evaluate((node) => node.scrollTop)).toBe(savedScroll);
+      await page.screenshot({ path: info.outputPath('history-restored.png'), fullPage: false });
+      if (variant.locale === 'en' && !variant.narrow) {
+        const inspector = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+        const resize = inspector.getByRole('separator');
+        const contentWidth = () =>
+          inspector.evaluate((node) => {
+            const style = getComputedStyle(node);
+            return (
+              node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+            );
+          });
+        for (const width of [523, 524, 525]) {
+          const current = await contentWidth();
+          const handle = (await resize.boundingBox())!;
+          const x = handle.x + handle.width / 2,
+            y = handle.y + handle.height / 2;
+          await page.mouse.move(x, y);
+          await page.mouse.down();
+          await page.mouse.move(x + current - width, y);
+          await page.mouse.up();
+          await expect.poll(contentWidth).toBe(width);
+          await expect(history.getByRole('searchbox')).toBeInViewport();
+          expect((await results.boundingBox())!.height).toBeGreaterThan(50);
+          await page.screenshot({
+            path: info.outputPath(`history-width-${width}.png`),
+            fullPage: false,
+          });
+        }
+      }
     } finally {
       await new Promise<void>((resolve, reject) =>
         server.server.close((error) => (error ? reject(error) : resolve()))
@@ -294,9 +424,9 @@ for (const variant of [
   });
 }
 
-async function seedHistory(page: Page, detailed = false) {
+async function seedHistory(page: Page, detailed = false, clickCount = 6) {
   await page.evaluate(
-    async ({ fixture, detailed }) => {
+    async ({ fixture, detailed, clickCount }) => {
       const db = await new Promise<IDBDatabase>((resolve, reject) => {
         const request = indexedDB.open(fixture.databaseName);
         request.onsuccess = () => resolve(request.result);
@@ -347,7 +477,7 @@ async function seedHistory(page: Page, detailed = false) {
               ]
             : []),
         ],
-        actionEvents: Array.from({ length: 6 }, (_, index) => ({
+        actionEvents: Array.from({ length: clickCount }, (_, index) => ({
           id: `click-${index}`,
           kind: 'CLICK',
           time: 1 + index * 0.01,
@@ -362,7 +492,7 @@ async function seedHistory(page: Page, detailed = false) {
       await done;
       db.close();
     },
-    { fixture: betaV1Fixture, detailed }
+    { fixture: betaV1Fixture, detailed, clickCount }
   );
 }
 
@@ -430,7 +560,12 @@ async function verifyClickFields(owner: Locator, page: Page, screenshot: string)
       await disclosure.locator('summary').click();
   }
   const rows = fields.locator('[data-ui="shared.ui.compact-inspector.numeric-row"]');
-  await expect(rows).toHaveCount(9);
+  const expectedRows = (await fields
+    .getByRole('textbox', { name: /Stroke|Толщина/, exact: false })
+    .count())
+    ? 8
+    : 7;
+  await expect(rows).toHaveCount(expectedRows);
   await rows.first().scrollIntoViewIfNeeded();
   await page.screenshot({ path: screenshot, fullPage: false });
   for (const row of await rows.all()) {
@@ -452,7 +587,7 @@ async function verifyClickFields(owner: Locator, page: Page, screenshot: string)
       contained: true,
     });
   }
-  await expect(fields.locator('input[type="range"]')).toHaveCount(9);
+  await expect(fields.locator('input[type="range"]')).toHaveCount(expectedRows);
   const radiusRow = rows.first();
   const radiusInput = radiusRow.getByRole('textbox');
   const originalRadius = await radiusInput.inputValue();

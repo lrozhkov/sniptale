@@ -35,7 +35,7 @@ function input(node: HTMLInputElement, value: string) {
 it('provides common slider ranges while accepting larger typed values', () => {
   const change = vi.fn();
   act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
-  expect(host.querySelectorAll('input[type="range"]')).toHaveLength(9);
+  expect(host.querySelectorAll('input[type="range"]')).toHaveLength(8);
   const radius = field('clickRadius', 'range');
   expect(radius.min).toBe('2');
   expect(radius.max).toBe('80');
@@ -66,4 +66,26 @@ it('shows slider drafts locally and commits one changed field for mixed selectio
   expect(change).not.toHaveBeenCalled();
   act(() => range.dispatchEvent(new Event('pointerup', { bubbles: true })));
   expect(change).toHaveBeenCalledExactlyOnceWith({ radius: 60 });
+});
+
+it('exposes only effective appearance controls and preserves fractional position input', () => {
+  const change = vi.fn();
+  act(() => root.render(<ReviewClickFields values={[click]} onChange={change} />));
+  expect(field('clickOpacity')).toBeNull();
+  expect(field('clickX', 'range').min).toBe('-10');
+  expect(field('clickX', 'range').max).toBe('10');
+  act(() => input(field('clickX', 'range'), '0.84'));
+  expect(field('clickX').value).toBe('0.8');
+  act(() => {
+    field('clickX').focus();
+    input(field('clickX'), '0.5');
+  });
+  act(() =>
+    field('clickX').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(change).toHaveBeenLastCalledWith({ x: 0.005 });
+  for (const effect of ['press', 'glow'] as const) {
+    act(() => root.render(<ReviewClickFields values={[{ ...click, effect }]} onChange={change} />));
+    expect(field('clickStroke')).toBeNull();
+  }
 });

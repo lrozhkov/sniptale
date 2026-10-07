@@ -6,7 +6,7 @@ import {
 } from '../../features/video/review/advanced/click-animation';
 import { ReviewClickFields } from './click-animation-fields';
 import { reviewTimeLabel } from './controls';
-import { Focus, Gauge, Scissors } from 'lucide-react';
+import { ArrowLeft, Focus, Gauge, Scissors } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { planReviewActionEdits } from '../../features/video/review/action-edits';
@@ -41,14 +41,20 @@ export function ReviewActionProperties(props: {
       {props.onOpenHistory ? (
         <ReviewButton
           className={reviewTextButtonClassName}
-          label={translate('gallery.videoReview.historyOpen')}
+          label={translate('gallery.videoReview.historyBack')}
           onClick={props.onOpenHistory}
-        />
+        >
+          <ArrowLeft size={14} aria-hidden="true" />
+          {translate('gallery.videoReview.historyBack')}
+        </ReviewButton>
       ) : null}
       {isReviewClick(marker) || marker.end <= marker.start ? (
-        <p>
-          {translate('gallery.videoReview.clickRecordedAt')}: {reviewTimeLabel(marker.start)}
-        </p>
+        <div className="flex min-h-8 items-center justify-between gap-2 text-xs tabular-nums">
+          <span className="font-medium text-[var(--sniptale-color-text-secondary)]">
+            {translate('gallery.videoReview.clickRecordedAt')}
+          </span>
+          <span>{reviewTimeLabel(marker.start)}</span>
+        </div>
       ) : (
         <ReviewInterval start={marker.start} end={marker.end} />
       )}

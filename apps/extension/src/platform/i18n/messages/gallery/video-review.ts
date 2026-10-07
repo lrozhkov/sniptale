@@ -3,6 +3,7 @@ import { defineMessageSource } from '../source';
 export const galleryVideoReviewMessages = defineMessageSource({
   clickMilliseconds: { ru: 'мс', en: 'ms' },
   historyFilters: { ru: 'Фильтры', en: 'Filters' },
+  historyFiltersActive: { ru: 'Фильтры применены', en: 'Filters applied' },
   historyType: { ru: 'Тип действия', en: 'Action type' },
   historyLonger: { ru: 'Дольше', en: 'Longer than' },
   historyStatus: { ru: 'Показывать', en: 'Show' },

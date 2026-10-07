@@ -1,3 +1,4 @@
+import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { useEffect, useState } from 'react';
 import {
   ColorField,
@@ -25,8 +26,8 @@ const CLICK_SCRUB = {
   before: [0, 0.5, 0.01],
   after: [0.05, 1.5, 0.01],
   offset: [-0.25, 0.25, 0.01],
-  x: [-0.25, 0.25, 0.01],
-  y: [-0.25, 0.25, 0.01],
+  x: [-0.1, 0.1, 0.001],
+  y: [-0.1, 0.1, 0.001],
   pulses: [1, 5, 1],
 } as const;
 
@@ -59,6 +60,13 @@ export function ReviewClickFields(props: {
       ? first
       : null;
   };
+  // Legacy projects keep their multiplier until the color is explicitly edited.
+  const colors = props.values.map((style) => {
+    const color = normalizePaintColor(style.color)!;
+    const alpha = Math.round(parseInt(color.slice(7, 9), 16) * style.opacity);
+    return `${color.slice(0, 7)}${alpha.toString(16).padStart(2, '0')}`;
+  });
+  const color = colors.every((value) => value === colors[0]) ? colors[0] : undefined;
   const number = (
     key: keyof typeof REVIEW_CLICK_BOUNDS,
     label: Parameters<typeof translate>[0],
@@ -78,8 +86,8 @@ export function ReviewClickFields(props: {
         value={value === null ? null : value * factor}
         min={min * factor}
         max={max * factor}
-        step={key === 'stroke' ? 0.5 : 1}
-        precision={key === 'stroke' ? 1 : 0}
+        step={key === 'stroke' ? 0.5 : key === 'x' || key === 'y' ? 0.1 : 1}
+        precision={key === 'stroke' || key === 'x' || key === 'y' ? 1 : 0}
         unit={unit}
         scrub={{ min: scrubMin * factor, max: scrubMax * factor, step: scrubStep * factor }}
         onCommitValue={(next) => props.onChange({ [key]: next / factor })}
@@ -104,7 +112,7 @@ export function ReviewClickFields(props: {
             preferenceId="click-appearance"
             label={translate('gallery.videoReview.clickAppearance')}
           >
-            {common('color') === null ? (
+            {color === undefined ? (
               <p className="text-xs text-[var(--sniptale-color-text-muted)]">
                 {translate('gallery.videoReview.clickMixed')}
               </p>
@@ -112,12 +120,13 @@ export function ReviewClickFields(props: {
             <ColorField
               label={translate('gallery.videoReview.clickColor')}
               title={translate('gallery.videoReview.clickColor')}
-              value={common('color') ?? '#ffffff'}
-              onChange={(color) => props.onChange({ color })}
+              value={color ?? '#ffffff'}
+              onChange={(color) => props.onChange({ color, opacity: 1 })}
             />
             {number('radius', 'gallery.videoReview.clickRadius', 1, 'px')}
-            {number('stroke', 'gallery.videoReview.clickStroke', 1, 'px')}
-            {number('opacity', 'gallery.videoReview.clickOpacity', 100, '%')}
+            {props.values.some((value) => value.effect === 'ripple')
+              ? number('stroke', 'gallery.videoReview.clickStroke', 1, 'px')
+              : null}
           </ReviewDetails>
           <ReviewDetails
             preferenceId="click-timing"

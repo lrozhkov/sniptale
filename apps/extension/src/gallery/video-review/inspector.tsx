@@ -119,7 +119,13 @@ export function ReviewInspector(props: {
           />
         </div>
       ) : null}
+      <div hidden={shown !== 'history'} className="review-history-host min-h-0 flex-1">
+        <ReviewInspectorPresentation value={presentation} section="history">
+          {props.actionHistory}
+        </ReviewInspectorPresentation>
+      </div>
       <div
+        hidden={shown === 'history'}
         ref={scroll}
         className="review-inspector-scroll min-h-0 flex-1 space-y-3 overflow-y-auto"
       >
@@ -128,9 +134,7 @@ export function ReviewInspector(props: {
           section={shown}
           selectionScope={props.selectionPreferenceScope}
         >
-          {shown === 'history' ? (
-            props.actionHistory
-          ) : shown === 'export' ? (
+          {shown === 'history' ? null : shown === 'export' ? (
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
               {props.actions}
             </section>

@@ -110,3 +110,40 @@
   > input[type='search']:focus-visible {
   outline: none;
 }
+
+/* History owns its bounded list; the inspector retains the mounted view across event navigation. */
+.review-history-host:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+}
+.review-history-root {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  gap: 12px;
+}
+.review-history-toolbar {
+  flex: none;
+}
+.review-history-results,
+.review-history-settings {
+  min-height: 0;
+  overflow-y: auto;
+}
+.review-history-results {
+  flex: 1;
+}
+.review-history-filter-toggle {
+  position: relative;
+}
+.review-history-filter-dot {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--sniptale-color-accent);
+}

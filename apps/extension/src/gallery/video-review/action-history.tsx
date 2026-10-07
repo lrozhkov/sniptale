@@ -14,7 +14,6 @@ import { ReviewClickFields } from './click-animation-fields';
 import { HistorySelection, ReviewHistoryRow } from './action-history-list';
 import {
   ReviewButton,
-  ReviewDetails,
   reviewEventLabel,
   reviewSelectFieldClassName,
   reviewTextButtonClassName,
@@ -39,7 +38,8 @@ export function ReviewActionHistory(props: {
   const [count, setCount] = useState(50);
   const [selected, setSelected] = useState<readonly string[]>([]);
   const [editing, setEditing] = useState(false);
-  const root = useRef<HTMLFieldSetElement>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const list = useRef<HTMLDivElement>(null);
   const navigation = useRef<HTMLDivElement>(null);
   const restoration = useRef<{ top: number; pending: boolean }>({ top: 0, pending: false });
   const settings = useMemo(
@@ -54,7 +54,7 @@ export function ReviewActionHistory(props: {
   );
   const hidden = ids.length - checked;
   const changeView = (next: boolean) => {
-    const scroll = root.current?.closest('.review-inspector-scroll');
+    const scroll = list.current;
     if (next) restoration.current.top = scroll?.scrollTop ?? 0;
     restoration.current.pending = true;
     setEditing(next);
@@ -63,18 +63,17 @@ export function ReviewActionHistory(props: {
     if (!restoration.current.pending) return;
     restoration.current.pending = false;
     navigation.current?.querySelector('button')?.focus({ preventScroll: true });
-    const scroll = root.current?.closest('.review-inspector-scroll');
+    const scroll = list.current;
     if (scroll) scroll.scrollTop = editing ? 0 : restoration.current.top;
   }, [editing]);
   return (
     <fieldset
-      ref={root}
       disabled={props.busy}
-      className="min-w-0 space-y-3"
+      className="review-history-root"
       data-ui="gallery.videoReview.actionHistory"
     >
       {editing ? (
-        <>
+        <div className="review-history-settings space-y-3">
           <div ref={navigation} className="review-history-navigation">
             <ReviewButton
               label={translate('gallery.videoReview.historyBack')}
@@ -95,63 +94,73 @@ export function ReviewActionHistory(props: {
               if (ids.length) props.onChange(ids, patch);
             }}
           />
-        </>
+        </div>
       ) : (
         <>
-          <HistoryFilters
-            markers={props.markers}
-            value={filters}
-            onChange={(patch) => {
-              setFilters((current) => ({ ...current, ...patch }));
-              setCount(50);
-            }}
-          />
-          <HistorySelection
-            count={ids.length}
-            hidden={hidden}
-            matching={matching.size}
-            checked={checked}
-            navigationRef={navigation}
-            onToggle={(value) =>
-              setSelected((current) =>
-                value
-                  ? [...new Set([...current, ...matching])]
-                  : current.filter((id) => !matching.has(id))
-              )
-            }
-            onClear={() => setSelected([])}
-            onConfigure={() => changeView(true)}
-          />
-          {!filtered.length ? (
-            <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
-              {translate('gallery.videoReview.historyEmpty')}
-            </p>
-          ) : null}
-          <ol className="space-y-1">
-            {filtered.slice(0, count).map((marker) => (
-              <ReviewHistoryRow
-                key={`${marker.ref.kind}:${marker.ref.id}`}
-                marker={marker}
-                style={isReviewClick(marker) ? settings.get(marker.ref.id) : undefined}
-                selected={isReviewClick(marker) && ids.includes(marker.ref.id)}
-                onSelect={() => props.onSelect(marker)}
-                onCheck={(value) =>
-                  setSelected((current) =>
-                    value
-                      ? [...new Set([...current, marker.ref.id])]
-                      : current.filter((id) => id !== marker.ref.id)
-                  )
-                }
-              />
-            ))}
-          </ol>
-          {count < filtered.length ? (
-            <ReviewButton
-              className={reviewTextButtonClassName}
-              label={translate('gallery.videoReview.historyMore')}
-              onClick={() => setCount((value) => value + 50)}
+          <div className="review-history-toolbar space-y-2">
+            <HistoryFilters
+              expanded={filtersExpanded}
+              onToggle={() => setFiltersExpanded((value) => !value)}
+              markers={props.markers}
+              value={filters}
+              onChange={(patch) => {
+                setFilters((current) => ({ ...current, ...patch }));
+                setCount(50);
+              }}
             />
-          ) : null}
+            <HistorySelection
+              count={ids.length}
+              hidden={hidden}
+              matching={matching.size}
+              checked={checked}
+              navigationRef={navigation}
+              onToggle={(value) =>
+                setSelected((current) =>
+                  value
+                    ? [...new Set([...current, ...matching])]
+                    : current.filter((id) => !matching.has(id))
+                )
+              }
+              onClear={() => setSelected([])}
+              onConfigure={() => changeView(true)}
+            />
+          </div>
+          <div
+            ref={list}
+            className="review-history-results"
+            data-ui="gallery.videoReview.historyResults"
+          >
+            {!filtered.length ? (
+              <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+                {translate('gallery.videoReview.historyEmpty')}
+              </p>
+            ) : null}
+            <ol className="space-y-1">
+              {filtered.slice(0, count).map((marker) => (
+                <ReviewHistoryRow
+                  key={`${marker.ref.kind}:${marker.ref.id}`}
+                  marker={marker}
+                  style={isReviewClick(marker) ? settings.get(marker.ref.id) : undefined}
+                  selected={isReviewClick(marker) && ids.includes(marker.ref.id)}
+                  onSelect={() => props.onSelect(marker)}
+                  onCheck={(value) =>
+                    setSelected((current) =>
+                      value
+                        ? [...new Set([...current, marker.ref.id])]
+                        : current.filter((id) => id !== marker.ref.id)
+                    )
+                  }
+                />
+              ))}
+            </ol>
+            {count < filtered.length ? (
+              <ReviewButton
+                className={reviewTextButtonClassName}
+                label={translate('gallery.videoReview.historyMore')}
+                onClick={() => setCount((value) => value + 50)}
+              />
+            ) : null}
+          </div>
         </>
       )}
     </fieldset>
@@ -167,51 +176,71 @@ interface HistoryFilterValues {
 
 /** Controlled search/filter presentation; the history owner retains values across settings navigation. */
 function HistoryFilters({
+  expanded,
+  onToggle,
   markers,
   value,
   onChange,
 }: {
   markers: readonly ReviewTelemetryMarker[];
   value: HistoryFilterValues;
+  expanded: boolean;
+  onToggle(): void;
   onChange(patch: Partial<HistoryFilterValues>): void;
 }) {
   const { query, type, status, longer } = value;
   const search = useRef<HTMLInputElement>(null);
+  const active = type !== 'all' || status !== 'all' || longer > 0;
   return (
     <>
-      <div className="review-history-search">
-        <Search size={16} aria-hidden="true" />
-        <input
-          ref={search}
-          type="search"
-          aria-label={translate('gallery.videoReview.historySearch')}
-          placeholder={translate('gallery.videoReview.historySearch')}
-          value={query}
-          onChange={(event) => {
-            onChange({ query: event.target.value });
-          }}
-        />
-        {query ? (
-          <ContentToolbarButton
-            type="button"
-            tone="utility"
-            size="compact"
-            aria-label={translate('gallery.videoReview.historySearchClear')}
-            title={translate('gallery.videoReview.historySearchClear')}
-            onClick={() => {
-              onChange({ query: '' });
-              search.current?.focus();
+      <div className="flex items-center gap-1">
+        <div className="review-history-search min-w-0 flex-1">
+          <Search size={16} aria-hidden="true" />
+          <input
+            ref={search}
+            type="search"
+            aria-label={translate('gallery.videoReview.historySearch')}
+            placeholder={translate('gallery.videoReview.historySearch')}
+            value={query}
+            onChange={(event) => {
+              onChange({ query: event.target.value });
             }}
-          >
-            <X size={14} aria-hidden="true" />
-          </ContentToolbarButton>
-        ) : null}
+          />
+          {query ? (
+            <ContentToolbarButton
+              type="button"
+              tone="utility"
+              size="compact"
+              aria-label={translate('gallery.videoReview.historySearchClear')}
+              title={translate('gallery.videoReview.historySearchClear')}
+              onClick={() => {
+                onChange({ query: '' });
+                search.current?.focus();
+              }}
+            >
+              <X size={14} aria-hidden="true" />
+            </ContentToolbarButton>
+          ) : null}
+        </div>
+        <ContentToolbarButton
+          type="button"
+          tone="utility"
+          size="compact"
+          aria-label={translate('gallery.videoReview.historyFilters')}
+          title={translate('gallery.videoReview.historyFilters')}
+          aria-expanded={expanded}
+          active={active}
+          aria-description={
+            active ? translate('gallery.videoReview.historyFiltersActive') : undefined
+          }
+          className="review-history-filter-toggle"
+          onClick={onToggle}
+        >
+          <SlidersHorizontal size={16} aria-hidden="true" />
+          {active ? <span className="review-history-filter-dot" aria-hidden="true" /> : null}
+        </ContentToolbarButton>
       </div>
-      <ReviewDetails
-        preferenceId="history-filters"
-        label={translate('gallery.videoReview.historyFilters')}
-        icon={SlidersHorizontal}
-      >
+      <div hidden={!expanded} className="review-history-filters space-y-2">
         <SelectField
           className={reviewSelectFieldClassName}
           label={translate('gallery.videoReview.historyType')}
@@ -258,7 +287,7 @@ function HistoryFilters({
             onChange({ status: value });
           }}
         />
-      </ReviewDetails>
+      </div>
     </>
   );
 }

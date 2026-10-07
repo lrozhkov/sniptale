@@ -364,9 +364,11 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await fixture.click('save');
-    expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    expect(fixture.host.querySelector('.review-inspector-list')?.textContent).toContain(
+      'Keep this note visible'
+    );
     await fixture.click('editComment');
-    expect(fixture.host.querySelector('ol li textarea')?.textContent).toBe(
+    expect(fixture.host.querySelector('.review-inspector-list li textarea')?.textContent).toBe(
       'Keep this note visible'
     );
     expect(
@@ -374,14 +376,16 @@ it('keeps a newly saved note selected and visible after leaving another inspecto
     ).toHaveLength(1);
     await fixture.click('discard');
     expect(fixture.host.querySelector('textarea')).toBeNull();
-    expect(fixture.host.querySelector('ol')?.textContent).toContain('Keep this note visible');
+    expect(fixture.host.querySelector('.review-inspector-list')?.textContent).toContain(
+      'Keep this note visible'
+    );
     expect(fixture.host.querySelector('aside [aria-label="gallery.videoReview.undo"]')).toBeNull();
     expect(
       fixture.host.querySelector(
         '[data-ui="gallery.videoReview.toolbar"] [aria-label="gallery.videoReview.undo"]'
       )
     ).not.toBeNull();
-    expect(fixture.host.querySelector('ol li')?.className).toContain(
+    expect(fixture.host.querySelector('.review-inspector-list li')?.className).toContain(
       'border-[var(--sniptale-color-accent)]'
     );
   } finally {

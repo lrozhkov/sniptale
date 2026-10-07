@@ -164,7 +164,7 @@ it('keeps batch edits explicit across filters, mixed fields and event navigation
     change('clickEasing', 'linear');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { easing: 'linear' });
     change('clickColor', '#00ff00');
-    expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { color: '#00ff00' });
+    expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), { color: '#00ff00', opacity: 1 });
     click('clickReset');
     expect(onChange).toHaveBeenLastCalledWith(expect.any(Array), null);
     click('historyBack');
@@ -260,6 +260,39 @@ it('paints only active click cues and removes the live canvas outside their life
   } finally {
     act(() => root.unmount());
     get.mockRestore();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps legacy transparency visible in the color field and removes its multiplier on color edit', async () => {
+  const { ReviewClickFields } = await import('./click-animation-fields');
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const change = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <ReviewClickFields
+          values={[{ ...REVIEW_CLICK_DEFAULT, effect: 'ripple', color: '#ff000080', opacity: 0.5 }]}
+          onChange={change}
+        />
+      )
+    );
+    const color = host.querySelector<HTMLInputElement>(
+      '[aria-label="gallery.videoReview.clickColor"]'
+    )!;
+    expect(color.value).toBe('#ff000040');
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        color,
+        '#00ff0080'
+      );
+      color.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(change).toHaveBeenCalledExactlyOnceWith({ color: '#00ff0080', opacity: 1 });
+  } finally {
+    act(() => root.unmount());
     vi.unstubAllGlobals();
   }
 });

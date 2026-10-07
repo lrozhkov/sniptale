@@ -4,7 +4,6 @@ import { reviewTimelineItemTone } from './controls';
 import { useMemo } from 'react';
 import {
   Activity,
-  Sparkles,
   MousePointer2,
   MousePointerClick,
   Command,
@@ -92,9 +91,8 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               'absolute flex min-w-1.5 items-center justify-center gap-1 overflow-hidden',
               'rounded-sm border text-[10px] transition-colors',
               tone,
-              animated && !selected
-                ? '!bg-[color-mix(in_srgb,var(--sniptale-color-info)_15%,transparent)]'
-                : '',
+              '!text-[var(--sniptale-color-text-secondary)]',
+              animated ? '!bg-[color-mix(in_srgb,var(--sniptale-color-info)_15%,transparent)]' : '',
             ].join(' ')}
             style={{
               left: item.left,
@@ -103,13 +101,6 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
               height: ACTION_MARKER_HEIGHT_PX,
             }}
           >
-            {animated ? (
-              <Sparkles
-                size={10}
-                aria-label={translate('gallery.videoReview.clickAnimation')}
-                className="shrink-0"
-              />
-            ) : null}
             <ReviewTimelineLabel
               icon={<ReviewEventIcon kind={marker.eventType} />}
               name={reviewEventLabel(marker.eventType)}

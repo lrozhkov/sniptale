@@ -167,3 +167,53 @@ it('undo/redo and baseline restore click settings; hidden lane does not disable 
     reasons: ['click-animations'],
   });
 });
+
+it.each(['ripple', 'press', 'glow'] as const)(
+  'applies before, after and offset independently for %s in result time',
+  (effect) => {
+    const map = buildReviewTimeMap(10, [
+      {
+        id: 'speed',
+        kind: 'speed',
+        start: 0,
+        end: 10,
+        requestedStart: 0,
+        requestedEnd: 10,
+        rate: 2,
+        audio: 'speed',
+      },
+    ]);
+    const point = { ...marker, start: 4, end: 4 };
+    const settings = patchReviewClicks([], ['click'], {
+      effect,
+      before: 0.4,
+      after: 0.8,
+      offset: 0.2,
+      x: 0.005,
+      y: -0.008,
+      color: '#00ff0080',
+    });
+    const cues = scheduleReviewClicks([point], settings, map);
+    expect(cues[0]!.anchor).toBeCloseTo(2.2);
+    expect(cues[0]!.start).toBeCloseTo(1.8);
+    expect(cues[0]!.end).toBeCloseTo(3);
+    expect(evaluateReviewClicks(cues, 1.79)).toEqual([]);
+    expect(evaluateReviewClicks(cues, 3.01)).toEqual([]);
+    const before = evaluateReviewClicks(cues, 2)[0]!;
+    const after = evaluateReviewClicks(cues, 2.6)[0]!;
+    expect(before).toMatchObject({
+      effect,
+      color: '#00ff0080',
+      point: { x: 0.20500000000000002, y: 0.392 },
+    });
+    expect(before.opacity).toBeCloseTo(0.5);
+    expect(after.opacity).toBeCloseTo(0.5);
+    const earlier = scheduleReviewClicks(
+      [point],
+      patchReviewClicks(settings, ['click'], { offset: -0.2 }),
+      map
+    );
+    expect(evaluateReviewClicks(earlier, 1.6)[0]!.radius).toBeCloseTo(before.radius);
+    expect(evaluateReviewClicks(earlier, 2.2)[0]!.radius).toBeCloseTo(after.radius);
+  }
+);
