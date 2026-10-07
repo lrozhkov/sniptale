@@ -121,9 +121,6 @@ export function BackgroundImagePicker(props: {
           {translate('settings.editor.backgrounds.library')}
         </button>
       </div>
-      <p className="text-[10px] text-[var(--sniptale-color-text-tertiary)]">
-        {translate('settings.editor.backgrounds.formats')}
-      </p>
       {(failed || catalog.status === 'failed') && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('settings.editor.backgrounds.failed')}

@@ -12,10 +12,18 @@ import {
   getMediaAssetBlob,
 } from '../persistence/media-library';
 import type { MediaLibraryItem } from '../persistence/media-library/contracts';
+import { listGallerySavedViews, type GallerySavedView } from '../persistence/gallery-saved-views';
+import { matchesLibraryFilters } from '../../features/media-hub/library-filters';
 import { translate } from '../../platform/i18n';
 
 /** Each visible thumbnail owns and revokes its disposable Blob URL. */
-export function BackgroundLibraryThumbnail({ mediaId }: { mediaId: string }) {
+export function BackgroundLibraryThumbnail({
+  mediaId,
+  fit = 'cover',
+}: {
+  mediaId: string;
+  fit?: 'cover' | 'contain';
+}) {
   const anchor = useRef<HTMLSpanElement>(null);
   const [url, setUrl] = useState<string>();
   useEffect(() => {
@@ -41,7 +49,13 @@ export function BackgroundLibraryThumbnail({ mediaId }: { mediaId: string }) {
   }, [mediaId]);
   return (
     <span ref={anchor} className="block h-full w-full">
-      {url && <img src={url} alt="" className="h-full w-full object-cover" />}
+      {url && (
+        <img
+          src={url}
+          alt=""
+          className={`h-full w-full ${fit === 'contain' ? 'object-contain' : 'object-cover'}`}
+        />
+      )}
     </span>
   );
 }
@@ -107,16 +121,23 @@ function BackgroundLibraryContent(props: { onSelect(id: string): void; busy: boo
   const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [attempt, setAttempt] = useState(0);
   const [query, setQuery] = useState('');
+  const [views, setViews] = useState<GallerySavedView[]>([]);
+  const [viewId, setViewId] = useState('');
   useEffect(() => {
     let active = true;
     setStatus('loading');
-    void listMediaLibrary()
-      .then((rows) => {
+    void Promise.all([listMediaLibrary(), listGallerySavedViews()])
+      .then(([rows, savedViews]) => {
         if (!active) return;
         setItems(
           rows.filter(
             (item) =>
               ['image', 'screenshot'].includes(item.kind) && item.lifecycle?.trashedAt === undefined
+          )
+        );
+        setViews(
+          savedViews.filter(
+            (view) => view.folderFilter === 'all' || view.folderFilter === 'screenshot'
           )
         );
         setStatus('ready');
@@ -128,23 +149,48 @@ function BackgroundLibraryContent(props: { onSelect(id: string): void; busy: boo
       active = false;
     };
   }, [attempt]);
+  const selected = views.find((view) => view.id === viewId);
+  const visibleItems = items.filter(
+    (item) =>
+      item.filename.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()) &&
+      (!selected || matchesLibraryFilters(item, selected.filters, Date.now()))
+  );
   const title = translate('settings.editor.backgrounds.library');
   return (
     <div className="flex min-h-0 flex-1 p-4">
       <MaterialBrowser
         labels={{ list: title, show: title, hide: title }}
+        listClassName="auto-rows-max"
         search={
-          <input
-            type="search"
-            className={[
-              'w-full rounded border bg-transparent px-3 py-2',
-              'border-[var(--sniptale-color-border-subtle)]',
-            ].join(' ')}
-            aria-label={translate('settings.editor.backgrounds.search')}
-            placeholder={translate('settings.editor.backgrounds.search')}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
+          <div className="flex min-w-0 items-center gap-2">
+            {views.length > 0 && (
+              <select
+                aria-label={translate('settings.editor.backgrounds.filter')}
+                className="h-9 w-44 shrink-0 rounded border px-2 text-xs
+                  border-[var(--sniptale-color-border-subtle)] bg-[var(--sniptale-color-surface-panel)]"
+                value={viewId}
+                onChange={(event) => setViewId(event.target.value)}
+              >
+                <option value="">{translate('settings.editor.backgrounds.allImages')}</option>
+                {views.map((view) => (
+                  <option key={view.id} value={view.id}>
+                    {view.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input
+              type="search"
+              className={[
+                'h-9 min-w-0 flex-1 rounded border bg-transparent px-3 text-xs',
+                'border-[var(--sniptale-color-border-subtle)]',
+              ].join(' ')}
+              aria-label={translate('settings.editor.backgrounds.search')}
+              placeholder={translate('settings.editor.backgrounds.search')}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
         }
         status={
           status === 'loading' ? (
@@ -155,29 +201,30 @@ function BackgroundLibraryContent(props: { onSelect(id: string): void; busy: boo
             </button>
           ) : items.length === 0 ? (
             <p>{translate('settings.editor.backgrounds.empty')}</p>
+          ) : visibleItems.length === 0 ? (
+            <p>{translate('settings.editor.backgrounds.noResults')}</p>
           ) : undefined
         }
       >
-        {items
-          .filter((item) => item.filename.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-          .map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              disabled={props.busy}
-              title={item.filename}
-              onClick={() => props.onSelect(item.id)}
-              className={[
-                'overflow-hidden rounded border border-[var(--sniptale-color-border-subtle)] text-left',
-                'hover:border-[var(--sniptale-color-text-secondary)] disabled:opacity-50',
-              ].join(' ')}
-            >
-              <span className="block h-32">
-                <BackgroundLibraryThumbnail mediaId={item.id} />
-              </span>
-              <span className="block truncate p-2 text-xs">{item.filename}</span>
-            </button>
-          ))}
+        {visibleItems.map((item) => (
+          <button
+            type="button"
+            key={item.id}
+            disabled={props.busy}
+            title={item.filename}
+            onClick={() => props.onSelect(item.id)}
+            className={[
+              'flex min-h-0 flex-col overflow-hidden rounded border text-left',
+              'border-[var(--sniptale-color-border-subtle)]',
+              'hover:border-[var(--sniptale-color-text-secondary)] disabled:opacity-50',
+            ].join(' ')}
+          >
+            <span className="block h-44 w-full shrink-0 bg-[var(--sniptale-color-surface-canvas)]">
+              <BackgroundLibraryThumbnail mediaId={item.id} fit="contain" />
+            </span>
+            <span className="block w-full shrink-0 truncate p-2 text-xs">{item.filename}</span>
+          </button>
+        ))}
       </MaterialBrowser>
     </div>
   );

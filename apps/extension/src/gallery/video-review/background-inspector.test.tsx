@@ -119,7 +119,7 @@ it('offers custom image backgrounds', () => {
   act(() =>
     root.render(<ReviewBackgroundInspector background={{ enabled: false }} onChange={vi.fn()} />)
   );
-  expect(host.querySelector('[aria-label="gallery.videoReview.backgroundImage"]')).not.toBeNull();
+  expect(host.querySelector('[title="gallery.videoReview.backgroundImage"]')).not.toBeNull();
 });
 
 it('opens the image picker and forwards only a selected file', async () => {
@@ -134,9 +134,7 @@ it('opens the image picker and forwards only a selected file', async () => {
     )
   );
   await act(async () =>
-    host
-      .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.backgroundImage"]')!
-      .click()
+    host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.backgroundImage"]')!.click()
   );
   const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
   const open = vi.spyOn(input, 'click').mockImplementation(() => undefined);

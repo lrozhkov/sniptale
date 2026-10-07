@@ -1,4 +1,5 @@
-import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
+import './background-inspector.css';
+import { ColorField, SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ReviewNumberRow } from './number-row';
 import { useState } from 'react';
@@ -10,12 +11,12 @@ import type { QuickEditBackgroundPatch } from '../../features/video/review/advan
 import { serializePaintToCss, createSolidPaint, type Paint } from '@sniptale/foundation/paint';
 import { useGradientPresetCatalog } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
 import { CompactPaintSelector } from '../../ui/paint-selector';
-import { ReviewButton, reviewTextButtonClassName } from './controls';
 
 const kinds = [
   { key: 'none', label: 'gallery.videoReview.backgroundNone' },
   { key: 'solid', label: 'gallery.videoReview.backgroundSolid' },
   { key: 'gradient', label: 'gallery.videoReview.backgroundGradient' },
+  { key: 'image', label: 'gallery.videoReview.backgroundImage' },
 ] as const;
 
 function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
@@ -39,44 +40,25 @@ export function ReviewBackgroundInspector(props: {
   return (
     <div data-ui="gallery.videoReview.backgroundInspector" className="review-inspector-columns">
       <div className="min-w-0 space-y-2">
-        <div
-          className="grid grid-cols-2 gap-1"
-          role="group"
-          data-inspector-choices
-          aria-label={translate('gallery.videoReview.background')}
-        >
-          {kinds.map((kind) => (
-            <ReviewButton
-              key={kind.key}
-              label={translate(kind.label)}
-              aria-pressed={
-                !imageRequested &&
-                (kind.key === 'none'
-                  ? !background.enabled
-                  : background.enabled && background.type === kind.key)
-              }
-              className={reviewTextButtonClassName}
-              onClick={() => {
-                setImageRequested(false);
-                onChange(
-                  kind.key === 'none'
-                    ? { enabled: false }
-                    : {
-                        enabled: true,
-                        type: kind.key,
-                        ...(kind.key === 'solid' ? { color: '#000000ff' } : {}),
-                      }
-                );
-              }}
-            >
-              {translate(kind.label)}
-            </ReviewButton>
-          ))}
-          <ReviewButton
-            label={translate('gallery.videoReview.backgroundImage')}
-            className={reviewTextButtonClassName}
-            aria-pressed={imageRequested || (background.enabled && background.type === 'image')}
-            onClick={() => setImageRequested(true)}
+        <div className="review-background-kinds">
+          <SegmentedRow
+            columns={4}
+            ariaLabel={translate('gallery.videoReview.background')}
+            options={kinds.map((kind) => ({ value: kind.key, label: translate(kind.label) }))}
+            value={imageRequested ? 'image' : background.enabled ? background.type : 'none'}
+            onChange={(kind) => {
+              setImageRequested(kind === 'image');
+              if (kind === 'image') return;
+              onChange(
+                kind === 'none'
+                  ? { enabled: false }
+                  : {
+                      enabled: true,
+                      type: kind,
+                      ...(kind === 'solid' ? { color: '#000000ff' } : {}),
+                    }
+              );
+            }}
           />
         </div>
         {imageRequested || (background.enabled && background.type === 'image') ? (
@@ -109,8 +91,7 @@ export function ReviewBackgroundInspector(props: {
         {!imageRequested && background.enabled && background.type !== 'image' ? (
           <CompactPaintSelector
             triggerVariant="swatch"
-            className="relative w-full min-w-0 [&>button>span>span]:text-xs
-            [&>button>span>span]:font-semibold"
+            className="review-background-paint relative w-full min-w-0"
             label={translate('gallery.videoReview.background')}
             title={translate('gallery.videoReview.background')}
             value={paint}

@@ -4,7 +4,7 @@ import type { QuickEditBackgroundLayout, QuickEditBackgroundSettings } from './t
 
 /** Persisted layout bounds, matching the workspace validation. */
 const MAX_BACKGROUND_SIZE = 4096;
-const DEFAULT_LAYOUT: QuickEditBackgroundLayout = { padding: 40, cornerRadius: 24 };
+const DEFAULT_LAYOUT: QuickEditBackgroundLayout = { padding: 40, cornerRadius: 12 };
 const DEFAULT_COLOR = '#000000ff';
 
 const clampLayout = (layout: QuickEditBackgroundLayout): QuickEditBackgroundLayout => ({

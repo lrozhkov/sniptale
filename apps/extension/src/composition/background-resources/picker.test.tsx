@@ -9,6 +9,7 @@ const io = vi.hoisted(() => ({
   list: vi.fn(),
   thumb: vi.fn(),
   blob: vi.fn(),
+  views: vi.fn(),
 }));
 vi.mock('./catalog', () => ({
   useBackgroundCatalog: () => ({
@@ -33,6 +34,7 @@ vi.mock('../persistence/media-library', () => ({
   getMediaThumbnail: io.thumb,
   getMediaAssetBlob: io.blob,
 }));
+vi.mock('../persistence/gallery-saved-views', () => ({ listGallerySavedViews: io.views }));
 import { BackgroundImagePicker } from './picker';
 import { translate } from '../../platform/i18n';
 let host: HTMLDivElement;
@@ -68,6 +70,7 @@ beforeEach(() => {
   io.library.mockResolvedValue({ file, originMediaId: 'image' });
   io.prepare.mockResolvedValue(file);
   io.thumb.mockResolvedValue({ blob: file });
+  io.views.mockResolvedValue([]);
   io.list.mockResolvedValue([{ id: 'image', kind: 'image', filename: 'My image.png' }]);
   host = document.createElement('div');
   document.body.append(host);
@@ -152,16 +155,70 @@ it('selects from Library, filters search, owns thumbnail URLs and closes the dra
   expect(document.querySelector('dialog')).toBeNull();
   expect(revoke).toHaveBeenCalled();
 });
-it('retries Library reads, shows empty results, and dismisses with native cancel', async () => {
-  io.list.mockRejectedValueOnce(new Error('unavailable')).mockResolvedValue([]);
-  await act(async () =>
-    root.render(<BackgroundImagePicker onSelect={vi.fn()} showPresets={false} />)
-  );
+it.each(['list', 'views'] as const)(
+  'retries failed %s reads, shows empty results, and dismisses with native cancel',
+  async (source) => {
+    io.list.mockResolvedValue([]);
+    io[source].mockRejectedValueOnce(new Error('unavailable'));
+    await act(async () =>
+      root.render(<BackgroundImagePicker onSelect={vi.fn()} showPresets={false} />)
+    );
+    await click(translate('settings.editor.backgrounds.library'));
+    await click(translate('settings.editor.backgrounds.retry'));
+    expect(document.body.textContent).toContain(translate('settings.editor.backgrounds.empty'));
+    await act(async () =>
+      document.querySelector('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
+    );
+    expect(document.querySelector('dialog')).toBeNull();
+  }
+);
+
+it('combines image saved filters with search and clears empty results without changing Library', async () => {
+  const filters = {
+    activeTags: ['background'],
+    scope: 'all',
+    facetFilters: {
+      created: [],
+      updated: [],
+      format: [],
+      size: [],
+      resolution: [],
+      duration: [],
+      source: [],
+    },
+  };
+  io.views.mockResolvedValue([
+    { id: 'image', name: 'Backgrounds', folderFilter: 'screenshot', filters },
+    { id: 'all', name: 'All backgrounds', folderFilter: 'all', filters },
+    { id: 'video', name: 'Video only', folderFilter: 'recording', filters },
+  ]);
+  io.list.mockResolvedValue([
+    { id: 'blue', kind: 'image', filename: 'Blue.png', tags: ['background'] },
+    { id: 'red', kind: 'screenshot', filename: 'Red.png', tags: [] },
+  ]);
+  await act(async () => root.render(<BackgroundImagePicker onSelect={vi.fn()} />));
   await click(translate('settings.editor.backgrounds.library'));
-  await click(translate('settings.editor.backgrounds.retry'));
-  expect(document.body.textContent).toContain(translate('settings.editor.backgrounds.empty'));
-  await act(async () =>
-    document.querySelector('dialog')?.dispatchEvent(new Event('cancel', { cancelable: true }))
-  );
-  expect(document.querySelector('dialog')).toBeNull();
+  const filter = document.querySelector('select')!;
+  expect([...filter.options].map((option) => option.text)).toEqual([
+    translate('settings.editor.backgrounds.allImages'),
+    'Backgrounds',
+    'All backgrounds',
+  ]);
+  await act(async () => {
+    filter.value = 'image';
+    filter.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(document.querySelector('button[title="Blue.png"]')).not.toBeNull();
+  expect(document.querySelector('button[title="Red.png"]')).toBeNull();
+  const search = document.querySelector('input[type=search]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(search, 'Red');
+    search.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(document.body.textContent).toContain(translate('settings.editor.backgrounds.noResults'));
+  await act(async () => {
+    filter.value = '';
+    filter.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(document.querySelector('button[title="Red.png"]')).not.toBeNull();
 });

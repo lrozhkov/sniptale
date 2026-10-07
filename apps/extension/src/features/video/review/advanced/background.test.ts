@@ -27,7 +27,7 @@ describe('updateQuickEditBackground', () => {
         enabled: true,
         type: 'solid',
         color: '#000000ff',
-        layout: { padding: 40, cornerRadius: 24 },
+        layout: { padding: 40, cornerRadius: 12 },
       }
     );
     expect(updateQuickEditBackground(solid, { enabled: false })).toEqual({ enabled: false });
@@ -49,7 +49,7 @@ describe('updateQuickEditBackground', () => {
     expect(fromDisabled.type).toBe('gradient');
     if (fromDisabled.type !== 'gradient') throw new Error('expected gradient');
     expect(fromDisabled.gradient.stops).toHaveLength(2);
-    expect(fromDisabled.layout).toEqual({ padding: 40, cornerRadius: 24 });
+    expect(fromDisabled.layout).toEqual({ padding: 40, cornerRadius: 12 });
     const fromSolid = updateQuickEditBackground(solid, { type: 'gradient' });
     if (!fromSolid.enabled) throw new Error('expected enabled background');
     expect(fromSolid.type).toBe('gradient');

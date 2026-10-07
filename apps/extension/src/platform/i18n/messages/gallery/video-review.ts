@@ -511,7 +511,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   scene: { ru: 'Сцена', en: 'Scene' },
   canvas: { ru: 'Холст', en: 'Canvas' },
   background: { ru: 'Фон', en: 'Background' },
-  backgroundNone: { ru: 'Без фона', en: 'No background' },
+  backgroundNone: { ru: 'Нет', en: 'None' },
   backgroundSolid: { ru: 'Цвет', en: 'Color' },
   backgroundGradient: { ru: 'Градиент', en: 'Gradient' },
   backgroundZoom: { ru: 'Фон при зуме', en: 'Background during zoom' },

@@ -35,8 +35,22 @@ for (const variant of [
       const solid = button('gallery.videoReview.backgroundSolid');
       await solid.click();
       await expect(solid).toHaveAttribute('aria-pressed', 'true');
-      await expect(solid).toHaveCSS('border-top-width', '1px');
+      await expect(solid).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
       await expect(solid).toHaveCSS('box-shadow', 'none');
+      const modes = dialog.locator('.review-background-kinds button');
+      const geometry = await modes.evaluateAll((nodes) =>
+        nodes.map((node) => ({
+          y: node.getBoundingClientRect().y,
+          fits: node.scrollWidth <= node.clientWidth,
+        }))
+      );
+      expect(geometry).toHaveLength(4);
+      expect(geometry.every((value) => value.y === geometry[0]!.y && value.fits)).toBe(true);
+      const paint = dialog.locator('.review-background-paint');
+      await expect(paint.locator('button > svg')).toBeHidden();
+      const fieldBox = (await paint.boundingBox())!;
+      const paintBox = (await paint.locator('button').boundingBox())!;
+      expect(paintBox.x + paintBox.width).toBeCloseTo(fieldBox.x + fieldBox.width, 0);
       await page.screenshot({ path: testInfo.outputPath('solid-selection.png') });
       await button('gallery.videoReview.backgroundGradient').click();
       const presets = dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button');
