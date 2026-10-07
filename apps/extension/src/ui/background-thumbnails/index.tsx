@@ -1,5 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
-import { Ellipsis } from 'lucide-react';
+import { Ellipsis, LoaderCircle } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 
 export interface BackgroundThumbnail {
@@ -8,6 +8,7 @@ export interface BackgroundThumbnail {
   style?: CSSProperties;
   content?: ReactNode;
   active?: boolean;
+  loading?: boolean;
   disabled?: boolean;
 }
 /** Compact ordered choices; the final cell reveals the next thirty items. */
@@ -33,10 +34,12 @@ export function BackgroundThumbnails(props: {
           title={item.name}
           aria-label={item.name}
           aria-pressed={item.active ?? false}
+          aria-busy={item.loading ?? false}
           disabled={props.disabled || item.disabled}
           className={[
-            'h-8 min-w-0 overflow-hidden rounded border border-[var(--sniptale-color-border-subtle)]',
-            'transition-opacity hover:opacity-80 disabled:opacity-40 aria-pressed:outline',
+            'relative h-8 min-w-0 overflow-hidden rounded border border-[var(--sniptale-color-border-subtle)]',
+            'transition-opacity hover:opacity-80 aria-pressed:outline',
+            item.loading ? 'disabled:opacity-100' : 'disabled:opacity-40',
             'aria-pressed:outline-1 aria-pressed:outline-offset-1',
             'aria-pressed:outline-[var(--sniptale-color-text-secondary)] focus-visible:outline',
             'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
@@ -45,6 +48,20 @@ export function BackgroundThumbnails(props: {
           onClick={() => props.onSelect(item.id)}
         >
           {item.content}
+          {item.loading && (
+            <span
+              role="status"
+              aria-label={translate('settings.editor.backgrounds.loading')}
+              className="absolute inset-0 flex items-center justify-center
+                bg-[var(--sniptale-color-surface-panel)]/70 text-[var(--sniptale-color-text-primary)]"
+            >
+              <LoaderCircle
+                size={14}
+                className="animate-spin motion-reduce:animate-none"
+                aria-hidden="true"
+              />
+            </span>
+          )}
         </button>
       ))}
       {count < props.items.length && (

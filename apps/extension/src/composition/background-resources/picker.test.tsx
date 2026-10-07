@@ -115,6 +115,8 @@ it('shows acquisition errors, and aborts pending work on unmount without committ
   await act(async () => root.render(<BackgroundImagePicker onSelect={select} />));
   await click('Built');
   expect(host.querySelector('[role=alert]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Built"]')?.getAttribute('aria-busy')).toBe('false');
+  expect(host.querySelector('[role=status]')).toBeNull();
   let resolve!: (image: { file: File }) => void;
   io.bundled.mockImplementationOnce(
     () =>
@@ -221,4 +223,31 @@ it('combines image saved filters with search and clears empty results without ch
     filter.dispatchEvent(new Event('change', { bubbles: true }));
   });
   expect(document.querySelector('button[title="Red.png"]')).not.toBeNull();
+});
+
+it('keeps loading on the chosen thumbnail through acquisition and parent import', async () => {
+  let resolve!: (image: { file: File }) => void;
+  io.bundled.mockImplementationOnce(
+    () =>
+      new Promise((done) => {
+        resolve = done;
+      })
+  );
+  const select = vi.fn();
+  await act(async () => root.render(<BackgroundImagePicker onSelect={select} />));
+  await click('Built');
+  const chosen = host.querySelector('[aria-label="Built"]')!;
+  expect(chosen.getAttribute('aria-busy')).toBe('true');
+  expect(chosen.querySelector('[role="status"]')).not.toBeNull();
+  await click('Custom');
+  expect(io.library).not.toHaveBeenCalled();
+  await act(async () => {
+    root.render(<BackgroundImagePicker onSelect={select} pending />);
+    resolve({ file: new File(['x'], 'bg.png') });
+  });
+  expect(select).toHaveBeenCalledOnce();
+  expect(chosen.getAttribute('aria-busy')).toBe('true');
+  await act(async () => root.render(<BackgroundImagePicker onSelect={select} pending={false} />));
+  expect(chosen.getAttribute('aria-busy')).toBe('false');
+  expect(chosen.querySelector('[role="status"]')).toBeNull();
 });

@@ -42,7 +42,7 @@ function setInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
-function Harness() {
+function Harness({ pending = false }: { pending?: boolean }) {
   const [advanced, setAdvanced] = useState<QuickEditAdvancedState>(createQuickEditAdvancedState());
   const setBackground = (
     update: (
@@ -78,7 +78,7 @@ function Harness() {
           onOriginalVolume={vi.fn()}
           onLaneVolume={vi.fn()}
           busy={false}
-          pending={false}
+          pending={pending}
           failed={false}
           onImportImage={vi.fn()}
           setBackground={setBackground}
@@ -306,4 +306,10 @@ it('duplicates the selected overlay through the panel binding and selects its in
   expect(state.zoom.regions.find((item) => item.id === selected)?.border).toEqual(
     initial.zoom.regions[0]!.border
   );
+});
+
+it('does not insert a loading paragraph above scene sections during background import', async () => {
+  act(() => root.render(<Harness pending />));
+  await act(async () => button('toggleMode').click());
+  expect(host.textContent).not.toContain('gallery.videoReview.backgroundImporting');
 });

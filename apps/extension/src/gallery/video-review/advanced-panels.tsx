@@ -107,9 +107,6 @@ export function ReviewSceneProperties(props: {
 }) {
   return (
     <fieldset disabled={props.busy} className="min-w-0">
-      {props.pending ? (
-        <p role="status">{translate('gallery.videoReview.backgroundImporting')}</p>
-      ) : null}
       {props.failed ? (
         <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
       ) : null}
@@ -145,6 +142,7 @@ export function ReviewSceneProperties(props: {
             content: (
               <ReviewBackgroundInspector
                 background={props.background}
+                pending={props.pending}
                 onImportImage={props.onImportImage}
                 onChange={(patch) =>
                   props.setBackground((current) => updateQuickEditBackground(current, patch))

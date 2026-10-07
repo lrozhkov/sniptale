@@ -124,6 +124,7 @@ test('all twenty bundled backgrounds decode and SVG raster exports preserve dime
 for (const viewport of [
   { width: 1280, height: 560 },
   { width: 1920, height: 900 },
+  { width: 1100, height: 560 },
 ]) {
   test(`quick editor displays nine backgrounds, reveals the rest and applies a bundled SVG ${viewport.width}`, async ({
     page,
@@ -135,9 +136,14 @@ for (const viewport of [
       await page.setViewportSize(viewport);
       await applyHarnessBootstrap(page, {
         preserveMediaLibrary: true,
-        storage: { 'sniptale-locale-preference': 'en' },
+        storage: {
+          'sniptale-locale-preference': 'en',
+          'sniptale-theme-preference': viewport.width === 1280 ? 'dark' : 'light',
+        },
       });
-      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
+      await page.goto(
+        `${host.origin}${GALLERY_HARNESS_PATH}?theme=${viewport.width === 1280 ? 'dark' : 'light'}`
+      );
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
@@ -156,7 +162,32 @@ for (const viewport of [
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(9);
       await picker.getByRole('button', { name: 'Show 30 more', exact: true }).click();
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(20);
-      await picker.getByRole('button', { name: 'Blue Hour', exact: true }).click();
+      let release!: () => void;
+      const hold = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await page.route('**/backgrounds/*.svg', async (route) => {
+        if (route.request().resourceType() === 'fetch') await hold;
+        const response = await route.fetch();
+        await route.fulfill({ response, contentType: 'image/svg+xml' });
+      });
+      const chosen = picker.getByRole('button', { name: 'Blue Hour', exact: true });
+      await chosen.scrollIntoViewIfNeeded();
+      const beforeLoading = await picker.boundingBox();
+      await chosen.click();
+      await expect(chosen).toHaveAttribute('aria-busy', 'true');
+      await expect(chosen.getByRole('status')).toBeVisible();
+      expect(await picker.boundingBox()).toEqual(beforeLoading);
+      await expect(
+        page.getByText(label('gallery.videoReview.backgroundImporting'), { exact: true })
+      ).toHaveCount(0);
+      await page.screenshot({
+        path: info.outputPath('background-thumbnail-loading.png'),
+        fullPage: false,
+      });
+      release();
+      await expect(chosen).toHaveAttribute('aria-busy', 'false');
+
       await expect(
         page.getByText(label('gallery.videoReview.backgroundImportFailed'), { exact: true })
       ).toHaveCount(0);
@@ -173,7 +204,7 @@ for (const viewport of [
               ).length ?? 0
           )
         )
-        .toBe(1);
+        .toBe(0);
       await page.screenshot({ path: info.outputPath('quick-background-svg.png'), fullPage: false });
       await picker.getByRole('button', { name: 'From Library', exact: true }).click();
       await expect(page.locator('[data-ui="background.library.drawer"]')).toBeVisible();

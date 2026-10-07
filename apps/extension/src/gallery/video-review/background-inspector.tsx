@@ -28,6 +28,7 @@ function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
 
 /** Canvas background owner: kind, paint, and layout belong to the whole frame. */
 export function ReviewBackgroundInspector(props: {
+  pending?: boolean;
   onImportImage?: ((file: File, originMediaId?: string) => void) | undefined;
   background: QuickEditBackgroundSettings;
   onChange(patch: QuickEditBackgroundPatch): void;
@@ -63,6 +64,7 @@ export function ReviewBackgroundInspector(props: {
         </div>
         {imageRequested || (background.enabled && background.type === 'image') ? (
           <BackgroundImagePicker
+            pending={props.pending ?? false}
             onSelect={({ file, originMediaId }) => props.onImportImage?.(file, originMediaId)}
           />
         ) : background.enabled && background.type === 'gradient' ? (

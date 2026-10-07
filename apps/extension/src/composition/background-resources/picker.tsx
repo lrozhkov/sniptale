@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FolderOpen, Library } from 'lucide-react';
+import { FolderOpen, Library, LoaderCircle } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { BackgroundThumbnails } from '../../ui/background-thumbnails';
 import {
@@ -24,12 +24,15 @@ export const backgroundActionClassName = [
 export function BackgroundImagePicker(props: {
   onSelect(image: AcquiredBackground, signal: AbortSignal): Promise<void> | void;
   showPresets?: boolean;
+  pending?: boolean;
 }) {
   const catalog = useBackgroundCatalog();
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const running = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pendingId, setPendingId] = useState<string>();
+  const isBusy = busy || !!props.pending;
   const [failed, setFailed] = useState(false);
   const [library, setLibrary] = useState(false);
   const [selected, setSelected] = useState<string>();
@@ -38,10 +41,11 @@ export function BackgroundImagePicker(props: {
     acquire: (signal: AbortSignal) => Promise<AcquiredBackground>,
     id?: string
   ) => {
-    if (running.current) return;
+    if (running.current || props.pending) return;
     const controller = new AbortController();
     running.current = controller;
     setBusy(true);
+    setPendingId(id);
     setFailed(false);
     try {
       const result = await acquire(controller.signal);
@@ -63,13 +67,14 @@ export function BackgroundImagePicker(props: {
       {props.showPresets !== false && (
         <BackgroundThumbnails
           label={translate('settings.editor.backgrounds.title')}
-          disabled={busy}
+          disabled={isBusy}
           items={catalog.presets
             .filter((item) => item.enabled && item.available)
             .map((item) => ({
               id: item.id,
               name: item.name,
               active: item.id === selected,
+              loading: isBusy && item.id === pendingId,
               content: item.url ? (
                 <img src={item.url} alt="" className="h-full w-full object-cover" />
               ) : item.mediaId ? (
@@ -105,16 +110,24 @@ export function BackgroundImagePicker(props: {
         <button
           type="button"
           className={backgroundActionClassName}
-          disabled={busy}
+          disabled={isBusy}
           onClick={() => input.current?.click()}
         >
-          <FolderOpen size={14} />
+          {isBusy && pendingId === undefined ? (
+            <LoaderCircle
+              size={14}
+              className="animate-spin motion-reduce:animate-none"
+              aria-hidden="true"
+            />
+          ) : (
+            <FolderOpen size={14} />
+          )}
           {translate('settings.editor.backgrounds.upload')}
         </button>
         <button
           type="button"
           className={backgroundActionClassName}
-          disabled={busy}
+          disabled={isBusy}
           onClick={() => setLibrary(true)}
         >
           <Library size={14} />
@@ -129,7 +142,7 @@ export function BackgroundImagePicker(props: {
       {library && (
         <BackgroundLibraryDrawer
           anchor={anchor}
-          busy={busy}
+          busy={isBusy}
           onClose={() => {
             running.current?.abort();
             running.current = null;
