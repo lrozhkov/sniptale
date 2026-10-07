@@ -70,6 +70,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
     en: 'Limit reached: 10,000 configured clicks. Reset unused settings.',
   },
   clickRecordedAt: { ru: 'Время записи', en: 'Recorded time' },
+  clickTarget: { ru: 'Нажатый элемент', en: 'Clicked element' },
   keyboardRegions: { ru: 'Превью → таймлайн → инспектор', en: 'Preview → timeline → inspector' },
   keyboardControls: { ru: 'Перейти между элементами управления', en: 'Move between controls' },
   keyboardActivate: { ru: 'Нажать кнопку с фокусом', en: 'Activate the focused button' },

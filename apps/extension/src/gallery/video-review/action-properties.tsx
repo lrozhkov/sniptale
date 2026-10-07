@@ -57,6 +57,16 @@ export function ReviewActionProperties(props: {
           {translate('gallery.videoReview.historyBack')}
         </ReviewButton>
       ) : null}
+      {isReviewClick(marker) && marker.target ? (
+        <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
+          <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
+            {translate('gallery.videoReview.clickTarget')}
+          </span>
+          <span className="min-w-0 truncate text-right" title={marker.target}>
+            {marker.target}
+          </span>
+        </div>
+      ) : null}
       {isReviewClick(marker) || isReviewKey(marker) || marker.end <= marker.start ? (
         <div className="flex min-h-8 items-center justify-between gap-2 text-xs tabular-nums">
           <span className="font-medium text-[var(--sniptale-color-text-secondary)]">
@@ -87,7 +97,7 @@ export function ReviewActionProperties(props: {
           onChange={(patch) => props.onKeyAnimation?.([marker.ref.id], patch)}
         />
       ) : null}
-      {marker.target ? (
+      {!isReviewClick(marker) && marker.target ? (
         <p className="break-words text-[var(--sniptale-color-text-secondary)]">{marker.target}</p>
       ) : null}
       {!isReviewClick(marker) &&
