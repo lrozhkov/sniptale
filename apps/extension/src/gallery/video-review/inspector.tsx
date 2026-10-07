@@ -334,20 +334,6 @@ function ReviewInspectorHeader(
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
         {props.filename}
       </h2>
-      <ContentToolbarButton
-        type="button"
-        tone="utility"
-        size="compact"
-        title={translate(
-          props.fullHeight
-            ? 'videoEditor.app.panelRestoreHeight'
-            : 'videoEditor.app.panelFullHeight'
-        )}
-        aria-pressed={!!props.fullHeight}
-        onClick={props.onToggleHeight}
-      >
-        {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
-      </ContentToolbarButton>
       {props.section === 'scene' ||
       (props.section === 'selected' && props.selectionHasSections === true) ? (
         <ContentToolbarButton
@@ -369,6 +355,21 @@ function ReviewInspectorHeader(
           )}
         </ContentToolbarButton>
       ) : null}
+
+      <ContentToolbarButton
+        type="button"
+        tone="utility"
+        size="compact"
+        title={translate(
+          props.fullHeight
+            ? 'videoEditor.app.panelRestoreHeight'
+            : 'videoEditor.app.panelFullHeight'
+        )}
+        aria-pressed={!!props.fullHeight}
+        onClick={props.onToggleHeight}
+      >
+        {props.fullHeight ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
+      </ContentToolbarButton>
 
       <ContentToolbarButton
         type="button"

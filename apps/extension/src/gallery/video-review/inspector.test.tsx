@@ -37,6 +37,7 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
   const onEdit = vi.fn();
   const onHover = vi.fn();
   const onDelete = vi.fn();
+  const onToggleHeight = vi.fn();
   const annotation = { id: 'a', text: 'Comment', anchor: { kind: 'point' as const, time: 2 } };
   try {
     act(() =>
@@ -86,6 +87,8 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
           filename="clip.webm"
           annotations={[annotation]}
           selectedId={annotation.id}
+          fullHeight
+          onToggleHeight={onToggleHeight}
           busy={false}
           message={null}
           onBack={vi.fn()}
@@ -100,6 +103,14 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
         </ReviewInspector>
       )
     );
+    const headerActions = host.querySelectorAll<HTMLButtonElement>('header button');
+    const height = headerActions[headerActions.length - 2]!;
+    expect(height.getAttribute('aria-label')).toBe('videoEditor.app.panelRestoreHeight');
+    expect(headerActions[headerActions.length - 1]!.getAttribute('aria-label')).toBe(
+      'common.actions.close'
+    );
+    act(() => height.click());
+    expect(onToggleHeight).toHaveBeenCalledOnce();
     const remove = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.deleteSelected"]'
     )!;
@@ -181,6 +192,17 @@ it('keeps scene navigation independent of selection and resets Basic to notes', 
     expect(host.querySelector('[data-ui="gallery.videoReview.exportFooter"]')).toBeNull();
     expect(host.textContent).toContain('Scene controls');
     expect(host.querySelector('[data-ui="gallery.videoReview.reportActions"]')).toBeNull();
+    const presentation = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.inspectorPresentation"]'
+    )!;
+    const originalLabel = presentation.getAttribute('aria-label');
+    await act(async () => presentation.click());
+    expect(presentation.getAttribute('aria-label')).not.toBe(originalLabel);
+    await act(async () => presentation.click());
+    expect(presentation.getAttribute('aria-label')).toBe(originalLabel);
+    expect(presentation.nextElementSibling?.getAttribute('aria-label')).toBe(
+      'videoEditor.app.panelFullHeight'
+    );
     await act(async () => render(true, 'settings:zoom:z1', 'Zoom'));
     expect(
       host.querySelector('[data-ui="gallery.videoReview.inspectorPresentation"]')
