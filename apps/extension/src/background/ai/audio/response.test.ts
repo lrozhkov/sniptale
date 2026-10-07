@@ -31,6 +31,45 @@ describe('audio response boundary', () => {
   ])('rejects malformed supplied alignment', (value) => {
     expect(parseAudioTranscriptResponse(value, 2)).toBeNull();
   });
+  it('keeps complete text and valid segments when a word has no duration', () => {
+    const segments = [{ text: 'one two', start: 0, end: 1 }];
+    expect(
+      parseAudioTranscriptResponse(
+        {
+          text: 'one two',
+          segments,
+          words: [
+            { word: 'one', start: 0, end: 0.5 },
+            { word: 'two', start: 0.5, end: 0.5 },
+          ],
+        },
+        2
+      )
+    ).toEqual({ text: 'one two', segments });
+    expect(
+      parseAudioTranscriptResponse(
+        {
+          text: 'two',
+          words: [{ word: 'two', start: 2, end: 2 }],
+        },
+        2
+      )
+    ).toEqual({ text: 'two' });
+  });
+  it.each([
+    [{ word: 'a', start: 1, end: 0.5 }],
+    [{ word: 'a', start: 3, end: 3 }],
+    [
+      { word: 'a', start: 1, end: 1 },
+      { word: 'b', start: 0, end: 0.5 },
+    ],
+    [
+      { word: 'a', start: 1, end: 1 },
+      { word: 'b', start: 1, end: Number.NaN },
+    ],
+  ])('still rejects invalid alignment alongside zero duration: %j', (...words) => {
+    expect(parseAudioTranscriptResponse({ text: 'a b', words }, 2)).toBeNull();
+  });
   it('checks WAV duration against the authorized native range', async () => {
     const bytes = new Uint8Array(32044);
     const view = new DataView(bytes.buffer);

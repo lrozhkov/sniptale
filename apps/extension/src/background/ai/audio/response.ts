@@ -16,15 +16,17 @@ function timing(value: unknown, duration: number, word: boolean): AudioTranscrip
     !Number.isFinite(start) ||
     !Number.isFinite(end) ||
     start < -0.02 ||
-    end <= start ||
+    (word ? end < start : end <= start) ||
     end > duration + 0.02
   )
     return null;
   const boundedStart = Math.max(0, start);
   const boundedEnd = Math.min(duration, end);
-  return boundedEnd > boundedStart ? { text, start: boundedStart, end: boundedEnd } : null;
+  return boundedEnd > boundedStart || (word && start === end && start >= 0 && end <= duration)
+    ? { text, start: boundedStart, end: boundedEnd }
+    : null;
 }
-/** Malformed supplied timings fail closed; absent timings are explicit text-only output. */
+/** Invalid timings fail closed; zero-duration words retain text without word alignment. */
 export function parseAudioTranscriptResponse(
   value: unknown,
   duration: number
@@ -48,7 +50,7 @@ export function parseAudioTranscriptResponse(
         return null;
       parsed.push(entry);
     }
-    result[key] = parsed;
+    if (key !== 'words' || parsed.every((entry) => entry.end > entry.start)) result[key] = parsed;
   }
   return result;
 }

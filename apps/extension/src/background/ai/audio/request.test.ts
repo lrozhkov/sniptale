@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { requestAudio } from './request';
-import type { AudioJobStart } from '../../../contracts/ai/audio';
+import { AUDIO_INPUT_MAX_BYTES, type AudioJobStart } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
 
 const scope = {
@@ -40,7 +40,10 @@ const transcriptionConfig: AudioModelConfig = {
   transcription: { responseFormat: 'json', timestampGranularity: 'none' },
 };
 const input = new File(['bytes'], 'audio.wav', { type: 'audio/wav' });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 function run(request = speech, config = speechConfig) {
   return requestAudio({
     request,
@@ -135,13 +138,26 @@ it('includes prompt and optional word granularity only when explicitly configure
       language: 'en',
     },
   });
-  const verbose = fetchMock.mock.calls[0]?.[1]?.body;
-  if (!(verbose instanceof FormData)) throw new Error('Expected multipart');
+  const verboseRequest = fetchMock.mock.calls[0]?.[1];
+  expect(verboseRequest?.body).toBeInstanceOf(ArrayBuffer);
+  const verbose = await new Response(verboseRequest?.body, {
+    headers: new Headers(verboseRequest?.headers),
+  }).formData();
+  const uploaded = verbose.get('file');
+  if (!(uploaded instanceof File)) throw new Error('Expected audio file');
+  expect(uploaded.name).toBe('audio.wav');
+  expect(uploaded.type).toBe('audio/wav');
+  expect(await uploaded.text()).toBe('bytes');
+  expect(verbose.get('model')).toBe('speech');
+  expect(verbose.get('response_format')).toBe('verbose_json');
+  expect(verbose.get('language')).toBe('en');
   expect(verbose.get('prompt')).toBe('Names');
   expect(verbose.get('timestamp_granularities[]')).toBe('word');
   await run(transcription, transcriptionConfig);
-  const plain = fetchMock.mock.calls[1]?.[1]?.body;
-  if (!(plain instanceof FormData)) throw new Error('Expected multipart');
+  const plainRequest = fetchMock.mock.calls[1]?.[1];
+  const plain = await new Response(plainRequest?.body, {
+    headers: new Headers(plainRequest?.headers),
+  }).formData();
   expect(plain.has('prompt')).toBe(false);
   expect(plain.has('timestamp_granularities[]')).toBe(false);
 });
@@ -222,4 +238,50 @@ it('reports a fixed network failure without retrying or exposing the raw excepti
   vi.stubGlobal('fetch', fetchMock);
   await expect(run()).rejects.toThrow(/^network-failed$/);
   expect(fetchMock).toHaveBeenCalledOnce();
+});
+
+it('rejects unreadable staged audio locally before making a paid request', async () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(Response.prototype, 'arrayBuffer').mockRejectedValueOnce(
+    new Error('private local path')
+  );
+  await expect(run(transcription, transcriptionConfig)).rejects.toThrow(/^storage-failed$/);
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('does not start a request when cancelled during multipart preparation', async () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', fetchMock);
+  const controller = new AbortController();
+  vi.spyOn(input, 'stream').mockImplementation(
+    () =>
+      new ReadableStream({
+        start(stream) {
+          controller.abort();
+          stream.enqueue(new TextEncoder().encode('bytes'));
+          stream.close();
+        },
+      })
+  );
+  await expect(
+    requestAudio({
+      request: transcription,
+      config: transcriptionConfig,
+      input,
+      signal: controller.signal,
+      onReceiving() {},
+    })
+  ).rejects.toThrow();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it('rejects an oversized input before reading it or making a request', async () => {
+  const fetchMock = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', fetchMock);
+  vi.spyOn(input, 'size', 'get').mockReturnValue(AUDIO_INPUT_MAX_BYTES + 1);
+  const read = vi.spyOn(input, 'stream');
+  await expect(run(transcription, transcriptionConfig)).rejects.toThrow(/^too-large$/);
+  expect(read).not.toHaveBeenCalled();
+  expect(fetchMock).not.toHaveBeenCalled();
 });

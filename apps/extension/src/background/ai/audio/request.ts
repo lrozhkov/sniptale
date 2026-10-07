@@ -1,4 +1,8 @@
-import { AUDIO_OUTPUT_MAX_BYTES, type AudioJobStart } from '../../../contracts/ai/audio';
+import {
+  AUDIO_INPUT_MAX_BYTES,
+  AUDIO_OUTPUT_MAX_BYTES,
+  type AudioJobStart,
+} from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
 import { parseAudioTranscriptResponse } from './response';
 
@@ -51,9 +55,14 @@ async function readBounded(
   return result;
 }
 
-function encodeTranscription(args: AudioRequest): FormData {
+async function encodeTranscription(
+  args: AudioRequest,
+  headers: Record<string, string>
+): Promise<ArrayBuffer> {
   const params = args.config.transcription;
   if (!args.input || !params) throw new Error('invalid-request');
+  if (args.input.size > AUDIO_INPUT_MAX_BYTES) throw new Error('too-large');
+  args.signal.throwIfAborted();
   const form = new FormData();
   form.set('file', args.input);
   form.set('model', args.config.modelCode);
@@ -62,7 +71,18 @@ function encodeTranscription(args: AudioRequest): FormData {
   if (params.prompt) form.set('prompt', params.prompt);
   if (params.timestampGranularity !== 'none')
     form.append('timestamp_granularities[]', params.timestampGranularity);
-  return form;
+  // Materialize the upload before fetch so network I/O never reads a live OPFS file.
+  // Response owns multipart encoding and the matching boundary; no headers are guessed.
+  const encoded = new Response(form);
+  const body = await encoded.arrayBuffer().catch(() => {
+    args.signal.throwIfAborted();
+    throw new Error('storage-failed');
+  });
+  args.signal.throwIfAborted();
+  const contentType = encoded.headers.get('Content-Type');
+  if (!contentType) throw new Error('invalid-request');
+  headers['Content-Type'] = contentType;
+  return body;
 }
 
 function encodeSpeech(args: AudioRequest): string {
@@ -128,7 +148,9 @@ async function decodeResponse(response: Response, args: AudioRequest) {
 export async function requestAudio(args: AudioRequest) {
   const headers: Record<string, string> = { Authorization: `Bearer ${args.config.apiKey}` };
   const body =
-    args.request.operation === 'transcription' ? encodeTranscription(args) : encodeSpeech(args);
+    args.request.operation === 'transcription'
+      ? await encodeTranscription(args, headers)
+      : encodeSpeech(args);
   if (args.request.operation === 'speech') headers['Content-Type'] = 'application/json';
   args.signal.throwIfAborted();
   const response = await fetch(args.config.url, {

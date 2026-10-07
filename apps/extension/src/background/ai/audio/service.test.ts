@@ -244,7 +244,7 @@ it('authorizes replayed trimmed native spans and excludes cut material', async (
   ).resolves.toBeUndefined();
 });
 
-it('sends browser multipart with no manual boundary and returns validated chunk-relative timings', async () => {
+it('sends prepared browser multipart and returns validated chunk-relative timings', async () => {
   const fetchMock = vi.fn<typeof fetch>(
     async () =>
       new Response(
@@ -278,11 +278,10 @@ it('sends browser multipart with no manual boundary and returns validated chunk-
     result: { text: 'hello', words: [{ text: 'hello', start: 0, end: 1 }] },
   });
   const init = fetchMock.mock.calls[0]?.[1];
-  expect(init?.headers).not.toHaveProperty('Content-Type');
-  expect(init?.body).toBeInstanceOf(FormData);
-  if (!(init?.body instanceof FormData)) throw new Error('Expected multipart body');
-  expect(init.body.get('timestamp_granularities[]')).toBe('word');
-  expect(init.body.get('file')).toBeInstanceOf(File);
+  expect(init?.body).toBeInstanceOf(ArrayBuffer);
+  const form = await new Response(init?.body, { headers: new Headers(init?.headers) }).formData();
+  expect(form.get('timestamp_granularities[]')).toBe('word');
+  expect(form.get('file')).toBeInstanceOf(File);
 });
 
 it('returns bounded binary speech and honours an abort while reading its response', async () => {
