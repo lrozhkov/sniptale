@@ -100,3 +100,23 @@ it('cancels after staging without attaching or publishing', async () => {
   expect(attach).not.toHaveBeenCalled();
   expect(asset.cancel).toHaveBeenCalledOnce();
 });
+
+it('freezes a Library background privately with provenance and never publishes another card', async () => {
+  const input = file();
+  await importReviewBackgroundImage({
+    file: input,
+    originMediaId: 'library-image',
+    signal: new AbortController().signal,
+    attach: vi.fn(),
+  });
+  expect(asset.prepare).toHaveBeenCalledWith(
+    input,
+    input.type,
+    input.name,
+    undefined,
+    undefined,
+    undefined,
+    { publishToLibrary: false, originMediaId: 'library-image' }
+  );
+  expect(asset.changed).not.toHaveBeenCalled();
+});

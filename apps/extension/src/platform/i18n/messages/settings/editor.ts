@@ -1,6 +1,33 @@
 import { defineMessageSource } from '../source';
 
 export const settingsEditorMessages = defineMessageSource({
+  backgrounds: {
+    title: { en: 'Backgrounds', ru: 'Фон' },
+    add: { en: 'Add background', ru: 'Добавить фон' },
+    upload: { en: 'From computer', ru: 'С компьютера' },
+    library: { en: 'From Library', ru: 'Из библиотеки' },
+    showMore: { en: 'Show 30 more', ru: 'Показать ещё 30' },
+    unavailable: { en: 'Image unavailable', ru: 'Изображение недоступно' },
+    failed: {
+      en: 'Could not load or save the background. Try again.',
+      ru: 'Не удалось загрузить или сохранить фон. Попробуйте ещё раз.',
+    },
+    formats: {
+      en: 'PNG, JPEG, WebP, SVG, AVIF, GIF, BMP, ICO · up to 16 MB',
+      ru: 'PNG, JPEG, WebP, SVG, AVIF, GIF, BMP, ICO · до 16 МБ',
+    },
+    libraryNote: {
+      en: 'Custom backgrounds are saved in Library. Removing a preset keeps the image in Library.',
+      ru: 'Ваши фоны сохраняются в библиотеке. Удаление из списка фонов не удаляет само изображение.',
+    },
+    name: { en: 'Background name', ru: 'Название фона' },
+    rename: { en: 'Rename background', ru: 'Переименовать фон' },
+    empty: { en: 'No images in Library', ru: 'В библиотеке пока нет изображений' },
+    search: { en: 'Find an image', ru: 'Найти изображение' },
+    select: { en: 'Use background', ru: 'Выбрать фон' },
+    loading: { en: 'Loading images…', ru: 'Загрузка изображений…' },
+    retry: { en: 'Retry', ru: 'Повторить' },
+  },
   subtitle: {
     ru: 'Шаблоны инструментов и палитры редактора изображений и рисования на странице.',
     en: 'Tool presets and palettes for the image editor and page drawing.',

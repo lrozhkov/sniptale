@@ -779,8 +779,8 @@ function ReviewScenePropertiesBinding({
       busy={busy || editing.exporter.phase !== 'idle'}
       pending={state.backgroundImport.pending}
       failed={state.backgroundImport.failed}
-      onImportImage={(file) =>
-        state.beforeAction(() => void state.backgroundImport.importImage(file))
+      onImportImage={(file, originMediaId) =>
+        state.beforeAction(() => void state.backgroundImport.importImage(file, originMediaId))
       }
       setBackground={state.setBackground}
     />

@@ -565,3 +565,34 @@ it('imports a background image in one project update without adding a timeline c
   expect(params.addAssetClip).not.toHaveBeenCalled();
   expect(params.upsertAsset).not.toHaveBeenCalled();
 });
+
+it('freezes the current Library background instead of reusing an older project presentation', async () => {
+  const params = createParams();
+  const project = params.getCurrentProject()!;
+  const asset = { ...(await importProjectAssetMock()), type: VideoProjectAssetType.IMAGE };
+  project.assets.push({
+    ...asset,
+    id: 'old-frozen-background',
+    source: { kind: 'project-asset', projectAssetId: 'old', originMediaId: 'library-image' },
+  });
+  importProjectAssetMock.mockResolvedValue(asset);
+  importProjectAssetMock.mockClear();
+  const file = new File(['new-presentation'], 'background.png', { type: 'image/png' });
+  renderHook(params);
+  await act(async () =>
+    latestHandlers!.handleImportImage(file, {
+      destination: 'background',
+      backgroundOriginMediaId: 'library-image',
+    })
+  );
+  expect(importProjectAssetMock).toHaveBeenCalledWith(file, VideoProjectAssetType.IMAGE, {
+    publishToLibrary: false,
+    originMediaId: 'library-image',
+  });
+  expect(ensureLibraryMediaAssets).not.toHaveBeenCalled();
+  const next = vi.mocked(params.updateProject).mock.calls[0]![0](project);
+  expect(next.assets.find((item) => item.id === asset.id)?.source).toMatchObject({
+    originMediaId: 'library-image',
+  });
+  expect(next.sceneBackground).toEqual({ kind: 'image', assetId: asset.id });
+});

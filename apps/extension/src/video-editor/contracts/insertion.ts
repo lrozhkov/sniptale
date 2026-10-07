@@ -1,5 +1,7 @@
 export interface VideoEditorImportPlacement {
   destination?: 'materials' | 'timeline' | 'background';
+  /** Original Library identity when freezing a selected background presentation. */
+  backgroundOriginMediaId?: string;
   startTime?: number;
   timelineLaneId?: string | null;
   trackId?: string | null;

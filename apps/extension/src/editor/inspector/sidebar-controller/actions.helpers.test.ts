@@ -10,9 +10,11 @@ vi.mock('../../document/file-actions/file-reader', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../document/file-actions/file-reader')>()),
   readFileAsDataUrl: fileMocks.readDataUrl,
 }));
-vi.mock('../../document/file-actions/raster-intake', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../document/file-actions/raster-intake')>()),
-  assertEditorRasterImageFileCanBeRead: fileMocks.assertReadable,
+vi.mock('../../../workflows/background-images/intake', () => ({
+  prepareBackgroundImage: async (file: File) => {
+    fileMocks.assertReadable(file);
+    return file;
+  },
 }));
 
 import { buildSidebarBackgroundActions } from './background';

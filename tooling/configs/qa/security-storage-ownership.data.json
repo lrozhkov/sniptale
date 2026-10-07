@@ -281,6 +281,20 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/background-presets/catalog.ts",
+      "owner": "background-presets",
+      "justification": "User-requested local background catalog metadata: bounded names and Library identities, enabled state and ordering.",
+      "reviewNote": "No media bytes, remote URLs or credentials. Explicit user additions; retained until removal or local-data erasure even with preferences preserved. Excluded from sync, diagnostics and settings transfer. Library images and project snapshots retain their existing independent lifecycle.",
+      "storageWrites": [
+        {
+          "sink": "deps.storage.local.set",
+          "keys": [
+            "BACKGROUND_PRESETS_KEY"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [

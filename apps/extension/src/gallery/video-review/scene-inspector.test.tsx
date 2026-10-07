@@ -133,6 +133,9 @@ it('edits browser title and address independently and bounds Unicode text safely
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, value);
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    await act(async () => {
+      field.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    });
   };
   try {
     await act(async () => root.render(<Harness />));

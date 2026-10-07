@@ -44,7 +44,8 @@
     "apps/extension/src/background/storage/llm",
     "apps/extension/src/background/storage/page-access",
     "apps/extension/src/background/storage/scenario",
-    "apps/extension/src/background/storage/video"
+    "apps/extension/src/background/storage/video",
+    "apps/extension/src/composition/persistence/background-presets"
   ],
   "forbiddenOwnerEdges": [
     [

@@ -80,7 +80,15 @@ async function importProjectAssetFile(
 
   if (placement?.destination === 'background' && assetType !== VideoProjectAssetType.IMAGE) return;
   const targetProjectId = project.id;
-  const asset = await importProjectAsset(file, assetType);
+  const originMediaId =
+    placement?.destination === 'background' && assetType === VideoProjectAssetType.IMAGE
+      ? placement.backgroundOriginMediaId
+      : undefined;
+  const asset = originMediaId
+    ? await importProjectAsset(file, assetType, { publishToLibrary: false, originMediaId })
+    : await importProjectAsset(file, assetType);
+  if (originMediaId && asset.source.kind === 'project-asset')
+    asset.source.originMediaId = originMediaId;
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     return;
   }

@@ -82,6 +82,49 @@ it('saves scenario Library image edits without replacing the stored source', asy
   expect(puts.media).toHaveBeenCalledTimes(2);
 });
 
+it('saves a published project background image without replacing its source identity', async () => {
+  const media = {
+    ...root(0),
+    id: 'project-asset:background',
+    blob: undefined,
+    source: { kind: 'project-asset' as const, projectAssetId: 'background' },
+  };
+  const puts = installTransaction({ media });
+  const document = createEditorDocumentFixture();
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document,
+      expectedRevision: 0,
+      requireExistingRoot: true,
+    })
+  ).resolves.toMatchObject({ revision: 1 });
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document,
+      expectedRevision: 1,
+      requireExistingRoot: true,
+    })
+  ).resolves.toMatchObject({ revision: 2 });
+  expect(puts.media).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      id: media.id,
+      source: media.source,
+      workspaceRevision: 2,
+    })
+  );
+  await expect(
+    commitImageWorkspace({
+      aggregateId: media.id,
+      document,
+      expectedRevision: 1,
+      requireExistingRoot: true,
+    })
+  ).rejects.toMatchObject({ name: 'StaleImageWorkspaceError' });
+  expect(puts.media).toHaveBeenCalledTimes(2);
+});
+
 it('creates a missing revision-zero aggregate and rejects non-initial missing roots', async () => {
   const document = createEditorDocumentFixture();
   const puts = installTransaction({ sourceId: 'new-image' });

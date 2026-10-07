@@ -5,7 +5,7 @@ import type {
 } from '../../../features/editor/document/types';
 import { createEditorFrameGradientPatch } from '../../../features/editor/document/frame-gradient';
 import { readFileAsDataUrl } from '../../document/file-actions/file-reader';
-import { assertEditorRasterImageFileCanBeRead } from '../../document/file-actions/raster-intake';
+import { prepareBackgroundImage } from '../../../workflows/background-images/intake';
 import type { getFrameGradientPresets } from '../sidebar-shared';
 
 export function buildSidebarBackgroundActions(args: {
@@ -26,8 +26,7 @@ export function buildSidebarBackgroundActions(args: {
     },
     handleBackgroundImageUpload: async (file: File | undefined) => {
       if (!file) return;
-      assertEditorRasterImageFileCanBeRead(file);
-      const backgroundImageData = await readFileAsDataUrl(file);
+      const backgroundImageData = await readFileAsDataUrl(await prepareBackgroundImage(file));
       args.setFrameDraft((state) => ({
         ...state,
         backgroundImageData,

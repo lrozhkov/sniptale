@@ -81,6 +81,19 @@ vi.mock('../../../../ui/paint-selector', () => ({
   ),
 }));
 
+vi.mock('../../../../composition/background-resources/catalog', () => ({
+  useBackgroundCatalog: () => ({ presets: [], status: 'ready' }),
+}));
+vi.mock(
+  '../../../../composition/gradient-preset-resources/use-gradient-preset-catalog',
+  async () => {
+    const { createDefaultGradientPresetCatalog } =
+      await import('../../../../composition/persistence/gradient-presets/defaults');
+    return {
+      useGradientPresetCatalog: () => ({ presets: createDefaultGradientPresetCatalog().presets }),
+    };
+  }
+);
 const FRAME: EditorFrameSettings = {
   ...DEFAULT_EDITOR_FRAME_SETTINGS,
   backgroundMode: 'color',
@@ -249,7 +262,9 @@ it('renders the image branch and forwards image mode updates', async () => {
 
   await act(async () => {
     (container?.querySelectorAll('button')[0] as HTMLButtonElement | undefined)?.click();
-    (container?.querySelectorAll('button')[1] as HTMLButtonElement | undefined)?.click();
+    Array.from(container!.querySelectorAll('button'))
+      .find((button) => button.textContent === translate('editor.scene.clearImage'))
+      ?.click();
     (
       container?.querySelector('[data-testid="select-field"] button') as
         | HTMLButtonElement
@@ -257,7 +272,7 @@ it('renders the image branch and forwards image mode updates', async () => {
     )?.click();
   });
 
-  expect(onPickBackgroundImage).toHaveBeenCalledTimes(1);
+  expect(container?.querySelector('input[type="file"]')).not.toBeNull();
   expect(onClearBackgroundImage).toHaveBeenCalledTimes(1);
   expect(applyFramePatch).toHaveBeenCalledWith({ backgroundImageFit: 'cover' });
 });
@@ -273,7 +288,7 @@ it('offers image acquisition before fit controls, then reveals fit after picking
   await renderUi(<EditorInspectorFrameBackgroundImageEditor {...props} />);
   expect(container?.querySelector('[data-testid="select-field"]')).toBeNull();
   await act(async () => container?.querySelector('button')?.click());
-  expect(props.onPickBackgroundImage).toHaveBeenCalledOnce();
+  expect(container?.querySelector('input[type="file"]')).not.toBeNull();
   await renderUi(
     <EditorInspectorFrameBackgroundImageEditor
       {...props}

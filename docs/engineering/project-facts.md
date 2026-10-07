@@ -39,6 +39,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 
 - `apps/extension/src/composition/archive-transfer`
 - `apps/extension/src/composition/audio-recording`
+- `apps/extension/src/composition/background-resources`
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
 - `apps/extension/src/composition/gradient-preset-resources`
@@ -49,6 +50,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/annotation-template-tags`
 - `apps/extension/src/composition/persistence/asset-publication-recovery`
 - `apps/extension/src/composition/persistence/assets`
+- `apps/extension/src/composition/persistence/background-presets`
 - `apps/extension/src/composition/persistence/callout-presets`
 - `apps/extension/src/composition/persistence/capture-settings`
 - `apps/extension/src/composition/persistence/command-palette`
@@ -122,6 +124,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/platform/runtime-messaging`
 - `apps/extension/src/platform/security-e2e-control`
 - `apps/extension/src/ui/annotation-template-query`
+- `apps/extension/src/ui/background-thumbnails`
 - `apps/extension/src/ui/callout-background-settings`
 - `apps/extension/src/ui/color-selector`
 - `apps/extension/src/ui/command-palette`
@@ -147,6 +150,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/aggregate-editor-presence`
 - `apps/extension/src/workflows/ai-session`
 - `apps/extension/src/workflows/ai-settings`
+- `apps/extension/src/workflows/background-images`
 - `apps/extension/src/workflows/browser-frame`
 - `apps/extension/src/workflows/editor`
 - `apps/extension/src/workflows/file-naming`

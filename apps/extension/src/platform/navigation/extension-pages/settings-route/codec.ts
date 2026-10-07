@@ -27,7 +27,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'media-quality': ['image', 'video'],
   saving: ['settings', 'files', 'drafts', 'storage', 'templates'],
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
-  'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
+  'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
   'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
   'voice-input': [],
@@ -53,7 +53,10 @@ export type SettingsRoute =
   | { section: 'media-quality'; view?: 'image' | 'video' }
   | { section: 'saving'; view?: 'settings' | 'files' | 'drafts' | 'storage' | 'templates' }
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
-  | { section: 'editor-resources'; view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' }
+  | {
+      section: 'editor-resources';
+      view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' | 'backgrounds';
+    }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
   | { section: 'ai-prompts'; view?: 'templates' | 'scenario-templates' | 'prompts' }
   | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }

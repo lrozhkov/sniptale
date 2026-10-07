@@ -164,6 +164,7 @@ export const settingsNavigationMessages = defineMessageSource({
     palettes: { ru: 'Палитры', en: 'Palettes' },
     surfaces: { ru: 'Поверхности', en: 'Surfaces' },
     gradients: { ru: 'Градиенты', en: 'Gradients' },
+    backgrounds: { ru: 'Фон', en: 'Backgrounds' },
     connection: { ru: 'Подключение', en: 'Connection' },
     capture: { ru: 'Захват', en: 'Capture' },
     commands: { ru: 'Команды', en: 'Commands' },

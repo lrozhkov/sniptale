@@ -14,6 +14,9 @@ vi.mock('./surface-styles/view', () => ({
 vi.mock('./gradients/view', () => ({
   GradientPresetsSettings: () => <div>gradients-owner</div>,
 }));
+vi.mock('./backgrounds/view', () => ({
+  BackgroundPresetsSettings: () => <div>backgrounds-owner</div>,
+}));
 import { EditorResourcesContent } from './content';
 it('composes tools and palettes as route-controlled subpages', () => {
   const node = document.createElement('div');
@@ -27,6 +30,7 @@ it('composes tools and palettes as route-controlled subpages', () => {
 it.each([
   ['surfaces', 'surfaces-owner'],
   ['gradients', 'gradients-owner'],
+  ['backgrounds', 'backgrounds-owner'],
 ] as const)('renders %s as an independent resource subpage', (view, owner) => {
   const node = document.createElement('div');
   const root = createRoot(node);

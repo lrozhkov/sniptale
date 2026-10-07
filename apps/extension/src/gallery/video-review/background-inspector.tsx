@@ -1,7 +1,9 @@
 import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
 import { ReviewNumberRow } from './number-row';
-import { useRef } from 'react';
+import { useState } from 'react';
+import { BackgroundImagePicker } from '../../composition/background-resources/picker';
+import { BackgroundThumbnails } from '../../ui/background-thumbnails';
 import { translate } from '../../platform/i18n';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import type { QuickEditBackgroundPatch } from '../../features/video/review/advanced/background';
@@ -25,11 +27,11 @@ function backgroundPaint(background: QuickEditBackgroundSettings): Paint {
 
 /** Canvas background owner: kind, paint, and layout belong to the whole frame. */
 export function ReviewBackgroundInspector(props: {
-  onImportImage?: ((file: File) => void) | undefined;
+  onImportImage?: ((file: File, originMediaId?: string) => void) | undefined;
   background: QuickEditBackgroundSettings;
   onChange(patch: QuickEditBackgroundPatch): void;
 }) {
-  const fileInput = useRef<HTMLInputElement>(null);
+  const [imageRequested, setImageRequested] = useState(false);
   const { presets } = useGradientPresetCatalog('highlighter-frame-fill');
   const { background, onChange } = props;
   const paint = backgroundPaint(background);
@@ -43,28 +45,19 @@ export function ReviewBackgroundInspector(props: {
           data-inspector-choices
           aria-label={translate('gallery.videoReview.background')}
         >
-          <input
-            ref={fileInput}
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            hidden
-            onChange={(event) => {
-              const file = event.currentTarget.files?.[0];
-              event.currentTarget.value = '';
-              if (file) props.onImportImage?.(file);
-            }}
-          />
           {kinds.map((kind) => (
             <ReviewButton
               key={kind.key}
               label={translate(kind.label)}
               aria-pressed={
-                kind.key === 'none'
+                !imageRequested &&
+                (kind.key === 'none'
                   ? !background.enabled
-                  : background.enabled && background.type === kind.key
+                  : background.enabled && background.type === kind.key)
               }
               className={reviewTextButtonClassName}
-              onClick={() =>
+              onClick={() => {
+                setImageRequested(false);
                 onChange(
                   kind.key === 'none'
                     ? { enabled: false }
@@ -73,8 +66,8 @@ export function ReviewBackgroundInspector(props: {
                         type: kind.key,
                         ...(kind.key === 'solid' ? { color: '#000000ff' } : {}),
                       }
-                )
-              }
+                );
+              }}
             >
               {translate(kind.label)}
             </ReviewButton>
@@ -82,50 +75,38 @@ export function ReviewBackgroundInspector(props: {
           <ReviewButton
             label={translate('gallery.videoReview.backgroundImage')}
             className={reviewTextButtonClassName}
-            aria-pressed={background.enabled && background.type === 'image'}
-            onClick={() => fileInput.current?.click()}
+            aria-pressed={imageRequested || (background.enabled && background.type === 'image')}
+            onClick={() => setImageRequested(true)}
           />
         </div>
-        {background.enabled && background.type === 'gradient' ? (
-          <div
-            className="grid grid-cols-5 gap-2"
-            role="group"
-            aria-label={translate('videoEditor.sidebar.sceneBackgroundPresetLabel')}
-            data-ui="gallery.videoReview.gradientPresets"
-          >
-            {presets
+        {imageRequested || (background.enabled && background.type === 'image') ? (
+          <BackgroundImagePicker
+            onSelect={({ file, originMediaId }) => props.onImportImage?.(file, originMediaId)}
+          />
+        ) : background.enabled && background.type === 'gradient' ? (
+          <BackgroundThumbnails
+            label={translate('videoEditor.sidebar.sceneBackgroundPresetLabel')}
+            dataUi="gallery.videoReview.gradientPresets"
+            items={presets
               .filter((preset) => preset.enabled)
-              .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.order - b.order)
-              .slice(0, 10)
-              .map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  title={preset.name}
-                  aria-label={preset.name}
-                  aria-pressed={
-                    serializePaintToCss(paint) ===
-                    serializePaintToCss({ kind: 'gradient', gradient: preset.gradient })
-                  }
-                  className="h-8 min-w-0 rounded border border-[var(--sniptale-color-border-subtle)]
-                    transition-opacity hover:opacity-80
-                    aria-pressed:outline aria-pressed:outline-1 aria-pressed:outline-offset-1
-                    aria-pressed:outline-[var(--sniptale-color-text-secondary)]
-                    focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]"
-                  style={{
-                    background: serializePaintToCss({
-                      kind: 'gradient',
-                      gradient: preset.gradient,
-                    }),
-                  }}
-                  onClick={() =>
-                    onChange({ enabled: true, type: 'gradient', gradient: preset.gradient })
-                  }
-                />
-              ))}
-          </div>
+              .sort((a, b) => a.order - b.order)
+              .map((preset) => ({
+                id: preset.id,
+                name: preset.name,
+                active:
+                  serializePaintToCss(paint) ===
+                  serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
+                style: {
+                  background: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
+                },
+              }))}
+            onSelect={(id) => {
+              const preset = presets.find((item) => item.id === id);
+              if (preset) onChange({ enabled: true, type: 'gradient', gradient: preset.gradient });
+            }}
+          />
         ) : null}
-        {background.enabled && background.type !== 'image' ? (
+        {!imageRequested && background.enabled && background.type !== 'image' ? (
           <CompactPaintSelector
             triggerVariant="swatch"
             className="relative w-full min-w-0 [&>button>span>span]:text-xs

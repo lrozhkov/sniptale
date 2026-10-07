@@ -100,7 +100,7 @@ export function ReviewSceneProperties(props: {
   busy: boolean;
   pending: boolean;
   failed: boolean;
-  onImportImage(file: File): void;
+  onImportImage(file: File, originMediaId?: string): void;
   setBackground(
     update: (current: QuickEditAdvancedState['background']) => QuickEditAdvancedState['background']
   ): void;

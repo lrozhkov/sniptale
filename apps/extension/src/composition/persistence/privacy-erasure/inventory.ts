@@ -93,6 +93,7 @@ const aiProviderSecretKeys = [
 ] as const;
 
 const localSensitiveKeys = [
+  'sniptale_background_presets',
   ALPHA_RESET_JOURNAL_KEY,
   DATABASE_BACKUP_RECEIPT_KEY,
   DATABASE_RESET_JOURNAL_KEY,

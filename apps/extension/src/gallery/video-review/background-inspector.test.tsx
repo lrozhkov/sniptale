@@ -37,6 +37,13 @@ vi.mock('../../composition/gradient-preset-resources/use-gradient-preset-catalog
   }),
 }));
 
+vi.mock('../../composition/background-resources/catalog', () => ({
+  useBackgroundCatalog: () => ({ presets: [], status: 'ready' }),
+}));
+vi.mock('../../workflows/background-images/intake', () => ({
+  BACKGROUND_IMAGE_ACCEPT: 'image/png,image/svg+xml',
+  prepareBackgroundImage: async (file: File) => file,
+}));
 let root: Root;
 let host: HTMLDivElement;
 
@@ -126,11 +133,16 @@ it('opens the image picker and forwards only a selected file', async () => {
       />
     )
   );
-  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
-  const open = vi.spyOn(input, 'click').mockImplementation(() => undefined);
-  act(() =>
+  await act(async () =>
     host
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.backgroundImage"]')!
+      .click()
+  );
+  const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const open = vi.spyOn(input, 'click').mockImplementation(() => undefined);
+  await act(async () =>
+    Array.from(host.querySelectorAll('button'))
+      .find((button) => button.textContent?.includes('settings.editor.backgrounds.upload'))!
       .click()
   );
   expect(open).toHaveBeenCalledOnce();
@@ -139,7 +151,7 @@ it('opens the image picker and forwards only a selected file', async () => {
   const file = new File(['image'], 'background.png', { type: 'image/png' });
   Object.defineProperty(input, 'files', { value: [file] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(onImportImage).toHaveBeenCalledWith(file);
+  expect(onImportImage).toHaveBeenCalledWith(file, undefined);
 });
 
 it('uses precise layout sliders without limiting typed high-resolution values', async () => {

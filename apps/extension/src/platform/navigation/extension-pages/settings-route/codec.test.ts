@@ -17,7 +17,7 @@ describe('settings route codec', () => {
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
       'media-quality': ['image', 'video'],
       saving: ['settings', 'files', 'drafts', 'storage', 'templates'],
-      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
+      'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients', 'backgrounds'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
       'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
