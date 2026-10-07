@@ -135,7 +135,8 @@ function recordActionEvent(
 export function createTelemetryListeners(state: TelemetryState): TelemetryListeners {
   const targets = new WeakMap<Element, string>();
   const identity = (event: MouseEvent) => {
-    const target = describeTelemetryTarget(event).element;
+    const description = describeTelemetryTarget(event);
+    const target = description.clickElement ?? description.element;
     if (!target) return null;
     let id = targets.get(target);
     if (!id) {

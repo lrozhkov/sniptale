@@ -1,3 +1,4 @@
+import { resolveRecordingTarget, type RecordingTargetSemantics } from '../project/recording-target';
 import { isRecordingPoint } from '../project/validation/recording-telemetry';
 import { normalizeRecordingActions, normalizeRecordingSignals } from '../project/recording-actions';
 import type {
@@ -16,6 +17,7 @@ export interface ReviewTelemetryMarker {
   ref: { kind: 'action' | 'signal' | 'cursor'; id: string };
   eventType: string;
   target?: string;
+  targetSemantics?: RecordingTargetSemantics;
   /** Verified normalized source position, never reconstructed from a final viewport. */
   focusPoint?: { x: number; y: number };
   start: number;
@@ -37,7 +39,8 @@ export function projectReviewTelemetry(
     start: number,
     end: number,
     target?: string,
-    point?: { x: number; y: number } | null
+    point?: { x: number; y: number } | null,
+    targetSemantics?: RecordingTargetSemantics
   ) => {
     if (
       !Number.isFinite(start) ||
@@ -50,6 +53,7 @@ export function projectReviewTelemetry(
     markers.push({
       ref: { kind, id },
       eventType,
+      ...(targetSemantics ? { targetSemantics } : {}),
       start,
       end: Math.min(duration, end),
       ...(target ? { target: target.slice(0, 120) } : {}),
@@ -65,7 +69,8 @@ export function projectReviewTelemetry(
       event.time,
       event.time + event.duration,
       event.label || undefined,
-      event.recordingPoint
+      event.recordingPoint,
+      event.kind === 'CLICK' ? resolveRecordingTarget(event.data) : undefined
     );
   for (const signal of normalizeRecordingSignals(input.signals)) {
     if (signal.kind === 'static-frame' && signal.startTime === signal.endTime) {

@@ -1,3 +1,5 @@
+import { resolveRecordingTarget } from '../../../features/video/project/recording-target';
+
 const CONTROL_SELECTOR = [
   'button',
   'a',
@@ -50,25 +52,49 @@ function staticLabel(element: Element | null): string {
 /** Describes the control, never its value or surrounding page content. DOM identity is disposable. */
 export function describeTelemetryTarget(event: Event | null): {
   element: Element | null;
+  clickElement?: Element;
   data: Record<string, string>;
 } {
-  const path = event && typeof event.composedPath === 'function' ? event.composedPath() : [];
-  const target =
-    path.find((node): node is Element => node instanceof Element) ??
-    (event?.target instanceof Element ? event.target : null);
-  const element = target?.closest(CONTROL_SELECTOR) ?? target;
+  const { element, identity, editableBlocked } = resolveTargetElements(event);
   if (!element) return { element: null, data: {} };
   const data: Record<string, string> = { targetTag: element.localName };
-  if (element instanceof HTMLInputElement) data['targetType'] = element.type;
+  if (element instanceof HTMLInputElement) {
+    data['targetType'] = element.type;
+    if (element.hasAttribute('list')) data['targetHasList'] = 'yes';
+  }
   const role = plainLabel(element.getAttribute('role'));
   if (role) data['targetRole'] = role;
-  if (!element.matches(CONTROL_SELECTOR)) return { element, data };
+  if (element.matches('a[href]')) data['targetHasHref'] = 'yes';
+  if (
+    !editableBlocked &&
+    element.matches(
+      '[contenteditable=""],[contenteditable="true"],[contenteditable="plaintext-only"]'
+    )
+  )
+    data['targetEditable'] = 'yes';
+  const semantics = resolveRecordingTarget(data);
+  data['targetKind'] = semantics.kind;
+  data['targetSource'] = semantics.source;
+  if (semantics.kind === 'unknown' && !element.matches(CONTROL_SELECTOR))
+    return { element: identity, data };
+  const name = controlLabel(element);
+  if (name) data['targetName'] = name;
+  return {
+    element: identity,
+    ...(semantics.kind !== 'unknown' ? { clickElement: element } : {}),
+    data,
+  };
+}
+
+function controlLabel(element: Element): string {
   const references = (element.getAttribute('aria-labelledby') ?? '')
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 8);
+  const root = element.getRootNode();
+  const labelRoot = root instanceof ShadowRoot ? root : element.ownerDocument;
   const referencedName = references
-    .map((id) => staticLabel(element.ownerDocument.getElementById(id)))
+    .map((id) => staticLabel(labelRoot.getElementById(id)))
     .join(' ');
   const labels =
     element instanceof HTMLInputElement ||
@@ -78,13 +104,41 @@ export function describeTelemetryTarget(event: Event | null): {
           .map(staticLabel)
           .join(' ')
       : '';
-  const name =
+  return (
     plainLabel(element.getAttribute('aria-label')) ||
     plainLabel(referencedName) ||
     plainLabel(labels) ||
     (element.matches('button,a,[role="button"],[role="link"],[role="menuitem"],[role="tab"]')
       ? staticLabel(element)
-      : '');
-  if (name) data['targetName'] = name;
-  return { element, data };
+      : '')
+  );
+}
+
+function resolveTargetElements(event: Event | null) {
+  const path = event && typeof event.composedPath === 'function' ? event.composedPath() : [];
+  const target =
+    path.find((node): node is Element => node instanceof Element) ??
+    (event?.target instanceof Element ? event.target : null);
+  // Preserve the previous identity used by keyboard privacy and typing checks.
+  const identity = target?.closest(CONTROL_SELECTOR) ?? target;
+  const candidates = path.filter((node): node is Element => node instanceof Element);
+  if (!candidates.length && target) {
+    for (let node: Element | null = target; node; node = node.parentElement) candidates.push(node);
+  }
+  let editableBlocked = false;
+  const candidate =
+    candidates.find((node) => {
+      const editable = node.getAttribute('contenteditable');
+      if (editable === 'false') editableBlocked = true;
+      return (
+        node.matches('button,input,textarea,select,a[href]') ||
+        (node instanceof HTMLLabelElement && !!node.control) ||
+        resolveRecordingTarget({ targetRole: node.getAttribute('role') }).kind !== 'unknown' ||
+        (!editableBlocked &&
+          (editable === '' || editable === 'true' || editable === 'plaintext-only'))
+      );
+    }) ?? target;
+  const element =
+    candidate instanceof HTMLLabelElement ? (candidate.control ?? candidate) : candidate;
+  return { element, identity, editableBlocked };
 }

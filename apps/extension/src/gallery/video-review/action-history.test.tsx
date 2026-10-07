@@ -421,3 +421,59 @@ it('configures recorded keys without pointer locations, separately from selected
     vi.unstubAllGlobals();
   }
 });
+
+it('filters click targets without hiding recovery controls on an empty result', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  act(() =>
+    root.render(
+      <ReviewActionHistory
+        markers={[
+          {
+            ref: { kind: 'action', id: 'button' },
+            eventType: 'CLICK',
+            start: 1,
+            end: 1,
+            target: 'Save',
+            targetSemantics: { kind: 'button', source: 'html' },
+          },
+          {
+            ref: { kind: 'action', id: 'input' },
+            eventType: 'CLICK',
+            start: 2,
+            end: 2,
+            target: 'Name',
+            targetSemantics: { kind: 'text-field', source: 'html' },
+          },
+          { ref: { kind: 'signal', id: 'typing' }, eventType: 'typing', start: 3, end: 5 },
+        ]}
+        animations={[]}
+        busy={false}
+        onChange={vi.fn()}
+        onSelect={vi.fn()}
+      />
+    )
+  );
+  const change = (key: string, value: string) =>
+    act(() => {
+      const select = host.querySelector<HTMLSelectElement>(
+        `[aria-label="gallery.videoReview.${key}"]`
+      )!;
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  try {
+    change('targetType', 'button');
+    expect(host.querySelectorAll('li')).toHaveLength(1);
+    expect(host.querySelector('li')?.textContent).toContain('Save');
+    change('historyStatus', 'animated');
+    expect(host.querySelectorAll('li')).toHaveLength(0);
+    expect(host.querySelector('[aria-label="gallery.videoReview.targetType"]')).not.toBeNull();
+    change('historyStatus', 'all');
+    change('targetType', 'all');
+    expect(host.querySelectorAll('li')).toHaveLength(3);
+  } finally {
+    act(() => root.unmount());
+  }
+});

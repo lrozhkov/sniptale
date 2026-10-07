@@ -1,9 +1,11 @@
+import { galleryVideoReviewTargetMessages } from './video-review-targets';
 import { galleryVideoReviewSpeechMessages } from './video-review-speech';
 import { galleryVideoReviewKeyMessages } from './video-review-keys';
 import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewTargetMessages,
   ...galleryVideoReviewSpeechMessages,
   ...galleryVideoReviewSpatialMessages,
   ...galleryVideoReviewKeyMessages,
@@ -71,8 +73,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
     ru: 'Достигнут предел: 10 000 настроенных щелчков. Сбросьте ненужные настройки.',
     en: 'Limit reached: 10,000 configured clicks. Reset unused settings.',
   },
-  clickRecordedAt: { ru: 'Время записи', en: 'Recorded time' },
-  clickTarget: { ru: 'Нажатый элемент', en: 'Clicked element' },
   keyboardRegions: { ru: 'Превью → таймлайн → инспектор', en: 'Preview → timeline → inspector' },
   keyboardControls: { ru: 'Перейти между элементами управления', en: 'Move between controls' },
   keyboardActivate: { ru: 'Нажать кнопку с фокусом', en: 'Activate the focused button' },

@@ -220,3 +220,39 @@ it('applies the same noise policy on publication and read without mutating store
   expect(entry.signals).toHaveLength(3);
   expect(entry.signals[0]!.endTime).toBe(1);
 });
+
+it('preserves click target semantics through save and read without changing event identity', async () => {
+  const db = createDb();
+  initDbMock.mockResolvedValue(db);
+  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
+  const entry: RecordingTelemetryEntry = {
+    recordingId: 'semantic',
+    captureMode: 'TAB',
+    createdAt: 1,
+    updatedAt: 1,
+    cursorTrack: null,
+    signals: [],
+    viewport: null,
+    actionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 2,
+        duration: 0.2,
+        point: null,
+        label: 'Save',
+        preset: 'NONE',
+        data: {
+          targetKind: 'button',
+          targetSource: 'html',
+          targetTag: 'button',
+          targetId: 'original',
+        },
+      },
+    ],
+  };
+  await saveRecordingTelemetry(entry);
+  db.get.mockResolvedValue(structuredClone(db.put.mock.calls.at(-1)?.[1]));
+  const restored = await getRecordingTelemetry('semantic');
+  expect(restored?.actionEvents).toEqual(entry.actionEvents);
+});

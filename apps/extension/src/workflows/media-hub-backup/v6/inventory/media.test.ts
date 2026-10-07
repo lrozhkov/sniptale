@@ -1,3 +1,4 @@
+import { putRecordingBackupRestore } from '../../../../composition/persistence/recordings/backup-restore';
 import { assertPortableJson } from '../codec';
 import { parsePortableMediaMetadata } from '../root-codecs/media';
 import { expect, it, vi } from 'vitest';
@@ -249,13 +250,25 @@ it('exports recording bytes through OPFS File and telemetry only when requested'
     duration: 3,
     filename: 'recording.webm',
     height: 720,
-    id: 'recording-media',
+    id: 'recording:recording-one',
     kind: 'video',
     mimeType: 'video/webm',
     size: 5,
     source: { kind: 'recording', recordingId: 'recording-one' },
     width: 1280,
   });
+  const actions: RecordingTelemetryEntry['actionEvents'] = [
+    {
+      id: 'captured-click',
+      kind: 'CLICK',
+      time: 1,
+      duration: 0.4,
+      preset: 'CLICK_RIPPLE',
+      label: 'Click',
+      point: { x: 0.5, y: 0.5 },
+      data: { targetKind: 'button', targetSource: 'html', targetTag: 'button', targetName: 'Save' },
+    },
+  ];
   const db = {
     transaction: emptyReviewTransaction,
     get: vi.fn(async (store: string) => {
@@ -274,7 +287,7 @@ it('exports recording bytes through OPFS File and telemetry only when requested'
         return { ...ref('recording-asset'), mimeType: 'video/webm', size: 5 };
       if (store === 'recording_telemetry') {
         return {
-          actionEvents: [],
+          actionEvents: actions,
           captureMode: null,
           createdAt: 1,
           cursorTrack: null,
@@ -303,6 +316,31 @@ it('exports recording bytes through OPFS File and telemetry only when requested'
     },
   });
   expect(JSON.stringify(payload.metadata)).not.toContain('recording-asset');
+  const restored = parsePortableMediaMetadata(JSON.parse(JSON.stringify(payload.metadata)));
+  expect(restored.recording?.telemetry?.actionEvents).toEqual(actions);
+  const recording = restored.recording!;
+  const telemetryStore = { put: vi.fn(async () => undefined) };
+  const discard = { put: async () => undefined };
+  await putRecordingBackupRestore({
+    entry: { ...recording.entry, assetId: 'restored-asset' },
+    ref: {
+      ...ref('restored-asset'),
+      location: { kind: 'opfs', objectKey: 'objects/restored-asset' },
+      mimeType: 'video/webm',
+      size: 5,
+    },
+    refStore: discard,
+    ownerStore: discard,
+    recordingStore: discard,
+    telemetry: recording.telemetry!,
+    telemetryStore,
+  });
+  expect(telemetryStore.put).toHaveBeenCalledWith(
+    expect.objectContaining({
+      recordingId: 'recording-one',
+      actionEvents: actions,
+    })
+  );
 });
 
 it('places durable audio in the readable Audio directory', async () => {

@@ -12,7 +12,7 @@ import { undoVideoEditorProjectHistory } from '../../history';
 import type { VideoProjectActionEvent } from '../../../../features/video/project/types';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 
-it('keeps captured duration when importing a short source interval', () => {
+it('preserves captured semantics and identity through material insertion and splitting', () => {
   const { store, asset } = setup();
   asset.source = { kind: 'recording', recordingId: 'source' };
   const telemetry: RecordingTelemetryEntry = {
@@ -31,7 +31,12 @@ it('keeps captured duration when importing a short source interval', () => {
         duration: 4,
         preset: 'CLICK_RIPPLE',
         label: 'Click',
-        data: {},
+        data: {
+          targetKind: 'button',
+          targetSource: 'html',
+          targetTag: 'button',
+          targetName: 'Save',
+        },
         point: null,
       },
     ],
@@ -42,6 +47,22 @@ it('keeps captured duration when importing a short source interval', () => {
   expect(store.getState().project!.actionEvents).toHaveLength(1);
   expect(store.getState().project!.actionEvents[0]?.capturedDuration).toBe(4);
   expect(telemetry.actionEvents[0]?.duration).toBe(4);
+  const inserted = store.getState().project!;
+  const fact = structuredClone(inserted.actionEvents[0]!);
+  expect(fact.data).toEqual(telemetry.actionEvents[0]!.data);
+  expect(fact.anchor).toMatchObject({
+    kind: 'recording-source',
+    sourceEventId: 'raw',
+    sourceTime: 2.8,
+  });
+  const clip = inserted.clips.find((item) => item.type === 'VIDEO')!;
+  store.getState().splitClipAt(clip.id, clip.startTime + 0.5);
+  const split = hydrateVideoProject(store.getState().project!);
+  expect(split.clips.length).toBeGreaterThan(inserted.clips.length);
+  expect(split.actionEvents).toEqual([fact]);
+  const occurrence = resolveVideoProjectActionOccurrences(split)[0]!;
+  expect(occurrence.eventId).toBe(fact.id);
+  expect(occurrence.clipId).not.toBe(clip.id);
 });
 
 it('inserts a gap without inventing a captured click at the cut', () => {

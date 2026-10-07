@@ -305,3 +305,39 @@ it('keeps source-normalized points, retains unavailable facts, and lets captured
     resolveVideoProjectActionPresentations(project).find(({ event }) => event.kind === 'KEY')
   ).toMatchObject({ enabled: true, renderKind: 'keystroke' });
 });
+
+it('retains captured target classification in a full editor project', () => {
+  const data = {
+    targetKind: 'button',
+    targetSource: 'html',
+    targetTag: 'button',
+    targetId: 'original',
+  };
+  const project = createVideoProjectFromRecording({
+    recordingId: 'semantic',
+    filename: 'semantic.webm',
+    width: 1280,
+    height: 720,
+    duration: 4,
+    mimeType: 'video/webm',
+    size: 1024,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        time: 2,
+        duration: 0.2,
+        point: { x: 0.5, y: 0.5 },
+        label: 'Save',
+        preset: 'NONE',
+        data,
+      },
+    ],
+  });
+  expect(project.actionEvents[0]?.data).toEqual(data);
+  expect(project.actionEvents[0]?.anchor).toMatchObject({
+    kind: 'recording-source',
+    sourceEventId: 'click',
+    sourceTime: 2,
+  });
+});

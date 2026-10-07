@@ -124,6 +124,7 @@ it('projects raw capture time even when optional animation and source anchor dif
         start: 2,
         end: 2.25,
         target: 'Click',
+        targetSemantics: { kind: 'unknown', source: 'unknown' },
       },
     ],
     warnings: 0,
@@ -214,4 +215,24 @@ it('uses immutable recording coordinates and only associates typing with a match
     15
   );
   expect(unknown.markers.every((item) => !item.focusPoint)).toBe(true);
+});
+
+it('projects legacy control semantics without mutating stored actions or accepting invented metadata', () => {
+  const event: RecordingActionEvent = {
+    id: 'legacy-input',
+    kind: 'CLICK',
+    time: 1,
+    duration: 0.2,
+    point: null,
+    label: 'Search',
+    preset: 'NONE',
+    data: { targetTag: 'input', targetType: 'search', targetKind: 'invalid-type' },
+  };
+  const original = structuredClone(event);
+  const result = projectReviewTelemetry(
+    { actionEvents: [event], signals: [], cursorTrack: null },
+    5
+  );
+  expect(result.markers[0]?.targetSemantics).toEqual({ kind: 'text-field', source: 'html' });
+  expect(event).toEqual(original);
 });

@@ -57,6 +57,16 @@ export function ReviewActionProperties(props: {
           {translate('gallery.videoReview.historyBack')}
         </ReviewButton>
       ) : null}
+      {isReviewClick(marker) ? (
+        <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
+          <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
+            {translate('gallery.videoReview.targetType')}
+          </span>
+          <span className="min-w-0 text-right">
+            {translate(`gallery.videoReview.target_${marker.targetSemantics?.kind ?? 'unknown'}`)}
+          </span>
+        </div>
+      ) : null}
       {isReviewClick(marker) && marker.target ? (
         <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
           <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
