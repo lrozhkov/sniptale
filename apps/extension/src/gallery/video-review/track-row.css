@@ -1,3 +1,11 @@
+/* Lane actions use icon feedback while preserving their hit area and keyboard focus. */
+@layer utilities {
+  [data-ui='gallery.videoReview.trackHeader'] [data-track-controls] button {
+    border-width: 0 !important;
+    background: transparent !important;
+  }
+}
+
 [data-review-track-muted='true'] [data-ui='gallery.videoReview.trackHeader'] {
   background-color: var(--sniptale-color-surface-input);
 }
