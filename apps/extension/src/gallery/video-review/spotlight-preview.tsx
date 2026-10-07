@@ -169,7 +169,8 @@ function SpotlightSourceFrame(props: Parameters<typeof ReviewSpotlightPreview>[0
       ref={canvas}
       width={props.output.width}
       height={props.output.height}
-      className="block w-full"
+      // Participate in positioned paint order above the absolute background and below focus controls.
+      className="relative block w-full"
     />
   );
 }
