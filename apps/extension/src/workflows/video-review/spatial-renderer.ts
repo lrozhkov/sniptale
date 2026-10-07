@@ -98,6 +98,12 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
         if (typeof maximum !== 'number' || source.width > maximum || source.height > maximum)
           throw new Error('Perspective output size is unavailable.');
         if (disposed || gl.isContextLost()) throw new Error('Perspective context was lost.');
+        if (
+          !sharp &&
+          !textures.supportsDepth &&
+          frame.focus.some((focus) => focus.weight * focus.settings.strength > 0)
+        )
+          throw new Error('Depth renderer precision is unavailable.');
         if (canvas.width !== source.width || canvas.height !== source.height) {
           canvas.width = source.width;
           canvas.height = source.height;
@@ -155,7 +161,16 @@ export function createReviewSpatialRenderer(onContextLost?: () => void) {
           focuses[0]?.settings.mode === 'depth' ? 1 : 0,
           focuses[1]?.settings.mode === 'depth' ? 1 : 0
         );
-        textures.upload(source);
+        let levelSizes: Float32Array;
+        try {
+          levelSizes = textures.upload(source);
+        } finally {
+          gl.useProgram(program);
+          gl.enableVertexAttribArray(position);
+          gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        gl.uniform2fv(uniform('levelSize[0]'), levelSizes);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         if (gl.getError() !== gl.NO_ERROR) throw new Error('Perspective rendering failed.');
         context.drawImage(canvas, 0, 0);

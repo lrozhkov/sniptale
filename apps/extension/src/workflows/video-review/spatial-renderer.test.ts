@@ -16,6 +16,14 @@ function graphics() {
     LINK_STATUS: 4,
     MAX_TEXTURE_SIZE: 5,
     NO_ERROR: 0,
+    FRAMEBUFFER_COMPLETE: 17,
+    FRAMEBUFFER: 18,
+    createFramebuffer: vi.fn<() => object | null>(() => ({})),
+    deleteFramebuffer: vi.fn(),
+    bindFramebuffer: vi.fn(),
+    framebufferTexture2D: vi.fn(),
+    checkFramebufferStatus: vi.fn(() => 17),
+    uniform2fv: vi.fn(),
     createShader: vi.fn(() => ({})),
     shaderSource: vi.fn(),
     compileShader: vi.fn(),
@@ -48,21 +56,15 @@ function graphics() {
     uniformMatrix3fv: vi.fn(),
     uniform2f: vi.fn(),
     uniform4f: vi.fn(),
-    texImage2D: vi.fn(
-      (
-        _target: number,
-        _level: number,
-        _internal: number,
-        _format: number,
-        _type: number,
-        _source: HTMLCanvasElement
-      ) => {}
-    ),
+    texImage2D: vi.fn<(...args: unknown[]) => void>(),
     drawArrays: vi.fn(),
     getError: vi.fn(() => 0),
     deleteTexture: vi.fn(),
     deleteBuffer: vi.fn(),
-    getExtension: vi.fn(() => ({ loseContext })),
+    getExtension: vi.fn<(name: string) => unknown>((name) => {
+      if (name === 'WEBGL_lose_context') return { loseContext };
+      return name === 'OES_texture_half_float' ? { HALF_FLOAT_OES: 36193 } : {};
+    }),
   };
   const loseContext = vi.fn();
   const context = { clearRect: vi.fn(), drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
@@ -144,48 +146,74 @@ it.each(['compile', 'link', 'unavailable'] as const)(
   }
 );
 
-it('filters odd-sized levels, reuses their allocations and releases partial allocation failures', () => {
-  const { gl, context } = graphics();
+it('filters odd-sized levels on GPU, reuses allocations and releases partial failures', () => {
+  const { gl } = graphics();
   const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext);
   const source = document.createElement('canvas');
   source.width = 963;
   source.height = 587;
-  textures.upload(source);
-  const uploaded = gl.texImage2D.mock.calls.map((call) => call[5] as HTMLCanvasElement);
-  expect(uploaded.map((canvas) => [canvas.width, canvas.height])).toEqual([
-    [963, 587],
-    [482, 294],
-    [241, 147],
-    [121, 74],
-    [61, 37],
-    [31, 19],
-    [16, 10],
-    [8, 5],
+  expect(Array.from(textures.upload(source))).toEqual([
+    963, 587, 482, 294, 241, 147, 121, 74, 61, 37, 31, 19, 16, 10, 8, 5,
   ]);
+  expect(gl.texImage2D.mock.calls.slice(1).every((call) => call[7] === 36193)).toBe(true);
   textures.upload(source);
   expect(gl.createTexture).toHaveBeenCalledTimes(8);
-  expect(gl.texImage2D.mock.calls[9]![5]).toBe(uploaded[1]);
-  expect(context.imageSmoothingEnabled).toBe(true);
-  expect(context.imageSmoothingQuality).toBe('high');
+  expect(gl.texImage2D).toHaveBeenCalledTimes(9);
   source.width = 1;
   source.height = 1;
-  textures.upload(source);
-  expect(uploaded.every((canvas) => canvas.width === 1 && canvas.height === 1)).toBe(true);
+  expect(Array.from(textures.upload(source))).toEqual(Array(16).fill(1));
   textures.dispose();
   textures.dispose();
   expect(gl.deleteTexture).toHaveBeenCalledTimes(8);
+  expect(gl.deleteFramebuffer).toHaveBeenCalledTimes(1);
+  expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
   gl.createTexture.mockReturnValueOnce({}).mockReturnValueOnce(null);
   expect(() => createReviewSpatialTextures(gl as unknown as WebGLRenderingContext)).toThrow(
     'texture'
   );
   expect(gl.deleteTexture).toHaveBeenCalledTimes(9);
+  expect(gl.deleteFramebuffer).toHaveBeenCalledTimes(2);
 });
 
-it('reports missing low-pass surface instead of using stale pixels', () => {
-  const { gl, getContext } = graphics();
-  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext);
-  getContext.mockReturnValue(null);
-  const source = document.createElement('canvas');
-  expect(() => textures.upload(source)).toThrow('filter surface');
-  textures.dispose();
+it('restores the main render state after a filter framebuffer failure and can retry', () => {
+  const { gl, context } = graphics();
+  const renderer = createReviewSpatialRenderer();
+  const source = renderer.surface('plane', 320, 180).canvas;
+  gl.checkFramebufferStatus.mockReturnValueOnce(0);
+  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow(
+    'framebuffer is incomplete'
+  );
+  expect(gl.bindFramebuffer).toHaveBeenLastCalledWith(gl.FRAMEBUFFER, null);
+  expect(gl.useProgram).toHaveBeenLastCalledWith(gl.createProgram.mock.results[0]!.value);
+  expect(gl.viewport).toHaveBeenLastCalledWith(0, 0, 320, 180);
+  renderer.draw(context, source, rect, rect, frame);
+  renderer.dispose();
+});
+
+it.each(['compile', 'link', 'framebuffer'] as const)(
+  'releases filter initialization failure: %s',
+  (failure) => {
+    const { gl } = graphics();
+    if (failure === 'compile') gl.getShaderParameter.mockReturnValue(false);
+    if (failure === 'link') gl.getProgramParameter.mockReturnValue(false);
+    if (failure === 'framebuffer') gl.createFramebuffer.mockReturnValue(null);
+    expect(() => createReviewSpatialTextures(gl as unknown as WebGLRenderingContext)).toThrow();
+    expect(gl.createTexture).not.toHaveBeenCalled();
+    if (failure === 'compile') expect(gl.deleteShader).toHaveBeenCalledTimes(1);
+    if (failure === 'link' || failure === 'framebuffer')
+      expect(gl.deleteProgram).toHaveBeenCalledTimes(1);
+  }
+);
+
+it('keeps perspective available without float targets but rejects inaccurate depth blur', () => {
+  const { gl, context } = graphics();
+  gl.getExtension.mockReturnValue(null);
+  const renderer = createReviewSpatialRenderer();
+  const source = renderer.surface('plane', 320, 180).canvas;
+  renderer.draw(context, source, rect, rect, { ...frame, focus: [] });
+  renderer.draw(context, source, rect, rect, frame, true);
+  expect(() => renderer.draw(context, source, rect, rect, frame)).toThrow(
+    'Depth renderer precision'
+  );
+  renderer.dispose();
 });
