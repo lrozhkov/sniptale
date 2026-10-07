@@ -4,6 +4,7 @@ import {
   createReviewTransitionFrames,
   isReviewTransitionFrame,
   paintReviewCutTransition,
+  paintReviewCutBlackout,
   type ReviewTransitionSample,
 } from './cut-transition-frames';
 import type { ReviewCutTransitionPlan } from '../../features/video/review/cuts';
@@ -212,7 +213,7 @@ it('releases a cached pair when another cut takes ownership and rejects aborted 
   for (const sample of [...first, ...second]) expect(sample.close).toHaveBeenCalledOnce();
 });
 
-it('fades the admitted moving side to black and restores it without borrowing the other side', () => {
+it('keeps the admitted moving side undimmed for final scene blackout without borrowing the other side', () => {
   const fills: number[] = [];
   const context = {
     globalAlpha: 1,
@@ -234,7 +235,7 @@ it('fades the admitted moving side to black and restores it without borrowing th
   expect(moving.draw).toHaveBeenCalledOnce();
   expect(left.draw).not.toHaveBeenCalled();
   expect(right.draw).not.toHaveBeenCalled();
-  expect(fills).toEqual([1, 0.5]);
+  expect(fills).toEqual([1]);
   fills.length = 0;
   paintReviewCutTransition(
     context,
@@ -243,5 +244,40 @@ it('fades the admitted moving side to black and restores it without borrowing th
     { left, right },
     frame(4.25)
   );
-  expect(fills).toEqual([1, 0.5]);
+  expect(fills).toEqual([1]);
+});
+
+it('blacks out full output coordinates once, leaving dissolve untouched', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    fillRect: vi.fn(),
+    globalAlpha: 1,
+  } as unknown as CanvasRenderingContext2D;
+  const size = { width: 1280, height: 800 };
+  paintReviewCutBlackout(context, size, reviewCutTransitionAt(1.75, [plan]));
+  expect(context.fillRect).not.toHaveBeenCalled();
+  for (const [time, alpha] of [
+    [1.75, 0.5],
+    [2, 1],
+    [2.25, 0.5],
+  ]) {
+    paintReviewCutBlackout(
+      context,
+      size,
+      reviewCutTransitionAt(time!, [{ ...plan, type: 'fade-black' }])
+    );
+    expect(context.globalAlpha).toBe(alpha);
+    expect(context.setTransform).toHaveBeenLastCalledWith(1, 0, 0, 1, 0, 0);
+    expect(context.fillRect).toHaveBeenLastCalledWith(0, 0, 1280, 800);
+  }
+  expect(context.restore).toHaveBeenCalledTimes(3);
+  expect(context.fillStyle).toBe('#000000');
+  paintReviewCutBlackout(
+    context,
+    size,
+    reviewCutTransitionAt(2, [{ ...plan, type: 'fade-black', color: '#abcdef' }])
+  );
+  expect(context.fillStyle).toBe('#abcdef');
 });

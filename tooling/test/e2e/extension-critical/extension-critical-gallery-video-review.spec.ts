@@ -3267,6 +3267,7 @@ for (const variant of [
   test(`cut transition inspector and rendered export in ${variant.locale}/${variant.theme}`, async ({
     page,
   }, testInfo) => {
+    const initialViewport = page.viewportSize()!;
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
@@ -3288,7 +3289,19 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
       await button('gallery.videoReview.cutMode').click();
-      await timelineGesture(page, 2.1, 4.1);
+      const sourceLane = (await dialog
+        .locator('[data-ui="gallery.videoReview.sourceLane"]')
+        .boundingBox())!;
+      const durationSeconds = Number(
+        await dialog
+          .locator('[data-ui="gallery.videoReview.timePlane"]')
+          .getAttribute('aria-valuemax')
+      );
+      const sourceX = (time: number) => sourceLane.x + (sourceLane.width * time) / durationSeconds;
+      await page.mouse.move(sourceX(2.1), sourceLane.y + sourceLane.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(sourceX(4.1), sourceLane.y + sourceLane.height / 2, { steps: 8 });
+      await page.mouse.up();
       await dialog
         .locator('summary')
         .filter({ hasText: label('gallery.videoReview.cutTransition') })
@@ -3304,12 +3317,24 @@ for (const variant of [
         .getByRole('option', {
           name: label(
             variant.locale === 'ru'
-              ? 'gallery.videoReview.cutFadeBlack'
+              ? 'gallery.videoReview.cutFadeColor'
               : 'gallery.videoReview.cutDissolve'
           ),
           exact: true,
         })
         .click();
+      if (variant.locale === 'ru') {
+        await settings.locator('[data-ui="shared.ui.color-selector.value-trigger"]').click();
+        const color = settings.getByRole('textbox', {
+          name: label('gallery.videoReview.cutTransitionColor'),
+          exact: true,
+        });
+        await color.fill('#1248a0');
+        await color.press('Enter');
+        await expect(
+          settings.locator('[data-ui="shared.ui.color-selector.value-trigger"]')
+        ).toContainText('#1248A0');
+      }
       const duration = settings.getByRole('textbox', {
         name: label('gallery.videoReview.zoomTransitionDuration'),
         exact: true,
@@ -3341,8 +3366,25 @@ for (const variant of [
       await dialog.screenshot({
         path: testInfo.outputPath(`cut-settings-small-${variant.locale}.png`),
       });
-      await page.setViewportSize({ width: 1280, height: 720 });
+      await page.setViewportSize(initialViewport);
       await dialog.screenshot({ path: testInfo.outputPath(`cut-settings-${variant.locale}.png`) });
+      await expect(
+        settings.getByText(label('gallery.videoReview.cutTransitionHint'), { exact: true })
+      ).toHaveCount(0);
+      await button('gallery.videoReview.advancedEditing').click();
+      await button('gallery.videoReview.scene').click();
+      await button('windowHeader.browser').click();
+      await button('gallery.videoReview.backgroundGradient').click();
+      await dialog
+        .locator('[data-ui="gallery.videoReview.gradientPresets"] button')
+        .first()
+        .click();
+      const padding = dialog.getByRole('textbox', {
+        name: label('gallery.videoReview.backgroundPadding'),
+        exact: true,
+      });
+      await padding.fill('12');
+      await padding.press('Enter');
       await button('gallery.videoReview.pointerTool').click();
       await timelineGesture(page, 1.7);
       await dialog.locator('video').evaluate(async (video: HTMLVideoElement) => {
@@ -3357,12 +3399,28 @@ for (const variant of [
       await dialog.screenshot({
         path: testInfo.outputPath(`cut-transition-${variant.locale}.png`),
       });
-      const previewPixels = await canvas.evaluate((node: HTMLCanvasElement) =>
-        Array.from(node.getContext('2d')!.getImageData(0, 0, 160, 90).data)
-      );
-      // Compare the encoded scene at a normal export resolution; the 160×90 fixture's
-      // source-size bitrate deliberately prioritizes size and obscures individual pixels.
-      await button('gallery.videoReview.advancedEditing').click();
+      const stage = dialog.locator('[data-ui="gallery.videoReview.stage"]');
+      const blackout = stage.locator('[data-ui="gallery.videoReview.cutBlackout"]');
+      if (variant.locale === 'ru') {
+        await expect(blackout).toBeVisible();
+        const stageBox = (await stage.boundingBox())!,
+          blackBox = (await blackout.boundingBox())!;
+        expect(blackBox).toEqual(stageBox);
+      } else await expect(blackout).toHaveCount(0);
+      await page.screenshot({
+        path: testInfo.outputPath('composed-transition.png'),
+        fullPage: false,
+      });
+      const shot = await stage.screenshot();
+      const previewPixels = await page.evaluate(async (encoded) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${encoded}`;
+        await image.decode();
+        const canvas = Object.assign(document.createElement('canvas'), { width: 160, height: 90 });
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0, 160, 90);
+        return Array.from(context.getImageData(0, 0, 160, 90).data);
+      }, shot.toString('base64'));
       await dialog.locator('[data-ui="gallery.videoReview.openExport"]').click();
       await button('videoEditor.exportDialog.resolutionLabel').click();
       await page.getByRole('option', { name: '480p', exact: true }).click();

@@ -145,13 +145,30 @@ export function paintReviewCutTransition(
     context.fillRect(0, 0, size.width, size.height);
     if (blend.plan.type === 'fade-black') {
       draw(current);
-      context.globalAlpha = blend.black;
-      context.fillRect(0, 0, size.width, size.height);
     } else {
       draw(before ? current : frames.left);
       context.globalAlpha = blend.incoming;
       draw(before ? frames.right : current);
     }
+  } finally {
+    context.restore();
+  }
+}
+
+/** Apply after all scene layers so header, background and overlays share one fade. */
+export function paintReviewCutBlackout(
+  context: CanvasRenderingContext2D,
+  size: { width: number; height: number },
+  blend: ReturnType<typeof reviewCutTransitionAt>
+) {
+  if (!blend || blend.plan.type !== 'fade-black' || blend.black <= 0) return;
+  context.save();
+  try {
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    context.globalCompositeOperation = 'source-over';
+    context.globalAlpha = blend.black;
+    context.fillStyle = blend.plan.color ?? '#000000';
+    context.fillRect(0, 0, size.width, size.height);
   } finally {
     context.restore();
   }

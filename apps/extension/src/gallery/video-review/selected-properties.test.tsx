@@ -2,7 +2,7 @@
 import { act, type ComponentProps, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ReviewSelectedProperties } from './selected-properties';
+import { ReviewSelectedProperties, reviewSelectionLabel } from './selected-properties';
 import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
 
 vi.mock('../../platform/i18n', async (original) => ({
@@ -18,6 +18,13 @@ vi.mock('./controls', async (original) => ({
 // Real control focus/Escape/blur is covered in the browser. This adapter exercises
 // the inspector's draft, coupled values and asynchronous commit boundary directly.
 vi.mock('../../ui/compact-inspector-controls', () => ({
+  ColorField: (props: { label: string; value: string; onChange(value: string): void }) => (
+    <input
+      aria-label={props.label}
+      value={props.value}
+      onChange={(event) => props.onChange(event.target.value)}
+    />
+  ),
   SelectField: (props: {
     label: string;
     value: string;
@@ -168,4 +175,89 @@ it('creates default side lengths from none and switches the type without losing 
     select.dispatchEvent(new Event('change', { bubbles: true }));
   });
   expect(view.change).toHaveBeenLastCalledWith(null);
+});
+
+it('commits an opaque custom transition color through the existing edit command', async () => {
+  const view = mount({ type: 'fade-black', before: 0.5, after: 0.5 });
+  const input = view.host.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.cutTransitionColor"]'
+  )!;
+  expect(input.value).toBe('#000000');
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      '#1248a0'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(view.change).toHaveBeenLastCalledWith({
+    type: 'fade-black',
+    before: 0.5,
+    after: 0.5,
+    color: '#1248a0',
+  });
+  expect(view.edit.transition?.color).toBe('#1248a0');
+});
+
+it('keeps inspector titles specific to the selected lane and focus type', () => {
+  type State = Parameters<typeof reviewSelectionLabel>[0];
+  const state = {
+    markers: [],
+    advanced: {
+      zoom: {
+        regions: [{ id: 'border', border: {} }, { id: 'spotlight', spotlight: {} }, { id: 'zoom' }],
+      },
+    },
+    editing: { selected: { kind: 'cut' } },
+  };
+  const cases = [
+    [{ kind: 'webcam' }, 'webcam'],
+    [{ kind: 'webcam-position' }, 'webcam'],
+    [{ kind: 'webcam-hidden' }, 'webcam'],
+    [{ kind: 'zoom', id: 'border' }, 'focusBorder'],
+    [{ kind: 'zoom', id: 'spotlight' }, 'focusSpotlight'],
+    [{ kind: 'zoom', id: 'zoom' }, 'zoomRegionLabel'],
+    [{ kind: 'zoom', id: 'missing' }, 'zoomRegionLabel'],
+    [{ kind: 'zoom-link' }, 'zoomLinkSettings'],
+    [{ kind: 'canvas-comment' }, 'overlayComments'],
+    [{ kind: 'original-audio' }, 'originalAudioRange'],
+    [{ kind: 'audio', lane: 'voiceover' }, 'audioVoiceover'],
+    [{ kind: 'audio', lane: 'music' }, 'audioMusic'],
+    [{ kind: 'edit', id: 'cut' }, 'cutLabel'],
+  ] as const;
+  for (const [selection, label] of cases)
+    expect(reviewSelectionLabel({ ...state, selection } as unknown as State)).toBe(
+      `gallery.videoReview.${label}`
+    );
+  expect(
+    reviewSelectionLabel({ ...state, selection: { kind: 'none' } } as unknown as State)
+  ).toBeUndefined();
+  expect(
+    reviewSelectionLabel({
+      ...state,
+      selection: { kind: 'edit' },
+      editing: { selected: { kind: 'speed' } },
+    } as unknown as State)
+  ).toBe('gallery.videoReview.speedMode');
+});
+
+it('resolves an action title by its full reference and tolerates a missing selection', () => {
+  type State = Parameters<typeof reviewSelectionLabel>[0];
+  const state = {
+    markers: [
+      { ref: { kind: 'cursor', id: 'one' }, eventType: 'cursor' },
+      { ref: { kind: 'action', id: 'other' }, eventType: 'KEY' },
+      { ref: { kind: 'action', id: 'one' }, eventType: 'CLICK' },
+    ],
+    selection: { kind: 'telemetry', ref: { kind: 'action', id: 'one' } },
+  } as unknown as State;
+  expect(reviewSelectionLabel(state)).toBe('gallery.videoReview.eventClick');
+  expect(reviewSelectionLabel({ ...state, markers: [] })).toBe('gallery.videoReview.telemetry');
+  expect(
+    reviewSelectionLabel({
+      ...state,
+      selection: { kind: 'edit', id: 'missing' },
+      editing: {},
+    } as State)
+  ).toBeUndefined();
 });

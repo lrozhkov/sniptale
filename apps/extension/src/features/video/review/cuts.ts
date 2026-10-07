@@ -123,6 +123,8 @@ export function reviewPlaybackTime(time: number, edits: readonly ReviewEdit[]): 
 export interface ReviewCutTransitionPlan {
   id: string;
   type: 'dissolve' | 'fade-black';
+  /** Absent in legacy transitions; resolves to opaque black without rewriting history. */
+  color?: string;
   seam: number;
   before: number;
   after: number;
@@ -158,6 +160,7 @@ export function planReviewCutTransitions(
     plans.push({
       id: cut.id,
       type: cut.transition.type,
+      ...(cut.transition.color === undefined ? {} : { color: cut.transition.color }),
       seam,
       left,
       right,

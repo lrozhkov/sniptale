@@ -212,7 +212,8 @@ export const galleryVideoReviewMessages = defineMessageSource({
   },
   cutTransition: { ru: 'Переход на стыке', en: 'Cut transition' },
   cutDissolve: { ru: 'Растворение', en: 'Dissolve' },
-  cutFadeBlack: { ru: 'Через чёрный', en: 'Fade through black' },
+  cutFadeColor: { ru: 'Через цвет', en: 'Fade through color' },
+  cutTransitionColor: { ru: 'Цвет перехода', en: 'Transition color' },
   cutTransitionBefore: { ru: 'До стыка', en: 'Before cut' },
   cutTransitionAfter: { ru: 'После стыка', en: 'After cut' },
   cutTransitionHint: {

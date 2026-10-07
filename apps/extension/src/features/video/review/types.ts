@@ -44,6 +44,8 @@ interface ReviewEditRange {
 /** Authored result-time portions around a cut; effective bounds never retime the montage. */
 export interface ReviewCutTransition {
   type: 'dissolve' | 'fade-black';
+  /** Absent in legacy transitions; resolves to opaque black without rewriting history. */
+  color?: string;
   before: number;
   after: number;
 }

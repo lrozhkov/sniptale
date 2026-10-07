@@ -279,3 +279,23 @@ it('rejects malformed cut transitions without silently dropping authored setting
     expect(parseReviewOperation({ ...operation, after }, source.duration)?.after).toEqual(after);
   }
 });
+
+it('preserves custom cut colors in history and rejects nonopaque or malformed colors', () => {
+  const cut = { id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 };
+  const transition = { type: 'fade-black', before: 0.5, after: 0.5 };
+  const operation = { id: 'op', at: 1, target: 'edit', before: { ...cut, transition } };
+  for (const color of ['#12abEF', '#123456ff']) {
+    const after = { ...cut, transition: { ...transition, color } };
+    const parsed = parseReviewOperation({ ...operation, after }, source.duration);
+    expect(parsed?.before).toEqual(operation.before);
+    expect(parsed?.after).toEqual(after);
+  }
+  for (const color of ['red', '#12345600', '#xyzxyz', '', null, 12]) {
+    expect(
+      parseReviewOperation(
+        { ...operation, after: { ...cut, transition: { ...transition, color } } },
+        source.duration
+      )
+    ).toBeNull();
+  }
+});

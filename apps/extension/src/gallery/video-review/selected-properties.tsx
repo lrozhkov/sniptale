@@ -2,7 +2,7 @@ import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { resolveQuickEditEffectiveFeatures } from '../../features/video/review/advanced/effective';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { NumericRow, SelectField } from '../../ui/compact-inspector-controls';
+import { ColorField, NumericRow, SelectField } from '../../ui/compact-inspector-controls';
 import { planReviewCutTransitions } from '../../features/video/review/cuts';
 import type { ReviewCutTransition, ReviewEdit } from '../../features/video/review/types';
 import { ReviewDetails, reviewSelectFieldClassName } from './controls';
@@ -326,7 +326,7 @@ function CutTransitionFields(props: {
           options={[
             { value: 'none', label: translate('gallery.videoReview.transitionNone') },
             { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
-            { value: 'fade-black', label: translate('gallery.videoReview.cutFadeBlack') },
+            { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
           ]}
           onChange={(type) =>
             void commit(type === 'none' ? null : { before: 0.25, after: 0.25, ...draft, type })
@@ -334,6 +334,17 @@ function CutTransitionFields(props: {
         />
         {draft ? (
           <>
+            {draft.type === 'fade-black' ? (
+              <ColorField
+                className={reviewSelectFieldClassName}
+                label={translate('gallery.videoReview.cutTransitionColor')}
+                title={translate('gallery.videoReview.cutTransitionColor')}
+                value={draft.color ?? '#000000'}
+                allowAlpha={false}
+                allowTransparent={false}
+                onChange={(color) => void commit({ ...draft, color })}
+              />
+            ) : null}
             {(['total', 'before', 'after'] as const).map((field) => (
               <NumericRow
                 key={field}
@@ -356,9 +367,6 @@ function CutTransitionFields(props: {
                 onCommitValue={(value) => void commit(change(field, value))}
               />
             ))}
-            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-              {translate('gallery.videoReview.cutTransitionHint')}
-            </p>
             <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
               {plan
                 ? translate('gallery.videoReview.cutTransitionEffective')

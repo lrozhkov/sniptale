@@ -173,7 +173,10 @@ function parseCutTransition(value: unknown): ReviewCutTransition | null {
     before + after > 60
   )
     return null;
-  return { type, before, after };
+  const color = value['color'];
+  if (color !== undefined && (typeof color !== 'string' || !/^#[0-9a-f]{6}(?:ff)?$/i.test(color)))
+    return null;
+  return { type, before, after, ...(color === undefined ? {} : { color }) };
 }
 
 function parseCanvasComment(value: unknown, duration: number): CanvasComment | null {

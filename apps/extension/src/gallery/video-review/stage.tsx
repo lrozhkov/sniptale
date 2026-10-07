@@ -9,6 +9,7 @@ import { ReviewButton } from './controls';
 import { useReviewWindowHeader } from './use-window-header';
 import {
   ReviewCutTransitionPreview,
+  ReviewCutBlackout,
   type ReviewCutPreviewBinding,
   type ReviewCutPreviewRaster,
 } from './cut-transition-preview';
@@ -252,6 +253,7 @@ export function ReviewStage(props: ReviewStageProps) {
         {props.webcam ? (
           <ReviewWebcamOverlay binding={props.webcam} main={props.video} output={size} />
         ) : null}
+        <ReviewCutBlackout binding={props.cutPreview} />
       </div>
     </div>
   );

@@ -2,7 +2,11 @@
 import { act, createRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { ReviewCutTransitionPreview, type ReviewCutPreviewBinding } from './cut-transition-preview';
+import {
+  ReviewCutTransitionPreview,
+  ReviewCutBlackout,
+  type ReviewCutPreviewBinding,
+} from './cut-transition-preview';
 import type { ReviewTransitionSample } from '../../workflows/video-review/cut-transition-frames';
 
 const state = vi.hoisted(() => ({
@@ -241,4 +245,47 @@ it('publishes only the ready cut raster and clears it outside the transition', a
   view.binding.time = 0;
   await view.render();
   expect(view.onRaster).toHaveBeenLastCalledWith({ active: false, frame: null });
+});
+
+it('uses the complete output plane for black fade and removes it for dissolve or outside the seam', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  cleanup = () => act(() => root.unmount());
+  const render = (type: 'fade-black' | 'dissolve', time: number, color?: string) =>
+    act(() =>
+      root.render(
+        <ReviewCutBlackout
+          binding={{
+            file: new File([], 'clip.webm'),
+            duration: 6,
+            time,
+            edits: [
+              {
+                id: 'cut',
+                kind: 'cut',
+                start: 2,
+                end: 4,
+                requestedStart: 2,
+                requestedEnd: 4,
+                transition: { type, before: 0.5, after: 0.5, ...(color ? { color } : {}) },
+              },
+            ],
+          }}
+        />
+      )
+    );
+  render('fade-black', 1.75);
+  expect(host.firstElementChild?.getAttribute('style')).toContain('opacity: 0.5');
+  render('fade-black', 2);
+  expect(host.firstElementChild?.getAttribute('style')).toContain('opacity: 1');
+  expect(host.firstElementChild?.getAttribute('style')).toContain('background-color: rgb(0, 0, 0)');
+  render('fade-black', 2, '#123456');
+  expect(host.firstElementChild?.getAttribute('style')).toContain(
+    'background-color: rgb(18, 52, 86)'
+  );
+  render('fade-black', 2.5);
+  expect(host.firstElementChild).toBeNull();
+  render('dissolve', 2);
+  expect(host.firstElementChild).toBeNull();
 });

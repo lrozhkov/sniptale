@@ -23,7 +23,11 @@ import {
   reviewCutTransitionAt,
   type ReviewCutTransitionPlan,
 } from '../../features/video/review/cuts';
-import { createReviewTransitionFrames, paintReviewCutTransition } from './cut-transition-frames';
+import {
+  createReviewTransitionFrames,
+  paintReviewCutTransition,
+  paintReviewCutBlackout,
+} from './cut-transition-frames';
 import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
 import { drawReviewSpotlights } from './render-spotlight';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
@@ -704,6 +708,7 @@ export async function renderRenderWindowFrames(args: {
           if (cameraFrame.done) throw new QuickEditExportUnavailable(['asset-missing']);
           cameraFrame.value?.draw(context, canvas);
         }
+        paintReviewCutBlackout(context, canvas, blend);
         await writer.add(
           timestamp,
           Math.min(window.segment.resultEnd, window.timestamps[frame + 1] ?? timestamp + 1 / fps),

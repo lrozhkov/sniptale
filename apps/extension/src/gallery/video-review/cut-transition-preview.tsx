@@ -194,3 +194,22 @@ function useTransitionEndpoints(file: File, next: ReviewCutTransitionPlan | unde
     loaded?.lease.active && loaded.file === file && loaded.key === key ? loaded : null;
   return { current, retry: () => setAttempt((value) => value + 1) };
 }
+
+/** Final output-plane fade, independent of source raster geometry and decoder readiness. */
+export function ReviewCutBlackout({ binding }: { binding: ReviewCutPreviewBinding | undefined }) {
+  const duration = binding?.duration;
+  const edits = binding?.edits;
+  const plans = useMemo(
+    () => (duration !== undefined && edits ? planReviewCutTransitions(duration, edits) : []),
+    [duration, edits]
+  );
+  const blend = reviewCutTransitionAt(binding?.time ?? 0, plans);
+  return blend?.plan.type === 'fade-black' && blend.black > 0 ? (
+    <div
+      aria-hidden="true"
+      data-ui="gallery.videoReview.cutBlackout"
+      className="pointer-events-none absolute inset-0 z-40"
+      style={{ opacity: blend.black, backgroundColor: blend.plan.color ?? '#000000' }}
+    />
+  ) : null;
+}
