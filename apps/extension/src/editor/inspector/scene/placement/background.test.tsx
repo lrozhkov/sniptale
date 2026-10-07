@@ -12,6 +12,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) =>
     ({
+      'editor.scene.backgroundNone': 'None',
       'editor.scene.backgroundTypeSection': 'Background type',
       'editor.compact.frameBackgroundModeColor': 'Color',
       'editor.compact.frameBackgroundModeGradient': 'Gradient',
@@ -19,6 +20,7 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
     })[key] ?? key,
 }));
 
+import { changeFrameBackgroundMode } from '../background/settings';
 import { EditorInspectorFrameBackgroundModeControl } from './background';
 
 const FRAME: EditorFrameSettings = {
@@ -81,18 +83,20 @@ it('exposes color, gradient, and image as independent background modes', async (
     />
   );
 
-  expect(segmentedGroup()?.getAttribute('aria-label')).toBe('Background type');
-  expect(segmentedGroup()?.className).toContain('bg-[var(--sniptale-color-surface-hover)]');
+  expect(segmentedGroup()?.querySelector('[aria-label]')?.getAttribute('aria-label')).toBe(
+    'Background type'
+  );
   expect(segmentedButtons().map((button) => button.textContent)).toEqual([
+    'None',
     'Color',
     'Gradient',
     'Image',
   ]);
-  expect(segmentedButtons()[0]?.getAttribute('aria-pressed')).toBe('true');
-  expect(segmentedButtons()[1]?.getAttribute('aria-pressed')).toBe('false');
+  expect(segmentedButtons()[1]?.getAttribute('aria-pressed')).toBe('true');
+  expect(segmentedButtons()[2]?.getAttribute('aria-pressed')).toBe('false');
 
   await act(async () => {
-    segmentedButtons()[2]?.click();
+    segmentedButtons()[3]?.click();
   });
 
   expect(setBackgroundMode).toHaveBeenCalledWith('image');
@@ -105,7 +109,7 @@ it('exposes color, gradient, and image as independent background modes', async (
       setBackgroundMode={setBackgroundMode}
     />
   );
-  expect(segmentedButtons()[1]?.getAttribute('aria-pressed')).toBe('true');
+  expect(segmentedButtons()[2]?.getAttribute('aria-pressed')).toBe('true');
 
   await renderUi(
     <EditorInspectorFrameBackgroundModeControl
@@ -114,9 +118,9 @@ it('exposes color, gradient, and image as independent background modes', async (
       setBackgroundMode={setBackgroundMode}
     />
   );
-  expect(segmentedButtons()[2]?.getAttribute('aria-pressed')).toBe('true');
+  expect(segmentedButtons()[3]?.getAttribute('aria-pressed')).toBe('true');
   await act(async () => {
-    segmentedButtons()[0]?.click();
+    segmentedButtons()[1]?.click();
   });
   expect(setBackgroundMode).toHaveBeenLastCalledWith('color');
 });
@@ -155,7 +159,7 @@ it('remembers gradient after the compact background controls unmount and reopen'
             frameDraft={draft.frameDraft}
             lastFillModeRef={draft.lastFillModeRef}
             setBackgroundMode={(backgroundMode) =>
-              draft.setFrameDraft((state) => ({ ...state, backgroundMode }))
+              draft.setFrameDraft((state) => changeFrameBackgroundMode(state, backgroundMode))
             }
           />
         ) : null}
@@ -165,7 +169,7 @@ it('remembers gradient after the compact background controls unmount and reopen'
 
   await renderUi(<Harness />);
   await act(async () => {
-    segmentedButtons()[2]?.click();
+    segmentedButtons()[3]?.click();
   });
   expect(container?.querySelector('output')?.textContent).toBe('image');
   await act(async () => {
@@ -176,7 +180,18 @@ it('remembers gradient after the compact background controls unmount and reopen'
     (container?.querySelector('button') as HTMLButtonElement)?.click();
   });
   await act(async () => {
-    segmentedButtons()[1]?.click();
+    segmentedButtons()[2]?.click();
   });
   expect(container?.querySelector('output')?.textContent).toBe('gradient');
+});
+
+it('selects None for an existing transparent unpadded image', async () => {
+  await renderUi(
+    <EditorInspectorFrameBackgroundModeControl
+      frameDraft={changeFrameBackgroundMode(FRAME, 'none')}
+      lastFillModeRef={lastFillModeRef}
+      setBackgroundMode={vi.fn()}
+    />
+  );
+  expect(segmentedButtons()[0]?.getAttribute('aria-pressed')).toBe('true');
 });

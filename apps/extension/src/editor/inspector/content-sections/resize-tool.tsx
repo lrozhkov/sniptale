@@ -1,3 +1,4 @@
+import { SegmentedRow } from '../../../ui/compact-inspector-controls';
 import React from 'react';
 import { translate } from '../../../platform/i18n';
 import { fireAndReportEditorAction } from '../../runtime/async-actions';
@@ -72,43 +73,23 @@ type ActiveResizeState = {
   sizeText: string;
 };
 
-const CROP_MODE_BUTTON_CLASS = [
-  'rounded-md px-2 py-1.5 text-xs',
-  'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-focus-ring)]',
-].join(' ');
-
 function CanvasCropModeSwitch(props: {
   mode: 'crop' | 'expand';
   onSelect: (mode: 'crop' | 'expand') => void;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--sniptale-color-surface-hover)] p-1">
-      {(['crop', 'expand'] as const).map((mode) => (
-        <button
-          key={mode}
-          type="button"
-          aria-pressed={props.mode === mode}
-          data-ui={`editor.canvas-size.mode.${mode}`}
-          className={[
-            CROP_MODE_BUTTON_CLASS,
-            props.mode === mode
-              ? [
-                  'bg-[var(--sniptale-color-surface-panel)] font-medium shadow-sm',
-                  'text-[var(--sniptale-color-text-primary)]',
-                ].join(' ')
-              : [
-                  'text-[var(--sniptale-color-text-secondary)]',
-                  'hover:bg-[var(--sniptale-color-surface-panel)]',
-                ].join(' '),
-          ].join(' ')}
-          onClick={() => props.onSelect(mode)}
-        >
-          {translate(
-            mode === 'crop' ? 'editor.compact.cropWithinCanvas' : 'editor.compact.expandCanvas'
-          )}
-        </button>
-      ))}
-    </div>
+    <SegmentedRow
+      ariaLabel={translate('editor.compact.cropWithinCanvas')}
+      value={props.mode}
+      onChange={props.onSelect}
+      columns={2}
+      options={(['crop', 'expand'] as const).map((value) => ({
+        value,
+        label: translate(
+          value === 'crop' ? 'editor.compact.cropWithinCanvas' : 'editor.compact.expandCanvas'
+        ),
+      }))}
+    />
   );
 }
 

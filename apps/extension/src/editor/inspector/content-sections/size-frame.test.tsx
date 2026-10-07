@@ -42,7 +42,9 @@ function createFrameSectionProps(overrides: Record<string, unknown> = {}) {
     frameBackgroundImageFitOptions: [{ value: 'cover' as const, label: 'Cover' }],
     recentColors: [],
     toNumber: (value: string) => Number(value),
-    setFrameDraft: vi.fn(),
+    setFrameDraft: vi.fn((update) =>
+      typeof update === 'function' ? update(DEFAULT_EDITOR_FRAME_SETTINGS) : update
+    ),
     applyGradientPreset: vi.fn(),
     onPickBackgroundImage: vi.fn(),
     clearBackgroundImage: vi.fn(),

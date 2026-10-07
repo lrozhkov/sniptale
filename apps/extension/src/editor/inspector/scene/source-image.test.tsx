@@ -23,15 +23,36 @@ vi.mock('../../chrome/ui', async (importOriginal) => ({
       select
     </button>
   ),
-  ColorField: (props: { value: string; onChange: (value: string) => void }) => (
-    <button
-      type="button"
-      data-testid="color"
-      data-value={props.value}
-      onClick={() => props.onChange('#abcdef')}
-    >
-      color
-    </button>
+  ColorField: (props: {
+    value: string;
+    onChange: (value: string) => void;
+    onPreviewChange?: (value: string) => void;
+    onPreviewReset?: (value: string) => void;
+  }) => (
+    <>
+      <button
+        type="button"
+        data-testid="color"
+        data-value={props.value}
+        onClick={() => props.onChange('#abcdef')}
+      >
+        color
+      </button>
+      <button
+        type="button"
+        data-testid="color-preview"
+        onClick={() => props.onPreviewChange?.('#abcdef')}
+      >
+        preview
+      </button>
+      <button
+        type="button"
+        data-testid="color-cancel"
+        onClick={() => props.onPreviewReset?.(props.value)}
+      >
+        cancel
+      </button>
+    </>
   ),
 }));
 
@@ -189,3 +210,29 @@ it('shows shadow controls directly and keeps only border details collapsible', a
   });
   expect(groups[0]?.open).toBe(true);
 });
+
+for (const colorIndex of [0, 1]) {
+  it(`keeps source color ${colorIndex} previews and cancellation out of document commits`, async () => {
+    const applyFramePatch = vi.fn();
+    await renderUi(
+      <EditorInspectorFrameSourceImageFields
+        frameDraft={DEFAULT_EDITOR_FRAME_SETTINGS}
+        recentColors={[]}
+        applyFramePatch={applyFramePatch}
+      />
+    );
+    const click = (name: string) => {
+      const button = container?.querySelectorAll<HTMLButtonElement>(`[data-testid="${name}"]`)[
+        colorIndex
+      ];
+      expect(button).toBeDefined();
+      act(() => button?.click());
+    };
+    click('color-preview');
+    expect(applyFramePatch).not.toHaveBeenCalled();
+    click('color-cancel');
+    expect(applyFramePatch).not.toHaveBeenCalled();
+    click('color');
+    expect(applyFramePatch).toHaveBeenCalledTimes(1);
+  });
+}

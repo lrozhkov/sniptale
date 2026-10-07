@@ -9,7 +9,7 @@ import {
 } from '@sniptale/ui/product-glass-controls';
 import { NumericRangeScrub } from '../../../ui/compact-inspector-controls';
 import { NumericRow, NumericValueField } from '../../chrome/ui';
-import { PanelSection } from './shared';
+import { PanelSection, useInspectorNumericDraft } from './shared';
 
 type PaddingHoverSide = keyof ProductGlassLinkedPaddingValue | 'all';
 
@@ -89,13 +89,11 @@ export function FramePaddingFields(props: {
             data-ui="editor.frame.padding-slider"
             data-padding-hover="all"
           >
-            <NumericRangeScrub
+            <PaddingRange
               active={rangeActive}
               label={translate('highlighter.editor.paddingLabel')}
               onActiveChange={setRangeActive}
-              onCommitValue={onChange}
-              onPreviewValue={onChange}
-              scrub={{ min: 0, max: 256, step: 1 }}
+              onChange={onChange}
               value={value}
               visible={
                 rangeActive ||
@@ -123,6 +121,18 @@ export function FramePaddingFields(props: {
   );
 }
 
+function PaddingRange(props: {
+  active: boolean;
+  label: string;
+  onActiveChange: (active: boolean) => void;
+  onChange: (value: number) => void;
+  value: number;
+  visible: boolean;
+}) {
+  const draft = useInspectorNumericDraft(props.value, props.onChange);
+  return <NumericRangeScrub {...props} {...draft} scrub={{ min: 0, max: 256, step: 1 }} />;
+}
+
 function PaddingValue(props: {
   compact: boolean;
   label: string;
@@ -131,6 +141,7 @@ function PaddingValue(props: {
   side: PaddingHoverSide;
   revealSlider: boolean;
 }) {
+  const draft = useInspectorNumericDraft(props.value, props.onChange);
   return (
     <div className="min-w-0" data-padding-hover={props.side}>
       {props.compact ? (
@@ -140,21 +151,17 @@ function PaddingValue(props: {
           label={props.label}
           max={4096}
           min={0}
-          onCommitValue={props.onChange}
-          onPreviewValue={props.onChange}
+          {...draft}
           unit="px"
-          value={props.value}
         />
       ) : (
         <NumericRow
           label={props.label}
           max={4096}
           min={0}
-          onCommitValue={props.onChange}
-          onPreviewValue={props.onChange}
+          {...draft}
           unit="px"
-          value={props.value}
-          scrub={{ min: 0, max: 256, step: 1, value: Math.min(256, props.value) }}
+          scrub={{ min: 0, max: 256, step: 1, value: Math.min(256, draft.value) }}
           revealScrub={props.revealSlider}
         />
       )}

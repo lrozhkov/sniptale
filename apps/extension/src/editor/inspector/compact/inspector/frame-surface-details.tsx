@@ -1,3 +1,8 @@
+import {
+  changeFrameBackgroundMode,
+  disableFrameBackground,
+  isFrameBackgroundNone,
+} from '../../scene/background/settings';
 import { translate } from '../../../../platform/i18n';
 import { CompactCommandField, CompactCommandToken, type CompactCommand } from '..';
 import type { InspectorCommandParams } from './command-types';
@@ -24,34 +29,40 @@ function buildFrameBackgroundCommand(params: InspectorCommandParams): CompactCom
             frameDraft={params.frameDraft}
             lastFillModeRef={params.lastFillModeRef}
             setBackgroundMode={(backgroundMode) =>
-              params.setFrameDraft((state) => ({ ...state, backgroundMode }))
+              params.setFrameDraft((state) => changeFrameBackgroundMode(state, backgroundMode))
             }
           />
-          <EditorInspectorFramePreviewCard
-            backgroundPreviewStyle={params.backgroundPreviewStyle}
-            frameDraft={params.frameDraft}
-          />
-          <EditorInspectorFrameBackgroundFillEditor
-            frameDraft={params.frameDraft}
-            gradientPresets={params.frameGradientPresets}
-            frameBackgroundPalette={params.frameBackgroundPalette}
-            frameBackgroundImageFitOptions={params.frameBackgroundImageFitOptions}
-            recentColors={params.recentColors}
-            toNumber={params.toNumber}
-            applyGradientPreset={params.applyGradientPreset}
-            previewFramePatch={(patch: Partial<typeof params.frameDraft>) => {
-              params.setFrameDraft((state) => ({ ...state, ...patch }));
-            }}
-            applyFramePatch={(patch: Partial<typeof params.frameDraft>) => {
-              params.setFrameDraft((state) => ({ ...state, ...patch }));
-            }}
-            onPickBackgroundImage={params.onPickBackgroundImage}
-            onClearBackgroundImage={params.clearBackgroundImage}
-          />
-          <EditorInspectorBackgroundBlurControl
-            frameDraft={params.frameDraft}
-            applyFramePatch={(patch) => params.setFrameDraft((state) => ({ ...state, ...patch }))}
-          />
+          {!isFrameBackgroundNone(params.frameDraft) && (
+            <>
+              <EditorInspectorFramePreviewCard
+                backgroundPreviewStyle={params.backgroundPreviewStyle}
+                frameDraft={params.frameDraft}
+              />
+              <EditorInspectorFrameBackgroundFillEditor
+                frameDraft={params.frameDraft}
+                gradientPresets={params.frameGradientPresets}
+                frameBackgroundPalette={params.frameBackgroundPalette}
+                frameBackgroundImageFitOptions={params.frameBackgroundImageFitOptions}
+                recentColors={params.recentColors}
+                toNumber={params.toNumber}
+                applyGradientPreset={params.applyGradientPreset}
+                previewFramePatch={(patch: Partial<typeof params.frameDraft>) => {
+                  params.setFrameDraft((state) => ({ ...state, ...patch }));
+                }}
+                applyFramePatch={(patch: Partial<typeof params.frameDraft>) => {
+                  params.setFrameDraft((state) => ({ ...state, ...patch }));
+                }}
+                onPickBackgroundImage={params.onPickBackgroundImage}
+                onClearBackgroundImage={params.clearBackgroundImage}
+              />
+              <EditorInspectorBackgroundBlurControl
+                frameDraft={params.frameDraft}
+                applyFramePatch={(patch) =>
+                  params.setFrameDraft((state) => ({ ...state, ...patch }))
+                }
+              />
+            </>
+          )}
         </div>
       </CompactCommandField>
     ),
@@ -79,12 +90,12 @@ function buildFramePaddingCommand(params: InspectorCommandParams): CompactComman
 export function buildFrameSurfaceCommands(params: InspectorCommandParams): CompactCommand[] {
   return [
     buildFrameBackgroundCommand(params),
-    buildFramePaddingCommand(params),
+    ...(!isFrameBackgroundNone(params.frameDraft) ? [buildFramePaddingCommand(params)] : []),
     {
       id: 'frame-apply',
-      title: translate('editor.compact.applyBackground'),
-      trigger: <CompactCommandToken>OK</CompactCommandToken>,
-      onClick: params.onApplyFrame,
+      title: translate('editor.scene.resetBackground'),
+      trigger: <CompactCommandToken>↺</CompactCommandToken>,
+      onClick: () => params.setFrameDraft(disableFrameBackground),
     },
   ];
 }

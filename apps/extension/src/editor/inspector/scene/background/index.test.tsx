@@ -40,7 +40,7 @@ vi.mock('../../../../ui/paint-selector', () => ({
     allowedModes: string[];
     showGradientAdvancedControls: boolean;
     onChange: (paint: unknown) => void;
-    onPreviewChange: (paint: unknown) => void;
+    onPreviewChange?: (paint: unknown) => void;
   }) => (
     <div
       data-testid="paint-control"
@@ -51,7 +51,7 @@ vi.mock('../../../../ui/paint-selector', () => ({
       <span>{props.title}</span>
       <button
         type="button"
-        onClick={() => props.onPreviewChange({ kind: 'solid', color: '#111111ff' })}
+        onClick={() => props.onPreviewChange?.({ kind: 'solid', color: '#111111ff' })}
       >
         preview-paint
       </button>
@@ -167,10 +167,7 @@ it('renders the solid color branch and forwards color updates', async () => {
     (container?.querySelectorAll('button')[1] as HTMLButtonElement | undefined)?.click();
   });
 
-  expect(previewFramePatch).toHaveBeenCalledWith({
-    backgroundColor: '#111111ff',
-    backgroundMode: 'color',
-  });
+  expect(previewFramePatch).not.toHaveBeenCalled();
   expect(applyFramePatch).toHaveBeenCalledWith({
     backgroundColor: '#222222ff',
     backgroundMode: 'color',

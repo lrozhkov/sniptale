@@ -22,7 +22,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../application/controller-context', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../application/controller-context')>()),
-  useEditorController: () => ({ canvas: null }),
+  useEditorController: () => ({ canvas: null, applyFrameSettings: vi.fn() }),
 }));
 vi.mock('../../controller/public-actions/selection/rich-shape', async (importOriginal) => ({
   ...(await importOriginal<
@@ -188,10 +188,11 @@ it('threads image setting updaters and normalizes source image preset header pat
   expect(mocks.actionArgs?.['updateSelectionImageSettings']).toBe(
     mocks.updateSelectionImageSettings
   );
-  expect(mocks.setFrameDraft.mock.calls[0]?.[0](DEFAULT_EDITOR_FRAME_SETTINGS).sourceImage).toEqual(
+  expect(mocks.setFrameDraft.mock.calls[0]?.[0].sourceImage).toEqual(
     expect.objectContaining({ opacity: 0.4, strokeStyle: 'solid' })
   );
-  expect(mocks.setFrameDraft.mock.calls[1]?.[0](DEFAULT_EDITOR_FRAME_SETTINGS).sourceImage).toEqual(
-    DEFAULT_EDITOR_FRAME_SETTINGS.sourceImage
-  );
+  expect(mocks.setFrameDraft.mock.calls[1]?.[0].sourceImage).toEqual({
+    ...DEFAULT_EDITOR_FRAME_SETTINGS.sourceImage,
+    opacity: 0.4,
+  });
 });

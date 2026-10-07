@@ -14,6 +14,20 @@ export const primaryPanelButtonClassName = INSPECTOR_PRIMARY_BUTTON_CLASS_NAME;
 
 export const secondaryPanelButtonClassName = INSPECTOR_SECONDARY_BUTTON_CLASS_NAME;
 
+/** Keep scrub feedback local; only completed edits reach the document/history. */
+export function useInspectorNumericDraft(value: number, onChange: (value: number) => void) {
+  const [preview, setPreview] = React.useState(value);
+  React.useEffect(() => setPreview(value), [value]);
+  return {
+    value: preview,
+    onPreviewValue: setPreview,
+    onCommitValue: (next: number) => {
+      setPreview(next);
+      if (next !== value) onChange(next);
+    },
+  };
+}
+
 export function EditorInspectorRangeField(props: {
   label: string;
   max: number;
@@ -23,6 +37,7 @@ export function EditorInspectorRangeField(props: {
   unit: '' | '%' | 'deg' | 'px';
   value: number;
 }) {
+  const draft = useInspectorNumericDraft(props.value, props.onChange);
   const min = props.min ?? 0;
   const step = props.step ?? 1;
 
@@ -33,9 +48,7 @@ export function EditorInspectorRangeField(props: {
       max={props.max}
       step={step}
       unit={props.unit}
-      value={props.value}
-      onPreviewValue={props.onChange}
-      onCommitValue={props.onChange}
+      {...draft}
       scrub={{ min, max: props.max, step }}
     />
   );

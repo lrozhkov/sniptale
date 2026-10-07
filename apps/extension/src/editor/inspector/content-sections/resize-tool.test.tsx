@@ -144,7 +144,9 @@ it('starts an editable full-canvas guide when expanding and restores bounded cro
 
   act(() => {
     container
-      ?.querySelector<HTMLButtonElement>('[data-ui="editor.canvas-size.mode.expand"]')
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.segmented-row"] button:nth-child(2)'
+      )
       ?.click();
   });
   expect(useEditorStore.getState().canvasCropMode).toBe('expand');
@@ -153,7 +155,9 @@ it('starts an editable full-canvas guide when expanding and restores bounded cro
 
   act(() => {
     container
-      ?.querySelector<HTMLButtonElement>('[data-ui="editor.canvas-size.mode.crop"]')
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.segmented-row"] button:first-child'
+      )
       ?.click();
   });
   expect(useEditorStore.getState().canvasCropMode).toBe('crop');
@@ -278,7 +282,9 @@ it('allows a free canvas selection larger than the old image through dimensions 
   renderResizeTool(controller);
   act(() =>
     container
-      ?.querySelector<HTMLButtonElement>('[data-ui="editor.canvas-size.mode.expand"]')
+      ?.querySelector<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.segmented-row"] button:nth-child(2)'
+      )
       ?.click()
   );
 

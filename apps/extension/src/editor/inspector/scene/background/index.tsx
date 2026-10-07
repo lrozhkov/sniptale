@@ -131,8 +131,6 @@ export function EditorInspectorFrameBackgroundFillEditor(
         recentColors={props.recentColors}
         palette={props.frameBackgroundPalette}
         onChange={(paint) => props.applyFramePatch(paintToFramePatch(paint))}
-        onPreviewChange={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
-        onPreviewReset={(paint) => props.previewFramePatch(paintToFramePatch(paint))}
         onOpenChange={(open) =>
           setTransactionValue((current) =>
             open ? (current ?? frameToPaint(props.frameDraft)) : null

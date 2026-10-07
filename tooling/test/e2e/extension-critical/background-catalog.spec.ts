@@ -202,7 +202,10 @@ for (const viewport of [
       });
       await page.goto(`${host.origin}${EDITOR_HARNESS_PATH}`);
       await page.locator('[data-ui="editor.floating.layers.mode.frame"]').click();
-      await page.locator('[data-ui="editor.frame.background-mode.image"]').click();
+      await page
+        .locator('[data-ui="editor.frame.background-mode"]')
+        .getByRole('button', { name: 'Image', exact: true })
+        .click();
       const picker = page.locator('[data-ui="background.image.picker"]');
       await expect(picker.locator('button[aria-pressed]')).toHaveCount(9);
       await picker.getByRole('button', { name: 'Show 30 more', exact: true }).click();

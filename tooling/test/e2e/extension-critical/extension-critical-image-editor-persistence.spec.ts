@@ -714,7 +714,9 @@ test('managed background follows canvas expansion and history', async ({
   );
   expect(sourceBefore).toBeTruthy();
   await page.locator('[data-ui="editor.floating.layers.mode.canvas-size"]').click();
-  await page.locator('[data-ui="editor.canvas-size.mode.expand"]').click();
+  await page
+    .locator('[data-ui="shared.ui.compact-inspector.segmented-row"] button:nth-child(2)')
+    .click();
   const dimensions = page.locator('[data-size-panel-dimensions] input');
   await dimensions.nth(0).fill('800');
   await dimensions.nth(0).press('Tab');
@@ -741,7 +743,9 @@ test('managed background follows canvas expansion and history', async ({
     .poll(async () => Number((await background())?.scaledWidth))
     .toBeGreaterThanOrEqual(800);
   await page.locator('[data-ui="editor.floating.layers.mode.canvas-size"]').click();
-  await page.locator('[data-ui="editor.canvas-size.mode.crop"]').click();
+  await page
+    .locator('[data-ui="shared.ui.compact-inspector.segmented-row"] button:first-child')
+    .click();
   await dimensions.nth(0).fill('400');
   await dimensions.nth(0).press('Tab');
   await dimensions.nth(1).fill('300');

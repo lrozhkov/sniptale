@@ -241,8 +241,8 @@ it('wires the inspector scene panel sections and actions', async () => {
   expect(presetHeader).not.toHaveBeenCalled();
   expect(setLayoutMode).toHaveBeenCalledWith('fit-image');
   expect(setBackgroundMode).toHaveBeenCalledWith('color');
-  expect(setFrameDraft).toHaveBeenCalledTimes(1);
-  expect(onApplyFrame).toHaveBeenCalledTimes(1);
+  expect(setFrameDraft).toHaveBeenCalledTimes(2);
+  expect(onApplyFrame).not.toHaveBeenCalled();
   expect(onCancelFrame).not.toHaveBeenCalled();
 });
 

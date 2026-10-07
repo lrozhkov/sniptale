@@ -1,3 +1,4 @@
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import React, { useMemo } from 'react';
 import { Calendar, Link, Monitor } from 'lucide-react';
 import { translate, useAppLocale } from '../../platform/i18n';
@@ -44,16 +45,6 @@ const pickerButtonClassName = {
   expanded: 'px-4',
 } as const;
 
-const selectedLayoutClassName = [
-  'bg-[var(--sniptale-color-surface-panel)] font-medium shadow-sm',
-  'text-[var(--sniptale-color-text-primary)]',
-].join(' ');
-
-const unselectedLayoutClassName = [
-  'text-[var(--sniptale-color-text-secondary)]',
-  'hover:bg-[var(--sniptale-color-surface-panel)]',
-].join(' ');
-
 interface EditorTechnicalDataPickerProps {
   onInsert: (kinds: readonly EditorTechnicalDataKind[], layout: EditorTechnicalDataLayout) => void;
   variant?: TechnicalDataPickerVariant;
@@ -87,27 +78,16 @@ function TechnicalDataLayoutToggle(props: {
       <h3 className={INSPECTOR_SECTION_LABEL_CLASS_NAME}>
         {translate('editor.compact.technicalDataLayout')}
       </h3>
-      <div
-        role="group"
-        aria-label={translate('editor.compact.technicalDataLayout')}
-        className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--sniptale-color-surface-hover)] p-1"
-      >
-        {(['column', 'row'] as const).map((layout) => (
-          <button
-            key={layout}
-            type="button"
-            aria-pressed={props.layout === layout}
-            className={cx(
-              'rounded-md px-2 py-1.5 text-xs',
-              'focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-focus-ring)]',
-              props.layout === layout ? selectedLayoutClassName : unselectedLayoutClassName
-            )}
-            onClick={() => props.onSelectLayout(layout)}
-          >
-            {getTechnicalDataLayoutLabel(layout)}
-          </button>
-        ))}
-      </div>
+      <SegmentedRow
+        ariaLabel={translate('editor.compact.technicalDataLayout')}
+        value={props.layout}
+        onChange={props.onSelectLayout}
+        columns={2}
+        options={(['column', 'row'] as const).map((value) => ({
+          value,
+          label: getTechnicalDataLayoutLabel(value),
+        }))}
+      />
     </section>
   );
 }
