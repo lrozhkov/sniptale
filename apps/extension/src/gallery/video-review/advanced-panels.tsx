@@ -4,7 +4,7 @@ import { ReviewWatermarkInspector } from './watermark-inspector';
 import type { ComponentProps } from 'react';
 import { quickEditSpatialSpan } from '../../features/video/review/advanced/spatial';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { Scan, Paintbrush, AudioLines, PanelTop, Clapperboard } from 'lucide-react';
+import { Scan, Wallpaper, Stamp, AudioLines, PanelTop, Clapperboard } from 'lucide-react';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
@@ -96,6 +96,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
 export function ReviewSceneProperties(props: {
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
   background: QuickEditAdvancedState['background'];
+  onPreviewBackground?(background: QuickEditAdvancedState['background'] | null): void;
   canvas: QuickEditAdvancedState['canvas'];
   presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: ComponentProps<typeof ReviewWatermarkInspector>;
@@ -130,16 +131,6 @@ export function ReviewSceneProperties(props: {
         ) : null}
         <ReviewInspectorSections
           sections={[
-            ...(props.presentation
-              ? [
-                  {
-                    id: 'presentation',
-                    label: translate('gallery.videoReview.presentation'),
-                    icon: Clapperboard,
-                    content: <ReviewPresentationBinding {...props.presentation} />,
-                  },
-                ]
-              : []),
             {
               id: 'canvas',
               label: translate('gallery.videoReview.canvas'),
@@ -166,7 +157,7 @@ export function ReviewSceneProperties(props: {
             {
               id: 'background',
               label: translate('gallery.videoReview.background'),
-              icon: Paintbrush,
+              icon: Wallpaper,
               content: (
                 <ReviewBackgroundInspector
                   perspectiveFixed={
@@ -180,18 +171,33 @@ export function ReviewSceneProperties(props: {
                   background={props.background}
                   pending={props.pending}
                   onImportImage={props.onImportImage}
+                  onPreview={(patch) =>
+                    props.onPreviewBackground?.(
+                      patch ? updateQuickEditBackground(props.background, patch) : null
+                    )
+                  }
                   onChange={(patch) =>
                     props.setBackground((current) => updateQuickEditBackground(current, patch))
                   }
                 />
               ),
             },
+            ...(props.presentation
+              ? [
+                  {
+                    id: 'presentation',
+                    label: translate('gallery.videoReview.presentation'),
+                    icon: Clapperboard,
+                    content: <ReviewPresentationBinding {...props.presentation} />,
+                  },
+                ]
+              : []),
             ...(props.watermark
               ? [
                   {
                     id: 'watermark',
                     label: translate('gallery.videoReview.watermark'),
-                    icon: Paintbrush,
+                    icon: Stamp,
                     content: <ReviewWatermarkInspector {...props.watermark} />,
                   },
                 ]

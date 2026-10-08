@@ -22,6 +22,8 @@ export interface QuickEditWatermarkSettings {
     value: string;
     font: 'sans' | 'serif' | 'mono';
     weight: 'normal' | 'bold';
+    /** Absent in earlier projects means no strikethrough. */
+    strike?: boolean;
     /** Font size relative to the short canvas side. */
     size: number;
     /** The color is the sole source of text alpha. */
@@ -119,7 +121,17 @@ function validWatermarkText(value: unknown): value is string {
 function parseText(value: unknown): QuickEditWatermarkSettings['text'] | null {
   if (
     !isRecord(value) ||
-    !onlyFields(value, ['value', 'font', 'weight', 'size', 'color', 'align', 'shadow', 'wrapWidth'])
+    !onlyFields(value, [
+      'value',
+      'font',
+      'weight',
+      'size',
+      'color',
+      'align',
+      'shadow',
+      'wrapWidth',
+      'strike',
+    ])
   )
     return null;
   if (
@@ -132,7 +144,8 @@ function parseText(value: unknown): QuickEditWatermarkSettings['text'] | null {
   if (
     !isBoundedNumber(value['size'], 1 / 1080, 0.25) ||
     !isBoundedNumber(value['wrapWidth'], 0.05, 1) ||
-    typeof value['shadow'] !== 'boolean'
+    typeof value['shadow'] !== 'boolean' ||
+    (value['strike'] !== undefined && typeof value['strike'] !== 'boolean')
   )
     return null;
   const color = typeof value['color'] === 'string' ? normalizePaintColor(value['color']) : null;
@@ -141,6 +154,7 @@ function parseText(value: unknown): QuickEditWatermarkSettings['text'] | null {
     value: value['value'],
     font: value['font'],
     weight: value['weight'],
+    ...(value['strike'] === undefined ? {} : { strike: value['strike'] }),
     size: value['size'],
     color,
     align: value['align'],

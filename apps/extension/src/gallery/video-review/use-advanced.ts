@@ -15,6 +15,11 @@ export function useReviewAdvanced(session: Session) {
   const snapshot = useReviewSnapshot(session);
   const persisted = snapshot.snapshot.workspace.advanced;
   const contentState = useReviewAdvancedContent(session, snapshot.document.advancedContent);
+  const [backgroundGesture, setBackgroundGesture] = useState<{
+    session: Session;
+    base: QuickEditAdvancedState['background'];
+    value: QuickEditAdvancedState['background'];
+  } | null>(null);
   const [optimistic, setOptimistic] = useState<PendingSave | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const currentRef = useRef(persisted);
@@ -96,6 +101,7 @@ export function useReviewAdvanced(session: Session) {
     pending.current = null;
     currentRef.current = session.getSnapshot().snapshot.workspace.advanced;
     contentState.reset();
+    setBackgroundGesture(null);
     if (mounted.current) {
       setOptimistic(null);
       setSaveFailed(false);
@@ -121,6 +127,12 @@ export function useReviewAdvanced(session: Session) {
   return {
     ...contentState.commands,
     advanced,
+    backgroundPreview:
+      backgroundGesture?.session === session && backgroundGesture.base === content.background
+        ? backgroundGesture.value
+        : null,
+    previewBackground: (value: QuickEditAdvancedState['background'] | null) =>
+      setBackgroundGesture(value ? { session, base: content.background, value } : null),
     saveFailed: saveFailed || contentState.saveFailed,
     pending: optimistic !== null || contentState.pending,
     retry: () => Promise.all([flush(), contentState.flush()]),

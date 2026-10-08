@@ -309,6 +309,29 @@ it('rejects malformed staged content without losing the pending edit and allows 
   expect(advanced.saveFailed).toBe(false);
 });
 
+it('keeps background gestures out of history and invalidates them on a committed background change', async () => {
+  const { session } = setup();
+  const before = session.getSnapshot().document.advancedContent;
+  const draft = {
+    enabled: true as const,
+    type: 'solid' as const,
+    color: '#123456ff',
+    layout: { padding: 80, cornerRadius: 12 },
+  };
+  act(() => advanced.previewBackground(draft));
+  await act(async () => advanced.flush());
+  expect(advanced.backgroundPreview).toEqual(draft);
+  expect(session.getSnapshot().document.advancedContent).toEqual(before);
+  expect(advanced.advanced.background).toEqual(before.background);
+  act(() => advanced.previewBackground(null));
+  expect(advanced.backgroundPreview).toBeNull();
+  act(() => advanced.previewBackground(draft));
+  act(() => advanced.setBackground(() => draft));
+  expect(advanced.backgroundPreview).toBeNull();
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.background).toEqual(draft);
+});
+
 it('does not resurrect a removed baseline watermark when another scene setting is edited', async () => {
   const initial = createQuickEditAdvancedState();
   initial.watermark = { ...createQuickEditWatermark('Saved mark'), mode: 'text' };

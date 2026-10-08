@@ -1,5 +1,5 @@
 .review-background-kinds [data-ui='shared.ui.compact-inspector.segmented-row'] {
-  grid-template-columns: auto auto auto minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 2px;
 }
 .review-background-kinds [data-ui='shared.ui.compact-inspector.segmented-row'] > button {
@@ -16,4 +16,9 @@
 }
 .review-background-paint .paint-inspector-field > button > svg {
   display: none;
+}
+
+.review-background-swatches [role='group'] > button {
+  height: auto;
+  aspect-ratio: 1;
 }

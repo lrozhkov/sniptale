@@ -179,6 +179,25 @@ async function proveInspectorBreakpoints(
     const sections = inspector.locator('[data-ui="gallery.videoReview.inspectorSections"]:visible');
     await expect(sections).toHaveAttribute('data-presentation', 'all');
     await expect(sections).toHaveCSS('display', target < 524 ? 'block' : 'grid');
+    if (target === 524) {
+      await scroll.evaluate((node) => {
+        node.scrollTop = 0;
+      });
+      const first = sections.locator('section[data-section="canvas"]');
+      const next = sections.locator('section[data-section="window-header"]');
+      const other = sections.locator('section[data-section="presentation"]');
+      const before = await next.boundingBox();
+      const otherBefore = await other.boundingBox();
+      await first.locator('summary').first().click();
+      await expect(first.locator('details').first()).not.toHaveAttribute('open', '');
+      await expect.poll(async () => (await next.boundingBox())!.y).toBeLessThan(before!.y);
+      expect((await other.boundingBox())!.y).toBeCloseTo(otherBefore!.y, 0);
+      await page.screenshot({
+        path: info.outputPath('scene-two-columns-independent-collapse.png'),
+        fullPage: false,
+      });
+      await first.locator('summary').first().click();
+    }
     await fields.scrollIntoViewIfNeeded();
     await expect(fields).toBeVisible();
     await page.screenshot({
@@ -225,6 +244,40 @@ for (const variant of variants) {
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
       const fields = inspector.locator('[data-ui="gallery.videoReview.watermarkInspector"]');
+      await expect(inspector.locator('.review-inspector-section')).toHaveCount(6);
+      expect(
+        await inspector
+          .locator('.review-inspector-section')
+          .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-section')))
+      ).toEqual(['canvas', 'window-header', 'background', 'presentation', 'watermark', 'audio']);
+      await button('gallery.videoReview.backgroundSolid').click();
+      await inspector
+        .getByRole('textbox', {
+          name: label('gallery.videoReview.backgroundPadding'),
+          exact: true,
+        })
+        .hover();
+      const padding = inspector.getByRole('slider', {
+        name: `${label('gallery.videoReview.backgroundPadding')} range`,
+        exact: true,
+      });
+      await padding.scrollIntoViewIfNeeded();
+      // Let the initial mode change settle before testing one held gesture.
+      await page.waitForTimeout(350);
+      const beforeBackground = (await persistedWatermark(page)).cursor;
+      const rangeBox = (await padding.boundingBox())!;
+      await page.mouse.move(rangeBox.x + rangeBox.width * 0.6, rangeBox.y + rangeBox.height / 2);
+      await page.mouse.down();
+      await page.waitForTimeout(350);
+      expect((await persistedWatermark(page)).cursor).toBe(beforeBackground);
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await persistedWatermark(page)).cursor)
+        .toBe(beforeBackground + 1);
+      await inspector
+        .locator('[data-ui="gallery.videoReview.backgroundInspector"]')
+        .getByRole('button', { name: label('gallery.videoReview.backgroundNone'), exact: true })
+        .click();
       const mode = (key: Message) => fields.getByRole('button', { name: label(key), exact: true });
       const text = fields.getByRole('textbox', {
         name: label('gallery.videoReview.watermarkText'),
@@ -233,11 +286,6 @@ for (const variant of variants) {
       const overlay = review.locator('[data-ui="gallery.videoReview.watermark"]');
       const canvas = overlay.locator('canvas');
       const settled = () => expect(fields).toHaveAttribute('aria-busy', 'false');
-      const select = async (field: Message, option: Message) => {
-        await fields.getByRole('button', { name: label(field), exact: true }).click();
-        await page.getByRole('option', { name: label(option), exact: true }).click();
-        await settled();
-      };
       expect((await persistedWatermark(page)).watermark).toBeUndefined();
       await expect(text).toHaveCount(0);
       await mode('gallery.videoReview.watermarkText').click();
@@ -280,8 +328,12 @@ for (const variant of variants) {
       await expect.poll(() => captionPixels(canvas)).toBe(false);
       await mode('gallery.videoReview.watermarkText').click();
       await expect(text).toHaveValue(authored);
-      await select('gallery.videoReview.watermarkFont', 'gallery.videoReview.watermarkFontMono');
-      await select('gallery.videoReview.watermarkWeight', 'gallery.videoReview.watermarkBold');
+      await mode('gallery.videoReview.watermarkFontMono').click();
+      await mode('gallery.videoReview.watermarkBold').click();
+      await mode('gallery.videoReview.watermarkStrike').click();
+      await expect
+        .poll(async () => (await persistedWatermark(page)).watermark?.text.strike)
+        .toBe(true);
       const size = fields.getByRole('textbox', {
         name: label('gallery.videoReview.watermarkSize'),
         exact: true,
@@ -349,6 +401,9 @@ for (const variant of variants) {
       // Playback removes the editing hitbox; the global transport shortcut still owns Space.
       await page.keyboard.press('Space');
       await expect.poll(() => video.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
+      await fields
+        .getByText(label('gallery.videoReview.watermarkPositionExact'), { exact: true })
+        .click();
       const x = fields.getByRole('textbox', {
         name: label('gallery.videoReview.watermarkX'),
         exact: true,
@@ -359,7 +414,7 @@ for (const variant of variants) {
       await expect
         .poll(async () => (await persistedWatermark(page)).watermark?.placement.position?.x)
         .toBe(0.4);
-      await select('gallery.videoReview.watermarkLayout', 'gallery.videoReview.watermarkTiled');
+      await mode('gallery.videoReview.watermarkTiled').click();
       await expect(anchors).toHaveCount(0);
       await expect(target).toHaveCount(0);
       const rotation = fields.getByRole('textbox', {

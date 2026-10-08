@@ -1,5 +1,5 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
+import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { BackgroundImagePicker } from '../../composition/background-resources/picker';
 import { prepareStaticLogo, StaticLogoError } from '../../workflows/background-images/static-logo';
 import {
@@ -9,7 +9,7 @@ import {
   type QuickEditWatermarkSettings,
 } from '../../features/video/review/advanced/watermark';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { reviewSelectFieldClassName } from './controls';
+import { ReviewButton, ReviewDetails } from './controls';
 import {
   WatermarkTextFields,
   WatermarkNumber,
@@ -96,16 +96,13 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
           <WatermarkPlacementFields {...binding} />
         </div>
       )}
-      <ContentToolbarButton
-        tone="outline"
-        aria-label={translate('gallery.videoReview.watermarkReset')}
+      <ReviewButton
+        label={translate('gallery.videoReview.watermarkReset')}
         onClick={() => {
           props.onPreview(null);
           props.onReset();
         }}
-      >
-        {translate('gallery.videoReview.watermarkReset')}
-      </ContentToolbarButton>
+      />
     </fieldset>
   );
 }
@@ -184,9 +181,9 @@ function WatermarkPlacementFields(props: Binding) {
   const { settings, onChange } = props;
   return (
     <div className="min-w-0 space-y-2">
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.watermarkLayout')}
+      <SegmentedRow
+        columns={2}
+        ariaLabel={translate('gallery.videoReview.watermarkLayout')}
         value={settings.layout}
         options={[
           { value: 'single', label: translate('gallery.videoReview.watermarkSingle') },
@@ -256,37 +253,42 @@ function WatermarkSinglePlacement(props: Binding) {
           ))}
         </div>
       </div>
-      <WatermarkNumber
-        {...props}
-        label={translate('gallery.videoReview.watermarkMargin')}
-        unit="%"
-        value={settings.placement.margin * 100}
-        min={0}
-        max={25}
-        step={0.1}
-        change={(value) => ({
-          ...settings,
-          placement: { ...settings.placement, margin: value / 100 },
-        })}
-      />
-      {(['x', 'y'] as const).map((axis) => (
+      <ReviewDetails
+        label={translate('gallery.videoReview.watermarkPositionExact')}
+        preferenceId="watermark.position"
+      >
         <WatermarkNumber
-          key={axis}
           {...props}
-          label={translate(
-            axis === 'x' ? 'gallery.videoReview.watermarkX' : 'gallery.videoReview.watermarkY'
-          )}
+          label={translate('gallery.videoReview.watermarkMargin')}
           unit="%"
-          value={position[axis] * 100}
+          value={settings.placement.margin * 100}
           min={0}
-          max={100}
+          max={25}
           step={0.1}
           change={(value) => ({
             ...settings,
-            placement: { ...settings.placement, position: { ...position, [axis]: value / 100 } },
+            placement: { ...settings.placement, margin: value / 100 },
           })}
         />
-      ))}
+        {(['x', 'y'] as const).map((axis) => (
+          <WatermarkNumber
+            key={axis}
+            {...props}
+            label={translate(
+              axis === 'x' ? 'gallery.videoReview.watermarkX' : 'gallery.videoReview.watermarkY'
+            )}
+            unit="%"
+            value={position[axis] * 100}
+            min={0}
+            max={100}
+            step={0.1}
+            change={(value) => ({
+              ...settings,
+              placement: { ...settings.placement, position: { ...position, [axis]: value / 100 } },
+            })}
+          />
+        ))}
+      </ReviewDetails>
     </>
   );
 }

@@ -41,6 +41,7 @@ beforeEach(() => {
           actualBoundingBoxDescent: 7,
         })),
         fillText: vi.fn(),
+        fillRect: vi.fn(),
         drawImage: vi.fn(),
         save: vi.fn(),
         restore: vi.fn(),
@@ -534,4 +535,24 @@ it('exposes image source storage without decoding and rejects painting an aborte
   controller.abort();
   await expect(measured.paint(read)).rejects.toThrow();
   expect(read).not.toHaveBeenCalled();
+});
+
+it('draws strikethrough with the same text alpha, alignment and raster transform', async () => {
+  const value = settings();
+  value.text.strike = true;
+  value.text.value = 'Latin\nКириллица';
+  const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const context = contexts[0]!;
+  const glyphs = vi.mocked(context.fillText).mock.calls;
+  const strokes = vi.mocked(context.fillRect).mock.calls;
+  expect(strokes).toHaveLength(glyphs.length);
+  for (const [index, [text, x, y]] of glyphs.entries()) {
+    const [left, top, width, height] = strokes[index]!;
+    expect(left).toBe(x);
+    expect(top).toBeCloseTo(y - 24 * 0.3);
+    expect(width).toBe(text.length * 12);
+    expect(height).toBeCloseTo(24 * 0.06);
+  }
+  expect(context.fillStyle).toBe(value.text.color);
+  painter.dispose();
 });

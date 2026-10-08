@@ -6,7 +6,10 @@ import {
   ReviewWatermarkInspector,
   type ReviewWatermarkInspectorProps,
 } from './watermark-inspector';
-import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
+import {
+  createQuickEditWatermark,
+  parseQuickEditWatermark,
+} from '../../features/video/review/advanced/watermark';
 
 const io = vi.hoisted(() => ({ picker: vi.fn() }));
 vi.mock('../../platform/i18n', () => ({
@@ -143,6 +146,29 @@ it('uses the bounded static acquisition policy, retains the thumbnail and expose
   expect(props.onRetry).toHaveBeenCalledTimes(1);
   expect(props.onImage).not.toHaveBeenCalled();
 });
+
+it.each([
+  { edge: 1440, typed: '1', pixels: 2 },
+  { edge: 101, typed: '26', pixels: 25 },
+  { edge: 2, typed: '1', pixels: 0.5 },
+])(
+  'commits a valid whole-pixel size at the $edge pixel output boundary',
+  async ({ edge, typed, pixels }) => {
+    props.output = { width: edge * 2, height: edge };
+    await render();
+    const input = host.querySelector<HTMLInputElement>(
+      'input[aria-label="gallery.videoReview.watermarkSize"]'
+    )!;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, typed);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    const saved = vi.mocked(props.onChange).mock.lastCall?.[0];
+    expect(saved?.text.size).toBe(pixels / edge);
+    expect(parseQuickEditWatermark(saved)).not.toBeNull();
+  }
+);
 
 it('previews numeric text size without committing until acceptance', async () => {
   await render();
@@ -340,4 +366,16 @@ it('commits slider changes when canvas previews are echoed into settings', async
   expect(Number(host.querySelector<HTMLInputElement>('input[type="range"]')!.value)).toBeCloseTo(
     after
   );
+});
+
+it('displays whole font pixels without writing rounded authoring on open or blur', async () => {
+  props.settings!.text.size = 24.46 / 1080;
+  await render();
+  const input = host.querySelector<HTMLInputElement>(
+    'input[aria-label="gallery.videoReview.watermarkSize"]'
+  )!;
+  expect(input.value).toBe('24');
+  await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+  expect(props.onChange).not.toHaveBeenCalled();
+  expect(props.settings!.text.size).toBe(24.46 / 1080);
 });

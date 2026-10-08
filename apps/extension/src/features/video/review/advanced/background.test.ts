@@ -30,7 +30,11 @@ describe('updateQuickEditBackground', () => {
         layout: { padding: 40, cornerRadius: 12 },
       }
     );
-    expect(updateQuickEditBackground(solid, { enabled: false })).toEqual({ enabled: false });
+    expect(updateQuickEditBackground(solid, { enabled: false })).toEqual({
+      enabled: false,
+      rememberedPaint: { kind: 'solid', color: solid.color },
+      rememberedLayout: solid.layout,
+    });
   });
 
   it('keeps the paint and layout while the type stays and clamps new layout values', () => {
@@ -158,4 +162,20 @@ it('preserves blur between paints, clamps updates and leaves legacy layouts unto
   expect(low.enabled && low.layout.blur).toBe(0);
   const legacy = updateQuickEditBackground(solid, { layout: solid.layout });
   expect(legacy.enabled && legacy.layout).not.toHaveProperty('blur');
+});
+
+it('retains authored paint and geometry through image and disabled modes', () => {
+  const painted = updateQuickEditBackground(solid, {
+    color: '#123456ff',
+    layout: { padding: 91, cornerRadius: 17, blur: 6 },
+  });
+  const image = updateQuickEditBackground(painted, { type: 'image', assetId: 'project-asset:one' });
+  const disabled = updateQuickEditBackground(image, { enabled: false });
+  const restored = updateQuickEditBackground(disabled, { enabled: true, type: 'solid' });
+  expect(restored).toMatchObject({
+    type: 'solid',
+    color: '#123456ff',
+    layout: { padding: 91, cornerRadius: 17, blur: 6 },
+    rememberedImage: { assetId: 'project-asset:one', imageFit: 'cover' },
+  });
 });

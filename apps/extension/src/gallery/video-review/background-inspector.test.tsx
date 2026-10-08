@@ -63,6 +63,28 @@ afterEach(async () => {
 
 const layout: QuickEditBackgroundLayout = { padding: 24, cornerRadius: 12 };
 
+it('keeps a held background slider outside authored changes until release', async () => {
+  const change = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ enabled: true, type: 'solid', color: '#000000ff', layout }}
+        onChange={change}
+      />
+    )
+  );
+  const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
+  act(() => range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(range, '50');
+    range.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(range.value).toBe('50');
+  expect(change).not.toHaveBeenCalled();
+  act(() => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(change).toHaveBeenCalledExactlyOnceWith({ layout: { ...layout, padding: 50 } });
+});
+
 it('switches the background kind and commits layout values', async () => {
   const change = vi.fn((_patch: { enabled?: boolean; type?: string }) => undefined);
   const render = (background: QuickEditBackgroundSettings) => {

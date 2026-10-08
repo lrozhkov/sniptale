@@ -1,11 +1,14 @@
+import { AlignLeft, AlignCenter, AlignRight, Bold, Strikethrough } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { useEffect, useId, useRef, useState } from 'react';
-import { ColorField, CompactTextarea, SelectField } from '../../ui/compact-inspector-controls';
+import { ColorField, CompactTextarea, SegmentedRow } from '../../ui/compact-inspector-controls';
 import {
   parseQuickEditWatermark,
   type QuickEditWatermarkSettings,
 } from '../../features/video/review/advanced/watermark';
 import { translate } from '../../platform/i18n';
-import { reviewSelectFieldClassName } from './controls';
+import { ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 
 export type WatermarkBinding = {
@@ -110,9 +113,9 @@ export function WatermarkTextFields(
   return (
     <>
       <WatermarkTextDraft {...props} />
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.watermarkFont')}
+      <SegmentedRow
+        columns={3}
+        ariaLabel={translate('gallery.videoReview.watermarkFont')}
         value={text.font}
         options={[
           { value: 'sans', label: translate('gallery.videoReview.watermarkFontSans') },
@@ -121,25 +124,18 @@ export function WatermarkTextFields(
         ]}
         onChange={(font: typeof text.font) => onChange(patch({ font }))}
       />
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.watermarkWeight')}
-        value={text.weight}
-        options={[
-          { value: 'normal', label: translate('gallery.videoReview.watermarkNormal') },
-          { value: 'bold', label: translate('gallery.videoReview.watermarkBold') },
-        ]}
-        onChange={(weight: typeof text.weight) => onChange(patch({ weight }))}
-      />
       <WatermarkNumber
         {...props}
         label={translate('gallery.videoReview.watermarkSize')}
         unit="px"
         value={text.size * shortSide}
-        min={shortSide / 1080}
-        max={shortSide * 0.25}
+        min={Math.ceil(shortSide / 1080)}
+        max={Math.max(1, Math.floor(shortSide * 0.25))}
         step={1}
-        change={(value) => patch({ size: value / shortSide })}
+        precision={0}
+        change={(value) =>
+          patch({ size: Math.max(1 / 1080, Math.min(0.25, Math.round(value) / shortSide)) })
+        }
       />
       <ColorField
         className={reviewSelectFieldClassName}
@@ -150,41 +146,87 @@ export function WatermarkTextFields(
         onPreviewChange={(color) => onPreview(patch({ color }))}
         onPreviewReset={() => onPreview(null)}
       />
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.watermarkAlign')}
-        value={text.align}
-        options={[
-          { value: 'left', label: translate('gallery.videoReview.watermarkAlignLeft') },
-          { value: 'center', label: translate('gallery.videoReview.watermarkAlignCenter') },
-          { value: 'right', label: translate('gallery.videoReview.watermarkAlignRight') },
-        ]}
-        onChange={(align: typeof text.align) => onChange(patch({ align }))}
-      />
-      <WatermarkNumber
-        {...props}
-        label={translate('gallery.videoReview.watermarkWrap')}
-        unit="%"
-        value={text.wrapWidth * 100}
-        min={5}
-        max={100}
-        step={1}
-        change={(value) => patch({ wrapWidth: value / 100 })}
-      />
-      <label
-        className={
-          'flex min-h-8 items-center justify-between gap-2 text-xs ' +
-          'text-[var(--sniptale-color-text-secondary)]'
-        }
+      <div className="flex items-center gap-2">
+        <div
+          role="group"
+          aria-label={translate('gallery.videoReview.watermarkWeight')}
+          className="flex gap-1"
+        >
+          <ContentToolbarButton
+            tone="utility"
+            aria-label={translate('gallery.videoReview.watermarkBold')}
+            title={translate('gallery.videoReview.watermarkBold')}
+            aria-pressed={text.weight === 'bold'}
+            className="aria-pressed:bg-[var(--sniptale-color-surface-hover)]"
+            onClick={() => onChange(patch({ weight: text.weight === 'bold' ? 'normal' : 'bold' }))}
+          >
+            <Bold size={15} aria-hidden="true" />
+          </ContentToolbarButton>
+          <ContentToolbarButton
+            tone="utility"
+            aria-label={translate('gallery.videoReview.watermarkStrike')}
+            title={translate('gallery.videoReview.watermarkStrike')}
+            aria-pressed={text.strike === true}
+            className="aria-pressed:bg-[var(--sniptale-color-surface-hover)]"
+            onClick={() => onChange(patch({ strike: !text.strike }))}
+          >
+            <Strikethrough size={15} aria-hidden="true" />
+          </ContentToolbarButton>
+        </div>
+        <div className="min-w-0 flex-1">
+          <SegmentedRow
+            columns={3}
+            ariaLabel={translate('gallery.videoReview.watermarkAlign')}
+            value={text.align}
+            options={[
+              {
+                value: 'left',
+                label: translate('gallery.videoReview.watermarkAlignLeft'),
+                icon: <AlignLeft size={15} />,
+              },
+              {
+                value: 'center',
+                label: translate('gallery.videoReview.watermarkAlignCenter'),
+                icon: <AlignCenter size={15} />,
+              },
+              {
+                value: 'right',
+                label: translate('gallery.videoReview.watermarkAlignRight'),
+                icon: <AlignRight size={15} />,
+              },
+            ]}
+            onChange={(align: typeof text.align) => onChange(patch({ align }))}
+          />
+        </div>
+      </div>
+      <ReviewDetails
+        label={translate('gallery.videoReview.watermarkAdvanced')}
+        preferenceId="watermark.text.advanced"
       >
-        {translate('gallery.videoReview.watermarkShadow')}
-        <input
-          type="checkbox"
-          className="size-4 accent-[var(--sniptale-color-text-primary)]"
-          checked={text.shadow}
-          onChange={(event) => onChange(patch({ shadow: event.currentTarget.checked }))}
+        <WatermarkNumber
+          {...props}
+          label={translate('gallery.videoReview.watermarkWrap')}
+          unit="%"
+          value={text.wrapWidth * 100}
+          min={5}
+          max={100}
+          step={1}
+          change={(value) => patch({ wrapWidth: value / 100 })}
         />
-      </label>
+        <div
+          className="flex min-h-8 items-center justify-between gap-2 text-xs
+          text-[var(--sniptale-color-text-secondary)]"
+        >
+          <span>{translate('gallery.videoReview.watermarkShadow')}</span>
+          <ProductGlassSwitch
+            role="switch"
+            aria-checked={text.shadow}
+            on={text.shadow}
+            aria-label={translate('gallery.videoReview.watermarkShadow')}
+            onClick={() => onChange(patch({ shadow: !text.shadow }))}
+          />
+        </div>
+      </ReviewDetails>
     </>
   );
 }
@@ -198,18 +240,20 @@ export function WatermarkNumber(
     min: number;
     max: number;
     step: number;
+    precision?: number;
     change(value: number): QuickEditWatermarkSettings;
   }
 ) {
   return (
     <ReviewPreviewNumberRow
+      enterBehavior="blur"
       label={props.label}
       {...(props.unit ? { unit: props.unit } : {})}
       value={props.value}
       min={props.min}
       max={props.max}
       step={props.step}
-      precision={1}
+      precision={props.precision ?? 1}
       onPreview={(value) => props.onPreview(value === null ? null : props.change(value))}
       onChange={(value) => props.onChange(props.change(value))}
     />

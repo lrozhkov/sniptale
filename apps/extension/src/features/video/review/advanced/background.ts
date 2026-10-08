@@ -1,4 +1,4 @@
-import type { Gradient } from '@sniptale/foundation/paint';
+import type { Gradient, Paint } from '@sniptale/foundation/paint';
 import { createGradientPaint } from '@sniptale/foundation/paint';
 import type { QuickEditBackgroundLayout, QuickEditBackgroundSettings } from './types';
 
@@ -34,7 +34,7 @@ export interface QuickEditBackgroundPatch {
 
 /**
  * Background belongs to the whole canvas, not to a clip: paint switches keep the layout,
- * none/paint switches start from the default layout, and the layout clamps into the contract.
+ * disabled backgrounds retain their layout and paint, and layout edits clamp into the contract.
  */
 export function updateQuickEditBackground(
   background: QuickEditBackgroundSettings,
@@ -47,31 +47,46 @@ export function updateQuickEditBackground(
       ? { assetId: background.assetId, imageFit: background.imageFit }
       : background.rememberedImage;
   const retained = image ? { rememberedImage: image } : {};
-  if (patch.enabled === false) return { enabled: false, ...motion, ...retained };
+  const paint: Paint | undefined =
+    background.enabled && background.type === 'solid'
+      ? { kind: 'solid', color: background.color }
+      : background.enabled && background.type === 'gradient'
+        ? { kind: 'gradient', gradient: background.gradient }
+        : background.rememberedPaint;
+  const remembered = paint ? { rememberedPaint: paint } : {};
+  if (patch.enabled === false)
+    return {
+      enabled: false,
+      ...motion,
+      ...retained,
+      ...remembered,
+      ...(background.enabled
+        ? { rememberedLayout: background.layout }
+        : background.rememberedLayout
+          ? { rememberedLayout: background.rememberedLayout }
+          : {}),
+    };
   const layout = patch.layout
     ? clampLayout(patch.layout)
     : background.enabled
       ? background.layout
-      : { ...DEFAULT_LAYOUT };
-  const type = patch.type ?? (background.enabled ? background.type : 'solid');
-  const active = background.enabled ? background : null;
+      : (background.rememberedLayout ?? { ...DEFAULT_LAYOUT });
+  const type = patch.type ?? (background.enabled ? background.type : (paint?.kind ?? 'solid'));
   if (type === 'solid')
     return {
       ...motion,
       ...retained,
       enabled: true,
       type,
-      color: patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR),
+      color: patch.color ?? (paint?.kind === 'solid' ? paint.color : DEFAULT_COLOR),
       layout,
     };
   if (type === 'gradient') {
-    const gradient =
-      patch.gradient ?? (active && active.type === 'gradient' ? active.gradient : null);
+    const gradient = patch.gradient ?? (paint?.kind === 'gradient' ? paint.gradient : null);
     if (gradient) return { enabled: true, type, gradient, layout, ...motion, ...retained };
     // A paint switch must turn the background on even without stored gradient
     // data: derive a ready two-stop default from the previous paint color.
-    const fallbackColor =
-      patch.color ?? (active && active.type === 'solid' ? active.color : DEFAULT_COLOR);
+    const fallbackColor = patch.color ?? (paint?.kind === 'solid' ? paint.color : DEFAULT_COLOR);
     const fallback = createGradientPaint(fallbackColor, () => crypto.randomUUID(), 'linear');
     if (fallback.kind !== 'gradient') return { enabled: false };
     return { enabled: true, type, gradient: fallback.gradient, layout, ...motion, ...retained };
@@ -79,6 +94,7 @@ export function updateQuickEditBackground(
   return {
     enabled: true,
     ...motion,
+    ...remembered,
     type: 'image',
     assetId: patch.assetId ?? image?.assetId ?? '',
     imageFit: patch.imageFit ?? image?.imageFit ?? 'cover',

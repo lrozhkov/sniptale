@@ -56,6 +56,7 @@ type PreviewState = Pick<
   timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'>;
   editing: { exporter: Pick<EditorState['editing']['exporter'], 'phase'> };
   advanced: EditorState['advanced'];
+  backgroundPreview?: EditorState['backgroundPreview'];
   presentation: Pick<EditorState['presentation'], 'settings'>;
   watermark: Pick<
     EditorState['watermark'],
@@ -247,7 +248,11 @@ function ReviewPreviewStage({
       drawing={!!composer.annotation && !state.playing && !busy}
       region={state.displayRegion}
       zoomRegions={features.zoomRegions}
-      background={features.background}
+      background={
+        state.advanced.ui.mode === 'advanced'
+          ? (state.backgroundPreview ?? features.background)
+          : features.background
+      }
       outputTime={state.timeline.sceneOutputTime}
       zoomOverlay={reviewFocusOverlay(state)}
       focusTimeMap={state.timeline.timeMap.getSegments()}

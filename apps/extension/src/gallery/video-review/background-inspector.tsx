@@ -1,21 +1,18 @@
 import './background-inspector.css';
 import { ColorField, SelectField, SegmentedRow } from '../../ui/compact-inspector-controls';
 import { reviewSelectFieldClassName } from './controls';
-import { ReviewNumberRow } from './number-row';
-import { useState } from 'react';
+import { ReviewPreviewNumberRow } from './number-row';
+import { useEffect, useRef, useState } from 'react';
 import { BackgroundImagePicker } from '../../composition/background-resources/picker';
-import { BackgroundThumbnails } from '../../ui/background-thumbnails';
 import { translate } from '../../platform/i18n';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import type { QuickEditBackgroundPatch } from '../../features/video/review/advanced/background';
-import { serializePaintToCss, createSolidPaint, type Paint } from '@sniptale/foundation/paint';
-import { useGradientPresetCatalog } from '../../composition/gradient-preset-resources/use-gradient-preset-catalog';
-import { CompactPaintSelector } from '../../ui/paint-selector';
+import { createSolidPaint, type Paint } from '@sniptale/foundation/paint';
+import { ReviewBackgroundPaints } from './background-paints';
 
 const kinds = [
   { key: 'none', label: 'gallery.videoReview.backgroundNone' },
   { key: 'solid', label: 'gallery.videoReview.backgroundSolid' },
-  { key: 'gradient', label: 'gallery.videoReview.backgroundGradient' },
   { key: 'image', label: 'gallery.videoReview.backgroundImage' },
 ] as const;
 
@@ -33,36 +30,51 @@ export function ReviewBackgroundInspector(props: {
   onImportImage?: ((file: File, originMediaId?: string) => void) | undefined;
   background: QuickEditBackgroundSettings;
   onChange(patch: QuickEditBackgroundPatch): void;
+  onPreview?(patch: QuickEditBackgroundPatch | null): void;
 }) {
   const [imageRequested, setImageRequested] = useState(false);
-  const { presets } = useGradientPresetCatalog('highlighter-frame-fill');
   const { background, onChange } = props;
   const paint = backgroundPaint(background);
+  const preview = useRef(props.onPreview);
+  preview.current = props.onPreview;
+  // Leaving the inspector cancels an unfinished scene gesture.
+  useEffect(() => () => preview.current?.(null), []);
 
   return (
     <div data-ui="gallery.videoReview.backgroundInspector" className="review-inspector-columns">
       <div className="min-w-0 space-y-2">
         <div className="review-background-kinds">
           <SegmentedRow
-            columns={4}
+            columns={3}
             ariaLabel={translate('gallery.videoReview.background')}
             options={kinds.map((kind) => ({ value: kind.key, label: translate(kind.label) }))}
-            value={imageRequested ? 'image' : background.enabled ? background.type : 'none'}
+            value={
+              imageRequested
+                ? 'image'
+                : background.enabled
+                  ? background.type === 'image'
+                    ? 'image'
+                    : 'solid'
+                  : 'none'
+            }
             onChange={(kind) => {
               setImageRequested(kind === 'image');
               if (kind === 'image') {
                 if (background.rememberedImage) onChange({ enabled: true, type: 'image' });
                 return;
               }
-              onChange(
-                kind === 'none'
-                  ? { enabled: false }
-                  : {
-                      enabled: true,
-                      type: kind,
-                      ...(kind === 'solid' ? { color: '#000000ff' } : {}),
-                    }
-              );
+              if (kind === 'none') onChange({ enabled: false });
+              else {
+                const paint =
+                  background.enabled && background.type !== 'image'
+                    ? backgroundPaint(background)
+                    : background.rememberedPaint;
+                onChange(
+                  paint?.kind === 'gradient'
+                    ? { enabled: true, type: 'gradient', gradient: paint.gradient }
+                    : { enabled: true, type: 'solid', color: paint?.color ?? '#000000ff' }
+                );
+              }
             }}
           />
         </div>
@@ -71,46 +83,19 @@ export function ReviewBackgroundInspector(props: {
             pending={props.pending ?? false}
             onSelect={({ file, originMediaId }) => props.onImportImage?.(file, originMediaId)}
           />
-        ) : background.enabled && background.type === 'gradient' ? (
-          <BackgroundThumbnails
-            label={translate('videoEditor.sidebar.sceneBackgroundPresetLabel')}
-            dataUi="gallery.videoReview.gradientPresets"
-            items={presets
-              .filter((preset) => preset.enabled)
-              .sort((a, b) => a.order - b.order)
-              .map((preset) => ({
-                id: preset.id,
-                name: preset.name,
-                active:
-                  serializePaintToCss(paint) ===
-                  serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
-                style: {
-                  background: serializePaintToCss({ kind: 'gradient', gradient: preset.gradient }),
-                },
-              }))}
-            onSelect={(id) => {
-              const preset = presets.find((item) => item.id === id);
-              if (preset) onChange({ enabled: true, type: 'gradient', gradient: preset.gradient });
-            }}
-          />
         ) : null}
         {!imageRequested && background.enabled && background.type !== 'image' ? (
-          <CompactPaintSelector
-            triggerVariant="swatch"
-            className="review-background-paint relative w-full min-w-0"
-            label={translate('gallery.videoReview.background')}
-            title={translate('gallery.videoReview.background')}
+          <ReviewBackgroundPaints
             value={paint}
-            palette={[
-              '#18181b',
-              '#fafafa',
-              '#334155',
-              '#2563eb',
-              '#0f766e',
-              '#14b8a6',
-              '#f97316',
-              '#e11d48',
-            ]}
+            onPreview={(next) =>
+              props.onPreview?.(
+                !next
+                  ? null
+                  : next.kind === 'solid'
+                    ? { enabled: true, type: 'solid', color: next.color }
+                    : { enabled: true, type: 'gradient', gradient: next.gradient }
+              )
+            }
             onChange={(next: Paint) =>
               onChange(
                 next.kind === 'solid'
@@ -126,6 +111,7 @@ export function ReviewBackgroundInspector(props: {
           perspectiveFixed={props.perspectiveFixed}
           background={background}
           onChange={onChange}
+          onPreview={props.onPreview}
         />
       ) : null}
     </div>
@@ -137,10 +123,12 @@ function ReviewBackgroundLayoutControls({
   perspectiveFixed,
   background,
   onChange,
+  onPreview,
 }: {
   perspectiveFixed?: boolean | undefined;
   background: Extract<QuickEditBackgroundSettings, { enabled: true }>;
   onChange(patch: QuickEditBackgroundPatch): void;
+  onPreview?: ((patch: QuickEditBackgroundPatch | null) => void) | undefined;
 }) {
   const changeShadowColor = (color: string) =>
     onChange({
@@ -150,7 +138,8 @@ function ReviewBackgroundLayoutControls({
       },
     });
   const layoutField = (key: 'padding' | 'cornerRadius', label: string) => (
-    <ReviewNumberRow
+    <ReviewPreviewNumberRow
+      enterBehavior="blur"
       label={label}
       unit="px"
       min={0}
@@ -158,6 +147,9 @@ function ReviewBackgroundLayoutControls({
       scrubMax={key === 'padding' ? 200 : 100}
       step={1}
       value={background.layout[key]}
+      onPreview={(value) =>
+        onPreview?.(value === null ? null : { layout: { ...background.layout, [key]: value } })
+      }
       onChange={(value) => onChange({ layout: { ...background.layout, [key]: value } })}
     />
   );
@@ -186,25 +178,42 @@ function ReviewBackgroundLayoutControls({
         </p>
       ) : null}
       {background.type !== 'solid' ? (
-        <ReviewNumberRow
+        <ReviewPreviewNumberRow
+          enterBehavior="blur"
           label={translate('editor.scene.backgroundBlurAmount')}
           unit="px"
           min={0}
           max={25}
           step={1}
           value={background.layout.blur ?? 0}
+          onPreview={(blur) =>
+            onPreview?.(blur === null ? null : { layout: { ...background.layout, blur } })
+          }
           onChange={(blur) => onChange({ layout: { ...background.layout, blur } })}
         />
       ) : null}
       {layoutField('padding', translate('gallery.videoReview.backgroundPadding'))}
       {layoutField('cornerRadius', translate('gallery.videoReview.backgroundCornerRadius'))}
-      <ReviewNumberRow
+      <ReviewPreviewNumberRow
+        enterBehavior="blur"
         label={translate('gallery.videoReview.backgroundShadow')}
         unit="%"
         min={0}
         max={100}
         step={1}
         value={background.layout.shadow?.intensity ?? 0}
+        onPreview={(intensity) =>
+          onPreview?.(
+            intensity === null
+              ? null
+              : {
+                  layout: {
+                    ...background.layout,
+                    shadow: { color: background.layout.shadow?.color ?? '#475569ff', intensity },
+                  },
+                }
+          )
+        }
         onChange={(intensity) =>
           onChange({
             layout: {
@@ -219,8 +228,15 @@ function ReviewBackgroundLayoutControls({
         title={translate('gallery.videoReview.backgroundShadowColor')}
         value={background.layout.shadow?.color ?? '#475569ff'}
         onChange={changeShadowColor}
-        onPreviewChange={changeShadowColor}
-        onPreviewReset={changeShadowColor}
+        onPreviewChange={(color) =>
+          onPreview?.({
+            layout: {
+              ...background.layout,
+              shadow: { intensity: background.layout.shadow?.intensity ?? 0, color },
+            },
+          })
+        }
+        onPreviewReset={() => onPreview?.(null)}
       />
     </div>
   );

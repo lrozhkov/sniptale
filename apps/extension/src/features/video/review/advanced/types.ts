@@ -1,9 +1,9 @@
-import type { Gradient } from '@sniptale/foundation/paint';
+import type { Gradient, Paint } from '@sniptale/foundation/paint';
 import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 9;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 10;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -144,6 +144,10 @@ export interface QuickEditBackgroundLayout {
 }
 
 export type QuickEditBackgroundSettings = {
+  /** Last authored fill retained in image/disabled mode. */
+  rememberedPaint?: Paint;
+  /** Last authored geometry retained while the background is disabled. */
+  rememberedLayout?: QuickEditBackgroundLayout;
   /** Last image retained while another background kind is active; reuses its project asset. */
   rememberedImage?: { assetId: string; imageFit: 'cover' | 'contain' };
   /** Absent on legacy workspaces means a stationary background. */

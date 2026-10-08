@@ -136,7 +136,20 @@ function measureText(
     width: advance + left + right + padding * 2,
     height: ascent + descent + (lines.length - 1) * lineHeight + padding * 2,
   });
-  return { size, font, lines, metrics, advance, left, ascent, lineHeight, blur, offset, padding };
+  return {
+    size,
+    pixels,
+    font,
+    lines,
+    metrics,
+    advance,
+    left,
+    ascent,
+    lineHeight,
+    blur,
+    offset,
+    padding,
+  };
 }
 
 function paintText(
@@ -145,7 +158,7 @@ function paintText(
   measured: ReturnType<typeof measureText>,
   raster?: Raster
 ) {
-  const { font, lines, metrics, advance, left, ascent, lineHeight, blur, offset, padding } =
+  const { pixels, font, lines, metrics, advance, left, ascent, lineHeight, blur, offset, padding } =
     measured;
   if (raster) context.scale(raster.scaleX, raster.scaleY);
   context.font = font;
@@ -167,6 +180,14 @@ function paintText(
           ? advance - width
           : 0;
     context.fillText(line, padding + left + alignment, padding + ascent + index * lineHeight);
+    if (text.strike) {
+      context.fillRect(
+        padding + left + alignment,
+        padding + ascent + index * lineHeight - pixels * 0.3,
+        width,
+        Math.max(1, pixels * 0.06)
+      );
+    }
   });
 }
 

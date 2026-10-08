@@ -44,7 +44,7 @@ for (const variant of [
           fits: node.scrollWidth <= node.clientWidth,
         }))
       );
-      expect(geometry).toHaveLength(4);
+      expect(geometry).toHaveLength(3);
       expect(geometry.every((value) => value.y === geometry[0]!.y && value.fits)).toBe(true);
       const paint = dialog.locator('.review-background-paint');
       await expect(paint.locator('button > svg')).toBeHidden();
@@ -52,8 +52,7 @@ for (const variant of [
       const paintBox = (await paint.locator('button').boundingBox())!;
       expect(paintBox.x + paintBox.width).toBeCloseTo(fieldBox.x + fieldBox.width, 0);
       await page.screenshot({ path: testInfo.outputPath('solid-selection.png') });
-      await button('gallery.videoReview.backgroundGradient').click();
-      const presets = dialog.locator('[data-ui="gallery.videoReview.gradientPresets"] button');
+
       const more = dialog.getByRole('button', {
         name: label('settings.editor.backgrounds.showMore'),
         exact: true,
@@ -70,7 +69,14 @@ for (const variant of [
       await page.keyboard.press('Shift+Tab');
       await expect(more).toBeFocused();
       await expect(more).toHaveCSS('outline-width', '2px');
-      const selected = presets.first();
+      await more.click();
+      await expect(dialog.locator('[data-ui="shared.ui.backgroundThumbnails.group"]')).toHaveText([
+        label('gallery.videoReview.backgroundColors'),
+        label('gallery.videoReview.backgroundGradients'),
+      ]);
+      const selected = dialog
+        .locator('[data-ui="gallery.videoReview.gradientPresets"] button[style*="gradient"]')
+        .first();
       await selected.click();
       await page.mouse.move(10, 10);
       await expect(selected).toHaveAttribute('aria-pressed', 'true');
@@ -101,6 +107,8 @@ for (const variant of [
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
+      // The combined palette starts with colors; reveal the gradient page again on reopen.
+      await more.click();
       const restored = dialog.locator(
         '[data-ui="gallery.videoReview.gradientPresets"] button[aria-pressed="true"]'
       );

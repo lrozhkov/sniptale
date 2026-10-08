@@ -158,3 +158,25 @@ it('spaces rotated painted tiles with a positive gap and rejects excessive insta
     resolveQuickEditWatermarkBounds(settings, { width: 0, height: 1080 }, { width: 1, height: 1 })
   ).toThrow();
 });
+
+it('roundtrips strikethrough and remembered scene paint without changing legacy omission', () => {
+  const state = createQuickEditAdvancedState();
+  const legacy = { ...state, schemaVersion: 9, watermark: createQuickEditWatermark('Saved') };
+  expect(loadQuickEditAdvancedState(legacy)?.watermark?.text).not.toHaveProperty('strike');
+  const settings = { ...legacy.watermark, text: { ...legacy.watermark.text, strike: true } };
+  const background = {
+    enabled: false,
+    rememberedPaint: { kind: 'solid', color: '#123456ff' },
+    rememberedLayout: { padding: 91, cornerRadius: 17, blur: 6 },
+  };
+  const loaded = loadQuickEditAdvancedState({ ...state, watermark: settings, background });
+  expect(loaded?.watermark).toEqual(settings);
+  expect(loaded?.background).toEqual(background);
+  expect(loadQuickEditAdvancedState(JSON.parse(JSON.stringify(loaded)))).toEqual(loaded);
+  expect(
+    parseQuickEditWatermark({ ...settings, text: { ...settings.text, strike: 'true' } })
+  ).toBeNull();
+  expect(
+    loadQuickEditAdvancedState({ ...state, background: { ...background, rememberedPaint: {} } })
+  ).toBeNull();
+});

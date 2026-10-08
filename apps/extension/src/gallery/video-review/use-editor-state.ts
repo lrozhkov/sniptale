@@ -419,6 +419,8 @@ function reviewAdvancedControls(
     setActionsEnabled: advancedState.setActionsEnabled,
     setClickAnimations: advancedState.setClickAnimations,
     setBackground: advancedState.setBackground,
+    backgroundPreview: advancedState.backgroundPreview,
+    previewBackground: advancedState.previewBackground,
     setCanvas: advancedState.setCanvas,
     setWindowHeader: advancedState.setWindowHeader,
     resetAdvanced: advancedState.reset,

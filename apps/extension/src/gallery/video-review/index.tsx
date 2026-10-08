@@ -85,6 +85,7 @@ type InspectorState = Pick<
   | 'setKeyAnimations'
   | 'setClickAnimations'
   | 'setBackground'
+  | 'previewBackground'
   | 'setCanvas'
   | 'setWindowHeader'
   | 'setOverlaysVisible'
@@ -703,6 +704,7 @@ function ReviewScenePropertiesBinding({
         state.beforeAction(() => void state.backgroundImport.importImage(file, originMediaId))
       }
       setBackground={state.setBackground}
+      onPreviewBackground={state.previewBackground}
     />
   );
 }
