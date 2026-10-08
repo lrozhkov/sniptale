@@ -1,6 +1,20 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpatialMessages = defineMessageSource({
+  spatialTools: { ru: 'Инструменты превью', en: 'Preview tools' },
+  spatialToolPosition: { ru: 'Положение', en: 'Position' },
+  spatialToolTilt: { ru: 'Наклон', en: 'Tilt' },
+  spatialToolRotation: { ru: 'Поворот', en: 'Rotation' },
+  spatialToolFocus: { ru: 'Резкость', en: 'Focus' },
+  spatialAxis: { ru: 'Ось наклона', en: 'Tilt axis' },
+  spatialAxisBoth: { ru: 'Обе оси', en: 'Both axes' },
+  spatialResetTilt: { ru: 'Без наклона', en: 'Reset tilt' },
+  spatialResetRotation: { ru: 'Без поворота', en: 'Reset rotation' },
+  spatialResetFocus: { ru: 'Сбросить резкость', en: 'Reset focus' },
+  spatialDragTilt: { ru: 'Изменить наклон', en: 'Adjust tilt' },
+  spatialDragRotation: { ru: 'Изменить поворот', en: 'Adjust rotation' },
+  spatialFocusCenter: { ru: 'Центр резкости', en: 'Focus center' },
+  spatialFlatDepth: { ru: 'Нет перепада глубины', en: 'No depth variation' },
   perspective: { ru: 'Поворот и перспектива', en: 'Rotation and perspective' },
   depthOfField: { ru: 'Глубина резкости', en: 'Depth of field' },
   spatialOn: { ru: 'включено', en: 'on' },

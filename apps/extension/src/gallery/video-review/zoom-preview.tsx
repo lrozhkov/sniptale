@@ -2,6 +2,9 @@ import {
   quickEditPlaneProjection,
   quickEditProjectionCss,
 } from '../../features/video/review/advanced/spatial-geometry';
+import { DEFAULT_QUICK_EDIT_DEPTH } from '../../features/video/review/advanced/spatial';
+import { ReviewSpatialToolbar, ReviewSpatialControls } from './spatial-controls';
+import type { SpatialTool, SpatialAxis } from './spatial-gesture';
 import { quickEditSpatialTargetCamera } from '../../features/video/review/advanced/spatial';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
@@ -11,7 +14,7 @@ import { evaluateQuickEditBordersAtTime } from '../../features/video/review/adva
 import { useReviewWindowHeader } from './use-window-header';
 import { ZoomPreviewCanvas } from './zoom-preview-canvas';
 import { ReviewSpotlightPreview } from './spotlight-preview';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState, type RefObject } from 'react';
 import { useReviewBackgroundImage } from './use-review-background';
 import { translate } from '../../platform/i18n';
 import type {
@@ -38,8 +41,14 @@ const PREVIEW_WIDTH_PX = 480;
  * scene layout the export applies (background padding plus fitted video), and the zoom
  * footprint through one interactive canvas.
  */
-export function ReviewZoomPreview(props: {
+type ZoomPreviewProps = {
   region: QuickEditZoomRegion;
+  spatialEdit?: {
+    region: QuickEditZoomRegion;
+    revision: string;
+    enabled?: boolean;
+    onCommit(revision: string, patch: QuickEditZoomRegionPatch): void;
+  };
   focus?: { regions: readonly QuickEditZoomRegion[]; time: number } | undefined;
   background: QuickEditBackgroundSettings;
   source: { width: number; height: number };
@@ -56,20 +65,24 @@ export function ReviewZoomPreview(props: {
   onChange(patch: QuickEditZoomRegionPatch): void;
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
   disabled?: boolean;
-}) {
+};
+
+export function ReviewZoomPreview(props: ZoomPreviewProps) {
   const { loadFrame, region, sourceTime } = props;
   const image = useReviewBackgroundImage(props.background);
   const header = useReviewWindowHeader(props.windowHeader, props.source.width, props.source.height);
-  const [zoomView, setView] = useState<'area' | 'result'>('area');
+  const controls = usePreviewToolSelection(props);
+  const { tool, axis, overlay, view } = controls;
+  const bounds = useRef<HTMLDivElement>(null);
   const { frame, status, retry } = useZoomPreviewFrame(loadFrame, sourceTime);
-  const overlay = !!(region.spotlight || region.border);
-  const view = overlay ? 'area' : zoomView;
   const playback = props.playback;
   const camera = resolvePreviewCamera(props);
 
   const { output, layout, previewScale, cornerRadius } = useZoomPreviewGeometry(props, camera);
   const previewStatus = playback ? 'ready' : status;
   const interactive = !props.disabled && !playback && status === 'ready';
+  const spatialInteractive =
+    interactive && props.spatialEdit?.enabled !== false && !props.spatialEdit?.region.dormant;
   const background = props.background;
   const surface = {
     background,
@@ -77,7 +90,7 @@ export function ReviewZoomPreview(props: {
     imageUrl: image.url,
     cornerRadius,
     camera,
-    disabled: !interactive,
+    disabled: !interactive || tool !== 'position',
     live: !!playback,
     frame: playback ? { image: playback.video, ...props.source } : frame,
     layout,
@@ -93,32 +106,25 @@ export function ReviewZoomPreview(props: {
       aria-label={translate('gallery.videoReview.zoomPreview')}
       className="space-y-2"
     >
-      <div className="flex items-center justify-between gap-2">
-        <h5 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-          {translate(
-            region.border
-              ? 'gallery.videoReview.borderPreview'
-              : overlay
-                ? 'gallery.videoReview.focusPreview'
-                : 'gallery.videoReview.zoomPreview'
-          )}
-        </h5>
-        {!overlay && (
-          <SegmentedSwitch<'area' | 'result'>
-            dataAttribute={{ 'data-ui': 'gallery.videoReview.previewMode' }}
-            ariaLabel={translate('gallery.videoReview.zoomPreview')}
-            density="compact"
-            activeId={view}
-            options={[
-              { id: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
-              { id: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
-            ]}
-            onChange={setView}
-          />
-        )}
-      </div>
+      <ZoomPreviewHeading region={region} controls={controls} />
+      {!overlay && props.spatialEdit ? (
+        <ReviewSpatialToolbar
+          tool={tool}
+          axis={axis}
+          region={props.spatialEdit.region}
+          disabled={!spatialInteractive}
+          onTool={controls.setTool}
+          onAxis={controls.setAxis}
+          onReset={() => resetPreviewTool(props.spatialEdit, tool, spatialInteractive)}
+        />
+      ) : null}
       <div
-        {...previewInteractionHandlers(interactive, sourceTime, props.onInteract)}
+        ref={bounds}
+        {...previewInteractionHandlers(
+          interactive && tool === 'position',
+          sourceTime,
+          props.onInteract
+        )}
         className="relative overflow-hidden rounded-[var(--sniptale-radius-sm)]"
         style={{ background: overlay ? previewBackgroundPaint(background) : '#000000' }}
       >
@@ -166,6 +172,22 @@ export function ReviewZoomPreview(props: {
             cornerRadius={cornerRadius}
           />
         ) : null}
+        {!overlay && props.spatialEdit && tool !== 'position' ? (
+          <ZoomSpatialEditor
+            edit={props.spatialEdit}
+            region={region}
+            camera={camera}
+            layout={layout}
+            background={background}
+            output={output}
+            sourceTime={sourceTime}
+            controls={controls}
+            bounds={bounds}
+            enabled={spatialInteractive}
+            onPreview={props.onPreview}
+            onInteract={props.onInteract}
+          />
+        ) : null}
       </div>
       <ZoomPreviewFeedback
         status={previewStatus}
@@ -180,8 +202,142 @@ export function ReviewZoomPreview(props: {
   );
 }
 
+/** Owns temporary tool/view choices without changing the authored target or transport. */
+function usePreviewToolSelection(props: ZoomPreviewProps) {
+  const [zoomView, setView] = useState<'area' | 'result'>('area');
+  const [selectedTool, setTool] = useState<SpatialTool>('position');
+  const [axis, setAxis] = useState<SpatialAxis>('both');
+  const { region } = props;
+  const overlay = !!(region.spotlight || region.border);
+  const unavailable =
+    !props.spatialEdit ||
+    overlay ||
+    (selectedTool === 'focus' && !region.depthOfField?.enabled) ||
+    ((selectedTool === 'tilt' || selectedTool === 'rotation') && !region.perspective?.enabled);
+  const tool = unavailable ? 'position' : selectedTool;
+  const view = overlay ? 'area' : tool === 'position' ? zoomView : 'result';
+  return { tool, axis, overlay, view, setTool, setAxis, setView };
+}
+
+/** Binds the authored edit to its rendered plane and cancels capture when the scene changes. */
+function ZoomSpatialEditor(props: {
+  edit: NonNullable<ZoomPreviewProps['spatialEdit']>;
+  region: QuickEditZoomRegion;
+  camera: QuickEditZoomRegion['transform'];
+  layout: ReturnType<typeof computeQuickEditSceneLayout>;
+  background: QuickEditBackgroundSettings;
+  output: { width: number; height: number };
+  sourceTime: number | null;
+  controls: ReturnType<typeof usePreviewToolSelection>;
+  bounds: RefObject<HTMLDivElement | null>;
+  enabled: boolean;
+  onPreview: ZoomPreviewProps['onPreview'];
+  onInteract: ZoomPreviewProps['onInteract'];
+}) {
+  const { edit, region, camera, layout, background, output, sourceTime } = props;
+  const geometry = resolveSpatialControlGeometry(region, camera, layout, background);
+  const sceneKey = JSON.stringify([
+    region.id,
+    sourceTime,
+    output,
+    layout.windowRect,
+    background.enabled,
+    background.zoomBehavior,
+  ]);
+  return (
+    <ReviewSpatialControls
+      key={sceneKey}
+      region={edit.region}
+      renderedRegion={region}
+      revision={edit.revision}
+      tool={props.controls.tool}
+      axis={props.controls.axis}
+      geometry={geometry}
+      output={output}
+      bounds={props.bounds}
+      enabled={props.enabled}
+      onPreview={(patch) => props.onPreview?.(patch)}
+      onCommit={edit.onCommit}
+      onInteract={() => {
+        if (sourceTime !== null) props.onInteract?.(sourceTime);
+      }}
+    />
+  );
+}
+
+/** The controls project from the same decorated source plane as the renderer. */
+function resolveSpatialControlGeometry(
+  region: QuickEditZoomRegion,
+  camera: QuickEditZoomRegion['transform'],
+  layout: ReturnType<typeof computeQuickEditSceneLayout>,
+  background: QuickEditBackgroundSettings
+) {
+  const spatial = camera.spatial;
+  if (!spatial) return null;
+  return {
+    plane: layout.windowRect,
+    projection: quickEditPlaneProjection(
+      layout.windowRect,
+      computeQuickEditSpatialWindow(layout, background),
+      spatial
+    ),
+    rotation: spatial.rotation,
+    focus: region.depthOfField ?? DEFAULT_QUICK_EDIT_DEPTH,
+  };
+}
+
+/** Reset touches only the selected tool's authored parameters. */
+function resetPreviewTool(
+  edit: ZoomPreviewProps['spatialEdit'],
+  tool: SpatialTool,
+  interactive: boolean
+) {
+  if (!edit || !interactive) return;
+  const perspective = edit.region.perspective;
+  if (tool === 'tilt' && perspective)
+    edit.onCommit(edit.revision, { perspective: { ...perspective, rotateX: 0, rotateY: 0 } });
+  else if (tool === 'rotation' && perspective)
+    edit.onCommit(edit.revision, { perspective: { ...perspective, rotateZ: 0 } });
+  else if (tool === 'focus' && edit.region.depthOfField)
+    edit.onCommit(edit.revision, { depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true } });
+}
+
+/** Framing mode remains available only for ordinary Zoom positioning. */
+function ZoomPreviewHeading(props: {
+  region: QuickEditZoomRegion;
+  controls: ReturnType<typeof usePreviewToolSelection>;
+}) {
+  const { region, controls } = props;
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <h5 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
+        {translate(
+          region.border
+            ? 'gallery.videoReview.borderPreview'
+            : controls.overlay
+              ? 'gallery.videoReview.focusPreview'
+              : 'gallery.videoReview.zoomPreview'
+        )}
+      </h5>
+      {!controls.overlay && controls.tool === 'position' && (
+        <SegmentedSwitch<'area' | 'result'>
+          dataAttribute={{ 'data-ui': 'gallery.videoReview.previewMode' }}
+          ariaLabel={translate('gallery.videoReview.zoomPreview')}
+          density="compact"
+          activeId={controls.view}
+          options={[
+            { id: 'area', label: translate('gallery.videoReview.zoomPreviewArea') },
+            { id: 'result', label: translate('gallery.videoReview.zoomPreviewResult') },
+          ]}
+          onChange={controls.setView}
+        />
+      )}
+    </div>
+  );
+}
+
 /** Overlay framing stays unzoomed; Zoom follows the sampled playback camera. */
-function resolvePreviewCamera(props: Parameters<typeof ReviewZoomPreview>[0]) {
+function resolvePreviewCamera(props: ZoomPreviewProps) {
   if (props.region.spotlight || props.region.border)
     return { scale: 1, centerX: 0.5, centerY: 0.5 };
   return props.playback?.camera ?? quickEditSpatialTargetCamera(props.region);
@@ -190,7 +346,7 @@ function resolvePreviewCamera(props: Parameters<typeof ReviewZoomPreview>[0]) {
 /** Results composite all sampled masks before source-attached strokes in the same window. */
 function ZoomResultOverlays(props: {
   region: QuickEditZoomRegion;
-  focus: Parameters<typeof ReviewZoomPreview>[0]['focus'];
+  focus: ZoomPreviewProps['focus'];
   background: QuickEditBackgroundSettings;
   output: { width: number; height: number };
   layout: ReturnType<typeof computeQuickEditSceneLayout>;

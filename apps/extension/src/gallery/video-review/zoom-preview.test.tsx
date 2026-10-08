@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomPreview } from './zoom-preview';
@@ -50,6 +50,7 @@ const frame: ZoomPreviewFrame = {
 
 function renderPreview(args: {
   region?: QuickEditZoomRegion;
+  spatialEdit?: ComponentProps<typeof ReviewZoomPreview>['spatialEdit'];
   sourceTime?: number | null;
   loadFrame?: (sourceTime: number, signal: AbortSignal) => Promise<ZoomPreviewFrame>;
   onInteract?: (time: number) => void;
@@ -62,6 +63,7 @@ function renderPreview(args: {
     root.render(
       <ReviewZoomPreview
         region={args.region ?? region()}
+        {...(args.spatialEdit ? { spatialEdit: args.spatialEdit } : {})}
         background={background}
         source={{ width: 640, height: 360 }}
         sourceTime={args.sourceTime === undefined ? 3 : args.sourceTime}
@@ -523,3 +525,187 @@ it.each(['fixed', 'follow-video'] as const)(
     expect(onChange).not.toHaveBeenCalled();
   }
 );
+
+const spatialRegion = () =>
+  region({
+    perspective: { enabled: true, rotateX: 25, rotateY: -30, rotateZ: 12, strength: 0.65 },
+    depthOfField: {
+      enabled: true,
+      mode: 'area',
+      x: 0.4,
+      y: 0.6,
+      width: 0.2,
+      softness: 0.05,
+      strength: 0.7,
+    },
+  });
+function previewButton(key: string) {
+  const button = host.querySelector<HTMLButtonElement>(
+    `button[title="gallery.videoReview.${key}"]`
+  );
+  if (!button) throw new Error(`Missing preview control ${key}`);
+  return button;
+}
+
+it('keeps spatial navigation read-only, restores framing, and owns just one decoded frame', async () => {
+  const authored = spatialRegion();
+  const onCommit = vi.fn();
+  const onInteract = vi.fn();
+  const view = renderPreview({
+    region: authored,
+    spatialEdit: { region: authored, revision: 'authored', onCommit },
+    onInteract,
+  });
+  await act(async () => Promise.resolve());
+  expect(view.section().dataset['view']).toBe('area');
+  await act(async () => previewButton('spatialToolTilt').click());
+  expect(view.section().dataset['view']).toBe('result');
+  expect(view.canvas().tabIndex).toBe(-1);
+  expect(host.querySelector('[data-ui="gallery.videoReview.previewMode"]')).toBeNull();
+  await act(async () => previewButton('spatialToolRotation').click());
+  await act(async () => previewButton('spatialToolFocus').click());
+  await act(async () => previewButton('spatialToolPosition').click());
+  expect(view.section().dataset['view']).toBe('area');
+  expect(view.canvas().tabIndex).toBe(0);
+  await act(async () => previewButton('zoomPreviewResult').click());
+  await act(async () => previewButton('spatialToolTilt').click());
+  await act(async () => previewButton('spatialToolPosition').click());
+  expect(view.section().dataset['view']).toBe('result');
+  expect(onInteract).not.toHaveBeenCalled();
+  expect(onCommit).not.toHaveBeenCalled();
+  expect(view.onChange).not.toHaveBeenCalled();
+  expect(view.loadFrame).toHaveBeenCalledTimes(1);
+});
+
+it.each([
+  [
+    'spatialToolTilt',
+    'spatialResetTilt',
+    { perspective: { enabled: true, rotateX: 0, rotateY: 0, rotateZ: 12, strength: 0.65 } },
+  ],
+  [
+    'spatialToolRotation',
+    'spatialResetRotation',
+    { perspective: { enabled: true, rotateX: 25, rotateY: -30, rotateZ: 0, strength: 0.65 } },
+  ],
+  [
+    'spatialToolFocus',
+    'spatialResetFocus',
+    {
+      depthOfField: {
+        enabled: true,
+        mode: 'depth',
+        x: 0.5,
+        y: 0.5,
+        width: 0.2,
+        softness: 0.3,
+        strength: 0.5,
+      },
+    },
+  ],
+] as const)('scopes %s reset to its authored group', async (tool, reset, patch) => {
+  const authored = spatialRegion();
+  const onCommit = vi.fn();
+  const view = renderPreview({
+    region: authored,
+    spatialEdit: { region: authored, revision: 'capture', onCommit },
+  });
+  await act(async () => Promise.resolve());
+  await act(async () => previewButton(tool).click());
+  await act(async () => previewButton(reset).click());
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith('capture', patch);
+  expect(view.onChange).not.toHaveBeenCalled();
+});
+
+it('routes an admitted spatial gesture once without also moving or seeking the Position canvas', async () => {
+  const authored = spatialRegion();
+  const onCommit = vi.fn();
+  const onPreview = vi.fn();
+  const onInteract = vi.fn();
+  const view = renderPreview({
+    region: authored,
+    spatialEdit: { region: authored, revision: 'capture', onCommit },
+    onPreview,
+    onInteract,
+  });
+  await act(async () => Promise.resolve());
+  await act(async () => previewButton('spatialToolTilt').click());
+  const handle = previewButton('spatialDragTilt');
+  const bounds = view.canvas().parentElement!;
+  vi.spyOn(bounds, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
+  Object.assign(handle, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  });
+  const send = (type: string, x: number, y: number) =>
+    act(async () => {
+      handle.dispatchEvent(
+        new MouseEvent(type, { bubbles: true, button: 0, clientX: x, clientY: y })
+      );
+    });
+  await send('pointerdown', 200, 100);
+  await send('pointermove', 224, 73);
+  await send('pointerup', 248, 73);
+  expect(onInteract).toHaveBeenCalledExactlyOnceWith(3);
+  expect(onCommit).toHaveBeenCalledExactlyOnceWith('capture', {
+    perspective: { ...authored.perspective, rotateX: 34, rotateY: -21 },
+  });
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+  expect(view.onChange).not.toHaveBeenCalled();
+  expect(view.loadFrame).toHaveBeenCalledTimes(1);
+});
+
+it('cancels captured spatial coordinates when the scene canvas changes without replacing the target', async () => {
+  const authored = spatialRegion();
+  const onPreview = vi.fn();
+  const onCommit = vi.fn();
+  const loadFrame = vi.fn(async () => frame);
+  const render = (width: number, height: number) =>
+    act(async () =>
+      root.render(
+        <ReviewZoomPreview
+          region={authored}
+          spatialEdit={{ region: authored, revision: 'same-target', onCommit }}
+          background={background}
+          source={{ width: 640, height: 360 }}
+          canvas={{ width, height }}
+          sourceTime={3}
+          loadFrame={loadFrame}
+          onChange={vi.fn()}
+          onPreview={onPreview}
+        />
+      )
+    );
+  await render(640, 360);
+  await act(async () => previewButton('spatialToolFocus').click());
+  const center = previewButton('spatialFocusCenter');
+  const bounds = host.querySelector('canvas')!.parentElement!;
+  vi.spyOn(bounds, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 480, 270));
+  const release = vi.fn();
+  Object.assign(center, {
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: release,
+  });
+  await act(async () =>
+    center.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, button: 0, clientX: 200, clientY: 140 })
+    )
+  );
+  await act(async () =>
+    center.dispatchEvent(
+      new MouseEvent('pointermove', { bubbles: true, clientX: 215, clientY: 140 })
+    )
+  );
+  await render(360, 640);
+  expect(release).toHaveBeenCalledTimes(1);
+  expect(onPreview).toHaveBeenLastCalledWith(null);
+  expect(previewButton('spatialFocusCenter')).not.toBe(center);
+  expect(host.querySelector('canvas')!.height).toBeGreaterThan(host.querySelector('canvas')!.width);
+  await act(async () =>
+    center.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, clientX: 215, clientY: 140 }))
+  );
+  expect(onCommit).not.toHaveBeenCalled();
+  expect(loadFrame).toHaveBeenCalledTimes(1);
+});

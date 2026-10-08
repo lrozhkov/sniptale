@@ -80,6 +80,7 @@ function ZoomTransitionSection(props: {
 /** Inspector form for the selected zoom region; edits clamp into the persisted contract. */
 export function ReviewZoomInspector(props: {
   region: QuickEditZoomRegion;
+  spatialPreview?: QuickEditZoomRegion;
   cutSuppressed?: boolean;
   zoomConversionBlocked?: boolean;
   onPreview?(patch: QuickEditZoomRegionPatch | null): void;
@@ -175,6 +176,7 @@ export function ReviewZoomInspector(props: {
                       </ReviewDetails>
                       <ReviewSpatialInspector
                         region={region}
+                        previewRegion={props.spatialPreview}
                         onChange={onChange}
                         onPreview={props.onPreview}
                       />

@@ -25,6 +25,7 @@ const depthLabels = {
 
 type Props = {
   region: QuickEditZoomRegion;
+  previewRegion?: QuickEditZoomRegion | undefined;
   onChange(patch: QuickEditZoomRegionPatch): void;
   onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 };
@@ -52,11 +53,18 @@ export function ReviewSpatialInspector(props: Props) {
               const limit = key === 'rotateZ' ? 180 : 60;
               return (
                 <ReviewPreviewNumberRow
-                  step={1}
+                  enterBehavior="blur"
+                  step={0.1}
+                  precision={1}
                   key={key}
                   unit={angle ? 'deg' : '%'}
                   label={translate(perspectiveLabels[key])}
                   value={perspective[key] * (angle ? 1 : 100)}
+                  previewValue={
+                    props.previewRegion?.perspective
+                      ? props.previewRegion.perspective[key] * (angle ? 1 : 100)
+                      : undefined
+                  }
                   min={angle ? -limit : 0}
                   max={angle ? limit : 100}
                   onPreview={(value) =>
@@ -108,11 +116,18 @@ export function ReviewSpatialInspector(props: Props) {
             />
             {(['x', 'y', 'width', 'softness', 'strength'] as const).map((key) => (
               <ReviewPreviewNumberRow
-                step={1}
+                enterBehavior="blur"
+                step={0.1}
+                precision={1}
                 key={key}
                 unit="%"
                 label={translate(depthLabels[key])}
                 value={depth[key] * 100}
+                previewValue={
+                  props.previewRegion?.depthOfField
+                    ? props.previewRegion.depthOfField[key] * 100
+                    : undefined
+                }
                 min={key === 'softness' ? 1 : 0}
                 max={100}
                 onPreview={(value) =>

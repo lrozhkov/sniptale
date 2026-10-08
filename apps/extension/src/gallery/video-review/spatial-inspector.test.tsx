@@ -183,3 +183,56 @@ it('edits depth mode, focus area and strength through the existing unit fields',
   );
   expect(onChange).toHaveBeenLastCalledWith({ depthOfField: DEFAULT_QUICK_EDIT_DEPTH });
 });
+
+it.each([
+  ['perspectiveY', 'perspectiveZ', 'perspective', 'rotateY', 35],
+  ['depthWidth', 'depthSoftness', 'depthOfField', 'width', 0.35],
+] as const)(
+  'accepts %s once on Enter, clears its preview and leaves numeric editing',
+  async (label, nextLabel, group, key, expected) => {
+    const { DEFAULT_QUICK_EDIT_DEPTH } =
+      await import('../../features/video/review/advanced/spatial');
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const host = document.createElement('div');
+    document.body.append(host);
+    hosts.push(host);
+    const root = createRoot(host);
+    roots.push(root);
+    const onChange = vi.fn();
+    const onPreview = vi.fn();
+    const region = {
+      ...createQuickEditZoomRegion({ id: 'precise', at: 0 }),
+      perspective: { ...DEFAULT_QUICK_EDIT_PERSPECTIVE, enabled: true },
+      depthOfField: { ...DEFAULT_QUICK_EDIT_DEPTH, enabled: true },
+    };
+    act(() =>
+      root.render(
+        <ReviewSpatialInspector region={region} onChange={onChange} onPreview={onPreview} />
+      )
+    );
+    const field = host.querySelector<HTMLInputElement>(
+      `input[aria-label="gallery.videoReview.${label}"]`
+    )!;
+    const next = host.querySelector<HTMLInputElement>(
+      `input[aria-label="gallery.videoReview.${nextLabel}"]`
+    )!;
+    field.closest('details')!.open = true;
+    act(() => field.focus());
+    expect(document.activeElement).toBe(field);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '35');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    expect(onChange).toHaveBeenCalledExactlyOnceWith({
+      [group]: { ...region[group], [key]: expected },
+    });
+    expect(onPreview).toHaveBeenLastCalledWith(null);
+    expect(document.activeElement).not.toBe(field);
+    expect(document.activeElement).not.toBe(next);
+    expect(host.contains(document.activeElement)).toBe(false);
+    act(() => field.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(onChange).toHaveBeenCalledTimes(1);
+  }
+);

@@ -67,6 +67,7 @@ export function ReviewAdvancedPanels(args: ReviewAdvancedPanelsProps) {
       ) : zoomRegion ? (
         <ReviewZoomInspector
           region={zoomRegion}
+          spatialPreview={args.zoom.previewRegion(zoomRegion)}
           zoomConversionBlocked={!args.zoom.canConvertToZoom(zoomRegion)}
           onPreview={(patch) => args.zoom.preview(zoomRegion.id, patch)}
           cutSuppressed={

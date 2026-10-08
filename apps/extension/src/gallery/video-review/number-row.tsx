@@ -27,6 +27,7 @@ export function ReviewNumberRow(props: {
   max: number;
   step: number;
   precision?: number;
+  enterBehavior?: ComponentProps<typeof NumericRow>['enterBehavior'];
   scrubStep?: number;
   scrubMax?: number;
   disabled?: boolean;
@@ -42,6 +43,7 @@ export function ReviewNumberRow(props: {
       min={props.min}
       max={props.max}
       step={props.step}
+      enterBehavior={props.enterBehavior}
       precision={props.precision}
       unit={props.unit}
       value={props.value}
@@ -62,11 +64,14 @@ export function ReviewPreviewNumberRow(
   props: ComponentProps<typeof ReviewNumberRow> & {
     onPreview?(value: number | null): void;
     title?: string;
+    /** External visual draft; value remains the authored commit comparator. */
+    previewValue?: number | undefined;
   }
 ) {
-  const [draft, setDraft] = useState(props.value);
+  const displayed = props.previewValue ?? props.value;
+  const [draft, setDraft] = useState(displayed);
   const cancelled = useRef(false);
-  useEffect(() => setDraft(props.value), [props.value]);
+  useEffect(() => setDraft(displayed), [displayed]);
   const cancel = () => {
     cancelled.current = true;
     setDraft(props.value);
@@ -95,6 +100,7 @@ export function ReviewPreviewNumberRow(
         min={props.min}
         max={props.max}
         step={props.step}
+        enterBehavior={props.enterBehavior}
         precision={props.precision}
         unit={props.unit}
         value={draft}

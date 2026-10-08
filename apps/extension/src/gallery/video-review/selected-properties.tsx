@@ -161,6 +161,12 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
                 key={region.id}
                 disabled={busy || editing.exporter.phase !== 'idle'}
                 region={zoom.previewRegion(region)}
+                spatialEdit={{
+                  region,
+                  revision: zoom.revision(region),
+                  enabled: advanced.zoom.enabled,
+                  onCommit: (revision, patch) => zoom.changeAtRevision(region.id, revision, patch),
+                }}
                 focus={{
                   regions:
                     resolveQuickEditEffectiveFeatures(advanced).zoomTrackVisible &&

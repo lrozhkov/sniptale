@@ -151,6 +151,48 @@ function applyZoomChange(
   };
 }
 
+/** Reset framing and the active overlay area while retaining its appearance and timing. */
+function resetZoomPosition(zoom: ZoomState, id: string): ZoomState {
+  const selected = zoom.regions.find((region) => region.id === id);
+  const spotlight = selected?.spotlight;
+  const border = selected?.border;
+  return {
+    ...zoom,
+    regions: updateQuickEditZoomRegion(zoom.regions, id, {
+      centerX: 0.5,
+      centerY: 0.5,
+      ...(border ? { border: { ...border, area: createQuickEditBorder().area } } : {}),
+      ...(spotlight ? { spotlight: { ...spotlight, area: createQuickEditSpotlight().area } } : {}),
+    }),
+  };
+}
+
+/** Spatial gestures admit one captured authored target against the current mutation state. */
+function applyZoomChangeAtRevision(
+  args: Pick<ZoomEditorArgs, 'timelineDuration' | 'timeMap'>,
+  zoom: ZoomState,
+  id: string,
+  revision: string,
+  patch: QuickEditZoomRegionPatch
+): ZoomState {
+  const region = zoom.regions.find((item) => item.id === id);
+  if (
+    !zoom.enabled ||
+    !region ||
+    region.dormant ||
+    region.border ||
+    region.spotlight ||
+    focusRevision(region) !== revision
+  )
+    return zoom;
+  const next = applyZoomChange(args.timelineDuration, zoom, id, patch, args.timeMap);
+  return next.regions.every(
+    (item, index) => focusRevision(item) === focusRevision(zoom.regions[index])
+  )
+    ? zoom
+    : next;
+}
+
 /** Source-intent commits validate current neighbors before projecting the visible result cache. */
 function applySourceZoomCommit(
   zoom: ZoomState,
@@ -357,26 +399,15 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     }));
     setSelection(selection === id ? null : selection);
   };
-  const resetPosition = (id: string) =>
-    args.setZoom((zoom) => {
-      const selected = zoom.regions.find((region) => region.id === id);
-      const spotlight = selected?.spotlight;
-      const border = selected?.border;
-      return {
-        ...zoom,
-        regions: updateQuickEditZoomRegion(zoom.regions, id, {
-          centerX: 0.5,
-          centerY: 0.5,
-          ...(border ? { border: { ...border, area: createQuickEditBorder().area } } : {}),
-          ...(spotlight
-            ? { spotlight: { ...spotlight, area: createQuickEditSpotlight().area } }
-            : {}),
-        }),
-      };
-    });
+  const resetPosition = (id: string) => args.setZoom((zoom) => resetZoomPosition(zoom, id));
   const change = (id: string, patch: QuickEditZoomRegionPatch) => {
     setDraft(null);
     args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch, args.timeMap));
+  };
+  /** Spatial gestures admit their captured authored target inside the latest-state mutation. */
+  const changeAtRevision = (id: string, revision: string, patch: QuickEditZoomRegionPatch) => {
+    setDraft(null);
+    args.setZoom((zoom) => applyZoomChangeAtRevision(args, zoom, id, revision, patch));
   };
   const preview = (id: string, patch: QuickEditZoomRegionPatch | null) =>
     setDraft(
@@ -448,6 +479,8 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     remove,
     resetPosition,
     change,
+    changeAtRevision,
+    revision: focusRevision,
     commitDrag,
     selected,
     canConvertToZoom: (region: QuickEditZoomRegion) =>
@@ -472,7 +505,9 @@ function focusRevision(region: QuickEditZoomRegion | undefined): string {
     region.id,
     region.start,
     region.end,
+    region.sourceAnchor,
     region.dormant,
+    region.motionBlur,
     region.border,
     region.perspective,
     region.depthOfField,

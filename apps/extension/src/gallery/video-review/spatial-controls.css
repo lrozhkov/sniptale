@@ -1,0 +1,138 @@
+.review-spatial-toolbar {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.review-spatial-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  min-width: 0;
+}
+.review-spatial-tools button[aria-pressed='true'] {
+  background: var(--sniptale-color-surface-input);
+}
+.review-spatial-tool-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.75rem;
+  color: var(--sniptale-color-text-secondary);
+  padding-inline: 0.25rem;
+}
+.review-spatial-controls {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.review-spatial-guides {
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke: var(--sniptale-color-text-primary);
+  opacity: 0.65;
+}
+.review-spatial-guides circle,
+.review-spatial-guides polyline {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1;
+}
+.review-spatial-soft-guide {
+  stroke-dasharray: 3 3;
+  opacity: 0.65;
+}
+.review-spatial-controls[data-active] .review-spatial-guides {
+  opacity: 0.2;
+}
+.review-spatial-handle,
+.review-spatial-tilt {
+  pointer-events: auto;
+  touch-action: none;
+  color: var(--sniptale-color-text-primary);
+  cursor: grab;
+}
+.review-spatial-handle {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: var(--sniptale-radius-sm);
+}
+.review-spatial-handle svg,
+.review-spatial-boundary-handle span {
+  background: var(--sniptale-color-surface-panel);
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-sm);
+}
+.review-spatial-handle svg {
+  box-sizing: content-box;
+  padding: 2px;
+}
+.review-spatial-boundary-handle span {
+  background: var(--sniptale-color-text-primary);
+  border-color: var(--sniptale-color-surface-panel);
+  width: 8px;
+  height: 8px;
+}
+.review-spatial-handle:hover,
+.review-spatial-handle:focus-visible {
+  color: var(--sniptale-color-accent);
+}
+.review-spatial-handle:focus-visible,
+.review-spatial-tilt:focus-visible {
+  outline: 1px solid var(--sniptale-color-accent);
+  outline-offset: -2px;
+}
+.review-spatial-tilt {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+}
+.review-spatial-tilt svg {
+  opacity: 0.5;
+}
+.review-spatial-controls[data-active] .review-spatial-tilt svg {
+  opacity: 0;
+}
+.review-spatial-controls[data-active] button {
+  cursor: grabbing;
+}
+.review-spatial-controls button:disabled {
+  pointer-events: none;
+  opacity: 0.35;
+}
+.review-spatial-status {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 12px);
+  padding: 2px 5px;
+  background: var(--sniptale-color-surface-panel);
+  color: var(--sniptale-color-text-secondary);
+  border-radius: var(--sniptale-radius-sm);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.review-spatial-controls[data-active='center']
+  [data-spatial-handle]:not([data-spatial-handle='center']),
+.review-spatial-controls[data-active='width']
+  [data-spatial-handle]:not([data-spatial-handle='width']),
+.review-spatial-controls[data-active='softness']
+  [data-spatial-handle]:not([data-spatial-handle='softness']) {
+  opacity: 0;
+  pointer-events: none;
+}

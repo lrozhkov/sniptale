@@ -313,3 +313,139 @@ it('does not insert a loading paragraph above scene sections during background i
   await act(async () => button('toggleMode').click());
   expect(host.textContent).not.toContain('gallery.videoReview.backgroundImporting');
 });
+
+function mountSpatialDraftPanel() {
+  const initial = createQuickEditAdvancedState();
+  initial.ui.mode = 'advanced';
+  const region = {
+    ...createQuickEditZoomRegion({ id: 'spatial-draft', at: 1, duration: 2, endMax: 10 }),
+    perspective: { enabled: true, rotateX: 10, rotateY: 20, rotateZ: 30, strength: 0.5 },
+    depthOfField: {
+      enabled: true,
+      mode: 'area' as const,
+      x: 0.5,
+      y: 0.5,
+      width: 0.2,
+      softness: 0.3,
+      strength: 0.5,
+    },
+  };
+  initial.zoom.regions = [region];
+  let authored = initial;
+  let owner: ReturnType<typeof useReviewZoomEditor>;
+  const mutations = vi.fn();
+  function SpatialDraftPanel() {
+    const [advanced, setAdvanced] = useState(initial);
+    const zoom = useReviewZoomEditor({
+      zoom: advanced.zoom,
+      selection: region.id,
+      timelineDuration: 10,
+      setZoom: (update) => {
+        mutations();
+        setAdvanced((current) => ({ ...current, zoom: update(current.zoom) }));
+      },
+    });
+    authored = advanced;
+    owner = zoom;
+    return <ReviewAdvancedPanels advanced={advanced} zoom={zoom} />;
+  }
+  act(() => root.render(<SpatialDraftPanel />));
+  const input = (name: string, range = false) => {
+    const node = host.querySelector<HTMLInputElement>(
+      `input[aria-label="gallery.videoReview.${name}${range ? ' range' : ''}"]`
+    );
+    if (!node) throw new Error(`Missing spatial numeric input: ${name}`);
+    return node;
+  };
+  return {
+    region,
+    input,
+    mutations,
+    authored: () => authored.zoom.regions[0]!,
+    owner: () => owner,
+  };
+}
+
+it('mirrors real zoom-owner spatial drafts in precise fields and restores authored values on cancellation', () => {
+  const panel = mountSpatialDraftPanel();
+  act(() =>
+    panel.owner().preview(panel.region.id, {
+      perspective: { ...panel.region.perspective, rotateX: 34.2 },
+      depthOfField: { ...panel.region.depthOfField, width: 0.508 },
+    })
+  );
+  expect(panel.input('perspectiveX').value).toBe('34.2');
+  expect(panel.input('depthWidth').value).toBe('50.8');
+  expect(panel.authored().perspective?.rotateX).toBe(10);
+  expect(panel.authored().depthOfField?.width).toBe(0.2);
+  expect(panel.mutations).not.toHaveBeenCalled();
+  act(() => panel.owner().preview(panel.region.id, null));
+  expect(panel.input('perspectiveX').value).toBe('10');
+  expect(panel.input('depthWidth').value).toBe('20');
+  expect(panel.mutations).not.toHaveBeenCalled();
+});
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'commits one %s range edit after its transient value has rerendered through the real panel',
+  async (name) => {
+    const panel = mountSpatialDraftPanel();
+    const range = panel.input(name, true);
+    await act(async () => {
+      range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      setInputValue(range, '45');
+    });
+    expect(panel.input(name).value).toBe('45');
+    expect(panel.authored()).toEqual(panel.region);
+    expect(panel.mutations).not.toHaveBeenCalled();
+    await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    expect(panel.mutations).toHaveBeenCalledTimes(1);
+    expect(
+      name === 'perspectiveX'
+        ? panel.authored().perspective?.rotateX
+        : panel.authored().depthOfField?.width
+    ).toBe(name === 'perspectiveX' ? 45 : 0.45);
+    expect(panel.input(name).value).toBe('45');
+  }
+);
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'cancels %s range preview and ignores its later pointerup after exact fields have synchronized',
+  async (name) => {
+    const panel = mountSpatialDraftPanel();
+    const range = panel.input(name, true);
+    await act(async () => {
+      range.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      setInputValue(range, '45');
+    });
+    expect(panel.input(name).value).toBe('45');
+    await act(async () =>
+      range.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    );
+    await act(async () => range.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    expect(panel.input(name).value).toBe(name === 'perspectiveX' ? '10' : '20');
+    expect(panel.authored()).toEqual(panel.region);
+    expect(panel.mutations).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['perspectiveX', 'depthWidth'])(
+  'commits %s text once on Enter without focusing the next exact field',
+  async (name) => {
+    const panel = mountSpatialDraftPanel();
+    const field = panel.input(name);
+    act(() => field.focus());
+    await act(async () => setInputValue(field, '45'));
+    expect(panel.authored()).toEqual(panel.region);
+    await act(async () =>
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
+    expect(panel.mutations).toHaveBeenCalledTimes(1);
+    expect(
+      name === 'perspectiveX'
+        ? panel.authored().perspective?.rotateX
+        : panel.authored().depthOfField?.width
+    ).toBe(name === 'perspectiveX' ? 45 : 0.45);
+    expect(panel.input(name).value).toBe('45');
+    expect(document.activeElement).toBe(document.body);
+  }
+);

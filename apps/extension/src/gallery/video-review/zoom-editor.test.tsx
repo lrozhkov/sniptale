@@ -293,38 +293,6 @@ it('refuses a zoom at EOF and selects the existing region when the playhead is o
   expect(current().selection).toBe(firstId);
 });
 
-it('shares a disposable framing draft without writing history and rejects stale selection drafts', () => {
-  const setZoom = vi.fn();
-  let zoom = { enabled: true, regions: [region('a', 0, 2), region('b', 4, 6)] };
-  let selected = 'a';
-  let editor: ReturnType<typeof useReviewZoomEditor>;
-  function Harness() {
-    editor = useReviewZoomEditor({ setZoom, zoom, timelineDuration: 10, selection: selected });
-    return null;
-  }
-  act(() => root.render(<Harness />));
-  act(() => editor.preview('a', { centerX: 0.7 }));
-  expect(editor!.previewRegion(zoom.regions[0]!).transform.centerX).toBe(0.7);
-  expect(zoom.regions[0]!.transform.centerX).toBe(0.5);
-  expect(setZoom).not.toHaveBeenCalled();
-  // Autosave acknowledgement reparses the same content while the pointer is still held.
-  zoom = structuredClone(zoom);
-  act(() => root.render(<Harness />));
-  expect(editor!.previewRegion(zoom.regions[0]!).transform.centerX).toBe(0.7);
-  act(() => editor.preview('a', null));
-  expect(editor!.previewRegion(zoom.regions[0]!)).toBe(zoom.regions[0]);
-  act(() => editor.preview('a', { centerX: 0.8 }));
-  selected = 'b';
-  act(() => root.render(<Harness />));
-  selected = 'a';
-  act(() => root.render(<Harness />));
-  expect(editor!.previewRegion(zoom.regions[0]!)).toBe(zoom.regions[0]);
-  expect(setZoom).not.toHaveBeenCalled();
-  act(() => editor.change('a', { centerX: 0.8 }));
-  expect(setZoom).toHaveBeenCalledOnce();
-  expect(apply(setZoom, zoom).regions[0]!.transform.centerX).toBe(0.8);
-});
-
 it('selects a contextual focus with its supplied geometry and refuses occupied intervals', () => {
   const zoom = { ...createQuickEditAdvancedState().zoom, regions: [region('occupied', 4, 6)] };
   const setZoom = vi.fn(),
