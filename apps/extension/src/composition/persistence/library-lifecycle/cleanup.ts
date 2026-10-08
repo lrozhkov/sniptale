@@ -61,11 +61,17 @@ function isExpired(updatedAt: number, retentionMs: number | null, now: number): 
 export async function cleanupDrafts(args: {
   policy: LocalStoragePolicy;
   includeUnexpired?: boolean;
+  signal?: AbortSignal;
   now?: number;
 }): Promise<DraftCleanupResult> {
+  const empty = { deletedCount: 0, deletedIds: [] };
+  if (args.signal?.aborted) return empty;
   await recoverRecordingAssetPublications();
+  if (args.signal?.aborted) return empty;
   await recoverProjectMediaPublications();
+  if (args.signal?.aborted) return empty;
   await recoverImageWorkspacePublications();
+  if (args.signal?.aborted) return empty;
   const now = args.now ?? Date.now();
   await repairTemporaryProjectLifecycles(now);
   await repairLinkedRecordingLifecycles(now);
@@ -84,6 +90,8 @@ export async function cleanupDrafts(args: {
 
   const includeUnexpired = Boolean(args.includeUnexpired);
   for (const entry of media) {
+    if (args.signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (args.signal?.aborted) break;
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')
       continue;
@@ -94,6 +102,7 @@ export async function cleanupDrafts(args: {
     const retention = entry.source.kind === 'recording' ? videoRetention : ordinaryRetention;
     if (!includeUnexpired && !isExpired(lifecycle.updatedAt, retention, now)) continue;
     if (entry.source.kind === 'web-snapshot') await recoverMediaSourcePublications(entry);
+    if (args.signal?.aborted) break;
     if (await deleteExpiredMedia(entry.id, now, retention, includeUnexpired)) {
       deletedIds.push(entry.id);
     }

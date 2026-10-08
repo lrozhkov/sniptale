@@ -1,7 +1,4 @@
-import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import { maintainLibraryAssets } from '../../workflows/media-hub/maintenance';
-import { loadSettings } from '../../composition/persistence/settings';
-import { cleanupLibraryTrash } from '../../workflows/media-hub/trash';
 import { getLibraryStorageUsage } from '../../composition/persistence/library-lifecycle';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
@@ -65,15 +62,12 @@ function createMediaHubEventHandler(
 }
 
 function applyGalleryRefreshResult(props: {
-  estimate: StorageEstimateInfo;
   itemsRef: React.MutableRefObject<GalleryItem[]>;
   nextItems: GalleryItem[];
   onPreviewItemRefresh: (items: GalleryItem[]) => void;
   onSelectionRefresh: (items: GalleryItem[]) => void;
   setHasLoadedLibrarySnapshot: (hasLoaded: boolean) => void;
   setItems: (items: GalleryItem[]) => void;
-  setStorageInfo: (value: StorageEstimateInfo | null) => void;
-  storageInfoRef: React.MutableRefObject<StorageEstimateInfo | null>;
 }) {
   const resolvedItems = resolveStableGalleryItems(props.itemsRef.current, props.nextItems);
   const itemsChanged = resolvedItems !== props.itemsRef.current;
@@ -85,10 +79,6 @@ function applyGalleryRefreshResult(props: {
     props.onPreviewItemRefresh(resolvedItems);
   }
 
-  if (!isStorageEstimateEqual(props.storageInfoRef.current, props.estimate)) {
-    props.storageInfoRef.current = props.estimate;
-    props.setStorageInfo(props.estimate);
-  }
   props.setHasLoadedLibrarySnapshot(true);
 }
 
@@ -375,33 +365,39 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
     args.setIsLoading(true);
   }
   try {
-    const settings = await loadSettings().catch(() => null);
-    if (settings) {
-      const maintenance = await runStorageStartupPhase('gallery-trash-cleanup', () =>
-        cleanupLibraryTrash(settings.localStoragePolicy)
-      ).catch(() => ({
-        failedCount: 1,
-      }));
-      if (maintenance.failedCount > 0) args.onBanner(translate('gallery.app.trashCleanupFailed'));
-    }
     const { estimate, nextItems } = await loadGalleryLibrarySnapshot();
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
       return;
     }
 
     applyGalleryRefreshResult({
-      estimate,
       itemsRef: args.itemsRef,
       nextItems,
       onPreviewItemRefresh: args.onPreviewItemRefresh,
       onSelectionRefresh: args.onSelectionRefresh,
       setHasLoadedLibrarySnapshot: args.setHasLoadedLibrarySnapshot,
       setItems: args.setItems,
-      setStorageInfo: args.setStorageInfo,
-      storageInfoRef: args.storageInfoRef,
+    });
+    void Promise.resolve(estimate).then((value) => {
+      if (
+        usageController.signal.aborted ||
+        !isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })
+      )
+        return;
+      if (value && !isStorageEstimateEqual(args.storageInfoRef.current, value)) {
+        args.storageInfoRef.current = value;
+        args.setStorageInfo(value);
+      }
     });
     loadGalleryTrashUsage(args, nextItems, refreshEpoch, usageController.signal);
-    void maintainLibraryAssets(usageController.signal);
+    void maintainLibraryAssets(usageController.signal, () => {
+      if (
+        usageController.signal.aborted ||
+        !isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })
+      )
+        return;
+      args.onBanner(translate('gallery.app.trashCleanupFailed'));
+    });
     args.onRefresh?.();
   } catch (error) {
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {

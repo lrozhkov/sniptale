@@ -20,7 +20,6 @@ import {
   type DatabaseAdmissionStatus,
 } from './admission';
 import { handleDatabaseUpgrade } from './upgrade/core.ts';
-import { runProvenanceUrlMaintenance } from './maintenance/provenance';
 import {
   DB_NAME,
   DB_VERSION,
@@ -246,11 +245,6 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
     throw error;
   }
 
-  await runStorageStartupPhase('database-url-maintenance', () =>
-    runProvenanceUrlMaintenance(db)
-  ).catch((error) => {
-    logger.warn('Provenance URL maintenance failed', error);
-  });
   return db;
 }
 

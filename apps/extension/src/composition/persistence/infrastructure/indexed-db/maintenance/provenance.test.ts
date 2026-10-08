@@ -234,3 +234,24 @@ function createReadableCursor(cursor: ReturnType<typeof createCursor> | undefine
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
+
+it('does not reserve a mutation permit for scanning already sanitized records', async () => {
+  const mutate = vi.fn();
+  const cursor = createCursor({ id: 'safe', sourceUrl: null, sourceFavicon: null });
+  await runProvenanceUrlMaintenance(createMaintenanceDb({ media_library: [cursor] }), { mutate });
+  expect(mutate).not.toHaveBeenCalled();
+});
+
+it('cancels a deferred patch before opening its write transaction', async () => {
+  const abort = new AbortController();
+  const cursor = createCursor(createSensitiveMediaRecord());
+  const db = createMaintenanceDb({ media_library: [cursor] });
+  await runProvenanceUrlMaintenance(db, {
+    signal: abort.signal,
+    mutate: async (operation) => {
+      abort.abort();
+      await operation(db);
+    },
+  });
+  expect(cursor.put).not.toHaveBeenCalled();
+});

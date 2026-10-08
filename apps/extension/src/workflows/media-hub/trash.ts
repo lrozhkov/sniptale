@@ -95,9 +95,10 @@ export async function permanentlyDeleteLibraryItem(
 /** Explicit Gallery maintenance; never run from a persistence read API. */
 export async function cleanupLibraryTrash(
   policy: LocalStoragePolicy,
-  now = Date.now()
+  now = Date.now(),
+  signal?: AbortSignal
 ): Promise<{ failedCount: number }> {
-  if (!policy.trashCleanupEnabled) return { failedCount: 0 };
+  if (signal?.aborted || !policy.trashCleanupEnabled) return { failedCount: 0 };
   const cutoff = now - (policy.trashRetentionDays ?? 30) * 86_400_000;
   const [media, videos, scenarios] = await Promise.all([
     listMediaLibrary(),
@@ -121,6 +122,8 @@ export async function cleanupLibraryTrash(
   media.forEach((item) => append({ kind: 'media', id: item.id }, item.lifecycle?.trashedAt));
   let failedCount = 0;
   for (const entry of candidates) {
+    if (signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (signal?.aborted) break;
     try {
       // Unattended cleanup cannot detach media from projects, including trashed projects.
       if (
@@ -128,6 +131,7 @@ export async function cleanupLibraryTrash(
         (await listMediaAssetProjectUsage(entry.target.id)).length > 0
       )
         continue;
+      if (signal?.aborted) break;
       await permanentlyDeleteTrashItem(entry, []);
     } catch (error) {
       if (!(error instanceof StaleTrashItemError)) failedCount += 1;

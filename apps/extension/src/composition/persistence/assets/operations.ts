@@ -1,3 +1,4 @@
+import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import { deleteAssetObject, listReadyJournals } from './opfs-store';
@@ -48,11 +49,13 @@ export async function completePhysicalDeleteOperation(
 ): Promise<void> {
   await initDB();
   await runWithDurableAssetLifecycleLock(async () => {
-    const journals = await listReadyJournals();
+    const journals = await runStorageStartupPhase('asset-ready-journal-list', listReadyJournals);
     let deferred = false;
     for (const assetId of operation.assetIds) {
       const authority = await runWithIndexedDbMutation(async (db) => {
-        const snapshot = await collectDurableAssetSnapshot(db);
+        const snapshot = await runStorageStartupPhase('asset-retention-snapshot', () =>
+          collectDurableAssetSnapshot(db)
+        );
         const ref = snapshot.refs.find((entry) => entry.assetId === assetId);
         const claimed = snapshot.owners.some((owner) => owner.assetId === assetId);
         const projected = snapshot.expectedOwners.some((owner) => owner.assetId === assetId);

@@ -348,8 +348,8 @@ async function deleteOperation(operationId: string): Promise<void> {
 async function recoverBackupRestoreOperations(
   lifecyclePermit: DurableAssetLifecyclePermit
 ): Promise<void> {
-  const operations = await runWithIndexedDbMutation(async (db) =>
-    db.getAll(ASSET_OPERATIONS_STORE)
+  const operations = await runStorageStartupPhase('asset-operation-list', () =>
+    runWithIndexedDbMutation(async (db) => db.getAll(ASSET_OPERATIONS_STORE))
   );
   const byId = new Map<string, AssetOperation>();
   const blockedCompensations = new Set<string>();
@@ -358,7 +358,9 @@ async function recoverBackupRestoreOperations(
   for (const raw of operations) {
     const physicalDelete = parsePhysicalDeleteAssetOperation(raw);
     if (physicalDelete) {
-      await completePhysicalDeleteOperation(physicalDelete, lifecyclePermit);
+      await runStorageStartupPhase('asset-physical-delete-replay', () =>
+        completePhysicalDeleteOperation(physicalDelete, lifecyclePermit)
+      );
       continue;
     }
     const archiveSession = parseArchiveRestoreSession(raw);
@@ -387,7 +389,10 @@ async function recoverBackupRestoreOperations(
         blockedCompensations.add(operation.operationId);
     }
   }
-  for (const journal of await listReadyJournals()) {
+  for (const journal of await runStorageStartupPhase(
+    'asset-ready-journal-list',
+    listReadyJournals
+  )) {
     if (!journal.operationId) continue;
     if (blockedCompensations.has(journal.operationId)) continue;
     const operation = byId.get(journal.operationId);

@@ -68,3 +68,13 @@ function createGate() {
   });
   return { promise, resolve };
 }
+
+it('lists a thousand project summaries without validating all asset bytes', async () => {
+  mocks.dbGetAll.mockResolvedValue(
+    Array.from({ length: 1000 }, (_, index) => createVideoProjectEntry({ id: `project-${index}` }))
+  );
+  mocks.verifyIntegrity.mockRejectedValue(new Error('unrelated byte verification'));
+  const { listVideoProjects } = await import('./index');
+  await expect(listVideoProjects()).resolves.toHaveLength(1000);
+  expect(mocks.verifyIntegrity).not.toHaveBeenCalled();
+});

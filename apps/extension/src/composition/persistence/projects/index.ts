@@ -218,11 +218,19 @@ export async function getVideoProject(id: string): Promise<VideoProjectReadResul
 }
 
 export async function listVideoProjects(): Promise<VideoProjectListItem[]> {
-  const verified = await listVideoProjectReadResults();
-  return verified
+  const db = await initDB();
+  const entries = (await db.getAll(VIDEO_PROJECTS_STORE)).map(parseVideoProjectEntryResult);
+  // Listing metadata must not read/hash every project's effect assets. Exact reads still verify them.
+  return entries
     .flatMap((result, index) =>
       result.status === 'ready'
-        ? [createVideoProjectListItem(result.project, result.lifecycle, result.workspaceRevision)]
+        ? [
+            createVideoProjectListItem(
+              result.entry.project,
+              result.entry.lifecycle,
+              result.entry.workspaceRevision
+            ),
+          ]
         : result.status === 'unsupported'
           ? [createUnsupportedVideoProjectListItem(result.metadata)]
           : result.status === 'invalid'

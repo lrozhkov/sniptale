@@ -15,16 +15,10 @@ import { isGalleryMediaItem } from '../library/items';
 import { isGalleryVideoProjectItem } from '../library/items';
 import { loadSettings } from '../../composition/persistence/settings';
 import {
-  cleanupDrafts,
   DEFAULT_LOCAL_STORAGE_POLICY,
   getDraftRetentionMs,
-  repairTemporaryProjectLifecycles,
 } from '../../composition/persistence/library-lifecycle';
 import { listAggregatePresentations } from '../../composition/persistence/aggregate-presentations';
-import { backfillScenarioLibraryAssets } from '../../composition/persistence/scenario/library-publication';
-import { createLogger } from '@sniptale/platform/observability/logger';
-
-const logger = createLogger({ namespace: 'GalleryLibrarySnapshot' });
 
 async function loadScenarioExports(projectId: string) {
   return [projectId, await listScenarioExportRecords(projectId)] as const;
@@ -35,28 +29,16 @@ async function loadScenarioExportsByProject(projectIds: string[]) {
 }
 
 export async function loadGalleryLibrarySnapshot(): Promise<{
-  estimate: StorageEstimateInfo;
+  estimate: Promise<StorageEstimateInfo | null>;
   nextItems: GalleryItem[];
 }> {
-  await runStorageStartupPhase('gallery-lifecycle-repair', () =>
-    repairTemporaryProjectLifecycles()
-  );
-  await runStorageStartupPhase('gallery-scenario-backfill', backfillScenarioLibraryAssets);
   const settings = await loadSettings().catch(() => null);
-  if (settings) {
-    await runStorageStartupPhase('gallery-draft-cleanup', () =>
-      cleanupDrafts({ policy: settings.localStoragePolicy })
-    ).catch(() => {
-      logger.warn('Draft maintenance failed; showing current library items.');
-    });
-  }
   const policy = settings?.localStoragePolicy ?? DEFAULT_LOCAL_STORAGE_POLICY;
-  const [mediaItems, scenarioProjects, thumbnailIds, estimate, videoProjects, presentations] =
+  const [mediaItems, scenarioProjects, thumbnailIds, videoProjects, presentations] =
     await Promise.all([
       runStorageStartupPhase('gallery-media-list', listMediaLibrary),
       runStorageStartupPhase('gallery-scenario-list', listScenarioProjectSummaries),
       runStorageStartupPhase('gallery-thumbnail-list', listMediaThumbnailIds),
-      runStorageStartupPhase('gallery-storage-estimate', getStorageEstimateInfo),
       runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
       runStorageStartupPhase('gallery-presentations', listAggregatePresentations),
     ]);
@@ -65,7 +47,9 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
   );
 
   return {
-    estimate,
+    estimate: runStorageStartupPhase('gallery-storage-estimate', getStorageEstimateInfo).catch(
+      () => null
+    ),
     nextItems: createGalleryItems({
       mediaItems,
       presentations,

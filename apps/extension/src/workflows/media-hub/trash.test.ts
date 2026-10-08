@@ -196,3 +196,19 @@ it('cleans only expired independent export markers while leaving active sibling 
   expect(mocks.deleteExport).toHaveBeenCalledExactlyOnceWith('expired');
   expect(mocks.deleteScenario).not.toHaveBeenCalled();
 });
+
+it('cancels automatic deletion after a pending usage check resolves', async () => {
+  const abort = new AbortController();
+  mocks.media.mockResolvedValue([{ id: 'expired', lifecycle: { trashedAt: 1 } }]);
+  mocks.usage.mockImplementationOnce(async () => {
+    abort.abort();
+    return [];
+  });
+  await cleanupLibraryTrash(
+    { ...DEFAULT_LOCAL_STORAGE_POLICY, trashCleanupEnabled: true, trashRetentionDays: 7 },
+    10 * 86_400_000,
+    abort.signal
+  );
+  expect(mocks.guard).not.toHaveBeenCalled();
+  expect(mocks.deleteMedia).not.toHaveBeenCalled();
+});

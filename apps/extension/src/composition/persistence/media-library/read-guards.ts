@@ -1,3 +1,4 @@
+import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { parseRecordingMetadata } from '../../../features/media-hub/recording-metadata';
 import type {
   MediaAssetKind,
@@ -194,9 +195,9 @@ export function parseMediaLibraryEntry(value: unknown): MediaLibraryEntry | null
     originalFilename: value['originalFilename'],
     size: value['size'],
     source,
-    sourceFavicon: value['sourceFavicon'],
+    sourceFavicon: sanitizeProvenanceUrl(value['sourceFavicon']),
     sourceTitle: value['sourceTitle'],
-    sourceUrl: value['sourceUrl'],
+    sourceUrl: sanitizeProvenanceUrl(value['sourceUrl']),
     tags: value['tags'],
     ...(lifecycle === undefined ? {} : { lifecycle }),
     ...(recordingGroup === undefined ? {} : { recordingGroup }),

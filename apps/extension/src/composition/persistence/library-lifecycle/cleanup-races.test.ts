@@ -332,3 +332,55 @@ it('retains independently trashed media and its legacy video project', async () 
   expect(deletes).not.toHaveBeenCalledWith('media_library', media.id);
   expect(deletes).not.toHaveBeenCalledWith('project_assets', 'project-asset-1');
 });
+
+it('does not start recovery or deletion for cancelled maintenance', async () => {
+  const { recoverRecordingAssetPublications } = await import('../recordings/asset-publication');
+  const abort = new AbortController();
+  abort.abort();
+  await expect(
+    cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal })
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(recoverRecordingAssetPublications).not.toHaveBeenCalled();
+});
+
+it.each(['recording', 'project', 'image'] as const)(
+  'cancels after %s recovery without starting retention scans',
+  async (phase) => {
+    const { recoverRecordingAssetPublications } = await import('../recordings/asset-publication');
+    const { recoverProjectMediaPublications } = await import('../projects/asset-publication');
+    const { recoverImageWorkspacePublications } = await import('../image-aggregates/mutations');
+    const abort = new AbortController();
+    const recover =
+      phase === 'recording'
+        ? recoverRecordingAssetPublications
+        : phase === 'project'
+          ? recoverProjectMediaPublications
+          : recoverImageWorkspacePublications;
+    vi.mocked(recover).mockImplementationOnce(async () => {
+      abort.abort();
+      return 0;
+    });
+    await expect(
+      cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal })
+    ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+    expect(persistenceMocks.listMediaLibrary).not.toHaveBeenCalled();
+  }
+);
+
+it('cancels candidate deletion when discovery completes after cancellation', async () => {
+  const abort = new AbortController();
+  persistenceMocks.listMediaLibrary.mockImplementationOnce(async () => {
+    abort.abort();
+    return [
+      {
+        id: 'expired',
+        lifecycle: createLibraryLifecycle('temporary', 1),
+        source: { kind: 'screenshot' },
+      },
+    ];
+  });
+  await expect(
+    cleanupDrafts({ policy: DEFAULT_LOCAL_STORAGE_POLICY, signal: abort.signal, now: 40 * day })
+  ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
+  expect(persistenceMocks.runWithIndexedDbMutation).not.toHaveBeenCalled();
+});

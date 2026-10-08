@@ -92,3 +92,24 @@ it('requires completed admission without queuing cold or terminated connections'
   expect(() => f.service.requireAdmission()).not.toThrow();
   expect(f.recover).not.toHaveBeenCalled();
 });
+
+it('prepares a new recording without entering whole-library recovery', async () => {
+  const { offscreenDataReadiness, prepareOffscreenRecordingData } =
+    await import('./data-readiness');
+  const admission = vi.spyOn(offscreenDataReadiness, 'ensureAdmission').mockResolvedValue();
+  const recovery = vi
+    .spyOn(offscreenDataReadiness, 'ensureAssets')
+    .mockRejectedValue(new Error('global maintenance must not block capture'));
+  const outbox = await import('../recording/post-record-publication');
+  const reconcile = vi.spyOn(outbox, 'reconcileRecordingCompletionOutbox').mockResolvedValue(false);
+  try {
+    await expect(prepareOffscreenRecordingData()).resolves.toBeUndefined();
+    expect(admission).toHaveBeenCalledOnce();
+    expect(recovery).not.toHaveBeenCalled();
+    expect(reconcile).toHaveBeenCalledOnce();
+  } finally {
+    admission.mockRestore();
+    recovery.mockRestore();
+    reconcile.mockRestore();
+  }
+});

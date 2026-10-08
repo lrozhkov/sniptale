@@ -96,6 +96,7 @@ it('retains each aggregate graph and original destination through duplicate tras
   await moveStoredItemsToTrash(targets, 200);
   expect(rows.get('media_library')?.get(media.id)).toEqual({
     ...media,
+    imageContentState: 'original',
     lifecycle: { ...media.lifecycle, trashedAt: 100 },
   });
   expect(rows.get('video_projects')?.get(video.id)).toEqual({
@@ -111,6 +112,7 @@ it('retains each aggregate graph and original destination through duplicate tras
   await restoreStoredItemsFromTrash(targets, 400);
   expect(rows.get('media_library')?.get(media.id)).toEqual({
     ...media,
+    imageContentState: 'original',
     lifecycle: { ...media.lifecycle, updatedAt: 300 },
   });
   expect(rows.get('video_projects')?.get(video.id)).toEqual({

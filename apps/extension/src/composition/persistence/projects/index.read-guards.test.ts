@@ -164,7 +164,7 @@ it('keeps hydratable persisted video projects visible before export-ready valida
   ]);
 });
 
-it('classifies a structurally valid project with a corrupt EffectV1 snapshot as invalid', async () => {
+it('lists project metadata but refuses a corrupt EffectV1 snapshot when opening it', async () => {
   const source = readFileSync(
     new URL(
       '../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/valid/' +
@@ -190,9 +190,10 @@ it('classifies a structurally valid project with a corrupt EffectV1 snapshot as 
     ],
   });
   mocks.dbGetAll.mockResolvedValue([entry]);
-  await expect((await import('./index')).listVideoProjects()).resolves.toEqual([
-    expect.objectContaining({ id: entry.id, unavailableReason: 'invalid' }),
-  ]);
+  const { listVideoProjects, getVideoProject } = await import('./index');
+  await expect(listVideoProjects()).resolves.toEqual([expect.objectContaining({ id: entry.id })]);
+  mocks.dbGet.mockResolvedValue(entry);
+  await expect(getVideoProject(entry.id)).resolves.toMatchObject({ status: 'invalid' });
 });
 
 it('keeps engine1 projects visible but returns a typed unsupported read result', async () => {

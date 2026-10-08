@@ -35,6 +35,13 @@ vi.mock('./use-gallery-library-snapshot', () => ({
   loadGalleryLibrarySnapshot: loadGalleryLibrarySnapshotMock,
 }));
 
+const maintainLibraryAssetsMock = vi.hoisted(() =>
+  vi.fn(async (_signal: AbortSignal, _onFailure?: () => void) => undefined)
+);
+vi.mock('../../workflows/media-hub/maintenance', () => ({
+  maintainLibraryAssets: maintainLibraryAssetsMock,
+}));
+
 import { useGalleryLibraryState } from './useGalleryLibraryState';
 
 let container: HTMLDivElement | null = null;
@@ -565,4 +572,49 @@ it('coalesces focus and visibility notifications and reloads once after changes 
   await act(async () => latest.resolve());
   await flushLibraryState();
   expect(values.at(-1)?.items[0]?.id).toBe('after-change');
+});
+
+it('renders the snapshot before storage estimation and ignores its superseded result', async () => {
+  let resolveOld!: (value: { usage: number; quota: number }) => void;
+  const estimate = new Promise<{ usage: number; quota: number }>((resolve) => {
+    resolveOld = resolve;
+  });
+  loadGalleryLibrarySnapshotMock.mockResolvedValueOnce({
+    estimate,
+    nextItems: [createMediaItem({ id: 'first' })],
+  });
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  expect(values.at(-1)?.isLoading).toBe(false);
+  expect(values.at(-1)?.items[0]?.id).toBe('first');
+  await act(async () => values.at(-1)?.refresh());
+  await flushLibraryState();
+  await act(async () => resolveOld({ usage: 99, quota: 100 }));
+  expect(values.at(-1)?.storageInfo).toMatchObject({ usage: 10, quota: 20 });
+});
+
+it('shows asynchronous Trash failure feedback only for the current refresh', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  const onBanner = vi.fn();
+  renderConnectedProbe(values, {
+    onBanner,
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  const staleFailure = maintainLibraryAssetsMock.mock.calls.at(-1)?.[1];
+  expect(staleFailure).toBeTypeOf('function');
+  await act(async () => values.at(-1)?.refresh());
+  await flushLibraryState();
+  const currentFailure = maintainLibraryAssetsMock.mock.calls.at(-1)?.[1];
+  act(() => staleFailure?.());
+  expect(onBanner).not.toHaveBeenCalled();
+  act(() => currentFailure?.());
+  expect(onBanner).toHaveBeenCalledOnce();
+  expect(values.at(-1)?.isLoading).toBe(false);
 });

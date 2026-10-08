@@ -90,7 +90,7 @@ export const offscreenDataReadiness = createOffscreenDataReadiness({
 
 /** Replay the previous durable completion before admitting another recording writer. */
 export async function prepareOffscreenRecordingData(): Promise<void> {
-  await offscreenDataReadiness.ensureAssets();
+  await offscreenDataReadiness.ensureAdmission();
   const [{ reconcileRecordingCompletionOutbox }, { sendRuntimeMessage }] =
     await runStorageStartupPhase('recording-outbox-import', () =>
       Promise.all([

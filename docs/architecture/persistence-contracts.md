@@ -8,7 +8,7 @@ Keep one database because recording publication commits recording metadata, medi
 
 ## Admission and migration
 
-Run readiness under the exclusive persistent-data transition barrier before admitting ordinary mutations. Readiness validates the database version, stores, indexes, and domain contracts. Return a typed recovery result when admission fails. Gallery owns interactive recovery.
+Run readiness under the exclusive persistent-data transition barrier before admitting ordinary mutations. Readiness validates the database version, stores, indexes, and domain contracts. Return a typed recovery result when admission fails. Gallery owns interactive recovery. Cold admission does not scan existing media or workspace provenance; parsers sanitize legacy provenance on read, and Gallery schedules cancellable rewriting after rendering. Discovery holds no mutation permit; each current-row rewrite acquires its own permit and preserves newer data.
 
 Retain a browser fixture and a contiguous migration descriptor for every released beta source version. Each descriptor identifies source and target versions, changed domains and stores, risk, backup coverage, and required free-space estimation. Refuse missing paths, future versions, malformed contracts, unknown required space, or insufficient quota before opening the target version.
 

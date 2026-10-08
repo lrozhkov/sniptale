@@ -1,9 +1,36 @@
-import { afterEach, expect, it, vi } from 'vitest';
-const collect = vi.hoisted(() => vi.fn());
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+const { collect, provenance, backfill, drafts, trash, recover, settings } = vi.hoisted(() => ({
+  collect: vi.fn(),
+  provenance: vi.fn(),
+  backfill: vi.fn(),
+  drafts: vi.fn(async () => ({ deletedCount: 0, deletedIds: [] })),
+  trash: vi.fn(),
+  recover: vi.fn(),
+  settings: vi.fn(async () => ({ localStoragePolicy: {} })),
+}));
+vi.mock('../../composition/persistence/infrastructure/indexed-db/maintenance/provenance', () => ({
+  maintainProvenanceUrls: provenance,
+}));
+vi.mock('../../composition/persistence/scenario/library-publication', () => ({
+  backfillScenarioLibraryAssets: backfill,
+}));
+vi.mock('../../composition/persistence/library-lifecycle/cleanup', () => ({
+  cleanupDrafts: drafts,
+}));
+vi.mock('../../composition/persistence/settings', () => ({ loadSettings: settings }));
+vi.mock('../../composition/persistence/asset-publication-recovery', () => ({
+  recoverPendingAssetPublications: recover,
+}));
+vi.mock('./trash', () => ({ cleanupLibraryTrash: trash }));
 vi.mock('../../composition/persistence/asset-publication-recovery/audit', () => ({
   collectOrphanAssetObjectsDuringIdle: collect,
 }));
+vi.mock('../../features/media-hub/events', () => ({ publishMediaHubLibraryChanged: vi.fn() }));
 import { maintainLibraryAssets } from './maintenance';
+beforeEach(() => {
+  settings.mockResolvedValue({ localStoragePolicy: {} });
+  trash.mockResolvedValue({ failedCount: 0 });
+});
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
@@ -22,4 +49,48 @@ it('keeps maintenance failures advisory', async () => {
   collect.mockRejectedValueOnce(new Error('unavailable'));
   await expect(maintainLibraryAssets(new AbortController().signal)).resolves.toBeUndefined();
   expect(collect).toHaveBeenCalledOnce();
+});
+
+it('stops later housekeeping stages after cancellation during a slow pass', async () => {
+  const abort = new AbortController();
+  provenance.mockImplementationOnce(async () => {
+    abort.abort();
+  });
+  await maintainLibraryAssets(abort.signal);
+  expect(backfill).not.toHaveBeenCalled();
+  expect(drafts).not.toHaveBeenCalled();
+  expect(trash).not.toHaveBeenCalled();
+  expect(recover).not.toHaveBeenCalled();
+});
+
+it('does not apply guessed retention when settings are unavailable', async () => {
+  settings.mockRejectedValue(new Error('unavailable'));
+  await maintainLibraryAssets(new AbortController().signal);
+  expect(drafts).not.toHaveBeenCalled();
+  expect(trash).not.toHaveBeenCalled();
+  expect(collect).toHaveBeenCalledOnce();
+});
+
+it.each(['reported', 'thrown'] as const)(
+  'reports %s Trash failures separately from snapshot loading',
+  async (failure) => {
+    const report = vi.fn();
+    if (failure === 'reported') trash.mockResolvedValueOnce({ failedCount: 1 });
+    else trash.mockRejectedValueOnce(new Error('delete failed'));
+    await maintainLibraryAssets(new AbortController().signal, report);
+    expect(report).toHaveBeenCalledOnce();
+    expect(collect).toHaveBeenCalledOnce();
+  }
+);
+
+it('discards a Trash failure that completes after maintenance cancellation', async () => {
+  const abort = new AbortController();
+  const report = vi.fn();
+  trash.mockImplementationOnce(async () => {
+    abort.abort();
+    throw new Error('late failure');
+  });
+  await maintainLibraryAssets(abort.signal, report);
+  expect(report).not.toHaveBeenCalled();
+  expect(collect).not.toHaveBeenCalled();
 });

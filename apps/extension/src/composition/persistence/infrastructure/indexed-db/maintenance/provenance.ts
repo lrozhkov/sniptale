@@ -1,3 +1,5 @@
+import { initDB } from '../core';
+import { runWithIndexedDbMutation } from '../mutation';
 import { IMAGE_WORKSPACES_STORE, MEDIA_LIBRARY_STORE } from '../core.stores.ts';
 import { sanitizeProvenanceUrl } from '@sniptale/platform/security/provenance-url';
 import { patchRecord } from './record-patch';
@@ -9,9 +11,29 @@ type MaintenanceSanitizeResult = {
   value: unknown;
 };
 
-export async function runProvenanceUrlMaintenance(db: MaintenanceDatabase): Promise<void> {
-  await sanitizeStoreProvenanceUrls(db, MEDIA_LIBRARY_STORE, sanitizeMediaLibraryRecord);
-  await sanitizeStoreProvenanceUrls(db, IMAGE_WORKSPACES_STORE, sanitizeImageWorkspaceRecord);
+type MaintenanceOptions = {
+  signal?: AbortSignal;
+  mutate?: (operation: (db: MaintenanceDatabase) => Promise<void>) => Promise<void>;
+};
+
+/** Scan without a mutation hold; only a current-row patch reserves a mutation permit. */
+export async function maintainProvenanceUrls(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  await runProvenanceUrlMaintenance(await initDB(), { signal, mutate: runWithIndexedDbMutation });
+}
+
+export async function runProvenanceUrlMaintenance(
+  db: MaintenanceDatabase,
+  options: MaintenanceOptions = {}
+): Promise<void> {
+  await sanitizeStoreProvenanceUrls(db, MEDIA_LIBRARY_STORE, sanitizeMediaLibraryRecord, options);
+  if (options.signal?.aborted) return;
+  await sanitizeStoreProvenanceUrls(
+    db,
+    IMAGE_WORKSPACES_STORE,
+    sanitizeImageWorkspaceRecord,
+    options
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -52,27 +74,38 @@ function unchangedResult(value: unknown): MaintenanceSanitizeResult {
 async function sanitizeStoreProvenanceUrls(
   db: MaintenanceDatabase,
   storeName: string,
-  sanitizeRecord: (value: unknown) => MaintenanceSanitizeResult | Promise<MaintenanceSanitizeResult>
+  sanitizeRecord: (
+    value: unknown
+  ) => MaintenanceSanitizeResult | Promise<MaintenanceSanitizeResult>,
+  options: MaintenanceOptions
 ): Promise<void> {
-  const candidates = await collectStoreCandidates(db, storeName);
+  const candidates = await collectStoreCandidates(db, storeName, options.signal);
   for (const candidate of candidates) {
+    if (options.signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    if (options.signal?.aborted) return;
     const result = await Promise.resolve(sanitizeRecord(candidate.value)).catch(() =>
       unchangedResult(candidate.value)
     );
     if (result.changed) {
-      await putCurrentRecord(db, storeName, candidate, result);
+      const patch = async (currentDb: MaintenanceDatabase) => {
+        if (!options.signal?.aborted)
+          await putCurrentRecord(currentDb, storeName, candidate, result);
+      };
+      if (options.mutate) await options.mutate(patch);
+      else await patch(db);
     }
   }
 }
 
 async function collectStoreCandidates(
   db: MaintenanceDatabase,
-  storeName: string
+  storeName: string,
+  signal?: AbortSignal
 ): Promise<MaintenanceCandidate[]> {
   const tx = db.transaction(storeName, 'readonly');
   const candidates: MaintenanceCandidate[] = [];
   let cursor = await tx.objectStore(storeName).openCursor();
-  while (cursor) {
+  while (cursor && !signal?.aborted) {
     candidates.push({ key: cursor.primaryKey, value: cursor.value });
     cursor = await cursor.continue();
   }

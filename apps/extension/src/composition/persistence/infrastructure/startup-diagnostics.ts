@@ -13,6 +13,10 @@ type StorageStartupPhase =
   | 'asset-recovery'
   | 'asset-writing-cleanup'
   | 'asset-backup-recovery'
+  | 'asset-operation-list'
+  | 'asset-ready-journal-list'
+  | 'asset-physical-delete-replay'
+  | 'asset-retention-snapshot'
   | 'asset-publication-replay'
   | 'offscreen-data-admission'
   | 'offscreen-data-recovery'
@@ -30,14 +34,14 @@ type StorageStartupPhase =
   | 'gallery-presentations'
   | 'gallery-scenario-exports';
 
-/** Report slow storage startup without exposing stored values or changing operation outcomes. */
+/** Trace slow storage work without adding extension errors or exposing stored values. */
 export async function runStorageStartupPhase<T>(
   phase: StorageStartupPhase,
   operation: () => Promise<T>
 ): Promise<T> {
   const start = performance.now();
   const report = (status: 'pending' | 'completed' | 'failed') => {
-    logger.warn(
+    logger.debug(
       'Slow storage startup phase',
       sanitizeDiagnosticData({
         phase,
