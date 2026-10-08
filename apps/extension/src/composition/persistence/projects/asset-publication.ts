@@ -7,6 +7,7 @@ import {
   collectReviewAssetReferences,
   reviewWorkspaceHasAudioClip,
   reviewWorkspaceHasWatermarkImage,
+  reviewWorkspaceHasSceneResource,
 } from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
@@ -250,7 +251,14 @@ async function recoverProjectAssetJournal(
       const referenced =
         !!review &&
         (payload.requiredReviewResource
-          ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
+          ? payload.requiredReviewResource.slot === 'watermark'
+            ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
+            : reviewWorkspaceHasSceneResource(
+                review.workspace,
+                payload.requiredReviewResource.slot,
+                payload.requiredReviewResource.kind,
+                assetId
+              )
           : payload.librarySourceId
             ? reviewWorkspaceHasAudioClip(review.workspace, payload.requiredReview!.clipId, assetId)
             : collectReviewAssetReferences(review.workspace).has(assetId));

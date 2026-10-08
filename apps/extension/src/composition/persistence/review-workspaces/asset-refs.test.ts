@@ -684,3 +684,86 @@ it('retains remembered watermark logos across portable current, history and reco
     new Set(ids.map((id) => `project-asset:copy-${id}`))
   );
 });
+
+it('retains both dormant scene variants through history, recovery, portable encoding and remap', async () => {
+  const { createNeutralPresentationSettings } =
+    await import('../../../features/video/review/advanced/presentation');
+  const { reviewWorkspaceHasSceneResource } = await import('./asset-refs');
+  const presentation = createNeutralPresentationSettings();
+  const framing = { fit: 'contain' as const, fillColor: '#000000ff', crop: { panX: 0, panY: 0 } };
+  presentation.intro = {
+    mode: 'none',
+    image: { ...framing, assetId: 'project-asset:shared', width: 20, height: 10, duration: 3 },
+    video: {
+      ...framing,
+      assetId: 'project-asset:video',
+      source: { width: 20, height: 10, duration: 5, size: 10, mimeType: 'video/webm' },
+      trim: { start: 1, end: 4 },
+      audio: { muted: false, gain: 1 },
+    },
+  };
+  presentation.outro = { mode: 'image', image: presentation.intro.image! };
+  const baseline = advanced({ presentation });
+  const historyPresentation = structuredClone(presentation);
+  historyPresentation.intro.image!.assetId = 'project-asset:history';
+  const recovery = structuredClone(presentation);
+  recovery.outro.image!.assetId = 'project-asset:recovery';
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: { ...baseline, recoveryV1: JSON.stringify({ presentation: recovery }) },
+      history: [
+        {
+          id: 'replace',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), presentation: historyPresentation },
+        },
+      ],
+    },
+  };
+  const ids = ['shared', 'video', 'history', 'recovery'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:${id}`))
+  );
+  expect(
+    reviewWorkspaceHasSceneResource(snapshot.workspace, 'intro', 'image', 'project-asset:history')
+  ).toBe(true);
+  expect(
+    reviewWorkspaceHasSceneResource(snapshot.workspace, 'outro', 'image', 'project-asset:recovery')
+  ).toBe(true);
+  expect(
+    reviewWorkspaceHasSceneResource(snapshot.workspace, 'outro', 'video', 'project-asset:video')
+  ).toBe(false);
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  expect(JSON.stringify(portable)).not.toContain('"assetId"');
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(ids.map((id) => [id, `${id}-copy`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:${id}-copy`))
+  );
+  expect(snapshot.workspace.advanced.presentation?.intro.video?.assetId).toBe(
+    'project-asset:video'
+  );
+});

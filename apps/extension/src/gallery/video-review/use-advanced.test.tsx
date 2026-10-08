@@ -470,3 +470,28 @@ it('keeps disabled lanes visible, preserves settings, and top-level hide/show re
   expect(session.getSnapshot().document.advancedContent.clickAnimations).toHaveLength(1);
   expect(session.getSnapshot().document.advancedContent.actionsEnabled).toBe(true);
 });
+
+it('does not resurrect removed presentation from persisted baseline during another scene edit', async () => {
+  const { createNewWorkspacePresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const initial = createQuickEditAdvancedState();
+  initial.presentation = createNewWorkspacePresentationSettings();
+  const { loadQuickEditAdvancedState } =
+    await import('../../features/video/review/advanced/validation');
+  const { session } = setup(loadQuickEditAdvancedState(initial)!);
+  const before = session.getSnapshot().document.advancedContent;
+  const { presentation: _removed, ...after } = before;
+  await act(async () =>
+    session.commitDurable({
+      id: 'remove-presentation',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after,
+    })
+  );
+  expect(advanced.advanced.presentation).toBeUndefined();
+  act(() => advanced.setCanvas({ width: 640, height: 360 }));
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.presentation).toBeUndefined();
+});

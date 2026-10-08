@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -145,7 +146,22 @@ beforeEach(() => {
       onResourceError: vi.fn(),
       resourceRetryGeneration: 2,
     },
-    exporter: { retryAssetAvailability: vi.fn() },
+    presentation: { settings: createNewWorkspacePresentationSettings() },
+    exporter: {
+      retryAssetAvailability: vi.fn(),
+      index: {
+        duration: 14,
+        boundaries: [0, 14],
+        videoCodec: 'vp9',
+        audioCodec: null,
+        container: 'webm',
+        rotation: 0,
+        width: 1280,
+        height: 720,
+        frameRate: 30000 / 1001,
+      },
+      renderSettings: { quality: 'HIGH', frameRate: 0 },
+    },
     source,
     backgroundImport: { pending: false },
     video: { current: null },
@@ -310,4 +326,25 @@ it('routes local preview preferences and inspector entry without changing editin
   expect(active).toBe(before);
   expect(state.play).not.toHaveBeenCalled();
   expect(state.seek).not.toHaveBeenCalled();
+});
+
+it('keeps one full-sequence draft plan across frame updates and uses the resolved fractional output rate', async () => {
+  await render();
+  const plan = stage().outerFadePlan!;
+  expect(plan.rate).toEqual({ numerator: 30000, denominator: 1001 });
+  state = { ...state, time: 2, timeline: { ...state.timeline, sceneOutputTime: 2 } };
+  await render();
+  expect(stage().outerFadePlan).toBe(plan);
+  state.presentation = { settings: { ...state.presentation.settings, color: '#ffffffff' } };
+  await render();
+  expect(stage().outerFadePlan).not.toBe(plan);
+  expect(stage().outerFadePlan?.color).toBe('#ffffffff');
+  state.advanced = { ...state.advanced, ui: { ...state.advanced.ui, mode: 'basic' } };
+  await render();
+  expect(stage().outerFadePlan).toBeUndefined();
+});
+it('does not substitute a fallback cadence when the output profile is invalid', async () => {
+  state.exporter.index = { ...state.exporter.index!, frameRate: NaN };
+  await render();
+  expect(stage().outerFadePlan).toBeUndefined();
 });

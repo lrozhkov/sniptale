@@ -1,0 +1,177 @@
+{
+  "package": "mediabunny",
+  "version": "1.55.2",
+  "resolved": "https://registry.npmjs.org/mediabunny/-/mediabunny-1.55.2.tgz",
+  "integrity": "sha512-EEx4O6qYddAdCyWPMZNDwI7uc5hewNHrPAf9jLcVhIbXoPsiqNQ+D9i1pfadmGkjN2V318jSrZljkpoziYm6Lg==",
+  "license": {
+    "path": "LICENSE",
+    "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04",
+    "modifiedSourcePaths": [
+      "src/isobmff/isobmff-muxer.ts",
+      "src/matroska/ebml.ts",
+      "src/matroska/matroska-muxer.ts",
+      "src/media-source.ts",
+      "src/output.ts"
+    ]
+  },
+  "tooling": {
+    "node": "24.18.0",
+    "typescript": "6.0.3",
+    "esbuild": "0.28.2"
+  },
+  "changes": [
+    {
+      "path": "dist/bundles/mediabunny.cjs",
+      "beforeSha256": "e6f95a002e87a0f6eb6b2d3f4efa14545e468056b7359f6e003f42a80cd3b6b0",
+      "afterSha256": "3a889f948bbab178e7f458c217aba08671f447672bb03a1db8da2ee5673fa5c8",
+      "bytes": 1448130
+    },
+    {
+      "path": "dist/bundles/mediabunny.min.cjs",
+      "beforeSha256": "addd26c70765f44c93edfa03331b6e6d6b17b2689f9e035a4f4085f17ea9578a",
+      "afterSha256": "d299cb3a40f025d955c4872730f6432032ae2da1e49c361206c518db65aa5b20",
+      "bytes": 693075
+    },
+    {
+      "path": "dist/bundles/mediabunny.min.mjs",
+      "beforeSha256": "0ffdb882fab437f402a9a4d95a1aa854bedfa061c6d08684c1a702ddd6ad8029",
+      "afterSha256": "9e64b4106cb815ec0b457655ec3c2f38a56eb5c234f6f7296535c935f0823669",
+      "bytes": 692551
+    },
+    {
+      "path": "dist/bundles/mediabunny.mjs",
+      "beforeSha256": "e30582383a17271ac7d88906e4ad536105371d484012ef996733656d9289668f",
+      "afterSha256": "1d3144f5a0e4bf3ff71078815d219f32f3381cbdc17e716a4253da2f3772e260",
+      "bytes": 1444077
+    },
+    {
+      "path": "dist/bundles/mediabunny.node.cjs",
+      "beforeSha256": "49dd54c7b40c43fc583f3ef312e2fce360890fbf889d3bdad955f8edea2c256f",
+      "afterSha256": "4b828cf92e6d6e99c50eb873843d41b4c2bbc52ccc1ea558142d1656a5660588",
+      "bytes": 1451821
+    },
+    {
+      "path": "dist/mediabunny.d.ts",
+      "beforeSha256": "d444e1729f8c8d23d72f9f1fce348fa64141a5f70bbcebdd3ce4af144658786c",
+      "afterSha256": "9121b770d2f8abbdddec62db8203b7b76f8a26db48145c2e55afa456ac017acb",
+      "bytes": 224511
+    },
+    {
+      "path": "dist/modules/src/isobmff/isobmff-muxer.d.ts.map",
+      "beforeSha256": "f4e17740768fbcf6bcf99931bc9ebad3e198824962b711aed7fc423d02ebf406",
+      "afterSha256": "be4fad7132667d4151e588562944e4fc0b01c56937d27fb5396bf10e410ad7ce",
+      "bytes": 4281
+    },
+    {
+      "path": "dist/modules/src/isobmff/isobmff-muxer.js",
+      "beforeSha256": "7766661b73f877302e29355b6b3ff3d3c82f6ea2f048cb2a068c4682ee414818",
+      "afterSha256": "a53c7b1e0ff4f39be0c68c1e56addca802b73915373df3a2c1e4623bb22febb5",
+      "bytes": 59198
+    },
+    {
+      "path": "dist/modules/src/matroska/ebml.d.ts",
+      "beforeSha256": "31b6268a3ea18985be3602df69d5facaaa59c3877cd3ed71ecd291bd10c34c72",
+      "afterSha256": "fa3ea5b4dc59f599f858a341966e42b4997ad5fa2f1047b6e4f81b22c0acff73",
+      "bytes": 7329
+    },
+    {
+      "path": "dist/modules/src/matroska/ebml.d.ts.map",
+      "beforeSha256": "0bb43322f66d87950daa604545fb18fbb540da5300ea57446b8c73ac8ee2177d",
+      "afterSha256": "0765d37d282ba81b0f1e18076cdb0d3e52648ba5e924b55888893e409c126c91",
+      "bytes": 4693
+    },
+    {
+      "path": "dist/modules/src/matroska/ebml.js",
+      "beforeSha256": "dc7a40d80ee3137e976c9e0ff6d51addf80a6d73a5d6cc5061a1f30576b2804c",
+      "afterSha256": "aacc733aef58222d42dfa24ce7ae24986239773fc3d38254e1a6ad2d71fd4c9c",
+      "bytes": 25673
+    },
+    {
+      "path": "dist/modules/src/matroska/matroska-muxer.d.ts.map",
+      "beforeSha256": "25f03398ea459bd628c7a7a5cd9d80ea43351a595575f646f570af4dc4e96420",
+      "afterSha256": "8b0f55db55b3498cd182af8da0a9655ba8b3e337f76e6f09a87f9039cb1620f9",
+      "bytes": 1907
+    },
+    {
+      "path": "dist/modules/src/matroska/matroska-muxer.js",
+      "beforeSha256": "6cd7d2fb3eb597409005e6b4d3b7da02dde0fc61d85b1cfa38677ed0a16b817a",
+      "afterSha256": "9c8bb5b94945c0e279e255347dfeae79b4b68750c65379e1956b85869081b707",
+      "bytes": 51923
+    },
+    {
+      "path": "dist/modules/src/media-source.d.ts",
+      "beforeSha256": "97a2c57dd1ef12bc38a13fa45daeb2f48baf98a8dd7a4d5071a8f516d019f76a",
+      "afterSha256": "8b30cb8effe5725f4a78070a233a0268ee355f97812b9e8d41a900868364ac38",
+      "bytes": 17305
+    },
+    {
+      "path": "dist/modules/src/media-source.d.ts.map",
+      "beforeSha256": "39e7d97eb4bb7fe6a46e31a50c1b1eaeeafd46de73188a3ef70235450eda8cf6",
+      "afterSha256": "68a30207165f06a876ff5fdd3cee377cb890bf3ba790cbb9b8233fa9dc31ce8f",
+      "bytes": 5245
+    },
+    {
+      "path": "dist/modules/src/media-source.js",
+      "beforeSha256": "ff564a78c77a94e4f29dca30b5818d142cc1580abecd9174580e37f1787901f9",
+      "afterSha256": "427d82742b6f12892bd9519a01a54703c09815e25d79f6d164f2c8676b1fac0d",
+      "bytes": 117648
+    },
+    {
+      "path": "dist/modules/src/output.d.ts",
+      "beforeSha256": "6ce2f5b515fa9c703b59b182ce9b80369e2747afa5b9a803c25bbbc841080d12",
+      "afterSha256": "879ec17c4186144da6c8b14d81700f1365b4d90ed54268b1c0127ee33cab80b5",
+      "bytes": 16431
+    },
+    {
+      "path": "dist/modules/src/output.d.ts.map",
+      "beforeSha256": "9df870cd1a163cdbec18fa1e4698395b32e4772b9009b7294c8743a97701de63",
+      "afterSha256": "6647b044debe6043e3f70946f54640e01eb927eb83eaf64b7142d347b9f9b079",
+      "bytes": 5743
+    },
+    {
+      "path": "dist/modules/src/output.js",
+      "beforeSha256": "718690f543f6e9e05aa7124f5a7bc4f682cf8b5c45410d2ea42aaa31329becab",
+      "afterSha256": "77ef4638fff9bf1b675115049ec102737d2d466c45f6d44648602ab8f4b1c3d5",
+      "bytes": 30214
+    },
+    {
+      "path": "src/isobmff/isobmff-muxer.ts",
+      "beforeSha256": "a855e4d9cc3b02718f6f56c9ef7ee3f7922553c2b92d65d723654bc51c0e1d08",
+      "afterSha256": "42e21ed67d1d3e16523f9371201bc272ac51860f9787274f8dd5f00a10226e6c",
+      "bytes": 53661
+    },
+    {
+      "path": "src/matroska/ebml.ts",
+      "beforeSha256": "42d83f2de0e2bb2a6c8fc317ccd156d839c02b80af86055e2d8d9a23fc06f14f",
+      "afterSha256": "7ab754813af1950bfbec311744f93673dff040d0292b28b18cb9f92ef4a9f793",
+      "bytes": 19735
+    },
+    {
+      "path": "src/matroska/matroska-muxer.ts",
+      "beforeSha256": "354800e236b9bf87d7e99dfb26cc4d9170fbf379fa5181be953716e0c74dc677",
+      "afterSha256": "ae89597102c27f85db3289264ff7718065c365060fd47c2386c72fc77586bb30",
+      "bytes": 43905
+    },
+    {
+      "path": "src/media-source.ts",
+      "beforeSha256": "cf115e3d7ea8d6f7a9749dda72292459484fbab86fdfd2093cbd17c49c0a8f7f",
+      "afterSha256": "8e5c075914741e50fc143198c25023a58c7d8801490bcc941b1ba025e3e76214",
+      "bytes": 100158
+    },
+    {
+      "path": "src/output.ts",
+      "beforeSha256": "55cce36203a4519c86380d6ef74fcc2d8c7dd3491837a374cb6b7051bf7f5f5e",
+      "afterSha256": "6a099f0fe133c1958aa42bb524de636756bc25a85d0f1e441d40f4c1d3b7f555",
+      "bytes": 34560
+    }
+  ],
+  "schemaVersion": 1,
+  "payload": {
+    "path": "patch-payload.json.gz",
+    "sha256": "357742efa2adb33d143070c5d0574cf4fe4e82607bf76c3c864a96ad39cc38a0",
+    "expandedBytes": 6758346,
+    "compressedBytes": 1335981
+  },
+  "packageJsonSha256": "36202e961af2e51278993fe300c331988194e78e3597edf7e491db37c993224f",
+  "sourcePatchSha256": "75b273fa50faa5d6c32dabbbb2e2d9fb8b43e083f064ceb241b4fa393e0da5d8"
+}

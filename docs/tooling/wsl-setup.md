@@ -57,6 +57,7 @@ Install repository dependencies:
 
 ```bash
 npm ci --ignore-scripts
+npm run dependencies:normalize
 npm rebuild canvas
 node node_modules/@ast-grep/cli/postinstall.js
 npm run prepare

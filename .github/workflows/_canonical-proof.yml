@@ -129,7 +129,9 @@ jobs:
         working-directory: candidate
         env:
           npm_config_cache: ${{ github.workspace }}/candidate/.tmp/npm-cache
-        run: npm ci --ignore-scripts
+        run: |
+          npm ci --ignore-scripts
+          node tooling/ci/mediabunny/normalize.mjs
       - name: Bind results to this commit
         id: derive
         if: steps.install.outcome == 'success'
@@ -597,7 +599,9 @@ jobs:
         with: { repository-root: trusted-control }
       - name: Install dependencies
         working-directory: candidate
-        run: npm ci --ignore-scripts
+        run: |
+          npm ci --ignore-scripts
+          node tooling/ci/mediabunny/normalize.mjs
       - name: Install mutation tools
         if: env.PROOF_LANE == 'release'
         working-directory: candidate

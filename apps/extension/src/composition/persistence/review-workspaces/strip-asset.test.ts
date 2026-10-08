@@ -282,3 +282,38 @@ it.each(['none', 'text', 'image'] as const)(
     expect(workspace.advanced.watermark.image).toEqual(watermark.image);
   }
 );
+
+it('purges an active bookend image but retains its remembered video and unrelated slot', async () => {
+  const { createNeutralPresentationSettings } =
+    await import('../../../features/video/review/advanced/presentation');
+  const workspace = makeWorkspace();
+  workspace.history = [];
+  workspace.cursor = 0;
+  workspace.advanced = createQuickEditAdvancedState();
+  const presentation = createNeutralPresentationSettings();
+  const framing = { fit: 'contain' as const, fillColor: '#000000ff', crop: { panX: 0, panY: 0 } };
+  presentation.intro = {
+    mode: 'image',
+    image: { ...framing, assetId: removed, width: 20, height: 10, duration: 3 },
+    video: {
+      ...framing,
+      assetId: retained,
+      source: { width: 20, height: 10, duration: 5, size: 10, mimeType: 'video/webm' },
+      trim: { start: 0, end: 5 },
+      audio: { muted: false, gain: 1 },
+    },
+  };
+  presentation.outro = { mode: 'none', image: { ...presentation.intro.image, assetId: retained } };
+  workspace.advanced.presentation = presentation;
+  workspace.advanced.recoveryV1 = JSON.stringify({ presentation });
+  const stripped = stripReviewAssetReference(workspace, removed, 2);
+  expect(stripped.advanced.presentation?.intro).toEqual({
+    mode: 'none',
+    video: presentation.intro.video,
+  });
+  expect(stripped.advanced.presentation?.outro).toEqual(presentation.outro);
+  expect(collectReviewAssetReferences(stripped)).toEqual(new Set([retained]));
+  expect(JSON.parse(stripped.advanced.recoveryV1!).presentation.intro).toEqual(
+    stripped.advanced.presentation?.intro
+  );
+});

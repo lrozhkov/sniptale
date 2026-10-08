@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 
-import { expect, it } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+const normalization = vi.hoisted(() => vi.fn());
+vi.mock('./mediabunny/normalize.mjs', () => ({ normalizeMediabunny: normalization }));
+beforeEach(() => normalization.mockReset());
 
 import { createTempRoot, writeFile, writeJson } from '../qa/test-support/test-helpers';
 import {
@@ -23,6 +26,14 @@ function fixture() {
   writeJson(root, 'package-lock.json', { lockfileVersion: 3, packages: {} });
   writeJson(root, 'node_modules/.package-lock.json', { lockfileVersion: 3, packages: {} });
   writeFile(root, '.npmrc', 'audit=false\n');
+  for (const file of [
+    'normalize.mjs',
+    'patch-manifest.json',
+    'patch-payload.json.gz',
+    'source.patch',
+    'LICENSE',
+  ])
+    writeFile(root, `tooling/ci/mediabunny/${file}`, 'fixture\n');
   return root;
 }
 
@@ -106,4 +117,32 @@ it('projects a freshly provisioned artifact into the native stamp without losing
     canvas: { digest: 'new-canvas-digest', installFingerprint: 'install-digest' },
     'ast-grep': { digest: 'ast-digest', installFingerprint: 'install-digest' },
   });
+});
+
+it.each([
+  'normalize.mjs',
+  'patch-manifest.json',
+  'patch-payload.json.gz',
+  'source.patch',
+  'LICENSE',
+])('invalidates install reuse when Mediabunny %s changes', (file) => {
+  const root = fixture();
+  recordLocalInstallState({ root });
+  fs.appendFileSync(`${root}/tooling/ci/mediabunny/${file}`, 'changed');
+  expect(canReuseLocalInstall({ root }).reusable).toBe(false);
+});
+it('checks actual installed bytes before reuse and refuses to stamp an unverified install', () => {
+  const root = fixture();
+  recordLocalInstallState({ root });
+  expect(normalization).toHaveBeenCalledWith({ root, check: true });
+  normalization.mockImplementationOnce(() => {
+    throw new Error('installed bytes drift');
+  });
+  expect(canReuseLocalInstall({ root }).reusable).toBe(false);
+  invalidateLocalBootstrapState({ root });
+  normalization.mockImplementationOnce(() => {
+    throw new Error('installed bytes drift');
+  });
+  expect(() => recordLocalInstallState({ root })).toThrow('installed bytes drift');
+  expect(fs.existsSync(`${root}/.tmp/ci/local-install-stamp.json`)).toBe(false);
 });

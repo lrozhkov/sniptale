@@ -118,12 +118,12 @@ it('admits speech without rewriting workspace history or the durable asset graph
   expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   const plan = buildDatabaseMigrationPlan(4, DB_VERSION)!;
-  expect(plan).toHaveLength(2);
+  expect(plan).toHaveLength(3);
   expect(plan[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 3, to: 4 }]);
   expect(await plan[0]?.estimateAdditionalBytes()).toBe(64 * 1024);
   expect(plan[0]?.risk).toBe('additive');
   expect(buildDatabaseMigrationPlan(DB_VERSION, 4)).toBeNull();
-  expect(buildDatabaseMigrationPlan(1, DB_VERSION)).toHaveLength(5);
+  expect(buildDatabaseMigrationPlan(1, DB_VERSION)).toHaveLength(6);
 });
 
 it('upgrades each retained source contract only after all required stores validate', async () => {

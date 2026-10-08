@@ -111,7 +111,13 @@ it('loads saved action history using the recording identity and exposes its sour
   expect(mocks.telemetry).toHaveBeenCalledWith('r');
   expect(result.telemetry).toEqual(telemetry);
   expect(projectReviewTelemetry(result.telemetry!, result.source.duration).markers).toEqual([
-    { ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 2, end: 2.2 },
+    {
+      ref: { kind: 'action', id: 'click' },
+      eventType: 'CLICK',
+      start: 2,
+      end: 2.2,
+      targetSemantics: { kind: 'unknown', source: 'unknown' },
+    },
   ]);
 });
 

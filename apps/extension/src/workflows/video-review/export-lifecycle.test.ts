@@ -614,3 +614,169 @@ it('copies Basic video with source gain while ignoring stored external audio', a
     vi.unstubAllGlobals();
   }
 });
+
+it.each([true, false])(
+  'forwards fragment bookends=%s while full exports always retain them',
+  async (includeBookends) => {
+    const { createNewWorkspacePresentationSettings } =
+      await import('../../features/video/review/advanced/presentation');
+    for (const fragment of [true, false]) {
+      const { args, deps } = fixture();
+      args.snapshot.workspace.advanced.ui.mode = 'advanced';
+      args.snapshot.workspace.advanced.presentation = createNewWorkspacePresentationSettings();
+      args.index.processedVideoCodec = 'vp8';
+      deps.writeReviewFrames.mockResolvedValue({
+        videoPackets: 60,
+        audioPackets: 0,
+        resultDuration: 2,
+        audioRanges: [],
+      });
+      const before = structuredClone(args.snapshot);
+      await exportReviewedVideo(
+        {
+          ...args,
+          destination: 'download',
+          includeBookends,
+          ...(fragment ? { selection: { kind: 'range' as const, start: 0, end: 2 } } : {}),
+        },
+        deps
+      );
+      expect(deps.writeReviewFrames).toHaveBeenCalledWith(
+        expect.objectContaining({
+          includeBookends: fragment ? includeBookends : true,
+          advanced: expect.objectContaining({
+            presentation: before.workspace.advanced.presentation,
+          }),
+        })
+      );
+      expect(args.snapshot).toEqual(before);
+    }
+  }
+);
+
+it('opens only intersecting preview audio, reuses distant references, and disposes partial acquisition', async () => {
+  const { buildReviewExportClipPlan } = await import('./export-lifecycle');
+  const sources = await import('./audio-clip-source');
+  const { args } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.ui.tracks.audio = true;
+  advanced.audio.music = [0, 100, 200].map((timelineStart, index) => ({
+    id: `m${index}`,
+    assetId: index === 2 ? 'other' : 'shared',
+    timelineStart,
+    sourceOffset: index * 1000,
+    duration: 10,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  }));
+  const readProjectAsset = vi.fn(async () => new Blob(['audio']));
+  const dispose = vi.fn();
+  const opened = vi.spyOn(sources, 'openReviewAudioClipSource').mockResolvedValue({
+    sampleRate: 48000,
+    numberOfChannels: 1,
+    length: 48000 * 4000,
+    read: async (start, end) => ({ start, planes: [new Float32Array(end - start)] }),
+    dispose,
+  });
+  const signal = new AbortController().signal;
+  try {
+    const silent = await buildReviewExportClipPlan({
+      advanced,
+      fragmentOffset: 0,
+      signal,
+      readProjectAsset,
+      window: null,
+    });
+    expect(silent.entries).toEqual([]);
+    expect(opened).not.toHaveBeenCalled();
+    silent.dispose?.();
+    const late = await buildReviewExportClipPlan({
+      advanced,
+      fragmentOffset: 0,
+      signal,
+      readProjectAsset,
+      window: { start: 102, end: 104 },
+    });
+    expect(late.entries.map((entry) => entry.clipId)).toEqual(['m1']);
+    expect(readProjectAsset).toHaveBeenCalledWith('shared');
+    expect(opened).toHaveBeenCalledOnce();
+    late.dispose?.();
+    late.dispose?.();
+    expect(dispose).toHaveBeenCalledOnce();
+    dispose.mockClear();
+    opened.mockClear();
+    readProjectAsset.mockClear();
+    opened.mockRejectedValueOnce(new Error('decode failed'));
+    await expect(
+      buildReviewExportClipPlan({
+        advanced,
+        fragmentOffset: 0,
+        signal,
+        readProjectAsset,
+        window: { start: 1, end: 205 },
+      })
+    ).rejects.toThrow();
+    expect(opened).toHaveBeenCalledOnce();
+    opened
+      .mockResolvedValueOnce({
+        sampleRate: 48000,
+        numberOfChannels: 1,
+        length: 48000,
+        read: async (start, end) => ({ start, planes: [new Float32Array(end - start)] }),
+        dispose,
+      })
+      .mockRejectedValueOnce(new Error('second failed'));
+    await expect(
+      buildReviewExportClipPlan({
+        advanced,
+        fragmentOffset: 0,
+        signal,
+        readProjectAsset,
+        window: { start: 1, end: 205 },
+      })
+    ).rejects.toThrow();
+    expect(dispose).toHaveBeenCalledOnce();
+  } finally {
+    opened.mockRestore();
+  }
+});
+
+it.each(['success', 'admission', 'render', 'cancel'] as const)(
+  'releases external audio readers on %s',
+  async (outcome) => {
+    const { args, deps } = fixture();
+    const advanced = args.snapshot.workspace.advanced;
+    advanced.ui.mode = 'advanced';
+    advanced.ui.tracks.audio = true;
+    advanced.audio.music = [
+      {
+        id: 'm',
+        assetId: 'music',
+        timelineStart: 0,
+        sourceOffset: 0,
+        duration: 2,
+        volume: 1,
+        muted: false,
+        fadeIn: 0,
+        fadeOut: 0,
+      },
+    ];
+    const controller = new AbortController();
+    args.signal = controller.signal;
+    if (outcome === 'admission')
+      deps.assertAssetWriteAdmission.mockRejectedValue(new Error('admission'));
+    if (outcome === 'render') deps.writeReviewPackets.mockRejectedValue(new Error('render'));
+    if (outcome === 'cancel')
+      deps.assertAssetWriteAdmission.mockImplementation(async () => {
+        controller.abort();
+      });
+    if (outcome === 'success') await exportReviewedVideo(args, deps);
+    else await expect(exportReviewedVideo(args, deps)).rejects.toThrow();
+    expect(deps.openAudioSource).toHaveBeenCalledOnce();
+    const source = await deps.openAudioSource.mock.results[0]!.value;
+    expect(source.dispose).toHaveBeenCalledOnce();
+  }
+);

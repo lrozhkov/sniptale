@@ -1,3 +1,4 @@
+import { normalizeMediabunny } from './mediabunny/normalize.mjs';
 import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import { runObservedWrapper } from '../qa/wrappers/observed/runner.mjs';
 import { collectCiReleaseResults } from './qa-composition.mjs';
@@ -59,6 +60,7 @@ export function materializeInheritedFastProofEvidence(admission) {
 
 if (isExecutedAsScript(import.meta.url)) {
   const fastProofAdmission = readFastProofAdmission();
+  normalizeMediabunny();
   materializeInheritedFastProofEvidence(fastProofAdmission);
   const outcome = await runObservedWrapper({
     wrapperId: 'ci:release',

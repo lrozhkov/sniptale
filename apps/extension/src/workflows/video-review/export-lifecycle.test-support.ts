@@ -73,6 +73,16 @@ export function createReviewExportFixture() {
     saveRecordingsBatchSafely: vi.fn(
       async (_inputs: Parameters<typeof saveRecordingsBatchSafely>[0]) => undefined
     ),
+    openAudioSource: vi.fn(async (_blob: Blob, _signal: AbortSignal) => ({
+      sampleRate: 48000,
+      numberOfChannels: 2,
+      length: 480000,
+      read: async (start: number, end: number) => ({
+        start,
+        planes: [new Float32Array(end - start), new Float32Array(end - start)],
+      }),
+      dispose: vi.fn(),
+    })),
     readProjectAsset: vi.fn(async (_assetId: string) => new Blob() as unknown as Blob | null),
     writeReviewPackets: vi.fn(async () => ({
       videoPackets: 40,

@@ -10,6 +10,7 @@ import {
   type ReviewSpeechReplacement,
 } from './speech-transcript';
 import { parseReviewSpeechTranscript } from './speech-validation';
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from './advanced/types';
 import { createQuickEditAdvancedState } from './advanced/defaults';
 import {
   loadQuickEditAdvancedState,
@@ -171,7 +172,13 @@ describe('speech durable codec', () => {
         schemaVersion: 3,
       })
     ).toEqual(reviewAdvancedContentBaseline(legacy));
-    expect(loadQuickEditAdvancedState({ ...legacy, schemaVersion: 5 })).toBeNull();
+    expect(loadQuickEditAdvancedState({ ...legacy, schemaVersion: 5 })).toEqual(legacy);
+    expect(
+      loadQuickEditAdvancedState({
+        ...legacy,
+        schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1,
+      })
+    ).toBeNull();
   });
 
   it('rejects corrupt references, future versions, overlapping phrases, bad word ranges and excessive counts', () => {

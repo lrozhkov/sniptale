@@ -1,3 +1,5 @@
+import { ReviewButton } from './controls';
+import { ReviewPresentationBinding } from './presentation-binding';
 import { ReviewWatermarkInspector } from './watermark-inspector';
 import type { ComponentProps } from 'react';
 import { quickEditSpatialSpan } from '../../features/video/review/advanced/spatial';
@@ -95,6 +97,7 @@ export function ReviewSceneProperties(props: {
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
   background: QuickEditAdvancedState['background'];
   canvas: QuickEditAdvancedState['canvas'];
+  presentation?: ComponentProps<typeof ReviewPresentationBinding>;
   watermark?: ComponentProps<typeof ReviewWatermarkInspector>;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
   onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
@@ -113,87 +116,106 @@ export function ReviewSceneProperties(props: {
   ): void;
 }) {
   return (
-    <fieldset disabled={props.busy} className="min-w-0">
-      {props.failed ? (
-        <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
+    <>
+      {props.presentation?.editor.pending &&
+      props.presentation.editor.picker?.source === 'computer' ? (
+        <ReviewButton
+          label={translate('common.actions.cancel')}
+          onClick={props.presentation.editor.cancel}
+        />
       ) : null}
-      <ReviewInspectorSections
-        sections={[
-          {
-            id: 'canvas',
-            label: translate('gallery.videoReview.canvas'),
-            icon: Scan,
-            content: (
-              <ReviewCanvasSettings
-                source={props.source}
-                canvas={props.canvas}
-                onChange={props.onCanvas}
-              />
-            ),
-          },
-          {
-            id: 'window-header',
-            label: translate('gallery.videoReview.windowHeader'),
-            icon: PanelTop,
-            content: (
-              <ReviewWindowHeaderSettings
-                header={props.windowHeader}
-                onChange={props.onWindowHeader}
-              />
-            ),
-          },
-          {
-            id: 'background',
-            label: translate('gallery.videoReview.background'),
-            icon: Paintbrush,
-            content: (
-              <ReviewBackgroundInspector
-                perspectiveFixed={
-                  props.focus
-                    ? quickEditSpatialSpan(
-                        resolveQuickEditEffectiveState(props.focus.advanced).zoomRegions,
-                        props.focus.time
-                      )
-                    : false
-                }
-                background={props.background}
-                pending={props.pending}
-                onImportImage={props.onImportImage}
-                onChange={(patch) =>
-                  props.setBackground((current) => updateQuickEditBackground(current, patch))
-                }
-              />
-            ),
-          },
-          ...(props.watermark
-            ? [
-                {
-                  id: 'watermark',
-                  label: translate('gallery.videoReview.watermark'),
-                  icon: Paintbrush,
-                  content: <ReviewWatermarkInspector {...props.watermark} />,
-                },
-              ]
-            : []),
-          ...(props.hasOriginalAudio || props.audio.voiceover.length || props.audio.music.length
-            ? [
-                {
-                  id: 'audio',
-                  label: translate('gallery.videoReview.volume'),
-                  icon: AudioLines,
-                  content: (
-                    <ReviewSceneAudio
-                      audio={props.audio}
-                      hasOriginalAudio={props.hasOriginalAudio}
-                      onOriginal={props.onOriginalVolume}
-                      onLaneVolume={props.onLaneVolume}
-                    />
-                  ),
-                },
-              ]
-            : []),
-        ]}
-      />
-    </fieldset>
+      <fieldset disabled={props.busy} className="min-w-0">
+        {props.failed ? (
+          <p role="alert">{translate('gallery.videoReview.backgroundImportFailed')}</p>
+        ) : null}
+        <ReviewInspectorSections
+          sections={[
+            ...(props.presentation
+              ? [
+                  {
+                    id: 'presentation',
+                    label: translate('gallery.videoReview.presentation'),
+                    icon: PanelTop,
+                    content: <ReviewPresentationBinding {...props.presentation} />,
+                  },
+                ]
+              : []),
+            {
+              id: 'canvas',
+              label: translate('gallery.videoReview.canvas'),
+              icon: Scan,
+              content: (
+                <ReviewCanvasSettings
+                  source={props.source}
+                  canvas={props.canvas}
+                  onChange={props.onCanvas}
+                />
+              ),
+            },
+            {
+              id: 'window-header',
+              label: translate('gallery.videoReview.windowHeader'),
+              icon: PanelTop,
+              content: (
+                <ReviewWindowHeaderSettings
+                  header={props.windowHeader}
+                  onChange={props.onWindowHeader}
+                />
+              ),
+            },
+            {
+              id: 'background',
+              label: translate('gallery.videoReview.background'),
+              icon: Paintbrush,
+              content: (
+                <ReviewBackgroundInspector
+                  perspectiveFixed={
+                    props.focus
+                      ? quickEditSpatialSpan(
+                          resolveQuickEditEffectiveState(props.focus.advanced).zoomRegions,
+                          props.focus.time
+                        )
+                      : false
+                  }
+                  background={props.background}
+                  pending={props.pending}
+                  onImportImage={props.onImportImage}
+                  onChange={(patch) =>
+                    props.setBackground((current) => updateQuickEditBackground(current, patch))
+                  }
+                />
+              ),
+            },
+            ...(props.watermark
+              ? [
+                  {
+                    id: 'watermark',
+                    label: translate('gallery.videoReview.watermark'),
+                    icon: Paintbrush,
+                    content: <ReviewWatermarkInspector {...props.watermark} />,
+                  },
+                ]
+              : []),
+            ...(props.hasOriginalAudio || props.audio.voiceover.length || props.audio.music.length
+              ? [
+                  {
+                    id: 'audio',
+                    label: translate('gallery.videoReview.volume'),
+                    icon: AudioLines,
+                    content: (
+                      <ReviewSceneAudio
+                        audio={props.audio}
+                        hasOriginalAudio={props.hasOriginalAudio}
+                        onOriginal={props.onOriginalVolume}
+                        onLaneVolume={props.onLaneVolume}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </fieldset>
+    </>
   );
 }

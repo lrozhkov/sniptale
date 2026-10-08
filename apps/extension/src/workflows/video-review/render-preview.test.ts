@@ -1,3 +1,5 @@
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { createReviewPreviewRenderer } from './render-preview';
@@ -72,6 +74,7 @@ function setup() {
         restore: vi.fn(),
         scale: vi.fn(),
         drawImage: vi.fn(),
+        fillRect: vi.fn(() => io.order.push('outer-fade')),
       } as unknown as CanvasRenderingContext2D;
       const release = vi.fn();
       leases.push({ release, context });
@@ -499,5 +502,35 @@ it('closes discovered bitmap when exact admission is refused without reserving i
   ).rejects.toThrow('admission refused');
   expect(bitmap.close).toHaveBeenCalledOnce();
   expect(resources.bytes).not.toHaveBeenCalled();
+  renderer.dispose();
+});
+
+it('evaluates the immutable outer plan at each represented frame after watermark and blackout', async () => {
+  const { resources, leases } = setup();
+  const renderer = createReviewPreviewRenderer({ resources });
+  const settings = createNewWorkspacePresentationSettings();
+  settings.color = '#ff0000ff';
+  const result = planReviewPresentationSequence({
+    settings,
+    mainDuration: 4,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 60, denominator: 1 },
+  });
+  if (!result.ok) throw new Error('Expected valid plan');
+  const input = { ...scene(), outerFadePlan: result.plan };
+  const prepared = await renderer.prepare(input, dimensions, new AbortController().signal);
+  const first = renderer.render(prepared, { ...frame(), resultTime: 0.2 });
+  expect(io.order.slice(-3)).toEqual(['watermark', 'blackout', 'outer-fade']);
+  expect(leases[0]!.context.fillRect).toHaveBeenCalledExactlyOnceWith(0, 0, 640, 360);
+  expect(leases[0]!.context.globalAlpha).toBeCloseTo(0.5);
+  expect(leases[0]!.context.fillStyle).toBe('#ff0000ff');
+  expect(leases[0]!.context.globalCompositeOperation).toBe('source-over');
+  first.release();
+  renderer.render(prepared, { ...frame(), resultTime: 1 }).release();
+  expect(leases[1]!.context.globalAlpha).toBe(0);
+  expect(io.watermark).toHaveBeenCalledOnce();
+  renderer.render(prepared, { ...frame(), resultTime: 4 }).release();
+  expect(leases[2]!.context.globalAlpha).toBe(1);
   renderer.dispose();
 });

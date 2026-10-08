@@ -1,3 +1,6 @@
+import { useMemo } from 'react';
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
@@ -52,12 +55,13 @@ type PreviewState = Pick<
     NonNullable<StageProps['webcam']>['editor'];
   timeline: Pick<EditorState['timeline'], 'sceneOutputTime' | 'resultDuration' | 'timeMap'>;
   editing: { exporter: Pick<EditorState['editing']['exporter'], 'phase'> };
-  advanced: Pick<EditorState['advanced'], 'ui' | 'zoom'>;
+  advanced: EditorState['advanced'];
+  presentation: Pick<EditorState['presentation'], 'settings'>;
   watermark: Pick<
     EditorState['watermark'],
     'settings' | 'pending' | 'preview' | 'change' | 'onResourceError' | 'resourceRetryGeneration'
   >;
-  exporter: Pick<EditorState['exporter'], 'retryAssetAvailability'>;
+  exporter: Pick<EditorState['exporter'], 'retryAssetAvailability' | 'index' | 'renderSettings'>;
   backgroundImport: Pick<EditorState['backgroundImport'], 'pending'>;
   zoom: Pick<
     EditorState['zoom'],
@@ -161,10 +165,38 @@ function ReviewPreviewStage({
   onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
 }) {
   const { busy, features, composer, snapshot, canvasComments } = state;
+  const outerFadePlan = useMemo(() => {
+    if (state.advanced.ui.mode !== 'advanced' || !state.exporter.index) return undefined;
+    try {
+      const profile = resolveReviewOutputProfile(
+        state.exporter.index,
+        state.advanced,
+        state.exporter.renderSettings
+      );
+      if (!profile.dimensionsSupported) return undefined;
+      const result = planReviewPresentationSequence({
+        settings: state.presentation.settings,
+        mainDuration: state.timeline.resultDuration,
+        fragmentOffset: 0,
+        includeBookends: true,
+        rate: profile.rate,
+      });
+      return result.ok ? result.plan : undefined;
+    } catch {
+      return undefined;
+    }
+  }, [
+    state.advanced,
+    state.exporter.index,
+    state.exporter.renderSettings,
+    state.presentation.settings,
+    state.timeline.resultDuration,
+  ]);
   const sceneEditable =
     !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
   return (
     <ReviewStageBinding
+      outerFadePlan={outerFadePlan}
       preview={
         previewPreferences
           ? {

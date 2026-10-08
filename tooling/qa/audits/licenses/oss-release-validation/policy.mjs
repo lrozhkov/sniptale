@@ -77,7 +77,12 @@ export function validateLegalFiles(root, policy) {
     errors.push(`dependency legal manifest is missing: ${policy.dependencyLegal.manifestPath}`);
   }
   const dependencyArchivePaths = Array.isArray(dependencyManifest?.entries)
-    ? dependencyManifest.entries.map((entry) => entry.archivePath)
+    ? dependencyManifest.entries.flatMap((entry) => [
+        entry.archivePath,
+        ...(Array.isArray(entry.modifiedSource?.files)
+          ? entry.modifiedSource.files.map((file) => file.archivePath)
+          : []),
+      ])
     : [];
   if (dependencyManifest && dependencyManifest.schemaVersion !== 1) {
     errors.push('dependency legal manifest has an invalid schema');

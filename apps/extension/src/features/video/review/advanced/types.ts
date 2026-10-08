@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 5;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 6;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -249,6 +249,7 @@ export interface QuickEditAdvancedState {
   windowHeader?: QuickEditWindowHeader;
   webcam?: QuickEditWebcam;
   watermark?: import('./watermark').QuickEditWatermarkSettings;
+  presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
   /** Raw v1 payload retained by the deterministic load-time migration. */
   recoveryV1?: string;
@@ -272,5 +273,6 @@ export interface QuickEditAdvancedContent {
   windowHeader?: QuickEditWindowHeader;
   webcam?: QuickEditWebcam;
   watermark?: import('./watermark').QuickEditWatermarkSettings;
+  presentation?: import('./presentation').QuickEditPresentationSettings;
   audio: QuickEditAudioState;
 }

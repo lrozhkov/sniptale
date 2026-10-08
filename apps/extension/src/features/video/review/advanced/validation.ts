@@ -1,3 +1,4 @@
+import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from './watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
 import { parseReviewKeyAnimations } from './key-animation';
@@ -427,11 +428,13 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 5 &&
       raw['schemaVersion'] !== 4 &&
       raw['schemaVersion'] !== 3 &&
       raw['schemaVersion'] !== 2) ||
     (raw['webcam'] !== undefined &&
       raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 5 &&
       raw['schemaVersion'] !== 4 &&
       raw['schemaVersion'] !== 3) ||
     'ui' in raw
@@ -440,6 +443,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 5 ||
       raw['schemaVersion'] === 4 ||
       raw['schemaVersion'] === 3
   );
@@ -454,10 +458,22 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
-  if (raw['watermark'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+  if (
+    raw['watermark'] !== undefined &&
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 5
+  )
     return null;
   const watermark =
     raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
+  if (
+    raw['presentation'] !== undefined &&
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+  )
+    return null;
+  const presentation =
+    raw['presentation'] === undefined ? undefined : parseStoredPresentation(raw['presentation']);
+  if (presentation === null) return null;
   if (canvas === null || windowHeader === null || webcam === null || watermark === null)
     return null;
   if (!zoom || !background || !audio) return null;
@@ -473,6 +489,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),
     ...(watermark ? { watermark } : {}),
+    ...(presentation ? { presentation } : {}),
   };
 }
 
@@ -490,6 +507,7 @@ export function loadQuickEditAdvancedState(
   const version = raw['schemaVersion'];
   if (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    version === 5 ||
     version === 4 ||
     version === 3 ||
     version === 2
@@ -509,6 +527,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['webcam'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 5 &&
     raw['schemaVersion'] !== 4 &&
     raw['schemaVersion'] !== 3
   )
@@ -517,6 +536,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 5 ||
       raw['schemaVersion'] === 4 ||
       raw['schemaVersion'] === 3
   );
@@ -531,10 +551,22 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
-  if (raw['watermark'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+  if (
+    raw['watermark'] !== undefined &&
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 5
+  )
     return null;
   const watermark =
     raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
+  if (
+    raw['presentation'] !== undefined &&
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+  )
+    return null;
+  const presentation =
+    raw['presentation'] === undefined ? undefined : parseStoredPresentation(raw['presentation']);
+  if (presentation === null) return null;
   if (canvas === null || windowHeader === null || webcam === null || watermark === null)
     return null;
   const recovery = raw['recoveryV1'];
@@ -553,6 +585,19 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),
     ...(watermark ? { watermark } : {}),
+    ...(presentation ? { presentation } : {}),
     audio,
   };
+}
+
+/** Durable scene resources use the project-asset owner; pure model IDs are transport-neutral. */
+function parseStoredPresentation(raw: unknown) {
+  const settings = parseQuickEditPresentationSettings(raw);
+  if (!settings) return null;
+  for (const slot of [settings.intro, settings.outro]) {
+    for (const resource of [slot.image, slot.video]) {
+      if (resource && !/^project-asset:\S{1,242}$/u.test(resource.assetId)) return null;
+    }
+  }
+  return settings;
 }

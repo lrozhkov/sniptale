@@ -132,3 +132,82 @@ it('cancels while priming a late fragment and never returns a partial buffer', a
   await vi.runAllTimersAsync();
   await rejection;
 });
+
+it.each(
+  [
+    { rate: 0.5, sampleRate: 8000 },
+    { rate: 1, sampleRate: 8000 },
+    { rate: 1.5, sampleRate: 8000 },
+    { rate: 16, sampleRate: 8000 },
+    { rate: 1.5, sampleRate: 44100 },
+  ].flatMap((configuration) =>
+    [0.37, 70.25].map((sourceOffset) => ({ ...configuration, sourceOffset }))
+  )
+)(
+  'keeps exact buffer parity for streamed distant clip windows at $rate x / $sampleRate Hz / offset $sourceOffset',
+  async ({ rate, sampleRate, sourceOffset }) => {
+    const source = new AudioBuffer({ length: sampleRate * 170, sampleRate, numberOfChannels: 2 });
+    const sourceOffsets = [sourceOffset];
+    for (let c = 0; c < 2; c++) {
+      const plane = source.getChannelData(c);
+      for (const offset of sourceOffsets)
+        for (
+          let i = Math.floor(offset * sampleRate);
+          i < Math.ceil((offset + 5 * rate) * sampleRate);
+          i++
+        )
+          plane[i] = Math.sin(i * 0.037 + c) * 0.3;
+    }
+    const reads: { start: number; end: number }[] = [];
+    const streamed: import('./audio-clip-source').ReviewAudioClipSource = {
+      sampleRate,
+      numberOfChannels: 2,
+      length: source.length,
+      dispose() {},
+      async read(start, end, signal) {
+        signal.throwIfAborted();
+        reads.push({ start, end });
+        return {
+          start,
+          planes: [0, 1].map((c) => {
+            const plane = new Float32Array(end - start);
+            const from = Math.max(0, start);
+            const to = Math.min(source.length, end);
+            if (to > from) plane.set(source.getChannelData(c).subarray(from, to), from - start);
+            return plane;
+          }),
+        };
+      },
+    };
+    const buffered = createReviewAudioClipRenderer();
+    const bounded = createReviewAudioClipRenderer();
+    const clip = { ...entry(rate, 5), sourceOffset };
+    for (const [from, to] of [
+      [3.1, 3.7],
+      [3.7, 4.5],
+    ] as const) {
+      const expected = await buffered.render(clip, source, from, to, new AbortController().signal);
+      const actual = await bounded.render(clip, streamed, from, to, new AbortController().signal);
+      for (let c = 0; c < 2; c++) {
+        const actualPcm = actual.getChannelData(c);
+        const expectedPcm = expected.getChannelData(c);
+        expect(actualPcm.length).toBe(expectedPcm.length);
+        const actualBits = new Uint32Array(
+          actualPcm.buffer,
+          actualPcm.byteOffset,
+          actualPcm.length
+        );
+        const expectedBits = new Uint32Array(
+          expectedPcm.buffer,
+          expectedPcm.byteOffset,
+          expectedPcm.length
+        );
+        expect(actualBits.every((bits, index) => bits === expectedBits[index])).toBe(true);
+      }
+    }
+    expect(reads.length).toBeGreaterThan(2);
+    expect(Math.max(...reads.map((window) => window.end - window.start))).toBeLessThanOrEqual(
+      sampleRate * 4.1
+    );
+  }
+);

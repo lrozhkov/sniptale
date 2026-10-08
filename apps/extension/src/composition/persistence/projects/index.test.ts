@@ -659,3 +659,49 @@ describe('projects-db export flows', () => {
     expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalledWith('recording:recording-1');
   });
 });
+
+describe('prepared scene resources', () => {
+  beforeEach(resetProjectsDbMocks);
+  it('protects exact video slot claims and refuses Library binding through the upload writer', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const claim = {
+      aggregateId: 'review',
+      slot: 'intro' as const,
+      kind: 'video' as const,
+      acquisition: 'private-upload' as const,
+    };
+    const prepared = await prepareProjectAsset(
+      new Blob(['video']),
+      'video/webm',
+      'intro.webm',
+      'intro',
+      1,
+      undefined,
+      { publishToLibrary: false, requiredReviewResource: claim }
+    );
+    await prepared.protect();
+    expect(projectsDbMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          requiredReviewResource: claim,
+          publishToLibrary: false,
+        }),
+      })
+    );
+    projectsDbMocks.writeBlobToAssetMock.mockClear();
+    for (const acquisition of ['library-binding', 'private-frozen-image'] as const) {
+      await expect(
+        prepareProjectAsset(
+          new Blob(['video']),
+          'video/webm',
+          'intro.webm',
+          'intro',
+          1,
+          undefined,
+          { publishToLibrary: false, requiredReviewResource: { ...claim, acquisition } }
+        )
+      ).rejects.toThrow('Invalid private review resource');
+    }
+    expect(projectsDbMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
+  });
+});

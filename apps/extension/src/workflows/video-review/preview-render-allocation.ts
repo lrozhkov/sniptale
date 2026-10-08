@@ -1,4 +1,4 @@
-import type { createReviewPreviewRenderer } from './render-preview';
+import type { PreviewScene, PreviewSceneDimensions } from './preview-scene';
 import {
   computeQuickEditSceneLayout,
   computeQuickEditSceneCamera,
@@ -351,11 +351,10 @@ export function calculatePreviewPreparationAllocation(input: PreviewPreparationA
   };
 }
 
-type PreviewRenderer = ReturnType<typeof createReviewPreviewRenderer>;
 /** Admission metadata remains separate from authored scene geometry. */
 export interface PreviewRuntimeAllocationInput {
-  scene: Parameters<PreviewRenderer['prepare']>[0];
-  dimensions: Parameters<PreviewRenderer['prepare']>[1];
+  scene: PreviewScene;
+  dimensions: PreviewSceneDimensions;
   resultTime: number;
   sourceTime: number;
   cameraTransform?: QuickEditCameraTransform;

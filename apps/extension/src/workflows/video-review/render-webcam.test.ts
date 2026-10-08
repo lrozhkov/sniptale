@@ -42,7 +42,13 @@ vi.mock('mediabunny', () => ({
           yield null;
           continue;
         }
-        const sample = { close: vi.fn(), draw: vi.fn(), format: 'RGBA' };
+        const sample = {
+          close: vi.fn(),
+          draw: vi.fn(),
+          format: 'RGBA',
+          timestamp: time,
+          allocationSize: () => 640 * 480 * 4,
+        };
         state.samples.push(sample);
         yield sample;
       }
@@ -151,6 +157,25 @@ it('closes the retained sample when encoding exits a window early', async () => 
   expect(state.samples[0]!.close).toHaveBeenCalledOnce();
   expect(state.times).toEqual([0]);
   renderer.dispose();
+});
+
+it('exposes immutable camera source metadata and releases a yielded lease on disposal', async () => {
+  const camera = webcam();
+  const renderer = await createReviewWebcamRenderer(camera, read, new AbortController().signal);
+  const frames = renderer.sourceFrames([1, 2]);
+  const { value: frame } = await frames.next();
+  expect(frame).toMatchObject({
+    representedMediaTime: 1,
+    source: { width: 640, height: 480 },
+    placement: camera.placement,
+  });
+  expect(frame!.allocationBytes()).toBe(640 * 480 * 4);
+  expect(frame!.drawable).toBe(state.samples[0]);
+  renderer.dispose();
+  frame!.release();
+  await frames.return(undefined);
+  expect(state.samples[0]!.close).toHaveBeenCalledOnce();
+  expect(state.times).toEqual([1]);
 });
 
 it('rejects unavailable bytes and missing frames instead of exporting without the enabled camera', async () => {

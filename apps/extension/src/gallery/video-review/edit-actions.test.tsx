@@ -225,6 +225,9 @@ it('offers independent initial downloads and shows actionable processing failure
     expect(download().disabled).toBe(false);
     act(() => root.render(<ReviewEditActions {...props} advancedBlockers={['watermark']} />));
     expect(host.textContent).toContain(translate('gallery.videoReview.watermark'));
+    act(() => root.render(<ReviewEditActions {...props} advancedBlockers={['presentation']} />));
+    expect(host.textContent).toContain(translate('gallery.videoReview.presentation'));
+    expect(host.textContent).not.toContain('gallery.videoReview.presentation');
     act(() => root.render(<ReviewEditActions {...props} />));
     act(() => download().click());
     expect(props.onDownload).toHaveBeenCalledOnce();
@@ -326,6 +329,10 @@ it('applies export frame rate and quality options without adding section divider
   const host = document.createElement('div');
   const root = createRoot(host);
   const exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'] = {
+    includeBookends: true,
+    setIncludeBookends: vi.fn(),
+    hasBookends: false,
+    presentationDuration: null,
     index: {
       duration: 12,
       boundaries: [0, 12],

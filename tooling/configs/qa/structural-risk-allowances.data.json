@@ -28,22 +28,22 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewInspectorBinding",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This inspector binding has3 outer statements; its121-line JSX includes availability/undo/redo flags, conflict text and conditional draft rendering. Cyclomatic15/cognitive17 count these independent visual conditions together, not mixed transaction branching. Its action callbacks delegate to the same serialized session and existing report workflow; no storage, privileged API or second recovery authority is implemented here.",
-      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-09-06",
-      "astHash": "1071607405e5b1670e31676700996340ac790f44d9a90060ae1bac88acf2f2c7",
-      "signatureHash": "a78f0f3a3391d39e46cd07222d59fc871f067011de96e856d92384b17eb44b8f"
+      "reason": "tool-noise: The151-line inspector binding remains four outer statements and score5delta0. The candidate only forwards the optional seam-preview callback into existing Scene properties. Its visual conditions describe availability, selected panels and history navigation; leave flushes the same serialized session before caller navigation. No additional storage, transport or recovery owner exists. Further forwarding JSX would distribute one inspector binding. Main inspected the current body; independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "35d5ed52e7cee66cd1d93ba70e59020d40ab1503ddfa5618d4fd8685d2129324",
+      "signatureHash": "5790099c501d119a4544c1c72567c72ae9cd954b827576db029e5e4a0e8ce450"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/stage.tsx",
       "symbol": "ReviewStage",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The182-line component owns one normalized rectangle drawing/moving/resizing gesture with pointer capture, cancellation, ResizeObserver cleanup and its video surface. It has13 statements, cyclomatic8, cognitive9, nesting2, no durable state or recovery. The sole warning is JSX length; extracting a second gesture owner would split the one capture/preview/commit lifetime. Geometry remains in the existing pure feature owner.",
-      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-09-06",
-      "astHash": "929e66060cee27b6e9fcb129c2ec2af0ec17fcf439f2ee69b9563aa9dc29a642",
-      "signatureHash": "7d939ca5189416581a71392f564ed3344becb4963fd10c3165f5effa58c00f3b"
+      "reason": "tool-noise: The154-line stage remains score5delta0 and8statements. It orders the existing native/manual image plane, interactions, overlays and feedback. This candidate adds one final outer-fade component to the native composition, matching the manual renderer. Pointer capture and publication still have one lifetime. Independent geometry/render layers already have named owners; splitting the remaining JSX for length would obscure explicit paint order. Main inspected the current body; independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "7f018631a44b50a6455c8ada7346dbf13a7dbe621960b68cc5e15840f998e501",
+      "signatureHash": "25f6a795e84bbf4f2ecc983277ca56be3560a879b56918727aa5e0f29e19f3ca"
     },
     {
       "rule": "structural-function-risk",
@@ -68,15 +68,15 @@
       "signatureHash": "99bc8f53332cdb91cb2856b5f298ed8492021b86e698d8380c534924bc6d9bdc"
     },
     {
+      "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
-      "rule": "structural-function-risk",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: ReviewEditor is a single UI composition with 8 statements, cyclomatic9, cognitive8 and nesting1. This change only adds a typed cut-preview binding to its existing stage, increasing JSX length to156 without adding a durable writer, transaction or recovery authority. Stage, inspector, timeline and voiceover already have concrete owners. Splitting another forwarding-only component to reduce line count would add navigation without separating an independent responsibility.",
-      "removalCondition": "Remove when the exact AST or signature changes; reassess any independent ownership, new durable authority, mixed fixture lifecycle, or review finding. Remove when the analyzer models this cohesive JSX/test shape. Independent architecture review must validate the classification.",
-      "reviewDate": "2026-10-04",
-      "astHash": "8f7208049817ff99e7b9d423d17a33932bd5bfa7f5e1f93e51521f6a49548209",
-      "signatureHash": "735e231ed936189e911f456a3d6b0bf409abf9cf5ed37b9d28077544dbd150dc"
+      "reason": "tool-noise: After extracting actual seam-preview input and dialog binding, this152-line component has score3delta0,13statements and nesting1. It composes the existing stage, inspector, timeline and recording overlays from the same review session. Preview/UI preferences are disposable and writes remain existing hooks. The remaining length is typed props and conditional visual composition; no independent transaction remains inside it to extract. Main inspected the current body; independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "3948d19277e55b5f0297435413f8ba667452e7d4231175e69563a8c6667d203b",
+      "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e"
     },
     {
       "file": "apps/extension/src/workflows/video-review/render-export.test.ts",
@@ -132,6 +132,50 @@
       "reviewDate": "2026-10-07",
       "astHash": "5ed73c28d90d9dfe45124c411d0f76ccdce9d7e8bc17ca50ec649ed151d626d4",
       "signatureHash": "5efd9d0c809937dc02ec92b8460eeaf7d66c78a927bec6616b85f3d39f65a758"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/review.test.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The added39-line Scene/Basic integration test uses the same real VideoReview session fixture and existing decoder/persistence mocks as the other tests. It crosses the800-line cap at810lines with unchangedscore4/delta0 andcohesion1.00. There is no independent fixture lifecycle, durable writer or recovery authority. Moving only this test would duplicate the existing mocks or introduce a forwarding test fixture without resolving an ownership defect. The actual test clicks the Scene audio-fade control, asserts durable history and verifies Basic suppresses UI without dropping settings. Keep this one integration fixture; independent architecture review must validate the exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess a new fixture lifecycle, independent authority or mixed recovery. Remove when the analyzer recognizes cohesive tests sharing one integration fixture. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "52d265648a04c3d0e4050495371a7428111eb1a8b5a719fe8d6cb0099e953f15",
+      "signatureHash": "d380ad731b1acca991b4ed9f9bec4d352770cd06d1fce01ecf98f89a30c3a202"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/projects/asset-publication.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:app-core:composition",
+      "reason": "tool-noise: The exact publication-adapter test file now804lines crosses800 with unchangedscore2/delta0 andcohesion1.00. Added intro/outro recovery and incompatible-claim cases use the existing createJournal/createTransaction and physical-reference fixture, testing the same adapter/parser transaction as existing audio/watermark claims. No separate storage lifetime or publication owner was introduced. Splitting those cases solely for fourlines requires copying the shared journal/mutation mocks or adding a fixture forwarding surface; it does not resolve an ownership defect. Main inspected the actual added claim tests; independent architecture review must validate this classification.",
+      "removalCondition": "Remove on exact AST/signature change; reassess an independent publication owner or fixture lifecycle, or an actual shared fixture split. Remove when the analyzer recognizes cohesive adapter tests. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "c15ea28e16e52a0a3425d010abea2dcb5908b54fc5fadcd8b93e3797453169bb",
+      "signatureHash": "80ae00ade1b6ba3c0d9bed24fed6982fc358cc34a161b697ca9f640b678189c2"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/use-export.ts",
+      "symbol": "useReviewExport",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: After extracting pure presentation-duration planning, this155-line hook has score1delta0,19statements,cyclomatic7,cognitive6 andnesting1. It binds one active export controller, mounted state and completion generation to the existing export workflow. Publication/asset rollback remain workflow-owned. The remaining threshold is function length including the returned UI command surface; extracting another closure would split the same cancellation/completion authority. Main inspected the current body; independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "05caf0b89a7fb88e23d34a832bbf8c10220a3c64b212fc14ee1fb26c1106ddc8",
+      "signatureHash": "841a0d40ac2ae0acb87a977b29e6352ec88d32c7a3313450773a1b773b6c9638"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/presentation-preview-dialog.tsx",
+      "symbol": "ReviewPresentationPreviewDialog",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: After separating loading/error/video feedback, this81-line dialog has11statements,cyclomatic6,cognitive5 andnesting1. The owner count reflects React/ReactDOM, locale, theme and ProductModal/SegmentedRow UI primitives, not separate runtime authorities. It owns one portal placement/focus/keyboard lifecycle and URL-keyed playback error; the parent owns encoding, URL disposal and main transport. No storage/network/domain transaction is present. Further splitting UI primitive composition only to reduce owner count would add forwarding without separating behavior. Main inspected the current body; independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "0160d1af95d883a2eab0cbf2ecf166538b058e3216b58c99c74fd637bf4d88a3",
+      "signatureHash": "fe2f621b4d19071bc7fd5970abe6c3a2008a940d849cf6678c9b2e10e6e8b991"
     }
   ]
 }

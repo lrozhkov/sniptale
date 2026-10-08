@@ -1,3 +1,4 @@
+import { selectModifiedDependencySource } from './modified-source.mjs';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -162,7 +163,14 @@ function canonicalAlias(record, aliases) {
   );
 }
 
-async function createLegalMaterial(record, selections, pinnedSources, canonicalLicenseAliases) {
+async function createLegalMaterial(
+  record,
+  selections,
+  pinnedSources,
+  canonicalLicenseAliases,
+  modifiedSources
+) {
+  const modified = await selectModifiedDependencySource(record, modifiedSources);
   const selectedLicense = resolveSelectedLicense(record, selections);
   const selectedText =
     (await selectPinnedLicenseSource(record, selectedLicense, pinnedSources)) ??
@@ -193,6 +201,7 @@ async function createLegalMaterial(record, selections, pinnedSources, canonicalL
     entry: {
       archivePath: outputPath,
       correspondingSourceUrl,
+      ...(modified ? { modifiedSource: modified.metadata } : {}),
       licenseExpression: record.licenseExpression,
       licenseProvenance: selectedText.licenseProvenance,
       licenseSource: selectedText.licenseSource,
@@ -205,6 +214,7 @@ async function createLegalMaterial(record, selections, pinnedSources, canonicalL
       sourceUrl: resolvedSourceUrl,
       version: record.version,
     },
+    sourceFiles: modified?.sourceFiles ?? [],
     licenseFile: alias ? undefined : { archivePath: outputPath, contents: selectedText.contents },
   };
 }
@@ -266,6 +276,8 @@ export async function selectDependencyLegalMaterials(records, options = {}) {
     );
   const pinnedSources = options.pinnedSources ?? [];
   const canonicalLicenseAliases = options.canonicalLicenseAliases ?? [];
+  const modifiedSources = options.modifiedSources ?? [];
+  validateExactPolicyRecords(records, modifiedSources, 'modified dependency source', 'version');
   validateCanonicalLicenseAliases(records, canonicalLicenseAliases);
   validateExactPolicyRecords(
     records,
@@ -278,7 +290,13 @@ export async function selectDependencyLegalMaterials(records, options = {}) {
   }
   const materials = await Promise.all(
     records.map((record) =>
-      createLegalMaterial(record, selections, pinnedSources, canonicalLicenseAliases)
+      createLegalMaterial(
+        record,
+        selections,
+        pinnedSources,
+        canonicalLicenseAliases,
+        modifiedSources
+      )
     )
   );
   const sorted = sortMaterials(materials);
@@ -288,6 +306,9 @@ export async function selectDependencyLegalMaterials(records, options = {}) {
   }
   return {
     entries: sorted.map((material) => material.entry),
+    ...(sorted.some((material) => material.sourceFiles.length)
+      ? { sourceFiles: sorted.flatMap((material) => material.sourceFiles) }
+      : {}),
     licenseFiles: sorted.map((material) => material.licenseFile).filter(Boolean),
   };
 }

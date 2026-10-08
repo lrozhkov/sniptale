@@ -1,3 +1,4 @@
+import { useReviewPresentation } from './use-review-presentation';
 import { useReviewWatermark } from './use-review-watermark';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
@@ -99,6 +100,7 @@ export function useReviewEditorState(resource: LoadedReview) {
 function useReviewEditorCore(resource: LoadedReview) {
   const base = useReviewEditorBase(resource);
   const timeline = useReviewEditorTimeline(resource, base);
+  const presentationPending = useRef(false);
   const webcam = useReviewWebcamEditor({
     session: base.session,
     advanced: base.advancedState,
@@ -116,6 +118,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     seek: (time) => timeline.seek(time, false),
     allowed: () =>
       !base.busy &&
+      !presentationPending.current &&
       base.exporter.phase === 'idle' &&
       !base.composer.getCurrent().annotation &&
       base.advanced.ui.mode === 'advanced',
@@ -126,14 +129,32 @@ function useReviewEditorCore(resource: LoadedReview) {
     flushAdvanced: base.advancedState.flush,
     pause: () => timeline.video.current?.pause(),
     allowed: () =>
-      !base.busy && base.exporter.phase === 'idle' && base.advanced.ui.mode === 'advanced',
+      !base.busy &&
+      !presentationPending.current &&
+      base.exporter.phase === 'idle' &&
+      base.advanced.ui.mode === 'advanced',
   });
+  const presentation = useReviewPresentation({
+    session: base.session,
+    settings: base.advanced.presentation,
+    flushAdvanced: base.advancedState.flush,
+    pause: () => timeline.video.current?.pause(),
+    allowed: () =>
+      !base.busy &&
+      !webcam.pending &&
+      !watermark.pending &&
+      base.exporter.phase === 'idle' &&
+      !base.composer.getCurrent().annotation &&
+      base.advanced.ui.mode === 'advanced',
+  });
+  presentationPending.current = presentation.pending;
   return {
     ...base,
     ...timeline,
     webcam,
     watermark,
-    busy: base.busy || webcam.pending || watermark.pending,
+    presentation,
+    busy: base.busy || webcam.pending || watermark.pending || presentation.pending,
   };
 }
 

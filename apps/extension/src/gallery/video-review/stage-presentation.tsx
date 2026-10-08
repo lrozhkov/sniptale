@@ -6,31 +6,57 @@ import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
 import { useReviewPreviewPresentation } from './use-preview-presentation';
-import type { ReviewStageProps } from './stage';
+import type { ReviewStageScene } from './stage-geometry';
+import type {
+  CanvasComment,
+  ReviewAnnotation,
+  ReviewSource,
+} from '../../features/video/review/types';
 
-type PresentationProps = Pick<
-  ReviewStageProps,
-  | 'video'
-  | 'url'
-  | 'source'
-  | 'scene'
-  | 'watermark'
-  | 'webcam'
-  | 'comments'
-  | 'keyCues'
-  | 'clickCues'
-  | 'preview'
-  | 'cutPreview'
->;
+type PreviewInput = Parameters<typeof useReviewPreviewPresentation>[0];
+/** Presentation input is independent of the stage component that consumes this adapter. */
+type PresentationProps = {
+  video: PreviewInput['video'];
+  url: string;
+  source: ReviewSource;
+  scene?: ReviewStageScene;
+  outerFadePlan?: PreviewInput['scene']['outerFadePlan'];
+  watermark?: { settings?: PreviewInput['scene']['watermark'] } | undefined;
+  webcam?: PreviewInput['webcam'];
+  comments?: {
+    items: readonly CanvasComment[];
+    annotations: readonly ReviewAnnotation[];
+    time: number;
+  };
+  keyCues?: PreviewInput['scene']['keys'] | undefined;
+  clickCues?: PreviewInput['scene']['clicks'] | undefined;
+  preview?:
+    | {
+        preferences: PreviewInput['preferences'];
+        playing: boolean;
+        sourceToResult: PreviewInput['sourceToResult'];
+        onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
+      }
+    | undefined;
+  cutPreview?: PreviewInput['cut'];
+};
 
 /** Assemble authored stage layers into the renderer scene, including editor-visible comments. */
 function stagePresentationScene(
   props: Pick<
     PresentationProps,
-    'source' | 'scene' | 'watermark' | 'webcam' | 'comments' | 'keyCues' | 'clickCues'
+    | 'source'
+    | 'scene'
+    | 'outerFadePlan'
+    | 'watermark'
+    | 'webcam'
+    | 'comments'
+    | 'keyCues'
+    | 'clickCues'
   >
 ): Parameters<typeof useReviewPreviewPresentation>[0]['scene'] {
   return {
+    outerFadePlan: props.outerFadePlan,
     source: { width: props.source.width, height: props.source.height },
     ...(props.scene?.canvas ? { canvas: props.scene.canvas } : {}),
     background: props.scene?.background ?? { enabled: false },

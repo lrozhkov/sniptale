@@ -118,3 +118,100 @@ it('admits adaptive60 and rejects unsupported modes or incompatible rates', () =
     })
   ).toThrow('Invalid');
 });
+
+it.each([24, 30, 60] as const)(
+  'keeps explicit %sfps exact for a fractional source',
+  (frameRate) => {
+    expect(
+      resolveReviewOutputProfile(
+        { ...index, frameRate: 30000 / 1001 },
+        createQuickEditAdvancedState(),
+        { quality: 'HIGH', frameRate }
+      ).fps
+    ).toBe(frameRate);
+  }
+);
+
+describe('rational selected output rate', () => {
+  const advanced = createQuickEditAdvancedState();
+  it.each([
+    [24, 24, 1],
+    [30, 30, 1],
+    [60, 60, 1],
+    [1, 1, 1],
+    [120, 120, 1],
+    [30000 / 1001, 30000, 1001],
+    [60000 / 1001, 60000, 1001],
+    [29.83, 2983, 100],
+    [30000 / 1001 + 1e-10, 30000, 1001],
+    [30000 / 1001 - 1e-10, 30000, 1001],
+    [60000 / 1001 + 1e-10, 60000, 1001],
+    [60000 / 1001 - 1e-10, 60000, 1001],
+    [29.97, 2997, 100],
+    [59.94, 2997, 50],
+  ])('represents selected %sfps as %s/%s', (frameRate, numerator, denominator) => {
+    const result = resolveReviewOutputProfile({ ...index, frameRate }, advanced);
+    expect(result.rate).toEqual({ numerator, denominator });
+    expect(result.fps).toBe(numerator / denominator);
+    expect(Math.abs(result.fps - frameRate)).toBeLessThanOrEqual(1e-9);
+  });
+  it.each([24, 30, 60] as const)(
+    'keeps explicit %s distinct from fractional Current',
+    (frameRate) => {
+      const result = resolveReviewOutputProfile({ ...index, frameRate: 30000 / 1001 }, advanced, {
+        quality: 'HIGH',
+        frameRate,
+      });
+      expect(result.rate).toEqual({ numerator: frameRate, denominator: 1 });
+    }
+  );
+  it('uses the existing fallback only when source metadata is absent', () => {
+    const { frameRate: _frameRate, ...withoutRate } = index;
+    expect(resolveReviewOutputProfile(withoutRate, advanced).rate).toEqual({
+      numerator: 30,
+      denominator: 1,
+    });
+    expect(
+      resolveReviewOutputProfile({ ...index, frameRate: 29.83 }, advanced, {
+        quality: 'HIGH',
+        frameRate: 0,
+      }).rate
+    ).toEqual({ numerator: 2983, denominator: 100 });
+  });
+  it.each([NaN, Infinity, -Infinity, 0, -1, 0.999, 120.001])(
+    'rejects invalid selected %sfps',
+    (frameRate) => {
+      expect(() => resolveReviewOutputProfile({ ...index, frameRate }, advanced)).toThrow(
+        'Invalid output frame rate'
+      );
+    }
+  );
+  it('bounds approximation throughout the supported domain with safe reduced fractions', () => {
+    const samples = [Math.PI * 10, Math.SQRT2, 1.00000000101, 119.99999999899, 29.9700299711];
+    for (let step = 0; step <= 1190; step++)
+      samples.push(1 + step / 10, Math.min(120, 1 + step / 10 + 0.0000123456789));
+    for (const frameRate of samples) {
+      const result = resolveReviewOutputProfile({ ...index, frameRate }, advanced);
+      expect(Number.isSafeInteger(result.rate.numerator)).toBe(true);
+      expect(Number.isSafeInteger(result.rate.denominator)).toBe(true);
+      expect(result.rate.denominator).toBeGreaterThan(0);
+      expect(result.rate.denominator).toBeLessThanOrEqual(1e9);
+      expect(result.fps).toBe(result.rate.numerator / result.rate.denominator);
+      expect(Math.abs(result.fps - frameRate)).toBeLessThanOrEqual(1e-9);
+      let a = result.rate.numerator,
+        b = result.rate.denominator;
+      while (b) {
+        const next = a % b;
+        a = b;
+        b = next;
+      }
+      expect(a).toBe(1);
+    }
+  });
+  it('does not snap a measurement outside tolerance to a catalog rate', () => {
+    const measured = 30000 / 1001 + 1e-7;
+    const result = resolveReviewOutputProfile({ ...index, frameRate: measured }, advanced);
+    expect(result.rate).not.toEqual({ numerator: 30000, denominator: 1001 });
+    expect(Math.abs(result.fps - measured)).toBeLessThanOrEqual(1e-9);
+  });
+});

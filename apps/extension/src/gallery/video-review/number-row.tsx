@@ -30,6 +30,7 @@ export function ReviewNumberRow(props: {
   enterBehavior?: ComponentProps<typeof NumericRow>['enterBehavior'];
   scrubStep?: number;
   scrubMax?: number;
+  scrubMin?: number;
   disabled?: boolean;
   onChange(value: number): void;
 }) {
@@ -49,7 +50,7 @@ export function ReviewNumberRow(props: {
       value={props.value}
       disabled={props.disabled}
       scrub={{
-        min: props.min,
+        min: props.scrubMin ?? props.min,
         max: props.scrubMax ?? props.max,
         step: props.scrubStep ?? props.step,
       }}
@@ -106,7 +107,7 @@ export function ReviewPreviewNumberRow(
         value={draft}
         disabled={props.disabled}
         scrub={{
-          min: props.min,
+          min: props.scrubMin ?? props.min,
           max: props.scrubMax ?? props.max,
           step: props.scrubStep ?? props.step,
         }}

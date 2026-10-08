@@ -226,3 +226,201 @@ it.each(['replace', 'duplicate'] as const)(
     expect(restored).toHaveProperty('advanced.watermark.image.assetId', reference);
   }
 );
+
+/** Source storage fixture: native bytes and a disabled intro retained by history. */
+async function bookendArchiveFixture() {
+  const { createNeutralPresentationSettings } =
+    await import('../../../../features/video/review/advanced/presentation');
+  const { readAssetFile } = await import('../../../../composition/persistence/assets');
+  const base = portableMetadata(true);
+  const fixture = reviewFixture();
+  const image = (id: string) => ({
+    assetId: `project-asset:${id}`,
+    width: 20,
+    height: 10,
+    duration: 1,
+    fit: 'contain' as const,
+    fillColor: '#000000ff',
+    crop: { panX: 0, panY: 0 },
+  });
+  const current = {
+    ...createNeutralPresentationSettings(),
+    outro: { mode: 'image' as const, image: image('ending') },
+  };
+  const previous = { ...current, intro: { mode: 'none' as const, image: image('opening') } };
+  const workspace = {
+    ...fixture.workspace,
+    sourceAssetId: 'source-bytes',
+    advanced: { ...fixture.workspace.advanced, presentation: previous },
+    history: fixture.workspace.history.map((operation) =>
+      operation.target === 'advancedContent'
+        ? {
+            ...operation,
+            before: { ...operation.before, presentation: previous },
+            after: { ...operation.after, presentation: current },
+          }
+        : operation
+    ),
+  };
+  const bytes = new Map<string, File>();
+  const assets = new Map<
+    string,
+    { id: string; assetId: string; mimeType: string; createdAt: number; size: number }
+  >();
+  for (const id of ['background', 'music', 'voice', 'opening', 'ending']) {
+    const mimeType = ['music', 'voice'].includes(id) ? 'audio/mpeg' : 'image/png';
+    const file = new File([`intact-${id}-bytes`], `${id}.bin`, { type: mimeType });
+    bytes.set(`${id}-bytes`, file);
+    assets.set(id, { id, assetId: `${id}-bytes`, mimeType, createdAt: 1, size: file.size });
+  }
+  bytes.set('source-bytes', new File(['source'], 'result.webm', { type: 'video/webm' }));
+  const ref = (assetId: string) => ({
+    assetId,
+    createdAt: 1,
+    mimeType: bytes.get(assetId)!.type,
+    size: bytes.get(assetId)!.size,
+    sha256: null,
+    location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+  });
+  vi.mocked(readAssetFile).mockImplementation(async (value) => {
+    const file = bytes.get(value.assetId);
+    if (!file) throw new Error('Missing physical fixture bytes');
+    return file;
+  });
+  const db = {
+    transaction: () => ({
+      objectStore: (name: string) => ({
+        get: async () => (name === 'video_workspaces' ? workspace : undefined),
+      }),
+      done: Promise.resolve(),
+    }),
+    get: async (name: string, key: unknown) => {
+      if (name === 'media_library') return key === base.entry.id ? base.entry : undefined;
+      if (name === 'project_exports') return { ...base.projectExport, assetId: 'source-bytes' };
+      if (name === 'project_assets') return assets.get(String(key));
+      if (name === 'asset_refs') return bytes.has(String(key)) ? ref(String(key)) : undefined;
+      return undefined;
+    },
+  };
+  return { base, db };
+}
+
+/** Restores physical byte objects from the ZIP, independently of logical ID remapping. */
+async function stageBookendArchive(
+  reader: import('../../../../composition/archive-transfer').ArchiveReader,
+  envelope: ReturnType<typeof import('../codec').parseRootEnvelope>
+) {
+  const restoredBytes = new Map<string, File>();
+  const staged = [];
+  for (const object of envelope.objects) {
+    const chunks: ArrayBuffer[] = [];
+    await reader.entry(object.path)!.pipeTo(
+      new WritableStream({
+        write(chunk) {
+          chunks.push(new Uint8Array(chunk).buffer);
+        },
+      })
+    );
+    const file = new File(chunks, object.filename, { type: object.mimeType });
+    const assetId = `restored-${object.objectId}`;
+    restoredBytes.set(assetId, file);
+    staged.push({
+      objectId: object.objectId,
+      ref: {
+        assetId,
+        createdAt: 1,
+        mimeType: object.mimeType,
+        size: file.size,
+        sha256: null,
+        location: { kind: 'opfs' as const, objectKey: `objects/${assetId}` },
+      },
+    });
+  }
+  return { restoredBytes, staged };
+}
+
+it('round-trips private current and history-only bookends through real inventory, ZIP and restore', async () => {
+  const { buildMediaRootInventory } = await import('../inventory/media');
+  const { createMediaHubBackupExportOptions } = await import('../options');
+  const { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } = await import('../export');
+  const { inspectMediaHubBackupV6 } = await import('../inspect');
+  const { createArchivePathAllocator, openArchiveReader } =
+    await import('../../../../composition/archive-transfer');
+  const { createArchiveMemorySink } =
+    await import('../../../../composition/archive-transfer/test-support');
+  const { parseRootEnvelope } = await import('../codec');
+  const { base, db } = await bookendArchiveFixture();
+  const options = createMediaHubBackupExportOptions({ scope: 'all' });
+  const roots = await buildMediaRootInventory({
+    db,
+    items: [
+      {
+        ...base.entry,
+        kind: 'export',
+        source: { kind: 'project-export', exportId: 'e', projectId: 'p' },
+        hasThumbnail: false,
+      },
+    ],
+    options,
+    paths: createArchivePathAllocator(),
+  });
+  const plan = buildMediaHubBackupExportPlanV6({
+    roots,
+    privacy: { includeSourceMetadata: false, includeTelemetry: false, includeWebSnapshots: false },
+  });
+  const output = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: output.sink });
+  const inspected = await inspectMediaHubBackupV6(output.blob());
+  expect(inspected.manifest.totals.objects).toBe(6);
+  const reader = await openArchiveReader(output.blob());
+  try {
+    const descriptor = inspected.descriptors[0]!;
+    const envelope = parseRootEnvelope(
+      JSON.parse(await reader.entry(descriptor.metadataPath)!.text())
+    );
+    const { restoredBytes, staged } = await stageBookendArchive(reader, envelope);
+    const tables = installDatabase(base);
+    const result = await mediaLibraryRootPublisher.publish({
+      envelope,
+      journal,
+      session: session('duplicate'),
+      staged,
+    });
+    expect(result.imported).toBe(true);
+    for (const id of ['opening', 'ending']) {
+      const matches = await Promise.all(
+        [...restoredBytes].map(async ([key, file]) =>
+          (await file.text()) === `intact-${id}-bytes` ? key : null
+        )
+      );
+      const restoredAssetId = matches.find((key) => key !== null);
+      const entry = [...tables.get('project_assets')!.values()].find(
+        (value) =>
+          typeof value === 'object' &&
+          value !== null &&
+          'assetId' in value &&
+          value.assetId === restoredAssetId
+      );
+      expect(entry).toBeDefined();
+      if (!entry || typeof entry !== 'object' || !('id' in entry) || !('assetId' in entry))
+        throw new Error('Missing restored scene asset');
+      expect(await restoredBytes.get(String(entry.assetId))!.text()).toBe(`intact-${id}-bytes`);
+      const reference = `project-asset:${entry.id}`;
+      expect(reference).not.toBe(`project-asset:${id}`);
+      expect(tables.get('media_library')!.has(reference)).toBe(false);
+      const restored = [...tables.get('video_workspaces')!.values()].find((value) =>
+        JSON.stringify(value).includes(reference)
+      );
+      expect(restored).toBeDefined();
+      if (id === 'ending')
+        expect(restored).toHaveProperty('advanced.presentation.outro.image.assetId', reference);
+      else
+        expect(restored).toHaveProperty(
+          'history.0.before.presentation.intro.image.assetId',
+          reference
+        );
+    }
+  } finally {
+    await reader.close();
+  }
+});

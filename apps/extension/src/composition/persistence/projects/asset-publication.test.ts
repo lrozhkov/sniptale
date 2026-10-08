@@ -692,3 +692,112 @@ it.each(['current', 'history', 'recovery', 'wrong-slot', 'missing'] as const)(
     expect(mocks.readReview).toHaveBeenCalledWith('review');
   }
 );
+
+it.each(['intro', 'outro'] as const)(
+  'recovers a scene video only from its exact retained %s kind, including history under none',
+  async (slot) => {
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    const content = {
+      presentation: { [slot]: { mode: 'none', video: { assetId: 'project-asset:scene' } } },
+    };
+    mocks.readReview.mockResolvedValue({
+      workspace: {
+        advanced: {},
+        history: [{ target: 'advancedContent', before: {}, after: content }],
+      },
+    });
+    mocks.runMutation.mockImplementation(async (operation) =>
+      operation({ transaction: () => createTransaction(writes, Promise.resolve()) })
+    );
+    const payload = {
+      entry: {
+        assetId: ref.assetId,
+        createdAt: 2,
+        id: 'scene',
+        mimeType: ref.mimeType,
+        size: ref.size,
+      },
+      filename: 'scene.webm',
+      expectedAssetId: null,
+      publishToLibrary: false,
+      requiredReviewResource: {
+        aggregateId: 'review-1',
+        slot,
+        kind: 'video',
+        acquisition: 'private-upload',
+      },
+    };
+    await projectAssetPublicationAdapter.publish(
+      createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, payload)
+    );
+    expect(writes).toContainEqual([
+      'project_assets',
+      'put',
+      expect.objectContaining({ id: 'scene' }),
+    ]);
+    writes.length = 0;
+    await expect(
+      projectAssetPublicationAdapter.publish(
+        createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+          ...payload,
+          requiredReviewResource: {
+            ...payload.requiredReviewResource,
+            slot: slot === 'intro' ? 'outro' : 'intro',
+          },
+        })
+      )
+    ).rejects.toMatchObject({ name: 'SupersededAssetPublicationError' });
+    expect(writes).toEqual([]);
+    expect(mocks.discardPrepared).not.toHaveBeenCalled();
+  }
+);
+
+it('rejects incompatible scene claim payloads without relaxing watermark or audio claims', async () => {
+  const { parseProjectAssetPayload } = await import('./asset-publication-payload');
+  const payload = {
+    entry: {
+      assetId: ref.assetId,
+      createdAt: 2,
+      id: 'scene',
+      mimeType: ref.mimeType,
+      size: ref.size,
+    },
+    filename: 'scene.webm',
+    expectedAssetId: null,
+    publishToLibrary: false,
+    requiredReviewResource: {
+      aggregateId: 'review-1',
+      slot: 'intro',
+      kind: 'video',
+      acquisition: 'private-upload',
+    },
+  };
+  expect(parseProjectAssetPayload(payload)).not.toBeNull();
+  for (const patch of [
+    { publishToLibrary: true },
+    { requiredReview: { aggregateId: 'review-1', clipId: 'audio' } },
+    { librarySourceId: 'unclaimed-library-source' },
+    { requiredReviewResource: { ...payload.requiredReviewResource, kind: 'image' } },
+    {
+      requiredReviewResource: {
+        ...payload.requiredReviewResource,
+        acquisition: 'private-frozen-image',
+      },
+    },
+    {
+      requiredReviewResource: { ...payload.requiredReviewResource, acquisition: 'library-binding' },
+    },
+    { requiredReviewResource: { aggregateId: 'review-1', slot: 'watermark' } },
+  ])
+    expect(parseProjectAssetPayload({ ...payload, ...patch })).toBeNull();
+  const direct = {
+    ...payload,
+    expectedAssetId: ref.assetId,
+    publishToLibrary: true,
+    librarySourceId: 'project-asset:scene',
+    requiredReviewResource: { ...payload.requiredReviewResource, acquisition: 'library-binding' },
+  };
+  expect(parseProjectAssetPayload(direct)).not.toBeNull();
+  expect(parseProjectAssetPayload({ ...direct, expectedAssetId: null })).toBeNull();
+  expect(parseProjectAssetPayload({ ...direct, publishToLibrary: false })).toBeNull();
+});

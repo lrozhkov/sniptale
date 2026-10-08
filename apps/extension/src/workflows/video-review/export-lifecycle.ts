@@ -1,3 +1,4 @@
+import { openReviewAudioClipSource, type ReviewAudioClipInput } from './audio-clip-source';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
@@ -66,6 +67,7 @@ const persistence = {
   writeReviewPackets,
   writeReviewFrames,
   readProjectAsset: resolveReviewAssetBytes,
+  openAudioSource: openReviewAudioClipSource,
 };
 
 /** Output time of a source position inside the full edit map. */
@@ -83,42 +85,68 @@ function reviewOutputTimeAt(
 }
 
 /**
- * Builds the applied external-audio mix plan and decodes every referenced asset
- * once; a missing asset blocks the export with a user-visible reason instead of
+ * Builds the applied external-audio mix plan and opens bounded native PCM readers
+ * once per asset; a missing asset blocks the export with a user-visible reason instead of
  * silently dropping the lane.
  */
-async function buildReviewExportClipPlan(args: {
-  advanced: QuickEditAdvancedState;
-  fragmentOffset: number;
-  signal: AbortSignal;
-  readProjectAsset: (assetId: string) => Promise<Blob | null>;
-}): Promise<ReviewExportClipPlan> {
+export async function buildReviewExportClipPlan(
+  args: {
+    advanced: QuickEditAdvancedState;
+    fragmentOffset: number;
+    signal: AbortSignal;
+    readProjectAsset: (assetId: string) => Promise<Blob | null>;
+    /** Main-output interval required by an unpublished preview; null excludes all main clips. */
+    window?: { start: number; end: number } | null;
+  },
+  deps = { openAudioSource: openReviewAudioClipSource }
+): Promise<ReviewExportClipPlan> {
   const effective = resolveQuickEditEffectiveState(args.advanced);
-  const entries = buildQuickEditAudioPlan(effective).map((entry) => ({
-    ...entry,
-    timelineStart: entry.timelineStart - args.fragmentOffset,
-  }));
-  const buffers = new Map<string, AudioBuffer>();
-  const decoder = new OfflineAudioContext(2, 1, 48_000);
-  for (const assetId of new Set(entries.map((entry) => entry.assetId))) {
-    const blob = await args.readProjectAsset(assetId);
-    args.signal.throwIfAborted();
-    if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
-    try {
-      buffers.set(assetId, await decoder.decodeAudioData(await blob.arrayBuffer()));
-    } catch {
-      throw new QuickEditExportUnavailable(['asset-missing']);
-    }
-  }
-  return {
-    entries,
-    buffers,
-    originalVolume: args.advanced.audio.original.volume,
-    ...(args.advanced.audio.original.ranges
-      ? { originalRanges: args.advanced.audio.original.ranges }
-      : {}),
-    originalMuted: args.advanced.audio.original.muted,
+  const entries = buildQuickEditAudioPlan(effective)
+    .map((entry) => ({
+      ...entry,
+      timelineStart: entry.timelineStart - args.fragmentOffset,
+    }))
+    .filter(
+      (entry) =>
+        args.window === undefined ||
+        (args.window !== null &&
+          entry.volume > 0 &&
+          entry.timelineStart < args.window.end &&
+          entry.timelineStart + entry.duration > args.window.start)
+    );
+  const buffers = new Map<string, ReviewAudioClipInput>();
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const source of buffers.values()) if ('dispose' in source) source.dispose();
   };
+  try {
+    for (const assetId of new Set(entries.map((entry) => entry.assetId))) {
+      const blob = await args.readProjectAsset(assetId);
+      args.signal.throwIfAborted();
+      if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
+      try {
+        buffers.set(assetId, await deps.openAudioSource(blob, args.signal));
+      } catch {
+        throw new QuickEditExportUnavailable(['asset-missing']);
+      }
+    }
+    args.signal.throwIfAborted();
+    return {
+      dispose,
+      entries,
+      buffers,
+      originalVolume: args.advanced.audio.original.volume,
+      ...(args.advanced.audio.original.ranges
+        ? { originalRanges: args.advanced.audio.original.ranges }
+        : {}),
+      originalMuted: args.advanced.audio.original.muted,
+    };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
 }
 
 /** Timing history observes renderer success, independently of the publication transaction. */
@@ -163,21 +191,20 @@ function createReviewExportTiming(
   };
 }
 
-/** Owns staging cancellation until journal publication becomes the final non-cancellable step. */
-export async function exportReviewedVideo(
-  args: {
-    snapshot: VideoWorkspaceSnapshot;
-    renderSettings?: ReviewRenderSettings;
-    index: ReviewMediaIndex;
-    signal: AbortSignal;
-    destination?: 'gallery' | 'download';
-    selection?: Extract<ReviewAnchor, { kind: 'range' }>;
-    onProgress?(fraction: number): void;
-    onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
-    onPublishing?(): void;
-  },
-  deps = persistence
-) {
+type ReviewExportInput = {
+  snapshot: VideoWorkspaceSnapshot;
+  renderSettings?: ReviewRenderSettings;
+  index: ReviewMediaIndex;
+  signal: AbortSignal;
+  destination?: 'gallery' | 'download';
+  selection?: Extract<ReviewAnchor, { kind: 'range' }>;
+  includeBookends?: boolean;
+  onProgress?(fraction: number): void;
+  onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
+  onPublishing?(): void;
+};
+
+async function prepareReviewExport(args: ReviewExportInput, deps: typeof persistence) {
   const { signal, index } = args;
   const snapshot = structuredClone(args.snapshot);
   const workspace = snapshot.workspace;
@@ -211,6 +238,7 @@ export async function exportReviewedVideo(
     : null;
   if (args.selection && (!fragment || args.destination !== 'download'))
     throw new Error('A nonempty fragment requires a temporary download.');
+  const includeBookends = !fragment || args.includeBookends !== false;
   const edits = fragment?.edits ?? document.edits;
   const renderSettings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;
   const outputProfile = resolveReviewOutputProfile(
@@ -223,6 +251,7 @@ export async function exportReviewedVideo(
     renderSettings
   );
   const plan = configuredReviewExportPlan({
+    includeBookends,
     index,
     renderSettings,
     document: { ...document, edits },
@@ -233,15 +262,56 @@ export async function exportReviewedVideo(
   const fragmentOffset = fragment
     ? reviewOutputTimeAt(buildReviewTimeMap(index.duration, document.edits), fragment.start)
     : 0;
+  return {
+    workspace,
+    original,
+    document,
+    advanced,
+    fragment,
+    includeBookends,
+    edits,
+    renderSettings,
+    outputProfile,
+    plan,
+    fragmentOffset,
+  };
+}
+
+type PreparedReviewExport = Awaited<ReturnType<typeof prepareReviewExport>>;
+
+/** Owns acquired external audio through preparation, staging and final publication. */
+export async function exportReviewedVideo(args: ReviewExportInput, deps = persistence) {
+  const prepared = await prepareReviewExport(args, deps);
+  const { plan, advanced, fragmentOffset } = prepared;
+  const { signal } = args;
   let exportAudio: ReviewExportClipPlan | undefined;
-  if (plan.audio === 'process') {
-    exportAudio = await buildReviewExportClipPlan({
-      advanced,
-      fragmentOffset,
-      signal,
-      readProjectAsset: deps.readProjectAsset,
-    });
+  try {
+    if (plan.audio === 'process') {
+      exportAudio = await buildReviewExportClipPlan(
+        {
+          advanced,
+          fragmentOffset,
+          signal,
+          readProjectAsset: deps.readProjectAsset,
+        },
+        { openAudioSource: deps.openAudioSource }
+      );
+    }
+    return await writePreparedReviewExport(args, prepared, exportAudio, deps);
+  } finally {
+    exportAudio?.dispose?.();
   }
+}
+
+async function writePreparedReviewExport(
+  args: ReviewExportInput,
+  prepared: PreparedReviewExport,
+  exportAudio: ReviewExportClipPlan | undefined,
+  deps: typeof persistence
+) {
+  const { signal, index } = args;
+  const { workspace, original, advanced, fragment, edits, renderSettings, outputProfile, plan } =
+    prepared;
   const speedAudio =
     !!index.audioCodec &&
     buildReviewTimeMap(index.duration, edits).some((part) => part.kind === 'speed');
@@ -288,48 +358,17 @@ export async function exportReviewedVideo(
   );
   let publishing = false;
   try {
-    const packetReceipt =
-      plan.video === 'render'
-        ? await deps.writeReviewFrames({
-            renderSettings,
-            file: original.file,
-            index,
-            edits,
-            advanced,
-            ...reviewExportPresentations(
-              original.telemetry,
-              advanced,
-              index.duration,
-              document.edits
-            ),
-            comments: resolveQuickEditEffectiveFeatures(advanced).overlaysVisible
-              ? resolveOverlayComments(document)
-              : [],
-            fragmentOffset,
-            writer,
-            signal,
-            provenance,
-            readProjectAsset: deps.readProjectAsset,
-            ...(exportAudio ? { exportAudio } : {}),
-            ...(args.onProgress ? { onProgress: args.onProgress } : {}),
-            ...(args.onTimeEstimate ? { onTimeEstimate: timing.onTimeEstimate } : {}),
-          })
-        : await deps.writeReviewPackets({
-            file: original.file,
-            index,
-            edits,
-            writer,
-            signal,
-            provenance,
-            ...(exportAudio ? { exportAudio } : {}),
-            ...(args.onProgress ? { onProgress: args.onProgress } : {}),
-            ...(args.onTimeEstimate ? { onTimeEstimate: timing.onTimeEstimate } : {}),
-          });
+    const packetReceipt = await renderPreparedReviewExport(
+      args,
+      prepared,
+      { writer, timing, provenance, exportAudio },
+      deps
+    );
     signal.throwIfAborted();
     timing.finish();
     args.onTimeEstimate?.(null);
-    const prepared = await writer.finalize();
-    const file = await deps.readAssetFile(prepared.ref, filename);
+    const stagedAsset = await writer.finalize();
+    const file = await deps.readAssetFile(stagedAsset.ref, filename);
     signal.throwIfAborted();
     if (args.destination === 'download') {
       const receipt: ReviewExportReceipt = {
@@ -348,7 +387,7 @@ export async function exportReviewedVideo(
       {
         id,
         filename,
-        preparedAsset: prepared,
+        preparedAsset: stagedAsset,
         ...reviewRecordingMetadata(original),
         mediaMetadata: {
           kind: 'video',
@@ -383,6 +422,63 @@ export async function exportReviewedVideo(
   } finally {
     args.onTimeEstimate?.(null);
   }
+}
+
+async function renderPreparedReviewExport(
+  args: ReviewExportInput,
+  prepared: PreparedReviewExport,
+  output: {
+    writer: Awaited<ReturnType<typeof persistence.createSeekableAssetObjectWriter>>;
+    timing: ReturnType<typeof createReviewExportTiming>;
+    provenance: ReturnType<typeof encodeReviewProvenance>;
+    exportAudio: ReviewExportClipPlan | undefined;
+  },
+  deps: typeof persistence
+) {
+  const { signal, index } = args;
+  const {
+    original,
+    document,
+    advanced,
+    includeBookends,
+    edits,
+    renderSettings,
+    plan,
+    fragmentOffset,
+  } = prepared;
+  const { writer, timing, provenance, exportAudio } = output;
+  return plan.video === 'render'
+    ? await deps.writeReviewFrames({
+        includeBookends,
+        renderSettings,
+        file: original.file,
+        index,
+        edits,
+        advanced,
+        ...reviewExportPresentations(original.telemetry, advanced, index.duration, document.edits),
+        comments: resolveQuickEditEffectiveFeatures(advanced).overlaysVisible
+          ? resolveOverlayComments(document)
+          : [],
+        fragmentOffset,
+        writer,
+        signal,
+        provenance,
+        readProjectAsset: deps.readProjectAsset,
+        ...(exportAudio ? { exportAudio } : {}),
+        ...(args.onProgress ? { onProgress: args.onProgress } : {}),
+        ...(args.onTimeEstimate ? { onTimeEstimate: timing.onTimeEstimate } : {}),
+      })
+    : await deps.writeReviewPackets({
+        file: original.file,
+        index,
+        edits,
+        writer,
+        signal,
+        provenance,
+        ...(exportAudio ? { exportAudio } : {}),
+        ...(args.onProgress ? { onProgress: args.onProgress } : {}),
+        ...(args.onTimeEstimate ? { onTimeEstimate: timing.onTimeEstimate } : {}),
+      });
 }
 
 /** Join fresh source facts once before slicing; all authored animation clocks remain global. */

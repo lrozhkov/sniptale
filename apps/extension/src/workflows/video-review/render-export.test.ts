@@ -10,6 +10,11 @@ import type { ReviewEdit } from '../../features/video/review/types';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 import { createCanvasComment } from '../../features/video/review/comments';
 import { drainSegmentAudio, renderRenderWindowFrames, writeReviewFrames } from './render-export';
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
+const presentationExport = vi.hoisted(() => vi.fn());
+vi.mock('./render-presentation-export', () => ({
+  writeReviewPresentationFrames: presentationExport,
+}));
 
 function segmentStub(sourceStart: number, sourceEnd: number) {
   return {
@@ -415,6 +420,26 @@ it('encodes the selected portrait canvas while fitting the native landscape sour
   ]);
 });
 
+it('shares the rational Current rate with the output profile', async () => {
+  const args = argsFixture({ frameRate: 30000 / 1001 + 1e-10 });
+  const { resolveReviewOutputProfile } = await import('./render-settings');
+  const profile = resolveReviewOutputProfile(args.index, args.advanced);
+  state.encoded.length = 0;
+  await writeReviewFrames(args);
+  expect(state.encoded[1]!.timestamp).toBe(1 / profile.fps);
+});
+
+it.each([NaN, Infinity, 0, 121])(
+  'rejects an invalid Current rate before decoding: %s',
+  async (frameRate) => {
+    state.drawn.length = 0;
+    await expect(writeReviewFrames(argsFixture({ frameRate }))).rejects.toThrow(
+      'Invalid output frame rate.'
+    );
+    expect(state.drawn).toHaveLength(0);
+  }
+);
+
 it('renders exact non-keyframe cuts while keeping output timestamps continuous', async () => {
   state.encoded.length = 0;
   const args = argsFixture();
@@ -682,4 +707,20 @@ it('clears a render estimate on cancellation without retaining machine state', a
   } finally {
     clock.mockRestore();
   }
+});
+
+it('routes only effective advanced presentation through the sequence writer', async () => {
+  const args = argsFixture();
+  args.advanced.presentation = createNewWorkspacePresentationSettings();
+  const receipt = { resultDuration: 3, videoPackets: 90, audioPackets: 0, audioRanges: [] };
+  presentationExport.mockResolvedValueOnce(receipt);
+  expect(await writeReviewFrames({ ...args, includeBookends: false })).toBe(receipt);
+  expect(presentationExport).toHaveBeenLastCalledWith(
+    expect.objectContaining({ includeBookends: false })
+  );
+  presentationExport.mockClear();
+  args.advanced.ui.mode = 'basic';
+  const basic = await writeReviewFrames(args);
+  expect(presentationExport).not.toHaveBeenCalled();
+  expect(basic.resultDuration).toBe(2);
 });

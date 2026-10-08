@@ -139,7 +139,7 @@ export async function inspectReviewMedia(
     const packetStats = await video.computePacketStats(Infinity, { metadataOnly: true });
     const frameRate =
       Number.isFinite(packetStats.averagePacketRate) && packetStats.averagePacketRate > 0
-        ? Math.min(120, Math.max(1, Math.round(packetStats.averagePacketRate)))
+        ? Math.min(120, Math.max(1, packetStats.averagePacketRate))
         : 30;
     const [mp4Audio, webmAudio, mp4Video, webmVideo] = await Promise.all([
       chooseReviewAudioCodec(audio ?? null, 'mp4'),

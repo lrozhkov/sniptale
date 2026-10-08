@@ -137,3 +137,130 @@ it.each(['text', 'image'] as const)(
     });
   }
 );
+
+it('uses sequence processing for bookends and defers unknown silent-main video audio', async () => {
+  const { createNeutralPresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const base = fixture();
+  const args = { advanced: base.advanced, document: base.document, index: base.index };
+  args.advanced.presentation = createNeutralPresentationSettings();
+  args.advanced.presentation.intro = {
+    mode: 'video',
+    video: {
+      assetId: 'project-asset:clip',
+      source: { width: 20, height: 10, duration: 2, size: 5, mimeType: 'video/webm' },
+      trim: { start: 0, end: 2 },
+      audio: { muted: false, gain: 1 },
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+    reasons: ['presentation'],
+  });
+  args.index.outputAudioCodecs!.mp4 = null;
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  args.index.audioCodec = null;
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  expect(configuredReviewExportPlan({ ...args, presentationAudioPresent: true })).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  expect(configuredReviewExportPlan({ ...args, presentationAudioPresent: false })).toMatchObject({
+    kind: 'ready',
+  });
+  args.advanced.presentation.intro.video.audio.muted = true;
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  args.advanced.presentation.intro = {
+    mode: 'none',
+    video: args.advanced.presentation.intro.video,
+  };
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});
+
+it('exports silent image sequences without an audio encoder and suppresses presentation in Basic', async () => {
+  const { createNewWorkspacePresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const base = fixture();
+  const args = { advanced: base.advanced, document: base.document, index: base.index };
+  args.index.audioCodec = null;
+  args.index.outputAudioCodecs!.mp4 = null;
+  args.advanced.presentation = createNewWorkspacePresentationSettings();
+  args.advanced.presentation.audioFade = true;
+  args.advanced.presentation.outro = {
+    mode: 'image',
+    image: {
+      assetId: 'project-asset:still',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  args.advanced.ui.mode = 'basic';
+  expect(configuredReviewExportPlan(args)).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});
+
+it('omits bookend capabilities without mutating retained media or outer fades', async () => {
+  const { createNewWorkspacePresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const args = fixture();
+  args.advanced.presentation = createNewWorkspacePresentationSettings();
+  args.advanced.presentation.intro = {
+    mode: 'image',
+    image: {
+      assetId: 'project-asset:intro',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  const before = structuredClone(args.advanced);
+  const result = configuredReviewExportPlan({ ...args, includeBookends: false });
+  expect(result).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    reasons: expect.arrayContaining(['presentation']),
+  });
+  expect(args.advanced).toEqual(before);
+  args.advanced.presentation.fadeIn.enabled = false;
+  args.advanced.presentation.fadeOut.enabled = false;
+  expect(
+    configuredReviewExportPlan({ ...args, renderSettings: undefined, includeBookends: false })
+  ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
+});

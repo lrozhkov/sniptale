@@ -1,10 +1,27 @@
 // @vitest-environment jsdom
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { readFile } from 'node:fs/promises';
 import { createDefaultEngine, useReviewAudioRuntime } from './use-review-audio-runtime';
 import type { QuickEditClipSchedule } from '../../features/video/review/advanced/audio-plan';
+const decoding = vi.hoisted(() => ({
+  decode:
+    vi.fn<
+      typeof import('../../workflows/video-review/audio-clip-source').decodeReviewAudioClipBuffer
+    >(),
+}));
+vi.mock('../../workflows/video-review/audio-clip-source', () => ({
+  decodeReviewAudioClipBuffer: decoding.decode,
+}));
+beforeEach(() => {
+  vi.stubGlobal('AudioBuffer', SpeechPcm);
+  decoding.decode
+    .mockReset()
+    .mockImplementation(
+      async () => new AudioBuffer({ length: 48000 * 9, sampleRate: 48000, numberOfChannels: 1 })
+    );
+});
 
 class FakeParam {
   value = 0;
@@ -219,7 +236,7 @@ it('processes accelerated spoken voice before connecting a native-rate preview n
     'AudioContext',
     captureFakeContext((made) => {
       context = made;
-      made.decodeAudioData = async () => voice;
+      decoding.decode.mockResolvedValue(voice);
     })
   );
   const host = document.createElement('div');
@@ -281,7 +298,7 @@ it.each([0.5, 1.25, 2, 4, 16])(
       'AudioContext',
       captureFakeContext((made) => {
         context = made;
-        made.decodeAudioData = async () => voice;
+        decoding.decode.mockResolvedValue(voice);
       })
     );
     const engine = createDefaultEngine(null)!;
@@ -331,3 +348,22 @@ it.each([0.5, 1.25, 2, 4, 16])(
     }
   }
 );
+
+it('cancels native asset decoding when the browser graph is disposed', async () => {
+  vi.stubGlobal(
+    'AudioContext',
+    captureFakeContext(() => {})
+  );
+  decoding.decode.mockImplementation(
+    async (_data, signal) =>
+      new Promise<AudioBuffer>((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      })
+  );
+  const engine = createDefaultEngine(null)!;
+  const pending = engine.decode(new ArrayBuffer(0));
+  const signal = decoding.decode.mock.calls[0]![1];
+  engine.dispose();
+  expect(signal.aborted).toBe(true);
+  await expect(pending).rejects.toThrow();
+});

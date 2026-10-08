@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
-// @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -102,7 +104,14 @@ const renderStage = (
   props: Partial<
     Pick<
       Parameters<typeof ReviewStage>[0],
-      'scene' | 'zoom' | 'backgroundImageUrl' | 'drawing' | 'region' | 'comments' | 'watermark'
+      | 'scene'
+      | 'zoom'
+      | 'backgroundImageUrl'
+      | 'drawing'
+      | 'region'
+      | 'comments'
+      | 'watermark'
+      | 'outerFadePlan'
     >
   >
 ) => {
@@ -110,6 +119,7 @@ const renderStage = (
     root.render(
       <ReviewStage
         watermark={props.watermark}
+        outerFadePlan={props.outerFadePlan}
         url="blob:review"
         source={source}
         video={{ current: null }}
@@ -698,4 +708,26 @@ it('preserves paused exposure and marks pointer gestures for selected-quality re
     },
   });
   expect(input().cameraTransform?.scale).toBe(2);
+});
+
+it('places native outer fade over the complete scene after blackout and disables it for manual frames', () => {
+  const result = planReviewPresentationSequence({
+    settings: createNewWorkspacePresentationSettings(),
+    mainDuration: 4,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 30, denominator: 1 },
+  });
+  if (!result.ok) throw new Error('Expected valid plan');
+  renderStage({ outerFadePlan: result.plan });
+  const fade = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.outerFade"]')!;
+  expect(fade.style.opacity).toBe('1');
+  expect(fade.className).toContain('inset-0');
+  expect(fade.className).toContain('pointer-events-none');
+  expect(fade.className).toContain('z-40');
+  expect(fade.previousElementSibling?.getAttribute('data-ui')).toBe('blackout-proof');
+  expect(presentation.input.mock.lastCall![0].scene.outerFadePlan).toBe(result.plan);
+  presentation.active = true;
+  renderStage({ outerFadePlan: result.plan });
+  expect(host.querySelector('[data-ui="gallery.videoReview.outerFade"]')).toBeNull();
 });

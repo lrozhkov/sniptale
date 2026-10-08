@@ -33,12 +33,14 @@ function sameJson(left, right) {
 
 async function validateLicenseArtifacts(root, policy, closure) {
   const errors = [];
-  const expectedPaths = closure.licenseFiles.map((file) => file.archivePath).sort();
+  const expectedPaths = [...closure.licenseFiles, ...(closure.sourceFiles ?? [])]
+    .map((file) => file.archivePath)
+    .sort();
   const actualPaths = await collectFiles(root, policy.dependencyLegal.licenseDirectory);
   if (!sameJson(actualPaths, expectedPaths)) {
     errors.push('Dependency license artifact inventory is incomplete or stale');
   }
-  for (const licenseFile of closure.licenseFiles) {
+  for (const licenseFile of [...closure.licenseFiles, ...(closure.sourceFiles ?? [])]) {
     let contents;
     try {
       contents = await fs.readFile(path.resolve(root, licenseFile.archivePath));
@@ -77,6 +79,7 @@ export async function validateDependencyLegalClosure(root = process.cwd()) {
     closure = await generateDependencyLegalClosure({
       canonicalLicenseAliases: policy.dependencyLegal.canonicalLicenseAliases,
       pinnedSources: policy.dependencyLegal.pinnedSources,
+      modifiedSources: policy.dependencyLegal.modifiedSources,
       repoRoot: root,
       reviewedSelections: policy.dependencyLegal.reviewedSelections,
     });

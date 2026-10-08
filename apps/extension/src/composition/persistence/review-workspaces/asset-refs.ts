@@ -69,6 +69,26 @@ function parseRecoveryContent(value: unknown): unknown {
   }
 }
 
+/** Visits only the bounded, authored scene slots, including dormant variants. */
+function mapPresentationReferences<T>(
+  presentation: T,
+  transform: (value: Record<string, unknown>) => Record<string, unknown>
+): T {
+  if (!isRecord(presentation)) return presentation;
+  const next: Record<string, unknown> = {};
+  for (const name of ['intro', 'outro']) {
+    const slot = presentation[name];
+    if (!isRecord(slot)) continue;
+    const mapped = { ...slot };
+    for (const kind of ['image', 'video']) {
+      const value = slot[kind];
+      if (isRecord(value)) mapped[kind] = transform(value);
+    }
+    next[name] = mapped;
+  }
+  return { ...presentation, ...next };
+}
+
 function assertPortableContentRefs(content: unknown, inspectRecovery = true): void {
   if (!isRecord(content)) return;
   if (isRecord(content['webcam']) && 'assetId' in content['webcam'])
@@ -77,6 +97,10 @@ function assertPortableContentRefs(content: unknown, inspectRecovery = true): vo
   const watermark = content['watermark'];
   if (isRecord(watermark) && isRecord(watermark['image']) && 'assetId' in watermark['image'])
     throw new Error(LOCAL_ASSET_ERROR);
+  mapPresentationReferences(content['presentation'], (value) => {
+    if ('assetId' in value) throw new Error(LOCAL_ASSET_ERROR);
+    return value;
+  });
   assertNoLocalAudioRefs(content['audio']);
   if (inspectRecovery)
     assertPortableContentRefs(parseRecoveryContent(content['recoveryV1']), false);
@@ -162,6 +186,12 @@ function renameContentRefs(
   recovery = true
 ): Record<string, unknown> {
   const next = { ...content };
+  if (content['presentation'] !== undefined)
+    next['presentation'] = mapPresentationReferences(content['presentation'], (value) => {
+      if (typeof value[from] !== 'string') return value;
+      const { [from]: reference, ...rest } = value;
+      return { ...rest, [to]: reference };
+    });
   const webcam = content['webcam'];
   if (isRecord(webcam) && typeof webcam[from] === 'string') {
     const { [from]: reference, ...rest } = webcam;
@@ -321,12 +351,19 @@ export function collectReviewAssetReferences(
 }
 
 function collectContentReferences(
-  content: Pick<QuickEditAdvancedContent, 'audio' | 'background' | 'webcam' | 'watermark'>,
+  content: Pick<
+    QuickEditAdvancedContent,
+    'audio' | 'background' | 'webcam' | 'watermark' | 'presentation'
+  >,
   into: Set<string>
 ): void {
   collectImageReference(content.background, into);
   collectAssetReference(content.webcam, into);
   collectAssetReference(content.watermark?.image, into);
+  mapPresentationReferences(content.presentation, (value) => {
+    collectAssetReference(value, into);
+    return value;
+  });
   for (const lane of LANES) {
     for (const clip of content.audio[lane]) {
       if (clip.assetId.startsWith(ASSET_PREFIX)) into.add(clip.assetId);
@@ -375,6 +412,10 @@ function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void 
   try {
     const parsed: unknown = JSON.parse(recoveryV1);
     if (!isRecord(parsed)) return;
+    mapPresentationReferences(parsed['presentation'], (value) => {
+      collectAssetReference(value, into);
+      return value;
+    });
     collectAssetReference(parsed['webcam'], into);
     collectImageReference(parsed['background'], into);
     if (isRecord(parsed['watermark'])) collectAssetReference(parsed['watermark']['image'], into);
@@ -429,10 +470,14 @@ function remapContentReferences(
   }
   const background = remapImageReference(content.background, assetIdMap);
   const webcam = remapAssetReference(content.webcam, assetIdMap);
+  const presentation = mapPresentationReferences(content.presentation, (value) =>
+    remapAssetReference(value, assetIdMap)
+  );
   const watermark = remapWatermarkReference(content.watermark, assetIdMap);
   return changed ||
     background !== content.background ||
     webcam !== content.webcam ||
+    presentation !== content.presentation ||
     watermark !== content.watermark
     ? {
         ...content,
@@ -440,6 +485,7 @@ function remapContentReferences(
         background,
         ...(webcam ? { webcam } : {}),
         ...(watermark ? { watermark } : {}),
+        ...(presentation ? { presentation } : {}),
       }
     : content;
 }
@@ -457,11 +503,16 @@ function remapRecoveryReferences(
   if (!isRecord(parsed)) return null;
   const webcam = remapAssetReference(parsed['webcam'], assetIdMap);
   const background = remapImageReference(parsed['background'], assetIdMap);
+  const presentation = mapPresentationReferences(parsed['presentation'], (value) =>
+    remapAssetReference(value, assetIdMap)
+  );
   const watermark = remapWatermarkReference(parsed['watermark'], assetIdMap);
   let changed =
     background !== parsed['background'] ||
     webcam !== parsed['webcam'] ||
+    presentation !== parsed['presentation'] ||
     watermark !== parsed['watermark'];
+  if (presentation !== parsed['presentation']) parsed['presentation'] = presentation;
   if (watermark !== parsed['watermark']) parsed['watermark'] = watermark;
   if (background !== parsed['background']) parsed['background'] = background;
   if (webcam !== parsed['webcam']) parsed['webcam'] = webcam;
@@ -531,4 +582,29 @@ function remapSnapshot(
       },
     },
   };
+}
+
+/** Exact retained scene slot/kind ownership, independent of its selected mode. */
+export function reviewWorkspaceHasSceneResource(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  slot: 'intro' | 'outro',
+  kind: 'image' | 'video',
+  assetId: string
+): boolean {
+  const matches = (content: unknown, recovery = true): boolean => {
+    if (!isRecord(content)) return false;
+    const presentation = content['presentation'];
+    const entry = isRecord(presentation) ? presentation[slot] : undefined;
+    const resource = isRecord(entry) ? entry[kind] : undefined;
+    if (isRecord(resource) && resource['assetId'] === assetId) return true;
+    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+  };
+  return (
+    matches(workspace.advanced) ||
+    workspace.history.some(
+      (operation) =>
+        operation.target === 'advancedContent' &&
+        (matches(operation.before) || matches(operation.after))
+    )
+  );
 }

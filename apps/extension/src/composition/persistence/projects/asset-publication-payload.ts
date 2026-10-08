@@ -7,7 +7,14 @@ export interface ProjectAssetPublicationOptions {
   publishToLibrary?: boolean;
   originMediaId?: string;
   /** Private scene resource retained by its exact review slot, including remembered settings. */
-  requiredReviewResource?: { aggregateId: string; slot: 'watermark' };
+  requiredReviewResource?:
+    | { aggregateId: string; slot: 'watermark' }
+    | {
+        aggregateId: string;
+        slot: 'intro' | 'outro';
+        kind: 'image' | 'video';
+        acquisition: 'private-upload' | 'private-frozen-image' | 'library-binding';
+      };
 }
 
 export interface ProjectAssetPublicationPayload extends ProjectAssetPublicationOptions {
@@ -27,12 +34,18 @@ export function isValidProjectAssetReviewResource(args: {
   publishToLibrary: boolean | undefined;
 }): boolean {
   if (!args.resource) return true;
+  const resource = args.resource;
+  if (args.requiredReview !== undefined || !resource.aggregateId) return false;
+  if (resource.slot === 'watermark')
+    return args.publishToLibrary === false && args.mimeType.startsWith('image/');
+  if (resource.slot !== 'intro' && resource.slot !== 'outro') return false;
+  if (resource.kind !== 'image' && resource.kind !== 'video') return false;
+  if (!args.mimeType.startsWith(`${resource.kind}/`)) return false;
+  if (resource.acquisition === 'library-binding') return true;
   return (
-    args.requiredReview === undefined &&
     args.publishToLibrary === false &&
-    args.mimeType.startsWith('image/') &&
-    Boolean(args.resource.aggregateId) &&
-    args.resource.slot === 'watermark'
+    (resource.acquisition === 'private-upload' ||
+      (resource.acquisition === 'private-frozen-image' && resource.kind === 'image'))
   );
 }
 
@@ -59,35 +72,23 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
         ? { aggregateId: required['aggregateId'], clipId: required['clipId'] }
         : null;
   if (requiredReview === null) return null;
-  const resource = value['requiredReviewResource'];
-  let requiredReviewResource: ProjectAssetPublicationOptions['requiredReviewResource'];
-  if (resource !== undefined) {
-    if (
-      !isRecord(resource) ||
-      typeof resource['aggregateId'] !== 'string' ||
-      resource['slot'] !== 'watermark' ||
-      value['librarySourceId'] !== undefined
-    )
-      return null;
-    requiredReviewResource = { aggregateId: resource['aggregateId'], slot: 'watermark' };
-    if (
-      !isValidProjectAssetReviewResource({
-        mimeType: entry.mimeType,
-        resource: requiredReviewResource,
-        requiredReview,
-        publishToLibrary: value['publishToLibrary'],
-      })
-    )
-      return null;
-  }
+  const requiredReviewResource = parseReviewResource(value, entry.mimeType, requiredReview);
+  if (requiredReviewResource === null) return null;
   const librarySourceId = value['librarySourceId'];
   if (librarySourceId !== undefined) {
     if (
       typeof librarySourceId !== 'string' ||
       !librarySourceId ||
-      !requiredReview?.aggregateId ||
-      !requiredReview.clipId ||
-      !entry.mimeType.startsWith('audio/')
+      (!(
+        requiredReview?.aggregateId &&
+        requiredReview.clipId &&
+        entry.mimeType.startsWith('audio/')
+      ) &&
+        !(
+          requiredReviewResource &&
+          requiredReviewResource.slot !== 'watermark' &&
+          requiredReviewResource.acquisition === 'library-binding'
+        ))
     )
       return null;
     if (entry.originMediaId) {
@@ -113,4 +114,56 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
     ...(requiredReviewResource ? { requiredReviewResource } : {}),
     ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
   };
+}
+
+function parseReviewResource(
+  value: Record<string, unknown>,
+  mimeType: string,
+  requiredReview: ProjectAssetPublicationPayload['requiredReview']
+): ProjectAssetPublicationOptions['requiredReviewResource'] | null {
+  const resource = value['requiredReviewResource'];
+  let requiredReviewResource: ProjectAssetPublicationOptions['requiredReviewResource'];
+  if (resource !== undefined) {
+    if (
+      !isRecord(resource) ||
+      typeof resource['aggregateId'] !== 'string' ||
+      !resource['aggregateId']
+    )
+      return null;
+    if (resource['slot'] === 'watermark') {
+      if (value['librarySourceId'] !== undefined) return null;
+      requiredReviewResource = { aggregateId: resource['aggregateId'], slot: 'watermark' };
+    } else {
+      if (
+        (resource['slot'] !== 'intro' && resource['slot'] !== 'outro') ||
+        (resource['kind'] !== 'image' && resource['kind'] !== 'video') ||
+        (resource['acquisition'] !== 'private-upload' &&
+          resource['acquisition'] !== 'private-frozen-image' &&
+          resource['acquisition'] !== 'library-binding')
+      )
+        return null;
+      requiredReviewResource = {
+        aggregateId: resource['aggregateId'],
+        slot: resource['slot'],
+        kind: resource['kind'],
+        acquisition: resource['acquisition'],
+      };
+      if (
+        (resource['acquisition'] === 'library-binding') !==
+        (typeof value['librarySourceId'] === 'string')
+      )
+        return null;
+    }
+    if (
+      !isValidProjectAssetReviewResource({
+        mimeType,
+        resource: requiredReviewResource,
+        requiredReview,
+        publishToLibrary:
+          typeof value['publishToLibrary'] === 'boolean' ? value['publishToLibrary'] : undefined,
+      })
+    )
+      return null;
+  }
+  return requiredReviewResource;
 }

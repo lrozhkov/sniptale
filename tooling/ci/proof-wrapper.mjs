@@ -1,8 +1,10 @@
+import { normalizeMediabunny } from './mediabunny/normalize.mjs';
 import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 import { runObservedWrapper } from '../qa/wrappers/observed/runner.mjs';
 import { collectCiProofResults } from './qa-composition.mjs';
 
 if (isExecutedAsScript(import.meta.url)) {
+  normalizeMediabunny();
   const outcome = await runObservedWrapper({
     wrapperId: 'ci:proof',
     label: 'CI proof',

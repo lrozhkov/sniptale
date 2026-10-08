@@ -35,6 +35,7 @@
     "packages/*"
   ],
   "scripts": {
+    "dependencies:normalize": "node tooling/ci/mediabunny/normalize.mjs",
     "dev": "vite --config apps/extension/vite.config.ts",
     "prepare": "husky",
     "typecheck": "node tooling/qa/proof/typecheck/execution/check.mjs",
@@ -114,7 +115,7 @@
     "idb": "^8.0.3",
     "jszip": "^3.10.1",
     "lucide-react": "^1.33.0",
-    "mediabunny": "^1.55.2",
+    "mediabunny": "1.55.2",
     "mp4-muxer": "^5.2.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

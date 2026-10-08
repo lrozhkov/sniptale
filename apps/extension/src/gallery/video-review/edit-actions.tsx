@@ -37,6 +37,7 @@ const REASON_LABEL: Record<QuickEditExportReason, Parameters<typeof translate>[0
   'window-header': 'gallery.videoReview.windowHeader',
   webcam: 'gallery.videoReview.webcam',
   watermark: 'gallery.videoReview.watermark',
+  presentation: 'gallery.videoReview.presentation',
   'precise-edits': 'gallery.videoReview.exportPreciseEdits',
   'cut-transition': 'gallery.videoReview.cutTransition',
   'transition-frames': 'gallery.videoReview.cutTransitionFramesUnavailable',
@@ -477,8 +478,59 @@ export function ReviewRenderOptions({
             onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
           />
         </div>
+        {exporter.hasBookends && (
+          <SelectField
+            className={reviewSelectFieldClassName}
+            label={translate('gallery.videoReview.fragmentIncludeBookends')}
+            disabled={busy}
+            value={exporter.includeBookends ? 'on' : 'off'}
+            options={[
+              { value: 'on', label: translate('gallery.videoReview.presentationOn') },
+              { value: 'off', label: translate('gallery.videoReview.presentationOff') },
+            ]}
+            onChange={(value) => exporter.setIncludeBookends(value === 'on')}
+          />
+        )}
       </fieldset>
+      {exporter.presentationDuration && exporter.hasBookends && (
+        <ReviewPresentationDuration plan={exporter.presentationDuration} />
+      )}
       <VideoExportSizeHint status={exporter.sizeEstimate ?? null} />
+    </div>
+  );
+}
+
+/** Read-only sequence timing is separate from codec and export-option edits. */
+function ReviewPresentationDuration({
+  plan,
+}: {
+  plan: NonNullable<
+    ReturnType<typeof import('./use-export').useReviewExport>['presentationDuration']
+  >;
+}) {
+  return (
+    <div
+      className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 pb-2"
+      data-ui="gallery.videoReview.exportDuration"
+    >
+      <span className="text-[var(--sniptale-color-text-secondary)]">
+        {translate('gallery.videoReview.presentationTotal')}
+      </span>
+      <span className="tabular-nums">{reviewTimeLabel(plan.totalDurationUs / 1_000_000)}</span>
+      <div className="flex w-full flex-wrap gap-x-2 gap-y-1 text-[var(--sniptale-color-text-secondary)]">
+        {plan.segments.map((segment) => (
+          <span key={segment.name}>
+            {translate(
+              segment.name === 'intro'
+                ? 'gallery.videoReview.presentationIntro'
+                : segment.name === 'outro'
+                  ? 'gallery.videoReview.presentationOutro'
+                  : 'gallery.videoReview.presentationMain'
+            )}{' '}
+            {reviewTimeLabel((segment.endUs - segment.startUs) / 1_000_000)}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

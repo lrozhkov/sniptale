@@ -29,6 +29,7 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 type ReviewStageBindingProps = {
+  outerFadePlan?: Parameters<typeof ReviewStage>[0]['outerFadePlan'] | undefined;
   preview?: Parameters<typeof ReviewStage>[0]['preview'] | undefined;
   watermark?: Parameters<typeof ReviewStage>[0]['watermark'] | undefined;
   keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
@@ -142,6 +143,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         </div>
       ) : null}
       <ReviewStage
+        outerFadePlan={props.outerFadePlan}
         preview={props.preview}
         watermark={props.watermark}
         keyCues={props.keyCues}

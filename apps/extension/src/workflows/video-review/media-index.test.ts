@@ -1,6 +1,18 @@
 import { readFile } from 'node:fs/promises';
 import { expect, it, vi } from 'vitest';
 import {
+  ALL_FORMATS,
+  BlobSource,
+  BufferTarget,
+  EncodedPacketSink,
+  EncodedVideoPacketSource,
+  Input,
+  Mp4OutputFormat,
+  Output,
+} from 'mediabunny';
+import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { resolveReviewOutputProfile } from './render-settings';
+import {
   inspectReviewMedia,
   chooseReviewVideoCodec,
   supportedReviewVideoCodecs,
@@ -115,4 +127,58 @@ it('uses measured source FPS for the initial encoder capability probe', async ()
   } finally {
     vi.unstubAllGlobals();
   }
+});
+
+/** Retimes real compressed AVC packets without depending on browser encoders. */
+async function videoAtPacketRate(rate: number) {
+  const bytes = await readFile('tooling/test/e2e/fixtures/review-avc-aac.mp4');
+  const input = new Input({ source: new BlobSource(new Blob([bytes])), formats: ALL_FORMATS });
+  try {
+    const track = (await input.getPrimaryVideoTrack())!;
+    const decoderConfig = (await track.getDecoderConfig())!;
+    const target = new BufferTarget();
+    const output = new Output({ target, format: new Mp4OutputFormat() });
+    const source = new EncodedVideoPacketSource(track.codec!);
+    output.addVideoTrack(source);
+    await output.start();
+    let frame = 0;
+    for await (const packet of new EncodedPacketSink(track).packets()) {
+      await source.add(packet.clone({ timestamp: frame++ / rate, duration: 1 / rate }), {
+        decoderConfig,
+      });
+    }
+    source.close();
+    await output.finalize();
+    return new Blob([target.buffer!]);
+  } finally {
+    input.dispose();
+  }
+}
+
+it.each([30000 / 1001, 60000 / 1001, 29.83])(
+  'preserves measured fractional packet rate %s through ingestion and Current output',
+  async (rate) => {
+    const probe = vi.fn(async (config: VideoEncoderConfig) => ({ config, supported: true }));
+    vi.stubGlobal('VideoEncoder', { isConfigSupported: probe });
+    try {
+      const file = await videoAtPacketRate(rate);
+      const index = await inspectReviewMedia(file, new AbortController().signal);
+      expect(index.frameRate).toBeCloseTo(rate, 3);
+      expect(Number.isInteger(index.frameRate)).toBe(false);
+      for (const [config] of probe.mock.calls) expect(config.framerate).toBe(index.frameRate);
+      const profile = resolveReviewOutputProfile(index, createQuickEditAdvancedState());
+      expect(Math.abs(profile.fps - index.frameRate!)).toBeLessThanOrEqual(1e-9);
+      expect(profile.fps).toBe(profile.rate.numerator / profile.rate.denominator);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
+);
+
+it.each([
+  [0.5, 1],
+  [150, 120],
+])('bounds measured packet rate %s to %s', async (rate, expected) => {
+  const file = await videoAtPacketRate(rate);
+  expect((await inspectReviewMedia(file, new AbortController().signal)).frameRate).toBe(expected);
 });

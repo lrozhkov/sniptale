@@ -1,3 +1,4 @@
+import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -30,10 +31,7 @@ import {
   saveVideoWorkspaceAdvanced,
   saveVideoWorkspaceDraft,
 } from './store';
-import {
-  createQuickEditAdvancedContent,
-  createQuickEditAdvancedState,
-} from '../../../features/video/review/advanced/defaults';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION } from '../../../features/video/review/advanced/types';
 
 const id = 'recording:beta-v1-recording';
@@ -315,9 +313,8 @@ it('refuses to create a session for a replaced file loaded before opening the ed
 
 it('opens legacy workspaces with advanced defaults and persists explicit replacement', async () => {
   const opened = await openVideoWorkspace(id, source);
-  expect(opened.workspace.advanced).toEqual(createQuickEditAdvancedState());
-  expect(parseVideoWorkspace({ ...opened.workspace, advanced: undefined })).toEqual(
-    opened.workspace
+  expect(parseVideoWorkspace({ ...opened.workspace, advanced: undefined })?.advanced).toEqual(
+    createQuickEditAdvancedState()
   );
   const advanced = {
     ...createQuickEditAdvancedState(),
@@ -340,7 +337,7 @@ it('opens legacy workspaces with advanced defaults and persists explicit replace
 
 it('commits advanced content as a fixed-point history payload and reopens its baseline', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const before = createQuickEditAdvancedContent();
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const after = {
     ...before,
     zoom: {
@@ -571,8 +568,7 @@ it('commits cut focus preservation atomically and restores source geometry throu
   expect((await readVideoWorkspace(id))?.workspace).toEqual(saved.workspace);
   harness.failure = false;
   const committed = await commitVideoWorkspace(args);
-  const { replayReviewHistory, reviewAdvancedContentBaseline } =
-    await import('../../../features/video/review/document');
+  const { replayReviewHistory } = await import('../../../features/video/review/document');
   const derive = (workspace: typeof saved.workspace) =>
     replayReviewHistory(
       workspace.history,
@@ -666,7 +662,7 @@ it('rejects malformed buffered snapshots and rolls back storage failures', async
 
 it('preserves a focus drag under Cut through undo, redo and reopen', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const before = createQuickEditAdvancedContent();
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const authored = {
     ...createQuickEditZoomRegion({ id: 'focus', at: 0, duration: 2 }),
     sourceAnchor: { start: 0, end: 2 },
@@ -691,8 +687,7 @@ it('preserves a focus drag under Cut through undo, redo and reopen', async () =>
       after: { id: 'cut', kind: 'cut', start: 3, end: 7, requestedStart: 3, requestedEnd: 7 },
     },
   });
-  const { replayReviewHistory, reviewAdvancedContentBaseline } =
-    await import('../../../features/video/review/document');
+  const { replayReviewHistory } = await import('../../../features/video/review/document');
   const current = replayReviewHistory(
     cut.workspace.history,
     cut.workspace.cursor,
@@ -741,7 +736,7 @@ it('preserves a focus drag under Cut through undo, redo and reopen', async () =>
 
 it('recovers legacy header history read-only, then commits and reopens normalized undo/redo', async () => {
   const opened = await openVideoWorkspace(id, source);
-  const content = createQuickEditAdvancedContent();
+  const content = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const legacyHeader = { kind: 'browser', title: 'Old browser', url: 'https://example.test' };
   const legacy = {
     ...opened.workspace,
@@ -780,4 +775,21 @@ it('recovers legacy header history read-only, then commits and reopens normalize
   });
   expect(undone.workspace.cursor).toBe(0);
   expect((await readVideoWorkspace(id))?.workspace.history).toEqual([operation]);
+});
+
+it('authors new presentation defaults once and never installs them on legacy reopen', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  expect(opened.workspace.advanced.presentation).toMatchObject({
+    fadeIn: { enabled: true, duration: 0.4 },
+    fadeOut: { enabled: true, duration: 0.4 },
+    audioFade: false,
+    intro: { mode: 'none' },
+    outro: { mode: 'none' },
+  });
+  expect(await openVideoWorkspace(id, source)).toEqual(opened);
+  const { presentation: _presentation, ...legacyAdvanced } = opened.workspace.advanced;
+  rows
+    .get('video_workspaces')!
+    .set(id, { ...opened.workspace, advanced: { ...legacyAdvanced, schemaVersion: 5 } });
+  expect((await openVideoWorkspace(id, source)).workspace.advanced.presentation).toBeUndefined();
 });

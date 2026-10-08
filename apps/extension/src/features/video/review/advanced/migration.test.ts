@@ -73,7 +73,7 @@ const v1State = (): QuickEditAdvancedState => {
 
 it('converts v1 placements from source time to result time', () => {
   const migrated = migrateQuickEditAdvancedV1(v1State(), segments);
-  expect(migrated.schemaVersion).toBe(5);
+  expect(migrated.schemaVersion).toBe(6);
   expect(migrated.zoom.regions[0]).toMatchObject({ start: 4, end: 6, dormant: false });
   expect(migrated.audio.voiceover[0]).toMatchObject({ timelineStart: 4, dormant: false });
 });
@@ -127,7 +127,7 @@ it('admits released v4 without dropping webcam, focus or speech content', () => 
   ];
   const legacy = { ...state, schemaVersion: 4 };
   const loaded = loadQuickEditAdvancedState(legacy);
-  expect(loaded).toEqual({ ...state, schemaVersion: 5 });
+  expect(loaded).toEqual({ ...state, schemaVersion: 6 });
   expect(loaded?.watermark).toBeUndefined();
   const content = reviewAdvancedContentBaseline(state);
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 4 })).toEqual(content);
@@ -137,7 +137,7 @@ it('admits released v4 without dropping webcam, focus or speech content', () => 
 it('does not admit watermark payloads under legacy or future version declarations', () => {
   const state = createQuickEditAdvancedState();
   const watermark = createQuickEditWatermark('Made with Sniptale');
-  for (const schemaVersion of [1, 2, 3, 4, 6]) {
+  for (const schemaVersion of [1, 2, 3, 4, 7]) {
     expect(loadQuickEditAdvancedState({ ...state, schemaVersion, watermark }, segments)).toBeNull();
     expect(
       loadQuickEditAdvancedContentState({
@@ -148,6 +148,37 @@ it('does not admit watermark payloads under legacy or future version declaration
     ).toBeNull();
   }
   for (const schemaVersion of [2, 3, 4]) {
-    expect(loadQuickEditAdvancedState({ ...state, schemaVersion })?.schemaVersion).toBe(5);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion })?.schemaVersion).toBe(6);
   }
+});
+
+it('admits presentation only in v6 and preserves v5 watermark in current and history content', () => {
+  const presentation = {
+    fadeIn: { enabled: true, duration: 0.4 },
+    fadeOut: { enabled: true, duration: 0.4 },
+    color: '#000000ff',
+    audioFade: false,
+    intro: { mode: 'none' },
+    outro: { mode: 'none' },
+  };
+  const state = { ...createQuickEditAdvancedState(), schemaVersion: 6, presentation };
+  expect(loadQuickEditAdvancedState(state)).toMatchObject({ presentation });
+  const { ui: _ui, ...content } = state;
+  expect(loadQuickEditAdvancedContentState(content)).toMatchObject({ presentation });
+  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 5 })).toBeNull();
+  const legacy = {
+    ...createQuickEditAdvancedState(),
+    schemaVersion: 5,
+    watermark: createQuickEditWatermark('Saved'),
+  };
+  expect(loadQuickEditAdvancedState(legacy)).toMatchObject({
+    schemaVersion: 6,
+    watermark: legacy.watermark,
+  });
+  const { ui: _legacyUi, ...legacyContent } = legacy;
+  expect(loadQuickEditAdvancedContentState(legacyContent)).toMatchObject({
+    schemaVersion: 6,
+    watermark: legacy.watermark,
+  });
+  expect(loadQuickEditAdvancedState(undefined)).not.toHaveProperty('presentation');
 });

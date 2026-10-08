@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { createNewWorkspacePresentationSettings } from '../../features/video/review/advanced/presentation';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
@@ -10,10 +12,12 @@ import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
+let outerFadePlan: Parameters<typeof ReviewStage>[0]['outerFadePlan'];
 let watermark: Parameters<typeof ReviewStage>[0]['watermark'];
 let scene: Parameters<typeof ReviewStage>[0]['scene'];
 vi.mock('./stage', () => ({
   ReviewStage: (props: Parameters<typeof ReviewStage>[0]) => {
+    outerFadePlan = props.outerFadePlan;
     scene = props.scene;
     watermark = props.watermark;
     return null;
@@ -24,6 +28,14 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
   'preserves camera and selected %s composition across framing and link gaps',
   (kind) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const plan = planReviewPresentationSequence({
+      settings: createNewWorkspacePresentationSettings(),
+      mainDuration: 10,
+      fragmentOffset: 0,
+      includeBookends: true,
+      rate: { numerator: 60, denominator: 1 },
+    });
+    if (!plan.ok) throw new Error('Expected plan');
     const overlay = {
       settings: undefined,
       editable: false,
@@ -77,6 +89,7 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
       act(() =>
         root.render(
           <ReviewStageBinding
+            outerFadePlan={plan.plan}
             watermark={overlay}
             url="blob:video"
             source={{ width: 320, height: 180, duration: 10, size: 1, mimeType: 'video/webm' }}
@@ -112,6 +125,7 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
           />
         )
       );
+      expect(outerFadePlan).toBe(plan.plan);
       expect(watermark).toBe(overlay);
       expect(scene?.camera.scale).toBe(kind === 'zoom' ? 3 : 2);
       expect(scene?.focus?.regions.map((region) => region.id)).toEqual([

@@ -1,3 +1,4 @@
+import { readLibrarySceneSource, sameLibrarySceneRef } from '../projects/library-scene-source';
 import { listReadyJournals } from '../assets/opfs-store';
 import { parseAssetRef } from '../assets/guards';
 import {
@@ -11,6 +12,7 @@ import {
   collectReviewAssetReferences,
   reviewWorkspaceHasAudioClip,
   reviewWorkspaceHasWatermarkImage,
+  reviewWorkspaceHasSceneResource,
 } from './asset-refs';
 import { readLibraryAudioSource, sameLibraryAudioRef } from '../projects/library-audio-source';
 import type { AssetRef } from '../assets/contracts';
@@ -29,14 +31,14 @@ interface LibraryAudioClaim {
 interface ReviewReadySources {
   assets: ReadonlyMap<string, ProjectAssetEntry | null>;
   libraryAudioClaims: readonly LibraryAudioClaim[];
-  watermarkAssets?: ReadonlyMap<string, ProjectAssetEntry | null>;
+  resourceClaims?: readonly { payload: ProjectAssetPublicationPayload; available: boolean }[];
 }
 
 /** Read under the lifecycle lock, before opening the consuming IDB transaction. */
 export async function readReviewReadySources(aggregateId: string): Promise<ReviewReadySources> {
   const sources = new Map<string, ProjectAssetEntry | null>();
   const libraryAudioClaims: LibraryAudioClaim[] = [];
-  const watermarkAssets = new Map<string, ProjectAssetEntry | null>();
+  const resourceClaims: { payload: ProjectAssetPublicationPayload; available: boolean }[] = [];
   for (const journal of await listReadyJournals()) {
     if (journal.domain !== 'project-assets' || journal.operationId) continue;
     const payload = parseProjectAssetPayload(journal.payload);
@@ -47,6 +49,13 @@ export async function readReviewReadySources(aggregateId: string): Promise<Revie
       (payload.requiredReviewResource && payload.requiredReviewResource.aggregateId !== aggregateId)
     )
       continue;
+    if (payload.requiredReviewResource) {
+      resourceClaims.push({
+        payload,
+        available: !!ref && (await resourceClaimAvailable(payload, ref)),
+      });
+      continue;
+    }
     if (payload.librarySourceId && payload.requiredReview) {
       libraryAudioClaims.push({
         assetId: `project-asset:${payload.entry.id}`,
@@ -64,14 +73,14 @@ export async function readReviewReadySources(aggregateId: string): Promise<Revie
       payload.entry.mimeType !== ref.mimeType
     )
       continue;
-    const target = payload.requiredReviewResource ? watermarkAssets : sources;
+    const target = sources;
     const previous = target.get(payload.entry.id);
     target.set(
       payload.entry.id,
       previous !== undefined && previous?.assetId !== ref.assetId ? null : payload.entry
     );
   }
-  return { assets: sources, libraryAudioClaims, watermarkAssets };
+  return { assets: sources, libraryAudioClaims, resourceClaims };
 }
 
 async function libraryAudioClaimAvailable(
@@ -105,6 +114,48 @@ async function libraryAudioClaimAvailable(
   }
 }
 
+function hasResourceClaim(
+  workspace: VideoWorkspace,
+  payload: ProjectAssetPublicationPayload
+): boolean {
+  const resource = payload.requiredReviewResource;
+  const assetId = `project-asset:${payload.entry.id}`;
+  if (!resource) return false;
+  return resource.slot === 'watermark'
+    ? reviewWorkspaceHasWatermarkImage(workspace, assetId)
+    : reviewWorkspaceHasSceneResource(workspace, resource.slot, resource.kind, assetId);
+}
+
+async function resourceClaimAvailable(
+  payload: ProjectAssetPublicationPayload,
+  ref: AssetRef
+): Promise<boolean> {
+  if (
+    payload.entry.assetId !== ref.assetId ||
+    payload.entry.size !== ref.size ||
+    payload.entry.mimeType !== ref.mimeType
+  )
+    return false;
+  const resource = payload.requiredReviewResource;
+  if (!resource || resource.slot === 'watermark' || resource.acquisition !== 'library-binding')
+    return payload.expectedAssetId === null;
+  if (!payload.librarySourceId) return false;
+  try {
+    const source = await readLibrarySceneSource(payload.librarySourceId, resource.kind);
+    if (!sameLibrarySceneRef(source.ref, ref)) return false;
+    return source.entry
+      ? payload.entry.id === source.entry.id &&
+          payload.expectedAssetId === ref.assetId &&
+          payload.publishToLibrary !== false &&
+          !payload.entry.originMediaId
+      : payload.entry.originMediaId === source.mediaId &&
+          payload.expectedAssetId === null &&
+          payload.publishToLibrary === false;
+  } catch {
+    return false;
+  }
+}
+
 /** Existing links stay editable; a new acquisition is admitted even if its bytes were retained. */
 export async function areNewReviewSourcesAvailable(
   next: VideoWorkspace,
@@ -124,27 +175,35 @@ export async function areNewReviewSourcesAvailable(
     if (existing && existing.assetId !== claim.entry.assetId) return false;
     claimed.set(claim.entry.id, claim.entry);
   }
+  const resourceAssets = new Map<string, ProjectAssetEntry>();
+  for (const claim of prepared.resourceClaims ?? []) {
+    if (!hasResourceClaim(next, claim.payload) || hasResourceClaim(previous, claim.payload))
+      continue;
+    if (!claim.available) return false;
+    const entry = claim.payload.entry;
+    const existing = resourceAssets.get(entry.id);
+    if (existing && existing.assetId !== entry.assetId) return false;
+    resourceAssets.set(entry.id, entry);
+  }
   const existing = collectReviewAssetReferences(previous);
   for (const reference of collectReviewAssetReferences(next)) {
     if (existing.has(reference)) continue;
     const id = reference.slice('project-asset:'.length);
-    const watermark = reviewWorkspaceHasWatermarkImage(next, reference)
-      ? prepared.watermarkAssets?.get(id)
-      : undefined;
+    const resource = resourceAssets.get(id);
     const raw = await stores.assets.get(id);
     const asset =
       raw === undefined
-        ? (claimed.get(id) ?? watermark ?? prepared.assets.get(id))
+        ? (claimed.get(id) ?? resource ?? prepared.assets.get(id))
         : parseProjectAssetEntry(raw);
     if (!asset || asset.id !== id) return false;
-    const claim = claimed.get(id);
+    const claim = claimed.get(id) ?? resource;
     if (claim && claim.assetId !== asset.assetId) return false;
     if (asset.originMediaId) {
       const media = parseMediaLibraryEntry(await stores.media.get(asset.originMediaId));
       if (
         !media ||
         media.id !== asset.originMediaId ||
-        (watermark && media.lifecycle?.trashedAt !== undefined)
+        (resource && media.lifecycle?.trashedAt !== undefined)
       )
         return false;
     }

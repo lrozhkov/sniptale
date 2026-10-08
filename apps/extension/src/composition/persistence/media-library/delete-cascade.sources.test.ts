@@ -288,7 +288,8 @@ it('retains the complete graph when the selected row contains a different Librar
 
 it.each(
   (['private', 'published', 'external', 'root-self', 'missing', 'invalid'] as const).flatMap(
-    (mode) => (['music', 'watermark'] as const).map((resource) => ({ mode, resource }))
+    (mode) =>
+      (['music', 'watermark', 'presentation'] as const).map((resource) => ({ mode, resource }))
   )
 )(
   'reclaims $resource review auxiliaries according to identity ownership: $mode',
@@ -326,6 +327,24 @@ it.each(
           height: 40,
           size: 0.2,
           opacity: 1,
+        },
+      };
+    }
+    if (resource === 'presentation') {
+      const { createNeutralPresentationSettings } =
+        await import('../../../features/video/review/advanced/presentation');
+      advanced.audio.music = [];
+      advanced.presentation = createNeutralPresentationSettings();
+      advanced.presentation.intro = {
+        mode: 'none',
+        image: {
+          assetId: mode === 'root-self' ? mediaId : 'project-asset:private-music',
+          width: 80,
+          height: 40,
+          duration: 3,
+          fit: 'contain',
+          fillColor: '#000000ff',
+          crop: { panX: 0, panY: 0 },
         },
       };
     }

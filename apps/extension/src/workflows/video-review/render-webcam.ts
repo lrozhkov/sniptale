@@ -93,6 +93,17 @@ export function drawReviewWebcam(
   }
 }
 
+/** Immutable decoded camera pixels; the consumer releases before requesting another frame. */
+interface ReviewWebcamSourceFrame {
+  allocationBytes(): number;
+  representedMediaTime: number;
+  source: Size;
+  placement: QuickEditWebcamPlacement;
+  crop?: Pick<QuickEditWebcam['appearance'], 'zoom' | 'panX' | 'panY'>;
+  drawable: WebcamDrawable;
+  release(): void;
+}
+
 interface ReviewWebcamRenderFrame {
   draw(context: CanvasRenderingContext2D, output: Size): void;
 }
@@ -111,7 +122,11 @@ export async function createReviewWebcamRenderer(
   signal.throwIfAborted();
   if (!blob) throw new QuickEditExportUnavailable(['asset-missing']);
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
-  const dispose = () => input.dispose();
+  const leases = new Set<ReviewWebcamSourceFrame>();
+  const dispose = () => {
+    for (const lease of leases) lease.release();
+    input.dispose();
+  };
   signal.addEventListener('abort', dispose, { once: true });
   const release = () => {
     signal.removeEventListener('abort', dispose);
@@ -133,47 +148,73 @@ export async function createReviewWebcamRenderer(
       throw new QuickEditExportUnavailable(['asset-missing']);
     signal.throwIfAborted();
     const sink = createReviewDecodedSampleSink(new VideoSampleSink(track), signal);
+    async function* sourceFrames(
+      sourceTimes: readonly number[]
+    ): AsyncGenerator<ReviewWebcamSourceFrame | null> {
+      const frames = sourceTimes.map((time) => quickEditWebcamFrameAt(webcam, time, duration));
+      const lastTick = (Math.ceil(duration * resolution) - 1) / resolution;
+      const timestamps = frames.flatMap((frame) =>
+        frame ? [Math.min(lastTick, Math.round(frame.time * resolution) / resolution)] : []
+      );
+      const decoded = sink.samplesAtTimestamps(timestamps);
+      try {
+        for (const frame of frames) {
+          signal.throwIfAborted();
+          if (!frame) {
+            yield null;
+            continue;
+          }
+          const next = await decoded.next();
+          const sample = next.value;
+          if (!sample) throw new QuickEditExportUnavailable(['asset-missing']);
+          let closed = false;
+          const lease: ReviewWebcamSourceFrame = {
+            allocationBytes: () => sample.allocationSize(),
+            representedMediaTime: sample.timestamp,
+            source,
+            placement: frame.placement,
+            ...(frame.crop ? { crop: frame.crop } : {}),
+            drawable: sample,
+            release() {
+              if (closed) return;
+              closed = true;
+              leases.delete(lease);
+              sample.close();
+            },
+          };
+          leases.add(lease);
+          try {
+            signal.throwIfAborted();
+            yield lease;
+          } finally {
+            lease.release();
+          }
+        }
+      } finally {
+        await decoded.return(undefined);
+      }
+    }
     return {
       dispose: release,
+      sourceFrames,
       async *frames(
         sourceTimes: readonly number[]
       ): AsyncGenerator<ReviewWebcamRenderFrame | null> {
-        const frames = sourceTimes.map((time) => quickEditWebcamFrameAt(webcam, time, duration));
-        const lastTick = (Math.ceil(duration * resolution) - 1) / resolution;
-        const timestamps = frames.flatMap((frame) =>
-          frame ? [Math.min(lastTick, Math.round(frame.time * resolution) / resolution)] : []
-        );
-        const decoded = sink.samplesAtTimestamps(timestamps);
-        try {
-          for (const frame of frames) {
-            signal.throwIfAborted();
-            if (!frame) {
-              yield null;
-              continue;
-            }
-            const next = await decoded.next();
-            const sample = next.value;
-            if (!sample) throw new QuickEditExportUnavailable(['asset-missing']);
-            try {
-              signal.throwIfAborted();
-              yield {
+        for await (const frame of sourceFrames(sourceTimes)) {
+          yield frame
+            ? {
                 draw: (context, output) =>
                   drawReviewWebcam(
                     context,
                     output,
                     webcam,
                     frame.placement,
-                    source,
-                    sample,
+                    frame.source,
+                    frame.drawable,
                     frame.crop
                   ),
-              };
-            } finally {
-              sample.close();
-            }
-          }
-        } finally {
-          await decoded.return(undefined);
+              }
+            : null;
         }
       },
     };

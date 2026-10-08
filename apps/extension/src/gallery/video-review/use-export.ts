@@ -1,3 +1,6 @@
+import { planReviewPresentationSequence } from '../../features/video/review/presentation-sequence';
+import { buildReviewTimeMap } from '../../features/video/review/timeline';
+import { resolveReviewOutputProfile } from '../../workflows/video-review/render-settings';
 import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { useReviewSizeEstimate } from './use-size-estimate';
 import { useReviewExportSettings } from './use-review-export-settings';
@@ -172,16 +175,47 @@ function useReviewExportLifetime(
   return { active, publishing, mounted, cancel };
 }
 
+/** Pure full-sequence timing for the export inspector; fragment options do not change it. */
+function reviewPresentationDuration(
+  index: ReviewMediaIndex | null,
+  advanced: Parameters<typeof resolveReviewOutputProfile>[1],
+  edits: Parameters<typeof buildReviewTimeMap>[1],
+  renderSettings: ReviewRenderSettings | undefined
+) {
+  if (!index || !advanced.presentation || advanced.ui.mode !== 'advanced') return null;
+  const result = planReviewPresentationSequence({
+    settings: advanced.presentation,
+    mainDuration: buildReviewTimeMap(index.duration, edits).at(-1)?.resultEnd ?? 0,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: resolveReviewOutputProfile(index, advanced, renderSettings).rate,
+  });
+  return result.ok ? result.plan : null;
+}
+
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
 export function useReviewExport(resource: LoadedReview) {
   const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
   const state = resource.session.getSnapshot();
+  const [includeBookends, setIncludeBookends] = useState(true);
+  const presentation = state.document.advancedContent.presentation;
+  const hasBookends =
+    state.snapshot.workspace.advanced.ui.mode === 'advanced' &&
+    !!presentation &&
+    (presentation.intro.mode !== 'none' || presentation.outro.mode !== 'none');
   const { index, renderSettings, setRenderSettings, checkingCodecs } = useReviewExportSettings(
     sourceIndex,
     {
       ui: state.snapshot.workspace.advanced.ui,
       ...state.document.advancedContent,
     }
+  );
+  const advanced = { ui: state.snapshot.workspace.advanced.ui, ...state.document.advancedContent };
+  const presentationDuration = reviewPresentationDuration(
+    index,
+    advanced,
+    state.document.edits,
+    renderSettings
   );
   const { phase, progress, timeEstimate, changePhase, setProgress, setTimeEstimate } =
     useReviewExportProgress();
@@ -198,7 +232,7 @@ export function useReviewExport(resource: LoadedReview) {
   );
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
-    reviewExportPlan(resource, index, renderSettings, selection);
+    reviewExportPlan(resource, index, renderSettings, selection, includeBookends);
   const sizeEstimate = useReviewSizeEstimate({
     resource,
     index,
@@ -234,7 +268,7 @@ export function useReviewExport(resource: LoadedReview) {
         index,
         signal: controller.signal,
         destination,
-        ...(selection ? { selection } : {}),
+        ...(selection ? { selection, includeBookends } : {}),
         onProgress: (fraction) => {
           if (mounted.current) setProgress(Math.round(fraction * 100));
         },
@@ -275,6 +309,10 @@ export function useReviewExport(resource: LoadedReview) {
   };
   return {
     index,
+    includeBookends,
+    setIncludeBookends,
+    hasBookends,
+    presentationDuration,
     indexing,
     phase,
     progress,
@@ -324,7 +362,8 @@ function reviewExportPlan(
   resource: LoadedReview,
   index: ReviewMediaIndex | null,
   renderSettings: ReviewRenderSettings,
-  selection?: Extract<ReviewAnchor, { kind: 'range' }>
+  selection?: Extract<ReviewAnchor, { kind: 'range' }>,
+  includeBookends = true
 ): QuickEditExportPlan {
   const state = resource.session.getSnapshot();
   const fragment =
@@ -338,6 +377,7 @@ function reviewExportPlan(
         })
       : null;
   return configuredReviewExportPlan({
+    includeBookends: !selection || includeBookends,
     index,
     renderSettings,
     document: fragment ? { ...state.document, edits: fragment.edits } : state.document,

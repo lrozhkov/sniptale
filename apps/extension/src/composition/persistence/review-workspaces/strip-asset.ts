@@ -29,6 +29,24 @@ function stripWatermark<T>(watermark: T, assetId: string): T {
   return { ...rest, mode: watermark['mode'] === 'image' ? 'none' : watermark['mode'] } as T;
 }
 
+function stripPresentation<T>(presentation: T, assetId: string): T {
+  if (!isRecord(presentation)) return presentation;
+  const next: Record<string, unknown> = {};
+  for (const name of ['intro', 'outro']) {
+    const slot = presentation[name];
+    if (!isRecord(slot)) continue;
+    const cleaned = { ...slot };
+    for (const kind of ['image', 'video']) {
+      const value = slot[kind];
+      if (!isRecord(value) || value['assetId'] !== assetId) continue;
+      delete cleaned[kind];
+      if (cleaned['mode'] === kind) cleaned['mode'] = 'none';
+    }
+    next[name] = cleaned;
+  }
+  return { ...presentation, ...next };
+}
+
 function stripAudioClips(clips: QuickEditAudioClip[], assetId: string): QuickEditAudioClip[] {
   return clips
     .filter((clip) => clip.assetId !== assetId)
@@ -72,6 +90,9 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
   const result = {
     ...content,
     background: stripBackground(content.background, assetId),
+    ...(content.presentation
+      ? { presentation: stripPresentation(content.presentation, assetId) }
+      : {}),
     ...(content.watermark ? { watermark: stripWatermark(content.watermark, assetId) } : {}),
     audio: {
       ...content.audio,
@@ -122,6 +143,9 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
       ...content,
       ...(nextAudio === undefined ? {} : { audio: nextAudio }),
       background: stripBackground(background, assetId),
+      ...(content['presentation'] === undefined
+        ? {}
+        : { presentation: stripPresentation(content['presentation'], assetId) }),
       ...(content['watermark'] === undefined
         ? {}
         : { watermark: stripWatermark(content['watermark'], assetId) }),

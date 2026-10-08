@@ -1,16 +1,14 @@
+import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
+import {
+  presentationMainColorOpacity,
+  type PresentationSequencePlan,
+} from '../../features/video/review/presentation-sequence';
 import type {
   RenderResources,
   RenderCanvasLease,
 } from '../../features/video/composition/canvas/render-resources';
-import type {
-  QuickEditAdvancedState,
-  QuickEditCameraTransform,
-  QuickEditZoomRegion,
-} from '../../features/video/review/advanced/types';
-import type { CanvasCommentExport } from '../../features/video/review/comments';
+import type { QuickEditCameraTransform } from '../../features/video/review/advanced/types';
 import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
-import type { ReviewClickCue } from '../../features/video/review/click-animation';
-import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import type { QuickEditWebcamPlacement } from '../../features/video/review/advanced/webcam';
 import type { reviewCutTransitionAt } from '../../features/video/review/cuts';
 import {
@@ -41,19 +39,6 @@ import {
 import { QuickEditExportUnavailable } from './export-unavailable';
 
 type Size = { width: number; height: number };
-type Dimensions = { canonical: Size; backing: Size };
-type Scene = {
-  source: Size;
-  canvas?: Size;
-  background: QuickEditAdvancedState['background'];
-  windowHeader?: QuickEditAdvancedState['windowHeader'];
-  watermark?: QuickEditAdvancedState['watermark'];
-  webcam?: QuickEditAdvancedState['webcam'];
-  zoomRegions: readonly QuickEditZoomRegion[];
-  comments: readonly CanvasCommentExport[];
-  keys: readonly ReviewKeyCue[];
-  clicks: readonly ReviewClickCue[];
-};
 type Drawable = {
   draw(
     context: CanvasRenderingContext2D,
@@ -336,8 +321,28 @@ function drawPreparedFrame(
       context.restore();
     }
     paintReviewCutBlackout(context, dimensions.backing, frame.transition?.blend ?? null);
+    paintPreviewOuterFade(context, dimensions.backing, scene.outerFadePlan, frame.resultTime);
   } finally {
     transition?.release();
+  }
+}
+
+/** One final backing-space fill, outside every camera, watermark and transition transform. */
+function paintPreviewOuterFade(
+  context: CanvasRenderingContext2D,
+  backing: Size,
+  plan: PresentationSequencePlan | undefined,
+  resultTime: number
+) {
+  if (!plan) return;
+  context.save();
+  try {
+    context.globalCompositeOperation = 'source-over';
+    context.globalAlpha = presentationMainColorOpacity(plan, resultTime);
+    context.fillStyle = plan.color;
+    context.fillRect(0, 0, backing.width, backing.height);
+  } finally {
+    context.restore();
   }
 }
 

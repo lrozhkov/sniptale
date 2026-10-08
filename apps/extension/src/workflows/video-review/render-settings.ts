@@ -4,10 +4,54 @@ import { parseQuickEditCanvas } from '../../features/video/review/advanced/canva
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { VideoQuality, VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import type { ReviewMediaIndex, ReviewRenderSettings } from './media-index';
+import type { PresentationRate } from '../../features/video/review/presentation-sequence';
 import type { QuickEditAdvancedState } from '../../features/video/review/advanced/types';
 import { resolveReviewRenderBitrate, type ReviewOutputCodec } from './render-codec';
 
 export { resolveReviewRenderBitrate, resolveReviewVideoEncoderConfig } from './render-codec';
+
+const RATE_ERROR = 1e-9;
+const MAX_RATE_DENOMINATOR = 1_000_000_000;
+
+/** Approximation of a selected measurement, not identification of a source's native timebase. */
+function outputRate(fps: number): PresentationRate {
+  if (!Number.isFinite(fps) || fps < 1 || fps > 120) throw new Error('Invalid output frame rate.');
+  let previousNumerator = 0,
+    numerator = 1;
+  let previousDenominator = 1,
+    denominator = 0;
+  let remainder = fps;
+  for (;;) {
+    const whole = Math.floor(remainder);
+    if (
+      !Number.isFinite(whole) ||
+      (denominator > 0 &&
+        whole > Math.floor((MAX_RATE_DENOMINATOR - previousDenominator) / denominator))
+    )
+      break;
+    const nextNumerator = whole * numerator + previousNumerator;
+    const nextDenominator = whole * denominator + previousDenominator;
+    if (Math.abs(nextNumerator / nextDenominator - fps) <= RATE_ERROR) {
+      return { numerator: nextNumerator, denominator: nextDenominator };
+    }
+    previousNumerator = numerator;
+    numerator = nextNumerator;
+    previousDenominator = denominator;
+    denominator = nextDenominator;
+    remainder = 1 / (remainder - whole);
+  }
+  // This grid bounds error to 0.5e-9fps; all products stay below 120e9, safely integral.
+  numerator = Math.round(fps * MAX_RATE_DENOMINATOR);
+  denominator = MAX_RATE_DENOMINATOR;
+  let a = numerator,
+    b = denominator;
+  while (b !== 0) {
+    const next = a % b;
+    a = b;
+    b = next;
+  }
+  return { numerator: numerator / a, denominator: denominator / a };
+}
 
 /** The output profile is independent of the source container and preserves the scene aspect ratio. */
 export function resolveReviewOutputProfile(
@@ -37,13 +81,15 @@ export function resolveReviewOutputProfile(
     settings?.resolution ?? VideoResolutionPreset.SOURCE
   );
   const dimensions = scene.output;
-  const fps = settings?.frameRate || index.frameRate || 30;
+  const rate = outputRate(settings?.frameRate || (index.frameRate ?? 30));
+  const fps = rate.numerator / rate.denominator;
   return {
     format,
     codec,
     ...dimensions,
     dimensionsSupported: scene.supported,
     fps,
+    rate,
     bitrate: resolveReviewRenderBitrate({ ...dimensions, fps }, settings?.quality),
   };
 }

@@ -674,3 +674,52 @@ it('applies source gain inside a fragment without scaling the added music buffer
     fixture.cleanup();
   }
 });
+
+it('retains native resampler context around streamed normal-speed clip windows', async () => {
+  const fixture = await audioFixture();
+  const read = vi.fn(async (start: number, end: number) => ({
+    start,
+    planes: [new Float32Array(end - start).fill(0.5)],
+  }));
+  try {
+    for await (const _sample of renderReviewAudio(
+      null,
+      { sourceStart: 1, sourceEnd: 2, resultStart: 1, resultEnd: 2, rate: 1, kind: 'keep' },
+      true,
+      new AbortController().signal,
+      {
+        entries: [
+          {
+            lane: 'music',
+            clipId: 'm',
+            assetId: 'a',
+            timelineStart: 0,
+            sourceOffset: 2,
+            duration: 5,
+            volume: 1,
+            fadeIn: 0,
+            fadeOut: 0,
+          },
+        ],
+        buffers: new Map([
+          ['a', { sampleRate: 44100, numberOfChannels: 1, length: 44100 * 10, read, dispose() {} }],
+        ]),
+        originalVolume: 1,
+        originalMuted: true,
+      }
+    )) {
+      /* drain */
+    }
+    expect(read).toHaveBeenCalledWith(
+      Math.floor(2.98 * 44100),
+      Math.ceil(4.02 * 44100),
+      expect.any(AbortSignal)
+    );
+    const source = fixture.windows[0]!.sources![0]!;
+    expect(source.started![0]).toBeCloseTo(0.02);
+    expect(source.started![1]).toBeCloseTo(0.02);
+    expect(source.started![2]).toBe(1);
+  } finally {
+    fixture.cleanup();
+  }
+});

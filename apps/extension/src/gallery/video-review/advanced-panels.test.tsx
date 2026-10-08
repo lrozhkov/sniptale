@@ -449,3 +449,62 @@ it.each(['perspectiveX', 'depthWidth'])(
     expect(document.activeElement).toBe(document.body);
   }
 );
+
+it('keeps computer admission cancellation reachable while Scene controls are disabled', async () => {
+  const advanced = createQuickEditAdvancedState();
+  const cancel = vi.fn();
+  await act(async () =>
+    root.render(
+      <ReviewSceneProperties
+        background={advanced.background}
+        canvas={advanced.canvas}
+        source={{ width: 320, height: 180 }}
+        audio={advanced.audio}
+        hasOriginalAudio={false}
+        onCanvas={vi.fn()}
+        onOriginalVolume={vi.fn()}
+        onLaneVolume={vi.fn()}
+        busy
+        pending={false}
+        failed={false}
+        onImportImage={vi.fn()}
+        setBackground={vi.fn()}
+        presentation={{
+          editor: {
+            settings: {
+              fadeIn: { enabled: false, duration: 0.4 },
+              fadeOut: { enabled: false, duration: 0.4 },
+              color: '#000000ff',
+              audioFade: false,
+              intro: { mode: 'none' },
+              outro: { mode: 'none' },
+            },
+            slotModes: { intro: 'image', outro: 'none' },
+            picker: { slot: 'intro', kind: 'image', source: 'computer' },
+            pending: true,
+            error: null,
+            canRetry: false,
+            audioUnsupported: false,
+            preview: vi.fn(),
+            change: vi.fn(async () => false),
+            reset: vi.fn(async () => false),
+            mode: vi.fn(async () => false),
+            choose: vi.fn(),
+            selectComputer: vi.fn(async () => false),
+            selectLibrary: vi.fn(async () => false),
+            retry: vi.fn(async () => false),
+            retryMuted: vi.fn(async () => false),
+            cancel,
+          },
+        }}
+      />
+    )
+  );
+  const button = host.querySelector<HTMLButtonElement>('[aria-label="common.actions.cancel"]')!;
+  expect(button).not.toBeNull();
+  expect(button.matches(':disabled')).toBe(false);
+  expect(button.closest('fieldset')).toBeNull();
+  expect(host.querySelector('fieldset')?.disabled).toBe(true);
+  act(() => button.click());
+  expect(cancel).toHaveBeenCalledOnce();
+});

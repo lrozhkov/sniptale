@@ -1,8 +1,10 @@
 import fs from 'node:fs';
 
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+const normalization = vi.hoisted(() => vi.fn());
+vi.mock('../../../../ci/mediabunny/normalize.mjs', () => ({ normalizeMediabunny: normalization }));
 
-import { createTypecheckArguments } from './check.mjs';
+import { createTypecheckArguments, runTypecheck, runTypecheckAsync } from './check.mjs';
 import { TYPECHECK_CHECKERS } from '../../../analysis/source/typescript-cli.mjs';
 
 it('uses only the TypeScript 7 native package as the canonical CLI', () => {
@@ -33,4 +35,20 @@ it('keeps unchecked side-effect import validation enabled in both root configs',
 
   expect(rootConfig).toContain('"noUncheckedSideEffectImports": true');
   expect(nodeConfig).toContain('"noUncheckedSideEffectImports": true');
+});
+
+it('rejects unverified installed declarations before sync and async typecheck consumers run', async () => {
+  normalization.mockImplementation(() => {
+    throw new Error('unverified Mediabunny');
+  });
+  expect(() => runTypecheck({ cwd: '/unverified-fixture' })).toThrow('unverified Mediabunny');
+  await expect(
+    runTypecheckAsync({
+      cwd: '/unverified-fixture',
+      mode: 'affected',
+      targetFiles: ['apps/extension/src/workflows/video-review/media-output.ts'],
+    })
+  ).rejects.toThrow('unverified Mediabunny');
+  expect(normalization).toHaveBeenCalledWith({ root: '/unverified-fixture', check: true });
+  normalization.mockReset();
 });

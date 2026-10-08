@@ -7,6 +7,12 @@
   "testRoots": ["apps/extension", "packages", "tooling/test"],
   "testSupportRoots": ["tooling/test/harness", "tooling/test/support"],
   "configFiles": [
+    "tooling/ci/mediabunny/normalize.mjs",
+    "tooling/ci/mediabunny/patch-manifest.json",
+    "tooling/ci/mediabunny/patch-payload.json.gz",
+    "tooling/ci/mediabunny/source.patch",
+    "tooling/ci/mediabunny/LICENSE",
+
     "package.json",
     "package-lock.json",
     "vitest.config.ts",

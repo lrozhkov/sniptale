@@ -340,3 +340,25 @@ it('preserves watermark settings and remembered logo across baseline, undo and r
     watermark.image
   );
 });
+
+it('replays presentation removal without resurrecting the baseline and retains independent slot variants', async () => {
+  const { createNewWorkspacePresentationSettings } = await import('./advanced/presentation');
+  const baseline = {
+    ...createQuickEditAdvancedContent(),
+    presentation: createNewWorkspacePresentationSettings(),
+  };
+  const { presentation: _removed, ...after } = baseline;
+  const history: ReviewOperation[] = [
+    { id: 'remove-presentation', at: 1, target: 'advancedContent', before: baseline, after },
+  ];
+  expect(reviewAdvancedContentBaseline(baseline)).toEqual(baseline);
+  expect(replayReviewHistory(history, 0, source, baseline).advancedContent.presentation).toEqual(
+    baseline.presentation
+  );
+  expect(
+    replayReviewHistory(history, 1, source, baseline).advancedContent.presentation
+  ).toBeUndefined();
+  expect(replayReviewHistory(history, 0, source, baseline).advancedContent.presentation).toEqual(
+    baseline.presentation
+  );
+});

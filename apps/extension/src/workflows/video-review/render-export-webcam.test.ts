@@ -52,6 +52,9 @@ it.each([false, true])(
     const cameraTimes: number[] = [];
     const webcam = {
       dispose: vi.fn(),
+      async *sourceFrames() {
+        yield null;
+      },
       async *frames(times: readonly number[]) {
         cameraTimes.push(...times);
         try {

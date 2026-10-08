@@ -116,7 +116,7 @@ function LibraryImagePreview({ src, filename }: { src: string; filename: string 
         if (event.key === 'Escape' && fullscreen.fullscreen) {
           event.preventDefault();
           event.stopPropagation();
-          fullscreen.exitFullscreen();
+          void fullscreen.exitFullscreen();
         }
       }}
     >

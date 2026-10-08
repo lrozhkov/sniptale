@@ -24,6 +24,7 @@ interface QuickEditEffectiveFeatures {
   actionsApplied: boolean;
   webcamApplied: boolean;
   watermarkApplied: boolean;
+  presentationApplied: boolean;
   zoomApplied: boolean;
   backgroundApplied: boolean;
   originalAudioApplied: boolean;
@@ -50,6 +51,7 @@ export function resolveQuickEditEffectiveFeatures(
       advanced &&
       (state.watermark?.mode === 'text' ||
         (state.watermark?.mode === 'image' && !!state.watermark.image)),
+    presentationApplied: advanced && hasPresentationEffects(state),
     actionsApplied: advanced && state.ui.tracks.actions && state.actionsEnabled !== false,
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
@@ -71,6 +73,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   windowHeader: QuickEditAdvancedState['windowHeader'];
   webcam: QuickEditAdvancedState['webcam'];
   watermark: QuickEditAdvancedState['watermark'];
+  presentation: QuickEditAdvancedState['presentation'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -93,6 +96,7 @@ export function resolveQuickEditEffectiveState(
     windowHeader: advanced ? state.windowHeader : undefined,
     webcam: features.webcamApplied ? state.webcam : undefined,
     watermark: features.watermarkApplied ? state.watermark : undefined,
+    presentation: features.presentationApplied ? state.presentation : undefined,
     originalAudio: state.audio.original,
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
@@ -118,6 +122,7 @@ export type QuickEditExportReason =
   | 'window-header'
   | 'webcam'
   | 'watermark'
+  | 'presentation'
   | 'canvas-size'
   | 'precise-edits'
   | 'cut-transition'
@@ -152,6 +157,8 @@ export function resolveQuickEditExportPlan(args: {
   advanced: QuickEditAdvancedState;
   /** Capability hint; undefined defers the authoritative check to the exporter. */
   audioProcessingAvailable?: boolean;
+  /** Actual composed audio presence; undefined defers bookend track discovery to the writer. */
+  presentationAudioPresent?: boolean;
   videoRenderAvailable?: boolean;
   videoCopyBoundaries?: readonly number[];
 }): QuickEditExportPlan {
@@ -166,6 +173,16 @@ export function resolveQuickEditExportPlan(args: {
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
   const effective = resolveQuickEditEffectiveState(args.advanced);
   const audio: QuickEditExportReason[] = [];
+  if (features.presentationApplied) {
+    visual.push('presentation');
+    const presentation = effective.presentation!;
+    if (
+      presentation.intro.mode !== 'none' ||
+      presentation.outro.mode !== 'none' ||
+      presentation.audioFade
+    )
+      audio.push('presentation');
+  }
   if (features.voiceoverApplied && effective.voiceover.length > 0) audio.push('voiceover');
   if (features.musicApplied && effective.music.length > 0) audio.push('music');
   if (
@@ -202,17 +219,23 @@ export function resolveQuickEditExportPlan(args: {
   if (visual.length) {
     if (args.videoRenderAvailable === false)
       return { kind: 'unavailable', reasons: ['video-encoder', ...audio] };
-    if (audio.length && args.audioProcessingAvailable === false)
+    if (
+      audioEncoderRequired(audio, args.presentationAudioPresent) &&
+      args.audioProcessingAvailable === false
+    )
       return { kind: 'unavailable', reasons: ['audio-encoder'] };
     return {
       kind: 'ready',
       video: 'render',
       audio: audio.length ? 'process' : 'copy',
-      reasons: [...visual, ...audio],
+      reasons: [...new Set([...visual, ...audio])],
     };
   }
   if (audio.length) {
-    if (args.audioProcessingAvailable === false)
+    if (
+      audioEncoderRequired(audio, args.presentationAudioPresent) &&
+      args.audioProcessingAvailable === false
+    )
       return { kind: 'unavailable', reasons: ['audio-encoder'] };
     return { kind: 'ready', video: 'copy', audio: 'process', reasons: audio };
   }
@@ -222,6 +245,7 @@ export function resolveQuickEditExportPlan(args: {
 /** Non-empty advanced content worth a "saved and temporarily not applied" hint. */
 export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): boolean {
   return (
+    hasPresentationEffects(state) ||
     !!state.keyAnimations?.some((item) => item.enabled) ||
     !!state.clickAnimations?.some((item) => item.effect !== 'off') ||
     !!state.canvas ||
@@ -233,5 +257,26 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||
     state.audio.music.length > 0
+  );
+}
+
+function hasPresentationEffects(state: QuickEditAdvancedState): boolean {
+  const settings = state.presentation;
+  return (
+    !!settings &&
+    ((settings.fadeIn.enabled && settings.fadeIn.duration > 0) ||
+      (settings.fadeOut.enabled && settings.fadeOut.duration > 0) ||
+      settings.intro.mode !== 'none' ||
+      settings.outro.mode !== 'none')
+  );
+}
+
+function audioEncoderRequired(
+  reasons: readonly QuickEditExportReason[],
+  presentationAudioPresent: boolean | undefined
+): boolean {
+  return (
+    reasons.some((reason) => reason !== 'presentation') ||
+    (reasons.includes('presentation') && presentationAudioPresent === true)
   );
 }

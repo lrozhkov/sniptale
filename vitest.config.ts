@@ -1,8 +1,12 @@
+import { normalizeMediabunny } from './tooling/ci/mediabunny/normalize.mjs';
+import { fileURLToPath } from 'node:url';
 import { tourPlayerScript } from './apps/extension/build/tour-player-script.ts';
 import { defineConfig } from 'vitest/config';
 
 import { collectProductTestInventory } from './tooling/test/harness/product-test-inventory.mjs';
 import { collectHarnessTestInventory } from './tooling/test/harness/harness-test-inventory.mjs';
+
+normalizeMediabunny({ root: fileURLToPath(new URL('.', import.meta.url)), check: true });
 
 type SniptaleVitestSuite = 'product' | 'harness' | 'all';
 type HarnessPartition = 'node-vm-a' | 'node-vm-b' | 'jsdom-vm' | 'forks';

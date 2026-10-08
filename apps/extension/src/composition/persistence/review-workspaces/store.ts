@@ -1,3 +1,5 @@
+import { createNewWorkspacePresentationSettings } from '../../../features/video/review/advanced/presentation';
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 import { areNewReviewSourcesAvailable, readReviewReadySources } from './new-reference-admission';
@@ -176,6 +178,10 @@ export async function openVideoWorkspace(
       revision: 1,
       history: [],
       cursor: 0,
+      advanced: {
+        ...createQuickEditAdvancedState(),
+        presentation: createNewWorkspacePresentationSettings(),
+      },
       createdAt: now,
       updatedAt: now,
     });

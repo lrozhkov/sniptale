@@ -1,3 +1,4 @@
+import type { ReviewAudioClipInput } from './audio-clip-source';
 import type { QuickEditOriginalAudioRange } from '../../features/video/review/advanced/types';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
 import {
@@ -16,7 +17,9 @@ import { createReviewAudioClipRenderer, type ReviewAudioClipRenderer } from './a
 export interface ReviewExportClipPlan {
   /** Fragment-local entries: output time is already shifted into the fragment. */
   entries: readonly QuickEditAudioPlanEntry[];
-  buffers: ReadonlyMap<string, AudioBuffer>;
+  buffers: ReadonlyMap<string, ReviewAudioClipInput>;
+  /** Releases job-owned decoder inputs; supplied AudioBuffer plans have no resources. */
+  dispose?(): void;
   originalVolume: number;
   originalRanges?: readonly QuickEditOriginalAudioRange[];
   originalMuted: boolean;
@@ -208,10 +211,21 @@ async function scheduleClipWindows(
     const rate = entry.playbackRate ?? 1;
     const localFrom = Math.max(0, audibleFrom - entry.timelineStart);
     const localTo = Math.max(0, audibleTo - entry.timelineStart);
-    const prepared =
-      rate === 1
-        ? buffer
-        : await args.clipRenderer.render(entry, buffer, localFrom, localTo, args.signal);
+    let offset = entry.sourceOffset + localFrom;
+    let prepared: AudioBuffer;
+    if (rate === 1 && 'read' in buffer) {
+      const first = Math.floor((offset - leadSeconds) * buffer.sampleRate);
+      const last = Math.ceil((entry.sourceOffset + localTo + leadSeconds) * buffer.sampleRate);
+      const window = await buffer.read(first, last, args.signal);
+      prepared = new AudioBuffer({
+        length: Math.max(1, last - first),
+        sampleRate: buffer.sampleRate,
+        numberOfChannels: buffer.numberOfChannels,
+      });
+      window.planes.forEach((plane, channel) => prepared.getChannelData(channel).set(plane));
+      offset -= first / buffer.sampleRate;
+    } else if (rate === 1 && !('read' in buffer)) prepared = buffer;
+    else prepared = await args.clipRenderer.render(entry, buffer, localFrom, localTo, args.signal);
     args.signal.throwIfAborted();
     const source = offline.createBufferSource();
     source.buffer = prepared;
@@ -256,7 +270,7 @@ async function scheduleClipWindows(
     else gain.gain.linearRampToValueAtTime(tailGain, windowEndAt);
     source.start(
       (rate === 1 ? leadSeconds : 0) + (audibleFrom - outStart),
-      rate === 1 ? entry.sourceOffset + localFrom : 0,
+      rate === 1 ? offset : 0,
       audibleTo - audibleFrom + (rate === 1 ? 0 : 2 * leadSeconds)
     );
   }

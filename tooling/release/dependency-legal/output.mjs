@@ -61,6 +61,9 @@ function formatDependencySection(entry) {
   const sourceLine = entry.correspondingSourceUrl
     ? `\n- MPL-2.0 corresponding source: ${entry.correspondingSourceUrl}`
     : '';
+  const modificationLines = entry.modifiedSource
+    ? `\n- Supplied modifications (combine with upstream source above):\n${entry.modifiedSource.files.map((file) => `  - [${file.archivePath}](${file.archivePath}) (SHA-256: ${file.sha256})`).join('\n')}\n- Original package integrity: ${entry.modifiedSource.upstreamIntegrity}`
+    : '';
   const provenanceLines = entry.licenseProvenance
     ? `
 - Immutable license origin: ${entry.licenseProvenance.originUrl}
@@ -77,7 +80,7 @@ function formatDependencySection(entry) {
 - License storage: \`${entry.licenseStorageKind}\`
 - Redistributed license text: [\`${entry.archivePath}\`](${entry.archivePath})
 - License text SHA-256: \`${entry.sha256}\`
-- Repository/source: ${entry.sourceUrl}${provenanceLines}${sourceLine}`;
+- Repository/source: ${entry.sourceUrl}${provenanceLines}${sourceLine}${modificationLines}`;
 }
 
 /** Formats the deterministic notices document for the complete production dependency closure. */
@@ -167,7 +170,24 @@ function normalizeClosure(closure) {
   if (filesByPath.size !== entries.length - canonicalEntries.length) {
     throw new Error('Dependency legal closure has orphaned generated license files.');
   }
-  return { canonicalEntries, entries, filesByPath };
+  const sourceFiles = closure.sourceFiles ?? [];
+  const expectedSourceFiles = entries.flatMap((entry) => entry.modifiedSource?.files ?? []);
+  if (
+    sourceFiles.length !== expectedSourceFiles.length ||
+    new Set(sourceFiles.map((file) => file.archivePath)).size !== sourceFiles.length
+  )
+    throw new Error('Modified dependency source inventory mismatch.');
+  for (const file of sourceFiles) {
+    const expected = expectedSourceFiles.find((entry) => entry.archivePath === file.archivePath);
+    if (
+      !expected ||
+      !file.archivePath.startsWith('LICENSES/dependencies/') ||
+      filesByPath.has(file.archivePath) ||
+      createHash('sha256').update(file.contents).digest('hex') !== expected.sha256
+    )
+      throw new Error('Modified dependency source content drift.');
+  }
+  return { canonicalEntries, entries, filesByPath, sourceFiles };
 }
 
 async function assertCanonicalLicenseFiles(outputRoot, entries) {
@@ -197,7 +217,7 @@ export async function writeDependencyLegalClosure({
   const licenseRoot = resolveOutputPath(outputRoot, 'LICENSES/dependencies');
   await fs.rm(licenseRoot, { force: true, recursive: true });
   await fs.mkdir(licenseRoot, { recursive: true });
-  for (const licenseFile of normalized.filesByPath.values()) {
+  for (const licenseFile of [...normalized.filesByPath.values(), ...normalized.sourceFiles]) {
     const destination = resolveOutputPath(outputRoot, licenseFile.archivePath);
     await fs.mkdir(path.dirname(destination), { recursive: true });
     await fs.writeFile(destination, licenseFile.contents);

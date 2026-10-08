@@ -1,3 +1,4 @@
+import { decodeReviewAudioClipBuffer } from '../../workflows/video-review/audio-clip-source';
 import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
 import { renderTempoBuffer } from '../../features/video/audio/tempo-buffer';
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
@@ -111,6 +112,7 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
     originalGain.connect(context.destination);
   }
   const handles = new Set<ReviewAudioHandle>();
+  const decoding = new AbortController();
   let disposed = false;
   const stopAll = () => {
     for (const handle of handles) handle.stop();
@@ -119,7 +121,8 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
   return {
     now: () => context.currentTime,
     resume: () => context.resume(),
-    decode: async (data) => new BrowserReviewAudioBuffer(await context.decodeAudioData(data)),
+    decode: async (data) =>
+      new BrowserReviewAudioBuffer(await decodeReviewAudioClipBuffer(data, decoding.signal)),
     prepareClip: async (buffer, entry, signal) => {
       const rate = entry.playbackRate ?? 1;
       if (rate === 1) return buffer;
@@ -139,6 +142,7 @@ export function createDefaultEngine(element: HTMLMediaElement | null): ReviewAud
     dispose: () => {
       if (disposed) return;
       disposed = true;
+      decoding.abort();
       stopAll();
       originalSource?.disconnect();
       originalGain?.disconnect();

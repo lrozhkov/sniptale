@@ -1,4 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
+import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
+import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
 const mocks = vi.hoisted(() => ({ measure: vi.fn(), write: vi.fn() }));
 vi.mock('../video/export-size', () => ({ measureVideoExportSize: mocks.measure }));
@@ -137,5 +139,73 @@ it('does not estimate adaptive output from constant-rate samples', async () => {
       renderSettings: { frameRate: 60, frameRateMode: 'adaptive', quality: 'HIGH' },
     })
   ).rejects.toThrow('Adaptive');
+  expect(mocks.measure).not.toHaveBeenCalled();
+});
+
+function presentationFixture() {
+  const args = sourceFixture();
+  const settings = createNeutralPresentationSettings();
+  settings.intro = {
+    mode: 'image',
+    image: {
+      assetId: 'intro',
+      width: 320,
+      height: 180,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  settings.outro = {
+    mode: 'video',
+    video: {
+      assetId: 'outro',
+      source: { width: 320, height: 180, duration: 5, size: 100, mimeType: 'video/webm' },
+      trim: { start: 1, end: 5 },
+      audio: { muted: false, gain: 1 },
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  args.advanced.presentation = settings;
+  return args;
+}
+it.each([
+  { mode: 'advanced' as const, includeBookends: true, duration: 9, bitrate: 128000 },
+  { mode: 'advanced' as const, includeBookends: false, duration: 2, bitrate: 0 },
+  { mode: 'basic' as const, includeBookends: true, duration: 2, bitrate: 0 },
+])(
+  'uses complete sequence sampling for $mode include=$includeBookends',
+  async ({ mode, includeBookends, duration, bitrate }) => {
+    const args = presentationFixture();
+    args.advanced.ui.mode = mode;
+    mocks.measure.mockImplementation(
+      async (input: Parameters<typeof measureVideoExportSize>[0]) => {
+        expect(input.duration).toBe(duration);
+        expect(input.windows).toEqual(videoExportSampleWindows(duration, 30));
+        expect(input.audioBitrate).toBe(bitrate);
+      }
+    );
+    await estimateReviewExportSize({ ...args, includeBookends });
+  }
+);
+it.each([true, false])('does not budget inaudible bookend settings (muted=%s)', async (muted) => {
+  const args = presentationFixture();
+  const outro = args.advanced.presentation!.outro;
+  if (outro.mode !== 'video') throw new Error('Expected video fixture');
+  outro.video.audio = { muted, gain: muted ? 1 : 0 };
+  mocks.measure.mockImplementation(async (input: Parameters<typeof measureVideoExportSize>[0]) => {
+    expect(input.duration).toBe(9);
+    expect(input.audioBitrate).toBe(0);
+  });
+  await estimateReviewExportSize(args);
+});
+it('rejects an unrepresentable sequence before measuring', async () => {
+  const args = presentationFixture();
+  args.index.duration = 0.000001;
+  args.index.boundaries = [0, 0.000001];
+  await expect(estimateReviewExportSize(args)).rejects.toThrow('represented');
   expect(mocks.measure).not.toHaveBeenCalled();
 });

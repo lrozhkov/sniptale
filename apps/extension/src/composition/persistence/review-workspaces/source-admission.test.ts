@@ -1,3 +1,4 @@
+import { reviewAdvancedContentBaseline } from '../../../features/video/review/document';
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AssetReadyJournal } from '../assets/contracts';
 import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
@@ -5,7 +6,6 @@ import { createReviewWorkspaceStoreFixture } from './store.test-support';
 import { createVideoReviewSession } from '../../../workflows/video-review/session';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
-import { createQuickEditAdvancedContent } from '../../../features/video/review/advanced/defaults';
 
 const harness = vi.hoisted(() => ({ database: vi.fn(), journals: vi.fn() }));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
@@ -182,8 +182,6 @@ it('admits voiceover attach before publication with a ready claim scoped to this
   const { commitVideoWorkspace } = await import('./store');
   const { createQuickEditAudioClip } =
     await import('../../../features/video/review/advanced/audio');
-  const { createQuickEditAdvancedContent } =
-    await import('../../../features/video/review/advanced/defaults');
   const audioEntry = { ...entry, mimeType: 'audio/webm' };
   const journal = readyJournal();
   journal.assetRefs[0] = { ...journal.assetRefs[0]!, mimeType: audioEntry.mimeType };
@@ -195,7 +193,7 @@ it('admits voiceover attach before publication with a ready claim scoped to this
   };
   journals.push(journal);
   const opened = await openVideoWorkspace(id, source);
-  const before = createQuickEditAdvancedContent();
+  const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
   const clip = createQuickEditAudioClip({
     id: 'voiceover',
     assetId: 'project-asset:background',
@@ -273,7 +271,7 @@ it.each([false, true])(
     journals.push(journal);
     const opened = await openVideoWorkspace(id, source);
     if (purged) rows.get('media_library')!.delete(originId);
-    const before = createQuickEditAdvancedContent();
+    const before = reviewAdvancedContentBaseline(opened.workspace.advanced);
     const result = commitVideoWorkspace({
       aggregateId: id,
       expectedRevision: opened.workspace.revision,
@@ -476,5 +474,114 @@ it.each(['missing', 'trash', 'active'] as const)(
       await expect(save).rejects.toMatchObject({ code: 'missing-media' });
       expect(await readVideoWorkspace(id)).toEqual(opened);
     }
+  }
+);
+
+it.each(['intro', 'outro'] as const)(
+  'admits a prepared image only for its exact remembered %s slot',
+  async (slot) => {
+    const { createNeutralPresentationSettings } =
+      await import('../../../features/video/review/advanced/presentation');
+    const opened = await openVideoWorkspace(id, source);
+    const journal = readyJournal();
+    journal.payload = {
+      entry,
+      filename: 'scene.png',
+      expectedAssetId: null,
+      publishToLibrary: false,
+      requiredReviewResource: {
+        aggregateId: id,
+        slot,
+        kind: 'image',
+        acquisition: 'private-upload',
+      },
+    };
+    journals.push(journal);
+    const presentation = createNeutralPresentationSettings();
+    const image = {
+      assetId: 'project-asset:background',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain' as const,
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    };
+    presentation[slot === 'intro' ? 'outro' : 'intro'] = { mode: 'none', image };
+    const save = () =>
+      saveVideoWorkspaceAdvanced({
+        aggregateId: id,
+        expectedRevision: opened.workspace.revision,
+        expectedSourceAssetId: opened.workspace.sourceAssetId,
+        advanced: { ...opened.workspace.advanced, presentation },
+      });
+    await expect(save()).rejects.toMatchObject({ code: 'missing-media' });
+    presentation[slot === 'intro' ? 'outro' : 'intro'] = { mode: 'none' };
+    presentation[slot] = { mode: 'none', image };
+    await expect(save()).resolves.toBeDefined();
+    expect(rows.get('project_assets')!.size).toBe(0);
+  }
+);
+
+it.each([false, true])(
+  'revalidates a new scene slot claim even with bytes already retained (changed=%s)',
+  async (changed) => {
+    const { createNeutralPresentationSettings } =
+      await import('../../../features/video/review/advanced/presentation');
+    const opened = await openVideoWorkspace(id, source);
+    const presentation = createNeutralPresentationSettings();
+    const image = {
+      assetId: 'project-asset:background',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain' as const,
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    };
+    rows.get('project_assets')!.set(entry.id, entry);
+    presentation.intro = { mode: 'none', image };
+    const initial = await saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      advanced: { ...opened.workspace.advanced, presentation },
+    });
+    const journal = readyJournal();
+    rows.set('asset_refs', new Map([[entry.assetId, journal.assetRefs[0]]]));
+    rows.get('media_library')!.set(
+      'project-asset:background',
+      createMediaLibraryEntry({
+        id: 'project-asset:background',
+        size: entry.size,
+        mimeType: entry.mimeType,
+        source: { kind: 'project-asset', projectAssetId: entry.id },
+      })
+    );
+    journal.payload = {
+      entry,
+      filename: 'scene.png',
+      expectedAssetId: entry.assetId,
+      librarySourceId: 'project-asset:background',
+      requiredReviewResource: {
+        aggregateId: id,
+        slot: 'outro',
+        kind: 'image',
+        acquisition: 'library-binding',
+      },
+    };
+    journals.push(journal);
+    if (changed) rows.get('media_library')!.delete('project-asset:background');
+    presentation.outro = { mode: 'none', image };
+    const save = saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: initial.workspace.revision,
+      expectedSourceAssetId: initial.workspace.sourceAssetId,
+      advanced: { ...initial.workspace.advanced, presentation },
+    });
+    if (changed) {
+      await expect(save).rejects.toMatchObject({ code: 'missing-media' });
+      expect(await readVideoWorkspace(id)).toEqual(initial);
+    } else await expect(save).resolves.toBeDefined();
   }
 );

@@ -288,6 +288,8 @@ export async function prepareProjectAsset(
   options: ProjectAssetPublicationOptions = {}
 ): Promise<PreparedProjectAsset> {
   if (
+    (options.requiredReviewResource?.slot !== 'watermark' &&
+      options.requiredReviewResource?.acquisition === 'library-binding') ||
     !isValidProjectAssetReviewResource({
       mimeType,
       resource: options.requiredReviewResource,

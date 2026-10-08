@@ -80,7 +80,7 @@ it('admits watermark content with one additive step and leaves rows and object b
   const fixture = upgradeFixture();
   const before = structuredClone(fixture.durable);
   const plan = buildDatabaseMigrationPlan(5, 6)!;
-  expect(DB_VERSION).toBe(6);
+  expect(DB_VERSION).toBe(7);
   expect(plan).toHaveLength(1);
   expect(plan[0]).toMatchObject({
     fromDatabaseVersion: 5,
@@ -91,7 +91,7 @@ it('admits watermark content with one additive step and leaves rows and object b
     stores: ['video_workspaces', 'video_workspace_drafts'],
   });
   expect(await plan[0]!.estimateAdditionalBytes()).toBe(64 * 1024);
-  handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
+  handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx);
   fixture.commit();
   expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(fixture.durable).toEqual(before);
@@ -99,7 +99,7 @@ it('admits watermark content with one additive step and leaves rows and object b
   expect(fixture.db.deleteObjectStore).not.toHaveBeenCalled();
   expect(fixture.tx.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
   fixture.retry();
-  handleDatabaseUpgrade(fixture.db, 6, 6, fixture.tx);
+  handleDatabaseUpgrade(fixture.db, DB_VERSION, DB_VERSION, fixture.tx);
   fixture.commit();
   expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(fixture.durable).toEqual(before);
@@ -112,14 +112,16 @@ it.each(['video_workspaces', 'video_workspace_drafts'])(
     const contracts = fixture.contracts();
     const before = structuredClone(fixture.durable);
     fixture.names.delete(missing);
-    expect(() => handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx)).toThrow('unavailable');
+    expect(() => handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx)).toThrow(
+      'unavailable'
+    );
     expect(fixture.tx.abort).toHaveBeenCalledOnce();
     expect(fixture.tx.objectStore).not.toHaveBeenCalled();
     expect(fixture.contracts()).toEqual(contracts);
     expect(fixture.durable).toEqual(before);
     fixture.names.add(missing);
     fixture.retry();
-    handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
+    handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx);
     fixture.commit();
     expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   }
@@ -129,13 +131,13 @@ it('rolls back interrupted contract publication and reruns without partial domai
   const fixture = upgradeFixture(3);
   const contracts = fixture.contracts();
   const before = structuredClone(fixture.durable);
-  expect(() => handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx)).toThrow('Interrupted');
+  expect(() => handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx)).toThrow('Interrupted');
   expect(fixture.tx.abort).toHaveBeenCalledOnce();
   expect(() => fixture.commit()).toThrow('Aborted');
   expect(fixture.contracts()).toEqual(contracts);
   expect(fixture.durable).toEqual(before);
   fixture.retry();
-  handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
+  handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx);
   fixture.commit();
   expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(fixture.durable).toEqual(before);
@@ -144,7 +146,7 @@ it('rolls back interrupted contract publication and reruns without partial domai
 it.each([
   [6, 5],
   [7, 6],
-  [6, 7],
+  [7, 8],
 ])('refuses unsupported or reverse migration %i to %i before mutation', (from, to) => {
   const fixture = upgradeFixture();
   const contracts = fixture.contracts();
@@ -157,7 +159,7 @@ it.each([
 
 it('requires the exact watermark domain contract at the current physical version', () => {
   expect(parseStoredSchemaContracts(CURRENT_SCHEMA_CONTRACTS)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  for (const schemaVersion of [4, 6]) {
+  for (const schemaVersion of [4, 5, 7]) {
     const incompatible = CURRENT_SCHEMA_CONTRACTS.map((contract) =>
       contract.domainId === 'mediaLibrary' ? { ...contract, schemaVersion } : contract
     );

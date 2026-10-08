@@ -1,3 +1,7 @@
+import {
+  presentationMainColorOpacity,
+  type PresentationSequencePlan,
+} from '../../features/video/review/presentation-sequence';
 import { useStagePresentation, ReviewStagePresentationFeedback } from './stage-presentation';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import {
@@ -71,7 +75,7 @@ type ReviewStageCommentBinding = {
   onGeometry?(geometry: ReviewStageCommentGeometry): void;
 };
 
-export type ReviewStageProps = {
+type ReviewStageProps = {
   preview?:
     | {
         preferences: QuickPreviewPreferences;
@@ -80,6 +84,7 @@ export type ReviewStageProps = {
         onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
       }
     | undefined;
+  outerFadePlan?: PresentationSequencePlan | undefined;
   watermark?: Omit<Parameters<typeof ReviewWatermarkOverlay>[0], 'output'> | undefined;
   keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[] | undefined;
@@ -298,13 +303,37 @@ export function ReviewStage(props: ReviewStageProps) {
             manual={manual ? presentation.watermarkManual : undefined}
           />
         )}
-        {!manual ? <ReviewCutBlackout binding={props.cutPreview} /> : null}
+        {!manual ? (
+          <>
+            <ReviewCutBlackout binding={props.cutPreview} />
+            <ReviewStageOuterFade plan={props.outerFadePlan} time={props.scene?.focus?.time ?? 0} />
+          </>
+        ) : null}
         <ReviewStagePresentationFeedback
           presentation={presentation}
           showFrameRate={props.preview?.preferences.showFrameRate ?? false}
         />
       </div>
     </div>
+  );
+}
+
+/** Native composition uses the same global envelope as the final manual fill. */
+function ReviewStageOuterFade({
+  plan,
+  time,
+}: {
+  plan: PresentationSequencePlan | undefined;
+  time: number;
+}) {
+  if (!plan) return null;
+  return (
+    <div
+      data-ui="gallery.videoReview.outerFade"
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-40"
+      style={{ backgroundColor: plan.color, opacity: presentationMainColorOpacity(plan, time) }}
+    />
   );
 }
 

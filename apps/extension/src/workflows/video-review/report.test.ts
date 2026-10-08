@@ -305,3 +305,84 @@ it('binds actual export timing to its revision without claiming later edits were
   expect(later).toContain('"matchesCurrentRevision": false');
   expect(later).toContain('"mediaId": "recording:copy"');
 });
+
+it('reports baked v2 source provenance without adding its edits to current history', async () => {
+  const { createPresentationReviewProvenance } =
+    await import('../../features/video/review/provenance');
+  const { createNeutralPresentationSettings } =
+    await import('../../features/video/review/advanced/presentation');
+  const { planReviewPresentationSequence } =
+    await import('../../features/video/review/presentation-sequence');
+  const source = { duration: 10, width: 160, height: 90, mimeType: 'video/webm', size: 100 };
+  const plan = planReviewPresentationSequence({
+    settings: createNeutralPresentationSettings(),
+    mainDuration: 10,
+    fragmentOffset: 0,
+    includeBookends: false,
+    rate: { numerator: 30000, denominator: 1001 },
+  });
+  if (!plan.ok) throw new Error('Invalid fixture plan');
+  const provenance = createPresentationReviewProvenance({
+    base: {
+      timeUnit: 'seconds',
+      revision: 8,
+      exportedAt: 1,
+      source: { ...source, duration: 12, filename: 'original.webm' },
+      audioReencoded: true,
+      edits: [
+        { id: 'original-cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 },
+      ],
+    },
+    plan: plan.plan,
+    output: {
+      format: 'webm',
+      videoCodec: 'vp9',
+      width: 160,
+      height: 90,
+      frameRateMode: 'constant',
+    },
+    includeBookends: false,
+    watermarkBaked: true,
+  });
+  const snapshot: VideoWorkspaceSnapshot = {
+    workspace: {
+      aggregateId: 'recording:baked',
+      formatVersion: 1,
+      revision: 1,
+      source,
+      sourceAssetId: 'baked-bytes',
+      advanced: createQuickEditAdvancedState(),
+      history: [],
+      cursor: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    draft: null,
+  };
+  const report = createVideoReviewReport({
+    snapshot,
+    filename: 'baked.webm',
+    telemetry: null,
+    provenance,
+    labels: {
+      title: 'Review',
+      source: 'Source',
+      timeline: 'Timeline',
+      machineData: 'Data',
+      comment: 'Comment',
+      cut: 'Cut',
+      speed: 'Speed',
+      telemetry: 'Telemetry',
+      excluded: 'Excluded',
+      empty: 'Empty',
+    },
+  });
+  const fenced = report.match(/```json\n([\s\S]*?)\n```/);
+  expect(fenced).not.toBeNull();
+  const data: unknown = JSON.parse(fenced![1]!);
+  expect(data).toMatchObject({
+    sourceProvenance: provenance,
+    edits: [],
+    source: { durationUs: 10000000 },
+  });
+});

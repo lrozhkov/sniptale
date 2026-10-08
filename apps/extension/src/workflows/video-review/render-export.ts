@@ -1,3 +1,5 @@
+import type { ReviewFrameExportInput } from './render-export-input';
+import { writeReviewPresentationFrames } from './render-presentation-export';
 import { createReviewWatermarkRenderer, type ReviewWatermarkRenderer } from './render-watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
@@ -14,7 +16,6 @@ import {
   hasQuickEditMotionBlur,
   quickEditMotionBlurCameras,
 } from '../../features/video/review/advanced/motion-blur';
-import type { VideoProjectExportTimeEstimate } from '../../features/video/project/types/export';
 import { createReviewRenderTimeTracking } from './time-estimate-plan';
 import { videoExportSampleWindows } from '../../features/video/project/export/size-estimate';
 import { reviewRenderFrameSchedule, type ReviewFrameWindow } from './render-schedule';
@@ -45,11 +46,11 @@ import {
 } from 'mediabunny';
 import {
   resolveReviewRenderBitrate,
+  resolveReviewOutputProfile,
   resolveReviewSceneOutput,
   reviewOutputCodecs,
   resolveReviewVideoEncoderConfig,
 } from './render-settings';
-import type { SeekableAssetObjectWriter } from '../../composition/persistence/assets';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type {
@@ -82,28 +83,11 @@ type ReviewAudioOut = ReturnType<typeof createReviewMediaOutput>['audio'];
  * probed frame rate. Audio follows the same plan as the packet path; fragment
  * ranges keep camera and audio on global output time while timestamps start at zero.
  */
-export async function writeReviewFrames(args: {
-  keyCues?: readonly ReviewKeyCue[] | undefined;
-  clickCues?: readonly ReviewClickCue[];
-  renderSettings?: ReviewRenderSettings | undefined;
-  /** Read-only bounded probe sink; bypasses muxing, audio rendering and writer use. */
-  frameProbe?: { add(sample: VideoSample): Promise<void> };
-  file: Blob;
-  index: ReviewMediaIndex;
-  /** Fragment-local edits; `fragmentOffset` maps local time back to global output time. */
-  edits: readonly ReviewEdit[];
-  advanced: QuickEditAdvancedState;
-  /** Text-resolved overlays; burning follows each comment's own renderToVideo flag. */
-  comments?: readonly CanvasCommentExport[];
-  fragmentOffset: number;
-  writer: Pick<SeekableAssetObjectWriter, 'writeAt'>;
-  signal: AbortSignal;
-  provenance?: string;
-  exportAudio?: ReviewExportClipPlan;
-  readProjectAsset(assetId: string): Promise<Blob | null>;
-  onProgress?(fraction: number): void;
-  onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
-}): Promise<ReviewPacketReceipt> {
+export async function writeReviewFrames(
+  args: ReviewFrameExportInput
+): Promise<ReviewPacketReceipt> {
+  if (resolveQuickEditEffectiveState(args.advanced).presentation)
+    return writeReviewPresentationFrames(args);
   const preparation = prepareReviewRender(args);
   const input = new Input({ source: new BlobSource(args.file), formats: ALL_FORMATS });
   const dispose = () => input.dispose();
@@ -308,20 +292,7 @@ function prepareReviewRender(args: {
   const supported = reviewOutputCodecs(args.index, container);
   const codec = args.renderSettings?.codec ?? supported[0];
   if (!codec || !supported.includes(codec)) throw new QuickEditExportUnavailable(['video-encoder']);
-  const requestedFps = args.renderSettings?.frameRate;
-  if (
-    (requestedFps !== undefined && ![0, 24, 30, 60].includes(requestedFps)) ||
-    (args.renderSettings?.frameRateMode !== undefined &&
-      args.renderSettings.frameRateMode !== 'constant' &&
-      args.renderSettings.frameRateMode !== 'adaptive') ||
-    (args.renderSettings?.frameRateMode === 'adaptive' && requestedFps !== 60)
-  )
-    throw new Error('Unsupported render frame rate.');
-  const fps =
-    requestedFps ||
-    (args.index.frameRate && Number.isFinite(args.index.frameRate) && args.index.frameRate > 0
-      ? args.index.frameRate
-      : 30);
+  const { fps } = resolveReviewOutputProfile(args.index, args.advanced, args.renderSettings);
   const duration = buildReviewTimeMap(args.index.duration, args.edits).at(-1)?.resultEnd ?? 0;
   const windows = reviewRenderFrameSchedule(
     args.index.duration,

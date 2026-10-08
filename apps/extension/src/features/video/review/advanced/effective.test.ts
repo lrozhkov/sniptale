@@ -614,3 +614,99 @@ it('keeps image acquisition neutral until a logo is selected and never hides a r
     video: 'render',
   });
 });
+
+it('suppresses presentation processing in Basic while retaining authored defaults and dormant resources', async () => {
+  const { createNewWorkspacePresentationSettings } = await import('./presentation');
+  const state = createQuickEditAdvancedState();
+  state.presentation = createNewWorkspacePresentationSettings();
+  const saved = structuredClone(state.presentation);
+  expect(resolveQuickEditEffectiveState(state).presentation).toBeUndefined();
+  expect(resolveQuickEditEffectiveFeatures(state).presentationApplied).toBe(false);
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state).presentation).toEqual(saved);
+  state.ui.mode = 'basic';
+  expect(state.presentation).toEqual(saved);
+  expect(
+    resolveQuickEditExportPlan({ document: { edits: [], canvasComments: [] }, advanced: state })
+  ).toMatchObject({ video: 'copy', audio: 'copy' });
+});
+
+it('routes outer fades and sequence bookends independently from global audio processing', async () => {
+  const { createNeutralPresentationSettings } = await import('./presentation');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.presentation = createNeutralPresentationSettings();
+  const args = { advanced, document: { edits: [], canvasComments: [] } };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+  advanced.presentation.fadeIn.enabled = true;
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    video: 'render',
+    audio: 'copy',
+    reasons: ['presentation'],
+  });
+  advanced.presentation.audioFade = true;
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    video: 'render',
+    audio: 'process',
+    reasons: ['presentation'],
+  });
+  advanced.presentation.fadeIn.enabled = false;
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+  advanced.presentation.intro = {
+    mode: 'image',
+    image: {
+      assetId: 'project-asset:still',
+      width: 20,
+      height: 10,
+      duration: 3,
+      fit: 'contain',
+      fillColor: '#000000ff',
+      crop: { panX: 0, panY: 0 },
+    },
+  };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    video: 'render',
+    audio: 'process',
+    reasons: ['presentation'],
+  });
+  advanced.presentation.intro = { mode: 'none', image: advanced.presentation.intro.image };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+  advanced.presentation.fadeOut = { enabled: true, duration: 0 };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({ video: 'copy', audio: 'copy' });
+});
+
+it('defers unknown sequence audio capability but blocks a confirmed composed audio track', async () => {
+  const { createNewWorkspacePresentationSettings } = await import('./presentation');
+  const advanced = createQuickEditAdvancedState();
+  advanced.ui.mode = 'advanced';
+  advanced.presentation = { ...createNewWorkspacePresentationSettings(), audioFade: true };
+  const args = {
+    advanced,
+    document: { edits: [], canvasComments: [] },
+    audioProcessingAvailable: false,
+  };
+  expect(resolveQuickEditExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'render',
+    audio: 'process',
+  });
+  expect(resolveQuickEditExportPlan({ ...args, presentationAudioPresent: false })).toMatchObject({
+    kind: 'ready',
+  });
+  expect(resolveQuickEditExportPlan({ ...args, presentationAudioPresent: true })).toEqual({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  expect(resolveQuickEditExportPlan({ ...args, videoRenderAvailable: false })).toMatchObject({
+    kind: 'unavailable',
+    reasons: expect.arrayContaining(['video-encoder']),
+  });
+  advanced.ui.mode = 'basic';
+  expect(resolveQuickEditExportPlan({ ...args, presentationAudioPresent: true })).toEqual({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+    reasons: [],
+  });
+});

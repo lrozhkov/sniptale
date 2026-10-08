@@ -30,6 +30,7 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
   const closure = await generateDependencyLegalClosure({
     canonicalLicenseAliases: policy.dependencyLegal.canonicalLicenseAliases,
     pinnedSources: policy.dependencyLegal.pinnedSources,
+    modifiedSources: policy.dependencyLegal.modifiedSources,
     repoRoot,
     reviewedSelections: policy.dependencyLegal.reviewedSelections,
   });
@@ -44,6 +45,7 @@ export async function generateRepositoryDependencyLegal(repoRoot = process.cwd()
       ...REQUIRED_RELEASE_LEGAL_PATHS,
       policy.dependencyLegal.manifestPath,
       ...closure.entries.map((entry) => entry.archivePath),
+      ...(closure.sourceFiles ?? []).map((file) => file.archivePath),
     ]),
   ].sort();
   policy.legalFiles = await Promise.all(legalPaths.map((entry) => legalFileEntry(repoRoot, entry)));

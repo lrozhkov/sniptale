@@ -7,6 +7,12 @@ import {
 const TYPECHECK_TOOL = 'verify-typecheck.mjs';
 const TYPECHECK_MODE = 'workspace-state';
 const TYPECHECK_CONFIG_FILES = [
+  'tooling/ci/mediabunny/normalize.mjs',
+  'tooling/ci/mediabunny/patch-manifest.json',
+  'tooling/ci/mediabunny/patch-payload.json.gz',
+  'tooling/ci/mediabunny/source.patch',
+  'tooling/ci/mediabunny/LICENSE',
+
   'package.json',
   'package-lock.json',
   'tsconfig.json',

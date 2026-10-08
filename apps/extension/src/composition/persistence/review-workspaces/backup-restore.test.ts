@@ -473,3 +473,71 @@ it('backs up remembered watermark bytes and remaps the exact slot across a resto
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
   expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
 });
+
+it('backs up and restores scene variants under none including history and recovery with new identities', async () => {
+  const { createNeutralPresentationSettings } =
+    await import('../../../features/video/review/advanced/presentation');
+  const presentation = createNeutralPresentationSettings();
+  const framing = { fit: 'contain' as const, fillColor: '#000000ff', crop: { panX: 0, panY: 0 } };
+  presentation.intro = {
+    mode: 'none',
+    image: { ...framing, assetId: 'project-asset:still', width: 20, height: 10, duration: 3 },
+    video: {
+      ...framing,
+      assetId: 'project-asset:clip',
+      source: { width: 20, height: 10, duration: 5, size: 10, mimeType: 'video/webm' },
+      trim: { start: 1, end: 4 },
+      audio: { muted: true, gain: 0.5 },
+    },
+  };
+  presentation.outro = { mode: 'none', image: presentation.intro.image! };
+  const before = { ...createQuickEditAdvancedContent(), presentation };
+  const stored: VideoWorkspace = {
+    ...workspace,
+    advanced: { ...workspace.advanced, presentation, recoveryV1: JSON.stringify({ presentation }) },
+    history: [
+      {
+        id: 'scene',
+        at: 1,
+        target: 'advancedContent',
+        before,
+        after: { ...before, presentation: { ...presentation, color: '#ffffffff' } },
+      },
+    ],
+    cursor: 0,
+  };
+  const exported = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(exported!);
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:copy',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([
+      ['still', 'new-still'],
+      ['clip', 'new-clip'],
+    ]),
+  });
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:new-still', 'project-asset:new-clip'])
+  );
+  expect(restored.workspace.advanced.presentation?.intro.video).toMatchObject({
+    assetId: 'project-asset:new-clip',
+    trim: { start: 1, end: 4 },
+    audio: { muted: true, gain: 0.5 },
+  });
+  expect(restored.workspace.history[0]?.after).toHaveProperty(
+    'presentation.intro.image.assetId',
+    'project-asset:new-still'
+  );
+  expect(JSON.parse(restored.workspace.advanced.recoveryV1!)).toHaveProperty(
+    'presentation.intro.video.assetId',
+    'project-asset:new-clip'
+  );
+});
