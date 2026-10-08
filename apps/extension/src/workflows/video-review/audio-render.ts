@@ -1,3 +1,4 @@
+import type { OriginalAudioAttenuation } from '../../features/video/review/advanced/original-audio';
 import type { ReviewAudioClipInput } from './audio-clip-source';
 import type { QuickEditOriginalAudioRange } from '../../features/video/review/advanced/types';
 import { createTempoProcessor } from '../../features/video/audio/tempo';
@@ -23,6 +24,7 @@ export interface ReviewExportClipPlan {
   originalVolume: number;
   originalRanges?: readonly QuickEditOriginalAudioRange[];
   originalMuted: boolean;
+  automaticOriginalRanges?: readonly OriginalAudioAttenuation[];
 }
 
 type Segment = ReturnType<typeof buildReviewTimeMap>[number];
@@ -134,6 +136,12 @@ async function renderWindow(args: AudioRenderWindow) {
     }
     node.playbackRate.value = 1;
     applySourceRangeGains(node.buffer, args.exportAudio?.originalRanges, start, segment.rate);
+    applySourceRangeGains(
+      node.buffer,
+      args.exportAudio?.automaticOriginalRanges,
+      start,
+      segment.rate
+    );
     connectOriginal(node, offline, args.exportAudio);
     node.start();
   }
@@ -157,7 +165,7 @@ async function renderWindow(args: AudioRenderWindow) {
 /** Apply source-time automation only to the original PCM, before adding external clips. */
 function applySourceRangeGains(
   buffer: AudioBuffer,
-  ranges: ReviewExportClipPlan['originalRanges'],
+  ranges: readonly OriginalAudioAttenuation[] | undefined,
   start: number,
   rate: number
 ) {
@@ -207,7 +215,10 @@ async function scheduleClipWindows(
     const audibleTo = Math.min(outEnd, entry.timelineStart + entry.duration);
     if (audibleTo <= audibleFrom) continue;
     const buffer = plan.buffers.get(entry.assetId);
-    if (!buffer) continue;
+    if (!buffer) {
+      if (entry.lane === 'revoice') throw new Error('Accepted replacement audio is unavailable.');
+      continue;
+    }
     const rate = entry.playbackRate ?? 1;
     const localFrom = Math.max(0, audibleFrom - entry.timelineStart);
     const localTo = Math.max(0, audibleTo - entry.timelineStart);

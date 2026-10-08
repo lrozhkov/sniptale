@@ -6,6 +6,7 @@ export type {
 import {
   collectReviewAssetReferences,
   reviewWorkspaceHasAudioClip,
+  reviewWorkspaceHasSpeechReplacement,
   reviewWorkspaceHasWatermarkImage,
   reviewWorkspaceHasSceneResource,
 } from '../review-workspaces/asset-refs';
@@ -243,25 +244,38 @@ async function recoverProjectAssetJournal(
       throw new Error('Private resource Library source is invalid.');
   }
   const aggregateId =
-    payload.requiredReview?.aggregateId ?? payload.requiredReviewResource?.aggregateId;
+    payload.requiredReview?.aggregateId ??
+    payload.requiredReviewResource?.aggregateId ??
+    payload.requiredReviewSpeech?.aggregateId;
   if (aggregateId) {
     const assetId = `project-asset:${payload.entry.id}`;
     return tryVoiceoverAttachmentLock(assetId, async () => {
       const review = await readVideoWorkspace(aggregateId);
       const referenced =
         !!review &&
-        (payload.requiredReviewResource
-          ? payload.requiredReviewResource.slot === 'watermark'
-            ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
-            : reviewWorkspaceHasSceneResource(
-                review.workspace,
-                payload.requiredReviewResource.slot,
-                payload.requiredReviewResource.kind,
-                assetId
-              )
-          : payload.librarySourceId
-            ? reviewWorkspaceHasAudioClip(review.workspace, payload.requiredReview!.clipId, assetId)
-            : collectReviewAssetReferences(review.workspace).has(assetId));
+        (payload.requiredReviewSpeech
+          ? reviewWorkspaceHasSpeechReplacement(
+              review.workspace,
+              payload.requiredReviewSpeech.target,
+              payload.requiredReviewSpeech.replacementId,
+              assetId
+            )
+          : payload.requiredReviewResource
+            ? payload.requiredReviewResource.slot === 'watermark'
+              ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
+              : reviewWorkspaceHasSceneResource(
+                  review.workspace,
+                  payload.requiredReviewResource.slot,
+                  payload.requiredReviewResource.kind,
+                  assetId
+                )
+            : payload.librarySourceId
+              ? reviewWorkspaceHasAudioClip(
+                  review.workspace,
+                  payload.requiredReview!.clipId,
+                  assetId
+                )
+              : collectReviewAssetReferences(review.workspace).has(assetId));
       if (!referenced) {
         throw new SupersededAssetPublicationError();
       }

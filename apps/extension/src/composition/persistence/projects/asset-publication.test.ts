@@ -801,3 +801,94 @@ it('rejects incompatible scene claim payloads without relaxing watermark or audi
   expect(parseProjectAssetPayload({ ...direct, expectedAssetId: null })).toBeNull();
   expect(parseProjectAssetPayload({ ...direct, publishToLibrary: false })).toBeNull();
 });
+
+it('strictly binds generated speech to one private exact target and replacement', async () => {
+  const { parseProjectAssetPayload } = await import('./asset-publication-payload');
+  const payload = {
+    entry: { id: 'speech', assetId: 'bytes', mimeType: 'audio/wav', createdAt: 1, size: 4 },
+    filename: 'speech',
+    publishToLibrary: false,
+    requiredReviewSpeech: {
+      aggregateId: 'review',
+      target: { kind: 'original' },
+      replacementId: 'accepted',
+    },
+  };
+  expect(parseProjectAssetPayload(payload)).toMatchObject({
+    requiredReviewSpeech: payload.requiredReviewSpeech,
+  });
+  for (const patch of [
+    { publishToLibrary: true },
+    { entry: { ...payload.entry, mimeType: 'image/png' } },
+    { requiredReview: { aggregateId: 'review', clipId: 'clip' } },
+    { requiredReviewResource: { aggregateId: 'review', slot: 'watermark' } },
+    { librarySourceId: 'other' },
+    { requiredReviewSpeech: { ...payload.requiredReviewSpeech, replacementId: '' } },
+    {
+      requiredReviewSpeech: {
+        ...payload.requiredReviewSpeech,
+        target: { kind: 'original', clipId: 'clip' },
+      },
+    },
+  ])
+    expect(parseProjectAssetPayload({ ...payload, ...patch })).toBeNull();
+});
+
+it.each(['original', 'voiceover'] as const)(
+  'recovers %s speech after Undo only for its exact accepted identity',
+  async (kind) => {
+    const target = kind === 'original' ? { kind } : { kind, clipId: 'voice' };
+    const replacement = { id: 'accepted', assetId: 'project-asset:speech' };
+    const transcript = { replacements: [replacement] };
+    const content = {
+      audio:
+        kind === 'original'
+          ? { originalSpeech: { enabled: false, transcript } }
+          : { voiceover: [{ id: 'voice', transcript }] },
+    };
+    mocks.readReview.mockResolvedValue({
+      workspace: {
+        advanced: {},
+        cursor: 0,
+        history: [{ target: 'advancedContent', before: {}, after: content }],
+      },
+    });
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    mocks.runMutation.mockImplementation(async (operation) =>
+      operation({ transaction: () => createTransaction(writes, Promise.resolve()) })
+    );
+    const payload = {
+      entry: {
+        assetId: ref.assetId,
+        createdAt: 2,
+        id: 'speech',
+        mimeType: 'audio/wav',
+        size: ref.size,
+      },
+      filename: 'speech.wav',
+      expectedAssetId: null,
+      publishToLibrary: false,
+      requiredReviewSpeech: { aggregateId: 'review', target, replacementId: 'accepted' },
+    };
+    await projectAssetPublicationAdapter.publish(
+      createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, payload)
+    );
+    expect(writes).toContainEqual([
+      'project_assets',
+      'put',
+      expect.objectContaining({ id: 'speech' }),
+    ]);
+    expect(writes.some(([store]) => store === 'media_library')).toBe(false);
+    writes.length = 0;
+    await expect(
+      projectAssetPublicationAdapter.publish(
+        createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+          ...payload,
+          requiredReviewSpeech: { ...payload.requiredReviewSpeech, replacementId: 'unrelated' },
+        })
+      )
+    ).rejects.toMatchObject({ name: 'SupersededAssetPublicationError' });
+    expect(writes).toEqual([]);
+    expect(mocks.discardPrepared).not.toHaveBeenCalled();
+  }
+);

@@ -587,3 +587,46 @@ it('initializes source timing when the first voiceover is imported without prece
     vi.unstubAllGlobals();
   }
 });
+
+it('toggles accepted original speech without changing manual original gain or other lanes', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  let audio: QuickEditAudioState = {
+    original: {
+      muted: true,
+      volume: 0.4,
+      ranges: [{ id: 'manual', start: 1, end: 3, volume: 0.2 }],
+    },
+    voiceover: [],
+    music: [],
+    originalSpeech: { enabled: true, transcript: { version: 1, phrases: [], replacements: [] } },
+  };
+  const original = audio.original;
+  const transcript = audio.originalSpeech!.transcript;
+  let hook!: ReturnType<typeof useReviewAudio>;
+  function Harness() {
+    hook = useReviewAudio({
+      audio,
+      setAudio: (update) => {
+        audio = update(audio);
+      },
+      timelineDuration: 10,
+    });
+    return null;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.setOriginalSpeechEnabled(false));
+    expect(audio.originalSpeech?.enabled).toBe(false);
+    expect(audio.original).toBe(original);
+    expect(audio.originalSpeech?.transcript).toBe(transcript);
+    act(() => hook.setOriginalSpeechEnabled(true));
+    expect(audio.originalSpeech?.enabled).toBe(true);
+    delete audio.originalSpeech;
+    act(() => hook.setOriginalSpeechEnabled(true));
+    expect(audio.originalSpeech).toBeUndefined();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

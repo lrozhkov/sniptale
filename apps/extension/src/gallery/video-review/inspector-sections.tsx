@@ -10,7 +10,7 @@ const PresentationContext = createContext<'all' | 'sections'>('all');
 /** Presentation stays outside the video document; disclosure choices survive editor sessions. */
 export function ReviewInspectorPresentation(props: {
   value: 'all' | 'sections';
-  section?: 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview';
+  section?: 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview' | 'speech';
   selectionScope?: string | undefined;
   children: ReactNode;
 }) {

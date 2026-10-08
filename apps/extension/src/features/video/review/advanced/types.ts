@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 6;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 7;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -226,6 +226,8 @@ export interface QuickEditCanvasSize {
 }
 
 export interface QuickEditAudioState {
+  /** Accepted native-source replacements; the revoice lane is derived, never stored twice. */
+  originalSpeech?: import('../speech-transcript').ReviewOriginalSpeech;
   /** Current video mapping used only to project anchored voiceover into playback slices. */
   voiceoverSegments?: ReviewTimeSegment[];
   /** Master gains multiply individual clip gains; omitted means unity. */

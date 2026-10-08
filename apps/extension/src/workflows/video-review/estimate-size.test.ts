@@ -209,3 +209,41 @@ it('rejects an unrepresentable sequence before measuring', async () => {
   await expect(estimateReviewExportSize(args)).rejects.toThrow('represented');
   expect(mocks.measure).not.toHaveBeenCalled();
 });
+
+it.each([false, true])(
+  'budgets accepted Revoice on a silent main only when advanced (basic=%s)',
+  async (basic) => {
+    const args = sourceFixture();
+    args.advanced.ui.mode = basic ? 'basic' : 'advanced';
+    args.advanced.audio.originalSpeech = {
+      enabled: true,
+      transcript: {
+        version: 1,
+        phrases: [],
+        replacements: [
+          {
+            id: 'accepted',
+            phraseId: 'p',
+            start: 0,
+            end: 2,
+            duration: 1,
+            enabled: true,
+            originalVolume: 0,
+            assetId: 'project-asset:accepted',
+            revision: 0,
+            text: 'accepted',
+            textSignature: 'test',
+            profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+          },
+        ],
+      },
+    };
+    mocks.measure.mockImplementation(
+      async (input: Parameters<typeof measureVideoExportSize>[0]) => {
+        expect(input.audioBitrate).toBe(basic ? 0 : 192000);
+        expect(input.duration).toBe(2);
+      }
+    );
+    await estimateReviewExportSize(args);
+  }
+);

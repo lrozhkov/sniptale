@@ -1,6 +1,27 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  speechSelectAll: { ru: 'Выбрать все фразы', en: 'Select all phrases' },
+  speechDeselectAll: { ru: 'Снять выделение', en: 'Clear selection' },
+  speechResultInterval: { ru: 'В готовом видео', en: 'In edited video' },
+  speechRemovedInterval: { ru: 'Вырезано', en: 'Cut' },
+  speechSelectionDuration: { ru: 'Выделено', en: 'Selected' },
+  speechRecognizeAll: { ru: 'Распознать всё', en: 'Transcribe all' },
+  speechRecognizeSelection: { ru: 'Распознать выделенное', en: 'Transcribe selection' },
+  speechNoSourceAudio: {
+    ru: 'В исходном видео нет доступной звуковой дорожки.',
+    en: 'The source video has no available audio track.',
+  },
+  speechOriginalUnderNew: { ru: 'Оригинал под новой речью', en: 'Original under new speech' },
+  speechOriginalMixHint: {
+    ru: 'Для следующих применений. Меняется громкость всего исходного звука, включая музыку и системные звуки.',
+    en: 'For the next applications. Affects all original audio, including music and system sounds.',
+  },
+  speechRevoice: { ru: 'Переозвучка', en: 'Revoice' },
+  speechEnableRevoice: { ru: 'Включить переозвучку', en: 'Enable revoice' },
+  speechDisableRevoice: { ru: 'Выключить переозвучку', en: 'Disable revoice' },
+  speechToggleReplacement: { ru: 'Включить или выключить фразу', en: 'Enable or disable phrase' },
+  speechRestorePhrase: { ru: 'Вернуть оригинал фразы', en: 'Restore original phrase' },
   speechProviderAuth: {
     ru: 'Провайдер отклонил авторизацию (HTTP 401/403). Проверьте API-ключ и доступ к модели в настройках подключения.',
     en: 'Provider rejected authorization (HTTP 401/403). Check the API key and model access in connection settings.',

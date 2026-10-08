@@ -42,7 +42,12 @@ it.each<MediaAssetSource>([
   async (source) => {
     const media = createMediaLibraryEntry({
       id: 'scene-media',
-      kind: 'video',
+      kind:
+        source.kind === 'recording'
+          ? 'recording'
+          : source.kind === 'project-export'
+            ? 'export'
+            : 'video',
       mimeType: ref.mimeType,
       size: ref.size,
       source,

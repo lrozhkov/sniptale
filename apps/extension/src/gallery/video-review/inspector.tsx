@@ -29,7 +29,14 @@ import {
   reviewTextButtonClassName,
 } from './controls';
 
-type InspectorSection = 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview';
+type InspectorSection =
+  | 'scene'
+  | 'selected'
+  | 'comments'
+  | 'export'
+  | 'history'
+  | 'preview'
+  | 'speech';
 
 function inspectorNavigationOptions(args: {
   shown: InspectorSection;
@@ -42,6 +49,8 @@ function inspectorNavigationOptions(args: {
   const options: { id: InspectorSection; label: string }[] = [];
   if (args.shown === 'preview')
     options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
+  if (args.context === 'speech' && args.settingsAvailable)
+    options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
   options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
   if (args.settingsAvailable)
     options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
@@ -68,6 +77,7 @@ export function ReviewInspector(props: {
   recovery?: ReactNode;
   scene?: ReactNode;
   preview?: ReactNode;
+  speech?: ReactNode;
   actionHistory?: ReactNode;
   selectionLabel?: string | undefined;
   selectionHasSections?: boolean;
@@ -172,6 +182,8 @@ export function ReviewInspector(props: {
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
               {props.actions}
             </section>
+          ) : shown === 'speech' ? (
+            props.speech
           ) : shown === 'scene' ? (
             props.scene
           ) : shown === 'selected' ? (
@@ -349,7 +361,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    section: 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview';
+    section: 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview' | 'speech';
     onTogglePresentation(): void;
   }
 ) {

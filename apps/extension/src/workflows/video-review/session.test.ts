@@ -349,11 +349,11 @@ it('retries the same failed speech save using fresh queued history and durable r
     replacements: [],
     profile: { modelId: 'model', voiceId: 'voice', responseFormat: 'wav' as const },
   };
-  await expect(saveReviewSpeechTranscript(session, 'voice', transcript)).rejects.toThrow(
-    'storage failed'
-  );
+  await expect(
+    saveReviewSpeechTranscript(session, { kind: 'voiceover', clipId: 'voice' }, transcript)
+  ).rejects.toThrow('storage failed');
   await expect(session.flush()).rejects.toThrow('storage');
-  await saveReviewSpeechTranscript(session, 'voice', transcript);
+  await saveReviewSpeechTranscript(session, { kind: 'voiceover', clipId: 'voice' }, transcript);
   await expect(session.flush()).resolves.toBeUndefined();
   expect(session.getSnapshot().document.advancedContent.audio.voiceover[0]?.transcript).toEqual(
     transcript
@@ -361,16 +361,102 @@ it('retries the same failed speech save using fresh queued history and durable r
   expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
   expect(commitVideoWorkspace.mock.calls[1]?.[0].expectedRevision).toBe(1);
   expect(stored.workspace.history).toHaveLength(1);
-  await saveReviewSpeechTranscript(session, 'voice', structuredClone(transcript));
-  await saveReviewSpeechTranscript(session, 'voice', {
-    ...transcript,
-    profile: { responseFormat: 'wav', voiceId: 'voice', modelId: 'model' },
-  });
+  await saveReviewSpeechTranscript(
+    session,
+    { kind: 'voiceover', clipId: 'voice' },
+    structuredClone(transcript)
+  );
+  await saveReviewSpeechTranscript(
+    session,
+    { kind: 'voiceover', clipId: 'voice' },
+    {
+      ...transcript,
+      profile: { responseFormat: 'wav', voiceId: 'voice', modelId: 'model' },
+    }
+  );
   expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
   expect(stored.workspace.history).toHaveLength(1);
   deps.moveVideoWorkspaceHistory.mockRejectedValueOnce(new Error('history failed'));
   await expect(session.history('undo')).rejects.toThrow('history failed');
-  await expect(saveReviewSpeechTranscript(session, 'voice', transcript)).rejects.toThrow('storage');
-  await expect(saveReviewSpeechTranscript(session, 'voice', transcript)).rejects.toThrow('storage');
+  await expect(
+    saveReviewSpeechTranscript(session, { kind: 'voiceover', clipId: 'voice' }, transcript)
+  ).rejects.toThrow('storage');
+  await expect(
+    saveReviewSpeechTranscript(session, { kind: 'voiceover', clipId: 'voice' }, transcript)
+  ).rejects.toThrow('storage');
   expect(commitVideoWorkspace).toHaveBeenCalledTimes(2);
+});
+
+it('queues original transcript saves with latest manual gain and preserves history-only accepted speech', async () => {
+  const { reviewSpeechTextSignature } =
+    await import('../../features/video/review/speech-transcript');
+  const snapshot = initial();
+  snapshot.workspace.advanced.audio.original.volume = 0.4;
+  let stored = structuredClone(snapshot);
+  const commitVideoWorkspace = vi.fn(
+    async (
+      args: Parameters<
+        typeof import('../../composition/persistence/review-workspaces/store').commitVideoWorkspace
+      >[0]
+    ) => {
+      stored = {
+        ...stored,
+        workspace: {
+          ...stored.workspace,
+          revision: stored.workspace.revision + 1,
+          cursor: stored.workspace.cursor + 1,
+          history: [...stored.workspace.history, args.operation as ReviewOperation],
+        },
+      };
+      return stored;
+    }
+  );
+  const deps = {
+    saveVideoWorkspaceDraft: vi.fn(async () => stored),
+    saveVideoWorkspaceSnapshot: vi.fn(async () => stored),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => stored),
+    commitVideoWorkspace,
+    readVideoWorkspace: vi.fn(async () => stored),
+    moveVideoWorkspaceHistory: vi.fn(async () => stored),
+  };
+  const session = createVideoReviewSession(snapshot, deps);
+  const profile = { modelId: 'm', voiceId: 'v', responseFormat: 'wav' as const };
+  const replacement = {
+    id: 'replacement',
+    assetId: 'project-asset:generated',
+    phraseId: 'phrase',
+    revision: 0,
+    start: 0,
+    end: 1,
+    duration: 0.8,
+    text: 'word',
+    profile,
+    textSignature: reviewSpeechTextSignature('word', profile),
+    enabled: false,
+    originalVolume: 0.25,
+  };
+  const transcript = { version: 1 as const, phrases: [], replacements: [replacement] };
+  await session.saveSpeechTranscript({ kind: 'original' }, 'source', transcript);
+  expect(commitVideoWorkspace).toHaveBeenCalledTimes(1);
+  expect(session.getSnapshot().document.advancedContent.audio.original.volume).toBe(0.4);
+  expect(
+    session.getSnapshot().document.advancedContent.audio.originalSpeech?.transcript.replacements
+  ).toEqual([replacement]);
+  await session.saveSpeechTranscript({ kind: 'original' }, 'source', {
+    ...transcript,
+    replacements: [],
+  });
+  expect(
+    await session.hasDurableSpeechAsset(
+      { kind: 'original' },
+      'replacement',
+      'project-asset:generated'
+    )
+  ).toBe(true);
+  expect(
+    await session.hasDurableSpeechAsset({ kind: 'original' }, 'other', 'project-asset:generated')
+  ).toBe(false);
+  await expect(
+    session.saveSpeechTranscript({ kind: 'original' }, 'other', transcript)
+  ).rejects.toThrow('changed');
 });

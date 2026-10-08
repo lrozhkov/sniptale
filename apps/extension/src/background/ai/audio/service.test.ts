@@ -19,7 +19,7 @@ const request: AudioJobStart = {
   scope: {
     workspaceId: 'w',
     workspaceRevision: 1,
-    clipId: 'c',
+    target: { kind: 'voiceover' as const, clipId: 'c' },
     assetId: 'a',
     nativeStart: 0,
     nativeEnd: 1,

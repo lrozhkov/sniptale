@@ -237,3 +237,36 @@ it.each([undefined, { offset: 0, duration: 4 }, { offset: 2, duration: 4 }])(
     }
   }
 );
+
+it('schedules already projected Revoice without applying microphone speech replacement again', () => {
+  const entry = {
+    id: 'accepted:part',
+    assetId: 'project-asset:accepted',
+    timelineStart: 3,
+    duration: 1,
+    sourceOffset: 2,
+    playbackRate: 2,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  };
+  const plan = buildQuickEditAudioPlan({ revoice: [entry], voiceover: [], music: [] });
+  expect(plan).toEqual([
+    {
+      lane: 'revoice',
+      clipId: 'accepted:part',
+      assetId: 'project-asset:accepted',
+      timelineStart: 3,
+      duration: 1,
+      sourceOffset: 2,
+      playbackRate: 2,
+      volume: 1,
+      fadeIn: 0,
+      fadeOut: 0,
+    },
+  ]);
+  expect(
+    planQuickEditClipPlayback({ entry: plan[0]!, outputTime: 3.25, audioNow: 100 })
+  ).toMatchObject({ offset: 2.5, duration: 1.5, playbackRate: 2 });
+});

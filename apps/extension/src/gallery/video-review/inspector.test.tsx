@@ -418,3 +418,39 @@ it.each(['scene', 'selected', 'history', 'export'] as const)(
     }
   }
 );
+
+it('opens original speech without a synthetic selected clip and leaves it on mode change', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  let navigation!: ReturnType<typeof useReviewInspectorNavigation>;
+  let settingsAvailable = true;
+  const beforeAction = vi.fn((action: () => void) => action());
+  function Harness() {
+    navigation = useReviewInspectorNavigation({
+      beforeAction,
+      contextKey: 'settings:none:',
+      contextSelection: { kind: 'none' },
+      settingsAvailable,
+      exportAvailable: true,
+    });
+    return <output>{navigation.shown}</output>;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => navigation.setSection('speech'));
+    expect(host.textContent).toBe('speech');
+    expect(beforeAction).toHaveBeenCalledTimes(1);
+    act(() => root.render(<Harness />));
+    expect(host.textContent).toBe('speech');
+    act(() => navigation.setSection('scene'));
+    expect(host.textContent).toBe('scene');
+    act(() => navigation.setSection('speech'));
+    settingsAvailable = false;
+    act(() => root.render(<Harness />));
+    expect(host.textContent).toBe('comments');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

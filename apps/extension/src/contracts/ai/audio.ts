@@ -9,11 +9,13 @@ export const AUDIO_OUTPUT_MAX_BYTES = 32 * 1024 * 1024;
 export const AUDIO_STAGING_TTL_MS = 10 * 60 * 1000;
 export const AUDIO_JOB_TIMEOUT_MS = 120_000;
 
+export type ReviewSpeechTarget = { kind: 'original' } | { kind: 'voiceover'; clipId: string };
+
 /** Durable selection authorized before each one-shot provider operation. */
 export interface AudioJobScope {
   workspaceId: string;
   workspaceRevision: number;
-  clipId: string;
+  target: ReviewSpeechTarget;
   assetId: string;
   nativeStart: number;
   nativeEnd: number;
@@ -114,11 +116,27 @@ export function isAudioStagingId(value: unknown): value is string {
     /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/u.test(value)
   );
 }
+export function parseReviewSpeechTarget(value: unknown): ReviewSpeechTarget | null {
+  if (!record(value)) return null;
+  const keys = Object.keys(value);
+  if (value['kind'] === 'original' && keys.length === 1) return { kind: 'original' };
+  if (value['kind'] === 'voiceover' && keys.length === 2 && identifier(value['clipId']))
+    return { kind: 'voiceover', clipId: value['clipId'] };
+  return null;
+}
+export function sameReviewSpeechTarget(
+  left: ReviewSpeechTarget,
+  right: ReviewSpeechTarget
+): boolean {
+  return left.kind === 'original'
+    ? right.kind === 'original'
+    : right.kind === 'voiceover' && left.clipId === right.clipId;
+}
 export function parseAudioJobScope(value: unknown): AudioJobScope | null {
   if (
     !record(value) ||
     !identifier(value['workspaceId']) ||
-    !identifier(value['clipId']) ||
+    'clipId' in value ||
     !identifier(value['assetId']) ||
     !revision(value['workspaceRevision']) ||
     typeof value['nativeStart'] !== 'number' ||
@@ -130,10 +148,12 @@ export function parseAudioJobScope(value: unknown): AudioJobScope | null {
     value['nativeEnd'] - value['nativeStart'] > 300
   )
     return null;
+  const target = parseReviewSpeechTarget(value['target']);
+  if (!target) return null;
   return {
     workspaceId: value['workspaceId'],
     workspaceRevision: value['workspaceRevision'],
-    clipId: value['clipId'],
+    target,
     assetId: value['assetId'],
     nativeStart: value['nativeStart'],
     nativeEnd: value['nativeEnd'],
@@ -181,7 +201,7 @@ export function sameAudioJobScope(left: AudioJobScope, right: AudioJobScope): bo
   return (
     left.workspaceId === right.workspaceId &&
     left.workspaceRevision === right.workspaceRevision &&
-    left.clipId === right.clipId &&
+    sameReviewSpeechTarget(left.target, right.target) &&
     left.assetId === right.assetId &&
     left.nativeStart === right.nativeStart &&
     left.nativeEnd === right.nativeEnd

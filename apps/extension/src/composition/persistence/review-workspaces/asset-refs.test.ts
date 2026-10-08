@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   collectReviewAssetReferences,
+  reviewWorkspaceHasSpeechReplacement,
   decodePortableReviewAssetRefs,
   encodePortableReviewAssetRefs,
   remapReviewAssetReferences,
@@ -532,9 +533,22 @@ it('roundtrips speech assets across current, history and recovery with portable 
     fadeOut: 0,
     transcript: speech('generated'),
   });
+  const originalSpeech = (id: string) => ({
+    enabled: false,
+    transcript: {
+      ...speech(id),
+      replacements: speech(id).replacements.map((replacement) => ({
+        ...replacement,
+        enabled: false,
+        originalVolume: 0.2,
+      })),
+    },
+  });
+  state.audio.originalSpeech = originalSpeech('original-generated');
   const before = reviewAdvancedContentBaseline(state);
   const after = structuredClone(before);
   after.audio.voiceover[0]!.transcript = speech('history');
+  after.audio.originalSpeech = originalSpeech('original-history');
   const snapshot: VideoWorkspaceSnapshot = {
     draft: null,
     workspace: {
@@ -552,16 +566,67 @@ it('roundtrips speech assets across current, history and recovery with portable 
           audio: {
             voiceover: [{ assetId: 'project-asset:original', transcript: speech('recovery') }],
             music: [],
+            originalSpeech: originalSpeech('original-recovery'),
           },
         }),
       },
       history: [{ id: 'apply', at: 1, target: 'advancedContent', before, after }],
     },
   };
-  const expected = ['original', 'generated', 'history', 'recovery'];
+  const expected = [
+    'original',
+    'generated',
+    'history',
+    'recovery',
+    'original-generated',
+    'original-history',
+    'original-recovery',
+  ];
   expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
     new Set(expected.map((id) => `project-asset:${id}`))
   );
+  for (const id of ['original-generated', 'original-history', 'original-recovery']) {
+    expect(
+      reviewWorkspaceHasSpeechReplacement(
+        snapshot.workspace,
+        { kind: 'original' },
+        'take',
+        `project-asset:${id}`
+      )
+    ).toBe(true);
+    expect(
+      reviewWorkspaceHasSpeechReplacement(
+        snapshot.workspace,
+        { kind: 'voiceover', clipId: 'voice' },
+        'take',
+        `project-asset:${id}`
+      )
+    ).toBe(false);
+    expect(
+      reviewWorkspaceHasSpeechReplacement(
+        snapshot.workspace,
+        { kind: 'original' },
+        'other',
+        `project-asset:${id}`
+      )
+    ).toBe(false);
+  }
+  expect(
+    reviewWorkspaceHasSpeechReplacement(
+      snapshot.workspace,
+      { kind: 'voiceover', clipId: 'voice' },
+      'take',
+      'project-asset:history'
+    )
+  ).toBe(true);
+  expect(
+    reviewWorkspaceHasSpeechReplacement(
+      snapshot.workspace,
+      { kind: 'voiceover', clipId: 'wrong' },
+      'take',
+      'project-asset:history'
+    )
+  ).toBe(false);
   const portable = encodePortableReviewAssetRefs(snapshot);
   expect(JSON.stringify(portable)).not.toContain('"assetId"');
   expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
@@ -590,6 +655,11 @@ it('roundtrips speech assets across current, history and recovery with portable 
   const parsed = parseVideoWorkspace(snapshot.workspace);
   expect(parsed?.history).toEqual(snapshot.workspace.history);
   expect(parsed?.advanced.audio.voiceover[0]?.transcript).toEqual(speech('generated'));
+  expect(parsed?.advanced.audio.originalSpeech).toEqual(originalSpeech('original-generated'));
+  const forgedOriginal = structuredClone(portable.workspace);
+  forgedOriginal.advanced.audio.originalSpeech!.transcript.replacements[0]!.assetId =
+    'project-asset:injected';
+  expect(() => assertPortableReviewAssetRefs(forgedOriginal)).toThrow('local asset id');
 });
 
 it('finds the exact audio clip in current, history and recovery without confusing shared assets', async () => {

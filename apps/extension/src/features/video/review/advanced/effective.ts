@@ -1,3 +1,5 @@
+import { projectOriginalSpeech } from '../original-speech';
+import type { ReviewTimeSegment } from '../timeline';
 import { projectReviewVoiceover } from '../voiceover-edits';
 import { projectReviewFocus } from '../focus-edits';
 import { reviewVisibleEditBoundaries } from '../timeline';
@@ -117,6 +119,27 @@ export function resolveQuickEditEffectiveState(
   };
 }
 
+/** Audio consumers supply their actual current map; visual derivation needs no audio clock. */
+export function resolveQuickEditEffectiveAudio(
+  state: QuickEditAdvancedState,
+  timeMap: readonly ReviewTimeSegment[]
+) {
+  const projected = projectOriginalSpeech({
+    speech: state.ui.mode === 'advanced' ? state.audio.originalSpeech : undefined,
+    timeMap,
+  });
+  return {
+    ...resolveQuickEditEffectiveState(state),
+    revoice: projected.clips,
+    automaticOriginalRanges: projected.originalRanges.filter((range) =>
+      timeMap.some(
+        (part) =>
+          part.kind !== 'cut' && part.sourceStart < range.end && part.sourceEnd > range.start
+      )
+    ),
+  };
+}
+
 export type QuickEditExportReason =
   | 'canvas'
   | 'window-header'
@@ -132,6 +155,7 @@ export type QuickEditExportReason =
   | 'comments'
   | 'key-animations'
   | 'click-animations'
+  | 'revoice'
   | 'voiceover'
   | 'music'
   | 'original-audio'
@@ -155,6 +179,7 @@ export type QuickEditExportPlan =
 export function resolveQuickEditExportPlan(args: {
   document: Pick<ReviewDocument, 'edits' | 'canvasComments'>;
   advanced: QuickEditAdvancedState;
+  timeMap?: readonly ReviewTimeSegment[];
   /** Capability hint; undefined defers the authoritative check to the exporter. */
   audioProcessingAvailable?: boolean;
   /** Actual composed audio presence; undefined defers bookend track discovery to the writer. */
@@ -173,6 +198,15 @@ export function resolveQuickEditExportPlan(args: {
   const features = resolveQuickEditEffectiveFeatures(args.advanced);
   const effective = resolveQuickEditEffectiveState(args.advanced);
   const audio: QuickEditExportReason[] = [];
+  if (
+    args.advanced.ui.mode === 'advanced' &&
+    args.advanced.audio.originalSpeech?.enabled &&
+    args.advanced.audio.originalSpeech.transcript.replacements.some((entry) => entry.enabled)
+  ) {
+    if (!args.timeMap) throw new Error('Original speech audio requires the current time map.');
+    const speech = resolveQuickEditEffectiveAudio(args.advanced, args.timeMap);
+    if (speech.revoice.length || speech.automaticOriginalRanges.length) audio.push('revoice');
+  }
   if (features.presentationApplied) {
     visual.push('presentation');
     const presentation = effective.presentation!;
@@ -256,7 +290,8 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     state.zoom.regions.length > 0 ||
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||
-    state.audio.music.length > 0
+    state.audio.music.length > 0 ||
+    !!state.audio.originalSpeech?.transcript.replacements.length
   );
 }
 

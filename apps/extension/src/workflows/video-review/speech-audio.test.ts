@@ -158,3 +158,30 @@ it('measures generated duration from decoded PCM and closes contexts on malforme
     );
   expect(close).toHaveBeenCalledTimes(4);
 });
+
+it('extracts the already-bound original Blob without acquiring or copying a Library asset', async () => {
+  decoder.bytes.mockClear();
+  const close = vi.fn();
+  decoder.samples = [
+    {
+      numberOfChannels: 1,
+      numberOfFrames: 4,
+      sampleRate: 16000,
+      timestamp: 3,
+      copyTo: (plane) => plane.fill(0.5),
+      close,
+    },
+  ];
+  const wav = await extractReviewSpeechWav(
+    new Blob(['original video']),
+    3,
+    3.00025,
+    new AbortController().signal
+  );
+  expect(Array.from(new Int16Array(await wav.arrayBuffer(), 44))).toEqual([
+    16384, 16384, 16384, 16384,
+  ]);
+  expect(decoder.bytes).not.toHaveBeenCalled();
+  expect(close).toHaveBeenCalledOnce();
+  expect(decoder.dispose).toHaveBeenCalled();
+});

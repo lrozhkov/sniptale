@@ -3,7 +3,7 @@ import type { QuickEditAudioClip } from './types';
 
 /** One scheduled external-audio entry in output time; consumed by preview and export. */
 export interface QuickEditAudioPlanEntry {
-  lane: 'voiceover' | 'music';
+  lane: 'revoice' | 'voiceover' | 'music';
   clipId: string;
   assetId: string;
   timelineStart: number;
@@ -21,25 +21,27 @@ export interface QuickEditAudioPlanEntry {
  * are not applied and muted clips contribute silence.
  */
 export function buildQuickEditAudioPlan(args: {
+  revoice?: readonly QuickEditAudioClip[];
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
 }): readonly QuickEditAudioPlanEntry[] {
-  return (['voiceover', 'music'] as const).flatMap((lane) =>
-    (lane === 'voiceover' ? args[lane].flatMap(projectReviewSpeechReplacements) : args[lane]).map(
-      (clip) => ({
-        lane,
-        clipId: clip.id,
-        assetId: clip.assetId,
-        timelineStart: clip.timelineStart,
-        duration: clip.duration,
-        sourceOffset: clip.sourceOffset,
-        volume: clip.muted ? 0 : clip.volume,
-        fadeIn: clip.fadeIn,
-        fadeOut: clip.fadeOut,
-        ...(clip.playbackRate ? { playbackRate: clip.playbackRate } : {}),
-        ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
-      })
-    )
+  return (['revoice', 'voiceover', 'music'] as const).flatMap((lane) =>
+    (lane === 'voiceover'
+      ? args[lane].flatMap(projectReviewSpeechReplacements)
+      : (args[lane] ?? [])
+    ).map((clip) => ({
+      lane,
+      clipId: clip.id,
+      assetId: clip.assetId,
+      timelineStart: clip.timelineStart,
+      duration: clip.duration,
+      sourceOffset: clip.sourceOffset,
+      volume: clip.muted ? 0 : clip.volume,
+      fadeIn: clip.fadeIn,
+      fadeOut: clip.fadeOut,
+      ...(clip.playbackRate ? { playbackRate: clip.playbackRate } : {}),
+      ...(clip.fadePhase ? { fadePhase: clip.fadePhase } : {}),
+    }))
   );
 }
 

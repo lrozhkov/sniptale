@@ -1,3 +1,4 @@
+import { parseReviewOriginalSpeech } from '../original-speech';
 import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from './watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
@@ -383,8 +384,14 @@ function parseOriginalAudio(value: unknown): QuickEditOriginalAudio | null {
   return { muted: value['muted'], volume: value['volume'], ...(ranges ? { ranges } : {}) };
 }
 
-function parseAudioState(value: unknown): QuickEditAudioState | null {
+function parseAudioState(value: unknown, allowOriginalSpeech: boolean): QuickEditAudioState | null {
   if (!isRecord(value)) return null;
+  if (value['originalSpeech'] !== undefined && !allowOriginalSpeech) return null;
+  const originalSpeech =
+    value['originalSpeech'] === undefined
+      ? undefined
+      : parseReviewOriginalSpeech(value['originalSpeech']);
+  if (originalSpeech === null) return null;
   const original = parseOriginalAudio(value['original']);
   const voiceover = parseAudioClips(value['voiceover']);
   const music = parseAudioClips(value['music']);
@@ -399,7 +406,10 @@ function parseAudioState(value: unknown): QuickEditAudioState | null {
     music.some((clip) => clip.sourceAnchor || clip.tempo !== undefined)
   )
     return null;
-  const timing = segments ? { voiceoverSegments: segments } : {};
+  const timing = {
+    ...(segments ? { voiceoverSegments: segments } : {}),
+    ...(originalSpeech ? { originalSpeech } : {}),
+  };
   const gains = value['laneVolumes'];
   if (gains === undefined) return { original, voiceover, music, ...timing };
   if (!isRecord(gains)) return null;
@@ -428,12 +438,14 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 6 &&
       raw['schemaVersion'] !== 5 &&
       raw['schemaVersion'] !== 4 &&
       raw['schemaVersion'] !== 3 &&
       raw['schemaVersion'] !== 2) ||
     (raw['webcam'] !== undefined &&
       raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 6 &&
       raw['schemaVersion'] !== 5 &&
       raw['schemaVersion'] !== 4 &&
       raw['schemaVersion'] !== 3) ||
@@ -443,12 +455,16 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 6 ||
       raw['schemaVersion'] === 5 ||
       raw['schemaVersion'] === 4 ||
       raw['schemaVersion'] === 3
   );
   const background = parseBackgroundSettings(raw['background']);
-  const audio = parseAudioState(raw['audio']);
+  const audio = parseAudioState(
+    raw['audio'],
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+  );
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
@@ -461,6 +477,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 6 &&
     raw['schemaVersion'] !== 5
   )
     return null;
@@ -468,7 +485,8 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
   if (
     raw['presentation'] !== undefined &&
-    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 6
   )
     return null;
   const presentation =
@@ -507,6 +525,7 @@ export function loadQuickEditAdvancedState(
   const version = raw['schemaVersion'];
   if (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    version === 6 ||
     version === 5 ||
     version === 4 ||
     version === 3 ||
@@ -527,6 +546,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['webcam'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 6 &&
     raw['schemaVersion'] !== 5 &&
     raw['schemaVersion'] !== 4 &&
     raw['schemaVersion'] !== 3
@@ -536,12 +556,16 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 6 ||
       raw['schemaVersion'] === 5 ||
       raw['schemaVersion'] === 4 ||
       raw['schemaVersion'] === 3
   );
   const background = parseBackgroundSettings(raw['background']);
-  const audio = parseAudioState(raw['audio']);
+  const audio = parseAudioState(
+    raw['audio'],
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+  );
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
   const keyAnimations = parseReviewKeyAnimations(raw['keyAnimations']);
@@ -554,6 +578,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 6 &&
     raw['schemaVersion'] !== 5
   )
     return null;
@@ -561,7 +586,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
   if (
     raw['presentation'] !== undefined &&
-    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 6
   )
     return null;
   const presentation =

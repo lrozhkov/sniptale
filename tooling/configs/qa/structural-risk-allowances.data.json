@@ -6,11 +6,11 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "<file>",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The gallery entry owns one modal review interaction. State signals count the same session and UI setters again through resource/state aliases (resource.session, state.session, cuts/state.editing, setMessage/state.setMessage), plus transient hover/selection/telemetry; these are not independent durable authorities. Durable writes remain in the serialized session and export publication remains in export-lifecycle. Two effects are DOM and listener lifecycle, four imports are pure features, locale and React/icons, cohesion0.93; splitting this connected view/state contract merely to lower the647-line count would distribute the same receiver. Keyboard/export guard correction preserves this same state receiver and transaction contract; its failed-first interaction test now rejects history and edit changes during export. The shared Add guard now also rejects busy report/export activation; unchanged647/158 lines and ownership metrics confirm no added authority. Independent architecture review accepted the prior shape; this exact corrected body requires renewed review.",
-      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-09-06",
-      "astHash": "03d4f1e84564598be8e4bb5bab7ed206ea81b60f06b27bf9558ebcd90c8fb344",
-      "signatureHash": "1d700bed52f5a50f5fd2221c74860dc7bdf16d453da5983409f7e51acbf334b7"
+      "reason": "tool-noise: This is the existing modal editor shell, with a single session receiver and disposable inspector/selection state. The candidate adds original-speech navigation and one selected replacement ID; provider, decoding, persistence queue and recovery remain in their existing owners. Resource/state aliases count the same session repeatedly. Score5 delta0; forwarding-only JSX extraction would distribute the same route without isolating an authority. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "453c2a55313aa2340cd903d4e55b5990cfcc42748cc899c0979cf62df089caec",
+      "signatureHash": "b6fcf8b682892ca49867a3cc5abf8d433a946f60b624aaf8ca1adc1151764fba"
     },
     {
       "rule": "structural-function-risk",
@@ -28,11 +28,11 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewInspectorBinding",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: The151-line inspector binding remains four outer statements and score5delta0. The candidate only forwards the optional seam-preview callback into existing Scene properties. Its visual conditions describe availability, selected panels and history navigation; leave flushes the same serialized session before caller navigation. No additional storage, transport or recovery owner exists. Further forwarding JSX would distribute one inspector binding. Main inspected the current body; independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reason": "tool-noise: The inspector binding still has four outer statements and no effect or recovery authority. It adds a speech panel with immutable source identity and current selection, delegating all operations to existing workflow/session/audio owners. The conditional JSX represents the same inspector; score5 delta0. No additional durable state or transport is owned here. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-08",
-      "astHash": "35d5ed52e7cee66cd1d93ba70e59020d40ab1503ddfa5618d4fd8685d2129324",
-      "signatureHash": "5790099c501d119a4544c1c72567c72ae9cd954b827576db029e5e4a0e8ce450"
+      "astHash": "daa44faed38041c4fa3e90bb6d199b8966b7b773394314ac98ce93ddd23ee55c",
+      "signatureHash": "5e676f508872db4a5b39f08c6def98de1c7c6534dcb9a152842c5e34b6047e1e"
     },
     {
       "rule": "structural-function-risk",
@@ -72,10 +72,10 @@
       "file": "apps/extension/src/gallery/video-review/index.tsx",
       "symbol": "ReviewEditor",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: After extracting actual seam-preview input and dialog binding, this152-line component has score3delta0,13statements and nesting1. It composes the existing stage, inspector, timeline and recording overlays from the same review session. Preview/UI preferences are disposable and writes remain existing hooks. The remaining length is typed props and conditional visual composition; no independent transaction remains inside it to extract. Main inspected the current body; independent architecture review must validate this exact classification.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver, recovery policy or mixed lifecycle. Remove when the analyzer recognizes cohesive JSX/hook composition. Independent architecture review must inspect the classification.",
+      "reason": "tool-noise: The existing editor wiring adds transient accepted-replacement selection and explicit navigation. Source playback, audio mutations, export and persistence still use existing hooks; score3 delta0. State aliases refer to one editor session and callbacks do not introduce independent runtime or recovery. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-08",
-      "astHash": "3948d19277e55b5f0297435413f8ba667452e7d4231175e69563a8c6667d203b",
+      "astHash": "148344c1520581fbbbc78b58bbec236717a14166f60462711ffbd941f58ec935",
       "signatureHash": "de72877baccf03b27a140a5e9119b187f5df9a2438d8c0a8dfb9d7451d3b2b2e"
     },
     {
@@ -94,10 +94,10 @@
       "file": "apps/extension/src/workflows/video-review/session.ts",
       "symbol": "createVideoReviewSession",
       "owner": "extension:app-core:workflows",
-      "reason": "tool-noise: This factory owns one serialized review session: one queue, snapshot, durable buffer, pending/error state and retry policy. Speech saves must construct history after the same queue flush and distinguish retry of their own failed save from unrelated failed history. Durable-reference queries use that same persisted history projection. Domain validation remains outside the factory; no UI, provider transport, staging or second persistence authority is implemented here. The sole blocking metric is 250 lines above the orchestration cap; score1/delta0,10 outer statements, cyclomatic1,cognitive0 and cohesion1.00. Splitting closure state or rewriting it as a class solely to shorten the factory would hide its single transaction receiver. Exact behavior is covered by save failure/retry, unrelated failed history, dirty buffer, no-op and asset-reference proof.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, durable writer, state receiver or recovery policy. Remove when the analyzer recognizes this cohesive serialized transaction factory. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-07",
-      "astHash": "ee7a893e36145d94be02ed3465f35ac4d312afb543e0249e562b21071808b1c1",
+      "reason": "tool-noise: The factory retains one serialized queue, history projection and durable session receiver. Original and voiceover transcript saves share that queue and exact retained-reference checks delegate to persistence. Score1 delta0; a separate per-target session would duplicate authority rather than isolate an independent lifecycle. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "d9ce89da4423af2d3a04dae67e54d2c5ddb118f624b4944fdde8778b1a53439a",
       "signatureHash": "aed89eba9c2e167caeeaf39979c18b16f68ed33f8a375440b08514c8a3e1a7cb"
     },
     {
@@ -116,22 +116,22 @@
       "file": "apps/extension/src/gallery/video-review/use-speech-edits.ts",
       "symbol": "useSpeechEdits",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This hook owns one local edit transaction: optimistic transformations, durable rebase/save, retry/discard, invalid profile draft, and navigation/unload protection. Phrase edit/split/merge/restore callbacks admit operations to that same queue and share transcript/invalidation authority. Persistence remains in the existing workflow/session; domain transformations are external pure functions. After independent preview lifecycle extraction, the remaining209-line hook has27 statements,CC5,cognitive4,nesting1 and cohesion0.83. Extracting closures just to satisfy length would pass the same edit authority through forwarding layers. The coalescing correction keeps this same queue and operation authority: unattempted consecutive text is grouped, attempted saves stay immutable, and navigation/explicit actions await the existing flush. Real session/history proof covers one commit per typing burst, Undo, forced flush, in-flight typing and failed retry. Reassessment found no independent authority introduced; renewed independent architecture review is required.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent state receiver, runtime, durable writer or recovery policy. Remove when the analyzer models cohesive hook lifecycles. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-07",
-      "astHash": "2c8779c975d63b8b249595b044507e8d90be6dc66a0979bed66ad9c304a2e210",
-      "signatureHash": "64a4729babdc707fc158f283c56d39ee7c2b39513e925d5ded0574819bd226cd"
+      "reason": "tool-noise: The existing serialized draft queue and navigation flush/error lifetime now resolve a discriminated target and patch accepted speech through that same queue. There is no second state authority or recovery transaction; score1 delta0. Splitting its closures for line count would distribute one pending-write lifetime. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "67562011f1a19930f9090302547dff98f8909958e84656744f5c26d0e8dd5536",
+      "signatureHash": "29edfed81c631521d5812ff089e0c51634e1aaaec2255c4efd11e0a95787cad6"
     },
     {
       "rule": "structural-function-risk",
       "file": "apps/extension/src/gallery/video-review/use-speech.ts",
       "symbol": "useReviewSpeech",
       "owner": "extension:gallery:video-review",
-      "reason": "tool-noise: This hook owns one configured remote-operation lifecycle: model discovery/selection, abort controller, beforeAction/flush admission, recognize/generate/apply sequencing and bounded error state. Independent durable draft and disposable preview lifecycles have concrete hooks. The remaining141-line coordinator has19 statements,CC3,cognitive2,nesting1 and cohesion0.73; it introduces no provider fetch or persistence writer. Splitting its admission and cancellation closures solely to satisfy length would distribute one active-operation lifetime. The coalescing correction keeps this same queue and operation authority: unattempted consecutive text is grouped, attempted saves stay immutable, and navigation/explicit actions await the existing flush. Real session/history proof covers one commit per typing burst, Undo, forced flush, in-flight typing and failed retry. Reassessment found no independent authority introduced; renewed independent architecture review is required.",
-      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent state receiver, runtime, durable writer or recovery policy. Remove when the analyzer models cohesive hook lifecycles. Independent architecture review must validate this classification.",
-      "reviewDate": "2026-10-07",
-      "astHash": "5ed73c28d90d9dfe45124c411d0f76ccdce9d7e8bc17ca50ec649ed151d626d4",
-      "signatureHash": "5efd9d0c809937dc02ec92b8460eeaf7d66c78a927bec6616b85f3d39f65a758"
+      "reason": "tool-noise: Recognition controls and pure source/result timing were separated before triage. The remaining hook retains one cancellable operation and configured catalog lifetime; original gain is disposable next-apply state. Target resolution replaces clip lookup, with no duplicate transport or durable owner; score1 delta0. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "bebfb9fe70b0f15f9073b8a32fd5b1030a34457cabf2f8d531cc233248739179",
+      "signatureHash": "6426776e4e54e75a4c11257cc77f404ee32b70dfc3016376f4e0f433ca8aab14"
     },
     {
       "rule": "structural-file-risk",
@@ -149,10 +149,10 @@
       "file": "apps/extension/src/composition/persistence/projects/asset-publication.test.ts",
       "symbol": "<file>",
       "owner": "extension:app-core:composition",
-      "reason": "tool-noise: The exact publication-adapter test file now804lines crosses800 with unchangedscore2/delta0 andcohesion1.00. Added intro/outro recovery and incompatible-claim cases use the existing createJournal/createTransaction and physical-reference fixture, testing the same adapter/parser transaction as existing audio/watermark claims. No separate storage lifetime or publication owner was introduced. Splitting those cases solely for fourlines requires copying the shared journal/mutation mocks or adding a fixture forwarding surface; it does not resolve an ownership defect. Main inspected the actual added claim tests; independent architecture review must validate this classification.",
-      "removalCondition": "Remove on exact AST/signature change; reassess an independent publication owner or fixture lifecycle, or an actual shared fixture split. Remove when the analyzer recognizes cohesive adapter tests. Independent architecture review must inspect the classification.",
+      "reason": "tool-noise: The same publication fixture now verifies exact original/voiceover replacement claims and history-only recovery. Its adapter maps and counters are one shared transaction fixture, not independent production authorities; score2 delta0 and cohesion1. Moving assertions only to shorten this fixture would duplicate its setup. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
       "reviewDate": "2026-10-08",
-      "astHash": "c15ea28e16e52a0a3425d010abea2dcb5908b54fc5fadcd8b93e3797453169bb",
+      "astHash": "72018ecdf06ad801714384a179ec508a98251a872891b47dcc7c987bb4ae5cde",
       "signatureHash": "80ae00ade1b6ba3c0d9bed24fed6982fc358cc34a161b697ca9f640b678189c2"
     },
     {
@@ -176,6 +176,39 @@
       "reviewDate": "2026-10-08",
       "astHash": "0160d1af95d883a2eab0cbf2ecf166538b058e3216b58c99c74fd637bf4d88a3",
       "signatureHash": "fe2f621b4d19071bc7fd5970abe6c3a2008a940d849cf6678c9b2e10e6e8b991"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/composition/persistence/review-workspaces/asset-refs.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:composition:persistence",
+      "reason": "tool-noise: Original transcript cases extend the existing speech current/history/recovery and portable-reference fixture. These assertions exercise the same reference walker/remapper; score2 delta0 and cohesion1. No independent state writer or effect was added. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "da453f7ac41451e43706e68d05b3d6908113ec89a96eb74bc90475b5fb2ce039",
+      "signatureHash": "eb89f5599e8f3549069f4e9fd7c31dae6ed1f4e85908453bedd8ca34b5a8bcee"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline-binding.tsx",
+      "symbol": "ReviewTimelineBinding",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The existing timeline composition gains one adjacent source-anchored Revoice row and carries already-derived gain ranges. It owns the same projection/tool UI, not media scheduling or durable speech state. Score5 delta0; extracting forwarding lane JSX would not separate an authority. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "9c252081eb15e0463e6e23ebb95945d3c22ef9b4785dbccfd57c8e0a51df7811",
+      "signatureHash": "627ee8a2ac056b80ef27c4a8e017c6bde5b731af11373aa60d99c17f31f96d81"
+    },
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/workflows/video-review/export-lifecycle.test.ts",
+      "symbol": "<file>",
+      "owner": "extension:workflows:video-review",
+      "reason": "tool-noise: The same export transaction fixture now proves Revoice packet/render dispatch and one fragment offset. Its mock state represents one lifecycle across success and refusal paths; score2 delta0 and cohesion1. Splitting solely for length would duplicate the lifecycle fixture. Main inspected the changed body; fresh independent architecture review must validate this exact classification.",
+      "removalCondition": "Remove when this exact AST or signature changes; reassess any independent runtime, state receiver, durable writer, request, recovery or effect lifetime. Remove when the analyzer models this cohesive JSX/fixture/queue shape. Independent architecture review must inspect this classification.",
+      "reviewDate": "2026-10-08",
+      "astHash": "88a08b0d43890bff1b0368e1b31774caacd317a53d4cb460af52757d92aec3e0",
+      "signatureHash": "7e731b2cca456f975c8c3aaa907d5b8c5086ab51cf1054b4eb6f487c62d2cbc0"
     }
   ]
 }

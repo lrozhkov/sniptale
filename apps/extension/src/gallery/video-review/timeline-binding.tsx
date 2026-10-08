@@ -86,8 +86,10 @@ function ReviewAudioLane(props: {
   onSelectSpeed(edit: ReviewEdit): void;
   hasOriginalAudio: boolean;
   showAddedAudio: boolean;
+  showOriginalSpeech: boolean;
   snapTimes: readonly number[];
   audioState: QuickEditAudioState;
+  automaticOriginalRanges?: readonly { start: number; end: number; volume: number }[] | undefined;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   projection?: ReviewTrackProjection;
   resultDuration: number;
@@ -96,10 +98,15 @@ function ReviewAudioLane(props: {
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
   onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
+  onOpenSpeech?: ((replacementId?: string, time?: number) => void) | undefined;
+  selectedSpeechId?: string | undefined;
 }) {
   return (
     <ReviewAudioTrack
       beforeAction={props.beforeAction}
+      onOpenSpeech={props.onOpenSpeech}
+      selectedSpeechId={props.selectedSpeechId}
+      onToggleSpeech={props.audio.setOriginalSpeechEnabled}
       originalEditor={props.audio}
       selectedEditId={props.selectedEditId}
       edits={props.edits}
@@ -107,6 +114,8 @@ function ReviewAudioLane(props: {
       onSelectSpeed={props.onSelectSpeed}
       hasOriginalAudio={props.hasOriginalAudio}
       showAddedAudio={props.showAddedAudio}
+      showOriginalSpeech={props.showOriginalSpeech}
+      automaticOriginalRanges={props.automaticOriginalRanges}
       projection={props.projection}
       waveforms={props.waveforms}
       assets={props.audio.assets}
@@ -162,10 +171,13 @@ type TimelineBindingProps = {
   zoom: ReturnType<typeof useReviewZoomEditor>;
   audio: ReturnType<typeof useReviewAudio>;
   audioState: QuickEditAudioState;
+  automaticOriginalRanges?: readonly { start: number; end: number; volume: number }[] | undefined;
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
   onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
+  onOpenSpeech?: ((replacementId?: string, time?: number) => void) | undefined;
+  selectedSpeechId?: string | undefined;
   onMarker(marker: ReviewTelemetryMarker): void;
   onClearSelection(): void;
   selectedObject: boolean;
@@ -320,6 +332,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
         ? { boundaries: props.editing.exporter.index.boundaries }
         : {})}
       {...(features.audioTrackVisible ||
+      (features.mode === 'advanced' &&
+        !!props.audioState.originalSpeech?.transcript.replacements.length) ||
       (features.mode === 'advanced' && props.editing.exporter.index === null) ||
       !!props.editing.exporter.index?.audioCodec
         ? {
@@ -337,6 +351,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 }}
                 onSelectSpeed={props.editing.select}
                 showAddedAudio={features.audioTrackVisible}
+                showOriginalSpeech={features.mode === 'advanced'}
+                automaticOriginalRanges={props.automaticOriginalRanges}
                 hasOriginalAudio={
                   props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
                 }
@@ -350,6 +366,8 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 onImportFile={props.onImportAudioFile}
                 onRecordVoiceover={props.onRecordVoiceover}
                 onOpenMusic={props.onOpenMusic}
+                onOpenSpeech={features.mode === 'advanced' ? props.onOpenSpeech : undefined}
+                selectedSpeechId={props.selectedSpeechId}
               />
             ),
           }

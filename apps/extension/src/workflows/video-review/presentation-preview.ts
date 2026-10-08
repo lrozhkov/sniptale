@@ -109,6 +109,11 @@ export async function renderPresentationPreview(
     exportAudio = await deps.audio({
       advanced: input.advanced,
       fragmentOffset: input.fragmentOffset,
+      timeMap: buildReviewTimeMap(input.index.duration, input.edits).map((part) => ({
+        ...part,
+        resultStart: part.resultStart + input.fragmentOffset,
+        resultEnd: part.resultEnd + input.fragmentOffset,
+      })),
       signal,
       readProjectAsset: input.readProjectAsset,
       window:

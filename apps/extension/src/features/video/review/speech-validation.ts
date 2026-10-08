@@ -100,7 +100,8 @@ function parsePhrase(value: unknown): ReviewSpeechPhrase | null {
   };
 }
 
-function parseReplacement(value: unknown): ReviewSpeechReplacement | null {
+/** Parses the shared immutable replacement contract before target-specific fields. */
+export function parseReviewSpeechReplacement(value: unknown): ReviewSpeechReplacement | null {
   if (
     !isRecord(value) ||
     !identity(value['id']) ||
@@ -154,7 +155,17 @@ function parseIntervals<T extends { id: string; start: number; end: number }>(
 }
 
 /** Rejects malformed new fields rather than silently losing transcript, references or history. */
-export function parseReviewSpeechTranscript(value: unknown): ReviewSpeechTranscript | null {
+export function parseReviewSpeechTranscript(value: unknown): ReviewSpeechTranscript | null;
+export function parseReviewSpeechTranscript<R extends ReviewSpeechReplacement>(
+  value: unknown,
+  parseReplacement: (value: unknown) => R | null
+): ReviewSpeechTranscript<R> | null;
+export function parseReviewSpeechTranscript(
+  value: unknown,
+  parseReplacement: (
+    value: unknown
+  ) => ReviewSpeechReplacement | null = parseReviewSpeechReplacement
+): ReviewSpeechTranscript | null {
   if (
     !isRecord(value) ||
     value['version'] !== 1 ||

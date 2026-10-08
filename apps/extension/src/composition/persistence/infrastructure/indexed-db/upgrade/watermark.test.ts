@@ -80,7 +80,7 @@ it('admits watermark content with one additive step and leaves rows and object b
   const fixture = upgradeFixture();
   const before = structuredClone(fixture.durable);
   const plan = buildDatabaseMigrationPlan(5, 6)!;
-  expect(DB_VERSION).toBe(7);
+  expect(DB_VERSION).toBeGreaterThanOrEqual(6);
   expect(plan).toHaveLength(1);
   expect(plan[0]).toMatchObject({
     fromDatabaseVersion: 5,
@@ -146,7 +146,7 @@ it('rolls back interrupted contract publication and reruns without partial domai
 it.each([
   [6, 5],
   [7, 6],
-  [7, 8],
+  [DB_VERSION, DB_VERSION + 1],
 ])('refuses unsupported or reverse migration %i to %i before mutation', (from, to) => {
   const fixture = upgradeFixture();
   const contracts = fixture.contracts();
@@ -159,7 +159,7 @@ it.each([
 
 it('requires the exact watermark domain contract at the current physical version', () => {
   expect(parseStoredSchemaContracts(CURRENT_SCHEMA_CONTRACTS)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  for (const schemaVersion of [4, 5, 7]) {
+  for (const schemaVersion of [4, 5, 8]) {
     const incompatible = CURRENT_SCHEMA_CONTRACTS.map((contract) =>
       contract.domainId === 'mediaLibrary' ? { ...contract, schemaVersion } : contract
     );

@@ -585,3 +585,81 @@ it.each([false, true])(
     } else await expect(save).resolves.toBeDefined();
   }
 );
+
+it.each([
+  'missing',
+  'ready',
+  'wrong-target',
+  'wrong-replacement',
+  'wrong-aggregate',
+  'durable',
+] as const)(
+  'admits original speech only with exact %s authority before the durable workspace write',
+  async (authority) => {
+    const { reviewSpeechTextSignature } =
+      await import('../../../features/video/review/speech-transcript');
+    const opened = await openVideoWorkspace(id, source);
+    const profile = { modelId: 'speech', voiceId: 'alloy', responseFormat: 'mp3' as const };
+    const advanced = structuredClone(opened.workspace.advanced);
+    advanced.audio.originalSpeech = {
+      enabled: false,
+      transcript: {
+        version: 1,
+        profile,
+        phrases: [],
+        replacements: [
+          {
+            id: 'accepted',
+            assetId: 'project-asset:background',
+            phraseId: 'draft-may-be-gone',
+            start: 1,
+            end: 3,
+            duration: 1,
+            revision: 1,
+            text: 'Speech',
+            profile,
+            textSignature: reviewSpeechTextSignature('Speech', profile),
+            enabled: false,
+            originalVolume: 0.25,
+          },
+        ],
+      },
+    };
+    const generated = { ...entry, mimeType: 'audio/mpeg' };
+    if (authority === 'durable') rows.get('project_assets')!.set(generated.id, generated);
+    else if (authority !== 'missing') {
+      const journal = readyJournal();
+      journal.assetRefs[0] = { ...journal.assetRefs[0]!, mimeType: generated.mimeType };
+      journal.payload = {
+        entry: generated,
+        filename: 'speech.mp3',
+        expectedAssetId: null,
+        publishToLibrary: false,
+        requiredReviewSpeech: {
+          aggregateId: authority === 'wrong-aggregate' ? 'other' : id,
+          target:
+            authority === 'wrong-target'
+              ? { kind: 'voiceover', clipId: 'voice' }
+              : { kind: 'original' },
+          replacementId: authority === 'wrong-replacement' ? 'other' : 'accepted',
+        },
+      };
+      journals.push(journal);
+    }
+    const saving = saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      advanced,
+    });
+    if (authority === 'ready' || authority === 'durable') {
+      expect((await saving).workspace.advanced.audio.originalSpeech).toEqual(
+        advanced.audio.originalSpeech
+      );
+      expect(rows.get('project_assets')!.has(entry.id)).toBe(authority === 'durable');
+    } else {
+      await expect(saving).rejects.toMatchObject({ code: 'missing-media' });
+      expect(await readVideoWorkspace(id)).toEqual(opened);
+    }
+  }
+);

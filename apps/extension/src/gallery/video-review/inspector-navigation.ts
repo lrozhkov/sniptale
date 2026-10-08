@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewSelection } from '../../features/video/review/types';
 
-type Section = 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview';
+type Section = 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview' | 'speech';
 type ReviewInspectorNavigationInput = {
   beforeAction?: ReviewBeforeAction | undefined;
   contextKey?: string;
@@ -25,7 +25,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       : props.settingsAvailable
         ? 'scene'
         : 'comments';
-  const [context, updateContext] = useState<'selected' | 'export' | 'history' | null>(
+  const [context, updateContext] = useState<'selected' | 'export' | 'history' | 'speech' | null>(
     props.selectionLabel ? 'selected' : null
   );
   const [section, updateSection] = useState<Section>(contextSection);
@@ -58,7 +58,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     (props.beforeAction ?? ((action) => action()))(() => {
       previewReturn.current = null;
       explicitSection.current = value;
-      if (value === 'export' || value === 'selected' || value === 'history') updateContext(value);
+      if (value === 'export' || value === 'selected' || value === 'history' || value === 'speech')
+        updateContext(value);
       updateSection(value);
     });
   };
@@ -82,7 +83,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     else if (!explicit)
       updateContext((current) =>
         (preserveExport && current === 'export') ||
-        (current === 'history' && props.contextSelection?.kind === 'none')
+        ((current === 'history' || (current === 'speech' && !modeChanged)) &&
+          props.contextSelection?.kind === 'none')
           ? current
           : contextSection === 'selected'
             ? 'selected'
@@ -93,7 +95,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
         ? 'export'
         : (explicit ??
           ((preserveExport && current === 'export') ||
-          (current === 'history' && props.contextSelection?.kind === 'none') ||
+          ((current === 'history' || (current === 'speech' && !modeChanged)) &&
+            props.contextSelection?.kind === 'none') ||
           (!modeChanged && contextSection === 'scene' && current === 'comments')
             ? current
             : contextSection))
@@ -114,7 +117,7 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       ? props.settingsAvailable
         ? 'scene'
         : 'comments'
-      : section === 'scene' && !props.settingsAvailable
+      : (section === 'scene' || section === 'speech') && !props.settingsAvailable
         ? 'comments'
         : section;
   return {

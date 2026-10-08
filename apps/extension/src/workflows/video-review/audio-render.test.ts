@@ -723,3 +723,72 @@ it('retains native resampler context around streamed normal-speed clip windows',
     fixture.cleanup();
   }
 });
+
+it.each([0.5, 1, 2, 4])(
+  'attenuates only original PCM through native slots at rate %s including the generated tail',
+  async (rate) => {
+    const fixture = await audioFixture();
+    audioMock.packets = Array.from({ length: 250 }, (_, i) => ({
+      timestamp: i * 0.02,
+      duration: 0.02,
+      data: new Uint8Array([0xf8, 0]),
+    }));
+    audioMock.samples.mockImplementation((start: number, end: number) => [
+      decodedSample(start, end - start),
+    ]);
+    const revoice = new AudioBuffer({ length: 48_000, numberOfChannels: 1, sampleRate: 48_000 });
+    revoice.getChannelData(0).fill(0.75);
+    try {
+      for await (const _sample of renderReviewAudio(
+        fixture.track,
+        {
+          sourceStart: 2,
+          sourceEnd: 3,
+          resultStart: 0,
+          resultEnd: 1 / rate,
+          rate,
+          kind: rate === 1 ? 'keep' : 'speed',
+        },
+        false,
+        new AbortController().signal,
+        {
+          entries: [
+            {
+              lane: 'revoice',
+              clipId: 'accepted',
+              assetId: 'accepted',
+              timelineStart: 0,
+              duration: 0.4 / rate,
+              sourceOffset: 0,
+              volume: 1,
+              fadeIn: 0,
+              fadeOut: 0,
+              playbackRate: rate,
+            },
+          ],
+          buffers: new Map([['accepted', revoice]]),
+          originalVolume: 2,
+          originalMuted: false,
+          originalRanges: [{ id: 'manual', start: 2, end: 3, volume: 0.5 }],
+          automaticOriginalRanges: [{ start: 2.2, end: 2.8, volume: 0.25 }],
+        }
+      )) {
+        /* drain bounded output */
+      }
+      const sampleAt = (sourceTime: number) => {
+        const outputTime = (sourceTime - 2) / rate;
+        const window = Math.floor(outputTime);
+        const pcm = fixture.windows[window]!.sources![0]!.buffer!.getChannelData(0);
+        return pcm[Math.round((outputTime - window + 0.02) * 48000)]!;
+      };
+      expect(sampleAt(2.1)).toBeCloseTo(0.125, 3);
+      expect(sampleAt(2.3)).toBeCloseTo(0.03125, 3);
+      expect(sampleAt(2.7)).toBeCloseTo(0.03125, 3);
+      if (rate >= 1) expect(sampleAt(2.9)).toBeCloseTo(0.125, 3);
+      expect(revoice.getChannelData(0)[0]).toBe(0.75);
+      expect(fixture.windows[0]!.gains![0]!.gain.value).toBe(2);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+);

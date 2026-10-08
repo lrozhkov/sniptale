@@ -11,7 +11,7 @@ const ticket = '12345678-1234-4234-8234-123456789abc';
 const scope = {
   workspaceId: 'w',
   workspaceRevision: 1,
-  clipId: 'c',
+  target: { kind: 'voiceover' as const, clipId: 'c' },
   assetId: 'a',
   nativeStart: 0,
   nativeEnd: 1,
@@ -303,4 +303,47 @@ it('cleans the authorized transcription upload after a network failure without r
   expect(job.deps.write).not.toHaveBeenCalled();
   expect(job.deps.request).toHaveBeenCalledOnce();
   await job.connection.disconnect();
+});
+
+it('original tickets reauthorize after staged input and cannot execute again or survive erasure', async () => {
+  const original: AudioJobStart = {
+    ...transcription,
+    scope: { ...scope, target: { kind: 'original' } },
+  };
+  const stale = setup();
+  stale.connection.receive(original);
+  await vi.waitFor(() =>
+    expect(stale.messages).toContainEqual({
+      type: 'authorized',
+      requestId: 'r',
+      ticket,
+      scope: original.scope,
+    })
+  );
+  stale.deps.read.mockImplementationOnce(async () => {
+    stale.deps.authorize.mockRejectedValue(new Error('stale'));
+    return wav();
+  });
+  execute(stale);
+  await vi.waitFor(() =>
+    expect(stale.messages).toContainEqual({ type: 'failure', requestId: 'r', code: 'stale' })
+  );
+  expect(stale.deps.read).toHaveBeenCalledWith(expect.anything(), original.scope);
+  expect(stale.deps.request).not.toHaveBeenCalled();
+  execute(stale);
+  expect(stale.deps.request).not.toHaveBeenCalled();
+  await stale.connection.disconnect();
+  const erased = setup();
+  erased.connection.receive(original);
+  await vi.waitFor(() => expect(erased.messages.some((m) => m.type === 'authorized')).toBe(true));
+  const exclusion = erased.service.reserveErasureExclusion();
+  await erased.service.cancelActiveJob();
+  await exclusion.waitForActiveMutations();
+  execute(erased);
+  const denied: AudioJobServerMessage[] = [];
+  erased.service.connect((message) => denied.push(message)).receive(original);
+  expect(denied).toContainEqual({ type: 'failure', requestId: 'r', code: 'unauthorized' });
+  expect(erased.deps.request).not.toHaveBeenCalled();
+  exclusion.release();
+  await erased.connection.disconnect();
 });

@@ -228,13 +228,29 @@ it('removes generated audio from all snapshots while preserving original audio a
     fadeOut: 0,
     transcript,
   };
+  const originalSpeech = {
+    enabled: false,
+    transcript: {
+      ...transcript,
+      replacements: transcript.replacements.map((entry) => ({
+        ...entry,
+        enabled: false,
+        originalVolume: 0.25,
+      })),
+    },
+  };
   const workspace = makeWorkspace();
+  workspace.advanced.audio.originalSpeech = originalSpeech;
   workspace.advanced.audio.voiceover = [voice];
-  workspace.advanced.recoveryV1 = JSON.stringify({ audio: { voiceover: [voice], music: [] } });
+  workspace.advanced.recoveryV1 = JSON.stringify({
+    audio: { voiceover: [voice], music: [], originalSpeech },
+  });
   const before = createQuickEditAdvancedContent();
   before.audio.voiceover = [voice];
+  before.audio.originalSpeech = originalSpeech;
   const after = structuredClone(before);
   after.audio.voiceover[0]!.transcript!.replacements = [];
+  after.audio.originalSpeech!.transcript.replacements = [];
   workspace.history = [{ id: 'restore', at: 1, target: 'advancedContent', before, after }];
   const result = stripReviewAssetReference(workspace, removed, 2);
   expect(result.advanced.audio.voiceover[0]).toMatchObject({
@@ -244,6 +260,14 @@ it('removes generated audio from all snapshots while preserving original audio a
   expect(
     JSON.parse(result.advanced.recoveryV1!).audio.voiceover[0].transcript.replacements
   ).toEqual([]);
+  expect(result.advanced.audio.originalSpeech).toEqual({
+    ...originalSpeech,
+    transcript: { ...originalSpeech.transcript, replacements: [] },
+  });
+  expect(
+    JSON.parse(result.advanced.recoveryV1!).audio.originalSpeech.transcript.replacements
+  ).toEqual([]);
+  expect(workspace.advanced.audio.originalSpeech!.transcript.replacements).toHaveLength(1);
   expect(result.history).toEqual([]);
   expect(result.cursor).toBe(0);
   expect(collectReviewAssetReferences(result)).toEqual(new Set([retained]));

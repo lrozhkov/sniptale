@@ -1,3 +1,4 @@
+import { parseReviewSpeechTarget, type ReviewSpeechTarget } from '../../../contracts/ai/audio';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { StoredProjectAssetEntry } from './contracts';
 import { parseProjectAssetEntry } from './read-guards';
@@ -6,6 +7,8 @@ export interface ProjectAssetPublicationOptions {
   /** False keeps a frozen project representation out of the Library catalogue. */
   publishToLibrary?: boolean;
   originMediaId?: string;
+  /** Private accepted speech is retained by this exact target and replacement. */
+  requiredReviewSpeech?: { aggregateId: string; target: ReviewSpeechTarget; replacementId: string };
   /** Private scene resource retained by its exact review slot, including remembered settings. */
   requiredReviewResource?:
     | { aggregateId: string; slot: 'watermark' }
@@ -74,6 +77,20 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
   if (requiredReview === null) return null;
   const requiredReviewResource = parseReviewResource(value, entry.mimeType, requiredReview);
   if (requiredReviewResource === null) return null;
+  const speech = value['requiredReviewSpeech'];
+  const requiredReviewSpeech =
+    speech === undefined ? undefined : parseProjectAssetSpeechClaim(speech);
+  if (
+    requiredReviewSpeech === null ||
+    (requiredReviewSpeech &&
+      (value['publishToLibrary'] !== false ||
+        !entry.mimeType.startsWith('audio/') ||
+        requiredReview !== undefined ||
+        requiredReviewResource !== undefined ||
+        value['librarySourceId'] !== undefined ||
+        entry.originMediaId !== undefined))
+  )
+    return null;
   const librarySourceId = value['librarySourceId'];
   if (librarySourceId !== undefined) {
     if (
@@ -111,6 +128,7 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
       ? { publishToLibrary: value['publishToLibrary'] }
       : {}),
     ...(requiredReview ? { requiredReview } : {}),
+    ...(requiredReviewSpeech ? { requiredReviewSpeech } : {}),
     ...(requiredReviewResource ? { requiredReviewResource } : {}),
     ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
   };
@@ -166,4 +184,23 @@ function parseReviewResource(
       return null;
   }
   return requiredReviewResource;
+}
+
+/** Strict exact-identity speech claim shared by prepare and recovered publication. */
+export function parseProjectAssetSpeechClaim(
+  value: unknown
+): NonNullable<ProjectAssetPublicationOptions['requiredReviewSpeech']> | null {
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some((key) => !['aggregateId', 'target', 'replacementId'].includes(key)) ||
+    typeof value['aggregateId'] !== 'string' ||
+    !value['aggregateId'] ||
+    typeof value['replacementId'] !== 'string' ||
+    !value['replacementId']
+  )
+    return null;
+  const target = parseReviewSpeechTarget(value['target']);
+  return target
+    ? { aggregateId: value['aggregateId'], target, replacementId: value['replacementId'] }
+    : null;
 }

@@ -584,3 +584,103 @@ it('reschedules external clips on explicit short-loop discontinuities below the 
   expect(engine.scheduled).toHaveLength(2);
   expect(engine.scheduled[1]!.schedule).toMatchObject({ offset: 2 });
 });
+
+it('uses the same combined gain as the native element and updates paused amplification', async () => {
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  video.currentTime = 4;
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    original: {
+      muted: false,
+      volume: 2,
+      ranges: [{ id: 'manual', start: 0, end: 10, volume: 0.75 }],
+    },
+    automaticOriginalRanges: [{ start: 2, end: 6, volume: 0.25 }],
+  });
+  await act(async () => root.render(<Harness />));
+  expect(engine.gains.at(-1)).toBe(1);
+  await act(async () => root.render(<Harness playing={false} automaticOriginalRanges={[]} />));
+  expect(engine.gains.at(-1)).toBe(1.5);
+  await act(async () => root.render(<Harness playing={false} silent />));
+  expect(engine.gains.at(-1)).toBe(0);
+});
+
+it.each(['missing', 'decode'] as const)(
+  'stops and reports accepted Revoice %s instead of playing suppressed silence',
+  async (failure) => {
+    const engine = new FakeEngine();
+    if (failure === 'decode') vi.spyOn(engine, 'decode').mockRejectedValue(new Error('bad bytes'));
+    const video = document.createElement('video');
+    const pause = vi.spyOn(video, 'pause').mockImplementation(() => undefined);
+    const onFailure = vi.fn();
+    const { Harness } = renderRuntime({
+      video: { current: video },
+      createEngine: () => engine,
+      playing: true,
+      outputTime: 3,
+      revoice: [clip()],
+      automaticOriginalRanges: [{ start: 2, end: 6, volume: 0 }],
+      onFailure,
+      resolveAsset: async () => (failure === 'missing' ? null : new Blob()),
+    });
+    await act(async () => root.render(<Harness />));
+    expect(onFailure).toHaveBeenCalledOnce();
+    expect(pause).toHaveBeenCalledOnce();
+    expect(engine.scheduled).toHaveLength(0);
+    expect(engine.stops).toBeGreaterThanOrEqual(2);
+  }
+);
+
+it('prepares tempo once and preserves native offset across Revoice disable/undo', async () => {
+  const engine = new FakeEngine();
+  const prepare = vi.spyOn(engine, 'prepareClip');
+  const revoice = [clip({ timelineStart: 2, duration: 2, sourceOffset: 1, playbackRate: 2 })];
+  const { Harness } = renderRuntime({
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 2.5,
+    revoice,
+    resolveAsset: async () => new Blob(),
+  });
+  await act(async () => root.render(<Harness />));
+  expect(prepare).toHaveBeenCalledOnce();
+  expect(prepare.mock.calls[0]![1]).toMatchObject({ sourceOffset: 1, playbackRate: 2 });
+  expect(engine.scheduled[0]!.schedule).toMatchObject({
+    offset: 0.5,
+    duration: 1.5,
+    playbackRate: 1,
+  });
+  await act(async () => root.render(<Harness revoice={[]} />));
+  const count = engine.scheduled.length;
+  await act(async () => root.render(<Harness />));
+  expect(engine.scheduled).toHaveLength(count + 1);
+  expect(revoice[0]!.sourceOffset).toBe(1);
+});
+
+it('retries a missing accepted asset after explicit resume instead of caching absence', async () => {
+  const engine = new FakeEngine();
+  const video = document.createElement('video');
+  vi.spyOn(video, 'pause').mockImplementation(() => undefined);
+  let available = false;
+  const onFailure = vi.fn();
+  const resolveAsset = vi.fn(async () => (available ? new Blob() : null));
+  const { Harness } = renderRuntime({
+    video: { current: video },
+    createEngine: () => engine,
+    playing: true,
+    outputTime: 3,
+    revoice: [clip()],
+    resolveAsset,
+    onFailure,
+  });
+  await act(async () => root.render(<Harness />));
+  expect(onFailure).toHaveBeenCalledOnce();
+  await act(async () => root.render(<Harness playing={false} />));
+  available = true;
+  await act(async () => root.render(<Harness />));
+  expect(resolveAsset).toHaveBeenCalledTimes(2);
+  expect(engine.scheduled).toHaveLength(1);
+});

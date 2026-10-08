@@ -24,7 +24,7 @@ it('reports worker interruption without automatically replaying the paid request
       scope: {
         workspaceId: 'workspace',
         workspaceRevision: 1,
-        clipId: 'clip',
+        target: { kind: 'voiceover' as const, clipId: 'clip' },
         assetId: 'asset',
         nativeStart: 0,
         nativeEnd: 2,
@@ -59,7 +59,7 @@ it('propagates cancellation to the worker and rejects instead of publishing a la
       scope: {
         workspaceId: 'workspace',
         workspaceRevision: 1,
-        clipId: 'clip',
+        target: { kind: 'voiceover' as const, clipId: 'clip' },
         assetId: 'asset',
         nativeStart: 0,
         nativeEnd: 2,
@@ -98,7 +98,7 @@ function connectedJob() {
   const scope = {
     workspaceId: 'workspace',
     workspaceRevision: 1,
-    clipId: 'clip',
+    target: { kind: 'voiceover' as const, clipId: 'clip' },
     assetId: 'asset',
     nativeStart: 0,
     nativeEnd: 2,

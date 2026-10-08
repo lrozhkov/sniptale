@@ -13,6 +13,7 @@ import {
   reviewWorkspaceHasAudioClip,
   reviewWorkspaceHasWatermarkImage,
   reviewWorkspaceHasSceneResource,
+  reviewWorkspaceHasSpeechReplacement,
 } from './asset-refs';
 import { readLibraryAudioSource, sameLibraryAudioRef } from '../projects/library-audio-source';
 import type { AssetRef } from '../assets/contracts';
@@ -46,10 +47,12 @@ export async function readReviewReadySources(aggregateId: string): Promise<Revie
     if (
       !payload ||
       (payload.requiredReview && payload.requiredReview.aggregateId !== aggregateId) ||
-      (payload.requiredReviewResource && payload.requiredReviewResource.aggregateId !== aggregateId)
+      (payload.requiredReviewResource &&
+        payload.requiredReviewResource.aggregateId !== aggregateId) ||
+      (payload.requiredReviewSpeech && payload.requiredReviewSpeech.aggregateId !== aggregateId)
     )
       continue;
-    if (payload.requiredReviewResource) {
+    if (payload.requiredReviewResource || payload.requiredReviewSpeech) {
       resourceClaims.push({
         payload,
         available: !!ref && (await resourceClaimAvailable(payload, ref)),
@@ -120,6 +123,14 @@ function hasResourceClaim(
 ): boolean {
   const resource = payload.requiredReviewResource;
   const assetId = `project-asset:${payload.entry.id}`;
+  const speech = payload.requiredReviewSpeech;
+  if (speech)
+    return reviewWorkspaceHasSpeechReplacement(
+      workspace,
+      speech.target,
+      speech.replacementId,
+      assetId
+    );
   if (!resource) return false;
   return resource.slot === 'watermark'
     ? reviewWorkspaceHasWatermarkImage(workspace, assetId)

@@ -398,3 +398,43 @@ it('clears a loop when duration leaves less than the minimum and discards it on 
     reopened.dispose();
   }
 });
+
+it('updates native attenuation while paused and restores manual gain after disable or seek', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const root = createRoot(document.createElement('div'));
+  let hook!: ReturnType<typeof useReviewPlayback>;
+  let ranges = [{ start: 2, end: 6, volume: 0.25 }];
+  function Harness() {
+    hook = useReviewPlayback({
+      duration: 10,
+      boundaries: () => undefined,
+      edits: [],
+      onSeek: vi.fn(),
+      onFailure: vi.fn(),
+      original: {
+        muted: false,
+        volume: 2,
+        ranges: [{ id: 'manual', start: 0, end: 10, volume: 0.75 }],
+      },
+      automaticOriginalRanges: ranges,
+    });
+    return <video ref={hook.video} />;
+  }
+  try {
+    act(() => root.render(<Harness />));
+    act(() => hook.seek(4, false));
+    expect(hook.video.current!.volume).toBe(0.375);
+    ranges = [];
+    act(() => root.render(<Harness />));
+    expect(hook.video.current!.volume).toBe(1);
+    ranges = [{ start: 2, end: 6, volume: 0 }];
+    act(() => root.render(<Harness />));
+    expect(hook.video.current!.muted).toBe(true);
+    act(() => hook.seek(6, false));
+    expect(hook.video.current!.muted).toBe(false);
+    expect(hook.video.current!.volume).toBe(1);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

@@ -264,3 +264,55 @@ it('omits bookend capabilities without mutating retained media or outer fades', 
     configuredReviewExportPlan({ ...args, renderSettings: undefined, includeBookends: false })
   ).toMatchObject({ kind: 'ready', video: 'copy', audio: 'copy', reasons: [] });
 });
+
+it('requires a real output audio encoder for Revoice on a silent main and avoids whole-file copy', () => {
+  const args = fixture();
+  args.index.audioCodec = null;
+  args.index.outputAudioCodecs!.webm = null;
+  args.advanced.audio.originalSpeech = {
+    enabled: true,
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'accepted',
+          phraseId: 'p',
+          start: 2,
+          end: 8,
+          duration: 4,
+          enabled: true,
+          originalVolume: 0,
+          assetId: 'project-asset:accepted',
+          revision: 0,
+          text: 'accepted',
+          textSignature: 'test',
+          profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+        },
+      ],
+    },
+  };
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'unavailable',
+    reasons: ['audio-encoder'],
+  });
+  args.index.outputAudioCodecs!.webm = 'opus';
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    audio: 'process',
+    reasons: ['revoice'],
+  });
+  const { renderSettings: _settings, ...copyVideo } = args;
+  expect(configuredReviewExportPlan(copyVideo)).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'process',
+    reasons: ['revoice'],
+  });
+  args.advanced.ui.mode = 'basic';
+  expect(configuredReviewExportPlan(args)).toMatchObject({
+    kind: 'ready',
+    video: 'copy',
+    audio: 'copy',
+  });
+});

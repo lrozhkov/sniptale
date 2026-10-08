@@ -1,3 +1,4 @@
+import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import { useEffect, useRef, useState } from 'react';
 import type { AIModelSelectionBootstrapPayload } from '../../contracts/messaging/ai-settings-runtime';
 import type {
@@ -14,6 +15,7 @@ import {
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
 import {
   saveReviewSpeechTranscript,
+  getReviewSpeechTarget,
   type ReviewSpeechSession,
 } from '../../workflows/video-review/speech-publication';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -28,7 +30,7 @@ const emptyTranscript = (): ReviewSpeechTranscript => ({
 /** Serializes durable edits and keeps failed or invalid drafts protected across navigation. */
 export function useSpeechEdits(args: {
   session: ReviewSpeechSession;
-  clipId: string;
+  target: ReviewSpeechTarget;
   durable: ReviewSpeechTranscript | undefined;
   catalog: AIModelSelectionBootstrapPayload | undefined;
   beforeAction: ReviewBeforeAction;
@@ -87,14 +89,12 @@ export function useSpeechEdits(args: {
       try {
         await latestArgs.current.flushAdvanced();
         while (edits.current.length) {
-          const current = args.session
-            .getSnapshot()
-            .document.advancedContent.audio.voiceover.find((entry) => entry.id === args.clipId);
+          const current = getReviewSpeechTarget(args.session, args.target);
           if (!current) throw new Error('stale');
           const head = edits.current[0]!;
           head.attempted = true;
           const next = head.change(current.transcript ?? emptyTranscript());
-          await saveReviewSpeechTranscript(args.session, args.clipId, next);
+          await saveReviewSpeechTranscript(args.session, args.target, next);
           edits.current.shift();
           if (mounted.current) refresh((value) => value + 1);
         }
@@ -223,6 +223,15 @@ export function useSpeechEdits(args: {
       ),
     restore: (ids: readonly string[]) =>
       edit((current) => restoreReviewSpeechReplacements(current, ids)),
+    patchReplacement: (id: string, patch: { enabled?: boolean; originalVolume?: number }) => {
+      if (args.target.kind !== 'original') return;
+      edit((current) => ({
+        ...current,
+        replacements: current.replacements.map((entry) =>
+          entry.id === id ? { ...entry, ...patch } : entry
+        ),
+      }));
+    },
     isChanged: (id: string) => {
       const phrase = transcript.phrases.find((entry) => entry.id === id);
       if (!phrase) return false;

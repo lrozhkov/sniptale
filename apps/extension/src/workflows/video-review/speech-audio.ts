@@ -32,7 +32,7 @@ export function encodeReviewSpeechWav(samples: Float32Array): Blob {
 
 /** Decode only the authorized native interval, bounded to five minutes. */
 export async function extractReviewSpeechWav(
-  assetId: string,
+  source: string | Blob,
   start: number,
   end: number,
   signal: AbortSignal
@@ -46,7 +46,7 @@ export async function extractReviewSpeechWav(
   )
     throw new Error('invalid-request');
   signal.throwIfAborted();
-  const blob = await resolveReviewAssetBytes(assetId);
+  const blob = typeof source === 'string' ? await resolveReviewAssetBytes(source) : source;
   if (!blob) throw new Error('missing-media');
   const { ALL_FORMATS, AudioSampleSink, BlobSource, Input } = await import('mediabunny');
   const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
@@ -117,7 +117,7 @@ export function reviewSpeechQuietBoundary(samples: Int16Array, sampleRate = RATE
 
 /** Read only a four-second local boundary window; nothing is staged or sent here. */
 export async function planReviewSpeechChunks(
-  assetId: string,
+  source: string | Blob,
   ranges: readonly { start: number; end: number }[],
   signal: AbortSignal
 ): Promise<{ start: number; end: number }[]> {
@@ -129,7 +129,7 @@ export async function planReviewSpeechChunks(
       let end = Math.min(range.end, start + 60);
       if (end < range.end) {
         const windowStart = end - 4;
-        const wav = await extractReviewSpeechWav(assetId, windowStart, end, signal);
+        const wav = await extractReviewSpeechWav(source, windowStart, end, signal);
         const boundary = reviewSpeechQuietBoundary(new Int16Array(await wav.arrayBuffer(), 44));
         if (boundary !== null) end = windowStart + boundary;
       }

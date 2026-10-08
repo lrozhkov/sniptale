@@ -3,7 +3,7 @@ import { deferReviewGesture, type ReviewBeforeAction } from './note-transitions'
 import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
-import { Volume2, VolumeX, Link2 } from 'lucide-react';
+import { Captions, Volume2, VolumeX, Link2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type {
@@ -38,6 +38,7 @@ export function ReviewOriginalAudioTrack(props: {
   beforeAction?: ReviewBeforeAction | undefined;
   original: QuickEditOriginalAudio;
   waveform?: ReviewWaveform | undefined;
+  automaticRanges?: Parameters<typeof originalAudioGainAt>[3] | undefined;
   projection?: ReviewTrackProjection | undefined;
   duration: number;
   busy: boolean;
@@ -46,6 +47,7 @@ export function ReviewOriginalAudioTrack(props: {
   selectedEditId?: string | undefined;
   onRange?: ((range: ReviewAnchor) => void) | undefined;
   onSelectSpeed?: ((edit: ReviewEdit) => void) | undefined;
+  onOpenSpeech?: (() => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
 }) {
   const duration = props.projection?.duration ?? props.duration;
@@ -53,8 +55,8 @@ export function ReviewOriginalAudioTrack(props: {
   const gesture = useOriginalAudioGesture(props, duration);
   const preview = gesture.preview;
   const gainAt = useCallback(
-    (time: number) => originalAudioGainAt(props.original, time, props.edits),
-    [props.original, props.edits]
+    (time: number) => originalAudioGainAt(props.original, time, props.edits, props.automaticRanges),
+    [props.original, props.edits, props.automaticRanges]
   );
   const rectStyle = (start: number, end: number) => ({
     left: `${(start / duration) * 100}%`,
@@ -69,6 +71,7 @@ export function ReviewOriginalAudioTrack(props: {
       }
       controls={
         <OriginalAudioControls
+          onOpenSpeech={props.onOpenSpeech}
           original={props.original}
           busy={props.busy}
           beforeAction={props.beforeAction}
@@ -166,11 +169,22 @@ function OriginalAudioControls(props: {
   original: QuickEditOriginalAudio;
   busy: boolean;
   beforeAction?: ReviewBeforeAction | undefined;
+  onOpenSpeech?: (() => void) | undefined;
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
 }) {
   const muted = props.original.muted || props.original.volume === 0;
   return (
     <>
+      {props.onOpenSpeech ? (
+        <ReviewButton
+          label={translate('gallery.videoReview.speechTitle')}
+          disabled={props.busy}
+          className={`${reviewTrackStatusButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
+          onClick={() => (props.beforeAction ?? ((action) => action()))(props.onOpenSpeech!)}
+        >
+          <Captions size={14} aria-hidden="true" />
+        </ReviewButton>
+      ) : null}
       <NumericValueField
         label={translate('gallery.videoReview.sourceAudioVolume')}
         unit="%"

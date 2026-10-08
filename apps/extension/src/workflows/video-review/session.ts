@@ -1,3 +1,6 @@
+import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
+import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
+import { reviewWorkspaceHasSpeechReplacement } from '../../composition/persistence/review-workspaces/asset-refs';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
 import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 import { applyLocalReviewChange, type LocalReviewChange } from './local-session';
@@ -139,15 +142,15 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         )
       );
     },
-    async hasDurableSpeechAsset(clipId: string, assetId: string) {
+    async hasDurableSpeechAsset(
+      target: ReviewSpeechTarget,
+      replacementId: string,
+      assetId: string
+    ) {
       const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
       return (
         !!saved &&
-        project(saved).advancedContent.audio.voiceover.some(
-          (clip) =>
-            clip.id === clipId &&
-            clip.transcript?.replacements.some((entry) => entry.assetId === assetId)
-        )
+        reviewWorkspaceHasSpeechReplacement(saved.workspace, target, replacementId, assetId)
       );
     },
     setAutosaveEnabled(enabled: boolean) {
@@ -205,25 +208,58 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
     },
     /** Builds speech history at queue execution time; only this failed save can be retried. */
     saveSpeechTranscript(
-      clipId: string,
+      target: ReviewSpeechTarget,
       expectedAssetId: string,
       transcript: ReviewSpeechTranscript
     ) {
-      const captured = parseReviewSpeechTranscript(structuredClone(transcript));
+      const captured =
+        target.kind === 'original'
+          ? parseReviewOriginalSpeechTranscript(structuredClone(transcript))
+          : parseReviewSpeechTranscript(structuredClone(transcript));
       if (!captured) return Promise.reject(new Error('Invalid speech transcript.'));
-      const key = JSON.stringify([clipId, expectedAssetId]);
+      const key = JSON.stringify([target, expectedAssetId]);
       return enqueue(
         async () => {
           if (state.error && failedSpeechSave !== key) throw new Error(`Review ${state.error}.`);
           await persistBuffer();
           const before = state.document.advancedContent;
-          const clip = before.audio.voiceover.find((entry) => entry.id === clipId);
-          if (!clip || clip.assetId !== expectedAssetId) throw new Error('Speech clip changed.');
+          const clip =
+            target.kind === 'voiceover'
+              ? before.audio.voiceover.find((entry) => entry.id === target.clipId)
+              : undefined;
+          const assetId =
+            target.kind === 'original' ? state.snapshot.workspace.sourceAssetId : clip?.assetId;
+          if (assetId !== expectedAssetId) throw new Error('Speech target changed.');
+          const previous =
+            target.kind === 'original' ? before.audio.originalSpeech?.transcript : clip?.transcript;
           if (
-            JSON.stringify(parseReviewSpeechTranscript(clip.transcript)) ===
-            JSON.stringify(captured)
+            JSON.stringify(
+              target.kind === 'original'
+                ? parseReviewOriginalSpeechTranscript(previous)
+                : parseReviewSpeechTranscript(previous)
+            ) === JSON.stringify(captured)
           )
             return state.snapshot;
+          const original =
+            target.kind === 'original' ? parseReviewOriginalSpeechTranscript(captured) : null;
+          if (target.kind === 'original' && !original)
+            throw new Error('Invalid original transcript.');
+          const audio = original
+            ? {
+                ...before.audio,
+                originalSpeech: {
+                  enabled: before.audio.originalSpeech?.enabled ?? true,
+                  transcript: original,
+                },
+              }
+            : {
+                ...before.audio,
+                voiceover: before.audio.voiceover.map((entry) =>
+                  target.kind === 'voiceover' && entry.id === target.clipId
+                    ? { ...entry, transcript: captured }
+                    : entry
+                ),
+              };
           return deps.commitVideoWorkspace({
             ...identity(),
             operation: {
@@ -233,12 +269,7 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
               before,
               after: {
                 ...before,
-                audio: {
-                  ...before.audio,
-                  voiceover: before.audio.voiceover.map((entry) =>
-                    entry.id === clipId ? { ...entry, transcript: captured } : entry
-                  ),
-                },
+                audio,
               },
             },
           });

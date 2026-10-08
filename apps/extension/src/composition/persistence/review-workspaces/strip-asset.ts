@@ -96,6 +96,19 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
     ...(content.watermark ? { watermark: stripWatermark(content.watermark, assetId) } : {}),
     audio: {
       ...content.audio,
+      ...(content.audio.originalSpeech
+        ? {
+            originalSpeech: {
+              ...content.audio.originalSpeech,
+              transcript: {
+                ...content.audio.originalSpeech.transcript,
+                replacements: content.audio.originalSpeech.transcript.replacements.filter(
+                  (entry) => entry.assetId !== assetId
+                ),
+              },
+            },
+          }
+        : {}),
       voiceover: stripAudioClips(content.audio.voiceover, assetId),
       music: stripAudioClips(content.audio.music, assetId),
     },
@@ -134,7 +147,9 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
                         clip.assetId !== assetId
                     )
                     .map((clip: unknown) => stripRecoverySpeech(clip, assetId))
-                : clips,
+                : key === 'originalSpeech'
+                  ? stripRecoverySpeech(clips, assetId)
+                  : clips,
             ])
           )
         : audio;

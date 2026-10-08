@@ -29,6 +29,22 @@ vi.mock('../../workflows/video-review/speech-transcription', () => ({
   transcribeReviewSpeech: mocks.transcribe,
 }));
 vi.mock('../../workflows/video-review/speech-publication', () => ({
+  getReviewSpeechTarget: (
+    session: ReviewSpeechSession,
+    target: import('../../contracts/ai/audio').ReviewSpeechTarget
+  ) => {
+    const state = session.getSnapshot();
+    if (target.kind === 'original')
+      return {
+        assetId: 'source',
+        transcript: state.document.advancedContent.audio.originalSpeech?.transcript,
+        nativeStart: 0,
+        nativeEnd: 4,
+      };
+    return state.document.advancedContent.audio.voiceover.find(
+      (entry) => entry.id === target.clipId
+    );
+  },
   saveReviewSpeechTranscript: mocks.save,
   generateReviewSpeech: mocks.generate,
   cleanupReviewSpeechPreview: mocks.cleanup,
@@ -58,6 +74,7 @@ function fixture() {
   };
   let state = {
     document: {
+      edits: [],
       advancedContent: {
         audio: { voiceover: [{ id: 'clip', assetId: 'project-asset:original', transcript }] },
       },
@@ -75,6 +92,7 @@ function fixture() {
     async (_session: ReviewSpeechSession, _clipId: string, next: ReviewSpeechTranscript) => {
       state = {
         document: {
+          edits: [],
           advancedContent: {
             audio: {
               voiceover: [{ id: 'clip', assetId: 'project-asset:original', transcript: next }],
@@ -89,7 +107,7 @@ function fixture() {
   const guard = createReviewSpeechEditGuard(onFailure);
   const args = {
     session,
-    clipId: 'clip',
+    target: { kind: 'voiceover' as const, clipId: 'clip' },
     beforeAction: (action: () => void) => {
       void guard.perform(action);
     },
@@ -102,6 +120,7 @@ function fixture() {
   }
   return {
     Harness,
+    args,
     guard,
     onFailure,
     getTranscript: () => state.document.advancedContent.audio.voiceover[0]!.transcript,
@@ -209,7 +228,7 @@ it('drops a disposable preview and follows the profile restored by external hist
     scope: {
       workspaceId: 'workspace',
       workspaceRevision: 1,
-      clipId: 'clip',
+      target: { kind: 'voiceover' as const, clipId: 'clip' },
       assetId: 'project-asset:original',
       nativeStart: 0,
       nativeEnd: 4,
@@ -333,9 +352,10 @@ it('applies only explicitly supplied previews and cleans them after publication'
   await act(async () => current.apply(current.previews));
   expect(mocks.apply).toHaveBeenCalledWith(
     expect.anything(),
-    'clip',
+    { kind: 'voiceover', clipId: 'clip' },
     [preview],
-    expect.any(AbortSignal)
+    expect.any(AbortSignal),
+    { originalVolume: 0 }
   );
   expect(current.previews).toEqual([]);
   expect(mocks.cleanup).toHaveBeenCalledWith(preview);
@@ -407,3 +427,49 @@ it.each([
     expect(mocks.transcribe).toHaveBeenCalledOnce();
   }
 );
+
+it('dispatches original source selection explicitly and keeps next-apply gain disposable', async () => {
+  const { args } = fixture();
+  const original = { file: new Blob(['source']), sourceAssetId: 'source' };
+  const selection = { start: 1, end: 3 };
+  const create = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:source');
+  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+  function Original() {
+    current = useReviewSpeech({ ...args, target: { kind: 'original' }, original, selection });
+    return null;
+  }
+  await act(async () => root?.render(<Original />));
+  await act(async () => current.setModelId('stt'));
+  await act(async () => current.recognize(true));
+  expect(mocks.transcribe).toHaveBeenLastCalledWith(
+    args.session,
+    { kind: 'original' },
+    'stt',
+    expect.any(AbortSignal),
+    { original, selection }
+  );
+  await act(async () => current.recognize());
+  expect(mocks.transcribe).toHaveBeenLastCalledWith(
+    args.session,
+    { kind: 'original' },
+    'stt',
+    expect.any(AbortSignal),
+    { original }
+  );
+  await act(async () => current.setOriginalVolume(0.25));
+  expect(mocks.save).not.toHaveBeenCalled();
+  await act(async () => current.apply([]));
+  expect(mocks.apply).toHaveBeenLastCalledWith(
+    args.session,
+    { kind: 'original' },
+    [],
+    expect.any(AbortSignal),
+    { originalVolume: 0.25 }
+  );
+  expect(current.recognitionDuration).toBe(4);
+  expect(current.selectionDuration).toBe(2);
+  await act(async () => root?.render(null));
+  expect(revoke).toHaveBeenCalledWith('blob:source');
+  create.mockRestore();
+  revoke.mockRestore();
+});

@@ -142,7 +142,7 @@ export function ReviewSelectedProperties(props: SelectedPropertiesProps) {
               <ReviewSpeechPanel
                 key={audio.selected.clip.id}
                 session={resource.session}
-                clipId={audio.selected.clip.id}
+                target={{ kind: 'voiceover', clipId: audio.selected.clip.id }}
                 beforeAction={props.beforeSpeechAction}
                 flushAdvanced={props.flushAdvanced}
                 registerSpeechFlush={props.registerSpeechFlush}

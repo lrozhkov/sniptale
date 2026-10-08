@@ -1,3 +1,4 @@
+import { parseProjectAssetSpeechClaim } from './asset-publication-payload';
 import { isValidProjectAssetReviewResource } from './asset-publication-payload';
 import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-reference-admission';
 import type { VideoProject } from '../../../features/video/project/types';
@@ -298,6 +299,16 @@ export async function prepareProjectAsset(
     })
   )
     throw new Error('Invalid private review resource publication.');
+  if (
+    options.requiredReviewSpeech &&
+    (!parseProjectAssetSpeechClaim(options.requiredReviewSpeech) ||
+      options.publishToLibrary !== false ||
+      !mimeType.startsWith('audio/') ||
+      requiredReview !== undefined ||
+      options.requiredReviewResource !== undefined ||
+      options.originMediaId !== undefined)
+  )
+    throw new Error('Invalid private speech publication.');
   const entryId = id ?? crypto.randomUUID();
   await recoverProjectMediaPublications();
   const sourceDb = await initDB();
@@ -323,6 +334,7 @@ export async function prepareProjectAsset(
     expectedAssetId,
     filename: filename || entryId,
     ...(requiredReview ? { requiredReview } : {}),
+    ...(options.requiredReviewSpeech ? { requiredReviewSpeech: options.requiredReviewSpeech } : {}),
     ...(options.requiredReviewResource
       ? { requiredReviewResource: options.requiredReviewResource }
       : {}),

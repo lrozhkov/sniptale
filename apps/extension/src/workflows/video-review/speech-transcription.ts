@@ -1,4 +1,8 @@
-import type { AudioTranscriptResult, AudioTranscriptTiming } from '../../contracts/ai/audio';
+import type {
+  AudioTranscriptResult,
+  AudioTranscriptTiming,
+  ReviewSpeechTarget,
+} from '../../contracts/ai/audio';
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { projectReviewVoiceover } from '../../features/video/review/voiceover-edits';
@@ -6,6 +10,7 @@ import { extractReviewSpeechWav, planReviewSpeechChunks } from './speech-audio';
 import { runReviewSpeechJob } from './speech-client';
 import {
   getReviewSpeechClip,
+  getReviewSpeechTarget,
   reviewSpeechGeometry,
   reviewSpeechScope,
   saveReviewSpeechTranscript,
@@ -119,31 +124,62 @@ const incomplete = new WeakMap<
 /** Each accepted chunk is durable; interruption retains completed chunks without another POST. */
 export async function transcribeReviewSpeech(
   session: ReviewSpeechSession,
-  clipId: string,
+  target: ReviewSpeechTarget,
   modelId: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  options: {
+    original?: { file: Blob; sourceAssetId: string };
+    selection?: { start: number; end: number };
+  } = {}
 ): Promise<void> {
   await session.flush();
   const state = session.getSnapshot();
-  const clip = getReviewSpeechClip(session, clipId);
+  const clip = getReviewSpeechTarget(session, target);
+  if (
+    target.kind === 'original' &&
+    (!options.original || options.original.sourceAssetId !== clip.assetId)
+  )
+    throw new Error('stale');
+  const source = target.kind === 'original' ? options.original!.file : clip.assetId;
+  const selection = options.selection;
+  if (
+    selection &&
+    (!Number.isFinite(selection.start) ||
+      !Number.isFinite(selection.end) ||
+      selection.start < 0 ||
+      selection.end <= selection.start ||
+      selection.end > state.snapshot.workspace.source.duration)
+  )
+    throw new Error('invalid-request');
   const map = createReviewTimeMap(
     state.snapshot.workspace.source.duration,
     state.document.edits
   ).getSegments();
-  const slices = projectReviewVoiceover([clip], map);
-  const ranges = slices.map((slice) => ({
-    start: slice.sourceOffset,
-    end: slice.sourceOffset + slice.duration * (slice.playbackRate ?? 1),
-  }));
-  const geometry = reviewSpeechGeometry(session, clipId);
-  const identity = JSON.stringify([clipId, modelId, geometry]);
+  const ranges =
+    target.kind === 'original'
+      ? map
+          .filter((part) => part.kind !== 'cut')
+          .map((part) => ({
+            start: Math.max(part.sourceStart, selection?.start ?? 0),
+            end: Math.min(
+              part.sourceEnd,
+              selection?.end ?? state.snapshot.workspace.source.duration
+            ),
+          }))
+          .filter((range) => range.end > range.start)
+      : projectReviewVoiceover([getReviewSpeechClip(session, target.clipId)], map).map((slice) => ({
+          start: slice.sourceOffset,
+          end: slice.sourceOffset + slice.duration * (slice.playbackRate ?? 1),
+        }));
+  const geometry = reviewSpeechGeometry(session, target);
+  const identity = JSON.stringify([target, modelId, geometry, selection]);
   const progress =
     incomplete.get(session)?.identity === identity
       ? incomplete.get(session)!
       : {
           identity,
           completed: new Set<string>(),
-          chunks: await planReviewSpeechChunks(clip.assetId, ranges, signal).catch(() => {
+          chunks: await planReviewSpeechChunks(source, ranges, signal).catch(() => {
             signal.throwIfAborted();
             throw new Error('decode-failed');
           }),
@@ -154,31 +190,31 @@ export async function transcribeReviewSpeech(
     signal.throwIfAborted();
     const chunkKey = JSON.stringify(chunk);
     if (progress.completed.has(chunkKey)) continue;
-    if (reviewSpeechGeometry(session, clipId) !== geometry) throw new Error('stale');
-    if (getReviewSpeechClip(session, clipId).assetId !== clip.assetId) throw new Error('stale');
-    const scope = reviewSpeechScope(session, clipId, chunk.start, chunk.end);
-    const beforeTranscript = getReviewSpeechClip(session, clipId).transcript;
+    if (reviewSpeechGeometry(session, target) !== geometry) throw new Error('stale');
+    if (getReviewSpeechTarget(session, target).assetId !== clip.assetId) throw new Error('stale');
+    const scope = reviewSpeechScope(session, target, chunk.start, chunk.end);
+    const beforeTranscript = getReviewSpeechTarget(session, target).transcript;
     const signature = JSON.stringify(beforeTranscript);
     const result = await runReviewSpeechJob(
       { type: 'start', operation: 'transcription', requestId: crypto.randomUUID(), modelId, scope },
       {
         signal,
         prepareInput: (jobSignal) =>
-          extractReviewSpeechWav(clip.assetId, chunk.start, chunk.end, jobSignal),
+          extractReviewSpeechWav(source, chunk.start, chunk.end, jobSignal),
       }
     );
     signal.throwIfAborted();
     if (result.type !== 'transcript') throw new Error('invalid-response');
-    const current = getReviewSpeechClip(session, clipId);
+    const current = getReviewSpeechTarget(session, target);
     if (
-      reviewSpeechGeometry(session, clipId) !== geometry ||
+      reviewSpeechGeometry(session, target) !== geometry ||
       current.assetId !== clip.assetId ||
       JSON.stringify(current.transcript) !== signature
     )
       throw new Error('stale');
     const phrases = reviewSpeechPhrases(result.result, chunk.start, chunk.end);
     const transcript = current.transcript ?? { version: 1 as const, phrases: [], replacements: [] };
-    await saveReviewSpeechTranscript(session, clipId, {
+    await saveReviewSpeechTranscript(session, target, {
       ...transcript,
       transcriptionModelId: modelId,
       phrases: [

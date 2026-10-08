@@ -1,3 +1,4 @@
+import type { ReviewSpeechTarget } from '../../../contracts/ai/audio';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type { QuickEditAdvancedContent } from '../../../features/video/review/advanced/types';
 import type { VideoWorkspace, VideoWorkspaceSnapshot } from './contracts';
@@ -22,6 +23,12 @@ function assertNoLocalImageRef(background: unknown): void {
 
 function assertNoLocalAudioRefs(audio: unknown): void {
   if (!isRecord(audio)) return;
+  if (
+    speechReplacements(audio['originalSpeech']).some(
+      (entry) => isRecord(entry) && 'assetId' in entry
+    )
+  )
+    throw new Error(LOCAL_ASSET_ERROR);
   for (const lane of LANES) {
     const clips = audio[lane];
     if (!Array.isArray(clips)) continue;
@@ -237,14 +244,21 @@ function renameLaneRef(
   sourceKey: string,
   targetKey: string
 ): Record<string, unknown> {
+  const rename = (entry: Record<string, unknown>) => {
+    if (typeof entry[sourceKey] !== 'string') return entry;
+    const { [sourceKey]: nested, ...fields } = entry;
+    return { ...fields, [targetKey]: nested };
+  };
   const next = { ...audio };
+  if (audio['originalSpeech'] !== undefined)
+    next['originalSpeech'] = mapSpeechReferences(audio['originalSpeech'], rename);
   for (const lane of LANES) {
     const clips = audio[lane];
     if (!Array.isArray(clips)) continue;
     next[lane] = clips.map((clip: unknown) => {
       if (!isRecord(clip)) return clip;
       const reference = clip[sourceKey];
-      if (typeof reference !== 'string') return clip;
+      if (typeof reference !== 'string') return mapSpeechReferences(clip, rename);
       const { [sourceKey]: _renamed, ...rest } = clip;
       return mapSpeechReferences({ ...rest, [targetKey]: reference }, (entry) => {
         if (typeof entry[sourceKey] !== 'string') return entry;
@@ -364,6 +378,8 @@ function collectContentReferences(
     collectAssetReference(value, into);
     return value;
   });
+  for (const replacement of content.audio.originalSpeech?.transcript.replacements ?? [])
+    collectAssetReference(replacement, into);
   for (const lane of LANES) {
     for (const clip of content.audio[lane]) {
       if (clip.assetId.startsWith(ASSET_PREFIX)) into.add(clip.assetId);
@@ -421,6 +437,8 @@ function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void 
     if (isRecord(parsed['watermark'])) collectAssetReference(parsed['watermark']['image'], into);
     if (!isRecord(parsed['audio'])) return;
     const recoveryAudio = parsed['audio'];
+    for (const replacement of speechReplacements(recoveryAudio['originalSpeech']))
+      collectAssetReference(replacement, into);
     for (const lane of LANES) {
       const clips = recoveryAudio[lane];
       if (!Array.isArray(clips)) continue;
@@ -447,6 +465,12 @@ function remapContentReferences(
 ): QuickEditAdvancedContent {
   const audio = { ...content.audio };
   let changed = false;
+  if (audio.originalSpeech) {
+    audio.originalSpeech = mapSpeechReferences(audio.originalSpeech, (entry) =>
+      remapAssetReference(entry, assetIdMap)
+    );
+    changed = true;
+  }
   for (const lane of LANES) {
     audio[lane] = content.audio[lane].map((clip) => {
       const remapped = requireMappedAssetId(assetIdMap, clip.assetId);
@@ -517,13 +541,24 @@ function remapRecoveryReferences(
   if (background !== parsed['background']) parsed['background'] = background;
   if (webcam !== parsed['webcam']) parsed['webcam'] = webcam;
   const recoveryAudio = isRecord(parsed['audio']) ? parsed['audio'] : {};
+  if (recoveryAudio['originalSpeech'] !== undefined) {
+    recoveryAudio['originalSpeech'] = mapSpeechReferences(
+      recoveryAudio['originalSpeech'],
+      (entry) => remapAssetReference(entry, assetIdMap)
+    );
+    changed = true;
+  }
   for (const lane of LANES) {
     const clips = recoveryAudio[lane];
     if (!Array.isArray(clips)) continue;
     recoveryAudio[lane] = clips.map((clip: unknown) => {
       if (!isRecord(clip)) return clip;
       const assetId = clip['assetId'];
-      if (typeof assetId !== 'string') return clip;
+      if (typeof assetId !== 'string') {
+        const mapped = mapSpeechReferences(clip, (entry) => remapAssetReference(entry, assetIdMap));
+        changed ||= mapped !== clip;
+        return mapped;
+      }
       const remapped = requireMappedAssetId(assetIdMap, assetId);
       changed = true;
       return mapSpeechReferences({ ...clip, assetId: remapped }, (entry) =>
@@ -597,6 +632,47 @@ export function reviewWorkspaceHasSceneResource(
     const entry = isRecord(presentation) ? presentation[slot] : undefined;
     const resource = isRecord(entry) ? entry[kind] : undefined;
     if (isRecord(resource) && resource['assetId'] === assetId) return true;
+    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+  };
+  return (
+    matches(workspace.advanced) ||
+    workspace.history.some(
+      (operation) =>
+        operation.target === 'advancedContent' &&
+        (matches(operation.before) || matches(operation.after))
+    )
+  );
+}
+
+/** Exact accepted identity retained independently of draft phrases, lane enablement or cuts. */
+export function reviewWorkspaceHasSpeechReplacement(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  target: ReviewSpeechTarget,
+  replacementId: string,
+  assetId: string
+): boolean {
+  const matches = (content: unknown, recovery = true): boolean => {
+    if (!isRecord(content)) return false;
+    const audio = content['audio'];
+    if (isRecord(audio)) {
+      const sources =
+        target.kind === 'original'
+          ? [audio['originalSpeech']]
+          : Array.isArray(audio['voiceover'])
+            ? audio['voiceover'].filter(
+                (clip: unknown) => isRecord(clip) && clip['id'] === target.clipId
+              )
+            : [];
+      if (
+        sources.some((source) =>
+          speechReplacements(source).some(
+            (entry) =>
+              isRecord(entry) && entry['id'] === replacementId && entry['assetId'] === assetId
+          )
+        )
+      )
+        return true;
+    }
     return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
   };
   return (

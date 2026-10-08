@@ -76,3 +76,20 @@ describe('source audio automation', () => {
     ).toEqual({ kind: 'ready', video: 'copy', audio: 'process', reasons: ['original-audio'] });
   });
 });
+
+it('multiplies manual and accepted native gain once with half-open slot tails', () => {
+  const original = {
+    muted: false,
+    volume: 2,
+    ranges: [{ id: 'manual', start: 2, end: 8, volume: 0.75 }],
+  };
+  const automatic = [{ start: 3, end: 6, volume: 0.25 }];
+  expect(originalAudioGainAt(original, 2.99, [], automatic)).toBe(1.5);
+  expect(originalAudioGainAt(original, 3, [], automatic)).toBe(0.375);
+  expect(originalAudioGainAt(original, 5.99, [], automatic)).toBe(0.375);
+  expect(originalAudioGainAt(original, 6, [], automatic)).toBe(1.5);
+  expect(originalAudioGainAt(original, 5.5, [speed], automatic)).toBe(0);
+  expect(originalAudioGainAt({ ...original, muted: true }, 3, [], automatic)).toBe(0);
+  expect(originalAudioGainAt(original, 3, [], [{ start: 3, end: 6, volume: 0 }])).toBe(0);
+  expect(originalAudioGainAt(original, 3, [], [{ start: 3, end: 6, volume: 1 }])).toBe(1.5);
+});

@@ -95,7 +95,12 @@ export async function readLibrarySceneSource(
     if (
       !media ||
       media.id !== mediaId ||
-      media.kind !== kind ||
+      (media.kind !== kind &&
+        !(
+          kind === 'video' &&
+          ((media.kind === 'recording' && media.source.kind === 'recording') ||
+            (media.kind === 'export' && media.source.kind === 'project-export'))
+        )) ||
       !media.mimeType.startsWith(`${kind}/`) ||
       media.lifecycle?.trashedAt !== undefined
     )

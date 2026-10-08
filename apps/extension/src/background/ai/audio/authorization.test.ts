@@ -20,7 +20,7 @@ const request: AudioJobStart = {
   scope: {
     workspaceId: 'w',
     workspaceRevision: 1,
-    clipId: 'clip',
+    target: { kind: 'voiceover' as const, clipId: 'clip' },
     assetId: 'project-asset:a',
     nativeStart: 0,
     nativeEnd: 1,
@@ -92,7 +92,10 @@ it('rejects disappeared or revision-changed workspaces before reading asset byte
 });
 it('rejects deleted clips and mismatched source locators', async () => {
   await expect(
-    authorizeAudioJob({ ...request, scope: { ...request.scope, clipId: 'deleted' } })
+    authorizeAudioJob({
+      ...request,
+      scope: { ...request.scope, target: { kind: 'voiceover' as const, clipId: 'deleted' } },
+    })
   ).rejects.toThrow('unauthorized');
   await expect(
     authorizeAudioJob({ ...request, scope: { ...request.scope, assetId: 'another' } })

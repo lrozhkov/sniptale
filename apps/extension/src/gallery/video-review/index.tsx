@@ -1,3 +1,4 @@
+import { ReviewSpeechPanel } from './speech-panel';
 import { usePresentationPreview } from './use-presentation-preview';
 import { ReviewPresentationPreviewDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
@@ -105,7 +106,9 @@ function ReviewInspectorBinding({
   resizeHandle,
   preview,
   onJoinPreview,
+  selectedSpeechId,
 }: {
+  selectedSpeechId?: string | undefined;
   onJoinPreview?: ((slot: 'intro' | 'outro') => void) | undefined;
   preview?: ReactNode;
   resizeHandle?: ReactNode;
@@ -134,6 +137,28 @@ function ReviewInspectorBinding({
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
+        speech={
+          <ReviewSpeechPanel
+            key="original"
+            target={{ kind: 'original' }}
+            session={resource.session}
+            original={{
+              file: resource.file,
+              sourceAssetId: snapshot.snapshot.workspace.sourceAssetId,
+            }}
+            selection={
+              state.playbackRange ??
+              (state.selection.kind === 'range' ? state.selection : undefined)
+            }
+            selectedReplacementId={selectedSpeechId}
+            beforeAction={state.beforeAction}
+            flushAdvanced={state.flushAdvanced}
+            registerSpeechFlush={state.registerSpeechFlush}
+            sourceAudioAvailable={!!editing.exporter.index?.audioCodec}
+            originalSpeechEnabled={state.advanced.audio.originalSpeech?.enabled ?? true}
+            onToggleOriginalSpeech={audio.setOriginalSpeechEnabled}
+          />
+        }
         preview={preview}
         beforeAction={state.beforeAction}
         fullHeight={fullHeight}
@@ -430,6 +455,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
     null
   );
   const [fullHeight, setFullHeight] = useState(false);
+  const [selectedSpeechId, setSelectedSpeechId] = useState<string>();
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
   const panels = useReviewPanelLayout(panelsEnabled);
   const { navigation, requestExport } = useReviewEditorNavigation(state);
@@ -472,6 +498,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
             sceneActive={navigation.shown === 'scene'}
           />
           <ReviewInspectorBinding
+            selectedSpeechId={navigation.shown === 'speech' ? selectedSpeechId : undefined}
             onJoinPreview={onJoinPreview ?? joinPreview.open}
             preview={
               <ReviewPreviewInspector
@@ -507,6 +534,14 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
+              selectedSpeechId={navigation.shown === 'speech' ? selectedSpeechId : undefined}
+              onOpenSpeech={(id, time) => {
+                state.video.current?.pause();
+                state.setActiveSelection({ kind: 'none' });
+                setSelectedSpeechId(id);
+                if (time !== undefined) state.seek(time, false);
+                navigation.setSection('speech');
+              }}
               onOpenHistory={() => navigation.setSection('history')}
               webcam={state.webcam}
               fillHeight={panels.timelineHeight !== null}
@@ -552,6 +587,7 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
               zoom={zoom}
               audio={audio}
               audioState={advanced.audio}
+              automaticOriginalRanges={features.automaticOriginalRanges}
               waveforms={waveforms}
               onImportAudioFile={(...args) => state.beforeAction(() => onImportAudioFile(...args))}
               onRecordVoiceover={() => state.beforeAction(voiceover.open)}

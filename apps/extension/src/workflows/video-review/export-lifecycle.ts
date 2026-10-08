@@ -33,6 +33,7 @@ import { buildQuickEditAudioPlan } from '../../features/video/review/advanced/au
 import type { ReviewExportClipPlan } from './audio-render';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import {
+  resolveQuickEditEffectiveAudio,
   resolveQuickEditEffectiveFeatures,
   resolveQuickEditEffectiveState,
 } from '../../features/video/review/advanced/effective';
@@ -93,6 +94,8 @@ export async function buildReviewExportClipPlan(
   args: {
     advanced: QuickEditAdvancedState;
     fragmentOffset: number;
+    /** Full-output map; only this builder subtracts fragmentOffset from generated entries. */
+    timeMap?: ReturnType<typeof buildReviewTimeMap>;
     signal: AbortSignal;
     readProjectAsset: (assetId: string) => Promise<Blob | null>;
     /** Main-output interval required by an unpublished preview; null excludes all main clips. */
@@ -100,7 +103,14 @@ export async function buildReviewExportClipPlan(
   },
   deps = { openAudioSource: openReviewAudioClipSource }
 ): Promise<ReviewExportClipPlan> {
-  const effective = resolveQuickEditEffectiveState(args.advanced);
+  if (
+    !args.timeMap &&
+    args.advanced.ui.mode === 'advanced' &&
+    args.advanced.audio.originalSpeech?.enabled &&
+    args.advanced.audio.originalSpeech.transcript.replacements.some((entry) => entry.enabled)
+  )
+    throw new Error('Original speech export requires the current time map.');
+  const effective = resolveQuickEditEffectiveAudio(args.advanced, args.timeMap ?? []);
   const entries = buildQuickEditAudioPlan(effective)
     .map((entry) => ({
       ...entry,
@@ -142,6 +152,7 @@ export async function buildReviewExportClipPlan(
         ? { originalRanges: args.advanced.audio.original.ranges }
         : {}),
       originalMuted: args.advanced.audio.original.muted,
+      automaticOriginalRanges: effective.automaticOriginalRanges,
     };
   } catch (error) {
     dispose();
@@ -291,6 +302,7 @@ export async function exportReviewedVideo(args: ReviewExportInput, deps = persis
         {
           advanced,
           fragmentOffset,
+          timeMap: buildReviewTimeMap(args.index.duration, prepared.document.edits),
           signal,
           readProjectAsset: deps.readProjectAsset,
         },

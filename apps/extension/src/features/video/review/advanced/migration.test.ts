@@ -8,7 +8,7 @@ import { expect, it } from 'vitest';
 import { buildReviewTimeMap } from '../timeline';
 import { migrateQuickEditAdvancedV1 } from './migration';
 import { createQuickEditAdvancedState } from './defaults';
-import type { QuickEditAdvancedState } from './types';
+import { QUICK_EDIT_ADVANCED_SCHEMA_VERSION, type QuickEditAdvancedState } from './types';
 
 /** cut [0,2) + speed [2,6)x2 + keep [6,12): source 8 sits at result time 4. */
 const segments = buildReviewTimeMap(12, [
@@ -73,7 +73,7 @@ const v1State = (): QuickEditAdvancedState => {
 
 it('converts v1 placements from source time to result time', () => {
   const migrated = migrateQuickEditAdvancedV1(v1State(), segments);
-  expect(migrated.schemaVersion).toBe(6);
+  expect(migrated.schemaVersion).toBe(QUICK_EDIT_ADVANCED_SCHEMA_VERSION);
   expect(migrated.zoom.regions[0]).toMatchObject({ start: 4, end: 6, dormant: false });
   expect(migrated.audio.voiceover[0]).toMatchObject({ timelineStart: 4, dormant: false });
 });
@@ -127,7 +127,7 @@ it('admits released v4 without dropping webcam, focus or speech content', () => 
   ];
   const legacy = { ...state, schemaVersion: 4 };
   const loaded = loadQuickEditAdvancedState(legacy);
-  expect(loaded).toEqual({ ...state, schemaVersion: 6 });
+  expect(loaded).toEqual(state);
   expect(loaded?.watermark).toBeUndefined();
   const content = reviewAdvancedContentBaseline(state);
   expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 4 })).toEqual(content);
@@ -137,7 +137,7 @@ it('admits released v4 without dropping webcam, focus or speech content', () => 
 it('does not admit watermark payloads under legacy or future version declarations', () => {
   const state = createQuickEditAdvancedState();
   const watermark = createQuickEditWatermark('Made with Sniptale');
-  for (const schemaVersion of [1, 2, 3, 4, 7]) {
+  for (const schemaVersion of [1, 2, 3, 4, QUICK_EDIT_ADVANCED_SCHEMA_VERSION + 1]) {
     expect(loadQuickEditAdvancedState({ ...state, schemaVersion, watermark }, segments)).toBeNull();
     expect(
       loadQuickEditAdvancedContentState({
@@ -148,11 +148,13 @@ it('does not admit watermark payloads under legacy or future version declaration
     ).toBeNull();
   }
   for (const schemaVersion of [2, 3, 4]) {
-    expect(loadQuickEditAdvancedState({ ...state, schemaVersion })?.schemaVersion).toBe(6);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion })?.schemaVersion).toBe(
+      QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    );
   }
 });
 
-it('admits presentation only in v6 and preserves v5 watermark in current and history content', () => {
+it('admits released v6 presentation and preserves v5 watermark in current and history content', () => {
   const presentation = {
     fadeIn: { enabled: true, duration: 0.4 },
     fadeOut: { enabled: true, duration: 0.4 },
@@ -172,12 +174,12 @@ it('admits presentation only in v6 and preserves v5 watermark in current and his
     watermark: createQuickEditWatermark('Saved'),
   };
   expect(loadQuickEditAdvancedState(legacy)).toMatchObject({
-    schemaVersion: 6,
+    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
     watermark: legacy.watermark,
   });
   const { ui: _legacyUi, ...legacyContent } = legacy;
   expect(loadQuickEditAdvancedContentState(legacyContent)).toMatchObject({
-    schemaVersion: 6,
+    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
     watermark: legacy.watermark,
   });
   expect(loadQuickEditAdvancedState(undefined)).not.toHaveProperty('presentation');

@@ -74,6 +74,15 @@ function fixture(): ReturnType<typeof useReviewSpeech> {
     alignment: 'range' as const,
   };
   return {
+    target: { kind: 'voiceover', clipId: 'clip' },
+    resultInterval: (start, end) => ({ start, end }),
+    recognitionDuration: 4,
+    selectionDuration: 2,
+    originalVolume: 0,
+    setOriginalVolume: vi.fn(),
+    selection: undefined,
+    sourceAudioAvailable: undefined,
+    patchReplacement: vi.fn(),
     transcript: { version: 1, phrases: [phrase], replacements: [] },
     profile,
     modelId: 'stt',
@@ -98,7 +107,7 @@ function fixture(): ReturnType<typeof useReviewSpeech> {
         scope: {
           workspaceId: 'workspace',
           workspaceRevision: 1,
-          clipId: 'clip',
+          target: { kind: 'voiceover' as const, clipId: 'clip' },
           assetId: 'original',
           nativeStart: 0,
           nativeEnd: 2,
@@ -141,7 +150,9 @@ function render(state: ReturnType<typeof useReviewSpeech>) {
     root.render(
       <ReviewSpeechPanel
         session={{} as ReviewSpeechSession}
-        clipId="clip"
+        target={state.target}
+        selection={state.selection}
+        sourceAudioAvailable={state.sourceAudioAvailable}
         beforeAction={(action) => action()}
         flushAdvanced={async () => undefined}
         registerSpeechFlush={() => () => undefined}
@@ -397,4 +408,56 @@ it.each([
   state.error = code;
   render(state);
   expect(host.querySelector('[role="alert"]')?.textContent).toBe(translate(key));
+});
+
+it('shows original selection recognition and addresses accepted controls by replacement identity', () => {
+  const state = fixture();
+  state.target = { kind: 'original' };
+  state.selection = { start: 1, end: 2 };
+  state.catalogs = {
+    transcription: {
+      models: [{ id: 'stt', displayName: 'STT', providerId: 'provider', modelCode: 'stt' }],
+      providers: [],
+      defaultModelId: 'stt',
+      chromeAiEnabled: false,
+      globalSystemPrompt: '',
+    },
+    speech: {
+      models: [],
+      providers: [],
+      defaultModelId: null,
+      chromeAiEnabled: false,
+      globalSystemPrompt: '',
+    },
+  };
+  state.transcript.replacements = [
+    { ...state.previews[0]!.replacement, id: 'accepted-independent', phraseId: 'removed-draft' },
+  ];
+  render(state);
+  const selected = Array.from(host.querySelectorAll('button')).find(
+    (button) => button.textContent === translate('gallery.videoReview.speechRecognizeSelection')
+  )!;
+  expect(selected.disabled).toBe(false);
+  act(() => selected.click());
+  expect(state.recognize).toHaveBeenCalledWith(true);
+  const accepted = host.querySelector('[data-speech-replacement-id="accepted-independent"]')!;
+  const restore = Array.from(accepted.querySelectorAll('button')).find(
+    (button) => button.textContent === translate('gallery.videoReview.speechRestorePhrase')
+  )!;
+  act(() => restore.click());
+  expect(state.restore).toHaveBeenCalledWith(['accepted-independent']);
+  const toggle = accepted.querySelector('button')!;
+  act(() => toggle.click());
+  expect(state.patchReplacement).toHaveBeenCalledWith('accepted-independent', { enabled: true });
+});
+it('keeps recognition unavailable when original has no audio', () => {
+  const state = fixture();
+  state.target = { kind: 'original' };
+  state.sourceAudioAvailable = false;
+  render(state);
+  expect(host.textContent).toContain(translate('gallery.videoReview.speechNoSourceAudio'));
+  const recognize = Array.from(host.querySelectorAll('button')).find(
+    (button) => button.textContent === translate('gallery.videoReview.speechRecognizeAll')
+  )!;
+  expect(recognize.disabled).toBe(true);
 });

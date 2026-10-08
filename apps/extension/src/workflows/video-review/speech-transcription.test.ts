@@ -59,10 +59,16 @@ describe('native speech transcription', () => {
 const workflow = vi.hoisted(() => ({
   job: vi.fn(),
   extract: vi.fn(async () => new Blob(['pcm'])),
-  plan: vi.fn(async () => [
-    { start: 0, end: 1 },
-    { start: 1, end: 2 },
-  ]),
+  plan: vi.fn(
+    async (
+      _source: string | Blob,
+      _ranges: readonly { start: number; end: number }[],
+      _signal: AbortSignal
+    ) => [
+      { start: 0, end: 1 },
+      { start: 1, end: 2 },
+    ]
+  ),
 }));
 vi.mock('./speech-client', () => ({ runReviewSpeechJob: workflow.job }));
 vi.mock('./speech-audio', () => ({
@@ -109,10 +115,20 @@ it('retains successful chunks and retries only unfinished paid work after provid
     .mockRejectedValueOnce(new Error('provider-failed'))
     .mockResolvedValueOnce({ type: 'transcript', result: { text: 'Second' } });
   await expect(
-    transcribeReviewSpeech(session, 'clip', 'model', new AbortController().signal)
+    transcribeReviewSpeech(
+      session,
+      { kind: 'voiceover', clipId: 'clip' },
+      'model',
+      new AbortController().signal
+    )
   ).rejects.toThrow('provider-failed');
   expect(clip.transcript?.phrases.map((p) => p.text)).toEqual(['First']);
-  await transcribeReviewSpeech(session, 'clip', 'model', new AbortController().signal);
+  await transcribeReviewSpeech(
+    session,
+    { kind: 'voiceover', clipId: 'clip' },
+    'model',
+    new AbortController().signal
+  );
   expect(clip.transcript?.phrases.map((p) => p.text)).toEqual(['First', 'Second']);
   expect(workflow.job.mock.calls.map((call) => call[0].scope.nativeStart)).toEqual([0, 1, 1]);
 });
@@ -124,7 +140,12 @@ it('rejects a response after clip geometry changed and preserves existing text',
     return { type: 'transcript', result: { text: 'Obsolete' } };
   });
   await expect(
-    transcribeReviewSpeech(session, 'clip', 'model', new AbortController().signal)
+    transcribeReviewSpeech(
+      session,
+      { kind: 'voiceover', clipId: 'clip' },
+      'model',
+      new AbortController().signal
+    )
   ).rejects.toThrow('stale');
   expect(saveSpeechTranscript).not.toHaveBeenCalled();
 });
@@ -139,7 +160,12 @@ it('rejects changed text and mismatched response kind before durable publication
         : { type: 'audio', staged: {} };
     });
     await expect(
-      transcribeReviewSpeech(session, 'clip', 'model', new AbortController().signal)
+      transcribeReviewSpeech(
+        session,
+        { kind: 'voiceover', clipId: 'clip' },
+        'model',
+        new AbortController().signal
+      )
     ).rejects.toThrow(changedText ? 'stale' : 'invalid-response');
     expect(saveSpeechTranscript).not.toHaveBeenCalled();
   }
@@ -178,7 +204,12 @@ it.each([false, true])(
       if (cancelled) controller.abort();
       throw new Error('private decoder failure');
     });
-    const pending = transcribeReviewSpeech(session, 'clip', 'model', controller.signal);
+    const pending = transcribeReviewSpeech(
+      session,
+      { kind: 'voiceover', clipId: 'clip' },
+      'model',
+      controller.signal
+    );
     if (cancelled) await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     else await expect(pending).rejects.toThrow(/^decode-failed$/);
     expect(workflow.plan).toHaveBeenCalledWith(
@@ -190,3 +221,88 @@ it.each([false, true])(
     expect(saveSpeechTranscript).not.toHaveBeenCalled();
   }
 );
+
+it('recognizes selected original native ranges excluding cuts even when original is muted', async () => {
+  const { createQuickEditAdvancedState } =
+    await import('../../features/video/review/advanced/defaults');
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.original.muted = true;
+  const state = {
+    snapshot: {
+      workspace: {
+        aggregateId: 'w',
+        revision: 1,
+        sourceAssetId: 'source',
+        source: { duration: 10 },
+      },
+    },
+    document: {
+      edits: [
+        { id: 'cut', kind: 'cut' as const, start: 4, end: 6, requestedStart: 4, requestedEnd: 6 },
+      ],
+      advancedContent: advanced,
+    },
+  };
+  const save = vi.fn(
+    async (_target: unknown, _asset: string, transcript: ReviewSpeechTranscript) => {
+      advanced.audio.originalSpeech = {
+        enabled: true,
+        transcript: { ...transcript, replacements: [] },
+      };
+      state.snapshot.workspace.revision++;
+    }
+  );
+  const session = {
+    getSnapshot: () => state,
+    flush: async () => undefined,
+    saveSpeechTranscript: save,
+  } as unknown as ReviewSpeechSession;
+  const file = new Blob(['original']);
+  workflow.plan.mockImplementationOnce(async (_source, ranges) => [...ranges]);
+  workflow.job.mockReset();
+  workflow.job.mockImplementation(async (_start, options) => {
+    await options.prepareInput(new AbortController().signal);
+    return { type: 'transcript', result: { text: 'words' } };
+  });
+  await transcribeReviewSpeech(
+    session,
+    { kind: 'original' },
+    'model',
+    new AbortController().signal,
+    { original: { file, sourceAssetId: 'source' }, selection: { start: 2, end: 8 } }
+  );
+  expect(workflow.plan).toHaveBeenLastCalledWith(
+    file,
+    [
+      { start: 2, end: 4 },
+      { start: 6, end: 8 },
+    ],
+    expect.any(AbortSignal)
+  );
+  expect(workflow.job.mock.calls.map((call) => call[0].scope)).toEqual([
+    expect.objectContaining({
+      target: { kind: 'original' },
+      assetId: 'source',
+      workspaceRevision: 1,
+      nativeStart: 2,
+      nativeEnd: 4,
+    }),
+    expect.objectContaining({
+      target: { kind: 'original' },
+      assetId: 'source',
+      workspaceRevision: 2,
+      nativeStart: 6,
+      nativeEnd: 8,
+    }),
+  ]);
+  expect(advanced.audio.originalSpeech?.transcript.phrases.map((p) => [p.start, p.end])).toEqual([
+    [2, 4],
+    [6, 8],
+  ]);
+  expect(advanced.audio.original.muted).toBe(true);
+  await expect(
+    transcribeReviewSpeech(session, { kind: 'original' }, 'model', new AbortController().signal, {
+      original: { file, sourceAssetId: 'other' },
+    })
+  ).rejects.toThrow('stale');
+});

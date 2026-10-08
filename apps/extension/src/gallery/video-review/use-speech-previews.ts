@@ -13,6 +13,7 @@ function disposePreviews(items: readonly ReviewSpeechPreview[]): void {
 /** Owns original audition URLs and disposable generated audio, including stale and expired results. */
 export function useSpeechPreviews(args: {
   assetId: string | undefined;
+  original?: Blob | undefined;
   transcript: ReviewSpeechTranscript | undefined;
   geometry: string | null;
   onError(): void;
@@ -31,11 +32,13 @@ export function useSpeechPreviews(args: {
     []
   );
   const originalAssetId = args.assetId;
+  const original = args.original;
   useEffect(() => {
     let active = true;
     let url: string | null = null;
-    if (originalAssetId)
-      void resolveReviewAssetBytes(originalAssetId)
+    setOriginalUrl(null);
+    if (original || originalAssetId)
+      void (original ? Promise.resolve(original) : resolveReviewAssetBytes(originalAssetId!))
         .then((blob) => {
           if (!active || !blob) return;
           url = URL.createObjectURL(blob);
@@ -48,7 +51,7 @@ export function useSpeechPreviews(args: {
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [originalAssetId]);
+  }, [originalAssetId, original]);
 
   const { geometry, transcript } = args;
   useEffect(() => {

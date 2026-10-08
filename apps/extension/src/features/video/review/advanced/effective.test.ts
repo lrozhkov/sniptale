@@ -710,3 +710,88 @@ it('defers unknown sequence audio capability but blocks a confirmed composed aud
     reasons: [],
   });
 });
+
+it('couples Revoice and native attenuation using the current map independently of microphone visibility', async () => {
+  const { resolveQuickEditEffectiveAudio } = await import('./effective');
+  const { buildReviewTimeMap } = await import('../timeline');
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.ui.tracks.audio = false;
+  state.audio.originalSpeech = {
+    enabled: true,
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'accepted',
+          phraseId: 'p',
+          start: 2,
+          end: 8,
+          duration: 4,
+          enabled: true,
+          originalVolume: 0.25,
+          assetId: 'project-asset:accepted',
+          revision: 0,
+          text: 'accepted',
+          textSignature: 'test',
+          profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+        },
+      ],
+    },
+  };
+  const edits: import('../types').ReviewEdit[] = [
+    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 4,
+      end: 8,
+      requestedStart: 4,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'mute',
+    },
+  ];
+  const timeMap = buildReviewTimeMap(10, edits);
+  const document = { edits, canvasComments: [] };
+  const effective = resolveQuickEditEffectiveAudio(state, timeMap);
+  expect(effective.revoice).toMatchObject([
+    { timelineStart: 2, duration: 1, sourceOffset: 0, playbackRate: 1 },
+    { timelineStart: 3, duration: 1, sourceOffset: 2, playbackRate: 2 },
+  ]);
+  expect(effective.automaticOriginalRanges).toEqual([{ start: 2, end: 8, volume: 0.25 }]);
+  expect(resolveQuickEditExportPlan({ advanced: state, document, timeMap })).toMatchObject({
+    audio: 'process',
+    reasons: ['revoice'],
+  });
+  expect(() => resolveQuickEditExportPlan({ advanced: state, document })).toThrow('time map');
+  const before = structuredClone(state.audio.originalSpeech);
+  state.ui.mode = 'basic';
+  expect(resolveQuickEditEffectiveAudio(state, timeMap)).toMatchObject({
+    revoice: [],
+    automaticOriginalRanges: [],
+  });
+  expect(state.audio.originalSpeech).toEqual(before);
+  state.ui.mode = 'advanced';
+  state.audio.originalSpeech.enabled = false;
+  expect(resolveQuickEditEffectiveAudio(state, timeMap)).toMatchObject({
+    revoice: [],
+    automaticOriginalRanges: [],
+  });
+  state.audio.originalSpeech.enabled = true;
+  state.audio.originalSpeech.transcript.replacements[0]!.enabled = false;
+  expect(resolveQuickEditEffectiveAudio(state, timeMap)).toMatchObject({
+    revoice: [],
+    automaticOriginalRanges: [],
+  });
+  state.audio.originalSpeech.transcript.replacements[0]!.enabled = true;
+  const cutMap = buildReviewTimeMap(10, [
+    { id: 'all', kind: 'cut', start: 2, end: 8, requestedStart: 2, requestedEnd: 8 },
+  ]);
+  expect(resolveQuickEditEffectiveAudio(state, cutMap)).toMatchObject({
+    revoice: [],
+    automaticOriginalRanges: [],
+  });
+  expect(state.audio.originalSpeech).toEqual(before);
+});

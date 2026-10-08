@@ -1,9 +1,16 @@
 import { expect, it } from 'vitest';
-import { parseAudioJobClientMessage, parseAudioJobServerMessage } from './audio';
+import {
+  parseAudioJobClientMessage,
+  parseAudioJobServerMessage,
+  parseAudioJobScope,
+  parseReviewSpeechTarget,
+  sameReviewSpeechTarget,
+  sameAudioJobScope,
+} from './audio';
 const scope = {
   workspaceId: 'w',
   workspaceRevision: 1,
-  clipId: 'c',
+  target: { kind: 'voiceover' as const, clipId: 'c' },
   assetId: 'a',
   nativeStart: 0,
   nativeEnd: 1,
@@ -97,4 +104,33 @@ it.each([
       code: `${code}: private provider body`,
     })
   ).toBeNull();
+});
+
+it('binds both strict target variants across scope parsing and equality', () => {
+  const original = { ...scope, target: { kind: 'original' as const } };
+  expect(parseAudioJobScope(original)).toEqual(original);
+  expect(sameAudioJobScope(original, original)).toBe(true);
+  expect(sameAudioJobScope(original, scope)).toBe(false);
+  expect(sameReviewSpeechTarget(scope.target, { kind: 'voiceover', clipId: 'other' })).toBe(false);
+  for (const target of [
+    null,
+    {},
+    { kind: 'music' },
+    { kind: 'voiceover' },
+    { kind: 'original', clipId: 'c' },
+    { kind: 'original', extra: true },
+    { kind: 'voiceover', clipId: 'c', extra: true },
+  ]) {
+    expect(parseReviewSpeechTarget(target)).toBeNull();
+    expect(parseAudioJobScope({ ...scope, target })).toBeNull();
+  }
+  expect(parseAudioJobScope({ ...original, clipId: 'legacy' })).toBeNull();
+  expect(
+    parseAudioJobServerMessage({
+      type: 'authorized',
+      requestId: 'r',
+      ticket: '12345678-1234-4234-8234-123456789abc',
+      scope: original,
+    })
+  ).toMatchObject({ scope: original });
 });

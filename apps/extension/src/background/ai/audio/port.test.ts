@@ -118,3 +118,30 @@ describe('Gallery audio ingress', () => {
     ).toBeNull();
   });
 });
+
+it('admits original targets but refuses legacy and mixed target payloads at the Port', () => {
+  const fixture = connectedPort();
+  const message = {
+    type: 'start',
+    requestId: 'r',
+    operation: 'transcription',
+    modelId: 'm',
+    scope: {
+      workspaceId: 'w',
+      workspaceRevision: 1,
+      target: { kind: 'original' },
+      assetId: 'source',
+      nativeStart: 0,
+      nativeEnd: 1,
+    },
+  };
+  fixture.onMessage.emit(message);
+  expect(fixture.connection.receive).toHaveBeenCalledExactlyOnceWith(message);
+  fixture.onMessage.emit({ ...message, scope: { ...message.scope, clipId: 'legacy' } });
+  fixture.onMessage.emit({
+    ...message,
+    scope: { ...message.scope, target: { kind: 'original', clipId: 'clip' } },
+  });
+  expect(fixture.connection.receive).toHaveBeenCalledTimes(1);
+  fixture.stop();
+});

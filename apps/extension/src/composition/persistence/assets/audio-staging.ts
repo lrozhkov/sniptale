@@ -1,3 +1,4 @@
+import { readLibrarySceneSource } from '../projects/library-scene-source';
 import { readVideoWorkspace } from '../review-workspaces/store';
 import {
   replayReviewHistory,
@@ -79,9 +80,24 @@ async function assertScopeExists(scope: AudioJobScope): Promise<void> {
     workspace.source,
     reviewAdvancedContentBaseline(workspace.advanced)
   );
+  const target = scope.target;
+  if (target.kind === 'original') {
+    if (workspace.aggregateId !== scope.workspaceId || workspace.sourceAssetId !== scope.assetId)
+      throw new Error('Missing audio staging scope.');
+    const source = await readLibrarySceneSource(workspace.aggregateId, 'video');
+    if (
+      source.ref.assetId !== workspace.sourceAssetId ||
+      source.ref.size !== workspace.source.size ||
+      // Inspection adds codec parameters; immutable storage records the container MIME.
+      source.ref.mimeType.split(';', 1)[0]?.trim().toLowerCase() !==
+        workspace.source.mimeType.split(';', 1)[0]?.trim().toLowerCase()
+    )
+      throw new Error('Missing audio staging scope.');
+    return;
+  }
   if (
     !document.advancedContent.audio.voiceover.some(
-      (clip) => clip.id === scope.clipId && clip.assetId === scope.assetId
+      (clip) => clip.id === target.clipId && clip.assetId === scope.assetId
     )
   )
     throw new Error('Missing audio staging scope.');

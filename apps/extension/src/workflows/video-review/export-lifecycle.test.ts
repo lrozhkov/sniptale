@@ -780,3 +780,125 @@ it.each(['success', 'admission', 'render', 'cancel'] as const)(
     expect(source.dispose).toHaveBeenCalledOnce();
   }
 );
+
+it('projects accepted native speech through the full map and subtracts fragment offset exactly once', async () => {
+  const { buildReviewExportClipPlan } = await import('./export-lifecycle');
+  const { buildReviewTimeMap } = await import('../../features/video/review/timeline');
+  const { args, deps } = fixture();
+  const advanced = args.snapshot.workspace.advanced;
+  advanced.ui.mode = 'advanced';
+  advanced.audio.originalSpeech = {
+    enabled: true,
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'accepted',
+          phraseId: 'p',
+          start: 2,
+          end: 8,
+          duration: 4,
+          enabled: true,
+          originalVolume: 0.25,
+          assetId: 'project-asset:accepted',
+          revision: 0,
+          text: 'accepted',
+          textSignature: 'test',
+          profile: { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' },
+        },
+      ],
+    },
+  };
+  const timeMap = buildReviewTimeMap(10, [
+    { id: 'cut', kind: 'cut', start: 3, end: 4, requestedStart: 3, requestedEnd: 4 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 4,
+      end: 8,
+      requestedStart: 4,
+      requestedEnd: 8,
+      rate: 2,
+      audio: 'mute',
+    },
+  ]);
+  const input = {
+    advanced,
+    timeMap,
+    fragmentOffset: 3,
+    signal: args.signal,
+    readProjectAsset: deps.readProjectAsset,
+    window: { start: 0, end: 2 },
+  };
+  const plan = await buildReviewExportClipPlan(input, deps);
+  expect(plan.entries).toMatchObject([
+    { lane: 'revoice', timelineStart: 0, duration: 1, sourceOffset: 2, playbackRate: 2 },
+  ]);
+  expect(plan.automaticOriginalRanges).toEqual([{ start: 2, end: 8, volume: 0.25 }]);
+  expect(deps.openAudioSource).toHaveBeenCalledOnce();
+  plan.dispose?.();
+  await expect(
+    buildReviewExportClipPlan({ ...input, readProjectAsset: async () => null }, deps)
+  ).rejects.toMatchObject({ reasons: ['asset-missing'] });
+  await expect(
+    buildReviewExportClipPlan(
+      { advanced, fragmentOffset: 3, signal: args.signal, readProjectAsset: deps.readProjectAsset },
+      deps
+    )
+  ).rejects.toThrow('time map');
+  advanced.ui.mode = 'basic';
+  expect((await buildReviewExportClipPlan(input, deps)).entries).toEqual([]);
+});
+
+it('exports accepted speech with packet video and preserves the original', async () => {
+  const { reviewSpeechTextSignature } =
+    await import('../../features/video/review/speech-transcript');
+  const { args, deps, original } = fixture();
+  const before = await original.arrayBuffer();
+  args.index.processedAudioCodec = 'opus';
+  const profile = { modelId: 'tts', voiceId: 'voice', responseFormat: 'wav' as const };
+  args.snapshot.workspace.advanced.ui.mode = 'advanced';
+  args.snapshot.workspace.advanced.audio.originalSpeech = {
+    enabled: true,
+    transcript: {
+      version: 1,
+      phrases: [],
+      replacements: [
+        {
+          id: 'accepted',
+          phraseId: 'p',
+          start: 4,
+          end: 6,
+          duration: 1,
+          enabled: true,
+          originalVolume: 0,
+          assetId: 'project-asset:accepted',
+          revision: 0,
+          text: 'accepted',
+          textSignature: reviewSpeechTextSignature('accepted', profile),
+          profile,
+        },
+      ],
+    },
+  };
+  await exportReviewedVideo(args, deps);
+  expect(deps.writeReviewPackets).toHaveBeenCalledOnce();
+  expect(deps.writeReviewFrames).not.toHaveBeenCalled();
+  expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+    expect.objectContaining({
+      exportAudio: expect.objectContaining({
+        entries: [
+          expect.objectContaining({
+            lane: 'revoice',
+            timelineStart: 2,
+            duration: 1,
+            sourceOffset: 0,
+          }),
+        ],
+        automaticOriginalRanges: [{ start: 4, end: 6, volume: 0 }],
+      }),
+    })
+  );
+  expect(await original.arrayBuffer()).toEqual(before);
+});

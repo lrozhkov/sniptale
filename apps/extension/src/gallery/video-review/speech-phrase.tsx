@@ -3,12 +3,13 @@ import { ProductField, ProductInput, ProductTextarea } from '@sniptale/ui/produc
 import type { ReviewSpeechPhrase } from '../../features/video/review/speech-transcript';
 import { parseReviewSpeechProfile } from '../../features/video/review/speech-validation';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
-import { translate } from '../../platform/i18n';
+import { formatNumber, translate } from '../../platform/i18n';
 import type { useReviewSpeech } from './use-speech';
 type Controller = ReturnType<typeof useReviewSpeech>;
 const buttonClass = `${reviewTextButtonClassName} !h-auto min-h-8! whitespace-normal text-left`;
 export function PhraseRow({
   phrase,
+  resultInterval,
   next,
   speech,
   tempo,
@@ -16,6 +17,7 @@ export function PhraseRow({
   onSelect,
 }: {
   phrase: ReviewSpeechPhrase;
+  resultInterval?: { start: number; end: number } | null | undefined;
   next: ReviewSpeechPhrase | undefined;
   speech: Pick<
     Controller,
@@ -58,6 +60,14 @@ export function PhraseRow({
           </span>
         ) : null}
       </label>
+      {resultInterval !== undefined ? (
+        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('gallery.videoReview.speechResultInterval')}:{' '}
+          {resultInterval
+            ? formatSpeechInterval(resultInterval)
+            : translate('gallery.videoReview.speechRemovedInterval')}
+        </p>
+      ) : null}
       {phrase.alignment === 'range' ? (
         <p className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.speechUnaligned')}
@@ -226,4 +236,15 @@ function PhraseAudition({
       ) : null}
     </>
   );
+}
+
+function formatSpeechInterval(interval: { start: number; end: number }): string {
+  const start = formatNumber(interval.start, { maximumFractionDigits: 2 });
+  const end = formatNumber(interval.end, {
+    style: 'unit',
+    unit: 'second',
+    unitDisplay: 'short',
+    maximumFractionDigits: 2,
+  });
+  return `${start}–${end}`;
 }

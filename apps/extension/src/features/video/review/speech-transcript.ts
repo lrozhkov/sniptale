@@ -41,16 +41,31 @@ export interface ReviewSpeechReplacement {
 }
 
 /** Versioned optional voiceover document; previews and running requests are disposable. */
-export interface ReviewSpeechTranscript {
+export interface ReviewSpeechTranscript<
+  R extends ReviewSpeechReplacement = ReviewSpeechReplacement,
+> {
   version: 1;
   phrases: ReviewSpeechPhrase[];
-  replacements: ReviewSpeechReplacement[];
+  replacements: R[];
   profile?: ReviewSpeechProfile;
   transcriptionModelId?: string;
 }
 
-export type ReviewSpeechEditResult =
-  | { ok: true; transcript: ReviewSpeechTranscript }
+/** Accepted native-source speech and its independently authored original-mix gain. */
+export interface ReviewOriginalSpeechReplacement extends ReviewSpeechReplacement {
+  enabled: boolean;
+  originalVolume: number;
+}
+export type ReviewOriginalSpeechTranscript =
+  ReviewSpeechTranscript<ReviewOriginalSpeechReplacement>;
+/** The workspace owns source identity; this optional object owns only authored speech state. */
+export interface ReviewOriginalSpeech {
+  enabled: boolean;
+  transcript: ReviewOriginalSpeechTranscript;
+}
+
+export type ReviewSpeechEditResult<R extends ReviewSpeechReplacement = ReviewSpeechReplacement> =
+  | { ok: true; transcript: ReviewSpeechTranscript<R> }
   | { ok: false; reason: 'stale' | 'duration' | 'partial-replacement' | 'invalid' };
 
 /** Canonical request snapshot; changing any synthesis setting invalidates a preview. */
@@ -70,10 +85,10 @@ const validRange = (start: number, end: number) =>
 const overlaps = (a: { start: number; end: number }, b: { start: number; end: number }) =>
   a.start < b.end && b.start < a.end;
 
-function replacePhrases(
-  transcript: ReviewSpeechTranscript,
+function replacePhrases<R extends ReviewSpeechReplacement>(
+  transcript: ReviewSpeechTranscript<R>,
   phrases: ReviewSpeechPhrase[]
-): ReviewSpeechEditResult {
+): ReviewSpeechEditResult<R> {
   const ordered = [...phrases].sort((a, b) => a.start - b.start);
   if (
     ordered.length > 2_000 ||
@@ -94,11 +109,11 @@ function replacePhrases(
 }
 
 /** Edits draft text or boundaries without mutating previously accepted replacements. */
-export function editReviewSpeechPhrase(
-  transcript: ReviewSpeechTranscript,
+export function editReviewSpeechPhrase<R extends ReviewSpeechReplacement>(
+  transcript: ReviewSpeechTranscript<R>,
   id: string,
   patch: { text?: string; start?: number; end?: number }
-): ReviewSpeechEditResult {
+): ReviewSpeechEditResult<R> {
   const phrase = transcript.phrases.find((entry) => entry.id === id);
   if (!phrase) return { ok: false, reason: 'stale' };
   const changed = { ...phrase, ...patch, revision: phrase.revision + 1 };
@@ -113,8 +128,8 @@ export function editReviewSpeechPhrase(
 }
 
 /** Splits one draft interval; callers explicitly choose the new text on each side. */
-export function splitReviewSpeechPhrase(
-  transcript: ReviewSpeechTranscript,
+export function splitReviewSpeechPhrase<R extends ReviewSpeechReplacement>(
+  transcript: ReviewSpeechTranscript<R>,
   id: string,
   args: {
     id: string;
@@ -124,7 +139,7 @@ export function splitReviewSpeechPhrase(
     leftOriginalText?: string;
     rightOriginalText?: string;
   }
-): ReviewSpeechEditResult {
+): ReviewSpeechEditResult<R> {
   const phrase = transcript.phrases.find((entry) => entry.id === id);
   if (!phrase) return { ok: false, reason: 'stale' };
   if (args.time <= phrase.start || args.time >= phrase.end || !args.id.trim())
@@ -160,11 +175,11 @@ export function splitReviewSpeechPhrase(
 }
 
 /** Only adjacent touching native ranges can merge; unrecognized gaps remain untouched. */
-export function mergeReviewSpeechPhrases(
-  transcript: ReviewSpeechTranscript,
+export function mergeReviewSpeechPhrases<R extends ReviewSpeechReplacement>(
+  transcript: ReviewSpeechTranscript<R>,
   leftId: string,
   rightId: string
-): ReviewSpeechEditResult {
+): ReviewSpeechEditResult<R> {
   const index = transcript.phrases.findIndex((entry) => entry.id === leftId);
   const left = transcript.phrases[index];
   const right = transcript.phrases[index + 1];
@@ -188,10 +203,10 @@ export function mergeReviewSpeechPhrases(
 }
 
 /** Explicitly returns whole accepted intervals to the original recording. */
-export function restoreReviewSpeechReplacements(
-  transcript: ReviewSpeechTranscript,
+export function restoreReviewSpeechReplacements<R extends ReviewSpeechReplacement>(
+  transcript: ReviewSpeechTranscript<R>,
   ids: readonly string[]
-): ReviewSpeechTranscript {
+): ReviewSpeechTranscript<R> {
   return {
     ...transcript,
     replacements: transcript.replacements.filter((entry) => !ids.includes(entry.id)),
@@ -199,11 +214,11 @@ export function restoreReviewSpeechReplacements(
 }
 
 /** Applies a batch atomically; partial replacement of an old generated interval is forbidden. */
-export function applyReviewSpeechReplacements(
-  transcript: ReviewSpeechTranscript,
-  replacements: readonly ReviewSpeechReplacement[],
+export function applyReviewSpeechReplacements<R extends ReviewSpeechReplacement>(
+  transcript: ReviewSpeechTranscript<R>,
+  replacements: readonly R[],
   restoreIds: readonly string[] = []
-): ReviewSpeechEditResult {
+): ReviewSpeechEditResult<R> {
   const ordered = [...replacements].sort((a, b) => a.start - b.start);
   for (const [index, replacement] of ordered.entries()) {
     const phrase = transcript.phrases.find((entry) => entry.id === replacement.phraseId);

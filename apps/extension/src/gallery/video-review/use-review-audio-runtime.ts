@@ -1,5 +1,8 @@
 import { decodeReviewAudioClipBuffer } from '../../workflows/video-review/audio-clip-source';
-import { originalAudioGainAt } from '../../features/video/review/advanced/original-audio';
+import {
+  originalAudioGainAt,
+  type OriginalAudioAttenuation,
+} from '../../features/video/review/advanced/original-audio';
 import { renderTempoBuffer } from '../../features/video/audio/tempo-buffer';
 import { useCallback, useEffect, useRef, type RefObject } from 'react';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
@@ -158,11 +161,13 @@ interface ReviewAudioRuntimeProps {
   outputTime: number;
   seekRevision?: number | undefined;
   original: QuickEditOriginalAudio;
+  revoice?: readonly QuickEditAudioClip[];
+  automaticOriginalRanges?: readonly OriginalAudioAttenuation[];
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   resolveAsset(assetId: string): Promise<Blob | null>;
   sessionKey: string;
-  onFailure(): void;
+  onFailure(stopPlayback?: boolean): void;
   createEngine?: (element: HTMLMediaElement | null) => ReviewAudioEngine | null;
 }
 
@@ -216,10 +221,12 @@ export function useReviewEditorAudioRuntime(args: {
   outputTime: number;
   seekRevision?: number | undefined;
   originalAudio: QuickEditOriginalAudio;
+  revoice?: readonly QuickEditAudioClip[];
+  automaticOriginalRanges?: readonly OriginalAudioAttenuation[];
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
   sessionKey: string;
-  onFailure(): void;
+  onFailure(stopPlayback?: boolean): void;
 }) {
   useReviewAudioRuntime({
     video: args.video,
@@ -228,6 +235,8 @@ export function useReviewEditorAudioRuntime(args: {
     outputTime: args.outputTime,
     seekRevision: args.seekRevision,
     original: args.originalAudio,
+    revoice: args.revoice ?? [],
+    automaticOriginalRanges: args.automaticOriginalRanges ?? [],
     voiceover: args.voiceover,
     music: args.music,
     resolveAsset: resolveReviewAssetBytes,
@@ -276,6 +285,10 @@ class ReviewAudioPlaybackSession {
       }
     })();
     this.buffers.set(entry.assetId, pending);
+    void pending.then((buffer) => {
+      if (!buffer && this.buffers.get(entry.assetId) === pending)
+        this.buffers.delete(entry.assetId);
+    });
     return pending;
   }
   schedule(planKey: string) {
@@ -286,7 +299,11 @@ class ReviewAudioPlaybackSession {
     this.preparation = controller;
     const engine = this.engines.get();
     if (!engine) {
-      if (current.playing) current.onFailure();
+      if (current.playing) {
+        const stopPlayback = !!current.revoice?.length;
+        if (stopPlayback) current.video.current?.pause();
+        current.onFailure(stopPlayback);
+      }
       return;
     }
     if (this.planKey !== planKey) {
@@ -300,7 +317,12 @@ class ReviewAudioPlaybackSession {
         ? 0
         : Math.max(
             1,
-            originalAudioGainAt(current.original, current.video.current?.currentTime ?? 0)
+            originalAudioGainAt(
+              current.original,
+              current.video.current?.currentTime ?? 0,
+              [],
+              current.automaticOriginalRanges
+            )
           )
     );
     void this.run({ current, generation, signal: controller.signal, engine });
@@ -327,13 +349,18 @@ class ReviewAudioPlaybackSession {
       await job.engine.resume();
       if (!this.active(job)) return;
       const plan = buildQuickEditAudioPlan({
+        revoice: job.current.revoice ?? [],
         voiceover: job.current.voiceover,
         music: job.current.music,
       });
       for (const entry of plan) {
         const buffer = await this.resolveBuffer(entry);
         if (!this.active(job)) return;
-        if (!buffer) continue;
+        if (!buffer) {
+          if (entry.lane === 'revoice')
+            throw new Error('Accepted replacement audio is unavailable.');
+          continue;
+        }
         const rate = entry.playbackRate ?? 1;
         const key = JSON.stringify([entry.assetId, entry.sourceOffset, entry.duration, rate]);
         let prepared = rate === 1 ? buffer : this.prepared.get(key);
@@ -363,13 +390,23 @@ class ReviewAudioPlaybackSession {
           );
       }
     } catch {
-      if (this.active(job)) this.latest.current.onFailure();
+      if (this.active(job)) {
+        job.engine.stopAll();
+        const stopPlayback = !!job.current.revoice?.length;
+        if (stopPlayback) this.latest.current.video.current?.pause();
+        this.latest.current.onFailure(stopPlayback);
+      }
     }
   }
 }
 
 export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
-  const planKey = JSON.stringify([props.voiceover, props.music]);
+  const planKey = JSON.stringify([
+    props.revoice,
+    props.voiceover,
+    props.music,
+    props.automaticOriginalRanges,
+  ]);
   const session = useRef<ReviewAudioPlaybackSession | null>(null);
   const latest = useRef(props);
   latest.current = props;
@@ -397,9 +434,11 @@ export function useReviewAudioRuntime(props: ReviewAudioRuntimeProps) {
             1,
             originalAudioGainAt(
               latest.current.original,
-              latest.current.video.current?.currentTime ?? 0
+              latest.current.video.current?.currentTime ?? 0,
+              [],
+              latest.current.automaticOriginalRanges
             )
           )
     );
-  }, [peek, props.original, props.outputTime, props.silent]);
+  }, [peek, props.original, props.outputTime, props.silent, props.automaticOriginalRanges]);
 }

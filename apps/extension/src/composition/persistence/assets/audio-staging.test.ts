@@ -1,3 +1,9 @@
+import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
+const stagingSource = vi.hoisted(() => ({ database: vi.fn() }));
+vi.mock('../infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
+  initDB: stagingSource.database,
+}));
 import { afterEach, expect, it, vi } from 'vitest';
 import { writeAudioStaging, readAudioStaging, discardAudioStaging } from './audio-staging';
 import { readVideoWorkspace } from '../review-workspaces/store';
@@ -10,7 +16,7 @@ afterEach(() => {
 const scope = {
   workspaceId: 'w',
   workspaceRevision: 1,
-  clipId: 'clip',
+  target: { kind: 'voiceover' as const, clipId: 'clip' },
   assetId: 'project-asset:a',
   nativeStart: 0,
   nativeEnd: 1,
@@ -168,9 +174,12 @@ it('roundtrips scoped bytes and refuses duplicate tickets without deleting the o
     'already exists'
   );
   expect(await (await readAudioStaging(handle, scope)).text()).toBe('audio');
-  await expect(discardAudioStaging(handle, { ...scope, clipId: 'other' })).rejects.toThrow(
-    'scope mismatch'
-  );
+  await expect(
+    discardAudioStaging(handle, {
+      ...scope,
+      target: { kind: 'voiceover' as const, clipId: 'other' },
+    })
+  ).rejects.toThrow('scope mismatch');
   expect(memory.files.size).toBe(2);
   await discardAudioStaging(handle, scope);
   await discardAudioStaging(handle, scope);
@@ -190,7 +199,11 @@ it('cleans failed writes and refuses an aborted or no-longer-existing clip befor
     writeAudioStaging({ id: stagingId, scope, blob: audioBlob(), signal: controller.signal })
   ).rejects.toThrow();
   await expect(
-    writeAudioStaging({ id: stagingId, scope: { ...scope, clipId: 'removed' }, blob: audioBlob() })
+    writeAudioStaging({
+      id: stagingId,
+      scope: { ...scope, target: { kind: 'voiceover' as const, clipId: 'removed' } },
+      blob: audioBlob(),
+    })
   ).rejects.toThrow('Missing audio staging scope');
 });
 
@@ -286,4 +299,65 @@ it('rejects invalid audio and scope before storage and tolerates already-erased 
   await expect(
     discardAudioStaging({ id: stagingId, size: 5, mimeType: 'audio/wav' }, scope)
   ).rejects.toThrow('storage failed');
+});
+
+it('roundtrips original scopes without allowing a voiceover discriminator to read or discard them', async () => {
+  const memory = memoryStaging();
+  const snapshot = await readVideoWorkspace('w');
+  if (!snapshot) throw new Error('Missing workspace fixture');
+  snapshot.workspace.source.mimeType = 'video/webm; codecs="vp8, opus"';
+  const original = { ...scope, target: { kind: 'original' as const }, assetId: 'source' };
+  const rows = new Map<string, unknown>([
+    [
+      'media_library',
+      createMediaLibraryEntry({
+        id: 'w',
+        kind: 'video',
+        mimeType: 'video/webm',
+        size: 10,
+        source: { kind: 'stored-asset', assetId: 'source' },
+      }),
+    ],
+    [
+      'asset_refs',
+      {
+        assetId: 'source',
+        size: 10,
+        mimeType: 'video/webm',
+        createdAt: 1,
+        sha256: null,
+        location: { kind: 'opfs', objectKey: 'objects/source' },
+      },
+    ],
+  ]);
+  stagingSource.database.mockResolvedValue({
+    transaction: () => ({
+      objectStore: (name: string) => ({ get: async () => rows.get(name) }),
+      done: Promise.resolve(),
+    }),
+  });
+  const handle = await writeAudioStaging({ id: stagingId, scope: original, blob: audioBlob() });
+  expect(await (await readAudioStaging(handle, original)).text()).toBe('audio');
+  await expect(readAudioStaging(handle, { ...original, target: scope.target })).rejects.toThrow(
+    'Stale audio staging'
+  );
+  await expect(discardAudioStaging(handle, { ...original, target: scope.target })).rejects.toThrow(
+    'scope mismatch'
+  );
+  await discardAudioStaging(handle, original);
+  expect(memory.files.size).toBe(0);
+  let reads = 0;
+  stagingSource.database.mockImplementation(async () => {
+    if (++reads === 2) rows.delete('media_library');
+    return {
+      transaction: () => ({
+        objectStore: (name: string) => ({ get: async () => rows.get(name) }),
+        done: Promise.resolve(),
+      }),
+    };
+  });
+  await expect(
+    writeAudioStaging({ id: stagingId, scope: original, blob: audioBlob() })
+  ).rejects.toThrow();
+  expect(memory.files.size).toBe(0);
 });

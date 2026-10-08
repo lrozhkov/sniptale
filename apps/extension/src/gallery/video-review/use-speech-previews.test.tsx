@@ -54,7 +54,7 @@ function preview(id = 'take'): ReviewSpeechPreview {
     scope: {
       workspaceId: 'workspace',
       workspaceRevision: 1,
-      clipId: 'clip',
+      target: { kind: 'voiceover' as const, clipId: 'clip' },
       assetId: 'original',
       nativeStart: 0,
       nativeEnd: 3,

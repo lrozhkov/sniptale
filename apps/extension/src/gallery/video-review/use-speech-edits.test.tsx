@@ -100,7 +100,7 @@ function fixture() {
     const state = useSyncExternalStore(session.subscribe, session.getSnapshot, session.getSnapshot);
     editor = useSpeechEdits({
       session,
-      clipId: 'clip',
+      target: { kind: 'voiceover' as const, clipId: 'clip' },
       durable: state.document.advancedContent.audio.voiceover[0]?.transcript,
       catalog: undefined,
       beforeAction: (action) => {

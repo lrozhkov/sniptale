@@ -1,6 +1,8 @@
 import {
   AUDIO_STAGING_TTL_MS,
   type AudioJobScope,
+  type ReviewSpeechTarget,
+  sameReviewSpeechTarget,
   type AudioStagedHandle,
 } from '../../contracts/ai/audio';
 import {
@@ -38,13 +40,41 @@ export function getReviewSpeechClip(session: ReviewSpeechSession, clipId: string
   if (!clip) throw new Error('stale');
   return clip;
 }
-export function reviewSpeechGeometry(session: ReviewSpeechSession, clipId: string): string {
-  const { transcript: _transcript, ...clip } = getReviewSpeechClip(session, clipId);
-  return JSON.stringify([clip, session.getSnapshot().document.edits]);
+export function getReviewSpeechTarget(session: ReviewSpeechSession, target: ReviewSpeechTarget) {
+  if (target.kind === 'voiceover') {
+    const clip = getReviewSpeechClip(session, target.clipId);
+    return {
+      assetId: clip.assetId,
+      transcript: clip.transcript,
+      nativeStart: clip.sourceOffset,
+      nativeEnd: clip.sourceOffset + clip.duration,
+    };
+  }
+  const state = session.getSnapshot();
+  return {
+    assetId: state.snapshot.workspace.sourceAssetId,
+    transcript: state.document.advancedContent.audio.originalSpeech?.transcript,
+    nativeStart: 0,
+    nativeEnd: state.snapshot.workspace.source.duration,
+  };
+}
+export function reviewSpeechGeometry(
+  session: ReviewSpeechSession,
+  target: ReviewSpeechTarget
+): string {
+  const { transcript: _transcript, ...source } = getReviewSpeechTarget(session, target);
+  const geometry =
+    target.kind === 'voiceover'
+      ? (() => {
+          const { transcript: _unused, ...clip } = getReviewSpeechClip(session, target.clipId);
+          return clip;
+        })()
+      : source;
+  return JSON.stringify([target, geometry, session.getSnapshot().document.edits]);
 }
 export function reviewSpeechScope(
   session: ReviewSpeechSession,
-  clipId: string,
+  target: ReviewSpeechTarget,
   start: number,
   end: number
 ): AudioJobScope {
@@ -52,8 +82,8 @@ export function reviewSpeechScope(
   return {
     workspaceId: state.snapshot.workspace.aggregateId,
     workspaceRevision: state.snapshot.workspace.revision,
-    clipId,
-    assetId: getReviewSpeechClip(session, clipId).assetId,
+    target,
+    assetId: getReviewSpeechTarget(session, target).assetId,
     nativeStart: start,
     nativeEnd: end,
   };
@@ -61,30 +91,32 @@ export function reviewSpeechScope(
 /** Writes transcript and audio placement together through the existing review history. */
 export async function saveReviewSpeechTranscript(
   session: ReviewSpeechSession,
-  clipId: string,
+  target: ReviewSpeechTarget,
   transcript: ReviewSpeechTranscript
 ): Promise<void> {
-  const clip = getReviewSpeechClip(session, clipId);
-  await session.saveSpeechTranscript(clipId, clip.assetId, transcript);
+  const clip = getReviewSpeechTarget(session, target);
+  await session.saveSpeechTranscript(target, clip.assetId, transcript);
 }
 export async function generateReviewSpeech(
   session: ReviewSpeechSession,
-  clipId: string,
+  target: ReviewSpeechTarget,
   phraseId: string,
   profile: ReviewSpeechProfile,
   signal: AbortSignal
 ): Promise<ReviewSpeechPreview> {
   signal.throwIfAborted();
-  const transcript = getReviewSpeechClip(session, clipId).transcript;
+  const transcript = getReviewSpeechTarget(session, target).transcript;
   if (!transcript) throw new Error('stale');
-  await saveReviewSpeechTranscript(session, clipId, { ...transcript, profile });
+  await saveReviewSpeechTranscript(session, target, { ...transcript, profile });
   signal.throwIfAborted();
-  const phrase = getReviewSpeechClip(session, clipId).transcript?.phrases.find(
-    (entry) => entry.id === phraseId
+  const phrase = structuredClone(
+    getReviewSpeechTarget(session, target).transcript?.phrases.find(
+      (entry) => entry.id === phraseId
+    )
   );
   if (!phrase) throw new Error('stale');
-  const scope = reviewSpeechScope(session, clipId, phrase.start, phrase.end);
-  const geometry = reviewSpeechGeometry(session, clipId);
+  const scope = reviewSpeechScope(session, target, phrase.start, phrase.end);
+  const geometry = reviewSpeechGeometry(session, target);
   const { modelId, ...parameters } = profile;
   const createdAt = Date.now();
   const expiresAt = createdAt + AUDIO_STAGING_TTL_MS;
@@ -107,7 +139,20 @@ export async function generateReviewSpeech(
     const blob = await readAudioStaging(result.staged, scope);
     const duration = await decodeReviewSpeechDuration(blob);
     signal.throwIfAborted();
-    if (Date.now() >= expiresAt) throw new Error('stale');
+    const current = getReviewSpeechTarget(session, target);
+    const currentPhrase = current.transcript?.phrases.find((entry) => entry.id === phraseId);
+    if (
+      Date.now() >= expiresAt ||
+      reviewSpeechGeometry(session, target) !== geometry ||
+      current.assetId !== scope.assetId ||
+      !currentPhrase ||
+      currentPhrase.revision !== phrase.revision ||
+      currentPhrase.text !== phrase.text ||
+      !current.transcript?.profile ||
+      reviewSpeechTextSignature(phrase.text, current.transcript.profile) !==
+        reviewSpeechTextSignature(phrase.text, profile)
+    )
+      throw new Error('stale');
     return {
       blob,
       url: URL.createObjectURL(blob),
@@ -142,21 +187,30 @@ export async function cleanupReviewSpeechPreview(preview: ReviewSpeechPreview): 
 /** Private assets become owned only after the complete replacement batch is durable. */
 export async function applyReviewSpeech(
   session: ReviewSpeechSession,
-  clipId: string,
+  target: ReviewSpeechTarget,
   previews: readonly ReviewSpeechPreview[],
-  signal: AbortSignal
+  signal: AbortSignal,
+  options: { originalVolume?: number } = {}
 ): Promise<void> {
   if (!previews.length) return;
+  if (
+    target.kind === 'original' &&
+    options.originalVolume !== undefined &&
+    (!Number.isFinite(options.originalVolume) ||
+      options.originalVolume < 0 ||
+      options.originalVolume > 1)
+  )
+    throw new Error('invalid-request');
   signal.throwIfAborted();
   await session.flush();
-  const clip = getReviewSpeechClip(session, clipId);
+  const clip = getReviewSpeechTarget(session, target);
   if (
     !clip.transcript ||
     previews.some(
       (preview) =>
         Date.now() >= preview.expiresAt ||
-        preview.geometry !== reviewSpeechGeometry(session, clipId) ||
-        preview.scope.clipId !== clipId ||
+        preview.geometry !== reviewSpeechGeometry(session, target) ||
+        !sameReviewSpeechTarget(preview.scope.target, target) ||
         preview.scope.assetId !== clip.assetId ||
         preview.scope.workspaceId !== session.getSnapshot().snapshot.workspace.aggregateId
     )
@@ -164,7 +218,11 @@ export async function applyReviewSpeech(
     throw new Error('stale');
   const initial = applyReviewSpeechReplacements(
     clip.transcript,
-    previews.map((preview) => preview.replacement)
+    previews.map((preview) =>
+      target.kind === 'original'
+        ? { ...preview.replacement, enabled: true, originalVolume: options.originalVolume ?? 0 }
+        : preview.replacement
+    )
   );
   if (!initial.ok) throw new Error(initial.reason);
   const prepared: Awaited<ReturnType<typeof prepareProjectAsset>>[] = [];
@@ -179,8 +237,15 @@ export async function applyReviewSpeech(
           'speech',
           undefined,
           undefined,
-          { aggregateId: preview.scope.workspaceId, clipId },
-          { publishToLibrary: false }
+          undefined,
+          {
+            publishToLibrary: false,
+            requiredReviewSpeech: {
+              aggregateId: preview.scope.workspaceId,
+              target,
+              replacementId: preview.replacement.id,
+            },
+          }
         )
       );
     }
@@ -194,21 +259,24 @@ export async function applyReviewSpeech(
         previews.some(
           (preview) =>
             Date.now() >= preview.expiresAt ||
-            preview.geometry !== reviewSpeechGeometry(session, clipId)
+            preview.geometry !== reviewSpeechGeometry(session, target)
         )
       )
         throw new Error('stale');
-      const current = getReviewSpeechClip(session, clipId).transcript;
+      const current = getReviewSpeechTarget(session, target).transcript;
       if (!current) throw new Error('stale');
       const applied = applyReviewSpeechReplacements(
         current,
         previews.map((preview, index) => ({
           ...preview.replacement,
+          ...(target.kind === 'original'
+            ? { enabled: true, originalVolume: options.originalVolume ?? 0 }
+            : {}),
           assetId: `project-asset:${prepared[index]!.id}`,
         }))
       );
       if (!applied.ok) throw new Error(applied.reason);
-      await saveReviewSpeechTranscript(session, clipId, applied.transcript);
+      await saveReviewSpeechTranscript(session, target, applied.transcript);
       committed = true;
       for (const asset of prepared) await asset.publish();
     };
@@ -221,10 +289,14 @@ export async function applyReviewSpeech(
     await lock(0);
   } finally {
     if (!committed)
-      for (const asset of prepared) {
+      for (const [index, asset] of prepared.entries()) {
         let retained = true;
         try {
-          retained = await session.hasDurableSpeechAsset(clipId, `project-asset:${asset.id}`);
+          retained = await session.hasDurableSpeechAsset(
+            target,
+            previews[index]!.replacement.id,
+            `project-asset:${asset.id}`
+          );
         } catch {
           /* Preserve ambiguous durable outcomes for recovery. */
         }
