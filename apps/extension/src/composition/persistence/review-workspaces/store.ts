@@ -3,7 +3,11 @@ import { createNewWorkspacePresentationSettings } from '../../../features/video/
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
-import { areNewReviewSourcesAvailable, readReviewReadySources } from './new-reference-admission';
+import {
+  areNewReviewSourcesAvailable,
+  readReviewReadySources,
+  promoteReviewSourceLifecycles,
+} from './new-reference-admission';
 import {
   STORE_NAME,
   PROJECT_ASSETS_STORE,
@@ -235,6 +239,15 @@ async function putWorkspace(
     ))
   )
     throw new VideoWorkspaceError('missing-media');
+  await promoteReviewSourceLifecycles(
+    next,
+    {
+      assets: tx.objectStore(PROJECT_ASSETS_STORE),
+      media: tx.objectStore(MEDIA_LIBRARY_STORE),
+      recordings: tx.objectStore(STORE_NAME),
+    },
+    prepared
+  );
   await tx.objectStore(VIDEO_WORKSPACES_STORE).put(withReviewWorkspaceUsage(next));
   return next;
 }

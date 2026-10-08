@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { runWithDurableAssetLifecycleLock } from '../infrastructure/mutation-barrier';
 
 const mocks = vi.hoisted(() => ({
   deleteObject: vi.fn(),
   initDB: vi.fn(),
   runMutation: vi.fn(),
   journals: vi.fn(),
+  writing: vi.fn(),
 }));
 
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
@@ -18,12 +20,15 @@ vi.mock('./opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./opfs-store')>()),
   deleteAssetObject: mocks.deleteObject,
   listReadyJournals: mocks.journals,
+  listWritingAssetIds: mocks.writing,
 }));
 
 import {
   appendAssetOperationCompensation,
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
+  completePhysicalDeleteOperations,
+  deleteOrphanAssetObjectBatch,
   createBackupRestoreOperation,
   readAssetOperation,
   transitionAssetOperation,
@@ -51,6 +56,7 @@ beforeEach(() => {
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('00000000-0000-4000-8000-000000000001');
   mocks.deleteObject.mockResolvedValue(undefined);
   mocks.journals.mockResolvedValue([]);
+  mocks.writing.mockResolvedValue([]);
 });
 
 function installMutationHarness(current: unknown = operation) {
@@ -352,3 +358,74 @@ it('reads retention once for an entire physical-delete operation', async () => {
   expect(db.getAll).toHaveBeenCalledTimes(12);
   expect(mocks.deleteObject).toHaveBeenCalledTimes(32);
 });
+
+it('retains the failing and unprocessed intents after a partial replay batch', async () => {
+  const { db } = installMutationHarness();
+  const intents = ['a', 'b', 'c'].map((id) => ({
+    ...buildPhysicalDeleteOperation([id]),
+    operationId: `delete-${id}`,
+  }));
+  mocks.deleteObject.mockImplementation(async (id: string) => {
+    if (id === 'b') throw new Error('storage failure');
+  });
+  await expect(completePhysicalDeleteOperations(intents)).rejects.toThrow('storage failure');
+  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-a']]);
+  expect(mocks.deleteObject.mock.calls).toEqual([['a'], ['b']]);
+});
+
+it('does not scan for an empty replay batch', async () => {
+  const { db } = installMutationHarness();
+  await completePhysicalDeleteOperations([]);
+  expect(db.getAll).not.toHaveBeenCalled();
+  expect(db.delete).not.toHaveBeenCalled();
+});
+
+it('keeps projected targets pending while completing unrelated intents in the same batch', async () => {
+  const { db } = installMutationHarness();
+  db.getAll.mockImplementation(async (store: string) =>
+    store === 'recordings'
+      ? [
+          {
+            id: 'retained',
+            assetId: 'protected',
+            createdAt: 1,
+            filename: 'r.webm',
+            mimeType: 'video/webm',
+            size: 1,
+          },
+        ]
+      : []
+  );
+  await completePhysicalDeleteOperations(
+    ['protected', 'unowned'].map((id) => ({
+      ...buildPhysicalDeleteOperation([id]),
+      operationId: `delete-${id}`,
+    }))
+  );
+  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(mocks.deleteObject.mock.calls).toEqual([['unowned']]);
+  expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-unowned']]);
+});
+
+it.each(['complete', 'writing', 'cancel-before', 'cancel-after-intent'] as const)(
+  'keeps orphan batch intent and physical effects ordered: %s',
+  async (mode) => {
+    const { db } = installMutationHarness();
+    const controller = new AbortController();
+    const put = vi.fn(async () => {
+      if (mode === 'cancel-after-intent') controller.abort();
+    });
+    mocks.runMutation.mockImplementation(async (callback) => callback({ ...db, put }));
+    if (mode === 'writing') mocks.writing.mockResolvedValue(['orphan']);
+    if (mode === 'cancel-before') controller.abort();
+    await runWithDurableAssetLifecycleLock((permit) =>
+      deleteOrphanAssetObjectBatch(['orphan'], controller.signal, permit)
+    );
+    expect(put).toHaveBeenCalledTimes(
+      mode === 'complete' || mode === 'cancel-after-intent' ? 1 : 0
+    );
+    expect(mocks.deleteObject).toHaveBeenCalledTimes(mode === 'complete' ? 1 : 0);
+    expect(db.delete).toHaveBeenCalledTimes(mode === 'complete' ? 1 : 0);
+  }
+);

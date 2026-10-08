@@ -23,9 +23,11 @@ export function createReviewWorkspaceStoreFixture(failure: () => boolean) {
           const store = pending.get(name)!;
           return {
             get: async (key: string) => structuredClone(store.get(key)),
-            put: async (value: { aggregateId: string }) => {
+            put: async (value: { aggregateId?: string; id?: string }) => {
               if (failure()) throw new DOMException('No space', 'QuotaExceededError');
-              store.set(value.aggregateId, structuredClone(value));
+              const key = value.aggregateId ?? value.id;
+              if (!key) throw new Error('Missing test row identity');
+              store.set(key, structuredClone(value));
             },
             delete: async (key: string) => {
               store.delete(key);

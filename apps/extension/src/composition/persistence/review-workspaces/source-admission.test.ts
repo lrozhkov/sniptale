@@ -663,3 +663,104 @@ it.each([
     }
   }
 );
+
+it.each(['published', 'ready'] as const)(
+  'promotes a temporary origin atomically when accepting a %s review source',
+  async (kind) => {
+    const origin = createMediaLibraryEntry({
+      id: 'temporary-origin',
+      lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+    });
+    rows.get('media_library')!.set(origin.id, origin);
+    const asset = { ...entry, originMediaId: origin.id };
+    if (kind === 'published') rows.get('project_assets')!.set(entry.id, asset);
+    else
+      journals.push(
+        readyJournal({
+          payload: {
+            entry: asset,
+            filename: 'background.png',
+            expectedAssetId: null,
+            publishToLibrary: false,
+          },
+        })
+      );
+    expect(rows.get('media_library')!.get(origin.id)).toEqual(origin);
+    await saveBackground();
+    expect(rows.get('media_library')!.get(origin.id)).toMatchObject({
+      lifecycle: { storageClass: 'library' },
+    });
+  }
+);
+
+it('rolls back origin promotion when the workspace write fails', async () => {
+  let writes = 0;
+  let failAt = Infinity;
+  const fixture = createReviewWorkspaceStoreFixture(() => ++writes === failAt);
+  rows = fixture.rows;
+  harness.database.mockResolvedValue(fixture.database);
+  const origin = createMediaLibraryEntry({
+    id: 'temporary-origin',
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+  });
+  rows.get('media_library')!.set(origin.id, origin);
+  rows.get('project_assets')!.set(entry.id, { ...entry, originMediaId: origin.id });
+  await openVideoWorkspace(id, source);
+  failAt = writes + 2;
+  await expect(saveBackground()).rejects.toThrow('No space');
+  expect(rows.get('media_library')!.get(origin.id)).toEqual(origin);
+  expect((await readVideoWorkspace(id))?.workspace.advanced.background.enabled).toBe(false);
+});
+
+it('promotes the Library audio origin from a ready attachment claim', async () => {
+  const { createQuickEditAudioClip } =
+    await import('../../../features/video/review/advanced/audio');
+  const audio = { ...entry, mimeType: 'audio/webm', originMediaId: 'audio-origin' };
+  const journal = readyJournal();
+  journal.assetRefs[0] = { ...journal.assetRefs[0]!, mimeType: audio.mimeType };
+  journal.payload = {
+    entry: audio,
+    filename: 'voice.webm',
+    expectedAssetId: null,
+    publishToLibrary: false,
+    librarySourceId: audio.originMediaId,
+    requiredReview: { aggregateId: id, clipId: 'voiceover' },
+  };
+  rows.set('asset_refs', new Map([[audio.assetId, journal.assetRefs[0]]]));
+  rows.get('media_library')!.set(
+    audio.originMediaId,
+    createMediaLibraryEntry({
+      id: audio.originMediaId,
+      kind: 'audio',
+      mimeType: audio.mimeType,
+      size: audio.size,
+      source: { kind: 'stored-asset', assetId: audio.assetId },
+      lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 1 },
+    })
+  );
+  journals.push(journal);
+  const opened = await openVideoWorkspace(id, source);
+  await saveVideoWorkspaceAdvanced({
+    aggregateId: id,
+    expectedRevision: opened.workspace.revision,
+    expectedSourceAssetId: opened.workspace.sourceAssetId,
+    advanced: {
+      ...opened.workspace.advanced,
+      audio: {
+        ...opened.workspace.advanced.audio,
+        voiceover: [
+          createQuickEditAudioClip({
+            id: 'voiceover',
+            assetId: 'project-asset:background',
+            timelineStart: 0,
+            duration: 2,
+            endMax: 12,
+          }),
+        ],
+      },
+    },
+  });
+  expect(rows.get('media_library')!.get(audio.originMediaId)).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+  });
+});

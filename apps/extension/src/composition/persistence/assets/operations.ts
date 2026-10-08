@@ -43,17 +43,28 @@ export function buildPhysicalDeleteOperation(assetIds: string[]): PhysicalDelete
   };
 }
 
-/** One authoritative snapshot covers the operation while its lifecycle lock remains held. */
+/** Complete a single intent through the same locked replay owner as recovery batches. */
 export async function completePhysicalDeleteOperation(
   operation: PhysicalDeleteAssetOperation,
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<void> {
+  return completePhysicalDeleteOperations([operation], lifecyclePermit);
+}
+
+/** Reuse validation only while the lifecycle lock prevents ownership changes between intents. */
+export async function completePhysicalDeleteOperations(
+  operations: readonly PhysicalDeleteAssetOperation[],
+  lifecyclePermit?: DurableAssetLifecyclePermit
+): Promise<void> {
+  if (!operations.length) return;
   await initDB();
   await runWithDurableAssetLifecycleLock(async () => {
     const authority = await readPhysicalDeleteAuthority();
-    const unowned = operation.assetIds.filter((id) => authority(id) === 'unowned');
-    const deferred = operation.assetIds.some((id) => authority(id) === 'unknown');
-    await finishPhysicalDelete(operation, unowned, deferred);
+    for (const operation of operations) {
+      const unowned = operation.assetIds.filter((id) => authority(id) === 'unowned');
+      const deferred = operation.assetIds.some((id) => authority(id) === 'unknown');
+      await finishPhysicalDelete(operation, unowned, deferred);
+    }
   }, lifecyclePermit);
 }
 

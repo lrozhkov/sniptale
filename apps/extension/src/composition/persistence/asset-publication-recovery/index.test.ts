@@ -20,6 +20,7 @@ vi.mock('../assets/operations', async (importOriginal) => ({
 vi.mock('../assets/opfs-store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../assets/opfs-store')>()),
   deleteReadyJournal: mocks.deleteJournal,
+  deleteAssetObject: mocks.deleteObject,
   listReadyJournals: mocks.journals,
 }));
 vi.mock('../assets', async (importOriginal) => ({
@@ -50,7 +51,7 @@ vi.mock('../recordings/asset-publication', async (importOriginal) => ({
   recordingAssetPublicationAdapter: { domain: 'recording-assets', publish: vi.fn() },
 }));
 
-import { recoverAssetPublications } from './index';
+import { recoverAssetPublications, recoverPendingAssetPublications } from './index';
 import type {
   ArchiveRestoreSession,
   AssetOperation,
@@ -79,11 +80,13 @@ it('retries durable physical-delete operations on startup', async () => {
     updatedAt: 1,
   };
   const harness = createDbHarness([operation]);
+  mocks.objects.mockResolvedValue(operation.assetIds);
   mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
 
   await recoverAssetPublications();
 
-  expect(mocks.completePhysicalDelete).toHaveBeenCalledWith(operation, expect.any(Object));
+  expect(mocks.deleteObject).toHaveBeenCalledWith('orphan-1');
+  expect(harness.get('asset_operations', operation.operationId)).toBeUndefined();
   expect(mocks.recoverStandalone).toHaveBeenCalledOnce();
 });
 
@@ -683,5 +686,68 @@ it('replays pending publications without discovering or collecting orphan object
   await recoverPendingAssetPublications();
   expect(mocks.recoverStandalone).toHaveBeenCalled();
   expect(mocks.objects).not.toHaveBeenCalled();
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});
+
+it('validates the retention graph once for multiple pending physical-delete records', async () => {
+  const operations: PhysicalDeleteAssetOperation[] = Array.from({ length: 7 }, (_, index) => ({
+    assetIds: [`orphan-${index}`],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: `delete-${index}`,
+    status: 'pending',
+    updatedAt: 1,
+  }));
+  const harness = createDbHarness(operations);
+  mocks.objects.mockResolvedValue(operations.flatMap((operation) => operation.assetIds));
+  const reads = vi.spyOn(harness.db, 'getAll');
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  const actual =
+    await vi.importActual<typeof import('../assets/operations')>('../assets/operations');
+  mocks.completePhysicalDelete.mockImplementation(actual.completePhysicalDeleteOperation);
+
+  await recoverPendingAssetPublications();
+
+  expect(reads.mock.calls.filter(([store]) => store === 'image_workspaces')).toHaveLength(1);
+  expect(mocks.deleteObject).toHaveBeenCalledTimes(7);
+  for (const operation of operations)
+    expect(harness.get('asset_operations', operation.operationId)).toBeUndefined();
+});
+
+it('settles absent physical targets without validating unrelated malformed documents', async () => {
+  const operation: PhysicalDeleteAssetOperation = {
+    assetIds: ['already-gone'],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'stale-delete',
+    status: 'pending',
+    updatedAt: 1,
+  };
+  const harness = createDbHarness([operation]);
+  harness.put('image_workspaces', 'unrelated-invalid', { invalid: true });
+  const reads = vi.spyOn(harness.db, 'getAll');
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+
+  await recoverPendingAssetPublications();
+
+  expect(harness.get('asset_operations', operation.operationId)).toBeUndefined();
+  expect(reads.mock.calls.filter(([store]) => store === 'image_workspaces')).toHaveLength(0);
+  expect(mocks.deleteObject).not.toHaveBeenCalled();
+});
+
+it('preserves intent when object enumeration fails instead of assuming absence', async () => {
+  const operation: PhysicalDeleteAssetOperation = {
+    assetIds: ['unknown'],
+    createdAt: 1,
+    kind: 'physical-delete',
+    operationId: 'uncertain-delete',
+    status: 'pending',
+    updatedAt: 1,
+  };
+  const harness = createDbHarness([operation]);
+  mocks.runMutation.mockImplementation(async (callback) => callback(harness.db));
+  mocks.objects.mockRejectedValueOnce(new Error('OPFS unavailable'));
+  await expect(recoverPendingAssetPublications()).rejects.toThrow('OPFS unavailable');
+  expect(harness.get('asset_operations', operation.operationId)).toEqual(operation);
   expect(mocks.deleteObject).not.toHaveBeenCalled();
 });

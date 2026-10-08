@@ -1,3 +1,4 @@
+import { completePhysicalDeleteOperations } from '../assets/operations';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { sameMediaSource } from '../media-library/dependencies';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
@@ -5,6 +6,7 @@ import {
   cancelAssetPublication,
   deleteReadyJournal,
   listReadyJournals,
+  listAssetObjectIds,
   parseBackupAssetOperation,
   parseArchiveRestoreSession,
   parsePhysicalDeleteAssetOperation,
@@ -12,6 +14,7 @@ import {
   collectQuiescentWritingObjects,
   recoverStandaloneAssetPublications,
   type AssetOperation,
+  type PhysicalDeleteAssetOperation,
   type AssetOperationCompensation,
   type ArchiveRestoreSession,
   clearArchiveRestoreCurrentRoot,
@@ -345,6 +348,33 @@ async function deleteOperation(operationId: string): Promise<void> {
   await runWithIndexedDbMutation(async (db) => db.delete(ASSET_OPERATIONS_STORE, operationId));
 }
 
+/** Settle absent targets and replay existing bytes before any compensation changes authority. */
+async function replayPendingPhysicalDeletes(
+  operations: unknown[],
+  lifecyclePermit: DurableAssetLifecyclePermit
+): Promise<void> {
+  const physicalDeletes = operations.flatMap((raw) => {
+    const operation = parsePhysicalDeleteAssetOperation(raw);
+    return operation ? [operation] : [];
+  });
+  // An absent object already satisfies its delete intent, even if unrelated metadata is invalid.
+  // Enumeration failure propagates: an unavailable directory is not evidence of absence.
+  if (physicalDeletes.length) {
+    const objects = new Set(await listAssetObjectIds());
+    const pending: PhysicalDeleteAssetOperation[] = [];
+    for (const operation of physicalDeletes) {
+      const assetIds = operation.assetIds.filter((id) => objects.has(id));
+      if (assetIds.length) pending.push({ ...operation, assetIds });
+      else await deleteOperation(operation.operationId);
+    }
+    // No snapshot escapes this batch or crosses compensation/publication graph mutations.
+    if (pending.length)
+      await runStorageStartupPhase('asset-physical-delete-replay', () =>
+        completePhysicalDeleteOperations(pending, lifecyclePermit)
+      );
+  }
+}
+
 async function recoverBackupRestoreOperations(
   lifecyclePermit: DurableAssetLifecyclePermit
 ): Promise<void> {
@@ -355,14 +385,9 @@ async function recoverBackupRestoreOperations(
   const blockedCompensations = new Set<string>();
   const archiveSessions = new Map<string, ArchiveRestoreSession>();
   const archiveSessionsWithAmbiguousJournals = new Set<string>();
+  await replayPendingPhysicalDeletes(operations, lifecyclePermit);
   for (const raw of operations) {
-    const physicalDelete = parsePhysicalDeleteAssetOperation(raw);
-    if (physicalDelete) {
-      await runStorageStartupPhase('asset-physical-delete-replay', () =>
-        completePhysicalDeleteOperation(physicalDelete, lifecyclePermit)
-      );
-      continue;
-    }
+    if (parsePhysicalDeleteAssetOperation(raw)) continue;
     const archiveSession = parseArchiveRestoreSession(raw);
     if (archiveSession) {
       archiveSessions.set(archiveSession.operationId, archiveSession);

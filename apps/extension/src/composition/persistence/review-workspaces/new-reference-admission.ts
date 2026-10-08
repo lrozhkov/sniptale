@@ -1,3 +1,4 @@
+import { promoteReferencedMediaLifecycles } from '../library-lifecycle/promotion';
 import { readLibrarySceneSource, sameLibrarySceneRef } from '../projects/library-scene-source';
 import { listReadyJournals } from '../assets/opfs-store';
 import { parseAssetRef } from '../assets/guards';
@@ -220,4 +221,39 @@ export async function areNewReviewSourcesAvailable(
     }
   }
   return true;
+}
+
+/** Promote retained external sources only inside the accepted workspace transaction. */
+export async function promoteReviewSourceLifecycles(
+  workspace: VideoWorkspace,
+  stores: {
+    assets: ReadStore;
+    media: Parameters<typeof promoteReferencedMediaLifecycles>[0]['mediaStore'];
+    recordings: Parameters<typeof promoteReferencedMediaLifecycles>[0]['recordingStore'];
+  },
+  prepared: ReviewReadySources
+): Promise<void> {
+  const ready = new Map(prepared.assets);
+  for (const claim of prepared.libraryAudioClaims)
+    if (claim.available) ready.set(claim.entry.id, claim.entry);
+  for (const claim of prepared.resourceClaims ?? [])
+    if (claim.available) ready.set(claim.payload.entry.id, claim.payload.entry);
+  const mediaIds = new Set<string>();
+  for (const reference of collectReviewAssetReferences(workspace)) {
+    const id = reference.slice('project-asset:'.length);
+    const raw = await stores.assets.get(id);
+    const asset = raw === undefined ? ready.get(id) : parseProjectAssetEntry(raw);
+    if (!asset || asset.id !== id) continue;
+    if (asset.originMediaId) mediaIds.add(asset.originMediaId);
+    const mirrorId = `project-asset:${id}`;
+    const mirror = parseMediaLibraryEntry(await stores.media.get(mirrorId));
+    if (mirror?.source.kind === 'project-asset' && mirror.source.projectAssetId === id)
+      mediaIds.add(mirrorId);
+  }
+  await promoteReferencedMediaLifecycles({
+    mediaIds,
+    mediaStore: stores.media,
+    recordingStore: stores.recordings,
+    now: workspace.updatedAt,
+  });
 }
