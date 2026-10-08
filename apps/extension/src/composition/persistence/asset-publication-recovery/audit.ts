@@ -1,3 +1,4 @@
+import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import { ASSET_REFS_STORE, initDB } from '../infrastructure/indexed-db/core';
 import { deleteOrphanAssetObjectBatch } from '../assets/operations';
 import {
@@ -16,6 +17,8 @@ import {
   tryRunWithDurableAssetLifecycleLock,
 } from '../infrastructure/mutation-barrier';
 import { collectDurableAssetSnapshot } from '../assets/retention-authority';
+
+const maintenanceLog = createMaintenanceLog();
 
 interface DurableAssetAuditReport {
   authorityValid: boolean;
@@ -140,14 +143,32 @@ export async function collectOrphanAssetObjectsDuringIdle(signal: AbortSignal): 
       (id) => !retained.has(id) && !journals.some((journal) => readyJournalClaimsAsset(journal, id))
     )
     .slice(0, 32);
-  if (!candidates.length || signal.aborted) return;
+  if (signal.aborted) return;
+  if (!candidates.length) {
+    void maintenanceLog.append({ operation: 'orphans', code: 'empty' });
+    return;
+  }
   await new Promise<void>((resolve) => setTimeout(resolve, 0));
   if (signal.aborted) return;
+  let acquired = false;
   await tryRunWithDurableAssetLifecycleLock(async (permit) => {
-    await withAvailableObjectLocks(candidates, signal, (locked) =>
-      deleteOrphanAssetObjectBatch(locked, signal, permit)
-    );
+    acquired = true;
+    await withAvailableObjectLocks(candidates, signal, (locked) => {
+      if (locked.length < candidates.length)
+        void maintenanceLog.append({
+          operation: 'orphans',
+          code: 'busy',
+          counts: { retained: candidates.length - locked.length },
+        });
+      return deleteOrphanAssetObjectBatch(locked, signal, permit);
+    });
   });
+  if (!acquired)
+    void maintenanceLog.append({
+      operation: 'orphans',
+      code: 'busy',
+      counts: { candidates: candidates.length },
+    });
 }
 
 /** Keep each available writer lock through the single batch validation and physical deletion. */

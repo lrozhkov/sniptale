@@ -13,6 +13,7 @@ export const SETTINGS_SECTION_IDS = [
   'voice-input',
   'native-app',
   'access-data',
+  'events-logs',
   'settings-transfer',
 ] as const;
 
@@ -34,6 +35,7 @@ export const SETTINGS_SECTION_VIEWS = {
   'native-app': ['connection', 'capture', 'commands', 'telemetry'],
   'access-data': ['permissions', 'privacy'],
   'settings-transfer': [],
+  'events-logs': [],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
 type SettingsRouteWithoutView = {
@@ -43,7 +45,8 @@ type SettingsRouteWithoutView = {
     | 'quick-actions'
     | 'screen-sizes'
     | 'voice-input'
-    | 'settings-transfer';
+    | 'settings-transfer'
+    | 'events-logs';
   view?: never;
 };
 

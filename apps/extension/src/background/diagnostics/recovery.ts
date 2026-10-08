@@ -78,10 +78,7 @@ async function recoverInterruptedSessionsWithPermit(): Promise<void> {
       });
     } catch (error) {
       failedSnapshots.push(snapshot);
-      diagnosticsLogger.error(
-        `Failed to recover interrupted diagnostics session ${snapshot.recordingId}`,
-        error
-      );
+      diagnosticsLogger.error('Failed to recover interrupted diagnostics session', error);
     }
   }
 

@@ -1,5 +1,6 @@
 import {
   Bot,
+  ScrollText,
   LayoutTemplate,
   FolderOpen,
   Image,
@@ -146,6 +147,12 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         icon: ShieldCheck,
       },
       {
+        id: 'events-logs',
+        label: 'settings.navigation.eventsLogs',
+        description: 'settings.navigation.descriptions.eventsLogs',
+        icon: ScrollText,
+      },
+      {
         id: 'settings-transfer',
         description: 'settings.navigation.descriptions.settingsTransfer',
         label: 'settings.navigation.settingsTransfer',
@@ -224,6 +231,10 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   'access-data': {
     load: () => import('../../sections/system/access-data'),
     exportName: 'AccessDataSection',
+  },
+  'events-logs': {
+    load: () => import('../../sections/system/events-logs'),
+    exportName: 'EventsLogsSection',
   },
   'settings-transfer': {
     load: () => import('../../sections/system/settings-transfer'),

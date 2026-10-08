@@ -1,3 +1,4 @@
+import { createMaintenanceLog } from './maintenance-log';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
@@ -48,6 +49,8 @@ import { buildPhysicalDeleteOperation, completePhysicalDeleteOperation } from '.
 import { recoverRecordingAssetPublications } from '../recordings/asset-publication';
 import { recoverProjectMediaPublications } from '../projects/asset-publication';
 import { recoverImageWorkspacePublications } from '../image-aggregates/mutations';
+
+const maintenanceLog = createMaintenanceLog();
 
 export interface DraftCleanupResult {
   deletedCount: number;
@@ -175,6 +178,11 @@ async function deleteExpiredMedia(
         reviewReferenced
       ) {
         await tx.done;
+        void maintenanceLog.append({
+          operation: 'drafts',
+          code: 'in-use',
+          counts: { retained: 1 },
+        });
         return false;
       }
       const recordingStore = tx.objectStore(STORE_NAME);

@@ -25,7 +25,6 @@ import { PAGE_PACKAGE_ARCHIVE_PATHS } from '@sniptale/runtime-contracts/page-pac
 import type { WebSnapshotDiagnosticAssetLedger } from '../../web-snapshot/types';
 import { hashWebSnapshotAssetBlob } from '../../../../features/web-snapshot/asset-manifest';
 import { createLogger } from '@sniptale/platform/observability/logger';
-import { sanitizeDiagnosticMessage } from '@sniptale/platform/observability/diagnostics/sanitizer';
 
 const logger = createLogger({ namespace: 'ContentPopupExport' });
 
@@ -84,13 +83,6 @@ async function runPreparationStage<T>(code: string, work: () => Promise<T>): Pro
   }
 }
 
-function getSafePreparationCause(error: unknown): string {
-  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
-  return sanitizeDiagnosticMessage(
-    cause instanceof Error ? cause.message : String(cause ?? '')
-  ).replace(/([a-z][a-z0-9+.-]*:\/\/)[^/\s@]+@/giu, '$1');
-}
-
 function getPreparationFailureMessage(error: unknown): string {
   return createUserFacingErrorMessage({
     cause: error,
@@ -101,10 +93,7 @@ function getPreparationFailureMessage(error: unknown): string {
 
 function getPreparationFailureDiagnostic(error: unknown): string {
   const code = error instanceof PagePackagePreparationError ? error.diagnosticCode : 'UNCLASSIFIED';
-  const causeMessage = getSafePreparationCause(error);
-  return causeMessage
-    ? `Page Package preparation failed [${code}]: ${causeMessage}`
-    : `Page Package preparation failed [${code}]`;
+  return `Page Package preparation failed [${code}]`;
 }
 
 function isFullPageCaptureCancellation(error: unknown): boolean {

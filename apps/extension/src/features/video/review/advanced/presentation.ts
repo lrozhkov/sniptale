@@ -1,5 +1,4 @@
-import { parseCutTransition } from '../cuts';
-import type { ReviewCutTransition } from '../types';
+import { parseCutTransition, type ReviewCutTransition } from '../cut-transition';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../../project/validation/primitives';

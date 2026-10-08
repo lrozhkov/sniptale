@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
+  appendLog: vi.fn(),
   snapshot: vi.fn(),
   objects: vi.fn(),
   journals: vi.fn(),
@@ -8,6 +9,9 @@ const mocks = vi.hoisted(() => ({
   objectLock: vi.fn(),
   keys: vi.fn(),
   batch: vi.fn(),
+}));
+vi.mock('../library-lifecycle/maintenance-log', () => ({
+  createMaintenanceLog: () => ({ append: mocks.appendLog }),
 }));
 vi.mock('../assets/retention-authority', () => ({ collectDurableAssetSnapshot: mocks.snapshot }));
 vi.mock('../assets/operations', async (original) => ({
@@ -69,6 +73,7 @@ it.each(['ref', 'writing', 'journal'])(
     if (kind === 'journal')
       mocks.journals.mockResolvedValue([{ assetRefs: [{ assetId: 'orphan' }], payload: {} }]);
     await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
+    expect(mocks.appendLog).toHaveBeenCalledWith({ operation: 'orphans', code: 'empty' });
     expect(mocks.batch).not.toHaveBeenCalled();
     expect(mocks.lifecycle).not.toHaveBeenCalled();
     expect(mocks.snapshot).not.toHaveBeenCalled();
@@ -78,9 +83,15 @@ it('bounds candidate admission to 32 and skips busy lifecycle locks', async () =
   mocks.objects.mockResolvedValue(Array.from({ length: 100 }, (_, i) => `object-${i}`));
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
   expect(mocks.batch.mock.calls[0]![0]).toHaveLength(32);
+  mocks.appendLog.mockClear();
   mocks.lifecycle.mockResolvedValueOnce(undefined);
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
   expect(mocks.batch).toHaveBeenCalledOnce();
+  expect(mocks.appendLog).toHaveBeenCalledWith({
+    operation: 'orphans',
+    code: 'busy',
+    counts: { candidates: 32 },
+  });
 });
 it('cancels before taking lifecycle or object locks', async () => {
   const controller = new AbortController();
@@ -106,4 +117,15 @@ it('releases all acquired locks when authoritative deletion fails', async () => 
     'write failed'
   );
   expect(released).toHaveBeenCalledOnce();
+});
+
+it('records busy writer candidates without claiming a deletion', async () => {
+  mocks.objectLock.mockResolvedValueOnce(undefined);
+  await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
+  expect(mocks.batch).toHaveBeenCalledWith([], expect.any(AbortSignal), 'permit');
+  expect(mocks.appendLog).toHaveBeenCalledWith({
+    operation: 'orphans',
+    code: 'busy',
+    counts: { retained: 1 },
+  });
 });

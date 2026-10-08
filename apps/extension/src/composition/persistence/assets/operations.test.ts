@@ -7,8 +7,12 @@ const mocks = vi.hoisted(() => ({
   runMutation: vi.fn(),
   journals: vi.fn(),
   writing: vi.fn(),
+  log: vi.fn(),
 }));
 
+vi.mock('../library-lifecycle/maintenance-log', () => ({
+  createMaintenanceLog: () => ({ append: mocks.log }),
+}));
 vi.mock('../infrastructure/indexed-db/core', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: mocks.initDB,
@@ -369,6 +373,12 @@ it('retains the failing and unprocessed intents after a partial replay batch', a
     if (id === 'b') throw new Error('storage failure');
   });
   await expect(completePhysicalDeleteOperations(intents)).rejects.toThrow('storage failure');
+  expect(mocks.log).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'delete-failed', counts: { deleted: 0, failed: 1 } })
+  );
+  expect(mocks.log).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'deleted', counts: { deleted: 1 } })
+  );
   expect(db.getAll).toHaveBeenCalledTimes(12);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-a']]);
   expect(mocks.deleteObject.mock.calls).toEqual([['a'], ['b']]);
@@ -406,6 +416,9 @@ it('keeps projected targets pending while completing unrelated intents in the sa
   expect(db.getAll).toHaveBeenCalledTimes(12);
   expect(mocks.deleteObject.mock.calls).toEqual([['unowned']]);
   expect(db.delete.mock.calls).toEqual([['asset_operations', 'delete-unowned']]);
+  expect(mocks.log).toHaveBeenCalledWith(
+    expect.objectContaining({ code: 'referenced', counts: { retained: 1 } })
+  );
 });
 
 it.each(['complete', 'writing', 'cancel-before', 'cancel-after-intent'] as const)(

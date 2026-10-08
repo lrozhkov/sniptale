@@ -1,3 +1,5 @@
+import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
+import type { MaintenanceLogCode } from '../library-lifecycle/maintenance-log-model';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
@@ -19,6 +21,8 @@ import { collectDurableAssetSnapshot } from './retention-authority';
 import { readyJournalClaimsAsset } from './retention-claims';
 export { collectBackupRollbackAssetIds, readyJournalClaimsAsset } from './retention-claims';
 import { mergeArchiveRestoreChildIdMap } from './restore-child-ids';
+
+const maintenanceLog = createMaintenanceLog();
 
 interface ArchiveRestoreSessionStore {
   get(operationId: string): Promise<unknown>;
@@ -62,7 +66,11 @@ export async function completePhysicalDeleteOperations(
     const authority = await readPhysicalDeleteAuthority();
     for (const operation of operations) {
       const unowned = operation.assetIds.filter((id) => authority(id) === 'unowned');
-      const deferred = operation.assetIds.some((id) => authority(id) === 'unknown');
+      const retained = operation.assetIds.filter(
+        (id) => !['unowned', 'adopted'].includes(authority(id))
+      );
+      const deferred = retained.length > 0;
+      reportRetainedAssets(operation.assetIds, authority);
       await finishPhysicalDelete(operation, unowned, deferred);
     }
   }, lifecyclePermit);
@@ -78,6 +86,7 @@ export async function deleteOrphanAssetObjectBatch(
   await runWithDurableAssetLifecycleLock(async () => {
     const authority = await readPhysicalDeleteAuthority(signal);
     const writing = new Set(await listWritingAssetIds());
+    reportRetainedAssets(candidates, authority);
     if (signal.aborted) return;
     const ids = candidates.filter((id) => authority(id) === 'unowned' && !writing.has(id));
     if (!ids.length) return;
@@ -101,17 +110,30 @@ async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
   const refs = new Set(snapshot.refs.map((entry) => entry.assetId));
   const owners = new Set(snapshot.owners.map((entry) => entry.assetId));
   const projected = new Set(snapshot.expectedOwners.map((entry) => entry.assetId));
-  return (id: string): 'unknown' | 'adopted' | 'unowned' => {
-    if (!snapshot.authorityValid || refs.has(id) !== owners.has(id)) return 'unknown';
+  return (
+    id: string
+  ): 'unowned' | 'adopted' | 'invalid' | 'mismatch' | 'referenced' | 'rollback' | 'publication' => {
+    if (!snapshot.authorityValid) return 'invalid';
+    if (refs.has(id) !== owners.has(id)) return 'mismatch';
     if (owners.has(id)) return 'adopted';
-    if (
-      projected.has(id) ||
-      snapshot.protectedRollbackAssetIds.has(id) ||
-      journals.some((journal) => readyJournalClaimsAsset(journal, id))
-    )
-      return 'unknown';
+    if (projected.has(id)) return 'referenced';
+    if (snapshot.protectedRollbackAssetIds.has(id)) return 'rollback';
+    if (journals.some((journal) => readyJournalClaimsAsset(journal, id))) return 'publication';
     return 'unowned';
   };
+}
+
+function reportRetainedAssets(
+  ids: readonly string[],
+  authority: Awaited<ReturnType<typeof readPhysicalDeleteAuthority>>
+): void {
+  const reasons = new Map<MaintenanceLogCode, number>();
+  for (const id of ids) {
+    const reason = authority(id);
+    if (reason !== 'unowned') reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
+  }
+  for (const [code, count] of reasons)
+    void maintenanceLog.append({ operation: 'physical-delete', code, counts: { retained: count } });
 }
 
 async function finishPhysicalDelete(
@@ -119,11 +141,33 @@ async function finishPhysicalDelete(
   ids: readonly string[],
   deferred: boolean
 ) {
-  for (const id of ids) await deleteAssetObject(id);
-  if (!deferred)
-    await runWithIndexedDbMutation((db) =>
-      db.delete(ASSET_OPERATIONS_STORE, operation.operationId)
-    );
+  let deleted = 0;
+  const started = performance.now();
+  try {
+    for (const id of ids) {
+      await deleteAssetObject(id);
+      deleted += 1;
+    }
+    if (!deferred)
+      await runWithIndexedDbMutation((db) =>
+        db.delete(ASSET_OPERATIONS_STORE, operation.operationId)
+      );
+    if (deleted)
+      void maintenanceLog.append({
+        operation: 'physical-delete',
+        code: 'deleted',
+        counts: { deleted },
+        durationMs: Math.round(performance.now() - started),
+      });
+  } catch (error) {
+    void maintenanceLog.append({
+      operation: 'physical-delete',
+      code: 'delete-failed',
+      counts: { deleted, failed: ids.length - deleted },
+      durationMs: Math.round(performance.now() - started),
+    });
+    throw error;
+  }
 }
 
 export async function createBackupRestoreOperation(): Promise<AssetOperation> {

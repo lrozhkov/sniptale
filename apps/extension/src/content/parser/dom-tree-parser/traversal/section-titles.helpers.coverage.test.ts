@@ -44,6 +44,8 @@ it('filters sections without content and merges duplicate normalized titles', ()
   expect(firstSection?.title).toBe('Данные учетной записи');
   expect(secondSection?.title).toBe('Комментарии');
   expect(secondSection?.children).toHaveLength(2);
+  expect(mocks.debugMock).toHaveBeenCalledWith('Merged duplicate section');
+  expect(mocks.debugMock.mock.calls.flat().join(' ')).not.toContain('Комментарии');
 });
 
 it('finalizes garbage titles by inferring a better title from section content', () => {
@@ -52,4 +54,6 @@ it('finalizes garbage titles by inferring a better title from section content', 
   finalizeSectionTitles(sections);
 
   expect(sections[0].title).toBe('Лицензирование');
+  expect(mocks.debugMock).toHaveBeenCalledWith('Inferred section title');
+  expect(mocks.debugMock.mock.calls.flat().join(' ')).not.toContain('Лицензирование');
 });

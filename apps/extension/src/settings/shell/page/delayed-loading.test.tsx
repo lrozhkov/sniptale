@@ -1,3 +1,7 @@
+vi.mock('../../sections/system/events-logs', () => {
+  settingsPageDelayMocks.loadedSectionModules.push('events-logs');
+  return { EventsLogsSection: markerComponent('events-logs-section') };
+});
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -220,6 +224,7 @@ describe('SettingsPage delayed loading', () => {
         'native-app',
         'access-data',
         'settings-transfer',
+        'events-logs',
       ])
     );
   });

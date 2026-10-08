@@ -405,7 +405,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         videoBitrate: this.input.encoding.videoBitrate,
         videoCodec: this.input.encoding.videoCodec,
       };
-      logger.info(`TAB_RECORDING_DIAGNOSTIC encoder-start ${JSON.stringify(startedDiagnostic)}`);
+      logger.info('TAB_RECORDING_DIAGNOSTIC encoder-start', startedDiagnostic);
       logger.info('Started source-driven live encoder', startedDiagnostic);
       this.callbacks.onStart?.();
     } catch (error) {
@@ -636,7 +636,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         videoKeyFrameBudget: cadenceDiagnostic.videoKeyFrameBudget,
       });
     }
-    logger.info(`TAB_RECORDING_DIAGNOSTIC encoder-final ${JSON.stringify(cadenceDiagnostic)}`);
+    logger.info('TAB_RECORDING_DIAGNOSTIC encoder-final', cadenceDiagnostic);
     logger.info('Finalized source-driven live encoder', cadenceDiagnostic);
   }
 

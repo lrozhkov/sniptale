@@ -101,6 +101,8 @@ const localSensitiveKeys = [
   DATABASE_RESET_JOURNAL_KEY,
   'llm_request_history',
   'sniptale_export_time_history',
+  'sniptale_library_maintenance_log',
+  'sniptale_runtime_diagnostic_log',
   'sniptale_ai_global_prompt',
   'sniptale_ai_scenario_editor_prompt',
   'sniptale_last_save_as_dir',

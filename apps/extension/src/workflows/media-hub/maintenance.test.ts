@@ -1,16 +1,30 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const { usageIndex, publish, collect, provenance, backfill, drafts, trash, recover, settings } =
-  vi.hoisted(() => ({
-    usageIndex: vi.fn(),
-    publish: vi.fn(),
-    collect: vi.fn(),
-    provenance: vi.fn(),
-    backfill: vi.fn(),
-    drafts: vi.fn(async () => ({ deletedCount: 0, deletedIds: [] })),
-    trash: vi.fn(),
-    recover: vi.fn(),
-    settings: vi.fn(async () => ({ localStoragePolicy: {} })),
-  }));
+const {
+  usageIndex,
+  publish,
+  collect,
+  provenance,
+  backfill,
+  drafts,
+  trash,
+  recover,
+  settings,
+  log,
+} = vi.hoisted(() => ({
+  log: vi.fn(),
+  usageIndex: vi.fn(),
+  publish: vi.fn(),
+  collect: vi.fn(),
+  provenance: vi.fn(),
+  backfill: vi.fn(),
+  drafts: vi.fn(async () => ({ deletedCount: 0, deletedIds: [] })),
+  trash: vi.fn(),
+  recover: vi.fn(),
+  settings: vi.fn(async () => ({ localStoragePolicy: {} })),
+}));
+vi.mock('../../composition/persistence/library-lifecycle/maintenance-log', () => ({
+  createMaintenanceLog: () => ({ append: log }),
+}));
 vi.mock('../../composition/persistence/media-library/usage-index-maintenance', () => ({
   maintainProjectUsageIndex: usageIndex,
 }));
@@ -55,6 +69,9 @@ it('keeps maintenance failures advisory', async () => {
   collect.mockRejectedValueOnce(new Error('unavailable'));
   await expect(maintainLibraryAssets(new AbortController().signal)).resolves.toBeUndefined();
   expect(collect).toHaveBeenCalledOnce();
+  expect(log).toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'orphans', code: 'failed' })
+  );
 });
 
 it('stops later housekeeping stages after cancellation during a slow pass', async () => {
@@ -85,6 +102,12 @@ it.each(['reported', 'thrown'] as const)(
     else trash.mockRejectedValueOnce(new Error('delete failed'));
     await maintainLibraryAssets(new AbortController().signal, report);
     expect(report).toHaveBeenCalledOnce();
+    expect(log).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'trash', code: 'failed' })
+    );
+    expect(log).not.toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'trash', code: 'completed' })
+    );
     expect(collect).toHaveBeenCalledOnce();
   }
 );

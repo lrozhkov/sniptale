@@ -1,3 +1,4 @@
+import { sanitizeDiagnosticMessage } from '../diagnostics/sanitizer';
 import { recordConsoleTrace } from '../message-tracer/console';
 import { SECRET_KEY_FRAGMENTS } from '../../security/secret-key-fragments';
 import { redactSensitiveString } from '../../security/secret-redaction';
@@ -16,6 +17,42 @@ interface CreateLoggerOptions {
   namespace: string;
   sink?: LogSink;
   traceEnabled?: boolean;
+}
+
+export interface DiagnosticLogEvent {
+  time: string;
+  source: string;
+  level: keyof Omit<Logger, 'child'>;
+  message: string;
+}
+let diagnosticObserver: ((event: DiagnosticLogEvent) => void) | null = null;
+/** Installs the runtime-owned diagnostic destination independently of console verbosity. */
+export function installDiagnosticLogObserver(
+  observer: (event: DiagnosticLogEvent) => void
+): () => void {
+  diagnosticObserver = observer;
+  return () => {
+    if (diagnosticObserver === observer) diagnosticObserver = null;
+  };
+}
+function emitDiagnostic(
+  namespace: string,
+  level: DiagnosticLogEvent['level'],
+  args: unknown[]
+): void {
+  if (!diagnosticObserver) return;
+  try {
+    // Producers must keep the first argument content-free; attached payloads are never retained.
+    const summary = typeof args[0] === 'string' ? args[0] : 'Runtime diagnostic';
+    diagnosticObserver({
+      time: new Date().toISOString(),
+      source: sanitizeDiagnosticMessage(namespace.slice(0, 120)),
+      level,
+      message: sanitizeDiagnosticMessage(summary.slice(0, 1000)),
+    });
+  } catch {
+    // Diagnostics are advisory and must never recursively log their own failures.
+  }
 }
 
 const LOGGER_SANITIZE_KEYS = SECRET_KEY_FRAGMENTS.map((pattern) => pattern.toLowerCase());
@@ -124,6 +161,8 @@ function emit(
   if (args.some(isExpectedExtensionContextInvalidation)) {
     return;
   }
+
+  emitDiagnostic(namespace, level, args);
 
   if (isReleaseBuild() && RELEASE_SILENCED_LEVELS.has(level)) {
     return;

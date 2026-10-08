@@ -11,7 +11,7 @@ const BASE = 'chrome-extension://test/apps/extension/src/settings/index.html';
 
 describe('settings route codec', () => {
   it('exposes the canonical leaf and view inventory', () => {
-    expect(SETTINGS_SECTION_IDS).toHaveLength(15);
+    expect(SETTINGS_SECTION_IDS).toHaveLength(16);
     expect(SETTINGS_SECTION_VIEWS).toMatchObject({
       'interface-browser': ['interface', 'context-menu'],
       annotations: ['borders', 'callouts', 'numbering', 'tags'],
@@ -23,6 +23,7 @@ describe('settings route codec', () => {
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
       'access-data': ['permissions', 'privacy'],
       'settings-transfer': [],
+      'events-logs': [],
     });
   });
 

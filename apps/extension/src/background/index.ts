@@ -1,3 +1,5 @@
+import { registerDiagnosticLogPorts } from './application/diagnostics/ports';
+import { installRuntimeLogCapture } from '../composition/persistence/diagnostics/runtime-log';
 // Background Service Worker для Sniptale
 
 import { initTracer } from '@sniptale/platform/observability/message-tracer';
@@ -6,7 +8,9 @@ import { registerBackgroundRuntimeMessageListener } from './runtime/routing/boun
 import { initializeBackgroundRuntime } from './runtime/routing/runtime-wiring/initialize';
 
 // Инициализация трассировщика (только в dev/build режимах)
+installRuntimeLogCapture('background');
 initTracer('bg');
+registerDiagnosticLogPorts();
 const runtimeState = createBackgroundRuntimeState();
 
 initializeBackgroundRuntime(runtimeState);

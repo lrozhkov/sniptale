@@ -34,7 +34,7 @@ function parseFormFields(container: HTMLElement, ctx: TraversalContext): FieldNo
 
 function getOrCreateCurrentSection(element: HTMLElement, ctx: TraversalContext) {
   if (ctx.currentSection) {
-    logger.debug(`Using existing section: ${ctx.currentSection.title}`);
+    logger.debug('Using existing section');
     return ctx.currentSection;
   }
 
@@ -117,10 +117,7 @@ export class FormFieldsParser extends DOMParser {
 
     if (fields.length > 0) {
       ctx.currentSection.children.push(...fields);
-      logger.debug(
-        `Added ${fields.length} fields to section "${ctx.currentSection.title}"`,
-        fields.map((field) => field.label)
-      );
+      logger.debug('Added fields to section', { count: fields.length });
       return { fields };
     }
 

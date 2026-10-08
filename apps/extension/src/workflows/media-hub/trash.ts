@@ -1,3 +1,4 @@
+import { createMaintenanceLog } from '../../composition/persistence/library-lifecycle/maintenance-log';
 import type { LocalStoragePolicy } from '../../contracts/settings';
 import type { LibraryLifecycle } from '../../composition/persistence/library-lifecycle/contracts';
 import type { LibraryTrashTarget } from '../../composition/persistence/library-lifecycle/trash';
@@ -24,6 +25,8 @@ import {
 import { deleteMediaLibraryAssetsBatchSafely } from './store';
 import { deletePersistedVideoProject } from './video-projects';
 import { publishMediaHubLibraryChanged } from '../../features/media-hub/events';
+
+const maintenanceLog = createMaintenanceLog();
 
 /** A deletion preview is bound to the exact trash admission seen by the user. */
 interface TrashDeletionTarget {
@@ -121,6 +124,8 @@ export async function cleanupLibraryTrash(
   );
   media.forEach((item) => append({ kind: 'media', id: item.id }, item.lifecycle?.trashedAt));
   let failedCount = 0;
+  let deleted = 0;
+  let retained = 0;
   for (const entry of candidates) {
     if (signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
     if (signal?.aborted) break;
@@ -129,13 +134,32 @@ export async function cleanupLibraryTrash(
       if (
         entry.target.kind === 'media' &&
         (await listMediaAssetProjectUsage(entry.target.id)).length > 0
-      )
+      ) {
+        retained += 1;
         continue;
+      }
       if (signal?.aborted) break;
       await permanentlyDeleteTrashItem(entry, []);
+      deleted += 1;
     } catch (error) {
-      if (!(error instanceof StaleTrashItemError)) failedCount += 1;
+      if (error instanceof StaleTrashItemError)
+        void maintenanceLog.append({
+          operation: 'trash',
+          code: 'conflict',
+          counts: { retained: 1 },
+        });
+      else failedCount += 1;
     }
   }
+  if (deleted)
+    void maintenanceLog.append({ operation: 'trash', code: 'expired', counts: { deleted } });
+  if (retained)
+    void maintenanceLog.append({ operation: 'trash', code: 'in-use', counts: { retained } });
+  if (failedCount)
+    void maintenanceLog.append({
+      operation: 'trash',
+      code: 'failed',
+      counts: { failed: failedCount },
+    });
   return { failedCount };
 }

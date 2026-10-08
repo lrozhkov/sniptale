@@ -309,6 +309,34 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log.ts",
+      "owner": "library-maintenance-journal",
+      "justification": "User-requested bounded local maintenance outcome log for Library inspection and explicit JSONL export.",
+      "reviewNote": "Fixed operations/reason codes/messages, UTC times and numeric metrics only; no media, filenames, identifiers, URLs or raw exceptions. At most 512 records/256 KiB with consecutive repeated-block coalescing. Cross-context lock and nonqueued erasure admission; read is write-free. Failure is advisory. No sync/backup; unconditional erasure removes exact key. Final persistence and export use shared sanitizer and closed reconstruction.",
+      "storageWrites": [
+        {
+          "sink": "area.set",
+          "keys": [
+            "MAINTENANCE_LOG_STORAGE_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/runtime-log.ts",
+      "owner": "runtime-diagnostic-log",
+      "justification": "User-requested local Events and logs destination for runtime diagnostic summaries.",
+      "reviewNote": "Sanitized summary/source/context/level/times only, no attached payloads or raw stacks. 512 rows/256 KiB, bounded64 queue and one-second batching, drop count, idle without timers. Permit covers admitted batch delay and write, exclusive lock rereads. Unconditional privacy erasure; no sync/backup. Explicit JSONL export resanitizes.",
+      "storageWrites": [
+        {
+          "sink": "area.set",
+          "keys": [
+            "RUNTIME_LOG_STORAGE_KEY"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [
@@ -377,6 +405,30 @@
       "owner": "shared-message-tracer",
       "justification": "Trace utility helpers owned by the canonical tracer seam.",
       "reviewNote": "Utility-level sanitization stays internal to tracing; new diagnostic writers should import the canonical sanitizer seam."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log.ts",
+      "owner": "library-maintenance-journal",
+      "justification": "Final local maintenance diagnostic sink.",
+      "reviewNote": "Shared structured sanitizer is applied before the bounded browser storage write; only fixed catalog messages and numeric metrics are constructed."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log-model.ts",
+      "owner": "library-maintenance-journal-export",
+      "justification": "Final explicit JSONL diagnostic export.",
+      "reviewNote": "Each entry is reconstructed from a closed catalog and validated scalar fields, then passed through shared structured diagnostic sanitization."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/runtime-log.ts",
+      "owner": "runtime-diagnostic-log",
+      "justification": "Bounded user-requested diagnostic retention and JSONL export.",
+      "reviewNote": "Only validated short summary fields; canonical sanitizer at storage and export sinks."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/model.ts",
+      "owner": "runtime-diagnostic-log",
+      "justification": "Bounded user-requested diagnostic retention and JSONL export.",
+      "reviewNote": "Only validated short summary fields; canonical sanitizer at storage and export sinks."
     }
   ]
 }

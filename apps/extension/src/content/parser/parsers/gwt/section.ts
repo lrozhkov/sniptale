@@ -66,8 +66,7 @@ export function parseGwtSectionElement(element: HTMLElement, ctx: TraversalConte
   // This section will remain active as long as TreeWalker is inside this element
   ctx.sectionElements.push(element);
   sectionByElement.set(element, section);
-  const trackedElementLabel = `${element.tagName}#${element.id || element.className}`;
-  logger.debug(`Started section: ${title}, tracking element: ${trackedElementLabel}`);
+  logger.debug('Started section');
 
   // Set currentSection to this section immediately
   // This ensures fields within this section are captured correctly
@@ -82,7 +81,7 @@ export function parseGwtSectionElement(element: HTMLElement, ctx: TraversalConte
     for (const [pendingTitle, fields] of pendingFields.entries()) {
       const pendingTitleLower = pendingTitle.toLowerCase();
       if (titleToMatch.includes(pendingTitleLower) || pendingTitleLower.includes(titleToMatch)) {
-        logger.debug(`Found ${fields.length} pending fields for section: ${title}`);
+        logger.debug('Found pending fields for section', { count: fields.length });
         section.children.push(...fields);
         pendingFields.delete(pendingTitle);
         break;
@@ -135,7 +134,7 @@ export function updateSectionContext(node: HTMLElement, ctx: TraversalContext): 
       return;
     }
 
-    closeActiveSection(originalNode, ctx);
+    closeActiveSection(ctx);
     return;
   }
 
@@ -157,25 +156,25 @@ function reconcileExitedSections(originalNode: HTMLElement, ctx: TraversalContex
       return;
     }
 
-    closeActiveSection(originalNode, ctx);
+    closeActiveSection(ctx);
   }
 }
 
-function closeActiveSection(originalNode: HTMLElement, ctx: TraversalContext): void {
+function closeActiveSection(ctx: TraversalContext): void {
   const exitedSection = ctx.sectionElements.pop();
   if (!exitedSection) {
     ctx.currentSection = null;
     return;
   }
 
-  logSectionContextTransition(exitedSection, originalNode);
+  logSectionContextTransition();
   const previousSectionElement = ctx.sectionElements[ctx.sectionElements.length - 1];
   ctx.currentSection = previousSectionElement
     ? (sectionByElement.get(previousSectionElement) ?? null)
     : null;
 }
 
-function logSectionContextTransition(exitedSection: HTMLElement, originalNode: HTMLElement) {
-  logger.debug(`Exited section (new section found): ${findSectionTitle(exitedSection)}`);
-  logger.debug(`New section element: ${originalNode.tagName}#${originalNode.id}`);
+function logSectionContextTransition() {
+  logger.debug('Exited section (new section found)');
+  logger.debug('New section element');
 }

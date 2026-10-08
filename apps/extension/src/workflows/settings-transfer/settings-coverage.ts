@@ -22,6 +22,7 @@ export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   'voice-input': ['system.voice', 'system.voice.microphone'],
   'native-app': ['system.native', 'system.native.connection'],
   'access-data': ['action/status'],
+  'events-logs': ['action/status'],
   'settings-transfer': ['action/status'],
 } as const satisfies Record<SettingsSectionId, readonly string[]>;
 
@@ -65,6 +66,11 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  excluded(
+    'system/events-logs/index.tsx',
+    ['createMaintenanceLog', 'createRuntimeLog'],
+    'action/status'
+  ),
   transferable(
     'capture/saving/filename-rules.tsx',
     ['updateSettings'],

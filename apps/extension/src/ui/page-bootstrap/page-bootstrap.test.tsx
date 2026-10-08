@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
+vi.mock('../../composition/persistence/diagnostics/runtime-log', () => ({
+  installRuntimeLogCapture: vi.fn(),
+}));
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { installRuntimeLogCapture } from '../../composition/persistence/diagnostics/runtime-log';
 
 const appBootstrapMocks = vi.hoisted(() => ({
   createRootMock: vi.fn(),
@@ -53,6 +57,7 @@ describe('page-bootstrap renderPageShell', () => {
       onRendered,
     });
 
+    expect(installRuntimeLogCapture).toHaveBeenCalledWith('DemoEntrypoint');
     expect(appBootstrapMocks.initializeExtensionPageThemeMock).toHaveBeenCalledTimes(1);
     expect(appBootstrapMocks.createRootMock).toHaveBeenCalledWith(document.getElementById('root'));
     expect(appBootstrapMocks.renderMock).toHaveBeenCalledTimes(1);

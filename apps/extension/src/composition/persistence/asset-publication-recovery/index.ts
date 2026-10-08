@@ -1,3 +1,4 @@
+import { createMaintenanceLog } from '../library-lifecycle/maintenance-log';
 import { completePhysicalDeleteOperations } from '../assets/operations';
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { sameMediaSource } from '../media-library/dependencies';
@@ -66,6 +67,8 @@ import { imageWorkspacePublicationAdapter } from '../image-aggregates/mutations'
 import { webSnapshotPublicationAdapter } from '../web-snapshots/publication';
 export { auditDurableAssets, collectOrphanAssetObjects } from './audit';
 import { collectOrphanAssetObjects } from './audit';
+
+const maintenanceLog = createMaintenanceLog();
 
 async function restorePreviousRecord(
   store: { put(value: unknown): Promise<unknown> },
@@ -365,7 +368,14 @@ async function replayPendingPhysicalDeletes(
     for (const operation of physicalDeletes) {
       const assetIds = operation.assetIds.filter((id) => objects.has(id));
       if (assetIds.length) pending.push({ ...operation, assetIds });
-      else await deleteOperation(operation.operationId);
+      else {
+        await deleteOperation(operation.operationId);
+        void maintenanceLog.append({
+          operation: 'physical-delete',
+          code: 'absent',
+          counts: { absent: operation.assetIds.length },
+        });
+      }
     }
     // No snapshot escapes this batch or crosses compensation/publication graph mutations.
     if (pending.length)

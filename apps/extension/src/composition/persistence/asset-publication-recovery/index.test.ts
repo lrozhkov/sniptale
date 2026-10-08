@@ -1,5 +1,5 @@
 import { createMediaLibraryEntry } from '../projects/index.test-support';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   completePhysicalDelete: vi.fn(),
@@ -58,6 +58,8 @@ import type {
   PhysicalDeleteAssetOperation,
 } from '../assets';
 
+afterEach(() => vi.unstubAllGlobals());
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.completePhysicalDelete.mockResolvedValue(undefined);
@@ -70,7 +72,17 @@ beforeEach(() => {
   mocks.recoverStandalone.mockResolvedValue(0);
 });
 
-it('retries durable physical-delete operations on startup', async () => {
+it('retries durable physical-delete operations on startup and relays offscreen outcomes', async () => {
+  const postMessage = vi.fn();
+  vi.stubGlobal('chrome', {
+    runtime: {
+      connect: () => ({
+        postMessage,
+        disconnect: vi.fn(),
+        onDisconnect: { addListener: vi.fn(), removeListener: vi.fn() },
+      }),
+    },
+  });
   const operation: PhysicalDeleteAssetOperation = {
     assetIds: ['orphan-1'],
     createdAt: 1,
@@ -88,6 +100,16 @@ it('retries durable physical-delete operations on startup', async () => {
   expect(mocks.deleteObject).toHaveBeenCalledWith('orphan-1');
   expect(harness.get('asset_operations', operation.operationId)).toBeUndefined();
   expect(mocks.recoverStandalone).toHaveBeenCalledOnce();
+  expect(postMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      kind: 'maintenance',
+      input: expect.objectContaining({
+        operation: 'physical-delete',
+        code: 'deleted',
+        counts: expect.objectContaining({ deleted: 1 }),
+      }),
+    })
+  );
 });
 
 it('aborts and compensates a crashed restore before removing its uncommitted object', async () => {
