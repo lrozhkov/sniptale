@@ -31,7 +31,8 @@ import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documen
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 
 export async function collectDurableAssetSnapshot(
-  db?: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>
+  db?: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
+  signal?: AbortSignal
 ): Promise<{
   authorityValid: boolean;
   archiveSessions: ArchiveRestoreSession[];
@@ -43,74 +44,110 @@ export async function collectDurableAssetSnapshot(
   protectedRollbackAssetIds: Set<string>;
   refs: AssetRef[];
 }> {
-  const [
-    rawRefs,
-    rawOwners,
-    rawOperations,
-    rawRecordings,
-    rawProjectAssets,
-    rawProjectExports,
-    rawScenarioAssets,
-    rawScenarioExports,
-    rawImageWorkspaces,
-    rawScenarioDocuments,
-    rawWebSnapshots,
-    rawMedia,
-  ] = await (db ? readDurableRows(db) : runWithIndexedDbMutation(readDurableRows));
-  const refsResult = parseRows(rawRefs, parseAssetRef);
-  const ownersResult = parseRows(rawOwners, parseAssetOwner);
-  const operationsResult = parseAssetOperations(rawOperations);
-  const recordingsResult = parseRows(rawRecordings, parseRecordingEntry);
-  const projectAssetsResult = parseRows(rawProjectAssets, parseProjectAssetEntry);
-  const projectExportsResult = parseRows(rawProjectExports, parseProjectExportEntry);
-  const scenarioAssetsResult = parseRows(rawScenarioAssets, parseScenarioAssetEntry);
-  const scenarioExportsResult = parseRows(rawScenarioExports, parseScenarioExportEntry);
-  const imageWorkspacesResult = parseRows(rawImageWorkspaces, parseImageWorkspaceEntry);
-  const scenarioDocumentsResult = parseRows(
-    rawScenarioDocuments,
-    parseScenarioStepEditorDocumentEntry
+  if (!db)
+    return runWithIndexedDbMutation((connection) =>
+      collectDurableAssetSnapshot(connection, signal)
+    );
+  signal?.throwIfAborted();
+  const refsResult = parseRows(await db.getAll(ASSET_REFS_STORE), parseAssetRef);
+  const ownersResult = parseRows(await db.getAll(ASSET_OWNERS_STORE), parseAssetOwner);
+  const operationsResult = parseAssetOperations(await db.getAll(ASSET_OPERATIONS_STORE));
+  let authorityValid = refsResult.valid && ownersResult.valid && operationsResult.valid;
+  const expectedOwners: AssetOwner[] = [];
+  const embeddedBinaryMetadata: string[] = [];
+  const owned = async <T>(
+    store: string,
+    parse: (raw: unknown) => T | null,
+    project: (entry: T) => AssetOwner[],
+    embeddedOwner?: string
+  ) => {
+    const valid = await visitDurableRows(
+      db,
+      store,
+      (raw, index) => {
+        if (embeddedOwner)
+          embeddedBinaryMetadata.push(...findEmbeddedBinaryRows([raw], embeddedOwner, index));
+        const entry = parse(raw);
+        if (!entry) return false;
+        expectedOwners.push(...project(entry));
+        return true;
+      },
+      signal
+    );
+    authorityValid = authorityValid && valid;
+  };
+  await owned(STORE_NAME, parseRecordingEntry, (entry) => [
+    createExpectedOwner('recording', entry.id, entry.assetId),
+  ]);
+  await owned(PROJECT_ASSETS_STORE, parseProjectAssetEntry, (entry) => [
+    createExpectedOwner('project-asset', entry.id, entry.assetId),
+  ]);
+  await owned(PROJECT_EXPORTS_STORE, parseProjectExportEntry, (entry) => [
+    createExpectedOwner('project-export', entry.id, entry.assetId),
+  ]);
+  await owned(SCENARIO_ASSETS_STORE, parseScenarioAssetEntry, (entry) => [
+    createExpectedOwner('scenario-asset', entry.id, entry.assetId),
+  ]);
+  await owned(SCENARIO_EXPORTS_STORE, parseScenarioExportEntry, (entry) =>
+    entry.html ? [createExpectedOwner('scenario-export', entry.id, entry.html.assetId)] : []
   );
-  const webSnapshotsResult = parseRows(rawWebSnapshots, parseStoredWebSnapshotRecord);
-  const mediaResult = parseRows(rawMedia, parseMediaLibraryEntry);
-  const refs = refsResult.entries;
-  const owners = ownersResult.entries;
-  const expectedOwners = projectExpectedOwners({
-    recordings: recordingsResult.entries,
-    projectAssets: projectAssetsResult.entries,
-    projectExports: projectExportsResult.entries,
-    scenarioAssets: scenarioAssetsResult.entries,
-    scenarioExports: scenarioExportsResult.entries,
-    imageWorkspaces: imageWorkspacesResult.entries,
-    scenarioDocuments: scenarioDocumentsResult.entries,
-    webSnapshots: webSnapshotsResult.entries,
-    media: mediaResult.entries,
-  });
-  const expectedOwnerAssets = new Map(
-    expectedOwners.map((owner) => [ownerKey(owner), owner.assetId])
+  await owned(
+    IMAGE_WORKSPACES_STORE,
+    parseImageWorkspaceEntry,
+    (entry) =>
+      entry.document.assets.map((asset) => ({
+        assetId: asset.assetId,
+        ownerId: entry.aggregateId,
+        ownerKind: 'image-workspace',
+        role: asset.role,
+      })),
+    'image-workspace'
+  );
+  await owned(
+    SCENARIO_STEP_EDITOR_DOCUMENTS_STORE,
+    parseScenarioStepEditorDocumentEntry,
+    (entry) =>
+      entry.document.assets.map((asset) => ({
+        assetId: asset.assetId,
+        ownerId: entry.stepId,
+        ownerKind: 'scenario-editor-document',
+        role: asset.role,
+      })),
+    'scenario-editor-document'
+  );
+  await owned(WEB_SNAPSHOTS_STORE, parseStoredWebSnapshotRecord, (entry) => [
+    {
+      assetId: entry.packageAssetId,
+      ownerId: entry.id,
+      ownerKind: 'web-snapshot',
+      role: 'package',
+    },
+    {
+      assetId: entry.screenshotAssetId,
+      ownerId: entry.id,
+      ownerKind: 'web-snapshot',
+      role: 'screenshot',
+    },
+  ]);
+  await owned(MEDIA_LIBRARY_STORE, parseMediaLibraryEntry, (entry) =>
+    entry.source.kind === 'stored-asset'
+      ? [
+          {
+            assetId: entry.source.assetId,
+            ownerId: entry.id,
+            ownerKind: 'media-library',
+            role: 'source',
+          },
+        ]
+      : []
   );
   return {
-    authorityValid: [
-      refsResult,
-      ownersResult,
-      operationsResult,
-      recordingsResult,
-      projectAssetsResult,
-      projectExportsResult,
-      scenarioAssetsResult,
-      scenarioExportsResult,
-      imageWorkspacesResult,
-      scenarioDocumentsResult,
-      webSnapshotsResult,
-      mediaResult,
-    ].every((result) => result.valid),
+    authorityValid,
     archiveSessions: operationsResult.archiveSessions,
-    embeddedBinaryMetadata: [
-      ...findEmbeddedBinaryRows(rawImageWorkspaces, 'image-workspace'),
-      ...findEmbeddedBinaryRows(rawScenarioDocuments, 'scenario-editor-document'),
-    ],
-    expectedOwnerAssets,
+    embeddedBinaryMetadata,
+    expectedOwnerAssets: new Map(expectedOwners.map((owner) => [ownerKey(owner), owner.assetId])),
     expectedOwners,
-    owners,
+    owners: ownersResult.entries,
     operationIds: new Set([
       ...operationsResult.archiveSessions.map((operation) => operation.operationId),
       ...operationsResult.backupOperations.map((operation) => operation.operationId),
@@ -118,68 +155,31 @@ export async function collectDurableAssetSnapshot(
     protectedRollbackAssetIds: new Set(
       operationsResult.backupOperations.flatMap(collectBackupRollbackAssetIds)
     ),
-    refs,
+    refs: refsResult.entries,
   };
 }
 
-/** Pure metadata projection owns the domain graph independently of snapshot IO and validity. */
-type OwnershipMetadata = {
-  recordings: NonNullable<ReturnType<typeof parseRecordingEntry>>[];
-  projectAssets: NonNullable<ReturnType<typeof parseProjectAssetEntry>>[];
-  projectExports: NonNullable<ReturnType<typeof parseProjectExportEntry>>[];
-  scenarioAssets: NonNullable<ReturnType<typeof parseScenarioAssetEntry>>[];
-  scenarioExports: NonNullable<ReturnType<typeof parseScenarioExportEntry>>[];
-  imageWorkspaces: NonNullable<ReturnType<typeof parseImageWorkspaceEntry>>[];
-  scenarioDocuments: NonNullable<ReturnType<typeof parseScenarioStepEditorDocumentEntry>>[];
-  webSnapshots: NonNullable<ReturnType<typeof parseStoredWebSnapshotRecord>>[];
-  media: NonNullable<ReturnType<typeof parseMediaLibraryEntry>>[];
-};
-
-function projectExpectedOwners(metadata: OwnershipMetadata) {
-  const expectedOwners: AssetOwner[] = [];
-  for (const entry of metadata.media)
-    if (entry.source.kind === 'stored-asset')
-      expectedOwners.push({
-        assetId: entry.source.assetId,
-        ownerKind: 'media-library',
-        ownerId: entry.id,
-        role: 'source',
-      });
-  for (const entry of metadata.recordings) {
-    expectedOwners.push(createExpectedOwner('recording', entry.id, entry.assetId));
+/** Release parsed canvases/manifests immediately; yield between bounded groups of rows. */
+async function visitDurableRows(
+  db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
+  store: string,
+  visit: (raw: unknown, index: number) => boolean,
+  signal?: AbortSignal
+): Promise<boolean> {
+  signal?.throwIfAborted();
+  const rows: unknown = await db.getAll(store);
+  if (!Array.isArray(rows)) return false;
+  let valid = true;
+  for (let index = 0; index < rows.length; index++) {
+    if (index % 8 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    signal?.throwIfAborted();
+    const accepted = visit(rows[index], index);
+    valid = valid && accepted;
   }
-  for (const entry of metadata.projectAssets) {
-    expectedOwners.push(createExpectedOwner('project-asset', entry.id, entry.assetId));
-  }
-  for (const entry of metadata.projectExports) {
-    expectedOwners.push(createExpectedOwner('project-export', entry.id, entry.assetId));
-  }
-  for (const entry of metadata.scenarioAssets) {
-    expectedOwners.push(createExpectedOwner('scenario-asset', entry.id, entry.assetId));
-  }
-  for (const entry of metadata.scenarioExports) {
-    if (entry.html)
-      expectedOwners.push(createExpectedOwner('scenario-export', entry.id, entry.html.assetId));
-  }
-  expectedOwners.push(...projectDocumentOwners(metadata));
-  for (const entry of metadata.webSnapshots) {
-    expectedOwners.push({
-      assetId: entry.packageAssetId,
-      ownerId: entry.id,
-      ownerKind: 'web-snapshot',
-      role: 'package',
-    });
-    expectedOwners.push({
-      assetId: entry.screenshotAssetId,
-      ownerId: entry.id,
-      ownerKind: 'web-snapshot',
-      role: 'screenshot',
-    });
-  }
-  return expectedOwners;
+  return valid;
 }
 
-function findEmbeddedBinaryRows(raw: unknown, owner: string): string[] {
+function findEmbeddedBinaryRows(raw: unknown, owner: string, offset = 0): string[] {
   if (!Array.isArray(raw)) return [];
   const findings: string[] = [];
   const visit = (value: unknown, path: string, depth: number): void => {
@@ -205,7 +205,7 @@ function findEmbeddedBinaryRows(raw: unknown, owner: string): string[] {
       }
     }
   };
-  raw.forEach((row, index) => visit(row, `${owner}[${index}]`, 0));
+  raw.forEach((row, index) => visit(row, `${owner}[${offset + index}]`, 0));
   return findings;
 }
 
@@ -253,49 +253,4 @@ function createExpectedOwner(ownerKind: string, ownerId: string, assetId: string
 
 function isPresent<T>(value: T | null): value is T {
   return value !== null;
-}
-
-function readDurableRows(
-  db: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>
-) {
-  return Promise.all([
-    db.getAll(ASSET_REFS_STORE),
-    db.getAll(ASSET_OWNERS_STORE),
-    db.getAll(ASSET_OPERATIONS_STORE),
-    db.getAll(STORE_NAME),
-    db.getAll(PROJECT_ASSETS_STORE),
-    db.getAll(PROJECT_EXPORTS_STORE),
-    db.getAll(SCENARIO_ASSETS_STORE),
-    db.getAll(SCENARIO_EXPORTS_STORE),
-    db.getAll(IMAGE_WORKSPACES_STORE),
-    db.getAll(SCENARIO_STEP_EDITOR_DOCUMENTS_STORE),
-    db.getAll(WEB_SNAPSHOTS_STORE),
-    db.getAll(MEDIA_LIBRARY_STORE),
-  ]);
-}
-
-/** Editable document bindings have roles independent of source body ownership. */
-function projectDocumentOwners(metadata: OwnershipMetadata): AssetOwner[] {
-  const expectedOwners: AssetOwner[] = [];
-  for (const entry of metadata.imageWorkspaces) {
-    for (const asset of entry.document.assets) {
-      expectedOwners.push({
-        assetId: asset.assetId,
-        ownerId: entry.aggregateId,
-        ownerKind: 'image-workspace',
-        role: asset.role,
-      });
-    }
-  }
-  for (const entry of metadata.scenarioDocuments) {
-    for (const asset of entry.document.assets) {
-      expectedOwners.push({
-        assetId: asset.assetId,
-        ownerId: entry.stepId,
-        ownerKind: 'scenario-editor-document',
-        role: asset.role,
-      });
-    }
-  }
-  return expectedOwners;
 }

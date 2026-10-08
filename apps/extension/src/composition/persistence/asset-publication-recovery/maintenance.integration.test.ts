@@ -17,6 +17,10 @@ const storage = vi.hoisted(() => ({
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
   initDB: async () => ({
+    getAllKeys: async (store: string) =>
+      (storage.rows.get(store) ?? []).map((row) =>
+        typeof row === 'object' && row !== null && 'assetId' in row ? row.assetId : ''
+      ),
     getAll: async (store: string) => {
       storage.reads += 1;
       return store === 'asset_operations'
@@ -151,7 +155,6 @@ it('retains a newly adopted candidate after discovery and skips a live writer lo
   storage.objects.add('adopted');
   storage.objects.add('writer');
   storage.beforeObjectList.mockImplementationOnce(async () => {
-    await vi.waitFor(() => expect(storage.reads).toBeGreaterThanOrEqual(12));
     await runWithDurableAssetLifecycleLock(async () => {
       storage.rows.set('recordings', [recording('adopted')]);
     });
@@ -208,6 +211,39 @@ it('aborts before any deletion and fails closed on malformed authoritative rows'
   await collectOrphanAssetObjectsDuringIdle(abort.signal);
   storage.rows.set('recordings', [{ invalid: true }]);
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
+  expect(storage.deleteObject).not.toHaveBeenCalled();
+  expect(storage.intents.size).toBe(0);
+});
+
+it('does no full document scan when all objects already have refs', async () => {
+  storage.objects.add('retained');
+  storage.rows.set('asset_refs', [ref('retained')]);
+  await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
+  expect(storage.reads).toBe(0);
+  expect(storage.deleteObject).not.toHaveBeenCalled();
+});
+
+it('validates one graph for a batch of orphan objects instead of once per object', async () => {
+  for (let i = 0; i < 12; i++) storage.objects.add(`orphan-${i}`);
+  await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
+  expect(storage.objects.size).toBe(0);
+  expect(storage.reads).toBe(12);
+});
+
+it('cancels during cooperative validation without committing deletion intent', async () => {
+  storage.objects.add('orphan');
+  storage.rows.set(
+    'recordings',
+    Array.from({ length: 1000 }, (_, i) => ({
+      ...recording(`retained-${i}`),
+      id: `recording-${i}`,
+    }))
+  );
+  const controller = new AbortController();
+  const work = collectOrphanAssetObjectsDuringIdle(controller.signal);
+  await vi.waitFor(() => expect(storage.reads).toBeGreaterThanOrEqual(4));
+  controller.abort();
+  await expect(work).rejects.toMatchObject({ name: 'AbortError' });
   expect(storage.deleteObject).not.toHaveBeenCalled();
   expect(storage.intents.size).toBe(0);
 });

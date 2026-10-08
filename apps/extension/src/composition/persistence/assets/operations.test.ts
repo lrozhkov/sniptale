@@ -343,3 +343,12 @@ it.each(['recording', 'invalid-source'] as const)(
     expect(harness.db.delete).not.toHaveBeenCalled();
   }
 );
+
+it('reads retention once for an entire physical-delete operation', async () => {
+  const { db } = installMutationHarness();
+  await completePhysicalDeleteOperation(
+    buildPhysicalDeleteOperation(Array.from({ length: 32 }, (_, i) => `asset-${i}`))
+  );
+  expect(db.getAll).toHaveBeenCalledTimes(12);
+  expect(mocks.deleteObject).toHaveBeenCalledTimes(32);
+});

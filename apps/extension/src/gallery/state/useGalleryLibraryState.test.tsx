@@ -598,7 +598,7 @@ it('renders the snapshot before storage estimation and ignores its superseded re
   expect(values.at(-1)?.storageInfo).toMatchObject({ usage: 10, quota: 20 });
 });
 
-it('shows asynchronous Trash failure feedback only for the current refresh', async () => {
+it('keeps maintenance feedback valid across refreshes and discards it after unmount', async () => {
   const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
   const onBanner = vi.fn();
   renderConnectedProbe(values, {
@@ -607,14 +607,34 @@ it('shows asynchronous Trash failure feedback only for the current refresh', asy
     onSelectionRefresh: vi.fn(),
   });
   await flushLibraryState();
-  const staleFailure = maintainLibraryAssetsMock.mock.calls.at(-1)?.[1];
-  expect(staleFailure).toBeTypeOf('function');
+  const failure = maintainLibraryAssetsMock.mock.calls.at(-1)?.[1];
+  expect(failure).toBeTypeOf('function');
   await act(async () => values.at(-1)?.refresh());
   await flushLibraryState();
-  const currentFailure = maintainLibraryAssetsMock.mock.calls.at(-1)?.[1];
-  act(() => staleFailure?.());
-  expect(onBanner).not.toHaveBeenCalled();
-  act(() => currentFailure?.());
+  expect(maintainLibraryAssetsMock).toHaveBeenCalledOnce();
+  act(() => failure?.());
+  expect(onBanner).toHaveBeenCalledOnce();
+  act(() => root?.unmount());
+  root = null;
+  act(() => failure?.());
   expect(onBanner).toHaveBeenCalledOnce();
   expect(values.at(-1)?.isLoading).toBe(false);
+});
+
+it('does not restart or cancel maintenance when the mounted library refreshes', async () => {
+  const values: Array<ReturnType<typeof useGalleryLibraryState>> = [];
+  renderConnectedProbe(values, {
+    onBanner: vi.fn(),
+    onPreviewItemRefresh: vi.fn(),
+    onSelectionRefresh: vi.fn(),
+  });
+  await flushLibraryState();
+  const signal = maintainLibraryAssetsMock.mock.calls[0]![0];
+  await act(async () => {
+    await values.at(-1)!.refresh();
+    await values.at(-1)!.refresh();
+  });
+  await flushLibraryState();
+  expect(maintainLibraryAssetsMock).toHaveBeenCalledOnce();
+  expect(signal.aborted).toBe(false);
 });

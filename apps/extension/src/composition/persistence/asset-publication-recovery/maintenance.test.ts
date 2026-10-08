@@ -1,5 +1,4 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-
 const mocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
   objects: vi.fn(),
@@ -7,18 +6,17 @@ const mocks = vi.hoisted(() => ({
   writing: vi.fn(),
   lifecycle: vi.fn(),
   objectLock: vi.fn(),
-  put: vi.fn(),
-  complete: vi.fn(),
-  init: vi.fn(),
+  keys: vi.fn(),
+  batch: vi.fn(),
 }));
 vi.mock('../assets/retention-authority', () => ({ collectDurableAssetSnapshot: mocks.snapshot }));
+vi.mock('../assets/operations', async (original) => ({
+  ...(await original<typeof import('../assets/operations')>()),
+  deleteOrphanAssetObjectBatch: mocks.batch,
+}));
 vi.mock('../infrastructure/indexed-db/core', async (original) => ({
   ...(await original<typeof import('../infrastructure/indexed-db/core')>()),
-  initDB: mocks.init,
-}));
-vi.mock('../infrastructure/indexed-db/mutation', () => ({
-  runWithIndexedDbMutation: async (effect: (db: { put: typeof mocks.put }) => Promise<unknown>) =>
-    effect({ put: mocks.put }),
+  initDB: async () => ({ getAllKeys: mocks.keys }),
 }));
 vi.mock('../infrastructure/mutation-barrier', async (original) => ({
   ...(await original<typeof import('../infrastructure/mutation-barrier')>()),
@@ -30,86 +28,82 @@ vi.mock('../assets', async (original) => ({
   listReadyJournals: mocks.journals,
   listWritingAssetIds: mocks.writing,
   runWithAssetObjectLockIfAvailable: mocks.objectLock,
-  completePhysicalDeleteOperation: mocks.complete,
 }));
 import { collectOrphanAssetObjectsDuringIdle } from './audit';
-
-function emptySnapshot() {
-  return {
-    authorityValid: true,
-    refs: [],
-    owners: [],
-    expectedOwners: [],
-    expectedOwnerAssets: new Map(),
-    protectedRollbackAssetIds: new Set<string>(),
-    operationIds: new Set(),
-    archiveSessions: [],
-    embeddedBinaryMetadata: [],
-  };
-}
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.snapshot.mockResolvedValue(emptySnapshot());
   mocks.objects.mockResolvedValue(['orphan']);
+  mocks.keys.mockResolvedValue([]);
   mocks.journals.mockResolvedValue([]);
   mocks.writing.mockResolvedValue([]);
-  mocks.lifecycle.mockImplementation(async (effect) => effect('test-permit'));
+  mocks.lifecycle.mockImplementation(async (effect) => effect('permit'));
   mocks.objectLock.mockImplementation(async (_id, effect) => effect());
-  mocks.put.mockResolvedValue(undefined);
-  mocks.complete.mockResolvedValue(undefined);
 });
-it('discovers outside the lifecycle lock and records durable intent before physical deletion', async () => {
-  mocks.lifecycle.mockImplementation(async (effect) => {
-    expect(mocks.snapshot).toHaveBeenCalledOnce();
-    return effect('test-permit');
+it('discovers by IDs and gives one batch to the deletion owner while all object locks remain held', async () => {
+  const locked = new Set<string>();
+  mocks.objects.mockResolvedValue(['one', 'busy', 'two']);
+  mocks.objectLock.mockImplementation(async (id, effect) => {
+    if (id === 'busy') return;
+    locked.add(id);
+    try {
+      await effect();
+    } finally {
+      locked.delete(id);
+    }
   });
-  mocks.complete.mockImplementation(async (operation, permit) => {
-    expect(permit).toBe('test-permit');
-    expect(mocks.put).toHaveBeenCalledWith('asset_operations', operation);
-    expect(operation.assetIds).toEqual(['orphan']);
+  mocks.batch.mockImplementation(async (ids, _signal, permit) => {
+    expect(ids).toEqual(['one', 'two']);
+    expect(locked).toEqual(new Set(ids));
+    expect(permit).toBe('permit');
   });
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
-  expect(mocks.complete).toHaveBeenCalledOnce();
+  expect(mocks.batch).toHaveBeenCalledOnce();
+  expect(mocks.snapshot).not.toHaveBeenCalled();
+  expect(locked.size).toBe(0);
 });
-it.each(['ref', 'owner', 'projected', 'rollback', 'writing', 'journal', 'invalid'])(
-  'retains a candidate when %s authority appears before deletion',
+it.each(['ref', 'writing', 'journal'])(
+  'does no validation when a candidate has %s protection',
   async (kind) => {
-    const snapshot = emptySnapshot();
-    const protectedSnapshot = {
-      ...snapshot,
-      authorityValid: kind !== 'invalid',
-      refs: kind === 'ref' ? [{ assetId: 'orphan' }] : [],
-      owners: kind === 'owner' ? [{ assetId: 'orphan' }] : [],
-      expectedOwners: kind === 'projected' ? [{ assetId: 'orphan' }] : [],
-      protectedRollbackAssetIds: new Set(kind === 'rollback' ? ['orphan'] : []),
-    };
-    mocks.snapshot.mockResolvedValueOnce(snapshot).mockResolvedValue(protectedSnapshot);
-    if (kind === 'writing') mocks.writing.mockResolvedValueOnce([]).mockResolvedValue(['orphan']);
+    if (kind === 'ref') mocks.keys.mockResolvedValue(['orphan']);
+    if (kind === 'writing') mocks.writing.mockResolvedValue(['orphan']);
     if (kind === 'journal')
-      mocks.journals
-        .mockResolvedValueOnce([])
-        .mockResolvedValue([{ assetRefs: [{ assetId: 'orphan' }], payload: {} }]);
+      mocks.journals.mockResolvedValue([{ assetRefs: [{ assetId: 'orphan' }], payload: {} }]);
     await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
-    expect(mocks.put).not.toHaveBeenCalled();
-    expect(mocks.complete).not.toHaveBeenCalled();
+    expect(mocks.batch).not.toHaveBeenCalled();
+    expect(mocks.lifecycle).not.toHaveBeenCalled();
+    expect(mocks.snapshot).not.toHaveBeenCalled();
   }
 );
-it('skips busy lifecycle locks and stops when Gallery cancels the pass', async () => {
-  mocks.lifecycle.mockResolvedValueOnce(null);
+it('bounds candidate admission to 32 and skips busy lifecycle locks', async () => {
+  mocks.objects.mockResolvedValue(Array.from({ length: 100 }, (_, i) => `object-${i}`));
   await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
-  expect(mocks.put).not.toHaveBeenCalled();
-  const abort = new AbortController();
+  expect(mocks.batch.mock.calls[0]![0]).toHaveLength(32);
+  mocks.lifecycle.mockResolvedValueOnce(undefined);
+  await collectOrphanAssetObjectsDuringIdle(new AbortController().signal);
+  expect(mocks.batch).toHaveBeenCalledOnce();
+});
+it('cancels before taking lifecycle or object locks', async () => {
+  const controller = new AbortController();
   mocks.objects.mockImplementationOnce(async () => {
-    abort.abort();
+    controller.abort();
     return ['orphan'];
   });
-  await collectOrphanAssetObjectsDuringIdle(abort.signal);
-  expect(mocks.lifecycle).toHaveBeenCalledOnce();
+  await collectOrphanAssetObjectsDuringIdle(controller.signal);
+  expect(mocks.lifecycle).not.toHaveBeenCalled();
+  expect(mocks.batch).not.toHaveBeenCalled();
 });
-it('never deletes when durable intent fails to commit', async () => {
-  mocks.put.mockRejectedValueOnce(new Error('write failed'));
+it('releases all acquired locks when authoritative deletion fails', async () => {
+  const released = vi.fn();
+  mocks.objectLock.mockImplementation(async (_id, effect) => {
+    try {
+      await effect();
+    } finally {
+      released();
+    }
+  });
+  mocks.batch.mockRejectedValueOnce(new Error('write failed'));
   await expect(collectOrphanAssetObjectsDuringIdle(new AbortController().signal)).rejects.toThrow(
     'write failed'
   );
-  expect(mocks.complete).not.toHaveBeenCalled();
+  expect(released).toHaveBeenCalledOnce();
 });

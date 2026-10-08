@@ -1,7 +1,7 @@
 import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { ASSET_OPERATIONS_STORE, initDB } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
-import { deleteAssetObject, listReadyJournals } from './opfs-store';
+import { deleteAssetObject, listReadyJournals, listWritingAssetIds } from './opfs-store';
 import {
   runWithDurableAssetLifecycleLock,
   type DurableAssetLifecyclePermit,
@@ -43,42 +43,76 @@ export function buildPhysicalDeleteOperation(assetIds: string[]): PhysicalDelete
   };
 }
 
+/** One authoritative snapshot covers the operation while its lifecycle lock remains held. */
 export async function completePhysicalDeleteOperation(
   operation: PhysicalDeleteAssetOperation,
   lifecyclePermit?: DurableAssetLifecyclePermit
 ): Promise<void> {
   await initDB();
   await runWithDurableAssetLifecycleLock(async () => {
-    const journals = await runStorageStartupPhase('asset-ready-journal-list', listReadyJournals);
-    let deferred = false;
-    for (const assetId of operation.assetIds) {
-      const authority = await runWithIndexedDbMutation(async (db) => {
-        const snapshot = await runStorageStartupPhase('asset-retention-snapshot', () =>
-          collectDurableAssetSnapshot(db)
-        );
-        const ref = snapshot.refs.find((entry) => entry.assetId === assetId);
-        const claimed = snapshot.owners.some((owner) => owner.assetId === assetId);
-        const projected = snapshot.expectedOwners.some((owner) => owner.assetId === assetId);
-        if (!snapshot.authorityValid || Boolean(ref) !== claimed) return 'unknown';
-        if (claimed) return 'adopted';
-        if (projected || snapshot.protectedRollbackAssetIds.has(assetId)) return 'unknown';
-        return 'unowned';
-      });
-      if (authority === 'adopted') continue;
-      if (
-        authority === 'unknown' ||
-        journals.some((journal) => readyJournalClaimsAsset(journal, assetId))
-      ) {
-        deferred = true;
-        continue;
-      }
-      await deleteAssetObject(assetId);
-    }
-    if (!deferred)
-      await runWithIndexedDbMutation((db) =>
-        db.delete(ASSET_OPERATIONS_STORE, operation.operationId)
-      );
+    const authority = await readPhysicalDeleteAuthority();
+    const unowned = operation.assetIds.filter((id) => authority(id) === 'unowned');
+    const deferred = operation.assetIds.some((id) => authority(id) === 'unknown');
+    await finishPhysicalDelete(operation, unowned, deferred);
   }, lifecyclePermit);
+}
+
+/** Caller holds candidate object locks; validate, journal and delete under one lifecycle hold. */
+export async function deleteOrphanAssetObjectBatch(
+  candidates: readonly string[],
+  signal: AbortSignal,
+  lifecyclePermit: DurableAssetLifecyclePermit
+): Promise<void> {
+  if (!candidates.length || signal.aborted) return;
+  await runWithDurableAssetLifecycleLock(async () => {
+    const authority = await readPhysicalDeleteAuthority(signal);
+    const writing = new Set(await listWritingAssetIds());
+    if (signal.aborted) return;
+    const ids = candidates.filter((id) => authority(id) === 'unowned' && !writing.has(id));
+    if (!ids.length) return;
+    const operation = buildPhysicalDeleteOperation(ids);
+    await runWithIndexedDbMutation(async (db) => {
+      if (!signal.aborted) await db.put(ASSET_OPERATIONS_STORE, operation);
+    });
+    // Cancellation after commit cannot abandon intent; finish or retain it for replay on failure.
+    if (signal.aborted) return;
+    await finishPhysicalDelete(operation, ids, false);
+  }, lifecyclePermit);
+}
+
+async function readPhysicalDeleteAuthority(signal?: AbortSignal) {
+  const snapshot = await runWithIndexedDbMutation((db) =>
+    runStorageStartupPhase('asset-retention-snapshot', () =>
+      collectDurableAssetSnapshot(db, signal)
+    )
+  );
+  const journals = await runStorageStartupPhase('asset-ready-journal-list', listReadyJournals);
+  const refs = new Set(snapshot.refs.map((entry) => entry.assetId));
+  const owners = new Set(snapshot.owners.map((entry) => entry.assetId));
+  const projected = new Set(snapshot.expectedOwners.map((entry) => entry.assetId));
+  return (id: string): 'unknown' | 'adopted' | 'unowned' => {
+    if (!snapshot.authorityValid || refs.has(id) !== owners.has(id)) return 'unknown';
+    if (owners.has(id)) return 'adopted';
+    if (
+      projected.has(id) ||
+      snapshot.protectedRollbackAssetIds.has(id) ||
+      journals.some((journal) => readyJournalClaimsAsset(journal, id))
+    )
+      return 'unknown';
+    return 'unowned';
+  };
+}
+
+async function finishPhysicalDelete(
+  operation: PhysicalDeleteAssetOperation,
+  ids: readonly string[],
+  deferred: boolean
+) {
+  for (const id of ids) await deleteAssetObject(id);
+  if (!deferred)
+    await runWithIndexedDbMutation((db) =>
+      db.delete(ASSET_OPERATIONS_STORE, operation.operationId)
+    );
 }
 
 export async function createBackupRestoreOperation(): Promise<AssetOperation> {

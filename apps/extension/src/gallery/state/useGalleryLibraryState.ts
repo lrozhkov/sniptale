@@ -390,14 +390,6 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
       }
     });
     loadGalleryTrashUsage(args, nextItems, refreshEpoch, usageController.signal);
-    void maintainLibraryAssets(usageController.signal, () => {
-      if (
-        usageController.signal.aborted ||
-        !isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })
-      )
-        return;
-      args.onBanner(translate('gallery.app.trashCleanupFailed'));
-    });
     args.onRefresh?.();
   } catch (error) {
     if (!isCurrentGalleryRefreshEpoch({ refreshEpoch, refreshEpochRef: args.refreshEpochRef })) {
@@ -496,6 +488,15 @@ export function useGalleryLibraryState({
     setStorageInfo,
     storageInfoRef,
   });
+
+  useEffect(() => {
+    if (!hasLoadedLibrarySnapshot) return;
+    const controller = new AbortController();
+    void maintainLibraryAssets(controller.signal, () => {
+      if (!controller.signal.aborted) onBanner(translate('gallery.app.trashCleanupFailed'));
+    });
+    return () => controller.abort();
+  }, [hasLoadedLibrarySnapshot, onBanner]);
 
   useGalleryLibrarySubscriptions({ onBanner, refresh, refreshEpochRef });
 
