@@ -6,9 +6,13 @@ import { createMaintenanceLogEntry } from '../../../../composition/persistence/l
 import { translate } from '../../../../platform/i18n';
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
+  exportZip: vi.fn(),
   subscribe: vi.fn(),
   download: vi.fn(),
   unsubscribe: vi.fn(),
+}));
+vi.mock('../../../../composition/persistence/diagnostics/event-history', () => ({
+  createEventHistory: () => ({ exportZip: mocks.exportZip }),
 }));
 vi.mock('../../../../composition/persistence/diagnostics/runtime-log', () => ({
   createRuntimeLog: () => ({ read: async () => [], subscribe: () => () => undefined }),
@@ -129,4 +133,24 @@ it('combines status, operation and period filters and surfaces export failure', 
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
   await choose(translate('settings.eventsLogs.period'), translate('settings.eventsLogs.week'));
   expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
+});
+
+it('exports full history independently of recent filters and prevents duplicate ZIP requests', async () => {
+  let finish!: (blob: Blob) => void;
+  mocks.exportZip.mockImplementation(
+    () =>
+      new Promise<Blob>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await open();
+  act(() => button(translate('settings.eventsLogs.exportZip')).click());
+  expect(button(translate('settings.eventsLogs.exporting')).disabled).toBe(true);
+  act(() => button(translate('settings.eventsLogs.exporting')).click());
+  expect(mocks.exportZip).toHaveBeenCalledOnce();
+  await act(async () => finish(new Blob(['zip'])));
+  expect(mocks.download).toHaveBeenCalledOnce();
+  mocks.exportZip.mockRejectedValueOnce(new Error('unavailable'));
+  await act(async () => button(translate('settings.eventsLogs.exportZip')).click());
+  expect(container.textContent).toContain(translate('settings.eventsLogs.exportFailed'));
 });

@@ -1,3 +1,4 @@
+import { createEventHistory, EVENT_HISTORY_DAYS } from './event-history';
 import {
   installDiagnosticLogObserver,
   type DiagnosticLogEvent,
@@ -9,6 +10,7 @@ import {
   appendRuntimeLog,
   parseRuntimeLog,
   parseRuntimeLogEntry,
+  runtimeLogJsonl,
   type RuntimeLogEntry,
 } from './model';
 
@@ -18,9 +20,15 @@ interface Dependencies {
   withPermit?: typeof tryRunWithPersistenceMutationPermit;
   withLock?: (work: () => Promise<void>) => Promise<void>;
   delay?: () => Promise<void>;
+  now?: () => number;
+  history?: Pick<ReturnType<typeof createEventHistory>, 'append'>;
 }
 /** Bounded, batched advisory capture. An admitted batch drains before privacy erasure. */
 export function createRuntimeLog(dependencies: Dependencies = {}) {
+  const now = dependencies.now ?? Date.now;
+  const recent = (rows: RuntimeLogEntry[]) =>
+    rows.filter((entry) => Date.parse(entry.time) > now() - EVENT_HISTORY_DAYS * 86_400_000);
+  const history = dependencies.history ?? createEventHistory();
   const area = dependencies.area ?? browserStorage.local;
   const withPermit = dependencies.withPermit ?? tryRunWithPersistenceMutationPermit;
   const withLock =
@@ -33,7 +41,6 @@ export function createRuntimeLog(dependencies: Dependencies = {}) {
     dependencies.delay ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 1000)));
   let batch: RuntimeLogEntry[] = [];
   let pending: Promise<void> | null = null;
-  let collecting = false;
   let dropped = 0;
   function append(event: DiagnosticLogEvent, context: string): void {
     const entry = parseRuntimeLogEntry({
@@ -45,16 +52,14 @@ export function createRuntimeLog(dependencies: Dependencies = {}) {
       context,
     });
     if (!entry) return;
-    if (pending) {
-      if (collecting && batch.length < 64) batch.push(entry);
-      else dropped = Math.min(1_000_000_000, dropped + 1);
-      return;
-    }
-    batch = [entry];
-    collecting = true;
+    if (batch.length < 64) batch.push(entry);
+    else dropped = Math.min(1_000_000_000, dropped + 1);
+    flush();
+  }
+  function flush(): void {
+    if (pending) return;
     pending = withPermit(async (permit) => {
       await delay();
-      collecting = false;
       const rows = batch;
       batch = [];
       const last = rows.at(-1);
@@ -62,7 +67,11 @@ export function createRuntimeLog(dependencies: Dependencies = {}) {
       dropped = 0;
       await withLock(async () => {
         const current = await area.get(RUNTIME_LOG_STORAGE_KEY);
-        const entries = appendRuntimeLog(parseRuntimeLog(current[RUNTIME_LOG_STORAGE_KEY]), rows);
+        const entries = appendRuntimeLog(
+          recent(parseRuntimeLog(current[RUNTIME_LOG_STORAGE_KEY])),
+          recent(rows)
+        );
+        await history.append(runtimeLogJsonl(rows), permit);
         await area.set(
           {
             [RUNTIME_LOG_STORAGE_KEY]: sanitizeStructuredDiagnosticExportData({
@@ -73,23 +82,29 @@ export function createRuntimeLog(dependencies: Dependencies = {}) {
           permit
         );
       });
+      return true;
     })
       .then(
-        () => undefined,
-        () => undefined
+        (admitted) => {
+          if (admitted !== true) batch = [];
+        },
+        () => {
+          batch = [];
+        }
       )
       .finally(() => {
-        batch = [];
         pending = null;
-        collecting = false;
+        if (batch.length) flush();
       });
   }
   return {
     append,
-    settled: () => pending ?? Promise.resolve(),
+    async settled() {
+      while (pending) await pending;
+    },
     async read() {
       const current = await area.get(RUNTIME_LOG_STORAGE_KEY);
-      return parseRuntimeLog(current[RUNTIME_LOG_STORAGE_KEY]);
+      return recent(parseRuntimeLog(current[RUNTIME_LOG_STORAGE_KEY]));
     },
     subscribe(listener: () => void): () => void {
       if (!browserStorage.canObserveChanges()) return () => undefined;

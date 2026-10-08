@@ -41,12 +41,13 @@ export async function runStorageStartupPhase<T>(
 ): Promise<T> {
   const start = performance.now();
   const report = (status: 'pending' | 'completed' | 'failed') => {
+    const durationMs = Math.min(86_400_000, Math.max(0, Math.round(performance.now() - start)));
     logger.debug(
-      'Slow storage startup phase',
+      `Slow storage startup phase: ${phase} ${status} ${durationMs}ms`,
       sanitizeDiagnosticData({
         phase,
         status,
-        durationMs: Math.min(86_400_000, Math.max(0, Math.round(performance.now() - start))),
+        durationMs,
       })
     );
   };

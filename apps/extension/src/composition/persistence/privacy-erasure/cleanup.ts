@@ -1,3 +1,4 @@
+import { createEventHistoryDatabase } from '../diagnostics/event-history-database';
 import { privacyErasureBrowserStorage } from '../infrastructure/browser-storage/privacy-erasure';
 import { runWithPersistentDataErasureBarrier } from '../infrastructure/mutation-barrier';
 import {
@@ -59,6 +60,7 @@ const defaultErasureDeps: LocalExtensionDataErasureDeps = {
       return eraseAssetStorage();
     },
   },
+  eventHistory: createEventHistoryDatabase(),
   videoPreviewCache: {
     erase: eraseVideoPreviewCacheForPrivacyErasure,
     verifyEmpty: verifyVideoPreviewCacheEmptyAfterPrivacyErasure,

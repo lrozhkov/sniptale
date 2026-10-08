@@ -1,6 +1,8 @@
 import { defineMessageSource } from '../source';
 
 export const eventsLogsMessages = defineMessageSource({
+  exportZip: { ru: 'Вся история ZIP', en: 'Full history ZIP' },
+  exporting: { ru: 'Сборка ZIP…', en: 'Creating ZIP…' },
   durationUnit: { ru: 'мс', en: 'ms' },
   dropped: { ru: 'Пропущено при перегрузке', en: 'Dropped during overload' },
   title: {
@@ -8,8 +10,8 @@ export const eventsLogsMessages = defineMessageSource({
     en: 'Events and logs',
   },
   retention: {
-    ru: 'До 512 записей и 256 КиБ для каждого журнала. Повторяющиеся блокировки объединяются. Время в выгрузке — UTC.',
-    en: 'Up to 512 entries and 256 KiB per log. Repeated blocked events are grouped. Export timestamps use UTC.',
+    ru: 'История: 14 дней, до 50 МиБ ZIP-архивов. Здесь — последние события; фильтры применяются к ним и выгрузке JSONL. Полная история доступна в ZIP. Время в выгрузке — UTC.',
+    en: 'History: 14 days, up to 50 MiB of ZIP archives. Recent events are shown here; filters apply to them and the JSONL export. Full history is available as ZIP. Export timestamps use UTC.',
   },
   all: {
     ru: 'Все',

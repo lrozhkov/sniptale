@@ -80,8 +80,9 @@ async function sanitizeStoreProvenanceUrls(
   options: MaintenanceOptions
 ): Promise<void> {
   const candidates = await collectStoreCandidates(db, storeName, options.signal);
-  for (const candidate of candidates) {
-    if (options.signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  for (const [index, candidate] of candidates.entries()) {
+    if (options.signal && index % 32 === 0)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
     if (options.signal?.aborted) return;
     const result = await Promise.resolve(sanitizeRecord(candidate.value)).catch(() =>
       unchangedResult(candidate.value)

@@ -1,8 +1,11 @@
+import { promoteReviewSourceLifecycles } from '../review-workspaces/new-reference-admission';
+import { parseVideoWorkspace } from '../review-workspaces/parser';
 import { promoteProjectSourceLifecycles } from '../projects/new-reference-admission';
 import { promoteScenarioSourceLifecycles } from '../scenario/library-publication';
 import {
   SCENARIO_PROJECTS_STORE,
   VIDEO_PROJECTS_STORE,
+  VIDEO_WORKSPACES_STORE,
   MEDIA_LIBRARY_STORE,
   PROJECT_ASSETS_STORE,
   SCENARIO_ASSETS_STORE,
@@ -20,6 +23,7 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
     const tx = db.transaction(
       [
         VIDEO_PROJECTS_STORE,
+        VIDEO_WORKSPACES_STORE,
         SCENARIO_PROJECTS_STORE,
         MEDIA_LIBRARY_STORE,
         PROJECT_ASSETS_STORE,
@@ -59,6 +63,19 @@ export async function repairTemporaryProjectLifecycles(now = Date.now()): Promis
       for (const raw of await stores.scenarioProjectStore.getAll()) {
         const entry = parseScenarioProjectEntry(raw);
         if (entry) await promoteScenarioSourceLifecycles(tx, entry, now);
+      }
+      for (const raw of await tx.objectStore(VIDEO_WORKSPACES_STORE).getAll()) {
+        const workspace = parseVideoWorkspace(raw);
+        if (workspace)
+          await promoteReviewSourceLifecycles(
+            workspace,
+            {
+              assets: stores.projectAssetStore,
+              media: stores.mediaLibraryStore,
+              recordings: stores.recordingStore,
+            },
+            { assets: new Map(), libraryAudioClaims: [] }
+          );
       }
       await tx.done;
       return repaired;

@@ -1,3 +1,4 @@
+import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { expect, it, vi } from 'vitest';
 import {
   createVideoProjectEntry,
@@ -177,5 +178,55 @@ it.each(['current', 'history'] as const)('retains scenario source used in %s', a
   await repairTemporaryProjectLifecycles(100);
   expect(persisted.get('media_library')!.get('origin')).toMatchObject({
     lifecycle: { storageClass: 'library', savedAt: 100 },
+  });
+});
+
+it('promotes legacy review auxiliary origins without promoting an unrelated draft', async () => {
+  const { persisted } = createProjectStores();
+  const advanced = createQuickEditAdvancedState();
+  advanced.audio.music.push({
+    id: 'music',
+    assetId: 'project-asset:audio',
+    timelineStart: 0,
+    sourceOffset: 0,
+    duration: 1,
+    volume: 1,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  });
+  persisted.set(
+    'video_workspaces',
+    new Map([
+      [
+        'root',
+        {
+          aggregateId: 'root',
+          formatVersion: 1,
+          sourceAssetId: 'root-bytes',
+          source: { duration: 2, width: 100, height: 100, size: 5, mimeType: 'video/webm' },
+          revision: 1,
+          cursor: 0,
+          history: [],
+          advanced,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ],
+    ])
+  );
+  for (const id of ['origin', 'unrelated'])
+    persisted
+      .get('media_library')!
+      .set(id, createMediaLibraryEntry({ id, lifecycle: createLibraryLifecycle('temporary', 1) }));
+  persisted
+    .get('project_assets')!
+    .set('audio', createProjectAssetEntry({ id: 'audio', originMediaId: 'origin' }));
+  await repairTemporaryProjectLifecycles(100);
+  expect(persisted.get('media_library')!.get('origin')).toMatchObject({
+    lifecycle: { storageClass: 'library' },
+  });
+  expect(persisted.get('media_library')!.get('unrelated')).toMatchObject({
+    lifecycle: { storageClass: 'temporary' },
   });
 });

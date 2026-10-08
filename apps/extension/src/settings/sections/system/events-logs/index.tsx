@@ -1,3 +1,4 @@
+import { createEventHistory } from '../../../../composition/persistence/diagnostics/event-history';
 import { createRuntimeLog } from '../../../../composition/persistence/diagnostics/runtime-log';
 import {
   RUNTIME_LOG_LEVELS,
@@ -28,22 +29,9 @@ export function EventsLogsSection() {
     outcome: 'all',
     period: 'all',
   });
-  const [exportFailed, setExportFailed] = useState(false);
   const entries = journalRows(maintenanceEntries, runtimeEntries);
   const filtered = filterJournalRows(entries, filters);
-  const exportLog = () => {
-    try {
-      downloadLog(
-        new Blob([filtered.map((entry) => entry.jsonl).join('')], {
-          type: 'application/x-ndjson;charset=utf-8',
-        }),
-        `sniptale-events-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`
-      );
-      setExportFailed(false);
-    } catch {
-      setExportFailed(true);
-    }
-  };
+  const { exportFailed, exporting, exportHistory, exportLog } = useJournalExport(filtered);
   return (
     <section
       aria-label={translate('settings.eventsLogs.title')}
@@ -76,6 +64,18 @@ export function EventsLogsSection() {
             : `${filtered.length} / ${entries.length}`}
         </span>
         <div className="flex gap-2">
+          <button
+            type="button"
+            className={buttonClass}
+            disabled={exporting}
+            onClick={() => {
+              void exportHistory();
+            }}
+          >
+            {translate(
+              exporting ? 'settings.eventsLogs.exporting' : 'settings.eventsLogs.exportZip'
+            )}
+          </button>
           <button type="button" className={buttonClass} onClick={refresh}>
             {translate('settings.eventsLogs.refresh')}
           </button>
@@ -91,6 +91,50 @@ export function EventsLogsSection() {
       </div>
     </section>
   );
+}
+
+function useJournalExport(filtered: readonly { jsonl: string }[]) {
+  const [exportFailed, setExportFailed] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [history] = useState(() => createEventHistory());
+  const exportingRef = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
+  const exportHistory = async () => {
+    if (exportingRef.current) return;
+    exportingRef.current = true;
+    setExporting(true);
+    setExportFailed(false);
+    try {
+      const blob = await history.exportZip();
+      if (mounted.current)
+        downloadLog(blob, `sniptale-events-${new Date().toISOString().replace(/[:.]/g, '-')}.zip`);
+    } catch {
+      if (mounted.current) setExportFailed(true);
+    } finally {
+      exportingRef.current = false;
+      if (mounted.current) setExporting(false);
+    }
+  };
+  const exportLog = () => {
+    try {
+      downloadLog(
+        new Blob([filtered.map((entry) => entry.jsonl).join('')], {
+          type: 'application/x-ndjson;charset=utf-8',
+        }),
+        `sniptale-events-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`
+      );
+      setExportFailed(false);
+    } catch {
+      setExportFailed(true);
+    }
+  };
+  return { exportFailed, exporting, exportHistory, exportLog };
 }
 
 function downloadLog(blob: Blob, filename: string): void {

@@ -122,3 +122,26 @@ it('deletes an expired orphan project-asset blob and never schedules a library a
   ).resolves.toEqual({ deletedCount: 0, deletedIds: [] });
   expect(persistenceMocks.runWithIndexedDbMutation).toHaveBeenCalledOnce();
 });
+
+it('does not schedule one timer per permanent material during draft discovery', async () => {
+  persistenceMocks.listMediaLibrary.mockResolvedValue(
+    Array.from({ length: 1000 }, (_, index) => ({
+      id: `saved-${index}`,
+      lifecycle: createLibraryLifecycle('library', 1),
+    }))
+  );
+  vi.useFakeTimers();
+  const timer = vi.spyOn(globalThis, 'setTimeout');
+  try {
+    const pending = cleanupDrafts({
+      policy: DEFAULT_LOCAL_STORAGE_POLICY,
+      signal: new AbortController().signal,
+    });
+    await vi.runAllTimersAsync();
+    expect(await pending).toEqual({ deletedCount: 0, deletedIds: [] });
+    expect(timer.mock.calls.length).toBeLessThanOrEqual(32);
+  } finally {
+    timer.mockRestore();
+    vi.useRealTimers();
+  }
+});

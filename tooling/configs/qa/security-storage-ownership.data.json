@@ -314,7 +314,7 @@
       "file": "apps/extension/src/composition/persistence/library-lifecycle/maintenance-log.ts",
       "owner": "library-maintenance-journal",
       "justification": "User-requested bounded local maintenance outcome log for Library inspection and explicit JSONL export.",
-      "reviewNote": "Fixed operations/reason codes/messages, UTC times and numeric metrics only; no media, filenames, identifiers, URLs or raw exceptions. At most 512 records/256 KiB with consecutive repeated-block coalescing. Cross-context lock and nonqueued erasure admission; read is write-free. Failure is advisory. No sync/backup; unconditional erasure removes exact key. Final persistence and export use shared sanitizer and closed reconstruction.",
+      "reviewNote": "Fixed operations/reason codes/messages, UTC times and numeric metrics only; no media, filenames, identifiers, URLs or raw exceptions. At most 512 records/256 KiB with consecutive repeated-block coalescing. Cross-context lock and nonqueued erasure admission; read is write-free. Failure is advisory. No sync/backup; unconditional erasure removes exact key. Final persistence and export use shared sanitizer and closed reconstruction. These are recent views with a 14-day access cutoff; the event-history owner retains and exports full compressed history independently.",
       "storageWrites": [
         {
           "sink": "area.set",
@@ -328,12 +328,44 @@
       "file": "apps/extension/src/composition/persistence/diagnostics/runtime-log.ts",
       "owner": "runtime-diagnostic-log",
       "justification": "User-requested local Events and logs destination for runtime diagnostic summaries.",
-      "reviewNote": "Sanitized summary/source/context/level/times only, no attached payloads or raw stacks. 512 rows/256 KiB, bounded64 queue and one-second batching, drop count, idle without timers. Permit covers admitted batch delay and write, exclusive lock rereads. Unconditional privacy erasure; no sync/backup. Explicit JSONL export resanitizes.",
+      "reviewNote": "Sanitized summary/source/context/level/times only, no attached payloads or raw stacks. 512 rows/256 KiB, bounded64 queue and one-second batching, drop count, idle without timers. Permit covers admitted batch delay and write, exclusive lock rereads. Unconditional privacy erasure; no sync/backup. Explicit JSONL export resanitizes. These are recent views with a 14-day access cutoff; the event-history owner retains and exports full compressed history independently.",
       "storageWrites": [
         {
           "sink": "area.set",
           "keys": [
             "RUNTIME_LOG_STORAGE_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/event-history-database.ts",
+      "owner": "event-history",
+      "justification": "User-requested independent advisory ZIP event history, isolated from product database admission.",
+      "reviewNote": "Only closed sanitized JSONL chunks and immutable bounded ZIP segments. 14-day access cutoff, 50 MiB compressed archives plus 1 MiB active segment. Nonqueued permit and history lock cover atomic active/archive publication. Required privacy participant clears and verifies all stores; no sync/backup/network. Read does not create the database.",
+      "storageWrites": [
+        {
+          "sink": "tx.objectStore('active').add",
+          "keys": [
+            "text"
+          ]
+        },
+        {
+          "sink": "tx.objectStore('state').put",
+          "keys": [
+            "'active'"
+          ]
+        },
+        {
+          "sink": "tx.objectStore('archives').put",
+          "keys": [
+            "archive.id"
+          ]
+        },
+        {
+          "sink": "tx.objectStore('catalog').put",
+          "keys": [
+            "archive.id"
           ]
         }
       ]
@@ -429,6 +461,12 @@
       "owner": "runtime-diagnostic-log",
       "justification": "Bounded user-requested diagnostic retention and JSONL export.",
       "reviewNote": "Only validated short summary fields; canonical sanitizer at storage and export sinks."
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/diagnostics/event-history-zip.ts",
+      "owner": "event-history",
+      "justification": "Final compressed history and full ZIP export boundary.",
+      "reviewNote": "Reconstructs the closed runtime/maintenance row schemas and reapplies shared structured sanitizer; bounded compressed input, actual inflation and sequential JSONL export."
     }
   ]
 }

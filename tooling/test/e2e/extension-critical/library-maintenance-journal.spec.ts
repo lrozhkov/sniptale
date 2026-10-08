@@ -1,3 +1,4 @@
+import { BlobReader, TextWriter, ZipReader } from '@zip.js/zip.js';
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -86,6 +87,29 @@ for (const variant of [
         node.scrollTop = 0;
       });
       await page.screenshot({ path: info.outputPath('journal.png'), fullPage: false });
+      const zipButton = dialog.getByRole('button', {
+        name: label('settings.eventsLogs.exportZip'),
+        exact: true,
+      });
+      await expect(zipButton).toBeInViewport();
+      const zipDownloadReady = page.waitForEvent('download');
+      await zipButton.click();
+      const zipDownload = await zipDownloadReady;
+      expect(zipDownload.suggestedFilename()).toMatch(/\.zip$/);
+      const zip = new ZipReader(
+        new BlobReader(new Blob([new Uint8Array(await readFile((await zipDownload.path())!))])),
+        { useWebWorkers: false }
+      );
+      try {
+        let exported = '';
+        for (const member of await zip.getEntries())
+          if (!member.directory) exported += await member.getData(new TextWriter());
+        expect(exported).toContain('CaptureDiagnostics');
+        expect(exported).toContain('physical-delete');
+      } finally {
+        await zip.close();
+      }
+
       await dialog.getByLabel(label('settings.eventsLogs.search'), { exact: true }).fill('invalid');
       await expect(dialog.locator('tbody tr')).toHaveCount(20);
       const downloadReady = page.waitForEvent('download');
@@ -148,6 +172,31 @@ for (const variant of [
         context: 'background',
         source: 'CaptureDiagnostics',
       });
+      if (variant.width === 1280) {
+        expect(await page.evaluate(() => window.__sniptaleEventHistoryHarness.populate())).toEqual({
+          readCreatedDatabase: false,
+          archives: 2,
+        });
+        const nativeDownloadReady = page.waitForEvent('download');
+        await zipButton.click();
+        const nativeDownload = await nativeDownloadReady;
+        const nativeZip = new ZipReader(
+          new BlobReader(
+            new Blob([new Uint8Array(await readFile((await nativeDownload.path())!))])
+          ),
+          { useWebWorkers: false }
+        );
+        try {
+          const members = await nativeZip.getEntries();
+          expect(members).toHaveLength(3);
+          for (const member of members)
+            if (!member.directory)
+              expect(await member.getData(new TextWriter())).toContain('Native history proof');
+        } finally {
+          await nativeZip.close();
+        }
+        expect(await page.evaluate(() => window.__sniptaleEventHistoryHarness.erase())).toBe(true);
+      }
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

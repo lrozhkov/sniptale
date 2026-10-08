@@ -92,8 +92,9 @@ export async function cleanupDrafts(args: {
   }
 
   const includeUnexpired = Boolean(args.includeUnexpired);
-  for (const entry of media) {
-    if (args.signal) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  for (const [index, entry] of media.entries()) {
+    if (args.signal && index % 32 === 0)
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
     if (args.signal?.aborted) break;
     const lifecycle = entry.lifecycle;
     if (!lifecycle || lifecycle.trashedAt !== undefined || lifecycle.storageClass !== 'temporary')

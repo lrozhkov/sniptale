@@ -6,7 +6,7 @@ afterEach(() => {
   installPersistenceLockManagerForTests(null);
 });
 const event = (index = 0) => ({
-  time: new Date(index).toISOString(),
+  time: new Date(Date.now() + index).toISOString(),
   source: 'Capture',
   level: 'debug' as const,
   message: `Step ${index}`,
@@ -130,7 +130,7 @@ it('does not write without coordination and validates events before starting a b
   expect(f.area.set).toHaveBeenCalledOnce();
   vi.unstubAllGlobals();
 });
-it('reports overflow during an in-flight storage write in the next admitted batch', async () => {
+it('queues events during a slow storage write for the next admitted batch', async () => {
   const f = fixture();
   let began!: () => void;
   let release!: () => void;
@@ -157,5 +157,6 @@ it('reports overflow during an in-flight storage write in the next admitted batc
   await log.settled();
   log.append(event(2), 'page');
   await log.settled();
-  expect((await log.read()).at(-1)?.dropped).toBe(1);
+  expect(await log.read()).toHaveLength(3);
+  expect((await log.read()).every((entry) => entry.dropped === 0)).toBe(true);
 });

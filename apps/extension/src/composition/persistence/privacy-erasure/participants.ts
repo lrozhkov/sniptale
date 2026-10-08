@@ -36,6 +36,7 @@ export interface LocalExtensionDataErasureDeps {
   assetStorage: AssetStorageErasureAdapter;
   extensionPageLocalStorage?: ExtensionPageLocalStorageErasureAdapter;
   videoPreviewCache: VideoPreviewCacheErasureAdapter;
+  eventHistory: { erase(): Promise<void>; verifyEmpty(): Promise<boolean> };
 }
 
 interface PersistentErasureParticipantExecution {
@@ -110,6 +111,23 @@ function buildErasureParticipants(
     createIndexedDbParticipant({ deps, storeNames }),
     createEditorBootstrapParticipant(deps),
     createVideoPreviewCacheParticipant(deps.videoPreviewCache),
+    {
+      id: 'indexed-db:event-history',
+      severity: 'required',
+      async erase() {
+        await deps.eventHistory.erase();
+        return { id: 'indexed-db:event-history', severity: 'required', status: 'erased' };
+      },
+      async verifyEmpty() {
+        const empty = await deps.eventHistory.verifyEmpty();
+        return {
+          id: 'indexed-db:event-history',
+          severity: 'required',
+          status: empty ? 'verified-empty' : 'failed',
+          remainingCount: empty ? 0 : 1,
+        };
+      },
+    },
     createAssetStorageErasureParticipant(deps.assetStorage),
     ...(deps.extensionPageLocalStorage
       ? [createExtensionPageLocalStorageParticipant(deps.extensionPageLocalStorage, options)]

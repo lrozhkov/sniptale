@@ -23,3 +23,7 @@ The offscreen `capabilityToken` field is a compatibility name for a payload bind
 `packages/foundation/src/history/snapshot-history.ts` is generic, but current production consumers store strings. Define cloning and equality before storing mutable objects.
 
 Update this document in the change that adds, removes, or alters an exception.
+
+## Event history
+
+The advisory Events and logs history uses the dedicated `sniptale-event-history` IndexedDB database. It cannot participate in product publication transactions and must remain available without admitting or scanning `sniptale-db`. This isolates diagnostic writes from the failing or slow storage they describe. The existing browser-storage journals are bounded recent UI views, not archive authority. The history owner seeds them once on the first successful archive admission; failure loses advisory history and never authorizes or blocks product work. Local-data erasure has a required, verified participant for all four history stores.

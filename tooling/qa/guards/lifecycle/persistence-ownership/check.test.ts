@@ -167,3 +167,21 @@ it('supports repo-wide mode without skipping when no explicit files are provided
   expect(result.skipped).toBe(false);
   expect(result.files.length).toBeGreaterThan(0);
 }, 120_000);
+
+it('admits only the explicit event history database adapter', () => {
+  const root = createTempRoot();
+  const owner = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/diagnostics/event-history-database.ts',
+    "import { openDB } from 'idb';\n"
+  );
+  const sibling = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/diagnostics/event-history.ts',
+    "import { openDB } from 'idb';\n"
+  );
+  expect(collectPersistenceOwnershipViolations([owner])).toEqual([]);
+  expect(collectPersistenceOwnershipViolations([sibling])).toEqual([
+    expect.objectContaining({ rule: 'indexed-db-entrypoint-owner-bypass' }),
+  ]);
+});

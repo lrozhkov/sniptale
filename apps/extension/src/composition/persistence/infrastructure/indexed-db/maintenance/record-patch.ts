@@ -12,7 +12,7 @@ export function patchRecord(
   return {
     applyToCurrent: (currentValue) =>
       isRecord(currentValue) ? applyPatch(currentValue, patch) : currentValue,
-    changed: JSON.stringify(previousValue) !== JSON.stringify(candidateValue),
+    changed: Object.keys(patch).some((key) => previousValue[key] !== candidateValue[key]),
     value: candidateValue,
   };
 }

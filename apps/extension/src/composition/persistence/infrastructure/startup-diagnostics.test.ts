@@ -40,20 +40,26 @@ it.each(['completed', 'failed'] as const)(
     const pending = runStorageStartupPhase('database-url-maintenance', () => work);
     const observed = pending.catch((reason: unknown) => reason);
     await vi.advanceTimersByTimeAsync(3000);
-    expect(debug).toHaveBeenCalledWith('Slow storage startup phase', {
-      phase: 'database-url-maintenance',
-      status: 'pending',
-      durationMs: 3000,
-    });
+    expect(debug).toHaveBeenCalledWith(
+      'Slow storage startup phase: database-url-maintenance pending 3000ms',
+      {
+        phase: 'database-url-maintenance',
+        status: 'pending',
+        durationMs: 3000,
+      }
+    );
     await vi.advanceTimersByTimeAsync(2000);
     if (status === 'completed') resolve('private result');
     else reject(error);
     expect(await observed).toBe(status === 'completed' ? 'private result' : error);
-    expect(debug).toHaveBeenLastCalledWith('Slow storage startup phase', {
-      phase: 'database-url-maintenance',
-      status,
-      durationMs: 5000,
-    });
+    expect(debug).toHaveBeenLastCalledWith(
+      `Slow storage startup phase: database-url-maintenance ${status} 5000ms`,
+      {
+        phase: 'database-url-maintenance',
+        status,
+        durationMs: 5000,
+      }
+    );
     expect(debug).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(debug.mock.calls)).not.toContain('private');
     expect(vi.getTimerCount()).toBe(0);

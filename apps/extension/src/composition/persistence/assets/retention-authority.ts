@@ -1,3 +1,4 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
 import {
   parseAssetOwner,
@@ -30,6 +31,8 @@ import { parseImageWorkspaceEntry } from '../image-workspaces/parser';
 import { parseScenarioStepEditorDocumentEntry } from '../scenario/editor-documents/index.guards';
 import { parseStoredWebSnapshotRecord } from '../web-snapshots/guards';
 
+const logger = createLogger({ namespace: 'AssetRetention' });
+
 export async function collectDurableAssetSnapshot(
   db?: Awaited<ReturnType<typeof import('../infrastructure/indexed-db/core').initDB>>,
   signal?: AbortSignal
@@ -52,6 +55,13 @@ export async function collectDurableAssetSnapshot(
   const refsResult = parseRows(await db.getAll(ASSET_REFS_STORE), parseAssetRef);
   const ownersResult = parseRows(await db.getAll(ASSET_OWNERS_STORE), parseAssetOwner);
   const operationsResult = parseAssetOperations(await db.getAll(ASSET_OPERATIONS_STORE));
+  for (const [store, valid] of [
+    [ASSET_REFS_STORE, refsResult.valid],
+    [ASSET_OWNERS_STORE, ownersResult.valid],
+    [ASSET_OPERATIONS_STORE, operationsResult.valid],
+  ] as const) {
+    if (!valid) logger.debug(`Retention validation failed: ${store}`);
+  }
   let authorityValid = refsResult.valid && ownersResult.valid && operationsResult.valid;
   const expectedOwners: AssetOwner[] = [];
   const embeddedBinaryMetadata: string[] = [];
@@ -74,6 +84,7 @@ export async function collectDurableAssetSnapshot(
       },
       signal
     );
+    if (!valid) logger.debug(`Retention validation failed: ${store}`);
     authorityValid = authorityValid && valid;
   };
   await owned(STORE_NAME, parseRecordingEntry, (entry) => [
