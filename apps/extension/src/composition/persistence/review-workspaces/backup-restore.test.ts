@@ -413,3 +413,63 @@ it('transfers an inactive image choice even without history', async () => {
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
   expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
 });
+
+it('backs up remembered watermark bytes and remaps the exact slot across a restored aggregate', async () => {
+  const { createQuickEditWatermark } =
+    await import('../../../features/video/review/advanced/watermark');
+  const watermark = {
+    ...createQuickEditWatermark('Saved brand'),
+    mode: 'none' as const,
+    image: { assetId: 'project-asset:logo', width: 80, height: 40, size: 0.2, opacity: 0.8 },
+  };
+  const before = { ...createQuickEditAdvancedContent(), watermark };
+  const stored: VideoWorkspace = {
+    ...workspace,
+    advanced: { ...workspace.advanced, watermark, recoveryV1: JSON.stringify({ watermark }) },
+    cursor: 0,
+    history: [
+      {
+        id: 'logo',
+        at: 1,
+        target: 'advancedContent',
+        before,
+        after: { ...before, watermark: { ...watermark, mode: 'text' } },
+      },
+    ],
+  };
+  const exported = await readVideoReviewForBackup({
+    db: snapshotDatabase(stored, undefined),
+    aggregateId: stored.aggregateId,
+    sourceAssetId: stored.sourceAssetId,
+  });
+  const portable = encodePortableReviewAssetRefs(exported!);
+  expect(JSON.stringify(portable)).not.toContain('assetId');
+  const parsed = parsePortableVideoReview(JSON.parse(JSON.stringify(portable)), stored.aggregateId);
+  const restored = prepareVideoReviewRestore({
+    review: parsed,
+    sourceAggregateId: stored.aggregateId,
+    targetAggregateId: 'recording:copy',
+    sourceAssetId: 'new-source',
+    assetIdMap: new Map([['logo', 'new-logo']]),
+  });
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(['project-asset:new-logo'])
+  );
+  expect(restored.workspace.advanced.watermark).toEqual({
+    ...watermark,
+    image: { ...watermark.image, assetId: 'project-asset:new-logo' },
+  });
+  expect(restored.workspace.history[0]?.after).toHaveProperty(
+    'watermark.image.assetId',
+    'project-asset:new-logo'
+  );
+  expect(JSON.parse(restored.workspace.advanced.recoveryV1!)).toHaveProperty(
+    'watermark.image.assetId',
+    'project-asset:new-logo'
+  );
+  expect(restored.workspace.cursor).toBe(0);
+  const workspaces = { put: vi.fn() },
+    drafts = { put: vi.fn(), delete: vi.fn() };
+  await putVideoReviewRestore({ review: restored, workspaces, drafts });
+  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+});

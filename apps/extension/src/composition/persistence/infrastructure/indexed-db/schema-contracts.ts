@@ -73,7 +73,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 4,
+    schemaVersion: 5,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -267,6 +267,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         )
       )
         throw new Error('Video speech workspace stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 4, to: 5 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 5,
+    toDatabaseVersion: 6,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Video watermark workspace stores are unavailable.');
       return undefined;
     },
   },

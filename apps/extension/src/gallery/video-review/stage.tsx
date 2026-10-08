@@ -1,3 +1,9 @@
+import {
+  useReviewStageGeometry,
+  type ReviewStageScene,
+  type ReviewStageCommentGeometry,
+} from './stage-geometry';
+import { ReviewWatermarkOverlay } from './watermark-overlay';
 import { ReviewKeyOverlay } from './key-animation-overlay';
 import { ReviewBackgroundBlurPreview } from './background-blur-preview';
 import {
@@ -8,7 +14,6 @@ import {
 import { ReviewClickOverlay } from './click-animation-overlay';
 import type { ReviewClickCue } from '../../features/video/review/click-animation';
 import { ReviewMotionBlurPreview } from './motion-blur-preview';
-import { evaluateQuickEditBordersAtTime } from '../../features/video/review/advanced/border';
 import { ReviewBorderOverlay } from './border-overlay';
 import { ReviewWebcamOverlay, type ReviewWebcamStageBinding } from './webcam-overlay';
 import { resolveQuickEditShadow } from '../../features/video/review/advanced/shadow';
@@ -20,8 +25,6 @@ import {
   type ReviewCutPreviewBinding,
   type ReviewCutPreviewRaster,
 } from './cut-transition-preview';
-import { evaluateQuickEditSpotlightsAtTime } from '../../features/video/review/advanced/focus';
-import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import {
   ReviewStageFocusControl,
   ReviewStageFocusTargets,
@@ -29,10 +32,9 @@ import {
   type ReviewStageFocusPicker,
 } from './stage-focus';
 import { ReviewSpotlightOverlay } from './spotlight-overlay';
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { translate } from '../../platform/i18n';
-import { fitVideoRect, projectVideoRegion } from '../../features/video/review/geometry';
-import { serializePaintToCss } from '@sniptale/foundation/paint';
+import { projectVideoRegion } from '../../features/video/review/geometry';
 import type {
   CanvasComment,
   ReviewAnnotation,
@@ -40,12 +42,11 @@ import type {
   ReviewSource,
 } from '../../features/video/review/types';
 import {
-  computeQuickEditSceneLayout,
+  type computeQuickEditSceneLayout,
   computeQuickEditSpatialWindow,
   computeQuickEditSceneSize,
   computeQuickEditWindowTransform,
   computeQuickEditSceneCamera,
-  computeQuickEditVideoTransform,
 } from '../../features/video/review/advanced/scene';
 import type {
   QuickEditBackgroundSettings,
@@ -53,16 +54,6 @@ import type {
 } from '../../features/video/review/advanced/types';
 import { ReviewCommentOverlay } from './comment-overlay';
 import { useReviewDrawingPlane } from './stage-drawing';
-
-type ReviewStageScene = {
-  background: QuickEditBackgroundSettings;
-  canvas?: { width: number; height: number } | undefined;
-  windowHeader?:
-    | import('../../features/video/review/advanced/types').QuickEditWindowHeader
-    | undefined;
-  camera: QuickEditCameraTransform;
-  focus?: { regions: readonly QuickEditZoomRegion[]; time: number };
-};
 
 type ReviewStageCommentBinding = {
   items: readonly CanvasComment[];
@@ -75,32 +66,11 @@ type ReviewStageCommentBinding = {
   onSelect(id: string): void;
   onMove(id: string, position: { x: number; y: number }): void;
   /** Reports the stage geometry for attachment switching; null hides overlays. */
-  onGeometry?(geometry: {
-    output: { width: number; height: number };
-    projection?:
-      | import('../../features/video/review/advanced/spatial-geometry').QuickEditHomography
-      | undefined;
-    videoTransform: { x: number; y: number; width: number; height: number } | null;
-  }): void;
+  onGeometry?(geometry: ReviewStageCommentGeometry): void;
 };
 
-/** Stage pixels: the host box measured once and on every resize. */
-function useStageMeasure(host: RefObject<HTMLDivElement | null>) {
-  const [size, setSize] = useState({ width: 1, height: 1 });
-  useEffect(() => {
-    const node = host.current;
-    if (!node) return;
-    const measure = () =>
-      setSize({ width: Math.max(1, node.clientWidth), height: Math.max(1, node.clientHeight) });
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [host]);
-  return size;
-}
-
 type ReviewStageProps = {
+  watermark?: Omit<Parameters<typeof ReviewWatermarkOverlay>[0], 'output'> | undefined;
   keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[] | undefined;
   webcam?: ReviewWebcamStageBinding | undefined;
@@ -135,6 +105,7 @@ export function ReviewStage(props: ReviewStageProps) {
   });
   const {
     size,
+    watermarkOutput,
     sceneLayout,
     zoomLayout,
     backgroundPaint,
@@ -262,6 +233,9 @@ export function ReviewStage(props: ReviewStageProps) {
           <ReviewWebcamOverlay binding={props.webcam} main={props.video} output={size} />
         ) : null}
         <ReviewKeyOverlay cues={props.keyCues} time={props.scene?.focus?.time ?? 0} output={size} />
+        {props.watermark && (
+          <ReviewWatermarkOverlay {...props.watermark} output={watermarkOutput} />
+        )}
         <ReviewCutBlackout binding={props.cutPreview} />
       </div>
     </div>
@@ -589,150 +563,6 @@ function ReviewRegionOverlay(props: {
         : null}
     </div>
   );
-}
-
-function backgroundPaintOf(background: {
-  type: 'solid' | 'gradient' | 'image';
-  color?: string;
-  gradient?: import('@sniptale/foundation/paint').Gradient;
-}): string {
-  if (background.type === 'solid' && background.color) return background.color;
-  if (background.type === 'gradient' && background.gradient)
-    return serializePaintToCss({ kind: 'gradient', gradient: background.gradient });
-  return '#000000';
-}
-
-/** Align the stationary raster bounds; fractional video boxes expose the black stage edge. */
-function snapPreviewRect(rect: ReviewRegion): ReviewRegion {
-  return {
-    x: Math.round(rect.x),
-    y: Math.round(rect.y),
-    width: Math.max(1, Math.round(rect.width)),
-    height: Math.max(1, Math.round(rect.height)),
-  };
-}
-
-function previewSceneLayout(input: Parameters<typeof computeQuickEditSceneLayout>[0]) {
-  const layout = computeQuickEditSceneLayout(input);
-  const videoRect = snapPreviewRect(layout.videoRect);
-  const windowRect = {
-    ...videoRect,
-    y: Math.round(layout.windowRect.y),
-    height: videoRect.height + videoRect.y - Math.round(layout.windowRect.y),
-  };
-  // Camera motion stays subpixel-smooth and overlays use the same displayed frame bounds.
-  return {
-    ...layout,
-    videoRect,
-    windowRect,
-    videoTransform: computeQuickEditVideoTransform({ videoRect, windowRect, camera: input.camera }),
-  };
-}
-
-/** Measures and projects the preview through the same scene model as export. */
-function useReviewStageGeometry(
-  props: Parameters<typeof ReviewStage>[0],
-  host: RefObject<HTMLDivElement | null>
-) {
-  const viewport = useStageMeasure(host);
-  const sceneSize = props.scene
-    ? computeQuickEditSceneSize({ ...props.scene, source: props.source })
-    : props.source;
-  const fitted = fitVideoRect(viewport, sceneSize);
-  const size = snapPreviewRect(fitted);
-  const sceneLayout = props.scene
-    ? previewSceneLayout({
-        output: fitted,
-        canvas: props.scene?.canvas,
-        windowHeader: props.scene?.windowHeader,
-        source: props.source,
-        background: props.scene.background,
-        camera: props.scene.camera,
-      })
-    : null;
-  const zoomLayout = props.zoom
-    ? previewSceneLayout({
-        output: fitted,
-        canvas: props.scene?.canvas,
-        windowHeader: props.scene?.windowHeader,
-        source: props.source,
-        background: props.scene?.background ?? { enabled: false },
-        camera:
-          props.zoom.region.spotlight || props.zoom.region.border
-            ? (props.scene?.camera ?? { scale: 1, centerX: 0.5, centerY: 0.5 })
-            : props.zoom.region.transform,
-      })
-    : null;
-  const backgroundPaint = props.scene?.background.enabled
-    ? backgroundPaintOf(props.scene.background)
-    : null;
-  // Drawing maps into the represented pixels, so the post-camera rect is authoritative.
-  const content = sceneLayout ? sceneLayout.videoTransform : fitVideoRect(size, props.source);
-  const reportGeometry = props.comments?.onGeometry;
-  useEffect(() => {
-    if (reportGeometry && sceneLayout)
-      reportGeometry({
-        output: size,
-        projection: sceneLayout.spatial
-          ? quickEditPlaneProjection(
-              computeQuickEditSpatialWindow(
-                sceneLayout,
-                props.scene?.background ?? { enabled: false }
-              ),
-              computeQuickEditSpatialWindow(
-                sceneLayout,
-                props.scene?.background ?? { enabled: false }
-              ),
-              sceneLayout.spatial
-            )
-          : undefined,
-        videoTransform: sceneLayout.videoTransform,
-      });
-  }, [size, sceneLayout, reportGeometry, props.scene?.background]);
-  const spotlight =
-    sceneLayout && props.scene?.focus
-      ? evaluateQuickEditSpotlightsAtTime({
-          ...props.scene.focus,
-          output: size,
-          video: computeQuickEditWindowTransform(sceneLayout),
-          scale:
-            (size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
-            props.scene.camera.scale,
-        })
-      : [];
-  const borders =
-    sceneLayout && props.scene?.focus
-      ? evaluateQuickEditBordersAtTime({
-          ...props.scene.focus,
-          output: size,
-          video: computeQuickEditWindowTransform(sceneLayout),
-          scale:
-            (size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
-            props.scene.camera.scale,
-        })
-      : [];
-  const overlayClip =
-    sceneLayout && props.scene
-      ? {
-          rect: computeQuickEditSceneCamera(sceneLayout, props.scene.background).windowClip,
-          radius: props.scene.background.enabled
-            ? ((props.scene.background.layout.cornerRadius * size.width) /
-                Math.max(1, props.scene.canvas?.width ?? props.source.width)) *
-              (computeQuickEditSceneCamera(sceneLayout, props.scene.background).windowClip.width /
-                sceneLayout.windowRect.width)
-            : 0,
-        }
-      : undefined;
-  return {
-    size,
-    sceneLayout,
-    zoomLayout,
-    backgroundPaint,
-    content,
-    spotlight,
-    borders,
-    overlayClip,
-  };
 }
 
 /** Header loading has its own recoverable notice above the rendered scene. */

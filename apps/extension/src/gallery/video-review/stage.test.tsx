@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
 import { act } from 'react';
@@ -14,6 +15,24 @@ import type {
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
+}));
+
+vi.mock('./watermark-overlay', () => ({
+  ReviewWatermarkOverlay: (props: {
+    output: { width: number; height: number };
+    editable: boolean;
+  }) => (
+    <div
+      data-ui="watermark-proof"
+      data-width={props.output.width}
+      data-height={props.output.height}
+      data-editable={String(props.editable)}
+    />
+  ),
+}));
+vi.mock('./cut-transition-preview', async (original) => ({
+  ...(await original<typeof import('./cut-transition-preview')>()),
+  ReviewCutBlackout: () => <div data-ui="blackout-proof" />,
 }));
 
 let root: Root;
@@ -50,13 +69,14 @@ const renderStage = (
   props: Partial<
     Pick<
       Parameters<typeof ReviewStage>[0],
-      'scene' | 'zoom' | 'backgroundImageUrl' | 'drawing' | 'region' | 'comments'
+      'scene' | 'zoom' | 'backgroundImageUrl' | 'drawing' | 'region' | 'comments' | 'watermark'
     >
   >
 ) => {
   act(() => {
     root.render(
       <ReviewStage
+        watermark={props.watermark}
         url="blob:review"
         source={source}
         video={{ current: null }}
@@ -582,4 +602,25 @@ it('uses the scene canvas scale for projected comments at rounded window corners
   )!;
   // 24px scene radius * (800 output / 640 canvas) * 1.5 outer zoom = 45px, not75px from source320.
   expect(overlay.style.clipPath).toContain('round 45px');
+});
+
+it('places watermark after keys and before blackout at full scene resolution independent of fitted preview', () => {
+  renderStage({
+    scene: { background: disabled, camera: identity, canvas: { width: 1920, height: 1080 } },
+    watermark: {
+      settings: { ...createQuickEditWatermark('Saved'), mode: 'text' },
+      editable: false,
+      onPreview: vi.fn(),
+      onChange: vi.fn(),
+      onError: vi.fn(),
+    },
+  });
+  const watermark = host.querySelector<HTMLElement>('[data-ui="watermark-proof"]')!;
+  expect(watermark.dataset['width']).toBe('1920');
+  expect(watermark.dataset['height']).toBe('1080');
+  expect(watermark.dataset['editable']).toBe('false');
+  expect(watermark.previousElementSibling?.getAttribute('data-ui')).toBe(
+    'gallery.videoReview.keyAnimation'
+  );
+  expect(watermark.nextElementSibling?.getAttribute('data-ui')).toBe('blackout-proof');
 });

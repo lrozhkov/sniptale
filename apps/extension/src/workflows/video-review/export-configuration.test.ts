@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 import { expect, it } from 'vitest';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -90,3 +91,49 @@ it('explains an oversized decorated output and accepts a smaller export preset',
     })
   ).toMatchObject({ kind: 'ready', video: 'render' });
 });
+
+it.each(['text', 'image'] as const)(
+  'requires rendering for an isolated %s watermark and restores copy when suppressed',
+  (mode) => {
+    const fixtureArgs = fixture();
+    const args = {
+      advanced: fixtureArgs.advanced,
+      index: fixtureArgs.index,
+      document: fixtureArgs.document,
+    };
+    // No output override, cut, zoom, background, camera or other effect can force this transition.
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+    });
+    args.advanced.watermark = {
+      ...createQuickEditWatermark('Saved'),
+      mode,
+      ...(mode === 'image'
+        ? {
+            image: { assetId: 'project-asset:logo', width: 100, height: 50, size: 0.2, opacity: 1 },
+          }
+        : {}),
+    };
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'render',
+      audio: 'copy',
+      reasons: ['watermark'],
+    });
+    args.advanced.watermark.mode = 'none';
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+    });
+    args.advanced.watermark.mode = mode;
+    args.advanced.ui.mode = 'basic';
+    expect(configuredReviewExportPlan(args)).toMatchObject({
+      kind: 'ready',
+      video: 'copy',
+      audio: 'copy',
+    });
+  }
+);

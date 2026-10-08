@@ -288,3 +288,23 @@ it('debounces the latest search, commits Enter immediately and cancels pending w
   expect(document.querySelector('dialog')).toBeNull();
   expect(io.list).toHaveBeenCalledOnce();
 });
+
+it('uses the opt-in policy for computer and Library and exposes acquisition errors', async () => {
+  const policy = vi.fn().mockRejectedValue(new Error('animated'));
+  const onError = vi.fn(),
+    onSelect = vi.fn();
+  await act(async () =>
+    root.render(
+      <BackgroundImagePicker onSelect={onSelect} prepareImage={policy} onError={onError} />
+    )
+  );
+  const input = host.querySelector('input[type=file]')!;
+  Object.defineProperty(input, 'files', { value: [new File(['raw'], 'logo.png')] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(policy).toHaveBeenCalledOnce();
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(onError).toHaveBeenCalledWith(expect.objectContaining({ message: 'animated' }));
+  await click('Custom');
+  expect(io.library).toHaveBeenCalledWith('image', expect.any(AbortSignal), policy);
+});

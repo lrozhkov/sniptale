@@ -249,3 +249,36 @@ it('removes generated audio from all snapshots while preserving original audio a
   expect(collectReviewAssetReferences(result)).toEqual(new Set([retained]));
   expect(workspace.advanced.audio.voiceover[0]!.transcript!.replacements).toHaveLength(1);
 });
+
+it.each(['none', 'text', 'image'] as const)(
+  'purges a remembered logo in %s without erasing authored text',
+  async (mode) => {
+    const { createQuickEditWatermark } =
+      await import('../../../features/video/review/advanced/watermark');
+    const watermark = {
+      ...createQuickEditWatermark('Keep this text'),
+      mode,
+      image: { assetId: removed, width: 80, height: 40, size: 0.2, opacity: 1 },
+    };
+    const workspace = makeWorkspace();
+    workspace.advanced.watermark = watermark;
+    workspace.advanced.recoveryV1 = JSON.stringify({ watermark });
+    for (const operation of workspace.history) {
+      if (operation.target !== 'advancedContent') continue;
+      operation.before.watermark = watermark;
+      operation.after.watermark = watermark;
+    }
+    const result = stripReviewAssetReference(workspace, removed, 2);
+    expect(result.advanced.watermark).not.toHaveProperty('image');
+    expect(result.advanced.watermark?.text).toEqual(watermark.text);
+    expect(result.advanced.watermark?.mode).toBe(mode === 'image' ? 'none' : mode);
+    expect(JSON.parse(result.advanced.recoveryV1!).watermark).not.toHaveProperty('image');
+    expect(collectReviewAssetReferences(result)).toEqual(new Set([retained]));
+    for (const operation of result.history) {
+      if (operation.target !== 'advancedContent') continue;
+      expect(operation.before.watermark).not.toHaveProperty('image');
+      expect(operation.after.watermark).not.toHaveProperty('image');
+    }
+    expect(workspace.advanced.watermark.image).toEqual(watermark.image);
+  }
+);

@@ -10,10 +10,12 @@ import { projectReviewFocus } from '../../features/video/review/focus-edits';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 
+let watermark: Parameters<typeof ReviewStage>[0]['watermark'];
 let scene: Parameters<typeof ReviewStage>[0]['scene'];
 vi.mock('./stage', () => ({
   ReviewStage: (props: Parameters<typeof ReviewStage>[0]) => {
     scene = props.scene;
+    watermark = props.watermark;
     return null;
   },
 }));
@@ -22,6 +24,13 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
   'preserves camera and selected %s composition across framing and link gaps',
   (kind) => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const overlay = {
+      settings: undefined,
+      editable: false,
+      onPreview: vi.fn(),
+      onChange: vi.fn(),
+      onError: vi.fn(),
+    };
     const host = document.createElement('div');
     const root = createRoot(host);
     const camera = {
@@ -68,6 +77,7 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
       act(() =>
         root.render(
           <ReviewStageBinding
+            watermark={overlay}
             url="blob:video"
             source={{ width: 320, height: 180, duration: 10, size: 1, mimeType: 'video/webm' }}
             video={{ current: null }}
@@ -88,13 +98,7 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
             canvasComments={{
               selectedId: null,
               onSelect: vi.fn(),
-              onAdd: vi.fn(async () => {}),
               onPatch: vi.fn(async () => {}),
-              onSwitchAttachment: vi.fn(async () => true),
-              onShowOnVideo: vi.fn(async () => {}),
-              onDelete: vi.fn(async () => {}),
-              onDraft: vi.fn(),
-              flushTexts: vi.fn(async () => {}),
               setGeometry: vi.fn(),
             }}
             overlaysVisible
@@ -108,6 +112,7 @@ it.each(['spotlight', 'border', 'zoom'] as const)(
           />
         )
       );
+      expect(watermark).toBe(overlay);
       expect(scene?.camera.scale).toBe(kind === 'zoom' ? 3 : 2);
       expect(scene?.focus?.regions.map((region) => region.id)).toEqual([
         ...cameraRegions.map((region) => region.id),

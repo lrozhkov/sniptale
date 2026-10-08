@@ -23,6 +23,7 @@ interface QuickEditEffectiveFeatures {
   /** Advanced effects are suppressed while the editor is in basic mode. */
   actionsApplied: boolean;
   webcamApplied: boolean;
+  watermarkApplied: boolean;
   zoomApplied: boolean;
   backgroundApplied: boolean;
   originalAudioApplied: boolean;
@@ -45,6 +46,10 @@ export function resolveQuickEditEffectiveFeatures(
     audioTrackVisible: advanced && state.ui.tracks.audio,
     webcamTrackVisible: advanced && !!state.webcam && state.ui.tracks.webcam !== false,
     webcamApplied: advanced && !!state.webcam?.enabled && state.ui.tracks.webcam !== false,
+    watermarkApplied:
+      advanced &&
+      (state.watermark?.mode === 'text' ||
+        (state.watermark?.mode === 'image' && !!state.watermark.image)),
     actionsApplied: advanced && state.ui.tracks.actions && state.actionsEnabled !== false,
     overlaysVisible: advanced && state.ui.overlaysVisible,
     zoomApplied: advanced && state.ui.tracks.zoom && state.zoom.enabled,
@@ -65,6 +70,7 @@ interface QuickEditEffectiveState extends QuickEditEffectiveFeatures {
   canvas: QuickEditCanvasSize | undefined;
   windowHeader: QuickEditAdvancedState['windowHeader'];
   webcam: QuickEditAdvancedState['webcam'];
+  watermark: QuickEditAdvancedState['watermark'];
   originalAudio: QuickEditOriginalAudio;
   voiceover: readonly QuickEditAudioClip[];
   music: readonly QuickEditAudioClip[];
@@ -86,6 +92,7 @@ export function resolveQuickEditEffectiveState(
     canvas: advanced ? state.canvas : undefined,
     windowHeader: advanced ? state.windowHeader : undefined,
     webcam: features.webcamApplied ? state.webcam : undefined,
+    watermark: features.watermarkApplied ? state.watermark : undefined,
     originalAudio: state.audio.original,
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
@@ -110,6 +117,7 @@ export type QuickEditExportReason =
   | 'canvas'
   | 'window-header'
   | 'webcam'
+  | 'watermark'
   | 'canvas-size'
   | 'precise-edits'
   | 'cut-transition'
@@ -183,6 +191,7 @@ export function resolveQuickEditExportPlan(args: {
   if (effective.canvas) visual.push('canvas');
   if (effective.windowHeader) visual.push('window-header');
   if (effective.webcam) visual.push('webcam');
+  if (features.watermarkApplied) visual.push('watermark');
   if (features.zoomApplied && effective.zoomRegions.length > 0) visual.push('zoom');
   if (features.backgroundApplied) visual.push('background');
   if (
@@ -218,6 +227,8 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
     !!state.canvas ||
     !!state.windowHeader ||
     !!state.webcam?.enabled ||
+    state.watermark?.mode === 'text' ||
+    (state.watermark?.mode === 'image' && !!state.watermark.image) ||
     state.zoom.regions.length > 0 ||
     state.background.enabled ||
     state.audio.voiceover.length > 0 ||

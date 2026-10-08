@@ -108,6 +108,7 @@ export function useReviewAdvanced(session: Session) {
     clickAnimations: _baselineClicks,
     canvas: _baselineCanvas,
     windowHeader: _baselineHeader,
+    watermark: _baselineWatermark,
     webcam: _baselineWebcam,
     ...workspaceState
   } = persisted;

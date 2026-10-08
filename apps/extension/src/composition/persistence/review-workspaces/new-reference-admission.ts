@@ -7,7 +7,11 @@ import {
 import { parseProjectAssetEntry } from '../projects/read-guards';
 import type { ProjectAssetEntry } from '../projects/contracts';
 import { parseMediaLibraryEntry } from '../media-library/read-guards';
-import { collectReviewAssetReferences, reviewWorkspaceHasAudioClip } from './asset-refs';
+import {
+  collectReviewAssetReferences,
+  reviewWorkspaceHasAudioClip,
+  reviewWorkspaceHasWatermarkImage,
+} from './asset-refs';
 import { readLibraryAudioSource, sameLibraryAudioRef } from '../projects/library-audio-source';
 import type { AssetRef } from '../assets/contracts';
 import type { VideoWorkspace } from './contracts';
@@ -25,17 +29,23 @@ interface LibraryAudioClaim {
 interface ReviewReadySources {
   assets: ReadonlyMap<string, ProjectAssetEntry | null>;
   libraryAudioClaims: readonly LibraryAudioClaim[];
+  watermarkAssets?: ReadonlyMap<string, ProjectAssetEntry | null>;
 }
 
 /** Read under the lifecycle lock, before opening the consuming IDB transaction. */
 export async function readReviewReadySources(aggregateId: string): Promise<ReviewReadySources> {
   const sources = new Map<string, ProjectAssetEntry | null>();
   const libraryAudioClaims: LibraryAudioClaim[] = [];
+  const watermarkAssets = new Map<string, ProjectAssetEntry | null>();
   for (const journal of await listReadyJournals()) {
     if (journal.domain !== 'project-assets' || journal.operationId) continue;
     const payload = parseProjectAssetPayload(journal.payload);
     const ref = journal.assetRefs.length === 1 ? parseAssetRef(journal.assetRefs[0]) : null;
-    if (!payload || (payload.requiredReview && payload.requiredReview.aggregateId !== aggregateId))
+    if (
+      !payload ||
+      (payload.requiredReview && payload.requiredReview.aggregateId !== aggregateId) ||
+      (payload.requiredReviewResource && payload.requiredReviewResource.aggregateId !== aggregateId)
+    )
       continue;
     if (payload.librarySourceId && payload.requiredReview) {
       libraryAudioClaims.push({
@@ -54,13 +64,14 @@ export async function readReviewReadySources(aggregateId: string): Promise<Revie
       payload.entry.mimeType !== ref.mimeType
     )
       continue;
-    const previous = sources.get(payload.entry.id);
-    sources.set(
+    const target = payload.requiredReviewResource ? watermarkAssets : sources;
+    const previous = target.get(payload.entry.id);
+    target.set(
       payload.entry.id,
       previous !== undefined && previous?.assetId !== ref.assetId ? null : payload.entry
     );
   }
-  return { assets: sources, libraryAudioClaims };
+  return { assets: sources, libraryAudioClaims, watermarkAssets };
 }
 
 async function libraryAudioClaimAvailable(
@@ -117,17 +128,25 @@ export async function areNewReviewSourcesAvailable(
   for (const reference of collectReviewAssetReferences(next)) {
     if (existing.has(reference)) continue;
     const id = reference.slice('project-asset:'.length);
+    const watermark = reviewWorkspaceHasWatermarkImage(next, reference)
+      ? prepared.watermarkAssets?.get(id)
+      : undefined;
     const raw = await stores.assets.get(id);
     const asset =
       raw === undefined
-        ? (claimed.get(id) ?? prepared.assets.get(id))
+        ? (claimed.get(id) ?? watermark ?? prepared.assets.get(id))
         : parseProjectAssetEntry(raw);
     if (!asset || asset.id !== id) return false;
     const claim = claimed.get(id);
     if (claim && claim.assetId !== asset.assetId) return false;
     if (asset.originMediaId) {
       const media = parseMediaLibraryEntry(await stores.media.get(asset.originMediaId));
-      if (!media || media.id !== asset.originMediaId) return false;
+      if (
+        !media ||
+        media.id !== asset.originMediaId ||
+        (watermark && media.lifecycle?.trashedAt !== undefined)
+      )
+        return false;
     }
   }
   return true;

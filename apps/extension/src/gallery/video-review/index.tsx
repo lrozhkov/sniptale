@@ -1,14 +1,14 @@
+import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { useReviewMusicImport } from './music-import';
 import { MusicLibraryDrawer } from './music-library';
 import { changeRecordedClicks, changeRecordedKeys } from './action-presentation';
 import { ReviewActionHistory } from './action-history';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { ReviewPanelResizeHandle, useReviewPanelLayout } from './panel-layout';
-import { ReviewPreviewFrame } from './preview-frame';
-import { reviewStagePickRegions } from './stage-focus';
+import { ReviewPreviewBinding } from './preview-binding';
 import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
-import { ReviewFeedback, ReviewLoadStatus, reviewErrorMessage } from './feedback';
+import { ReviewLoadStatus, reviewErrorMessage } from './feedback';
 import { ReviewDialog } from './review-dialog';
 import { ReviewHistoryControls } from './timeline-chrome';
 import { ReviewSelectedProperties, reviewSelectionLabel } from './selected-properties';
@@ -17,7 +17,6 @@ import { translate, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import { ReviewButton } from './controls';
 import { useReviewWaveforms } from './audio-waveform';
-import { ReviewStageBinding } from './stage-binding';
 import { ReviewTimelineBinding } from './timeline-binding';
 import { ReviewInspector } from './inspector';
 import {
@@ -73,6 +72,7 @@ type InspectorState = Pick<
   | 'advanced'
   | 'zoom'
   | 'webcam'
+  | 'watermark'
   | 'timeline'
   | 'setKeyAnimations'
   | 'setClickAnimations'
@@ -326,158 +326,6 @@ function ReviewHistoryControlBinding({
   );
 }
 
-/** Preview layout, feedback and stage events share one visible-area binding. */
-function ReviewPreviewBinding({
-  resource,
-  state,
-}: {
-  resource: LoadedReview;
-  state: ReturnType<typeof useReviewEditorState>;
-}) {
-  const { busy, features, composer, snapshot, canvasComments, audio } = state;
-  return (
-    <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
-      {state.webcam.failed || state.webcam.pending ? (
-        <div
-          role={state.webcam.failed ? 'alert' : 'status'}
-          className="flex items-center gap-2 text-xs"
-        >
-          <span>
-            {translate(
-              state.webcam.failed
-                ? 'gallery.videoReview.webcamFailed'
-                : 'gallery.videoReview.webcamLoading'
-            )}
-          </span>
-          {state.webcam.failed ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.retry')}
-              onClick={state.webcam.retry}
-            />
-          ) : null}
-        </div>
-      ) : null}
-      <ReviewFeedback
-        message={state.message}
-        originalFeedback={audio.originalFeedback}
-        onDismiss={() => {
-          state.setMessage(null);
-          audio.dismissOriginalFeedback();
-        }}
-      />
-      <ReviewPreviewFrame
-        time={state.timeline.sceneOutputTime}
-        duration={state.timeline.resultDuration}
-        playing={state.playing}
-        disabled={busy || state.editing.exporter.phase !== 'idle'}
-        onPlay={() => state.beforeAction(state.play)}
-        onSeek={(value) =>
-          state.beforeAction(() => {
-            const sourceTime = state.timeline.timeMap.timelineToSource(value);
-            if (sourceTime !== null) {
-              state.setActiveSelection({ kind: 'none' });
-              state.seek(sourceTime, false);
-            }
-          })
-        }
-      >
-        {(fullscreen) => (
-          <ReviewStageBinding
-            keyCues={state.keyCues}
-            clickCues={state.clickCues}
-            webcam={
-              features.webcam && !state.webcam.pending
-                ? {
-                    settings: features.webcam,
-                    editor: state.webcam,
-                    onResourceReady: state.exporter.retryAssetAvailability,
-                    disabled:
-                      state.playing ||
-                      busy ||
-                      state.editing.exporter.phase !== 'idle' ||
-                      !!composer.annotation,
-                  }
-                : undefined
-            }
-            cutPreview={{
-              file: resource.file,
-              duration: state.source.duration,
-              edits: snapshot.document.edits,
-              time: state.timeline.sceneOutputTime,
-            }}
-            backgroundPending={state.backgroundImport.pending}
-            url={resource.url}
-            source={state.source}
-            canvas={features.canvas}
-            windowHeader={features.windowHeader}
-            video={state.video}
-            drawing={!!composer.annotation && !state.playing && !busy}
-            region={state.displayRegion}
-            zoomRegions={features.zoomRegions}
-            background={features.background}
-            outputTime={state.timeline.sceneOutputTime}
-            zoomOverlay={reviewFocusOverlay(state)}
-            focusTimeMap={state.timeline.timeMap.getSegments()}
-            focusPicker={
-              fullscreen &&
-              !state.playing &&
-              !busy &&
-              state.editing.exporter.phase === 'idle' &&
-              !composer.annotation &&
-              features.zoomApplied
-                ? {
-                    regions: reviewStagePickRegions(
-                      state.advanced.zoom.regions,
-                      state.timeline.timeMap.getSegments(),
-                      state.timeline.sceneOutputTime
-                    ),
-                    onSelect: (id) => {
-                      const region = state.advanced.zoom.regions.find((item) => item.id === id);
-                      if (!region) return;
-                      state.zoom.setSelection(id);
-                      const sourceTime = state.timeline.timeMap.timelineToSource(
-                        (region.start + region.end) / 2
-                      );
-                      if (sourceTime !== null) state.seek(sourceTime, false);
-                    },
-                  }
-                : undefined
-            }
-            comments={snapshot.document.canvasComments}
-            annotations={snapshot.document.annotations}
-            canvasComments={canvasComments}
-            overlaysVisible={features.overlaysVisible}
-            time={state.time}
-            busy={busy}
-            onRegion={(region) => {
-              if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
-            }}
-            onReady={() => {
-              const anchor = composer.annotation?.anchor;
-              if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
-            }}
-            onTime={(value) => {
-              const next = state.onTime(value);
-              state.setSelection((current) =>
-                current.kind === 'point' ? { kind: 'point', time: next } : current
-              );
-            }}
-            onPlaying={(playing) => {
-              if (playing)
-                state.setActiveSelection((current) =>
-                  current.kind === 'none' ? current : { kind: 'none' }
-                );
-              state.setPlaying(playing);
-            }}
-            onEnded={() => state.beforeAction(state.onEnded)}
-            onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
-          />
-        )}
-      </ReviewPreviewFrame>
-    </main>
-  );
-}
-
 function ReviewEditor({
   resource,
   onBack,
@@ -491,21 +339,7 @@ function ReviewEditor({
   const [fullHeight, setFullHeight] = useState(false);
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
   const panels = useReviewPanelLayout(panelsEnabled);
-  const [exportRequest, requestExport] = useState(0);
-  const navigation = useReviewInspectorNavigation({
-    beforeAction: state.beforeAction,
-    contextKey: reviewInspectorContext(state),
-    contextSelection: state.activeSelection,
-    selectionLabel: reviewSelectionLabel({
-      selection: state.activeSelection,
-      markers: state.projected.markers,
-      advanced: state.advanced,
-      editing: state.editing,
-    }),
-    settingsAvailable: state.advanced.ui.mode === 'advanced',
-    exportAvailable: true,
-    exportRequest,
-  });
+  const { navigation, requestExport } = useReviewEditorNavigation(state);
   const { onImportAudioFile, voiceover } = useReviewAudioWiring(state);
   const music = useReviewMusicImport(state);
   const { audio, canvasComments, editing, snapshot, composer, advanced, features, zoom, busy } =
@@ -533,7 +367,11 @@ function ReviewEditor({
           }}
           className={`grid h-full min-h-0 min-w-[1254px] ${voiceover.recording ? 'pb-40' : ''}`}
         >
-          <ReviewPreviewBinding resource={resource} state={state} />
+          <ReviewPreviewBinding
+            resource={resource}
+            state={state}
+            sceneActive={navigation.shown === 'scene'}
+          />
           <ReviewInspectorBinding
             navigation={navigation}
             resizeHandle={
@@ -669,22 +507,6 @@ function reviewInspectorContext(state: InspectorState): string {
   return `settings:${selection.kind}:${id}`;
 }
 
-/** The selected focus shares one edit transaction between the inspector and the stage. */
-function reviewFocusOverlay(state: ReturnType<typeof useReviewEditorState>) {
-  const { zoom, features, advanced, busy, playing, editing } = state;
-  const region = features.zoomTrackVisible ? zoom.selected(advanced.zoom) : null;
-  if (!region || busy || playing || editing.exporter.phase !== 'idle') return undefined;
-  return {
-    region: zoom.previewRegion(region),
-    onPreview: (patch: Parameters<typeof zoom.preview>[1]) => zoom.preview(region.id, patch),
-    onChange: (patch: Parameters<typeof zoom.change>[1]) => zoom.change(region.id, patch),
-    onInteract: () => {
-      const time = state.timeline.timeMap.timelineToSource((region.start + region.end) / 2);
-      if (time !== null) state.seek(time, false);
-    },
-  };
-}
-
 /** Creating a focus from history enables its workspace lane and shows the authored target frame. */
 function focusRecordedAction(
   state: InspectorState,
@@ -719,6 +541,24 @@ function ReviewScenePropertiesBinding({
       canvas={state.advanced.canvas}
       source={source}
       onCanvas={state.setCanvas}
+      watermark={{
+        settings: state.advanced.watermark,
+        output: computeQuickEditSceneSize({
+          source,
+          background: state.features.background,
+          canvas: state.features.canvas,
+          windowHeader: state.features.windowHeader,
+        }),
+        onChange: state.watermark.change,
+        onPreview: state.watermark.preview,
+        onImage: state.watermark.image,
+        onReset: state.watermark.reset,
+        onError: state.watermark.setError,
+        pending: state.watermark.pending,
+        error: state.watermark.error,
+        onRetry: state.watermark.retry,
+        imagePreviewUrl: state.watermark.imagePreviewUrl,
+      }}
       windowHeader={state.advanced.windowHeader}
       onWindowHeader={state.setWindowHeader}
       audio={state.advanced.audio}
@@ -792,4 +632,24 @@ function ReviewSelectionBinding({
       canvasComments={canvasComments}
     />
   );
+}
+
+/** Inspector navigation owns selection context and explicit export requests. */
+function useReviewEditorNavigation(state: ReturnType<typeof useReviewEditorState>) {
+  const [exportRequest, requestExport] = useState(0);
+  const navigation = useReviewInspectorNavigation({
+    beforeAction: state.beforeAction,
+    contextKey: reviewInspectorContext(state),
+    contextSelection: state.activeSelection,
+    selectionLabel: reviewSelectionLabel({
+      selection: state.activeSelection,
+      markers: state.projected.markers,
+      advanced: state.advanced,
+      editing: state.editing,
+    }),
+    settingsAvailable: state.advanced.ui.mode === 'advanced',
+    exportAvailable: true,
+    exportRequest,
+  });
+  return { navigation, requestExport };
 }

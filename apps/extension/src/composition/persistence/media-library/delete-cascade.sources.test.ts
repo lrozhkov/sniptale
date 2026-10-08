@@ -286,9 +286,13 @@ it('retains the complete graph when the selected row contains a different Librar
   expect(rows).toEqual(before);
 });
 
-it.each(['private', 'published', 'external', 'root-self', 'missing', 'invalid'] as const)(
-  'reclaims review auxiliaries according to identity ownership: %s',
-  async (mode) => {
+it.each(
+  (['private', 'published', 'external', 'root-self', 'missing', 'invalid'] as const).flatMap(
+    (mode) => (['music', 'watermark'] as const).map((resource) => ({ mode, resource }))
+  )
+)(
+  'reclaims $resource review auxiliaries according to identity ownership: $mode',
+  async ({ mode, resource }) => {
     const { createQuickEditAdvancedState } =
       await import('../../../features/video/review/advanced/defaults');
     installSource(
@@ -309,6 +313,22 @@ it.each(['private', 'published', 'external', 'root-self', 'missing', 'invalid'] 
       fadeIn: 0,
       fadeOut: 0,
     });
+    if (resource === 'watermark') {
+      const { createQuickEditWatermark } =
+        await import('../../../features/video/review/advanced/watermark');
+      advanced.audio.music = [];
+      advanced.watermark = {
+        ...createQuickEditWatermark('Remembered'),
+        mode: 'none',
+        image: {
+          assetId: mode === 'root-self' ? mediaId : 'project-asset:private-music',
+          width: 80,
+          height: 40,
+          size: 0.2,
+          opacity: 1,
+        },
+      };
+    }
     rows.set(
       'video_workspaces',
       new Map([
@@ -433,4 +453,79 @@ it('reconsiders private auxiliaries after their consuming workspace is released'
   await deleteMediaAssetWithProjectCascade(mediaId, []);
   expect(rows.get('project_assets')?.has('a')).toBe(false);
   expect(rows.get('project_assets')?.has('b')).toBe(false);
+});
+
+it('confirmed image-origin purge strips active and remembered logos from the retained review graph', async () => {
+  const { createQuickEditAdvancedState, createQuickEditAdvancedContent } =
+    await import('../../../features/video/review/advanced/defaults');
+  const { createQuickEditWatermark } =
+    await import('../../../features/video/review/advanced/watermark');
+  const { parseVideoWorkspace } = await import('../review-workspaces/parser');
+  const { collectReviewAssetReferences } = await import('../review-workspaces/asset-refs');
+  installSource({ kind: 'screenshot' });
+  rows.get('video_projects')!.clear();
+  const watermark = {
+    ...createQuickEditWatermark('Keep brand text'),
+    mode: 'text' as const,
+    image: { assetId: 'project-asset:private-logo', width: 80, height: 40, size: 0.2, opacity: 1 },
+  };
+  const before = { ...createQuickEditAdvancedContent(), watermark };
+  rows.get('project_assets')!.set('private-logo', {
+    id: 'private-logo',
+    assetId: 'logo-body',
+    mimeType: 'image/png',
+    size: 5,
+    createdAt: 1,
+    originMediaId: mediaId,
+  });
+  rows.get('asset_refs')!.set('logo-body', { assetId: 'logo-body' });
+  rows.get('asset_owners')!.set(JSON.stringify(['project-asset', 'private-logo', 'body']), {
+    ownerKind: 'project-asset',
+    ownerId: 'private-logo',
+    role: 'body',
+    assetId: 'logo-body',
+  });
+  rows.set(
+    'video_workspaces',
+    new Map([
+      [
+        'recording:other',
+        {
+          aggregateId: 'recording:other',
+          formatVersion: 1,
+          sourceAssetId: 'primary-physical',
+          source: { duration: 2, width: 640, height: 360, size: 4, mimeType: 'video/webm' },
+          revision: 1,
+          cursor: 0,
+          createdAt: 1,
+          updatedAt: 1,
+          advanced: {
+            ...createQuickEditAdvancedState(),
+            watermark,
+            recoveryV1: JSON.stringify({ watermark: { ...watermark, mode: 'none' } }),
+          },
+          history: [
+            {
+              id: 'logo',
+              at: 1,
+              target: 'advancedContent',
+              before,
+              after: { ...before, watermark: { ...watermark, mode: 'image' } },
+            },
+          ],
+        },
+      ],
+    ])
+  );
+  await deleteMediaAssetWithProjectCascade(mediaId, [
+    { id: 'recording:other', kind: 'review', name: 'clip.webm', primary: false },
+  ]);
+  const review = parseVideoWorkspace(rows.get('video_workspaces')!.get('recording:other'));
+  expect(review).not.toBeNull();
+  expect(collectReviewAssetReferences(review!)).toEqual(new Set());
+  expect(review!.advanced.watermark?.text).toEqual(watermark.text);
+  expect(review!.advanced.watermark?.mode).toBe('text');
+  expect(review!.advanced.watermark).not.toHaveProperty('image');
+  expect(rows.get('project_assets')!.has('private-logo')).toBe(false);
+  expect(rows.get('asset_refs')!.has('logo-body')).toBe(false);
 });

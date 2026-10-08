@@ -1,3 +1,4 @@
+import { parseQuickEditWatermark } from './watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
 import { parseReviewKeyAnimations } from './key-animation';
 import { parseQuickEditPerspective, parseQuickEditDepth } from './spatial';
@@ -426,17 +427,21 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 4 &&
       raw['schemaVersion'] !== 3 &&
       raw['schemaVersion'] !== 2) ||
     (raw['webcam'] !== undefined &&
       raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 4 &&
       raw['schemaVersion'] !== 3) ||
     'ui' in raw
   )
     return null;
   const zoom = parseZoomState(
     raw['zoom'],
-    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || raw['schemaVersion'] === 3
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 4 ||
+      raw['schemaVersion'] === 3
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
@@ -449,7 +454,12 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
-  if (canvas === null || windowHeader === null || webcam === null) return null;
+  if (raw['watermark'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+    return null;
+  const watermark =
+    raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
+  if (canvas === null || windowHeader === null || webcam === null || watermark === null)
+    return null;
   if (!zoom || !background || !audio) return null;
   return {
     schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
@@ -462,6 +472,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),
+    ...(watermark ? { watermark } : {}),
   };
 }
 
@@ -477,7 +488,12 @@ export function loadQuickEditAdvancedState(
   if (raw === undefined) return createQuickEditAdvancedState();
   if (!isRecord(raw)) return null;
   const version = raw['schemaVersion'];
-  if (version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || version === 3 || version === 2)
+  if (
+    version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    version === 4 ||
+    version === 3 ||
+    version === 2
+  )
     return parseAdvancedFields(raw);
   if (version === QUICK_EDIT_ADVANCED_SCHEMA_V1 && segments) {
     const parsed = parseAdvancedFields(raw);
@@ -493,13 +509,16 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['webcam'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 4 &&
     raw['schemaVersion'] !== 3
   )
     return null;
   const ui = parseUiState(raw['ui']);
   const zoom = parseZoomState(
     raw['zoom'],
-    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || raw['schemaVersion'] === 3
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 4 ||
+      raw['schemaVersion'] === 3
   );
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(raw['audio']);
@@ -512,7 +531,12 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const canvas = raw['canvas'] === undefined ? undefined : parseQuickEditCanvas(raw['canvas']);
   const windowHeader = parseStoredWindowHeader(raw['windowHeader']);
   const webcam = raw['webcam'] === undefined ? undefined : parseQuickEditWebcam(raw['webcam']);
-  if (canvas === null || windowHeader === null || webcam === null) return null;
+  if (raw['watermark'] !== undefined && raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION)
+    return null;
+  const watermark =
+    raw['watermark'] === undefined ? undefined : parseQuickEditWatermark(raw['watermark']);
+  if (canvas === null || windowHeader === null || webcam === null || watermark === null)
+    return null;
   const recovery = raw['recoveryV1'];
   if (recovery !== undefined && typeof recovery !== 'string') return null;
   if (!ui || !zoom || !background || !audio) return null;
@@ -528,6 +552,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ...(canvas ? { canvas } : {}),
     ...(windowHeader ? { windowHeader } : {}),
     ...(webcam ? { webcam } : {}),
+    ...(watermark ? { watermark } : {}),
     audio,
   };
 }

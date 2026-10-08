@@ -1,3 +1,9 @@
+import { createQuickEditBorder } from './border';
+import { reviewSpeechTextSignature } from '../speech-transcript';
+import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
+import { reviewAdvancedContentBaseline } from '../document';
+import { createQuickEditWebcam } from './webcam';
+import { createQuickEditWatermark } from './watermark';
 import { expect, it } from 'vitest';
 import { buildReviewTimeMap } from '../timeline';
 import { migrateQuickEditAdvancedV1 } from './migration';
@@ -67,7 +73,7 @@ const v1State = (): QuickEditAdvancedState => {
 
 it('converts v1 placements from source time to result time', () => {
   const migrated = migrateQuickEditAdvancedV1(v1State(), segments);
-  expect(migrated.schemaVersion).toBe(4);
+  expect(migrated.schemaVersion).toBe(5);
   expect(migrated.zoom.regions[0]).toMatchObject({ start: 4, end: 6, dormant: false });
   expect(migrated.audio.voiceover[0]).toMatchObject({ timelineStart: 4, dormant: false });
 });
@@ -84,4 +90,64 @@ it('retains the pre-conversion v1 payload for recovery', () => {
     schemaVersion: 1,
     zoom: legacy.zoom,
   });
+});
+
+it('admits released v4 without dropping webcam, focus or speech content', () => {
+  const state = createQuickEditAdvancedState();
+  state.webcam = createQuickEditWebcam(
+    'project-asset:camera',
+    { width: 640, height: 480 },
+    { width: 1920, height: 1080 }
+  );
+  state.zoom = v1State().zoom;
+  state.zoom.regions[0]!.border = createQuickEditBorder();
+  const profile = { modelId: 'model', voiceId: 'voice', responseFormat: 'wav' as const };
+  state.audio.voiceover = [
+    {
+      ...v1State().audio.voiceover[0]!,
+      transcript: {
+        version: 1,
+        phrases: [],
+        replacements: [
+          {
+            id: 'replacement',
+            start: 0,
+            end: 1,
+            assetId: 'project-asset:speech',
+            duration: 1,
+            phraseId: 'phrase',
+            revision: 0,
+            text: 'Saved',
+            profile,
+            textSignature: reviewSpeechTextSignature('Saved', profile),
+          },
+        ],
+      },
+    },
+  ];
+  const legacy = { ...state, schemaVersion: 4 };
+  const loaded = loadQuickEditAdvancedState(legacy);
+  expect(loaded).toEqual({ ...state, schemaVersion: 5 });
+  expect(loaded?.watermark).toBeUndefined();
+  const content = reviewAdvancedContentBaseline(state);
+  expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion: 4 })).toEqual(content);
+  expect(loadQuickEditAdvancedState(loaded)).toEqual(loaded);
+});
+
+it('does not admit watermark payloads under legacy or future version declarations', () => {
+  const state = createQuickEditAdvancedState();
+  const watermark = createQuickEditWatermark('Made with Sniptale');
+  for (const schemaVersion of [1, 2, 3, 4, 6]) {
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion, watermark }, segments)).toBeNull();
+    expect(
+      loadQuickEditAdvancedContentState({
+        ...reviewAdvancedContentBaseline(state),
+        schemaVersion,
+        watermark,
+      })
+    ).toBeNull();
+  }
+  for (const schemaVersion of [2, 3, 4]) {
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion })?.schemaVersion).toBe(5);
+  }
 });

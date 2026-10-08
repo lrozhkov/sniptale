@@ -13,7 +13,17 @@ import type { useReviewWebcamEditor } from './webcam-editor';
 
 export type ReviewWebcamStageBinding = {
   settings: QuickEditWebcam;
-  editor: ReturnType<typeof useReviewWebcamEditor>;
+  editor: Pick<
+    ReturnType<typeof useReviewWebcamEditor>,
+    | 'crop'
+    | 'place'
+    | 'placement'
+    | 'resourceAttempt'
+    | 'retry'
+    | 'selectVisible'
+    | 'selection'
+    | 'time'
+  >;
   disabled: boolean;
   onResourceReady?(): void;
 };

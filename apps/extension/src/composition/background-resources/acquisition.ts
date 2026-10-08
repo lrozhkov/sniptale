@@ -5,6 +5,9 @@ import { getAggregatePresentation } from '../persistence/aggregate-presentations
 import { prepareBackgroundImage } from '../../workflows/background-images/intake';
 import { BUNDLED_BACKGROUNDS } from '../persistence/background-presets/bundled';
 
+/** Optional acquisition policy receives original bytes before normalization. */
+export type BackgroundImagePreparation = (file: File, signal?: AbortSignal) => Promise<File>;
+
 export interface AcquiredBackground {
   file: File;
   originMediaId?: string;
@@ -12,8 +15,10 @@ export interface AcquiredBackground {
 /** Read a current Library presentation without publishing another Library identity. */
 export async function readLibraryBackground(
   mediaId: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  prepareImage: BackgroundImagePreparation = prepareBackgroundImage
 ): Promise<AcquiredBackground> {
+  signal?.throwIfAborted();
   const entry = await getMediaLibraryEntry(mediaId);
   if (
     !entry ||
@@ -38,10 +43,18 @@ export async function readLibraryBackground(
     (latest.workspaceRevision ?? 0) !== revision
   )
     throw new Error('Background image changed');
-  const file = await prepareBackgroundImage(
-    new File([blob], entry.filename, { type: blob.type }),
-    signal
-  );
+  const file = await prepareImage(new File([blob], entry.filename, { type: blob.type }), signal);
+  signal?.throwIfAborted();
+  if (prepareImage !== prepareBackgroundImage) {
+    const preparedEntry = await getMediaLibraryEntry(mediaId);
+    signal?.throwIfAborted();
+    if (
+      !preparedEntry ||
+      preparedEntry.lifecycle?.trashedAt !== undefined ||
+      (preparedEntry.workspaceRevision ?? 0) !== revision
+    )
+      throw new Error('Background image changed');
+  }
   return { file, originMediaId: entry.id };
 }
 

@@ -17,13 +17,14 @@ import { parseReviewOperation } from '../../features/video/review/validation';
 import { createVideoReviewSession } from '../../workflows/video-review/session';
 import { useReviewAdvanced } from './use-advanced';
 import { createQuickEditWebcam } from '../../features/video/review/advanced/webcam';
+import { createQuickEditWatermark } from '../../features/video/review/advanced/watermark';
 
 let root: Root;
 let host: HTMLDivElement;
 let advanced: ReturnType<typeof useReviewAdvanced>;
 
-function setup() {
-  let workspaceAdvanced = createQuickEditAdvancedState();
+function setup(initial = createQuickEditAdvancedState()) {
+  let workspaceAdvanced = initial;
   let revision = 1;
   let history: ReviewOperation[] = [];
   const build = (): VideoWorkspaceSnapshot => ({
@@ -306,6 +307,31 @@ it('rejects malformed staged content without losing the pending edit and allows 
     height: 1080,
   });
   expect(advanced.saveFailed).toBe(false);
+});
+
+it('does not resurrect a removed baseline watermark when another scene setting is edited', async () => {
+  const initial = createQuickEditAdvancedState();
+  initial.watermark = { ...createQuickEditWatermark('Saved mark'), mode: 'text' };
+  const { session } = setup(initial);
+  const before = session.getSnapshot().document.advancedContent;
+  const { watermark: _removed, ...after } = before;
+  await act(async () => {
+    await session.commitDurable({
+      id: 'remove-watermark',
+      at: 2,
+      target: 'advancedContent',
+      before,
+      after,
+    });
+  });
+  expect(advanced.advanced.watermark).toBeUndefined();
+  act(() => advanced.setCanvas({ width: 640, height: 360 }));
+  await act(async () => advanced.flush());
+  expect(session.getSnapshot().document.advancedContent.watermark).toBeUndefined();
+  expect(session.getSnapshot().document.advancedContent.canvas).toEqual({
+    width: 640,
+    height: 360,
+  });
 });
 
 it('keeps webcam edits in content history and restores them on reopen', async () => {

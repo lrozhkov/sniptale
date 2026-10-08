@@ -11,6 +11,7 @@ import {
   readBundledBackground,
   readLibraryBackground,
   type AcquiredBackground,
+  type BackgroundImagePreparation,
 } from './acquisition';
 import { BackgroundLibraryDrawer, BackgroundLibraryThumbnail } from './library';
 
@@ -23,10 +24,18 @@ export const backgroundActionClassName = [
 /** Acquisition lifecycle is disposable; the receiving editor owns placement and history. */
 export function BackgroundImagePicker(props: {
   onSelect(image: AcquiredBackground, signal: AbortSignal): Promise<void> | void;
+  /** Replaces default normalization, admitting original computer and Library bytes. */
+  prepareImage?: BackgroundImagePreparation;
+  onError?(error: unknown): void;
   showPresets?: boolean;
   pending?: boolean;
 }) {
   const catalog = useBackgroundCatalog();
+  const prepareImage = props.prepareImage ?? prepareBackgroundImage;
+  const acquireLibrary = (id: string, signal: AbortSignal) =>
+    props.prepareImage
+      ? readLibraryBackground(id, signal, props.prepareImage)
+      : readLibraryBackground(id, signal);
   const [anchor, setAnchor] = useState<HTMLDivElement | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const running = useRef<AbortController | null>(null);
@@ -55,8 +64,11 @@ export function BackgroundImagePicker(props: {
         setSelected(id);
         setLibrary(false);
       }
-    } catch {
-      if (!controller.signal.aborted) setFailed(true);
+    } catch (error) {
+      if (!controller.signal.aborted) {
+        setFailed(true);
+        props.onError?.(error);
+      }
     } finally {
       if (running.current === controller) running.current = null;
       if (!controller.signal.aborted) setBusy(false);
@@ -87,7 +99,7 @@ export function BackgroundImagePicker(props: {
               void run(
                 (signal) =>
                   item.mediaId
-                    ? readLibraryBackground(item.mediaId, signal)
+                    ? acquireLibrary(item.mediaId, signal)
                     : readBundledBackground(id, signal),
                 id
               );
@@ -102,8 +114,7 @@ export function BackgroundImagePicker(props: {
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
           event.currentTarget.value = '';
-          if (file)
-            void run(async (signal) => ({ file: await prepareBackgroundImage(file, signal) }));
+          if (file) void run(async (signal) => ({ file: await prepareImage(file, signal) }));
         }}
       />
       <div className="grid grid-cols-2 gap-2">
@@ -149,7 +160,7 @@ export function BackgroundImagePicker(props: {
             setBusy(false);
             setLibrary(false);
           }}
-          onSelect={(id) => void run((signal) => readLibraryBackground(id, signal), id)}
+          onSelect={(id) => void run((signal) => acquireLibrary(id, signal), id)}
         />
       )}
     </div>

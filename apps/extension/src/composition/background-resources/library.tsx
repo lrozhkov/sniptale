@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Filter, Search, CornerDownRight, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -72,10 +72,16 @@ export function BackgroundLibraryDrawer(props: {
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const theme = useResolvedPortalTheme(props.anchor);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = dialog.current;
+    const trigger = document.activeElement;
     element?.showModal();
-    return () => element?.close();
+    return () => {
+      element?.close();
+      if (trigger instanceof HTMLElement && trigger.isConnected) {
+        trigger.focus({ preventScroll: true });
+      }
+    };
   }, []);
   const title = translate('settings.editor.backgrounds.library');
   return createPortal(

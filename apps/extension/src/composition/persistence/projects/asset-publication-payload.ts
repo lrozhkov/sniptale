@@ -6,6 +6,8 @@ export interface ProjectAssetPublicationOptions {
   /** False keeps a frozen project representation out of the Library catalogue. */
   publishToLibrary?: boolean;
   originMediaId?: string;
+  /** Private scene resource retained by its exact review slot, including remembered settings. */
+  requiredReviewResource?: { aggregateId: string; slot: 'watermark' };
 }
 
 export interface ProjectAssetPublicationPayload extends ProjectAssetPublicationOptions {
@@ -15,6 +17,23 @@ export interface ProjectAssetPublicationPayload extends ProjectAssetPublicationO
   librarySourceId?: string;
   expectedAssetId?: string | null;
   requiredReview?: { aggregateId: string; clipId: string };
+}
+
+/** Shared compatibility rule for prepared writes and recovered scene-resource claims. */
+export function isValidProjectAssetReviewResource(args: {
+  mimeType: string;
+  resource: ProjectAssetPublicationOptions['requiredReviewResource'];
+  requiredReview: ProjectAssetPublicationPayload['requiredReview'];
+  publishToLibrary: boolean | undefined;
+}): boolean {
+  if (!args.resource) return true;
+  return (
+    args.requiredReview === undefined &&
+    args.publishToLibrary === false &&
+    args.mimeType.startsWith('image/') &&
+    Boolean(args.resource.aggregateId) &&
+    args.resource.slot === 'watermark'
+  );
 }
 
 /** Parse the same standalone asset payload for publication and prepared-reference admission. */
@@ -40,6 +59,27 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
         ? { aggregateId: required['aggregateId'], clipId: required['clipId'] }
         : null;
   if (requiredReview === null) return null;
+  const resource = value['requiredReviewResource'];
+  let requiredReviewResource: ProjectAssetPublicationOptions['requiredReviewResource'];
+  if (resource !== undefined) {
+    if (
+      !isRecord(resource) ||
+      typeof resource['aggregateId'] !== 'string' ||
+      resource['slot'] !== 'watermark' ||
+      value['librarySourceId'] !== undefined
+    )
+      return null;
+    requiredReviewResource = { aggregateId: resource['aggregateId'], slot: 'watermark' };
+    if (
+      !isValidProjectAssetReviewResource({
+        mimeType: entry.mimeType,
+        resource: requiredReviewResource,
+        requiredReview,
+        publishToLibrary: value['publishToLibrary'],
+      })
+    )
+      return null;
+  }
   const librarySourceId = value['librarySourceId'];
   if (librarySourceId !== undefined) {
     if (
@@ -70,6 +110,7 @@ export function parseProjectAssetPayload(value: unknown): ProjectAssetPublicatio
       ? { publishToLibrary: value['publishToLibrary'] }
       : {}),
     ...(requiredReview ? { requiredReview } : {}),
+    ...(requiredReviewResource ? { requiredReviewResource } : {}),
     ...(typeof librarySourceId === 'string' ? { librarySourceId } : {}),
   };
 }

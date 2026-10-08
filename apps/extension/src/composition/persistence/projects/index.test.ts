@@ -386,6 +386,61 @@ describe('projects-db video project flows', () => {
 describe('projects-db asset save and read flows', () => {
   beforeEach(resetProjectsDbMocks);
 
+  it.each(['audio-mime', 'public', 'empty-review', 'clip-claim'] as const)(
+    'rejects an invalid private resource before staging bytes: %s',
+    async (invalid) => {
+      const { prepareProjectAsset } = await importProjectsDbModule();
+      await expect(
+        prepareProjectAsset(
+          new Blob(['logo']),
+          invalid === 'audio-mime' ? 'audio/webm' : 'image/png',
+          'logo.png',
+          'logo',
+          1,
+          invalid === 'clip-claim' ? { aggregateId: 'review', clipId: 'audio' } : undefined,
+          {
+            publishToLibrary: invalid === 'public',
+            requiredReviewResource: {
+              aggregateId: invalid === 'empty-review' ? '' : 'review',
+              slot: 'watermark',
+            },
+          }
+        )
+      ).rejects.toThrow('Invalid private review resource publication.');
+      expect(projectsDbMocks.recoverProjectMediaPublicationsMock).not.toHaveBeenCalled();
+      expect(projectsDbMocks.writeBlobToAssetMock).not.toHaveBeenCalled();
+      expect(projectsDbMocks.createAssetPublicationJournalMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('records a watermark recovery slot in the real prepared writer before attachment', async () => {
+    const { prepareProjectAsset } = await importProjectsDbModule();
+    const prepared = await prepareProjectAsset(
+      new File(['logo'], 'logo.png', { type: 'image/png' }),
+      'image/png',
+      'logo.png',
+      'logo',
+      1,
+      undefined,
+      {
+        publishToLibrary: false,
+        originMediaId: 'source',
+        requiredReviewResource: { aggregateId: 'review', slot: 'watermark' },
+      }
+    );
+    await prepared.protect();
+    expect(projectsDbMocks.createAssetPublicationJournalMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          requiredReviewResource: { aggregateId: 'review', slot: 'watermark' },
+          publishToLibrary: false,
+          entry: expect.objectContaining({ originMediaId: 'source' }),
+        }),
+      })
+    );
+    expect(projectsDbMocks.publishReadyJournalWithRetryMock).not.toHaveBeenCalled();
+  });
+
   it('records private acquisition origin and publication intent before placement', async () => {
     const { saveProjectAsset } = await importProjectsDbModule();
     await saveProjectAsset(

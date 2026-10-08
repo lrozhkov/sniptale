@@ -1,3 +1,4 @@
+import { createReviewWatermarkRenderer, type ReviewWatermarkRenderer } from './render-watermark';
 import type { ReviewKeyCue } from '../../features/video/review/key-animation';
 import { drawReviewKeys } from './render-key-animation';
 import { drawReviewSceneOverlays } from './render-scene-overlays';
@@ -112,8 +113,15 @@ export async function writeReviewFrames(args: {
   let source: ReviewRenderSource | null = null;
   let transitionFrames: ReturnType<typeof createReviewTransitionFrames> | null = null;
   let webcam: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null = null;
+  let watermark: ReviewWatermarkRenderer | null = null;
   try {
     source = await openReviewRenderSource(args, input, preparation);
+    watermark = await createReviewWatermarkRenderer(
+      preparation.effective.watermark,
+      { width: source.canvas.width, height: source.canvas.height },
+      args.signal,
+      args.readProjectAsset
+    );
     if (preparation.effective.webcam)
       webcam = await createReviewWebcamRenderer(
         preparation.effective.webcam,
@@ -240,6 +248,7 @@ export async function writeReviewFrames(args: {
         transitions,
         transitionFrames,
         webcam,
+        watermark,
         videoOut,
         resultDuration: receipt.resultDuration,
         onProgress: timeTracking?.renderProgress ?? args.onProgress,
@@ -261,6 +270,7 @@ export async function writeReviewFrames(args: {
   } finally {
     args.onTimeEstimate?.(null);
     webcam?.dispose();
+    watermark?.dispose();
     transitionFrames?.dispose();
     source?.image?.close();
     source?.headerImage?.close();
@@ -556,6 +566,7 @@ export async function renderRenderWindowFrames(args: {
   transitions?: readonly ReviewCutTransitionPlan[];
   transitionFrames?: ReturnType<typeof createReviewTransitionFrames> | null;
   webcam?: Awaited<ReturnType<typeof createReviewWebcamRenderer>> | null;
+  watermark?: ReviewWatermarkRenderer | null;
   videoOut: { add(sample: VideoSample): Promise<void>; close(): void };
   resultDuration: number;
   onProgress: ((fraction: number) => void) | undefined;
@@ -688,6 +699,7 @@ export async function renderRenderWindowFrames(args: {
           cameraFrame.value?.draw(context, canvas);
         }
         drawReviewKeys(context, args.keyCues ?? [], timestamp + args.fragmentOffset, canvas);
+        args.watermark?.draw(context);
         paintReviewCutBlackout(context, canvas, blend);
         await writer.add(
           timestamp,

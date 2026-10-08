@@ -620,3 +620,67 @@ it('finds the exact audio clip in current, history and recovery without confusin
     expect(reviewWorkspaceHasAudioClip(workspace, 'selected', 'project-asset:other')).toBe(false);
   }
 });
+
+it('retains remembered watermark logos across portable current, history and recovery', async () => {
+  const { createQuickEditWatermark } =
+    await import('../../../features/video/review/advanced/watermark');
+  const { reviewWorkspaceHasWatermarkImage } = await import('./asset-refs');
+  const logo = (id: string) => ({
+    ...createQuickEditWatermark('Saved text'),
+    mode: 'text' as const,
+    image: { assetId: `project-asset:${id}`, width: 80, height: 40, size: 0.2, opacity: 0.5 },
+  });
+  const baseline = advanced({ watermark: logo('base') });
+  const snapshot: VideoWorkspaceSnapshot = {
+    draft: null,
+    workspace: {
+      formatVersion: 1,
+      aggregateId: 'recording:main',
+      sourceAssetId: 'main',
+      source: { duration: 12, width: 1920, height: 1080, mimeType: 'video/webm', size: 100 },
+      revision: 1,
+      createdAt: 1,
+      updatedAt: 1,
+      cursor: 0,
+      advanced: {
+        ...baseline,
+        recoveryV1: JSON.stringify({ watermark: { ...logo('recovery'), mode: 'none' } }),
+      },
+      history: [
+        {
+          id: 'logo',
+          at: 1,
+          target: 'advancedContent',
+          before: reviewAdvancedContentBaseline(baseline),
+          after: { ...reviewAdvancedContentBaseline(baseline), watermark: logo('after') },
+        },
+      ],
+    },
+  };
+  const ids = ['base', 'recovery', 'after'];
+  expect(collectReviewAssetReferences(snapshot.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:${id}`))
+  );
+  for (const id of ids)
+    expect(reviewWorkspaceHasWatermarkImage(snapshot.workspace, `project-asset:${id}`)).toBe(true);
+  expect(reviewWorkspaceHasWatermarkImage(snapshot.workspace, 'project-asset:other')).toBe(false);
+  expect(() => assertPortableReviewAssetRefs(snapshot.workspace)).toThrow('local asset id');
+  const portable = encodePortableReviewAssetRefs(snapshot);
+  expect(() => assertPortableReviewAssetRefs(portable.workspace)).not.toThrow();
+  const decoded = decodePortableReviewAssetRefs(portable.workspace);
+  expect({ ...decoded, advanced: { ...decoded.advanced, recoveryV1: undefined } }).toEqual({
+    ...snapshot.workspace,
+    advanced: { ...snapshot.workspace.advanced, recoveryV1: undefined },
+  });
+  expect(JSON.parse(decoded.advanced.recoveryV1!)).toEqual(
+    JSON.parse(snapshot.workspace.advanced.recoveryV1!)
+  );
+  expect(() => remapReviewAssetReferences(snapshot, new Map())).toThrow('unresolved');
+  const restored = remapReviewAssetReferences(
+    snapshot,
+    new Map(ids.map((id) => [id, `copy-${id}`]))
+  );
+  expect(collectReviewAssetReferences(restored.workspace)).toEqual(
+    new Set(ids.map((id) => `project-asset:copy-${id}`))
+  );
+});

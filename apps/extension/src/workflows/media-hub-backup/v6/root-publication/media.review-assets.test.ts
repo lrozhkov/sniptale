@@ -128,3 +128,101 @@ it.each(
     );
   }
 );
+
+it.each(['replace', 'duplicate'] as const)(
+  'restores private remembered watermark bytes with %s without a Library logo card',
+  async (strategy) => {
+    const { createQuickEditWatermark } =
+      await import('../../../../features/video/review/advanced/watermark');
+    const { encodePortableReviewAssetRefs } =
+      await import('../../../../composition/persistence/review-workspaces/asset-refs');
+    const fixture = reviewFixture();
+    const watermark = {
+      ...createQuickEditWatermark('Saved brand'),
+      mode: 'none' as const,
+      image: { assetId: 'project-asset:logo', width: 80, height: 40, size: 0.2, opacity: 1 },
+    };
+    const base = portableMetadata(true);
+    const metadata = {
+      ...base,
+      videoReview: encodePortableReviewAssetRefs({
+        ...fixture,
+        workspace: {
+          ...fixture.workspace,
+          advanced: {
+            ...fixture.workspace.advanced,
+            watermark,
+            recoveryV1: JSON.stringify({ watermark }),
+          },
+          history: fixture.workspace.history.map((operation) =>
+            operation.target === 'advancedContent'
+              ? {
+                  ...operation,
+                  before: { ...operation.before, watermark },
+                  after: { ...operation.after, watermark },
+                }
+              : operation
+          ),
+        },
+      }),
+      reviewAssets: [
+        ...base.reviewAssets,
+        {
+          entry: { id: 'logo', mimeType: 'image/png', createdAt: 1, size: 10 },
+          filename: 'logo.png',
+          objectId: 'logo-object',
+          publishToLibrary: false,
+        },
+      ],
+    };
+    const tables = installDatabase(metadata);
+    const result = await mediaLibraryRootPublisher.publish({
+      envelope: {
+        descriptor: {
+          mediaSubtype: 'library-item',
+          metadataPath: '_sniptale/metadata/media/export-e.json',
+          objectCount: 5,
+          rootId: metadata.entry.id,
+          rootKind: 'media',
+          totalBytes: 46,
+        },
+        metadata: portableJson(metadata),
+        objects: [],
+      },
+      journal,
+      session: session(strategy),
+      staged: [
+        ...stagedObjects(),
+        {
+          objectId: 'logo-object',
+          ref: {
+            assetId: 'logo-bytes',
+            createdAt: 1,
+            mimeType: 'image/png',
+            size: 10,
+            sha256: null,
+            location: { kind: 'opfs', objectKey: 'objects/logo-bytes' },
+          },
+        },
+      ],
+    });
+    expect(result.imported).toBe(true);
+    expect(result.retainedAssetIds).toContain('logo-bytes');
+    const saved = [...tables.get('project_assets')!.values()].find(
+      (value) =>
+        typeof value === 'object' &&
+        value !== null &&
+        'assetId' in value &&
+        value.assetId === 'logo-bytes'
+    );
+    expect(saved).toMatchObject({ mimeType: 'image/png' });
+    if (typeof saved !== 'object' || !saved || !('id' in saved) || typeof saved.id !== 'string')
+      throw new Error('Missing restored logo');
+    const reference = `project-asset:${saved.id}`;
+    expect(tables.get('media_library')!.has(reference)).toBe(false);
+    const restored = [...tables.get('video_workspaces')!.values()].find((value) =>
+      JSON.stringify(value).includes(reference)
+    );
+    expect(restored).toHaveProperty('advanced.watermark.image.assetId', reference);
+  }
+);

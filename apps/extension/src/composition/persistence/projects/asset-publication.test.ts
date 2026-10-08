@@ -618,3 +618,77 @@ it('validates marked Library claims without weakening legacy publication payload
   ])
     expect(parseProjectAssetPayload(invalid)).toBeNull();
 });
+
+it('admits only private image publications with an exclusive watermark recovery slot', async () => {
+  const { parseProjectAssetPayload } = await import('./asset-publication-payload');
+  const payload = {
+    entry: { id: 'logo', assetId: 'bytes', createdAt: 1, mimeType: 'image/png', size: 5 },
+    filename: 'logo.png',
+    expectedAssetId: null,
+    publishToLibrary: false,
+    requiredReviewResource: { aggregateId: 'review', slot: 'watermark' },
+  };
+  expect(parseProjectAssetPayload(payload)).toEqual(payload);
+  for (const invalid of [
+    { ...payload, requiredReview: { aggregateId: 'review', clipId: 'audio' } },
+    { ...payload, requiredReviewResource: { aggregateId: '', slot: 'watermark' } },
+    { ...payload, requiredReviewResource: { aggregateId: 'review', slot: 'background' } },
+    { ...payload, publishToLibrary: true },
+    { ...payload, publishToLibrary: undefined },
+    { ...payload, librarySourceId: 'source' },
+    { ...payload, entry: { ...payload.entry, mimeType: 'audio/webm' } },
+  ])
+    expect(parseProjectAssetPayload(invalid)).toBeNull();
+});
+
+it.each(['current', 'history', 'recovery', 'wrong-slot', 'missing'] as const)(
+  'recovers a private image only from its exact retained watermark slot: %s',
+  async (location) => {
+    const writes: Array<[string, 'delete' | 'put', unknown]> = [];
+    const image = { assetId: 'project-asset:logo' };
+    const empty = { audio: { voiceover: [], music: [] } };
+    const remembered = { ...empty, watermark: { mode: 'none', image } };
+    const advanced =
+      location === 'current'
+        ? remembered
+        : location === 'recovery'
+          ? { ...empty, recoveryV1: JSON.stringify(remembered) }
+          : location === 'wrong-slot'
+            ? { ...empty, background: { type: 'image', ...image } }
+            : empty;
+    mocks.readReview.mockResolvedValue({
+      workspace: {
+        advanced,
+        history:
+          location === 'history'
+            ? [{ target: 'advancedContent', before: empty, after: remembered }]
+            : [],
+      },
+    });
+    mocks.runMutation.mockImplementation(async (operation) =>
+      operation({ transaction: () => createTransaction(writes, Promise.resolve()) })
+    );
+    const journal = createJournal(PROJECT_ASSET_PUBLICATION_DOMAIN, {
+      entry: { id: 'logo', assetId: ref.assetId, createdAt: 1, mimeType: 'image/png', size: 5 },
+      filename: 'logo.png',
+      expectedAssetId: null,
+      publishToLibrary: false,
+      requiredReviewResource: { aggregateId: 'review', slot: 'watermark' },
+    });
+    journal.assetRefs = [{ ...ref, mimeType: 'image/png' }];
+    const recovery = projectAssetPublicationAdapter.publish(journal);
+    if (location === 'wrong-slot' || location === 'missing') {
+      await expect(recovery).rejects.toThrow('superseded');
+      expect(writes).toEqual([]);
+    } else {
+      await recovery;
+      expect(writes).toContainEqual([
+        'project_assets',
+        'put',
+        expect.objectContaining({ id: 'logo' }),
+      ]);
+      expect(writes.some(([store]) => store === 'media_library')).toBe(false);
+    }
+    expect(mocks.readReview).toHaveBeenCalledWith('review');
+  }
+);

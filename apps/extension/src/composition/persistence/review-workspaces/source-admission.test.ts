@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import type { AssetReadyJournal } from '../assets/contracts';
+import { createMediaLibraryEntry } from '../projects/index.storage.test-support';
 import { createReviewWorkspaceStoreFixture } from './store.test-support';
 import { createVideoReviewSession } from '../../../workflows/video-review/session';
 import { updateQuickEditBackground } from '../../../features/video/review/advanced/background';
@@ -405,6 +406,75 @@ it.each(['missing', 'ready', 'durable'] as const)(
         advanced.audio.voiceover[0]!.transcript
       );
       expect(rows.get('project_assets')!.has(entry.id)).toBe(authority === 'durable');
+    }
+  }
+);
+
+it('does not lend a watermark ready claim to a background or another aggregate', async () => {
+  const journal = readyJournal({
+    payload: {
+      entry,
+      filename: 'logo.png',
+      expectedAssetId: null,
+      publishToLibrary: false,
+      requiredReviewResource: { aggregateId: id, slot: 'watermark' },
+    },
+  });
+  journals.push(journal);
+  await expect(saveBackground()).rejects.toMatchObject({ code: 'missing-media' });
+  expect((await readVideoWorkspace(id))?.workspace.advanced.background.enabled).toBe(false);
+});
+
+it.each(['missing', 'trash', 'active'] as const)(
+  'readmits watermark origin in its consuming transaction: %s',
+  async (state) => {
+    const { createQuickEditWatermark } =
+      await import('../../../features/video/review/advanced/watermark');
+    if (state !== 'missing')
+      rows.get('media_library')!.set(
+        'origin',
+        createMediaLibraryEntry({
+          id: 'origin',
+          ...(state === 'trash'
+            ? { lifecycle: { storageClass: 'library', savedAt: 1, updatedAt: 2, trashedAt: 2 } }
+            : {}),
+        })
+      );
+    journals.push(
+      readyJournal({
+        payload: {
+          entry: { ...entry, originMediaId: 'origin' },
+          filename: 'logo.png',
+          expectedAssetId: null,
+          publishToLibrary: false,
+          requiredReviewResource: { aggregateId: id, slot: 'watermark' },
+        },
+      })
+    );
+    const opened = await openVideoWorkspace(id, source);
+    const save = saveVideoWorkspaceAdvanced({
+      aggregateId: id,
+      expectedRevision: opened.workspace.revision,
+      expectedSourceAssetId: opened.workspace.sourceAssetId,
+      advanced: {
+        ...opened.workspace.advanced,
+        watermark: {
+          ...createQuickEditWatermark('Remember'),
+          mode: 'none',
+          image: {
+            assetId: 'project-asset:background',
+            width: 80,
+            height: 40,
+            size: 0.2,
+            opacity: 1,
+          },
+        },
+      },
+    });
+    if (state === 'active') await expect(save).resolves.toBeDefined();
+    else {
+      await expect(save).rejects.toMatchObject({ code: 'missing-media' });
+      expect(await readVideoWorkspace(id)).toEqual(opened);
     }
   }
 );

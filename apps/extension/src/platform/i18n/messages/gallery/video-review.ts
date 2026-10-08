@@ -1,3 +1,5 @@
+import { galleryVideoReviewSceneMessages } from './video-review-scene';
+import { galleryVideoReviewWatermarkMessages } from './video-review-watermark';
 import { galleryVideoReviewMusicMessages } from './video-review-music';
 import { galleryVideoReviewTargetMessages } from './video-review-targets';
 import { galleryVideoReviewSpeechMessages } from './video-review-speech';
@@ -6,6 +8,8 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewSceneMessages,
+  ...galleryVideoReviewWatermarkMessages,
   ...galleryVideoReviewMusicMessages,
   ...galleryVideoReviewTargetMessages,
   ...galleryVideoReviewSpeechMessages,
@@ -536,20 +540,6 @@ export const galleryVideoReviewMessages = defineMessageSource({
     en: 'Drag the frame. Arrow keys adjust focus; Shift moves faster. Esc cancels the drag.',
   },
   zoomStageTarget: { ru: 'Область приближения', en: 'Zoom area' },
-  canvasSource: { ru: 'Как в исходнике', en: 'Match source' },
-  scene: { ru: 'Сцена', en: 'Scene' },
-  canvas: { ru: 'Холст', en: 'Canvas' },
-  background: { ru: 'Фон', en: 'Background' },
-  backgroundNone: { ru: 'Нет', en: 'None' },
-  backgroundSolid: { ru: 'Цвет', en: 'Color' },
-  backgroundGradient: { ru: 'Градиент', en: 'Gradient' },
-  backgroundZoom: { ru: 'Фон при зуме', en: 'Background during zoom' },
-  backgroundZoomFixed: { ru: 'Неподвижный', en: 'Fixed' },
-  backgroundZoomFollow: { ru: 'Вместе с видео', en: 'Follow video' },
-  backgroundPadding: { ru: 'Отступ', en: 'Padding' },
-  backgroundShadow: { ru: 'Тень', en: 'Shadow' },
-  backgroundShadowColor: { ru: 'Цвет тени', en: 'Shadow color' },
-  backgroundCornerRadius: { ru: 'Скругление углов', en: 'Corner radius' },
   audioTrack: { ru: 'Звук', en: 'Audio' },
   advancedSuppressedHint: {
     ru: 'Расширенные настройки сохранены и временно не применяются.',

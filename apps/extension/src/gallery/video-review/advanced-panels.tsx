@@ -1,3 +1,5 @@
+import { ReviewWatermarkInspector } from './watermark-inspector';
+import type { ComponentProps } from 'react';
 import { quickEditSpatialSpan } from '../../features/video/review/advanced/spatial';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
 import { Scan, Paintbrush, AudioLines, PanelTop } from 'lucide-react';
@@ -92,6 +94,7 @@ export function ReviewSceneProperties(props: {
   focus?: { advanced: QuickEditAdvancedState; time: number } | undefined;
   background: QuickEditAdvancedState['background'];
   canvas: QuickEditAdvancedState['canvas'];
+  watermark?: ComponentProps<typeof ReviewWatermarkInspector>;
   windowHeader?: QuickEditAdvancedState['windowHeader'];
   onWindowHeader?(header: QuickEditAdvancedState['windowHeader']): void;
   source: { width: number; height: number };
@@ -161,6 +164,16 @@ export function ReviewSceneProperties(props: {
               />
             ),
           },
+          ...(props.watermark
+            ? [
+                {
+                  id: 'watermark',
+                  label: translate('gallery.videoReview.watermark'),
+                  icon: Paintbrush,
+                  content: <ReviewWatermarkInspector {...props.watermark} />,
+                },
+              ]
+            : []),
           ...(props.hasOriginalAudio || props.audio.voiceover.length || props.audio.music.length
             ? [
                 {

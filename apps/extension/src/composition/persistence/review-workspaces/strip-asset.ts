@@ -18,6 +18,17 @@ function stripBackground<T>(background: T, assetId: string): T | { enabled: fals
   return rest as T;
 }
 
+function stripWatermark<T>(watermark: T, assetId: string): T {
+  if (
+    !isRecord(watermark) ||
+    !isRecord(watermark['image']) ||
+    watermark['image']['assetId'] !== assetId
+  )
+    return watermark;
+  const { image: _removed, ...rest } = watermark;
+  return { ...rest, mode: watermark['mode'] === 'image' ? 'none' : watermark['mode'] } as T;
+}
+
 function stripAudioClips(clips: QuickEditAudioClip[], assetId: string): QuickEditAudioClip[] {
   return clips
     .filter((clip) => clip.assetId !== assetId)
@@ -61,6 +72,7 @@ function stripContent<T extends QuickEditAdvancedContent | QuickEditAdvancedStat
   const result = {
     ...content,
     background: stripBackground(content.background, assetId),
+    ...(content.watermark ? { watermark: stripWatermark(content.watermark, assetId) } : {}),
     audio: {
       ...content.audio,
       voiceover: stripAudioClips(content.audio.voiceover, assetId),
@@ -110,6 +122,9 @@ function stripRecovery(value: string | undefined, assetId: string): string | und
       ...content,
       ...(nextAudio === undefined ? {} : { audio: nextAudio }),
       background: stripBackground(background, assetId),
+      ...(content['watermark'] === undefined
+        ? {}
+        : { watermark: stripWatermark(content['watermark'], assetId) }),
     });
   } catch {
     return value;

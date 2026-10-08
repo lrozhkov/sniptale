@@ -1,3 +1,5 @@
+import { createQuickEditWatermark } from './advanced/watermark';
+import { reviewAdvancedContentBaseline } from './document';
 import { projectReviewVoiceover } from './voiceover-edits';
 import { buildReviewTimeMap } from './timeline';
 import { describe, expect, it } from 'vitest';
@@ -312,4 +314,29 @@ it('replays own audio tempo, reset and video Speed independently at every histor
     expect(output.every((clip) => clip.playbackRate === tempo)).toBe(true);
   }
   expect(baseline.audio.voiceover[0]).not.toHaveProperty('tempo');
+});
+
+it('preserves watermark settings and remembered logo across baseline, undo and redo', () => {
+  const before = createQuickEditAdvancedContent();
+  const watermark = {
+    ...createQuickEditWatermark('Автор'),
+    mode: 'image' as const,
+    image: { assetId: 'project-asset:logo', width: 200, height: 100, size: 0.2, opacity: 0.5 },
+  };
+  const after = { ...before, watermark };
+  const off = { ...after, watermark: { ...watermark, mode: 'none' as const } };
+  const reset = { ...before, watermark: createQuickEditWatermark('Made with Sniptale') };
+  const operations: ReviewOperation[] = [
+    { id: 'logo', at: 1, target: 'advancedContent', before, after },
+    { id: 'off', at: 2, target: 'advancedContent', before: after, after: off },
+    { id: 'reset', at: 3, target: 'advancedContent', before: off, after: reset },
+  ];
+  expect(reviewAdvancedContentBaseline(after)).toEqual(after);
+  expect(replayReviewHistory(operations, 0, source).advancedContent.watermark).toBeUndefined();
+  expect(replayReviewHistory(operations, 1, source).advancedContent).toEqual(after);
+  expect(replayReviewHistory(operations, 2, source).advancedContent).toEqual(off);
+  expect(replayReviewHistory(operations, 3, source).advancedContent).toEqual(reset);
+  expect(replayReviewHistory(operations, 1, source).advancedContent.watermark?.image).toEqual(
+    watermark.image
+  );
 });

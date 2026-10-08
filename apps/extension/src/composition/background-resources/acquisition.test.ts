@@ -88,3 +88,44 @@ it('publishes an explicit Settings upload once and cancels failed publication', 
   await expect(retainBackgroundInLibrary({ file })).rejects.toThrow('write failed');
   expect(io.cancel).toHaveBeenCalledOnce();
 });
+
+it('passes the edited Library bytes to an opt-in policy before generic normalization', async () => {
+  io.presentation.mockResolvedValue({
+    presentationRevision: 2,
+    previewBlob: new Blob(['animated-original'], { type: 'image/webp' }),
+  });
+  const policy = vi.fn(async (file: File) => file);
+  const result = await readLibraryBackground('image', undefined, policy);
+  expect(await result.file.text()).toBe('animated-original');
+  expect(result.originMediaId).toBe('image');
+  expect(policy).toHaveBeenCalledOnce();
+  expect(io.prepare).not.toHaveBeenCalled();
+  policy.mockRejectedValueOnce(new Error('animated'));
+  await expect(readLibraryBackground('image', undefined, policy)).rejects.toThrow('animated');
+});
+
+it('refuses an edited Library selection changed or cancelled during custom preparation', async () => {
+  io.presentation.mockResolvedValue({
+    presentationRevision: 2,
+    previewBlob: new Blob(['current'], { type: 'image/png' }),
+  });
+  const policy = vi.fn(async (file: File) => {
+    io.entry.mockResolvedValue({ id: 'image', kind: 'image', workspaceRevision: 3 });
+    return file;
+  });
+  await expect(readLibraryBackground('image', undefined, policy)).rejects.toThrow('changed');
+  io.entry.mockResolvedValue({
+    id: 'image',
+    filename: 'image.png',
+    kind: 'image',
+    workspaceRevision: 2,
+  });
+  const controller = new AbortController();
+  policy.mockImplementationOnce(async (file: File) => {
+    controller.abort();
+    return file;
+  });
+  await expect(readLibraryBackground('image', controller.signal, policy)).rejects.toMatchObject({
+    name: 'AbortError',
+  });
+});

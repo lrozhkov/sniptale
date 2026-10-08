@@ -1,3 +1,4 @@
+import { createQuickEditWatermark } from './watermark';
 import { loadQuickEditAdvancedState, loadQuickEditAdvancedContentState } from './validation';
 import { reviewAdvancedContentBaseline } from '../document';
 import { expect, it } from 'vitest';
@@ -564,4 +565,52 @@ it('validates optional track flags and preserves the absent legacy history shape
       })
     ).toBeNull();
   }
+});
+
+it('applies watermark consistently in advanced preview/export and retains it while basic', () => {
+  const state = createQuickEditAdvancedState();
+  state.watermark = { ...createQuickEditWatermark('Text'), mode: 'text' };
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveFeatures(state).watermarkApplied).toBe(false);
+  expect(resolveQuickEditEffectiveState(state).watermark).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  expect(hasSuppressedAdvancedFeatures(state)).toBe(true);
+  state.ui.mode = 'advanced';
+  expect(resolveQuickEditEffectiveState(state).watermark).toEqual(state.watermark);
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'render',
+    reasons: ['watermark'],
+  });
+  state.watermark.mode = 'none';
+  expect(resolveQuickEditEffectiveState(state).watermark).toBeUndefined();
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  expect(state.watermark.text.value).toBe('Text');
+});
+
+it('keeps image acquisition neutral until a logo is selected and never hides a referenced logo failure', () => {
+  const state = createQuickEditAdvancedState();
+  state.ui.mode = 'advanced';
+  state.watermark = { ...createQuickEditWatermark('Text'), mode: 'image' };
+  const document = { edits: [], canvasComments: [] };
+  expect(resolveQuickEditEffectiveFeatures(state).watermarkApplied).toBe(false);
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'copy',
+  });
+  state.watermark.image = {
+    assetId: 'project-asset:missing',
+    width: 200,
+    height: 100,
+    size: 0.2,
+    opacity: 0.5,
+  };
+  expect(resolveQuickEditEffectiveState(state).watermark?.image?.assetId).toBe(
+    'project-asset:missing'
+  );
+  expect(resolveQuickEditExportPlan({ advanced: state, document })).toMatchObject({
+    video: 'render',
+  });
 });

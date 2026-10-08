@@ -29,6 +29,7 @@ import type { ReviewWebcamStageBinding } from './webcam-overlay';
  * exclude disabled lanes. The paused framing midpoint shows the full selected target.
  */
 type ReviewStageBindingProps = {
+  watermark?: Parameters<typeof ReviewStage>[0]['watermark'] | undefined;
   keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
   clickCues?:
     | readonly import('../../features/video/review/click-animation').ReviewClickCue[]
@@ -53,7 +54,10 @@ type ReviewStageBindingProps = {
   focusTimeMap?: readonly ReviewTimeSegment[] | undefined;
   comments: readonly CanvasComment[];
   annotations: readonly ReviewAnnotation[];
-  canvasComments: ReturnType<typeof useCanvasComments>;
+  canvasComments: Pick<
+    ReturnType<typeof useCanvasComments>,
+    'setGeometry' | 'selectedId' | 'onSelect' | 'onPatch'
+  >;
   /** Editor-only overlay display; false hides the stack without touching data. */
   overlaysVisible: boolean;
   time: number;
@@ -137,6 +141,7 @@ export function ReviewStageBinding(props: ReviewStageBindingProps) {
         </div>
       ) : null}
       <ReviewStage
+        watermark={props.watermark}
         keyCues={props.keyCues}
         clickCues={props.clickCues}
         webcam={props.webcam}

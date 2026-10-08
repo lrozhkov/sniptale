@@ -6,6 +6,7 @@ export type {
 import {
   collectReviewAssetReferences,
   reviewWorkspaceHasAudioClip,
+  reviewWorkspaceHasWatermarkImage,
 } from '../review-workspaces/asset-refs';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import { assertStandaloneMediaSourceReplaceable } from './source-admission';
@@ -240,15 +241,19 @@ async function recoverProjectAssetJournal(
     if (!origin || origin.id !== payload.entry.originMediaId)
       throw new Error('Private resource Library source is invalid.');
   }
-  if (payload.requiredReview) {
+  const aggregateId =
+    payload.requiredReview?.aggregateId ?? payload.requiredReviewResource?.aggregateId;
+  if (aggregateId) {
     const assetId = `project-asset:${payload.entry.id}`;
     return tryVoiceoverAttachmentLock(assetId, async () => {
-      const review = await readVideoWorkspace(payload.requiredReview!.aggregateId);
+      const review = await readVideoWorkspace(aggregateId);
       const referenced =
         !!review &&
-        (payload.librarySourceId
-          ? reviewWorkspaceHasAudioClip(review.workspace, payload.requiredReview!.clipId, assetId)
-          : collectReviewAssetReferences(review.workspace).has(assetId));
+        (payload.requiredReviewResource
+          ? reviewWorkspaceHasWatermarkImage(review.workspace, assetId)
+          : payload.librarySourceId
+            ? reviewWorkspaceHasAudioClip(review.workspace, payload.requiredReview!.clipId, assetId)
+            : collectReviewAssetReferences(review.workspace).has(assetId));
       if (!referenced) {
         throw new SupersededAssetPublicationError();
       }

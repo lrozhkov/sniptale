@@ -223,6 +223,9 @@ it('offers independent initial downloads and shows actionable processing failure
   try {
     act(() => root.render(<ReviewEditActions {...props} />));
     expect(download().disabled).toBe(false);
+    act(() => root.render(<ReviewEditActions {...props} advancedBlockers={['watermark']} />));
+    expect(host.textContent).toContain(translate('gallery.videoReview.watermark'));
+    act(() => root.render(<ReviewEditActions {...props} />));
     act(() => download().click());
     expect(props.onDownload).toHaveBeenCalledOnce();
     act(() => root.render(<ReviewEditActions {...props} hasEdits audioUnavailable failed />));

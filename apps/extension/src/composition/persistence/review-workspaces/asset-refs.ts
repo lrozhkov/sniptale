@@ -74,6 +74,9 @@ function assertPortableContentRefs(content: unknown, inspectRecovery = true): vo
   if (isRecord(content['webcam']) && 'assetId' in content['webcam'])
     throw new Error(LOCAL_ASSET_ERROR);
   assertNoLocalImageRef(content['background']);
+  const watermark = content['watermark'];
+  if (isRecord(watermark) && isRecord(watermark['image']) && 'assetId' in watermark['image'])
+    throw new Error(LOCAL_ASSET_ERROR);
   assertNoLocalAudioRefs(content['audio']);
   if (inspectRecovery)
     assertPortableContentRefs(parseRecoveryContent(content['recoveryV1']), false);
@@ -178,6 +181,14 @@ function renameContentRefs(
       ...(isRecord(remembered) ? { rememberedImage: rename(remembered) } : {}),
     };
   }
+  const watermark = content['watermark'];
+  if (isRecord(watermark) && isRecord(watermark['image'])) {
+    const image = watermark['image'];
+    if (typeof image[from] === 'string') {
+      const { [from]: reference, ...rest } = image;
+      next['watermark'] = { ...watermark, image: { ...rest, [to]: reference } };
+    }
+  }
   if (recovery && typeof content['recoveryV1'] === 'string') {
     try {
       const recovery: unknown = JSON.parse(content['recoveryV1']);
@@ -267,6 +278,32 @@ export function reviewWorkspaceHasAudioClip(
   );
 }
 
+/** Exact watermark ownership survives disabled modes, undo/redo and legacy recovery. */
+export function reviewWorkspaceHasWatermarkImage(
+  workspace: Pick<VideoWorkspace, 'advanced' | 'history'>,
+  assetId: string
+): boolean {
+  const matches = (content: unknown, recovery = true): boolean => {
+    if (!isRecord(content)) return false;
+    const watermark = content['watermark'];
+    if (
+      isRecord(watermark) &&
+      isRecord(watermark['image']) &&
+      watermark['image']['assetId'] === assetId
+    )
+      return true;
+    return recovery && matches(parseRecoveryContent(content['recoveryV1']), false);
+  };
+  return (
+    matches(workspace.advanced) ||
+    workspace.history.some(
+      (operation) =>
+        operation.target === 'advancedContent' &&
+        (matches(operation.before) || matches(operation.after))
+    )
+  );
+}
+
 /** Collects every project-asset reference the review keeps, including history ops. */
 export function collectReviewAssetReferences(
   workspace: Pick<VideoWorkspace, 'advanced' | 'history'>
@@ -284,11 +321,12 @@ export function collectReviewAssetReferences(
 }
 
 function collectContentReferences(
-  content: Pick<QuickEditAdvancedContent, 'audio' | 'background' | 'webcam'>,
+  content: Pick<QuickEditAdvancedContent, 'audio' | 'background' | 'webcam' | 'watermark'>,
   into: Set<string>
 ): void {
   collectImageReference(content.background, into);
   collectAssetReference(content.webcam, into);
+  collectAssetReference(content.watermark?.image, into);
   for (const lane of LANES) {
     for (const clip of content.audio[lane]) {
       if (clip.assetId.startsWith(ASSET_PREFIX)) into.add(clip.assetId);
@@ -327,12 +365,19 @@ function remapImageReference<T>(background: T, assetIdMap: ReadonlyMap<string, s
   return { ...active, ...(remembered === undefined ? {} : { rememberedImage: remembered }) };
 }
 
+function remapWatermarkReference<T>(watermark: T, assetIdMap: ReadonlyMap<string, string>): T {
+  if (!isRecord(watermark)) return watermark;
+  const image = remapAssetReference(watermark['image'], assetIdMap);
+  return image === watermark['image'] ? watermark : { ...watermark, image };
+}
+
 function collectRecoveryReferences(recoveryV1: string, into: Set<string>): void {
   try {
     const parsed: unknown = JSON.parse(recoveryV1);
     if (!isRecord(parsed)) return;
     collectAssetReference(parsed['webcam'], into);
     collectImageReference(parsed['background'], into);
+    if (isRecord(parsed['watermark'])) collectAssetReference(parsed['watermark']['image'], into);
     if (!isRecord(parsed['audio'])) return;
     const recoveryAudio = parsed['audio'];
     for (const lane of LANES) {
@@ -384,8 +429,18 @@ function remapContentReferences(
   }
   const background = remapImageReference(content.background, assetIdMap);
   const webcam = remapAssetReference(content.webcam, assetIdMap);
-  return changed || background !== content.background || webcam !== content.webcam
-    ? { ...content, audio, background, ...(webcam ? { webcam } : {}) }
+  const watermark = remapWatermarkReference(content.watermark, assetIdMap);
+  return changed ||
+    background !== content.background ||
+    webcam !== content.webcam ||
+    watermark !== content.watermark
+    ? {
+        ...content,
+        audio,
+        background,
+        ...(webcam ? { webcam } : {}),
+        ...(watermark ? { watermark } : {}),
+      }
     : content;
 }
 
@@ -402,7 +457,12 @@ function remapRecoveryReferences(
   if (!isRecord(parsed)) return null;
   const webcam = remapAssetReference(parsed['webcam'], assetIdMap);
   const background = remapImageReference(parsed['background'], assetIdMap);
-  let changed = background !== parsed['background'] || webcam !== parsed['webcam'];
+  const watermark = remapWatermarkReference(parsed['watermark'], assetIdMap);
+  let changed =
+    background !== parsed['background'] ||
+    webcam !== parsed['webcam'] ||
+    watermark !== parsed['watermark'];
+  if (watermark !== parsed['watermark']) parsed['watermark'] = watermark;
   if (background !== parsed['background']) parsed['background'] = background;
   if (webcam !== parsed['webcam']) parsed['webcam'] = webcam;
   const recoveryAudio = isRecord(parsed['audio']) ? parsed['audio'] : {};

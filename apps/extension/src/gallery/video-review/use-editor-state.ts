@@ -1,3 +1,4 @@
+import { useReviewWatermark } from './use-review-watermark';
 import { createReviewSpeechEditGuard } from './speech-edit-guard';
 import { scheduleReviewKeys } from '../../features/video/review/key-animation';
 import { scheduleReviewClicks } from '../../features/video/review/click-animation';
@@ -119,7 +120,21 @@ function useReviewEditorCore(resource: LoadedReview) {
       !base.composer.getCurrent().annotation &&
       base.advanced.ui.mode === 'advanced',
   });
-  return { ...base, ...timeline, webcam, busy: base.busy || webcam.pending };
+  const watermark = useReviewWatermark({
+    session: base.session,
+    settings: base.advanced.watermark,
+    flushAdvanced: base.advancedState.flush,
+    pause: () => timeline.video.current?.pause(),
+    allowed: () =>
+      !base.busy && base.exporter.phase === 'idle' && base.advanced.ui.mode === 'advanced',
+  });
+  return {
+    ...base,
+    ...timeline,
+    webcam,
+    watermark,
+    busy: base.busy || webcam.pending || watermark.pending,
+  };
 }
 
 /** Owns the review session and local selection state. */

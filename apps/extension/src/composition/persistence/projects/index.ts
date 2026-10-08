@@ -1,3 +1,4 @@
+import { isValidProjectAssetReviewResource } from './asset-publication-payload';
 import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-reference-admission';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
@@ -286,6 +287,15 @@ export async function prepareProjectAsset(
   requiredReview?: ProjectAssetPublicationPayload['requiredReview'],
   options: ProjectAssetPublicationOptions = {}
 ): Promise<PreparedProjectAsset> {
+  if (
+    !isValidProjectAssetReviewResource({
+      mimeType,
+      resource: options.requiredReviewResource,
+      requiredReview,
+      publishToLibrary: options.publishToLibrary,
+    })
+  )
+    throw new Error('Invalid private review resource publication.');
   const entryId = id ?? crypto.randomUUID();
   await recoverProjectMediaPublications();
   const sourceDb = await initDB();
@@ -306,20 +316,31 @@ export async function prepareProjectAsset(
       ? { originMediaId: options.originMediaId }
       : {}),
   };
+  return createPreparedProjectAssetPublication(prepared.ref, {
+    entry,
+    expectedAssetId,
+    filename: filename || entryId,
+    ...(requiredReview ? { requiredReview } : {}),
+    ...(options.requiredReviewResource
+      ? { requiredReviewResource: options.requiredReviewResource }
+      : {}),
+    ...(options.publishToLibrary === false ? { publishToLibrary: false } : {}),
+  });
+}
+
+/** Owns the staged asset's protection, publication retry and terminal cleanup state. */
+function createPreparedProjectAssetPublication(
+  ref: AssetRef,
+  payload: ProjectAssetPublicationPayload
+): PreparedProjectAsset {
   let journal: AssetReadyJournal<ProjectAssetPublicationPayload> | null = null;
   let complete = false;
   let inFlight: Promise<void> | null = null;
   const protect = async () => {
     journal ??= await createAssetPublicationJournal({
-      assetRefs: [prepared.ref],
+      assetRefs: [ref],
       domain: PROJECT_ASSET_PUBLICATION_DOMAIN,
-      payload: {
-        entry,
-        expectedAssetId,
-        filename: filename || entryId,
-        ...(requiredReview ? { requiredReview } : {}),
-        ...(options.publishToLibrary === false ? { publishToLibrary: false } : {}),
-      },
+      payload,
     });
   };
   const publish = async () => {
@@ -329,7 +350,7 @@ export async function prepareProjectAsset(
       await protect();
       if (!journal) throw new Error('Project asset publication journal is unavailable.');
       await publishReadyJournalWithRetry(journal, publishProjectAssetJournal);
-      await releaseAssetReadyProtection([prepared.ref.assetId]);
+      await releaseAssetReadyProtection([ref.assetId]);
       complete = true;
     })();
     try {
@@ -339,18 +360,18 @@ export async function prepareProjectAsset(
     }
   };
   return {
-    id: entryId,
-    ref: prepared.ref,
+    id: payload.entry.id,
+    ref,
     protect,
     cancel: async () => {
       if (complete) return;
       if (journal) await cancelAssetPublication(journal);
-      else await discardPreparedAsset(prepared.ref.assetId);
+      else await discardPreparedAsset(ref.assetId);
     },
     publish,
     discard: async () => {
       if (journal) return;
-      await discardPreparedAsset(prepared.ref.assetId);
+      await discardPreparedAsset(ref.assetId);
     },
   };
 }
