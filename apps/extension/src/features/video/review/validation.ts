@@ -1,3 +1,4 @@
+import { parseCutTransition } from './cuts';
 import { parsePaint } from '@sniptale/foundation/paint';
 import { isReviewSpeedRate } from './speed';
 import { CANVAS_COMMENT_LIMITS } from './comments';
@@ -8,7 +9,6 @@ import type {
   ReviewAnchor,
   ReviewAnnotation,
   ReviewEdit,
-  ReviewCutTransition,
   ReviewOperation,
   ReviewRegion,
   ReviewSource,
@@ -155,28 +155,6 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
   )
     return null;
   return { ...range, kind: 'speed', rate, audio };
-}
-
-/** Invalid authored transitions refuse the operation instead of degrading it to a hard cut. */
-function parseCutTransition(value: unknown): ReviewCutTransition | null {
-  if (!isRecord(value)) return null;
-  const type = value['type'];
-  const before = value['before'];
-  const after = value['after'];
-  if (
-    (type !== 'dissolve' && type !== 'fade-black') ||
-    !finite(before) ||
-    !finite(after) ||
-    before < 0 ||
-    after < 0 ||
-    before + after <= 0 ||
-    before + after > 60
-  )
-    return null;
-  const color = value['color'];
-  if (color !== undefined && (typeof color !== 'string' || !/^#[0-9a-f]{6}(?:ff)?$/i.test(color)))
-    return null;
-  return { type, before, after, ...(color === undefined ? {} : { color }) };
 }
 
 function parseCanvasComment(value: unknown, duration: number): CanvasComment | null {

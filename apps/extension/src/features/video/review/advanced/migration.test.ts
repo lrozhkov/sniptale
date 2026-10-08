@@ -154,33 +154,38 @@ it('does not admit watermark payloads under legacy or future version declaration
   }
 });
 
-it('admits released v6 presentation and preserves v5 watermark in current and history content', () => {
-  const presentation = {
-    fadeIn: { enabled: true, duration: 0.4 },
-    fadeOut: { enabled: true, duration: 0.4 },
-    color: '#000000ff',
-    audioFade: false,
-    intro: { mode: 'none' },
-    outro: { mode: 'none' },
-  };
-  const state = { ...createQuickEditAdvancedState(), schemaVersion: 6, presentation };
-  expect(loadQuickEditAdvancedState(state)).toMatchObject({ presentation });
-  const { ui: _ui, ...content } = state;
-  expect(loadQuickEditAdvancedContentState(content)).toMatchObject({ presentation });
-  expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 5 })).toBeNull();
-  const legacy = {
-    ...createQuickEditAdvancedState(),
-    schemaVersion: 5,
-    watermark: createQuickEditWatermark('Saved'),
-  };
-  expect(loadQuickEditAdvancedState(legacy)).toMatchObject({
-    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
-    watermark: legacy.watermark,
-  });
-  const { ui: _legacyUi, ...legacyContent } = legacy;
-  expect(loadQuickEditAdvancedContentState(legacyContent)).toMatchObject({
-    schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
-    watermark: legacy.watermark,
-  });
-  expect(loadQuickEditAdvancedState(undefined)).not.toHaveProperty('presentation');
-});
+it.each([6, 7])(
+  'admits released v%i presentation without injecting joins into current or history content',
+  (version) => {
+    const presentation = {
+      fadeIn: { enabled: true, duration: 0.4 },
+      fadeOut: { enabled: true, duration: 0.4 },
+      color: '#000000ff',
+      audioFade: false,
+      intro: { mode: 'none' },
+      outro: { mode: 'none' },
+    };
+    const state = { ...createQuickEditAdvancedState(), schemaVersion: version, presentation };
+    expect(loadQuickEditAdvancedState(state)).toMatchObject({ presentation });
+    const { ui: _ui, ...content } = state;
+    expect(loadQuickEditAdvancedContentState(content)).toMatchObject({ presentation });
+    expect(loadQuickEditAdvancedContentState(content)?.presentation).toEqual(presentation);
+    expect(loadQuickEditAdvancedState(state)?.presentation).toEqual(presentation);
+    expect(loadQuickEditAdvancedState({ ...state, schemaVersion: 5 })).toBeNull();
+    const legacy = {
+      ...createQuickEditAdvancedState(),
+      schemaVersion: 5,
+      watermark: createQuickEditWatermark('Saved'),
+    };
+    expect(loadQuickEditAdvancedState(legacy)).toMatchObject({
+      schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+      watermark: legacy.watermark,
+    });
+    const { ui: _legacyUi, ...legacyContent } = legacy;
+    expect(loadQuickEditAdvancedContentState(legacyContent)).toMatchObject({
+      schemaVersion: QUICK_EDIT_ADVANCED_SCHEMA_VERSION,
+      watermark: legacy.watermark,
+    });
+    expect(loadQuickEditAdvancedState(undefined)).not.toHaveProperty('presentation');
+  }
+);

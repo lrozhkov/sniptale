@@ -74,7 +74,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 8,
+    schemaVersion: 9,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -375,6 +375,27 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
         ].every((name) => db.objectStoreNames.contains(name))
       )
         throw new Error('Project usage index stores are unavailable.');
+      return undefined;
+    },
+  },
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 8, to: 9 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 9,
+    toDatabaseVersion: 10,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate() {
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      )
+        throw new Error('Presentation join workspace stores are unavailable.');
       return undefined;
     },
   },

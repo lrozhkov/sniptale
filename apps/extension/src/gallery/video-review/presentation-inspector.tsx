@@ -228,6 +228,7 @@ function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
               hasAudio={audio?.assetId === video?.assetId && audio?.available === true}
             />
           )}
+          {media && <JoinFields {...props} />}
           <ReviewButton
             label={label('presentationPreview')}
             disabled={!media || props.previewDisabled || !props.onJoinPreview}
@@ -396,5 +397,76 @@ function VideoFields(
         />
       )}
     </>
+  );
+}
+
+function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
+  const key = props.slot === 'intro' ? 'introTransition' : 'outroTransition';
+  const transition = props.settings[key];
+  const patch = (value: NonNullable<Settings[typeof key]> | null): Settings => {
+    const next = { ...props.settings };
+    if (value) next[key] = value;
+    else delete next[key];
+    return next;
+  };
+  return (
+    <div className="min-w-0 space-y-1">
+      <SelectField<'none' | 'dissolve' | 'fade-black'>
+        className={reviewSelectFieldClassName}
+        label={label('presentationJoin')}
+        value={transition?.type ?? 'none'}
+        options={[
+          { value: 'none', label: translate('gallery.videoReview.transitionNone') },
+          { value: 'dissolve', label: translate('gallery.videoReview.cutDissolve') },
+          { value: 'fade-black', label: translate('gallery.videoReview.cutFadeColor') },
+        ]}
+        onChange={(type) =>
+          props.onChange(
+            patch(
+              type === 'none'
+                ? null
+                : {
+                    before: 0.2,
+                    after: 0.2,
+                    ...transition,
+                    type,
+                  }
+            )
+          )
+        }
+      />
+      {transition && (
+        <>
+          {transition.type === 'fade-black' && (
+            <ColorField
+              className={reviewSelectFieldClassName}
+              label={translate('gallery.videoReview.cutTransitionColor')}
+              title={translate('gallery.videoReview.cutTransitionColor')}
+              value={transition.color ?? '#000000'}
+              allowAlpha={false}
+              allowTransparent={false}
+              onChange={(color) => props.onChange(patch({ ...transition, color }))}
+              onPreviewChange={(color) =>
+                props.onPreview(color ? patch({ ...transition, color }) : null)
+              }
+            />
+          )}
+          {(['before', 'after'] as const).map((edge) => (
+            <NumberField
+              {...props}
+              key={edge}
+              label={label(edge === 'before' ? 'presentationJoinBefore' : 'presentationJoinAfter')}
+              value={transition[edge]}
+              min={transition[edge === 'before' ? 'after' : 'before'] === 0 ? 0.05 : 0}
+              max={60 - transition[edge === 'before' ? 'after' : 'before']}
+              scrubMax={Math.min(3, 60 - transition[edge === 'before' ? 'after' : 'before'])}
+              step={0.05}
+              unit="s"
+              patch={(value) => patch({ ...transition, [edge]: value })}
+            />
+          ))}
+        </>
+      )}
+    </div>
   );
 }

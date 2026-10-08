@@ -6,6 +6,7 @@ import {
   presentationColorOpacity,
   presentationMainHoldTime,
   type PresentationCandidate,
+  type PresentationJoin,
   type PresentationSequencePlan,
 } from '../../features/video/review/presentation-sequence';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
@@ -108,6 +109,11 @@ class PresentationRenderer {
   private readonly media: Partial<Record<'intro' | 'outro', Media>> = {};
   private watermark: Watermark | null = null;
   private front: RenderCanvasLease | null = null;
+  private endpoints: {
+    join: PresentationJoin;
+    outgoing: RenderCanvasLease;
+    incoming: RenderCanvasLease;
+  } | null = null;
   private disposed = false;
   private busy = false;
 
@@ -117,8 +123,8 @@ class PresentationRenderer {
   ) {
     const { backing } = args.main.dimensions;
     this.resources = createPreviewRenderResources({
-      maximumCanvases: 1,
-      maximumManagedBytes: backing.width * backing.height * 4,
+      maximumCanvases: plan.joins?.length ? 4 : 1,
+      maximumManagedBytes: backing.width * backing.height * (plan.joins?.length ? 16 : 4),
     });
     this.holdTime = presentationMainHoldTime(plan);
     args.main.signal.addEventListener('abort', this.dispose, { once: true });
@@ -178,19 +184,19 @@ class PresentationRenderer {
     this.busy = true;
     let output: RenderCanvasLease | undefined;
     try {
-      if (candidate.segment === 'main') {
-        output = await this.main!.render(candidate, { heldMainLocalTime: this.holdTime });
-      } else {
-        if (candidate.mapping.kind === 'main') throw new Error('Invalid bookend mapping');
-        const media = this.media[candidate.segment]!;
-        const frame = await media.frame(candidate.mapping);
-        try {
-          this.assertLive();
-          output = this.resources.canvas('presentation-bookend', this.args.main.dimensions.backing);
-          frame.draw(output.context);
-          this.drawWatermark(output.context);
-        } finally {
-          frame.release();
+      const join = this.plan.joins?.find(
+        (entry) =>
+          candidate.timestampUs >= entry.seamUs - entry.beforeUs &&
+          candidate.timestampUs < entry.seamUs + entry.afterUs
+      );
+      if (this.endpoints?.join !== join) this.releaseEndpoints();
+      if (join?.type === 'dissolve') output = await this.dissolve(join, candidate.timestampUs);
+      else {
+        output = await this.renderContent(candidate);
+        if (join) {
+          const distance = candidate.timestampUs - join.seamUs;
+          const alpha = distance < 0 ? 1 + distance / join.beforeUs : 1 - distance / join.afterUs;
+          this.drawColor(output.context, Math.max(0, Math.min(1, alpha)), join.color);
         }
       }
       this.assertLive();
@@ -218,6 +224,89 @@ class PresentationRenderer {
     }
   }
 
+  private async renderContent(candidate: PresentationCandidate): Promise<RenderCanvasLease> {
+    if (candidate.segment === 'main')
+      return this.main!.render(candidate, { heldMainLocalTime: this.holdTime });
+    if (candidate.mapping.kind === 'main') throw new Error('Invalid bookend mapping');
+    const frame = await this.media[candidate.segment]!.frame(candidate.mapping);
+    let output: RenderCanvasLease | undefined;
+    try {
+      this.assertLive();
+      output = this.resources.canvas('presentation-bookend', this.args.main.dimensions.backing);
+      frame.draw(output.context);
+      this.drawWatermark(output.context);
+      return output;
+    } catch (error) {
+      output?.release();
+      throw error;
+    } finally {
+      frame.release();
+    }
+  }
+
+  private async endpoint(tick: number, name: string): Promise<RenderCanvasLease> {
+    const candidate = iteratePresentationCandidates(this.plan, {
+      startTick: tick,
+      endTick: tick + 1,
+    })
+      [Symbol.iterator]()
+      .next();
+    if (candidate.done) throw new Error('Missing presentation transition endpoint');
+    const content = await this.renderContent(candidate.value);
+    let copy: RenderCanvasLease | undefined;
+    try {
+      this.assertLive();
+      copy = this.resources.canvas(name, this.args.main.dimensions.backing);
+      copy.context.drawImage(content.canvas, 0, 0);
+      return copy;
+    } catch (error) {
+      copy?.release();
+      throw error;
+    } finally {
+      content.release();
+    }
+  }
+
+  private async dissolve(join: PresentationJoin, timeUs: number): Promise<RenderCanvasLease> {
+    if (!this.endpoints) {
+      const outgoing = await this.endpoint(join.outgoingTick, 'presentation-join-outgoing');
+      try {
+        const incoming = await this.endpoint(join.incomingTick, 'presentation-join-incoming');
+        this.endpoints = { join, outgoing, incoming };
+      } catch (error) {
+        outgoing.release();
+        throw error;
+      }
+    }
+    this.assertLive();
+    const output = this.resources.canvas('presentation-join', this.args.main.dimensions.backing);
+    try {
+      const context = output.context;
+      context.save();
+      try {
+        const incoming = (timeUs - join.seamUs + join.beforeUs) / (join.beforeUs + join.afterUs);
+        context.globalAlpha = 1 - incoming;
+        context.drawImage(this.endpoints.outgoing.canvas, 0, 0);
+        // Add premultiplied contributions so transparent corners also dissolve away.
+        context.globalCompositeOperation = 'lighter';
+        context.globalAlpha = incoming;
+        context.drawImage(this.endpoints.incoming.canvas, 0, 0);
+      } finally {
+        context.restore();
+      }
+      return output;
+    } catch (error) {
+      output.release();
+      throw error;
+    }
+  }
+
+  private releaseEndpoints() {
+    this.endpoints?.outgoing.release();
+    this.endpoints?.incoming.release();
+    this.endpoints = null;
+  }
+
   private drawWatermark(context: CanvasRenderingContext2D) {
     const { canonical, backing } = this.args.main.dimensions;
     context.save();
@@ -237,7 +326,10 @@ class PresentationRenderer {
   }
 
   private drawFade(context: CanvasRenderingContext2D, timestampUs: number) {
-    const alpha = presentationColorOpacity(this.plan, timestampUs);
+    this.drawColor(context, presentationColorOpacity(this.plan, timestampUs), this.plan.color);
+  }
+
+  private drawColor(context: CanvasRenderingContext2D, alpha: number, color: string) {
     if (alpha === 0) return;
     const { backing } = this.args.main.dimensions;
     context.save();
@@ -249,7 +341,7 @@ class PresentationRenderer {
       context.shadowColor = 'transparent';
       context.shadowBlur = 0;
       context.shadowOffsetX = context.shadowOffsetY = 0;
-      context.fillStyle = this.plan.color;
+      context.fillStyle = color;
       context.fillRect(0, 0, backing.width, backing.height);
     } finally {
       context.restore();
@@ -263,6 +355,7 @@ class PresentationRenderer {
     this.controller.abort();
     this.front?.release();
     this.front = null;
+    this.releaseEndpoints();
     for (const owner of this.owned.splice(0).reverse()) owner.dispose();
     this.resources.dispose();
   };

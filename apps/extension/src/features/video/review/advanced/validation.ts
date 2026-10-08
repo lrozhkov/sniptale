@@ -438,6 +438,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 7 &&
       raw['schemaVersion'] !== 6 &&
       raw['schemaVersion'] !== 5 &&
       raw['schemaVersion'] !== 4 &&
@@ -445,6 +446,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
       raw['schemaVersion'] !== 2) ||
     (raw['webcam'] !== undefined &&
       raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 7 &&
       raw['schemaVersion'] !== 6 &&
       raw['schemaVersion'] !== 5 &&
       raw['schemaVersion'] !== 4 &&
@@ -455,6 +457,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 7 ||
       raw['schemaVersion'] === 6 ||
       raw['schemaVersion'] === 5 ||
       raw['schemaVersion'] === 4 ||
@@ -463,7 +466,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(
     raw['audio'],
-    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || raw['schemaVersion'] === 7
   );
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
@@ -477,6 +480,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 7 &&
     raw['schemaVersion'] !== 6 &&
     raw['schemaVersion'] !== 5
   )
@@ -486,6 +490,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['presentation'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 7 &&
     raw['schemaVersion'] !== 6
   )
     return null;
@@ -525,6 +530,7 @@ export function loadQuickEditAdvancedState(
   const version = raw['schemaVersion'];
   if (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    version === 7 ||
     version === 6 ||
     version === 5 ||
     version === 4 ||
@@ -546,6 +552,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['webcam'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 7 &&
     raw['schemaVersion'] !== 6 &&
     raw['schemaVersion'] !== 5 &&
     raw['schemaVersion'] !== 4 &&
@@ -556,6 +563,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 7 ||
       raw['schemaVersion'] === 6 ||
       raw['schemaVersion'] === 5 ||
       raw['schemaVersion'] === 4 ||
@@ -564,7 +572,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const background = parseBackgroundSettings(raw['background']);
   const audio = parseAudioState(
     raw['audio'],
-    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION
+    raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION || raw['schemaVersion'] === 7
   );
   const actionsEnabled = raw['actionsEnabled'];
   if (actionsEnabled !== undefined && typeof actionsEnabled !== 'boolean') return null;
@@ -578,6 +586,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 7 &&
     raw['schemaVersion'] !== 6 &&
     raw['schemaVersion'] !== 5
   )
@@ -587,6 +596,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['presentation'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 7 &&
     raw['schemaVersion'] !== 6
   )
     return null;

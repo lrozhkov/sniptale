@@ -1,6 +1,7 @@
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { buildReviewTimeMap } from './timeline';
 import { isReviewSpeedRate } from './speed';
-import type { ReviewAnchor, ReviewEdit } from './types';
+import type { ReviewAnchor, ReviewEdit, ReviewCutTransition } from './types';
 
 /** The supplied index, not a nominal GOP interval, owns selectable cut boundaries. */
 export function nearestReviewBoundary(time: number, boundaries: readonly number[]): number {
@@ -201,4 +202,28 @@ export function reviewCutTransitionAt(time: number, plans: readonly ReviewCutTra
         ? 1 - (time - plan.seam) / plan.after
         : 0;
   return { plan, incoming, beforeSeam: time < plan.seam, black: Math.max(0, Math.min(1, black)) };
+}
+
+/** Invalid authored transitions refuse the operation instead of degrading it to a hard cut. */
+export function parseCutTransition(value: unknown): ReviewCutTransition | null {
+  if (!isRecord(value)) return null;
+  const type = value['type'];
+  const before = value['before'];
+  const after = value['after'];
+  if (
+    (type !== 'dissolve' && type !== 'fade-black') ||
+    typeof before !== 'number' ||
+    !Number.isFinite(before) ||
+    typeof after !== 'number' ||
+    !Number.isFinite(after) ||
+    before < 0 ||
+    after < 0 ||
+    before + after <= 0 ||
+    before + after > 60
+  )
+    return null;
+  const color = value['color'];
+  if (color !== undefined && (typeof color !== 'string' || !/^#[0-9a-f]{6}(?:ff)?$/i.test(color)))
+    return null;
+  return { type, before, after, ...(color === undefined ? {} : { color }) };
 }

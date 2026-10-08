@@ -67,7 +67,7 @@ class RasterContext {
   shadowOffsetX = 0;
   shadowOffsetY = 0;
   private scale = [1, 1];
-  private stack: { alpha: number; fill: string; scale: number[] }[] = [];
+  private stack: { alpha: number; fill: string; scale: number[]; composite: string }[] = [];
   constructor(private readonly raster: Raster) {}
   reset() {
     this.raster.pixels.fill(0);
@@ -75,16 +75,29 @@ class RasterContext {
     this.scale = [1, 1];
   }
   save() {
-    this.stack.push({ alpha: this.globalAlpha, fill: this.fillStyle, scale: this.scale });
+    this.stack.push({
+      alpha: this.globalAlpha,
+      fill: this.fillStyle,
+      scale: this.scale,
+      composite: this.globalCompositeOperation,
+    });
   }
   restore() {
     const state = this.stack.pop()!;
     this.globalAlpha = state.alpha;
+    this.globalCompositeOperation = state.composite;
     this.fillStyle = state.fill;
     this.scale = state.scale;
   }
   setTransform(x: number, _b: number, _c: number, y: number) {
     this.scale = [x, y];
+  }
+  drawImage(source: Raster, _x: number, _y: number) {
+    for (let index = 0; index < this.raster.pixels.length; index++)
+      this.raster.pixels[index] =
+        this.raster.pixels[index]! *
+          (this.globalCompositeOperation === 'lighter' ? 1 : 1 - this.globalAlpha) +
+        source.pixels[index]! * this.globalAlpha;
   }
   fillRect(x: number, y: number, width: number, height: number) {
     const rgb = [1, 3, 5].map((at) => parseInt(this.fillStyle.slice(at, at + 2), 16));
@@ -446,4 +459,65 @@ it('exposes primary audio borrowed from the already prepared main adapter', asyn
   expect(io.main).toHaveBeenCalledOnce();
   owner.dispose();
   expect(io.mainDispose).toHaveBeenCalledOnce();
+});
+
+it.each(['dissolve', 'fade-black'] as const)(
+  'composes %s across the full join without retiming or repeated endpoint decoding',
+  async (type) => {
+    const args = fixture();
+    args.settings.fadeIn.enabled = args.settings.fadeOut.enabled = false;
+    args.settings.introTransition = { type, before: 0.5, after: 0.5, color: '#ffffff' };
+    const planned = planReviewPresentationSequence({
+      settings: args.settings,
+      mainDuration: 1,
+      fragmentOffset: 7,
+      includeBookends: true,
+      rate: args.plan.rate,
+    });
+    if (!planned.ok) throw new Error('Invalid join fixture');
+    args.plan = planned.plan;
+    const owner = await open(args);
+    const candidates = [...iteratePresentationCandidates(args.plan)];
+    for (const tick of [1, 2, 3]) {
+      const lease = await owner.render(candidates[tick]!);
+      const raster = lease.canvas as unknown as Raster;
+      if (tick === 2) {
+        expect(raster.pixel(0, 0)).toEqual(
+          type === 'dissolve' ? [127.5, 0, 127.5] : [255, 255, 255]
+        );
+        expect(raster.pixel(0, 1)).toEqual(
+          type === 'dissolve' ? [255, 127.5, 127.5] : [255, 255, 255]
+        );
+      }
+      lease.release();
+    }
+    if (type === 'dissolve') {
+      expect(io.frame).toHaveBeenCalledOnce();
+      expect(io.render).toHaveBeenCalledOnce();
+      expect(io.render.mock.calls[0]![0]).toMatchObject({ mapping: { mainLocalTime: 0 } });
+    }
+    expect(args.plan.totalDurationUs).toBe(2_000_000);
+  }
+);
+
+it('releases an acquired outgoing endpoint when incoming decode fails', async () => {
+  const args = fixture();
+  args.settings.introTransition = { type: 'dissolve', before: 0.2, after: 0.2 };
+  const planned = planReviewPresentationSequence({
+    settings: args.settings,
+    mainDuration: 1,
+    fragmentOffset: 7,
+    includeBookends: true,
+    rate: args.plan.rate,
+  });
+  if (!planned.ok) throw new Error('Invalid join fixture');
+  args.plan = planned.plan;
+  io.render.mockRejectedValueOnce(new Error('decode'));
+  const owner = await open(args);
+  await expect(owner.render([...iteratePresentationCandidates(args.plan)][2]!)).rejects.toThrow(
+    'decode'
+  );
+  expect(io.frameRelease).toHaveBeenCalledOnce();
+  expect(io.mainDispose).toHaveBeenCalledOnce();
+  expect(io.mediaDispose).toHaveBeenCalledTimes(2);
 });

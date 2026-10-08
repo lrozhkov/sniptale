@@ -32,6 +32,16 @@ type Segment = {
   audioStart: number;
   audioEnd: number;
 };
+/** Transition endpoints are existing complete compositions on the same output lattice. */
+export interface PresentationJoin {
+  type: 'dissolve' | 'fade-black';
+  color: string;
+  seamUs: number;
+  beforeUs: number;
+  afterUs: number;
+  outgoingTick: number;
+  incomingTick: number;
+}
 type Envelope = { span: number; fadeIn: number; fadeOut: number };
 /** Derived placement only; authored trim and main clocks are never retimed. */
 export interface PresentationSequencePlan {
@@ -43,6 +53,7 @@ export interface PresentationSequencePlan {
   visualEnvelope: Envelope;
   audioEnvelope: Envelope;
   visualFeedback: 'single-frame' | null;
+  joins?: readonly PresentationJoin[];
 }
 /** Source ranges are half-open; hold-last asks the decoder for its final valid frame, not an epsilon. */
 export interface PresentationCandidate {
@@ -222,6 +233,37 @@ function quantizeSegments(raw: ReturnType<typeof rawSegments>, rate: Presentatio
   return { ok: true as const, segments, totalDurationUs, candidateCount };
 }
 
+function planJoins(settings: QuickEditPresentationSettings, segments: readonly Segment[]) {
+  const joins: PresentationJoin[] = [];
+  for (let index = 1; index < segments.length; index++) {
+    const outgoing = segments[index - 1]!;
+    const incoming = segments[index]!;
+    const authored =
+      outgoing.name === 'intro' ? settings.introTransition : settings.outroTransition;
+    if (!authored) continue;
+    joins.push({
+      type: authored.type,
+      color: authored.color ?? '#000000',
+      seamUs: incoming.startUs,
+      beforeUs: Math.min(authored.before * 1_000_000, outgoing.endUs - outgoing.startUs),
+      afterUs: Math.min(authored.after * 1_000_000, incoming.endUs - incoming.startUs),
+      outgoingTick: outgoing.endTick - 1,
+      incomingTick: incoming.startTick,
+    });
+  }
+  if (joins.length === 2) {
+    const left = joins[0]!,
+      right = joins[1]!;
+    const span = right.seamUs - left.seamUs;
+    const requested = left.afterUs + right.beforeUs;
+    if (requested > span) {
+      left.afterUs *= span / requested;
+      right.beforeUs *= span / requested;
+    }
+  }
+  return joins;
+}
+
 /** Plans cumulative half-up joins and a lazy global lattice with a possibly partial final sample. */
 export function planReviewPresentationSequence(
   input: PresentationSequenceInput
@@ -243,6 +285,7 @@ export function planReviewPresentationSequence(
   const quantized = quantizeSegments(rawSegments(input, settings), rate);
   if (!quantized.ok) return quantized;
   const { segments, totalDurationUs, candidateCount } = quantized;
+  const joins = planJoins(settings, segments);
   return {
     ok: true,
     plan: {
@@ -250,6 +293,7 @@ export function planReviewPresentationSequence(
       totalDurationUs,
       candidateCount,
       segments,
+      ...(joins.length ? { joins } : {}),
       color: settings.color,
       visualEnvelope: envelope(
         settings,

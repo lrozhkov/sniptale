@@ -18,6 +18,8 @@ Gallery voiceover transcripts and accepted generated-phrase references require p
 
 Gallery scene watermarks require physical version 6 and the mediaLibrary logical contract 5. The additive 5→6 admission step preserves workspace rows, history, recovery drafts, asset references and immutable objects without rewriting them or enabling watermarks in existing projects. Advanced content parsers retain legacy versions 2–4 and emit version 5; remembered logo references participate in the same review history, backup and deletion graph as active logos. Earlier applications refuse the newer database before ordinary mutations, preventing older parsers from silently discarding the new content and asset references.
 
+Gallery presentation join settings require physical version 10 and mediaLibrary contract 9. The additive 9→10 step retains every workspace, history, recovery draft, asset and native usage index. Advanced version 8 admits versions 2–7 without injecting join defaults into legacy settings or replay operations. Earlier applications refuse the newer database before ordinary mutations.
+
 ## Alpha reset and recovery
 
 Use `sniptale-video-db` only in alpha-reset and privacy-erasure inventories. Under the persistent-data barrier, Gallery records a browser-storage journal, removes alpha IndexedDB and OPFS data plus preview cache, verifies absence, and clears the journal. Resume an interrupted reset from that journal. Do not migrate or export alpha data.

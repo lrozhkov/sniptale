@@ -1,6 +1,9 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewPresentationMessages = defineMessageSource({
+  presentationJoinBefore: { en: 'Before join', ru: 'До стыка' },
+  presentationJoinAfter: { en: 'After join', ru: 'После стыка' },
+  presentationJoin: { en: 'Join transition', ru: 'Переход на стыке' },
   presentationTotal: { ru: 'Длительность экспорта', en: 'Export duration' },
   presentationMain: { ru: 'Монтаж', en: 'Main' },
   presentation: { ru: 'Начало и завершение', en: 'Beginning and ending' },

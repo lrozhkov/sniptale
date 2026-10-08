@@ -403,3 +403,27 @@ describe('bounded presentation candidate lookup', () => {
     );
   });
 });
+
+it('plans separate intro/outro joins without changing duration and bounds their shared main span', () => {
+  const request = input([1, 0.2, 1]);
+  Object.assign(request.settings, {
+    introTransition: { type: 'dissolve', before: 0.4, after: 0.4 },
+    outroTransition: { type: 'fade-black', before: 0.4, after: 0.4, color: '#ffffff' },
+  });
+  const result = plan(request);
+  expect(result.totalDurationUs).toBe(2_200_000);
+  expect(result).toMatchObject({
+    joins: [
+      { type: 'dissolve', seamUs: 1_000_000, beforeUs: 400_000, afterUs: 100_000 },
+      {
+        type: 'fade-black',
+        seamUs: 1_200_000,
+        beforeUs: 100_000,
+        afterUs: 400_000,
+        color: '#ffffff',
+      },
+    ],
+  });
+  request.includeBookends = false;
+  expect(plan(request)).not.toHaveProperty('joins');
+});

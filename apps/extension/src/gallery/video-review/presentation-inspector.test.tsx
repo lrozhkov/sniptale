@@ -408,3 +408,47 @@ it('persists duration after the parent echoes each preview and survives inspecto
   await render();
   expect(field('Duration range').value).toBe('3.1');
 });
+
+it('configures and removes a join independently of the opposite edge and media', async () => {
+  retained();
+  props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.3 };
+  await render();
+  async function choose(option: string) {
+    act(() => button('Join transition', section()).click());
+    const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (item) => item.textContent === option
+    )!;
+    await act(async () => node.click());
+  }
+  await choose('Dissolve');
+  expect(props.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      introTransition: { type: 'dissolve', before: 0.2, after: 0.2 },
+      outroTransition: props.settings.outroTransition,
+      intro: props.settings.intro,
+    })
+  );
+  props.settings.introTransition = { type: 'dissolve', before: 0.2, after: 0.2 };
+  await render();
+  const field = await type('Before join', '0.5');
+  accept(field);
+  expect(props.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      introTransition: { type: 'dissolve', before: 0.5, after: 0.2 },
+    })
+  );
+  await choose('Fade through color');
+  expect(props.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      introTransition: { type: 'fade-black', before: 0.2, after: 0.2 },
+    })
+  );
+  props.settings.introTransition.type = 'fade-black';
+  await render();
+  expect(section().textContent).toContain('Transition color');
+  await choose('None');
+  const last = vi.mocked(props.onChange).mock.calls.at(-1)![0];
+  expect(last).not.toHaveProperty('introTransition');
+  expect(last.outroTransition).toEqual(props.settings.outroTransition);
+  expect(last.intro).toEqual(props.settings.intro);
+});

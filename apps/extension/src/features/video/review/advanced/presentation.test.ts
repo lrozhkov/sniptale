@@ -31,6 +31,8 @@ describe('presentation settings', () => {
       ...neutral,
       fadeIn: { enabled: true, duration: 0.4 },
       fadeOut: { enabled: true, duration: 0.4 },
+      introTransition: { type: 'dissolve', before: 0.2, after: 0.2 },
+      outroTransition: { type: 'dissolve', before: 0.2, after: 0.2 },
     });
     fresh.intro.mode = 'none';
     fresh.fadeIn.duration = 2;
@@ -162,4 +164,25 @@ describe('presentation settings', () => {
     input.intro.video.audio.gain = 2;
     expect(parseQuickEditPresentationSettings(input)).not.toBeNull();
   });
+});
+
+it('preserves legacy omission and rejects malformed authored join settings', () => {
+  const legacy = createNeutralPresentationSettings();
+  expect(parseQuickEditPresentationSettings(legacy)).not.toHaveProperty('introTransition');
+  for (const transition of [
+    null,
+    {},
+    { type: 'dissolve', before: 0, after: 0 },
+    { type: 'fade-black', before: 1, after: 1, color: '#00000000' },
+    { type: 'dissolve', before: -1, after: 1 },
+  ]) {
+    expect(
+      parseQuickEditPresentationSettings({ ...legacy, introTransition: transition })
+    ).toBeNull();
+  }
+  const valid = {
+    ...legacy,
+    outroTransition: { type: 'fade-black', before: 0, after: 0.4, color: '#ffffff' },
+  };
+  expect(parseQuickEditPresentationSettings(valid)).toEqual(valid);
 });

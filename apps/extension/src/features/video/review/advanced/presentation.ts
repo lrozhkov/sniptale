@@ -1,3 +1,5 @@
+import { parseCutTransition } from '../cuts';
+import type { ReviewCutTransition } from '../types';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { isBoundedNumber } from '../../project/validation/primitives';
@@ -30,6 +32,8 @@ export interface QuickEditPresentationSettings {
   audioFade: boolean;
   intro: Slot;
   outro: Slot;
+  introTransition?: ReviewCutTransition;
+  outroTransition?: ReviewCutTransition;
 }
 
 /** Legacy omission is processing-neutral, including when advanced mode is selected. */
@@ -49,6 +53,8 @@ export function createNewWorkspacePresentationSettings(): QuickEditPresentationS
   const settings = createNeutralPresentationSettings();
   settings.fadeIn.enabled = true;
   settings.fadeOut.enabled = true;
+  settings.introTransition = { type: 'dissolve', before: 0.2, after: 0.2 };
+  settings.outroTransition = { type: 'dissolve', before: 0.2, after: 0.2 };
   return settings;
 }
 
@@ -207,7 +213,16 @@ export function parseQuickEditPresentationSettings(
   if (value === undefined) return createNeutralPresentationSettings();
   if (
     !isRecord(value) ||
-    !fields(value, ['fadeIn', 'fadeOut', 'color', 'audioFade', 'intro', 'outro'])
+    !fields(value, [
+      'fadeIn',
+      'fadeOut',
+      'color',
+      'audioFade',
+      'intro',
+      'outro',
+      'introTransition',
+      'outroTransition',
+    ])
   )
     return null;
   const fadeIn = fade(value['fadeIn']);
@@ -217,5 +232,23 @@ export function parseQuickEditPresentationSettings(
   const outro = slot(value['outro']);
   if (!fadeIn || !fadeOut || !color || !intro || !outro || typeof value['audioFade'] !== 'boolean')
     return null;
-  return { fadeIn, fadeOut, color, intro, outro, audioFade: value['audioFade'] };
+  const introTransition =
+    value['introTransition'] === undefined
+      ? undefined
+      : parseCutTransition(value['introTransition']);
+  const outroTransition =
+    value['outroTransition'] === undefined
+      ? undefined
+      : parseCutTransition(value['outroTransition']);
+  if (introTransition === null || outroTransition === null) return null;
+  return {
+    fadeIn,
+    fadeOut,
+    color,
+    intro,
+    outro,
+    audioFade: value['audioFade'],
+    ...(introTransition ? { introTransition } : {}),
+    ...(outroTransition ? { outroTransition } : {}),
+  };
 }

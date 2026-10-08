@@ -273,6 +273,26 @@ for (const variant of variants) {
         expect(await scroll.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
         expect(await scroll.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
       }
+      await select(
+        intro,
+        'gallery.videoReview.presentationJoin',
+        'gallery.videoReview.cutDissolve'
+      );
+      const joinBefore = intro.getByRole('textbox', {
+        name: label('gallery.videoReview.presentationJoinBefore'),
+        exact: true,
+      });
+      await joinBefore.fill('0.4');
+      await joinBefore.press('Enter');
+      await settled();
+      await expect
+        .poll(async () => (await persistedPresentation(page))?.introTransition?.before)
+        .toBe(0.4);
+      await joinBefore.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('presentation-join-controls.png'),
+        fullPage: false,
+      });
       const mainVideo = review.locator('video').first();
       const trigger = mode('gallery.videoReview.presentationPreview');
       await trigger.click();

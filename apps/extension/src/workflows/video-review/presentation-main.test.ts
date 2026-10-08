@@ -414,3 +414,27 @@ it('disposes the Input when cancellation interrupts primary audio metadata', asy
   expect(io.inputs).toHaveLength(1);
   expect(io.inputs[0]!.dispose).toHaveBeenCalledOnce();
 });
+
+it('joins only retained main endpoints when both source edges are cut and the middle is sped up', async () => {
+  const args = fixture();
+  args.edits = [
+    { id: 'head', kind: 'cut', start: 0, end: 0.5, requestedStart: 0, requestedEnd: 0.5 },
+    { id: 'tail', kind: 'cut', start: 2.5, end: 3, requestedStart: 2.5, requestedEnd: 3 },
+    {
+      id: 'speed',
+      kind: 'speed',
+      start: 0.5,
+      end: 2.5,
+      requestedStart: 0.5,
+      requestedEnd: 2.5,
+      rate: 2,
+      audio: 'speed',
+    },
+  ];
+  const owner = await open(args);
+  const first = await owner.render(candidate(0));
+  first.release();
+  const last = await owner.render(candidate(1, true), { heldMainLocalTime: 29 / 30 });
+  last.release();
+  expect(io.times).toEqual([0.5, 2.433]);
+});
