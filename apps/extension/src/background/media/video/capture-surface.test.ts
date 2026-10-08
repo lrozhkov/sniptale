@@ -27,6 +27,7 @@ import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { CaptureSurfaceError } from '../../capture-surface';
 import {
   acceptVideoSourceReady,
+  cancelVideoSourceReadyWait,
   acquireVideoCaptureSurface,
   releaseVideoCaptureSurface,
   waitForVideoSourceReady,
@@ -249,3 +250,72 @@ it('resizes the initiating browser window for desktop capture without page acces
   await releaseVideoCaptureSurface('desktop');
   expect(mocks.release).toHaveBeenCalledWith(applied);
 });
+
+it.each([11_000, 44_000])('admits a source after %i ms of slow preparation', async (delay) => {
+  vi.useFakeTimers();
+  const recordingId = `slow-${delay}`;
+  try {
+    await acquireVideoCaptureSurface({
+      captureMode: CaptureMode.TAB,
+      presetId: null,
+      recordingId,
+      tabId: 7,
+    });
+    const ready = waitForVideoSourceReady({ expectedStreamInstanceId: 'slow-stream', recordingId });
+    const observed = ready.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(delay);
+    await expect(
+      acceptVideoSourceReady({
+        type: 'OFFSCREEN_SOURCE_READY',
+        generation: 1,
+        recordingId,
+        streamInstanceId: 'slow-stream',
+        videoWidth: 1280,
+        videoHeight: 720,
+        trackSettings: {},
+      })
+    ).resolves.toBe('ALLOW');
+    await expect(observed).resolves.toBe('slow-stream');
+  } finally {
+    await releaseVideoCaptureSurface(recordingId);
+    vi.useRealTimers();
+  }
+});
+
+it.each(['timeout', 'cancel'] as const)(
+  'rejects a late source after preparation %s',
+  async (mode) => {
+    vi.useFakeTimers();
+    const recordingId = `late-${mode}`;
+    try {
+      await acquireVideoCaptureSurface({
+        captureMode: CaptureMode.TAB,
+        presetId: null,
+        recordingId,
+        tabId: 7,
+      });
+      const ready = waitForVideoSourceReady({
+        expectedStreamInstanceId: 'late-stream',
+        recordingId,
+      });
+      const observed = ready.catch((error: unknown) => error);
+      if (mode === 'cancel') cancelVideoSourceReadyWait(recordingId, new Error('cancelled'));
+      else await vi.advanceTimersByTimeAsync(45_000);
+      expect(await observed).toBeInstanceOf(Error);
+      await expect(
+        acceptVideoSourceReady({
+          type: 'OFFSCREEN_SOURCE_READY',
+          generation: 1,
+          recordingId,
+          streamInstanceId: 'late-stream',
+          videoWidth: 1280,
+          videoHeight: 720,
+          trackSettings: {},
+        })
+      ).resolves.toBe('DENY');
+    } finally {
+      await releaseVideoCaptureSurface(recordingId);
+      vi.useRealTimers();
+    }
+  }
+);

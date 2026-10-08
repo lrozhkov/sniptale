@@ -1,4 +1,8 @@
-import { OFFSCREEN_RECORDING_START_TIMEOUT_MS } from '@sniptale/runtime-contracts/video/types/timeouts';
+import {
+  OFFSCREEN_RECORDING_START_TIMEOUT_MS,
+  RECORDING_SOURCE_PREPARATION_TIMEOUT_MS,
+  RECORDING_START_DELIVERY_TIMEOUT_MS,
+} from '@sniptale/runtime-contracts/video/types/timeouts';
 import { reserveRecordingBegin, cancelRecordingBegin } from './start/gate';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
 import { createRuntimeMessagingTransport } from '../../platform/runtime-messaging';
@@ -173,7 +177,13 @@ async function prepareRecordingData(
   });
   try {
     if ((params.settings.sourceCount ?? 1) <= 1) {
-      const begin = reserveRecordingBegin(binding, timeoutMs);
+      // BEGIN arrives only after source admission and the background countdown.
+      const begin = reserveRecordingBegin(
+        binding,
+        RECORDING_SOURCE_PREPARATION_TIMEOUT_MS +
+          RECORDING_START_DELIVERY_TIMEOUT_MS +
+          Math.max(0, params.settings.countdownSeconds ?? 0) * 1000
+      );
       void begin.catch((error) => preparation.abort.abort(error));
     }
     await Promise.race([prepareData(), aborted]);

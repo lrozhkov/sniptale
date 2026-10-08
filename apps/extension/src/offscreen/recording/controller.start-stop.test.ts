@@ -756,3 +756,28 @@ it('releases a failed admission so a subsequent start can retry', async () => {
   await startRecording(createStartParams());
   expect(startRecordingImplMock).toHaveBeenCalledOnce();
 });
+
+it('keeps BEGIN available through slow preparation and the full countdown', async () => {
+  vi.useFakeTimers();
+  const { waitForRecordingBegin, allowRecordingBegin, cancelRecordingBegin } =
+    await import('./start/gate');
+  try {
+    const params = createStartParams();
+    params.settings.countdownSeconds = 10;
+    startRecordingImplMock.mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 33_000));
+      await waitForRecordingBegin(sourceBinding, 10_000);
+    });
+    const pending = startRecording(
+      params,
+      () => new Promise<void>((resolve) => setTimeout(resolve, 11_000))
+    );
+    const observed = pending.catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(54_000);
+    allowRecordingBegin(sourceBinding);
+    await expect(observed).resolves.toBeUndefined();
+  } finally {
+    cancelRecordingBegin();
+    vi.useRealTimers();
+  }
+});
