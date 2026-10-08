@@ -1,3 +1,4 @@
+import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
   initDB,
   subscribeToDbTermination,
@@ -31,7 +32,10 @@ export function createOffscreenDataReadiness(deps: Dependencies) {
     const current = generation;
     const start = performance.now();
     try {
-      await operation();
+      await runStorageStartupPhase(
+        phase === 'admission' ? 'offscreen-data-admission' : 'offscreen-data-recovery',
+        operation
+      );
       if (current !== generation) throw new Error('Offscreen data connection changed');
       if (phase === 'admission') admitted = true;
       logger.debug('Data readiness completed', {
@@ -87,9 +91,14 @@ export const offscreenDataReadiness = createOffscreenDataReadiness({
 /** Replay the previous durable completion before admitting another recording writer. */
 export async function prepareOffscreenRecordingData(): Promise<void> {
   await offscreenDataReadiness.ensureAssets();
-  const [{ reconcileRecordingCompletionOutbox }, { sendRuntimeMessage }] = await Promise.all([
-    import('../recording/post-record-publication'),
-    import('../../platform/runtime-messaging'),
-  ]);
-  await reconcileRecordingCompletionOutbox({ sendRuntimeMessage });
+  const [{ reconcileRecordingCompletionOutbox }, { sendRuntimeMessage }] =
+    await runStorageStartupPhase('recording-outbox-import', () =>
+      Promise.all([
+        import('../recording/post-record-publication'),
+        import('../../platform/runtime-messaging'),
+      ])
+    );
+  await runStorageStartupPhase('recording-outbox-reconcile', () =>
+    reconcileRecordingCompletionOutbox({ sendRuntimeMessage })
+  );
 }

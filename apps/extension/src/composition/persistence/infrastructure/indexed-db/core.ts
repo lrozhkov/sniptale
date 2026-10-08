@@ -1,3 +1,4 @@
+import { runStorageStartupPhase } from '../startup-diagnostics';
 import { openDB, type IDBPDatabase } from 'idb';
 import { createLazyDefaultOwner } from '@sniptale/foundation/default-owner';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -183,7 +184,9 @@ async function createPersistentStorageGrantPromise(): Promise<boolean> {
 }
 
 async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
-  await requestPersistentStorageGrant().catch(() => false);
+  await runStorageStartupPhase('database-persistence-grant', requestPersistentStorageGrant).catch(
+    () => false
+  );
   let openedDb: IDBPDatabase | null = null;
   let openingBlocked = false;
   let rejectBlocked!: (error: DatabaseAdmissionError) => void;
@@ -226,7 +229,9 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
     }
     return db;
   });
-  const db = await Promise.race([opening, blockedResult]);
+  const db = await runStorageStartupPhase('database-open', () =>
+    Promise.race([opening, blockedResult])
+  );
   openedDb = db;
 
   if (!hasExpectedStores(db)) {
@@ -241,7 +246,9 @@ async function openStoresWithMaintenance(): Promise<IDBPDatabase> {
     throw error;
   }
 
-  await runProvenanceUrlMaintenance(db).catch((error) => {
+  await runStorageStartupPhase('database-url-maintenance', () =>
+    runProvenanceUrlMaintenance(db)
+  ).catch((error) => {
     logger.warn('Provenance URL maintenance failed', error);
   });
   return db;
@@ -295,7 +302,7 @@ async function prepareDatabase(allowAlphaReset = false): Promise<void> {
   }
   if (state.preparationPromise) return state.preparationPromise;
   const preparation = runWithPersistentDataErasureBarrier(async () => {
-    let admission = await inspectDatabaseAdmission();
+    let admission = await runStorageStartupPhase('database-schema-check', inspectDatabaseAdmission);
     if (
       allowAlphaReset &&
       admission.status === 'blocked' &&
@@ -325,19 +332,23 @@ async function prepareDatabase(allowAlphaReset = false): Promise<void> {
           });
         }
       }
-      admission = await inspectDatabaseAdmission();
+      admission = await runStorageStartupPhase('database-schema-check', inspectDatabaseAdmission);
     }
     if (admission.status !== 'ready') throw new DatabaseAdmissionError(admission);
     await openDbAuthority();
-    const verified = await inspectDatabaseAdmission();
+    const verified = await runStorageStartupPhase(
+      'database-schema-check',
+      inspectDatabaseAdmission
+    );
     if (verified.status !== 'ready') throw new DatabaseAdmissionError(verified);
     state.databaseReady = true;
   });
-  state.preparationPromise = preparation;
+  const observed = runStorageStartupPhase('database-admission', () => preparation);
+  state.preparationPromise = observed;
   try {
-    await preparation;
+    await observed;
   } finally {
-    if (state.preparationPromise === preparation) state.preparationPromise = null;
+    if (state.preparationPromise === observed) state.preparationPromise = null;
   }
 }
 

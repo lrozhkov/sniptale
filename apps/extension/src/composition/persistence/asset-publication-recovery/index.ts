@@ -1,3 +1,4 @@
+import { runStorageStartupPhase } from '../infrastructure/startup-diagnostics';
 import { sameMediaSource } from '../media-library/dependencies';
 import type { DurableAssetLifecyclePermit } from '../infrastructure/mutation-barrier';
 import {
@@ -488,24 +489,30 @@ async function recoverPublications(
   // the durable operation and lifecycle locks are held or nested IndexedDB mutations would
   // queue it behind this context's own holds.
   await initDB();
-  return runWithDurableAssetOperationRecovery(permit, async () => {
-    await collectQuiescentWritingObjects();
-    await runWithDurableAssetLifecycleLock((permit) => recoverBackupRestoreOperations(permit));
-    const recovered = await recoverStandaloneAssetPublications(
-      [
-        recordingAssetPublicationAdapter,
-        projectAssetPublicationAdapter,
-        projectExportPublicationAdapter,
-        scenarioAssetPublicationAdapter,
-        scenarioHtmlPublicationAdapter,
-        imageWorkspacePublicationAdapter,
-        webSnapshotPublicationAdapter,
-      ],
-      transitionPermit
-    );
-    if (collectOrphans) await collectOrphanAssetObjects();
-    return recovered;
-  });
+  return runStorageStartupPhase('asset-recovery', () =>
+    runWithDurableAssetOperationRecovery(permit, async () => {
+      await runStorageStartupPhase('asset-writing-cleanup', () => collectQuiescentWritingObjects());
+      await runStorageStartupPhase('asset-backup-recovery', () =>
+        runWithDurableAssetLifecycleLock((permit) => recoverBackupRestoreOperations(permit))
+      );
+      const recovered = await runStorageStartupPhase('asset-publication-replay', () =>
+        recoverStandaloneAssetPublications(
+          [
+            recordingAssetPublicationAdapter,
+            projectAssetPublicationAdapter,
+            projectExportPublicationAdapter,
+            scenarioAssetPublicationAdapter,
+            scenarioHtmlPublicationAdapter,
+            imageWorkspacePublicationAdapter,
+            webSnapshotPublicationAdapter,
+          ],
+          transitionPermit
+        )
+      );
+      if (collectOrphans) await collectOrphanAssetObjects();
+      return recovered;
+    })
+  );
 }
 
 /** Preserve the full maintenance behavior for existing explicit recovery consumers. */

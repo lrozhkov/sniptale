@@ -1,3 +1,4 @@
+import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import {
   listMediaThumbnailIds,
   listMediaLibrary,
@@ -37,26 +38,30 @@ export async function loadGalleryLibrarySnapshot(): Promise<{
   estimate: StorageEstimateInfo;
   nextItems: GalleryItem[];
 }> {
-  await repairTemporaryProjectLifecycles();
-  await backfillScenarioLibraryAssets();
+  await runStorageStartupPhase('gallery-lifecycle-repair', () =>
+    repairTemporaryProjectLifecycles()
+  );
+  await runStorageStartupPhase('gallery-scenario-backfill', backfillScenarioLibraryAssets);
   const settings = await loadSettings().catch(() => null);
   if (settings) {
-    await cleanupDrafts({ policy: settings.localStoragePolicy }).catch(() => {
+    await runStorageStartupPhase('gallery-draft-cleanup', () =>
+      cleanupDrafts({ policy: settings.localStoragePolicy })
+    ).catch(() => {
       logger.warn('Draft maintenance failed; showing current library items.');
     });
   }
   const policy = settings?.localStoragePolicy ?? DEFAULT_LOCAL_STORAGE_POLICY;
   const [mediaItems, scenarioProjects, thumbnailIds, estimate, videoProjects, presentations] =
     await Promise.all([
-      listMediaLibrary(),
-      listScenarioProjectSummaries(),
-      listMediaThumbnailIds(),
-      getStorageEstimateInfo(),
-      listVideoProjects(),
-      listAggregatePresentations(),
+      runStorageStartupPhase('gallery-media-list', listMediaLibrary),
+      runStorageStartupPhase('gallery-scenario-list', listScenarioProjectSummaries),
+      runStorageStartupPhase('gallery-thumbnail-list', listMediaThumbnailIds),
+      runStorageStartupPhase('gallery-storage-estimate', getStorageEstimateInfo),
+      runStorageStartupPhase('gallery-video-project-list', listVideoProjects),
+      runStorageStartupPhase('gallery-presentations', listAggregatePresentations),
     ]);
-  const scenarioExportsByProject = await loadScenarioExportsByProject(
-    scenarioProjects.map((project) => project.id)
+  const scenarioExportsByProject = await runStorageStartupPhase('gallery-scenario-exports', () =>
+    loadScenarioExportsByProject(scenarioProjects.map((project) => project.id))
   );
 
   return {

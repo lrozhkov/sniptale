@@ -1,3 +1,4 @@
+import { runStorageStartupPhase } from '../../composition/persistence/infrastructure/startup-diagnostics';
 import { maintainLibraryAssets } from '../../workflows/media-hub/maintenance';
 import { loadSettings } from '../../composition/persistence/settings';
 import { cleanupLibraryTrash } from '../../workflows/media-hub/trash';
@@ -376,7 +377,9 @@ async function runGalleryRefresh(args: GalleryRefreshActionArgs) {
   try {
     const settings = await loadSettings().catch(() => null);
     if (settings) {
-      const maintenance = await cleanupLibraryTrash(settings.localStoragePolicy).catch(() => ({
+      const maintenance = await runStorageStartupPhase('gallery-trash-cleanup', () =>
+        cleanupLibraryTrash(settings.localStoragePolicy)
+      ).catch(() => ({
         failedCount: 1,
       }));
       if (maintenance.failedCount > 0) args.onBanner(translate('gallery.app.trashCleanupFailed'));
