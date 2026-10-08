@@ -10,6 +10,11 @@ export async function maintainLibraryAssets(
 ): Promise<void> {
   const steps = [
     async () => {
+      const { maintainProjectUsageIndex } =
+        await import('../../composition/persistence/media-library/usage-index-maintenance');
+      if (await maintainProjectUsageIndex(signal)) publishMediaHubLibraryChanged('sync', []);
+    },
+    async () => {
       const { maintainProvenanceUrls } =
         await import('../../composition/persistence/infrastructure/indexed-db/maintenance/provenance');
       if (!signal.aborted)

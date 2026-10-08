@@ -1,3 +1,4 @@
+import { openDB } from 'idb';
 import { describe, expect, it, vi } from 'vitest';
 import { DB_VERSION, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stores.ts';
 import { handleDatabaseUpgrade } from './upgrade/core';
@@ -9,6 +10,13 @@ import {
   parseStoredSchemaContracts,
   type DatabaseMigrationDescriptor,
 } from './schema-contracts.ts';
+
+vi.mock('idb', () => ({
+  openDB: vi.fn(async () => ({
+    transaction: () => ({ store: { openCursor: async () => null } }),
+    close: vi.fn(),
+  })),
+}));
 
 describe('beta persistence domain registry', () => {
   it('assigns every product store to exactly one owner and keeps metadata infrastructure-owned', () => {
@@ -101,6 +109,7 @@ it('admits speech without rewriting workspace history or the durable asset graph
     abort: vi.fn(),
     objectStore: vi.fn((_name: string) => ({
       put,
+      createIndex: vi.fn(),
       clear: vi.fn(),
       delete: vi.fn(),
       getAll: vi.fn(),
@@ -115,7 +124,13 @@ it('admits speech without rewriting workspace history or the durable asset graph
   handleDatabaseUpgrade(db, 4, DB_VERSION, transaction);
   expect(db.createObjectStore).not.toHaveBeenCalled();
   expect(db.deleteObjectStore).not.toHaveBeenCalled();
-  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(transaction.objectStore.mock.calls).toEqual([
+    ['video_projects'],
+    ['video_workspaces'],
+    ['project_assets'],
+    ['scenario_assets'],
+    [SCHEMA_CONTRACTS_STORE],
+  ]);
   expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
   const plan = buildDatabaseMigrationPlan(4, DB_VERSION)!;
   expect(plan).toHaveLength(DB_VERSION - 4);
@@ -138,10 +153,19 @@ it('upgrades each retained source contract only after all required stores valida
       }),
       deleteObjectStore: vi.fn(),
     };
-    const transaction = { abort: vi.fn(), objectStore: vi.fn() };
+    const transaction = {
+      abort: vi.fn(),
+      objectStore: vi.fn(() => ({
+        createIndex,
+        put: vi.fn(),
+        clear: vi.fn(),
+        delete: vi.fn(),
+        getAll: vi.fn(),
+      })),
+    };
     expect(migration.migrate(db, transaction)).toBeUndefined();
     expect(migration.validate(db, transaction)).toBeUndefined();
-    expect(await migration.estimateAdditionalBytes()).toBe(64 * 1024);
+    expect(await migration.estimateAdditionalBytes(await openDB('test'))).toBe(64 * 1024);
     if (migration.fromDatabaseVersion === 1) {
       expect(db.createObjectStore.mock.calls.map(([name]) => name)).toEqual([
         'video_workspaces',

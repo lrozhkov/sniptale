@@ -1,3 +1,5 @@
+import { withVideoProjectUsage } from './usage-index-keys';
+import { createVideoProjectEntryWithMediaClip } from '../projects/index.test-support';
 import { expect, it } from 'vitest';
 import { mediaId, physicalId, mediaEntry, rows, replaceRows } from './delete-cascade.test-support';
 import {
@@ -111,6 +113,10 @@ it.each([false, true])(
       ])
     );
 
+    const montage = createVideoProjectEntryWithMediaClip();
+    montage.project.assets[0]!.source = { kind: 'scenario-asset', scenarioAssetId: childId };
+    rows.set('video_projects', new Map([[montage.id, withVideoProjectUsage(montage)]]));
+
     if (replaced)
       rows.get('asset_refs')!.set(childPhysicalId, {
         assetId: childPhysicalId,
@@ -122,7 +128,12 @@ it.each([false, true])(
 
     await deleteMediaAssetWithProjectCascade(scenarioMediaId, [
       { id: scenarioId, kind: 'scenario', name: 'Guide', primary: false },
+      { id: montage.id, kind: 'video', name: montage.project.name, primary: false },
     ]);
+    expect(rows.get('video_projects')!.get(montage.id)).toMatchObject({
+      usageReferenceKeys: ['indexed:v1'],
+      project: { assets: [], clips: [] },
+    });
     const saved = rows.get('scenario_projects')!.get(scenarioId) as typeof entry;
     expect(saved.project.items[0]).toMatchObject({ blocks: [{ kind: 'image-slot' }] });
     expect(rows.get('scenario_assets')?.has(childId)).toBe(false);

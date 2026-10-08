@@ -1,12 +1,18 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-const { collect, provenance, backfill, drafts, trash, recover, settings } = vi.hoisted(() => ({
-  collect: vi.fn(),
-  provenance: vi.fn(),
-  backfill: vi.fn(),
-  drafts: vi.fn(async () => ({ deletedCount: 0, deletedIds: [] })),
-  trash: vi.fn(),
-  recover: vi.fn(),
-  settings: vi.fn(async () => ({ localStoragePolicy: {} })),
+const { usageIndex, publish, collect, provenance, backfill, drafts, trash, recover, settings } =
+  vi.hoisted(() => ({
+    usageIndex: vi.fn(),
+    publish: vi.fn(),
+    collect: vi.fn(),
+    provenance: vi.fn(),
+    backfill: vi.fn(),
+    drafts: vi.fn(async () => ({ deletedCount: 0, deletedIds: [] })),
+    trash: vi.fn(),
+    recover: vi.fn(),
+    settings: vi.fn(async () => ({ localStoragePolicy: {} })),
+  }));
+vi.mock('../../composition/persistence/media-library/usage-index-maintenance', () => ({
+  maintainProjectUsageIndex: usageIndex,
 }));
 vi.mock('../../composition/persistence/infrastructure/indexed-db/maintenance/provenance', () => ({
   maintainProvenanceUrls: provenance,
@@ -25,7 +31,7 @@ vi.mock('./trash', () => ({ cleanupLibraryTrash: trash }));
 vi.mock('../../composition/persistence/asset-publication-recovery/audit', () => ({
   collectOrphanAssetObjectsDuringIdle: collect,
 }));
-vi.mock('../../features/media-hub/events', () => ({ publishMediaHubLibraryChanged: vi.fn() }));
+vi.mock('../../features/media-hub/events', () => ({ publishMediaHubLibraryChanged: publish }));
 import { maintainLibraryAssets } from './maintenance';
 beforeEach(() => {
   settings.mockResolvedValue({ localStoragePolicy: {} });
@@ -93,4 +99,10 @@ it('discards a Trash failure that completes after maintenance cancellation', asy
   await maintainLibraryAssets(abort.signal, report);
   expect(report).not.toHaveBeenCalled();
   expect(collect).not.toHaveBeenCalled();
+});
+
+it('refreshes advisory relationships after background indexing completes', async () => {
+  usageIndex.mockResolvedValueOnce(true);
+  await maintainLibraryAssets(new AbortController().signal);
+  expect(publish).toHaveBeenCalledWith('sync', []);
 });

@@ -1,3 +1,4 @@
+import { withVideoProjectUsage } from './usage-index-keys';
 import { expect, it } from 'vitest';
 import { mediaId, physicalId, mediaEntry, rows, harness } from './delete-cascade.test-support';
 import {
@@ -109,7 +110,7 @@ function installSource(source: MediaAssetSource) {
   const video = createVideoProjectEntryWithMediaClip();
   video.project.assets[0]!.source = { kind: 'library-asset', mediaId };
   rows.get('video_projects')!.clear();
-  rows.get('video_projects')!.set(video.id, video);
+  rows.get('video_projects')!.set(video.id, withVideoProjectUsage(video));
   return video;
 }
 
@@ -122,6 +123,7 @@ it.each(sources)(
     ]);
     expect(rows.get('media_library')?.has(mediaId)).toBe(false);
     const saved = rows.get('video_projects')!.get(video.id) as typeof video;
+    expect(saved).toMatchObject({ usageReferenceKeys: ['indexed:v1'] });
     expect(saved.project.assets).toEqual([]);
     expect(saved.project.clips).toEqual([]);
     if (source.kind !== 'screenshot') {

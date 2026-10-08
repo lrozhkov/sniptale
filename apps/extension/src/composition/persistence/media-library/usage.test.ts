@@ -195,70 +195,6 @@ it('reports video and borrowed scenario consumers of one library source', async 
   expect(usage).toHaveLength(2);
 });
 
-it('reuses one advisory project snapshot across media switches and invalidates on project change', async () => {
-  extraMedia = { ...media, id: 'second', filename: 'second.png' };
-  const first = await listPreviewMediaAssetProjectUsage(media.id);
-  expect(first).toHaveLength(2);
-  expect(await listPreviewMediaAssetProjectUsage('second')).toEqual([]);
-  expect(mocks.videos).toHaveBeenCalledTimes(1);
-  expect(mocks.scenarios).toHaveBeenCalledTimes(1);
-
-  video.project.assets[0]!.source = { kind: 'library-asset', mediaId: 'second' };
-  const onEvent = mocks.events.mock.calls[0]?.[0];
-  expect(onEvent).toBeTypeOf('function');
-  onEvent({ type: 'library-changed', reason: 'update', assetIds: ['video:one'], timestamp: 1 });
-  expect(await listPreviewMediaAssetProjectUsage('second')).toEqual([
-    { id: video.id, kind: 'video', name: video.project.name, primary: false },
-  ]);
-  expect(mocks.videos).toHaveBeenCalledTimes(2);
-});
-
-it('retries a failed advisory snapshot and keeps the direct read authoritative', async () => {
-  const onEvent = mocks.events.mock.calls[0]?.[0];
-  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 2 });
-  mocks.videos.mockRejectedValueOnce(new Error('unavailable'));
-  await expect(listPreviewMediaAssetProjectUsage(media.id)).rejects.toThrow('unavailable');
-  expect(await listPreviewMediaAssetProjectUsage(media.id)).toHaveLength(2);
-  expect(await listMediaAssetProjectUsage(media.id)).toHaveLength(2);
-  expect(mocks.videos).toHaveBeenCalledTimes(3);
-});
-
-it('releases the advisory snapshot after its bounded lifetime', async () => {
-  const onEvent = mocks.events.mock.calls[0]?.[0];
-  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 3 });
-  vi.useFakeTimers();
-  try {
-    await listPreviewMediaAssetProjectUsage(media.id);
-    expect(mocks.videos).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(5_001);
-    await listPreviewMediaAssetProjectUsage(media.id);
-    expect(mocks.videos).toHaveBeenCalledTimes(2);
-  } finally {
-    vi.useRealTimers();
-  }
-});
-
-it('does not return an in-flight snapshot invalidated by a project write', async () => {
-  const onEvent = mocks.events.mock.calls[0]?.[0];
-  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 4 });
-  let resolveOld!: (entries: (typeof video)[]) => void;
-  mocks.videos
-    .mockReturnValueOnce(
-      new Promise<(typeof video)[]>((resolve) => {
-        resolveOld = resolve;
-      })
-    )
-    .mockResolvedValueOnce([video]);
-  childRows = [];
-  const usage = listPreviewMediaAssetProjectUsage(media.id);
-  onEvent({ type: 'library-changed', reason: 'update', assetIds: [], timestamp: 5 });
-  resolveOld([]);
-  expect(await usage).toEqual([
-    { id: video.id, kind: 'video', name: video.project.name, primary: false },
-  ]);
-  expect(mocks.videos).toHaveBeenCalledTimes(2);
-});
-
 it('loads the full graph once for a batch instead of once per selected file', async () => {
   extraMedia = {
     ...media,
@@ -299,10 +235,9 @@ it('loads the full graph once for a batch instead of once per selected file', as
   expect(getAll).toHaveBeenCalledTimes(4);
 });
 
-it('reads each deletion preparation freshly even while the advisory preview snapshot is cached', async () => {
+it('reads each deletion preparation freshly without trusting an advisory index', async () => {
   const first = await listMediaAssetProjectUsageBatch([media.id]);
   expect(first.get(media.id)?.length).toBeGreaterThan(0);
-  await listPreviewMediaAssetProjectUsage(media.id);
   mocks.videos.mockResolvedValue([]);
   mocks.scenarios.mockResolvedValue([]);
   expect(await listMediaAssetProjectUsageBatch([media.id])).toEqual(new Map([[media.id, []]]));
@@ -349,4 +284,55 @@ it('shows a frozen video representation as a consumer of its inserted Library id
   expect(await listMediaAssetProjectUsage(media.id)).toEqual([
     { id: video.id, kind: 'video', name: video.project.name, primary: false },
   ]);
+});
+
+it('reads inspector relationships through indexes without any global document list or recovery', async () => {
+  const getAll = vi.fn(async () => {
+    throw new Error('full scan forbidden');
+  });
+  mocks.videos.mockRejectedValueOnce(new Error('global video list forbidden'));
+  mocks.scenarios.mockRejectedValueOnce(new Error('scenario recovery forbidden'));
+  mocks.initDB.mockResolvedValue({
+    get: async (_store: string, id: string) => (id === media.id ? media : undefined),
+    getAll,
+    transaction: () => ({
+      objectStore: () => ({ count: async () => 0, index: () => ({ count: async () => 0 }) }),
+      done: Promise.resolve(),
+    }),
+    getAllFromIndex: async () => [],
+  });
+  await expect(listPreviewMediaAssetProjectUsage(media.id)).resolves.toEqual([]);
+  expect(getAll).not.toHaveBeenCalled();
+  expect(mocks.videos).not.toHaveBeenCalled();
+  expect(mocks.scenarios).not.toHaveBeenCalled();
+});
+
+it('cleans up advisory event, focus and visibility subscriptions when the inspector unmounts', async () => {
+  const windowEvents = new EventTarget();
+  const documentEvents = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+  vi.stubGlobal('window', windowEvents);
+  vi.stubGlobal('document', documentEvents);
+  const unsubscribe = vi.fn();
+  mocks.events.mockReturnValueOnce(unsubscribe);
+  const { subscribeToPreviewProjectUsageInvalidation } = await import('./usage');
+  const listener = vi.fn();
+  try {
+    const dispose = subscribeToPreviewProjectUsageInvalidation(listener);
+    const event = mocks.events.mock.calls.at(-1)![0];
+    event({ type: 'unrelated' });
+    documentEvents.dispatchEvent(new Event('visibilitychange'));
+    expect(listener).not.toHaveBeenCalled();
+    event({ type: 'library-changed' });
+    windowEvents.dispatchEvent(new Event('focus'));
+    documentEvents.visibilityState = 'visible';
+    documentEvents.dispatchEvent(new Event('visibilitychange'));
+    expect(listener).toHaveBeenCalledTimes(3);
+    dispose();
+    windowEvents.dispatchEvent(new Event('focus'));
+    documentEvents.dispatchEvent(new Event('visibilitychange'));
+    expect(listener).toHaveBeenCalledTimes(3);
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });

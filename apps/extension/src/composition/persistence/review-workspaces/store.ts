@@ -1,3 +1,4 @@
+import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { createNewWorkspacePresentationSettings } from '../../../features/video/review/advanced/presentation';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
@@ -186,7 +187,7 @@ export async function openVideoWorkspace(
       updatedAt: now,
     });
     if (!workspace) throw new VideoWorkspaceError('invalid');
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put(workspace);
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).put(withReviewWorkspaceUsage(workspace));
     return { workspace, draft: null };
   });
 }
@@ -234,7 +235,7 @@ async function putWorkspace(
     ))
   )
     throw new VideoWorkspaceError('missing-media');
-  await tx.objectStore(VIDEO_WORKSPACES_STORE).put(next);
+  await tx.objectStore(VIDEO_WORKSPACES_STORE).put(withReviewWorkspaceUsage(next));
   return next;
 }
 

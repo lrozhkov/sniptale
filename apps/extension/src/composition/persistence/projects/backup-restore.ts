@@ -1,3 +1,4 @@
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import { promoteProjectSourceLifecycles } from './new-reference-admission';
 import {
   STORE_NAME,
@@ -345,10 +346,12 @@ export async function putVideoProjectBackupRestore(args: {
     });
   const lifecycle =
     args.root.entry.lifecycle ?? createLibraryLifecycle('library', args.root.entry.updatedAt);
-  await args.stores.projects.put({
-    ...args.root.entry,
-    lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
-  });
+  await args.stores.projects.put(
+    withVideoProjectUsage({
+      ...args.root.entry,
+      lifecycle: promoteLibraryLifecycle(lifecycle, lifecycle.updatedAt),
+    })
+  );
   await publishProjectAssets(args.root, args.stores);
   await publishProjectExports(args.root, args.stores);
   await publishProjectSidecars(args.root, args.stores);

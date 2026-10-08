@@ -278,36 +278,52 @@ export function PreviewProjectUsage({
   const mediaId = isGalleryMediaItem(item) ? (item.entityId ?? item.id) : null;
   const [usage, setUsage] = useState<MediaAssetProjectUsage[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [usageRevision, setUsageRevision] = useState(0);
-  const invalidationRevision = useRef(0);
-
-  useEffect(() => {
-    if (!mediaId) return;
-    return subscribeToPreviewProjectUsageInvalidation(() => {
-      invalidationRevision.current += 1;
-      setUsageRevision((value) => value + 1);
-    });
-  }, [mediaId]);
-
   useEffect(() => {
     if (!mediaId) return;
     let active = true;
-    const requestRevision = invalidationRevision.current;
+    let inFlight = false;
+    let queued = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     setStatus('loading');
-    void listPreviewMediaAssetProjectUsage(mediaId).then(
-      (result) => {
-        if (!active || requestRevision !== invalidationRevision.current) return;
-        setUsage(result);
-        setStatus('ready');
-      },
-      () => {
-        if (active && requestRevision === invalidationRevision.current) setStatus('error');
+    setUsage([]);
+    const refresh = async () => {
+      if (inFlight) {
+        queued = true;
+        return;
       }
-    );
+      inFlight = true;
+      try {
+        const result = await Promise.race([
+          listPreviewMediaAssetProjectUsage(mediaId),
+          new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => reject(new Error('Project usage lookup timed out.')), 8_000);
+          }),
+        ]);
+        if (active) {
+          setUsage(result);
+          setStatus('ready');
+        }
+      } catch {
+        if (active) setStatus('error');
+      } finally {
+        clearTimeout(timer);
+        inFlight = false;
+        if (active && queued) {
+          queued = false;
+          void refresh();
+        }
+      }
+    };
+    const unsubscribe = subscribeToPreviewProjectUsageInvalidation(() => {
+      void refresh();
+    });
+    void refresh();
     return () => {
       active = false;
+      clearTimeout(timer);
+      unsubscribe();
     };
-  }, [mediaId, usageRevision]);
+  }, [mediaId]);
 
   if (!mediaId) return null;
   return (

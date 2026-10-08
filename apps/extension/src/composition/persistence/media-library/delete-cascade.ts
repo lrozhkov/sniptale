@@ -1,3 +1,4 @@
+import { withVideoProjectUsage, withReviewWorkspaceUsage } from './usage-index-keys';
 import { sameMediaSource } from './dependencies';
 import {
   MediaAssetDeletionBlockedError,
@@ -212,12 +213,14 @@ async function detachVideoProjects(
     affected.push({ id: entry.id, kind: 'video', name: entry.project.name, primary });
     if (primary) throw new PrimaryMediaAssetDeleteError();
     const project = removeVideoProjectLibrarySources(entry.project, sources);
-    await tx.objectStore(VIDEO_PROJECTS_STORE).put!({
-      ...entry,
-      project: { ...project, updatedAt: now },
-      updatedAt: now,
-      workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
-    });
+    await tx.objectStore(VIDEO_PROJECTS_STORE).put!(
+      withVideoProjectUsage({
+        ...entry,
+        project: { ...project, updatedAt: now },
+        updatedAt: now,
+        workspaceRevision: (entry.workspaceRevision ?? 0) + 1,
+      })
+    );
   }
   return affected;
 }
@@ -270,7 +273,7 @@ async function detachReviewWorkspaces(
     let next = workspace;
     for (const ref of reviewReferencesForMedia(graph.media))
       next = stripReviewAssetReference(next, ref, now);
-    await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(next);
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).put!(withReviewWorkspaceUsage(next));
   }
   return affected;
 }

@@ -91,7 +91,7 @@ it('admits watermark content with one additive step and leaves rows and object b
     stores: ['video_workspaces', 'video_workspace_drafts'],
   });
   expect(await plan[0]!.estimateAdditionalBytes()).toBe(64 * 1024);
-  handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx);
+  handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
   fixture.commit();
   expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(fixture.durable).toEqual(before);
@@ -112,16 +112,14 @@ it.each(['video_workspaces', 'video_workspace_drafts'])(
     const contracts = fixture.contracts();
     const before = structuredClone(fixture.durable);
     fixture.names.delete(missing);
-    expect(() => handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx)).toThrow(
-      'unavailable'
-    );
+    expect(() => handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx)).toThrow('unavailable');
     expect(fixture.tx.abort).toHaveBeenCalledOnce();
     expect(fixture.tx.objectStore).not.toHaveBeenCalled();
     expect(fixture.contracts()).toEqual(contracts);
     expect(fixture.durable).toEqual(before);
     fixture.names.add(missing);
     fixture.retry();
-    handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx);
+    handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
     fixture.commit();
     expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   }
@@ -131,13 +129,13 @@ it('rolls back interrupted contract publication and reruns without partial domai
   const fixture = upgradeFixture(3);
   const contracts = fixture.contracts();
   const before = structuredClone(fixture.durable);
-  expect(() => handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx)).toThrow('Interrupted');
+  expect(() => handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx)).toThrow('Interrupted');
   expect(fixture.tx.abort).toHaveBeenCalledOnce();
   expect(() => fixture.commit()).toThrow('Aborted');
   expect(fixture.contracts()).toEqual(contracts);
   expect(fixture.durable).toEqual(before);
   fixture.retry();
-  handleDatabaseUpgrade(fixture.db, 5, DB_VERSION, fixture.tx);
+  handleDatabaseUpgrade(fixture.db, 5, 6, fixture.tx);
   fixture.commit();
   expect(fixture.contracts()).toEqual(CURRENT_SCHEMA_CONTRACTS);
   expect(fixture.durable).toEqual(before);
@@ -159,7 +157,7 @@ it.each([
 
 it('requires the exact watermark domain contract at the current physical version', () => {
   expect(parseStoredSchemaContracts(CURRENT_SCHEMA_CONTRACTS)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  for (const schemaVersion of [4, 5, 8]) {
+  for (const schemaVersion of [4, 5, 9]) {
     const incompatible = CURRENT_SCHEMA_CONTRACTS.map((contract) =>
       contract.domainId === 'mediaLibrary' ? { ...contract, schemaVersion } : contract
     );

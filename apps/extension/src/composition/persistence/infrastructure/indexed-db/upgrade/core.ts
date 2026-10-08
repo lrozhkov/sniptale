@@ -45,7 +45,10 @@ function createStore(
   indexes: readonly string[] = []
 ): void {
   const store = db.createObjectStore(name, { keyPath });
-  for (const index of indexes) store.createIndex(index, index);
+  for (const index of indexes) {
+    if (index === 'usageReferenceKeys') store.createIndex(index, index, { multiEntry: true });
+    else store.createIndex(index, index);
+  }
 }
 
 export function handleDatabaseUpgrade(
@@ -99,10 +102,15 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, RECORDING_TELEMETRY_STORE, 'recordingId', ['updatedAt']);
   createStore(db, DIAGNOSTICS_META_STORE, 'recordingId');
   createStore(db, DIAGNOSTICS_EVENTS_STORE, ['recordingId', 'chunkIndex'], ['recordingId']);
-  createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt']);
+  createStore(db, VIDEO_PROJECTS_STORE, 'id', ['updatedAt', 'usageReferenceKeys']);
   createStore(db, SCENARIO_PROJECTS_STORE, 'id', ['updatedAt']);
-  createStore(db, PROJECT_ASSETS_STORE, 'id', ['createdAt']);
-  createStore(db, SCENARIO_ASSETS_STORE, 'id', ['projectId', 'createdAt']);
+  createStore(db, PROJECT_ASSETS_STORE, 'id', ['createdAt', 'originMediaId']);
+  createStore(db, SCENARIO_ASSETS_STORE, 'id', [
+    'projectId',
+    'createdAt',
+    'borrowedMediaId',
+    'galleryAssetId',
+  ]);
   createStore(db, SCENARIO_PENDING_ASSETS_STORE, 'id', ['tabId', 'createdAt']);
   createStore(db, PROJECT_EXPORTS_STORE, 'id', ['projectId', 'createdAt']);
   createStore(db, SCENARIO_EXPORTS_STORE, 'id', ['projectId', 'createdAt']);
@@ -110,7 +118,7 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, MEDIA_LIBRARY_STORE, 'id', ['createdAt', 'kind']);
   createStore(db, THUMBNAILS_STORE, 'assetId');
   createStore(db, IMAGE_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
-  createStore(db, VIDEO_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
+  createStore(db, VIDEO_WORKSPACES_STORE, 'aggregateId', ['updatedAt', 'usageReferenceKeys']);
   createStore(db, VIDEO_WORKSPACE_DRAFTS_STORE, 'aggregateId', ['updatedAt']);
   createStore(db, AGGREGATE_PRESENTATIONS_STORE, ['aggregateKind', 'aggregateId'], ['updatedAt']);
   createStore(db, WEB_SNAPSHOTS_STORE, 'id', ['createdAt']);

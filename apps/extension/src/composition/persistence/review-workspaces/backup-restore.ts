@@ -1,3 +1,4 @@
+import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import {
   VIDEO_WORKSPACES_STORE,
@@ -121,7 +122,7 @@ export async function putVideoReviewRestore(args: {
     delete(key: string): Promise<unknown>;
   };
 }): Promise<void> {
-  await args.workspaces.put(args.review.workspace);
+  await args.workspaces.put(withReviewWorkspaceUsage(args.review.workspace));
   if (args.review.draft) await args.drafts.put(args.review.draft);
   else await args.drafts.delete(args.review.workspace.aggregateId);
 }

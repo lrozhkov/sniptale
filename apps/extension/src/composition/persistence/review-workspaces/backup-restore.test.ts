@@ -1,3 +1,4 @@
+import { withReviewWorkspaceUsage } from '../media-library/usage-index-keys';
 import { createQuickEditSpotlight } from '../../../features/video/review/advanced/focus';
 import { createQuickEditWebcam } from '../../../features/video/review/advanced/webcam';
 import { createQuickEditZoomRegion } from '../../../features/video/review/advanced/zoom';
@@ -59,7 +60,7 @@ it('exports full undo/redo and field recovery, excluding the local source object
   const workspaces = { put: vi.fn() };
   const drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
   expect(drafts.put).toHaveBeenCalledWith(restored.draft);
   expect(drafts.delete).not.toHaveBeenCalled();
 });
@@ -207,7 +208,7 @@ it('roundtrips disabled webcam settings, redo history and recovery through porta
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
 });
 
 it('backs up disabled image history and restores it with newly allocated asset references', async () => {
@@ -268,7 +269,7 @@ it('backs up disabled image history and restores it with newly allocated asset r
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
 });
 
 it.each([false, true])(
@@ -411,7 +412,7 @@ it('transfers an inactive image choice even without history', async () => {
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
 });
 
 it('backs up remembered watermark bytes and remaps the exact slot across a restored aggregate', async () => {
@@ -471,7 +472,7 @@ it('backs up remembered watermark bytes and remaps the exact slot across a resto
   const workspaces = { put: vi.fn() },
     drafts = { put: vi.fn(), delete: vi.fn() };
   await putVideoReviewRestore({ review: restored, workspaces, drafts });
-  expect(workspaces.put).toHaveBeenCalledWith(restored.workspace);
+  expect(workspaces.put).toHaveBeenCalledWith(withReviewWorkspaceUsage(restored.workspace));
 });
 
 it('backs up and restores scene variants under none including history and recovery with new identities', async () => {

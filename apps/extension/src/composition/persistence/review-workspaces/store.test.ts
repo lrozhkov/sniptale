@@ -270,7 +270,8 @@ it('validates duplicate operations and the entire redo suffix before accepting s
 });
 
 it('refuses edits against replaced original bytes without deleting the old session', async () => {
-  const opened = await openVideoWorkspace(id, source);
+  await openVideoWorkspace(id, source);
+  const retained = structuredClone(rows.get('video_workspaces')!.get(id));
   rows
     .get('recordings')!
     .set('beta-v1-recording', { ...betaV1Fixture.records.recordings[0], assetId: 'replacement' });
@@ -283,7 +284,7 @@ it('refuses edits against replaced original bytes without deleting the old sessi
       operation,
     })
   ).rejects.toMatchObject({ code: 'changed-source' });
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(opened.workspace);
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(retained);
 });
 
 it('rejects a stale tab after restore even when imported history has the same numeric revision', async () => {
@@ -476,6 +477,7 @@ it('migrates a v1 advanced payload on load and keeps the workspace writable (R03
 
 it('rejects stale or malformed advanced saves without touching the record', async () => {
   const opened = await openVideoWorkspace(id, source);
+  const retained = structuredClone(rows.get('video_workspaces')!.get(id));
   await expect(
     saveVideoWorkspaceAdvanced({
       aggregateId: id,
@@ -500,7 +502,7 @@ it('rejects stale or malformed advanced saves without touching the record', asyn
       advanced: { broken: true },
     })
   ).rejects.toMatchObject({ code: 'invalid' });
-  expect(rows.get('video_workspaces')!.get(id)).toEqual(opened.workspace);
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(retained);
 });
 
 it('advances the revision for advanced saves so history writers detect the change', async () => {

@@ -1,3 +1,4 @@
+import type { DatabaseMigrationSource } from './upgrade/types';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
@@ -73,7 +74,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 7,
+    schemaVersion: 8,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
@@ -94,7 +95,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'videoProjects',
-    schemaVersion: 2,
+    schemaVersion: 3,
     stores: [
       { storeName: VIDEO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: PROJECT_ASSETS_STORE, dataClass: 'durable-authority' },
@@ -104,7 +105,7 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'scenarioProjects',
-    schemaVersion: 3,
+    schemaVersion: 4,
     stores: [
       { storeName: SCENARIO_PROJECTS_STORE, dataClass: 'durable-authority' },
       { storeName: SCENARIO_ASSETS_STORE, dataClass: 'durable-authority' },
@@ -163,7 +164,7 @@ export interface DatabaseMigrationDescriptor {
     from: number;
     to: number;
   }[];
-  estimateAdditionalBytes(): Promise<number>;
+  estimateAdditionalBytes(source?: DatabaseMigrationSource): Promise<number>;
   fromDatabaseVersion: number;
   migrate(db: UpgradeDatabase, transaction: UpgradeTransaction): undefined;
   risk: DatabaseMigrationRisk;
@@ -333,6 +334,50 @@ export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
       return undefined;
     },
   },
+  {
+    backupCoverage: 'none',
+    domainVersions: [
+      { domainId: 'mediaLibrary', from: 7, to: 8 },
+      { domainId: 'videoProjects', from: 2, to: 3 },
+      { domainId: 'scenarioProjects', from: 3, to: 4 },
+    ],
+    estimateAdditionalBytes: estimateUsageIndexBytes,
+    fromDatabaseVersion: 8,
+    toDatabaseVersion: 9,
+    risk: 'additive',
+    stores: [
+      VIDEO_PROJECTS_STORE,
+      VIDEO_WORKSPACES_STORE,
+      PROJECT_ASSETS_STORE,
+      SCENARIO_ASSETS_STORE,
+    ],
+    migrate(_db, transaction) {
+      for (const [name, indexes] of [
+        [VIDEO_PROJECTS_STORE, ['usageReferenceKeys']],
+        [VIDEO_WORKSPACES_STORE, ['usageReferenceKeys']],
+        [PROJECT_ASSETS_STORE, ['originMediaId']],
+        [SCENARIO_ASSETS_STORE, ['borrowedMediaId', 'galleryAssetId']],
+      ] as const) {
+        const store = transaction.objectStore(name);
+        if (!store.createIndex) throw new Error('Project usage index creation unavailable.');
+        for (const index of indexes)
+          store.createIndex(index, index, { multiEntry: index === 'usageReferenceKeys' });
+      }
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![
+          VIDEO_PROJECTS_STORE,
+          VIDEO_WORKSPACES_STORE,
+          PROJECT_ASSETS_STORE,
+          SCENARIO_ASSETS_STORE,
+        ].every((name) => db.objectStoreNames.contains(name))
+      )
+        throw new Error('Project usage index stores are unavailable.');
+      return undefined;
+    },
+  },
 ];
 
 export function buildDatabaseMigrationPlan(
@@ -382,4 +427,32 @@ export function parseStoredSchemaContracts(value: unknown): readonly StoredSchem
 
 function isUnknownRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Estimate the one-time native alias indexes before upgrade; derived document keys backfill later. */
+async function estimateUsageIndexBytes(source?: DatabaseMigrationSource): Promise<number> {
+  if (!source) throw new Error('Source database unavailable for usage index estimation.');
+  let bytes = 64 * 1024;
+  for (const name of [PROJECT_ASSETS_STORE, SCENARIO_ASSETS_STORE]) {
+    let cursor = await source.transaction(name, 'readonly').store.openCursor();
+    while (cursor) {
+      bytes += aliasIndexRowBytes(name, cursor.value, cursor.primaryKey);
+      cursor = await cursor.continue();
+    }
+  }
+  return bytes;
+}
+
+function aliasIndexRowBytes(store: string, value: unknown, primaryKey: IDBValidKey): number {
+  if (!isUnknownRecord(value)) return 0;
+  const fields =
+    store === PROJECT_ASSETS_STORE ? ['originMediaId'] : ['borrowedMediaId', 'galleryAssetId'];
+  let bytes = 0;
+  for (const field of fields) {
+    const alias = value[field];
+    if (typeof alias !== 'string') continue;
+    if (typeof primaryKey !== 'string') throw new Error('Invalid project usage index key.');
+    bytes += 1024 + 4 * (alias.length + primaryKey.length);
+  }
+  return bytes;
 }

@@ -80,7 +80,7 @@ it('admits original speech content with one additive step and leaves rows and ob
   const fixture = upgradeFixture();
   const before = structuredClone(fixture.durable);
   const plan = buildDatabaseMigrationPlan(7, 8)!;
-  expect(DB_VERSION).toBe(8);
+  expect(DB_VERSION).toBeGreaterThanOrEqual(8);
   expect(plan).toHaveLength(1);
   expect(plan[0]).toMatchObject({
     fromDatabaseVersion: 7,
@@ -144,7 +144,7 @@ it('rolls back interrupted contract publication and reruns without partial domai
 it.each([
   [6, 5],
   [7, 6],
-  [8, 9],
+  [DB_VERSION, DB_VERSION + 1],
 ])('refuses unsupported or reverse migration %i to %i before mutation', (from, to) => {
   const fixture = upgradeFixture();
   const contracts = fixture.contracts();
@@ -157,7 +157,7 @@ it.each([
 
 it('requires the exact original speech domain contract at the current physical version', () => {
   expect(parseStoredSchemaContracts(CURRENT_SCHEMA_CONTRACTS)).toEqual(CURRENT_SCHEMA_CONTRACTS);
-  for (const schemaVersion of [6, 8]) {
+  for (const schemaVersion of [7, 9]) {
     const incompatible = CURRENT_SCHEMA_CONTRACTS.map((contract) =>
       contract.domainId === 'mediaLibrary' ? { ...contract, schemaVersion } : contract
     );

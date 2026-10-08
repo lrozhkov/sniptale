@@ -179,3 +179,30 @@ it('retries an unavailable usage lookup after a library change', async () => {
   expect(container.textContent).toContain('Video');
   expect(container.textContent).not.toContain('gallery.preview.projectsUnavailable');
 });
+
+it('ends loading for a stuck lookup instead of spinning indefinitely', async () => {
+  vi.useFakeTimers();
+  try {
+    mocks.usage.mockReturnValue(new Promise(() => undefined));
+    await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    expect(container.textContent).not.toContain('gallery.preview.projectsLoading');
+    expect(container.textContent).toContain('gallery.preview.projectsUnavailable');
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('coalesces a burst of invalidations while a request is pending', async () => {
+  const pending = pendingUsage();
+  mocks.usage.mockReturnValueOnce(pending.promise).mockResolvedValueOnce([]);
+  await act(async () => root.render(<PreviewProjectUsage item={createMediaItem()} />));
+  const invalidate = mocks.subscribe.mock.calls[0]?.[0];
+  await act(async () => {
+    for (let i = 0; i < 100; i++) invalidate();
+  });
+  expect(mocks.usage).toHaveBeenCalledTimes(1);
+  await act(async () => pending.resolve([]));
+  expect(mocks.usage).toHaveBeenCalledTimes(2);
+  expect(container.textContent).toContain('gallery.preview.projectsEmpty');
+});

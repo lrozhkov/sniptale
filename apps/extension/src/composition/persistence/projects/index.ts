@@ -1,3 +1,4 @@
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import { parseProjectAssetSpeechClaim } from './asset-publication-payload';
 import { isValidProjectAssetReviewResource } from './asset-publication-payload';
 import { assertNewProjectSources, promoteProjectSourceLifecycles } from './new-reference-admission';
@@ -160,7 +161,7 @@ async function persistProjectReferences(args: {
   projectStore: ReturnType<typeof createProjectMutationStores>['projectStore'];
   recordingStore: ReturnType<typeof createProjectMutationStores>['recordingStore'];
 }): Promise<void> {
-  await args.projectStore.put(args.entry);
+  await args.projectStore.put(withVideoProjectUsage(args.entry));
   await promoteLinkedRecordingLifecycles({
     mediaStore: args.mediaLibraryStore,
     now: args.now,

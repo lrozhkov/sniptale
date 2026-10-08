@@ -1,3 +1,4 @@
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
   MEDIA_LIBRARY_STORE,
   SCENARIO_PROJECTS_STORE,
@@ -68,6 +69,7 @@ function encodeTargetLifecycle(
   entry: NonNullable<ReturnType<typeof parseTarget>>,
   lifecycle: LibraryLifecycle
 ) {
+  if (target.kind === 'video-project') return withVideoProjectUsage({ ...entry, lifecycle });
   if (target.kind !== 'scenario-export') return { ...entry, lifecycle };
   const catalogue = parseScenarioExportEntry(entry);
   if (!catalogue) throw new StaleTrashItemError();

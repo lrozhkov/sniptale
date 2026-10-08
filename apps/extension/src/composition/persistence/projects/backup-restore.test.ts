@@ -70,6 +70,7 @@ it('restores an archived temporary project as permanent without changing its gra
   });
   expect(target.projects.put).toHaveBeenCalledWith({
     ...entry,
+    usageReferenceKeys: ['indexed:v1'],
     lifecycle: expect.objectContaining({ savedAt: 10, storageClass: 'library' }),
   });
 });

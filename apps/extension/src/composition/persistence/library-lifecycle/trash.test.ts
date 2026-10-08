@@ -101,6 +101,7 @@ it('retains each aggregate graph and original destination through duplicate tras
   });
   expect(rows.get('video_projects')?.get(video.id)).toEqual({
     ...video,
+    usageReferenceKeys: ['indexed:v1'],
     lifecycle: { ...video.lifecycle, trashedAt: 100 },
   });
   expect(rows.get('scenario_projects')?.get(scenario.id)).toEqual({
@@ -117,6 +118,7 @@ it('retains each aggregate graph and original destination through duplicate tras
   });
   expect(rows.get('video_projects')?.get(video.id)).toEqual({
     ...video,
+    usageReferenceKeys: ['indexed:v1'],
     lifecycle: { ...video.lifecycle, updatedAt: 300 },
   });
   expect(rows.get('scenario_projects')?.get(scenario.id)).toEqual({

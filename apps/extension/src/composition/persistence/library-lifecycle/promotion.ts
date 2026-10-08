@@ -1,3 +1,4 @@
+import { withVideoProjectUsage } from '../media-library/usage-index-keys';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
   IMAGE_WORKSPACES_STORE,
@@ -198,10 +199,12 @@ async function promoteVideoProjectGraph(projectId: string): Promise<void> {
         });
       }
     }
-    await projectStore.put({
-      ...project,
-      lifecycle: promoteLibraryLifecycle(existingLifecycle, promotedAt),
-    });
+    await projectStore.put(
+      withVideoProjectUsage({
+        ...project,
+        lifecycle: promoteLibraryLifecycle(existingLifecycle, promotedAt),
+      })
+    );
     await tx.done;
   });
 }

@@ -256,7 +256,8 @@ async function inspectCurrentDatabase(db: IDBPDatabase): Promise<DatabaseAdmissi
 
 export async function evaluateDatabaseMigrationPlan(
   databaseVersion: number,
-  plan: readonly DatabaseMigrationDescriptor[]
+  plan: readonly DatabaseMigrationDescriptor[],
+  source?: IDBPDatabase
 ): Promise<DatabaseAdmissionStatus> {
   const destructive = plan.some((migration) => migration.risk === 'destructive');
   if (destructive) {
@@ -269,7 +270,7 @@ export async function evaluateDatabaseMigrationPlan(
   }
   let estimates: readonly number[];
   try {
-    estimates = await Promise.all(plan.map((step) => step.estimateAdditionalBytes()));
+    estimates = await Promise.all(plan.map((step) => step.estimateAdditionalBytes(source)));
   } catch {
     return {
       databaseVersion,
@@ -380,7 +381,7 @@ async function inspectOpenedDatabase(db: IDBPDatabase): Promise<DatabaseAdmissio
     }
     const plan = buildDatabaseMigrationPlan(db.version, DB_VERSION);
     return plan
-      ? await evaluateDatabaseMigrationPlan(db.version, plan)
+      ? await evaluateDatabaseMigrationPlan(db.version, plan, db)
       : {
           databaseVersion: db.version,
           reason: 'migration-path-missing',
@@ -397,7 +398,7 @@ export async function inspectDatabaseAdmission(): Promise<DatabaseAdmissionStatu
   let db: IDBPDatabase | null = null;
   try {
     db = await openDB(DB_NAME);
-    return inspectOpenedDatabase(db);
+    return await inspectOpenedDatabase(db);
   } finally {
     db?.close();
   }
