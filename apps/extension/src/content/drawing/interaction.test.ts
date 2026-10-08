@@ -18,7 +18,10 @@ import {
   rotateDrawingObject,
 } from './interaction';
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 it.each<DrawingCreatableShapeKind>(['rectangle', 'ellipse', 'triangle'])(
   'creates and commits the selected %s shape through the unified shape tool',
@@ -516,4 +519,29 @@ it('shears shapes from a horizontal side handle with Ctrl and snaps with Ctrl+Sh
   expect(
     resizeDrawingObject(draft, { x: 85, y: 20 }, { ctrlKey: false, shiftKey: false })
   ).not.toHaveProperty('skewX');
+});
+
+it('creates and commits a drawing stroke without randomUUID on HTTP', () => {
+  const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+  vi.stubGlobal('crypto', { getRandomValues });
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.setActiveTool('pencil');
+  const started = beginDrawingPointer({
+    point: { x: 10, y: 20 },
+    snapshot: session.getSnapshot(),
+    timestamp: 0,
+  });
+  if (started.draft?.kind !== 'create') throw new Error('Expected stroke draft');
+  const object = updateCreatedDrawingObject({
+    object: started.draft.object,
+    modifiers: { ctrlKey: false, shiftKey: false },
+    point: { x: 70, y: 60 },
+    start: started.draft.start,
+    timestamp: 10,
+  });
+  commitDrawingPointerDraft(session, { ...started.draft, object });
+  expect(session.getSnapshot().document.objects[0]).toMatchObject({
+    kind: 'pencil',
+    id: expect.stringMatching(/^drawing-[0-9a-f-]{36}$/u),
+  });
 });

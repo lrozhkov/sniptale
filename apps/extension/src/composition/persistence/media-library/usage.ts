@@ -19,16 +19,11 @@ import {
 import { parseMediaLibraryEntry } from './read-guards';
 import { MEDIA_LIBRARY_STORE } from '../infrastructure/indexed-db/core';
 import { parseVideoWorkspace } from '../review-workspaces/parser';
-import type { MediaLibraryEntry } from './contracts';
+import type { MediaAssetProjectUsage, MediaLibraryEntry } from './contracts';
 import type { ScenarioAssetEntry } from '../scenario/contracts';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
 
-export interface MediaAssetProjectUsage {
-  id: string;
-  kind: 'scenario' | 'video' | 'review';
-  name: string;
-  primary: boolean;
-}
+export type { MediaAssetProjectUsage } from './contracts';
 
 interface UsageSnapshot {
   mediaById: Map<string, MediaLibraryEntry>;

@@ -50,3 +50,22 @@ it('splits only well-formed runtime message freshness envelopes', () => {
     valid: false,
   });
 });
+
+it('creates freshness on HTTP when only secure random values are available', () => {
+  const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+  vi.stubGlobal('crypto', { getRandomValues });
+  const first = createRuntimeMessageFreshness(123);
+  const second = createRuntimeMessageFreshness(123);
+  expect(first.issuedAtEpochMs).toBe(123);
+  expect(first.nonce).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u
+  );
+  expect(second.nonce).not.toBe(first.nonce);
+});
+
+it('fails closed without any secure randomness', () => {
+  vi.stubGlobal('crypto', {});
+  expect(() => createRuntimeMessageFreshness()).toThrow(
+    'Runtime message nonce generation is unavailable.'
+  );
+});

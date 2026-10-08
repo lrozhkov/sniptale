@@ -1,3 +1,4 @@
+import { createSecureRandomUuid } from './secure-random-id';
 import {
   RUNTIME_MESSAGE_FRESHNESS_FIELD,
   type RuntimeMessageFreshness,
@@ -11,11 +12,7 @@ export {
 export type { RuntimeMessageFreshness } from '@sniptale/runtime-contracts/protocol/runtime-message-freshness';
 
 function createNonce(): string {
-  const randomUUID = globalThis.crypto?.randomUUID;
-  if (!randomUUID) {
-    throw new Error('Runtime message nonce generation is unavailable.');
-  }
-  return randomUUID.call(globalThis.crypto);
+  return createSecureRandomUuid('Runtime message nonce generation is unavailable.');
 }
 
 export function createRuntimeMessageFreshness(nowEpochMs = Date.now()): RuntimeMessageFreshness {

@@ -19,7 +19,7 @@ import {
   videoSourceUsesMedia,
 } from './dependencies';
 import { USAGE_INDEX_MARKER, USAGE_REFERENCE_INDEX, usageReferenceKey } from './usage-index-keys';
-import type { MediaAssetProjectUsage } from './usage';
+import type { MediaAssetProjectUsage } from './contracts';
 
 type Database = Awaited<ReturnType<typeof initDB>>;
 

@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { triggerQuickActionFromShim } from './quick-action';
 
 type SentMessage = Record<string, unknown>;
@@ -59,4 +59,22 @@ it('requests a content-action capability before triggering a quick action', asyn
       type: 'TRIGGER_QUICK_ACTION',
     })
   );
+});
+
+afterEach(() => vi.unstubAllGlobals());
+
+it('uses secure random values for HTTP quick-action request IDs', async () => {
+  const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+  vi.stubGlobal('crypto', { getRandomValues });
+  const { sendRuntimeMessage, sentMessages } = createRuntimeMessagingAdapter();
+  await triggerQuickActionFromShim(
+    {
+      hotkey: { altKey: false, ctrlKey: true, key: 'k', metaKey: false, shiftKey: false },
+      id: 'quick-action-1',
+      status: true,
+    },
+    { sendRuntimeMessage }
+  );
+  expect(sentMessages[1]?.['requestId']).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(sentMessages.at(-1)?.['type']).toBe('TRIGGER_QUICK_ACTION');
 });

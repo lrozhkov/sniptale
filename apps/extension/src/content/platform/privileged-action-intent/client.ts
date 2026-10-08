@@ -1,3 +1,4 @@
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type {
   ContentPrivilegedActionActivationKey,
@@ -64,11 +65,7 @@ export function createBackgroundAutoStartContentActionIntentSource(
 }
 
 function createDefaultRequestId(): string {
-  const randomUUID = globalThis.crypto?.randomUUID;
-  if (!randomUUID) {
-    throw new Error('Content action capability request id generation is unavailable.');
-  }
-  return randomUUID.call(globalThis.crypto);
+  return createSecureRandomUuid('Content action capability request id generation is unavailable.');
 }
 
 class ContentActionIntentClientImpl implements ContentActionIntentClient {

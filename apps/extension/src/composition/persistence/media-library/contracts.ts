@@ -6,6 +6,13 @@ import type { RecordingGroupMember } from '../../../features/media-hub/recording
 
 export type { MediaAssetKind } from '../../../features/media-hub/media-types';
 
+export interface MediaAssetProjectUsage {
+  id: string;
+  kind: 'scenario' | 'video' | 'review';
+  name: string;
+  primary: boolean;
+}
+
 export type ImageContentState = 'edited' | 'original';
 
 export type MediaAssetSource =

@@ -1,6 +1,7 @@
+import { createSecureRandomUuid } from '@sniptale/platform/security/secure-random-id';
 import type { DrawingObject, DrawingPoint, DrawingTool, DrawingToolDefaults } from './model';
 
-export const createDrawingId = () => `drawing-${crypto.randomUUID()}`;
+export const createDrawingId = () => `drawing-${createSecureRandomUuid()}`;
 
 export function createDrawingObject(
   tool: DrawingTool,
