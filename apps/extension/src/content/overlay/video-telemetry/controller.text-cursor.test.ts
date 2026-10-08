@@ -11,7 +11,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('makes Windows text hover capture-safe only while recording and restores on focus', () => {
+it('keeps Windows text hover capture-safe during focus and selection until recording pauses', () => {
   vi.spyOn(runtimeInfo, 'getURL').mockImplementation((path) => `chrome-extension://test/${path}`);
   vi.spyOn(navigator, 'platform', 'get').mockReturnValue('Win32');
   const input = document.createElement('input');
@@ -25,9 +25,11 @@ it('makes Windows text hover capture-safe only while recording and restores on f
   expect(input.style.cursor).toContain('chrome-extension://test/cursors/text.svg');
   expect(document.getElementById('sniptale-controlled-cursor-overlay')).toBeNull();
   input.focus();
-  expect(input.style.cursor).toBe('text');
+  expect(input.style.cursor).toContain('cursors/text.svg');
+  input.value = 'Select this text';
+  input.setSelectionRange(0, 6);
   hover();
-  expect(input.style.cursor).toBe('text');
+  expect(input.style.cursor).toContain('cursors/text.svg');
   input.blur();
   hover();
   expect(input.style.cursor).toContain('chrome-extension://test/cursors/text.svg');
