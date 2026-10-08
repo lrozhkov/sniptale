@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createReviewWatermarkRenderer } from './render-watermark';
+import { createReviewWatermarkRenderer, measureReviewWatermark } from './render-watermark';
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import type { QuickEditWatermarkSettings } from '../../features/video/review/advanced/watermark';
 
 function settings(): QuickEditWatermarkSettings {
@@ -214,8 +215,10 @@ it('closes a late bitmap and never paints when resource acquisition is cancelled
     )
   ).rejects.toMatchObject({ name: 'AbortError' });
   expect(bitmap.close).toHaveBeenCalledOnce();
-  expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
-  expect(surfaces[0]!.width).toBe(0);
+  expect(contexts.every((context) => vi.mocked(context.drawImage).mock.calls.length === 0)).toBe(
+    true
+  );
+  expect(surfaces.every((surface) => surface.width === 0)).toBe(true);
 });
 it('releases the cache on abort and makes later draw calls harmless', async () => {
   const controller = new AbortController();
@@ -227,8 +230,10 @@ it('releases the cache on abort and makes later draw calls harmless', async () =
   controller.abort();
   renderer.draw(contexts[0]!);
   renderer.dispose();
-  expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
-  expect(surfaces[0]!.width).toBe(0);
+  expect(contexts.every((context) => vi.mocked(context.drawImage).mock.calls.length === 0)).toBe(
+    true
+  );
+  expect(surfaces.every((surface) => surface.width === 0)).toBe(true);
 });
 
 it.each(['missing', 'read', 'decode', 'dimensions'] as const)(
@@ -254,8 +259,10 @@ it.each(['missing', 'read', 'decode', 'dimensions'] as const)(
     await expect(
       createReviewWatermarkRenderer(value, { width: 1920, height: 1080 }, undefined, read)
     ).rejects.toMatchObject({ name: 'QuickEditExportUnavailable', reasons: ['asset-missing'] });
-    expect(contexts[0]!.drawImage).not.toHaveBeenCalled();
-    expect(surfaces[0]!.width).toBe(0);
+    expect(contexts.every((context) => vi.mocked(context.drawImage).mock.calls.length === 0)).toBe(
+      true
+    );
+    expect(surfaces.every((surface) => surface.width === 0)).toBe(true);
     if (failure === 'dimensions') expect(bitmap.close).toHaveBeenCalledOnce();
   }
 );
@@ -300,4 +307,231 @@ it('does not misclassify image cache geometry failures as missing assets', async
     )
   ).rejects.toThrow('Watermark cache budget exceeded.');
   expect(bitmap.close).toHaveBeenCalledOnce();
+});
+
+function managedResources() {
+  const releases: ReturnType<typeof vi.fn>[] = [];
+  const resources: RenderResources = {
+    canvas: vi.fn((_role, size) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size.width;
+      canvas.height = size.height;
+      const context = canvas.getContext('2d')!;
+      const release = vi.fn(() => {
+        canvas.width = 0;
+        canvas.height = 0;
+      });
+      releases.push(release);
+      return { canvas, context, release };
+    }),
+    bytes: vi.fn(() => {
+      const release = vi.fn();
+      releases.push(release);
+      return { release };
+    }),
+  };
+  return { resources, releases };
+}
+
+it('keeps canonical wrapping and tiled destinations while scaling only the managed text cache', async () => {
+  const value = settings();
+  value.layout = 'tiled';
+  value.text.value = 'ABCD\nEFGH';
+  value.text.wrapWidth = 0.03;
+  const baseline = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  const baselineSurface = { ...surfaces[0]! };
+  const baselinePaint = vi.mocked(contexts[0]!.fillText).mock.calls;
+  const { resources, releases } = managedResources();
+  const renderer = await createReviewWatermarkRenderer(
+    value,
+    { width: 1920, height: 1080 },
+    undefined,
+    undefined,
+    { scaleX: 0.5, scaleY: 0.25, resources }
+  );
+  expect(renderer.bounds).toEqual(baseline.bounds);
+  expect(resources.canvas).toHaveBeenNthCalledWith(1, 'watermark-measurement', {
+    width: 1,
+    height: 1,
+  });
+  expect(resources.canvas).toHaveBeenNthCalledWith(2, 'watermark-cache', {
+    width: Math.ceil(baselineSurface.width * 0.5),
+    height: Math.ceil(baselineSurface.height * 0.25),
+  });
+  expect(contexts[2]!.fillText).toHaveBeenCalledTimes(baselinePaint.length);
+  expect(vi.mocked(contexts[2]!.fillText).mock.calls).toEqual(baselinePaint);
+  expect(contexts[2]!.scale).toHaveBeenCalledWith(0.5, 0.25);
+  expect(contexts[2]!.shadowBlur).toBe(contexts[0]!.shadowBlur * 0.5);
+  expect(contexts[2]!.shadowOffsetY).toBe(contexts[0]!.shadowOffsetY * 0.25);
+  baseline.draw(contexts[0]!);
+  renderer.draw(contexts[2]!);
+  expect(vi.mocked(contexts[2]!.drawImage).mock.calls.map((call) => call.slice(5))).toEqual(
+    vi.mocked(contexts[0]!.drawImage).mock.calls.map((call) => call.slice(5))
+  );
+  expect(vi.mocked(contexts[2]!.drawImage).mock.calls[0]!.slice(3, 5)).toEqual([
+    surfaces[2]!.width,
+    surfaces[2]!.height,
+  ]);
+  expect(releases[0]).toHaveBeenCalledOnce();
+  renderer.dispose();
+  renderer.dispose();
+  expect(releases[1]).toHaveBeenCalledOnce();
+  baseline.dispose();
+});
+
+it.each(['success', 'decode', 'dimensions', 'abort', 'cache', 'paint'] as const)(
+  'releases managed logo reservations and bitmap on %s',
+  async (outcome) => {
+    const { resources, releases } = managedResources();
+    const controller = new AbortController();
+    const bitmap = { width: outcome === 'dimensions' ? 401 : 400, height: 200, close: vi.fn() };
+    vi.stubGlobal(
+      'createImageBitmap',
+      vi.fn(async () => {
+        expect(resources.bytes).toHaveBeenCalledWith('watermark-source-bitmap', 400 * 200 * 4);
+        if (outcome === 'decode') throw new Error('decode');
+        if (outcome === 'abort') controller.abort();
+        return bitmap;
+      })
+    );
+    if (outcome === 'cache')
+      vi.mocked(resources.canvas).mockImplementation(() => {
+        throw new Error('budget');
+      });
+    if (outcome === 'paint') {
+      const allocate = resources.canvas;
+      resources.canvas = (...args) => {
+        const lease = allocate(...args);
+        vi.mocked(lease.context.drawImage).mockImplementation(() => {
+          throw new Error('paint');
+        });
+        return lease;
+      };
+    }
+    const preparation = createReviewWatermarkRenderer(
+      {
+        ...settings(),
+        mode: 'image',
+        image: { assetId: 'project-asset:logo', width: 400, height: 200, size: 0.2, opacity: 0.4 },
+      },
+      { width: 1920, height: 1080 },
+      controller.signal,
+      async () => new Blob(['image']),
+      { scaleX: 0.25, scaleY: 0.25, resources }
+    );
+    if (outcome === 'success') {
+      const renderer = await preparation;
+      expect(resources.canvas).toHaveBeenCalledWith('watermark-cache', { width: 96, height: 48 });
+      expect(renderer.bounds.width).toBe(384);
+      renderer.dispose();
+    } else await expect(preparation).rejects.toThrow();
+    expect(releases[0]).toHaveBeenCalledOnce();
+    if (outcome !== 'decode') expect(bitmap.close).toHaveBeenCalledOnce();
+    for (const release of releases) expect(release).toHaveBeenCalledOnce();
+  }
+);
+
+it.each([0, -1, NaN, Infinity])(
+  'refuses invalid raster scale %s before managed allocation',
+  async (scaleX) => {
+    const { resources } = managedResources();
+    await expect(
+      createReviewWatermarkRenderer(
+        settings(),
+        { width: 1920, height: 1080 },
+        undefined,
+        undefined,
+        { scaleX, scaleY: 1, resources }
+      )
+    ).rejects.toThrow('Invalid watermark raster scale.');
+    expect(resources.canvas).not.toHaveBeenCalled();
+  }
+);
+
+it('releases a managed text cache on abort and does not draw or release twice', async () => {
+  const { resources, releases } = managedResources();
+  const controller = new AbortController();
+  const renderer = await createReviewWatermarkRenderer(
+    settings(),
+    { width: 1920, height: 1080 },
+    controller.signal,
+    undefined,
+    { scaleX: 0.5, scaleY: 0.5, resources }
+  );
+  controller.abort();
+  renderer.draw(contexts[1]!);
+  renderer.dispose();
+  expect(contexts[1]!.drawImage).not.toHaveBeenCalled();
+  for (const release of releases) expect(release).toHaveBeenCalledOnce();
+});
+
+it('releases the measurement lease when canonical text metrics exceed their existing budget', async () => {
+  const { resources, releases } = managedResources();
+  await expect(
+    createReviewWatermarkRenderer(
+      settings(),
+      { width: 1000000, height: 1000000 },
+      undefined,
+      undefined,
+      { scaleX: 0.1, scaleY: 0.1, resources }
+    )
+  ).rejects.toThrow('Watermark cache budget exceeded.');
+  expect(resources.canvas).toHaveBeenCalledOnce();
+  expect(releases[0]).toHaveBeenCalledOnce();
+});
+
+it('measures once and exposes rounded allocation before painting the captured canonical text', async () => {
+  const { resources, releases } = managedResources();
+  const value = settings();
+  const measured = await measureReviewWatermark(
+    value,
+    { width: 1920, height: 1080 },
+    new AbortController().signal,
+    { scaleX: 0.333, scaleY: 0.333, resources }
+  );
+  expect(resources.canvas).toHaveBeenCalledTimes(1);
+  expect(releases[0]).toHaveBeenCalledOnce();
+  expect(measured.kind).toBe('text');
+  expect(Object.isFrozen(measured.cache)).toBe(true);
+  const calls = vi.mocked(contexts[0]!.measureText).mock.calls.length;
+  value.text.value = 'changed';
+  const painter = await measured.paint();
+  expect(resources.canvas).toHaveBeenLastCalledWith('watermark-cache', measured.cache);
+  expect(vi.mocked(contexts[0]!.measureText).mock.calls).toHaveLength(calls);
+  expect(contexts[1]!.fillText).not.toHaveBeenCalledWith(
+    'changed',
+    expect.anything(),
+    expect.anything()
+  );
+  expect(load).toHaveBeenCalledTimes(1);
+  painter.dispose();
+});
+
+it('exposes image source storage without decoding and rejects painting an aborted descriptor', async () => {
+  const { resources } = managedResources();
+  const controller = new AbortController();
+  const read = vi.fn();
+  const measured = await measureReviewWatermark(
+    {
+      ...settings(),
+      mode: 'image',
+      image: {
+        assetId: 'project-asset:logo',
+        width: 400,
+        height: 200,
+        size: 0.2,
+        opacity: 1,
+      },
+    },
+    { width: 1920, height: 1080 },
+    controller.signal,
+    { scaleX: 0.25, scaleY: 0.25, resources }
+  );
+  expect(measured.cache).toEqual({ width: 96, height: 48 });
+  expect(measured.source).toEqual({ width: 400, height: 200 });
+  expect(resources.canvas).not.toHaveBeenCalled();
+  expect(resources.bytes).not.toHaveBeenCalled();
+  controller.abort();
+  await expect(measured.paint(read)).rejects.toThrow();
+  expect(read).not.toHaveBeenCalled();
 });

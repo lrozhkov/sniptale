@@ -281,3 +281,23 @@ it('blacks out full output coordinates once, leaving dissolve untouched', () => 
   );
   expect(context.fillStyle).toBe('#abcdef');
 });
+
+it('retains decoded allocation metadata on the same bounded endpoint samples', async () => {
+  const left = { ...frame(1.9), allocationSize: () => 1234 };
+  const right = { ...frame(4.1), allocationSize: () => 5678 };
+  const owner = createReviewTransitionFrames(
+    {
+      getSample: async () => left,
+      async *samples() {
+        yield right;
+      },
+    },
+    new AbortController().signal
+  );
+  const loaded = await owner.load(plan);
+  expect(loaded?.left.allocationSize?.()).toBe(1234);
+  expect(loaded?.right.allocationSize?.()).toBe(5678);
+  owner.dispose();
+  expect(left.close).toHaveBeenCalledOnce();
+  expect(right.close).toHaveBeenCalledOnce();
+});

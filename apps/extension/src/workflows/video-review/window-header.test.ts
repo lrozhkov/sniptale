@@ -198,3 +198,149 @@ it('matches a fitted DOM allocation without changing glyph scale or the encoder 
     new DOMParser().parseFromString(encoded, 'image/svg+xml').documentElement.getAttribute('height')
   ).toBe('18');
 });
+
+it('honors explicit backing despite intrinsic header width and shares one fractional video join', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const release = vi.fn();
+  const canvas = vi.fn((_role: string, size: { width: number; height: number }) => ({
+    canvas: { ...size } as HTMLCanvasElement,
+    context,
+    release,
+  }));
+  const header = document.createElement('canvas');
+  header.width = 1920;
+  const draw = vi.fn();
+  const args = {
+    header,
+    windowRect: { x: 10, y: 20, width: 1920, height: 1133 },
+    videoRect: { x: 10, y: 73, width: 1920, height: 1080 },
+    draw,
+    backing: { width: 640, height: 378 },
+    resources: { canvas, bytes: vi.fn() },
+  };
+  const raster = createReviewWindowRaster(args);
+  expect(canvas).toHaveBeenCalledExactlyOnceWith('decorated-window', { width: 640, height: 378 });
+  const join = (53 * 378) / 1133;
+  expect(context.drawImage).toHaveBeenCalledWith(header, 0, 0, 640, expect.closeTo(join, 9));
+  expect(draw).toHaveBeenCalledWith(
+    context,
+    0,
+    expect.closeTo(join, 9),
+    640,
+    expect.closeTo((1080 * 378) / 1133, 9)
+  );
+  expect(context.globalCompositeOperation).toBe('lighter');
+  expect(raster).toMatchObject({ width: 640, height: 378 });
+  raster.release();
+  expect(release).toHaveBeenCalledTimes(1);
+  draw.mockImplementationOnce(() => {
+    throw new Error('paint failed');
+  });
+  expect(() => createReviewWindowRaster(args)).toThrow('paint failed');
+  expect(release).toHaveBeenCalledTimes(2);
+});
+
+it.each([0, -1, 1.5, NaN, Infinity])(
+  'rejects invalid explicit window backing %s before acquisition',
+  (width) => {
+    const canvas = vi.fn();
+    expect(() =>
+      createReviewWindowRaster({
+        header: document.createElement('canvas'),
+        windowRect: { x: 0, y: 0, width: 1920, height: 1133 },
+        videoRect: { x: 0, y: 53, width: 1920, height: 1080 },
+        draw: vi.fn(),
+        backing: { width, height: 378 },
+        resources: { canvas, bytes: vi.fn() },
+      })
+    ).toThrow('Invalid window raster backing');
+    expect(canvas).not.toHaveBeenCalled();
+  }
+);
+
+it('retains fractional intrinsic raster geometry while managed allocation matches pool rounding', () => {
+  const context = {
+    save: vi.fn(),
+    restore: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
+    drawImage: vi.fn(),
+  } as unknown as CanvasRenderingContext2D;
+  const release = vi.fn();
+  const canvas = vi.fn((_role: string, size: { width: number; height: number }) => {
+    expect(Number.isInteger(size.width)).toBe(true);
+    expect(Number.isInteger(size.height)).toBe(true);
+    return { canvas: { ...size } as HTMLCanvasElement, context, release };
+  });
+  const header = document.createElement('canvas');
+  header.width = 1920;
+  const draw = vi.fn();
+  const scale = 1920 / 931;
+  const raster = createReviewWindowRaster({
+    header,
+    windowRect: { x: 0, y: 0, width: 931, height: 606 },
+    videoRect: { x: 0, y: 86, width: 931, height: 520 },
+    draw,
+    resources: { canvas, bytes: vi.fn() },
+  });
+  expect(canvas).toHaveBeenCalledExactlyOnceWith('decorated-window', {
+    width: 1920,
+    height: Math.ceil(606 * scale),
+  });
+  expect(raster.height).toBe(606 * scale);
+  expect(draw).toHaveBeenCalledWith(context, 0, 86 * scale, expect.closeTo(1920, 8), 520 * scale);
+  raster.release();
+  expect(release).toHaveBeenCalledTimes(1);
+});
+
+it('decodes the canonical header into explicit backing without changing legacy decode options', async () => {
+  const images: HTMLImageElement[] = [];
+  vi.stubGlobal(
+    'Image',
+    class {
+      constructor() {
+        const image = document.createElement('img');
+        images.push(image);
+        return image;
+      }
+    }
+  );
+  const bitmap = { close: vi.fn() };
+  const decode = vi.fn(async () => bitmap);
+  vi.stubGlobal('createImageBitmap', decode);
+  const signal = new AbortController().signal;
+  const resized = loadReviewWindowHeader('data:image/svg+xml,test', signal, {
+    backing: { width: 640, height: 48 },
+  });
+  images[0]!.dispatchEvent(new Event('load'));
+  expect(await resized).toBe(bitmap);
+  expect(decode).toHaveBeenLastCalledWith(images[0], {
+    resizeWidth: 640,
+    resizeHeight: 48,
+    resizeQuality: 'high',
+  });
+  const legacy = loadReviewWindowHeader('data:image/svg+xml,test', signal);
+  images[1]!.dispatchEvent(new Event('load'));
+  await legacy;
+  expect(decode).toHaveBeenLastCalledWith(images[1]);
+});
+
+it.each([0, -1, 1.5, NaN, Infinity])(
+  'rejects invalid header backing %s before loading',
+  async (width) => {
+    const image = vi.fn();
+    vi.stubGlobal('Image', image);
+    await expect(
+      loadReviewWindowHeader('data:image/svg+xml,test', new AbortController().signal, {
+        backing: { width, height: 40 },
+      })
+    ).rejects.toThrow('Invalid window header backing');
+    expect(image).not.toHaveBeenCalled();
+  }
+);

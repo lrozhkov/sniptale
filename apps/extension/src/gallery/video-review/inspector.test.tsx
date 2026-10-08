@@ -327,3 +327,94 @@ it('consumes export requests once and returns to the same selected edit', async 
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['scene', 'selected', 'history', 'export'] as const)(
+  'returns from Preview to %s without leaving the editor or changing selection',
+  (section) => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      }
+    );
+    const host = document.createElement('div');
+    document.body.append(host);
+    const root = createRoot(host);
+    const leave = vi.fn();
+    let navigation!: ReturnType<typeof useReviewInspectorNavigation>;
+    function Fixture() {
+      navigation = useReviewInspectorNavigation({
+        settingsAvailable: true,
+        selectionLabel: 'Selected object',
+        contextKey: 'selected:x',
+        exportAvailable: true,
+      });
+      return (
+        <>
+          <button
+            id="preview-trigger"
+            onClick={(event) => navigation.openPreview(event.currentTarget)}
+          >
+            Preview
+          </button>
+          <Inspector
+            filename="clip"
+            annotations={[]}
+            selectedId={null}
+            busy={false}
+            message={null}
+            settingsAvailable
+            selectionLabel="Selected object"
+            navigation={navigation}
+            scene={<span>Scene</span>}
+            actions={<span>Export</span>}
+            actionHistory={<span>History</span>}
+            preview={<button>Quality</button>}
+            onBack={leave}
+            onAdd={vi.fn()}
+            onSelect={vi.fn()}
+            onHover={vi.fn()}
+            onEdit={vi.fn()}
+            onDelete={vi.fn()}
+            onReport={vi.fn()}
+          >
+            <span>Object</span>
+          </Inspector>
+        </>
+      );
+    }
+    try {
+      act(() => root.render(<Fixture />));
+      act(() => navigation.setSection(section));
+      const trigger = host.querySelector<HTMLButtonElement>('#preview-trigger')!;
+      act(() => trigger.click());
+      act(() => trigger.click());
+      expect(navigation.shown).toBe('preview');
+      expect(document.activeElement?.getAttribute('data-ui')).toBe(
+        'gallery.videoReview.previewInspector'
+      );
+      const panel = host.querySelector<HTMLElement>(
+        '[data-ui="gallery.videoReview.previewInspector"]'
+      )!;
+      act(() =>
+        panel.dispatchEvent(
+          new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        )
+      );
+      expect(navigation.shown).toBe(section);
+      expect(document.activeElement).toBe(trigger);
+      expect(leave).not.toHaveBeenCalled();
+      act(() => trigger.click());
+      const back = host.querySelector<HTMLButtonElement>('header button')!;
+      act(() => back.click());
+      expect(navigation.shown).toBe(section);
+      expect(leave).not.toHaveBeenCalled();
+    } finally {
+      act(() => root.unmount());
+      host.remove();
+      vi.unstubAllGlobals();
+    }
+  }
+);

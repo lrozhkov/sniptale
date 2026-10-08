@@ -3,10 +3,15 @@ import {
   resolveQuickEditWatermarkTile,
   type QuickEditWatermarkSettings,
 } from '../../features/video/review/advanced/watermark';
+import type {
+  RenderCanvasLease,
+  RenderResources,
+} from '../../features/video/composition/canvas/render-resources';
 import { resolveReviewAssetBytes } from './asset-bytes';
 import { QuickEditExportUnavailable } from './export-unavailable';
 
 type Size = { width: number; height: number };
+type Raster = { scaleX: number; scaleY: number; resources: RenderResources };
 const MAX_CACHE_PIXELS = 4_194_304;
 const MAX_LOGO_PIXELS = 16_000_000;
 
@@ -21,7 +26,7 @@ function emptyRenderer(): ReviewWatermarkRenderer {
   return { bounds: { x: 0, y: 0, width: 0, height: 0 }, draw() {}, dispose() {} };
 }
 
-function allocate(canvas: HTMLCanvasElement, size: Size) {
+function cacheSize(size: Size): Size {
   const width = Math.ceil(size.width);
   const height = Math.ceil(size.height);
   if (
@@ -34,8 +39,32 @@ function allocate(canvas: HTMLCanvasElement, size: Size) {
     width * height > MAX_CACHE_PIXELS
   )
     throw new Error('Watermark cache budget exceeded.');
-  canvas.width = width;
-  canvas.height = height;
+  return { width, height };
+}
+
+function createCache(size: Size, raster?: Raster): RenderCanvasLease {
+  const backing = cacheSize({
+    width: size.width * (raster?.scaleX ?? 1),
+    height: size.height * (raster?.scaleY ?? 1),
+  });
+  if (raster) return raster.resources.canvas('watermark-cache', backing);
+  const canvas = document.createElement('canvas');
+  canvas.width = backing.width;
+  canvas.height = backing.height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    canvas.width = 0;
+    canvas.height = 0;
+    throw new Error('Watermark canvas is unavailable.');
+  }
+  return {
+    canvas,
+    context,
+    release() {
+      canvas.width = 0;
+      canvas.height = 0;
+    },
+  };
 }
 
 function textFont(text: QuickEditWatermarkSettings['text'], pixels: number) {
@@ -77,8 +106,7 @@ function wrapText(context: CanvasRenderingContext2D, text: string, width: number
 }
 
 /** Glyph overhang and a conservative blur envelope are included before placement and tiling. */
-function paintText(
-  canvas: HTMLCanvasElement,
+function measureText(
   context: CanvasRenderingContext2D,
   settings: QuickEditWatermarkSettings,
   output: Size
@@ -104,10 +132,22 @@ function paintText(
   const blur = text.shadow ? Math.max(1, pixels * 0.12) : 0;
   const offset = text.shadow ? Math.max(1, pixels * 0.06) : 0;
   const padding = Math.ceil(blur * 3 + offset + 2);
-  allocate(canvas, {
+  const size = cacheSize({
     width: advance + left + right + padding * 2,
     height: ascent + descent + (lines.length - 1) * lineHeight + padding * 2,
   });
+  return { size, font, lines, metrics, advance, left, ascent, lineHeight, blur, offset, padding };
+}
+
+function paintText(
+  context: CanvasRenderingContext2D,
+  text: QuickEditWatermarkSettings['text'],
+  measured: ReturnType<typeof measureText>,
+  raster?: Raster
+) {
+  const { font, lines, metrics, advance, left, ascent, lineHeight, blur, offset, padding } =
+    measured;
+  if (raster) context.scale(raster.scaleX, raster.scaleY);
   context.font = font;
   context.textBaseline = 'alphabetic';
   context.textAlign = 'left';
@@ -115,8 +155,8 @@ function paintText(
   context.globalAlpha = 1;
   if (text.shadow) {
     context.shadowColor = '#00000080';
-    context.shadowBlur = blur;
-    context.shadowOffsetY = offset;
+    context.shadowBlur = blur * Math.max(raster?.scaleX ?? 1, raster?.scaleY ?? 1);
+    context.shadowOffsetY = offset * (raster?.scaleY ?? 1);
   }
   lines.forEach((line, index) => {
     const width = metrics[index]!.width;
@@ -148,17 +188,22 @@ async function readWatermarkBitmap(
 }
 
 async function paintImage(
-  canvas: HTMLCanvasElement,
-  context: CanvasRenderingContext2D,
   settings: QuickEditWatermarkSettings,
   output: Size,
   readAsset: typeof resolveReviewAssetBytes,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  raster?: Raster
 ) {
   const image = settings.image;
   if (!image) throw new QuickEditExportUnavailable(['asset-missing']);
-  const bitmap = await readWatermarkBitmap(image.assetId, readAsset, signal);
+  const reservation = raster?.resources.bytes(
+    'watermark-source-bitmap',
+    image.width * image.height * 4
+  );
+  let bitmap: ImageBitmap | undefined;
+  let cache: RenderCanvasLease | undefined;
   try {
+    bitmap = await readWatermarkBitmap(image.assetId, readAsset, signal);
     signal?.throwIfAborted();
     if (
       bitmap.width !== image.width ||
@@ -173,12 +218,67 @@ async function paintImage(
       width,
       height: (width * image.height) / image.width,
     });
-    allocate(canvas, bounds);
-    context.globalAlpha = image.opacity;
-    context.drawImage(bitmap, 0, 0, bounds.width, bounds.height);
-    return { width: bounds.width, height: bounds.height };
+    cache = createCache(bounds, raster);
+    cache.context.globalAlpha = image.opacity;
+    cache.context.drawImage(
+      bitmap,
+      0,
+      0,
+      raster ? cache.canvas.width : bounds.width,
+      raster ? cache.canvas.height : bounds.height
+    );
+    return { cache, painted: { width: bounds.width, height: bounds.height } };
+  } catch (failure) {
+    cache?.release();
+    throw failure;
   } finally {
-    bitmap.close();
+    bitmap?.close();
+    reservation?.release();
+  }
+}
+
+/** Canonical measurement finishes before the retained raster cache is admitted. */
+function prepareTextCache(settings: QuickEditWatermarkSettings, output: Size, raster?: Raster) {
+  const measurement = raster?.resources.canvas('watermark-measurement', {
+    width: 1,
+    height: 1,
+  });
+  const canvas = measurement?.canvas ?? document.createElement('canvas');
+  const context = measurement?.context ?? canvas.getContext('2d');
+  if (!context) throw new Error('Watermark canvas is unavailable.');
+  let measured: ReturnType<typeof measureText>;
+  try {
+    measured = measureText(context, settings, output);
+  } catch (failure) {
+    if (!measurement) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    throw failure;
+  } finally {
+    measurement?.release();
+  }
+  const painted = measured.size;
+  let cache: RenderCanvasLease;
+  if (raster) cache = createCache(painted, raster);
+  else {
+    canvas.width = painted.width;
+    canvas.height = painted.height;
+    cache = {
+      canvas,
+      context,
+      release() {
+        canvas.width = 0;
+        canvas.height = 0;
+      },
+    };
+  }
+  try {
+    paintText(cache.context, settings.text, measured, raster);
+    return { cache, painted };
+  } catch (failure) {
+    cache.release();
+    throw failure;
   }
 }
 
@@ -187,7 +287,8 @@ export async function createReviewWatermarkRenderer(
   settings: QuickEditWatermarkSettings | undefined,
   output: Size,
   signal?: AbortSignal,
-  readAsset: typeof resolveReviewAssetBytes = resolveReviewAssetBytes
+  readAsset: typeof resolveReviewAssetBytes = resolveReviewAssetBytes,
+  raster?: Raster
 ): Promise<ReviewWatermarkRenderer> {
   signal?.throwIfAborted();
   if (
@@ -210,73 +311,178 @@ export async function createReviewWatermarkRenderer(
       textFont(settings.text, Math.min(output.width, output.height) * settings.text.size),
       signal
     );
-  const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d');
-  if (!context) throw new Error('Watermark canvas is unavailable.');
+  if (
+    raster &&
+    ![raster.scaleX, raster.scaleY].every((scale) => Number.isFinite(scale) && scale > 0)
+  )
+    throw new Error('Invalid watermark raster scale.');
+  let cache: RenderCanvasLease | undefined;
   try {
     let painted: Size;
     if (settings.mode === 'text') {
-      paintText(canvas, context, settings, output);
-      painted = { width: canvas.width, height: canvas.height };
-    } else painted = await paintImage(canvas, context, settings, output, readAsset, signal);
-    signal?.throwIfAborted();
-    const bounds = resolveQuickEditWatermarkBounds(settings, output, painted);
-    const tile =
-      settings.layout === 'tiled' ? resolveQuickEditWatermarkTile(settings, output, bounds) : null;
-    let disposed = false;
-    const dispose = () => {
-      disposed = true;
-      canvas.width = 0;
-      canvas.height = 0;
-      signal?.removeEventListener('abort', dispose);
-    };
-    signal?.addEventListener('abort', dispose, { once: true });
-    return {
-      bounds,
-      draw(target) {
-        if (disposed) return;
-        target.save();
-        try {
-          if (!tile)
-            target.drawImage(
-              canvas,
-              0,
-              0,
-              painted.width,
-              painted.height,
-              bounds.x,
-              bounds.y,
-              bounds.width,
-              bounds.height
-            );
-          else
-            for (let row = 0; row < tile.rows; row++)
-              for (let column = 0; column < tile.columns; column++) {
-                target.save();
-                target.translate((column - 0.5) * tile.stepX, (row - 0.5) * tile.stepY);
-                target.rotate(tile.rotation);
-                target.drawImage(
-                  canvas,
-                  0,
-                  0,
-                  painted.width,
-                  painted.height,
-                  -bounds.width / 2,
-                  -bounds.height / 2,
-                  bounds.width,
-                  bounds.height
-                );
-                target.restore();
-              }
-        } finally {
-          target.restore();
-        }
-      },
-      dispose,
-    };
+      const text = prepareTextCache(settings, output, raster);
+      cache = text.cache;
+      painted = text.painted;
+    } else {
+      const image = await paintImage(settings, output, readAsset, signal, raster);
+      cache = image.cache;
+      painted = image.painted;
+    }
+    return rendererFromCache(cache, painted, settings, output, signal, raster);
   } catch (failure) {
-    canvas.width = 0;
-    canvas.height = 0;
+    cache?.release();
     throw failure;
   }
+}
+
+function rendererFromCache(
+  cache: RenderCanvasLease,
+  painted: Size,
+  settings: QuickEditWatermarkSettings,
+  output: Size,
+  signal?: AbortSignal,
+  raster?: Raster
+): ReviewWatermarkRenderer {
+  const { canvas } = cache;
+  const sampled = raster ? { width: canvas.width, height: canvas.height } : painted;
+  signal?.throwIfAborted();
+  const bounds = resolveQuickEditWatermarkBounds(settings, output, painted);
+  const tile =
+    settings.layout === 'tiled' ? resolveQuickEditWatermarkTile(settings, output, bounds) : null;
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    cache?.release();
+    signal?.removeEventListener('abort', dispose);
+  };
+  signal?.addEventListener('abort', dispose, { once: true });
+  return {
+    bounds,
+    draw(target) {
+      if (disposed) return;
+      target.save();
+      try {
+        if (!tile)
+          target.drawImage(
+            canvas,
+            0,
+            0,
+            sampled.width,
+            sampled.height,
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height
+          );
+        else
+          for (let row = 0; row < tile.rows; row++)
+            for (let column = 0; column < tile.columns; column++) {
+              target.save();
+              target.translate((column - 0.5) * tile.stepX, (row - 0.5) * tile.stepY);
+              target.rotate(tile.rotation);
+              target.drawImage(
+                canvas,
+                0,
+                0,
+                sampled.width,
+                sampled.height,
+                -bounds.width / 2,
+                -bounds.height / 2,
+                bounds.width,
+                bounds.height
+              );
+              target.restore();
+            }
+      } finally {
+        target.restore();
+      }
+    },
+    dispose,
+  };
+}
+
+/** Measures once before orchestration admits the exact cache and optional decoded-image storage. */
+export async function measureReviewWatermark(
+  settings: QuickEditWatermarkSettings | undefined,
+  output: Size,
+  signal: AbortSignal,
+  raster: Raster
+) {
+  signal.throwIfAborted();
+  if (![raster.scaleX, raster.scaleY].every((scale) => Number.isFinite(scale) && scale > 0))
+    throw new Error('Invalid watermark raster scale.');
+  if (
+    !settings ||
+    settings.mode === 'none' ||
+    (settings.mode === 'text' && !settings.text.value) ||
+    (settings.mode === 'image' && !settings.image)
+  )
+    return Object.freeze({
+      kind: 'none' as const,
+      cache: null,
+      source: null,
+      paint: async () => {
+        signal.throwIfAborted();
+        return emptyRenderer();
+      },
+    });
+  if (![output.width, output.height].every((value) => Number.isFinite(value) && value >= 1))
+    throw new Error('Invalid watermark output.');
+  const captured = structuredClone(settings);
+  const canonical = { ...output };
+  const capturedRaster = { ...raster };
+  let measured: ReturnType<typeof measureText> | undefined;
+  let painted: Size;
+  if (captured.mode === 'text') {
+    await prepareTextFont(
+      captured.text,
+      textFont(captured.text, Math.min(output.width, output.height) * captured.text.size),
+      signal
+    );
+    const measurement = raster.resources.canvas('watermark-measurement', { width: 1, height: 1 });
+    try {
+      measured = measureText(measurement.context, captured, canonical);
+    } finally {
+      measurement.release();
+    }
+    painted = measured.size;
+  } else {
+    const image = captured.image!;
+    const width = output.width * image.size;
+    const bounds = resolveQuickEditWatermarkBounds(captured, canonical, {
+      width,
+      height: (width * image.height) / image.width,
+    });
+    painted = { width: bounds.width, height: bounds.height };
+  }
+  const cache = Object.freeze(
+    cacheSize({ width: painted.width * raster.scaleX, height: painted.height * raster.scaleY })
+  );
+  const source =
+    captured.mode === 'image'
+      ? Object.freeze({ width: captured.image!.width, height: captured.image!.height })
+      : null;
+  signal.throwIfAborted();
+  return Object.freeze({
+    kind: captured.mode === 'image' ? ('image' as const) : ('text' as const),
+    cache,
+    source,
+    async paint(readAsset: typeof resolveReviewAssetBytes = resolveReviewAssetBytes) {
+      signal.throwIfAborted();
+      let lease: RenderCanvasLease | undefined;
+      try {
+        if (measured) {
+          lease = createCache(painted, capturedRaster);
+          paintText(lease.context, captured.text, measured, capturedRaster);
+        } else
+          lease = (await paintImage(captured, canonical, readAsset, signal, capturedRaster)).cache;
+        signal.throwIfAborted();
+        return rendererFromCache(lease, painted, captured, canonical, signal, capturedRaster);
+      } catch (failure) {
+        lease?.release();
+        throw failure;
+      }
+    },
+  });
 }

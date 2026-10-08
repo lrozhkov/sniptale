@@ -5,12 +5,20 @@ import {
 
 type Frame = NonNullable<ReturnType<typeof quickEditWebcamFrameAt>>;
 
+/** Decoder evidence accompanying the mapped authored webcam frame. */
+export type ReviewWebcamAdmission = Frame & {
+  representedMediaTime: number;
+  generation: number;
+  tolerance: number;
+  acceptedAt: number;
+};
+
 type PlaybackArgs = {
   main: HTMLVideoElement;
   camera: HTMLVideoElement;
   frameDuration?: number;
   settings(): QuickEditWebcam;
-  paint(frame: Frame | null): void;
+  paint(frame: ReviewWebcamAdmission | null): void;
   failed(): void;
 };
 
@@ -20,133 +28,238 @@ type PlaybackArgs = {
  * seeks, visibility boundaries and sustained drift clear it.
  */
 export function createReviewWebcamPlayback(args: PlaybackArgs) {
-  const { main, camera } = args;
-  let disposed = false;
-  let animation = 0;
-  let callback = 0;
-  let generation = 0;
-  let decoded: number | null = null;
-  const raster = createWebcamRaster(args.paint);
-  const clear = raster.clear;
-  const frameDuration = args.frameDuration ?? 1 / 30;
-  let seeking = false;
-  let requestedTime: number | null = null;
-  let seekStarted = 0;
-  let seekLatency = 0;
-  const hasFrameCallback = typeof camera.requestVideoFrameCallback === 'function';
-  const transport = createWebcamTransport(camera, args.failed);
-  const { play, pause } = transport;
-  const clock = createSourcePlaybackClock(main, pause);
-  const requestFrame = () => {
-    if (!hasFrameCallback || disposed) return;
-    const expected = generation;
-    callback = camera.requestVideoFrameCallback((_now, metadata) => {
-      if (disposed || expected !== generation) return;
-      decoded = metadata.mediaTime;
-      requestFrame();
+  const playback = new ReviewWebcamPlayback(args);
+  playback.start();
+  return () => playback.dispose();
+}
+
+/** One session owns decoder evidence, alignment policy and transport lifetime. */
+class ReviewWebcamPlayback {
+  private disposed = false;
+  private animation = 0;
+  private callback = 0;
+  private generation = 0;
+  private decoded: number | null = null;
+  private seeking = false;
+  private requestedTime: number | null = null;
+  private alignmentNeeded = true;
+  private initialAlignment = true;
+  private visible = false;
+  private holdingAhead = false;
+  private readonly events = new AbortController();
+  private readonly raster: ReturnType<typeof createWebcamRaster>;
+  private readonly transport: ReturnType<typeof createWebcamTransport>;
+  private readonly clock: ReturnType<typeof createSourcePlaybackClock>;
+  private readonly frameDuration: number;
+  private readonly hasFrameCallback: boolean;
+  private previousSourceTime: number;
+  private previousOffset: number;
+  private previousRate: number;
+
+  constructor(private readonly args: PlaybackArgs) {
+    this.raster = createWebcamRaster(args.paint);
+    this.transport = createWebcamTransport(args.camera, args.failed);
+    this.clock = createSourcePlaybackClock(args.main, this.transport.pause);
+    this.frameDuration = args.frameDuration ?? 1 / 30;
+    this.hasFrameCallback = typeof args.camera.requestVideoFrameCallback === 'function';
+    this.previousSourceTime = args.main.currentTime;
+    this.previousOffset = args.settings().offsetSeconds;
+    this.previousRate = args.main.playbackRate;
+  }
+
+  start() {
+    const { main, camera } = this.args;
+    const options = { signal: this.events.signal };
+    camera.addEventListener('seeked', this.onSeeked, options);
+    camera.addEventListener('error', this.onError, options);
+    main.addEventListener('pause', this.onPause, options);
+    main.addEventListener('seeking', this.onSeeking, options);
+    main.addEventListener('ended', this.onPause, options);
+    this.requestFrame();
+    this.animation = requestAnimationFrame(this.reconcile);
+  }
+
+  dispose() {
+    this.disposed = true;
+    this.generation++;
+    cancelAnimationFrame(this.animation);
+    if (this.hasFrameCallback) this.args.camera.cancelVideoFrameCallback(this.callback);
+    this.events.abort();
+    this.clock.dispose();
+    this.transport.dispose();
+  }
+  private requestFrame = () => {
+    if (!this.hasFrameCallback || this.disposed) return;
+    const expected = this.generation;
+    this.callback = this.args.camera.requestVideoFrameCallback((_now, metadata) => {
+      if (this.disposed || expected !== this.generation) return;
+      this.decoded = metadata.mediaTime;
+      this.requestFrame();
     });
   };
-  const seek = (time: number) => {
-    pause();
-    decoded = null;
-    generation++;
-    if (hasFrameCallback) camera.cancelVideoFrameCallback(callback);
-    seeking = true;
-    seekStarted = performance.now();
-    requestedTime = time;
-    camera.currentTime = time;
-    requestFrame();
+  private seek = (time: number) => {
+    this.args.camera.playbackRate = this.args.main.playbackRate;
+    this.transport.pause();
+    this.decoded = null;
+    this.generation++;
+    if (this.hasFrameCallback) this.args.camera.cancelVideoFrameCallback(this.callback);
+    this.seeking = true;
+    this.alignmentNeeded = false;
+    this.initialAlignment = false;
+    this.holdingAhead = false;
+    this.requestedTime = time;
+    this.args.camera.currentTime = time;
+    this.requestFrame();
   };
-  const reconcile = () => {
-    if (disposed) return;
+  private reconcile = () => {
+    if (this.disposed) return;
     const now = performance.now();
-    const settings = args.settings();
-    const frame = quickEditWebcamFrameAt(settings, main.currentTime, camera.duration);
-    const running = clock.running(now);
-    const bridge = running && frame && raster.canRetain(frame, settings, now, main.playbackRate);
-    if (!running) pause();
-    if (!frame || main.seeking) {
-      pause();
-      clear();
-    } else if (camera.readyState < 2) {
-      pause();
-      if (!bridge) clear();
+    const settings = this.args.settings();
+    const frame = quickEditWebcamFrameAt(
+      settings,
+      this.args.main.currentTime,
+      this.args.camera.duration
+    );
+    const running = this.clock.running(now);
+    const tolerance = this.frameDuration * 2;
+    this.updateAlignment(frame, settings, tolerance);
+    const bridge =
+      running && frame && this.raster.canRetain(frame, settings, now, this.args.main.playbackRate);
+    if (!running) this.transport.pause();
+    if (!frame || this.args.main.seeking) {
+      this.transport.pause();
+      this.raster.clear();
+    } else if (this.args.camera.readyState < 2) {
+      if (!bridge) this.raster.clear();
+    } else if (!this.seeking && !this.args.camera.seeking && this.alignmentNeeded) {
+      this.raster.clear();
+      this.seek(frame.time);
     } else {
-      camera.playbackRate = main.playbackRate;
-      const tolerance = frameDuration * 2;
-      // Accelerated playback can skip source frames between presentation ticks.
-      // Keep clock drift strict; bound visible frame age in playback wall time.
-      const presentationTolerance = tolerance * (running ? Math.max(1, main.playbackRate) : 1);
-      const represented = hasFrameCallback ? decoded : camera.currentTime;
+      const presentationTolerance =
+        tolerance * (running ? Math.max(1, this.args.main.playbackRate) : 1);
+      const represented = this.hasFrameCallback ? this.decoded : this.args.camera.currentTime;
       const ready =
-        !seeking &&
-        !camera.seeking &&
+        !this.alignmentNeeded &&
+        !this.seeking &&
+        !this.args.camera.seeking &&
         represented !== null &&
         Math.abs(represented - frame.time) <= presentationTolerance;
       if (ready) {
-        requestedTime = null;
-        raster.paint(frame, settings, now);
-        if (running) play();
+        this.requestedTime = null;
+        this.raster.paint(
+          {
+            ...frame,
+            representedMediaTime: represented,
+            generation: this.generation,
+            tolerance,
+            acceptedAt: now,
+          },
+          settings,
+          now
+        );
+      } else if (!bridge) this.raster.clear();
+      this.synchronizeTransport(frame, running, ready, tolerance);
+    }
+    this.animation = requestAnimationFrame(this.reconcile);
+  };
+  private onSeeked = () => {
+    this.seeking = false;
+    if (!this.hasFrameCallback) this.decoded = this.args.camera.currentTime;
+  };
+  private onPause = () => {
+    this.holdingAhead = false;
+    this.args.camera.playbackRate = this.args.main.playbackRate;
+    this.transport.pause();
+  };
+  private onSeeking = () => {
+    this.initialAlignment = false;
+    this.alignmentNeeded = true;
+    this.holdingAhead = false;
+    this.generation++;
+    this.decoded = null;
+    if (this.hasFrameCallback) this.args.camera.cancelVideoFrameCallback(this.callback);
+    this.requestFrame();
+    this.transport.pause();
+    this.raster.clear();
+  };
+  private onError = () => {
+    this.transport.pause();
+    this.raster.clear();
+    this.args.failed();
+  };
+  private updateAlignment(frame: Frame | null, settings: QuickEditWebcam, tolerance: number) {
+    if (
+      settings.offsetSeconds !== this.previousOffset ||
+      this.args.main.currentTime < this.previousSourceTime ||
+      (!!frame && !this.visible)
+    ) {
+      this.alignmentNeeded = true;
+      this.raster.clear();
+    }
+    if (
+      settings.offsetSeconds !== this.previousOffset ||
+      this.args.main.currentTime < this.previousSourceTime
+    )
+      this.initialAlignment = false;
+    this.previousOffset = settings.offsetSeconds;
+    this.previousSourceTime = this.args.main.currentTime;
+    this.visible = !!frame;
+    if (this.args.main.playbackRate !== this.previousRate) {
+      this.holdingAhead = false;
+      this.args.camera.playbackRate = this.args.main.playbackRate;
+      this.previousRate = this.args.main.playbackRate;
+    }
+    if (
+      frame &&
+      this.args.main.paused &&
+      this.requestedTime !== null &&
+      Math.abs(this.requestedTime - frame.time) > tolerance
+    )
+      this.alignmentNeeded = true;
+    // Seeking an already decoded initial frame may never produce a second callback.
+    // Explicit discontinuities disable this exception before any evidence is consumed.
+    if (this.hasAlignedInitialFrame(frame, tolerance)) {
+      this.initialAlignment = false;
+      this.alignmentNeeded = false;
+    }
+  }
+  private hasAlignedInitialFrame(frame: Frame | null, tolerance: number) {
+    return (
+      this.initialAlignment &&
+      frame &&
+      !this.args.main.seeking &&
+      !this.seeking &&
+      !this.args.camera.seeking &&
+      this.args.camera.readyState >= 2 &&
+      this.decoded !== null &&
+      Math.abs(this.decoded - frame.time) <= tolerance &&
+      Math.abs(this.args.camera.currentTime - frame.time) <= tolerance
+    );
+  }
+  private synchronizeTransport(frame: Frame, running: boolean, ready: boolean, tolerance: number) {
+    if (!this.seeking && !this.args.camera.seeking && !this.alignmentNeeded) {
+      if (running) {
+        const drift = frame.time - this.args.camera.currentTime;
+        // Ahead decoders wait; hysteresis avoids pause/play chatter at a frame boundary.
+        this.holdingAhead = this.holdingAhead ? drift < -tolerance / 2 : drift < -tolerance;
+        if (this.holdingAhead) {
+          this.args.camera.playbackRate = this.args.main.playbackRate;
+          this.transport.pause();
+        } else {
+          // Recover ordinary lag through transport, never by accepting older pixels.
+          const catchUp =
+            drift > tolerance ? Math.min(this.args.main.playbackRate * 0.25, drift / 0.25) : 0;
+          this.args.camera.playbackRate = Math.min(16, this.args.main.playbackRate + catchUp);
+          this.transport.play();
+        }
       } else {
-        if (!bridge) clear();
-        if (
-          running &&
-          !seeking &&
-          !camera.seeking &&
-          Math.abs(camera.currentTime - frame.time) <= tolerance
-        ) {
-          // A delayed presentation callback is not decoder drift. Seeking here
-          // pauses an aligned decoder and can repeatedly restart it at high rates.
-          play();
-        } else if (
-          !seeking &&
-          !camera.seeking &&
-          (requestedTime === null || Math.abs(requestedTime - frame.time) > tolerance)
-        )
-          seek(
-            running
-              ? Math.min(
-                  camera.duration - Math.min(frameDuration, camera.duration),
-                  frame.time + seekLatency * main.playbackRate
-                )
-              : frame.time
-          );
+        this.holdingAhead = false;
+        this.args.camera.playbackRate = this.args.main.playbackRate;
+        if (this.args.main.paused && !ready && this.requestedTime !== frame.time)
+          this.seek(frame.time);
       }
     }
-    animation = requestAnimationFrame(reconcile);
-  };
-  const onSeeked = () => {
-    if (seeking) seekLatency = Math.min(1, Math.max(0, performance.now() - seekStarted) / 1000);
-    seeking = false;
-    if (!hasFrameCallback) decoded = camera.currentTime;
-  };
-  const onPause = () => pause();
-  const onSeeking = () => {
-    pause();
-    clear();
-  };
-  const onError = () => {
-    pause();
-    clear();
-    args.failed();
-  };
-  const events = new AbortController();
-  camera.addEventListener('seeked', onSeeked, { signal: events.signal });
-  camera.addEventListener('error', onError, { signal: events.signal });
-  main.addEventListener('pause', onPause, { signal: events.signal });
-  main.addEventListener('seeking', onSeeking, { signal: events.signal });
-  main.addEventListener('ended', onPause, { signal: events.signal });
-  requestFrame();
-  animation = requestAnimationFrame(reconcile);
-  return () => {
-    disposed = true;
-    generation++;
-    cancelAnimationFrame(animation);
-    if (hasFrameCallback) camera.cancelVideoFrameCallback(callback);
-    events.abort();
-    clock.dispose();
-    transport.dispose();
-  };
+  }
 }
 
 /** Serializes native play promises and makes late resolution harmless after disposal. */
@@ -190,7 +303,7 @@ function createWebcamRaster(paint: PlaybackArgs['paint']) {
       accepted = null;
       paint(null);
     },
-    paint(frame: Frame, settings: QuickEditWebcam, now: number) {
+    paint(frame: ReviewWebcamAdmission, settings: QuickEditWebcam, now: number) {
       accepted = { at: now, time: frame.time, settings };
       paint(frame);
     },

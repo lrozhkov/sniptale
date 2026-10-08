@@ -153,3 +153,47 @@ test('quick editor exports a small left-edge blur with browser header and shadow
     );
   }
 });
+
+test('tiled spotlight masks match the untiled reference at every pixel', async ({ page }, info) => {
+  await page.setViewportSize({ width: 900, height: 900 });
+  const bundle = await build({
+    entryPoints: ['tooling/test/e2e/support/spotlight-mask-parity-probe.ts'],
+    bundle: true,
+    format: 'esm',
+    platform: 'browser',
+    write: false,
+  });
+  const results = await page.evaluate(async (text) => {
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+    try {
+      const module: typeof import('../support/spotlight-mask-parity-probe') = await import(url);
+      return module.probe();
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }, bundle.outputFiles[0]!.text);
+  await writeFile(info.outputPath('spotlight-mask-parity.json'), JSON.stringify(results, null, 2));
+  await page.screenshot({ path: info.outputPath('spotlight-mask-parity.png'), fullPage: false });
+  expect(results).toHaveLength(22);
+  for (const result of results) {
+    const evidence = JSON.stringify(result);
+    expect(result.radius, evidence).toBe(result.expectedRadius);
+    for (const channel of [result.dim, result.blur]) {
+      expect(channel.maxDifference, evidence).toBe(0);
+      expect(channel.differentPixels, evidence).toBe(0);
+      expect(channel.seamDifferentPixels, evidence).toBe(0);
+    }
+    expect(result.resources.canvases, evidence).toBe(0);
+    expect(result.resources.bytes, evidence).toBe(0);
+    if (result.managed) {
+      expect(result.resources.hole, evidence).toEqual(result.output);
+      expect(result.resources.tile, evidence).toEqual(result.tile);
+    }
+    if (result.name === 'projected-fractional') {
+      expect(result.dim.fractionalPixels, evidence).toBeGreaterThan(0);
+      expect(result.tile.height, evidence).toBeLessThan(result.output.height);
+      expect(result.output.height % result.tile.height, evidence).not.toBe(0);
+    }
+    if (result.name === 'full-protection') expect(result.dim.fractionalPixels, evidence).toBe(0);
+  }
+});

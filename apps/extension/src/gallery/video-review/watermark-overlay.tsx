@@ -36,6 +36,8 @@ type OverlayProps = {
   settings: Settings | undefined;
   output: { width: number; height: number };
   editable: boolean;
+  /** Canonical measured cache bounds from the sole manual renderer; null is pending. */
+  manual?: { bounds: Bounds | null } | undefined;
   /** Reprepare unchanged resources after an explicit user retry. */
   retryGeneration?: number | undefined;
   onReady?(): void;
@@ -63,9 +65,10 @@ export function ReviewWatermarkOverlay(props: OverlayProps) {
   const width = props.output.width;
   const height = props.output.height;
   const resource = useWatermarkResource(props, resourceKey);
+  const measuredBounds = props.manual ? props.manual.bounds : resource?.bounds;
   const bounds =
-    resource && settings && resource.bounds.width > 0 && resource.bounds.height > 0
-      ? resolveQuickEditWatermarkBounds(settings, props.output, resource.bounds)
+    measuredBounds && settings && measuredBounds.width > 0 && measuredBounds.height > 0
+      ? resolveQuickEditWatermarkBounds(settings, props.output, measuredBounds)
       : null;
   useWatermarkPaint(canvas, resource, bounds, props.output, settings?.layout);
   const events = useWatermarkGesture(props, host, settings, bounds, resourceKey, setDraft);
@@ -76,13 +79,15 @@ export function ReviewWatermarkOverlay(props: OverlayProps) {
       className="pointer-events-none absolute inset-0"
       data-ui="gallery.videoReview.watermark"
     >
-      <canvas
-        ref={canvas}
-        width={width}
-        height={height}
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 h-full w-full"
-      />
+      {!props.manual ? (
+        <canvas
+          ref={canvas}
+          width={width}
+          height={height}
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 h-full w-full"
+        />
+      ) : null}
       {props.editable && settings?.layout === 'single' && settings.mode !== 'none' && bounds && (
         <button
           ref={bindHandle}
@@ -122,8 +127,10 @@ function useWatermarkResource(props: OverlayProps, resourceKey: string | undefin
   const latest = useRef(props);
   latest.current = props;
   const { width, height } = props.output;
+  const manual = !!props.manual;
   const [resource, setResource] = useState<ReviewWatermarkRenderer | null>(null);
   useEffect(() => {
+    if (manual) return;
     let active = true;
     let prepared: ReviewWatermarkRenderer | null = null;
     const controller = new AbortController();
@@ -152,7 +159,7 @@ function useWatermarkResource(props: OverlayProps, resourceKey: string | undefin
       controller.abort();
       prepared?.dispose();
     };
-  }, [resourceKey, width, height, props.retryGeneration]);
+  }, [resourceKey, width, height, props.retryGeneration, manual]);
   return resource;
 }
 

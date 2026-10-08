@@ -192,3 +192,103 @@ it('does not introduce a reveal seam for a full perimeter with floating-point su
   ]);
   expect(mask.context.stroke).not.toHaveBeenCalled();
 });
+
+function managedCompositor() {
+  const parts = compositor();
+  const layerRelease = vi.fn(),
+    maskRelease = vi.fn();
+  const canvas = vi.fn((role: string, size: { width: number; height: number }) => {
+    const source = role === 'border-layer' ? parts.layer : parts.mask;
+    source.canvas.width = size.width;
+    source.canvas.height = size.height;
+    return {
+      canvas: source.canvas as unknown as HTMLCanvasElement,
+      context: target(source.context),
+      release: role === 'border-layer' ? layerRelease : maskRelease,
+    };
+  });
+  return { ...parts, canvas, layerRelease, maskRelease, resources: { canvas, bytes: vi.fn() } };
+}
+
+it('reuses two managed surfaces across patterned and solid frames without DOM allocation', () => {
+  const p = managedCompositor();
+  drawReviewBorders(
+    target(p.destination.context),
+    output,
+    [
+      { ...frame, style: 'dashed', start: 0.25, end: 0.75, opacity: 0.4 },
+      { ...frame, start: 0.1, end: 0.6, opacity: 0.8 },
+    ],
+    { rect: { x: 0, y: 0, width: 120, height: 80 }, radius: 8 },
+    p.resources
+  );
+  expect(p.canvas.mock.calls).toEqual([
+    ['border-layer', output],
+    ['border-mask', output],
+  ]);
+  expect(p.createElement).not.toHaveBeenCalled();
+  expect(p.mask.context.setLineDash).toHaveBeenCalledWith([160, 160]);
+  expect(p.layer.operations).toEqual(['destination-in']);
+  expect(p.layer.context.lineCap).toBe('round');
+  expect(p.destination.context.drawImage).toHaveBeenCalledTimes(2);
+  expect(p.destination.context.globalAlpha).toBe(0.8);
+  expect(p.destination.context.clip).toHaveBeenCalledTimes(1);
+  expect(p.layerRelease).toHaveBeenCalledTimes(1);
+  expect(p.maskRelease).toHaveBeenCalledTimes(1);
+});
+
+it('does not acquire managed surfaces for an empty frame list', () => {
+  const p = managedCompositor();
+  drawReviewBorders(target(p.destination.context), output, [], undefined, p.resources);
+  expect(p.canvas).not.toHaveBeenCalled();
+});
+
+it('releases the admitted layer when the second managed allocation fails', () => {
+  const p = managedCompositor();
+  const acquire = p.canvas.getMockImplementation()!;
+  p.canvas.mockImplementation((role, size) => {
+    if (role === 'border-mask') throw new Error('allocation refused');
+    return acquire(role, size);
+  });
+  expect(() =>
+    drawReviewBorders(target(p.destination.context), output, [frame], undefined, p.resources)
+  ).toThrow('allocation refused');
+  expect(p.layerRelease).toHaveBeenCalledTimes(1);
+  expect(p.maskRelease).not.toHaveBeenCalled();
+  expect(p.destination.context.save).not.toHaveBeenCalled();
+});
+
+it.each(['path', 'stroke', 'mask', 'publish'] as const)(
+  'restores saved state and releases both leases when %s fails',
+  (failure) => {
+    const p = managedCompositor();
+    const fail = () => {
+      throw new Error('draw failed');
+    };
+    if (failure === 'path')
+      vi.stubGlobal(
+        'Path2D',
+        class {
+          constructor() {
+            fail();
+          }
+        }
+      );
+    if (failure === 'stroke') p.layer.context.stroke.mockImplementation(fail);
+    if (failure === 'mask') p.mask.context.stroke.mockImplementation(fail);
+    if (failure === 'publish') p.destination.context.drawImage.mockImplementation(fail);
+    expect(() =>
+      drawReviewBorders(
+        target(p.destination.context),
+        output,
+        [{ ...frame, style: 'dashed', start: 0, end: 0.5 }],
+        undefined,
+        p.resources
+      )
+    ).toThrow('draw failed');
+    expect(p.layer.context.restore).toHaveBeenCalledTimes(1);
+    expect(p.destination.context.restore).toHaveBeenCalledTimes(1);
+    expect(p.layerRelease).toHaveBeenCalledTimes(1);
+    expect(p.maskRelease).toHaveBeenCalledTimes(1);
+  }
+);

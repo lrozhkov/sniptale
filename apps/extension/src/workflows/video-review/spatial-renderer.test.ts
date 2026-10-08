@@ -2,6 +2,7 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { createReviewSpatialTextures } from './spatial-textures';
 import { createReviewSpatialRenderer } from './spatial-renderer';
+import { createPreviewRenderResources } from './preview-render-resources';
 import {
   DEFAULT_QUICK_EDIT_DEPTH,
   type QuickEditSpatialFrame,
@@ -216,4 +217,114 @@ it('keeps perspective available without float targets but rejects inaccurate dep
     'Depth renderer precision'
   );
   renderer.dispose();
+});
+
+function resourceSession(maximumManagedBytes = 1_000_000) {
+  return createPreviewRenderResources({ maximumManagedBytes, maximumCanvases: 4 });
+}
+
+it.each([true, false])('accounts actual odd texture levels with half-float=%s', (halfFloat) => {
+  const { gl } = graphics();
+  if (!halfFloat) gl.getExtension.mockReturnValue(null);
+  const resources = resourceSession();
+  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext, resources);
+  const source = document.createElement('canvas');
+  source.width = 5;
+  source.height = 3;
+  textures.upload(source);
+  // Base5×3; reduced3×2,2×1, then five1×1 levels.
+  const expected = 64 + 15 * 4 + 13 * (halfFloat ? 8 : 4);
+  expect(resources.counters.managedBytes).toBe(expected);
+  textures.upload(source);
+  expect(resources.counters.managedBytes).toBe(expected);
+  expect(gl.createTexture).toHaveBeenCalledTimes(8);
+  source.width = 1;
+  source.height = 1;
+  textures.upload(source);
+  expect(resources.counters.managedBytes).toBe(64 + 4 + 7 * (halfFloat ? 8 : 4));
+  expect(resources.counters.peakManagedBytes).toBe(expected);
+  textures.dispose();
+  textures.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
+  expect(() => textures.upload(source)).toThrow('disposed');
+});
+
+it('refuses texture admission before texImage2D and releases prior metadata', () => {
+  const { gl } = graphics();
+  const resources = resourceSession(64);
+  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext, resources);
+  const source = document.createElement('canvas');
+  source.width = source.height = 10;
+  expect(() => textures.upload(source)).toThrow('resource allocation failed');
+  expect(gl.texImage2D).not.toHaveBeenCalled();
+  expect(resources.counters.managedBytes).toBe(0);
+  expect(gl.deleteTexture).toHaveBeenCalledTimes(8);
+});
+
+it('releases all admitted texture storage after framebuffer failure', () => {
+  const { gl } = graphics();
+  const resources = resourceSession();
+  const textures = createReviewSpatialTextures(gl as unknown as WebGLRenderingContext, resources);
+  const source = document.createElement('canvas');
+  source.width = source.height = 10;
+  gl.checkFramebufferStatus.mockReturnValueOnce(0);
+  expect(() => textures.upload(source)).toThrow('framebuffer is incomplete');
+  expect(resources.counters.managedBytes).toBe(0);
+  expect(() => textures.upload(source)).toThrow('disposed');
+});
+
+it('retains named canvas slots and releases managed GL reservations on context loss', () => {
+  const { context, gpu } = graphics();
+  const resources = resourceSession();
+  const lost = vi.fn();
+  const renderer = createReviewSpatialRenderer(lost, resources);
+  const plane = renderer.surface('plane', 10, 10);
+  expect(renderer.surface('plane', 10, 10).canvas).toBe(plane.canvas);
+  const overlay = renderer.surface('overlay', 10, 10);
+  expect(overlay.canvas).not.toBe(plane.canvas);
+  renderer.draw(context, plane.canvas, rect, rect, frame);
+  expect(resources.counters.managedBytes).toBeGreaterThan(800);
+  gpu().dispatchEvent(new Event('webglcontextlost'));
+  expect(lost).toHaveBeenCalledOnce();
+  // Released 2D leases remain idle in the session ledger until eviction/disposal.
+  expect(resources.counters.managedBytes).toBe(800);
+  expect(() => renderer.surface('plane', 10, 10)).toThrow('context was lost');
+  renderer.dispose();
+  resources.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
+  expect(plane.canvas.width).toBe(0);
+});
+
+it('releases an old surface before resizing and can evict it at exact capacity', () => {
+  graphics();
+  const resources = resourceSession(168 + 64 + 400);
+  const renderer = createReviewSpatialRenderer(undefined, resources);
+  const first = renderer.surface('plane', 10, 10);
+  const next = renderer.surface('plane', 5, 20);
+  expect(first.canvas.width).toBe(0);
+  expect(next.canvas.width).toBe(5);
+  expect(resources.counters.peakManagedBytes).toBe(632);
+  renderer.dispose();
+  resources.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
+});
+
+it('cleans managed constructor and drawing-buffer admission failures', () => {
+  const { context, loseContext } = graphics();
+  const tooSmall = resourceSession(167);
+  expect(() => createReviewSpatialRenderer(undefined, tooSmall)).toThrow(
+    'resource allocation failed'
+  );
+  expect(tooSmall.counters.managedBytes).toBe(0);
+  expect(loseContext).toHaveBeenCalledOnce();
+  const resources = resourceSession(168 + 64 + 400);
+  const renderer = createReviewSpatialRenderer(undefined, resources);
+  const plane = renderer.surface('plane', 10, 10);
+  expect(() => renderer.draw(context, plane.canvas, rect, rect, frame)).toThrow(
+    'resource allocation failed'
+  );
+  expect(resources.counters.managedBytes).toBe(400);
+  renderer.dispose();
+  resources.dispose();
+  expect(resources.counters.managedBytes).toBe(0);
 });

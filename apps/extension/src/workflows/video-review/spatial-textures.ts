@@ -1,12 +1,24 @@
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { REVIEW_SPATIAL_FILTER_FRAGMENT, REVIEW_SPATIAL_FILTER_VERTEX } from './spatial-shaders';
 
 /** Centered low-pass levels support arbitrary canvas sizes without POT padding or extensions. */
-export function createReviewSpatialTextures(gl: WebGLRenderingContext) {
+export function createReviewSpatialTextures(
+  gl: WebGLRenderingContext,
+  resources?: RenderResources
+) {
   const textures: WebGLTexture[] = [];
+  const reservations = new Map<number, { release(): void }>();
+  let sizeReservation: { release(): void } | undefined;
+  let disposed = false;
   const shaders: WebGLShader[] = [];
   let program: WebGLProgram | null = null;
   let framebuffer: WebGLFramebuffer | null = null;
   const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const reservation of reservations.values()) reservation.release();
+    reservations.clear();
+    sizeReservation?.release();
     for (const texture of textures) gl.deleteTexture(texture);
     for (const shader of shaders) gl.deleteShader(shader);
     if (framebuffer) gl.deleteFramebuffer(framebuffer);
@@ -63,10 +75,33 @@ export function createReviewSpatialTextures(gl: WebGLRenderingContext) {
     const texelSize = gl.getUniformLocation(program, 'texelSize');
     const sourceEncoded = gl.getUniformLocation(program, 'sourceEncoded');
     const dimensions: { width: number; height: number }[] = [];
+    sizeReservation = resources?.bytes('spatial-level-sizes', 16 * 4);
     const sizes = new Float32Array(16);
+    const reserveLevel = (index: number, width: number, height: number) => {
+      if (!resources) return;
+      const previous = dimensions[index];
+      if (previous?.width === width && previous.height === height) return;
+      if (reservations.has(index)) {
+        const replacement = gl.createTexture();
+        if (!replacement) throw new Error('Perspective texture is unavailable.');
+        const texture = textures[index];
+        if (texture) gl.deleteTexture(texture);
+        reservations.get(index)?.release();
+        reservations.delete(index);
+        textures[index] = replacement;
+        gl.bindTexture(gl.TEXTURE_2D, replacement);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      }
+      const pixelBytes = index === 0 || !supportsDepth ? 4 : 8;
+      reservations.set(index, resources.bytes('spatial-texture', width * height * pixelBytes));
+    };
     return {
       supportsDepth,
       upload(source: HTMLCanvasElement) {
+        if (disposed) throw new Error('Perspective textures were disposed.');
         gl.useProgram(program);
         gl.enableVertexAttribArray(position);
         gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 0, 0);
@@ -80,6 +115,8 @@ export function createReviewSpatialTextures(gl: WebGLRenderingContext) {
             sizes[index * 2] = width;
             sizes[index * 2 + 1] = height;
             if (index === 0) {
+              reserveLevel(index, width, height);
+              dimensions[index] = { width, height };
               gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
               continue;
             }
@@ -92,6 +129,7 @@ export function createReviewSpatialTextures(gl: WebGLRenderingContext) {
             const size = dimensions[index];
             const resized = size?.width !== width || size.height !== height;
             if (resized) {
+              reserveLevel(index, width, height);
               gl.texImage2D(
                 gl.TEXTURE_2D,
                 0,
@@ -108,7 +146,7 @@ export function createReviewSpatialTextures(gl: WebGLRenderingContext) {
               gl.FRAMEBUFFER,
               gl.COLOR_ATTACHMENT0,
               gl.TEXTURE_2D,
-              texture,
+              textures[index] ?? texture,
               0
             );
             if (resized && gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
@@ -121,6 +159,9 @@ export function createReviewSpatialTextures(gl: WebGLRenderingContext) {
             gl.drawArrays(gl.TRIANGLES, 0, 6);
           }
           return sizes;
+        } catch (error) {
+          if (resources) dispose();
+          throw error;
         } finally {
           gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         }

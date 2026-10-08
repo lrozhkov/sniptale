@@ -223,3 +223,45 @@ it('places below bubbles under the anchor point', () => {
   expect(bubble.style.top).toBe('calc(100% + 12px)');
   expect(bubble.style.bottom).toBe('');
 });
+
+it('keeps canonical manual handles and forwards disposable positions without duplicate comment pixels', async () => {
+  const comment = {
+    ...createCanvasComment({ id: 'manual' }),
+    text: 'Live only',
+    renderToVideo: false,
+  };
+  const onPreviewPosition = vi.fn();
+  act(() =>
+    root.render(
+      <ReviewCommentOverlay
+        comments={[comment]}
+        output={{ width: 800, height: 450 }}
+        source={{ width: 320, height: 180 }}
+        background={{ enabled: false }}
+        camera={null}
+        time={3}
+        selectedId={comment.id}
+        busy={false}
+        onSelect={onSelect}
+        onMove={onMove}
+        visualMode="handles"
+        onPreviewPosition={onPreviewPosition}
+      />
+    )
+  );
+  expect(host.querySelector('[data-ui="gallery.videoReview.canvasCommentBubble"]')).toBeNull();
+  const handle = host.querySelector('button')!;
+  expect(handle.querySelector('span')).toBeNull();
+  expect(handle.getAttribute('aria-pressed')).toBe('true');
+  await drag(handle, [
+    { kind: 'pointerdown', x: 100, y: 100 },
+    { kind: 'pointermove', x: 180, y: 145 },
+  ]);
+  expect(onPreviewPosition).toHaveBeenLastCalledWith(comment.id, {
+    x: comment.position.x + 0.1,
+    y: comment.position.y + 0.1,
+  });
+  await drag(handle, [{ kind: 'keydown', key: 'Escape' }]);
+  expect(onPreviewPosition).toHaveBeenLastCalledWith(comment.id, null);
+  expect(onMove).not.toHaveBeenCalled();
+});

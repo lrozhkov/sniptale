@@ -38,6 +38,7 @@
     "apps/extension/src/composition/persistence/capture-settings",
     "apps/extension/src/composition/persistence/effect-bundles",
     "apps/extension/src/composition/persistence/video-editor-preview-preferences",
+    "apps/extension/src/composition/persistence/quick-preview-preferences",
     "apps/extension/src/composition/persistence/video-preview-cache",
     "apps/extension/src/composition/persistence/web-snapshots",
     "apps/extension/src/background/storage/diagnostics",

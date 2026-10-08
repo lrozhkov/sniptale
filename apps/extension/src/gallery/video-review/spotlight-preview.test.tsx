@@ -50,6 +50,7 @@ beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
     clearRect: vi.fn(),
     save: vi.fn(),
+    translate: vi.fn(),
     restore: vi.fn(),
     beginPath: vi.fn(),
     roundRect: vi.fn(),
@@ -541,6 +542,11 @@ it('reuses combined masks across identical live samples and invalidates changed 
   await show(30);
   const generated = vi.mocked(HTMLCanvasElement.prototype.toDataURL).mock.calls.length;
   expect(generated).toBe(2);
+  for (const canvas of vi.mocked(HTMLCanvasElement.prototype.toDataURL).mock.contexts) {
+    if (!(canvas instanceof HTMLCanvasElement)) throw new Error('Expected a mask canvas.');
+    expect(canvas.width).toBe(0);
+    expect(canvas.height).toBe(0);
+  }
   for (let i = 0; i < 10; i++) await show(30);
   expect(HTMLCanvasElement.prototype.toDataURL).toHaveBeenCalledTimes(generated);
   await show(40);

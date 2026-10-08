@@ -149,10 +149,18 @@ function CombinedSpotlightOverlay(props: {
       props.clip,
       props.projection
     );
-    cache.current = {
-      key,
-      masks: { dim: result.dim.toDataURL(), blur: result.blur.toDataURL(), radius: result.radius },
-    };
+    try {
+      cache.current = {
+        key,
+        masks: {
+          dim: result.dim.toDataURL(),
+          blur: result.blur.toDataURL(),
+          radius: result.radius,
+        },
+      };
+    } finally {
+      result.dispose();
+    }
   }
   const masks = cache.current.masks;
   const maskStyle = (url: string) => ({ maskImage: `url("${url}")`, maskSize: '100% 100%' });

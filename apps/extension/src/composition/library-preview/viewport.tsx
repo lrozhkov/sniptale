@@ -132,10 +132,12 @@ export function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
   const frame = useRef<HTMLDivElement>(null);
   const fullscreenButton = useRef<HTMLButtonElement>(null);
   const previousFullscreen = useRef(false);
+  const handoff = useRef(false);
   const [fullscreen, setFullscreen] = useState(false);
   useLayoutEffect(() => {
     if (previousFullscreen.current !== fullscreen) {
-      fullscreenButton.current?.focus({ preventScroll: true });
+      if (!handoff.current) fullscreenButton.current?.focus({ preventScroll: true });
+      if (!fullscreen) handoff.current = false;
       previousFullscreen.current = fullscreen;
     }
   }, [fullscreen]);
@@ -144,6 +146,23 @@ export function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
     document.addEventListener('fullscreenchange', update);
     return () => document.removeEventListener('fullscreenchange', update);
   }, []);
+  const exit = async (restoreFocus: boolean): Promise<boolean> => {
+    handoff.current = !restoreFocus;
+    try {
+      if (document.fullscreenElement) {
+        if (!document.exitFullscreen) throw new Error('Fullscreen exit unavailable');
+        await document.exitFullscreen();
+      }
+      if (document.fullscreenElement === frame.current && frame.current) {
+        throw new Error('Fullscreen exit incomplete');
+      }
+      return true;
+    } catch {
+      handoff.current = false;
+      setFailed(true);
+      return false;
+    }
+  };
   return {
     frame,
     fullscreen,
@@ -151,9 +170,8 @@ export function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
     enterFullscreen: () => {
       void frame.current?.requestFullscreen?.().catch(() => setFailed(true));
     },
-    exitFullscreen: () => {
-      void document.exitFullscreen?.().catch(() => setFailed(true));
-    },
+    exitFullscreen: () => exit(true),
+    exitFullscreenForHandoff: () => exit(false),
   };
 }
 

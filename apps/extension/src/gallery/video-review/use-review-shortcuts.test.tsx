@@ -164,6 +164,29 @@ it('uses physical shortcut keys across layouts and leaves text editing alone', (
         new KeyboardEvent('keydown', { bubbles: true, key: 'я', code: 'KeyZ', ctrlKey: true })
       );
     expect(undo).toHaveBeenCalledTimes(1);
+    play.mockClear();
+    const preview = document.createElement('section');
+    preview.dataset['ui'] = 'gallery.videoReview.previewInspector';
+    const choice = document.createElement('button');
+    choice.setAttribute('aria-haspopup', 'listbox');
+    choice.setAttribute('aria-expanded', 'false');
+    preview.append(choice);
+    host.append(preview);
+    const gear = document.createElement('button');
+    gear.dataset['ui'] = 'gallery.videoReview.previewSettings';
+    host.append(gear);
+    for (const control of [choice, gear]) {
+      control.focus();
+      const event = new KeyboardEvent('keydown', {
+        key: ' ',
+        code: 'Space',
+        bubbles: true,
+        cancelable: true,
+      });
+      control.dispatchEvent(event);
+      expect(event.defaultPrevented).toBe(false);
+    }
+    expect(play).not.toHaveBeenCalled();
   } finally {
     act(() => root.unmount());
     host.remove();

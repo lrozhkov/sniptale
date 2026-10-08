@@ -1,3 +1,4 @@
+import type { RenderResources } from './render-resources';
 import { acquireVideoCompositionBuffer } from './buffer-pool';
 
 interface VideoCompositionPassBuffer {
@@ -14,6 +15,7 @@ export function createVideoCompositionPassBuffer(params: {
   drawHeight: number;
   drawWidth: number;
   ownerDocument?: Document | null;
+  resources?: RenderResources | undefined;
   targetContext: CanvasRenderingContext2D;
 }): VideoCompositionPassBuffer | null {
   if (
@@ -25,54 +27,88 @@ export function createVideoCompositionPassBuffer(params: {
     return null;
   }
 
-  const lease = acquireVideoCompositionBuffer(
-    params.bufferWidth,
-    params.bufferHeight,
-    params.ownerDocument
-  );
+  const acquire = (role: string) => {
+    if (params.resources) {
+      return params.resources.canvas(role, {
+        width: Math.ceil(params.bufferWidth),
+        height: Math.ceil(params.bufferHeight),
+      });
+    }
+    const pooled = acquireVideoCompositionBuffer(
+      params.bufferWidth,
+      params.bufferHeight,
+      params.ownerDocument
+    );
+    return pooled
+      ? {
+          ...pooled,
+          context: pooled.canvas.getContext('2d') as CanvasRenderingContext2D | null,
+        }
+      : null;
+  };
+  const lease = acquire('motion-accumulator');
   const canvas = lease?.canvas;
-  const context = canvas?.getContext('2d') ?? null;
+  const context = lease?.context;
   if (!canvas || !context || !('setTransform' in context) || !('clearRect' in context)) {
     lease?.release();
     return null;
   }
 
   const drawingContext = context as CanvasRenderingContext2D;
-  drawingContext.reset?.();
-  drawingContext.save();
-  drawingContext.setTransform(1, 0, 0, 1, 0, 0);
-  drawingContext.clearRect(0, 0, params.bufferWidth, params.bufferHeight);
-  drawingContext.globalCompositeOperation = 'lighter';
+  let saved = false;
+  try {
+    drawingContext.reset?.();
+    drawingContext.save();
+    saved = true;
+    drawingContext.setTransform(1, 0, 0, 1, 0, 0);
+    drawingContext.clearRect(0, 0, params.bufferWidth, params.bufferHeight);
+    drawingContext.globalCompositeOperation = 'lighter';
+  } catch (error) {
+    try {
+      if (saved) drawingContext.restore();
+    } finally {
+      lease!.release();
+    }
+    throw error;
+  }
 
-  let sampleLease: ReturnType<typeof acquireVideoCompositionBuffer> = null;
+  let sampleLease: ReturnType<typeof acquire> = null;
   let disposed = false;
   const dispose = () => {
     if (disposed) return;
     disposed = true;
-    drawingContext.restore();
-    sampleLease?.release();
-    lease!.release();
+    try {
+      drawingContext.restore();
+    } finally {
+      try {
+        sampleLease?.release();
+      } finally {
+        lease!.release();
+      }
+    }
   };
   return {
     dispose,
     context: drawingContext,
     drawPass: (alpha, paint) => {
-      sampleLease ??= acquireVideoCompositionBuffer(
-        params.bufferWidth,
-        params.bufferHeight,
-        params.ownerDocument
-      );
-      const sample = sampleLease?.canvas;
-      const sampleContext = sample?.getContext('2d');
-      if (!sample || !sampleContext) throw new Error('Motion blur sample canvas is unavailable.');
-      accumulatePass(
-        drawingContext,
-        sample,
-        sampleContext as CanvasRenderingContext2D,
-        params.targetContext,
-        alpha,
-        paint
-      );
+      if (disposed) throw new Error('Motion blur buffer is disposed.');
+      try {
+        sampleLease ??= acquire('motion-sample');
+        const sample = sampleLease?.canvas;
+        const sampleContext = sampleLease?.context;
+        if (!sample || !sampleContext) throw new Error('Motion blur sample canvas is unavailable.');
+        accumulatePass(
+          drawingContext,
+          sample,
+          sampleContext as CanvasRenderingContext2D,
+          params.targetContext,
+          alpha,
+          paint
+        );
+      } catch (error) {
+        dispose();
+        throw error;
+      }
     },
     flush: () => {
       try {

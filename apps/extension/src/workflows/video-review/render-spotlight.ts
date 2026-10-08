@@ -1,3 +1,7 @@
+import type {
+  RenderCanvasLease,
+  RenderResources,
+} from '../../features/video/composition/canvas/render-resources';
 import {
   projectQuickEditPoint,
   type QuickEditHomography,
@@ -19,19 +23,23 @@ export function drawReviewSpotlight(
   context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   scratch: HTMLCanvasElement | null,
-  frame: QuickEditSpotlightFrame | null
+  frame: QuickEditSpotlightFrame | null,
+  resources?: RenderResources
 ) {
   if (!frame) return;
   context.save();
-  context.clip(new Path2D(quickEditSpotlightPath(canvas, frame)), 'evenodd');
-  if (frame.blur > 0 && scratch) {
-    drawReviewBlurredScene(context, canvas, scratch, frame.blur);
+  try {
+    context.clip(new Path2D(quickEditSpotlightPath(canvas, frame)), 'evenodd');
+    if (frame.blur > 0 && (scratch || resources)) {
+      drawReviewBlurredScene(context, canvas, scratch, frame.blur, resources);
+    }
+    if (frame.dim > 0) {
+      context.fillStyle = `rgba(0,0,0,${frame.dim})`;
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  } finally {
+    context.restore();
   }
-  if (frame.dim > 0) {
-    context.fillStyle = `rgba(0,0,0,${frame.dim})`;
-    context.fillRect(0, 0, canvas.width, canvas.height);
-  }
-  context.restore();
 }
 
 /** Preserve legacy single-mask composition when its target is fully within the window. */
@@ -71,33 +79,149 @@ export function reviewSpotlightOpeningClip(
   };
 }
 
-function maskCanvas(output: { width: number; height: number }) {
+function maskCanvas(
+  output: { width: number; height: number },
+  role: string,
+  resources?: RenderResources
+): RenderCanvasLease {
+  const size = {
+    width: Math.max(1, Math.round(output.width)),
+    height: Math.max(1, Math.round(output.height)),
+  };
+  if (resources) return resources.canvas(role, size, { willReadFrequently: true });
   const canvas = document.createElement('canvas');
-  canvas.width = Math.max(1, Math.round(output.width));
-  canvas.height = Math.max(1, Math.round(output.height));
+  canvas.width = size.width;
+  canvas.height = size.height;
   const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) throw new Error('Spotlight compositor is unavailable.');
-  return { canvas, context };
+  if (!context) {
+    canvas.width = canvas.height = 0;
+    throw new Error('Spotlight compositor is unavailable.');
+  }
+  return {
+    canvas,
+    context,
+    release() {
+      canvas.width = canvas.height = 0;
+    },
+  };
 }
 
-/** Rasterizes true union coverage once, shared by CSS preview and Canvas export. */
+/** Rasterizes union coverage in bounded tiles; callers dispose both returned masks. */
 export function createReviewSpotlightMasks(
   output: { width: number; height: number },
   frames: readonly QuickEditSpotlightFrame[],
   clip?: ReviewSpotlightClip,
-  projection?: QuickEditHomography
+  projection?: QuickEditHomography,
+  resources?: RenderResources
 ) {
-  const dim = maskCanvas(output),
-    blur = maskCanvas(output),
-    hole = maskCanvas(output);
-  const coverage = (
-    rect: QuickEditSpotlightFrame['opening'],
-    radius: number,
-    bounds: ReviewSpotlightClip | undefined,
-    clipped: boolean
-  ) => {
-    hole.context.clearRect(0, 0, hole.canvas.width, hole.canvas.height);
-    hole.context.save();
+  const leases: RenderCanvasLease[] = [];
+  let disposed = false;
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    for (const lease of leases) lease.release();
+  };
+  try {
+    const dim = maskCanvas(output, 'spotlight.dim', resources);
+    leases.push(dim);
+    const blur = maskCanvas(output, 'spotlight.blur', resources);
+    leases.push(blur);
+    const width = dim.canvas.width,
+      height = dim.canvas.height;
+    // Tile readbacks and output ImageData stay within one scene-sized working set.
+    const pixels = Math.max(1, Math.floor((width * height) / (2 * frames.length + 3)));
+    const tileWidth = Math.min(width, pixels),
+      tileHeight = Math.max(1, Math.min(height, Math.floor(pixels / tileWidth)));
+    const radius = Math.max(0, ...frames.map((frame) => frame.blur));
+    let reservation: ReturnType<RenderResources['bytes']> | undefined;
+    // Skia coverage depends on raster clipping bounds; retain the original full-scene raster.
+    const hole = maskCanvas({ width, height }, 'spotlight.hole', resources);
+    try {
+      reservation = resources?.bytes(
+        'spotlight.coverage',
+        frames.length === 1
+          ? 3 * tileWidth * tileHeight * 4
+          : (2 * frames.length + 2) * tileWidth * tileHeight * 4 + (frames.length + 1) * 8
+      );
+      const single = frames.length === 1 ? frames[0] : undefined;
+      const prefix = single ? null : new Float64Array(frames.length + 1);
+      if (prefix) prefix[0] = 1;
+      if (single)
+        rasterizeMaskOpening(
+          hole,
+          single.opening,
+          single.radius,
+          reviewSpotlightOpeningClip(single, clip),
+          reviewSpotlightNeedsClip(single, clip),
+          projection
+        );
+      for (let y = 0; y < height; y += tileHeight)
+        for (let x = 0; x < width; x += tileWidth) {
+          const tile = {
+            x,
+            y,
+            width: Math.min(tileWidth, width - x),
+            height: Math.min(tileHeight, height - y),
+          };
+          if (single) paintSingleMaskTile(dim.context, blur.context, hole, single, radius, tile);
+          else if (prefix)
+            paintMaskTile(
+              dim.context,
+              blur.context,
+              hole,
+              frames,
+              prefix,
+              radius,
+              tile,
+              clip,
+              projection
+            );
+        }
+    } finally {
+      reservation?.release();
+      hole.release();
+    }
+    return { dim: dim.canvas, blur: blur.canvas, radius, dispose };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+}
+
+/** Self-protection is excluded from a mask, so one frame needs only opening coverage. */
+function paintSingleMaskTile(
+  dim: CanvasRenderingContext2D,
+  blur: CanvasRenderingContext2D,
+  hole: RenderCanvasLease,
+  frame: QuickEditSpotlightFrame,
+  radius: number,
+  tile: QuickEditRect
+) {
+  const opening = hole.context.getImageData(tile.x, tile.y, tile.width, tile.height).data;
+  const dimPixels = dim.createImageData(tile.width, tile.height);
+  const blurPixels = blur.createImageData(tile.width, tile.height);
+  for (let pixel = 3; pixel < dimPixels.data.length; pixel += 4) {
+    const outside = 1 - opening[pixel]! / 255;
+    const dimCoverage = Math.max(0, frame.dim * outside);
+    const blurCoverage = Math.max(0, frame.blur * outside);
+    dimPixels.data[pixel] = Math.round(255 * dimCoverage);
+    blurPixels.data[pixel] = radius ? Math.round((255 * blurCoverage) / radius) : 0;
+  }
+  dim.putImageData(dimPixels, tile.x, tile.y);
+  blur.putImageData(blurPixels, tile.x, tile.y);
+}
+
+function rasterizeMaskOpening(
+  hole: RenderCanvasLease,
+  rect: QuickEditRect,
+  corner: number,
+  bounds: ReviewSpotlightClip | undefined,
+  clipped: boolean,
+  projection: QuickEditHomography | undefined
+) {
+  hole.context.clearRect(0, 0, hole.canvas.width, hole.canvas.height);
+  hole.context.save();
+  try {
     if (bounds && clipped) {
       if (projection) hole.context.clip(projectedOpening(bounds.rect, bounds.radius, projection));
       else {
@@ -112,15 +236,36 @@ export function createReviewSpotlightMasks(
         hole.context.clip();
       }
     }
-    // Draw the positive opening once. Subtracting its inverse under an antialiased clip
-    // applies edge coverage twice and leaves a translucent ring around the whole window.
+    // Positive coverage preserves the original fractional clip-edge semantics.
     hole.context.fill(
       projection
-        ? projectedOpening(rect, radius, projection)
-        : new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius }))
+        ? projectedOpening(rect, corner, projection)
+        : new Path2D(quickEditSpotlightOpeningPath({ opening: rect, radius: corner }))
     );
+  } finally {
     hole.context.restore();
-    return hole.context.getImageData(0, 0, hole.canvas.width, hole.canvas.height).data;
+  }
+}
+
+function paintMaskTile(
+  dim: CanvasRenderingContext2D,
+  blur: CanvasRenderingContext2D,
+  hole: RenderCanvasLease,
+  frames: readonly QuickEditSpotlightFrame[],
+  prefix: Float64Array,
+  radius: number,
+  tile: QuickEditRect,
+  clip?: ReviewSpotlightClip,
+  projection?: QuickEditHomography
+) {
+  const coverage = (
+    rect: QuickEditRect,
+    corner: number,
+    bounds: ReviewSpotlightClip | undefined,
+    clipped: boolean
+  ) => {
+    rasterizeMaskOpening(hole, rect, corner, bounds, clipped, projection);
+    return hole.context.getImageData(tile.x, tile.y, tile.width, tile.height).data;
   };
   const openings = frames.map((frame) =>
     coverage(
@@ -138,33 +283,27 @@ export function createReviewSpotlightMasks(
       reviewSpotlightNeedsClip(frame, clip)
     )
   );
-  const radius = Math.max(0, ...frames.map((frame) => frame.blur));
-  const dimPixels = dim.context.createImageData(dim.canvas.width, dim.canvas.height);
-  const blurPixels = blur.context.createImageData(blur.canvas.width, blur.canvas.height);
-  const dims = frames.map((frame) => frame.dim),
-    blurs = frames.map((frame) => frame.blur);
-  const presences = frames.map((frame) => frame.presence ?? 1);
-  const prefix = new Float64Array(frames.length + 1);
-  prefix[0] = 1;
+  const dimPixels = dim.createImageData(tile.width, tile.height),
+    blurPixels = blur.createImageData(tile.width, tile.height);
   for (let pixel = 3; pixel < dimPixels.data.length; pixel += 4) {
     for (let i = 0; i < frames.length; i++)
-      prefix[i + 1] = prefix[i]! * (1 - (presences[i]! * protections[i]![pixel]!) / 255);
+      prefix[i + 1] =
+        prefix[i]! * (1 - ((frames[i]!.presence ?? 1) * protections[i]![pixel]!) / 255);
     let suffix = 1,
       dimCoverage = 0,
       blurCoverage = 0;
     for (let i = frames.length - 1; i >= 0; i--) {
-      // Prefix/suffix deliberately excludes this frame's protection, including fractional edges.
+      // Exclude this frame's protection, including its fractional edges.
       const outside = (1 - openings[i]![pixel]! / 255) * prefix[i]! * suffix;
-      dimCoverage = Math.max(dimCoverage, dims[i]! * outside);
-      blurCoverage = Math.max(blurCoverage, blurs[i]! * outside);
-      suffix *= 1 - (presences[i]! * protections[i]![pixel]!) / 255;
+      dimCoverage = Math.max(dimCoverage, frames[i]!.dim * outside);
+      blurCoverage = Math.max(blurCoverage, frames[i]!.blur * outside);
+      suffix *= 1 - ((frames[i]!.presence ?? 1) * protections[i]![pixel]!) / 255;
     }
     dimPixels.data[pixel] = Math.round(255 * dimCoverage);
     blurPixels.data[pixel] = radius ? Math.round((255 * blurCoverage) / radius) : 0;
   }
-  dim.context.putImageData(dimPixels, 0, 0);
-  blur.context.putImageData(blurPixels, 0, 0);
-  return { dim: dim.canvas, blur: blur.canvas, radius };
+  dim.putImageData(dimPixels, tile.x, tile.y);
+  blur.putImageData(blurPixels, tile.x, tile.y);
 }
 
 /** Blur reads the original scene once; dim follows blur and borders are painted later. */
@@ -174,31 +313,35 @@ export function drawReviewSpotlights(
   scratch: HTMLCanvasElement | null,
   frames: readonly QuickEditSpotlightFrame[],
   clip?: ReviewSpotlightClip,
-  projection?: QuickEditHomography
+  projection?: QuickEditHomography,
+  resources?: RenderResources
 ) {
   if (
     !projection &&
     frames.length <= 1 &&
     (!frames[0] || !reviewSpotlightNeedsClip(frames[0], clip))
   ) {
-    drawReviewSpotlight(context, canvas, scratch, frames[0] ?? null);
+    drawReviewSpotlight(context, canvas, scratch, frames[0] ?? null, resources);
     return;
   }
   if (!frames.length) return;
-  const masks = createReviewSpotlightMasks(canvas, frames, clip, projection);
-  if (masks.radius > 0) {
-    const layer = maskCanvas(canvas);
-    drawReviewBlurredScene(
-      layer.context,
-      canvas,
-      scratch ?? document.createElement('canvas'),
-      masks.radius
-    );
-    layer.context.globalCompositeOperation = 'destination-in';
-    layer.context.drawImage(masks.blur, 0, 0);
-    context.drawImage(layer.canvas, 0, 0);
+  const masks = createReviewSpotlightMasks(canvas, frames, clip, projection, resources);
+  try {
+    if (masks.radius > 0) {
+      const layer = maskCanvas(canvas, 'spotlight.layer', resources);
+      try {
+        drawReviewBlurredScene(layer.context, canvas, scratch, masks.radius, resources);
+        layer.context.globalCompositeOperation = 'destination-in';
+        layer.context.drawImage(masks.blur, 0, 0);
+        context.drawImage(layer.canvas, 0, 0);
+      } finally {
+        layer.release();
+      }
+    }
+    context.drawImage(masks.dim, 0, 0);
+  } finally {
+    masks.dispose();
   }
-  context.drawImage(masks.dim, 0, 0);
 }
 
 /** Rounded openings become a bounded polygon in the same projected space as the window. */

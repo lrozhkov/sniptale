@@ -1,3 +1,5 @@
+import { useStagePresentation, ReviewStagePresentationFeedback } from './stage-presentation';
+import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import {
   useReviewStageGeometry,
   type ReviewStageScene,
@@ -69,7 +71,15 @@ type ReviewStageCommentBinding = {
   onGeometry?(geometry: ReviewStageCommentGeometry): void;
 };
 
-type ReviewStageProps = {
+export type ReviewStageProps = {
+  preview?:
+    | {
+        preferences: QuickPreviewPreferences;
+        playing: boolean;
+        sourceToResult(time: number): number | null;
+        onRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
+      }
+    | undefined;
   watermark?: Omit<Parameters<typeof ReviewWatermarkOverlay>[0], 'output'> | undefined;
   keyCues?: readonly import('../../features/video/review/key-animation').ReviewKeyCue[] | undefined;
   clickCues?: readonly ReviewClickCue[] | undefined;
@@ -96,24 +106,13 @@ type ReviewStageProps = {
   onError(): void;
 };
 
-/** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
-export function ReviewStage(props: ReviewStageProps) {
-  const host = useRef<HTMLDivElement>(null);
-  const [cutRaster, setCutRaster] = useState<ReviewCutPreviewRaster>({
-    active: false,
-    frame: null,
-  });
-  const {
-    size,
-    watermarkOutput,
-    sceneLayout,
-    zoomLayout,
-    backgroundPaint,
-    content,
-    spotlight,
-    borders,
-    overlayClip,
-  } = useReviewStageGeometry(props, host);
+/** Keep native header geometry and pointer inversion aligned with the authored scene. */
+function useStageInteractionGeometry(
+  props: Pick<ReviewStageProps, 'source' | 'scene' | 'drawing' | 'region' | 'onRegion' | 'video'>,
+  geometry: Pick<ReturnType<typeof useReviewStageGeometry>, 'sceneLayout' | 'content'>,
+  manual: boolean
+) {
+  const { sceneLayout, content } = geometry;
   // Match the SVG viewport to the fitted header allocation, including its rounded toolbar rows.
   // A source-rounded SVG in a differently shaped img box otherwise gains internal letterboxing.
   const headerDisplayHeight = sceneLayout
@@ -124,7 +123,7 @@ export function ReviewStage(props: ReviewStageProps) {
       ) / 1e6
     : undefined;
   const header = useReviewWindowHeader(
-    props.scene?.windowHeader,
+    manual ? undefined : props.scene?.windowHeader,
     props.source.width,
     props.source.height,
     headerDisplayHeight
@@ -155,13 +154,50 @@ export function ReviewStage(props: ReviewStageProps) {
     : props.region
       ? projectVideoRegion(props.region, content)
       : null;
+  return { header, motion, projection, plane, projected };
+}
+
+/** One stage binding: the applied scene, drawing plane, and overlay comment stack. */
+export function ReviewStage(props: ReviewStageProps) {
+  const host = useRef<HTMLDivElement>(null);
+  const publication = useRef<HTMLDivElement>(null);
+  const [cutRaster, setCutRaster] = useState<ReviewCutPreviewRaster>({
+    active: false,
+    frame: null,
+  });
+  const {
+    size,
+    watermarkOutput,
+    sceneLayout,
+    zoomLayout,
+    backgroundPaint,
+    content,
+    spotlight,
+    borders,
+    overlayClip,
+  } = useReviewStageGeometry(props, host);
+  const { presentation, beginInteraction } = useStagePresentation(
+    props,
+    publication,
+    watermarkOutput,
+    size
+  );
+  const manual = presentation.active;
+  const { header, motion, projection, plane, projected } = useStageInteractionGeometry(
+    props,
+    { sceneLayout, content },
+    manual
+  );
   return (
     <div
       ref={host}
+      onPointerDownCapture={(event) => {
+        if (event.button === 0) beginInteraction();
+      }}
       className="relative min-h-36 flex-1 overflow-hidden rounded-[var(--sniptale-radius-sm)]
           bg-[var(--sniptale-color-surface-canvas)]"
     >
-      <ReviewHeaderFailure failed={header.failed} retry={header.retry} />
+      <ReviewHeaderFailure failed={!manual && header.failed} retry={header.retry} />
       <div
         data-ui="gallery.videoReview.stage"
         className="absolute overflow-hidden bg-black"
@@ -178,8 +214,11 @@ export function ReviewStage(props: ReviewStageProps) {
         onPointerUp={plane.onPointerUp}
         onPointerCancel={plane.onPointerCancel}
       >
-        <ReviewStageBackground props={props} motion={motion} paint={backgroundPaint} />
+        {!manual ? (
+          <ReviewStageBackground props={props} motion={motion} paint={backgroundPaint} />
+        ) : null}
         <ReviewSceneVideo
+          manual={manual}
           url={props.url}
           cutPreview={props.cutPreview}
           onCutRaster={setCutRaster}
@@ -196,26 +235,31 @@ export function ReviewStage(props: ReviewStageProps) {
           onEnded={props.onEnded}
           onError={props.onError}
         />
-        {(!props.drawing || sceneLayout?.spatial) && props.scene && sceneLayout ? (
-          <ReviewMotionBlurPreview
-            focus={props.scene.focus}
-            camera={props.scene.camera}
-            layout={sceneLayout}
-            output={size}
-            background={props.scene.background}
-            imageUrl={props.backgroundImageUrl}
+        {!manual ? (
+          <ReviewStageNativeEffects
+            props={props}
+            geometry={{ sceneLayout, size, spotlight, overlayClip }}
             headerImage={header.image}
-            sceneScale={size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)}
+            projection={projection}
             getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
           />
         ) : null}
-        <ReviewSpotlightOverlay
-          projection={projection}
-          output={size}
-          frames={spotlight}
-          clip={overlayClip}
+        <div
+          ref={publication}
+          data-ui="gallery.videoReview.manualPreview"
+          className="pointer-events-none absolute inset-0"
+          style={{ display: manual ? undefined : 'none' }}
         />
+        {manual && projected && !sceneLayout?.spatial ? (
+          <ReviewRegionOverlay
+            drawing={props.drawing}
+            projected={projected}
+            offset={{ x: 0, y: 0 }}
+          />
+        ) : null}
         <ReviewStageContent
+          manual={manual}
+          onCommentPreview={presentation.onCommentPreview}
           getFrame={() => (cutRaster.active ? cutRaster.frame : props.video.current)}
           props={props}
           geometry={{ size, sceneLayout, zoomLayout, borders, overlayClip }}
@@ -225,31 +269,100 @@ export function ReviewStage(props: ReviewStageProps) {
         <ReviewStageComments
           comments={props.comments}
           attachment="viewport"
+          visualMode={manual ? 'handles' : undefined}
+          onPreviewPosition={presentation.onCommentPreview}
           output={size}
           source={props.source}
           layout={sceneLayout}
         />
         {props.webcam ? (
-          <ReviewWebcamOverlay binding={props.webcam} main={props.video} output={size} />
+          <ReviewWebcamOverlay
+            binding={props.webcam}
+            main={props.video}
+            output={size}
+            manual={manual ? presentation.webcamManual : undefined}
+            onPreviewPlacement={presentation.onWebcamPreview}
+          />
         ) : null}
-        <ReviewKeyOverlay cues={props.keyCues} time={props.scene?.focus?.time ?? 0} output={size} />
+        {!manual ? (
+          <ReviewKeyOverlay
+            cues={props.keyCues}
+            time={props.scene?.focus?.time ?? 0}
+            output={size}
+          />
+        ) : null}
         {props.watermark && (
-          <ReviewWatermarkOverlay {...props.watermark} output={watermarkOutput} />
+          <ReviewWatermarkOverlay
+            {...props.watermark}
+            output={watermarkOutput}
+            manual={manual ? presentation.watermarkManual : undefined}
+          />
         )}
-        <ReviewCutBlackout binding={props.cutPreview} />
+        {!manual ? <ReviewCutBlackout binding={props.cutPreview} /> : null}
+        <ReviewStagePresentationFeedback
+          presentation={presentation}
+          showFrameRate={props.preview?.preferences.showFrameRate ?? false}
+        />
       </div>
     </div>
   );
 }
 
+/** Native-only optical effects consume the same frame and clip as the scene. */
+function ReviewStageNativeEffects({
+  props,
+  geometry,
+  headerImage,
+  projection,
+  getFrame,
+}: {
+  props: Pick<ReviewStageProps, 'drawing' | 'scene' | 'backgroundImageUrl' | 'source'>;
+  geometry: Pick<
+    ReturnType<typeof useReviewStageGeometry>,
+    'sceneLayout' | 'size' | 'spotlight' | 'overlayClip'
+  >;
+  headerImage: ReturnType<typeof useReviewWindowHeader>['image'];
+  projection: Parameters<typeof ReviewSpotlightOverlay>[0]['projection'];
+  getFrame(): CanvasImageSource | null;
+}) {
+  const { sceneLayout, size, spotlight, overlayClip } = geometry;
+  return (
+    <>
+      {(!props.drawing || sceneLayout?.spatial) && props.scene && sceneLayout ? (
+        <ReviewMotionBlurPreview
+          focus={props.scene.focus}
+          camera={props.scene.camera}
+          layout={sceneLayout}
+          output={size}
+          background={props.scene.background}
+          imageUrl={props.backgroundImageUrl}
+          headerImage={headerImage}
+          sceneScale={size.width / Math.max(1, props.scene.canvas?.width ?? props.source.width)}
+          getFrame={getFrame}
+        />
+      ) : null}
+      <ReviewSpotlightOverlay
+        projection={projection}
+        output={size}
+        frames={spotlight}
+        clip={overlayClip}
+      />
+    </>
+  );
+}
+
 /** Sharp content overlays and interaction targets share one projected plane. */
 function ReviewStageContent({
+  manual,
+  onCommentPreview,
   getFrame,
   props,
   geometry,
   projection,
   projected,
 }: {
+  manual: boolean;
+  onCommentPreview: ReturnType<typeof useStagePresentation>['presentation']['onCommentPreview'];
   getFrame(): CanvasImageSource | null;
   props: ReviewStageProps;
   geometry: Pick<
@@ -278,19 +391,23 @@ function ReviewStageContent({
           offset={{ x: 0, y: 0 }}
         />
       ) : null}
-      <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} />
-      <ReviewClickOverlay
-        getFrame={getFrame}
-        cues={props.clickCues}
-        time={props.scene?.focus?.time ?? 0}
-        output={size}
-        video={sceneLayout?.videoTransform}
-        sourceWidth={props.source.width}
-        clip={overlayClip}
-      />
+      {!manual ? <ReviewBorderOverlay output={size} frames={borders} clip={overlayClip} /> : null}
+      {!manual ? (
+        <ReviewClickOverlay
+          getFrame={getFrame}
+          cues={props.clickCues}
+          time={props.scene?.focus?.time ?? 0}
+          output={size}
+          video={sceneLayout?.videoTransform}
+          sourceWidth={props.source.width}
+          clip={overlayClip}
+        />
+      ) : null}
       <ReviewStageComments
         comments={props.comments}
         attachment="content"
+        visualMode={manual ? 'handles' : undefined}
+        onPreviewPosition={onCommentPreview}
         clip={projection ? overlayClip : undefined}
         projection={projection}
         output={size}
@@ -322,6 +439,8 @@ function ReviewStageContent({
 
 /** Overlay comment stack using the shared scene geometry. */
 function ReviewStageComments(props: {
+  visualMode?: 'handles' | undefined;
+  onPreviewPosition?: Parameters<typeof ReviewCommentOverlay>[0]['onPreviewPosition'];
   clip?: Parameters<typeof ReviewCommentOverlay>[0]['clip'];
   attachment: CanvasComment['attachment'];
   projection?:
@@ -335,6 +454,8 @@ function ReviewStageComments(props: {
   if (!props.comments?.items.length) return null;
   return (
     <ReviewCommentOverlay
+      visualMode={props.visualMode}
+      onPreviewPosition={props.onPreviewPosition}
       clip={props.clip}
       projection={props.projection}
       layout={props.layout ?? undefined}
@@ -355,6 +476,7 @@ function ReviewStageComments(props: {
 
 /** One composition-space video: fitted inside the padded content rect, cropped by the clip. */
 function ReviewSceneVideo(props: {
+  manual: boolean;
   cutPreview?: ReviewCutPreviewBinding | undefined;
   onCutRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
   url: string;
@@ -400,6 +522,8 @@ function ReviewSceneVideo(props: {
     <div
       style={{
         position: 'absolute',
+        opacity: props.manual ? 0 : undefined,
+        pointerEvents: props.manual ? 'none' : undefined,
         left: videoClip?.x ?? 0,
         top: videoClip?.y ?? 0,
         width: videoClip?.width ?? undefined,
@@ -452,7 +576,7 @@ function ReviewSceneVideo(props: {
         onEnded={() => (props.onEnded ? props.onEnded() : props.onPlaying(false))}
         onError={props.onError}
       />
-      {props.cutPreview && props.layout ? (
+      {!props.manual && props.cutPreview && props.layout ? (
         <ReviewCutTransitionPreview
           binding={props.cutPreview}
           onRaster={props.onCutRaster}

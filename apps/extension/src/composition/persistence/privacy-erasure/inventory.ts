@@ -23,6 +23,7 @@ import type {
   BrowserStorageErasurePlan,
   LocalExtensionDataErasureOptions,
 } from '@sniptale/runtime-contracts/privacy-erasure/types';
+import { QUICK_PREVIEW_PREFERENCES_STORAGE_KEY } from '../quick-preview-preferences';
 import { POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY } from '../popup-export-preferences';
 
 export const LOCAL_EXTENSION_PAGE_STORAGE_KEYS = [
@@ -50,6 +51,7 @@ const localPreferenceKeys = [
   POPUP_PAGE_PACKAGE_PREFERENCES_STORAGE_KEY,
   'sniptale_popup_startup',
   'sniptale_video_editor_preview_preferences',
+  QUICK_PREVIEW_PREFERENCES_STORAGE_KEY,
   'sniptale_scenario_editor_navigator_collapsed',
   'sniptale_video_settings',
   'sniptale_video_ui_state',

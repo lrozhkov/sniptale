@@ -41,13 +41,7 @@ export function ReviewCutTransitionPreview(props: {
   onRaster?: ((raster: ReviewCutPreviewRaster) => void) | undefined;
 }) {
   const { binding, onRaster } = props;
-  const plans = useMemo(
-    () => planReviewCutTransitions(binding.duration, binding.edits),
-    [binding.duration, binding.edits]
-  );
-  const blend = reviewCutTransitionAt(binding.time, plans);
-  const next = blend?.plan ?? plans.find((plan) => plan.seam + plan.after > binding.time);
-  const { current, retry } = useTransitionEndpoints(binding.file, next);
+  const { plans, blend, current, retry } = useReviewCutTransitionProvider(binding);
   const canvas = useRef<HTMLCanvasElement>(null);
   const mediaTime = useRef(NaN);
   const nativeRaster = useRef<HTMLCanvasElement | null>(null);
@@ -152,23 +146,72 @@ export function ReviewCutTransitionPreview(props: {
   );
 }
 
+/** Endpoint acquisition without the hybrid painter or native frame callback loop.
+ * Read after preparation and consume synchronously while the returned lease remains active.
+ */
+export function useReviewCutTransitionProvider(
+  binding: ReviewCutPreviewBinding | undefined,
+  managed = false,
+  admit?: (bytes: readonly [number, number]) => { release(): void }
+) {
+  const duration = binding?.duration;
+  const edits = binding?.edits;
+  const plans = useMemo(
+    () => (duration !== undefined && edits ? planReviewCutTransitions(duration, edits) : []),
+    [duration, edits]
+  );
+  const blend = reviewCutTransitionAt(binding?.time ?? 0, plans);
+  const next = blend?.plan ?? plans.find((plan) => plan.seam + plan.after > (binding?.time ?? 0));
+  const { current, retry } = useTransitionEndpoints(binding?.file, next, managed, admit);
+  const latest = useRef({ plans, current, managed });
+  latest.current = { plans, current, managed };
+  return {
+    plans,
+    blend,
+    current,
+    retry,
+    read(time: number) {
+      const value = latest.current;
+      const sampled = reviewCutTransitionAt(time, value.plans);
+      if (!sampled) return null;
+      const key = JSON.stringify([sampled.plan.left, sampled.plan.right]);
+      const admitted =
+        value.current?.lease.active && value.current.key === key ? value.current : null;
+      return {
+        blend: sampled,
+        allocationBytes: admitted?.allocationBytes ?? null,
+        frames: admitted?.frames ?? null,
+        lease: admitted?.lease,
+        failed: admitted?.failed ?? false,
+      };
+    },
+  };
+}
+
 /** Owns endpoint decoding and invalidates every published pair before disposing it. */
-function useTransitionEndpoints(file: File, next: ReviewCutTransitionPlan | undefined) {
+function useTransitionEndpoints(
+  file: File | undefined,
+  next: ReviewCutTransitionPlan | undefined,
+  managed: boolean,
+  admit: ((bytes: readonly [number, number]) => { release(): void }) | undefined
+) {
   const key = next ? JSON.stringify([next.left, next.right]) : '';
   const [attempt, setAttempt] = useState(0);
   const [loaded, setLoaded] = useState<{
     file: File;
     key: string;
     frames: ReviewTransitionFrames | null;
+    allocationBytes: readonly [number, number] | null;
     failed: boolean;
     lease: { active: boolean };
   } | null>(null);
   useEffect(() => {
-    if (!next) return;
+    if (!file || !next) return;
     const controller = new AbortController();
     const lease = { active: true };
     const input = new Input({ source: new BlobSource(file), formats: ALL_FORMATS });
     let owner: ReturnType<typeof createReviewTransitionFrames> | null = null;
+    let reservation: { release(): void } | undefined;
     setLoaded(null);
     void (async () => {
       try {
@@ -178,21 +221,42 @@ function useTransitionEndpoints(file: File, next: ReviewCutTransitionPlan | unde
         owner = createReviewTransitionFrames(new VideoSampleSink(track), controller.signal);
         const frames = await owner.load(next);
         controller.signal.throwIfAborted();
-        setLoaded({ file, key, frames, failed: !frames, lease });
+        const allocationBytes = managed && frames ? transitionAllocation(frames) : null;
+        if (allocationBytes) reservation = admit?.(allocationBytes);
+        setLoaded({ file, key, frames, allocationBytes, failed: !frames, lease });
       } catch {
-        if (!controller.signal.aborted) setLoaded({ file, key, frames: null, failed: true, lease });
+        owner?.dispose();
+        reservation?.release();
+        reservation = undefined;
+        if (!controller.signal.aborted)
+          setLoaded({ file, key, frames: null, allocationBytes: null, failed: true, lease });
       }
     })();
     return () => {
       lease.active = false;
       controller.abort();
       owner?.dispose();
+      reservation?.release();
+      reservation = undefined;
       input.dispose();
     };
-  }, [file, next, key, attempt]);
+  }, [file, next, key, attempt, managed, admit]);
   const current =
     loaded?.lease.active && loaded.file === file && loaded.key === key ? loaded : null;
   return { current, retry: () => setAttempt((value) => value + 1) };
+}
+
+/** Measure decoder payload before publishing or retaining a managed endpoint pair. */
+function transitionAllocation(frames: ReviewTransitionFrames): readonly [number, number] {
+  const left = frames.left.allocationSize?.();
+  const right = frames.right.allocationSize?.();
+  if (
+    left === undefined ||
+    right === undefined ||
+    ![left, right, left + right].every((bytes) => Number.isSafeInteger(bytes) && bytes > 0)
+  )
+    throw new Error('Transition allocation unavailable');
+  return [left, right];
 }
 
 /** Final output-plane fade, independent of source raster geometry and decoder readiness. */

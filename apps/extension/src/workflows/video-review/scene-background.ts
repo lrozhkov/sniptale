@@ -1,3 +1,7 @@
+import type {
+  RenderCanvasLease,
+  RenderResources,
+} from '../../features/video/composition/canvas/render-resources';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
 import { drawSceneGradient } from '../../features/video/project/scene/background-gradient-canvas';
 import { drawReviewBlurredScene } from './spotlight-blur';
@@ -52,9 +56,60 @@ export function drawReviewBackgroundPaint(
   context.drawImage(cached.raster, 0, 0, width, height);
 }
 
+/** Owns the retained blurred background for one prepared preview session. */
+export function createReviewBackgroundPainter(resources: RenderResources) {
+  let cached: { key: string; image: BackgroundPaint['image']; lease: RenderCanvasLease } | null =
+    null;
+  let disposed = false;
+  const clear = () => {
+    cached?.lease.release();
+    cached = null;
+  };
+  return {
+    draw(context: CanvasRenderingContext2D, args: BackgroundPaint) {
+      if (disposed) throw new Error('Background painter is disposed.');
+      const { background, image, width, height } = args;
+      const blur = background.enabled ? (background.layout.blur ?? 0) : 0;
+      if (!background.enabled || background.type === 'solid' || blur <= 0) {
+        clear();
+        drawPaint(context, args, resources);
+        return;
+      }
+      const key = JSON.stringify([width, height, background]);
+      if (!cached || cached.key !== key || cached.image !== image) {
+        const scale = Math.min(1, 2048 / Math.max(width, height));
+        const size = {
+          width: Math.max(1, Math.round(width * scale)),
+          height: Math.max(1, Math.round(height * scale)),
+        };
+        const source = resources.canvas('background-source', size);
+        let replacement: RenderCanvasLease | undefined;
+        try {
+          replacement = resources.canvas('background-cache', size);
+          drawPaint(source.context, { ...args, ...size }, resources);
+          drawReviewBlurredScene(replacement.context, source.canvas, null, blur * scale, resources);
+          clear();
+          cached = { key, image, lease: replacement };
+          replacement = undefined;
+        } finally {
+          replacement?.release();
+          source.release();
+        }
+      }
+      context.drawImage(cached.lease.canvas, 0, 0, width, height);
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      clear();
+    },
+  };
+}
+
 function drawPaint(
   context: CanvasRenderingContext2D,
-  { background, image, width, height }: BackgroundPaint
+  { background, image, width, height }: BackgroundPaint,
+  resources?: RenderResources
 ) {
   context.fillStyle = '#000000';
   context.fillRect(0, 0, width, height);
@@ -63,7 +118,21 @@ function drawPaint(
     context.fillStyle = background.color;
     context.fillRect(0, 0, width, height);
   } else if (background.type === 'gradient') {
-    drawSceneGradient(context, background.gradient, width, height);
+    drawSceneGradient(
+      context,
+      background.gradient,
+      width,
+      height,
+      resources
+        ? {
+            backing: {
+              width: Math.max(1, Math.ceil(width)),
+              height: Math.max(1, Math.ceil(height)),
+            },
+            resources,
+          }
+        : undefined
+    );
   } else if (image) {
     const scale =
       background.imageFit === 'cover'

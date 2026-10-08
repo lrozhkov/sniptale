@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, expect, it, vi } from 'vitest';
-import { drawReviewBackgroundPaint } from './scene-background';
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
+import { createReviewBackgroundPainter, drawReviewBackgroundPaint } from './scene-background';
 import { drawReviewBlurredScene } from './spotlight-blur';
 import { resolveReviewSceneOutput } from './render-settings';
 import type { QuickEditBackgroundSettings } from '../../features/video/review/advanced/types';
@@ -100,4 +101,79 @@ it('fails explicitly when an offscreen paint surface cannot acquire a context', 
   expect(() =>
     drawReviewBackgroundPaint(target, { background, image: null, width: 100, height: 50 })
   ).toThrow('Background compositor');
+});
+
+function managedBackground() {
+  const leases: { role: string; release: ReturnType<typeof vi.fn>; canvas: HTMLCanvasElement }[] =
+    [];
+  const resources: RenderResources = {
+    canvas(role, size) {
+      const target = context();
+      target.canvas.width = size.width;
+      target.canvas.height = size.height;
+      const release = vi.fn();
+      leases.push({ role, release, canvas: target.canvas });
+      return { canvas: target.canvas, context: target, release };
+    },
+    bytes: () => ({ release: vi.fn() }),
+  };
+  return { resources, leases, painter: createReviewBackgroundPainter(resources) };
+}
+
+it('retains one managed cache, replaces it only after preparation and releases it on disable', () => {
+  const { painter, resources, leases } = managedBackground();
+  const target = context();
+  const args = { background, image: null, width: 400, height: 200 };
+  painter.draw(target, args);
+  painter.draw(target, args);
+  expect(leases.map((lease) => lease.role)).toEqual(['background-source', 'background-cache']);
+  expect(leases[0]!.release).toHaveBeenCalledOnce();
+  expect(leases[1]!.release).not.toHaveBeenCalled();
+  expect(drawReviewBlurredScene).toHaveBeenLastCalledWith(
+    expect.anything(),
+    leases[0]!.canvas,
+    null,
+    12,
+    resources
+  );
+  painter.draw(target, { ...args, width: 800 });
+  expect(leases[1]!.release).toHaveBeenCalledOnce();
+  expect(leases[3]!.release).not.toHaveBeenCalled();
+  painter.draw(target, { ...args, background: { enabled: false } });
+  expect(leases[3]!.release).toHaveBeenCalledOnce();
+  painter.dispose();
+  painter.dispose();
+  expect(() => painter.draw(target, args)).toThrow('disposed');
+});
+
+it('keeps the last cache when replacement filtering fails and releases temporary leases', () => {
+  const { painter, leases } = managedBackground();
+  const target = context();
+  const args = { background, image: null, width: 400, height: 200 };
+  painter.draw(target, args);
+  vi.mocked(drawReviewBlurredScene).mockImplementationOnce(() => {
+    throw new Error('filter failure');
+  });
+  expect(() => painter.draw(target, { ...args, width: 800 })).toThrow('filter failure');
+  expect(leases[1]!.release).not.toHaveBeenCalled();
+  expect(leases[2]!.release).toHaveBeenCalledOnce();
+  expect(leases[3]!.release).toHaveBeenCalledOnce();
+  painter.draw(target, args);
+  expect(leases).toHaveLength(4);
+  painter.dispose();
+  expect(leases[1]!.release).toHaveBeenCalledOnce();
+});
+
+it('releases the managed source when the cache allocation fails', () => {
+  const { resources, painter, leases } = managedBackground();
+  const allocate = resources.canvas;
+  vi.spyOn(resources, 'canvas').mockImplementation((role, size, options) => {
+    if (role === 'background-cache') throw new Error('allocation refused');
+    return allocate(role, size, options);
+  });
+  expect(() =>
+    painter.draw(context(), { background, image: null, width: 400, height: 200 })
+  ).toThrow('allocation refused');
+  expect(leases[0]!.release).toHaveBeenCalledOnce();
+  painter.dispose();
 });

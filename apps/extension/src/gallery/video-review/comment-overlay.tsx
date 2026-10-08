@@ -75,7 +75,7 @@ function OverlayCommentBubble(props: {
 }
 
 /** One overlay bubble with its media-time pulse and pointer drag commit. */
-function OverlayComment(props: {
+type OverlayCommentProps = {
   projection?: QuickEditHomography | undefined;
   comment: CanvasComment;
   resolvedText: string;
@@ -88,7 +88,11 @@ function OverlayComment(props: {
   sourceTime: number;
   onSelect(): void;
   onMove(id: string, position: { x: number; y: number }): void;
-}) {
+  visualMode?: 'handles' | undefined;
+  onPreviewPosition?: ((id: string, position: { x: number; y: number } | null) => void) | undefined;
+};
+
+function useCommentDrag(props: OverlayCommentProps) {
   const [dragPosition, setDragPosition] = useState<{ x: number; y: number } | null>(null);
   const dragPositionRef = useRef<{ x: number; y: number } | null>(null);
   const origin = useRef<{
@@ -110,6 +114,7 @@ function OverlayComment(props: {
       if (next) {
         dragPositionRef.current = next;
         setDragPosition(next);
+        props.onPreviewPosition?.(props.comment.id, next);
       }
       return;
     }
@@ -119,6 +124,7 @@ function OverlayComment(props: {
     };
     dragPositionRef.current = next;
     setDragPosition(next);
+    props.onPreviewPosition?.(props.comment.id, next);
   };
   const pointer = (event: React.PointerEvent<HTMLElement>) => {
     const stage = event.currentTarget
@@ -133,7 +139,10 @@ function OverlayComment(props: {
     if (dragPositionRef.current) props.onMove(props.comment.id, dragPositionRef.current);
     dragPositionRef.current = null;
     setDragPosition(null);
+    props.onPreviewPosition?.(props.comment.id, null);
   };
+  const latest = useRef(props);
+  latest.current = props;
   useEffect(() => {
     if (!dragPosition) return;
     const cancel = (event: KeyboardEvent) => {
@@ -141,10 +150,30 @@ function OverlayComment(props: {
       origin.current = null;
       dragPositionRef.current = null;
       setDragPosition(null);
+      latest.current.onPreviewPosition?.(latest.current.comment.id, null);
     };
     window.addEventListener('keydown', cancel);
     return () => window.removeEventListener('keydown', cancel);
   }, [dragPosition]);
+
+  useEffect(
+    () => () => {
+      if (dragPositionRef.current)
+        latest.current.onPreviewPosition?.(latest.current.comment.id, null);
+    },
+    []
+  );
+  const cancel = () => {
+    origin.current = null;
+    dragPositionRef.current = null;
+    setDragPosition(null);
+    props.onPreviewPosition?.(props.comment.id, null);
+  };
+  return { point, origin, pointer, preview, finish, cancel };
+}
+
+function OverlayComment(props: OverlayCommentProps) {
+  const { point, origin, pointer, preview, finish, cancel } = useCommentDrag(props);
   const phase = overlayPulsePhase(props.sourceTime, props.comment.start);
   return (
     <div
@@ -157,13 +186,15 @@ function OverlayComment(props: {
         zIndex: props.layer,
       }}
     >
-      <OverlayCommentBubble
-        comment={props.comment}
-        resolvedText={props.resolvedText}
-        scale={props.scale}
-        output={props.output}
-        selected={props.selected}
-      />
+      {props.visualMode !== 'handles' ? (
+        <OverlayCommentBubble
+          comment={props.comment}
+          resolvedText={props.resolvedText}
+          scale={props.scale}
+          output={props.output}
+          selected={props.selected}
+        />
+      ) : null}
       <button
         type="button"
         aria-label={translate('gallery.videoReview.overlayPoint')}
@@ -171,6 +202,11 @@ function OverlayComment(props: {
         className="pointer-events-auto relative block h-3.5 w-3.5 cursor-grab touch-none
             rounded-full border-2 border-[var(--sniptale-color-surface)]
             bg-[var(--sniptale-color-accent)] shadow-sm"
+        style={
+          props.visualMode === 'handles'
+            ? { background: 'transparent', boxShadow: 'none' }
+            : undefined
+        }
         onClick={props.onSelect}
         onPointerDown={(event) => {
           if (props.busy) return;
@@ -194,20 +230,18 @@ function OverlayComment(props: {
           event.stopPropagation();
           finish();
         }}
-        onPointerCancel={() => {
-          origin.current = null;
-          dragPositionRef.current = null;
-          setDragPosition(null);
-        }}
+        onPointerCancel={cancel}
       >
-        <span
-          className="absolute inset-0 -z-10 rounded-full
+        {props.visualMode !== 'handles' ? (
+          <span
+            className="absolute inset-0 -z-10 rounded-full
             bg-[var(--sniptale-color-accent)]"
-          style={{
-            opacity: 0.35 * (1 - phase),
-            transform: `scale(${1 + 1.4 * phase})`,
-          }}
-        />
+            style={{
+              opacity: 0.35 * (1 - phase),
+              transform: `scale(${1 + 1.4 * phase})`,
+            }}
+          />
+        ) : null}
       </button>
     </div>
   );
@@ -234,6 +268,8 @@ export function ReviewCommentOverlay(props: {
   selectedId: string | null;
   onSelect(id: string): void;
   onMove(id: string, position: { x: number; y: number }): void;
+  visualMode?: 'handles' | undefined;
+  onPreviewPosition?: ((id: string, position: { x: number; y: number } | null) => void) | undefined;
   busy: boolean;
 }) {
   const layout =
@@ -272,6 +308,8 @@ export function ReviewCommentOverlay(props: {
           return (
             <OverlayComment
               key={comment.id}
+              visualMode={props.visualMode}
+              onPreviewPosition={props.onPreviewPosition}
               projection={content ? props.projection : undefined}
               comment={comment}
               resolvedText={canvasCommentText(comment, props.annotations ?? [])}

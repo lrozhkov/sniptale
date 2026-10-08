@@ -29,3 +29,19 @@ describe('video editor preview raster', () => {
     expect(raster.width * raster.height).toBeLessThanOrEqual(3840 * 2160);
   });
 });
+
+it('retains every named preset through the full-editor public adapter', () => {
+  const cases = [
+    ['360p', 640, 360],
+    ['540p', 960, 540],
+    ['720p', 1280, 720],
+    ['1080p', 1920, 1080],
+    ['1440p', 2560, 1440],
+    ['2160p', 3840, 2160],
+  ] as const;
+  for (const [preset, width, height] of cases)
+    expect(resolveVideoEditorPreviewRasterSize({ width: 1920, height: 1080 }, preset)).toEqual({
+      width,
+      height,
+    });
+});

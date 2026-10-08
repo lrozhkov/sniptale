@@ -18,7 +18,7 @@ import {
   FileDown,
   X,
 } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../platform/i18n';
 import type { ReviewAnnotation } from '../../features/video/review/types';
@@ -28,6 +28,31 @@ import {
   reviewIconButtonClassName,
   reviewTextButtonClassName,
 } from './controls';
+
+type InspectorSection = 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview';
+
+function inspectorNavigationOptions(args: {
+  shown: InspectorSection;
+  context: ReviewInspectorNavigation['context'];
+  settingsAvailable: boolean | undefined;
+  selectionLabel: string | undefined;
+  actionHistory: boolean;
+  actions: boolean;
+}): { id: InspectorSection; label: string }[] {
+  const options: { id: InspectorSection; label: string }[] = [];
+  if (args.shown === 'preview')
+    options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
+  options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
+  if (args.settingsAvailable)
+    options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
+  if (args.context === 'selected' && args.selectionLabel)
+    options.push({ id: 'selected', label: args.selectionLabel });
+  if (args.context === 'history' && args.actionHistory)
+    options.push({ id: 'history', label: translate('gallery.videoReview.telemetry') });
+  if (args.context === 'export' && args.actions)
+    options.push({ id: 'export', label: translate('gallery.videoReview.exportSection') });
+  return options;
+}
 
 /** Fixed-open action inspector, with navigation separate from editing the current field. */
 export function ReviewInspector(props: {
@@ -42,6 +67,7 @@ export function ReviewInspector(props: {
   message: string | null;
   recovery?: ReactNode;
   scene?: ReactNode;
+  preview?: ReactNode;
   actionHistory?: ReactNode;
   selectionLabel?: string | undefined;
   selectionHasSections?: boolean;
@@ -64,10 +90,20 @@ export function ReviewInspector(props: {
   saveStatus?: 'saving' | 'saved' | 'failed';
   onRetry?(): void;
 }) {
-  type Section = 'scene' | 'selected' | 'comments' | 'export' | 'history';
   const { presentation, setPresentation, shown, context, setSection, scroll } = props.navigation;
+  const previewHost = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (shown === 'preview') previewHost.current?.focus({ preventScroll: true });
+  }, [shown]);
   return (
     <aside
+      onKeyDown={(event) => {
+        if (shown === 'preview' && event.key === 'Escape' && !event.defaultPrevented) {
+          event.preventDefault();
+          event.stopPropagation();
+          props.navigation.closePreview();
+        }
+      }}
       data-ui="gallery.videoReview.inspector"
       className={`sniptale-inspector-surface relative flex min-h-0 flex-col gap-2 border-l
         border-[var(--sniptale-color-border-soft)] p-3 [--sniptale-compact-font-size:12px] ${
@@ -77,6 +113,7 @@ export function ReviewInspector(props: {
       {props.resizeHandle}
       <ReviewInspectorHeader
         {...props}
+        onBack={shown === 'preview' ? props.navigation.closePreview : props.onBack}
         presentation={presentation}
         section={shown}
         onTogglePresentation={() =>
@@ -86,35 +123,23 @@ export function ReviewInspector(props: {
         }
       />
       <ReviewInspectorStatus {...props} />
-      {props.settingsAvailable || props.selectionLabel || props.actions ? (
+      {props.settingsAvailable || props.selectionLabel || props.actions || shown === 'preview' ? (
         <div
           className="review-inspector-navigation shrink-0"
           data-ui="gallery.videoReview.inspectorNavigation"
         >
-          <SegmentedSwitch<Section>
+          <SegmentedSwitch<InspectorSection>
             density="compact"
             activeId={shown}
             ariaLabel={translate('gallery.videoReview.inspector')}
-            options={[
-              { id: 'comments', label: translate('gallery.videoReview.comments') },
-              ...(props.settingsAvailable
-                ? [{ id: 'scene' as const, label: translate('gallery.videoReview.scene') }]
-                : []),
-              ...(context === 'selected' && props.selectionLabel
-                ? [{ id: 'selected' as const, label: props.selectionLabel }]
-                : []),
-              ...(context === 'history' && props.actionHistory
-                ? [{ id: 'history' as const, label: translate('gallery.videoReview.telemetry') }]
-                : []),
-              ...(context === 'export' && props.actions
-                ? [
-                    {
-                      id: 'export' as const,
-                      label: translate('gallery.videoReview.exportSection'),
-                    },
-                  ]
-                : []),
-            ]}
+            options={inspectorNavigationOptions({
+              shown,
+              context,
+              settingsAvailable: props.settingsAvailable,
+              selectionLabel: props.selectionLabel,
+              actionHistory: !!props.actionHistory,
+              actions: !!props.actions,
+            })}
             onChange={setSection}
           />
         </div>
@@ -134,7 +159,16 @@ export function ReviewInspector(props: {
           section={shown}
           selectionScope={props.selectionPreferenceScope}
         >
-          {shown === 'history' ? null : shown === 'export' ? (
+          {shown === 'preview' ? (
+            <div
+              ref={previewHost}
+              tabIndex={-1}
+              aria-label={translate('gallery.videoReview.previewSection')}
+              data-ui="gallery.videoReview.previewInspector"
+            >
+              {props.preview}
+            </div>
+          ) : shown === 'history' ? null : shown === 'export' ? (
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
               {props.actions}
             </section>
@@ -315,7 +349,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    section: 'scene' | 'selected' | 'comments' | 'export' | 'history';
+    section: 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview';
     onTogglePresentation(): void;
   }
 ) {

@@ -1,3 +1,4 @@
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import type { ReviewSpatialRenderer } from './spatial-renderer';
 import { createReviewWindowRaster } from './window-header';
 import { createVideoCompositionPassBuffer } from '../../features/video/composition/canvas/pass-buffer';
@@ -14,15 +15,39 @@ import type {
   QuickEditCameraTransform,
 } from '../../features/video/review/advanced/types';
 import type { CanvasCommentExport } from '../../features/video/review/comments';
-import { drawReviewBackgroundPaint } from './scene-background';
+import { drawReviewBackgroundPaint, type createReviewBackgroundPainter } from './scene-background';
 import { drawReviewComments } from './render-comments';
 import { drawReviewSceneShadow } from './scene-shadow';
+
+type ReviewCommentSpace = {
+  canvas: { width: number; height: number };
+  layout: ReturnType<typeof computeQuickEditSceneLayout>;
+  background: QuickEditAdvancedState['background'];
+  cameraScale?: number | undefined;
+};
+
+/** Content comments occupy the unprojected plane; viewport comments keep the original space. */
+export function spatialReviewCommentSpace(
+  space: ReviewCommentSpace | undefined,
+  cameraScale?: number
+) {
+  if (!space) return undefined;
+  const layout = computeQuickEditSpatialRasterLayout(space.layout, space.background);
+  return {
+    ...space,
+    layout,
+    background: { ...space.background, zoomBehavior: 'fixed' as const },
+    cameraScale: cameraScale ?? layout.videoTransform.width / layout.videoRect.width,
+  };
+}
 
 /** Paints one decorated scene, accumulating only camera motion; annotations stay readable. */
 export function drawReviewSceneFrame(
   context: CanvasRenderingContext2D,
   args: Parameters<typeof drawReviewSceneSample>[1] & {
     spatialRenderer?: ReviewSpatialRenderer | undefined;
+    resources?: RenderResources | undefined;
+    windowRasterBacking?: { width: number; height: number } | undefined;
     motionBlur?: readonly { camera: QuickEditCameraTransform; alpha: number }[] | undefined;
   }
 ) {
@@ -31,6 +56,8 @@ export function drawReviewSceneFrame(
     args.headerImage && args.layout.windowRect
       ? createReviewWindowRaster({
           header: args.headerImage,
+          resources: args.resources,
+          backing: args.windowRasterBacking,
           videoRect: args.layout.videoRect,
           windowRect: args.layout.windowRect,
           draw: args.sample.draw,
@@ -102,6 +129,7 @@ function drawSpatialScene(
     drawReviewSceneComments(overlay.context, {
       ...args,
       layout: baseLayout,
+      commentSpace: spatialReviewCommentSpace(args.commentSpace, 1),
       background: fixed,
       cameraScale: 1,
       comments: args.comments.filter((c) => c.attachment === 'content'),
@@ -134,6 +162,7 @@ function drawReviewSceneExposure(
       drawWidth: args.canvas.width,
       drawHeight: args.canvas.height,
       targetContext: context,
+      resources: args.resources,
     });
     if (!buffer) throw new Error('Motion blur canvas is unavailable.');
     try {
@@ -168,25 +197,47 @@ export function drawReviewSceneComments(
   args: Parameters<typeof drawReviewSceneFrame>[1]
 ) {
   if (!args.comments?.length) return;
-  const { canvas, layout, background, comments, sourceTime } = args;
+  const space = args.commentSpace ?? args;
+  const { canvas, layout, background } = space;
+  const { comments, sourceTime, resources } = args;
+  const rasterScale = {
+    x: args.canvas.width / canvas.width,
+    y: args.canvas.height / canvas.height,
+  };
+  const draw = () => {
+    context.save();
+    try {
+      clipReviewScene(context, layout, background);
+      drawReviewComments(context, comments, {
+        attachment: 'content',
+        canvas,
+        videoTransform: layout.videoTransform,
+        scale: space.cameraScale ?? args.cameraScale ?? 1,
+        sourceTime,
+        resources,
+        rasterScale,
+      });
+    } finally {
+      context.restore();
+    }
+    drawReviewComments(context, comments, {
+      attachment: 'viewport',
+      canvas,
+      videoTransform: null,
+      scale: 1,
+      sourceTime,
+      resources,
+      rasterScale,
+    });
+  };
+  if (!args.commentSpace) return draw();
   context.save();
-  clipReviewScene(context, layout, background);
-  const cameraScale = args.cameraScale ?? 1;
-  drawReviewComments(context, comments ?? [], {
-    attachment: 'content',
-    canvas,
-    videoTransform: layout.videoTransform,
-    scale: cameraScale,
-    sourceTime,
-  });
-  context.restore();
-  drawReviewComments(context, comments ?? [], {
-    attachment: 'viewport',
-    canvas,
-    videoTransform: null,
-    scale: 1,
-    sourceTime,
-  });
+  try {
+    context.scale(rasterScale.x, rasterScale.y);
+    draw();
+  } finally {
+    context.restore();
+  }
 }
 
 function clipReviewScene(
@@ -238,6 +289,9 @@ function drawReviewSceneSample(
       ): void;
     };
     backgroundCacheContext?: CanvasRenderingContext2D;
+    resources?: RenderResources | undefined;
+    commentSpace?: ReviewCommentSpace | undefined;
+    backgroundPainter?: Pick<ReturnType<typeof createReviewBackgroundPainter>, 'draw'> | undefined;
     planeOnly?: boolean;
     backgroundOnly?: boolean;
     deferComments?: boolean;
@@ -294,6 +348,7 @@ function drawReviewSceneBackground(
     background,
     image,
     backgroundCacheContext,
+    backgroundPainter,
   }: Parameters<typeof drawReviewSceneSample>[1]
 ) {
   context.fillStyle = '#000000';
@@ -304,10 +359,11 @@ function drawReviewSceneBackground(
     context.translate(motion.x, motion.y);
     context.scale(motion.scale, motion.scale);
   }
-  drawReviewBackgroundPaint(
-    context,
-    { background, image, width: canvas.width, height: canvas.height },
-    backgroundCacheContext
-  );
-  if (motion.scale !== 1) context.restore();
+  try {
+    const paint = { background, image, width: canvas.width, height: canvas.height };
+    if (backgroundPainter) backgroundPainter.draw(context, paint);
+    else drawReviewBackgroundPaint(context, paint, backgroundCacheContext);
+  } finally {
+    if (motion.scale !== 1) context.restore();
+  }
 }

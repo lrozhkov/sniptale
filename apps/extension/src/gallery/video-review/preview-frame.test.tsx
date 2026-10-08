@@ -45,12 +45,18 @@ afterEach(() => {
   vi.resetAllMocks();
   vi.unstubAllGlobals();
 });
-function render(disabled = false, playing = false, duration = 10) {
+function render(
+  disabled = false,
+  playing = false,
+  duration = 10,
+  onOpenPreviewSettings?: (trigger: HTMLButtonElement) => void
+) {
   const onPlay = vi.fn(),
     onSeek = vi.fn();
   act(() =>
     root.render(
       <ReviewPreviewFrame
+        onOpenPreviewSettings={onOpenPreviewSettings}
         time={2}
         duration={duration}
         playing={playing}
@@ -139,4 +145,60 @@ it('keeps exit available while a fullscreen transport becomes busy', async () =>
   expect(controls.toggle.disabled).toBe(false);
   await act(async () => controls.toggle.click());
   expect(active).toBeNull();
+});
+
+it.each(['success', 'failure', 'unmount'] as const)(
+  'awaits fullscreen exit before opening preferences: %s',
+  async (outcome) => {
+    const open = vi.fn();
+    const controls = render(false, true, 10, open);
+    const gear = host.querySelector<HTMLButtonElement>(
+      '[data-ui="gallery.videoReview.previewSettings"]'
+    )!;
+    expect(gear.parentElement).toBe(controls.toggle.parentElement);
+    await act(async () => controls.toggle.click());
+    let resolve!: () => void;
+    let reject!: (error: Error) => void;
+    exit.mockImplementationOnce(
+      () =>
+        new Promise<void>((yes, no) => {
+          resolve = yes;
+          reject = no;
+        })
+    );
+    act(() => {
+      gear.click();
+      gear.click();
+    });
+    expect(exit).toHaveBeenCalledOnce();
+    expect(open).not.toHaveBeenCalled();
+    if (outcome === 'unmount') act(() => root.render(null));
+    await act(async () => {
+      if (outcome === 'failure') reject(new Error('denied'));
+      else {
+        active = null;
+        document.dispatchEvent(new Event('fullscreenchange'));
+        resolve();
+      }
+    });
+    if (outcome === 'success') expect(open).toHaveBeenCalledExactlyOnceWith(gear);
+    else expect(open).not.toHaveBeenCalled();
+    if (outcome === 'failure') expect(host.querySelector('[role="alert"]')).not.toBeNull();
+    expect(controls.onPlay).not.toHaveBeenCalled();
+    expect(controls.onSeek).not.toHaveBeenCalled();
+  }
+);
+it('hides disconnected settings and opens connected settings without changing transport', () => {
+  render();
+  expect(host.querySelector('[data-ui="gallery.videoReview.previewSettings"]')).toBeNull();
+  const open = vi.fn();
+  render(false, false, 10, open);
+  const gear = host.querySelector<HTMLButtonElement>(
+    '[data-ui="gallery.videoReview.previewSettings"]'
+  )!;
+  act(() => gear.click());
+  expect(open).toHaveBeenCalledWith(gear);
+  render(true, false, 10, open);
+  act(() => gear.click());
+  expect(open).toHaveBeenCalledOnce();
 });

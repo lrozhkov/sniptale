@@ -116,3 +116,21 @@ it('includes extension-page trace localStorage in the page-local erasure invento
   expect(LOCAL_EXTENSION_PAGE_STORAGE_KEYS).toContain('sniptale.gallery.filters');
   expect(LOCAL_EXTENSION_PAGE_STORAGE_KEYS).toContain('sniptale.gallery.facet-disclosures');
 });
+
+it('erases quick preview preferences only when preferences are not preserved', () => {
+  const key = 'sniptale_quick_preview_preferences';
+  const erased = buildBrowserStorageErasurePlan({
+    includeAiProviderSecrets: true,
+    preservePreferences: false,
+  });
+  const preserved = buildBrowserStorageErasurePlan({
+    includeAiProviderSecrets: true,
+    preservePreferences: true,
+  });
+  expect(erased.local).toContain(key);
+  expect(erased.local).toContain('sniptale_video_editor_preview_preferences');
+  expect(preserved.local).not.toContain(key);
+  expect(preserved.local).not.toContain('sniptale_video_editor_preview_preferences');
+  expect(erased.sync).not.toContain(key);
+  expect(erased.session).not.toContain(key);
+});

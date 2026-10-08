@@ -1,3 +1,4 @@
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { acquireVideoCompositionBuffer } from '../../features/video/composition/canvas/buffer-pool';
 import type { QuickEditRect } from '../../features/video/review/advanced/scene';
 
@@ -23,9 +24,16 @@ export function reviewWindowHeaderUrl(
 /** Rasterize the complete SVG once; the caller owns the bitmap and must close it. */
 export async function loadReviewWindowHeader(
   url: string,
-  signal: AbortSignal
+  signal: AbortSignal,
+  options?: { backing: { width: number; height: number } }
 ): Promise<ImageBitmap> {
   signal.throwIfAborted();
+  const backing = options?.backing;
+  if (
+    backing &&
+    ![backing.width, backing.height].every((value) => Number.isSafeInteger(value) && value > 0)
+  )
+    throw new Error('Invalid window header backing.');
   const image = new Image();
   await new Promise<void>((resolve, reject) => {
     const clean = () => {
@@ -53,7 +61,13 @@ export async function loadReviewWindowHeader(
     signal.throwIfAborted();
     // Re-rasterizing nested SVG viewports for each fractional zoom opens antialiased
     // slice edges. A fixed raster shares the video sampling path and keeps joins opaque.
-    const bitmap = await createImageBitmap(image);
+    const bitmap = backing
+      ? await createImageBitmap(image, {
+          resizeWidth: backing.width,
+          resizeHeight: backing.height,
+          resizeQuality: 'high',
+        })
+      : await createImageBitmap(image);
     if (signal.aborted) {
       bitmap.close();
       signal.throwIfAborted();
@@ -67,6 +81,8 @@ export async function loadReviewWindowHeader(
 /** One source plane lets filtering cross the header/video join. Caller releases the scratch lease. */
 export function createReviewWindowRaster(args: {
   header: CanvasImageSource;
+  backing?: { width: number; height: number } | undefined;
+  resources?: RenderResources | undefined;
   videoRect: QuickEditRect;
   windowRect: QuickEditRect;
   draw(
@@ -77,42 +93,61 @@ export function createReviewWindowRaster(args: {
     height: number
   ): void;
 }) {
+  if (
+    args.backing &&
+    ![args.backing.width, args.backing.height].every(
+      (value) => Number.isSafeInteger(value) && value > 0
+    )
+  )
+    throw new Error('Invalid window raster backing.');
   const width =
-    'width' in args.header && typeof args.header.width === 'number' && args.header.width > 0
+    args.backing?.width ??
+    ('width' in args.header && typeof args.header.width === 'number' && args.header.width > 0
       ? args.header.width
-      : args.windowRect.width;
+      : args.windowRect.width);
   const scale = width / args.windowRect.width;
-  const height = args.windowRect.height * scale;
-  const lease = acquireVideoCompositionBuffer(width, height);
-  const context = lease?.canvas.getContext('2d') as CanvasRenderingContext2D | null | undefined;
+  const height = args.backing?.height ?? args.windowRect.height * scale;
+  const scaleY = args.backing ? height / args.windowRect.height : scale;
+  const managed = args.resources?.canvas('decorated-window', {
+    width: Math.ceil(width),
+    height: Math.ceil(height),
+  });
+  const lease = managed ?? acquireVideoCompositionBuffer(width, height);
+  const context = managed
+    ? managed.context
+    : (lease?.canvas.getContext('2d') as CanvasRenderingContext2D | null | undefined);
   if (!lease || !context) {
     lease?.release();
     throw new Error('Window composition canvas is unavailable.');
   }
-  context.save();
+  let saved = false;
   try {
-    context.setTransform(1, 0, 0, 1, 0, 0);
-    context.clearRect(0, 0, lease.canvas.width, lease.canvas.height);
-    context.globalAlpha = 1;
-    context.globalCompositeOperation = 'source-over';
-    context.imageSmoothingEnabled = true;
-    context.imageSmoothingQuality = 'high';
-    const headerHeight = (args.videoRect.y - args.windowRect.y) * scale;
-    context.drawImage(args.header, 0, 0, width, headerHeight);
-    // Sum coverage at the shared edge without backing transparent source pixels.
-    context.globalCompositeOperation = 'lighter';
-    args.draw(
-      context,
-      (args.videoRect.x - args.windowRect.x) * scale,
-      headerHeight,
-      args.videoRect.width * scale,
-      args.videoRect.height * scale
-    );
+    context.save();
+    saved = true;
+    try {
+      context.setTransform(1, 0, 0, 1, 0, 0);
+      context.clearRect(0, 0, lease.canvas.width, lease.canvas.height);
+      context.globalAlpha = 1;
+      context.globalCompositeOperation = 'source-over';
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      const headerHeight = (args.videoRect.y - args.windowRect.y) * scaleY;
+      context.drawImage(args.header, 0, 0, width, headerHeight);
+      // Sum coverage at the shared edge without backing transparent source pixels.
+      context.globalCompositeOperation = 'lighter';
+      args.draw(
+        context,
+        (args.videoRect.x - args.windowRect.x) * scale,
+        headerHeight,
+        args.videoRect.width * scale,
+        args.videoRect.height * scaleY
+      );
+    } finally {
+      if (saved) context.restore();
+    }
   } catch (error) {
     lease.release();
     throw error;
-  } finally {
-    context.restore();
   }
   return { image: lease.canvas, width, height, release: lease.release };
 }

@@ -1,0 +1,161 @@
+import { useEffect, useState, type RefObject } from 'react';
+import { sameQuickEditCamera } from '../../features/video/review/advanced/motion-blur';
+import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
+import { resolveOverlayComments } from '../../features/video/review/comments';
+import { DEFAULT_QUICK_PREVIEW_PREFERENCES } from '../../features/video/preview/quick-preferences';
+import { translate } from '../../platform/i18n';
+import { ReviewButton } from './controls';
+import { useReviewPreviewPresentation } from './use-preview-presentation';
+import type { ReviewStageProps } from './stage';
+
+type PresentationProps = Pick<
+  ReviewStageProps,
+  | 'video'
+  | 'url'
+  | 'source'
+  | 'scene'
+  | 'watermark'
+  | 'webcam'
+  | 'comments'
+  | 'keyCues'
+  | 'clickCues'
+  | 'preview'
+  | 'cutPreview'
+>;
+
+/** Assemble authored stage layers into the renderer scene, including editor-visible comments. */
+function stagePresentationScene(
+  props: Pick<
+    PresentationProps,
+    'source' | 'scene' | 'watermark' | 'webcam' | 'comments' | 'keyCues' | 'clickCues'
+  >
+): Parameters<typeof useReviewPreviewPresentation>[0]['scene'] {
+  return {
+    source: { width: props.source.width, height: props.source.height },
+    ...(props.scene?.canvas ? { canvas: props.scene.canvas } : {}),
+    background: props.scene?.background ?? { enabled: false },
+    ...(props.scene?.windowHeader ? { windowHeader: props.scene.windowHeader } : {}),
+    ...(props.watermark ? { watermark: props.watermark.settings } : {}),
+    ...(props.webcam ? { webcam: props.webcam.settings } : {}),
+    zoomRegions: props.scene?.focus?.regions ?? [],
+    comments: resolveOverlayComments({
+      canvasComments: [...(props.comments?.items ?? [])],
+      annotations: [...(props.comments?.annotations ?? [])],
+    }).map((comment) => ({ ...comment, renderToVideo: true })),
+    keys: props.keyCues ?? [],
+    clicks: props.clickCues ?? [],
+  };
+}
+
+/** Paused target editing overrides interpolation only when its camera actually differs. */
+function pausedCameraOverride(scene: PresentationProps['scene'], playing: boolean) {
+  if (playing || !scene) return undefined;
+  const evaluated = evaluateQuickEditCameraAtTime(
+    scene.focus?.regions ?? [],
+    scene.focus?.time ?? 0
+  );
+  return sameQuickEditCamera(scene.camera, evaluated) ? undefined : scene.camera;
+}
+
+/** Convert stage geometry and gesture state into one manual presentation request. */
+export function useStagePresentation(
+  props: PresentationProps,
+  publication: RefObject<HTMLDivElement | null>,
+  watermarkOutput: { width: number; height: number },
+  size: { width: number; height: number }
+) {
+  const [interacting, setInteracting] = useState(false);
+  useEffect(() => {
+    const finish = () => setInteracting(false);
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') finish();
+    };
+    globalThis.window.addEventListener('pointerup', finish);
+    globalThis.window.addEventListener('pointercancel', finish);
+    globalThis.window.addEventListener('blur', finish);
+    globalThis.window.addEventListener('keydown', cancel);
+    return () => {
+      globalThis.window.removeEventListener('pointerup', finish);
+      globalThis.window.removeEventListener('pointercancel', finish);
+      globalThis.window.removeEventListener('blur', finish);
+      globalThis.window.removeEventListener('keydown', cancel);
+    };
+  }, []);
+  const presentation = useReviewPreviewPresentation({
+    video: props.video,
+    host: publication,
+    sourceIdentity: props.url,
+    scene: stagePresentationScene(props),
+    canonical: watermarkOutput,
+    css: size,
+    preferences: props.preview?.preferences ?? DEFAULT_QUICK_PREVIEW_PREFERENCES,
+    playing: props.preview?.playing ?? false,
+    interacting,
+    visible: true,
+    pausedSourceTime: props.comments?.time ?? props.video.current?.currentTime ?? 0,
+    pausedResultTime: props.scene?.focus?.time ?? 0,
+    sourceToResult: props.preview?.sourceToResult ?? ((time) => time),
+    cameraTransform: pausedCameraOverride(props.scene, props.preview?.playing ?? false),
+    cut: props.cutPreview,
+    webcam: props.webcam,
+  });
+  const onRaster = props.preview?.onRaster;
+  useEffect(() => {
+    onRaster?.(presentation.status.actualRaster);
+  }, [onRaster, presentation.status.actualRaster]);
+  return { presentation, beginInteraction: () => setInteracting(true) };
+}
+
+/** Presentation feedback is independent of authored scene layers and handles. */
+export function ReviewStagePresentationFeedback({
+  presentation,
+  showFrameRate,
+}: {
+  presentation: ReturnType<typeof useReviewPreviewPresentation>;
+  showFrameRate: boolean;
+}) {
+  const manual = presentation.active;
+  return (
+    <>
+      {manual && presentation.status.phase !== 'ready' ? (
+        <div
+          role={presentation.status.phase === 'failed' ? 'alert' : 'status'}
+          className="absolute inset-x-0 top-0 z-40 flex items-center gap-2
+              bg-[var(--sniptale-color-surface-panel)] px-3 py-1 text-xs"
+        >
+          <span>
+            {translate(
+              presentation.status.phase === 'failed'
+                ? 'gallery.videoReview.previewFailed'
+                : 'gallery.videoReview.previewLoading'
+            )}
+          </span>
+          {presentation.status.phase === 'failed' ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.retry')}
+              onClick={presentation.retry}
+            />
+          ) : null}
+        </div>
+      ) : null}
+      {showFrameRate ? (
+        <output
+          data-ui="gallery.videoReview.previewFPS"
+          className="pointer-events-none absolute bottom-2 left-2 z-40 rounded px-1.5 py-0.5 text-xs
+              tabular-nums bg-[var(--sniptale-color-surface-panel)]"
+          title={translate(
+            manual
+              ? 'gallery.videoReview.previewPresentedFrameRate'
+              : 'gallery.videoReview.previewNativeFrameRate'
+          )}
+        >
+          {(manual
+            ? presentation.status.presentedFPS
+            : presentation.status.nativeVideoFPS
+          )?.toFixed(1) ?? '—'}{' '}
+          FPS
+        </output>
+      ) : null}
+    </>
+  );
+}

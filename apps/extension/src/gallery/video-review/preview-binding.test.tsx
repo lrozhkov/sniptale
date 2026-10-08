@@ -276,3 +276,38 @@ it('restores annotation anchors on media readiness and restricts drawing to an i
   stage().onRegion(region);
   expect(state.composer.change).not.toHaveBeenCalled();
 });
+
+it('routes local preview preferences and inspector entry without changing editing or transport', async () => {
+  const preferences = {
+    rasterPreset: '720p',
+    frameRate: '30',
+    pausedQuality: 'detailed',
+    showFrameRate: true,
+  } as const;
+  const open = vi.fn();
+  const raster = vi.fn();
+  const before = active;
+  await act(async () =>
+    root.render(
+      <ReviewPreviewBinding
+        state={state}
+        sceneActive={false}
+        resource={{ file: new File(['video'], 'clip.webm'), url: 'blob:video' }}
+        previewPreferences={preferences}
+        onPreviewRaster={raster}
+        onOpenPreviewSettings={open}
+      />
+    )
+  );
+  expect(stage().preview?.preferences).toBe(preferences);
+  expect(stage().preview?.playing).toBe(state.playing);
+  expect(stage().preview?.sourceToResult(1)).toBe(state.timeline.timeMap.sourceToTimeline(1));
+  stage().preview?.onRaster?.({ width: 1280, height: 720 });
+  expect(raster).toHaveBeenCalledWith({ width: 1280, height: 720 });
+  const trigger = document.createElement('button');
+  frame().onOpenPreviewSettings?.(trigger);
+  expect(open).toHaveBeenCalledWith(trigger);
+  expect(active).toBe(before);
+  expect(state.play).not.toHaveBeenCalled();
+  expect(state.seek).not.toHaveBeenCalled();
+});

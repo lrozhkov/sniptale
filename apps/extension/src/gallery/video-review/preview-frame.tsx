@@ -1,5 +1,5 @@
-import { useState, type ReactNode } from 'react';
-import { Maximize, Minimize, Pause, Play, X } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Maximize, Minimize, Pause, Play, Settings, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import { useLibraryFullscreen } from '../../composition/library-preview/viewport';
@@ -7,17 +7,46 @@ import { translate } from '../../platform/i18n';
 import { reviewTimeLabel } from './controls';
 
 /** Native fullscreen retains the mounted scene and its one transport/resource owner. */
-export function ReviewPreviewFrame(props: {
+type PreviewFrameProps = {
   children(fullscreen: boolean): ReactNode;
   time: number;
   duration: number;
   playing: boolean;
   disabled: boolean;
+  onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
   onPlay(): void;
   onSeek(time: number): void;
-}) {
+};
+
+function usePreviewFullscreen(onOpenPreviewSettings: PreviewFrameProps['onOpenPreviewSettings']) {
   const [failed, setFailed] = useState(false);
+  const opening = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const fullscreen = useLibraryFullscreen(setFailed);
+  const openSettings = async (trigger: HTMLButtonElement) => {
+    if (opening.current) return;
+    opening.current = true;
+    setFailed(false);
+    try {
+      if (fullscreen.fullscreen && !(await fullscreen.exitFullscreenForHandoff())) return;
+      if (mounted.current) onOpenPreviewSettings?.(trigger);
+    } finally {
+      opening.current = false;
+    }
+  };
+  return { fullscreen, failed, setFailed, openSettings };
+}
+
+export function ReviewPreviewFrame(props: PreviewFrameProps) {
+  const { fullscreen, failed, setFailed, openSettings } = usePreviewFullscreen(
+    props.onOpenPreviewSettings
+  );
   const label = translate(
     fullscreen.fullscreen ? 'videoEditor.stage.exitFullscreen' : 'videoEditor.stage.enterFullscreen'
   );
@@ -32,7 +61,7 @@ export function ReviewPreviewFrame(props: {
         if (event.key === 'Escape' && fullscreen.fullscreen) {
           event.preventDefault();
           event.stopPropagation();
-          fullscreen.exitFullscreen();
+          void fullscreen.exitFullscreen();
         } else if (
           [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
             event.key
@@ -46,6 +75,20 @@ export function ReviewPreviewFrame(props: {
     >
       <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
         {props.children(fullscreen.fullscreen)}
+        {props.onOpenPreviewSettings ? (
+          <ContentToolbarButton
+            dataUi="gallery.videoReview.previewSettings"
+            tone="utility"
+            className="!absolute !h-8 !min-h-8 !w-8 !p-0 right-12 top-2 z-20
+              !bg-[var(--sniptale-color-surface-panel)] opacity-70 hover:opacity-100 focus-visible:opacity-100"
+            title={translate('gallery.videoReview.previewSettings')}
+            aria-label={translate('gallery.videoReview.previewSettings')}
+            disabled={props.disabled}
+            onClick={(event) => void openSettings(event.currentTarget)}
+          >
+            <Settings size={18} aria-hidden />
+          </ContentToolbarButton>
+        ) : null}
         <ContentToolbarButton
           ref={fullscreen.fullscreenButton}
           dataUi="gallery.videoReview.fullscreen"
@@ -57,7 +100,7 @@ export function ReviewPreviewFrame(props: {
           disabled={!fullscreen.fullscreen && (props.disabled || !document.fullscreenEnabled)}
           onClick={() => {
             setFailed(false);
-            if (fullscreen.fullscreen) fullscreen.exitFullscreen();
+            if (fullscreen.fullscreen) void fullscreen.exitFullscreen();
             else fullscreen.enterFullscreen();
           }}
         >

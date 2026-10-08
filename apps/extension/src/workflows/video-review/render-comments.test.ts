@@ -127,3 +127,146 @@ it('bounds accepted long comment dense-gradient raster work to the output frame'
     vi.unstubAllGlobals();
   }
 });
+
+it.each(['content', 'viewport'] as const)(
+  'keeps canonical %s wrapping at reduced portrait backing',
+  async (attachment) => {
+    const { drawReviewSceneComments } = await import('./scene-frame');
+    const { computeQuickEditSceneLayout } =
+      await import('../../features/video/review/advanced/scene');
+    const canonical = { width: 600, height: 1100 };
+    const backing = { width: 150, height: 275 };
+    const background = { enabled: false as const };
+    const camera = { scale: 1.3, centerX: 0.4, centerY: 0.6 };
+    const layout = computeQuickEditSceneLayout({
+      output: canonical,
+      source: canonical,
+      background,
+      camera,
+    });
+    const smallerLayout = computeQuickEditSceneLayout({
+      output: backing,
+      source: canonical,
+      background,
+      camera,
+    });
+    const comment = {
+      ...createCanvasComment({ id: 'canonical', at: 0 }),
+      attachment,
+      resolvedText: 'One two three four five six seven eight nine ten eleven twelve '.repeat(5),
+    };
+    const reference = contextFixture(),
+      reduced = contextFixture();
+    reduced.scale = vi.fn();
+    const args = { ...scene, canvas: canonical, layout, comments: [comment], cameraScale: 1.3 };
+    drawReviewSceneComments(reference, args);
+    drawReviewSceneComments(reduced, {
+      ...args,
+      canvas: backing,
+      layout: smallerLayout,
+      commentSpace: { canvas: canonical, layout, background, cameraScale: 1.3 },
+    });
+    expect(reduced.scale).toHaveBeenCalledExactlyOnceWith(0.25, 0.25);
+    expect(reduced.font).toBe(reference.font);
+    expect(vi.mocked(reduced.fillText).mock.calls).toEqual(
+      vi.mocked(reference.fillText).mock.calls
+    );
+    expect(vi.mocked(reduced.roundRect).mock.calls).toEqual(
+      vi.mocked(reference.roundRect).mock.calls
+    );
+    expect(vi.mocked(reduced.arc).mock.calls).toEqual(vi.mocked(reference.arc).mock.calls);
+    expect(reduced.restore).toHaveBeenCalledTimes(vi.mocked(reduced.save).mock.calls.length);
+  }
+);
+
+it.each(['measureText', 'fillText'] as const)(
+  'restores canonical and nested comment state after %s fails',
+  async (method) => {
+    const { drawReviewSceneComments } = await import('./scene-frame');
+    const { computeQuickEditSceneLayout } =
+      await import('../../features/video/review/advanced/scene');
+    const context = contextFixture();
+    context.scale = vi.fn();
+    vi.mocked(context[method]).mockImplementation(() => {
+      throw new Error('comment failed');
+    });
+    const canvas = { width: 600, height: 1100 };
+    const layout = computeQuickEditSceneLayout({
+      output: canvas,
+      source: canvas,
+      background: scene.background,
+      camera: { scale: 1, centerX: 0.5, centerY: 0.5 },
+    });
+    expect(() =>
+      drawReviewSceneComments(context, {
+        ...scene,
+        comments: [{ ...createCanvasComment({ id: 'failure', at: 0 }), resolvedText: 'Text' }],
+        commentSpace: { canvas, layout, background: scene.background },
+      })
+    ).toThrow('comment failed');
+    expect(context.restore).toHaveBeenCalledTimes(vi.mocked(context.save).mock.calls.length);
+  }
+);
+
+it.each([false, true])(
+  'uses backing-sized dense-gradient leases and restores state on paint failure=%s',
+  async (fail) => {
+    const { drawReviewComments } = await import('./render-comments');
+    const { getShowcaseGradient } = await import('../../features/highlighter/showcase-resources');
+    const gradient = getShowcaseGradient('system-ocean');
+    gradient.repeat = { enabled: true, span: 0.01 };
+    const comment = createCanvasComment({ id: 'dense', at: 0 });
+    const context = contextFixture();
+    context.translate = vi.fn();
+    const releases: ReturnType<typeof vi.fn>[] = [];
+    const release = () => {
+      const callback = vi.fn();
+      releases.push(callback);
+      return callback;
+    };
+    const canvas = vi.fn((_role: string, backing: { width: number; height: number }) => ({
+      canvas: { ...backing } as HTMLCanvasElement,
+      context: {
+        createImageData: (width: number, height: number) => ({
+          data: new Uint8ClampedArray(width * height * 4),
+        }),
+        putImageData: vi.fn(() => {
+          if (fail) throw new Error('gradient failed');
+        }),
+      } as unknown as CanvasRenderingContext2D,
+      release: release(),
+    }));
+    const draw = () =>
+      drawReviewComments(
+        context,
+        [
+          {
+            ...comment,
+            resolvedText: 'Canonical fill',
+            style: { ...comment.style, fillPaint: { kind: 'gradient', gradient } },
+          },
+        ],
+        {
+          attachment: comment.attachment,
+          canvas: { width: 600, height: 1100 },
+          videoTransform: null,
+          scale: 1,
+          sourceTime: 0,
+          rasterScale: { x: 0.25, y: 0.5 },
+          resources: { canvas, bytes: () => ({ release: release() }) },
+        }
+      );
+    if (fail) expect(draw).toThrow('gradient failed');
+    else draw();
+    expect(context.restore).toHaveBeenCalledTimes(vi.mocked(context.save).mock.calls.length);
+    const box = vi.mocked(context.roundRect).mock.calls[0]!;
+    expect(canvas).toHaveBeenCalledWith('gradient-dense', {
+      width: Math.ceil(box[2] * 0.25),
+      height: Math.ceil(box[3] * 0.5),
+    });
+    if (!fail)
+      expect(context.drawImage).toHaveBeenCalledWith(expect.anything(), 0, 0, box[2], box[3]);
+    expect(releases.length).toBeGreaterThan(1);
+    expect(releases.every((callback) => callback.mock.calls.length === 1)).toBe(true);
+  }
+);

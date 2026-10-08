@@ -30,6 +30,7 @@ function media(frames = true) {
     ended: { get: () => state.ended },
     readyState: { get: () => state.ready },
     playbackRate: {
+      configurable: true,
       get: () => state.rate,
       set: (rate: number) => {
         state.rate = rate;
@@ -204,7 +205,7 @@ it('bridges short presentation jitter but hides sustained stalls and stays stric
   expect(paint).toHaveBeenLastCalledWith(null);
 });
 
-it('compensates measured seek latency only while the main clock is running', () => {
+it('aligns explicit source discontinuities exactly without predicting seek latency', () => {
   const { main, camera } = setup();
   main.state.time = 1;
   tick();
@@ -213,10 +214,11 @@ it('compensates measured seek latency only while the main clock is running', () 
   camera.seeked();
   tick();
   main.state.time = 3;
+  main.node.dispatchEvent(new Event('seeking'));
   main.state.rate = 2;
   main.state.paused = false;
   tick();
-  expect(camera.seeks.at(-1)).toBeCloseTo(3.12);
+  expect(camera.seeks.at(-1)).toBe(3);
   camera.decode(3.12);
   camera.seeked();
   main.state.time = 3.12;
@@ -406,7 +408,7 @@ it('recovers after waiting when the source clock resumes without another playing
   expect(paint.mock.lastCall?.[0]?.time).toBe(1.03);
 });
 
-it('accounts for slow camera seeks rather than endlessly chasing the advancing source', () => {
+it('recovers a slow camera seek by running forward rather than chasing the advancing source', () => {
   const { main, camera } = setup();
   main.state.paused = false;
   main.state.time = 1;
@@ -416,5 +418,214 @@ it('accounts for slow camera seeks rather than endlessly chasing the advancing s
   camera.decode(1);
   camera.seeked();
   tick();
-  expect(camera.seeks.at(-1)).toBeGreaterThanOrEqual(1.59);
+  expect(camera.seeks).toEqual([1]);
+  expect(camera.state.paused).toBe(false);
+  expect(camera.state.rate).toBe(1.25);
+});
+
+it('publishes represented decoded timestamps and invalidates admission generation after main seeks', () => {
+  const { main, camera, paint } = setup();
+  main.state.time = 0.03;
+  tick();
+  camera.decode(0);
+  camera.seeked();
+  tick();
+  const before = paint.mock.lastCall?.[0];
+  expect(before).toMatchObject({ time: 0.03, representedMediaTime: 0, tolerance: 2 / 30 });
+  main.node.dispatchEvent(new Event('seeking'));
+  expect(paint).toHaveBeenLastCalledWith(null);
+  tick();
+  expect(paint).toHaveBeenLastCalledWith(null);
+  camera.decode(0.03);
+  camera.seeked();
+  tick();
+  expect(paint.mock.lastCall?.[0]?.generation).toBeGreaterThan(before.generation);
+});
+
+it('lets a running decoder recover the recorded 65ms startup lag without restarting its seek', () => {
+  const { main, camera, paint } = setup(true, 1 / 60);
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  expect(camera.state.paused).toBe(false);
+  main.state.time = 1.065;
+  camera.state.time = 1.018;
+  tick(65);
+  expect(camera.seeks).toEqual([1]);
+  expect(camera.state.paused).toBe(false);
+  expect(camera.state.rate).toBeGreaterThan(main.state.rate);
+  expect(paint.mock.lastCall?.[0]?.representedMediaTime).toBe(1);
+  main.state.time = 1.4;
+  camera.state.time = 1.018;
+  tick(270);
+  expect(paint).toHaveBeenLastCalledWith(null);
+});
+
+it('does not turn a completed variable-latency seek into another prediction-driven seek', () => {
+  const { main, camera, paint } = setup(true, 1 / 60);
+  main.state.paused = false;
+  main.state.time = 5;
+  tick();
+  main.state.time = 5.31;
+  now += 310;
+  camera.decode(5);
+  camera.seeked();
+  tick();
+  expect(camera.seeks).toEqual([5]);
+  expect(camera.state.paused).toBe(false);
+  expect(paint).toHaveBeenLastCalledWith(null);
+});
+
+it('holds an ahead running camera for the source instead of seeking backward', () => {
+  const { main, camera, paint } = setup(true, 1 / 60);
+  main.state.paused = false;
+  main.state.time = 5;
+  tick();
+  camera.decode(5);
+  camera.seeked();
+  tick();
+  main.state.time = 5.05;
+  camera.state.time = 5.35;
+  camera.decode(5.35);
+  tick(50);
+  expect(camera.seeks).toEqual([5]);
+  expect(camera.state.paused).toBe(true);
+  main.state.time = 5.35;
+  tick(300);
+  expect(camera.seeks).toEqual([5]);
+  expect(paint.mock.lastCall?.[0]?.representedMediaTime).toBe(5.35);
+});
+
+it('bounds catch-up rate and restores authored rate when the decoder catches up', () => {
+  const { main, camera } = setup(true, 1 / 60);
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  main.state.time = 1.1;
+  camera.state.time = 1.02;
+  tick(100);
+  expect(camera.state.rate).toBe(1.25);
+  main.state.time = 1.2;
+  camera.state.time = 1.19;
+  camera.decode(1.19);
+  tick(100);
+  expect(camera.state.rate).toBe(1);
+  main.state.rate = 2;
+  main.state.time = 1.22;
+  camera.state.time = 1.22;
+  tick();
+  expect(camera.state.rate).toBe(2);
+  expect(camera.seeks).toEqual([1]);
+});
+
+it('realigns same-object offset changes but preserves transport for appearance edits', () => {
+  const { main, camera, settings } = setup();
+  main.state.paused = false;
+  main.state.time = 2;
+  tick();
+  camera.decode(2);
+  camera.seeked();
+  tick();
+  settings.appearance.zoom = 1.5;
+  main.state.time = 2.02;
+  camera.state.time = 2.02;
+  tick();
+  expect(camera.seeks).toEqual([2]);
+  settings.offsetSeconds = 1;
+  tick();
+  expect(camera.seeks).toEqual([2, 1.02]);
+});
+
+it('coalesces explicit seeks while ordinary running time never supersedes an in-flight target', () => {
+  const { main, camera, paint } = setup();
+  main.state.paused = false;
+  main.state.time = 1;
+  tick();
+  main.state.time = 1.2;
+  tick(200);
+  expect(camera.seeks).toEqual([1]);
+  main.state.time = 4;
+  main.node.dispatchEvent(new Event('seeking'));
+  tick();
+  main.state.time = 6;
+  main.node.dispatchEvent(new Event('seeking'));
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  expect(paint).toHaveBeenLastCalledWith(null);
+  expect(camera.seeks).toEqual([1, 6]);
+  camera.decode(6);
+  camera.seeked();
+  tick();
+  expect(paint.mock.lastCall?.[0]?.representedMediaTime).toBe(6);
+});
+
+it('keeps catch-up within the native playback-rate maximum at supported 16x source speed', () => {
+  const { main, camera } = setup(true, 1 / 60);
+  main.state.paused = false;
+  main.state.rate = 16;
+  main.state.time = 1;
+  Object.defineProperty(camera.node, 'playbackRate', {
+    get: () => camera.state.rate,
+    set: (rate: number) => {
+      if (rate > 16) throw new DOMException('Unsupported rate', 'NotSupportedError');
+      camera.state.rate = rate;
+    },
+  });
+  tick();
+  camera.decode(1);
+  camera.seeked();
+  tick();
+  main.state.time = 1.8;
+  camera.state.time = 1.05;
+  expect(() => tick(50)).not.toThrow();
+  expect(camera.state.rate).toBe(16);
+  expect(camera.seeks).toEqual([1]);
+});
+
+it('requests one exact paused alignment when currentTime is aligned but decoded evidence is stale', () => {
+  const { main, camera, paint } = setup(true, 1 / 60);
+  tick();
+  camera.decode(0);
+  camera.seeked();
+  tick();
+  main.state.time = 0.1;
+  camera.state.time = 0.1;
+  tick();
+  expect(camera.seeks).toEqual([0, 0.1]);
+  expect(paint).toHaveBeenLastCalledWith(null);
+  camera.seeked();
+  tick();
+  tick();
+  expect(camera.seeks).toEqual([0, 0.1]);
+  expect(paint).toHaveBeenLastCalledWith(null);
+  camera.decode(0.1);
+  tick();
+  expect(paint.mock.lastCall?.[0]?.representedMediaTime).toBe(0.1);
+  expect(camera.play).not.toHaveBeenCalled();
+});
+
+it('accepts proven initial decoded alignment delivered before loadeddata without seeking the same frame again', () => {
+  const { main, camera, paint } = setup(true, 1 / 60);
+  camera.state.ready = 1;
+  tick();
+  camera.decode(0);
+  camera.state.ready = 2;
+  tick();
+  expect(camera.seeks).toEqual([]);
+  expect(paint.mock.lastCall?.[0]).toMatchObject({ time: 0, representedMediaTime: 0 });
+  tick(10_000);
+  expect(camera.seeks).toEqual([]);
+  expect(paint.mock.lastCall?.[0]).toMatchObject({ time: 0, representedMediaTime: 0 });
+  main.node.dispatchEvent(new Event('seeking'));
+  tick();
+  expect(camera.seeks).toEqual([0]);
+  expect(paint).toHaveBeenLastCalledWith(null);
 });

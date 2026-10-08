@@ -246,3 +246,19 @@ it('cancels a placement draft when output dimensions change without committing i
   pointer(button(), 'pointerup', 200, 100);
   expect(props.onChange).not.toHaveBeenCalled();
 });
+
+it('uses manual renderer bounds for the same handle without preparing or painting duplicate pixels', async () => {
+  props.manual = { bounds: { x: 790, y: 440, width: 200, height: 50 } };
+  await render();
+  expect(io.prepare).not.toHaveBeenCalled();
+  expect(io.draw).not.toHaveBeenCalled();
+  expect(host.querySelector('canvas')).toBeNull();
+  const handle = button();
+  expect(handle.style.width).toBe('20%');
+  pointer(handle, 'pointerdown', 850, 450);
+  pointer(handle, 'pointermove', 800, 400);
+  expect(props.onPreview).toHaveBeenCalled();
+  pointer(handle, 'pointercancel', 800, 400);
+  expect(props.onPreview).toHaveBeenLastCalledWith(null);
+  expect(props.onChange).not.toHaveBeenCalled();
+});

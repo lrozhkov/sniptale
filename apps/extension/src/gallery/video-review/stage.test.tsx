@@ -12,6 +12,37 @@ import type {
   QuickEditCameraTransform,
 } from '../../features/video/review/advanced/types';
 
+const presentation = vi.hoisted(() => ({
+  active: false,
+  input: vi.fn(),
+  retry: vi.fn(),
+  draft: vi.fn(),
+}));
+vi.mock('./use-preview-presentation', () => ({
+  useReviewPreviewPresentation: (input: unknown) => {
+    presentation.input(input);
+    return {
+      active: presentation.active,
+      status: {
+        phase: presentation.active ? 'ready' : 'inactive',
+        actualRaster: null,
+        presentedFPS: null,
+        nativeVideoFPS: null,
+      },
+      retry: presentation.retry,
+      onCommentPreview: presentation.draft,
+      onWebcamPreview: presentation.draft,
+      webcamManual: {
+        phase: 'ready',
+        duration: 4,
+        ready: true,
+        onPreviewPlacement: presentation.draft,
+      },
+      watermarkManual: { bounds: null },
+    };
+  },
+}));
+
 vi.mock('../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -39,6 +70,8 @@ let root: Root;
 let host: HTMLDivElement;
 
 beforeEach(() => {
+  presentation.active = false;
+  presentation.input.mockClear();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -623,4 +656,46 @@ it('places watermark after keys and before blackout at full scene resolution ind
     'gallery.videoReview.keyAnimation'
   );
   expect(watermark.nextElementSibling?.getAttribute('data-ui')).toBe('blackout-proof');
+});
+
+it('keeps the native video node mounted while switching all scene pixels to managed presentation', () => {
+  const props = { scene: { background: disabled, camera: identity } };
+  const original = renderStage(props).video;
+  expect(host.querySelector('[data-ui="blackout-proof"]')).not.toBeNull();
+  presentation.active = true;
+  const managed = renderStage(props).video;
+  expect(managed).toBe(original);
+  expect(managed.parentElement!.style.opacity).toBe('0');
+  expect(host.querySelector('[data-ui="blackout-proof"]')).toBeNull();
+  expect(host.querySelector('[data-ui="gallery.videoReview.keyAnimation"]')).toBeNull();
+  expect(
+    host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.manualPreview"]')!.style.display
+  ).toBe('');
+  presentation.active = false;
+  expect(renderStage(props).video).toBe(original);
+  expect(original.parentElement!.style.opacity).toBe('');
+  expect(host.querySelector('[data-ui="blackout-proof"]')).not.toBeNull();
+});
+
+it('preserves paused exposure and marks pointer gestures for selected-quality rendering', async () => {
+  const view = renderStage({
+    scene: { background: disabled, camera: identity, focus: { regions: [], time: 0 } },
+  });
+  const input = () =>
+    presentation.input.mock
+      .lastCall![0] as import('./use-preview-presentation').ReviewPreviewPresentationInput;
+  expect(input().cameraTransform).toBeUndefined();
+  const surface = host.querySelector('[data-ui="gallery.videoReview.stage"]')!;
+  await view.event(surface, 'pointerdown', 100, 100);
+  expect(input().interacting).toBe(true);
+  await view.event(surface, 'pointerup', 100, 100);
+  expect(input().interacting).toBe(false);
+  renderStage({
+    scene: {
+      background: disabled,
+      camera: { ...identity, scale: 2 },
+      focus: { regions: [], time: 0 },
+    },
+  });
+  expect(input().cameraTransform?.scale).toBe(2);
 });

@@ -229,3 +229,69 @@ it('reuses both exposure surfaces after a sample paint failure', () => {
   next.flush();
   expect(allocations).toBe(2);
 });
+
+it.each([false, true])(
+  'rounds and reuses two managed leases, releasing them on failure=%s',
+  async (fail) => {
+    const pool = await import('./buffer-pool');
+    const globalAcquire = vi.spyOn(pool, 'acquireVideoCompositionBuffer');
+    const leases: {
+      context: CanvasRenderingContext2D;
+      canvas: HTMLCanvasElement;
+      release: ReturnType<typeof vi.fn>;
+    }[] = [];
+    const canvas = vi.fn((_role: string, size: { width: number; height: number }) => {
+      const context = {
+        save: vi.fn(),
+        restore: vi.fn(),
+        setTransform: vi.fn(),
+        clearRect: vi.fn(),
+        drawImage: vi.fn(),
+        getTransform: vi.fn(() => ({ a: 0.5, d: 0.5 })),
+      } as unknown as CanvasRenderingContext2D;
+      const lease = { canvas: { ...size } as HTMLCanvasElement, context, release: vi.fn() };
+      leases.push(lease);
+      return lease;
+    });
+    const target = {
+      drawImage: vi.fn(),
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high',
+    } as unknown as CanvasRenderingContext2D;
+    try {
+      const buffer = createVideoCompositionPassBuffer({
+        bufferWidth: 639.5,
+        bufferHeight: 359.5,
+        drawWidth: 1920,
+        drawHeight: 1080,
+        targetContext: target,
+        resources: { canvas, bytes: vi.fn() },
+      })!;
+      const paint = vi.fn((context: CanvasRenderingContext2D) => {
+        expect(context.globalCompositeOperation).toBe('source-over');
+        expect(context.globalAlpha).toBe(1);
+      });
+      buffer.drawPass(0.3, paint);
+      buffer.drawPass(0.7, paint);
+      expect(canvas.mock.calls.map(([role]) => role)).toEqual([
+        'motion-accumulator',
+        'motion-sample',
+      ]);
+      expect(leases[0]!.context.globalAlpha).toBe(0.7);
+      expect(leases[1]!.context.setTransform).toHaveBeenCalledWith({ a: 0.5, d: 0.5 });
+      if (fail)
+        expect(() =>
+          buffer.drawPass(1, () => {
+            throw new Error('paint failed');
+          })
+        ).toThrow('paint failed');
+      else buffer.flush();
+      buffer.dispose();
+      expect(leases.map((lease) => lease.release.mock.calls.length)).toEqual([1, 1]);
+      expect(globalAcquire).not.toHaveBeenCalled();
+      if (!fail) expect(target.drawImage).toHaveBeenCalledWith(leases[0]!.canvas, 0, 0, 1920, 1080);
+    } finally {
+      globalAcquire.mockRestore();
+    }
+  }
+);

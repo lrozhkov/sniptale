@@ -1,3 +1,4 @@
+import type { RenderResources } from '../../features/video/composition/canvas/render-resources';
 import { DEFAULT_COLOR_ACCENT } from '@sniptale/ui/default-colors/constants';
 import {
   canvasCommentBubble,
@@ -18,6 +19,8 @@ export function drawReviewComments(
     videoTransform: { x: number; y: number; width: number; height: number } | null;
     scale: number;
     sourceTime: number | undefined;
+    resources?: RenderResources | undefined;
+    rasterScale?: { x: number; y: number } | undefined;
   }
 ): void {
   for (const comment of comments) {
@@ -39,6 +42,8 @@ function drawReviewComment(
     videoTransform: { x: number; y: number; width: number; height: number } | null;
     scale: number;
     sourceTime: number | undefined;
+    resources?: RenderResources | undefined;
+    rasterScale?: { x: number; y: number } | undefined;
   }
 ): void {
   const point = args.videoTransform
@@ -51,30 +56,37 @@ function drawReviewComment(
   const pointRadius = bubble.pointRadius * args.scale;
   const phase = overlayPulsePhase(args.sourceTime ?? 0, comment.start);
   context.save();
-  if (phase > 0 && phase < 1) {
-    const ringRadius = pointRadius * (1 + 1.4 * phase);
-    context.globalAlpha = 0.35 * (1 - phase);
+  try {
+    if (phase > 0 && phase < 1) {
+      const ringRadius = pointRadius * (1 + 1.4 * phase);
+      context.globalAlpha = 0.35 * (1 - phase);
+      context.fillStyle = DEFAULT_COLOR_ACCENT;
+      context.beginPath();
+      context.arc(point.x, point.y, ringRadius, 0, Math.PI * 2);
+      context.fill();
+      context.globalAlpha = 1;
+    }
     context.fillStyle = DEFAULT_COLOR_ACCENT;
+    context.strokeStyle = '#ffffff';
+    context.lineWidth = 2 * args.scale;
     context.beginPath();
-    context.arc(point.x, point.y, ringRadius, 0, Math.PI * 2);
+    context.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
     context.fill();
-    context.globalAlpha = 1;
+    context.stroke();
+    drawCommentBubble(context, comment, args, point, pointRadius, bubble);
+  } finally {
+    context.restore();
   }
-  context.fillStyle = DEFAULT_COLOR_ACCENT;
-  context.strokeStyle = '#ffffff';
-  context.lineWidth = 2 * args.scale;
-  context.beginPath();
-  context.arc(point.x, point.y, pointRadius, 0, Math.PI * 2);
-  context.fill();
-  context.stroke();
-  drawCommentBubble(context, comment, args, point, pointRadius, bubble);
-  context.restore();
 }
 
 function drawCommentBubble(
   context: CanvasRenderingContext2D,
   comment: CanvasCommentExport,
-  args: { scale: number },
+  args: {
+    scale: number;
+    resources?: RenderResources | undefined;
+    rasterScale?: { x: number; y: number } | undefined;
+  },
   point: { x: number; y: number },
   pointRadius: number,
   bubble: ReturnType<typeof canvasCommentBubble>
@@ -100,28 +112,48 @@ function drawCommentBubble(
       ? point.y + pointRadius + bubble.gap * args.scale
       : point.y - pointRadius - bubble.gap * args.scale - boxHeight;
   context.save();
-  context.beginPath();
-  context.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
-  context.clip();
-  const paint = comment.style.fillPaint;
-  if (paint.kind === 'solid') {
-    context.fillStyle = paint.color;
-    context.fillRect(boxX, boxY, boxWidth, boxHeight);
-  } else {
-    context.translate(boxX, boxY);
-    drawSceneGradient(context, paint.gradient, boxWidth, boxHeight);
+  try {
+    context.beginPath();
+    context.roundRect(boxX, boxY, boxWidth, boxHeight, radius);
+    context.clip();
+    const paint = comment.style.fillPaint;
+    if (paint.kind === 'solid') {
+      context.fillStyle = paint.color;
+      context.fillRect(boxX, boxY, boxWidth, boxHeight);
+    } else {
+      context.translate(boxX, boxY);
+      drawSceneGradient(
+        context,
+        paint.gradient,
+        boxWidth,
+        boxHeight,
+        args.resources
+          ? {
+              resources: args.resources,
+              backing: {
+                width: Math.max(1, Math.ceil(boxWidth * (args.rasterScale?.x ?? 1))),
+                height: Math.max(1, Math.ceil(boxHeight * (args.rasterScale?.y ?? 1))),
+              },
+            }
+          : undefined
+      );
+    }
+  } finally {
+    context.restore();
   }
-  context.restore();
   context.save();
-  context.beginPath();
-  context.rect(boxX, boxY, boxWidth, boxHeight);
-  context.clip();
-  context.fillStyle = comment.style.textColor;
-  context.textBaseline = 'top';
-  lines.forEach((line, index) => {
-    context.fillText(line, boxX + paddingX, boxY + paddingY + index * lineHeight);
-  });
-  context.restore();
+  try {
+    context.beginPath();
+    context.rect(boxX, boxY, boxWidth, boxHeight);
+    context.clip();
+    context.fillStyle = comment.style.textColor;
+    context.textBaseline = 'top';
+    lines.forEach((line, index) => {
+      context.fillText(line, boxX + paddingX, boxY + paddingY + index * lineHeight);
+    });
+  } finally {
+    context.restore();
+  }
 }
 
 function wrapCanvasText(

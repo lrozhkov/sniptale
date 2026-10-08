@@ -1,3 +1,4 @@
+import { isCanvasCommentVisibleAt } from '../../features/video/review/comments';
 import { quickEditPlaneProjection } from '../../features/video/review/advanced/spatial-geometry';
 import {
   evaluateReviewClicks,
@@ -12,7 +13,7 @@ import {
   computeQuickEditSpatialRasterLayout,
   computeQuickEditWindowTransform,
 } from '../../features/video/review/advanced/scene';
-import { drawReviewSceneComments } from './scene-frame';
+import { drawReviewSceneComments, spatialReviewCommentSpace } from './scene-frame';
 import { drawReviewClicks } from './render-click-animation';
 import { drawReviewBorders } from './render-border';
 import { drawReviewSpotlights } from './render-spotlight';
@@ -37,13 +38,9 @@ export function drawReviewSceneOverlays(args: {
 }) {
   const { scene, context, canvas, renderer: spatialRenderer } = args;
   const { layout, background, comments: burned = [] } = scene;
-  const overlay =
-    layout.spatial && spatialRenderer
-      ? spatialRenderer.surface('overlay', canvas.width, canvas.height)
-      : null;
-  const overlayContext = overlay?.context ?? context;
-  const overlayLayout = overlay ? computeQuickEditSpatialRasterLayout(layout, background) : layout;
-  const overlayBackground = overlay
+  const spatial = layout.spatial && spatialRenderer;
+  const overlayLayout = spatial ? computeQuickEditSpatialRasterLayout(layout, background) : layout;
+  const overlayBackground = spatial
     ? { ...background, zoomBehavior: 'fixed' as const }
     : background;
   const motion = computeQuickEditSceneCamera(overlayLayout, overlayBackground);
@@ -68,28 +65,48 @@ export function drawReviewSceneOverlays(args: {
     },
     layout.spatial
       ? quickEditPlaneProjection(spotlightWindow, spotlightWindow, layout.spatial)
-      : undefined
+      : undefined,
+    scene.resources
   );
+  const borders = evaluateQuickEditBordersAtTime({
+    regions: args.regions,
+    time: args.globalResultTime,
+    output: canvas,
+    video: computeQuickEditWindowTransform(overlayLayout),
+    scale:
+      (scene.sceneScale ?? 1) *
+      (overlayLayout.videoTransform.width / overlayLayout.videoRect.width),
+  });
+  const clicks = evaluateReviewClicks(args.clicks ?? [], args.globalResultTime);
+  const hasContentComment = burned.some(
+    (comment) =>
+      comment.attachment === 'content' &&
+      comment.renderToVideo &&
+      (scene.sourceTime === undefined || isCanvasCommentVisibleAt(comment, scene.sourceTime))
+  );
+  if (spatial && !borders.length && !clicks.length && !hasContentComment) {
+    drawReviewSceneComments(context, {
+      ...scene,
+      comments: burned.filter((comment) => comment.attachment === 'viewport'),
+      cameraScale: 1,
+    });
+    return;
+  }
+  const overlay = spatial ? spatial.surface('overlay', canvas.width, canvas.height) : null;
+  const overlayContext = overlay?.context ?? context;
   drawReviewBorders(
     overlayContext,
     overlay?.canvas ?? canvas,
-    evaluateQuickEditBordersAtTime({
-      regions: args.regions,
-      time: args.globalResultTime,
-      output: canvas,
-      video: computeQuickEditWindowTransform(overlayLayout),
-      scale:
-        (scene.sceneScale ?? 1) *
-        (overlayLayout.videoTransform.width / overlayLayout.videoRect.width),
-    }),
+    borders,
     {
       rect: motion.windowClip,
       radius: background.enabled ? background.layout.cornerRadius * motion.scale : 0,
-    }
+    },
+    scene.resources
   );
   drawReviewClicks(
     overlayContext,
-    evaluateReviewClicks(args.clicks ?? [], args.globalResultTime),
+    clicks,
     overlayLayout.videoTransform,
     args.sourceWidth,
     {
@@ -102,6 +119,7 @@ export function drawReviewSceneOverlays(args: {
     ...scene,
     canvas: overlay?.canvas ?? canvas,
     layout: overlayLayout,
+    commentSpace: overlay ? spatialReviewCommentSpace(scene.commentSpace) : scene.commentSpace,
     background: overlayBackground,
     comments: overlay ? burned.filter((c) => c.attachment === 'content') : burned,
     cameraScale: overlayLayout.videoTransform.width / overlayLayout.videoRect.width,

@@ -1,3 +1,4 @@
+import { galleryVideoReviewPreviewMessages } from './video-review-preview';
 import { galleryVideoReviewSceneMessages } from './video-review-scene';
 import { galleryVideoReviewWatermarkMessages } from './video-review-watermark';
 import { galleryVideoReviewMusicMessages } from './video-review-music';
@@ -8,6 +9,7 @@ import { galleryVideoReviewSpatialMessages } from './video-review-spatial';
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  ...galleryVideoReviewPreviewMessages,
   ...galleryVideoReviewSceneMessages,
   ...galleryVideoReviewWatermarkMessages,
   ...galleryVideoReviewMusicMessages,

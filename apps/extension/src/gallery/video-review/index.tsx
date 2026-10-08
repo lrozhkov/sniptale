@@ -1,3 +1,5 @@
+import { ReviewPreviewInspector } from './preview-inspector';
+import { useReviewPreviewPreferences } from './use-preview-preferences';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { useReviewMusicImport } from './music-import';
 import { MusicLibraryDrawer } from './music-library';
@@ -96,7 +98,9 @@ function ReviewInspectorBinding({
   onToggleHeight,
   navigation,
   resizeHandle,
+  preview,
 }: {
+  preview?: ReactNode;
   resizeHandle?: ReactNode;
   fullHeight: boolean;
   navigation: ReviewInspectorNavigation;
@@ -123,6 +127,7 @@ function ReviewInspectorBinding({
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
+        preview={preview}
         beforeAction={state.beforeAction}
         fullHeight={fullHeight}
         resizeHandle={resizeHandle}
@@ -326,16 +331,18 @@ function ReviewHistoryControlBinding({
   );
 }
 
-function ReviewEditor({
-  resource,
-  onBack,
-  onClose,
-}: {
+type ReviewEditorProps = {
   resource: LoadedReview;
   onBack(): void;
   onClose(): void;
-}) {
+};
+
+function ReviewEditor({ resource, onBack, onClose }: ReviewEditorProps) {
   const state = useReviewEditorState(resource);
+  const previewPreferences = useReviewPreviewPreferences();
+  const [previewRaster, setPreviewRaster] = useState<{ width: number; height: number } | null>(
+    null
+  );
   const [fullHeight, setFullHeight] = useState(false);
   const panelsEnabled = state.advanced.ui.mode === 'advanced';
   const panels = useReviewPanelLayout(panelsEnabled);
@@ -368,11 +375,24 @@ function ReviewEditor({
           className={`grid h-full min-h-0 min-w-[1254px] ${voiceover.recording ? 'pb-40' : ''}`}
         >
           <ReviewPreviewBinding
+            onOpenPreviewSettings={navigation.openPreview}
+            previewPreferences={previewPreferences.preferences}
+            onPreviewRaster={setPreviewRaster}
             resource={resource}
             state={state}
             sceneActive={navigation.shown === 'scene'}
           />
           <ReviewInspectorBinding
+            preview={
+              <ReviewPreviewInspector
+                preferences={previewPreferences.preferences}
+                status={previewPreferences.status}
+                actualRaster={previewRaster}
+                onChange={previewPreferences.change}
+                onReset={previewPreferences.reset}
+                onRetry={previewPreferences.retry}
+              />
+            }
             navigation={navigation}
             resizeHandle={
               panelsEnabled ? <ReviewPanelResizeHandle resize={panels.inspector} /> : null

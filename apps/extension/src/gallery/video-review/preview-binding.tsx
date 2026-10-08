@@ -1,3 +1,4 @@
+import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
 import { ReviewFeedback } from './feedback';
@@ -69,10 +70,16 @@ export function ReviewPreviewBinding({
   resource,
   state,
   sceneActive,
+  previewPreferences,
+  onPreviewRaster,
+  onOpenPreviewSettings,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url'>;
   state: PreviewState;
   sceneActive: boolean;
+  previewPreferences?: QuickPreviewPreferences | undefined;
+  onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
+  onOpenPreviewSettings?: ((trigger: HTMLButtonElement) => void) | undefined;
 }) {
   const { busy, audio } = state;
   return (
@@ -106,6 +113,7 @@ export function ReviewPreviewBinding({
         }}
       />
       <ReviewPreviewFrame
+        onOpenPreviewSettings={onOpenPreviewSettings}
         time={state.timeline.sceneOutputTime}
         duration={state.timeline.resultDuration}
         playing={state.playing}
@@ -127,6 +135,8 @@ export function ReviewPreviewBinding({
             state={state}
             sceneActive={sceneActive}
             fullscreen={fullscreen}
+            previewPreferences={previewPreferences}
+            onPreviewRaster={onPreviewRaster}
           />
         )}
       </ReviewPreviewFrame>
@@ -140,17 +150,31 @@ function ReviewPreviewStage({
   state,
   sceneActive,
   fullscreen,
+  previewPreferences,
+  onPreviewRaster,
 }: {
   resource: Pick<LoadedReview, 'file' | 'url'>;
   state: PreviewState;
   sceneActive: boolean;
   fullscreen: boolean;
+  previewPreferences?: QuickPreviewPreferences | undefined;
+  onPreviewRaster?: ((size: { width: number; height: number } | null) => void) | undefined;
 }) {
   const { busy, features, composer, snapshot, canvasComments } = state;
   const sceneEditable =
     !state.playing && !busy && state.editing.exporter.phase === 'idle' && !composer.annotation;
   return (
     <ReviewStageBinding
+      preview={
+        previewPreferences
+          ? {
+              preferences: previewPreferences,
+              playing: state.playing,
+              sourceToResult: state.timeline.timeMap.sourceToTimeline,
+              onRaster: onPreviewRaster,
+            }
+          : undefined
+      }
       watermark={
         state.advanced.ui.mode === 'advanced'
           ? {

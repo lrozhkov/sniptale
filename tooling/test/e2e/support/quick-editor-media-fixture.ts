@@ -20,9 +20,12 @@ export async function seedReviewVideo(
   filename: string,
   dimensions: { width: number; height: number; duration: number },
   gaps = false,
-  history = false
+  history = false,
+  source?: { bytes: Uint8Array; mimeType: 'video/webm' | 'video/mp4' }
 ) {
-  let bytes = await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
+  let bytes = source
+    ? Buffer.from(source.bytes)
+    : await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
   if (gaps) bytes = await withAudioGaps(bytes);
   await page.evaluate(
     async ({ fixture, encoded, dimensions, mimeType, history }) => {
@@ -92,7 +95,7 @@ export async function seedReviewVideo(
       encoded: bytes.toString('base64'),
       dimensions,
       history,
-      mimeType: filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm',
+      mimeType: source?.mimeType ?? (filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm'),
     }
   );
 }

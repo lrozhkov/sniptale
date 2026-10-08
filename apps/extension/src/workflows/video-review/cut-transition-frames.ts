@@ -6,6 +6,8 @@ import type {
 /** Decoded raster with its actual presentation timestamp; a seek request is not frame authority. */
 export interface ReviewTransitionSample {
   timestamp: number;
+  /** Actual decoded payload accounting, available on native VideoSample instances. */
+  allocationSize?(): number;
   draw(
     context: CanvasRenderingContext2D,
     x: number,

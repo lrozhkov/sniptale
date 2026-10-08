@@ -80,6 +80,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/persistence/projects`
 - `apps/extension/src/composition/persistence/prompt-templates`
 - `apps/extension/src/composition/persistence/quick-actions`
+- `apps/extension/src/composition/persistence/quick-preview-preferences`
 - `apps/extension/src/composition/persistence/recent-colors`
 - `apps/extension/src/composition/persistence/recordings`
 - `apps/extension/src/composition/persistence/review-workspaces`
