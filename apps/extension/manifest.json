@@ -36,6 +36,11 @@
       ],
       "matches": ["http://*/*", "https://*/*", "file:///*"],
       "use_dynamic_url": true
+    },
+    {
+      "resources": ["cursors/text.svg"],
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
+      "use_dynamic_url": true
     }
   ],
   "background": {

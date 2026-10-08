@@ -4,6 +4,7 @@ import {
 } from '../../../features/video/project/recording-actions';
 import type { RecordingTelemetrySnapshot } from '../../../contracts/messaging/contracts/response-types';
 import { clearLegacyControlledCursorArtifacts } from './artifacts';
+import { createRecordingTextCursor } from './text-cursor';
 import { recordTelemetryPauseBoundary } from './events';
 import type { TelemetryState } from './types';
 import {
@@ -108,12 +109,26 @@ function disableTelemetryState(state: TelemetryState): RecordingTelemetrySnapsho
 
 export function createVideoTelemetryController(): VideoTelemetryController {
   const state = createInitialState();
+  const textCursor = createRecordingTextCursor();
 
   return {
-    enable: (recordingId, offsetSeconds) => enableTelemetryState(state, recordingId, offsetSeconds),
-    disable: () => disableTelemetryState(state),
+    enable: (recordingId, offsetSeconds) => {
+      textCursor.stop();
+      enableTelemetryState(state, recordingId, offsetSeconds);
+      if (state.isEnabled) textCursor.start();
+    },
+    disable: () => {
+      textCursor.stop();
+      return disableTelemetryState(state);
+    },
     isEnabled: () => state.isEnabled,
-    pause: () => pauseTelemetryState(state),
-    resume: () => resumeTelemetryState(state),
+    pause: () => {
+      textCursor.stop();
+      pauseTelemetryState(state);
+    },
+    resume: () => {
+      resumeTelemetryState(state);
+      if (state.isEnabled && !state.isPaused) textCursor.start();
+    },
   };
 }

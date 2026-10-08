@@ -206,6 +206,17 @@
       "justification": "Allows the injected content runtime to render the extension UI consistently after host-page injection.",
       "reviewNote": "Keep resources concrete, dynamic-url scoped, and avoid wildcard WAR entries for injected runtime bundles.",
       "userFacingDisclosure": "settings.permissions.sitesDescription"
+    },
+    {
+      "name": "web_accessible_resources:{\"resources\":[\"cursors/text.svg\"],\"matches\":[\"file:///*\",\"http://*/*\",\"https://*/*\"],\"extensionIds\":[],\"useDynamicUrl\":true}",
+      "owner": "apps/extension/src/content/overlay/video-telemetry/text-cursor.ts",
+      "feature": "Windows text cursor compatibility during recording",
+      "runtimeRoute": "Content recording lifecycle resolves one packaged cursor image through runtimeInfo.getURL",
+      "capabilityPolicy": "Expose only the fixed inert text-cursor SVG using a dynamic URL; no scripts, host permissions or page-supplied resource paths.",
+      "failureBehavior": "Unavailable cursor image falls back to the native text cursor; pause and disposal restore page styles.",
+      "justification": "Avoids Windows XOR cursor bitmap loss in tab capture and host CSP rejection of inline data images.",
+      "reviewNote": "Keep the image self-contained with no scripts, external references or animation, and preserve dynamic URLs and exact resource matching.",
+      "userFacingDisclosure": "settings.permissions.sitesDescription"
     }
   ]
 }

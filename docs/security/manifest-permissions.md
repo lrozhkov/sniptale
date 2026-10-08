@@ -17,7 +17,7 @@ This document owns permission-design decisions. `tooling/configs/qa/manifest-per
 
 ## Resource and runtime rules
 
-- Expose only the exact font files listed in the machine inventory.
+- Expose only the exact font files and the inert `cursors/text.svg` recording cursor listed in the machine inventory. Keep the cursor self-contained, without scripts, external references or animation, and use a dynamic resource URL.
 - Do not use wildcard web-accessible-resource entries.
 - Do not expose injected runtime bundles as web-accessible resources.
 - Use `file:///*` only for the web-accessible-resource match. Keep `file:///` as the optional Chrome permission.
