@@ -146,17 +146,11 @@ for (const variant of variants) {
         await settled();
       };
       await fields.scrollIntoViewIfNeeded();
-      await select(
-        fields,
-        'gallery.videoReview.presentationFadeIn',
-        'gallery.videoReview.presentationOn'
-      );
-      await select(
-        fields,
-        'gallery.videoReview.presentationFadeOut',
-        'gallery.videoReview.presentationOn'
-      );
-      await expect.poll(async () => (await persistedPresentation(page))?.fadeIn.enabled).toBe(true);
+      await mode('gallery.videoReview.presentationFadeIn').click();
+      await settled();
+      await expect
+        .poll(async () => (await persistedPresentation(page))?.introControl?.mode)
+        .toBe('fade');
       const edgeDuration = fields
         .getByRole('textbox', {
           name: label('gallery.videoReview.presentationDuration'),
@@ -165,7 +159,9 @@ for (const variant of variants) {
         .first();
       await edgeDuration.fill('0.6');
       await edgeDuration.press('Enter');
-      await expect.poll(async () => (await persistedPresentation(page))?.fadeIn.duration).toBe(0.6);
+      await expect
+        .poll(async () => (await persistedPresentation(page))?.introControl?.plain.duration)
+        .toBe(0.6);
       // Real drag must survive parent preview feedback before the pointer is released.
       const edgeSlider = fields
         .getByRole('slider', {
@@ -187,18 +183,20 @@ for (const variant of variants) {
       );
       const draggedDuration = Number(await edgeSlider.inputValue());
       expect(draggedDuration).toBeGreaterThan(0.6);
-      await expect.poll(async () => (await persistedPresentation(page))?.fadeIn.duration).toBe(0.6);
+      await expect
+        .poll(async () => (await persistedPresentation(page))?.introControl?.plain.duration)
+        .toBe(0.6);
       await page.mouse.up();
       await settled();
       await expect
-        .poll(async () => (await persistedPresentation(page))?.fadeIn.duration)
+        .poll(async () => (await persistedPresentation(page))?.introControl?.plain.duration)
         .toBe(draggedDuration);
       await expect(edgeSlider).toHaveValue(String(draggedDuration));
       await edgeDuration.fill('0.6');
       await edgeDuration.press('Enter');
       await settled();
 
-      await mode('gallery.videoReview.presentationImage').click();
+      await mode('gallery.videoReview.presentationBookend').click();
       const png = await page.evaluate(() => {
         const canvas = document.createElement('canvas');
         canvas.width = 300;
@@ -232,14 +230,18 @@ for (const variant of variants) {
           )
         )
         .toEqual([0, 0, 0, 255]);
-      await mode('gallery.videoReview.presentationNone').click();
+      await mode('gallery.videoReview.presentationNoEffect').click();
       await settled();
       await expect(canvas).toHaveCount(0);
       expect((await persistedPresentation(page))?.intro.image?.assetId).toBe(saved.assetId);
-      await mode('gallery.videoReview.presentationImage').click();
+      await mode('gallery.videoReview.presentationBookend').click();
       await settled();
       await expect(canvas).toBeVisible();
       expect((await persistedPresentation(page))?.intro.image?.assetId).toBe(saved.assetId);
+      await intro
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationFraming') })
+        .click();
       await select(
         intro,
         'gallery.videoReview.presentationFit',
@@ -261,7 +263,7 @@ for (const variant of variants) {
         fullPage: false,
       });
       if (variant.width === 1920) await inspectorBreakpoints(page, inspector, canvas, info);
-      const reset = fields.getByRole('button', {
+      const reset = intro.getByRole('button', {
         name: label('gallery.videoReview.presentationReset'),
         exact: true,
       });
@@ -275,9 +277,13 @@ for (const variant of variants) {
       }
       await select(
         intro,
-        'gallery.videoReview.presentationJoin',
+        'gallery.videoReview.presentationJoinIntro',
         'gallery.videoReview.cutDissolve'
       );
+      await intro
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.presentationJoinTiming') })
+        .click();
       const joinBefore = intro.getByRole('textbox', {
         name: label('gallery.videoReview.presentationJoinBefore'),
         exact: true,
@@ -293,16 +299,40 @@ for (const variant of variants) {
         path: info.outputPath('presentation-join-controls.png'),
         fullPage: false,
       });
+      if (variant.width === 1920) {
+        // Exercise the complete native seam pipeline with both retained source edges trimmed.
+        await button('gallery.videoReview.cutMode').click();
+        const source = review.locator('[data-ui="gallery.videoReview.sourceLane"]');
+        for (const [from, to, start, end] of [
+          [0.01, 0.07, '0', '1'],
+          [0.91, 0.98, '11', '12.01'],
+        ] as const) {
+          const box = (await source.boundingBox())!;
+          await page.mouse.move(box.x + box.width * from, box.y + box.height / 2);
+          await page.mouse.down();
+          await page.mouse.move(box.x + box.width * to, box.y + box.height / 2, { steps: 5 });
+          await page.mouse.up();
+          const cut = review.getByRole('button', { name: /^Cut ·/ }).last();
+          await cut.click();
+          for (const [key, value] of [
+            ['rangeStart', start],
+            ['rangeEnd', end],
+          ] as const) {
+            const input = inspector.getByRole('textbox', {
+              name: label(`gallery.videoReview.${key}`),
+              exact: true,
+            });
+            await input.fill(value);
+            await input.press('Enter');
+          }
+        }
+        await showScene();
+      }
       const mainVideo = review.locator('video').first();
       const trigger = mode('gallery.videoReview.presentationPreview');
       await trigger.click();
       const modal = page.locator('[data-ui="gallery.videoReview.presentationPreview"]');
       await expect(modal).toBeVisible();
-      const selectedWindow = modal.locator(
-        '[data-ui="shared.ui.compact-inspector.segmented-row"] > button[aria-pressed="true"]'
-      );
-      await expect(selectedWindow).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
-      await expect(selectedWindow).toHaveCSS('box-shadow', 'none');
       await expect(modal.getByRole('status')).toBeVisible();
       await page.screenshot({
         path: info.outputPath('presentation-seam-pending.png'),
@@ -316,34 +346,6 @@ for (const variant of variants) {
       await expect
         .poll(() => mainVideo.evaluate((node: HTMLVideoElement) => node.paused))
         .toBe(true);
-      if (variant.width === 1920) {
-        const joinUrl = await clip.getAttribute('src');
-        await modal
-          .getByRole('button', {
-            name: label('gallery.videoReview.presentationWindowStart'),
-            exact: true,
-          })
-          .click();
-        await expect(clip).toBeVisible({ timeout: 45_000 });
-        await expect(clip).not.toHaveAttribute('src', joinUrl!);
-        await expect
-          .poll(() => clip.evaluate((node: HTMLVideoElement) => node.readyState))
-          .toBeGreaterThanOrEqual(2);
-        await expect
-          .poll(() => clip.evaluate((node: HTMLVideoElement) => node.duration))
-          .toBeLessThanOrEqual(4.001);
-        await modal
-          .getByRole('button', {
-            name: label('gallery.videoReview.presentationWindowJoin'),
-            exact: true,
-          })
-          .click();
-        await expect(clip).toBeVisible({ timeout: 45_000 });
-        await expect
-          .poll(() => clip.evaluate((node: HTMLVideoElement) => node.readyState))
-          .toBeGreaterThanOrEqual(2);
-        expect(await mainVideo.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
-      }
       await modal.focus();
       await page.keyboard.press('Space');
       await expect.poll(() => clip.evaluate((node: HTMLVideoElement) => node.paused)).toBe(false);
@@ -381,7 +383,7 @@ for (const variant of variants) {
         );
         await outro
           .getByRole('button', {
-            name: label('gallery.videoReview.presentationVideo'),
+            name: label('gallery.videoReview.presentationBookend'),
             exact: true,
           })
           .click();
@@ -435,6 +437,10 @@ for (const variant of variants) {
           await input.press('Enter');
           await settled();
         };
+        await outro
+          .locator('summary')
+          .filter({ hasText: label('gallery.videoReview.presentationTrim') })
+          .click();
         await edit('gallery.videoReview.presentationTrimStart', '1');
         await edit('gallery.videoReview.presentationTrimEnd', '2');
         await expect

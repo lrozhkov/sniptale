@@ -1,3 +1,4 @@
+import { resolvePresentationSettings } from './presentation';
 import { projectOriginalSpeech } from '../original-speech';
 import type { ReviewTimeSegment } from '../timeline';
 import { projectReviewVoiceover } from '../voiceover-edits';
@@ -98,7 +99,10 @@ export function resolveQuickEditEffectiveState(
     windowHeader: advanced ? state.windowHeader : undefined,
     webcam: features.webcamApplied ? state.webcam : undefined,
     watermark: features.watermarkApplied ? state.watermark : undefined,
-    presentation: features.presentationApplied ? state.presentation : undefined,
+    presentation:
+      features.presentationApplied && state.presentation
+        ? resolvePresentationSettings(state.presentation)
+        : undefined,
     originalAudio: state.audio.original,
     voiceover: projectReviewVoiceover(
       features.voiceoverApplied ? state.audio.voiceover : [],
@@ -213,7 +217,9 @@ export function resolveQuickEditExportPlan(args: {
     if (
       presentation.intro.mode !== 'none' ||
       presentation.outro.mode !== 'none' ||
-      presentation.audioFade
+      presentation.audioFade ||
+      presentation.fadeIn.audioFade ||
+      presentation.fadeOut.audioFade
     )
       audio.push('presentation');
   }
@@ -296,7 +302,7 @@ export function hasSuppressedAdvancedFeatures(state: QuickEditAdvancedState): bo
 }
 
 function hasPresentationEffects(state: QuickEditAdvancedState): boolean {
-  const settings = state.presentation;
+  const settings = state.presentation ? resolvePresentationSettings(state.presentation) : undefined;
   return (
     !!settings &&
     ((settings.fadeIn.enabled && settings.fadeIn.duration > 0) ||

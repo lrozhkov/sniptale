@@ -1,5 +1,6 @@
 import {
   parseQuickEditPresentationSettings,
+  presentationEdgeControl,
   type QuickEditPresentationSettings,
 } from '../../features/video/review/advanced/presentation';
 import type { ReviewSource } from '../../features/video/review/types';
@@ -19,7 +20,7 @@ type Acquisition = Parameters<typeof createReviewPresentationAttachment>[0]['acq
 /** Identity-bearing picker intent; completion must retain this exact request object. */
 export type ReviewPresentationPicker = {
   slot: SlotName;
-  kind: 'image' | 'video';
+  kind: 'image' | 'video' | 'media';
   source: 'computer' | 'library';
 };
 /** A selected source and explicit audio admission choice, retained for retry. */
@@ -31,8 +32,8 @@ export type ReviewPresentationSelection = {
 type AdmittedPresentationSelection = {
   acquisition: Acquisition;
   media:
-    | { kind: 'image'; width: number; height: number }
-    | { kind: 'video'; source: ReviewSource; muted: boolean };
+    | { kind: 'image'; width: number; height: number; filename?: string }
+    | { kind: 'video'; source: ReviewSource; muted: boolean; filename?: string };
 };
 
 /** Reuses source-specific freeze/binding and decode authorities without publishing assets. */
@@ -40,7 +41,18 @@ export async function admitPresentationSelection(
   selection: ReviewPresentationSelection,
   signal: AbortSignal
 ): Promise<AdmittedPresentationSelection> {
-  const { kind } = selection.picker;
+  let kind = selection.picker.kind;
+  if (kind === 'media') {
+    if ('file' in selection.input) {
+      kind = selection.input.file.type.startsWith('image/') ? 'image' : 'video';
+    } else {
+      const entry = await getMediaLibraryEntry(selection.input.mediaId);
+      signal.throwIfAborted();
+      if (!entry || !['image', 'screenshot', 'video'].includes(entry.kind))
+        throw new ReviewPresentationAdmissionError('decode');
+      kind = entry.kind === 'video' ? 'video' : 'image';
+    }
+  }
   let file: File;
   let acquisition: Acquisition;
   if ('file' in selection.input) {
@@ -79,7 +91,12 @@ export async function admitPresentationSelection(
       };
     return {
       acquisition,
-      media: { kind: 'video', source: admitted.source, muted: selection.muted },
+      media: {
+        kind: 'video',
+        source: admitted.source,
+        muted: selection.muted,
+        filename: file.name,
+      },
     };
   }
   const prepared =
@@ -95,7 +112,10 @@ export async function admitPresentationSelection(
   const bitmap = await createImageBitmap(prepared);
   try {
     signal.throwIfAborted();
-    return { acquisition, media: { kind: 'image', width: bitmap.width, height: bitmap.height } };
+    return {
+      acquisition,
+      media: { kind: 'image', width: bitmap.width, height: bitmap.height, filename: file.name },
+    };
   } finally {
     bitmap.close();
   }
@@ -115,6 +135,7 @@ export function attachedPresentationSettings(
           ...framing,
           ...before.image,
           assetId,
+          ...(media.filename === undefined ? {} : { filename: media.filename }),
           width: media.width,
           height: media.height,
           duration: before.image?.duration ?? 3,
@@ -123,12 +144,17 @@ export function attachedPresentationSettings(
           ...framing,
           ...before.video,
           assetId,
+          ...(media.filename === undefined ? {} : { filename: media.filename }),
           source: media.source,
           trim: { start: 0, end: media.source.duration },
           audio: { muted: media.muted, gain: before.video?.audio.gain ?? 1 },
         };
   const parsed = parseQuickEditPresentationSettings({
     ...initial,
+    [slot === 'intro' ? 'introControl' : 'outroControl']: {
+      ...presentationEdgeControl(initial, slot),
+      mode: 'media',
+    },
     [slot]: { ...before, mode: media.kind, [media.kind]: variant },
   });
   if (!parsed) throw new Error('Invalid admitted presentation media.');

@@ -1,5 +1,5 @@
+import type { usePresentationPreview } from './use-presentation-preview';
 import '../../ui/compact-inspector-controls/inspector-surface.css';
-import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { ProductModal, ProductModalHeader, ProductModalFooter } from '@sniptale/ui/product-modal';
@@ -70,19 +70,6 @@ export function ReviewPresentationPreviewDialog(props: Props) {
           closeTitle={translate('common.actions.close')}
           compact
         />
-        {props.windows.length > 1 ? (
-          <div className="shrink-0 px-4 py-2">
-            <div className="sniptale-inspector-surface max-w-80">
-              <SegmentedRow
-                columns={2}
-                ariaLabel={title}
-                value={props.selected}
-                options={props.windows.map((window) => ({ value: window.id, label: window.label }))}
-                onChange={props.onSelect}
-              />
-            </div>
-          </div>
-        ) : null}
         <div className="min-h-0 overflow-auto px-4 pb-3" aria-busy={props.pending}>
           <PreviewBody
             video={video}
@@ -228,6 +215,42 @@ function PreviewClip({
       onError={onError}
       className="block w-full object-contain bg-black"
       style={{ height: 'min(54dvh, 540px)' }}
+    />
+  );
+}
+
+/** Maps the preview job to its modal in the presentation UI owner. */
+export function ReviewEditorPresentationDialog({
+  preview: joinPreview,
+}: {
+  preview: ReturnType<typeof usePresentationPreview>;
+}) {
+  if (!joinPreview.selection) return null;
+  return (
+    <ReviewPresentationPreviewDialog
+      anchor={joinPreview.selection.anchor}
+      edge={joinPreview.selection.edge}
+      selected={joinPreview.selection.selected}
+      windows={(joinPreview.plan?.windows ?? []).map((window) => ({
+        id: window.name,
+        label: translate(
+          window.name === 'start'
+            ? 'gallery.videoReview.presentationWindowStart'
+            : window.name === 'end'
+              ? 'gallery.videoReview.presentationWindowEnd'
+              : 'gallery.videoReview.presentationWindowJoin'
+        ),
+      }))}
+      url={joinPreview.result.url}
+      pending={joinPreview.result.pending}
+      error={
+        joinPreview.result.error
+          ? translate('gallery.videoReview.presentationPreviewPlayFailed')
+          : null
+      }
+      onSelect={joinPreview.select}
+      onRetry={joinPreview.retry}
+      onClose={joinPreview.close}
     />
   );
 }

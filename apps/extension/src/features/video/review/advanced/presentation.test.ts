@@ -186,3 +186,127 @@ it('preserves legacy omission and rejects malformed authored join settings', () 
   };
   expect(parseQuickEditPresentationSettings(valid)).toEqual(valid);
 });
+
+it('retains independent plain and media fades across parser roundtrips and disabled edges', async () => {
+  const { presentationEdgeControl, resolvePresentationSettings } = await import('./presentation');
+  const settings = createNewWorkspacePresentationSettings();
+  const before = presentationEdgeControl(settings, 'intro');
+  settings.introControl = {
+    ...before,
+    mode: 'fade',
+    plain: { enabled: true, duration: 1.2, color: '#ff0000ff', audioFade: true },
+  };
+  settings.outroControl = {
+    ...presentationEdgeControl(settings, 'outro'),
+    mode: 'fade',
+    plain: { enabled: true, duration: 0.5, color: '#0000ffff', audioFade: false },
+  };
+  const parsed = parseQuickEditPresentationSettings(JSON.parse(JSON.stringify(settings)))!;
+  const active = resolvePresentationSettings(parsed);
+  expect(active.fadeIn.color).toBe('#ff0000ff');
+  expect(active.fadeOut.color).toBe('#0000ffff');
+  expect(active.fadeIn.audioFade).toBe(true);
+  expect(active.fadeOut.audioFade).toBe(false);
+  parsed.introControl!.mode = 'media';
+  expect(resolvePresentationSettings(parsed).fadeIn.enabled).toBe(false);
+  parsed.introControl!.mode = 'none';
+  expect(resolvePresentationSettings(parsed).fadeIn.enabled).toBe(false);
+  parsed.introControl!.mode = 'fade';
+  expect(resolvePresentationSettings(parsed).fadeIn.duration).toBe(1.2);
+});
+
+it('rejects malformed inactive edge controls rather than discarding their settings', () => {
+  const base = createNeutralPresentationSettings();
+  const valid = { mode: 'none', plain: base.fadeIn, media: base.fadeOut };
+  for (const patch of [
+    { mode: 'unexpected' },
+    { plain: { enabled: true, duration: NaN } },
+    { media: { enabled: false, duration: 1, color: '#00000000' } },
+    { media: { enabled: false, duration: 1, audioFade: 'false' } },
+    { extra: true },
+  ])
+    expect(
+      parseQuickEditPresentationSettings({ ...base, introControl: { ...valid, ...patch } })
+    ).toBeNull();
+});
+
+it('keeps remembered media fade dormant while the media slot is empty', async () => {
+  const { resolvePresentationSettings } = await import('./presentation');
+  const settings = createNeutralPresentationSettings();
+  settings.introControl = {
+    mode: 'media',
+    plain: settings.fadeIn,
+    media: { enabled: true, duration: 2 },
+  };
+  expect(resolvePresentationSettings(settings).fadeIn.enabled).toBe(false);
+  expect(settings.introControl.media.enabled).toBe(true);
+});
+
+it('uses the inspector timing projection for a shortened main beside a longer bookend', async () => {
+  const { constrainPresentationTiming } = await import('./presentation');
+  const { planReviewPresentationSequence } = await import('../presentation-sequence');
+  const settings = createNeutralPresentationSettings();
+  settings.introControl = {
+    mode: 'fade',
+    plain: { enabled: true, duration: 5, audioFade: true },
+    media: { enabled: false, duration: 4 },
+  };
+  settings.outro = {
+    mode: 'image',
+    image: { ...variants().image, fit: 'contain', duration: 6 },
+  };
+  settings.outroControl = {
+    mode: 'media',
+    plain: { enabled: true, duration: 5 },
+    media: { enabled: false, duration: 4 },
+  };
+  const before = structuredClone(settings);
+  const effective = constrainPresentationTiming(settings, 2);
+  const result = planReviewPresentationSequence({
+    settings,
+    mainDuration: 2,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 30, denominator: 1 },
+  });
+  expect(result.ok).toBe(true);
+  if (!result.ok) throw new Error('Expected valid sequence');
+  expect(effective.introControl!.plain.duration).toBe(2);
+  expect(result.plan.visualEnvelope.fadeIn).toBe(effective.introControl!.plain.duration);
+  expect(result.plan.audioEnvelope.fadeIn).toBe(2);
+  expect(settings).toEqual(before);
+});
+
+it('scales a short pair before independently disabling the outgoing audio fade', async () => {
+  const { constrainPresentationTiming } = await import('./presentation');
+  const { planReviewPresentationSequence } = await import('../presentation-sequence');
+  const settings = createNeutralPresentationSettings();
+  settings.introControl = {
+    mode: 'fade',
+    plain: { enabled: true, duration: 2, audioFade: true },
+    media: settings.fadeIn,
+  };
+  settings.outroControl = {
+    mode: 'fade',
+    plain: { enabled: true, duration: 2, audioFade: false },
+    media: settings.fadeOut,
+  };
+  const effective = constrainPresentationTiming(settings, 2);
+  expect(effective.introControl!.plain.duration).toBe(1);
+  expect(effective.outroControl!.plain.duration).toBe(1);
+  const result = planReviewPresentationSequence({
+    settings,
+    mainDuration: 2,
+    fragmentOffset: 0,
+    includeBookends: true,
+    rate: { numerator: 30, denominator: 1 },
+  });
+  if (!result.ok) throw new Error('Expected valid sequence');
+  expect(result.plan.audioEnvelope.fadeIn).toBe(result.plan.visualEnvelope.fadeIn);
+  expect(result.plan.audioEnvelope.fadeOut).toBe(0);
+  expect(
+    Math.abs(result.plan.visualEnvelope.fadeIn - effective.introControl!.plain.duration)
+  ).toBeLessThan(1 / 30);
+  expect(settings.introControl.plain.duration).toBe(2);
+  expect(settings.outroControl.plain.duration).toBe(2);
+});

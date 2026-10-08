@@ -1,11 +1,15 @@
+import { FolderOpen, Library, LogIn, LogOut } from 'lucide-react';
+import { backgroundActionClassName } from '../../composition/background-resources/picker';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   parseQuickEditPresentationSettings,
+  presentationEdgeControl,
+  type PresentationEdgeControl,
   type QuickEditPresentationSettings,
 } from '../../features/video/review/advanced/presentation';
 import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { ReviewButton, reviewSelectFieldClassName } from './controls';
+import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import { ReviewPresentationMediaPreview } from './presentation-media-preview';
 
@@ -20,6 +24,7 @@ const label = (key: Message) => translate(`gallery.videoReview.${key}`);
 /** Acquisition and pending empty-slot selection remain with the scene controller. */
 export interface ReviewPresentationInspectorProps {
   settings: Settings;
+  timing?: Settings;
   output?: { width: number; height: number } | undefined;
   slotModes: Record<SlotName, Mode>;
   pending?: boolean;
@@ -27,8 +32,8 @@ export interface ReviewPresentationInspectorProps {
   onChange(settings: Settings): void;
   onPreview(settings: Settings | null): void;
   onMode(slot: SlotName, mode: Mode): void;
-  onChoose(slot: SlotName, kind: 'image' | 'video', source: 'computer' | 'library'): void;
-  onJoinPreview?: ((slot: SlotName) => void) | undefined;
+  onChoose(slot: SlotName, kind: 'image' | 'video' | 'media', source: 'computer' | 'library'): void;
+  onJoinPreview?: ((slot: SlotName, target?: 'fade' | 'join') => void) | undefined;
   previewDisabled?: boolean;
   onReset(): void;
 }
@@ -49,53 +54,10 @@ export function ReviewPresentationInspector(props: ReviewPresentationInspectorPr
         </p>
       )}
       <div className="review-inspector-columns">
-        {(['fadeIn', 'fadeOut'] as const).map((edge) => (
-          <div key={edge} className="min-w-0 space-y-1">
-            <Enabled
-              label={label(edge === 'fadeIn' ? 'presentationFadeIn' : 'presentationFadeOut')}
-              value={props.settings[edge].enabled}
-              onChange={(enabled) =>
-                props.onChange({ ...props.settings, [edge]: { ...props.settings[edge], enabled } })
-              }
-            />
-            {props.settings[edge].enabled && (
-              <NumberField
-                {...props}
-                label={label('presentationDuration')}
-                value={props.settings[edge].duration}
-                min={0}
-                max={60}
-                scrubMax={3}
-                step={0.1}
-                unit="s"
-                patch={(duration) => ({
-                  ...props.settings,
-                  [edge]: { ...props.settings[edge], duration },
-                })}
-              />
-            )}
-          </div>
+        {(['intro', 'outro'] as const).map((slot) => (
+          <Bookend key={slot} {...props} slot={slot} />
         ))}
-        <ColorField
-          className={reviewSelectFieldClassName}
-          label={label('presentationFadeColor')}
-          title={label('presentationFadeColor')}
-          value={props.settings.color}
-          allowAlpha={false}
-          allowTransparent={false}
-          onChange={(color) => props.onChange({ ...props.settings, color })}
-          onPreviewChange={(color) => props.onPreview(color ? { ...props.settings, color } : null)}
-        />
-        <Enabled
-          label={label('presentationAudioFade')}
-          value={props.settings.audioFade}
-          onChange={(audioFade) => props.onChange({ ...props.settings, audioFade })}
-        />
       </div>
-      {(['intro', 'outro'] as const).map((slot) => (
-        <Bookend key={slot} {...props} slot={slot} />
-      ))}
-      <ReviewButton label={label('presentationReset')} onClick={props.onReset} />
     </fieldset>
   );
 }
@@ -171,72 +133,161 @@ function decimalPrecision(value: number) {
 function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
   const [audio, setAudio] = useState<{ assetId: string; available: boolean } | null>(null);
   const slot = props.settings[props.slot];
-  const mode = props.slotModes[props.slot];
+  const control = presentationEdgeControl(props.settings, props.slot);
   const heading = label(props.slot === 'intro' ? 'presentationIntro' : 'presentationOutro');
-  const image = mode === 'image' ? slot.image : undefined;
-  const video = mode === 'video' ? slot.video : undefined;
-  const media = image ?? video;
+  const media = slot.mode === 'image' ? slot.image : slot.mode === 'video' ? slot.video : undefined;
   const assetId = media?.assetId;
   const onAudio = useCallback(
-    (available: boolean) => {
-      setAudio(assetId ? { assetId, available } : null);
-    },
+    (available: boolean) => setAudio(assetId ? { assetId, available } : null),
     [assetId]
   );
+  const key = props.slot === 'intro' ? 'introControl' : 'outroControl';
+  const patch = (next: PresentationEdgeControl): Settings => ({ ...props.settings, [key]: next });
+  const adapted = { ...props, slotModes: { ...props.slotModes, [props.slot]: slot.mode } };
   return (
-    <section
-      className="min-w-0 space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3"
-      aria-label={heading}
-    >
-      <h3 className="text-xs font-semibold text-[var(--sniptale-color-text-secondary)]">
-        {heading}
-      </h3>
-      <SegmentedRow
-        columns={3}
-        ariaLabel={heading}
-        value={mode}
-        options={[
-          { value: 'none', label: label('presentationNone') },
-          { value: 'image', label: label('presentationImage') },
-          { value: 'video', label: label('presentationVideo') },
-        ]}
-        onChange={(next: Mode) => props.onMode(props.slot, next)}
-      />
-      {mode !== 'none' && (
-        <>
-          <div className="flex flex-wrap gap-2">
-            <ReviewButton
-              label={label('presentationComputer')}
-              onClick={() => props.onChoose(props.slot, mode, 'computer')}
-            />
-            <ReviewButton
-              label={label('presentationLibrary')}
-              onClick={() => props.onChoose(props.slot, mode, 'library')}
-            />
-          </div>
-          {media && props.output && slot.mode !== 'none' && mode === slot.mode && (
-            <ReviewPresentationMediaPreview
-              pending={props.pending}
-              slot={slot}
-              output={props.output}
-              onAudio={onAudio}
-            />
-          )}
-          {media && (
-            <BookendFields
-              {...props}
-              hasAudio={audio?.assetId === video?.assetId && audio?.available === true}
-            />
-          )}
-          {media && <JoinFields {...props} />}
+    <section aria-label={heading}>
+      <ReviewDetails
+        label={heading}
+        preferenceId={`presentation.${props.slot}`}
+        icon={props.slot === 'intro' ? LogIn : LogOut}
+        initiallyOpen
+      >
+        <SegmentedRow
+          columns={3}
+          ariaLabel={heading}
+          value={control.mode}
+          options={[
+            { value: 'none', label: label('presentationNoEffect') },
+            {
+              value: 'fade',
+              label: label(props.slot === 'intro' ? 'presentationFadeIn' : 'presentationFadeOut'),
+            },
+            { value: 'media', label: label('presentationBookend') },
+          ]}
+          onChange={(mode: PresentationEdgeControl['mode']) =>
+            props.onChange(patch({ ...control, mode }))
+          }
+        />
+        {control.mode === 'fade' && (
+          <FadeFields {...props} control={control} patch={patch} media={false} />
+        )}
+        {control.mode === 'media' && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                className={backgroundActionClassName}
+                onClick={() => props.onChoose(props.slot, 'media', 'computer')}
+              >
+                <FolderOpen size={14} aria-hidden="true" />
+                {label('presentationComputer')}
+              </button>
+              <button
+                type="button"
+                className={backgroundActionClassName}
+                onClick={() => props.onChoose(props.slot, 'media', 'library')}
+              >
+                <Library size={14} aria-hidden="true" />
+                {label('presentationLibrary')}
+              </button>
+            </div>
+            {media && slot.mode !== 'none' && props.output && (
+              <ReviewPresentationMediaPreview
+                pending={props.pending}
+                slot={slot}
+                output={props.output}
+                onAudio={onAudio}
+              />
+            )}
+            {media && (
+              <>
+                <BookendFields
+                  {...adapted}
+                  hasAudio={audio?.assetId === assetId && audio?.available === true}
+                />
+                <JoinFields {...adapted} />
+                <ReviewDetails
+                  label={label('presentationAdvanced')}
+                  preferenceId={`presentation.${props.slot}.advanced`}
+                >
+                  <FadeFields {...props} control={control} patch={patch} media />
+                </ReviewDetails>
+              </>
+            )}
+          </>
+        )}
+        {control.mode !== 'none' && (
           <ReviewButton
-            label={label('presentationPreview')}
-            disabled={!media || props.previewDisabled || !props.onJoinPreview}
-            onClick={() => props.onJoinPreview?.(props.slot)}
+            label={label('presentationReset')}
+            onClick={() => props.onChange(patch({ ...control, mode: 'none' }))}
+          />
+        )}
+      </ReviewDetails>
+    </section>
+  );
+}
+
+function FadeFields(
+  props: ReviewPresentationInspectorProps & {
+    slot: SlotName;
+    control: PresentationEdgeControl;
+    media: boolean;
+    patch(value: PresentationEdgeControl): Settings;
+  }
+) {
+  const field = props.media ? 'media' : 'plain';
+  const fade = props.control[field];
+  const duration = presentationEdgeControl(props.timing ?? props.settings, props.slot)[field]
+    .duration;
+  const patch = (value: Partial<typeof fade>) =>
+    props.patch({ ...props.control, [field]: { ...fade, ...value } });
+  return (
+    <div className="min-w-0 space-y-1">
+      {props.media && (
+        <Enabled
+          label={label(props.slot === 'intro' ? 'presentationFadeIn' : 'presentationFadeOut')}
+          value={fade.enabled}
+          onChange={(enabled) => props.onChange(patch({ enabled }))}
+        />
+      )}
+      {(!props.media || fade.enabled) && (
+        <>
+          <NumberField
+            {...props}
+            label={label('presentationDuration')}
+            value={duration}
+            min={0}
+            max={60}
+            scrubMax={3}
+            step={0.1}
+            unit="s"
+            patch={(duration) => patch({ duration })}
+          />
+          <ColorField
+            className={reviewSelectFieldClassName}
+            label={label('presentationFadeColor')}
+            title={label('presentationFadeColor')}
+            value={fade.color ?? props.settings.color}
+            allowAlpha={false}
+            allowTransparent={false}
+            onChange={(color) => props.onChange(patch({ color }))}
+            onPreviewChange={(color) => props.onPreview(color ? patch({ color }) : null)}
+          />
+          <Enabled
+            label={label('presentationAudioFade')}
+            value={fade.audioFade ?? props.settings.audioFade}
+            onChange={(audioFade) => props.onChange(patch({ audioFade }))}
+          />
+          <ReviewButton
+            label={label(
+              props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
+            )}
+            disabled={props.previewDisabled || !props.onJoinPreview}
+            onClick={() => props.onJoinPreview?.(props.slot, 'fade')}
           />
         </>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -292,51 +343,62 @@ function BookendFields(
           10,
           1
         )}
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={label('presentationFit')}
-        value={media.fit}
-        options={[
-          { value: 'contain', label: label('presentationContain') },
-          { value: 'cover', label: label('presentationCover') },
-        ]}
-        onChange={(fit: 'contain' | 'cover') => props.onChange(patchMedia({ fit }))}
-      />
-      <ColorField
-        className={reviewSelectFieldClassName}
-        label={label('presentationFill')}
-        title={label('presentationFill')}
-        value={media.fillColor}
-        allowAlpha={false}
-        allowTransparent={false}
-        onChange={(fillColor) => props.onChange(patchMedia({ fillColor }))}
-        onPreviewChange={(fillColor) =>
-          props.onPreview(fillColor ? patchMedia({ fillColor }) : null)
-        }
-      />
-      {media.fit === 'cover' && (
-        <>
-          {number(
-            'presentationPanX',
-            media.crop.panX * 100,
-            -100,
-            100,
-            0.1,
-            (value) => patchMedia({ crop: { ...media.crop, panX: value / 100 } }),
-            '%'
-          )}
-          {number(
-            'presentationPanY',
-            media.crop.panY * 100,
-            -100,
-            100,
-            0.1,
-            (value) => patchMedia({ crop: { ...media.crop, panY: value / 100 } }),
-            '%'
-          )}
-        </>
-      )}
       {video && <VideoFields {...props} video={video} hasAudio={props.hasAudio} />}
+      <ReviewDetails
+        label={label('presentationFraming')}
+        preferenceId={`presentation.${props.slot}.framing`}
+      >
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={label('presentationFit')}
+          value={media.fit}
+          options={[
+            { value: 'contain', label: label('presentationContain') },
+            { value: 'cover', label: label('presentationCover') },
+          ]}
+          onChange={(fit: 'contain' | 'cover') => props.onChange(patchMedia({ fit }))}
+        />
+        {media.fit === 'contain' && (
+          <ColorField
+            className={reviewSelectFieldClassName}
+            label={label('presentationFill')}
+            title={label('presentationFill')}
+            value={media.fillColor}
+            allowAlpha={false}
+            allowTransparent={false}
+            onChange={(fillColor) => props.onChange(patchMedia({ fillColor }))}
+            onPreviewChange={(fillColor) =>
+              props.onPreview(fillColor ? patchMedia({ fillColor }) : null)
+            }
+          />
+        )}
+        {media.fit === 'cover' && (
+          <>
+            {number(
+              'presentationPanX',
+              media.crop.panX * 100,
+              -100,
+              100,
+              0.1,
+              (value) => patchMedia({ crop: { ...media.crop, panX: value / 100 } }),
+              '%'
+            )}
+            {number(
+              'presentationPanY',
+              media.crop.panY * 100,
+              -100,
+              100,
+              0.1,
+              (value) => patchMedia({ crop: { ...media.crop, panY: value / 100 } }),
+              '%'
+            )}
+            <ReviewButton
+              label={label('presentationCenter')}
+              onClick={() => props.onChange(patchMedia({ crop: { panX: 0, panY: 0 } }))}
+            />
+          </>
+        )}
+      </ReviewDetails>
     </div>
   );
 }
@@ -355,26 +417,31 @@ function VideoFields(
   });
   return (
     <>
-      <NumberField
-        {...props}
-        label={label('presentationTrimStart')}
-        value={video.trim.start}
-        min={0}
-        max={video.trim.end}
-        step={0.001}
-        unit="s"
-        patch={(start) => patch({ trim: { ...video.trim, start } })}
-      />
-      <NumberField
-        {...props}
-        label={label('presentationTrimEnd')}
-        value={video.trim.end}
-        min={video.trim.start}
-        max={video.source.duration}
-        step={0.001}
-        unit="s"
-        patch={(end) => patch({ trim: { ...video.trim, end } })}
-      />
+      <ReviewDetails
+        label={label('presentationTrim')}
+        preferenceId={`presentation.${props.slot}.trim`}
+      >
+        <NumberField
+          {...props}
+          label={label('presentationTrimStart')}
+          value={video.trim.start}
+          min={0}
+          max={video.trim.end}
+          step={0.001}
+          unit="s"
+          patch={(start) => patch({ trim: { ...video.trim, start } })}
+        />
+        <NumberField
+          {...props}
+          label={label('presentationTrimEnd')}
+          value={video.trim.end}
+          min={video.trim.start}
+          max={video.source.duration}
+          step={0.001}
+          unit="s"
+          patch={(end) => patch({ trim: { ...video.trim, end } })}
+        />
+      </ReviewDetails>
       {props.hasAudio && (
         <Enabled
           label={label('presentationSound')}
@@ -403,6 +470,7 @@ function VideoFields(
 function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
   const key = props.slot === 'intro' ? 'introTransition' : 'outroTransition';
   const transition = props.settings[key];
+  const timing = (props.timing ?? props.settings)[key] ?? transition;
   const patch = (value: NonNullable<Settings[typeof key]> | null): Settings => {
     const next = { ...props.settings };
     if (value) next[key] = value;
@@ -413,7 +481,7 @@ function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }
     <div className="min-w-0 space-y-1">
       <SelectField<'none' | 'dissolve' | 'fade-black'>
         className={reviewSelectFieldClassName}
-        label={label('presentationJoin')}
+        label={label(props.slot === 'intro' ? 'presentationJoinIntro' : 'presentationJoinOutro')}
         value={transition?.type ?? 'none'}
         options={[
           { value: 'none', label: translate('gallery.videoReview.transitionNone') },
@@ -451,20 +519,46 @@ function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }
               }
             />
           )}
-          {(['before', 'after'] as const).map((edge) => (
-            <NumberField
-              {...props}
-              key={edge}
-              label={label(edge === 'before' ? 'presentationJoinBefore' : 'presentationJoinAfter')}
-              value={transition[edge]}
-              min={transition[edge === 'before' ? 'after' : 'before'] === 0 ? 0.05 : 0}
-              max={60 - transition[edge === 'before' ? 'after' : 'before']}
-              scrubMax={Math.min(3, 60 - transition[edge === 'before' ? 'after' : 'before'])}
-              step={0.05}
-              unit="s"
-              patch={(value) => patch({ ...transition, [edge]: value })}
-            />
-          ))}
+          <NumberField
+            {...props}
+            label={label('presentationDuration')}
+            value={timing!.before + timing!.after}
+            min={0.05}
+            max={60}
+            scrubMax={3}
+            step={0.05}
+            unit="s"
+            patch={(total) => {
+              const ratio = timing!.before / (timing!.before + timing!.after);
+              return patch({ ...transition, before: total * ratio, after: total * (1 - ratio) });
+            }}
+          />
+          <ReviewButton
+            label={label('presentationPreview')}
+            disabled={props.previewDisabled || !props.onJoinPreview}
+            onClick={() => props.onJoinPreview?.(props.slot, 'join')}
+          />
+          <ReviewDetails
+            label={label('presentationJoinTiming')}
+            preferenceId={`presentation.${props.slot}.joinTiming`}
+          >
+            {(['before', 'after'] as const).map((edge) => (
+              <NumberField
+                {...props}
+                key={edge}
+                label={label(
+                  edge === 'before' ? 'presentationJoinBefore' : 'presentationJoinAfter'
+                )}
+                value={timing![edge]}
+                min={transition[edge === 'before' ? 'after' : 'before'] === 0 ? 0.05 : 0}
+                max={60 - transition[edge === 'before' ? 'after' : 'before']}
+                scrubMax={Math.min(3, 60 - transition[edge === 'before' ? 'after' : 'before'])}
+                step={0.05}
+                unit="s"
+                patch={(value) => patch({ ...transition, [edge]: value })}
+              />
+            ))}
+          </ReviewDetails>
         </>
       )}
     </div>

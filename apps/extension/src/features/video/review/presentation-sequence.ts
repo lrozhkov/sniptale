@@ -1,5 +1,7 @@
 import {
+  constrainPresentationTiming,
   parseQuickEditPresentationSettings,
+  resolvePresentationSettings,
   type QuickEditPresentationSettings,
 } from './advanced/presentation';
 
@@ -50,6 +52,7 @@ export interface PresentationSequencePlan {
   candidateCount: number;
   segments: readonly Segment[];
   color: string;
+  endColor?: string;
   visualEnvelope: Envelope;
   audioEnvelope: Envelope;
   visualFeedback: 'single-frame' | null;
@@ -139,12 +142,30 @@ function normalizedRate(rate: PresentationRate): PresentationRate | null {
 function envelope(
   settings: QuickEditPresentationSettings,
   span: number,
-  enabled: boolean
+  enabled: boolean,
+  audio = false
 ): Envelope {
-  const fadeIn = enabled && settings.fadeIn.enabled ? settings.fadeIn.duration : 0;
-  const fadeOut = enabled && settings.fadeOut.enabled ? settings.fadeOut.duration : 0;
+  const edgeSpan = (side: 'intro' | 'outro') => {
+    if (!(side === 'intro' ? settings.introControl : settings.outroControl)) return Infinity;
+    const slot = settings[side];
+    return slot.mode === 'image'
+      ? slot.image.duration
+      : slot.mode === 'video'
+        ? slot.video.trim.end - slot.video.trim.start
+        : span;
+  };
+  const fadeIn =
+    enabled && settings.fadeIn.enabled ? Math.min(settings.fadeIn.duration, edgeSpan('intro')) : 0;
+  const fadeOut =
+    enabled && settings.fadeOut.enabled
+      ? Math.min(settings.fadeOut.duration, edgeSpan('outro'))
+      : 0;
   const scale = fadeIn + fadeOut > span ? span / (fadeIn + fadeOut) : 1;
-  return { span, fadeIn: fadeIn * scale, fadeOut: fadeOut * scale };
+  return {
+    span,
+    fadeIn: !audio || (settings.fadeIn.audioFade ?? settings.audioFade) ? fadeIn * scale : 0,
+    fadeOut: !audio || (settings.fadeOut.audioFade ?? settings.audioFade) ? fadeOut * scale : 0,
+  };
 }
 function rawSegments(input: PresentationSequenceInput, settings: QuickEditPresentationSettings) {
   const result: { name: SegmentName; content: Content; duration: Rational }[] = [];
@@ -268,7 +289,10 @@ function planJoins(settings: QuickEditPresentationSettings, segments: readonly S
 export function planReviewPresentationSequence(
   input: PresentationSequenceInput
 ): { ok: true; plan: PresentationSequencePlan } | PresentationPlanFailure {
-  const settings = parseQuickEditPresentationSettings(input.settings);
+  const parsed = parseQuickEditPresentationSettings(input.settings);
+  const settings = parsed
+    ? resolvePresentationSettings(constrainPresentationTiming(parsed, input.mainDuration))
+    : null;
   const rate = normalizedRate(input.rate);
   if (
     !settings ||
@@ -286,6 +310,20 @@ export function planReviewPresentationSequence(
   if (!quantized.ok) return quantized;
   const { segments, totalDurationUs, candidateCount } = quantized;
   const joins = planJoins(settings, segments);
+  const visualEnvelope = envelope(
+    settings,
+    tickTime(candidateCount - 1, rate) / 1_000_000,
+    candidateCount > 1
+  );
+  const audioSpan = Math.max(0, (audioIndex(totalDurationUs) - 1) / 48_000);
+  const audioEnvelope =
+    (settings.introControl || settings.outroControl) && candidateCount > 1
+      ? {
+          span: audioSpan,
+          fadeIn: (settings.fadeIn.audioFade ?? settings.audioFade) ? visualEnvelope.fadeIn : 0,
+          fadeOut: (settings.fadeOut.audioFade ?? settings.audioFade) ? visualEnvelope.fadeOut : 0,
+        }
+      : envelope(settings, audioSpan, true, true);
   return {
     ok: true,
     plan: {
@@ -294,17 +332,10 @@ export function planReviewPresentationSequence(
       candidateCount,
       segments,
       ...(joins.length ? { joins } : {}),
-      color: settings.color,
-      visualEnvelope: envelope(
-        settings,
-        tickTime(candidateCount - 1, rate) / 1_000_000,
-        candidateCount > 1
-      ),
-      audioEnvelope: envelope(
-        settings,
-        Math.max(0, (audioIndex(totalDurationUs) - 1) / 48_000),
-        settings.audioFade
-      ),
+      color: settings.fadeIn.color ?? settings.color,
+      endColor: settings.fadeOut.color ?? settings.color,
+      visualEnvelope,
+      audioEnvelope,
       visualFeedback: candidateCount === 1 ? 'single-frame' : null,
     },
   };
@@ -422,4 +453,23 @@ export function presentationMainColorOpacity(
   const timestampUs = main.startUs + (globalMainTime - main.content.fragmentOffset) * 1_000_000;
   const lastTimestampUs = tickTime(plan.candidateCount - 1, plan.rate);
   return presentationColorOpacity(plan, Math.max(0, Math.min(lastTimestampUs, timestampUs)));
+}
+
+/** Edge color follows the same non-overlapping envelope as opacity. */
+export function presentationColor(plan: PresentationSequencePlan, timestampUs: number): string {
+  return timestampUs / 1_000_000 >= plan.visualEnvelope.fadeIn
+    ? (plan.endColor ?? plan.color)
+    : plan.color;
+}
+/** Converts main-result time into the complete sequence clock for the live canvas. */
+export function presentationMainColor(
+  plan: PresentationSequencePlan,
+  globalMainTime: number
+): string {
+  const main = plan.segments.find((segment) => segment.name === 'main');
+  if (!main || main.content.kind !== 'main') return plan.color;
+  return presentationColor(
+    plan,
+    main.startUs + (globalMainTime - main.content.fragmentOffset) * 1_000_000
+  );
 }

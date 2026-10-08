@@ -69,7 +69,7 @@ afterEach(async () => {
 async function render() {
   await act(async () => root.render(<ReviewPresentationInspector {...props} />));
 }
-function section(name = 'Intro') {
+function section(name = 'Beginning') {
   return host.querySelector<HTMLElement>(`section[aria-label="${name}"]`)!;
 }
 function button(label: string, parent: ParentNode = host) {
@@ -131,22 +131,22 @@ function retained(mode: 'image' | 'video' = 'image') {
     },
   };
   props.slotModes.intro = mode;
+  props.settings.introTransition = { type: 'dissolve', before: 0.2, after: 0.2 };
 }
 
-it('requests an empty pending slot without persisting an invalid active mode', async () => {
+it('selects one media mode before requesting either acquisition source', async () => {
   await render();
-  act(() => button('Image', section()).click());
-  expect(props.onMode).toHaveBeenCalledExactlyOnceWith('intro', 'image');
-  expect(props.onChange).not.toHaveBeenCalled();
-  props.slotModes.intro = 'image';
+  act(() => button('Media', section()).click());
+  props.settings = vi.mocked(props.onChange).mock.calls.at(-1)![0];
+  expect(props.settings.introControl?.mode).toBe('media');
   await render();
-  expect(button('Preview join', section()).disabled).toBe(true);
+  expect(button('Preview transition', section())).toBeUndefined();
   act(() => {
     button('From computer', section()).click();
     button('From Library', section()).click();
   });
-  expect(props.onChoose).toHaveBeenNthCalledWith(1, 'intro', 'image', 'computer');
-  expect(props.onChoose).toHaveBeenNthCalledWith(2, 'intro', 'image', 'library');
+  expect(props.onChoose).toHaveBeenNthCalledWith(1, 'intro', 'media', 'computer');
+  expect(props.onChoose).toHaveBeenNthCalledWith(2, 'intro', 'media', 'library');
   expect(parseQuickEditPresentationSettings(props.settings)).not.toBeNull();
 });
 it('commits valid image duration once on Enter plus blur and retains remembered video', async () => {
@@ -219,9 +219,10 @@ it('preserves an existing submillisecond trim and rejects collapsed proposals', 
 it('preserves both variants when requesting None and changes only cover framing', async () => {
   retained();
   await render();
-  act(() => button('None', section()).click());
-  expect(props.onMode).toHaveBeenCalledWith('intro', 'none');
-  expect(props.onChange).not.toHaveBeenCalled();
+  act(() => button('No effect', section()).click());
+  const disabled = vi.mocked(props.onChange).mock.calls.at(-1)![0];
+  expect(disabled.introControl?.mode).toBe('none');
+  expect(disabled.intro).toEqual(props.settings.intro);
   await select(0, 'Fill', section());
   expect(props.onChange).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -253,7 +254,7 @@ it('controls video sound, gain, and join preview independently', async () => {
       }),
     })
   );
-  await select(1, 'Off', section());
+  await select(0, 'Off', section());
   expect(props.onChange).toHaveBeenLastCalledWith(
     expect.objectContaining({
       intro: expect.objectContaining({
@@ -261,8 +262,8 @@ it('controls video sound, gain, and join preview independently', async () => {
       }),
     })
   );
-  act(() => button('Preview join', section()).click());
-  expect(props.onJoinPreview).toHaveBeenCalledWith('intro');
+  act(() => button('Preview transition', section()).click());
+  expect(props.onJoinPreview).toHaveBeenCalledWith('intro', 'join');
 });
 it('exposes pending state and errors while disabling actions', async () => {
   retained();
@@ -281,18 +282,19 @@ it('exposes pending state and errors while disabling actions', async () => {
   expect(props.onReset).not.toHaveBeenCalled();
 });
 it.each([
-  ['en', 'Fade in', 'Intro', 'None', 'Reset'],
-  ['ru', 'Появление', 'Интро', 'Нет', 'Сбросить'],
+  ['en', 'Fade in', 'Beginning', 'No effect', 'Reset'],
+  ['ru', 'Появление', 'Начало ролика', 'Без эффекта', 'Сбросить'],
 ] as const)(
   'renders real %s messages and reset action',
   async (language, fade, intro, none, reset) => {
     locale.value = language;
+    retained();
     await render();
     expect(host.textContent).toContain(fade);
     expect(section(intro)).not.toBeNull();
     expect(button(none, section(intro))).toBeDefined();
     act(() => button(reset).click());
-    expect(props.onReset).toHaveBeenCalledOnce();
+    expect(vi.mocked(props.onChange).mock.calls.at(-1)![0].introControl?.mode).toBe('none');
     expect(host.textContent).not.toContain('gallery.videoReview.');
   }
 );
@@ -341,32 +343,28 @@ it('rejects collapsed trim previews and cancels the validation feedback', async 
   expect(host.querySelector('[role="alert"]')).toBeNull();
   expect(props.onChange).not.toHaveBeenCalled();
 });
-it('keeps fade edges and audio independently controlled and blocks disabled seam preview', async () => {
-  retained();
+it('keeps fade settings independent and retains them when media is selected', async () => {
   await render();
-  await select(0, 'On');
-  expect(props.onChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({
-      fadeIn: { enabled: true, duration: 0.4 },
-      fadeOut: { enabled: false, duration: 0.4 },
-    })
-  );
-  await select(2, 'On');
-  expect(props.onChange).toHaveBeenLastCalledWith(
-    expect.objectContaining({ audioFade: true, fadeIn: { enabled: false, duration: 0.4 } })
-  );
-  props.previewDisabled = true;
+  act(() => button('Fade in', section()).click());
+  props.settings = vi.mocked(props.onChange).mock.calls.at(-1)![0];
   await render();
-  expect(button('Preview join', section()).disabled).toBe(true);
-  act(() => button('Preview join', section()).click());
-  expect(props.onJoinPreview).not.toHaveBeenCalled();
+  await select(0, 'On', section());
+  const changed = vi.mocked(props.onChange).mock.calls.at(-1)![0];
+  expect(changed.introControl?.plain.audioFade).toBe(true);
+  expect(changed.outroControl).toBeUndefined();
+  props.settings = changed;
+  await render();
+  act(() => button('Media', section()).click());
+  const next = vi.mocked(props.onChange).mock.calls.at(-1)![0];
+  expect(next.introControl?.plain.audioFade).toBe(true);
+  expect(next.introControl?.media.enabled).toBe(false);
 });
 
 it('does not offer an unwired join preview even when a remembered asset is active', async () => {
   retained();
   props.onJoinPreview = undefined;
   await render();
-  expect(button('Preview join', section()).disabled).toBe(true);
+  expect(button('Preview transition', section()).disabled).toBe(true);
 });
 
 it('hides sound controls when the admitted video has no audio track', async () => {
@@ -414,7 +412,7 @@ it('configures and removes a join independently of the opposite edge and media',
   props.settings.outroTransition = { type: 'dissolve', before: 0.1, after: 0.3 };
   await render();
   async function choose(option: string) {
-    act(() => button('Join transition', section()).click());
+    act(() => button('Transition to video', section()).click());
     const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
       (item) => item.textContent === option
     )!;

@@ -9,7 +9,7 @@ import { matchesLibraryFilters } from '../../features/media-hub/library-filters'
 
 /** One cancellable listing attempt owns rows/views; filter choices remain caller-owned. */
 export function usePresentationLibrary(
-  kind: 'image' | 'video',
+  kind: 'image' | 'video' | 'media',
   appliedQuery: string,
   viewId: string
 ) {
@@ -26,15 +26,18 @@ export function usePresentationLibrary(
         setItems(
           rows.filter(
             (item) =>
-              (kind === 'video'
-                ? item.kind === 'video'
-                : ['image', 'screenshot'].includes(item.kind)) &&
+              (kind === 'media'
+                ? ['image', 'screenshot', 'video'].includes(item.kind)
+                : kind === 'video'
+                  ? item.kind === 'video'
+                  : ['image', 'screenshot'].includes(item.kind)) &&
               item.lifecycle?.trashedAt === undefined
           )
         );
         setViews(
           savedViews.filter(
             (view) =>
+              kind === 'media' ||
               view.folderFilter === 'all' ||
               view.folderFilter === (kind === 'video' ? 'recording' : 'screenshot')
           )

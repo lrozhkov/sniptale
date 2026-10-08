@@ -267,7 +267,7 @@ class PresentationController {
     this.retryRequest = null;
     this.update({
       picker: { slot, kind, source },
-      modes: { ...this.view.modes, [slot]: kind },
+      modes: kind === 'media' ? this.view.modes : { ...this.view.modes, [slot]: kind },
       error: null,
       canRetry: false,
       audioUnsupported: false,
@@ -289,7 +289,7 @@ class PresentationController {
         this.assert(signal);
         this.retained = null;
         this.update({
-          modes: { ...this.view.modes, [selection.picker.slot]: selection.picker.kind },
+          modes: {},
         });
       },
       { kind: 'selection', selection }
@@ -304,7 +304,7 @@ class PresentationController {
     const attachment = createReviewPresentationAttachment({
       aggregateId: this.session.getSnapshot().snapshot.workspace.aggregateId,
       slot: selection.picker.slot,
-      kind: selection.picker.kind,
+      kind: admitted.media.kind,
       acquisition: admitted.acquisition,
       signal: this.lifetime.signal,
       assertCurrentTarget: () => this.assert(attempt.signal),

@@ -67,12 +67,15 @@ it('renders authored framing through the production media adapter with bounded o
   expect(mocks.create).toHaveBeenCalledWith(
     expect.objectContaining({ slot, output: { width: 640, height: 360 }, readAsset: mocks.read })
   );
-  expect(frame).toHaveBeenCalledWith({
-    kind: 'video',
-    assetId: 'project-asset:video',
-    range: { start: 2, end: 2 },
-    holdLast: false,
-  });
+  expect(frame).toHaveBeenCalledWith(
+    {
+      kind: 'video',
+      assetId: 'project-asset:video',
+      range: { start: 2, end: 2 },
+      holdLast: false,
+    },
+    slot
+  );
   expect(draw).toHaveBeenCalledOnce();
   expect(release).toHaveBeenCalledOnce();
   expect(audio).toHaveBeenLastCalledWith(false);
@@ -138,12 +141,15 @@ async function seekTo(value: string) {
 it('seeks to the authored trim endpoint using the decoder hold-last contract', async () => {
   await render();
   await seekTo('8');
-  expect(frame).toHaveBeenLastCalledWith({
-    kind: 'video',
-    assetId: 'project-asset:video',
-    range: { start: 8, end: 8 },
-    holdLast: true,
-  });
+  expect(frame).toHaveBeenLastCalledWith(
+    {
+      kind: 'video',
+      assetId: 'project-asset:video',
+      range: { start: 8, end: 8 },
+      holdLast: true,
+    },
+    slot
+  );
   expect(mocks.create).toHaveBeenCalledOnce();
 });
 it('serializes rapid seek requests and discards intermediate frame leases', async () => {
@@ -161,12 +167,15 @@ it('serializes rapid seek requests and discards intermediate frame leases', asyn
   expect(frame).toHaveBeenCalledTimes(2);
   await act(async () => finish({ draw, release }));
   expect(frame).toHaveBeenCalledTimes(3);
-  expect(frame).toHaveBeenLastCalledWith({
-    kind: 'video',
-    assetId: 'project-asset:video',
-    range: { start: 5, end: 5 },
-    holdLast: false,
-  });
+  expect(frame).toHaveBeenLastCalledWith(
+    {
+      kind: 'video',
+      assetId: 'project-asset:video',
+      range: { start: 5, end: 5 },
+      holdLast: false,
+    },
+    slot
+  );
   expect(draw).toHaveBeenCalledTimes(2);
   expect(release).toHaveBeenCalledTimes(3);
 });
@@ -184,7 +193,7 @@ it('renders static image slots without a seek control', async () => {
     },
   };
   await render();
-  expect(frame).toHaveBeenCalledWith({ kind: 'image', assetId: 'project-asset:image' });
+  expect(frame).toHaveBeenCalledWith({ kind: 'image', assetId: 'project-asset:image' }, slot);
   expect(host.querySelector('input')).toBeNull();
 });
 
@@ -194,4 +203,17 @@ it('does not read an attached asset until its publication settles', async () => 
   await render(false);
   expect(mocks.create).toHaveBeenCalledOnce();
   expect(draw).toHaveBeenCalledOnce();
+});
+
+it('keeps admitted audio available while authored framing and publication state change', async () => {
+  mocks.create.mockResolvedValue({ frame, dispose, audioTrack: {} });
+  await render();
+  audio.mockClear();
+  if (slot.mode !== 'video') throw new Error('expected video');
+  slot = { ...slot, video: { ...slot.video, crop: { panX: 0.2, panY: 0 } } };
+  await render(true);
+  expect(audio).not.toHaveBeenCalledWith(false);
+  await render(false);
+  expect(audio).not.toHaveBeenCalledWith(false);
+  expect(mocks.create).toHaveBeenCalledOnce();
 });

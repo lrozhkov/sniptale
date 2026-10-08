@@ -4,6 +4,7 @@ import {
   iteratePresentationCandidates,
   planReviewPresentationSequence,
   presentationColorOpacity,
+  presentationColor,
   presentationMainHoldTime,
   type PresentationCandidate,
   type PresentationJoin,
@@ -326,7 +327,11 @@ class PresentationRenderer {
   }
 
   private drawFade(context: CanvasRenderingContext2D, timestampUs: number) {
-    this.drawColor(context, presentationColorOpacity(this.plan, timestampUs), this.plan.color);
+    this.drawColor(
+      context,
+      presentationColorOpacity(this.plan, timestampUs),
+      presentationColor(this.plan, timestampUs)
+    );
   }
 
   private drawColor(context: CanvasRenderingContext2D, alpha: number, color: string) {

@@ -1,6 +1,6 @@
 import { ReviewSpeechPanel } from './speech-panel';
 import { usePresentationPreview } from './use-presentation-preview';
-import { ReviewPresentationPreviewDialog } from './presentation-preview-dialog';
+import { ReviewEditorPresentationDialog } from './presentation-preview-dialog';
 import { resolveReviewAssetBytes } from '../../workflows/video-review/asset-bytes';
 import { resolveOverlayComments } from '../../features/video/review/comments';
 import { ReviewPreviewInspector } from './preview-inspector';
@@ -109,7 +109,7 @@ function ReviewInspectorBinding({
   selectedSpeechId,
 }: {
   selectedSpeechId?: string | undefined;
-  onJoinPreview?: ((slot: 'intro' | 'outro') => void) | undefined;
+  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   preview?: ReactNode;
   resizeHandle?: ReactNode;
   fullHeight: boolean;
@@ -369,7 +369,7 @@ function ReviewHistoryControlBinding({
 }
 
 type ReviewEditorProps = {
-  onJoinPreview?: ((slot: 'intro' | 'outro') => void) | undefined;
+  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   resource: LoadedReview;
   onBack(): void;
   onClose(): void;
@@ -413,41 +413,6 @@ function useEditorPresentationPreview(
 }
 
 /** Localize prepared window choices without adding scene/export policy to the workspace shell. */
-function ReviewEditorPresentationDialog({
-  preview: joinPreview,
-}: {
-  preview: ReturnType<typeof usePresentationPreview>;
-}) {
-  if (!joinPreview.selection) return null;
-  return (
-    <ReviewPresentationPreviewDialog
-      anchor={joinPreview.selection.anchor}
-      edge={joinPreview.selection.edge}
-      selected={joinPreview.selection.selected}
-      windows={(joinPreview.plan?.windows ?? []).map((window) => ({
-        id: window.name,
-        label: translate(
-          window.name === 'start'
-            ? 'gallery.videoReview.presentationWindowStart'
-            : window.name === 'end'
-              ? 'gallery.videoReview.presentationWindowEnd'
-              : 'gallery.videoReview.presentationWindowJoin'
-        ),
-      }))}
-      url={joinPreview.result.url}
-      pending={joinPreview.result.pending}
-      error={
-        joinPreview.result.error
-          ? translate('gallery.videoReview.presentationPreviewPlayFailed')
-          : null
-      }
-      onSelect={joinPreview.select}
-      onRetry={joinPreview.retry}
-      onClose={joinPreview.close}
-    />
-  );
-}
-
 function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditorProps) {
   const state = useReviewEditorState(resource);
   const previewPreferences = useReviewPreviewPreferences();
@@ -619,7 +584,7 @@ export function VideoReview({
   onClose = onBack,
   onJoinPreview,
 }: {
-  onJoinPreview?: ((slot: 'intro' | 'outro') => void) | undefined;
+  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   aggregateId: string;
   onBack(): void;
   onClose?(): void;
@@ -683,7 +648,7 @@ function ReviewScenePropertiesBinding({
   audio,
   onJoinPreview,
 }: {
-  onJoinPreview?: ((slot: 'intro' | 'outro') => void) | undefined;
+  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
   state: InspectorState;
   source: LoadedReview['source'];
   audio: ReturnType<typeof useReviewAudio>;
@@ -698,6 +663,7 @@ function ReviewScenePropertiesBinding({
       onCanvas={state.setCanvas}
       presentation={{
         editor: state.presentation,
+        mainDuration: state.timeline.resultDuration,
         onJoinPreview,
         output: computeQuickEditSceneSize({
           source,

@@ -1,6 +1,7 @@
 import type { PreviewScene as Scene, PreviewSceneDimensions as Dimensions } from './preview-scene';
 import {
   presentationMainColorOpacity,
+  presentationMainColor,
   type PresentationSequencePlan,
 } from '../../features/video/review/presentation-sequence';
 import type {
@@ -339,7 +340,7 @@ function paintPreviewOuterFade(
   try {
     context.globalCompositeOperation = 'source-over';
     context.globalAlpha = presentationMainColorOpacity(plan, resultTime);
-    context.fillStyle = plan.color;
+    context.fillStyle = presentationMainColor(plan, resultTime);
     context.fillRect(0, 0, backing.width, backing.height);
   } finally {
     context.restore();

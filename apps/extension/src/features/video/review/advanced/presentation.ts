@@ -9,8 +9,15 @@ type Framing = {
   /** Object-position convention: -1 exposes start, +1 exposes end. */
   crop: { panX: number; panY: number };
 };
-type Image = Framing & { assetId: string; width: number; height: number; duration: number };
+type Image = Framing & {
+  filename?: string;
+  assetId: string;
+  width: number;
+  height: number;
+  duration: number;
+};
 type Video = Framing & {
+  filename?: string;
   assetId: string;
   source: NonNullable<ReturnType<typeof source>>;
   trim: { start: number; end: number };
@@ -20,10 +27,18 @@ type Slot =
   | { mode: 'none'; image?: Image; video?: Video }
   | { mode: 'image'; image: Image; video?: Video }
   | { mode: 'video'; image?: Image; video: Video };
-type Fade = { enabled: boolean; duration: number };
+type Fade = { enabled: boolean; duration: number; color?: string; audioFade?: boolean };
+/** Independent authored edge; legacy scalar fields are fallback only when this is absent. */
+export interface PresentationEdgeControl {
+  mode: 'none' | 'fade' | 'media';
+  plain: Fade;
+  media: Fade;
+}
 
 /** Authored seconds and immutable references; dormant slot variants remain retained. */
 export interface QuickEditPresentationSettings {
+  introControl?: PresentationEdgeControl;
+  outroControl?: PresentationEdgeControl;
   fadeIn: Fade;
   fadeOut: Fade;
   color: string;
@@ -102,7 +117,18 @@ function framing(value: Record<string, unknown>): Framing | null {
 function image(value: unknown): Image | null {
   if (
     !isRecord(value) ||
-    !fields(value, ['assetId', 'width', 'height', 'duration', 'fit', 'fillColor', 'crop']) ||
+    !fields(value, [
+      'assetId',
+      'filename',
+      'width',
+      'height',
+      'duration',
+      'fit',
+      'fillColor',
+      'crop',
+    ]) ||
+    (value['filename'] !== undefined &&
+      (typeof value['filename'] !== 'string' || value['filename'].length > 512)) ||
     !identity(value['assetId']) ||
     !isBoundedNumber(value['width'], 1, 4096) ||
     !isBoundedNumber(value['height'], 1, 4096) ||
@@ -115,6 +141,7 @@ function image(value: unknown): Image | null {
     ? {
         ...frame,
         assetId: value['assetId'],
+        ...(typeof value['filename'] === 'string' ? { filename: value['filename'] } : {}),
         width: value['width'],
         height: value['height'],
         duration: value['duration'],
@@ -148,7 +175,18 @@ function source(value: unknown) {
 function video(value: unknown): Video | null {
   if (
     !isRecord(value) ||
-    !fields(value, ['assetId', 'source', 'trim', 'audio', 'fit', 'fillColor', 'crop']) ||
+    !fields(value, [
+      'assetId',
+      'filename',
+      'source',
+      'trim',
+      'audio',
+      'fit',
+      'fillColor',
+      'crop',
+    ]) ||
+    (value['filename'] !== undefined &&
+      (typeof value['filename'] !== 'string' || value['filename'].length > 512)) ||
     !identity(value['assetId'])
   )
     return null;
@@ -173,6 +211,7 @@ function video(value: unknown): Video | null {
   return {
     ...frame,
     assetId: value['assetId'],
+    ...(typeof value['filename'] === 'string' ? { filename: value['filename'] } : {}),
     source: media,
     trim: { start: trim['start'], end: trim['end'] },
     audio: { muted: audio['muted'], gain: audio['gain'] },
@@ -197,12 +236,19 @@ function slot(value: unknown): Slot | null {
 function fade(value: unknown): Fade | null {
   if (
     !isRecord(value) ||
-    !fields(value, ['enabled', 'duration']) ||
+    !fields(value, ['enabled', 'duration', 'color', 'audioFade']) ||
     typeof value['enabled'] !== 'boolean' ||
-    !isBoundedNumber(value['duration'], 0, 60)
+    !isBoundedNumber(value['duration'], 0, 60) ||
+    (value['color'] !== undefined && !opaqueColor(value['color'])) ||
+    (value['audioFade'] !== undefined && typeof value['audioFade'] !== 'boolean')
   )
     return null;
-  return { enabled: value['enabled'], duration: value['duration'] };
+  return {
+    enabled: value['enabled'],
+    duration: value['duration'],
+    ...(value['color'] === undefined ? {} : { color: opaqueColor(value['color'])! }),
+    ...(typeof value['audioFade'] === 'boolean' ? { audioFade: value['audioFade'] } : {}),
+  };
 }
 
 /** Rejects malformed active or remembered fields; absence alone receives neutral defaults. */
@@ -213,6 +259,8 @@ export function parseQuickEditPresentationSettings(
   if (
     !isRecord(value) ||
     !fields(value, [
+      'introControl',
+      'outroControl',
       'fadeIn',
       'fadeOut',
       'color',
@@ -224,6 +272,11 @@ export function parseQuickEditPresentationSettings(
     ])
   )
     return null;
+  const introControl =
+    value['introControl'] === undefined ? undefined : edgeControl(value['introControl']);
+  const outroControl =
+    value['outroControl'] === undefined ? undefined : edgeControl(value['outroControl']);
+  if (introControl === null || outroControl === null) return null;
   const fadeIn = fade(value['fadeIn']);
   const fadeOut = fade(value['fadeOut']);
   const color = opaqueColor(value['color']);
@@ -241,6 +294,8 @@ export function parseQuickEditPresentationSettings(
       : parseCutTransition(value['outroTransition']);
   if (introTransition === null || outroTransition === null) return null;
   return {
+    ...(introControl ? { introControl } : {}),
+    ...(outroControl ? { outroControl } : {}),
     fadeIn,
     fadeOut,
     color,
@@ -250,4 +305,137 @@ export function parseQuickEditPresentationSettings(
     ...(introTransition ? { introTransition } : {}),
     ...(outroTransition ? { outroTransition } : {}),
   };
+}
+
+function edgeControl(value: unknown): PresentationEdgeControl | null {
+  if (
+    !isRecord(value) ||
+    !fields(value, ['mode', 'plain', 'media']) ||
+    (value['mode'] !== 'none' && value['mode'] !== 'fade' && value['mode'] !== 'media')
+  )
+    return null;
+  const plain = fade(value['plain']);
+  const media = fade(value['media']);
+  return plain && media ? { mode: value['mode'], plain, media } : null;
+}
+
+/** Projects legacy combinations without mutating history or inventing authored operations. */
+export function presentationEdgeControl(
+  settings: QuickEditPresentationSettings,
+  side: 'intro' | 'outro'
+): PresentationEdgeControl {
+  const authored = side === 'intro' ? settings.introControl : settings.outroControl;
+  if (authored) return authored;
+  const fade = side === 'intro' ? settings.fadeIn : settings.fadeOut;
+  const legacy = {
+    ...fade,
+    color: fade.color ?? settings.color,
+    audioFade: fade.audioFade ?? settings.audioFade,
+  };
+  const hasMedia = settings[side].mode !== 'none';
+  return {
+    mode: hasMedia ? 'media' : fade.enabled ? 'fade' : 'none',
+    plain: { ...legacy, enabled: true },
+    media: hasMedia
+      ? legacy
+      : { enabled: false, duration: 0.4, color: '#000000ff', audioFade: false },
+  };
+}
+
+/** Runtime projection; retained assets and inactive settings stay in the authored document. */
+export function resolvePresentationSettings(
+  settings: QuickEditPresentationSettings
+): QuickEditPresentationSettings {
+  const result = { ...settings };
+  for (const side of ['intro', 'outro'] as const) {
+    const control = side === 'intro' ? settings.introControl : settings.outroControl;
+    if (!control) continue;
+    const key = side === 'intro' ? 'fadeIn' : 'fadeOut';
+    result[key] = {
+      ...(control.mode === 'media' ? control.media : control.plain),
+      enabled:
+        control.mode === 'fade' ||
+        (control.mode === 'media' && settings[side].mode !== 'none' && control.media.enabled),
+    };
+    if (control.mode !== 'media') result[side] = { ...settings[side], mode: 'none' };
+  }
+  return result;
+}
+
+/** Bounds authored join controls to their available neighbours without adding montage time. */
+export function constrainPresentationTiming(
+  settings: QuickEditPresentationSettings,
+  mainDuration: number
+): QuickEditPresentationSettings {
+  if (!Number.isFinite(mainDuration) || mainDuration <= 0) return settings;
+  const active = resolvePresentationSettings(settings);
+  const result = { ...settings };
+  const span = (side: 'intro' | 'outro') => {
+    const slot = active[side];
+    return slot.mode === 'image'
+      ? slot.image.duration
+      : slot.mode === 'video'
+        ? slot.video.trim.end - slot.video.trim.start
+        : 0;
+  };
+  for (const side of ['intro', 'outro'] as const) {
+    const length = span(side);
+    const key = side === 'intro' ? 'introTransition' : 'outroTransition';
+    const transition = result[key];
+    if (length > 0 && transition)
+      result[key] = {
+        ...transition,
+        before: Math.min(transition.before, side === 'intro' ? length : mainDuration),
+        after: Math.min(transition.after, side === 'intro' ? mainDuration : length),
+      };
+    const controlKey = side === 'intro' ? 'introControl' : 'outroControl';
+    const control = result[controlKey];
+    if (control)
+      result[controlKey] = {
+        ...control,
+        plain: { ...control.plain, duration: Math.min(control.plain.duration, mainDuration) },
+        media:
+          length > 0
+            ? { ...control.media, duration: Math.min(control.media.duration, length) }
+            : control.media,
+      };
+  }
+  if (span('intro') > 0 && span('outro') > 0 && result.introTransition && result.outroTransition) {
+    const requested = result.introTransition.after + result.outroTransition.before;
+    if (requested > mainDuration) {
+      result.introTransition = {
+        ...result.introTransition,
+        after: (result.introTransition.after * mainDuration) / requested,
+      };
+      result.outroTransition = {
+        ...result.outroTransition,
+        before: (result.outroTransition.before * mainDuration) / requested,
+      };
+    }
+  }
+  return constrainActiveFades(result, mainDuration + span('intro') + span('outro'));
+}
+
+/** Scale the active pair before audio switches are applied; dormant authoring is untouched. */
+function constrainActiveFades(settings: QuickEditPresentationSettings, span: number) {
+  if (!settings.introControl && !settings.outroControl) return settings;
+  const active = resolvePresentationSettings(settings);
+  const requested =
+    (active.fadeIn.enabled ? active.fadeIn.duration : 0) +
+    (active.fadeOut.enabled ? active.fadeOut.duration : 0);
+  if (requested <= span) return settings;
+  const result = { ...settings };
+  for (const side of ['intro', 'outro'] as const) {
+    const key = side === 'intro' ? 'introControl' : 'outroControl';
+    const fadeKey = side === 'intro' ? 'fadeIn' : 'fadeOut';
+    const fade = active[fadeKey];
+    if (!fade.enabled) continue;
+    const duration = (fade.duration * span) / requested;
+    const control = settings[key];
+    if (control) {
+      const field = control.mode === 'media' ? 'media' : 'plain';
+      result[key] = { ...control, [field]: { ...control[field], duration } };
+    } else result[fadeKey] = { ...fade, duration };
+  }
+  return result;
 }

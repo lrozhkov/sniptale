@@ -4,7 +4,7 @@ import { ReviewWatermarkInspector } from './watermark-inspector';
 import type { ComponentProps } from 'react';
 import { quickEditSpatialSpan } from '../../features/video/review/advanced/spatial';
 import { resolveQuickEditEffectiveState } from '../../features/video/review/advanced/effective';
-import { Scan, Paintbrush, AudioLines, PanelTop } from 'lucide-react';
+import { Scan, Paintbrush, AudioLines, PanelTop, Clapperboard } from 'lucide-react';
 import { ReviewInspectorSections } from './inspector-sections';
 import type { ReactNode } from 'react';
 import { translate } from '../../platform/i18n';
@@ -135,7 +135,7 @@ export function ReviewSceneProperties(props: {
                   {
                     id: 'presentation',
                     label: translate('gallery.videoReview.presentation'),
-                    icon: PanelTop,
+                    icon: Clapperboard,
                     content: <ReviewPresentationBinding {...props.presentation} />,
                   },
                 ]

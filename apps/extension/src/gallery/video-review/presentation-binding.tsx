@@ -1,3 +1,4 @@
+import { constrainPresentationTiming } from '../../features/video/review/advanced/presentation';
 import { useLayoutEffect, useRef } from 'react';
 import { translate } from '../../platform/i18n';
 import { ReviewButton } from './controls';
@@ -13,10 +14,12 @@ export function ReviewPresentationBinding({
   editor,
   onJoinPreview,
   output,
+  mainDuration,
 }: {
   editor: Editor;
+  mainDuration?: number;
   output?: { width: number; height: number } | undefined;
-  onJoinPreview?: ((slot: 'intro' | 'outro') => void) | undefined;
+  onJoinPreview?: ((slot: 'intro' | 'outro', target?: 'fade' | 'join') => void) | undefined;
 }) {
   const anchor = useRef<HTMLDivElement>(null);
   const request = editor.picker;
@@ -25,6 +28,11 @@ export function ReviewPresentationBinding({
       <ReviewPresentationInspector
         output={output}
         settings={editor.settings}
+        timing={
+          mainDuration
+            ? constrainPresentationTiming(editor.settings, mainDuration)
+            : editor.settings
+        }
         slotModes={editor.slotModes}
         pending={editor.pending}
         error={editor.error}
@@ -34,6 +42,7 @@ export function ReviewPresentationBinding({
         onChoose={editor.choose}
         onReset={() => void editor.reset()}
         onJoinPreview={onJoinPreview}
+        previewDisabled={mainDuration !== undefined && mainDuration <= 0}
       />
       {editor.canRetry && (
         <ReviewButton
@@ -70,6 +79,7 @@ function ComputerSelection({
 }: {
   request: ReviewPresentationPicker;
   editor: Editor;
+  mainDuration?: number;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const cancel = useRef(editor.cancel);
@@ -87,7 +97,13 @@ function ComputerSelection({
       type="file"
       className="hidden"
       aria-label={translate('gallery.videoReview.presentationComputer')}
-      accept={request.kind === 'image' ? 'image/*' : 'video/*'}
+      accept={
+        request.kind === 'media'
+          ? 'image/*,video/*'
+          : request.kind === 'image'
+            ? 'image/*'
+            : 'video/*'
+      }
       onChange={(event) => {
         const file = event.currentTarget.files?.[0];
         event.currentTarget.value = '';

@@ -7,16 +7,18 @@ import { ReviewButton } from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 
 type Slot = Exclude<QuickEditPresentationSettings['intro'], { mode: 'none' }>;
-/** Silent local seek owns disposable decoding; authored placement and trim stay unchanged. */
-export function ReviewPresentationMediaPreview(props: {
+type MediaPreviewProps = {
   slot: Slot;
   pending?: boolean | undefined;
   output: { width: number; height: number };
   onAudio(available: boolean): void;
-}) {
-  useAppLocale();
+};
+
+/** Owns decoding, cancellation and serialized repaint of one immutable asset. */
+function usePresentationMedia(props: MediaPreviewProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const seek = useRef<(time: number) => void>(() => {});
+  const position = useRef(0);
   const [time, setTime] = useState(0);
   const [retry, setRetry] = useState(0);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -24,7 +26,15 @@ export function ReviewPresentationMediaPreview(props: {
   const width = Math.max(1, Math.round(props.output.width * scale));
   const height = Math.max(1, Math.round(props.output.height * scale));
   const { slot, onAudio, pending } = props;
+  const latest = useRef({ slot, onAudio });
+  latest.current = { slot, onAudio };
+  const assetId = slot.mode === 'image' ? slot.image.assetId : slot.video.assetId;
+  const opened = useRef<string | null>(null);
+  const available = !pending || opened.current === assetId;
   useEffect(() => {
+    const slot = latest.current.slot;
+    if (!available) return;
+    opened.current = assetId;
     const controller = new AbortController();
     const { signal } = controller;
     let media: Awaited<ReturnType<typeof createReviewPresentationMedia>> | undefined;
@@ -33,7 +43,7 @@ export function ReviewPresentationMediaPreview(props: {
     let revision = 0;
     setTime(requested);
     setStatus('loading');
-    onAudio(false);
+
     const draw = async () => {
       if (running || !media || signal.aborted) return;
       running = true;
@@ -41,6 +51,7 @@ export function ReviewPresentationMediaPreview(props: {
         while (!signal.aborted) {
           const current = revision;
           const at = requested;
+          const slot = latest.current.slot;
           const mapping =
             slot.mode === 'image'
               ? { kind: 'image' as const, assetId: slot.image.assetId }
@@ -50,7 +61,7 @@ export function ReviewPresentationMediaPreview(props: {
                   range: { start: at, end: at },
                   holdLast: at === slot.video.trim.end,
                 };
-          const lease = await media.frame(mapping);
+          const lease = await media.frame(mapping, slot);
           try {
             if (signal.aborted) return;
             if (current === revision) {
@@ -67,7 +78,7 @@ export function ReviewPresentationMediaPreview(props: {
       } catch {
         if (!signal.aborted) {
           setStatus('error');
-          onAudio(false);
+
           media?.dispose();
         }
       } finally {
@@ -75,39 +86,52 @@ export function ReviewPresentationMediaPreview(props: {
       }
     };
     seek.current = (value) => {
+      const slot = latest.current.slot;
       requested =
         slot.mode === 'video'
           ? Math.min(slot.video.trim.end, Math.max(slot.video.trim.start, value))
           : 0;
       revision += 1;
+      position.current = requested;
       setTime(requested);
       void draw();
     };
-    if (!pending)
-      void createReviewPresentationMedia({
-        slot,
-        output: { width, height },
-        signal,
-        readAsset: resolveReviewAssetBytes,
+    void createReviewPresentationMedia({
+      slot,
+      output: { width, height },
+      signal,
+      readAsset: resolveReviewAssetBytes,
+    })
+      .then((ready) => {
+        if (signal.aborted) {
+          ready.dispose();
+          return;
+        }
+        media = ready;
+        latest.current.onAudio(ready.audioTrack !== null);
+        void draw();
       })
-        .then((ready) => {
-          if (signal.aborted) {
-            ready.dispose();
-            return;
-          }
-          media = ready;
-          onAudio(ready.audioTrack !== null);
-          void draw();
-        })
-        .catch(() => {
-          if (!signal.aborted) setStatus('error');
-        });
+      .catch(() => {
+        if (!signal.aborted) setStatus('error');
+      });
     return () => {
       seek.current = () => {};
       controller.abort();
       media?.dispose();
     };
-  }, [slot, width, height, retry, onAudio, pending]);
+  }, [assetId, width, height, retry, available]);
+  useEffect(() => {
+    seek.current(position.current);
+  }, [slot]);
+  return { canvas, seek, time, status, width, height, retry: () => setRetry((value) => value + 1) };
+}
+
+/** Silent local seek leaves authored placement and trim unchanged. */
+export function ReviewPresentationMediaPreview(props: MediaPreviewProps) {
+  useAppLocale();
+  const { canvas, seek, time, status, width, height, retry } = usePresentationMedia(props);
+  const { slot } = props;
+  const filename = slot.mode === 'image' ? slot.image.filename : slot.video.filename;
   return (
     <div className="min-w-0 space-y-1" aria-busy={status === 'loading'}>
       <div
@@ -135,11 +159,19 @@ export function ReviewPresentationMediaPreview(props: {
             <p role="alert">{translate('gallery.videoReview.presentationMediaPreviewFailed')}</p>
             <ReviewButton
               label={translate('gallery.videoReview.presentationMediaRetry')}
-              onClick={() => setRetry((value) => value + 1)}
+              onClick={retry}
             />
           </div>
         )}
       </div>
+      {filename && (
+        <p
+          className="truncate text-xs text-[var(--sniptale-color-text-secondary)]"
+          title={filename}
+        >
+          {filename}
+        </p>
+      )}
       {slot.mode === 'video' && (
         <ReviewPreviewNumberRow
           label={translate('gallery.videoReview.presentationMediaPosition')}

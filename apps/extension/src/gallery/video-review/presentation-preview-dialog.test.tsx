@@ -141,16 +141,14 @@ it('pauses the previous source on replacement and never revokes parent-owned URL
   expect(pause).toHaveBeenCalledTimes(2);
   expect(revoke).not.toHaveBeenCalled();
 });
-it('keeps controlled window choices and close reachable during preparation or failure', async () => {
+it('keeps contextual preview and recovery reachable without a second window selector', async () => {
   props = { ...props, pending: true };
   await render();
   expect(dialog().querySelector('video')).toBeNull();
   expect(dialog().querySelector('[role=status]')).not.toBeNull();
-  const start = [...dialog().querySelectorAll<HTMLButtonElement>('button')].find(
-    (node) => node.textContent === 'Start'
-  )!;
-  act(() => start.click());
-  expect(props.onSelect).toHaveBeenCalledExactlyOnceWith('start');
+  expect(
+    dialog().querySelector('[data-ui="shared.ui.compact-inspector.segmented-row"]')
+  ).toBeNull();
   props = { ...props, pending: false, error: 'Cannot prepare this join' };
   await render();
   expect(dialog().querySelector('[role=alert]')?.textContent).toContain('Cannot prepare this join');

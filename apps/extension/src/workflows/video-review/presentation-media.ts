@@ -145,20 +145,28 @@ export async function createReviewPresentationMedia(args: {
   return {
     audioTrack,
     dispose,
-    async frame(mapping: Mapping): Promise<PresentationMediaFrame> {
+    async frame(mapping: Mapping, placement: Slot = slot): Promise<PresentationMediaFrame> {
       assertLive();
       if (pending || currentLease) throw new PresentationMediaError('busy');
-      if (mapping.kind !== slot.mode || mapping.assetId !== asset.assetId)
+      if (
+        mapping.kind !== slot.mode ||
+        mapping.assetId !== asset.assetId ||
+        placement.mode !== slot.mode ||
+        (placement.mode === 'image' ? placement.image.assetId : placement.video.assetId) !==
+          asset.assetId
+      )
         throw new PresentationMediaError('mapping');
       pending = true;
       try {
         if (slot.mode === 'video' && mapping.kind === 'video') {
           const { start, end } = mapping.range;
-          const trim = slot.video.trim;
+          const trim = placement.mode === 'video' ? placement.video.trim : slot.video.trim;
           if (
             ![start, end].every(Number.isFinite) ||
             start < trim.start ||
             end > trim.end ||
+            trim.start < 0 ||
+            trim.end > slot.video.source.duration ||
             end < start ||
             (mapping.holdLast ? start !== trim.end || end !== trim.end : start >= trim.end)
           )
@@ -194,7 +202,7 @@ export async function createReviewPresentationMedia(args: {
               context,
               source,
               output,
-              asset,
+              placement.mode === 'image' ? placement.image : placement.video,
               (target, x, y, width, height) => {
                 if (heldSample) heldSample.draw(target, x, y, width, height);
                 else target.drawImage(bitmap!, x, y, width, height);

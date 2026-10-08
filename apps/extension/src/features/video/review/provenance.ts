@@ -1,3 +1,4 @@
+import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import { parseReviewOperation, parseReviewSource } from './validation';
 import { buildReviewTimeMap } from './timeline';
@@ -40,6 +41,7 @@ export interface ReviewPresentationProvenance {
   totalDurationUs: number;
   fragmentOffset: number;
   color: string;
+  endColor?: string;
   visualEnvelope: PresentationSequencePlan['visualEnvelope'];
   audioEnvelope: PresentationSequencePlan['audioEnvelope'];
   segments: {
@@ -299,6 +301,13 @@ function parsePresentation(
     value['segments'].length > 3
   )
     return null;
+  const endColor =
+    value['endColor'] === undefined
+      ? undefined
+      : typeof value['endColor'] === 'string'
+        ? normalizePaintColor(value['endColor'])
+        : null;
+  if (endColor === null || (endColor !== undefined && !endColor.endsWith('ff'))) return null;
   const output = parseOutput(value['output']);
   const segments: ReviewPresentationProvenance['segments'] = [];
   for (const candidate of value['segments']) {
@@ -332,6 +341,7 @@ function parsePresentation(
     totalDurationUs: plan.totalDurationUs,
     fragmentOffset: value['fragmentOffset'],
     color: plan.color,
+    ...(endColor ? { endColor } : {}),
     visualEnvelope,
     audioEnvelope,
     segments,
@@ -388,6 +398,7 @@ export function createPresentationReviewProvenance(args: {
         totalDurationUs: args.plan.totalDurationUs,
         fragmentOffset: main.content.fragmentOffset,
         color: args.plan.color,
+        ...(args.plan.endColor ? { endColor: args.plan.endColor } : {}),
         visualEnvelope: args.plan.visualEnvelope,
         audioEnvelope: args.plan.audioEnvelope,
         segments: projectSegments(args.plan),

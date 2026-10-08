@@ -771,38 +771,32 @@ it('keeps original audio controls when the export index cannot inspect the sourc
 
 it('connects Scene presentation controls to the real session and suppresses them in Basic', async () => {
   const fixture = createEditorFixture(integration);
+  const inspector = () =>
+    fixture.host.querySelector('[data-ui="gallery.videoReview.presentationInspector"]');
+  const audioFade = () =>
+    advancedContentAt(fixture.snapshot).presentation?.introControl?.plain.audioFade;
   try {
     await act(async () =>
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
-    expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.presentationInspector"]')
-    ).toBeNull();
+    expect(inspector()).toBeNull();
     await fixture.click('advancedEditing');
-    const inspector = fixture.host.querySelector<HTMLElement>(
-      '[data-ui="gallery.videoReview.presentationInspector"]'
+    await act(async () =>
+      inspector()!
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="gallery.videoReview.presentationIntro"] button:nth-child(2)'
+        )!
+        .click()
     );
-    expect(inspector).not.toBeNull();
-    const audioFade = inspector!.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.presentationAudioFade"]'
-    );
-    expect(audioFade).not.toBeNull();
-    await act(async () => audioFade!.click());
+    await fixture.click('presentationAudioFade');
     const on = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
       (node) => node.textContent === 'gallery.videoReview.presentationOn'
     )!;
-    expect(on).toBeDefined();
     await act(async () => on.click());
-    await act(async () =>
-      vi.waitFor(() =>
-        expect(advancedContentAt(fixture.snapshot).presentation?.audioFade).toBe(true)
-      )
-    );
+    await act(async () => vi.waitFor(() => expect(audioFade()).toBe(true)));
     await fixture.click('advancedEditing');
-    expect(
-      fixture.host.querySelector('[data-ui="gallery.videoReview.presentationInspector"]')
-    ).toBeNull();
-    expect(advancedContentAt(fixture.snapshot).presentation?.audioFade).toBe(true);
+    expect(inspector()).toBeNull();
+    expect(audioFade()).toBe(true);
   } finally {
     await fixture.cleanup();
   }

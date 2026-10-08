@@ -40,7 +40,7 @@ function PresentationLibraryThumbnail({
 
 /** Native modal owns focus trapping, Escape and restoration, including inside quick-editor dialogs. */
 export function ReviewPresentationLibrary(props: {
-  kind: 'image' | 'video';
+  kind: 'image' | 'video' | 'media';
   anchor: HTMLElement | null;
   onClose(): void;
   onSelect(id: string): void;
@@ -102,7 +102,7 @@ export function ReviewPresentationLibrary(props: {
 
 /** Library listing owns its read/search/retry lifecycle independently of modal placement. */
 function PresentationLibraryContent(props: {
-  kind: 'image' | 'video';
+  kind: 'image' | 'video' | 'media';
   onSelect(id: string): void;
   onClose(): void;
   busy: boolean;

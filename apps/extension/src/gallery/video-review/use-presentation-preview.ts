@@ -1,3 +1,4 @@
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { QuickPreviewPreferences } from '../../features/video/preview/quick-preferences';
 import {
@@ -5,6 +6,8 @@ import {
   renderPresentationPreview,
   type PresentationPreviewInput,
 } from '../../workflows/video-review/presentation-preview';
+
+const logger = createLogger({ namespace: 'gallery:video-review:presentation-preview' });
 
 type Selection = {
   edge: 'intro' | 'outro';
@@ -76,9 +79,21 @@ export function usePresentationPreview(
           setResult({ url, pending: false, error: false });
         })
         .catch(() => {
-          if (!controller.signal.aborted) setResult({ url: null, pending: false, error: true });
+          if (!controller.signal.aborted) {
+            logger.error('presentation-preview-failed', {
+              stage: 'render',
+              edge: selection.edge,
+              window: selection.selected,
+            });
+            setResult({ url: null, pending: false, error: true });
+          }
         });
     } catch {
+      logger.error('presentation-preview-failed', {
+        stage: 'plan',
+        edge: selection.edge,
+        window: selection.selected,
+      });
       setResult({ url: null, pending: false, error: true });
     }
     return () => {
@@ -99,7 +114,7 @@ export function usePresentationPreview(
     selection,
     result,
     plan,
-    open(edge: 'intro' | 'outro') {
+    open(edge: 'intro' | 'outro', target: 'fade' | 'join' = 'join') {
       const current = latest.current;
       if (!current.input) return;
       current.pause();
@@ -110,7 +125,7 @@ export function usePresentationPreview(
           edge,
           current.preferences
         ).windows;
-        if (windows.some((value) => value.name === 'join')) selected = 'join';
+        if (target === 'join' && windows.some((value) => value.name === 'join')) selected = 'join';
       } catch {
         /* Retry stays available. */
       }

@@ -76,16 +76,21 @@ function button(text: string) {
   )!;
 }
 it('routes computer choice and preserves the exact captured request for file admission', async () => {
+  editor.settings.introControl = {
+    mode: 'media',
+    plain: editor.settings.fadeIn,
+    media: editor.settings.fadeIn,
+  };
   await render();
   act(() => button('From computer').click());
-  expect(editor.choose).toHaveBeenCalledExactlyOnceWith('intro', 'image', 'computer');
-  const request = { slot: 'intro', kind: 'image', source: 'computer' } as const;
+  expect(editor.choose).toHaveBeenCalledExactlyOnceWith('intro', 'media', 'computer');
+  const request = { slot: 'intro', kind: 'media', source: 'computer' } as const;
   editor.picker = request;
   const click = vi.spyOn(HTMLInputElement.prototype, 'click');
   await render();
   expect(click).toHaveBeenCalledTimes(1);
   const input = host.querySelector<HTMLInputElement>('input[type=file]')!;
-  expect(input.accept).toBe('image/*');
+  expect(input.accept).toBe('image/*,video/*');
   const file = new File(['image'], 'still.png', { type: 'image/png' });
   Object.defineProperty(input, 'files', { value: [file] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
@@ -139,4 +144,32 @@ it('forwards chosen output geometry to the silent media preview', async () => {
   const canvas = host.querySelector('canvas');
   expect(canvas?.width).toBe(640);
   expect(canvas?.height).toBe(360);
+});
+
+it('shows effective timing without committing opposite or dormant authored durations', async () => {
+  editor.settings.introControl = {
+    mode: 'fade',
+    plain: { enabled: true, duration: 5 },
+    media: { enabled: false, duration: 4 },
+  };
+  editor.settings.outroControl = {
+    mode: 'none',
+    plain: { enabled: true, duration: 7 },
+    media: { enabled: false, duration: 8 },
+  };
+  const before = structuredClone(editor.settings);
+  await act(async () =>
+    root.render(<ReviewPresentationBinding editor={editor} mainDuration={2} />)
+  );
+  expect(host.querySelector<HTMLInputElement>('input[aria-label="Duration"]')?.value).toBe('2');
+  await act(async () => button('Fade audio').click());
+  const on = [...document.querySelectorAll<HTMLElement>('[role=option]')].find(
+    (node) => node.textContent === 'On'
+  )!;
+  await act(async () => on.click());
+  const changed = vi.mocked(editor.change).mock.calls[0]![0];
+  if (!changed) throw new Error('Expected settings commit');
+  expect(changed.outroControl).toEqual(before.outroControl);
+  expect(changed.introControl!.media).toEqual(before.introControl!.media);
+  expect(changed.introControl!.plain).toEqual({ ...before.introControl!.plain, audioFade: true });
 });

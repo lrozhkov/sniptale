@@ -1,5 +1,6 @@
 import {
   presentationMainColorOpacity,
+  presentationMainColor,
   type PresentationSequencePlan,
 } from '../../features/video/review/presentation-sequence';
 import { useStagePresentation, ReviewStagePresentationFeedback } from './stage-presentation';
@@ -332,7 +333,10 @@ function ReviewStageOuterFade({
       data-ui="gallery.videoReview.outerFade"
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 z-40"
-      style={{ backgroundColor: plan.color, opacity: presentationMainColorOpacity(plan, time) }}
+      style={{
+        backgroundColor: presentationMainColor(plan, time),
+        opacity: presentationMainColorOpacity(plan, time),
+      }}
     />
   );
 }
