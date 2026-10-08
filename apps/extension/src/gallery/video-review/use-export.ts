@@ -197,7 +197,6 @@ function reviewPresentationDuration(
 export function useReviewExport(resource: LoadedReview) {
   const { sourceIndex, indexing } = useReviewSourceIndex(resource.file);
   const state = resource.session.getSnapshot();
-  const [includeBookends, setIncludeBookends] = useState(true);
   const presentation = state.document.advancedContent.presentation;
   const hasBookends =
     state.snapshot.workspace.advanced.ui.mode === 'advanced' &&
@@ -232,7 +231,7 @@ export function useReviewExport(resource: LoadedReview) {
   );
   /** Export plan from the applied changes; unavailable reasons are shown verbatim. */
   const plan = (selection?: Extract<ReviewAnchor, { kind: 'range' }>) =>
-    reviewExportPlan(resource, index, renderSettings, selection, includeBookends);
+    reviewExportPlan(resource, index, renderSettings, selection);
   const sizeEstimate = useReviewSizeEstimate({
     resource,
     index,
@@ -268,7 +267,7 @@ export function useReviewExport(resource: LoadedReview) {
         index,
         signal: controller.signal,
         destination,
-        ...(selection ? { selection, includeBookends } : {}),
+        ...(selection ? { selection } : {}),
         onProgress: (fraction) => {
           if (mounted.current) setProgress(Math.round(fraction * 100));
         },
@@ -309,8 +308,6 @@ export function useReviewExport(resource: LoadedReview) {
   };
   return {
     index,
-    includeBookends,
-    setIncludeBookends,
     hasBookends,
     presentationDuration,
     indexing,
@@ -362,8 +359,7 @@ function reviewExportPlan(
   resource: LoadedReview,
   index: ReviewMediaIndex | null,
   renderSettings: ReviewRenderSettings,
-  selection?: Extract<ReviewAnchor, { kind: 'range' }>,
-  includeBookends = true
+  selection?: Extract<ReviewAnchor, { kind: 'range' }>
 ): QuickEditExportPlan {
   const state = resource.session.getSnapshot();
   const fragment =
@@ -377,7 +373,7 @@ function reviewExportPlan(
         })
       : null;
   return configuredReviewExportPlan({
-    includeBookends: !selection || includeBookends,
+    includeBookends: !selection,
     index,
     renderSettings,
     document: fragment ? { ...state.document, edits: fragment.edits } : state.document,

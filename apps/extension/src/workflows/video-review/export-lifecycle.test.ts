@@ -616,7 +616,7 @@ it('copies Basic video with source gain while ignoring stored external audio', a
 });
 
 it.each([true, false])(
-  'forwards fragment bookends=%s while full exports always retain them',
+  'always omits fragment bookends even with legacy preference=%s',
   async (includeBookends) => {
     const { createNewWorkspacePresentationSettings } =
       await import('../../features/video/review/advanced/presentation');
@@ -632,18 +632,16 @@ it.each([true, false])(
         audioRanges: [],
       });
       const before = structuredClone(args.snapshot);
-      await exportReviewedVideo(
-        {
-          ...args,
-          destination: 'download',
-          includeBookends,
-          ...(fragment ? { selection: { kind: 'range' as const, start: 0, end: 2 } } : {}),
-        },
-        deps
-      );
+      const request = {
+        ...args,
+        destination: 'download' as const,
+        includeBookends,
+        ...(fragment ? { selection: { kind: 'range' as const, start: 0, end: 2 } } : {}),
+      };
+      await exportReviewedVideo(request, deps);
       expect(deps.writeReviewFrames).toHaveBeenCalledWith(
         expect.objectContaining({
-          includeBookends: fragment ? includeBookends : true,
+          includeBookends: !fragment,
           advanced: expect.objectContaining({
             presentation: before.workspace.advanced.presentation,
           }),

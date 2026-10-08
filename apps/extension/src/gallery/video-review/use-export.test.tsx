@@ -523,17 +523,13 @@ it('reports direct downloads and ignores cleanup errors from an older completed 
   }
 });
 
-it('keeps fragment bookend inclusion ephemeral and out of full-export arguments', async () => {
+it('exports fragments without exposing a bookend preference', async () => {
   const fixture = setup();
   try {
     await act(async () => fixture.root.render(<fixture.Harness />));
     const before = structuredClone(fixture.resource.session.getSnapshot().snapshot);
-    expect(fixture.hook.includeBookends).toBe(true);
-    await act(async () => fixture.hook.setIncludeBookends(false));
     await act(async () => fixture.hook.downloadSelection({ kind: 'range', start: 0, end: 2 }));
-    expect(mocks.export).toHaveBeenLastCalledWith(
-      expect.objectContaining({ includeBookends: false })
-    );
+    expect(mocks.export.mock.lastCall?.[0]).not.toHaveProperty('includeBookends');
     await act(async () => fixture.hook.start('download'));
     expect(mocks.export.mock.lastCall?.[0]).not.toHaveProperty('includeBookends');
     expect(fixture.resource.session.getSnapshot().snapshot).toEqual(before);
@@ -542,7 +538,7 @@ it('keeps fragment bookend inclusion ephemeral and out of full-export arguments'
   }
 });
 
-it('offers the fragment option only when advanced bookends are active', async () => {
+it('shows full sequence duration without a fragment bookend option', async () => {
   const { createNeutralPresentationSettings } =
     await import('../../features/video/review/advanced/presentation');
   const fixture = setup((advanced) => {
@@ -563,17 +559,13 @@ it('offers the fragment option only when advanced bookends are active', async ()
   }, true);
   try {
     await act(async () => fixture.root.render(<fixture.Harness />));
-    expect(fixture.host.textContent).toContain(
-      translate('gallery.videoReview.fragmentIncludeBookends')
-    );
     expect(fixture.hook.hasBookends).toBe(true);
     expect(fixture.hook.presentationDuration?.totalDurationUs).toBe(9_000_000);
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.exportDuration"]')?.textContent
     ).toContain('9.0');
-    await act(async () => fixture.hook.setIncludeBookends(false));
     expect(fixture.hook.presentationDuration?.totalDurationUs).toBe(9_000_000);
-    expect(fixture.host.querySelectorAll('[aria-haspopup="listbox"]')).toHaveLength(6);
+    expect(fixture.host.querySelectorAll('[aria-haspopup="listbox"]')).toHaveLength(5);
   } finally {
     await fixture.cleanup();
   }

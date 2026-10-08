@@ -479,19 +479,6 @@ export function ReviewRenderOptions({
             onChange={(quality) => exporter.setRenderSettings({ ...settings, quality })}
           />
         </div>
-        {exporter.hasBookends && (
-          <SelectField
-            className={reviewSelectFieldClassName}
-            label={translate('gallery.videoReview.fragmentIncludeBookends')}
-            disabled={busy}
-            value={exporter.includeBookends ? 'on' : 'off'}
-            options={[
-              { value: 'on', label: translate('gallery.videoReview.presentationOn') },
-              { value: 'off', label: translate('gallery.videoReview.presentationOff') },
-            ]}
-            onChange={(value) => exporter.setIncludeBookends(value === 'on')}
-          />
-        )}
       </fieldset>
       {exporter.presentationDuration && exporter.hasBookends && (
         <ReviewPresentationDuration plan={exporter.presentationDuration} />

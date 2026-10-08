@@ -3,7 +3,6 @@ import { defineMessageSource } from '../source';
 export const galleryVideoReviewPresentationMessages = defineMessageSource({
   presentationTotal: { ru: 'Длительность экспорта', en: 'Export duration' },
   presentationMain: { ru: 'Монтаж', en: 'Main' },
-  fragmentIncludeBookends: { ru: 'Заставки во фрагментах', en: 'Bookends in fragments' },
   presentation: { ru: 'Начало и завершение', en: 'Beginning and ending' },
   presentationFadeIn: { ru: 'Появление', en: 'Fade in' },
   presentationFadeOut: { ru: 'Завершение', en: 'Fade out' },

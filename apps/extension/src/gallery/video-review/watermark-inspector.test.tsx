@@ -305,3 +305,39 @@ it('ignores a stale text acknowledgement after external settings replace the pen
   expect(save).toHaveBeenCalledTimes(2);
   await act(async () => settle(true));
 });
+
+it('commits slider changes when canvas previews are echoed into settings', async () => {
+  function Controlled() {
+    const [draft, setDraft] = useState<ReviewWatermarkInspectorProps['settings']>(undefined);
+    return (
+      <ReviewWatermarkInspector
+        {...props}
+        settings={draft ?? props.settings}
+        onPreview={(value) => setDraft(value ?? undefined)}
+        onChange={async (settings) => {
+          const saved = await props.onChange(settings);
+          props.settings = settings;
+          return saved;
+        }}
+      />
+    );
+  }
+  await act(async () => root.render(<Controlled />));
+  const range = host.querySelector<HTMLInputElement>('input[type="range"]')!;
+  const before = Number(range.value);
+  const after = before + 1;
+  act(() =>
+    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(Number(range.value)).toBeCloseTo(after);
+  expect(props.onChange).not.toHaveBeenCalled();
+  await act(async () =>
+    range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(props.onChange).toHaveBeenCalledOnce();
+  await act(async () => root.render(null));
+  await render();
+  expect(Number(host.querySelector<HTMLInputElement>('input[type="range"]')!.value)).toBeCloseTo(
+    after
+  );
+});

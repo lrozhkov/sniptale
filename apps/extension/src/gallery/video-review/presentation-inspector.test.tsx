@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -376,4 +376,35 @@ it('hides sound controls when the admitted video has no audio track', async () =
   expect(field('Volume')).toBeNull();
   expect(section().textContent).not.toContain('Bookend audio');
   expect(field('Trim start')).not.toBeNull();
+});
+
+it('persists duration after the parent echoes each preview and survives inspector remount', async () => {
+  retained();
+  function Controlled() {
+    const [draft, setDraft] = useState<ReviewPresentationInspectorProps['settings'] | null>(null);
+    return (
+      <ReviewPresentationInspector
+        {...props}
+        settings={draft ?? props.settings}
+        onPreview={setDraft}
+        onChange={(settings) => {
+          props.onChange(settings);
+          props.settings = settings;
+        }}
+      />
+    );
+  }
+  await act(async () => root.render(<Controlled />));
+  const range = field('Duration range');
+  act(() =>
+    range.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+  );
+  expect(range.value).toBe('3.1');
+  expect(props.settings.intro.image!.duration).toBe(3);
+  act(() => range.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowRight', bubbles: true })));
+  expect(props.onChange).toHaveBeenCalledOnce();
+  expect(props.settings.intro.image!.duration).toBe(3.1);
+  await act(async () => root.render(null));
+  await render();
+  expect(field('Duration range').value).toBe('3.1');
 });

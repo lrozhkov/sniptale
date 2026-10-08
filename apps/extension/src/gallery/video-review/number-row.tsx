@@ -65,7 +65,7 @@ export function ReviewPreviewNumberRow(
   props: ComponentProps<typeof ReviewNumberRow> & {
     onPreview?(value: number | null): void;
     title?: string;
-    /** External visual draft; value remains the authored commit comparator. */
+    /** Optional external visual draft, separate from the supplied value. */
     previewValue?: number | undefined;
   }
 ) {
@@ -121,7 +121,8 @@ export function ReviewPreviewNumberRow(
           if (cancelled.current) return;
           setDraft(value);
           props.onPreview?.(null);
-          if (value !== props.value) props.onChange(value);
+          // Parent value may already echo this gesture's preview, not a durable edit.
+          props.onChange(value);
         }}
       />
     </div>

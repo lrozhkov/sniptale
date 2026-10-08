@@ -209,7 +209,6 @@ type ReviewExportInput = {
   signal: AbortSignal;
   destination?: 'gallery' | 'download';
   selection?: Extract<ReviewAnchor, { kind: 'range' }>;
-  includeBookends?: boolean;
   onProgress?(fraction: number): void;
   onTimeEstimate?(estimate: VideoProjectExportTimeEstimate | null): void;
   onPublishing?(): void;
@@ -249,7 +248,7 @@ async function prepareReviewExport(args: ReviewExportInput, deps: typeof persist
     : null;
   if (args.selection && (!fragment || args.destination !== 'download'))
     throw new Error('A nonempty fragment requires a temporary download.');
-  const includeBookends = !fragment || args.includeBookends !== false;
+  const includeBookends = !fragment;
   const edits = fragment?.edits ?? document.edits;
   const renderSettings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;
   const outputProfile = resolveReviewOutputProfile(

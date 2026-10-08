@@ -166,6 +166,38 @@ for (const variant of variants) {
       await edgeDuration.fill('0.6');
       await edgeDuration.press('Enter');
       await expect.poll(async () => (await persistedPresentation(page))?.fadeIn.duration).toBe(0.6);
+      // Real drag must survive parent preview feedback before the pointer is released.
+      const edgeSlider = fields
+        .getByRole('slider', {
+          name: `${label('gallery.videoReview.presentationDuration')} range`,
+          exact: true,
+        })
+        .first();
+      await edgeDuration.hover();
+      const sliderBox = (await edgeSlider.boundingBox())!;
+      await page.mouse.move(
+        sliderBox.x + sliderBox.width * 0.2,
+        sliderBox.y + sliderBox.height / 2
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        sliderBox.x + sliderBox.width * 0.55,
+        sliderBox.y + sliderBox.height / 2,
+        { steps: 8 }
+      );
+      const draggedDuration = Number(await edgeSlider.inputValue());
+      expect(draggedDuration).toBeGreaterThan(0.6);
+      await expect.poll(async () => (await persistedPresentation(page))?.fadeIn.duration).toBe(0.6);
+      await page.mouse.up();
+      await settled();
+      await expect
+        .poll(async () => (await persistedPresentation(page))?.fadeIn.duration)
+        .toBe(draggedDuration);
+      await expect(edgeSlider).toHaveValue(String(draggedDuration));
+      await edgeDuration.fill('0.6');
+      await edgeDuration.press('Enter');
+      await settled();
+
       await mode('gallery.videoReview.presentationImage').click();
       const png = await page.evaluate(() => {
         const canvas = document.createElement('canvas');
