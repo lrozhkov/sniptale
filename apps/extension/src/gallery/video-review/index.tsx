@@ -1,4 +1,7 @@
-import { useReviewInspectorNavigation } from './inspector-navigation';
+import {
+  useReviewInspectorNavigation,
+  reviewTimelineInspectorCommands,
+} from './inspector-navigation';
 import { useReviewAudioWiring } from './voiceover-recording';
 import { ReviewInspectorBinding, reviewInspectorContext } from './inspector-binding';
 import { usePresentationPreview } from './use-presentation-preview';
@@ -187,23 +190,23 @@ function ReviewEditor({ resource, onBack, onClose, onJoinPreview }: ReviewEditor
           >
             {panelsEnabled ? <ReviewPanelResizeHandle resize={panels.timelineResize} /> : null}
             <ReviewTimelineBinding
-              selectedSpeechId={navigation.shown === 'speech' ? selectedSpeechId : undefined}
-              onOpenSpeech={(id, time) => {
-                state.video.current?.pause();
-                state.setActiveSelection({ kind: 'none' });
-                setSelectedSpeechId(id);
-                if (time !== undefined) state.seek(time, false);
-                navigation.setSection('speech');
-              }}
-              onOpenHistory={() => navigation.setSection('history')}
+              text={state.text}
+              {...reviewTimelineInspectorCommands({
+                video: state.video,
+                select: state.setActiveSelection,
+                seek: state.seek,
+                navigation,
+                selectedTextId: state.text.selectedId,
+                selectedSpeechId,
+                setSpeechId: setSelectedSpeechId,
+                requestExport,
+              })}
               webcam={state.webcam}
               fillHeight={panels.timelineHeight !== null}
               playbackRange={state.playbackRange}
               onPlaybackRange={state.setPlaybackRange}
               zoomAnchor={state.zoomAnchor}
               beforeAction={state.beforeAction}
-              onOpenExport={() => requestExport((value) => value + 1)}
-              exportActive={navigation.shown === 'export'}
               historyControls={<ReviewHistoryControlBinding state={state} />}
               editing={editing}
               edits={snapshot.document.edits}

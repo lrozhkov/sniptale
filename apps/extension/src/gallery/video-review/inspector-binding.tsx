@@ -1,11 +1,16 @@
 import { ReviewOriginalSpeechPanel } from './speech-panel';
+import { ReviewTextDocumentPanel } from './text-panel';
 import { computeQuickEditSceneSize } from '../../features/video/review/advanced/scene';
 import { changeRecordedClicks, changeRecordedKeys } from './action-presentation';
 import { ReviewActionHistory } from './action-history';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { ReviewIntervalMap } from './interval-timing';
 import { evaluateQuickEditCameraAtTime } from '../../features/video/review/advanced/scene';
-import { ReviewSelectedProperties, reviewSelectionLabel } from './selected-properties';
+import {
+  ReviewSelectedProperties,
+  ReviewSelectedTextProperties,
+  reviewSelectionLabel,
+} from './selected-properties';
 import type { ReviewAnnotation } from '../../features/video/review/types';
 import { ReviewInspector } from './inspector';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
@@ -24,6 +29,7 @@ import type { useReviewEditorState } from './use-editor-state';
 type InspectorState = Pick<
   ReturnType<typeof useReviewEditorState>,
   | 'selection'
+  | 'text'
   | 'playbackRange'
   | 'advancedPending'
   | 'advancedFailed'
@@ -130,21 +136,19 @@ export function ReviewInspectorBinding({
   onBack(): void;
   onClose(): void;
 }) {
-  const { editing, session, snapshot, composer, video, busy, run } = state;
+  const { editing, snapshot, composer, busy, run } = state;
   const [historySelection, setHistorySelection] = useState<typeof state.activeSelection>();
-  const leave = (done: () => void) => {
-    video.current?.pause();
-    void run(async () => {
-      await composer.flush();
-      await state.flushAdvanced();
-      await canvasComments.flushTexts();
-      await session.flush();
-      done();
-    });
-  };
+  const leave = (done: () => void) => leaveReviewInspector(state, canvasComments, done);
   return (
     <ReviewIntervalMap.Provider value={state.timeline.timeMap.getSegments()}>
       <ReviewInspector
+        textDocument={
+          <ReviewTextDocumentPanel
+            editor={state.text}
+            snapshots={state.text.snapshots}
+            busy={busy || editing.exporter.phase !== 'idle'}
+          />
+        }
         speech={
           <ReviewSourceSpeechBinding
             resource={resource}
@@ -502,6 +506,14 @@ function ReviewSelectionBinding({
   onBackToHistory?: (() => void) | undefined;
 }) {
   const video = state.video;
+  if (state.activeSelection.kind === 'text')
+    return (
+      <ReviewSelectedTextProperties
+        editor={state.text}
+        id={state.activeSelection.id}
+        busy={state.busy || state.editing.exporter.phase !== 'idle'}
+      />
+    );
   return (
     <ReviewSelectedProperties
       registerSpeechFlush={state.registerSpeechFlush}
@@ -544,4 +556,20 @@ function ReviewSelectionBinding({
       canvasComments={canvasComments}
     />
   );
+}
+
+/** Leaving waits for the existing independent edit buffers before dismissing the inspector. */
+function leaveReviewInspector(
+  state: Pick<InspectorState, 'video' | 'run' | 'composer' | 'flushAdvanced' | 'session'>,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>,
+  done: () => void
+) {
+  state.video.current?.pause();
+  void state.run(async () => {
+    await state.composer.flush();
+    await state.flushAdvanced();
+    await canvasComments.flushTexts();
+    await state.session.flush();
+    done();
+  });
 }

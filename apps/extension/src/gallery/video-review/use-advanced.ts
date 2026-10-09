@@ -117,6 +117,8 @@ export function useReviewAdvanced(session: Session) {
     watermark: _baselineWatermark,
     presentation: _baselinePresentation,
     webcam: _baselineWebcam,
+    text: _baselineText,
+    captions: _baselineCaptions,
     ...workspaceState
   } = persisted;
   const advanced: QuickEditAdvancedState = {

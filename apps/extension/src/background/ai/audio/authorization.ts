@@ -1,7 +1,8 @@
 import { readLibrarySceneSource } from '../../../composition/persistence/projects/library-scene-source';
 import { readAssetFile } from '../../../composition/persistence/assets/opfs-store';
 import type { VideoWorkspace } from '../../../composition/persistence/review-workspaces/contracts';
-import type { AudioJobScope } from '../../../contracts/ai/audio';
+import { isAudioSourceJobScope, type AudioSourceJobScope } from '../../../contracts/ai/audio';
+import { matchesReviewTextScope } from '../../../features/video/review/text-document';
 import { getProjectAsset } from '../../../composition/persistence/projects';
 import {
   replayReviewHistory,
@@ -22,7 +23,7 @@ export function isAudioJobSender(sender: chrome.runtime.MessageSender | undefine
   );
 }
 
-async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioJobScope) {
+async function authorizeOriginalSource(workspace: VideoWorkspace, scope: AudioSourceJobScope) {
   if (workspace.aggregateId !== scope.workspaceId || workspace.sourceAssetId !== scope.assetId)
     throw new Error('unauthorized');
   try {
@@ -53,13 +54,32 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
     workspace.source,
     reviewAdvancedContentBaseline(workspace.advanced)
   );
-  const target = request.scope.target;
+  const scope = request.scope;
+  if (!isAudioSourceJobScope(scope)) {
+    const fragment = document.advancedContent.text?.fragments.find(
+      (entry) => entry.id === scope.target.fragmentId
+    );
+    const segments = buildReviewTimeMap(workspace.source.duration, document.edits);
+    const limit =
+      scope.timeDomain === 'source' ? workspace.source.duration : (segments.at(-1)?.resultEnd ?? 0);
+    if (
+      request.operation !== 'speech' ||
+      !matchesReviewTextScope(fragment, scope) ||
+      request.phraseId !== scope.target.fragmentId ||
+      request.textRevision !== scope.textRevision ||
+      fragment?.text !== request.text ||
+      scope.end > limit
+    )
+      throw new Error('stale');
+    return;
+  }
+  const target = scope.target;
   const timeMap = buildReviewTimeMap(workspace.source.duration, document.edits);
   const clip =
     target.kind === 'voiceover'
       ? document.advancedContent.audio.voiceover.find((entry) => entry.id === target.clipId)
       : undefined;
-  if (target.kind === 'voiceover' && (!clip || clip.assetId !== request.scope.assetId))
+  if (target.kind === 'voiceover' && (!clip || clip.assetId !== scope.assetId))
     throw new Error('unauthorized');
   const ranges =
     target.kind === 'original'
@@ -73,13 +93,13 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
           }))
           .sort((left, right) => left.start - right.start);
   const tolerance = target.kind === 'original' ? 0 : 0.000001;
-  let covered = request.scope.nativeStart;
+  let covered = scope.nativeStart;
   for (const range of ranges) {
     if (range.start > covered + tolerance) break;
     if (range.end > covered) covered = range.end;
   }
-  if (covered < request.scope.nativeEnd - tolerance) throw new Error('unauthorized');
-  if (target.kind === 'original') await authorizeOriginalSource(workspace, request.scope);
+  if (covered < scope.nativeEnd - tolerance) throw new Error('unauthorized');
+  if (target.kind === 'original') await authorizeOriginalSource(workspace, scope);
   else if (
     !clip!.assetId.startsWith('project-asset:') ||
     (await getProjectAsset(clip!.assetId.slice('project-asset:'.length))).status !== 'ready'
@@ -95,8 +115,8 @@ export async function authorizeAudioJob(request: AudioJobStart): Promise<void> {
       !phrase ||
       phrase.text !== request.text ||
       phrase.revision !== request.textRevision ||
-      phrase.start !== request.scope.nativeStart ||
-      phrase.end !== request.scope.nativeEnd
+      phrase.start !== scope.nativeStart ||
+      phrase.end !== scope.nativeEnd
     )
       throw new Error('stale');
   }

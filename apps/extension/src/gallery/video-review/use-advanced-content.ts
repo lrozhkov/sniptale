@@ -152,6 +152,19 @@ export function useReviewAdvancedContent(
 /** Authored mutations share the debounced history writer, independent of its React lifecycle. */
 function reviewContentCommands(stage: (mutation: ContentMutation) => void) {
   return {
+    setText: (
+      update: (text: QuickEditAdvancedContent['text']) => QuickEditAdvancedContent['text']
+    ) =>
+      stage((content) => {
+        const { text: previous, ...rest } = content;
+        const text = update(previous);
+        return text ? { ...rest, text } : rest;
+      }),
+    setCaptions: (captions: QuickEditAdvancedContent['captions']) =>
+      stage((content) => {
+        const { captions: _previous, ...rest } = content;
+        return captions ? { ...rest, captions } : rest;
+      }),
     setActionsEnabled: (actionsEnabled: boolean) =>
       stage((content) => ({ ...content, actionsEnabled })),
     setKeyAnimations: (

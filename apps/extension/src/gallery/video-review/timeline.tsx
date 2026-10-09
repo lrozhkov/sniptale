@@ -62,6 +62,7 @@ type TimelineProps = {
   zoomTrack?: ReactNode;
   webcamTrack?: ReactNode;
   audioTrack?: ReactNode;
+  textTrack?: ReactNode;
   boundaries?: readonly number[];
   onRangeCommit?(range: ReviewAnchor): void;
   onFocusRangeCommit?: ((range: ReviewAnchor) => void) | undefined;
@@ -85,7 +86,7 @@ type TimelineProps = {
 /** One source lane, with an independent ruler/playhead rather than browser slider chrome. */
 export function ReviewTimeline(props: TimelineProps) {
   const audioVisible = !!props.audioTrack;
-  const zoomVisible = !!props.zoomTrack;
+  const zoomVisible = !!props.zoomTrack || !!props.textTrack;
   const { viewport, gutter, width } = useReviewTimelineGeometry(
     audioVisible,
     zoomVisible,
@@ -221,6 +222,7 @@ export function ReviewTimeline(props: TimelineProps) {
           <div inert={props.busy}>
             {props.zoomTrack}
             {props.webcamTrack}
+            {props.textTrack}
             {props.audioTrack}
           </div>
         </div>

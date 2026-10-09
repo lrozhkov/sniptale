@@ -8,6 +8,10 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { writeAudioStaging, readAudioStaging, discardAudioStaging } from './audio-staging';
 import { readVideoWorkspace } from '../review-workspaces/store';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
+import {
+  addReviewTextFragment,
+  createReviewTextDocument,
+} from '../../../features/video/review/text-document';
 vi.mock('../review-workspaces/store', () => ({ readVideoWorkspace: vi.fn() }));
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -163,6 +167,56 @@ function memoryStaging() {
 }
 const stagingId = '12345678-1234-4234-8234-123456789abc';
 const audioBlob = () => new Blob(['audio'], { type: 'audio/wav' });
+
+it('stages asset-free narration and refuses changed placement before physical writes', async () => {
+  const memory = memoryStaging();
+  const advanced = createQuickEditAdvancedState();
+  const added = addReviewTextFragment(createReviewTextDocument(), {
+    id: 'text',
+    start: 0,
+    end: 1,
+    text: 'Hello',
+  });
+  if (!added.ok) throw new Error('fixture');
+  advanced.text = added.document;
+  const fragment = added.document.fragments[0]!;
+  const textScope = {
+    workspaceId: 'w',
+    workspaceRevision: 1,
+    target: { kind: 'text' as const, fragmentId: fragment.id },
+    textRevision: fragment.revision,
+    timingRevision: fragment.timingRevision,
+    start: fragment.start,
+    end: fragment.end,
+    timeDomain: fragment.timeDomain,
+  };
+  vi.mocked(readVideoWorkspace).mockResolvedValue({
+    workspace: {
+      aggregateId: 'w',
+      formatVersion: 1,
+      revision: 1,
+      sourceAssetId: 'unused',
+      source: { duration: 1, width: 10, height: 10, mimeType: 'video/webm', size: 10 },
+      advanced,
+      history: [],
+      cursor: 0,
+      createdAt: 1,
+      updatedAt: 1,
+    },
+    draft: null,
+  });
+  const handle = await writeAudioStaging({ id: stagingId, scope: textScope, blob: audioBlob() });
+  expect(await (await readAudioStaging(handle, textScope)).text()).toBe('audio');
+  expect(memory.files.size).toBe(2);
+  await discardAudioStaging(handle, textScope);
+  memory.getDirectory.mockClear();
+  fragment.timingRevision += 1;
+  await expect(
+    writeAudioStaging({ id: stagingId, scope: textScope, blob: audioBlob() })
+  ).rejects.toThrow('Stale audio staging scope');
+  expect(memory.getDirectory).not.toHaveBeenCalled();
+  expect(memory.files.size).toBe(0);
+});
 
 it('roundtrips scoped bytes and refuses duplicate tickets without deleting the original', async () => {
   const memory = memoryStaging();

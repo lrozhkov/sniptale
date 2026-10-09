@@ -10,6 +10,10 @@ import type { MediaAssetSource } from '../../../composition/persistence/media-li
 import type { AudioJobStart, AudioJobServerMessage } from '../../../contracts/ai/audio';
 import { readVideoWorkspace } from '../../../composition/persistence/review-workspaces/store';
 import { authorizeAudioJob } from './authorization';
+import {
+  addReviewTextFragment,
+  createReviewTextDocument,
+} from '../../../features/video/review/text-document';
 import { createAudioJobService } from './service';
 const harness = vi.hoisted(() => ({ database: vi.fn() }));
 vi.mock('../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
@@ -374,4 +378,39 @@ it('accepts detected codec parameters while preserving immutable container ident
   await expect(authorizeAudioJob(request)).resolves.toBeUndefined();
   workspace.source.mimeType = 'video/mp4; codecs="avc1.42001f"';
   await expect(authorizeAudioJob(request)).rejects.toThrow('unauthorized');
+});
+
+it('uses authored text authority without resolving source bytes, while source jobs still require them', async () => {
+  const added = addReviewTextFragment(createReviewTextDocument(), {
+    id: 'script',
+    text: 'Narration for a silent video',
+    start: 0,
+    end: 4,
+  });
+  if (!added.ok) throw new Error('fixture');
+  workspace.advanced.text = added.document;
+  const fragment = added.document.fragments[0]!;
+  const speech: AudioJobStart = {
+    ...request,
+    operation: 'speech',
+    phraseId: fragment.id,
+    textRevision: fragment.revision,
+    text: fragment.text,
+    profile: { voiceId: 'voice', responseFormat: 'mp3' },
+    scope: {
+      workspaceId: workspace.aggregateId,
+      workspaceRevision: workspace.revision,
+      target: { kind: 'text', fragmentId: fragment.id },
+      textRevision: fragment.revision,
+      timingRevision: fragment.timingRevision,
+      start: fragment.start,
+      end: fragment.end,
+      timeDomain: fragment.timeDomain,
+    },
+  };
+  objects.clear();
+  await expect(authorizeAudioJob(speech)).resolves.toBeUndefined();
+  await expect(authorizeAudioJob(request)).rejects.toThrow('unauthorized');
+  fragment.text = 'Changed after selection';
+  await expect(authorizeAudioJob(speech)).rejects.toThrow('stale');
 });

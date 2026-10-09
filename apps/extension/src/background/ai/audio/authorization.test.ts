@@ -5,6 +5,10 @@ import { getProjectAsset } from '../../../composition/persistence/projects';
 import { createQuickEditAdvancedState } from '../../../features/video/review/advanced/defaults';
 import type { VideoWorkspace } from '../../../composition/persistence/review-workspaces/contracts';
 import type { AudioJobStart } from '../../../contracts/ai/audio';
+import {
+  addReviewTextFragment,
+  createReviewTextDocument,
+} from '../../../features/video/review/text-document';
 vi.mock('../../../composition/persistence/review-workspaces/store', () => ({
   readVideoWorkspace: vi.fn(),
 }));
@@ -12,7 +16,7 @@ vi.mock('../../../composition/persistence/projects', () => ({
   getProjectAsset: vi.fn(async () => ({ status: 'ready' })),
 }));
 
-const request: AudioJobStart = {
+const request = {
   type: 'start',
   requestId: 'r',
   operation: 'speech',
@@ -29,7 +33,7 @@ const request: AudioJobStart = {
   textRevision: 1,
   text: 'hello',
   profile: { voiceId: 'voice', responseFormat: 'mp3' },
-};
+} satisfies AudioJobStart;
 let workspace: VideoWorkspace;
 beforeEach(() => {
   vi.clearAllMocks();
@@ -82,6 +86,62 @@ it('admits exact saved phrase and checks that its bytes still exist', async () =
   expect(getProjectAsset).toHaveBeenCalledWith('a');
   vi.mocked(getProjectAsset).mockResolvedValueOnce({ status: 'not-found' });
   await expect(authorizeAudioJob(request)).rejects.toThrow('unauthorized');
+});
+
+it('authorizes authored text without source audio and rejects changed text or placement before POST', async () => {
+  const added = addReviewTextFragment(createReviewTextDocument(), {
+    id: 'text',
+    text: 'Hello',
+    start: 1,
+    end: 3,
+  });
+  if (!added.ok) throw new Error('fixture');
+  workspace.advanced.text = added.document;
+  workspace.advanced.audio.voiceover = [];
+  const fragment = added.document.fragments[0]!;
+  const textRequest = {
+    ...request,
+    phraseId: fragment.id,
+    text: fragment.text,
+    textRevision: fragment.revision,
+    scope: {
+      workspaceId: 'w',
+      workspaceRevision: 1,
+      target: { kind: 'text' as const, fragmentId: fragment.id },
+      textRevision: fragment.revision,
+      timingRevision: fragment.timingRevision,
+      start: fragment.start,
+      end: fragment.end,
+      timeDomain: fragment.timeDomain,
+    },
+  };
+  await expect(authorizeAudioJob(textRequest)).resolves.toBeUndefined();
+  expect(getProjectAsset).not.toHaveBeenCalled();
+  for (const timeDomain of ['source', 'result'] as const) {
+    fragment.timeDomain = timeDomain;
+    await expect(
+      authorizeAudioJob({ ...textRequest, scope: { ...textRequest.scope, timeDomain } })
+    ).resolves.toBeUndefined();
+    fragment.end = 5;
+    await expect(
+      authorizeAudioJob({ ...textRequest, scope: { ...textRequest.scope, timeDomain, end: 5 } })
+    ).rejects.toThrow('stale');
+    fragment.end = 3;
+  }
+  for (const patch of [
+    { text: 'Forged' },
+    { textRevision: 999 },
+    { phraseId: 'foreign' },
+    { scope: { ...textRequest.scope, timingRevision: 999 } },
+    { scope: { ...textRequest.scope, end: 4 } },
+    { scope: { ...textRequest.scope, workspaceRevision: 999 } },
+  ])
+    await expect(authorizeAudioJob({ ...textRequest, ...patch })).rejects.toThrow('stale');
+  await expect(authorizeAudioJob({ ...textRequest, operation: 'transcription' })).rejects.toThrow(
+    'stale'
+  );
+  workspace.advanced.text = createReviewTextDocument();
+  await expect(authorizeAudioJob(textRequest)).rejects.toThrow('stale');
 });
 it('rejects disappeared or revision-changed workspaces before reading asset bytes', async () => {
   vi.mocked(readVideoWorkspace).mockResolvedValueOnce(null);

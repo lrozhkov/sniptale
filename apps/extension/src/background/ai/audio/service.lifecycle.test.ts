@@ -96,6 +96,30 @@ function execute(job: ReturnType<typeof setup>) {
 }
 afterEach(() => vi.useRealTimers());
 
+it('voices authored text through the same cancellable job without preparing an audio upload', async () => {
+  const job = setup();
+  const textScope = {
+    workspaceId: 'w',
+    workspaceRevision: 1,
+    target: { kind: 'text' as const, fragmentId: 'p' },
+    textRevision: 1,
+    timingRevision: 0,
+    start: 0,
+    end: 2,
+    timeDomain: 'result' as const,
+  };
+  job.connection.receive({ ...speech, scope: textScope });
+  await vi.waitFor(() =>
+    expect(job.messages).toContainEqual({ type: 'audio', requestId: 'r', staged: output })
+  );
+  expect(job.deps.read).not.toHaveBeenCalled();
+  expect(job.deps.request).toHaveBeenCalledOnce();
+  expect(job.deps.request.mock.calls[0]?.[0].input).toBeUndefined();
+  expect(job.deps.write).toHaveBeenCalledWith(expect.objectContaining({ scope: textScope }));
+  expect(job.deps.authorize).toHaveBeenCalledTimes(4);
+  await job.connection.disconnect();
+});
+
 it('stages speech only after post-response authority and delivers its scoped handle', async () => {
   const job = setup();
   job.deps.request.mockImplementationOnce(async (args) => {

@@ -23,6 +23,7 @@ import { reviewTimelineNavigationBounds } from './track-projection';
 import { useReviewSelectionLifecycle } from './use-review-selection';
 import type { useReviewZoomEditor } from './zoom-editor';
 import { removeReviewWebcamItem } from './webcam-editor';
+import { useReviewText } from './use-review-text';
 
 type Session = ReturnType<
   typeof import('../../workflows/video-review/session').createVideoReviewSession
@@ -103,6 +104,21 @@ export function useReviewEditorWiring(args: {
       args.setActiveSelection(value ? { kind: 'audio', ...value } : { kind: 'none' }),
   });
   useOriginalAudioToolLifecycle(args.activeSelection.kind, audio);
+  const text = useReviewText({
+    document: args.advanced.text,
+    snapshots: args.advanced.audio.voiceover.flatMap((clip) =>
+      clip.textSnapshot ? [clip.textSnapshot] : []
+    ),
+    selection: args.activeSelection,
+    setText: args.advancedState.setText,
+    sourceDuration: args.sourceDuration,
+    edits: args.document.edits,
+    sourceTime: args.time,
+    beforeAction: args.beforeAction,
+    select: args.setActiveSelection,
+    seek: args.seek,
+    pause: () => args.video.current?.pause(),
+  });
   const removeSelection = useReviewSelectionLifecycle({
     selection: args.activeSelection,
     markers: projected.markers,
@@ -115,6 +131,7 @@ export function useReviewEditorWiring(args: {
       const comment = args.document.canvasComments.find((item) => item.id === id);
       if (comment) void canvasComments.onDelete(comment);
     },
+    deleteText: (id) => text.remove([id]),
     deleteZoom: args.zoom.remove,
     deleteZoomLink: (id) => args.zoom.change(id, { linkTo: null }),
     deleteAudio: audio.removeClip,
@@ -136,6 +153,7 @@ export function useReviewEditorWiring(args: {
   });
   useWiredReviewShortcuts(args, audio, comments, history, removeSelection);
   return {
+    text,
     audio,
     canvasComments,
     comments,

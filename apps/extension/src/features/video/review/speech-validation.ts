@@ -56,7 +56,8 @@ function parseWord(value: unknown): ReviewSpeechWord | null {
   return { text: value['text'], start: value['start'], end: value['end'] };
 }
 
-function parsePhrase(value: unknown): ReviewSpeechPhrase | null {
+/** Parses a phrase independently of transcript ordering, for standalone authored text. */
+export function parseReviewSpeechPhrase(value: unknown): ReviewSpeechPhrase | null {
   if (
     !isRecord(value) ||
     !identity(value['id']) ||
@@ -172,7 +173,7 @@ export function parseReviewSpeechTranscript(
     (value['transcriptionModelId'] !== undefined && !identity(value['transcriptionModelId']))
   )
     return null;
-  const phrases = parseIntervals(value['phrases'], parsePhrase);
+  const phrases = parseIntervals(value['phrases'], parseReviewSpeechPhrase);
   const replacements = parseIntervals(value['replacements'], parseReplacement);
   const profile =
     value['profile'] === undefined ? undefined : parseReviewSpeechProfile(value['profile']);

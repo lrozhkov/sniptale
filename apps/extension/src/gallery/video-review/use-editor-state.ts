@@ -375,7 +375,7 @@ function assembleReviewEditorState(
     time,
     cuts,
   } = core;
-  const { audio, canvasComments, comments, telemetry, projected } = wiring;
+  const { audio, text, canvasComments, comments, telemetry, projected } = wiring;
   return {
     ...core,
     zoomAnchor: reviewSelectionSourceTime(
@@ -389,6 +389,7 @@ function assembleReviewEditorState(
     editing: { ...cuts, exporter: wiring.exporter },
     moveHistory: wiring.moveHistory,
     audio,
+    text,
     canvasComments,
     telemetry,
     ...reviewAdvancedControls(advancedState, setActiveSelection, core.beforeAction),
@@ -433,6 +434,8 @@ function reviewAdvancedControls(
     previewBackground: advancedState.previewBackground,
     setCanvas: advancedState.setCanvas,
     setWindowHeader: advancedState.setWindowHeader,
+    setText: advancedState.setText,
+    setCaptions: advancedState.setCaptions,
     resetAdvanced: advancedState.reset,
     flushAdvanced: advancedState.flush,
     advancedPending: advancedState.pending,

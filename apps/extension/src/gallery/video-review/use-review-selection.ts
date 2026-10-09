@@ -62,6 +62,8 @@ export function reviewSelectionExists(
     return document.annotations.some((item) => item.id === selection.id);
   if (selection.kind === 'canvas-comment')
     return document.canvasComments.some((item) => item.id === selection.id);
+  if (selection.kind === 'text')
+    return !!advanced.text?.fragments.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom')
     return advanced.zoom.regions.some((item) => item.id === selection.id);
   if (selection.kind === 'zoom-link')
@@ -93,6 +95,7 @@ export function useReviewSelectionLifecycle(args: {
   commit(operation: ReviewOperation): Promise<unknown>;
   run(action: () => Promise<unknown>): Promise<unknown>;
   deleteCanvas(id: string): void;
+  deleteText?(id: string): void;
   deleteZoom(id: string): void;
   deleteZoomLink(id: string): void;
   deleteAudio(lane: 'voiceover' | 'music', id: string): void;
@@ -107,6 +110,7 @@ export function useReviewSelectionLifecycle(args: {
     const historyRemoval = selectedHistoryRemoval(args.selection, args.document);
     if (historyRemoval) void args.run(() => args.commit(historyRemoval));
     else if (args.selection.kind === 'canvas-comment') args.deleteCanvas(args.selection.id);
+    else if (args.selection.kind === 'text') args.deleteText?.(args.selection.id);
     else if (args.selection.kind === 'zoom') args.deleteZoom(args.selection.id);
     else if (args.selection.kind === 'zoom-link') args.deleteZoomLink(args.selection.id);
     else if (args.selection.kind === 'original-audio')
@@ -164,6 +168,13 @@ export function reviewSelectionSourceTime(
     case 'canvas-comment': {
       const comment = document.canvasComments.find((item) => item.id === selection.id);
       return comment?.visible ? ((comment.start ?? 0) + (comment.end ?? duration)) / 2 : null;
+    }
+    case 'text': {
+      const fragment = advanced.text?.fragments.find((item) => item.id === selection.id);
+      if (!fragment) return null;
+      if (fragment.timeDomain === 'source') return midpoint(fragment);
+      const projection = createTrackProjection(duration, document.edits);
+      return (projection.source(fragment.start) + projection.source(fragment.end, 'end')) / 2;
     }
     case 'telemetry':
       return midpoint(

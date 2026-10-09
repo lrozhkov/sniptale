@@ -35,7 +35,8 @@ type InspectorSection =
   | 'export'
   | 'history'
   | 'preview'
-  | 'speech';
+  | 'speech'
+  | 'text';
 
 function inspectorNavigationOptions(args: {
   shown: InspectorSection;
@@ -46,11 +47,15 @@ function inspectorNavigationOptions(args: {
   actions: boolean;
 }): { id: InspectorSection; label: string }[] {
   const options: { id: InspectorSection; label: string }[] = [];
-  if (args.shown === 'preview')
-    options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
   options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
   if (args.settingsAvailable)
     options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
+  if (args.shown === 'preview') {
+    options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
+    return options;
+  }
+  if (args.context === 'text' && args.settingsAvailable)
+    options.push({ id: 'text', label: translate('gallery.videoReview.textTrackDocument') });
   if (args.context === 'speech' && args.settingsAvailable)
     options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
   if (args.context === 'selected' && args.selectionLabel)
@@ -77,6 +82,7 @@ export function ReviewInspector(props: {
   scene?: ReactNode;
   preview?: ReactNode;
   speech?: ReactNode;
+  textDocument?: ReactNode;
   actionHistory?: ReactNode;
   selectionLabel?: string | undefined;
   selectionHasSections?: boolean;
@@ -181,6 +187,8 @@ export function ReviewInspector(props: {
             <section data-ui="gallery.videoReview.exportSection" className="space-y-3">
               {props.actions}
             </section>
+          ) : shown === 'text' ? (
+            props.textDocument
           ) : shown === 'speech' ? (
             props.speech
           ) : shown === 'scene' ? (
@@ -360,7 +368,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
-    section: 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview' | 'speech';
+    section: InspectorSection;
     onTogglePresentation(): void;
   }
 ) {

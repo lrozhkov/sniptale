@@ -45,6 +45,8 @@ export function reviewAdvancedContentBaseline(state: {
   webcam?: QuickEditAdvancedContent['webcam'];
   watermark?: QuickEditAdvancedContent['watermark'];
   presentation?: QuickEditAdvancedContent['presentation'];
+  text?: QuickEditAdvancedContent['text'];
+  captions?: QuickEditAdvancedContent['captions'];
 }): QuickEditAdvancedContent {
   return {
     schemaVersion: state.schemaVersion,
@@ -59,6 +61,8 @@ export function reviewAdvancedContentBaseline(state: {
     ...(state.webcam ? { webcam: state.webcam } : {}),
     ...(state.watermark ? { watermark: state.watermark } : {}),
     ...(state.presentation ? { presentation: state.presentation } : {}),
+    ...(state.text ? { text: state.text } : {}),
+    ...(state.captions ? { captions: state.captions } : {}),
   };
 }
 

@@ -3,7 +3,7 @@ import type { ReviewTimeSegment } from '../time-segment';
 import type { QuickEditWebcam } from './webcam';
 import type { ReviewSpeechTranscript } from '../speech-transcript';
 
-export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 11;
+export const QUICK_EDIT_ADVANCED_SCHEMA_VERSION = 12;
 
 /** Bumped in v2: v1 placements were stored in source time, v2 stores result time. */
 export const QUICK_EDIT_ADVANCED_SCHEMA_V1 = 1;
@@ -184,6 +184,8 @@ export interface QuickEditVoiceoverAnchor {
 }
 
 export interface QuickEditAudioClip {
+  /** Immutable text association; deleting or editing text does not delete this audio. */
+  textSnapshot?: import('../text-document').ReviewVoiceTextSnapshot;
   /** Optional native-asset transcript and immutable accepted speech replacements. */
   transcript?: ReviewSpeechTranscript;
   /** Native sample tempo, independent of video Speed; absent means 1x. */
@@ -243,6 +245,8 @@ export interface QuickEditAudioState {
 
 /** Advanced quick-editor state persisted beside the edit history in the same workspace record. */
 export interface QuickEditAdvancedState {
+  text?: import('../text-document').ReviewTextDocument;
+  captions?: import('../text-document').ReviewCaptionSettings;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
   keyAnimations?: import('./key-animation').ReviewKeyAnimation[];
@@ -267,6 +271,8 @@ export interface QuickEditAdvancedState {
  * zoom/background/audio changes join the same undo timeline as cuts.
  */
 export interface QuickEditAdvancedContent {
+  text?: import('../text-document').ReviewTextDocument;
+  captions?: import('../text-document').ReviewCaptionSettings;
   /** Missing on older projects means enabled. */
   actionsEnabled?: boolean;
   keyAnimations?: import('./key-animation').ReviewKeyAnimation[];

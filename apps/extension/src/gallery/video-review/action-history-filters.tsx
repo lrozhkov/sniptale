@@ -194,7 +194,17 @@ function historySearchText(marker: ReviewTelemetryMarker): string {
 }
 
 /** Search owns input focus restoration independently of filter selection. */
-function HistorySearch({ query, onChange }: { query: string; onChange(query: string): void }) {
+export function HistorySearch({
+  query,
+  onChange,
+  label,
+  clearLabel,
+}: {
+  query: string;
+  onChange(query: string): void;
+  label?: string;
+  clearLabel?: string;
+}) {
   const search = useRef<HTMLInputElement>(null);
   return (
     <div className="review-history-search min-w-0 flex-1">
@@ -202,8 +212,8 @@ function HistorySearch({ query, onChange }: { query: string; onChange(query: str
       <input
         ref={search}
         type="search"
-        aria-label={translate('gallery.videoReview.historySearch')}
-        placeholder={translate('gallery.videoReview.historySearch')}
+        aria-label={label ?? translate('gallery.videoReview.historySearch')}
+        placeholder={label ?? translate('gallery.videoReview.historySearch')}
         value={query}
         onChange={(event) => {
           onChange(event.target.value);
@@ -214,8 +224,8 @@ function HistorySearch({ query, onChange }: { query: string; onChange(query: str
           type="button"
           tone="utility"
           size="compact"
-          aria-label={translate('gallery.videoReview.historySearchClear')}
-          title={translate('gallery.videoReview.historySearchClear')}
+          aria-label={clearLabel ?? translate('gallery.videoReview.historySearchClear')}
+          title={clearLabel ?? translate('gallery.videoReview.historySearchClear')}
           onClick={() => {
             onChange('');
             search.current?.focus();

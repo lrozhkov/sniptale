@@ -12,6 +12,8 @@ import type { ReviewWaveform } from '../../workflows/video-review/waveform';
 import { ReviewTimelineToolbar, ReviewTrackControls } from './review-toolbar';
 import { ReviewZoomTrack } from './zoom-track';
 import { ReviewAudioTrack } from './audio-track';
+import { ReviewTextTrack } from './original-speech-track';
+import type { useReviewText } from './use-review-text';
 import { ReviewWebcamTrack } from './webcam-track';
 import type { useReviewWebcamEditor } from './webcam-editor';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
@@ -133,6 +135,10 @@ function ReviewAudioLane(props: {
 }
 
 type TimelineBindingProps = {
+  text?: ReturnType<typeof useReviewText>;
+  selectedTextId?: string | undefined;
+  onOpenText?(): void;
+  onSelectText?(id: string): void;
   webcam?: ReturnType<typeof useReviewWebcamEditor>;
   fillHeight?: boolean;
   playbackRange?: ReviewPlaybackRange | null | undefined;
@@ -261,6 +267,17 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
   const focus = useFocusPlacement(props, projection);
   return (
     <ReviewTimeline
+      textTrack={
+        <ReviewTextLane
+          editor={props.text}
+          mode={features.mode}
+          busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
+          selectedId={props.selectedTextId}
+          beforeAction={props.beforeAction}
+          onOpen={props.onOpenText}
+          onSelect={props.onSelectText}
+        />
+      }
       fillHeight={props.fillHeight}
       sourceCompact={compact}
       playbackRange={props.playbackRange}
@@ -325,47 +342,7 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
       {...(props.advanced.ui.mode !== 'advanced' && props.editing.exporter.index
         ? { boundaries: props.editing.exporter.index.boundaries }
         : {})}
-      {...(features.audioTrackVisible ||
-      (features.mode === 'advanced' &&
-        !!props.audioState.originalSpeech?.transcript.replacements.length) ||
-      (features.mode === 'advanced' && props.editing.exporter.index === null) ||
-      !!props.editing.exporter.index?.audioCodec
-        ? {
-            audioTrack: (
-              <ReviewAudioLane
-                beforeAction={props.beforeAction}
-                selectedEditId={props.editing.selected?.id}
-                edits={props.edits}
-                onOriginalRange={(range) => {
-                  props.onClearSelection();
-                  props.setSelection({
-                    kind: 'point',
-                    time: range.kind === 'range' ? range.start : range.time,
-                  });
-                }}
-                onSelectSpeed={props.editing.select}
-                showAddedAudio={features.audioTrackVisible}
-                showOriginalSpeech={features.mode === 'advanced'}
-                automaticOriginalRanges={props.automaticOriginalRanges}
-                hasOriginalAudio={
-                  props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
-                }
-                projection={projection}
-                snapTimes={reviewAudioSnapTimes(props)}
-                audioState={props.audioState}
-                waveforms={props.waveforms}
-                resultDuration={props.resultDuration}
-                audio={props.audio}
-                busy={props.busy}
-                onImportFile={props.onImportAudioFile}
-                onRecordVoiceover={props.onRecordVoiceover}
-                onOpenMusic={props.onOpenMusic}
-                onOpenSpeech={features.mode === 'advanced' ? props.onOpenSpeech : undefined}
-                selectedSpeechId={props.selectedSpeechId}
-              />
-            ),
-          }
-        : {})}
+      {...reviewTimelineAudioTrack(props, features, projection)}
       onRangeCommit={(range) => {
         if (props.editing.mode) void props.editing.commitRange(range);
       }}
@@ -623,4 +600,76 @@ function ReviewTimelineTrackControls({
       busy={props.busy || props.composerBusy || props.editing.exporter.phase !== 'idle'}
     />
   );
+}
+
+/** Advanced text capability gates the lane; basic audio and source controls keep their ownership. */
+function ReviewTextLane(props: {
+  editor: ReturnType<typeof useReviewText> | undefined;
+  mode: 'basic' | 'advanced';
+  busy: boolean;
+  selectedId: string | undefined;
+  beforeAction: ReviewBeforeAction | undefined;
+  onOpen: (() => void) | undefined;
+  onSelect: ((id: string) => void) | undefined;
+}) {
+  if (props.mode !== 'advanced' || !props.editor || !props.onOpen || !props.onSelect) return null;
+  return (
+    <ReviewTextTrack
+      editor={props.editor}
+      busy={props.busy}
+      selectedId={props.selectedId}
+      beforeAction={props.beforeAction}
+      onOpenDocument={props.onOpen}
+      onSelect={props.onSelect}
+    />
+  );
+}
+
+/** Audio capability and original-range navigation share one source/result projection decision. */
+function reviewTimelineAudioTrack(
+  props: TimelineBindingProps,
+  features: ReturnType<typeof resolveQuickEditEffectiveFeatures>,
+  projection: ReviewTrackProjection
+) {
+  return features.audioTrackVisible ||
+    (features.mode === 'advanced' &&
+      !!props.audioState.originalSpeech?.transcript.replacements.length) ||
+    (features.mode === 'advanced' && props.editing.exporter.index === null) ||
+    !!props.editing.exporter.index?.audioCodec
+    ? {
+        audioTrack: (
+          <ReviewAudioLane
+            beforeAction={props.beforeAction}
+            selectedEditId={props.editing.selected?.id}
+            edits={props.edits}
+            onOriginalRange={(range) => {
+              props.onClearSelection();
+              props.setSelection({
+                kind: 'point',
+                time: range.kind === 'range' ? range.start : range.time,
+              });
+            }}
+            onSelectSpeed={props.editing.select}
+            showAddedAudio={features.audioTrackVisible}
+            showOriginalSpeech={features.mode === 'advanced'}
+            automaticOriginalRanges={props.automaticOriginalRanges}
+            hasOriginalAudio={
+              props.editing.exporter.index === null || !!props.editing.exporter.index.audioCodec
+            }
+            projection={projection}
+            snapTimes={reviewAudioSnapTimes(props)}
+            audioState={props.audioState}
+            waveforms={props.waveforms}
+            resultDuration={props.resultDuration}
+            audio={props.audio}
+            busy={props.busy}
+            onImportFile={props.onImportAudioFile}
+            onRecordVoiceover={props.onRecordVoiceover}
+            onOpenMusic={props.onOpenMusic}
+            onOpenSpeech={features.mode === 'advanced' ? props.onOpenSpeech : undefined}
+            selectedSpeechId={props.selectedSpeechId}
+          />
+        ),
+      }
+    : {};
 }

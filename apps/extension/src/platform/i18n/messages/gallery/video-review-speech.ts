@@ -1,6 +1,53 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewSpeechMessages = defineMessageSource({
+  textTrack: { ru: 'Текст', en: 'Text' },
+  textTrackDocument: { ru: 'Текст дорожки', en: 'Track text' },
+  textTrackOpen: { ru: 'Открыть текст дорожки', en: 'Open track text' },
+  textFragmentAdd: { ru: 'Создать фрагмент', en: 'Create fragment' },
+  textFragment: { ru: 'Фрагмент текста', en: 'Text fragment' },
+  textFragmentStart: { ru: 'Начало (с)', en: 'Start (s)' },
+  textFragmentEnd: { ru: 'Конец (с)', en: 'End (s)' },
+  textFragmentOrigin: { ru: 'Источник текста', en: 'Text source' },
+  textFragmentVisibility: { ru: 'Показ в видео', en: 'Video visibility' },
+  textFragmentDelete: { ru: 'Удалить текст', en: 'Delete text' },
+  textFragmentSplit: { ru: 'Разделить текст', en: 'Split text' },
+  textFragmentMerge: { ru: 'Объединить со следующей фразой', en: 'Merge with next phrase' },
+  textFragmentSplitHint: {
+    ru: 'Выберите место в тексте и установите курсор видео на границу разделения.',
+    en: 'Choose a position in the text and move the video playhead to the split time.',
+  },
+  textFragmentInvalid: {
+    ru: 'Проверьте границы и место разделения текста.',
+    en: 'Check the text timing and split position.',
+  },
+  textFragmentGap: {
+    ru: 'Можно объединить соседние фразы с одинаковыми настройками, без паузы между ними.',
+    en: 'Merge adjacent phrases with matching settings and no gap between them.',
+  },
+  textFragmentSearch: { ru: 'Поиск по тексту', en: 'Search text' },
+  textFragmentFilters: { ru: 'Фильтры текста', en: 'Text filters' },
+  textFragmentAll: { ru: 'Все', en: 'All' },
+  textFragmentManual: { ru: 'Введён вручную', en: 'Authored' },
+  textFragmentOriginal: { ru: 'Исходный звук', en: 'Source audio' },
+  textFragmentVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
+  textFragmentVoiceNone: { ru: 'Без озвучки', en: 'No voice take' },
+  textFragmentVoiceCurrent: { ru: 'Озвучка соответствует тексту', en: 'Matching voice take' },
+  textFragmentVoiceChanged: {
+    ru: 'Текст или время изменены после озвучки',
+    en: 'Text or timing changed after voicing',
+  },
+  textFragmentShown: { ru: 'Показывать в видео', en: 'Show in video' },
+  textFragmentHidden: { ru: 'Скрыт в видео', en: 'Hidden in video' },
+  textFragmentSelectFound: { ru: 'Выбрать найденные', en: 'Select matching' },
+  textFragmentCount: { ru: 'Найдено {found} из {total}', en: 'Found {found} of {total}' },
+  textFragmentBatchScope: {
+    ru: 'Выбрано в выдаче: {selected}. Скрытых: {hidden}, не участвуют.',
+    en: 'Matching selection: {selected}. Hidden: {hidden}, excluded.',
+  },
+  textFragmentEmpty: { ru: 'Нет подходящих фраз', en: 'No matching phrases' },
+  textFragmentResetFilters: { ru: 'Сбросить фильтры', en: 'Reset filters' },
+  textFragmentMore: { ru: 'Показать ещё', en: 'Show more' },
   speechAuditionSeek: { ru: 'Позиция прослушивания', en: 'Audition position' },
   speechAuditionSource: { ru: 'Источник прослушивания', en: 'Audition source' },
   speechAuditionFailed: {

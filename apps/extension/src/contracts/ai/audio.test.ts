@@ -15,6 +15,47 @@ const scope = {
   nativeStart: 0,
   nativeEnd: 1,
 };
+
+it('admits asset-free text synthesis and refuses text transcription, mixed clocks or forged identity', () => {
+  const textScope = {
+    workspaceId: 'w',
+    workspaceRevision: 2,
+    target: { kind: 'text' as const, fragmentId: 'text' },
+    textRevision: 1,
+    timingRevision: 3,
+    start: 2,
+    end: 5,
+    timeDomain: 'result' as const,
+  };
+  const start = {
+    type: 'start',
+    requestId: 'r',
+    modelId: 'voice',
+    scope: textScope,
+    operation: 'speech',
+    phraseId: 'text',
+    textRevision: 1,
+    text: 'Hello',
+    profile: { voiceId: 'alloy', responseFormat: 'mp3' },
+  };
+  expect(parseAudioJobScope(textScope)).toEqual(textScope);
+  expect(parseAudioJobClientMessage(start)).toMatchObject({ scope: textScope });
+  expect(parseAudioJobClientMessage({ ...start, operation: 'transcription' })).toBeNull();
+  expect(parseAudioJobClientMessage({ ...start, phraseId: 'another' })).toBeNull();
+  expect(parseAudioJobClientMessage({ ...start, textRevision: 2 })).toBeNull();
+  for (const patch of [
+    { assetId: 'fake' },
+    { nativeStart: 0 },
+    { end: Infinity },
+    { timeDomain: 'native' },
+    { timingRevision: -1 },
+  ])
+    expect(parseAudioJobScope({ ...textScope, ...patch })).toBeNull();
+  expect(sameAudioJobScope(textScope, textScope)).toBe(true);
+  expect(sameAudioJobScope(textScope, { ...textScope, timingRevision: 4 })).toBe(false);
+  expect(sameAudioJobScope(textScope, scope)).toBe(false);
+  expect(sameAudioJobScope(scope, textScope)).toBe(false);
+});
 it('parses operation-scoped messages and rejects forged staging identity and profile', () => {
   expect(
     parseAudioJobClientMessage({

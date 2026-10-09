@@ -14,13 +14,31 @@ export const AUDIO_JOB_KEEPALIVE_MS = 20_000;
 export type ReviewSpeechTarget = { kind: 'original' } | { kind: 'voiceover'; clipId: string };
 
 /** Durable selection authorized before each one-shot provider operation. */
-export interface AudioJobScope {
+export interface AudioSourceJobScope {
   workspaceId: string;
   workspaceRevision: number;
   target: ReviewSpeechTarget;
   assetId: string;
   nativeStart: number;
   nativeEnd: number;
+}
+
+/** Authored narration can be voiced without any source audio or synthetic input asset. */
+export interface AudioTextJobScope {
+  workspaceId: string;
+  workspaceRevision: number;
+  target: { kind: 'text'; fragmentId: string };
+  textRevision: number;
+  timingRevision: number;
+  start: number;
+  end: number;
+  timeDomain: 'source' | 'result';
+}
+
+export type AudioJobScope = AudioSourceJobScope | AudioTextJobScope;
+
+export function isAudioSourceJobScope(scope: AudioJobScope): scope is AudioSourceJobScope {
+  return scope.target.kind !== 'text';
 }
 
 export interface AudioStagedHandle {
@@ -137,6 +155,37 @@ export function sameReviewSpeechTarget(
     : right.kind === 'voiceover' && left.clipId === right.clipId;
 }
 export function parseAudioJobScope(value: unknown): AudioJobScope | null {
+  if (record(value) && record(value['target']) && value['target']['kind'] === 'text') {
+    const target = value['target'];
+    if (
+      !identifier(value['workspaceId']) ||
+      !revision(value['workspaceRevision']) ||
+      Object.keys(target).length !== 2 ||
+      !identifier(target['fragmentId']) ||
+      !revision(value['textRevision']) ||
+      !revision(value['timingRevision']) ||
+      typeof value['start'] !== 'number' ||
+      !Number.isFinite(value['start']) ||
+      value['start'] < 0 ||
+      typeof value['end'] !== 'number' ||
+      !Number.isFinite(value['end']) ||
+      value['end'] <= value['start'] ||
+      value['end'] > 86_400 ||
+      (value['timeDomain'] !== 'source' && value['timeDomain'] !== 'result') ||
+      ['assetId', 'nativeStart', 'nativeEnd', 'clipId'].some((key) => key in value)
+    )
+      return null;
+    return {
+      workspaceId: value['workspaceId'],
+      workspaceRevision: value['workspaceRevision'],
+      target: { kind: 'text', fragmentId: target['fragmentId'] },
+      textRevision: value['textRevision'],
+      timingRevision: value['timingRevision'],
+      start: value['start'],
+      end: value['end'],
+      timeDomain: value['timeDomain'],
+    };
+  }
   if (
     !record(value) ||
     !identifier(value['workspaceId']) ||
@@ -181,7 +230,8 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   const scope = parseAudioJobScope(value['scope']);
   if (!scope) return null;
   const base = { type: 'start' as const, requestId, modelId: value['modelId'], scope };
-  if (value['operation'] === 'transcription') return { ...base, operation: 'transcription' };
+  if (value['operation'] === 'transcription')
+    return isAudioSourceJobScope(scope) ? { ...base, operation: 'transcription', scope } : null;
   if (
     value['operation'] !== 'speech' ||
     !identifier(value['phraseId']) ||
@@ -193,6 +243,11 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
     return null;
   const config = { operation: 'speech', audio: { speech: value['profile'] } };
   if (!isValidAIModelOperationConfiguration(config) || !config.audio?.speech) return null;
+  if (
+    !isAudioSourceJobScope(scope) &&
+    (scope.target.fragmentId !== value['phraseId'] || scope.textRevision !== value['textRevision'])
+  )
+    return null;
   return {
     ...base,
     operation: 'speech',
@@ -203,9 +258,20 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   };
 }
 export function sameAudioJobScope(left: AudioJobScope, right: AudioJobScope): boolean {
+  if (left.workspaceId !== right.workspaceId || left.workspaceRevision !== right.workspaceRevision)
+    return false;
+  if (!isAudioSourceJobScope(left))
+    return (
+      !isAudioSourceJobScope(right) &&
+      left.target.fragmentId === right.target.fragmentId &&
+      left.textRevision === right.textRevision &&
+      left.timingRevision === right.timingRevision &&
+      left.start === right.start &&
+      left.end === right.end &&
+      left.timeDomain === right.timeDomain
+    );
   return (
-    left.workspaceId === right.workspaceId &&
-    left.workspaceRevision === right.workspaceRevision &&
+    isAudioSourceJobScope(right) &&
     sameReviewSpeechTarget(left.target, right.target) &&
     left.assetId === right.assetId &&
     left.nativeStart === right.nativeStart &&

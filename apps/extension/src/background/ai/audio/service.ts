@@ -1,5 +1,6 @@
 import {
   AUDIO_JOB_TIMEOUT_MS,
+  isAudioSourceJobScope,
   parseAudioJobFailureCode,
   type AudioJobClientMessage,
   type AudioJobFailureCode,
@@ -88,8 +89,13 @@ class AudioJobCoordinator {
     if (!job.config || JSON.stringify(config) !== JSON.stringify(job.config))
       throw new Error('stale');
     const input = job.input ? await this.deps.read(job.input, job.request.scope) : undefined;
-    const duration = job.request.scope.nativeEnd - job.request.scope.nativeStart;
-    if (input && !(await validateAudioUpload(input, duration))) throw new Error('invalid-request');
+    const scope = job.request.scope;
+    if (
+      input &&
+      (!isAudioSourceJobScope(scope) ||
+        !(await validateAudioUpload(input, scope.nativeEnd - scope.nativeStart)))
+    )
+      throw new Error('invalid-request');
     job.controller.signal.throwIfAborted();
     await this.deps.authorize(job.request);
     job.controller.signal.throwIfAborted();

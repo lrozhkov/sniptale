@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { DB_VERSION, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from './core.stores.ts';
 import { handleDatabaseUpgrade } from './upgrade/core';
 import { betaV4Fixture } from './fixtures/beta-v4';
+import { betaV13Fixture } from './fixtures/beta-v13';
 import {
   CURRENT_SCHEMA_CONTRACTS,
   PERSISTENCE_DOMAIN_REGISTRY,
@@ -70,6 +71,43 @@ describe('database migration graph', () => {
     expect(buildDatabaseMigrationPlan(3, 2, migrations)).toBeNull();
     expect(buildDatabaseMigrationPlan(1, 3, [migration(1, 2)])).toBeNull();
   });
+});
+
+it('admits authored text without reading or rewriting workspace rows and rejects older contracts', () => {
+  const names = new Set<string>(betaV13Fixture.stores);
+  const put = vi.fn();
+  const db = {
+    objectStoreNames: { contains: (name: string) => names.has(name) },
+    createObjectStore: vi.fn(),
+    deleteObjectStore: vi.fn(),
+  };
+  const transaction = {
+    abort: vi.fn(),
+    objectStore: vi.fn((_name: string) => ({
+      put,
+      clear: vi.fn(),
+      delete: vi.fn(),
+      getAll: vi.fn(),
+    })),
+  };
+  const plan = buildDatabaseMigrationPlan(13, DB_VERSION);
+  expect(plan).toHaveLength(1);
+  expect(plan?.[0]?.domainVersions).toEqual([{ domainId: 'mediaLibrary', from: 12, to: 13 }]);
+  handleDatabaseUpgrade(db, 13, DB_VERSION, transaction);
+  expect(transaction.objectStore.mock.calls).toEqual([[SCHEMA_CONTRACTS_STORE]]);
+  expect(put.mock.calls.map(([value]) => value)).toEqual(CURRENT_SCHEMA_CONTRACTS);
+  expect(db.createObjectStore).not.toHaveBeenCalled();
+  expect(db.deleteObjectStore).not.toHaveBeenCalled();
+  const olderContracts = Object.entries(betaV13Fixture.domainVersions).map(
+    ([domainId, schemaVersion]) => ({ domainId, schemaVersion })
+  );
+  expect(parseStoredSchemaContracts(olderContracts)).toBeNull();
+  expect(buildDatabaseMigrationPlan(DB_VERSION, 13)).toBeNull();
+  put.mockClear();
+  names.delete('video_workspace_drafts');
+  expect(() => handleDatabaseUpgrade(db, 13, DB_VERSION, transaction)).toThrow('unavailable');
+  expect(transaction.abort).toHaveBeenCalledOnce();
+  expect(put).not.toHaveBeenCalled();
 });
 
 it('requires a complete supported upgrade chain and rejects malformed persisted domain rows', () => {

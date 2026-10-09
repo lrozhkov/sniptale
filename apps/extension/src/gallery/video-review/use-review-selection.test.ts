@@ -20,6 +20,32 @@ const document: ReviewDocument = {
 };
 
 describe('review selection owner', () => {
+  it('resolves authored text in its declared clock and clears a deleted text selection', () => {
+    const advanced = createQuickEditAdvancedState();
+    const fragment = {
+      id: 'text',
+      text: 'Hello',
+      originalText: '',
+      start: 1,
+      end: 3,
+      timeDomain: 'result' as const,
+      revision: 0,
+      timingRevision: 0,
+      alignment: 'manual' as const,
+      showInVideo: true,
+    };
+    advanced.text = { version: 1, fragments: [fragment] };
+    const selection: ReviewSelection = { kind: 'text', id: fragment.id };
+    expect(reviewSelectionExists(selection, document, advanced)).toBe(true);
+    expect(selectedHistoryRemoval(selection, document)).toBeNull();
+    expect(reviewSelectionSourceTime(selection, document, advanced, 10, [])).toBe(3);
+    advanced.text = { version: 1, fragments: [{ ...fragment, timeDomain: 'source' }] };
+    expect(reviewSelectionSourceTime(selection, document, advanced, 10, [])).toBe(2);
+    advanced.text = { version: 1, fragments: [] };
+    expect(reviewSelectionExists(selection, document, advanced)).toBe(false);
+    expect(reviewSelectionSourceTime(selection, document, advanced, 10, [])).toBeNull();
+  });
+
   it('creates deletion operations only for history-owned selections', () => {
     expect(selectedHistoryRemoval({ kind: 'edit', id: 'e' }, document)).toMatchObject({
       target: 'edit',

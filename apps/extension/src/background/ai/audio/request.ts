@@ -1,6 +1,7 @@
 import {
   AUDIO_INPUT_MAX_BYTES,
   AUDIO_OUTPUT_MAX_BYTES,
+  isAudioSourceJobScope,
   type AudioJobStart,
 } from '../../../contracts/ai/audio';
 import type { AudioModelConfig } from './model-config';
@@ -110,6 +111,8 @@ async function assertResponseStatus(response: Response): Promise<void> {
 }
 
 async function decodeTranscription(response: Response, args: AudioRequest) {
+  const scope = args.request.scope;
+  if (!isAudioSourceJobScope(scope)) throw new Error('invalid-request');
   const bytes = await readBounded(response, 1024 * 1024, args.signal);
   let raw: unknown;
   try {
@@ -117,10 +120,7 @@ async function decodeTranscription(response: Response, args: AudioRequest) {
   } catch {
     throw new Error('invalid-response');
   }
-  const result = parseAudioTranscriptResponse(
-    raw,
-    args.request.scope.nativeEnd - args.request.scope.nativeStart
-  );
+  const result = parseAudioTranscriptResponse(raw, scope.nativeEnd - scope.nativeStart);
   if (!result) throw new Error('invalid-response');
   return { kind: 'transcript' as const, result };
 }

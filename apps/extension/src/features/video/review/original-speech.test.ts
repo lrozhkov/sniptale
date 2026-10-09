@@ -150,7 +150,7 @@ describe('original speech durable specialization', () => {
     expect(loadQuickEditAdvancedState(structuredClone(state))).toEqual(state);
     const content = reviewAdvancedContentBaseline(state);
     expect(loadQuickEditAdvancedContentState(structuredClone(content))).toEqual(content);
-    for (const schemaVersion of [6, 8]) {
+    for (const schemaVersion of [6, state.schemaVersion + 1]) {
       expect(loadQuickEditAdvancedState({ ...state, schemaVersion })).toBeNull();
       expect(loadQuickEditAdvancedContentState({ ...content, schemaVersion })).toBeNull();
     }

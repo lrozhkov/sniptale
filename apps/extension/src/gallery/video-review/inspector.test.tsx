@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewInspector as Inspector } from './inspector';
@@ -491,6 +491,87 @@ it('opens original speech without a synthetic selected clip and leaves it on mod
     expect(host.querySelector('output')?.textContent).toBe('comments');
   } finally {
     act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('opens the track document in the third context and closes it on selection or section change', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  function Harness() {
+    const [selection, setSelection] = useState<ReviewSelection>({ kind: 'text', id: 'one' });
+    const navigation = useReviewInspectorNavigation({
+      contextKey: selection.kind === 'text' ? `text:${selection.id}` : 'none',
+      contextSelection: selection,
+      selectionLabel: selection.kind === 'text' ? 'Phrase' : undefined,
+      settingsAvailable: true,
+      exportAvailable: false,
+    });
+    return (
+      <>
+        <button
+          data-open-track
+          onClick={() => {
+            setSelection({ kind: 'none' });
+            navigation.setSection('text');
+          }}
+        >
+          Track document
+        </button>
+        <button
+          data-select-text
+          onClick={() => {
+            setSelection({ kind: 'text', id: 'one' });
+            navigation.setSection('selected');
+          }}
+        >
+          Select text block
+        </button>
+        <Inspector
+          navigation={navigation}
+          filename="clip"
+          annotations={[]}
+          selectedId={null}
+          busy={false}
+          message={null}
+          settingsAvailable
+          selectionLabel={selection.kind === 'text' ? 'Phrase' : undefined}
+          textDocument={<p data-track-document>Document list</p>}
+          scene={<p>Scene controls</p>}
+          onBack={vi.fn()}
+          onAdd={vi.fn()}
+          onSelect={vi.fn()}
+          onHover={vi.fn()}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onReport={vi.fn()}
+        >
+          <p data-selected-fragment>Selected fragment</p>
+        </Inspector>
+      </>
+    );
+  }
+  try {
+    await act(async () => root.render(<Harness />));
+    expect(host.querySelector('[data-selected-fragment]')).not.toBeNull();
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-open-track]')!.click());
+    expect(host.querySelector('[data-track-document]')).not.toBeNull();
+    expect(host.querySelector('[data-selected-fragment]')).toBeNull();
+    expect(
+      host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
+    ).toHaveLength(3);
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-select-text]')!.click());
+    expect(host.querySelector('[data-track-document]')).toBeNull();
+    expect(host.querySelector('[data-selected-fragment]')).not.toBeNull();
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-open-track]')!.click());
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[title="gallery.videoReview.scene"]')!.click()
+    );
+    expect(host.textContent).toContain('Scene controls');
+    expect(host.querySelector('[title="gallery.videoReview.textTrackDocument"]')).toBeNull();
+  } finally {
+    await act(async () => root.unmount());
     vi.unstubAllGlobals();
   }
 });

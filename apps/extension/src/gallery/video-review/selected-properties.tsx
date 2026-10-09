@@ -1,3 +1,5 @@
+import { ReviewTextPhrase } from './speech-phrase';
+import type { useReviewText } from './use-review-text';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { ReviewSpeechPanel } from './speech-panel';
@@ -438,6 +440,7 @@ export function reviewSelectionLabel(
   state: Pick<SelectedPropertiesProps, 'selection' | 'markers' | 'advanced' | 'editing'>
 ): string | undefined {
   const selection = state.selection;
+  if (selection.kind === 'text') return translate('gallery.videoReview.textFragment');
   if (
     selection.kind === 'webcam' ||
     selection.kind === 'webcam-position' ||
@@ -477,4 +480,32 @@ export function reviewSelectionLabel(
         : 'gallery.videoReview.speedMode'
     );
   return undefined;
+}
+
+/** Text selection owns only its fragment form; existing media inspectors keep their routing. */
+export function ReviewSelectedTextProperties(props: {
+  editor: ReturnType<typeof useReviewText>;
+  id: string;
+  busy: boolean;
+}) {
+  const fragment = props.editor.document.fragments.find((entry) => entry.id === props.id);
+  if (!fragment) return null;
+  const limit =
+    fragment.timeDomain === 'source'
+      ? props.editor.projection.duration
+      : props.editor.projection.resultDuration;
+  return (
+    <fieldset disabled={props.busy} className="min-w-0 space-y-3">
+      <ReviewTextPhrase
+        key={fragment.id}
+        fragment={fragment}
+        editor={props.editor}
+        expanded
+        busy={props.busy}
+        focus={props.editor.createdId === fragment.id}
+        limit={limit}
+        onJump={() => props.editor.jump(fragment)}
+      />
+    </fieldset>
+  );
 }

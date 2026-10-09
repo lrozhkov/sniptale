@@ -1,4 +1,9 @@
 import { parseReviewOriginalSpeech } from '../original-speech';
+import {
+  parseReviewCaptionSettings,
+  parseReviewTextDocument,
+  parseReviewVoiceTextSnapshot,
+} from '../text-validation';
 import { parseQuickEditPresentationSettings } from './presentation';
 import { parseQuickEditWatermark } from './watermark';
 import { parseReviewSpeechTranscript } from '../speech-validation';
@@ -360,8 +365,13 @@ function parseAudioClip(value: unknown): QuickEditAudioClip | null {
     value['transcript'] === undefined
       ? undefined
       : parseReviewSpeechTranscript(value['transcript']);
-  if (sourceAnchor === null || transcript === null) return null;
+  const textSnapshot =
+    value['textSnapshot'] === undefined
+      ? undefined
+      : parseReviewVoiceTextSnapshot(value['textSnapshot']);
+  if (sourceAnchor === null || transcript === null || textSnapshot === null) return null;
   return {
+    ...(textSnapshot ? { textSnapshot } : {}),
     ...(sourceAnchor ? { sourceAnchor } : {}),
     ...(transcript ? { transcript } : {}),
     ...(typeof value['tempo'] === 'number' ? { tempo: value['tempo'] } : {}),
@@ -453,9 +463,17 @@ function parseAudioState(value: unknown, allowOriginalSpeech: boolean): QuickEdi
  * rejects the operation at the workspace boundary.
  */
 export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvancedContent | null {
+  const text =
+    isRecord(raw) && raw['text'] !== undefined ? parseReviewTextDocument(raw['text']) : undefined;
+  const captions =
+    isRecord(raw) && raw['captions'] !== undefined
+      ? parseReviewCaptionSettings(raw['captions'])
+      : undefined;
+  if (text === null || captions === null) return null;
   if (
     !isRecord(raw) ||
     (raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 11 &&
       raw['schemaVersion'] !== 10 &&
       raw['schemaVersion'] !== 9 &&
       raw['schemaVersion'] !== 8 &&
@@ -467,6 +485,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
       raw['schemaVersion'] !== 2) ||
     (raw['webcam'] !== undefined &&
       raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+      raw['schemaVersion'] !== 11 &&
       raw['schemaVersion'] !== 10 &&
       raw['schemaVersion'] !== 9 &&
       raw['schemaVersion'] !== 8 &&
@@ -481,6 +500,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
       raw['schemaVersion'] === 9 ||
       raw['schemaVersion'] === 8 ||
@@ -494,6 +514,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   const audio = parseAudioState(
     raw['audio'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
       raw['schemaVersion'] === 9 ||
       raw['schemaVersion'] === 8 ||
@@ -511,6 +532,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
     raw['schemaVersion'] !== 9 &&
     raw['schemaVersion'] !== 8 &&
@@ -524,6 +546,7 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
   if (
     raw['presentation'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
     raw['schemaVersion'] !== 9 &&
     raw['schemaVersion'] !== 8 &&
@@ -542,6 +565,8 @@ export function loadQuickEditAdvancedContentState(raw: unknown): QuickEditAdvanc
     zoom,
     background,
     audio,
+    ...(text ? { text } : {}),
+    ...(captions ? { captions } : {}),
     ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),
@@ -567,6 +592,7 @@ export function loadQuickEditAdvancedState(
   const version = raw['schemaVersion'];
   if (
     version === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+    version === 11 ||
     version === 10 ||
     version === 9 ||
     version === 8 ||
@@ -589,9 +615,14 @@ export function loadQuickEditAdvancedState(
 
 /** Parses the current shape; the recovery copy is an opaque string. */
 function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedState | null {
+  const text = raw['text'] === undefined ? undefined : parseReviewTextDocument(raw['text']);
+  const captions =
+    raw['captions'] === undefined ? undefined : parseReviewCaptionSettings(raw['captions']);
+  if (text === null || captions === null) return null;
   if (
     raw['webcam'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
     raw['schemaVersion'] !== 9 &&
     raw['schemaVersion'] !== 8 &&
@@ -606,6 +637,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const zoom = parseZoomState(
     raw['zoom'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
       raw['schemaVersion'] === 9 ||
       raw['schemaVersion'] === 8 ||
@@ -619,6 +651,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   const audio = parseAudioState(
     raw['audio'],
     raw['schemaVersion'] === QUICK_EDIT_ADVANCED_SCHEMA_VERSION ||
+      raw['schemaVersion'] === 11 ||
       raw['schemaVersion'] === 10 ||
       raw['schemaVersion'] === 9 ||
       raw['schemaVersion'] === 8 ||
@@ -636,6 +669,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['watermark'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
     raw['schemaVersion'] !== 9 &&
     raw['schemaVersion'] !== 8 &&
@@ -649,6 +683,7 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
   if (
     raw['presentation'] !== undefined &&
     raw['schemaVersion'] !== QUICK_EDIT_ADVANCED_SCHEMA_VERSION &&
+    raw['schemaVersion'] !== 11 &&
     raw['schemaVersion'] !== 10 &&
     raw['schemaVersion'] !== 9 &&
     raw['schemaVersion'] !== 8 &&
@@ -670,6 +705,8 @@ function parseAdvancedFields(raw: Record<string, unknown>): QuickEditAdvancedSta
     ui,
     zoom,
     background,
+    ...(text ? { text } : {}),
+    ...(captions ? { captions } : {}),
     ...(actionsEnabled === undefined ? {} : { actionsEnabled }),
     ...(keyAnimations ? { keyAnimations } : {}),
     ...(clickAnimations ? { clickAnimations } : {}),

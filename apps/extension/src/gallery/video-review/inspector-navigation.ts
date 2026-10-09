@@ -2,7 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReviewBeforeAction } from './note-transitions';
 import type { ReviewSelection } from '../../features/video/review/types';
 
-type Section = 'scene' | 'selected' | 'comments' | 'export' | 'history' | 'preview' | 'speech';
+type Section =
+  | 'scene'
+  | 'selected'
+  | 'comments'
+  | 'export'
+  | 'history'
+  | 'preview'
+  | 'speech'
+  | 'text';
 type ReviewInspectorNavigationInput = {
   beforeAction?: ReviewBeforeAction | undefined;
   contextKey?: string;
@@ -25,9 +33,9 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       : props.settingsAvailable
         ? 'scene'
         : 'comments';
-  const [context, updateContext] = useState<'selected' | 'export' | 'history' | 'speech' | null>(
-    props.selectionLabel ? 'selected' : null
-  );
+  const [context, updateContext] = useState<
+    'selected' | 'export' | 'history' | 'speech' | 'text' | null
+  >(props.selectionLabel ? 'selected' : null);
   const [section, updateSection] = useState<Section>(contextSection);
   const explicitSection = useRef<Section | null>(null);
   const previewReturn = useRef<{
@@ -58,8 +66,22 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     (props.beforeAction ?? ((action) => action()))(() => {
       previewReturn.current = null;
       explicitSection.current = value;
-      if (value === 'export' || value === 'selected' || value === 'history' || value === 'speech')
+      if (
+        value === 'export' ||
+        value === 'selected' ||
+        value === 'history' ||
+        value === 'speech' ||
+        value === 'text'
+      )
         updateContext(value);
+      else
+        updateContext((current) =>
+          current === 'text' || current === 'speech'
+            ? props.selectionLabel
+              ? 'selected'
+              : null
+            : current
+        );
       updateSection(value);
     });
   };
@@ -83,7 +105,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
     else if (!explicit)
       updateContext((current) =>
         (preserveExport && current === 'export') ||
-        ((current === 'history' || (current === 'speech' && !modeChanged)) &&
+        ((current === 'history' ||
+          ((current === 'speech' || current === 'text') && !modeChanged)) &&
           props.contextSelection?.kind === 'none')
           ? current
           : contextSection === 'selected'
@@ -95,7 +118,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
         ? 'export'
         : (explicit ??
           ((preserveExport && current === 'export') ||
-          ((current === 'history' || (current === 'speech' && !modeChanged)) &&
+          ((current === 'history' ||
+            ((current === 'speech' || current === 'text') && !modeChanged)) &&
             props.contextSelection?.kind === 'none') ||
           (!modeChanged && contextSection === 'scene' && current === 'comments')
             ? current
@@ -117,7 +141,8 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
       ? props.settingsAvailable
         ? 'scene'
         : 'comments'
-      : (section === 'scene' || section === 'speech') && !props.settingsAvailable
+      : (section === 'scene' || section === 'speech' || section === 'text') &&
+          !props.settingsAvailable
         ? 'comments'
         : section;
   return {
@@ -133,3 +158,42 @@ export function useReviewInspectorNavigation(props: ReviewInspectorNavigationInp
 }
 
 export type ReviewInspectorNavigation = ReturnType<typeof useReviewInspectorNavigation>;
+
+/** Timeline commands use the same exclusive third context as direct inspector navigation. */
+export function reviewTimelineInspectorCommands(args: {
+  video: { current: Pick<HTMLVideoElement, 'pause'> | null };
+  select(selection: ReviewSelection): void;
+  seek(time: number, snap?: boolean): void;
+  navigation: Pick<ReviewInspectorNavigation, 'setSection' | 'shown'>;
+  selectedTextId: string | undefined;
+  selectedSpeechId: string | undefined;
+  setSpeechId(id: string | undefined): void;
+  requestExport(update: (current: number) => number): void;
+}) {
+  const clearSelection = () => {
+    args.video.current?.pause();
+    args.select({ kind: 'none' });
+  };
+  return {
+    selectedTextId: args.selectedTextId,
+    selectedSpeechId: args.navigation.shown === 'speech' ? args.selectedSpeechId : undefined,
+    exportActive: args.navigation.shown === 'export',
+    onSelectText: (id: string) => {
+      args.video.current?.pause();
+      args.select({ kind: 'text', id });
+      args.navigation.setSection('selected');
+    },
+    onOpenText: () => {
+      clearSelection();
+      args.navigation.setSection('text');
+    },
+    onOpenSpeech: (id?: string, time?: number) => {
+      clearSelection();
+      args.setSpeechId(id);
+      if (time !== undefined) args.seek(time, false);
+      args.navigation.setSection('speech');
+    },
+    onOpenHistory: () => args.navigation.setSection('history'),
+    onOpenExport: () => args.requestExport((current) => current + 1),
+  };
+}

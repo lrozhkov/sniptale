@@ -8,11 +8,13 @@ import {
   AUDIO_OUTPUT_MAX_BYTES,
   AUDIO_STAGING_TTL_MS,
   isAudioStagingId,
+  isAudioSourceJobScope,
   parseAudioJobScope,
   sameAudioJobScope,
   type AudioJobScope,
   type AudioStagedHandle,
 } from '../../../contracts/ai/audio';
+import { matchesReviewTextScope } from '../../../features/video/review/text-document';
 import { runWithPersistenceMutationTransition } from '../infrastructure/mutation-barrier';
 import { ASSET_ROOT_DIRECTORY_NAME } from './opfs-store';
 
@@ -80,6 +82,13 @@ async function assertScopeExists(scope: AudioJobScope): Promise<void> {
     workspace.source,
     reviewAdvancedContentBaseline(workspace.advanced)
   );
+  if (!isAudioSourceJobScope(scope)) {
+    const fragment = document.advancedContent.text?.fragments.find(
+      (entry) => entry.id === scope.target.fragmentId
+    );
+    if (!matchesReviewTextScope(fragment, scope)) throw new Error('Stale audio staging scope.');
+    return;
+  }
   const target = scope.target;
   if (target.kind === 'original') {
     if (workspace.aggregateId !== scope.workspaceId || workspace.sourceAssetId !== scope.assetId)

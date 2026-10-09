@@ -1,6 +1,6 @@
 import {
   AUDIO_STAGING_TTL_MS,
-  type AudioJobScope,
+  type AudioSourceJobScope,
   type ReviewSpeechTarget,
   sameReviewSpeechTarget,
   type AudioStagedHandle,
@@ -27,7 +27,7 @@ export interface ReviewSpeechPreview {
   replacement: ReviewSpeechReplacement;
   blob: Blob;
   url: string;
-  scope: AudioJobScope;
+  scope: AudioSourceJobScope;
   staged: AudioStagedHandle;
   geometry: string;
   createdAt: number;
@@ -77,7 +77,7 @@ export function reviewSpeechScope(
   target: ReviewSpeechTarget,
   start: number,
   end: number
-): AudioJobScope {
+): AudioSourceJobScope {
   const state = session.getSnapshot();
   return {
     workspaceId: state.snapshot.workspace.aggregateId,
