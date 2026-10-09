@@ -147,6 +147,7 @@ export function ReviewInspectorBinding({
             editor={state.text}
             snapshots={state.text.snapshots}
             busy={busy || editing.exporter.phase !== 'idle'}
+            voice={reviewTextVoiceAccess(state, canvasComments)}
           />
         }
         speech={
@@ -509,9 +510,11 @@ function ReviewSelectionBinding({
   if (state.activeSelection.kind === 'text')
     return (
       <ReviewSelectedTextProperties
+        key={state.activeSelection.id}
         editor={state.text}
         id={state.activeSelection.id}
         busy={state.busy || state.editing.exporter.phase !== 'idle'}
+        voice={reviewTextVoiceAccess(state, canvasComments)}
       />
     );
   return (
@@ -566,10 +569,23 @@ function leaveReviewInspector(
 ) {
   state.video.current?.pause();
   void state.run(async () => {
-    await state.composer.flush();
-    await state.flushAdvanced();
-    await canvasComments.flushTexts();
+    await reviewTextVoiceAccess(state, canvasComments).beforeRequest();
     await state.session.flush();
     done();
   });
+}
+
+/** Notes, advanced content and canvas text join the same ordered buffer before explicit API Save. */
+function reviewTextVoiceAccess(
+  state: Pick<InspectorState, 'composer' | 'flushAdvanced' | 'session'>,
+  canvasComments: Pick<ReturnType<typeof useCanvasComments>, 'flushTexts'>
+) {
+  return {
+    session: state.session,
+    beforeRequest: async () => {
+      await state.composer.flush();
+      await state.flushAdvanced();
+      await canvasComments.flushTexts();
+    },
+  };
 }

@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest';
-import { applyLocalReviewChange } from './local-session';
+import { applyLocalReviewChange, prepareReviewSpeechTranscriptChange } from './local-session';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { parseVideoWorkspace } from '../../composition/persistence/review-workspaces/parser';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
@@ -45,6 +45,100 @@ function document(snapshot: VideoWorkspaceSnapshot) {
 function commit(snapshot: VideoWorkspaceSnapshot, operation: ReviewOperation) {
   return applyLocalReviewChange(snapshot, { kind: 'commit', operation, consumeDraft: false });
 }
+
+it('prepares original speech without changing authored text, captions, gain or visibility', () => {
+  const before = document(initial()).advancedContent;
+  const transcript = { version: 1 as const, phrases: [], replacements: [] };
+  before.audio.original.volume = 0.4;
+  before.audio.originalSpeech = { enabled: false, transcript };
+  const captured = {
+    ...transcript,
+    profile: { modelId: 'model', voiceId: 'voice', responseFormat: 'wav' as const },
+  };
+  const frozen = structuredClone(before);
+  const change = prepareReviewSpeechTranscriptChange(
+    before,
+    { kind: 'original' },
+    'source',
+    'source',
+    captured
+  )!;
+  expect(before).toEqual(frozen);
+  expect(change.before).toBe(before);
+  expect(change.after).toEqual({
+    ...before,
+    audio: { ...before.audio, originalSpeech: { enabled: false, transcript: captured } },
+  });
+  expect(
+    prepareReviewSpeechTranscriptChange(
+      change.after,
+      { kind: 'original' },
+      'source',
+      'source',
+      structuredClone(captured)
+    )
+  ).toBeNull();
+  expect(() =>
+    prepareReviewSpeechTranscriptChange(
+      before,
+      { kind: 'original' },
+      'source',
+      'changed-source',
+      captured
+    )
+  ).toThrow('changed');
+});
+
+it('updates only the matching voice transcript and refuses a changed or missing clip asset', () => {
+  const before = document(initial()).advancedContent;
+  const clip = {
+    id: 'voice',
+    assetId: 'voice-asset',
+    timelineStart: 1,
+    sourceOffset: 0,
+    duration: 2,
+    volume: 0.6,
+    muted: false,
+    fadeIn: 0,
+    fadeOut: 0,
+  };
+  before.audio.voiceover = [clip, { ...clip, id: 'neighbor' }];
+  const captured = { version: 1 as const, phrases: [], replacements: [] };
+  const target = { kind: 'voiceover' as const, clipId: 'voice' };
+  const change = prepareReviewSpeechTranscriptChange(
+    before,
+    target,
+    'source',
+    'voice-asset',
+    captured
+  )!;
+  expect(change.after.audio.voiceover).toEqual([
+    { ...clip, transcript: captured },
+    { ...clip, id: 'neighbor' },
+  ]);
+  expect(before.audio.voiceover[0]?.transcript).toBeUndefined();
+  expect(
+    prepareReviewSpeechTranscriptChange(
+      change.after,
+      target,
+      'source',
+      'voice-asset',
+      structuredClone(captured)
+    )
+  ).toBeNull();
+  expect(() =>
+    prepareReviewSpeechTranscriptChange(before, target, 'source', 'changed-asset', captured)
+  ).toThrow('changed');
+  expect(() =>
+    prepareReviewSpeechTranscriptChange(
+      before,
+      { kind: 'voiceover', clipId: 'missing' },
+      'source',
+      'voice-asset',
+      captured
+    )
+  ).toThrow('changed');
+});
 
 it.each([2, 0.5, 0.75] as const)(
   'persists decimal voice insertion, overlapping voices and history under Speed %sx',

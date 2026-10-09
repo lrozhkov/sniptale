@@ -3,6 +3,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
+import { installSpeechPortFixture, speechModelResponse } from '../support/voiceover-speech-fixture';
 
 async function checkTextGesture(page: Page, block: Locator, undo: Locator, redo: Locator) {
   await block.scrollIntoViewIfNeeded();
@@ -58,11 +59,13 @@ for (const variant of [
           'sniptale-locale-preference': variant.locale,
           'sniptale-theme-preference': variant.theme,
         },
+        runtimeResponses: { AI_SETTINGS_QUERY: speechModelResponse },
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
       await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
       await page.reload();
+      await installSpeechPortFixture(page);
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       const dialog = page.locator('dialog');
@@ -112,6 +115,77 @@ for (const variant of [
       const switchBox = (await visibility.boundingBox())!;
       expect(switchBox.y + switchBox.height).toBeLessThanOrEqual(variant.height);
       await page.screenshot({ path: info.outputPath('text-document.png'), fullPage: false });
+      await document
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechGenerate'),
+          exact: true,
+        })
+        .press('Enter');
+      const voice = dialog.locator('[data-ui="gallery.videoReview.textVoice"]');
+      await expect(voice).toBeVisible();
+      await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
+      await expect(voice.locator('svg.animate-spin')).toHaveCount(0);
+      await expect(document).toHaveCount(0);
+      await expect(
+        dialog.locator('[data-ui="gallery.videoReview.inspectorNavigation"] button')
+      ).toHaveCount(3);
+      await button('gallery.videoReview.textVoiceBack').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('text-voice-form.png'), fullPage: false });
+      await voice
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechGenerateSelected'),
+          exact: true,
+        })
+        .click();
+      await expect(voice).toContainText('Local speech fixture');
+      const requestCount = () =>
+        page.evaluate(() => {
+          const requests = Reflect.get(window, 'speechFixtureRequests');
+          return Array.isArray(requests) ? requests.length : -1;
+        });
+      expect(await requestCount()).toBe(0);
+      await voice
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechConsentContinue'),
+          exact: true,
+        })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({ path: info.outputPath('text-voice-consent.png'), fullPage: false });
+      await voice
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechConsentContinue'),
+          exact: true,
+        })
+        .click();
+      await expect(voice.locator('audio')).toHaveCount(1);
+      expect(await requestCount()).toBe(1);
+      const apply = voice.getByRole('button', {
+        name: label('gallery.videoReview.speechApply'),
+        exact: true,
+      });
+      await apply.scrollIntoViewIfNeeded();
+      const applyBox = (await apply.boundingBox())!;
+      expect(applyBox.y + applyBox.height).toBeLessThanOrEqual(variant.height);
+      await page.screenshot({ path: info.outputPath('text-voice-preview.png'), fullPage: false });
+      await apply.click();
+      await expect(voice).toContainText(label('gallery.videoReview.textVoiceAccepted'));
+      const takes = dialog.locator('[data-audio-lane="voiceover"] [data-audio-id]');
+      await expect(takes).toHaveCount(1);
+      await button('gallery.videoReview.textVoiceBack').press('Enter');
+      await expect(document).toBeVisible();
+      await expect(
+        document.getByRole('button', {
+          name: label('gallery.videoReview.speechGenerate'),
+          exact: true,
+        })
+      ).toBeFocused();
+      await expect(
+        document.getByRole('button', {
+          name: label('gallery.videoReview.speechGenerate'),
+          exact: true,
+        })
+      ).toBeInViewport();
+      await expect(textbox).toHaveValue('Вторая фраза');
       if (variant.width === 1920) {
         for (const width of [523, 524, 525]) {
           await resizeInspectorContent(page, dialog, width);
@@ -140,11 +214,56 @@ for (const variant of [
       await expect(
         dialog.getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
       ).toHaveValue('Первая фраза');
+      await button('gallery.videoReview.speechGenerate').press('Enter');
+      await expect(voice).toBeVisible();
+      await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
+      await button('gallery.videoReview.textVoiceBack').press('Enter');
+      await expect(voice).toHaveCount(0);
+      await expect(button('gallery.videoReview.speechGenerate')).toBeFocused();
+      await expect(button('gallery.videoReview.speechGenerate')).toBeInViewport();
       await button('gallery.videoReview.textTrackOpen').click();
       await expect(document).toBeVisible();
       await expect(
         dialog.getByRole('textbox', { name: label('gallery.videoReview.speechText'), exact: true })
       ).toHaveCount(0);
+      await document
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechBatch'),
+          exact: true,
+        })
+        .press('Enter');
+      await document
+        .getByRole('button', {
+          name: label('gallery.videoReview.textFragmentSelectFound'),
+          exact: true,
+        })
+        .press('Enter');
+      await document
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechGenerateSelected'),
+          exact: true,
+        })
+        .press('Enter');
+      await expect(button('gallery.videoReview.textVoiceBack')).toBeFocused();
+      await button('gallery.videoReview.textVoiceBack').press('Enter');
+      await expect(
+        document.getByRole('button', {
+          name: label('gallery.videoReview.speechGenerateSelected'),
+          exact: true,
+        })
+      ).toBeFocused();
+      await expect(
+        document.getByRole('button', {
+          name: label('gallery.videoReview.speechGenerateSelected'),
+          exact: true,
+        })
+      ).toBeInViewport();
+      await document
+        .getByRole('button', {
+          name: label('gallery.videoReview.speechBatch'),
+          exact: true,
+        })
+        .press('Enter');
       await checkTextGesture(
         page,
         blocks.nth(0),
@@ -178,6 +297,7 @@ for (const variant of [
       await expect(cards).toHaveCount(2);
       await expect(cards.nth(0)).toContainText('Первая фраза');
       await expect(cards.nth(1)).toContainText('Вторая фраза');
+      await expect(takes).toHaveCount(1);
       await page.screenshot({ path: info.outputPath('text-restored.png'), fullPage: false });
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));

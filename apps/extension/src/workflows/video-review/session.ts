@@ -1,9 +1,16 @@
 import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
 import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
-import { reviewWorkspaceHasSpeechReplacement } from '../../composition/persistence/review-workspaces/asset-refs';
+import {
+  collectReviewAssetReferences,
+  reviewWorkspaceHasSpeechReplacement,
+} from '../../composition/persistence/review-workspaces/asset-refs';
 import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
 import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
-import { applyLocalReviewChange, type LocalReviewChange } from './local-session';
+import {
+  applyLocalReviewChange,
+  prepareReviewSpeechTranscriptChange,
+  type LocalReviewChange,
+} from './local-session';
 import {
   saveVideoWorkspaceSnapshot,
   commitVideoWorkspace,
@@ -47,6 +54,30 @@ function failureCode(error: unknown): Failure {
   return 'storage';
 }
 
+/** A clean buffer cannot hide a previous failed operation; explicit retry requires local edits. */
+function saveExplicitReviewBuffer(
+  state: { error: Failure | null; dirty: boolean },
+  save: () => Promise<VideoWorkspaceSnapshot>
+) {
+  if (state.error && !state.dirty) throw new Error(`Review ${state.error}.`);
+  return save();
+}
+
+/** Both Save and Reset compare against the last durable snapshot, including its draft revision. */
+function reviewSnapshotSaveRequest(
+  durable: VideoWorkspaceSnapshot,
+  next: VideoWorkspaceSnapshot
+): Parameters<typeof saveVideoWorkspaceSnapshot>[0] {
+  return {
+    aggregateId: durable.workspace.aggregateId,
+    expectedRevision: durable.workspace.revision,
+    expectedSourceAssetId: durable.workspace.sourceAssetId,
+    expectedDraftRevision: durable.draft?.revision ?? null,
+    workspace: next.workspace,
+    draft: next.draft,
+  };
+}
+
 /** Serializes one editor's durable operations; the only document authority is persisted history. */
 export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps = persistence) {
   const project = (snapshot: VideoWorkspaceSnapshot) =>
@@ -79,14 +110,9 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   });
   async function persistBuffer() {
     if (!state.dirty) return state.snapshot;
-    const snapshot = await deps.saveVideoWorkspaceSnapshot({
-      aggregateId: durable.workspace.aggregateId,
-      expectedRevision: durable.workspace.revision,
-      expectedSourceAssetId: durable.workspace.sourceAssetId,
-      expectedDraftRevision: durable.draft?.revision ?? null,
-      workspace: state.snapshot.workspace,
-      draft: state.snapshot.draft,
-    });
+    const snapshot = await deps.saveVideoWorkspaceSnapshot(
+      reviewSnapshotSaveRequest(durable, state.snapshot)
+    );
     durable = snapshot;
     state = { ...state, snapshot, dirty: false };
     return snapshot;
@@ -133,6 +159,11 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
   }
   return {
     getSnapshot: () => state,
+    async hasRetainedAssetReference(assetId: string) {
+      const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
+      if (!saved) throw new Error('Review session is unavailable.');
+      return collectReviewAssetReferences(saved.workspace).has(assetId);
+    },
     async hasDurableVoiceoverClip(clipId: string, assetId: string) {
       const saved = await deps.readVideoWorkspace(initial.workspace.aggregateId);
       return (
@@ -222,55 +253,20 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         async () => {
           if (state.error && failedSpeechSave !== key) throw new Error(`Review ${state.error}.`);
           await persistBuffer();
-          const before = state.document.advancedContent;
-          const clip =
-            target.kind === 'voiceover'
-              ? before.audio.voiceover.find((entry) => entry.id === target.clipId)
-              : undefined;
-          const assetId =
-            target.kind === 'original' ? state.snapshot.workspace.sourceAssetId : clip?.assetId;
-          if (assetId !== expectedAssetId) throw new Error('Speech target changed.');
-          const previous =
-            target.kind === 'original' ? before.audio.originalSpeech?.transcript : clip?.transcript;
-          if (
-            JSON.stringify(
-              target.kind === 'original'
-                ? parseReviewOriginalSpeechTranscript(previous)
-                : parseReviewSpeechTranscript(previous)
-            ) === JSON.stringify(captured)
-          )
-            return state.snapshot;
-          const original =
-            target.kind === 'original' ? parseReviewOriginalSpeechTranscript(captured) : null;
-          if (target.kind === 'original' && !original)
-            throw new Error('Invalid original transcript.');
-          const audio = original
-            ? {
-                ...before.audio,
-                originalSpeech: {
-                  enabled: before.audio.originalSpeech?.enabled ?? true,
-                  transcript: original,
-                },
-              }
-            : {
-                ...before.audio,
-                voiceover: before.audio.voiceover.map((entry) =>
-                  target.kind === 'voiceover' && entry.id === target.clipId
-                    ? { ...entry, transcript: captured }
-                    : entry
-                ),
-              };
+          const change = prepareReviewSpeechTranscriptChange(
+            state.document.advancedContent,
+            target,
+            state.snapshot.workspace.sourceAssetId,
+            expectedAssetId,
+            captured
+          );
+          if (!change) return state.snapshot;
           return deps.commitVideoWorkspace({
             ...identity(),
             operation: {
               id: crypto.randomUUID(),
               at: Date.now(),
-              target: 'advancedContent',
-              before,
-              after: {
-                ...before,
-                audio,
-              },
+              ...change,
             },
           });
         },
@@ -286,19 +282,14 @@ export function createVideoReviewSession(initial: VideoWorkspaceSnapshot, deps =
         return deps.commitVideoWorkspace({ ...identity(), operation: captured });
       });
     },
+    /** Explicit Save of the entire local workspace buffer; opening an API form never invokes it. */
+    saveBuffered: () => enqueue(() => saveExplicitReviewBuffer(state, persistBuffer)),
     /** Clears authored content atomically while preserving source identity and UI preferences. */
     reset() {
       return enqueue(
         async () => {
           const next = applyLocalReviewChange(state.snapshot, { kind: 'reset' });
-          return deps.saveVideoWorkspaceSnapshot({
-            aggregateId: durable.workspace.aggregateId,
-            expectedRevision: durable.workspace.revision,
-            expectedSourceAssetId: durable.workspace.sourceAssetId,
-            expectedDraftRevision: durable.draft?.revision ?? null,
-            workspace: next.workspace,
-            draft: next.draft,
-          });
+          return deps.saveVideoWorkspaceSnapshot(reviewSnapshotSaveRequest(durable, next));
         },
         { kind: 'reset' }
       );

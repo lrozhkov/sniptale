@@ -183,6 +183,41 @@ function findLexicalBinding(identifier) {
   return null;
 }
 
+function scopeHasVarBinding(scope, name) {
+  let shadowed = false;
+  function visit(node) {
+    if (shadowed || (node !== scope && ts.isFunctionLike(node))) return;
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isVariableDeclarationList(node.parent) &&
+      (node.parent.flags & ts.NodeFlags.BlockScoped) === 0 &&
+      findBindingIdentifier(name, node.name)
+    ) {
+      shadowed = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(scope);
+  return shadowed;
+}
+
+/** Detects function-scoped var shadows, including declarations nested in sibling blocks. */
+export function hasFunctionScopedVarShadow(identifier, sourceFile) {
+  let current = identifier.parent;
+  while (current) {
+    if (
+      (current === sourceFile || ts.isFunctionLike(current)) &&
+      scopeHasVarBinding(current, identifier.text)
+    ) {
+      return true;
+    }
+    if (current === sourceFile) break;
+    current = current.parent;
+  }
+  return false;
+}
+
 export function createLexicalBindingKey(root, sourceFile, suffix = '') {
   if (root.kind === ts.SyntaxKind.ThisKeyword) {
     let owner = root.parent;

@@ -31,6 +31,7 @@ it('admits asset-free text synthesis and refuses text transcription, mixed clock
     type: 'start',
     requestId: 'r',
     modelId: 'voice',
+    approvedProviderId: 'approved-provider',
     scope: textScope,
     operation: 'speech',
     phraseId: 'text',
@@ -40,6 +41,11 @@ it('admits asset-free text synthesis and refuses text transcription, mixed clock
   };
   expect(parseAudioJobScope(textScope)).toEqual(textScope);
   expect(parseAudioJobClientMessage(start)).toMatchObject({ scope: textScope });
+  expect(parseAudioJobClientMessage({ ...start, approvedProviderId: undefined })).toBeNull();
+  expect(parseAudioJobClientMessage({ ...start, approvedProviderId: '' })).toBeNull();
+  expect(
+    parseAudioJobClientMessage({ ...start, approvedProviderId: { id: 'provider' } })
+  ).toBeNull();
   expect(parseAudioJobClientMessage({ ...start, operation: 'transcription' })).toBeNull();
   expect(parseAudioJobClientMessage({ ...start, phraseId: 'another' })).toBeNull();
   expect(parseAudioJobClientMessage({ ...start, textRevision: 2 })).toBeNull();

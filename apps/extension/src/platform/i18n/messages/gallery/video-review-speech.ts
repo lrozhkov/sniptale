@@ -248,4 +248,30 @@ export const galleryVideoReviewSpeechMessages = defineMessageSource({
     ru: 'Запрос отменён. Повторный запуск выполняется только по вашему действию.',
     en: 'Request canceled. Run it again explicitly if needed.',
   },
+  textVoiceBack: { ru: 'Вернуться к тексту', en: 'Return to text' },
+  textVoiceScope: { ru: 'Озвучить фразы: {count}', en: 'Phrases to voice: {count}' },
+  textVoiceSaveDisclosure: {
+    ru: 'Перед запросом сохранятся все изменения проекта, включая заметки. Автосохранение останется выключенным.',
+    en: 'All project changes, including notes, will be saved before the request. Autosave will remain off.',
+  },
+  textVoiceSaveStart: { ru: 'Сохранить изменения и озвучить', en: 'Save changes and generate' },
+  textVoicePromptSent: {
+    ru: 'Инструкции для голоса также будут отправлены.',
+    en: 'Voice instructions will also be sent.',
+  },
+  textVoiceNoPrompt: {
+    ru: 'Дополнительные инструкции не передаются.',
+    en: 'No additional instructions will be sent.',
+  },
+  textVoiceHistoryDisclosure: {
+    ru: 'Текст фраз и инструкции не сохраняются в истории AI-запросов.',
+    en: 'Phrase text and instructions are not stored in AI request history.',
+  },
+  textVoiceDuration: { ru: '{duration} с', en: '{duration} s' },
+  textVoiceWaiting: { ru: 'Прошло {seconds} с', en: 'Elapsed: {seconds} s' },
+  textVoiceAccepted: { ru: 'Добавлено на дорожку озвучки', en: 'Added to the voiceover track' },
+  textVoiceProjectLimit: {
+    ru: 'Озвучка выходит за конец видео. Переместите фразу или сократите текст.',
+    en: 'The take extends beyond the video. Move the phrase or shorten its text.',
+  },
 });

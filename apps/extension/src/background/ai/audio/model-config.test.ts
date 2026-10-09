@@ -60,6 +60,21 @@ const request: AudioJobStart = {
   },
 };
 
+const authoredRequest: AudioJobStart = {
+  ...request,
+  approvedProviderId: provider.id,
+  scope: {
+    workspaceId: 'workspace',
+    workspaceRevision: 1,
+    target: { kind: 'text', fragmentId: 'phrase' },
+    textRevision: 1,
+    timingRevision: 0,
+    start: 0,
+    end: 1,
+    timeDomain: 'result',
+  },
+};
+
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('chrome', { permissions: { contains: permission } });
@@ -72,6 +87,48 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('audio model operation and credential admission', () => {
+  it('refuses a stale disclosed provider binding before secret access and POST', async () => {
+    vi.mocked(loadAIModels).mockResolvedValue([{ ...model, providerId: 'changed-provider' }]);
+    vi.mocked(loadAIProviders).mockResolvedValue([{ ...provider, id: 'changed-provider' }]);
+    const post = vi.fn();
+    const messages: AudioJobServerMessage[] = [];
+    const service = createAudioJobService({
+      authorize: vi.fn(async () => undefined),
+      request: post,
+    });
+    const job = service.connect((message) => messages.push(message));
+    job.receive(authoredRequest);
+    await vi.waitFor(() =>
+      expect(messages.some((message) => message.type === 'failure')).toBe(true)
+    );
+    expect(messages).toContainEqual({
+      type: 'failure',
+      requestId: request.requestId,
+      code: 'model-unavailable',
+    });
+    expect(permission).not.toHaveBeenCalled();
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+    await job.disconnect();
+  });
+
+  it('requires text consent identity even when called without port parsing', async () => {
+    const unapproved = structuredClone(authoredRequest);
+    delete unapproved.approvedProviderId;
+    await expect(resolveAudioModelConfig(unapproved)).rejects.toThrow('model-unavailable');
+    expect(permission).not.toHaveBeenCalled();
+    expect(activateStoredAIProviderSecretForUse).not.toHaveBeenCalled();
+  });
+
+  it('uses the matching disclosed provider for authored speech', async () => {
+    await expect(resolveAudioModelConfig(authoredRequest)).resolves.toMatchObject({
+      url: 'https://audio.example.test/custom/v1/audio/speech',
+      modelCode: model.modelCode,
+      speech: request.profile,
+    });
+    expect(activateStoredAIProviderSecretForUse).toHaveBeenCalledExactlyOnceWith(provider);
+  });
+
   it('checks exact provider origin permission before resolving its bound secret', async () => {
     await expect(resolveAudioModelConfig(request)).resolves.toEqual({
       url: 'https://audio.example.test/custom/v1/audio/speech',

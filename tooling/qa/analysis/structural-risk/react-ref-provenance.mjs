@@ -1,4 +1,9 @@
-import { createLexicalBindingKey, ts, unwrapExpression } from './ast.mjs';
+import {
+  createLexicalBindingKey,
+  hasFunctionScopedVarShadow,
+  ts,
+  unwrapExpression,
+} from './ast.mjs';
 
 function isReactImport(statement) {
   return (
@@ -30,47 +35,6 @@ function collectReactUseRefImports(sourceFile) {
     recordReactImportBindings(statement.importClause, direct, namespaces, sourceFile);
   }
   return { direct, namespaces };
-}
-
-function bindingDeclaresName(binding, name) {
-  if (ts.isIdentifier(binding)) return binding.text === name;
-  return binding.elements.some(
-    (element) => !ts.isOmittedExpression(element) && bindingDeclaresName(element.name, name)
-  );
-}
-
-function scopeHasVarBinding(scope, name) {
-  let shadowed = false;
-  function visit(node) {
-    if (shadowed || (node !== scope && ts.isFunctionLike(node))) return;
-    if (
-      ts.isVariableDeclaration(node) &&
-      ts.isVariableDeclarationList(node.parent) &&
-      (node.parent.flags & ts.NodeFlags.BlockScoped) === 0 &&
-      bindingDeclaresName(node.name, name)
-    ) {
-      shadowed = true;
-      return;
-    }
-    ts.forEachChild(node, visit);
-  }
-  visit(scope);
-  return shadowed;
-}
-
-function hasFunctionScopedVarShadow(identifier, sourceFile) {
-  let current = identifier.parent;
-  while (current) {
-    if (
-      (current === sourceFile || ts.isFunctionLike(current)) &&
-      scopeHasVarBinding(current, identifier.text)
-    ) {
-      return true;
-    }
-    if (current === sourceFile) break;
-    current = current.parent;
-  }
-  return false;
 }
 
 function isReactUseRefCall(node, imports, sourceFile) {

@@ -10,7 +10,7 @@ import {
   type AISpeechModelParameters,
   type AITranscriptionModelParameters,
 } from '../../../contracts/settings/model-operation';
-import type { AudioJobStart } from '../../../contracts/ai/audio';
+import { isAudioSourceJobScope, type AudioJobStart } from '../../../contracts/ai/audio';
 
 export interface AudioModelConfig {
   url: string;
@@ -28,6 +28,11 @@ export async function resolveAudioModelConfig(request: AudioJobStart): Promise<A
     !model ||
     model.operation !== request.operation ||
     !isValidAIModelOperationConfiguration(model)
+  )
+    throw new Error('model-unavailable');
+  if (
+    (!isAudioSourceJobScope(request.scope) && !request.approvedProviderId) ||
+    (request.approvedProviderId !== undefined && request.approvedProviderId !== model.providerId)
   )
     throw new Error('model-unavailable');
   const provider = providers.find((entry) => entry.id === model.providerId);

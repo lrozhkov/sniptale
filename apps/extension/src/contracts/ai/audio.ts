@@ -51,6 +51,8 @@ export type AudioJobStart = {
   type: 'start';
   requestId: string;
   modelId: string;
+  /** The provider disclosed by the requesting view; mandatory for authored text synthesis. */
+  approvedProviderId?: string;
   scope: AudioJobScope;
 } & (
   | { operation: 'transcription' }
@@ -229,7 +231,19 @@ export function parseAudioJobClientMessage(value: unknown): AudioJobClientMessag
   if (value['type'] !== 'start' || !identifier(value['modelId'])) return null;
   const scope = parseAudioJobScope(value['scope']);
   if (!scope) return null;
-  const base = { type: 'start' as const, requestId, modelId: value['modelId'], scope };
+  const approvedProviderId = value['approvedProviderId'];
+  if (
+    (approvedProviderId !== undefined && !identifier(approvedProviderId)) ||
+    (!isAudioSourceJobScope(scope) && !identifier(approvedProviderId))
+  )
+    return null;
+  const base = {
+    type: 'start' as const,
+    requestId,
+    modelId: value['modelId'],
+    scope,
+    ...(typeof approvedProviderId === 'string' ? { approvedProviderId } : {}),
+  };
   if (value['operation'] === 'transcription')
     return isAudioSourceJobScope(scope) ? { ...base, operation: 'transcription', scope } : null;
   if (

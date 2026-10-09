@@ -1,4 +1,7 @@
 import { ReviewTextPhrase } from './speech-phrase';
+import { ReviewTextVoiceForm } from './text-voice-panel';
+import { useReviewTextVoiceMode } from './text-voice-focus';
+import type { ReviewTextVoiceAccess } from './use-text-voice';
 import type { useReviewText } from './use-review-text';
 import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
@@ -27,12 +30,13 @@ import type { useReviewExport } from './use-export';
 import { ReviewEditRangeFields } from './edit-range-fields';
 import { ReviewSpeedOptions } from './edit-actions';
 import type { useReviewZoomEditor } from './zoom-editor';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Volume2 } from 'lucide-react';
 import {
   ReviewButton,
   ReviewInterval,
   reviewDeleteButtonClassName,
   reviewEventLabel,
+  reviewTextButtonClassName,
 } from './controls';
 import { ReviewActionProperties } from './action-properties';
 import { ReviewAudioInspectorSection } from './audio-editor';
@@ -487,15 +491,26 @@ export function ReviewSelectedTextProperties(props: {
   editor: ReturnType<typeof useReviewText>;
   id: string;
   busy: boolean;
+  voice?: ReviewTextVoiceAccess | undefined;
 }) {
+  const voiceMode = useReviewTextVoiceMode<HTMLFieldSetElement>();
   const fragment = props.editor.document.fragments.find((entry) => entry.id === props.id);
   if (!fragment) return null;
+  if (voiceMode.ids && props.voice)
+    return (
+      <ReviewTextVoiceForm
+        access={props.voice}
+        ids={[fragment.id]}
+        disabled={props.busy}
+        onClose={voiceMode.close}
+      />
+    );
   const limit =
     fragment.timeDomain === 'source'
       ? props.editor.projection.duration
       : props.editor.projection.resultDuration;
   return (
-    <fieldset disabled={props.busy} className="min-w-0 space-y-3">
+    <fieldset ref={voiceMode.root} disabled={props.busy} className="min-w-0 space-y-3">
       <ReviewTextPhrase
         key={fragment.id}
         fragment={fragment}
@@ -505,6 +520,19 @@ export function ReviewSelectedTextProperties(props: {
         focus={props.editor.createdId === fragment.id}
         limit={limit}
         onJump={() => props.editor.jump(fragment)}
+        actions={
+          props.voice && (
+            <ReviewButton
+              data-text-voice-trigger="selected"
+              label={translate('gallery.videoReview.speechGenerate')}
+              className={`${reviewTextButtonClassName} !w-8 !px-0`}
+              disabled={props.busy || !fragment.text.trim()}
+              onClick={() => voiceMode.open([fragment.id], 'selected')}
+            >
+              <Volume2 size={14} />
+            </ReviewButton>
+          )
+        }
       />
     </fieldset>
   );

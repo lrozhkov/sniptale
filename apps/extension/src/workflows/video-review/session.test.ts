@@ -460,3 +460,38 @@ it('queues original transcript saves with latest manual gain and preserves histo
     session.saveSpeechTranscript({ kind: 'original' }, 'other', transcript)
   ).rejects.toThrow('changed');
 });
+
+it('explicit buffer Save drains earlier edits without a synthetic operation or enabling autosave', async () => {
+  const snapshot = initial();
+  const saveSnapshot = vi.fn(async (args: { workspace: unknown; draft: unknown }) => {
+    const { parseVideoWorkspace, parseVideoWorkspaceDraft } =
+      await import('../../composition/persistence/review-workspaces/parser');
+    const workspace = parseVideoWorkspace(args.workspace)!;
+    return {
+      workspace: { ...workspace, revision: 2 },
+      draft: parseVideoWorkspaceDraft(args.draft, workspace.source.duration),
+    };
+  });
+  const session = createVideoReviewSession(snapshot, {
+    saveVideoWorkspaceSnapshot: saveSnapshot,
+    saveVideoWorkspaceDraft: vi.fn(async () => snapshot),
+    saveVideoWorkspaceAdvanced: vi.fn(async () => snapshot),
+    commitVideoWorkspace: vi.fn(async () => snapshot),
+    readVideoWorkspace: vi.fn(async () => snapshot),
+    moveVideoWorkspaceHistory: vi.fn(async () => snapshot),
+  });
+  session.setAutosaveEnabled(false);
+  const draft = session.saveDraft(annotation, null);
+  const advanced = session.saveAdvanced({
+    ...snapshot.workspace.advanced,
+    ui: { ...snapshot.workspace.advanced.ui, mode: 'advanced' },
+  });
+  const saved = await session.saveBuffered();
+  await Promise.all([draft, advanced]);
+  expect(saveSnapshot).toHaveBeenCalledOnce();
+  expect(saved.workspace).toMatchObject({ revision: 2, history: [], cursor: 0 });
+  expect(saved.draft?.annotation).toEqual(annotation);
+  expect(session.getSnapshot()).toMatchObject({ dirty: false, autosaveEnabled: false, pending: 0 });
+  await session.saveBuffered();
+  expect(saveSnapshot).toHaveBeenCalledOnce();
+});

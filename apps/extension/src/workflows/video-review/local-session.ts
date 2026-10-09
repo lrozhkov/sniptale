@@ -1,4 +1,8 @@
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import type { ReviewSpeechTarget } from '../../contracts/ai/audio';
+import { parseReviewOriginalSpeechTranscript } from '../../features/video/review/original-speech';
+import { parseReviewSpeechTranscript } from '../../features/video/review/speech-validation';
+import type { ReviewSpeechTranscript } from '../../features/video/review/speech-transcript';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import {
   parseVideoWorkspace,
@@ -17,6 +21,52 @@ export type LocalReviewChange =
   | { kind: 'draft'; annotation: ReviewAnnotation | null; before: ReviewAnnotation | null }
   | { kind: 'commit'; operation: ReviewOperation; consumeDraft: boolean }
   | { kind: 'history'; direction: ReviewHistoryDirection };
+
+/** Prepares only the content change; the session retains queue, identity and commit ownership. */
+export function prepareReviewSpeechTranscriptChange(
+  before: Extract<ReviewOperation, { target: 'advancedContent' }>['before'],
+  target: ReviewSpeechTarget,
+  sourceAssetId: string,
+  expectedAssetId: string,
+  captured: ReviewSpeechTranscript
+): Omit<Extract<ReviewOperation, { target: 'advancedContent' }>, 'id' | 'at'> | null {
+  const clip =
+    target.kind === 'voiceover'
+      ? before.audio.voiceover.find((entry) => entry.id === target.clipId)
+      : undefined;
+  const assetId = target.kind === 'original' ? sourceAssetId : clip?.assetId;
+  if (assetId !== expectedAssetId) throw new Error('Speech target changed.');
+  const previous =
+    target.kind === 'original' ? before.audio.originalSpeech?.transcript : clip?.transcript;
+  if (
+    JSON.stringify(
+      target.kind === 'original'
+        ? parseReviewOriginalSpeechTranscript(previous)
+        : parseReviewSpeechTranscript(previous)
+    ) === JSON.stringify(captured)
+  )
+    return null;
+  const original =
+    target.kind === 'original' ? parseReviewOriginalSpeechTranscript(captured) : null;
+  if (target.kind === 'original' && !original) throw new Error('Invalid original transcript.');
+  const audio = original
+    ? {
+        ...before.audio,
+        originalSpeech: {
+          enabled: before.audio.originalSpeech?.enabled ?? true,
+          transcript: original,
+        },
+      }
+    : {
+        ...before.audio,
+        voiceover: before.audio.voiceover.map((entry) =>
+          target.kind === 'voiceover' && entry.id === target.clipId
+            ? { ...entry, transcript: captured }
+            : entry
+        ),
+      };
+  return { target: 'advancedContent', before, after: { ...before, audio } };
+}
 
 /** Derives an editable buffer without advancing either durable revision. */
 export function applyLocalReviewChange(
