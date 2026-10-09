@@ -235,6 +235,28 @@ for (const variant of [
       }
       expect(await historyCursor(page)).toBe(cursor);
       expect(await persistedFocus(page)).toEqual(initial);
+      const scaleRange = dialog.locator(
+        `input[type="range"][aria-label="${label('gallery.videoReview.zoomScale')} range"]`
+      );
+      await scaleRange.focus();
+      await page.keyboard.down('ArrowRight');
+      await page.waitForTimeout(300);
+      expect(await historyCursor(page)).toBe(cursor);
+      await page.keyboard.down('ArrowLeft');
+      await page.keyboard.up('ArrowLeft');
+      await page.keyboard.up('ArrowRight');
+      await page.waitForTimeout(300);
+      expect(await historyCursor(page)).toBe(cursor);
+      expect(await persistedFocus(page)).toEqual(initial);
+      await expect(tools.locator('.review-spatial-tool-active')).toHaveCount(1);
+      expect(
+        await tools
+          .locator('.review-spatial-tool-active')
+          .evaluate((node) => getComputedStyle(node).backgroundColor)
+      ).not.toBe('rgba(0, 0, 0, 0)');
+      await expect(
+        tools.locator('.review-spatial-tool-active .review-spatial-tool-label')
+      ).toHaveText(label('gallery.videoReview.spatialToolPosition'));
       expect(await video.evaluate((node: HTMLVideoElement) => node.currentTime)).toBe(time);
       await tool('gallery.videoReview.spatialToolTilt').click();
       const tilt = controls.getByRole('button', {
@@ -371,7 +393,31 @@ for (const variant of [
         path: info.outputPath('animation-direct-controls.png'),
         fullPage: false,
       });
+      const phaseHeading = dialog
+        .locator('summary')
+        .filter({ hasText: label('gallery.videoReview.zoomTransitionIn') });
+      await phaseHeading.click();
+      await expect(entrance).not.toBeVisible();
+      await expect(
+        dialog.getByRole('group', {
+          name: label('gallery.videoReview.zoomTransitionOut'),
+          exact: true,
+        })
+      ).toBeVisible();
+      await phaseHeading.click();
+      await expect(entrance).toBeVisible();
       const saved = await persistedFocus(page);
+      await button('gallery.videoReview.zoomResetPosition').click();
+      await expect.poll(async () => (await persistedFocus(page))?.perspective).toBeUndefined();
+      expect((await persistedFocus(page))?.depthOfField).toBeUndefined();
+      expect((await persistedFocus(page))?.transform).toEqual({
+        scale: 1.5,
+        centerX: 0.5,
+        centerY: 0.5,
+      });
+      expect((await persistedFocus(page))?.sourceAnchor).toEqual(saved?.sourceAnchor);
+      await button('gallery.videoReview.undo').click();
+      await expect.poll(() => persistedFocus(page)).toEqual(saved);
       await button('gallery.videoReview.back').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog

@@ -131,114 +131,127 @@ export function ReviewBorderAnimation(props: {
   return (
     <div className="review-inspector-columns">
       {(['enter', 'hold', 'exit'] as const).map((phase) => {
+        const label = translate(
+          phase === 'hold'
+            ? 'gallery.videoReview.borderHold'
+            : phase === 'enter'
+              ? 'gallery.videoReview.zoomTransitionIn'
+              : 'gallery.videoReview.zoomTransitionOut'
+        );
         if (phase === 'hold')
           return (
-            <fieldset key={phase} className="review-inspector-phase min-w-0 space-y-2">
-              <legend>{translate('gallery.videoReview.borderHold')}</legend>
-              <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
-            </fieldset>
+            <ReviewDetails
+              key={phase}
+              preferenceId="gallery.videoReview.border.hold"
+              label={label}
+              initiallyOpen
+            >
+              <fieldset aria-label={label} className="review-inspector-phase min-w-0 space-y-2">
+                <BorderHold border={border} onChange={onChange} onPreview={props.onPreview} />
+              </fieldset>
+            </ReviewDetails>
           );
         const clock = region[phase];
         const reveal = phase === 'enter' ? border.reveal : border.exitReveal;
         return (
-          <fieldset key={phase} className="review-inspector-phase min-w-0 space-y-2">
-            <legend>
-              {translate(
-                phase === 'enter'
-                  ? 'gallery.videoReview.zoomTransitionIn'
-                  : 'gallery.videoReview.zoomTransitionOut'
-              )}
-            </legend>
-            <SegmentedRow<'none' | 'fade' | 'draw'>
-              columns={3}
-              layout="stacked"
-              ariaLabel={translate('gallery.videoReview.focusReveal')}
-              label={translate('gallery.videoReview.focusReveal')}
-              value={clock.type === 'none' ? 'none' : reveal === 'fade' ? 'fade' : 'draw'}
-              options={[
-                {
-                  value: 'none',
-                  label: translate(
-                    phase === 'enter'
-                      ? 'gallery.videoReview.borderAppear'
-                      : 'gallery.videoReview.borderDisappear'
-                  ),
-                },
-                { value: 'fade', label: translate('gallery.videoReview.focusFade') },
-                {
-                  value: 'draw',
-                  label: translate(
-                    phase === 'enter'
-                      ? 'gallery.videoReview.borderDrawing'
-                      : 'gallery.videoReview.borderErasing'
-                  ),
-                },
-              ]}
-              onChange={(value) =>
-                onChange({
-                  [phase]: { ...clock, type: value === 'none' ? 'none' : 'ease-in-out' },
-                  border: {
-                    ...border,
-                    [phase === 'enter' ? 'reveal' : 'exitReveal']:
-                      value === 'none'
-                        ? reveal
-                        : value === 'fade'
-                          ? 'fade'
-                          : phase === 'enter'
-                            ? reveal.endsWith('-ccw')
-                              ? 'draw-ccw'
-                              : 'draw'
-                            : reveal.endsWith('-ccw')
-                              ? 'erase-ccw'
-                              : 'erase',
+          <ReviewDetails
+            key={phase}
+            preferenceId={`gallery.videoReview.border.${phase}`}
+            label={label}
+            initiallyOpen
+          >
+            <fieldset aria-label={label} className="review-inspector-phase min-w-0 space-y-2">
+              <SegmentedRow<'none' | 'fade' | 'draw'>
+                columns={3}
+                layout="stacked"
+                ariaLabel={translate('gallery.videoReview.focusReveal')}
+                label={translate('gallery.videoReview.focusReveal')}
+                value={clock.type === 'none' ? 'none' : reveal === 'fade' ? 'fade' : 'draw'}
+                options={[
+                  {
+                    value: 'none',
+                    label: translate(
+                      phase === 'enter'
+                        ? 'gallery.videoReview.borderAppear'
+                        : 'gallery.videoReview.borderDisappear'
+                    ),
                   },
-                })
-              }
-            />
-            {clock.type !== 'none' && reveal !== 'fade' ? (
-              <BorderDirection
-                counterclockwise={reveal.endsWith('-ccw')}
-                onChange={(counterclockwise) =>
+                  { value: 'fade', label: translate('gallery.videoReview.focusFade') },
+                  {
+                    value: 'draw',
+                    label: translate(
+                      phase === 'enter'
+                        ? 'gallery.videoReview.borderDrawing'
+                        : 'gallery.videoReview.borderErasing'
+                    ),
+                  },
+                ]}
+                onChange={(value) =>
                   onChange({
+                    [phase]: { ...clock, type: value === 'none' ? 'none' : 'ease-in-out' },
                     border: {
                       ...border,
                       [phase === 'enter' ? 'reveal' : 'exitReveal']:
-                        phase === 'enter'
-                          ? counterclockwise
-                            ? 'draw-ccw'
-                            : 'draw'
-                          : counterclockwise
-                            ? 'erase-ccw'
-                            : 'erase',
+                        value === 'none'
+                          ? reveal
+                          : value === 'fade'
+                            ? 'fade'
+                            : phase === 'enter'
+                              ? reveal.endsWith('-ccw')
+                                ? 'draw-ccw'
+                                : 'draw'
+                              : reveal.endsWith('-ccw')
+                                ? 'erase-ccw'
+                                : 'erase',
                     },
                   })
                 }
               />
-            ) : null}
-            <ReviewPreviewNumberRow
-              label={translate('gallery.videoReview.zoomTransitionDuration')}
-              min={0}
-              max={Math.min(
-                60,
-                Math.max(
-                  0,
-                  interval.end -
-                    interval.start -
-                    region[phase === 'enter' ? 'exit' : 'enter'].duration
-                )
-              )}
-              unit="s"
-              step={0.1}
-              precision={2}
-              scrubStep={0.01}
-              disabled={clock.type === 'none'}
-              value={clock.duration}
-              onPreview={(duration) =>
-                props.onPreview?.(duration === null ? null : { [phase]: { ...clock, duration } })
-              }
-              onChange={(duration) => onChange({ [phase]: { ...clock, duration } })}
-            />
-          </fieldset>
+              {clock.type !== 'none' && reveal !== 'fade' ? (
+                <BorderDirection
+                  counterclockwise={reveal.endsWith('-ccw')}
+                  onChange={(counterclockwise) =>
+                    onChange({
+                      border: {
+                        ...border,
+                        [phase === 'enter' ? 'reveal' : 'exitReveal']:
+                          phase === 'enter'
+                            ? counterclockwise
+                              ? 'draw-ccw'
+                              : 'draw'
+                            : counterclockwise
+                              ? 'erase-ccw'
+                              : 'erase',
+                      },
+                    })
+                  }
+                />
+              ) : null}
+              <ReviewPreviewNumberRow
+                label={translate('gallery.videoReview.zoomTransitionDuration')}
+                min={0}
+                max={Math.min(
+                  60,
+                  Math.max(
+                    0,
+                    interval.end -
+                      interval.start -
+                      region[phase === 'enter' ? 'exit' : 'enter'].duration
+                  )
+                )}
+                unit="s"
+                step={0.1}
+                precision={2}
+                scrubStep={0.01}
+                disabled={clock.type === 'none'}
+                value={clock.duration}
+                onPreview={(duration) =>
+                  props.onPreview?.(duration === null ? null : { [phase]: { ...clock, duration } })
+                }
+                onChange={(duration) => onChange({ [phase]: { ...clock, duration } })}
+              />
+            </fieldset>
+          </ReviewDetails>
         );
       })}
     </div>

@@ -94,9 +94,11 @@ export function useReviewAdvancedContent(
     (mutate: ContentMutation) => {
       const previous = pending.current;
       const base = previous?.value ?? session.getSnapshot().document.advancedContent;
+      const value = mutate(base);
+      if (JSON.stringify(value) === JSON.stringify(base)) return;
       const entry: PendingContent = {
         revision: ++nextRevision.current,
-        value: mutate(base),
+        value,
         mutations: [...(previous?.mutations ?? []), mutate],
       };
       optimistic.current = entry;

@@ -574,3 +574,11 @@ it('retains later presentation settings while an earlier watermark write is in f
     true
   );
 });
+
+it('does not enter the save queue for an unchanged authored proposal', async () => {
+  const { deps } = setup();
+  act(() => advanced.setZoom((zoom) => ({ ...zoom, regions: [...zoom.regions] })));
+  expect(advanced.pending).toBe(false);
+  await act(async () => vi.advanceTimersByTimeAsync(300));
+  expect(deps.saveVideoWorkspaceAdvanced).not.toHaveBeenCalled();
+});

@@ -8,7 +8,8 @@ import {
   originalAudioGainAt,
   type OriginalAudioAttenuation,
 } from '../../features/video/review/advanced/original-audio';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useReviewPlaybackRecovery } from './use-playback-recovery';
 import type { ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditOriginalAudio } from '../../features/video/review/advanced/types';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
@@ -19,6 +20,7 @@ interface ReviewPlaybackProps {
   boundaries(): readonly number[] | undefined;
   onSeek(value: number): void;
   onFailure(): void;
+  onRecovered?: (() => void) | undefined;
   onInvalidRange?: (() => void) | undefined;
   original: QuickEditOriginalAudio;
   automaticOriginalRanges?: readonly OriginalAudioAttenuation[];
@@ -40,7 +42,24 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
   };
   const latest = useRef(props);
   latest.current = props;
-  const synchronize = (value: number, applyEdits: boolean) => {
+  const recovery = useReviewPlaybackRecovery({
+    video,
+    time,
+    playing,
+    stop: () => {
+      video.current?.pause();
+      setPlaying(false);
+    },
+    restore: (value) => synchronize(value, false, true),
+    ready: (value) => {
+      synchronize(value, false);
+      latest.current.onRecovered?.();
+    },
+    fail: () => latest.current.onFailure(),
+  });
+  const synchronize = (value: number, applyEdits: boolean, restoreSource = false) => {
+    const restoring = recovery.currentTime();
+    if (restoring !== null && !restoreSource) return restoring;
     const node = video.current;
     const effective = resolveReviewPlaybackSample({
       time: value,
@@ -51,8 +70,11 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       range: rangeRef.current,
     });
     const next = effective.time;
-    if (effective.looped) reviseSeek((revision) => revision + 1);
-    if (node) applyReviewPlaybackSample(node, effective, value, latest.current);
+    if (effective.looped || restoreSource) reviseSeek((revision) => revision + 1);
+    if (node) {
+      if (restoreSource) node.currentTime = next;
+      applyReviewPlaybackSample(node, effective, value, latest.current);
+    }
     setTime(next);
     return next;
   };
@@ -79,19 +101,17 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
     const node = video.current;
     if (node) tick.current(node.currentTime, false);
   }, [audioSettingsKey, props.duration]);
-  useEffect(() => {
-    if (!playing) return;
-    let frame = 0;
-    const advance = () => {
-      const node = video.current;
-      if (node && !node.paused) tick.current(node.currentTime, true);
-      frame = requestAnimationFrame(advance);
-    };
-    frame = requestAnimationFrame(advance);
-    return () => cancelAnimationFrame(frame);
-  }, [playing]);
+  usePlaybackFrames(playing, video, tick);
+  const seekSource = (value: number) => {
+    if (recovery.seek(value)) setTime(value);
+    else if (video.current) video.current.currentTime = value;
+    reviseSeek((revision) => revision + 1);
+    synchronize(value, false);
+    props.onSeek(value);
+  };
   return {
     video,
+    recovering: recovery.recovering,
     time,
     playing,
     setPlaying,
@@ -110,11 +130,9 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
         return;
       }
       setRange(range);
-      if (video.current) video.current.currentTime = start;
-      reviseSeek((revision) => revision + 1);
-      synchronize(start, false);
-      props.onSeek(start);
+      seekSource(start);
     },
+    onMediaError: recovery.onMediaError,
     onEnded: () => {
       const range = props.retainCutTime ? null : rangeRef.current;
       const start = range && reviewPlaybackRangeStart(range, props.edits);
@@ -133,14 +151,12 @@ export function useReviewPlayback(props: ReviewPlaybackProps) {
       const range = rangeRef.current;
       if (range && !props.retainCutTime && (next < range.start || next >= range.end))
         setRange(null);
-      if (video.current) video.current.currentTime = next;
-      reviseSeek((revision) => revision + 1);
-      synchronize(next, false);
-      props.onSeek(next);
+      seekSource(next);
     },
     play: () => {
       const node = video.current;
       if (!node) return;
+      if (recovery.retry()) return;
       if (node.paused) {
         if (node.currentTime >= props.duration) node.currentTime = 0;
         synchronize(node.currentTime, true);
@@ -173,4 +189,23 @@ function applyReviewPlaybackSample(
   const volume = Math.min(1, gain);
   if (node.volume !== volume) node.volume = volume;
   if (sample.time >= props.duration) node.pause();
+}
+
+/** Native frame scheduling and cancellation share one lifecycle, separate from source decisions. */
+function usePlaybackFrames(
+  playing: boolean,
+  video: RefObject<HTMLVideoElement | null>,
+  tick: RefObject<(value: number, applyEdits: boolean, restoreSource?: boolean) => number>
+) {
+  useEffect(() => {
+    if (!playing) return;
+    let frame = 0;
+    const advance = () => {
+      const node = video.current;
+      if (node && !node.paused) tick.current(node.currentTime, true);
+      frame = requestAnimationFrame(advance);
+    };
+    frame = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frame);
+  }, [playing, video, tick]);
 }

@@ -4,6 +4,8 @@ import { ReviewSpatialToolContext } from './spatial-controls';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ReviewZoomInspector, ReviewZoomLinkInspector } from './zoom-inspector';
+import { ReviewSpotlightInspector } from './spotlight-inspector';
+import { createQuickEditSpotlight } from '../../features/video/review/advanced/focus';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
 import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 
@@ -399,10 +401,16 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
   const { updateQuickEditZoomRegion, fitQuickEditZoomTransitions } =
     await import('../../features/video/review/advanced/zoom');
   let current = { ...region, start: 0, end: 0.6 };
+  let preview: QuickEditZoomRegion | undefined;
   const render = () =>
     root.render(
       <ReviewZoomInspector
         region={current}
+        {...(preview ? { spatialPreview: preview } : {})}
+        onPreview={(patch) => {
+          preview = patch ? updateQuickEditZoomRegion([current], current.id, patch)[0]! : undefined;
+          render();
+        }}
         onChange={change}
         onReset={vi.fn()}
         onDelete={vi.fn()}
@@ -415,14 +423,19 @@ it('updates the opposite fractional budget live and keeps fitted values unchange
   await act(async () => render());
   const ranges = () => [...host.querySelectorAll<HTMLInputElement>('fieldset input[type="range"]')];
   await type(ranges()[0]!, '0.17');
-  expect(current.enter.duration).toBe(0.17);
+  expect(current.enter.duration).toBe(0.3);
+  expect(preview?.enter.duration).toBe(0.17);
+  expect(change).not.toHaveBeenCalled();
   expect(current.exit.duration).toBe(0.3);
   expect(Number(ranges()[1]!.max)).toBeCloseTo(0.43);
   expect(
     Number.parseFloat(ranges()[1]!.style.getPropertyValue('--sniptale-range-fill-ratio'))
   ).toBeCloseTo((0.3 / 0.43) * 100);
+  await act(async () => ranges()[0]!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+  expect(current.enter.duration).toBe(0.17);
   await type(ranges()[1]!, '0.42');
-  expect(current.exit.duration).toBe(0.42);
+  expect(current.exit.duration).toBe(0.3);
+  expect(preview?.exit.duration).toBe(0.42);
   expect(current.enter.duration + current.exit.duration).toBeLessThanOrEqual(0.6);
   await act(async () => ranges()[1]!.dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
   current = fitQuickEditZoomTransitions({ ...current, end: 0.4 });
@@ -603,3 +616,67 @@ it('edits only outgoing link exposure in the selected transition inspector', asy
     motionBlur: { enter: source.motionBlur.enter, link: { enabled: true, strength: 0.5 } },
   });
 });
+
+it('orders spotlight roundness before precise area and makes both animation phases disclosures', async () => {
+  const { createQuickEditSpotlight } = await import('../../features/video/review/advanced/focus');
+  await act(async () =>
+    root.render(
+      <ReviewZoomInspector
+        region={{ ...region, spotlight: createQuickEditSpotlight() }}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+  );
+  const strength = host.querySelector('[aria-label="gallery.videoReview.focusStrength"]')!;
+  const roundness = host.querySelector('[aria-label="gallery.videoReview.focusRoundness"]')!;
+  const area = [...host.querySelectorAll('summary h4')].find(
+    (node) => node.textContent === 'gallery.videoReview.preciseArea'
+  )!;
+  expect(
+    strength.compareDocumentPosition(roundness) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(roundness.compareDocumentPosition(area) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  const phases = [...host.querySelectorAll('summary h4')].filter((node) =>
+    node.textContent?.includes('zoomTransition')
+  );
+  expect(phases.map((node) => node.textContent)).toEqual([
+    'gallery.videoReview.zoomTransitionIn',
+    'gallery.videoReview.zoomTransitionOut',
+  ]);
+});
+
+it.each([
+  ['dim', 'focusStrength', 'strength'],
+  ['blur', 'focusBlurRadius', 'blur'],
+  ['dim', 'focusRoundness', 'roundness'],
+  ['dim', 'focusAreaX', 'area'],
+  ['dim', 'focusAreaWidth', 'area'],
+] as const)(
+  'Spotlight %s %s previews, cancels and accepts independently',
+  async (effect, label, target) => {
+    const value = { ...createQuickEditSpotlight(), effect };
+    const preview = vi.fn();
+    const change = vi.fn();
+    await act(async () =>
+      root.render(<ReviewSpotlightInspector value={value} onPreview={preview} onChange={change} />)
+    );
+    const range = host.querySelector<HTMLInputElement>(
+      `input[type="range"][aria-label^="gallery.videoReview.${label}"]`
+    )!;
+    const key = (type: string, key: string) =>
+      act(() => range.dispatchEvent(new KeyboardEvent(type, { key, bubbles: true })));
+    key('keydown', 'ArrowRight');
+    expect(preview.mock.lastCall![0].spotlight[target]).not.toEqual(value[target]);
+    expect(change).not.toHaveBeenCalled();
+    key('keydown', 'Escape');
+    key('keyup', 'ArrowRight');
+    expect(preview).toHaveBeenLastCalledWith(null);
+    expect(change).not.toHaveBeenCalled();
+    key('keydown', 'ArrowRight');
+    key('keyup', 'ArrowRight');
+    expect(change).toHaveBeenCalledOnce();
+    expect(change.mock.lastCall![0][target]).not.toEqual(value[target]);
+  }
+);

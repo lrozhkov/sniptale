@@ -530,7 +530,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   transitionNone: { ru: 'Без анимации', en: 'None' },
   transitionLinear: { ru: 'Равномерно', en: 'Constant speed' },
   transitionSmooth: { ru: 'Плавно', en: 'Smooth' },
-  zoomResetPosition: { ru: 'Вернуть в центр', en: 'Center area' },
+  zoomResetPosition: { ru: 'Сбросить настройки', en: 'Reset settings' },
   focusDuplicate: { ru: 'Создать копию', en: 'Create copy' },
   focusDuplicateZoom: {
     ru: 'Приближения не могут пересекаться на одном интервале',

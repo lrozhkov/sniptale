@@ -21,6 +21,7 @@ export function useReviewTransport(args: {
   onSeek(value: number): void;
   boundaries(): readonly number[] | undefined;
   onTransportFailure(): void;
+  onTransportRecovered?(): void;
   onInvalidRange?(): void;
   silent?: boolean;
 }) {
@@ -36,6 +37,8 @@ export function useReviewTransport(args: {
     playbackRange,
     setPlaybackRange,
     onEnded,
+    onMediaError,
+    recovering,
     seekRevision,
   } = useReviewPlayback({
     duration: source.duration,
@@ -47,6 +50,7 @@ export function useReviewTransport(args: {
     boundaries: args.boundaries,
     onSeek: args.onSeek,
     onFailure: args.onTransportFailure,
+    onRecovered: args.onTransportRecovered,
     onInvalidRange: args.onInvalidRange,
   });
   const timeline = useReviewTimeMap(source, args.edits, time);
@@ -79,6 +83,8 @@ export function useReviewTransport(args: {
     playbackRange,
     setPlaybackRange,
     onEnded,
+    onMediaError,
+    recovering,
     seekRevision,
   };
 }

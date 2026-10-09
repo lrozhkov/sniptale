@@ -13,17 +13,49 @@
   height: 2rem;
   min-width: 0;
 }
-.review-spatial-tools button[aria-pressed='true'] {
-  background: var(--sniptale-color-surface-input);
-}
-.review-spatial-tool-name {
-  flex: 1;
-  min-width: 0;
+.review-spatial-tools .review-spatial-tool {
+  flex: 0 1 28px;
+  min-width: 28px;
   overflow: hidden;
+  justify-content: center;
+  gap: 0;
+  transition:
+    flex-grow 200ms ease,
+    flex-basis 200ms ease,
+    color 200ms ease,
+    background-color 200ms ease;
+}
+.review-spatial-tools .review-spatial-tool.review-spatial-tool-active {
+  flex: 1 1 116px;
+  gap: 6px;
+  padding-inline: 8px;
+  background: var(--sniptale-color-surface-input) !important;
+}
+.review-spatial-tool svg {
+  flex-shrink: 0;
+}
+.review-spatial-tool-active svg {
+  color: var(--sniptale-color-accent);
+}
+.review-spatial-tool-label {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
   text-overflow: ellipsis;
   font-size: 0.75rem;
-  color: var(--sniptale-color-text-secondary);
-  padding-inline: 0.25rem;
+  transition: opacity 150ms ease;
+}
+.review-spatial-tool-active .review-spatial-tool-label {
+  width: auto;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-spatial-tools .review-spatial-tool,
+  .review-spatial-tool-label {
+    transition: none;
+  }
 }
 .review-spatial-controls {
   position: absolute;

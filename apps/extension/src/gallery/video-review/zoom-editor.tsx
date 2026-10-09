@@ -151,20 +151,26 @@ function applyZoomChange(
   };
 }
 
-/** Reset framing and the active overlay area while retaining its appearance and timing. */
-function resetZoomPosition(zoom: ZoomState, id: string): ZoomState {
+/** Reset effect parameters while preserving its authored interval, kind and link relationship. */
+function resetFocusSettings(zoom: ZoomState, id: string): ZoomState {
   const selected = zoom.regions.find((region) => region.id === id);
-  const spotlight = selected?.spotlight;
-  const border = selected?.border;
-  return {
-    ...zoom,
-    regions: updateQuickEditZoomRegion(zoom.regions, id, {
-      centerX: 0.5,
-      centerY: 0.5,
-      ...(border ? { border: { ...border, area: createQuickEditBorder().area } } : {}),
-      ...(spotlight ? { spotlight: { ...spotlight, area: createQuickEditSpotlight().area } } : {}),
+  if (!selected) return zoom;
+  const defaults = withReviewFocusType(
+    createQuickEditZoomRegion({
+      id,
+      at: selected.start,
+      duration: selected.end - selected.start,
+      endMax: selected.end,
+      ...(selected.sourceAnchor ? { sourceAnchor: selected.sourceAnchor } : {}),
     }),
-  };
+    selected.border ? 'border' : selected.spotlight ? 'spotlight' : 'zoom'
+  );
+  const reset = fitQuickEditZoomTransitions({
+    ...defaults,
+    ...(selected.dormant !== undefined ? { dormant: selected.dormant } : {}),
+    ...(selected.linkTo ? { linkTo: selected.linkTo } : {}),
+  });
+  return { ...zoom, regions: zoom.regions.map((region) => (region.id === id ? reset : region)) };
 }
 
 /** Spatial gestures admit one captured authored target against the current mutation state. */
@@ -399,7 +405,7 @@ export function useReviewZoomEditor(args: ZoomEditorArgs) {
     }));
     setSelection(selection === id ? null : selection);
   };
-  const resetPosition = (id: string) => args.setZoom((zoom) => resetZoomPosition(zoom, id));
+  const resetPosition = (id: string) => args.setZoom((zoom) => resetFocusSettings(zoom, id));
   const change = (id: string, patch: QuickEditZoomRegionPatch) => {
     setDraft(null);
     args.setZoom((zoom) => applyZoomChange(args.timelineDuration, zoom, id, patch, args.timeMap));

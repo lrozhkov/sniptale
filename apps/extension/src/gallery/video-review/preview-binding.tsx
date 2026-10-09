@@ -33,6 +33,8 @@ type PreviewState = Pick<
   | 'setSelection'
   | 'setPlaying'
   | 'onEnded'
+  | 'onMediaError'
+  | 'recovering'
 > & {
   features: Pick<
     EditorState['features'],
@@ -88,7 +90,10 @@ export function ReviewPreviewBinding({
 }) {
   const { busy, audio } = state;
   return (
-    <main className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3">
+    <main
+      aria-busy={state.recovering}
+      className="flex min-h-0 min-w-0 flex-col overflow-hidden p-3"
+    >
       {state.webcam.failed || state.webcam.pending ? (
         <div
           role={state.webcam.failed ? 'alert' : 'status'}
@@ -122,7 +127,7 @@ export function ReviewPreviewBinding({
         time={state.timeline.sceneOutputTime}
         duration={state.timeline.resultDuration}
         playing={state.playing}
-        disabled={busy || state.editing.exporter.phase !== 'idle'}
+        disabled={busy || state.recovering || state.editing.exporter.phase !== 'idle'}
         onPlay={() => state.beforeAction(state.play)}
         onSeek={(value) =>
           state.beforeAction(() => {
@@ -267,6 +272,7 @@ function ReviewPreviewStage({
         if (composer.annotation && !busy) composer.change({ ...composer.annotation, region });
       }}
       onReady={() => {
+        if (state.recovering) return;
         const anchor = composer.annotation?.anchor;
         if (anchor) state.seek(anchor.kind === 'point' ? anchor.time : anchor.start);
       }}
@@ -284,7 +290,7 @@ function ReviewPreviewStage({
         state.setPlaying(playing);
       }}
       onEnded={() => state.beforeAction(state.onEnded)}
-      onError={() => state.setMessage(translate('gallery.videoReview.playbackFailed'))}
+      onError={state.onMediaError}
     />
   );
 }

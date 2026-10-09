@@ -1,7 +1,8 @@
 import { reviewSelectFieldClassName, ReviewDetails } from './controls';
 import { translate } from '../../platform/i18n';
 import { SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
-import { ReviewNumberRow } from './number-row';
+import { ReviewPreviewNumberRow } from './number-row';
+import type { QuickEditZoomRegionPatch } from '../../features/video/review/advanced/zoom';
 import { clampQuickEditSpotlightArea } from '../../features/video/review/advanced/focus';
 import type { QuickEditSpotlight } from '../../features/video/review/advanced/types';
 
@@ -9,6 +10,7 @@ import type { QuickEditSpotlight } from '../../features/video/review/advanced/ty
 export function ReviewSpotlightInspector(props: {
   value: QuickEditSpotlight;
   onChange(value: QuickEditSpotlight): void;
+  onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
 }) {
   const { value, onChange } = props;
   const fields = [
@@ -30,7 +32,7 @@ export function ReviewSpotlightInspector(props: {
         onChange={(effect: QuickEditSpotlight['effect']) => onChange({ ...value, effect })}
       />
       {value.effect === 'dim' ? (
-        <ReviewNumberRow
+        <ReviewPreviewNumberRow
           label={translate('gallery.videoReview.focusStrength')}
           min={0}
           max={100}
@@ -38,10 +40,15 @@ export function ReviewSpotlightInspector(props: {
           precision={0}
           unit="%"
           value={value.strength * 100}
+          onPreview={(strength) =>
+            props.onPreview?.(
+              strength === null ? null : { spotlight: { ...value, strength: strength / 100 } }
+            )
+          }
           onChange={(strength) => onChange({ ...value, strength: strength / 100 })}
         />
       ) : (
-        <ReviewNumberRow
+        <ReviewPreviewNumberRow
           label={translate('gallery.videoReview.focusBlurRadius')}
           min={0}
           max={40}
@@ -49,15 +56,33 @@ export function ReviewSpotlightInspector(props: {
           precision={1}
           unit="px"
           value={value.blur}
+          onPreview={(blur) =>
+            props.onPreview?.(blur === null ? null : { spotlight: { ...value, blur } })
+          }
           onChange={(blur) => onChange({ ...value, blur })}
         />
       )}
+      <ReviewPreviewNumberRow
+        label={translate('gallery.videoReview.focusRoundness')}
+        min={0}
+        max={50}
+        step={1}
+        precision={0}
+        unit="%"
+        value={value.roundness * 100}
+        onPreview={(roundness) =>
+          props.onPreview?.(
+            roundness === null ? null : { spotlight: { ...value, roundness: roundness / 100 } }
+          )
+        }
+        onChange={(roundness) => onChange({ ...value, roundness: roundness / 100 })}
+      />
       <ReviewDetails
         preferenceId="gallery.videoReview.preciseArea"
         label={translate('gallery.videoReview.preciseArea')}
       >
         {fields.map(([field, label]) => (
-          <ReviewNumberRow
+          <ReviewPreviewNumberRow
             key={field}
             label={translate(`gallery.videoReview.${label}`)}
             min={field === 'x' || field === 'y' ? 0 : 1}
@@ -66,6 +91,18 @@ export function ReviewSpotlightInspector(props: {
             precision={1}
             unit="%"
             value={value.area[field] * 100}
+            onPreview={(next) =>
+              props.onPreview?.(
+                next === null
+                  ? null
+                  : {
+                      spotlight: {
+                        ...value,
+                        area: clampQuickEditSpotlightArea({ ...value.area, [field]: next / 100 }),
+                      },
+                    }
+              )
+            }
             onChange={(next) =>
               onChange({
                 ...value,
@@ -75,16 +112,6 @@ export function ReviewSpotlightInspector(props: {
           />
         ))}
       </ReviewDetails>
-      <ReviewNumberRow
-        label={translate('gallery.videoReview.focusRoundness')}
-        min={0}
-        max={50}
-        step={1}
-        precision={0}
-        unit="%"
-        value={value.roundness * 100}
-        onChange={(roundness) => onChange({ ...value, roundness: roundness / 100 })}
-      />
     </div>
   );
 }

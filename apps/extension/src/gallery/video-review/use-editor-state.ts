@@ -296,6 +296,8 @@ function useReviewEditorTimeline(
     playbackRange,
     setPlaybackRange,
     onEnded,
+    onMediaError,
+    recovering,
     seekRevision,
   } = useReviewTransport({
     resource,
@@ -311,6 +313,10 @@ function useReviewEditorTimeline(
     boundaries: () =>
       cuts.cutting && advanced.ui.mode !== 'advanced' ? exporter.index?.boundaries : undefined,
     onTransportFailure,
+    onTransportRecovered: () =>
+      setMessage((message) =>
+        message === translate('gallery.videoReview.playbackFailed') ? null : message
+      ),
     onInvalidRange: () => setMessage(translate('gallery.videoReview.emptyPlaybackRange')),
     silent: voiceoverSilent,
   });
@@ -340,6 +346,8 @@ function useReviewEditorTimeline(
     playbackRange,
     setPlaybackRange,
     onEnded,
+    onMediaError,
+    recovering,
     seekRevision,
     playing,
     setPlaying,

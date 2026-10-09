@@ -438,3 +438,144 @@ it('updates native attenuation while paused and restores manual gain after disab
     vi.unstubAllGlobals();
   }
 });
+
+it('reloads a failed decoder once, restores the source position and audio, and resumes transport', async () => {
+  const test = playbackHarness();
+  vi.useFakeTimers();
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const recovered = vi.fn();
+  const failure = vi.fn();
+  try {
+    test.update({ onRecovered: recovered, onFailure: failure });
+    act(() => test.hook.setPlaybackRange({ start: 4, end: 8 }));
+    act(() => test.hook.seek(5, false));
+    act(() => test.hook.setPlaying(true));
+    const node = test.hook.video.current!;
+    Object.defineProperty(node, 'error', { configurable: true, value: { code: 3 } });
+    Object.defineProperty(node, 'readyState', { configurable: true, value: 3 });
+    act(() => test.hook.onMediaError());
+    expect(test.hook.playing).toBe(false);
+    expect(test.hook.time).toBe(5);
+    act(() => vi.advanceTimersByTime(500));
+    expect(load).toHaveBeenCalledOnce();
+    node.currentTime = 0;
+    act(() => test.hook.onTime(0));
+    expect(test.hook.time).toBe(5);
+    act(() => node.dispatchEvent(new Event('loadedmetadata')));
+    expect(node.currentTime).toBe(5);
+    expect(node.playbackRate).toBe(2);
+    expect(node.muted).toBe(true);
+    await act(async () => node.dispatchEvent(new Event('canplay')));
+    expect(test.play).toHaveBeenCalledOnce();
+    expect(recovered).toHaveBeenCalledOnce();
+    expect(test.hook.playbackRange).toEqual({ start: 4, end: 8 });
+    act(() => test.hook.onMediaError());
+    expect(failure).toHaveBeenCalledOnce();
+    act(() => vi.advanceTimersByTime(10000));
+    expect(load).toHaveBeenCalledOnce();
+  } finally {
+    test.dispose();
+    vi.useRealTimers();
+  }
+});
+
+it('bounds recovery, allows explicit Play retry, preserves paused intent and ignores disposed completion', () => {
+  const test = playbackHarness();
+  vi.useFakeTimers();
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const failure = vi.fn();
+  try {
+    test.update({ onFailure: failure });
+    act(() => test.hook.seek(7, false));
+    const node = test.hook.video.current!;
+    Object.defineProperty(node, 'error', { configurable: true, value: { code: 3 } });
+    Object.defineProperty(node, 'readyState', { configurable: true, value: 3 });
+    act(() => test.hook.onMediaError());
+    act(() => vi.advanceTimersByTime(10000));
+    expect(failure).toHaveBeenCalledOnce();
+    expect(load).toHaveBeenCalledOnce();
+    Object.defineProperty(node, 'error', { configurable: true, value: null });
+    act(() => test.hook.play());
+    act(() => vi.advanceTimersByTime(500));
+    expect(load).toHaveBeenCalledTimes(2);
+    act(() => test.hook.seek(8, false));
+    act(() => node.dispatchEvent(new Event('loadedmetadata')));
+    expect(node.currentTime).toBe(8);
+  } finally {
+    const node = test.hook.video.current!;
+    test.dispose();
+    node.dispatchEvent(new Event('canplay'));
+    vi.advanceTimersByTime(20000);
+    expect(test.play).not.toHaveBeenCalled();
+    expect(failure).toHaveBeenCalledOnce();
+    vi.useRealTimers();
+  }
+});
+
+it.each([1, 2, 4])('reports native error %s without an automatic reload', (code) => {
+  const test = playbackHarness();
+  const failure = vi.fn();
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  try {
+    test.update({ onFailure: failure });
+    Object.defineProperty(test.hook.video.current!, 'error', { value: { code } });
+    act(() => test.hook.onMediaError());
+    expect(failure).toHaveBeenCalledOnce();
+    expect(load).not.toHaveBeenCalled();
+  } finally {
+    test.dispose();
+  }
+});
+
+it('restores a paused frame only after new metadata and seek readiness', () => {
+  const test = playbackHarness();
+  vi.useFakeTimers();
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const recovered = vi.fn();
+  try {
+    test.update({ onRecovered: recovered });
+    act(() => test.hook.seek(7, false));
+    const node = test.hook.video.current!;
+    Object.defineProperty(node, 'error', { value: { code: 3 } });
+    Object.defineProperty(node, 'readyState', { value: 3 });
+    Object.defineProperty(node, 'seeking', { configurable: true, value: true });
+    act(() => test.hook.onMediaError());
+    act(() => node.dispatchEvent(new Event('canplay')));
+    expect(recovered).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(500));
+    act(() => node.dispatchEvent(new Event('loadedmetadata')));
+    act(() => node.dispatchEvent(new Event('canplay')));
+    expect(test.hook.recovering).toBe(true);
+    Object.defineProperty(node, 'seeking', { value: false });
+    act(() => node.dispatchEvent(new Event('seeked')));
+    expect(test.hook.recovering).toBe(false);
+    expect(test.hook.time).toBe(7);
+    expect(recovered).toHaveBeenCalledOnce();
+    expect(test.play).not.toHaveBeenCalled();
+  } finally {
+    test.dispose();
+    vi.useRealTimers();
+  }
+});
+
+it('cancels a second decoder failure without reloading again', () => {
+  const test = playbackHarness();
+  vi.useFakeTimers();
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const failure = vi.fn();
+  try {
+    test.update({ onFailure: failure });
+    const node = test.hook.video.current!;
+    Object.defineProperty(node, 'error', { value: { code: 3 } });
+    act(() => test.hook.onMediaError());
+    act(() => vi.advanceTimersByTime(500));
+    act(() => test.hook.onMediaError());
+    act(() => vi.advanceTimersByTime(20000));
+    expect(test.hook.recovering).toBe(false);
+    expect(load).toHaveBeenCalledOnce();
+    expect(failure).toHaveBeenCalledOnce();
+  } finally {
+    test.dispose();
+    vi.useRealTimers();
+  }
+});

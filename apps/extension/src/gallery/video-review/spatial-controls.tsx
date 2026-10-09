@@ -52,16 +52,20 @@ export function ReviewSpatialToolbar(props: {
               key={tool}
               size="compact"
               tone="utility"
+              className={`review-spatial-tool ${props.tool === tool ? 'review-spatial-tool-active' : ''}`}
+              aria-label={translate(toolLabels[tool])}
               aria-pressed={props.tool === tool}
               title={translate(toolLabels[tool])}
               disabled={props.disabled}
               onClick={() => props.onTool(tool)}
             >
               <Icon size={15} aria-hidden />
+              <span aria-hidden="true" className="review-spatial-tool-label">
+                {translate(toolLabels[tool])}
+              </span>
             </ContentToolbarButton>
           );
         })}
-        <span className="review-spatial-tool-name">{translate(toolLabels[props.tool])}</span>
         <ContentToolbarButton
           type="button"
           size="compact"

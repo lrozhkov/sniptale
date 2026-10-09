@@ -694,3 +694,39 @@ it('does not duplicate a camera, unresolved placement, or missing selection', ()
   expect(setZoom).not.toHaveBeenCalled();
   expect(editor.selection).toBeNull();
 });
+
+it.each(['zoom', 'spotlight', 'border'] as const)(
+  'resets all %s parameters without changing its interval or link target',
+  (type) => {
+    const initial = withReviewFocusType(region('selected', 2, 5), 'zoom');
+    const authored = {
+      ...withReviewFocusType(initial, 'spotlight'),
+      sourceAnchor: { start: 4, end: 10 },
+      transform: { scale: 3, centerX: 0.2, centerY: 0.7 },
+      enter: { type: 'linear' as const, duration: 2 },
+      exit: { type: 'linear' as const, duration: 2 },
+      perspective: { enabled: true, rotateX: 10, rotateY: 15, rotateZ: 20, strength: 0.6 },
+      motionBlur: { enter: { enabled: true, strength: 0.8 } },
+      linkTo: 'next',
+    };
+    // Each effect kind shares the same complete reset protocol.
+    const selected = withReviewFocusType(authored, type);
+    const neighbour = region('next', 7, 9);
+    const zoom = { enabled: true, regions: [selected, neighbour] };
+    const setZoom = vi.fn();
+    let editor!: ReturnType<typeof useReviewZoomEditor>;
+    function Harness() {
+      editor = useReviewZoomEditor({ zoom, setZoom, timelineDuration: 10 });
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    act(() => editor.resetPosition(selected.id));
+    const reset = apply(setZoom, zoom);
+    const expected = withReviewFocusType(
+      { ...initial, ...(selected.sourceAnchor ? { sourceAnchor: selected.sourceAnchor } : {}) },
+      type
+    );
+    expect(reset.regions[0]).toEqual({ ...expected, linkTo: 'next' });
+    expect(reset.regions[1]).toBe(neighbour);
+  }
+);

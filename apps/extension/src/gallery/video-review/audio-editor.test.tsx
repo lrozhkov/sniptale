@@ -219,10 +219,22 @@ it.each(['voiceover', 'music'] as const)('exposes an independent tempo only for 
     return;
   }
   expect(field?.value).toBe('1');
-  setValue(field!, '2');
+  act(() => setValue(field!, '2'));
   act(() => field!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ tempo: 2 });
-  setValue(field!, '1');
+  // A controlled consumer echoes the accepted value before the next gesture.
+  act(() =>
+    root.render(
+      <ReviewAudioClipEditor
+        clip={{ ...clip, tempo: 2 }}
+        lane={lane}
+        busy={false}
+        onPatch={onPatch}
+        onDelete={onDelete}
+      />
+    )
+  );
+  act(() => setValue(field!, '1'));
   act(() => field!.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(onPatch).toHaveBeenLastCalledWith({ tempo: 1 });
 });

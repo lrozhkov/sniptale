@@ -43,41 +43,49 @@ const transitionLabels: Record<QuickEditZoomTransition['type'], Parameters<typeo
 /** One transition phase: direct segments for the curve plus a duration row in seconds. */
 function ZoomTransitionSection(props: {
   label: string;
+  preferenceId: string;
   value: QuickEditZoomTransition;
   max: number;
   onChange(next: QuickEditZoomTransition): void;
+  onPreview?(next: QuickEditZoomTransition | null): void;
+  previewValue?: QuickEditZoomTransition | undefined;
   children?: ReactNode;
 }) {
   return (
-    <fieldset aria-label={props.label} className="review-inspector-phase min-w-0 space-y-2">
-      <legend className="mb-2">{props.label}</legend>
-      {props.children}
-      <SegmentedRow<QuickEditZoomTransition['type']>
-        columns={3}
-        layout="stacked"
-        ariaLabel={translate('gallery.videoReview.zoomTransitionType')}
-        label={translate('gallery.videoReview.zoomTransitionType')}
-        value={props.value.type}
-        options={(['none', 'linear', 'ease-in-out'] as const).map((type) => ({
-          value: type,
-          label: translate(transitionLabels[type]),
-        }))}
-        onChange={(type) => props.onChange({ ...props.value, type })}
-      />
-      <ReviewNumberRow
-        label={translate('gallery.videoReview.zoomTransitionDuration')}
-        unit="s"
-        min={0}
-        max={props.max}
-        scrubMax={Math.min(5, props.max)}
-        step={0.1}
-        precision={2}
-        scrubStep={0.01}
-        disabled={props.value.type === 'none'}
-        value={props.value.duration}
-        onChange={(duration) => props.onChange({ ...props.value, duration })}
-      />
-    </fieldset>
+    <ReviewDetails label={props.label} preferenceId={props.preferenceId} initiallyOpen>
+      <fieldset aria-label={props.label} className="review-inspector-phase min-w-0 space-y-2">
+        {props.children}
+        <SegmentedRow<QuickEditZoomTransition['type']>
+          columns={3}
+          layout="stacked"
+          ariaLabel={translate('gallery.videoReview.zoomTransitionType')}
+          label={translate('gallery.videoReview.zoomTransitionType')}
+          value={props.value.type}
+          options={(['none', 'linear', 'ease-in-out'] as const).map((type) => ({
+            value: type,
+            label: translate(transitionLabels[type]),
+          }))}
+          onChange={(type) => props.onChange({ ...props.value, type })}
+        />
+        <ReviewPreviewNumberRow
+          label={translate('gallery.videoReview.zoomTransitionDuration')}
+          unit="s"
+          min={0}
+          max={props.max}
+          scrubMax={Math.min(5, props.max)}
+          step={0.1}
+          precision={2}
+          scrubStep={0.01}
+          disabled={props.value.type === 'none'}
+          value={props.value.duration}
+          previewValue={props.previewValue?.duration}
+          onPreview={(duration) =>
+            props.onPreview?.(duration === null ? null : { ...props.value, duration })
+          }
+          onChange={(duration) => props.onChange({ ...props.value, duration })}
+        />
+      </fieldset>
+    </ReviewDetails>
   );
 }
 
@@ -153,7 +161,12 @@ export function ReviewZoomInspector(props: {
                   onChange={onChange}
                 />
               ) : (
-                <ReviewZoomAnimation region={region} onChange={onChange} />
+                <ReviewZoomAnimation
+                  region={region}
+                  previewRegion={props.spatialPreview}
+                  onPreview={props.onPreview}
+                  onChange={onChange}
+                />
               ),
             },
           ]}
@@ -193,6 +206,7 @@ function ReviewFocusParameters(props: FocusParameterProps) {
       <ReviewSpotlightInspector
         value={region.spotlight}
         onChange={(spotlight) => onChange({ spotlight })}
+        onPreview={props.onPreview}
       />
     );
   if (props.tool === 'position') return <ReviewZoomPositionFields {...props} />;
@@ -316,10 +330,13 @@ function ReviewFocusActions(props: {
 /** Owns the coupled phase controls and their source-clock duration budget. */
 function ReviewZoomAnimation(props: {
   region: QuickEditZoomRegion;
+  previewRegion?: QuickEditZoomRegion | undefined;
+  onPreview?: ((patch: QuickEditZoomRegionPatch | null) => void) | undefined;
   onChange(patch: QuickEditZoomRegionPatch): void;
 }) {
   const { onChange } = props;
   const region = fitQuickEditZoomTransitions(props.region);
+  const preview = fitQuickEditZoomTransitions(props.previewRegion ?? region);
   const interval = region.sourceAnchor ?? region;
   const duration = interval.end - interval.start;
   return (
@@ -327,8 +344,11 @@ function ReviewZoomAnimation(props: {
       <ReviewInspectorColumns>
         <ZoomTransitionSection
           label={translate('gallery.videoReview.zoomTransitionIn')}
+          preferenceId={`gallery.videoReview.${region.spotlight ? 'spotlight' : 'zoom'}.enter`}
           value={region.enter}
-          max={Math.min(60, Math.max(0, duration - region.exit.duration))}
+          previewValue={preview.enter}
+          onPreview={(enter) => props.onPreview?.(enter === null ? null : { enter })}
+          max={Math.min(60, Math.max(0, duration - preview.exit.duration))}
           onChange={(enter) => onChange({ enter })}
         >
           {region.spotlight ? (
@@ -343,8 +363,11 @@ function ReviewZoomAnimation(props: {
         </ZoomTransitionSection>
         <ZoomTransitionSection
           label={translate('gallery.videoReview.zoomTransitionOut')}
+          preferenceId={`gallery.videoReview.${region.spotlight ? 'spotlight' : 'zoom'}.exit`}
           value={region.exit}
-          max={Math.min(60, Math.max(0, duration - region.enter.duration))}
+          previewValue={preview.exit}
+          onPreview={(exit) => props.onPreview?.(exit === null ? null : { exit })}
+          max={Math.min(60, Math.max(0, duration - preview.enter.duration))}
           onChange={(exit) => onChange({ exit })}
         >
           {region.spotlight ? (

@@ -31,7 +31,9 @@ const field = (name: string, scope: ParentNode = host) =>
   scope.querySelector<HTMLInputElement>(`[aria-label="gallery.videoReview.${name}"]`)!;
 const hold = () =>
   [...host.querySelectorAll('fieldset')].find(
-    (node) => node.querySelector('legend')?.textContent === 'gallery.videoReview.borderHold'
+    (node) =>
+      node.closest('details')?.querySelector('summary h4')?.textContent ===
+      'gallery.videoReview.borderHold'
   )!;
 async function input(node: HTMLInputElement, value: string) {
   await act(async () => {
@@ -139,7 +141,7 @@ it('uses source-time coupled duration budgets and exposes rotation speed only wh
     root.render(<ReviewBorderAnimation region={region} onChange={change} onPreview={preview} />);
   act(render);
   const phases = () => [...host.querySelectorAll('fieldset')].filter((node) => node !== hold());
-  expect([...host.querySelectorAll('legend')].map((node) => node.textContent)).toEqual([
+  expect([...host.querySelectorAll('summary h4')].map((node) => node.textContent)).toEqual([
     'gallery.videoReview.zoomTransitionIn',
     'gallery.videoReview.borderHold',
     'gallery.videoReview.zoomTransitionOut',

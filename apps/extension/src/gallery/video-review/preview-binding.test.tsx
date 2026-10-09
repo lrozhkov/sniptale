@@ -175,6 +175,8 @@ beforeEach(() => {
     onTime: (time: number) => time + 1,
     setPlaying: vi.fn(),
     onEnded: vi.fn(),
+    onMediaError: vi.fn(),
+    recovering: false,
     setMessage: vi.fn(),
   };
 });
@@ -206,7 +208,7 @@ it('maps transport seeks and playback events while preserving non-point selectio
   stage().onEnded?.();
   expect(state.onEnded).toHaveBeenCalledOnce();
   stage().onError();
-  expect(state.setMessage).toHaveBeenCalledWith('gallery.videoReview.playbackFailed');
+  expect(state.onMediaError).toHaveBeenCalledOnce();
   vi.mocked(state.timeline.timeMap.timelineToSource).mockReturnValueOnce(null);
   vi.mocked(state.seek).mockClear();
   frame().onSeek(3);
@@ -347,4 +349,14 @@ it('does not substitute a fallback cadence when the output profile is invalid', 
   state.exporter.index = { ...state.exporter.index!, frameRate: NaN };
   await render();
   expect(stage().outerFadePlan).toBeUndefined();
+});
+
+it('keeps decoder recovery busy without moving the restored frame to an annotation anchor', async () => {
+  state.recovering = true;
+  state.composer.annotation = { id: 'note', text: 'Draft', anchor: { kind: 'point', time: 2 } };
+  await render();
+  expect(frame().disabled).toBe(true);
+  expect(host.querySelector('main')?.getAttribute('aria-busy')).toBe('true');
+  stage().onReady();
+  expect(state.seek).not.toHaveBeenCalled();
 });

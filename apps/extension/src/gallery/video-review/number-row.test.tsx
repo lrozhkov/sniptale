@@ -133,3 +133,56 @@ it('deduplicates direct authored updates and accepts the same edit after restora
   key('keyup', 'ArrowRight');
   expect(commit.mock.calls).toEqual([[2.5], [2.5]]);
 });
+
+it.each([ReviewNumberRow, ReviewPreviewNumberRow])(
+  'keeps a range gesture disposable and skips a return to its original value (%s)',
+  async (Row) => {
+    await act(async () =>
+      root.render(<Row label="Amount" min={0} max={10} step={1} value={2} onChange={commit} />)
+    );
+    act(() => range().dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    for (const value of [5, 2]) {
+      act(() => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+          range(),
+          String(value)
+        );
+        range().dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      expect(range().value).toBe(String(value));
+      expect(commit).not.toHaveBeenCalled();
+    }
+    act(() => range().dispatchEvent(new MouseEvent('pointerup', { bubbles: true })));
+    expect(commit).not.toHaveBeenCalled();
+  }
+);
+it('skips a returned gesture even when its parent echoes previews', async () => {
+  await act(async () => root.render(<Harness echo />));
+  key('keydown', 'ArrowRight');
+  key('keydown', 'ArrowLeft');
+  key('keyup', 'ArrowLeft');
+  expect(commit).not.toHaveBeenCalled();
+  expect(range().value).toBe('2');
+});
+
+it.each([ReviewNumberRow, ReviewPreviewNumberRow])(
+  'discards cancelled text before Enter or blur (%s)',
+  async (Row) => {
+    await act(async () =>
+      root.render(<Row label="Amount" min={0} max={10} step={1} value={2} onChange={commit} />)
+    );
+    const input = host.querySelector<HTMLInputElement>('input[type="text"]')!;
+    const press = (key: string) =>
+      act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true })));
+    act(() => input.focus());
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '5');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    press('Escape');
+    expect(input.value).toBe('2');
+    press('Enter');
+    act(() => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
+    expect(commit).not.toHaveBeenCalled();
+  }
+);
