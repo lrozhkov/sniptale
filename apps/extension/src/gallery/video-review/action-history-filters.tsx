@@ -13,6 +13,7 @@ import { reviewEventLabel, reviewSelectFieldClassName } from './controls';
 export interface HistoryFilterValues {
   query: string;
   targetType: string;
+  element?: string;
   type: string;
   status: string;
   longer: number;
@@ -26,15 +27,33 @@ function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: Hi
       (value.type === 'clicks' ? isReviewClick(marker) : marker.eventType === value.type)
   );
   const all = value.type === 'all';
+  const target = all || value.type === 'clicks' || matching.some(isReviewClick);
+  const targetType = target ? value.targetType : 'all';
+  const targets = matching.filter(
+    (marker) =>
+      targetType === 'all' ||
+      (isReviewClick(marker) && (marker.targetSemantics?.kind ?? 'unknown') === targetType)
+  );
+  const element =
+    target && targets.some((marker) => isReviewClick(marker) && marker.target === value.element)
+      ? (value.element ?? '')
+      : '';
+  const scoped = element
+    ? targets.filter((marker) => isReviewClick(marker) && marker.target === element)
+    : targets;
+  const pointScope = targetType !== 'all' || !!element || value.type === 'clicks';
+  const animation =
+    all ||
+    value.type === 'clicks' ||
+    scoped.some((marker) => isReviewClick(marker) || isReviewKey(marker));
+  const status = animation ? value.status : 'all';
   const capabilities = {
-    target: all || value.type === 'clicks' || matching.some(isReviewClick),
-    animation:
-      all ||
-      value.type === 'clicks' ||
-      matching.some((marker) => isReviewClick(marker) || isReviewKey(marker)),
+    target,
+    animation,
     duration:
-      all ||
-      matching.some(
+      status === 'all' &&
+      !pointScope &&
+      scoped.some(
         (marker) => !isReviewClick(marker) && !isReviewKey(marker) && marker.end > marker.start
       ),
   };
@@ -42,8 +61,9 @@ function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: Hi
     capabilities,
     value: {
       ...value,
-      targetType: capabilities.target ? value.targetType : 'all',
-      status: capabilities.animation ? value.status : 'all',
+      targetType,
+      element,
+      status,
       longer: capabilities.duration ? value.longer : 0,
     },
   };
@@ -54,18 +74,21 @@ export function HistoryFilters({
   expanded,
   onToggle,
   markers,
+  elementMarkers,
   value,
   onChange,
 }: {
   markers: readonly ReviewTelemetryMarker[];
+  elementMarkers: readonly ReviewTelemetryMarker[];
   value: HistoryFilterValues;
   expanded: boolean;
   onToggle(): void;
   onChange(patch: Partial<HistoryFilterValues>): void;
 }) {
   const normalized = historyFilterState(markers, value).value;
-  const { query, type, status, longer, targetType } = normalized;
-  const active = targetType !== 'all' || type !== 'all' || status !== 'all' || longer > 0;
+  const { query, type, status, longer, targetType, element } = normalized;
+  const active =
+    !!element || targetType !== 'all' || type !== 'all' || status !== 'all' || longer > 0;
   return (
     <>
       <div className="flex items-center gap-1">
@@ -91,6 +114,7 @@ export function HistoryFilters({
       <div hidden={!expanded}>
         <HistoryFilterFields
           markers={markers}
+          elementMarkers={elementMarkers}
           value={normalized}
           onChange={(patch) =>
             onChange(historyFilterState(markers, { ...normalized, ...patch }).value)
@@ -118,22 +142,28 @@ export function queryHistory(
   const ids = selected.filter((id) => eligible.has(id));
   const selectedIds = new Set(ids);
   const needle = filters.query.trim().toLocaleLowerCase();
-  const filtered = markers.filter((marker) => {
+  const elementMarkers = markers.filter((marker) => {
     const animated = isReviewClick(marker)
       ? settings.has(marker.ref.id) && settings.get(marker.ref.id)?.effect !== 'off'
       : isReviewKey(marker) && !!keyAnimations.get(marker.ref.id)?.enabled;
     const statusMatches =
       filters.status === 'all' ||
       (filters.status === 'animated' ? animated : selectedIds.has(marker.ref.id));
-    return statusMatches && matchesRecordedMetadata(marker, filters, needle);
+    return (
+      statusMatches &&
+      matchesRecordedMetadata(marker, { ...filters, element: '', longer: 0 }, needle)
+    );
   });
+  const filtered = elementMarkers.filter((marker) =>
+    matchesRecordedMetadata(marker, filters, needle)
+  );
   const matching = new Set(
     filtered
       .filter((marker) => (isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker))
       .map((marker) => marker.ref.id)
   );
   const checked = ids.filter((id) => matching.has(id)).length;
-  return { ids, filtered, matching, checked };
+  return { ids, filtered, matching, checked, elementMarkers };
 }
 
 function matchesRecordedMetadata(
@@ -148,6 +178,7 @@ function matchesRecordedMetadata(
     (filters.type === 'all' ||
       (filters.type === 'clicks' ? isReviewClick(marker) : marker.eventType === filters.type)) &&
     targetMatches &&
+    (!filters.element || (isReviewClick(marker) && marker.target === filters.element)) &&
     (!filters.longer || marker.end - marker.start > filters.longer) &&
     historySearchText(marker).includes(needle)
   );
@@ -200,15 +231,25 @@ function HistorySearch({ query, onChange }: { query: string; onChange(query: str
 /** Expanded criteria share one controlled value with the persistent history owner. */
 function HistoryFilterFields({
   markers,
+  elementMarkers,
   value,
   onChange,
 }: {
   markers: readonly ReviewTelemetryMarker[];
+  elementMarkers: readonly ReviewTelemetryMarker[];
   value: HistoryFilterValues;
   onChange(patch: Partial<HistoryFilterValues>): void;
 }) {
   const { capabilities } = historyFilterState(markers, value);
-  const { type, targetType, longer, status } = value;
+  const { type, targetType, longer, status, element = '' } = value;
+  const elements = Array.from(
+    new Set([
+      ...elementMarkers
+        .filter(isReviewClick)
+        .flatMap((marker) => (marker.target ? [marker.target] : [])),
+      ...(element ? [element] : []),
+    ])
+  );
   return (
     <div className="review-history-filters space-y-2">
       <SelectField
@@ -247,6 +288,18 @@ function HistoryFilterFields({
             })),
           ]}
           onChange={(value) => onChange({ targetType: value })}
+        />
+      ) : null}
+      {capabilities.target ? (
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.historyElement')}
+          value={element}
+          options={[
+            { value: '', label: translate('gallery.videoReview.targetAll') },
+            ...elements.map((value) => ({ value, label: value })),
+          ]}
+          onChange={(element) => onChange({ element })}
         />
       ) : null}
       {capabilities.duration ? (

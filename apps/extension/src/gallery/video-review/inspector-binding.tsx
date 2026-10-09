@@ -279,6 +279,7 @@ function ReviewRecordedHistory({
   return (
     <ReviewActionHistory
       markers={state.projected.markers}
+      activeRef={state.activeSelection.kind === 'telemetry' ? state.activeSelection.ref : undefined}
       keyAnimations={state.advanced.keyAnimations ?? []}
       onKeyChange={(ids, patch) => changeRecordedKeys(state, ids, patch)}
       animations={state.advanced.clickAnimations ?? []}

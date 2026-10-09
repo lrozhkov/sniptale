@@ -739,3 +739,142 @@ async function verifyClickFields(owner: Locator, page: Page, screenshot: string)
   await last.press('Escape');
   await rows.first().scrollIntoViewIfNeeded();
 }
+
+for (const variant of [
+  { locale: 'en', theme: 'light', width: 1920, height: 900 },
+  { locale: 'ru', theme: 'dark', width: 1280, height: 560 },
+  { locale: 'en', theme: 'light', width: 1200, height: 560 },
+] as const) {
+  test(`history element facets and active row (${variant.locale}/${variant.width})`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const server = await startHostServer();
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${server.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await seedReviewVideo(page, 'review-vp8-opus.webm', {
+        width: 160,
+        height: 90,
+        duration: 12.01,
+      });
+      await seedHistory(page, true, 60);
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
+        .click();
+      const history = dialog.locator('[data-ui="gallery.videoReview.actionHistory"]');
+      const filter = history.getByRole('button', {
+        name: label('gallery.videoReview.historyFilters'),
+        exact: true,
+      });
+      await filter.click();
+      const select = async (key: Parameters<typeof translate>[0], option: string) => {
+        await history.getByRole('button', { name: label(key), exact: true }).click();
+        await page.getByRole('option', { name: option, exact: true }).click();
+      };
+      await select('gallery.videoReview.historyElement', 'Save recording');
+      await expect(
+        history.getByRole('textbox', {
+          name: label('gallery.videoReview.historyLonger'),
+          exact: true,
+        })
+      ).toHaveCount(0);
+      await expect(filter).toHaveAttribute('data-active', 'true');
+      await select('gallery.videoReview.historyElement', label('gallery.videoReview.targetAll'));
+      await expect(
+        history.getByRole('textbox', {
+          name: label('gallery.videoReview.historyLonger'),
+          exact: true,
+        })
+      ).toBeVisible();
+      await filter.click();
+      await history.getByRole('searchbox').fill('Save recording');
+      const more = history.getByRole('button', {
+        name: label('gallery.videoReview.historyMore'),
+        exact: true,
+      });
+      await more.scrollIntoViewIfNeeded();
+      await more.hover();
+      await expect(more).toHaveCSS('border-top-color', 'rgba(0, 0, 0, 0)');
+      await more.click();
+      await expect(history.locator('li')).toHaveCount(60);
+      const row = history.locator('li').nth(55);
+      await row.scrollIntoViewIfNeeded();
+      await page.mouse.move(5, 5);
+      const resting = await row.evaluate((node) => getComputedStyle(node).backgroundColor);
+      await row.hover();
+      expect(await row.evaluate((node) => getComputedStyle(node).backgroundColor)).not.toBe(
+        resting
+      );
+      const target = row.locator('.review-history-target');
+      const normalColor = await target.evaluate((node) => getComputedStyle(node).color);
+      const results = history.locator('[data-ui="gallery.videoReview.historyResults"]');
+      const top = await results.evaluate((node) => node.scrollTop);
+      await row.locator('button').click();
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
+        .click();
+      await expect(row).toHaveAttribute('data-active', 'true');
+      expect(await target.evaluate((node) => getComputedStyle(node).color)).not.toBe(normalColor);
+      await expect(row.getByRole('checkbox')).not.toBeChecked();
+      await expect.poll(() => results.evaluate((node) => node.scrollTop)).toBe(top);
+      await page.screenshot({
+        path: info.outputPath('history-active-return.png'),
+        fullPage: false,
+      });
+      if (variant.width === 1920) {
+        const scroll = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
+        const width = () =>
+          scroll.evaluate((node) => {
+            const style = getComputedStyle(node);
+            return (
+              node.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+            );
+          });
+        const handle = scroll.getByRole('separator');
+        for (const desired of [523, 524, 525]) {
+          const current = await width();
+          const box = (await handle.boundingBox())!;
+          await page.mouse.move(box.x + box.width / 2, box.y + 20);
+          await page.mouse.down();
+          await page.mouse.move(box.x + box.width / 2 + current - desired, box.y + 20, {
+            steps: 4,
+          });
+          await page.mouse.up();
+          await expect.poll(width).toBe(desired);
+          await filter.click();
+          await expect(
+            history.getByRole('button', {
+              name: label('gallery.videoReview.historyElement'),
+              exact: true,
+            })
+          ).toBeInViewport();
+          await page.screenshot({
+            path: info.outputPath(`history-elements-${desired}.png`),
+            fullPage: false,
+          });
+          await filter.click();
+        }
+      }
+      await dialog
+        .getByRole('button', { name: label('common.actions.close'), exact: true })
+        .click();
+    } finally {
+      await new Promise<void>((resolve) => server.server.close(() => resolve()));
+    }
+  });
+}

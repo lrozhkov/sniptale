@@ -28,6 +28,7 @@ type ReviewActionHistoryProps = {
   animations: readonly ReviewClickAnimation[];
   keyAnimations?: readonly ReviewKeyAnimation[];
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
+  activeRef?: ReviewTelemetryMarker['ref'] | undefined;
   busy: boolean;
   onSelect(marker: ReviewTelemetryMarker): void;
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
@@ -36,6 +37,7 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
   const [filters, setFilters] = useState<HistoryFilterValues>({
     query: '',
     targetType: 'all',
+    element: '',
     type: 'all',
     status: 'all',
     longer: 0,
@@ -55,7 +57,7 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
     () => new Map((props.keyAnimations ?? []).map((item) => [item.id, item])),
     [props.keyAnimations]
   );
-  const { ids, filtered, matching, checked } = queryHistory(
+  const { ids, filtered, matching, checked, elementMarkers } = queryHistory(
     props.markers,
     settings,
     filters,
@@ -108,6 +110,7 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
               expanded={filtersExpanded}
               onToggle={() => setFiltersExpanded((value) => !value)}
               markers={props.markers}
+              elementMarkers={elementMarkers}
               value={filters}
               onChange={(patch) => {
                 setFilters((current) => ({ ...current, ...patch }));
@@ -149,6 +152,10 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
                   keyStyle={isReviewKey(marker) ? keySettings.get(marker.ref.id) : undefined}
                   style={isReviewClick(marker) ? settings.get(marker.ref.id) : undefined}
                   selected={ids.includes(marker.ref.id)}
+                  active={
+                    props.activeRef?.kind === marker.ref.kind &&
+                    props.activeRef.id === marker.ref.id
+                  }
                   onSelect={() => props.onSelect(marker)}
                   onCheck={(value) =>
                     setSelected((current) =>
@@ -162,7 +169,7 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
             </ol>
             {count < filtered.length ? (
               <ReviewButton
-                className={reviewTextButtonClassName}
+                className={`${reviewTextButtonClassName} review-history-more`}
                 label={translate('gallery.videoReview.historyMore')}
                 onClick={() => setCount((value) => value + 50)}
               />

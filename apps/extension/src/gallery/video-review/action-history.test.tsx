@@ -472,6 +472,21 @@ it('filters click targets without hiding recovery controls on an empty result', 
     change('targetType', 'button');
     expect(host.querySelectorAll('li')).toHaveLength(1);
     expect(host.querySelector('li')?.textContent).toContain('Save');
+    expect(host.querySelector('[aria-label="gallery.videoReview.historyLonger"]')).toBeNull();
+    const elements = host.querySelector<HTMLSelectElement>(
+      '[aria-label="gallery.videoReview.historyElement"]'
+    )!;
+    expect(Array.from(elements.options, (option) => option.value).filter(Boolean)).toEqual([
+      'Save',
+    ]);
+    change('historyElement', 'Save');
+    change('targetType', 'text-field');
+    expect(elements.value).toBe('');
+    expect(Array.from(elements.options, (option) => option.value).filter(Boolean)).toEqual([
+      'Name',
+    ]);
+    expect(host.querySelector('li')?.textContent).toContain('Name');
+    change('targetType', 'button');
     change('historyStatus', 'animated');
     expect(host.querySelectorAll('li')).toHaveLength(0);
     expect(host.querySelector('[aria-label="gallery.videoReview.targetType"]')).not.toBeNull();
@@ -514,4 +529,85 @@ it('ignores incompatible retained filters when displaying interval and keyboard 
       new Map()
     ).filtered.map((m) => m.ref.id)
   ).toEqual(['key']);
+});
+
+it('filters concrete targets and clears only incompatible dependent criteria', async () => {
+  const { queryHistory } = await import('./action-history-filters');
+  const click = (id: string, target: string, kind: 'button' | 'text-field') => ({
+    ref: { kind: 'action' as const, id },
+    eventType: 'CLICK',
+    start: 1,
+    end: 1,
+    target,
+    targetSemantics: { kind, source: 'html' as const },
+    focusPoint: { x: 0.5, y: 0.5 },
+  });
+  const markers = [
+    click('save', 'Save', 'button'),
+    click('export', 'Export', 'button'),
+    click('input', 'Save', 'text-field'),
+    click('all', 'all', 'button'),
+    { ref: { kind: 'signal' as const, id: 'idle' }, eventType: 'static-frame', start: 2, end: 6 },
+  ];
+  const filters = {
+    query: '',
+    type: 'all',
+    targetType: 'button',
+    element: 'Save',
+    status: 'all',
+    longer: 5,
+  };
+  const query = (patch: Partial<typeof filters> = {}) =>
+    queryHistory(markers, new Map(), { ...filters, ...patch }, [], new Map());
+  expect(query().filtered.map((m) => m.ref.id)).toEqual(['save']);
+  expect(query().elementMarkers.map((m) => m.ref.id)).toEqual(['save', 'export', 'all']);
+  expect(query({ element: 'all' }).filtered.map((m) => m.ref.id)).toEqual(['all']);
+  expect(
+    query({ targetType: 'text-field', element: 'Export' }).filtered.map((m) => m.ref.id)
+  ).toEqual(['input']);
+  expect(query({ type: 'static-frame', longer: 2 }).filtered.map((m) => m.ref.id)).toEqual([
+    'idle',
+  ]);
+  expect(query({ query: 'Export' }).filtered).toEqual([]);
+  expect(query({ query: 'Export' }).elementMarkers.map((m) => m.ref.id)).toEqual(['export']);
+  expect(query({ status: 'animated' }).elementMarkers).toEqual([]);
+});
+
+it('keeps the inspected action distinct from batch selection on return', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const ref = { kind: 'action' as const, id: 'current' };
+  const markers = [
+    { ref, eventType: 'CLICK', start: 1, end: 1, target: 'Save', focusPoint: { x: 0.5, y: 0.5 } },
+    {
+      ref: { kind: 'signal' as const, id: 'current' },
+      eventType: 'static-frame',
+      start: 2,
+      end: 4,
+    },
+  ];
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionHistory
+          markers={markers}
+          activeRef={ref}
+          animations={[]}
+          busy={false}
+          onSelect={vi.fn()}
+          onChange={vi.fn()}
+        />
+      )
+    );
+    expect(host.querySelectorAll('li[data-active]')).toHaveLength(1);
+    expect(host.querySelector('li[data-active] .review-history-target')?.textContent).toBe('Save');
+    expect(host.querySelector('li[data-active] input')?.getAttribute('checked')).toBeNull();
+    act(() => host.querySelector<HTMLInputElement>('li input')!.click());
+    expect(host.querySelectorAll('li[data-active]')).toHaveLength(1);
+    expect(host.querySelector('li[data-active]')?.getAttribute('data-selected')).toBe('true');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
 });

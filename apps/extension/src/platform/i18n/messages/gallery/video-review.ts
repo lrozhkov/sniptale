@@ -25,6 +25,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   historyFilters: { ru: 'Фильтры', en: 'Filters' },
   historyFiltersActive: { ru: 'Фильтры применены', en: 'Filters applied' },
   historyType: { ru: 'Тип действия', en: 'Action type' },
+  historyElement: { ru: 'Элемент', en: 'Element' },
   historyLonger: { ru: 'Дольше', en: 'Longer than' },
   historyStatus: { ru: 'Показывать', en: 'Show' },
   historySelectedOnly: { ru: 'Только выбранные действия', en: 'Selected actions only' },

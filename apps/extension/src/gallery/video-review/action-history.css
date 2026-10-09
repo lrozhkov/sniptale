@@ -96,7 +96,7 @@
   border: 1px solid var(--sniptale-color-border-soft);
 }
 .review-history-row[data-selected] {
-  background: var(--sniptale-color-surface-hover);
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 55%, transparent);
   border-color: var(--sniptale-color-border-strong);
 }
 .review-history-row button:focus-visible {
@@ -157,4 +157,27 @@
 .review-history-settings {
   min-width: 0;
   padding-right: 2px;
+}
+
+.review-history-row:hover,
+.review-history-row:focus-within {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 35%, transparent);
+  border-color: var(--sniptale-color-border-strong);
+}
+.review-history-row[data-selected]:hover,
+.review-history-row[data-selected]:focus-within {
+  background: color-mix(in srgb, var(--sniptale-color-surface-hover) 65%, transparent);
+}
+.review-history-row[data-active] .review-history-target {
+  color: var(--sniptale-color-accent);
+}
+@layer utilities {
+  [data-ui='gallery.videoReview.inspector']
+    [data-ui='gallery.videoReview.actionHistory']
+    .review-history-more,
+  [data-ui='gallery.videoReview.inspector']
+    [data-ui='gallery.videoReview.actionHistory']
+    .review-history-more:hover {
+    border-color: transparent !important;
+  }
 }

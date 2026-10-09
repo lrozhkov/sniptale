@@ -49,6 +49,7 @@ export function ReviewHistoryRow(props: {
   style: ReviewClickAnimation | undefined;
   keyStyle?: ReviewKeyAnimation | undefined;
   selected: boolean;
+  active: boolean;
   onSelect(): void;
   onCheck(checked: boolean): void;
 }) {
@@ -56,7 +57,11 @@ export function ReviewHistoryRow(props: {
   const locale = useAppLocale();
   const duration = marker.end - marker.start;
   return (
-    <li className="review-history-row" data-selected={props.selected || undefined}>
+    <li
+      className="review-history-row"
+      data-selected={props.selected || undefined}
+      data-active={props.active || undefined}
+    >
       {(isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker) ? (
         <HistoryCheckbox
           label={`${translate('gallery.videoReview.historySelect')} ${reviewTimeLabel(marker.start)}`}
@@ -68,12 +73,14 @@ export function ReviewHistoryRow(props: {
       )}
       <button type="button" className="min-w-0 flex-1 text-left text-xs" onClick={props.onSelect}>
         <span className="flex min-w-0 items-center gap-2 text-[var(--sniptale-color-text-secondary)]">
-          <span className="truncate">{reviewEventLabel(marker.eventType)}</span>
+          <span className={marker.target ? 'truncate' : 'review-history-target truncate'}>
+            {reviewEventLabel(marker.eventType)}
+          </span>
           <span className="ml-auto shrink-0 tabular-nums">{reviewTimeLabel(marker.start)}</span>
         </span>
         {marker.target ? (
           <span
-            className="block truncate font-medium text-[var(--sniptale-color-text-primary)]"
+            className="review-history-target block truncate font-medium text-[var(--sniptale-color-text-primary)]"
             title={marker.target}
           >
             {marker.target}
