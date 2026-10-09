@@ -329,7 +329,7 @@ it('frame-probes the full sequence clock without audio, encoder, muxer or positi
   expect(io.samples.some((sample) => sample.timestamp > 90)).toBe(true);
 });
 
-it('omits remembered bookends explicitly but retains main presentation fades and clocks', async () => {
+it('omits fragment bookends and visual/audio fades while retaining main clocks', async () => {
   const args = fixture();
   args.includeBookends = false;
   args.fragmentOffset = 4;
@@ -338,7 +338,8 @@ it('omits remembered bookends explicitly but retains main presentation fades and
   const plan = io.open.mock.calls[0]![0].plan;
   expect(plan.segments).toHaveLength(1);
   expect(plan.segments[0].content.fragmentOffset).toBe(4);
-  expect(plan.visualEnvelope.fadeIn).toBeGreaterThan(0);
+  expect(plan.visualEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
+  expect(plan.audioEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
 });
 
 it('rejects audible media without an admitted output codec before muxing', async () => {

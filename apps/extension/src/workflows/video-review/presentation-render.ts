@@ -57,7 +57,7 @@ function matchingPlan(args: ReviewPresentationRendererInput): PresentationSequen
     settings: args.settings,
     mainDuration: duration,
     fragmentOffset: args.main.fragmentOffset,
-    includeBookends: args.plan.segments.some((segment) => segment.name !== 'main'),
+    includeBookends: args.plan.includeBookends,
     rate: args.plan.rate,
   });
   // Plans are the canonical DTO returned by the pure planner, never independently assembled timelines.

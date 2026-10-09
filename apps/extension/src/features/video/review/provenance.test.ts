@@ -203,3 +203,41 @@ it('preserves a valid one-microsecond visual tail with zero rounded audio sample
   });
   expect(parseReviewProvenance(encodeReviewProvenance(value))).toEqual(value);
 });
+
+it('admits historical v2 colored fragments with baked edge fades', () => {
+  const legacy = {
+    ...provenance,
+    format: 'sniptale.video-edit.v2',
+    presentation: {
+      baked: true,
+      includeBookends: false,
+      watermarkBaked: false,
+      output: {
+        format: 'webm',
+        videoCodec: 'vp9',
+        width: 160,
+        height: 90,
+        frameRateMode: 'constant',
+      },
+      rate: { numerator: 1, denominator: 1 },
+      totalDurationUs: 11000000,
+      fragmentOffset: 0.5,
+      color: '#ff0000ff',
+      endColor: '#ff0000ff',
+      visualEnvelope: { span: 10, fadeIn: 0.4, fadeOut: 0.4 },
+      audioEnvelope: { span: 10.999979166666666, fadeIn: 0.4, fadeOut: 0.4 },
+      segments: [
+        {
+          name: 'main',
+          kind: 'main',
+          startUs: 0,
+          endUs: 11000000,
+          audioStart: 0,
+          audioEnd: 528000,
+          contentDuration: 11,
+        },
+      ],
+    },
+  };
+  expect(parseReviewProvenance(JSON.stringify(legacy))).toEqual(legacy);
+});

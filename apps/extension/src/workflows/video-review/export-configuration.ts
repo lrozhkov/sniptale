@@ -1,3 +1,4 @@
+import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { buildReviewTimeMap } from '../../features/video/review/timeline';
 import {
   resolveQuickEditExportPlan,
@@ -26,11 +27,7 @@ export function configuredReviewExportPlan(
     args.includeBookends === false && presentation
       ? {
           ...args.advanced,
-          presentation: {
-            ...presentation,
-            intro: { ...presentation.intro, mode: 'none' as const },
-            outro: { ...presentation.outro, mode: 'none' as const },
-          },
+          presentation: createNeutralPresentationSettings(),
         }
       : args.advanced;
   const settings = advanced.ui.mode === 'advanced' ? args.renderSettings : undefined;

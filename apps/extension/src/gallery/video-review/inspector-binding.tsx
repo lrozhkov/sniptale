@@ -11,7 +11,7 @@ import { ReviewInspector } from './inspector';
 import type { ReviewInspectorNavigation } from './inspector-navigation';
 import { ReviewComposer } from './composer';
 import { exportReviewReport } from './report-actions';
-import { ReviewInspectorActions } from './edit-actions';
+import { ReviewFragmentAction, ReviewInspectorActions } from './edit-actions';
 import { ReviewSceneProperties } from './advanced-panels';
 import type { useCanvasComments } from './use-canvas-comments';
 import type { useReviewAudio } from './use-review-audio';
@@ -73,6 +73,33 @@ type InspectorState = Pick<
   | 'flushAdvanced'
   | 'registerSpeechFlush'
 >;
+
+/** Adapts the retained playback range to the existing guarded fragment download. */
+function ReviewInspectorFragment({ state }: { state: InspectorState }) {
+  const selectedRange = state.selection.kind === 'range' ? state.selection : undefined;
+  const selection = state.playbackRange
+    ? { kind: 'range' as const, ...state.playbackRange }
+    : selectedRange;
+  if (!selection) return null;
+  const exporter = state.editing.exporter;
+  return (
+    <ReviewFragmentAction
+      showLabel
+      selection={selection}
+      edits={state.snapshot.document.edits}
+      index={exporter.index}
+      snapToKeyframes={state.advanced.ui.mode !== 'advanced'}
+      busy={
+        state.busy ||
+        !!state.composer.before ||
+        exporter.checkingCodecs ||
+        exporter.phase !== 'idle' ||
+        exporter.plan(selection).kind === 'unavailable'
+      }
+      onDownload={exporter.downloadSelection}
+    />
+  );
+}
 
 export function ReviewInspectorBinding({
   resource,
@@ -139,6 +166,7 @@ export function ReviewInspectorBinding({
         actions={
           <ReviewInspectorActions
             exporter={editing.exporter}
+            fragmentAction={<ReviewInspectorFragment state={state} />}
             toolKey={`${editing.mode}:${state.zoom.drawing}:${state.zoom.insertionType}:${audio.originalTool}`}
             onOpenResult={(mediaId) => {
               void run(() => openGalleryPage({ mediaId }));

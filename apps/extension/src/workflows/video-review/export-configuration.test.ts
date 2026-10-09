@@ -233,7 +233,7 @@ it('exports silent image sequences without an audio encoder and suppresses prese
   });
 });
 
-it('omits bookend capabilities without mutating retained media or outer fades', async () => {
+it('omits all fragment presentation capabilities without mutating retained settings', async () => {
   const { createNewWorkspacePresentationSettings } =
     await import('../../features/video/review/advanced/presentation');
   const args = fixture();
@@ -255,7 +255,7 @@ it('omits bookend capabilities without mutating retained media or outer fades', 
   expect(result).toMatchObject({
     kind: 'ready',
     video: 'render',
-    reasons: expect.arrayContaining(['presentation']),
+    reasons: [],
   });
   expect(args.advanced).toEqual(before);
   args.advanced.presentation.fadeIn.enabled = false;

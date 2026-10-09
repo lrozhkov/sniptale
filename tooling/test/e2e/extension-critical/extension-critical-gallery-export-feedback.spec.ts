@@ -127,3 +127,80 @@ for (const variant of [
     }
   });
 }
+
+for (const viewport of [
+  { width: 1920, height: 900 },
+  { width: 1280, height: 560 },
+  { width: 1200, height: 560 },
+]) {
+  test(`selected fragment is available from ordinary export menu ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize(viewport);
+    const locale = viewport.width === 1280 ? 'ru' : 'en';
+    const theme = locale === 'ru' ? 'dark' : 'light';
+    const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+    const host = await startHostServer();
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: { 'sniptale-locale-preference': locale, 'sniptale-theme-preference': theme },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      const dialog = page.locator('dialog');
+      const open = dialog.locator('[data-ui="gallery.videoReview.openExport"]');
+      const actions = dialog.locator('[data-ui="gallery.videoReview.exportActions"]');
+      const fragment = actions.getByRole('button', {
+        name: label('gallery.videoReview.exportSelection'),
+        exact: true,
+      });
+      await open.click();
+      await expect(fragment).toHaveCount(0);
+      const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+      const box = (await ruler.boundingBox())!;
+      await page.mouse.move(box.x + box.width * 0.2, box.y + 12);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width * 0.7, box.y + 12, { steps: 8 });
+      await page.mouse.up();
+      if (!(await fragment.isVisible())) await open.click();
+      await expect(fragment).toBeEnabled();
+      await expect(
+        actions.getByRole('button', { name: label('gallery.videoReview.exportVideo'), exact: true })
+      ).toBeEnabled();
+      await expect(
+        actions.getByRole('button', {
+          name: label('gallery.videoReview.downloadVideo'),
+          exact: true,
+        })
+      ).toBeEnabled();
+      await fragment.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('fragment-export-actions.png'),
+        fullPage: false,
+      });
+      const download = page.waitForEvent('download');
+      await fragment.click();
+      expect((await download).suggestedFilename()).toContain('fragment-');
+      await expect(dialog.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100');
+      await dialog
+        .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
+        .click();
+      if (!(await fragment.isVisible())) await open.click();
+      await expect(fragment).toBeEnabled();
+      await fragment.scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: info.outputPath('advanced-fragment-export-actions.png'),
+        fullPage: false,
+      });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}

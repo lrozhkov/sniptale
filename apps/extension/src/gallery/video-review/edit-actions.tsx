@@ -197,6 +197,7 @@ export function ReviewEditActions(props: {
   completion?: ReturnType<typeof import('./use-export').useReviewExport>['completion'];
   onOpenResult?: (mediaId: string) => void;
   settings?: ReactNode;
+  fragmentAction?: ReactNode;
   audioUnavailable?: boolean;
   advancedBlockers?: readonly QuickEditExportReason[] | null;
   onExport(): void;
@@ -303,6 +304,7 @@ export function ReviewEditActions(props: {
           <Download size={16} />
           <span>{translate('gallery.videoReview.downloadVideo')}</span>
         </ReviewButton>
+        {props.fragmentAction}
       </div>
       {props.failed ? (
         <p role="alert" className="text-xs">
@@ -328,6 +330,7 @@ export function ReviewEditActions(props: {
 export function ReviewFragmentAction(props: {
   selection: ReviewAnchor;
   snapToKeyframes?: boolean;
+  showLabel?: boolean;
   index: ReviewMediaIndex | null;
   edits: readonly ReviewEdit[];
   busy: boolean;
@@ -358,14 +361,19 @@ export function ReviewFragmentAction(props: {
     : '';
   return (
     <ReviewButton
-      label={translate('gallery.videoReview.downloadSelection')}
-      toolbarLabel={translate('gallery.videoReview.toolbarFragment')}
+      label={translate(
+        props.showLabel
+          ? 'gallery.videoReview.exportSelection'
+          : 'gallery.videoReview.downloadSelection'
+      )}
+      toolbarLabel={props.showLabel ? undefined : translate('gallery.videoReview.toolbarFragment')}
       title={rangeLabel + hint}
       disabled={!fragment || props.busy || audioUnavailable}
-      className={plain}
+      className={props.showLabel ? `${reviewTextButtonClassName} !w-full justify-start` : plain}
       onClick={() => props.onDownload(selection)}
     >
       <Download size={16} />
+      {props.showLabel ? <span>{translate('gallery.videoReview.exportSelection')}</span> : null}
     </ReviewButton>
   );
 }
@@ -533,6 +541,7 @@ export function ReviewInspectorActions({
   onExport,
   onOpenResult,
   toolKey,
+  fragmentAction,
 }: {
   exporter: Parameters<typeof ReviewRenderOptions>[0]['exporter'];
   advanced: boolean;
@@ -542,6 +551,7 @@ export function ReviewInspectorActions({
   onExport(): void;
   onOpenResult(mediaId: string): void;
   toolKey: string;
+  fragmentAction?: ReactNode;
 }) {
   const { dismissCompletion } = exporter;
   useEffect(() => () => dismissCompletion(), [dismissCompletion, toolKey]);
@@ -557,6 +567,7 @@ export function ReviewInspectorActions({
     <>
       <ReviewEditActions
         settings={settings}
+        fragmentAction={fragmentAction}
         available={!!exporter.index && exporter.index.boundaries.length >= 2}
         hasEdits={hasEdits}
         busy={busy || composerBusy || checkingCodecs}

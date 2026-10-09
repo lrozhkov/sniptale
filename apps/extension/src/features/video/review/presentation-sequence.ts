@@ -15,6 +15,7 @@ export interface PresentationSequenceInput {
   settings: QuickEditPresentationSettings;
   mainDuration: number;
   fragmentOffset: number;
+  /** False exports main content without media bookends or visual/audio edge effects. */
   includeBookends: boolean;
   rate: PresentationRate;
 }
@@ -47,6 +48,8 @@ export interface PresentationJoin {
 type Envelope = { span: number; fadeIn: number; fadeOut: number };
 /** Derived placement only; authored trim and main clocks are never retimed. */
 export interface PresentationSequencePlan {
+  /** Retains omission intent even when a full sequence has no media bookends. */
+  includeBookends: boolean;
   rate: PresentationRate;
   totalDurationUs: number;
   candidateCount: number;
@@ -313,7 +316,7 @@ export function planReviewPresentationSequence(
   const visualEnvelope = envelope(
     settings,
     tickTime(candidateCount - 1, rate) / 1_000_000,
-    candidateCount > 1
+    input.includeBookends && candidateCount > 1
   );
   const audioSpan = Math.max(0, (audioIndex(totalDurationUs) - 1) / 48_000);
   const audioEnvelope =
@@ -323,10 +326,11 @@ export function planReviewPresentationSequence(
           fadeIn: (settings.fadeIn.audioFade ?? settings.audioFade) ? visualEnvelope.fadeIn : 0,
           fadeOut: (settings.fadeOut.audioFade ?? settings.audioFade) ? visualEnvelope.fadeOut : 0,
         }
-      : envelope(settings, audioSpan, true, true);
+      : envelope(settings, audioSpan, input.includeBookends, true);
   return {
     ok: true,
     plan: {
+      includeBookends: input.includeBookends,
       rate,
       totalDurationUs,
       candidateCount,

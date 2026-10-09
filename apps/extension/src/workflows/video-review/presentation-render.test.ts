@@ -133,7 +133,7 @@ function canvasLease(): RenderCanvasLease {
     release: vi.fn(io.outputRelease),
   };
 }
-function fixture(bookends = true): ReviewPresentationRendererInput {
+function fixture(bookends = true, includeBookends = true): ReviewPresentationRendererInput {
   const settings = createNeutralPresentationSettings();
   settings.fadeIn = { enabled: true, duration: 0.5 };
   settings.fadeOut = { enabled: true, duration: 0.5 };
@@ -156,7 +156,7 @@ function fixture(bookends = true): ReviewPresentationRendererInput {
     settings,
     mainDuration: 1,
     fragmentOffset: 7,
-    includeBookends: bookends,
+    includeBookends,
     rate: { numerator: 4, denominator: 1 },
   });
   if (!planned.ok) throw new Error('Invalid fixture');
@@ -271,6 +271,30 @@ it('fades the whole main canvas with header, background and watermark without re
   frame.release();
 });
 
+it('renders a fragment without retained media or any edge fade', async () => {
+  const args = fixture();
+  const result = planReviewPresentationSequence({
+    settings: args.settings,
+    mainDuration: 1,
+    fragmentOffset: 7,
+    includeBookends: false,
+    rate: args.plan.rate,
+  });
+  if (!result.ok) throw new Error('Invalid fixture');
+  args.plan = result.plan;
+  const owner = await open(args);
+  for (const candidate of iteratePresentationCandidates(args.plan)) {
+    const frame = await owner.render(candidate);
+    const raster = frame.canvas as unknown as Raster;
+    expect(raster.pixel(0, 0)[2]).toBe(255);
+    expect(raster.pixel(0, 1)[0]).toBe(255);
+    expect(raster.pixel(3, 0)[1]).toBe(255);
+    frame.release();
+  }
+  expect(io.media).not.toHaveBeenCalled();
+  expect(args.plan.audioEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
+});
+
 it('derives a held main clock from the full lattice without rendering a preceding frame', async () => {
   const args = fixture(true);
   args.settings.intro = {
@@ -301,7 +325,7 @@ it('derives a held main clock from the full lattice without rendering a precedin
 });
 
 it('does not prepare dormant or excluded bookends', async () => {
-  const args = fixture(false);
+  const args = fixture(false, false);
   args.settings.intro = fixture().settings.intro;
   const owner = await open(args);
   expect(io.media).not.toHaveBeenCalled();

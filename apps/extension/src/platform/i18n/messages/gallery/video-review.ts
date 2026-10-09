@@ -345,6 +345,7 @@ export const galleryVideoReviewMessages = defineMessageSource({
   },
   exportVideo: { ru: 'Сохранить копию в галерею', en: 'Save copy to gallery' },
   downloadVideo: { ru: 'Экспортировать видео', en: 'Export video' },
+  exportSelection: { ru: 'Экспортировать выбранный фрагмент', en: 'Export selected fragment' },
   downloadSelection: { ru: 'Скачать выделенный фрагмент', en: 'Download selected fragment' },
   downloadSelectionHint: {
     ru: 'Скачать фрагмент с текущими правками. Границы привязываются к ключевым кадрам; копия в галерее не создаётся.',

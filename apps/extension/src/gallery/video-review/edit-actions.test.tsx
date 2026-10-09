@@ -33,7 +33,8 @@ it('offers a fragment only for a retained range and blocks it during pending edi
       root.render(<ReviewFragmentAction {...props} selection={{ kind: 'point', time: 2 }} />)
     );
     expect(host.querySelector('button')).toBeNull();
-    act(() => root.render(<ReviewFragmentAction {...props} />));
+    act(() => root.render(<ReviewFragmentAction {...props} showLabel />));
+    expect(host.textContent).toBe(translate('gallery.videoReview.exportSelection'));
     act(() => host.querySelector('button')!.click());
     expect(onDownload).toHaveBeenCalledWith(selection);
     act(() => root.render(<ReviewFragmentAction {...props} busy />));

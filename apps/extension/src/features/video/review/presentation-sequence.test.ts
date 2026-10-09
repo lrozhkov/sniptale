@@ -207,7 +207,10 @@ describe('presentation sequence', () => {
     const omitted = plan({ ...request, includeBookends: false });
     expect(omitted.totalDurationUs).toBe(1250000);
     expect(omitted.segments).toHaveLength(1);
-    expect(presentationColorOpacity(omitted, 0)).toBe(1);
+    expect(presentationColorOpacity(omitted, 0)).toBe(0);
+    expect(omitted.visualEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
+    expect(omitted.audioEnvelope).toMatchObject({ fadeIn: 0, fadeOut: 0 });
+    expect(presentationAudioGain(omitted, 0)).toBe(1);
     expect(request.settings.intro.mode).toBe('video');
   });
   it('clips video ranges and exposes an exclusive-end hold without inventing decode time', () => {
