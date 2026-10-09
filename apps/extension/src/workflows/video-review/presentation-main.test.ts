@@ -438,3 +438,14 @@ it('joins only retained main endpoints when both source edges are cut and the mi
   last.release();
   expect(io.times).toEqual([0.5, 2.433]);
 });
+
+it('starts a retained interval at its first representable source tick after a fractional leading cut', async () => {
+  const args = fixture();
+  args.edits = [
+    { id: 'cut', kind: 'cut', start: 0, end: 0.5001, requestedStart: 0, requestedEnd: 0.5001 },
+  ];
+  const owner = await open(args);
+  const frame = await owner.render(candidate(0));
+  expect(io.times).toEqual([0.501]);
+  frame.release();
+});

@@ -434,7 +434,6 @@ function ReviewScenePropertiesBinding({
         onChange: state.watermark.change,
         onPreview: state.watermark.preview,
         onImage: state.watermark.image,
-        onReset: state.watermark.reset,
         onError: state.watermark.setError,
         pending: state.watermark.pending,
         error: state.watermark.error,

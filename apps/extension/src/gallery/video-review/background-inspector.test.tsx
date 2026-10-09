@@ -332,3 +332,18 @@ it('changes zoom target without requiring a background or a non-perspective fram
   await act(async () => target.click());
   expect(change).toHaveBeenCalledExactlyOnceWith({ zoomBehavior: 'content' });
 });
+
+it('places scaling before the labeled background type selector', () => {
+  act(() =>
+    root.render(
+      <ReviewBackgroundInspector
+        background={{ enabled: false, zoomBehavior: 'window' }}
+        onChange={vi.fn()}
+      />
+    )
+  );
+  const zoom = host.querySelector('[aria-label="gallery.videoReview.backgroundZoom"]')!;
+  const type = host.querySelector('[aria-label="gallery.videoReview.background"]')!;
+  expect(zoom.compareDocumentPosition(type) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(host.textContent).toContain('gallery.videoReview.backgroundType');
+});

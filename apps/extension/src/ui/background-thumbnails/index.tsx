@@ -79,7 +79,7 @@ export function BackgroundThumbnails(props: {
         <button
           type="button"
           className={[
-            'flex h-8 min-w-0 items-center justify-center rounded border border-[var(--sniptale-color-border-subtle)]',
+            'flex h-8 min-w-0 items-center justify-center rounded',
             'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-hover)]',
             'focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--sniptale-color-accent)]',
           ].join(' ')}

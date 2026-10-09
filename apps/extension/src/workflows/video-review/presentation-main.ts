@@ -188,14 +188,14 @@ class PresentationMain {
       mapping.globalMainTime !== this.args.fragmentOffset + mapping.mainLocalTime
     )
       throw new Error('Invalid main presentation clock');
+    const firstTick = Math.ceil(segment.sourceStart * this.resolution) / this.resolution;
     const lastTick = (Math.ceil(segment.sourceEnd * this.resolution) - 1) / this.resolution;
     const requested = segment.sourceStart + (localTime - segment.resultStart) * segment.rate;
     const sourceTime = Math.min(
       lastTick,
-      Math.round(requested * this.resolution) / this.resolution
+      Math.max(firstTick, Math.round(requested * this.resolution) / this.resolution)
     );
-    if (sourceTime < segment.sourceStart)
-      throw new Error('Main source interval has no representable tick');
+    if (firstTick > lastTick) throw new Error('Main source interval has no representable tick');
     return {
       sourceTime,
       resultTime: mapping.holdLast ? this.args.fragmentOffset + localTime : mapping.globalMainTime,

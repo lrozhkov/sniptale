@@ -1,3 +1,4 @@
+import { createNeutralPresentationSettings } from '../../features/video/review/advanced/presentation';
 import { patchReviewClicks } from '../../features/video/review/advanced/click-animation';
 import { DEFAULT_WINDOW_HEADER } from '../../features/browser-frame/header';
 // @vitest-environment jsdom
@@ -517,4 +518,59 @@ it('does not resurrect removed presentation from persisted baseline during anoth
   act(() => advanced.setCanvas({ width: 640, height: 360 }));
   await act(async () => advanced.flush());
   expect(session.getSnapshot().document.advancedContent.presentation).toBeUndefined();
+});
+
+it('shows watermark and presentation immediately, coalesces rapid edits and retries a failed save', async () => {
+  const { deps } = setup();
+  const mark = { ...createQuickEditWatermark('Author'), mode: 'text' as const };
+  const presentation = { ...createNeutralPresentationSettings(), audioFade: true };
+  act(() => {
+    advanced.setWatermark(mark);
+    advanced.setPresentation(presentation);
+    advanced.setWatermark({ ...mark, text: { ...mark.text, italic: true } });
+  });
+  expect(advanced.advanced.watermark?.text.italic).toBe(true);
+  expect(advanced.advanced.presentation?.audioFade).toBe(true);
+  expect(deps.commitVideoWorkspace).not.toHaveBeenCalled();
+  deps.commitVideoWorkspace.mockRejectedValueOnce(new Error('write failed'));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  expect(advanced.saveFailed).toBe(true);
+  expect(advanced.advanced.watermark?.text.italic).toBe(true);
+  await act(async () => {
+    await advanced.flush();
+  });
+  expect(advanced.saveFailed).toBe(false);
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
+  const operation = parseReviewOperation(deps.commitVideoWorkspace.mock.lastCall![0].operation, 4)!;
+  expect(operation.target === 'advancedContent' && operation.after.watermark?.text.italic).toBe(
+    true
+  );
+});
+
+it('retains later presentation settings while an earlier watermark write is in flight', async () => {
+  const { deps, build } = setup();
+  let release!: () => void;
+  deps.commitVideoWorkspace.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve(build() as never);
+      })
+  );
+  const mark = { ...createQuickEditWatermark('Author'), mode: 'text' as const };
+  act(() => advanced.setWatermark(mark));
+  await act(async () => vi.advanceTimersByTimeAsync(250));
+  act(() => advanced.setPresentation({ ...createNeutralPresentationSettings(), audioFade: true }));
+  await act(async () => {
+    release();
+    await Promise.resolve();
+  });
+  await act(async () => advanced.flush());
+  expect(deps.commitVideoWorkspace).toHaveBeenCalledTimes(2);
+  const operation = parseReviewOperation(deps.commitVideoWorkspace.mock.lastCall![0].operation, 4)!;
+  expect(operation.target === 'advancedContent' && operation.after.watermark?.text.value).toBe(
+    'Author'
+  );
+  expect(operation.target === 'advancedContent' && operation.after.presentation?.audioFade).toBe(
+    true
+  );
 });

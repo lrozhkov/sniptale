@@ -1,4 +1,4 @@
-import { AlignLeft, AlignCenter, AlignRight, Bold, Strikethrough } from 'lucide-react';
+import { AlignLeft, AlignCenter, AlignRight, Bold, Italic, Strikethrough } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { useEffect, useId, useRef, useState } from 'react';
@@ -157,17 +157,27 @@ export function WatermarkTextFields(
             aria-label={translate('gallery.videoReview.watermarkBold')}
             title={translate('gallery.videoReview.watermarkBold')}
             aria-pressed={text.weight === 'bold'}
-            className="aria-pressed:bg-[var(--sniptale-color-surface-hover)]"
+            className="!border-0 !bg-transparent aria-pressed:!text-[var(--sniptale-color-accent)]"
             onClick={() => onChange(patch({ weight: text.weight === 'bold' ? 'normal' : 'bold' }))}
           >
             <Bold size={15} aria-hidden="true" />
           </ContentToolbarButton>
           <ContentToolbarButton
             tone="utility"
+            aria-label={translate('gallery.videoReview.watermarkItalic')}
+            title={translate('gallery.videoReview.watermarkItalic')}
+            aria-pressed={text.italic === true}
+            className="!border-0 !bg-transparent aria-pressed:!text-[var(--sniptale-color-accent)]"
+            onClick={() => onChange(patch({ italic: !text.italic }))}
+          >
+            <Italic size={15} aria-hidden="true" />
+          </ContentToolbarButton>
+          <ContentToolbarButton
+            tone="utility"
             aria-label={translate('gallery.videoReview.watermarkStrike')}
             title={translate('gallery.videoReview.watermarkStrike')}
             aria-pressed={text.strike === true}
-            className="aria-pressed:bg-[var(--sniptale-color-surface-hover)]"
+            className="!border-0 !bg-transparent aria-pressed:!text-[var(--sniptale-color-accent)]"
             onClick={() => onChange(patch({ strike: !text.strike }))}
           >
             <Strikethrough size={15} aria-hidden="true" />

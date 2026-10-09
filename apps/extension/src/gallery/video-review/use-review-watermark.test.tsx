@@ -79,6 +79,11 @@ beforeEach(() => {
       commitDurable: commit,
       reload,
     },
+    stageSettings: vi.fn((watermark) => {
+      const { watermark: _previous, ...rest } = content;
+      content = watermark ? { ...rest, watermark } : rest;
+      args.settings = watermark;
+    }),
     flushAdvanced: vi.fn(async () => undefined),
     allowed: () => true,
     pause: vi.fn(),
@@ -102,46 +107,22 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it('keeps gesture previews disposable and commits one accepted settings change', async () => {
+it('keeps gestures disposable and stages successive parameter changes without waiting for storage', async () => {
   await render();
   const first = { ...content.watermark!, placement: { anchor: 'center' as const, margin: 0.1 } };
   const last = { ...first, placement: { ...first.placement, margin: 0.2 } };
-  act(() => {
-    api.preview(first);
-    api.preview(last);
-  });
-  expect(commit).not.toHaveBeenCalled();
-  expect(api.settings).toEqual(last);
-  await act(async () => {
-    api.change(last);
-    api.change(last);
-  });
-  expect(commit).toHaveBeenCalledTimes(1);
-  expect(content.watermark).toEqual(last);
-  expect(args.flushAdvanced).toHaveBeenCalledTimes(1);
-  args.settings = content.watermark;
-  await render();
   act(() => api.preview(first));
-  act(() => api.preview(null));
-  expect(api.settings).toEqual(last);
-  expect(commit).toHaveBeenCalledTimes(1);
-});
-
-it('resets the logo and text in one history operation and preserves unrelated scene content', async () => {
-  content = {
-    ...content,
-    canvas: { width: 1280, height: 720 },
-    watermark: { ...content.watermark!, image: logo },
-  };
-  args.settings = content.watermark;
-  await render();
+  expect(api.settings).toEqual(first);
+  expect(args.stageSettings).not.toHaveBeenCalled();
   await act(async () => {
-    await api.reset();
+    expect(await api.change(first)).toBe(true);
+    expect(await api.change(last)).toBe(true);
   });
-  expect(commit).toHaveBeenCalledTimes(1);
-  expect(content.watermark).toBeUndefined();
-  expect(content.canvas).toEqual({ width: 1280, height: 720 });
-  expect(commit.mock.calls[0]![0].before.watermark.image).toEqual(logo);
+  await render();
+  expect(api.settings).toEqual(last);
+  expect(api.pending).toBe(false);
+  expect(commit).not.toHaveBeenCalled();
+  expect(args.flushAdvanced).not.toHaveBeenCalled();
 });
 
 it('retries retained image publication without decoding, preparing or attaching twice', async () => {
@@ -242,7 +223,8 @@ it('invalidates old project image work while a new project remains editable', as
       text: { ...content.watermark!.text, value: 'New project' },
     });
   });
-  expect(commit).toHaveBeenCalledTimes(1);
+  expect(args.stageSettings).toHaveBeenCalledOnce();
+  expect(commit).not.toHaveBeenCalled();
   await act(async () => {
     finish({ width: 200, height: 100, close: vi.fn() });
     await expect(flight).rejects.toThrow();
@@ -355,51 +337,28 @@ it('refreshes an early missing thumbnail after attachment publication completes'
   expect(io.prepare).toHaveBeenCalledTimes(1);
 });
 
-it('acknowledges only a completed text save and permits retry after a precommit failure', async () => {
-  commit.mockRejectedValueOnce(new Error('write failed'));
+it('rejects disabled and malformed parameter edits without staging', async () => {
   await render();
-  const changed = {
-    ...content.watermark!,
-    text: { ...content.watermark!.text, value: 'Retry text' },
-  };
-  let result: unknown;
-  await act(async () => {
-    result = await api.change(changed);
-  });
-  expect(result).toBe(false);
-  expect(content.watermark?.text.value).toBe('Saved');
-  await act(async () => {
-    result = await api.change(changed);
-  });
-  expect(result).toBe(true);
-  expect(content.watermark?.text.value).toBe('Retry text');
   args.allowed = () => false;
-  await act(async () => {
-    result = await api.change(changed);
-  });
-  expect(result).toBe(false);
-  expect(commit).toHaveBeenCalledTimes(2);
+  expect(await api.change(content.watermark)).toBe(false);
+  args.allowed = () => true;
+  expect(
+    await api.change({ ...content.watermark!, text: { ...content.watermark!.text, size: NaN } })
+  ).toBe(false);
+  expect(args.stageSettings).not.toHaveBeenCalled();
 });
 
-it('reconciles ambiguous text writes before explicit retry without duplicate history', async () => {
-  commit.mockImplementationOnce(async (operation: { after: QuickEditAdvancedContent }) => {
-    persisted = operation.after;
-    throw new Error('reply lost');
+it('flushes previously staged parameters before committing a new image attachment', async () => {
+  await render();
+  const changed = { ...content.watermark!, text: { ...content.watermark!.text, italic: true } };
+  await act(async () => {
+    await api.change(changed);
   });
   await render();
-  const changed = {
-    ...content.watermark!,
-    text: { ...content.watermark!.text, value: 'Durable text' },
-  };
-  let result: unknown;
   await act(async () => {
-    result = await api.change(changed);
+    await api.image(file());
   });
-  expect(result).toBe(false);
-  expect(reload).toHaveBeenCalledTimes(1);
-  await act(async () => {
-    result = await api.change(changed);
-  });
-  expect(result).toBe(true);
-  expect(commit).toHaveBeenCalledTimes(1);
+  expect(args.flushAdvanced).toHaveBeenCalledOnce();
+  expect(content.watermark?.text.italic).toBe(true);
+  expect(commit).toHaveBeenCalledOnce();
 });

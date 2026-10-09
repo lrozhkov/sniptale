@@ -556,3 +556,12 @@ it('draws strikethrough with the same text alpha, alignment and raster transform
   expect(context.fillStyle).toBe(value.text.color);
   painter.dispose();
 });
+
+it('loads and paints italic with the same font description in preview and export', async () => {
+  const value = settings();
+  value.text.italic = true;
+  const painter = await createReviewWatermarkRenderer(value, { width: 1920, height: 1080 });
+  expect(load).toHaveBeenCalledWith('italic 700 24px "Sniptale Sans"', value.text.value);
+  expect(contexts[0]!.font).toBe('italic 700 24px "Sniptale Sans"');
+  painter.dispose();
+});

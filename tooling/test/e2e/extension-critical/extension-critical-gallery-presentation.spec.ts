@@ -304,8 +304,8 @@ for (const variant of variants) {
         await button('gallery.videoReview.cutMode').click();
         const source = review.locator('[data-ui="gallery.videoReview.sourceLane"]');
         for (const [from, to, start, end] of [
-          [0.01, 0.07, '0', '1'],
-          [0.91, 0.98, '11', '12.01'],
+          [0.01, 0.07, '0', '1.0001'],
+          [0.91, 0.98, '11.0001', '12.01'],
         ] as const) {
           const box = (await source.boundingBox())!;
           await page.mouse.move(box.x + box.width * from, box.y + box.height / 2);
@@ -342,7 +342,7 @@ for (const variant of variants) {
       await expect(clip).toBeVisible({ timeout: 45_000 });
       await expect
         .poll(() => clip.evaluate((node: HTMLVideoElement) => node.readyState))
-        .toBeGreaterThanOrEqual(2);
+        .toBeGreaterThanOrEqual(4);
       await expect
         .poll(() => mainVideo.evaluate((node: HTMLVideoElement) => node.paused))
         .toBe(true);
@@ -406,6 +406,25 @@ for (const variant of variants) {
           await expect(outro.locator('canvas')).toBeVisible();
         };
         await uploadVideo('review-vp8-opus.webm');
+        const outroPreview = outro.getByRole('button', {
+          name: label('gallery.videoReview.presentationPreviewJoinOutro'),
+          exact: true,
+        });
+        await outroPreview.click();
+        const outroModal = page.locator('[data-ui="gallery.videoReview.presentationPreview"]');
+        await expect(outroModal.locator('video')).toBeVisible({ timeout: 45_000 });
+        await expect
+          .poll(() =>
+            outroModal.locator('video').evaluate((node: HTMLVideoElement) => node.readyState)
+          )
+          .toBeGreaterThanOrEqual(4);
+        await page.screenshot({
+          path: info.outputPath('presentation-tail-cut-seam-ready.png'),
+          fullPage: false,
+        });
+        await page.keyboard.press('Escape');
+        await expect(outroModal).toHaveCount(0);
+
         await expect(
           outro.getByRole('button', {
             name: label('gallery.videoReview.presentationSound'),

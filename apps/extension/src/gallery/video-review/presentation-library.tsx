@@ -1,13 +1,11 @@
+import { MediaLibraryHeader } from '../../ui/media-library-header';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Filter, Search, X } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { ProductModal, ProductModalHeader } from '@sniptale/ui/product-modal';
+import { ProductModal } from '@sniptale/ui/product-modal';
 import { MaterialBrowser } from '@sniptale/ui/material-browser';
 import type { GallerySavedView } from '../../composition/persistence/gallery-saved-views';
 import {
@@ -176,91 +174,33 @@ function PresentationLibraryHeader(props: {
   onClose(): void;
 }) {
   const [query, setQuery] = useState('');
+  const [composing, setComposing] = useState(false);
   const { onQuery } = props;
   useEffect(() => {
+    if (composing) return;
     const timer = setTimeout(() => onQuery(query), 250);
     return () => clearTimeout(timer);
-  }, [query, onQuery]);
+  }, [query, onQuery, composing]);
   return (
-    <ProductModalHeader
+    <MediaLibraryHeader
       title={translate('settings.editor.backgrounds.library')}
-      actions={
-        <div
-          className="flex shrink-0 items-center gap-3"
-          data-ui="gallery.videoReview.presentationLibrary.controls"
-        >
-          <div
-            className="flex h-8 w-48 shrink-0 items-center gap-1.5 rounded-[6px] border
-              border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] px-2
-              transition-[width] duration-200 focus-within:w-60 motion-reduce:transition-none"
-            data-ui="gallery.videoReview.presentationLibrary.search"
-          >
-            <Search
-              className="h-4 w-4 shrink-0 text-[var(--sniptale-color-text-muted)]"
-              aria-hidden="true"
-            />
-            <input
-              type="search"
-              className="min-w-0 flex-1 bg-transparent text-sm outline-none
-                  placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent"
-              aria-label={translate(
-                props.kind === 'media'
-                  ? 'gallery.videoReview.presentationSearchMedia'
-                  : props.kind === 'video'
-                    ? 'gallery.videoReview.presentationSearchVideo'
-                    : 'settings.editor.backgrounds.search'
-              )}
-              placeholder={translate(
-                props.kind === 'media'
-                  ? 'gallery.videoReview.presentationSearchMedia'
-                  : props.kind === 'video'
-                    ? 'gallery.videoReview.presentationSearchVideo'
-                    : 'settings.editor.backgrounds.search'
-              )}
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
-                  event.preventDefault();
-                  props.onQuery(query);
-                }
-              }}
-            />
-          </div>
-          <div className="flex min-w-0 shrink-0 items-center gap-1">
-            <Filter
-              size={16}
-              className="text-[var(--sniptale-color-text-muted)]"
-              aria-hidden="true"
-            />
-            <ProductSelect
-              dataUi="gallery.videoReview.presentationLibrary.filter"
-              aria-label={translate('settings.editor.backgrounds.filter')}
-              title={presentationLibrarySelectionLabel(props)}
-              containerClassName="!w-48 shrink-0"
-              style={{
-                minHeight: 32,
-                height: 32,
-                paddingTop: 4,
-                paddingBottom: 4,
-                borderRadius: 6,
-              }}
-              controlSize="sm"
-              value={props.viewId}
-              onChange={props.onViewChange}
-              menuWidth={280}
-              options={presentationLibraryOptions(props)}
-            />
-          </div>
-          <ContentToolbarButton
-            onClick={props.onClose}
-            aria-label={translate('common.actions.close')}
-            title={translate('common.actions.close')}
-          >
-            <X size={14} aria-hidden="true" />
-          </ContentToolbarButton>
-        </div>
-      }
+      dataUi="gallery.videoReview.presentationLibrary"
+      query={query}
+      onQueryChange={setQuery}
+      onApplyQuery={() => onQuery(query)}
+      onComposingChange={setComposing}
+      searchLabel={translate(
+        props.kind === 'media'
+          ? 'gallery.videoReview.presentationSearchMedia'
+          : props.kind === 'video'
+            ? 'gallery.videoReview.presentationSearchVideo'
+            : 'settings.editor.backgrounds.search'
+      )}
+      filterLabel={translate('settings.editor.backgrounds.filter')}
+      viewId={props.viewId}
+      onViewChange={props.onViewChange}
+      options={presentationLibraryOptions(props)}
+      onClose={props.onClose}
     />
   );
 }
@@ -311,13 +251,4 @@ function presentationLibraryOptions(props: {
         group: section.label,
       })),
   ]);
-}
-
-function presentationLibrarySelectionLabel(props: {
-  kind: 'image' | 'video' | 'media';
-  views: GallerySavedView[];
-  viewId: string;
-}) {
-  const option = presentationLibraryOptions(props).find((option) => option.value === props.viewId);
-  return option && 'group' in option ? `${option.group}: ${option.label}` : option?.label;
 }

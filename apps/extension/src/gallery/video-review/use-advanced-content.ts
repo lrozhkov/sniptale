@@ -170,6 +170,16 @@ function reviewContentCommands(stage: (mutation: ContentMutation) => void) {
         background: QuickEditAdvancedState['background']
       ) => QuickEditAdvancedState['background']
     ) => stage((content) => ({ ...content, background: update(content.background) })),
+    setWatermark: (watermark: QuickEditAdvancedState['watermark']) =>
+      stage((content) => {
+        const { watermark: _previous, ...rest } = content;
+        return watermark ? { ...rest, watermark } : rest;
+      }),
+    setPresentation: (presentation: QuickEditAdvancedState['presentation']) =>
+      stage((content) => {
+        const { presentation: _previous, ...rest } = content;
+        return presentation ? { ...rest, presentation } : rest;
+      }),
     setWindowHeader: (windowHeader: QuickEditAdvancedState['windowHeader']) =>
       stage((content) => {
         const { windowHeader: _previous, ...rest } = content;

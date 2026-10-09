@@ -24,6 +24,7 @@ export interface QuickEditWatermarkSettings {
     weight: 'normal' | 'bold';
     /** Absent in earlier projects means no strikethrough. */
     strike?: boolean;
+    italic?: boolean;
     /** Font size relative to the short canvas side. */
     size: number;
     /** The color is the sole source of text alpha. */
@@ -85,6 +86,25 @@ export function setQuickEditWatermarkMode(
   return { ...(previous ?? createQuickEditWatermark(textSeed)), mode };
 }
 
+/** Reset active mode presentation, retaining the other mode and immutable image bytes. */
+export function resetQuickEditWatermark(
+  settings: QuickEditWatermarkSettings,
+  textSeed: string
+): QuickEditWatermarkSettings {
+  if (settings.mode === 'none') return settings;
+  const defaults = createQuickEditWatermark(textSeed);
+  return {
+    ...settings,
+    layout: defaults.layout,
+    placement: defaults.placement,
+    tile: defaults.tile,
+    ...(settings.mode === 'text' ? { text: defaults.text } : {}),
+    ...(settings.mode === 'image' && settings.image
+      ? { image: { ...settings.image, size: 0.2, opacity: 1 } }
+      : {}),
+  };
+}
+
 /** Explicit anchor selection replaces custom drag/numeric placement. */
 export function setQuickEditWatermarkAnchor(
   settings: QuickEditWatermarkSettings,
@@ -131,6 +151,7 @@ function parseText(value: unknown): QuickEditWatermarkSettings['text'] | null {
       'shadow',
       'wrapWidth',
       'strike',
+      'italic',
     ])
   )
     return null;
@@ -145,7 +166,8 @@ function parseText(value: unknown): QuickEditWatermarkSettings['text'] | null {
     !isBoundedNumber(value['size'], 1 / 1080, 0.25) ||
     !isBoundedNumber(value['wrapWidth'], 0.05, 1) ||
     typeof value['shadow'] !== 'boolean' ||
-    (value['strike'] !== undefined && typeof value['strike'] !== 'boolean')
+    (value['strike'] !== undefined && typeof value['strike'] !== 'boolean') ||
+    (value['italic'] !== undefined && typeof value['italic'] !== 'boolean')
   )
     return null;
   const color = typeof value['color'] === 'string' ? normalizePaintColor(value['color']) : null;
@@ -155,6 +177,7 @@ function parseText(value: unknown): QuickEditWatermarkSettings['text'] | null {
     font: value['font'],
     weight: value['weight'],
     ...(value['strike'] === undefined ? {} : { strike: value['strike'] }),
+    ...(value['italic'] === undefined ? {} : { italic: value['italic'] }),
     size: value['size'],
     color,
     align: value['align'],

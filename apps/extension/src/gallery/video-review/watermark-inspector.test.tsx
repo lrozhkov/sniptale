@@ -51,7 +51,6 @@ beforeEach(() => {
     pending: false,
     error: null,
     onError: vi.fn(),
-    onReset: vi.fn(),
   };
 });
 afterEach(async () => {
@@ -110,7 +109,7 @@ it('keeps over-limit text visible with validation and never silently truncates o
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('watermarkTextInvalid');
 });
 
-it('hides irrelevant placement controls for tiled mode and forwards reset as one action', async () => {
+it('hides irrelevant placement controls for tiled mode and resets active defaults as one authored change', async () => {
   props.settings = { ...props.settings!, layout: 'tiled' };
   await render();
   expect(host.querySelector('[data-ui="watermark.anchors"]')).toBeNull();
@@ -120,8 +119,14 @@ it('hides irrelevant placement controls for tiled mode and forwards reset as one
       .querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.watermarkReset"]')!
       .click()
   );
-  expect(props.onReset).toHaveBeenCalledTimes(1);
-  expect(props.onChange).not.toHaveBeenCalled();
+  expect(props.onChange).toHaveBeenCalledTimes(1);
+  expect(props.onChange).toHaveBeenCalledWith(
+    expect.objectContaining({
+      mode: 'text',
+      layout: 'single',
+      text: expect.objectContaining({ value: 'gallery.videoReview.watermarkSeed' }),
+    })
+  );
 });
 
 it('uses the bounded static acquisition policy, retains the thumbnail and exposes retry errors', async () => {
@@ -378,4 +383,13 @@ it('displays whole font pixels without writing rounded authoring on open or blur
   await act(async () => input.dispatchEvent(new FocusEvent('focusout', { bubbles: true })));
   expect(props.onChange).not.toHaveBeenCalled();
   expect(props.settings!.text.size).toBe(24.46 / 1080);
+});
+
+it('hides reset when watermark is off and exposes italic when text is selected', async () => {
+  props.settings = { ...props.settings!, mode: 'none' };
+  await render();
+  expect(host.querySelector('[aria-label="gallery.videoReview.watermarkReset"]')).toBeNull();
+  props.settings = { ...props.settings!, mode: 'text' };
+  await render();
+  expect(host.querySelector('[aria-label="gallery.videoReview.watermarkItalic"]')).not.toBeNull();
 });

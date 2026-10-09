@@ -131,6 +131,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     session: base.session,
     settings: base.advanced.watermark,
     flushAdvanced: base.advancedState.flush,
+    stageSettings: base.advancedState.setWatermark,
     pause: () => timeline.video.current?.pause(),
     allowed: () =>
       !base.busy &&
@@ -142,6 +143,7 @@ function useReviewEditorCore(resource: LoadedReview) {
     session: base.session,
     settings: base.advanced.presentation,
     flushAdvanced: base.advancedState.flush,
+    stageSettings: base.advancedState.setPresentation,
     pause: () => timeline.video.current?.pause(),
     allowed: () =>
       !base.busy &&

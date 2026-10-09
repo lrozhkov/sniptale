@@ -11,6 +11,7 @@ export const galleryVideoReviewSceneMessages = defineMessageSource({
   backgroundColors: { ru: 'Цвета', en: 'Colors' },
   backgroundGradients: { ru: 'Градиенты', en: 'Gradients' },
   backgroundPaintPresets: { ru: 'Варианты заливки', en: 'Fill presets' },
+  backgroundType: { ru: 'Тип фона', en: 'Background type' },
   backgroundZoom: { ru: 'Масштабирование', en: 'Zoom target' },
   backgroundZoomWindow: { ru: 'Окно целиком', en: 'Whole window' },
   backgroundZoomContent: { ru: 'Внутри рамки', en: 'Inside frame' },

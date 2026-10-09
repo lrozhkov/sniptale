@@ -104,9 +104,33 @@ for (const variant of [
       await page
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
+      const background = page.locator('[data-ui="gallery.videoReview.backgroundInspector"]');
+      await background
+        .getByRole('button', { name: label('gallery.videoReview.backgroundSolid'), exact: true })
+        .click();
+      const paint = background
+        .locator('.review-background-swatches [role="group"] > button')
+        .first();
+      await expect(paint).toHaveCSS('height', '32px');
+      const paintSize = (await paint.boundingBox())!;
+      const more = background.getByRole('button', {
+        name: label('settings.editor.backgrounds.showMore'),
+        exact: true,
+      });
+      if (await more.count()) await expect(more).toHaveCSS('border-top-width', '0px');
+      await page.screenshot({
+        path: info.outputPath('background-paint-presets.png'),
+        fullPage: false,
+      });
       await page
+        .locator('[data-ui="gallery.videoReview.backgroundInspector"]')
         .getByRole('button', { name: label('gallery.videoReview.backgroundImage'), exact: true })
         .click();
+      const image = background
+        .locator('[data-ui="background.image.picker"] [role="group"] > button')
+        .first();
+      await expect(image).toHaveCSS('height', '32px');
+      expect((await image.boundingBox())!.width).toBeCloseTo(paintSize.width, 0);
       await page
         .locator('[data-ui="background.image.picker"]')
         .getByRole('button', { name: label('settings.editor.backgrounds.library'), exact: true })
@@ -129,6 +153,10 @@ for (const variant of [
           .getByRole('button', { name: label('settings.editor.backgrounds.filter') })
           .boundingBox())!.height
       ).toBe((await searchShell.boundingBox())!.height);
+      await controls
+        .getByRole('button', { name: label('settings.editor.backgrounds.filter') })
+        .focus();
+      await expect(searchShell).toHaveCSS('width', '192px');
       const idleWidth = (await searchShell.boundingBox())!.width;
       await search.focus();
       await expect

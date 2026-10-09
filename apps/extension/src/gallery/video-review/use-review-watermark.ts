@@ -28,11 +28,12 @@ function createLifecycle(session: Session): Lifecycle {
   return { session, controller: new AbortController(), busy: false, retained: null };
 }
 
-/** Disposable gestures stay outside the debounced writer; an accepted change is one durable operation. */
+/** Parameters use the shared debounced writer; image publication remains a durable transaction. */
 export function useReviewWatermark(args: {
   session: Session;
   settings: Settings | undefined;
   flushAdvanced(): Promise<void>;
+  stageSettings(settings: Settings | undefined): void;
   allowed(): boolean;
   pause(): void;
 }) {
@@ -68,18 +69,23 @@ export function useReviewWatermark(args: {
   };
   const save = (settings: Settings | undefined, session: Session, signal: AbortSignal) =>
     saveWatermark(settings, session, signal, current);
+  const editable = () => {
+    const owner = lifecycle.current;
+    return (
+      owner !== null &&
+      !owner.busy &&
+      !owner.controller.signal.aborted &&
+      owner.session === current.current.session &&
+      current.current.session === args.session &&
+      current.current.allowed()
+    );
+  };
   const run = async (
     action: (owner: Lifecycle, signal: AbortSignal) => Promise<void>,
     acquisitionSignal?: AbortSignal
   ) => {
     const owner = lifecycle.current;
-    if (
-      !owner ||
-      owner.busy ||
-      current.current.session !== args.session ||
-      !current.current.allowed()
-    )
-      return false;
+    if (!owner || !editable()) return false;
     const signal = acquisitionSignal
       ? AbortSignal.any([owner.controller.signal, acquisitionSignal])
       : owner.controller.signal;
@@ -102,8 +108,17 @@ export function useReviewWatermark(args: {
       if (lifecycle.current === owner && !owner.controller.signal.aborted) setPending(false);
     }
   };
-  const change = (settings: Settings | undefined): Promise<boolean> =>
-    run((owner, signal) => save(settings, owner.session, signal)).catch(() => false);
+  const change = async (settings: Settings | undefined): Promise<boolean> => {
+    const owner = lifecycle.current;
+    if (!owner || owner.retained || !editable()) return false;
+    const parsed = settings === undefined ? undefined : parseQuickEditWatermark(settings);
+    if (parsed === null) return false;
+    current.current.pause();
+    current.current.stageSettings(parsed);
+    setDraft(null);
+    setError(null);
+    return true;
+  };
   const image = (file: File, originMediaId?: string, acquisitionSignal?: AbortSignal) =>
     run(async (owner, signal) => {
       await attachWatermarkImage({
@@ -140,17 +155,11 @@ export function useReviewWatermark(args: {
         setError(message);
     },
     preview: (settings: Settings | null) => {
-      if (
-        lifecycle.current?.busy ||
-        current.current.session !== args.session ||
-        !current.current.allowed()
-      )
-        return;
+      if (!editable()) return;
       current.current.pause();
       setDraft(settings);
     },
     change,
-    reset: () => change(undefined),
     image,
     retry: retained
       ? () => image(retained.file, retained.origin)

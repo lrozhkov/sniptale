@@ -1,9 +1,11 @@
+import { RotateCcw } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedRow } from '../../ui/compact-inspector-controls';
 import { BackgroundImagePicker } from '../../composition/background-resources/picker';
 import { prepareStaticLogo, StaticLogoError } from '../../workflows/background-images/static-logo';
 import {
   createQuickEditWatermark,
+  resetQuickEditWatermark,
   setQuickEditWatermarkAnchor,
   setQuickEditWatermarkMode,
   type QuickEditWatermarkSettings,
@@ -28,7 +30,6 @@ export interface ReviewWatermarkInspectorProps {
   onError(message: string | null): void;
   imagePreviewUrl?: string | undefined;
   onRetry?: (() => Promise<void>) | undefined;
-  onReset(): void;
 }
 
 const modes = [
@@ -96,13 +97,21 @@ export function ReviewWatermarkInspector(props: ReviewWatermarkInspectorProps) {
           <WatermarkPlacementFields {...binding} />
         </div>
       )}
-      <ReviewButton
-        label={translate('gallery.videoReview.watermarkReset')}
-        onClick={() => {
-          props.onPreview(null);
-          props.onReset();
-        }}
-      />
+      {settings.mode !== 'none' && (
+        <ReviewButton
+          className="flex w-full items-center justify-center gap-2"
+          label={translate('gallery.videoReview.watermarkReset')}
+          onClick={() => {
+            props.onPreview(null);
+            void props.onChange(
+              resetQuickEditWatermark(settings, translate('gallery.videoReview.watermarkSeed'))
+            );
+          }}
+        >
+          <RotateCcw size={14} aria-hidden="true" />
+          {translate('gallery.videoReview.watermarkReset')}
+        </ReviewButton>
+      )}
     </fieldset>
   );
 }

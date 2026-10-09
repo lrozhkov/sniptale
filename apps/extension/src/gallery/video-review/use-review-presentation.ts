@@ -31,12 +31,11 @@ type Arguments = {
   session: Session;
   settings: Settings | undefined;
   flushAdvanced(): Promise<void>;
+  stageSettings(settings: Settings | undefined): void;
   allowed(): boolean;
   pause(): void;
 };
-type Retry =
-  | { kind: 'settings'; settings: Settings | undefined }
-  | { kind: 'selection'; selection: Selection };
+type Retry = { kind: 'selection'; selection: Selection };
 type View = {
   draft: Settings | null;
   modes: Partial<Record<SlotName, Settings[SlotName]['mode']>>;
@@ -214,7 +213,7 @@ class PresentationController {
     } catch (failure) {
       if (!signal.aborted)
         this.update({
-          error: failureMessage(failure, retry.kind),
+          error: failureMessage(failure),
           audioUnsupported:
             failure instanceof ReviewPresentationAdmissionError && failure.code === 'audio-decoder',
           canRetry: true,
@@ -235,8 +234,11 @@ class PresentationController {
   }
   change(value: Settings | undefined) {
     const parsed = value === undefined ? undefined : parseQuickEditPresentationSettings(value);
-    if (parsed === null || this.hasRetained()) return Promise.resolve(false);
-    return this.run((signal) => this.save(parsed, signal), { kind: 'settings', settings: parsed });
+    if (parsed === null || !this.available() || this.hasRetained()) return Promise.resolve(false);
+    this.current().pause();
+    this.current().stageSettings(parsed);
+    this.update({ draft: null, error: null, canRetry: false });
+    return Promise.resolve(true);
   }
   preview(value: Settings | null) {
     if (!this.available() || this.hasRetained()) return;
@@ -296,6 +298,10 @@ class PresentationController {
     );
   }
   private async prepare(selection: Selection, signal: AbortSignal) {
+    const expected = parseQuickEditPresentationSettings(this.current().settings)!;
+    await this.current().flushAdvanced();
+    this.assert(signal);
+    this.assertAuthored(expected);
     const initial = this.authored();
     const admitted = await admitPresentationSelection(selection, signal);
     this.assert(signal);
@@ -320,9 +326,7 @@ class PresentationController {
   }
   retry() {
     if (!this.available() || !this.retryRequest) return Promise.resolve(false);
-    return this.retryRequest.kind === 'settings'
-      ? this.change(this.retryRequest.settings)
-      : this.acquire(this.retryRequest.selection);
+    return this.acquire(this.retryRequest.selection);
   }
   retryMuted() {
     if (
@@ -353,7 +357,7 @@ class PresentationController {
   }
 }
 
-function failureMessage(failure: unknown, action: Retry['kind']) {
+function failureMessage(failure: unknown) {
   if (failure instanceof ReviewPresentationAdmissionError && failure.code === 'audio-decoder')
     return translate('gallery.videoReview.presentationAudioUnsupported');
   if (failure instanceof StaticLogoError && failure.code === 'animated')
@@ -363,9 +367,5 @@ function failureMessage(failure: unknown, action: Retry['kind']) {
     (failure.code === 'size' || failure.code === 'dimensions')
   )
     return translate('gallery.videoReview.watermarkImageSize');
-  return translate(
-    action === 'settings'
-      ? 'gallery.videoReview.saveFailed'
-      : 'gallery.videoReview.presentationAcquireFailed'
-  );
+  return translate('gallery.videoReview.presentationAcquireFailed');
 }

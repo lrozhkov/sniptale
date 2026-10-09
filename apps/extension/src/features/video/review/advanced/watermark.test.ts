@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   createQuickEditWatermark,
+  resetQuickEditWatermark,
   setQuickEditWatermarkMode,
   setQuickEditWatermarkAnchor,
   parseQuickEditWatermark,
@@ -179,4 +180,22 @@ it('roundtrips strikethrough and remembered scene paint without changing legacy 
   expect(
     loadQuickEditAdvancedState({ ...state, background: { ...background, rememberedPaint: {} } })
   ).toBeNull();
+});
+
+it('retains italic across canonical parsing and rejects nonboolean typography', () => {
+  const base = createQuickEditWatermark('Text');
+  const italic = { ...base, text: { ...base.text, italic: true } };
+  expect(parseQuickEditWatermark(italic)).toEqual(italic);
+  expect(
+    loadQuickEditAdvancedContentState({ ...createQuickEditAdvancedContent(), watermark: italic })
+      ?.watermark
+  ).toEqual(italic);
+  expect(parseQuickEditWatermark({ ...base, text: { ...base.text, italic: 'true' } })).toBeNull();
+});
+it('resets image presentation defaults while preserving its bytes and authored text', () => {
+  const base = { ...createQuickEditWatermark('Author'), mode: 'image' as const, image: logo };
+  const reset = resetQuickEditWatermark(base, 'Localized seed');
+  expect(reset.mode).toBe('image');
+  expect(reset.image).toEqual({ ...logo, size: 0.2, opacity: 1 });
+  expect(reset.text).toEqual(base.text);
 });

@@ -285,12 +285,22 @@ for (const variant of variants) {
       });
       const overlay = review.locator('[data-ui="gallery.videoReview.watermark"]');
       const canvas = overlay.locator('canvas');
-      const settled = () => expect(fields).toHaveAttribute('aria-busy', 'false');
+      const settled = async () => {
+        // Fields stay editable while the existing advanced writer coalesces a 250ms burst.
+        await page.waitForTimeout(300);
+        await expect(fields).toHaveAttribute('aria-busy', 'false');
+        await expect(review.locator('[data-ui="autosave-control"] button').first()).toHaveAttribute(
+          'aria-label',
+          `${label('editor.documentActions.autosaveTitle')}: ${label('common.states.saved')}`
+        );
+      };
       expect((await persistedWatermark(page)).watermark).toBeUndefined();
       await expect(text).toHaveCount(0);
       await mode('gallery.videoReview.watermarkText').click();
       await expect(text).toHaveValue(label('gallery.videoReview.watermarkSeed'));
       await expect.poll(() => captionPixels(canvas)).toBe(true);
+      await expect.poll(async () => (await persistedWatermark(page)).watermark?.mode).toBe('text');
+      await settled();
       const beforeText = (await persistedWatermark(page)).cursor;
       const video = review.locator('video').first();
       await video.evaluate((node) => {
@@ -330,6 +340,11 @@ for (const variant of variants) {
       await expect(text).toHaveValue(authored);
       await mode('gallery.videoReview.watermarkFontMono').click();
       await mode('gallery.videoReview.watermarkBold').click();
+      await mode('gallery.videoReview.watermarkItalic').click();
+      await expect(mode('gallery.videoReview.watermarkItalic')).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
       await mode('gallery.videoReview.watermarkStrike').click();
       await expect
         .poll(async () => (await persistedWatermark(page)).watermark?.text.strike)
@@ -543,16 +558,29 @@ for (const variant of variants) {
         .getByRole('button', { name: label('gallery.videoReview.scene'), exact: true })
         .click();
       await expect.poll(() => captionPixels(canvas)).toBe(true);
+      const opacity = fields.getByRole('textbox', {
+        name: label('gallery.videoReview.watermarkOpacity'),
+        exact: true,
+      });
+      await opacity.fill('70');
+      await opacity.press('Enter');
+      await settled();
       const beforeReset = (await persistedWatermark(page)).cursor;
       await reset.click();
-      await expect.poll(async () => (await persistedWatermark(page)).watermark).toBeUndefined();
+      await expect
+        .poll(async () => (await persistedWatermark(page)).watermark?.image?.opacity)
+        .toBe(1);
+      expect((await persistedWatermark(page)).watermark?.image?.assetId).toBe(libraryLogo.assetId);
       expect((await persistedWatermark(page)).cursor).toBe(beforeReset + 1);
       await button('gallery.videoReview.undo').click();
       await expect
         .poll(async () => (await persistedWatermark(page)).watermark?.image?.assetId)
         .toBe(libraryLogo.assetId);
       await button('gallery.videoReview.redo').click();
-      await expect.poll(async () => (await persistedWatermark(page)).watermark).toBeUndefined();
+      await expect
+        .poll(async () => (await persistedWatermark(page)).watermark?.image?.opacity)
+        .toBe(1);
+      expect((await persistedWatermark(page)).watermark?.image?.assetId).toBe(libraryLogo.assetId);
       await button('gallery.videoReview.undo').click();
       await settled();
       await button('gallery.videoReview.back').click();

@@ -17,8 +17,3 @@
 .review-background-paint .paint-inspector-field > button > svg {
   display: none;
 }
-
-.review-background-swatches [role='group'] > button {
-  height: auto;
-  aspect-ratio: 1;
-}

@@ -120,6 +120,11 @@ beforeEach(() => {
       reload,
     },
     settings: content.presentation,
+    stageSettings: vi.fn((presentation) => {
+      const { presentation: _previous, ...rest } = content;
+      content = presentation ? { ...rest, presentation } : rest;
+      args.settings = presentation;
+    }),
     flushAdvanced: vi.fn(async () => undefined),
     allowed: () => true,
     pause: vi.fn(),
@@ -166,24 +171,24 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-it('keeps previews disposable and commits once after flushing unrelated scene changes', async () => {
+it('keeps previews disposable and stages a rapid parameter burst without acquisition locks', async () => {
   await render();
   const next = { ...api.settings, audioFade: true };
   act(() => api.preview(next));
   expect(api.settings.audioFade).toBe(true);
-  expect(commit).not.toHaveBeenCalled();
-  act(() => api.preview(null));
-  expect(api.settings.audioFade).toBe(false);
+  expect(args.stageSettings).not.toHaveBeenCalled();
   await act(async () => {
-    const first = api.change(next);
-    expect(await api.change(next)).toBe(false);
-    await first;
+    expect(await api.change(next)).toBe(true);
+    expect(await api.change({ ...next, color: '#ffffffff' })).toBe(true);
   });
-  expect(args.flushAdvanced).toHaveBeenCalledOnce();
-  expect(commit).toHaveBeenCalledOnce();
+  await render();
+  expect(api.pending).toBe(false);
+  expect(commit).not.toHaveBeenCalled();
+  expect(args.flushAdvanced).not.toHaveBeenCalled();
   expect(content.presentation?.audioFade).toBe(true);
-  expect(content.canvas).toEqual({ width: 1280, height: 720 });
+  expect(content.presentation?.color).toBe('#ffffffff');
 });
+
 it('keeps independent empty modes transient and remembers variants through None', async () => {
   await render();
   await act(async () => {
@@ -344,23 +349,25 @@ it('rejects stale picker completions and old-session callbacks', async () => {
   expect(commit).not.toHaveBeenCalled();
   expect(api.picker).toBeNull();
 });
-it('reloads an ambiguous settings commit before explicit retry and avoids a duplicate history step', async () => {
-  commit.mockImplementationOnce(async (operation) => {
-    if (operation.target === 'advancedContent') content = operation.after;
-    throw new Error('lost response');
-  });
+it('keeps asset publication recoverable after parameters were staged', async () => {
   await render();
   await act(async () => {
-    expect(await api.change({ ...api.settings, audioFade: true })).toBe(false);
+    await api.change({ ...api.settings, audioFade: true });
   });
-  expect(reload).toHaveBeenCalledOnce();
-  expect(api.error).toBe('gallery.videoReview.saveFailed');
+  await render();
+  io.publish.mockRejectedValueOnce(new Error('publication failed'));
+  const request = select();
+  await act(async () => {
+    expect(await api.selectComputer(request, file())).toBe(false);
+  });
   await act(async () => {
     expect(await api.retry()).toBe(true);
   });
   expect(commit).toHaveBeenCalledOnce();
+  expect(content.presentation?.audioFade).toBe(true);
 });
-it('resets through one durable operation and clears preview when authored state is restored', async () => {
+
+it('stages reset and clears preview when authored state is restored', async () => {
   await render();
   act(() => api.preview({ ...api.settings, audioFade: true }));
   args.settings = createNeutralPresentationSettings();
@@ -371,7 +378,8 @@ it('resets through one durable operation and clears preview when authored state 
   });
   expect(content.presentation).toBeUndefined();
   expect(content.canvas).toEqual({ width: 1280, height: 720 });
-  expect(commit).toHaveBeenCalledOnce();
+  expect(commit).not.toHaveBeenCalled();
+  expect(args.stageSettings).toHaveBeenCalledOnce();
 });
 it('keeps StrictMode effect replay usable and reports static image failures without raw details', async () => {
   await render(true);
@@ -550,8 +558,9 @@ it('does not overwrite an authored restore that arrives while flushing prior adv
   args.flushAdvanced = () => flushing.promise;
   await render();
   let running!: Promise<boolean>;
+  const request = select();
   await act(async () => {
-    running = api.change({ ...api.settings, audioFade: true });
+    running = api.selectComputer(request, file());
     await Promise.resolve();
   });
   content = { ...content, presentation: { ...content.presentation!, color: '#ffffffff' } };

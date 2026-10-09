@@ -180,6 +180,8 @@ it.each([
         ),
         point
       );
+      expect(projected).not.toBeNull();
+      if (!projected) throw new Error('Expected the represented video point on the canvas');
       expect(projected.x).toBeGreaterThan(0);
       expect(projected.x).toBeLessThan(observed.size.width);
       expect(raster.video.x + raster.video.width * 0.1).toBeGreaterThan(0);

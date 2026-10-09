@@ -42,8 +42,11 @@ export function ReviewBackgroundInspector(props: {
   return (
     <div data-ui="gallery.videoReview.backgroundInspector" className="review-inspector-columns">
       <div className="min-w-0 space-y-2">
+        <ReviewZoomObject background={background} onChange={onChange} />
         <div className="review-background-kinds">
           <SegmentedRow
+            label={translate('gallery.videoReview.backgroundType')}
+            layout="stacked"
             columns={3}
             ariaLabel={translate('gallery.videoReview.background')}
             options={kinds.map((kind) => ({ value: kind.key, label: translate(kind.label) }))}
@@ -77,7 +80,6 @@ export function ReviewBackgroundInspector(props: {
             }}
           />
         </div>
-        <ReviewZoomObject background={background} onChange={onChange} />
         {imageRequested || (background.enabled && background.type === 'image') ? (
           <BackgroundImagePicker
             pending={props.pending ?? false}
