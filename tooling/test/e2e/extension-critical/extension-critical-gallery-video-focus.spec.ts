@@ -269,7 +269,7 @@ for (const variant of [
       expect(saved.end - saved.start).toBeGreaterThan(0);
       await dialog
         .getByRole('button', {
-          name: translate('gallery.videoReview.back', variant.locale),
+          name: translate('common.actions.close', variant.locale),
           exact: true,
         })
         .click();
@@ -694,7 +694,7 @@ for (const variant of [
         await expect.poll(() => persistedFocus(page)).toEqual(before);
         await button('gallery.videoReview.redo').click();
         await expect.poll(() => persistedFocus(page)).toEqual(shortened);
-        await button('gallery.videoReview.back').click();
+        await button('common.actions.close').click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
         await block.click();
         await expect.poll(() => persistedFocus(page)).toEqual(shortened);

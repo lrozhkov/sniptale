@@ -39,7 +39,7 @@ for (const variant of [
         await volume.fill(value);
         await volume.press('Enter');
         // Leaving flushes this debounced edit into its own durable history step.
-        await button('gallery.videoReview.back').click();
+        await button('common.actions.close').click();
         await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       }
       await expect(volume).toHaveValue('70');
@@ -63,7 +63,7 @@ for (const variant of [
       await expect(volume).toHaveValue('100');
       await expect(button('gallery.videoReview.undo')).toBeDisabled();
       await expect(button('gallery.videoReview.redo')).toBeEnabled();
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(volume).toHaveValue('100');
       await button('gallery.videoReview.redo').click();
@@ -86,14 +86,14 @@ for (const variant of [
       await expect(confirm).toHaveCount(0);
       await expect(volume).toHaveValue('100');
       await expect(button('gallery.videoReview.redo')).toBeDisabled();
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(volume).toHaveValue('100');
       await expect(button('gallery.videoReview.redo')).toBeDisabled();
       await button('gallery.videoReview.historyReset').click();
       await expect(choices.locator('[data-history-start]')).toBeDisabled();
       await page.keyboard.press('Escape');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

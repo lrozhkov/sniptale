@@ -64,7 +64,7 @@ for (const locale of ['en', 'ru'] as const) {
       await expect(page.locator('dialog video').first()).toBeVisible();
       await page
         .locator('dialog')
-        .getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
+        .getByRole('button', { name: label('common.actions.close'), exact: true })
         .click();
       const raw = await readWorkspace(page);
       const workspace = parseVideoWorkspace(raw);

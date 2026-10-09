@@ -161,7 +161,7 @@ for (const variant of [
       await expect.poll(() => persistedFocus(page)).toEqual(before);
       await button('gallery.videoReview.redo').click();
       await expect.poll(() => persistedFocus(page)).toEqual(trimmed);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await block.click();
       await expectAlignedRange(exitRange, trimmed.exit.duration);

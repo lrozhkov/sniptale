@@ -409,13 +409,13 @@ it('closes the preview only after saving the note and preserves it when saving f
       'header [aria-label="common.actions.close"]'
     )!;
     expect(close).not.toBeNull();
-    expect(fixture.button('back').closest('header')).not.toBeNull();
+    expect(fixture.host.querySelector('header [aria-label="gallery.videoReview.back"]')).toBeNull();
     await act(async () => close.click());
     expect(onClose).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep this note');
     await act(async () => close.click());
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(fixture.back).not.toHaveBeenCalled();
+    expect(fixture.back).toHaveBeenCalledOnce();
+    expect(onClose).not.toHaveBeenCalled();
     expect(fixture.snapshot.draft).toBeNull();
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'annotation',

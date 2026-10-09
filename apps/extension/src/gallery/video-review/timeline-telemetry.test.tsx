@@ -187,3 +187,24 @@ it('tints an authored keyboard event without tinting a signal with the same loca
   );
   expect(host.querySelectorAll('button[data-animated="true"]')).toHaveLength(1);
 });
+
+it('uses the full editor click cursor for ordinary and double clicks', () => {
+  const markers = ['CLICK', 'DOUBLE_CLICK'].map((eventType, index) => ({
+    ...marker('action', String(index), index + 1),
+    eventType,
+  }));
+  act(() =>
+    root.render(
+      <ReviewTelemetryStrip
+        markers={markers}
+        duration={10}
+        time={0}
+        width={1000}
+        zoom={1}
+        onMarker={vi.fn()}
+      />
+    )
+  );
+  expect(host.querySelectorAll('.lucide-mouse-pointer-click')).toHaveLength(2);
+  expect(host.querySelector('.lucide-mouse-pointer-2')).toBeNull();
+});

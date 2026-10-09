@@ -13,7 +13,6 @@ import {
   Pencil,
   Trash2,
   Copy,
-  ArrowLeft,
   Plus,
   FileDown,
   X,
@@ -123,7 +122,7 @@ export function ReviewInspector(props: {
       {props.resizeHandle}
       <ReviewInspectorHeader
         {...props}
-        onBack={shown === 'preview' ? props.navigation.closePreview : props.onBack}
+        onBack={props.onBack}
         presentation={presentation}
         section={shown}
         onTogglePresentation={() =>
@@ -357,7 +356,7 @@ function ReviewNotes(props: Parameters<typeof ReviewInspector>[0]) {
   );
 }
 
-/** Header exits share the flush owner; Back restores the viewer, Close dismisses it. */
+/** The header close action returns to the viewer through the existing guarded exit. */
 function ReviewInspectorHeader(
   props: Parameters<typeof ReviewInspector>[0] & {
     presentation: 'all' | 'sections';
@@ -367,16 +366,6 @@ function ReviewInspectorHeader(
 ) {
   return (
     <header className="flex shrink-0 items-center gap-1">
-      <ContentToolbarButton
-        type="button"
-        tone="utility"
-        size="compact"
-        title={translate('gallery.videoReview.back')}
-        disabled={props.busy}
-        onClick={props.onBack}
-      >
-        <ArrowLeft size={16} aria-hidden="true" />
-      </ContentToolbarButton>
       <h2 className="min-w-0 flex-1 truncate text-sm font-semibold" title={props.filename}>
         {props.filename}
       </h2>
@@ -425,7 +414,7 @@ function ReviewInspectorHeader(
         size="compact"
         title={translate('common.actions.close')}
         disabled={props.busy}
-        onClick={props.onClose ?? props.onBack}
+        onClick={props.onBack}
       >
         <X size={16} aria-hidden="true" />
       </ContentToolbarButton>

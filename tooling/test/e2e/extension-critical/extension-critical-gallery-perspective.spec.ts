@@ -124,7 +124,7 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
       .locator('video')
       .evaluate((video: HTMLVideoElement) => video.currentTime);
     const expected = await raster.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
-    await button('gallery.videoReview.back').click();
+    await button('common.actions.close').click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await dialog
       .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')

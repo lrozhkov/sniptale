@@ -226,7 +226,7 @@ for (const variant of [
       await expect(area).toHaveCount(0);
       await button('gallery.videoReview.zoomPreviewArea').click();
       await expect.poll(width).toBeCloseTo(80, 3);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')

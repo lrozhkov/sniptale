@@ -329,7 +329,7 @@ for (const variant of [
         ).toBeLessThan(10);
       }
       await page.screenshot({ path: info.outputPath('focus-border-overlap.png'), fullPage: false });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(blocks).toHaveCount(4);
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
@@ -392,7 +392,7 @@ for (const variant of [
         }
       }
 
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
       await expect(

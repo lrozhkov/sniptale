@@ -142,7 +142,7 @@ test('explicit speech batch publishes selected phrases to their own clips', asyn
       { operation: 'speech', text: 'First phrase.' },
       { operation: 'speech', text: 'First phrase.' },
     ]);
-    await button('gallery.videoReview.back').click();
+    await button('common.actions.close').click();
     await page.reload();
     await installSpeechPortFixture(page);
     await openReview(page);
@@ -415,7 +415,7 @@ for (const variant of [
         { operation: 'speech', text: 'An overflow phrase.' },
         { operation: 'speech', text: 'Edited middle phrase.' },
       ]);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.reload();
       await installSpeechPortFixture(page);
       await openReview(page);

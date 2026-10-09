@@ -352,7 +352,7 @@ for (const variant of [
       await rulerDrag(page, 1, 4);
       await page.screenshot({ path: info.outputPath('loop-with-speed.png'), fullPage: false });
       await dialog
-        .getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
+        .getByRole('button', { name: label('common.actions.close'), exact: true })
         .click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.loopSummary"]')).toHaveCount(0);
@@ -429,7 +429,7 @@ test('quick editor Space keeps transport priority after buttons and closed selec
     await help.getByRole('button').press('Space');
     await expect(help).toHaveCount(0);
     await expect(video).toHaveJSProperty('paused', true);
-    await button('gallery.videoReview.back').click();
+    await button('common.actions.close').click();
     await expect(dialog).toHaveCount(0);
   } finally {
     await new Promise<void>((resolve, reject) =>

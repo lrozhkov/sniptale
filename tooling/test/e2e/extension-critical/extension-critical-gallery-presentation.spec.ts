@@ -364,7 +364,7 @@ for (const variant of variants) {
       await expect(modal).toHaveCount(0);
       await expect(trigger).toBeFocused();
       expect(await mainVideo.evaluate((node: HTMLVideoElement) => node.paused)).toBe(true);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.reload();
       await open();
       await showScene();

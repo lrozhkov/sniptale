@@ -187,7 +187,7 @@ it('integrates selection, recoverable text, drawing, history and report actions 
     expect(host.querySelector('textarea')).toBeNull();
     expect(host.querySelector('[data-ui="gallery.videoReview.actionProperties"]')).not.toBeNull();
     await click('telemetry');
-    await click('back');
+    await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
   } finally {
     await act(async () => root.unmount());
@@ -207,7 +207,7 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     await click('addComment');
     await fill('Keep this text');
     integration.draft.mockRejectedValueOnce(new Error('Quota'));
-    await click('back');
+    await click('common.actions.close');
     expect(back).not.toHaveBeenCalled();
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
     expect(host.textContent).toContain('gallery.videoReview.saveFailed');
@@ -215,7 +215,7 @@ it('keeps unsaved text in the editor when Back cannot persist recovery, then ret
     expect(host.querySelector('[data-ui="gallery.videoReview.feedback"]')).toBeNull();
     expect(host.textContent).toContain('gallery.videoReview.saveFailed');
     expect(host.querySelector('textarea')?.value).toBe('Keep this text');
-    await click('back');
+    await click('common.actions.close');
     expect(back).toHaveBeenCalledOnce();
     expect(fixture.snapshot.draft).toBeNull();
     expect(fixture.snapshot.workspace.history.at(-1)?.target).toBe('annotation');

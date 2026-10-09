@@ -131,7 +131,7 @@ for (const variant of [
       await button('gallery.videoReview.redo').click();
       await sound(false, 0.7);
       await change('0');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(button('gallery.videoReview.advancedEditing')).toHaveAttribute(
         'aria-pressed',
@@ -141,7 +141,7 @@ for (const variant of [
       await button('gallery.videoReview.restoreSourceAudio').click();
       await sound(false, 1);
       await page.screenshot({ path: testInfo.outputPath('master-restored.png') });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
@@ -341,7 +341,7 @@ for (const variant of [
         });
       await original.fill('0');
       await original.press('Enter');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(voice).toBeVisible();
       await expect.poll(() => voiceTiming(page)).toMatchObject({ rates: [4] });
@@ -407,7 +407,7 @@ for (const variant of [
       // Exact same-rate DSP agreement is also covered at both rates by the unit proof.
       if (pcm!.sameSampleRate) expect(pcm!.difference).toBeLessThan(1e-6);
       expect(pcm!.exportedDuration).toBeCloseTo(Math.min(1, initial.rawDuration / 4) + 0.04, 4);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

@@ -116,11 +116,11 @@ it('retains failed new-note text and blocks Back until retry succeeds', async ()
     await fixture.click('addComment');
     await fixture.fill('Keep on failure');
     integration.commit.mockRejectedValueOnce(new Error('Quota'));
-    await fixture.click('back');
+    await fixture.click('common.actions.close');
     expect(fixture.back).not.toHaveBeenCalled();
     expect(fixture.host.querySelector('textarea')?.value).toBe('Keep on failure');
     expect(fixture.host.textContent).toContain('gallery.videoReview.saveFailed');
-    await fixture.click('back');
+    await fixture.click('common.actions.close');
     expect(fixture.back).toHaveBeenCalledOnce();
     expect(fixture.snapshot.workspace.history).toHaveLength(1);
   } finally {

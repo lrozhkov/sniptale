@@ -211,7 +211,9 @@ export function createEditorFixture(
   const root = createRoot(host);
   const back = vi.fn();
   const button = (key: string) => {
-    const node = host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`);
+    const node = host.querySelector<HTMLButtonElement>(
+      `[aria-label="${key.includes('.') ? key : `gallery.videoReview.${key}`}"]`
+    );
     if (!node) throw new Error(`Missing ${key}`);
     return node;
   };

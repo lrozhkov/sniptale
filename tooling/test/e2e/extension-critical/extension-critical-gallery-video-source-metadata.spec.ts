@@ -66,7 +66,7 @@ for (const variant of [
       expect(exported.duration).toBeLessThan(12);
       expect(exported.width).toBe(160);
       await dialog
-        .getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
+        .getByRole('button', { name: label('common.actions.close'), exact: true })
         .click();
       await page.evaluate(
         async ({ databaseName, recordingId }) => {

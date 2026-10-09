@@ -407,10 +407,12 @@ it.each(['scene', 'selected', 'history', 'export'] as const)(
       expect(document.activeElement).toBe(trigger);
       expect(leave).not.toHaveBeenCalled();
       act(() => trigger.click());
-      const back = host.querySelector<HTMLButtonElement>('header button')!;
-      act(() => back.click());
-      expect(navigation.shown).toBe(section);
-      expect(leave).not.toHaveBeenCalled();
+      const close = host.querySelector<HTMLButtonElement>(
+        'header [aria-label="common.actions.close"]'
+      )!;
+      expect(host.querySelector('header .lucide-arrow-left')).toBeNull();
+      act(() => close.click());
+      expect(leave).toHaveBeenCalledOnce();
     } finally {
       act(() => root.unmount());
       host.remove();

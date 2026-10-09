@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
   Activity,
-  MousePointer2,
   MousePointerClick,
   Command,
   Keyboard,
@@ -148,25 +147,23 @@ export function ReviewTelemetryStrip(props: TelemetryStripProps) {
 /** Event-specific shapes remain identifiable in narrow point markers. */
 function ReviewEventIcon({ kind }: { kind: string }) {
   const Icon =
-    kind === 'DOUBLE_CLICK'
+    kind === 'DOUBLE_CLICK' || kind === 'CLICK'
       ? MousePointerClick
-      : kind === 'CLICK'
-        ? MousePointer2
-        : kind === 'KEY'
-          ? Command
-          : kind === 'typing'
-            ? Keyboard
-            : kind === 'SCROLL'
-              ? Mouse
-              : kind === 'PAUSE'
-                ? Pause
-                : kind === 'CALLOUT'
-                  ? MessageSquare
-                  : kind === 'cursor-idle'
-                    ? Clock
-                    : kind === 'static-frame'
-                      ? Focus
-                      : Activity;
+      : kind === 'KEY'
+        ? Command
+        : kind === 'typing'
+          ? Keyboard
+          : kind === 'SCROLL'
+            ? Mouse
+            : kind === 'PAUSE'
+              ? Pause
+              : kind === 'CALLOUT'
+                ? MessageSquare
+                : kind === 'cursor-idle'
+                  ? Clock
+                  : kind === 'static-frame'
+                    ? Focus
+                    : Activity;
   return <Icon size={12} className="shrink-0" aria-hidden="true" />;
 }
 

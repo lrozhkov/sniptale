@@ -84,7 +84,7 @@ for (const variant of [
       await page.screenshot({ path: info.outputPath('history-group-menu.png'), fullPage: false });
       await page.keyboard.press('Escape');
       await expect(
-        dialog.getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
+        dialog.getByRole('button', { name: label('common.actions.close'), exact: true })
       ).toBeInViewport();
     } finally {
       await new Promise<void>((resolve, reject) =>
@@ -310,7 +310,7 @@ for (const variant of [
       await expect(history.locator('li')).toHaveCount(6);
       await page.screenshot({ path: info.outputPath('click-history.png'), fullPage: false });
       await dialog
-        .getByRole('button', { name: label('gallery.videoReview.back'), exact: true })
+        .getByRole('button', { name: label('common.actions.close'), exact: true })
         .click();
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();

@@ -44,7 +44,7 @@ for (const locale of ['ru', 'en'] as const) {
       const preview = dialog.locator('[data-ui="gallery.videoReview.stage"]');
       await checkRenderedWindowIcon(page, preview, info.outputPath('quick-icon-detail.png'), 0.08);
       await page.screenshot({ path: info.outputPath('quick-local-icon.png'), fullPage: false });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       const folder = settings.getByRole('button', {

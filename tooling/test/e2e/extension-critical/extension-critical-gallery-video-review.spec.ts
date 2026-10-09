@@ -224,7 +224,7 @@ for (const variant of [
       const report = await readFile(await (await reportDownload).path(), 'utf8');
       expect(report).toContain('Interval with region');
       expect(report).toContain('"region"');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.preview.surface"] video')).toHaveJSProperty(
         'controls',
         true
@@ -510,7 +510,7 @@ for (const { container, gaps } of [
           const report = await readFile(await (await reportDownload).path(), 'utf8');
           expect(report).toContain('"audioReencoded": true');
           expect(report).toContain('"videoReencoded": false');
-          await button('gallery.videoReview.back').click();
+          await button('common.actions.close').click();
           await page.keyboard.press('Escape');
           await page
             .getByRole('button', { name: `beta-v1-edited.${container}`, exact: true })
@@ -764,7 +764,7 @@ for (const variant of [
       await expect(linkInspector).toBeVisible();
       await page.screenshot({ path: testInfo.outputPath('zoom-link-minimum.png') });
       // Reopen the persisted edit and verify the authored connection parameters.
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(link).toHaveAttribute('data-connected', 'true');
       await link.click();
@@ -943,7 +943,7 @@ for (const variant of [
         .locator('[data-ui="gallery.videoReview.focusType"]')
         .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
@@ -1188,7 +1188,7 @@ for (const variant of [
       await page.setViewportSize({ width: 1280, height: 720 });
       await expect(dialog.locator('[data-ui="gallery.videoReview.focusType"]')).toBeInViewport();
       await page.screenshot({ path: testInfo.outputPath('spotlight-minimum.png') });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
@@ -1212,7 +1212,7 @@ for (const variant of [
       await expect(link).toHaveCount(1);
       await link.click();
       await expect(link).toHaveAttribute('data-connected', 'true');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await lane.locator('[role="button"]').last().click();
       await dialog
@@ -1551,7 +1551,7 @@ test('quick editor source audio ranges preserve gain, selection and exported sou
     await button('gallery.videoReview.redo').click();
     await expect(range).toHaveCount(1);
     await range.click();
-    await button('gallery.videoReview.back').click();
+    await button('common.actions.close').click();
     await page.locator('[data-ui="gallery.videoReview.enter"]').click();
     await expect(range).toHaveCount(1);
     const downloadPromise = page.waitForEvent('download');
@@ -2559,7 +2559,7 @@ for (const variant of [
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'false');
       await button('gallery.videoReview.redo').click();
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-cut-suppressed="true"]')
@@ -2649,7 +2649,7 @@ for (const variant of [
       await button('gallery.videoReview.redo').click();
       await expect(focus).toHaveAttribute('data-cut-suppressed', 'true');
       expect((await focus.boundingBox())!.x).toBeCloseTo(partial.x, 0);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-cut-suppressed="true"]')
@@ -2963,7 +2963,7 @@ for (const variant of [
       await expect(strip).toHaveCount(0);
       await expect(dialog.locator('[inert]')).toHaveCount(0);
       await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(1);
       const retained = await recordedAudioResources(
@@ -3032,7 +3032,7 @@ for (const variant of [
         })
         .click();
       await expect(strip).toHaveCount(0);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(dialog.locator('[data-audio-lane="voiceover"] [role="button"]')).toHaveCount(2);
     } finally {
@@ -3727,7 +3727,7 @@ for (const variant of [
       await expect.poll(artwork).toContain('https://sniptale.test/?a=1&amp;b=2');
       await page.screenshot({ path: info.outputPath('browser-header-scene.png'), fullPage: false });
       // Reopen commits the authored fields before testing removal as a separate history step.
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
@@ -3759,7 +3759,7 @@ for (const variant of [
         .getByRole('button', { name: label('gallery.videoReview.zoomPreviewResult'), exact: true })
         .click();
       await expect(framing).toHaveAttribute('data-view', 'result');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       await expect(title).toHaveValue('Browser & <title>');
@@ -3884,7 +3884,7 @@ for (const locale of ['en', 'ru'] as const) {
         .getByRole('button', { name: label('windowHeader.browser'), exact: true })
         .click();
       await expect(stage.locator('img')).toHaveCount(1);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       await expect(intensity).toHaveValue('40');
@@ -3893,7 +3893,7 @@ for (const locale of ['en', 'ru'] as const) {
       await expect
         .poll(() => window.evaluate((node) => getComputedStyle(node).boxShadow))
         .toBe('none');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.undo').click();
       await button('gallery.videoReview.scene').click();
@@ -4103,7 +4103,7 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
         await expect(y).toHaveValue('0');
         if (enabled) await expect.poll(topAligned).toBeLessThan(1.5);
       }
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await region.click();
       await expect(scale).toHaveValue('4');

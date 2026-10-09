@@ -142,11 +142,10 @@ for (const variant of [
       await expect(mode).toHaveCSS('border-color', 'rgba(0, 0, 0, 0)');
       const inspector = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
       const heading = inspector.locator('header h2');
-      const backBox = await button('gallery.videoReview.back').boundingBox();
       const titleBox = await heading.boundingBox();
       const closeBox = await button('common.actions.close').boundingBox();
       expect(
-        Math.abs(backBox!.y + backBox!.height / 2 - titleBox!.y - titleBox!.height / 2)
+        Math.abs(closeBox!.y + closeBox!.height / 2 - titleBox!.y - titleBox!.height / 2)
       ).toBeLessThan(2);
       expect(closeBox!.x).toBeGreaterThan(titleBox!.x + titleBox!.width);
       const format = button('videoEditor.sidebar.canvasFormatLabel');
@@ -185,7 +184,7 @@ for (const variant of [
       await expect(dialog.locator('ol')).toContainText('Explicit note');
       await page.screenshot({ path: testInfo.outputPath('advanced.png') });
       await page.setViewportSize({ width: 1280, height: 720 });
-      await expect(button('gallery.videoReview.back')).toBeInViewport();
+      await expect(button('common.actions.close')).toBeInViewport();
       await expect(button('gallery.videoReview.advancedEditing')).toBeInViewport();
       const stage = await dialog.locator('[data-ui="gallery.videoReview.stage"]').boundingBox();
       expect(stage!.height).toBeGreaterThan(140);
@@ -197,7 +196,7 @@ for (const variant of [
       await page.screenshot({ path: testInfo.outputPath('minimum.png') });
       await button('gallery.videoReview.advancedEditing').click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] img')).toHaveCount(0);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
       await expect(dialog.locator('[data-ui="gallery.videoReview.stage"] img')).toHaveCount(1);

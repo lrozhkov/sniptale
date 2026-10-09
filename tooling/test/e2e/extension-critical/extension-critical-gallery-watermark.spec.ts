@@ -583,7 +583,7 @@ for (const variant of variants) {
       expect((await persistedWatermark(page)).watermark?.image?.assetId).toBe(libraryLogo.assetId);
       await button('gallery.videoReview.undo').click();
       await settled();
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.reload();
       await open();
       await inspector

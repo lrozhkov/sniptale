@@ -76,7 +76,7 @@ for (const viewport of [
       await button('gallery.videoReview.scene').click();
       await button('gallery.videoReview.backgroundGradient').click();
       // Finish the paint edit before testing blur as a separate undo operation.
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toBeVisible();
       await page.reload();
       await open();
@@ -100,7 +100,7 @@ for (const viewport of [
         path: info.outputPath('background-blur-control.png'),
         fullPage: false,
       });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toBeVisible();
       await page.reload();
       await open();

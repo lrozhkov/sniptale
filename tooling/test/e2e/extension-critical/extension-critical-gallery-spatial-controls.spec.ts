@@ -418,7 +418,7 @@ for (const variant of [
       expect((await persistedFocus(page))?.sourceAnchor).toEqual(saved?.sourceAnchor);
       await button('gallery.videoReview.undo').click();
       await expect.poll(() => persistedFocus(page)).toEqual(saved);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')

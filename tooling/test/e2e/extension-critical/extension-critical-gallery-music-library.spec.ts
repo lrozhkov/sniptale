@@ -388,7 +388,7 @@ for (const variant of [
       await button('gallery.videoReview.redo').click();
       await expect(clips).toHaveCount(1);
       await expect(clips.first()).toHaveAttribute('data-audio-id', selectedId!);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(clips).toHaveCount(1);
       await expect(clips.first()).toHaveAttribute('data-audio-id', selectedId!);
@@ -427,7 +427,7 @@ for (const variant of [
       await button('gallery.videoReview.redo').click();
       await expect(clips).toHaveCount(1);
       await expect(clips.first()).toHaveAttribute('data-audio-id', uploadedId!);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await expect(clips).toHaveCount(1);
       await expect(clips.first()).toHaveAttribute('data-audio-id', uploadedId!);

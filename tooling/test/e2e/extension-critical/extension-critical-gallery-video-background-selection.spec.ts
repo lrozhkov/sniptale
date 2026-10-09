@@ -104,7 +104,7 @@ for (const variant of [
       await expect(selected).toHaveCSS('outline-color', colors.accent);
       await expect(dialog.locator('[data-ui="gallery.videoReview.inspector"]')).toBeInViewport();
       const presetName = await selected.getAttribute('aria-label');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.scene').click();
       // The combined palette starts with colors; reveal the gradient page again on reopen.
@@ -115,7 +115,7 @@ for (const variant of [
       await expect(restored).toHaveCount(1);
       await expect(restored).toHaveAttribute('aria-label', presetName!);
       await expect(restored).toHaveCSS('outline-width', '1px');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

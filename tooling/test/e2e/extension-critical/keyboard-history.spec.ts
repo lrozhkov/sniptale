@@ -122,7 +122,7 @@ for (const [width, height, locale, theme] of [
       await page.screenshot({ path: info.outputPath('keyboard-inspector.png'), fullPage: false });
       await button('gallery.videoReview.clickReset').scrollIntoViewIfNeeded();
       await page.screenshot({ path: info.outputPath('keyboard-footer.png'), fullPage: false });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await expect(page.locator('[data-ui="gallery.videoReview.enter"]')).toBeVisible();
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();

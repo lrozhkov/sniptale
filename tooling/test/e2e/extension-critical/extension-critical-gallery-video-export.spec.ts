@@ -284,7 +284,7 @@ for (const variant of [
         label('videoEditor.exportDialog.qualityMedium')
       );
       await expect(button('gallery.videoReview.exportFrameRate')).toContainText('30');
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }

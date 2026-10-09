@@ -33,6 +33,13 @@ for (const variant of [
       const dialog = page.locator('dialog');
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
+      await expect(dialog.locator('aside header .lucide-arrow-left')).toHaveCount(0);
+      await expect(
+        dialog.locator('aside header').getByRole('button', {
+          name: translate('common.actions.close', variant.locale),
+          exact: true,
+        })
+      ).toBeVisible();
       await button('gallery.videoReview.advancedEditing').click();
       await button('gallery.videoReview.cutMode').click();
       const lane = dialog.locator('[data-ui="gallery.videoReview.sourceLane"]');
@@ -129,10 +136,10 @@ for (const variant of [
         await viewport.evaluate((node) => {
           node.scrollLeft = node.scrollWidth;
         });
-        await expect(button('gallery.videoReview.back')).toBeInViewport({ ratio: 1 });
+        await expect(button('common.actions.close')).toBeInViewport({ ratio: 1 });
       }
       await page.screenshot({ path: info.outputPath('recovered.png'), fullPage: false });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await expect(dialog).toHaveCount(0);
     } finally {
       await new Promise<void>((resolve, reject) =>

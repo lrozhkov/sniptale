@@ -92,7 +92,7 @@ test('custom background survives paint switches and reopening without duplicate 
       .poll(async () => (await savedBackground(page))?.background.rememberedImage)
       .toEqual(image);
     await dialog
-      .getByRole('button', { name: translate('gallery.videoReview.back', 'en'), exact: true })
+      .getByRole('button', { name: translate('common.actions.close', 'en'), exact: true })
       .click();
     await page.reload();
     await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();

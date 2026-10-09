@@ -128,7 +128,7 @@ for (const variant of [
       await page.screenshot({
         path: testInfo.outputPath(`focus-frame-${variant.locale}-${variant.theme}.png`),
       });
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
@@ -175,7 +175,7 @@ for (const variant of [
       const swBounds = grips.find((item) => item.corner === 'sw')!;
       expect(nwBounds.right).toBeLessThanOrEqual(neBounds.left + 0.1);
       expect(nwBounds.bottom).toBeLessThanOrEqual(swBounds.top + 0.1);
-      await button('gallery.videoReview.back').click();
+      await button('common.actions.close').click();
     } finally {
       await new Promise<void>((resolve) => host.server.close(() => resolve()));
     }
