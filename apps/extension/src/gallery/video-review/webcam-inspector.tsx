@@ -2,7 +2,7 @@ import { ReviewWebcamCropPreview } from './webcam-crop-preview';
 import { Camera, Clock3, Move, Plus, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import { ColorField, SelectField } from '../../ui/compact-inspector-controls';
-import { ReviewInspectorSections } from './inspector-sections';
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { ReviewNumberRow } from './number-row';
 import {
   ReviewButton,
@@ -42,6 +42,63 @@ export function ReviewWebcamInspector({
 }) {
   const camera = editor.camera;
   if (!camera) return null;
+  const actions = reviewInspectorActions(
+    <>
+      {!editor.hidden ? (
+        <>
+          <ReviewButton
+            label={translate('gallery.videoReview.webcamAddPosition')}
+            className={`${reviewTextButtonClassName} !w-full justify-start`}
+            disabled={
+              editor.time < 0.001 ||
+              editor.time >= editor.duration ||
+              camera.positions.length >= 512
+            }
+            onClick={editor.addPosition}
+          >
+            <Plus size={15} aria-hidden="true" />
+            <span>{translate('gallery.videoReview.webcamAddPosition')}</span>
+          </ReviewButton>
+          <ReviewButton
+            label={translate('gallery.videoReview.webcamHideRange')}
+            className={`${reviewTextButtonClassName} !w-full justify-start`}
+            disabled={!range || !editor.canHide(range)}
+            title={
+              !range
+                ? translate('gallery.videoReview.webcamSelectRange')
+                : !editor.canHide(range)
+                  ? translate('gallery.videoReview.webcamHideConflict')
+                  : undefined
+            }
+            onClick={() => {
+              if (range) editor.hide(range);
+            }}
+          >
+            <Plus size={15} aria-hidden="true" />
+            <span>{translate('gallery.videoReview.webcamHideRange')}</span>
+          </ReviewButton>
+        </>
+      ) : null}
+      <ReviewButton
+        label={translate(
+          editor.selection.kind === 'webcam'
+            ? 'gallery.videoReview.webcamDisable'
+            : 'gallery.videoReview.removeEdit'
+        )}
+        onClick={editor.remove}
+        className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+      >
+        <Trash2 size={15} />
+        <span>
+          {translate(
+            editor.selection.kind === 'webcam'
+              ? 'gallery.videoReview.webcamDisable'
+              : 'gallery.videoReview.removeEdit'
+          )}
+        </span>
+      </ReviewButton>
+    </>
+  );
   return (
     <div className="space-y-3" data-ui="gallery.videoReview.webcamInspector">
       {editor.candidate ? (
@@ -70,6 +127,7 @@ export function ReviewWebcamInspector({
               onChange={(value) => editor.hide({ ...editor.hidden!, [edge]: value }, true)}
             />
           ))}
+          <ReviewInspectorSections sections={[actions]} />
         </>
       ) : (
         <ReviewInspectorSections
@@ -106,50 +164,13 @@ export function ReviewWebcamInspector({
                       }
                     />
                   </div>
-                  <ReviewButton
-                    label={translate('gallery.videoReview.webcamHideRange')}
-                    className={reviewTextButtonClassName}
-                    disabled={!range || !editor.canHide(range)}
-                    title={
-                      !range
-                        ? translate('gallery.videoReview.webcamSelectRange')
-                        : !editor.canHide(range)
-                          ? translate('gallery.videoReview.webcamHideConflict')
-                          : undefined
-                    }
-                    onClick={() => {
-                      if (range) editor.hide(range);
-                    }}
-                  >
-                    <Plus size={14} />
-                    <span>{translate('gallery.videoReview.webcamHideRange')}</span>
-                  </ReviewButton>
                 </div>
               ),
             },
+            actions,
           ]}
         />
       )}
-      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate(
-            editor.selection.kind === 'webcam'
-              ? 'gallery.videoReview.webcamDisable'
-              : 'gallery.videoReview.removeEdit'
-          )}
-          onClick={editor.remove}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-        >
-          <Trash2 size={15} />
-          <span>
-            {translate(
-              editor.selection.kind === 'webcam'
-                ? 'gallery.videoReview.webcamDisable'
-                : 'gallery.videoReview.removeEdit'
-            )}
-          </span>
-        </ReviewButton>
-      </div>
     </div>
   );
 }
@@ -181,17 +202,7 @@ function WebcamLayout({ editor }: { editor: Editor }) {
         ]}
         onChange={(id) => editor.navigate(id === 'base' ? null : id)}
       />
-      <ReviewButton
-        label={translate('gallery.videoReview.webcamAddPosition')}
-        className={reviewTextButtonClassName}
-        disabled={
-          editor.time < 0.001 || editor.time >= editor.duration || camera.positions.length >= 512
-        }
-        onClick={editor.addPosition}
-      >
-        <Plus size={14} />
-        <span>{translate('gallery.videoReview.webcamAddPosition')}</span>
-      </ReviewButton>
+
       <div className="review-inspector-columns">
         <WebcamPlacement editor={editor} />
         <WebcamCrop editor={editor} />

@@ -333,6 +333,11 @@
     gap: 12px;
     align-items: start;
   }
+  /* Embedded object settings already occupy their parent section's column. */
+  .review-inspector-section-body
+    [data-ui='gallery.videoReview.inspectorSections'][data-presentation='all'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .review-inspector-section-column {
     display: flex;
     flex-direction: column;
@@ -349,25 +354,18 @@
   }
 }
 
-/* Footer actions retain the same column geometry as inspector sections. */
+/* Commands stay within their owning section, including two-column inspectors. */
 .review-inspector-actions {
   display: grid;
   gap: 8px;
+  min-width: 0;
+}
+.review-inspector-actions .review-inspector-danger:not(:first-child) {
+  margin-top: 4px;
 }
 @container review-inspector-content (min-width: 524px) {
   [data-ui='gallery.videoReview.interval'] {
     width: calc((100cqw - 12px) / 2);
     max-width: 100%;
-  }
-  .review-inspector-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: 12px;
-  }
-  .review-inspector-actions > button {
-    grid-column: 1;
-  }
-  .review-inspector-actions > .review-inspector-danger {
-    grid-column: 2;
-    grid-row: 1;
   }
 }

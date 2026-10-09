@@ -1,4 +1,8 @@
-import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
+import {
+  reviewInspectorActions,
+  ReviewInspectorSections,
+  ReviewInspectorColumns,
+} from './inspector-sections';
 import { useContext } from 'react';
 import { ReviewIntervalMap } from './interval-timing';
 import {
@@ -102,6 +106,17 @@ export function ReviewAudioClipEditor(props: {
       ),
     },
   ];
+  const actions = reviewInspectorActions(
+    <ReviewButton
+      label={translate('gallery.videoReview.audioClipDelete')}
+      disabled={props.busy}
+      className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+      onClick={props.onDelete}
+    >
+      <Trash2 size={15} aria-hidden="true" />
+      <span>{translate('gallery.videoReview.audioClipDelete')}</span>
+    </ReviewButton>
+  );
   return (
     <div data-ui="gallery.videoReview.audioInspector" className="min-w-0 space-y-3">
       <ReviewInterval
@@ -124,21 +139,11 @@ export function ReviewAudioClipEditor(props: {
           {sections.map((section) => (
             <div key={section.id}>{section.content}</div>
           ))}
+          <ReviewInspectorSections sections={[actions]} />
         </div>
       ) : (
-        <ReviewInspectorSections sections={sections} />
+        <ReviewInspectorSections sections={[...sections, actions]} />
       )}
-      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.audioClipDelete')}
-          disabled={props.busy}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={props.onDelete}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.audioClipDelete')}</span>
-        </ReviewButton>
-      </div>
     </div>
   );
 }

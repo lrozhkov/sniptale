@@ -269,7 +269,7 @@ it('edits a selected speed range from its inspector through the same reversible 
       'aside button[aria-label="gallery.videoReview.deleteSelected"]'
     )!;
     expect(remove.className).toContain('!w-full');
-    expect(remove.parentElement?.className).toContain('border-t');
+    expect(remove.closest('[data-section="actions"]')).not.toBeNull();
     await act(async () => remove.click());
     expect(fixture.snapshot.workspace.history.at(-1)).toMatchObject({
       target: 'edit',

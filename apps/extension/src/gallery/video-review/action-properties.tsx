@@ -1,4 +1,4 @@
-import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import {
   REVIEW_KEY_DEFAULT,
@@ -92,33 +92,23 @@ export function ReviewActionProperties(props: {
             },
             ...(!isReviewClick(marker) && marker.end > marker.start && !plan.removed
               ? [
-                  {
-                    id: 'actions',
-                    label: translate('gallery.videoReview.actionActions'),
-                    icon: Scissors,
-                    content: (
-                      <ReviewActionShortcuts
-                        plan={plan}
-                        busy={props.busy}
-                        onEdit={props.onEdit}
-                        onFocus={props.onFocus}
-                      />
-                    ),
-                  },
+                  reviewInspectorActions(
+                    <ReviewActionShortcuts
+                      plan={plan}
+                      busy={props.busy}
+                      onEdit={props.onEdit}
+                      onFocus={props.onFocus}
+                    />
+                  ),
                 ]
               : []),
             ...(plan.removed
               ? [
-                  {
-                    id: 'removed',
-                    label: translate('gallery.videoReview.actionActions'),
-                    icon: Scissors,
-                    content: (
-                      <p className="text-[var(--sniptale-color-text-muted)]">
-                        {translate('gallery.videoReview.actionRemoved')}
-                      </p>
-                    ),
-                  },
+                  reviewInspectorActions(
+                    <p className="text-[var(--sniptale-color-text-muted)]">
+                      {translate('gallery.videoReview.actionRemoved')}
+                    </p>
+                  ),
                 ]
               : []),
           ]}
@@ -190,7 +180,7 @@ function ReviewActionShortcuts(props: {
 }) {
   const { plan } = props;
   return (
-    <ReviewInspectorColumns>
+    <div className="space-y-2">
       {plan.contextual ? (
         <p className="text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.actionContextInterval')}
@@ -242,6 +232,6 @@ function ReviewActionShortcuts(props: {
           ) : null}
         </div>
       ))}
-    </ReviewInspectorColumns>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import type { ReviewSpeechFlushRegistration } from './speech-edit-guard';
 import { ReviewSpeechPanel } from './speech-panel';
 import type { ReviewBeforeAction } from './note-transitions';
@@ -294,16 +295,20 @@ function SelectedEdit(
           onApply={(range) => editing.commitRange(range, selected)}
         />
       </div>
-      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.deleteSelected')}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={() => void editing.remove()}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.deleteSelected')}</span>
-        </ReviewButton>
-      </div>
+      <ReviewInspectorSections
+        sections={[
+          reviewInspectorActions(
+            <ReviewButton
+              label={translate('gallery.videoReview.deleteSelected')}
+              className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+              onClick={() => void editing.remove()}
+            >
+              <Trash2 size={15} aria-hidden="true" />
+              <span>{translate('gallery.videoReview.deleteSelected')}</span>
+            </ReviewButton>
+          ),
+        ]}
+      />
     </div>
   );
 }

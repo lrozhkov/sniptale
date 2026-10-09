@@ -1,6 +1,6 @@
 import { InspectorDisclosurePreferences } from '../../composition/inspector-disclosures/state';
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { Ellipsis, type LucideIcon } from 'lucide-react';
 import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
 import { translate } from '../../platform/i18n';
 import { ReviewDetails } from './controls';
@@ -39,6 +39,16 @@ export function ReviewInspectorPresentation(props: {
 }
 
 type ReviewSection = { id: string; label: string; icon: LucideIcon; content: ReactNode };
+
+/** Selected-object commands share metadata and local geometry in either presentation mode. */
+export function reviewInspectorActions(content: ReactNode): ReviewSection {
+  return {
+    id: 'actions',
+    label: translate('gallery.videoReview.actionActions'),
+    icon: Ellipsis,
+    content: <div className="review-inspector-actions">{content}</div>,
+  };
+}
 
 /** One section definition drives both the vertical navigation and the collapsible list. */
 export function ReviewInspectorSections({ sections }: { sections: readonly ReviewSection[] }) {

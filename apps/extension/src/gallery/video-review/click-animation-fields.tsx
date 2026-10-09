@@ -1,5 +1,5 @@
 import { MousePointer2, Palette, Clock3, Move, RotateCcw, Info } from 'lucide-react';
-import { ReviewInspectorSections } from './inspector-sections';
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { normalizePaintColor } from '@sniptale/foundation/paint';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
@@ -169,23 +169,20 @@ export function reviewClickSections(props: {
         ),
       }
     );
-  sections.push({
-    id: 'reset',
-    label: translate('gallery.videoReview.actionActions'),
-    icon: RotateCcw,
-    content: (
+  sections.push(
+    reviewInspectorActions(
       <>
         <ReviewButton
-          className={reviewTextButtonClassName}
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
           label={translate('gallery.videoReview.clickReset')}
           onClick={() => props.onChange(null)}
         >
-          <RotateCcw size={14} />
+          <RotateCcw size={15} aria-hidden="true" />
           {translate('gallery.videoReview.clickReset')}
         </ReviewButton>
       </>
-    ),
-  });
+    )
+  );
   return sections;
 }
 

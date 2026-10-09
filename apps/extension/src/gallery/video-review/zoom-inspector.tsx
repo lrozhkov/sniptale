@@ -4,7 +4,11 @@ import { ReviewSpatialToolContext } from './spatial-controls';
 import type { SpatialTool } from './spatial-gesture';
 import { ReviewIntervalMap } from './interval-timing';
 import { reviewFocusSourceRange } from '../../features/video/review/focus-edits';
-import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
+import {
+  reviewInspectorActions,
+  ReviewInspectorSections,
+  ReviewInspectorColumns,
+} from './inspector-sections';
 import { quickEditFocusType } from '../../features/video/review/advanced/focus-layout';
 import { withReviewFocusType, type ReviewFocusType as FocusType } from './zoom-editor';
 import { ReviewBorderInspector, ReviewBorderAnimation } from './border-inspector';
@@ -169,13 +173,15 @@ export function ReviewZoomInspector(props: {
                 />
               ),
             },
+            reviewInspectorActions(
+              <ReviewFocusActions
+                region={region}
+                onReset={props.onReset}
+                onDelete={props.onDelete}
+                onDuplicate={props.onDuplicate}
+              />
+            ),
           ]}
-        />
-        <ReviewFocusActions
-          region={region}
-          onReset={props.onReset}
-          onDelete={props.onDelete}
-          onDuplicate={props.onDuplicate}
         />
       </div>
     </ReviewSpatialToolContext.Provider>
@@ -288,7 +294,7 @@ function ReviewFocusActions(props: {
 }) {
   const { region } = props;
   return (
-    <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
+    <>
       <ReviewButton
         label={translate('gallery.videoReview.zoomResetPosition')}
         className={`${reviewTextButtonClassName} !w-full justify-start`}
@@ -323,7 +329,7 @@ function ReviewFocusActions(props: {
         <Trash2 size={15} aria-hidden="true" />
         <span>{translate('gallery.videoReview.zoomDelete')}</span>
       </ReviewButton>
-    </div>
+    </>
   );
 }
 
@@ -437,16 +443,20 @@ export function ReviewZoomLinkInspector(props: {
           onChange={props.onChange}
         />
       ) : null}
-      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.zoomLinkRemove')}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={props.onRemove}
-        >
-          <Unlink size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
-        </ReviewButton>
-      </div>
+      <ReviewInspectorSections
+        sections={[
+          reviewInspectorActions(
+            <ReviewButton
+              label={translate('gallery.videoReview.zoomLinkRemove')}
+              className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+              onClick={props.onRemove}
+            >
+              <Unlink size={15} aria-hidden="true" />
+              <span>{translate('gallery.videoReview.zoomLinkRemove')}</span>
+            </ReviewButton>
+          ),
+        ]}
+      />
     </div>
   );
 }

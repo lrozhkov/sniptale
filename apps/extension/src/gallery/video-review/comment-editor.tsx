@@ -1,7 +1,11 @@
 import { CompactPaintSelector } from '../../ui/paint-selector';
 import { ColorField } from '../../ui/compact-inspector-controls/controls';
 import { Plus, Type, Paintbrush, Play, Trash2 } from 'lucide-react';
-import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
+import {
+  reviewInspectorActions,
+  ReviewInspectorSections,
+  ReviewInspectorColumns,
+} from './inspector-sections';
 import { useEffect, useRef, useState } from 'react';
 import { serializePaintToCss } from '@sniptale/foundation/paint';
 import { translate } from '../../platform/i18n';
@@ -360,19 +364,21 @@ export function ReviewCanvasCommentEditor(props: CanvasCommentEditorProps) {
               </ReviewInspectorColumns>
             ),
           },
+          reviewInspectorActions(
+            <>
+              <ReviewButton
+                label={translate('gallery.videoReview.overlayDelete')}
+                disabled={props.busy}
+                className={`${reviewDeleteButtonClassName} !w-full justify-start`}
+                onClick={props.onDelete}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+                <span>{translate('gallery.videoReview.overlayDelete')}</span>
+              </ReviewButton>
+            </>
+          ),
         ]}
       />
-      <div className="review-inspector-actions border-t border-[var(--sniptale-color-border-soft)] pt-3">
-        <ReviewButton
-          label={translate('gallery.videoReview.overlayDelete')}
-          disabled={props.busy}
-          className={`${reviewDeleteButtonClassName} !w-full justify-start`}
-          onClick={props.onDelete}
-        >
-          <Trash2 size={15} aria-hidden="true" />
-          <span>{translate('gallery.videoReview.overlayDelete')}</span>
-        </ReviewButton>
-      </div>
     </div>
   );
 }

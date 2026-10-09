@@ -227,7 +227,7 @@ it('keeps intermediate numeric input and commits the complete style with pending
   });
 });
 
-it('groups existing overlay settings and keeps delete outside routine toggles', async () => {
+it('groups overlay management commands in Actions in both inspector modes', async () => {
   const render = (mode: 'all' | 'sections') =>
     root.render(
       <ReviewInspectorPresentation value={mode}>
@@ -245,13 +245,19 @@ it('groups existing overlay settings and keeps delete outside routine toggles', 
   await act(async () => render('all'));
   const remove = host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')!;
   expect(remove.closest('[data-inspector-choices]')).toBeNull();
-  expect(host.querySelectorAll('[data-level="section"]')).toHaveLength(3);
+  expect(host.querySelectorAll('[data-level="section"]')).toHaveLength(4);
+  expect(remove.closest('[data-section="actions"]')).not.toBeNull();
   await act(async () => render('sections'));
-  expect(host.querySelectorAll('nav button')).toHaveLength(3);
+  expect(host.querySelectorAll('nav button')).toHaveLength(4);
   expect(host.querySelector('textarea')).not.toBeNull();
   await act(async () => (host.querySelectorAll('nav button')[1] as HTMLButtonElement).click());
   expect(host.querySelector('input[min="10"]')).not.toBeNull();
   expect(host.querySelector('textarea')).toBeNull();
+  expect(host.querySelector('[aria-label="gallery.videoReview.overlayDelete"]')).toBeNull();
+  await act(async () => (host.querySelectorAll('nav button')[3] as HTMLButtonElement).click());
+  expect(
+    host.querySelector('[data-section="actions"] [aria-label="gallery.videoReview.overlayDelete"]')
+  ).not.toBeNull();
 });
 
 it('keeps linked annotation text read-only without copying it into appearance patches', async () => {

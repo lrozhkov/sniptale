@@ -1,5 +1,5 @@
 import { Info, Keyboard, Palette, Clock3, Move, RotateCcw } from 'lucide-react';
-import { ReviewInspectorSections } from './inspector-sections';
+import { reviewInspectorActions, ReviewInspectorSections } from './inspector-sections';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   ColorField,
@@ -143,23 +143,20 @@ export function reviewKeySections(props: {
         ),
       }
     );
-  sections.push({
-    id: 'reset',
-    label: translate('gallery.videoReview.actionActions'),
-    icon: RotateCcw,
-    content: (
+  sections.push(
+    reviewInspectorActions(
       <>
         <ReviewButton
-          className={reviewTextButtonClassName}
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
           label={translate('gallery.videoReview.keyReset')}
           onClick={() => props.onChange(null)}
         >
-          <RotateCcw size={14} />
+          <RotateCcw size={15} aria-hidden="true" />
           {translate('gallery.videoReview.keyReset')}
         </ReviewButton>
       </>
-    ),
-  });
+    )
+  );
   return sections;
 }
 /** Display enablement stays distinct from the preserved keyboard appearance and timing. */
