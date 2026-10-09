@@ -140,7 +140,7 @@ it('selects one media mode before requesting either acquisition source', async (
   props.settings = vi.mocked(props.onChange).mock.calls.at(-1)![0];
   expect(props.settings.introControl?.mode).toBe('media');
   await render();
-  expect(button('Preview transition', section())).toBeUndefined();
+  expect(button('Preview transition to video', section())).toBeUndefined();
   act(() => {
     button('From computer', section()).click();
     button('From Library', section()).click();
@@ -262,7 +262,7 @@ it('controls video sound, gain, and join preview independently', async () => {
       }),
     })
   );
-  act(() => button('Preview transition', section()).click());
+  act(() => button('Preview transition to video', section()).click());
   expect(props.onJoinPreview).toHaveBeenCalledWith('intro', 'join');
 });
 it('exposes pending state and errors while disabling actions', async () => {
@@ -276,14 +276,14 @@ it('exposes pending state and errors while disabling actions', async () => {
   expect(host.querySelector('[role="alert"]')?.textContent).toBe(props.error);
   act(() => {
     button('From computer', section()).click();
-    button('Reset').click();
+    button('Reset beginning').click();
   });
   expect(props.onChoose).not.toHaveBeenCalled();
   expect(props.onReset).not.toHaveBeenCalled();
 });
 it.each([
-  ['en', 'Fade in', 'Beginning', 'No effect', 'Reset'],
-  ['ru', 'Появление', 'Начало ролика', 'Без эффекта', 'Сбросить'],
+  ['en', 'Fade in', 'Beginning', 'No effect', 'Reset beginning'],
+  ['ru', 'Появление', 'Начало ролика', 'Без эффекта', 'Сбросить начало'],
 ] as const)(
   'renders real %s messages and reset action',
   async (language, fade, intro, none, reset) => {
@@ -364,7 +364,7 @@ it('does not offer an unwired join preview even when a remembered asset is activ
   retained();
   props.onJoinPreview = undefined;
   await render();
-  expect(button('Preview transition', section()).disabled).toBe(true);
+  expect(button('Preview transition to video', section()).disabled).toBe(true);
 });
 
 it('hides sound controls when the admitted video has no audio track', async () => {

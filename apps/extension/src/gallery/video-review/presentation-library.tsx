@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Filter, Search, CornerDownRight, X } from 'lucide-react';
+import { Filter, Search, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductSelect } from '@sniptale/ui/product-form-controls';
 import {
@@ -108,8 +108,8 @@ function PresentationLibraryContent(props: {
   busy: boolean;
 }) {
   const [appliedQuery, setAppliedQuery] = useState('');
-  const [viewId, setViewId] = useState('');
-  const { items, views, visibleItems, status, retry } = usePresentationLibrary(
+  const [viewId, setViewId] = useState('section:all');
+  const { items, views, visibleItems, activeViewId, status, retry } = usePresentationLibrary(
     props.kind,
     appliedQuery,
     viewId
@@ -118,8 +118,9 @@ function PresentationLibraryContent(props: {
   return (
     <>
       <PresentationLibraryHeader
+        kind={props.kind}
         views={views}
-        viewId={viewId}
+        viewId={activeViewId}
         onViewChange={setViewId}
         onQuery={setAppliedQuery}
         onClose={props.onClose}
@@ -167,6 +168,7 @@ function PresentationLibraryContent(props: {
 
 /** Header owns transient typing; applied filters remain with the listing. */
 function PresentationLibraryHeader(props: {
+  kind: 'image' | 'video' | 'media';
   views: GallerySavedView[];
   viewId: string;
   onViewChange(id: string): void;
@@ -187,34 +189,6 @@ function PresentationLibraryHeader(props: {
           className="flex shrink-0 items-center gap-3"
           data-ui="gallery.videoReview.presentationLibrary.controls"
         >
-          <ProductSelect
-            aria-label={translate('settings.editor.backgrounds.filter')}
-            containerClassName="!w-48 shrink-0"
-            style={{
-              minHeight: 32,
-              height: 32,
-              paddingTop: 4,
-              paddingBottom: 4,
-              borderRadius: 6,
-            }}
-            controlSize="sm"
-            value={props.viewId}
-            onChange={props.onViewChange}
-            menuWidth={280}
-            menuClassName="[&_[role=option]:not(:first-child)]:pl-7"
-            options={[
-              {
-                value: '',
-                label: translate('gallery.videoReview.presentationLibraryAll'),
-                icon: <Filter size={16} aria-hidden="true" />,
-              },
-              ...props.views.map((view) => ({
-                value: view.id,
-                label: view.name,
-                icon: <CornerDownRight size={16} aria-hidden="true" />,
-              })),
-            ]}
-          />
           <div
             className="flex h-8 w-48 shrink-0 items-center gap-1.5 rounded-[6px] border
               border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-input)] px-2
@@ -229,8 +203,20 @@ function PresentationLibraryHeader(props: {
               type="search"
               className="min-w-0 flex-1 bg-transparent text-sm outline-none
                   placeholder:text-[var(--sniptale-color-text-muted)] focus:placeholder:text-transparent"
-              aria-label={translate('settings.editor.backgrounds.search')}
-              placeholder={translate('settings.editor.backgrounds.search')}
+              aria-label={translate(
+                props.kind === 'media'
+                  ? 'gallery.videoReview.presentationSearchMedia'
+                  : props.kind === 'video'
+                    ? 'gallery.videoReview.presentationSearchVideo'
+                    : 'settings.editor.backgrounds.search'
+              )}
+              placeholder={translate(
+                props.kind === 'media'
+                  ? 'gallery.videoReview.presentationSearchMedia'
+                  : props.kind === 'video'
+                    ? 'gallery.videoReview.presentationSearchVideo'
+                    : 'settings.editor.backgrounds.search'
+              )}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -239,6 +225,31 @@ function PresentationLibraryHeader(props: {
                   props.onQuery(query);
                 }
               }}
+            />
+          </div>
+          <div className="flex min-w-0 shrink-0 items-center gap-1">
+            <Filter
+              size={16}
+              className="text-[var(--sniptale-color-text-muted)]"
+              aria-hidden="true"
+            />
+            <ProductSelect
+              dataUi="gallery.videoReview.presentationLibrary.filter"
+              aria-label={translate('settings.editor.backgrounds.filter')}
+              title={presentationLibrarySelectionLabel(props)}
+              containerClassName="!w-48 shrink-0"
+              style={{
+                minHeight: 32,
+                height: 32,
+                paddingTop: 4,
+                paddingBottom: 4,
+                borderRadius: 6,
+              }}
+              controlSize="sm"
+              value={props.viewId}
+              onChange={props.onViewChange}
+              menuWidth={280}
+              options={presentationLibraryOptions(props)}
             />
           </div>
           <ContentToolbarButton
@@ -252,4 +263,61 @@ function PresentationLibraryHeader(props: {
       }
     />
   );
+}
+
+function presentationLibrarySections(kind: 'image' | 'video' | 'media') {
+  return kind === 'media'
+    ? [
+        {
+          id: 'all',
+          folder: 'all',
+          label: translate('gallery.videoReview.presentationLibraryAll'),
+        },
+        {
+          id: 'image',
+          folder: 'screenshot',
+          label: translate('gallery.videoReview.presentationLibraryImages'),
+        },
+        {
+          id: 'video',
+          folder: 'recording',
+          label: translate('gallery.videoReview.presentationLibraryVideos'),
+        },
+      ]
+    : [
+        {
+          id: 'all',
+          folder: 'all',
+          label: translate(
+            kind === 'video'
+              ? 'gallery.videoReview.presentationLibraryVideos'
+              : 'gallery.videoReview.presentationLibraryImages'
+          ),
+        },
+      ];
+}
+
+function presentationLibraryOptions(props: {
+  kind: 'image' | 'video' | 'media';
+  views: GallerySavedView[];
+}) {
+  return presentationLibrarySections(props.kind).flatMap((section) => [
+    { value: `section:${section.id}`, label: section.label },
+    ...props.views
+      .filter((view) => (props.kind === 'media' ? view.folderFilter === section.folder : true))
+      .map((view) => ({
+        value: `view:${view.id}`,
+        label: view.name,
+        group: section.label,
+      })),
+  ]);
+}
+
+function presentationLibrarySelectionLabel(props: {
+  kind: 'image' | 'video' | 'media';
+  views: GallerySavedView[];
+  viewId: string;
+}) {
+  const option = presentationLibraryOptions(props).find((option) => option.value === props.viewId);
+  return option && 'group' in option ? `${option.group}: ${option.label}` : option?.label;
 }

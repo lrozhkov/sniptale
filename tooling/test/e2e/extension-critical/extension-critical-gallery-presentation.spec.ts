@@ -264,7 +264,7 @@ for (const variant of variants) {
       });
       if (variant.width === 1920) await inspectorBreakpoints(page, inspector, canvas, info);
       const reset = intro.getByRole('button', {
-        name: label('gallery.videoReview.presentationReset'),
+        name: label('gallery.videoReview.presentationResetIntro'),
         exact: true,
       });
       await reset.scrollIntoViewIfNeeded();
@@ -329,7 +329,7 @@ for (const variant of variants) {
         await showScene();
       }
       const mainVideo = review.locator('video').first();
-      const trigger = mode('gallery.videoReview.presentationPreview');
+      const trigger = mode('gallery.videoReview.presentationPreviewJoinIntro');
       await trigger.click();
       const modal = page.locator('[data-ui="gallery.videoReview.presentationPreview"]');
       await expect(modal).toBeVisible();

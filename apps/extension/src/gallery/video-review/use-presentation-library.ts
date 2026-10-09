@@ -37,9 +37,9 @@ export function usePresentationLibrary(
         setViews(
           savedViews.filter(
             (view) =>
-              kind === 'media' ||
               view.folderFilter === 'all' ||
-              view.folderFilter === (kind === 'video' ? 'recording' : 'screenshot')
+              (view.folderFilter === 'screenshot' && kind !== 'video') ||
+              (view.folderFilter === 'recording' && kind !== 'image')
           )
         );
         setStatus('ready');
@@ -51,13 +51,41 @@ export function usePresentationLibrary(
       active = false;
     };
   }, [attempt, kind]);
-  const selected = views.find((view) => view.id === viewId);
+  const selected = viewId.startsWith('view:')
+    ? views.find((view) => view.id === viewId.slice(5))
+    : undefined;
+  const activeViewId = selected
+    ? viewId
+    : viewId === 'section:image' && kind !== 'video'
+      ? viewId
+      : viewId === 'section:video' && kind !== 'image'
+        ? viewId
+        : 'section:all';
+  const section =
+    selected?.folderFilter === 'screenshot'
+      ? 'image'
+      : selected?.folderFilter === 'recording'
+        ? 'video'
+        : activeViewId === 'section:image'
+          ? 'image'
+          : activeViewId === 'section:video'
+            ? 'video'
+            : 'all';
   const visibleItems = items.filter(
     (item) =>
+      (section === 'all' ||
+        (section === 'video' ? item.kind === 'video' : item.kind !== 'video')) &&
       item.filename.toLocaleLowerCase().includes(appliedQuery.trim().toLocaleLowerCase()) &&
       (!selected || matchesLibraryFilters(item, selected.filters, Date.now()))
   );
-  return { items, views, visibleItems, status, retry: () => setAttempt((value) => value + 1) };
+  return {
+    items,
+    views,
+    visibleItems,
+    activeViewId,
+    status,
+    retry: () => setAttempt((value) => value + 1),
+  };
 }
 
 /** Visible tiles hold one disposable thumbnail URL, released on replacement or unmount. */

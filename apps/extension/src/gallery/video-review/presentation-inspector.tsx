@@ -1,4 +1,4 @@
-import { FolderOpen, Library, LogIn, LogOut } from 'lucide-react';
+import { FolderOpen, Library, LogIn, LogOut, Play, RotateCcw } from 'lucide-react';
 import { backgroundActionClassName } from '../../composition/background-resources/picker';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
@@ -9,7 +9,12 @@ import {
 } from '../../features/video/review/advanced/presentation';
 import { ColorField, SegmentedRow, SelectField } from '../../ui/compact-inspector-controls';
 import { translate, useAppLocale } from '../../platform/i18n';
-import { ReviewButton, ReviewDetails, reviewSelectFieldClassName } from './controls';
+import {
+  ReviewButton,
+  ReviewDetails,
+  reviewDeleteButtonClassName,
+  reviewSelectFieldClassName,
+} from './controls';
 import { ReviewPreviewNumberRow } from './number-row';
 import { ReviewPresentationMediaPreview } from './presentation-media-preview';
 
@@ -218,9 +223,15 @@ function Bookend(props: ReviewPresentationInspectorProps & { slot: SlotName }) {
         )}
         {control.mode !== 'none' && (
           <ReviewButton
-            label={label('presentationReset')}
+            label={label(
+              props.slot === 'intro' ? 'presentationResetIntro' : 'presentationResetOutro'
+            )}
+            className={`${reviewDeleteButtonClassName} mt-3`}
             onClick={() => props.onChange(patch({ ...control, mode: 'none' }))}
-          />
+          >
+            <RotateCcw size={14} aria-hidden="true" />
+            <span>{label('presentationReset')}</span>
+          </ReviewButton>
         )}
       </ReviewDetails>
     </section>
@@ -284,7 +295,14 @@ function FadeFields(
             )}
             disabled={props.previewDisabled || !props.onJoinPreview}
             onClick={() => props.onJoinPreview?.(props.slot, 'fade')}
-          />
+          >
+            <Play size={14} aria-hidden="true" />
+            <span>
+              {label(
+                props.slot === 'intro' ? 'presentationPreviewFadeIn' : 'presentationPreviewFadeOut'
+              )}
+            </span>
+          </ReviewButton>
         </>
       )}
     </div>
@@ -534,10 +552,23 @@ function JoinFields(props: ReviewPresentationInspectorProps & { slot: SlotName }
             }}
           />
           <ReviewButton
-            label={label('presentationPreview')}
+            label={label(
+              props.slot === 'intro'
+                ? 'presentationPreviewJoinIntro'
+                : 'presentationPreviewJoinOutro'
+            )}
             disabled={props.previewDisabled || !props.onJoinPreview}
             onClick={() => props.onJoinPreview?.(props.slot, 'join')}
-          />
+          >
+            <Play size={14} aria-hidden="true" />
+            <span>
+              {label(
+                props.slot === 'intro'
+                  ? 'presentationPreviewJoinIntro'
+                  : 'presentationPreviewJoinOutro'
+              )}
+            </span>
+          </ReviewButton>
           <ReviewDetails
             label={label('presentationJoinTiming')}
             preferenceId={`presentation.${props.slot}.joinTiming`}

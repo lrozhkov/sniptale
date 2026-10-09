@@ -36,6 +36,18 @@ export const galleryVideoReviewPresentationMessages = defineMessageSource({
     ru: 'В библиотеке нет подходящих медиа.',
     en: 'No matching media in Library.',
   },
+  presentationSearchMedia: { ru: 'Найти медиа', en: 'Find media' },
+  presentationSearchVideo: { ru: 'Найти видео', en: 'Find video' },
+  presentationLibraryImages: { ru: 'Изображения', en: 'Images' },
+  presentationLibraryVideos: { ru: 'Видео', en: 'Videos' },
+  presentationPreviewJoinIntro: {
+    ru: 'Просмотреть переход к ролику',
+    en: 'Preview transition to video',
+  },
+  presentationPreviewJoinOutro: {
+    ru: 'Просмотреть переход от ролика',
+    en: 'Preview transition from video',
+  },
   presentationLibraryAll: { ru: 'Все медиа', en: 'All media' },
   presentationFit: { ru: 'Размещение', en: 'Placement' },
   presentationContain: { ru: 'Вписать', en: 'Fit' },
@@ -79,4 +91,6 @@ export const galleryVideoReviewPresentationMessages = defineMessageSource({
     en: 'Could not preview this media.',
   },
   presentationReset: { ru: 'Сбросить', en: 'Reset' },
+  presentationResetIntro: { ru: 'Сбросить начало', en: 'Reset beginning' },
+  presentationResetOutro: { ru: 'Сбросить конец', en: 'Reset ending' },
 });

@@ -220,3 +220,33 @@ it('routes explicit menu width through ProductSelect while keeping its compact t
   expect(onChange).toHaveBeenCalledWith('en');
   expect(getRenderedMenu()).toBeNull();
 });
+
+it('groups nested options without changing keyboard order or selected identity', () => {
+  const onChange = vi.fn();
+  renderElement(
+    <ProductSelect
+      aria-label="Media"
+      value="all"
+      onChange={onChange}
+      options={[
+        { value: 'all', label: 'All media' },
+        { value: 'saved-all', label: 'Work', group: 'All media' },
+        { value: 'images', label: 'Images' },
+        { value: 'saved-images', label: 'Work', group: 'Images' },
+        { value: 'videos', label: 'Videos' },
+      ]}
+    />
+  );
+  openRenderedSelect();
+  const menu = getRenderedMenu()!;
+  expect(menu.querySelectorAll('[role="group"]')).toHaveLength(2);
+  expect(menu.querySelector('[role="group"][aria-label="Images"]')!.textContent).toContain('Work');
+  const options = getRenderedOptions();
+  act(() =>
+    options[2]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  );
+  expect(document.activeElement).toBe(options[3]);
+  act(() => options[3]!.click());
+  expect(onChange).toHaveBeenCalledExactlyOnceWith('saved-images');
+  expect(getRenderedMenu()).toBeNull();
+});

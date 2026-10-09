@@ -5,10 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import { ReviewPresentationLibrary } from './presentation-library';
 import { usePresentationLibrary } from './use-presentation-library';
+import type { GallerySavedView } from '../../composition/persistence/gallery-saved-views';
 
 const library = vi.hoisted(() => ({
   list: vi.fn<() => Promise<MediaLibraryItem[]>>(),
   thumbnail: vi.fn(),
+  views: vi.fn<() => Promise<GallerySavedView[]>>(),
 }));
 vi.mock('../../composition/persistence/media-library', () => ({
   listMediaLibrary: library.list,
@@ -16,7 +18,7 @@ vi.mock('../../composition/persistence/media-library', () => ({
   getMediaAssetBlob: vi.fn(),
 }));
 vi.mock('../../composition/persistence/gallery-saved-views', () => ({
-  listGallerySavedViews: async () => [],
+  listGallerySavedViews: library.views,
 }));
 
 let host: HTMLDivElement;
@@ -29,6 +31,7 @@ beforeEach(() => {
   closedWhileConnected = [];
   library.list.mockResolvedValue([]);
   library.thumbnail.mockReset();
+  library.views.mockResolvedValue([]);
   vi.stubGlobal(
     'IntersectionObserver',
     class {
@@ -234,4 +237,83 @@ it('loads only a visible thumbnail and revokes its URL when the drawer closes', 
   expect(revoke).toHaveBeenCalledExactlyOnceWith('blob:thumbnail');
   create.mockRestore();
   revoke.mockRestore();
+});
+
+function savedView(folderFilter: GallerySavedView['folderFilter']): GallerySavedView {
+  return {
+    id: `${folderFilter}-filter`,
+    name: 'Work',
+    folderFilter,
+    createdAt: 1,
+    updatedAt: 1,
+    filters: {
+      activeTags: ['work'],
+      scope: 'all',
+      facetFilters: {
+        created: [],
+        updated: [],
+        format: [],
+        size: [],
+        resolution: [],
+        duration: [],
+        source: [],
+      },
+    },
+  };
+}
+
+it('intersects a saved image filter with its parent section instead of admitting tagged videos', async () => {
+  library.list.mockResolvedValue(
+    [item('still.png', 'image'), item('clip.webm', 'video')].map((row) => ({
+      ...row,
+      tags: ['work'],
+    }))
+  );
+  library.views.mockResolvedValue([
+    savedView('screenshot'),
+    savedView('recording'),
+    savedView('audio'),
+  ]);
+  function Listing() {
+    const { views, visibleItems } = usePresentationLibrary('media', '', 'view:screenshot-filter');
+    return (
+      <span>
+        {views.map((view) => view.folderFilter).join(',')}:
+        {visibleItems.map((row) => row.filename).join(',')}
+      </span>
+    );
+  }
+  await act(async () => root.render(<Listing />));
+  expect(host.textContent).toBe('screenshot,recording:still.png');
+});
+
+it.each(['image', 'video'] as const)(
+  'selects the %s parent independently of saved filters',
+  async (section) => {
+    library.list.mockResolvedValue([item('still.png', 'image'), item('clip.webm', 'video')]);
+    function Listing() {
+      const { visibleItems } = usePresentationLibrary('media', '', `section:${section}`);
+      return <span>{visibleItems.map((row) => row.filename).join(',')}</span>;
+    }
+    await act(async () => root.render(<Listing />));
+    expect(host.textContent).toBe(section === 'image' ? 'still.png' : 'clip.webm');
+  }
+);
+
+it('falls back to all supported media when a saved filter no longer exists, preserving the query', async () => {
+  library.list.mockResolvedValue([
+    item('work.png', 'image'),
+    item('work.webm', 'video'),
+    item('other.png', 'image'),
+  ]);
+  function Listing() {
+    const { visibleItems, activeViewId } = usePresentationLibrary('media', 'work', 'view:removed');
+    return (
+      <span>
+        {activeViewId}:{visibleItems.map((row) => row.filename).join(',')}
+      </span>
+    );
+  }
+  await act(async () => root.render(<Listing />));
+  expect(host.textContent).toBe('section:all:work.png,work.webm');
 });

@@ -12,6 +12,8 @@ export interface ProductSelectOption<T extends string = string> {
   value: T;
   label: string;
   description?: string;
+  /** Contiguous nested options share an accessible group below a selectable parent. */
+  group?: string;
   icon?: ReactNode;
   disabled?: boolean;
 }
