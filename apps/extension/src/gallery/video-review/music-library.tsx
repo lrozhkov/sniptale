@@ -184,27 +184,6 @@ function MusicLibraryHeader(props: {
               className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2"
               data-ui="music.library.controls"
             >
-              <ProductSelect
-                aria-label={translate('gallery.videoReview.musicFilter')}
-                containerClassName="!w-44 shrink-0"
-                controlSize="sm"
-                value={state.viewId}
-                onChange={state.setViewId}
-                menuWidth={280}
-                menuClassName="[&_[role=option]:not(:first-child)]:pl-7"
-                options={[
-                  {
-                    value: '',
-                    label: translate('gallery.videoReview.musicAll'),
-                    icon: <Filter size={16} aria-hidden="true" />,
-                  },
-                  ...state.views.map((view) => ({
-                    value: view.id,
-                    label: view.name,
-                    icon: <CornerDownRight size={16} aria-hidden="true" />,
-                  })),
-                ]}
-              />
               <div
                 className={[
                   'flex h-8 w-40 shrink-0 items-center gap-1.5 rounded-md border',
@@ -237,9 +216,30 @@ function MusicLibraryHeader(props: {
                   }}
                 />
               </div>
+              <ProductSelect
+                aria-label={translate('gallery.videoReview.musicFilter')}
+                containerClassName="!w-44 shrink-0"
+                controlSize="sm"
+                value={state.viewId}
+                onChange={state.setViewId}
+                menuWidth={280}
+                menuClassName="[&_[role=option]:not(:first-child)]:pl-7"
+                options={[
+                  {
+                    value: '',
+                    label: translate('gallery.videoReview.musicAll'),
+                    icon: <Filter size={16} aria-hidden="true" />,
+                  },
+                  ...state.views.map((view) => ({
+                    value: view.id,
+                    label: view.name,
+                    icon: <CornerDownRight size={16} aria-hidden="true" />,
+                  })),
+                ]}
+              />
               <ContentToolbarButton
                 tone="outline"
-                className="shrink-0"
+                className="!h-8 !min-h-8 !w-auto shrink-0 !px-3"
                 disabled={busy !== null}
                 onClick={() => input.current?.click()}
                 aria-label={translate('gallery.videoReview.musicUpload')}

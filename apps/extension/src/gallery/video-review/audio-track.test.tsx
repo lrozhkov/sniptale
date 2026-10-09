@@ -755,7 +755,7 @@ it.each(['voiceover', 'music'] as const)(
   }
 );
 
-it('opens music after note admission and imports voiceover through the file picker', async () => {
+it('opens the shared audio picker for the captured lane after note admission', async () => {
   const openMusic = vi.fn();
   let admit!: () => void;
   renderTrack(
@@ -780,15 +780,14 @@ it('opens music after note admission and imports voiceover through the file pick
   expect(openMusic).not.toHaveBeenCalled();
   expect(pickFile).not.toHaveBeenCalled();
   act(() => admit());
-  expect(openMusic).toHaveBeenCalledExactlyOnceWith(music);
+  expect(openMusic).toHaveBeenCalledExactlyOnceWith(music, 'music');
   const voiceover = host.querySelector<HTMLButtonElement>(
     '[aria-label="gallery.videoReview.audioImport"]'
   )!;
   act(() => voiceover.click());
-  expect(pickFile).toHaveBeenCalledTimes(1);
+  expect(openMusic).toHaveBeenCalledTimes(1);
+  act(() => admit());
+  expect(openMusic).toHaveBeenLastCalledWith(voiceover, 'voiceover');
+  expect(pickFile).not.toHaveBeenCalled();
   expect(fileInput.accept).toBe('audio/*');
-  const file = new File([new Uint8Array(2)], 'song.mp3', { type: 'audio/mpeg' });
-  Object.defineProperty(fileInput, 'files', { value: [file] });
-  await act(async () => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(onImportFile).toHaveBeenCalledExactlyOnceWith(file, 'voiceover');
 });

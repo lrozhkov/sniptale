@@ -1,7 +1,11 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 async function expectAlignedRange(range: Locator, value: number) {
@@ -61,7 +65,7 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: translate(key, variant.locale), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const phase = (side: 'In' | 'Out') =>
         dialog.getByRole('group', {
           name: translate(`gallery.videoReview.zoomTransition${side}`, variant.locale),

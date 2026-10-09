@@ -1,4 +1,5 @@
 import {
+  addReviewFocus,
   seedReviewVideo,
   persistedFocus,
   clickReviewExport,
@@ -566,7 +567,7 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       // Two active regions with a real gap between them.
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       await timelineGesture(page, 5);
       await expect
         .poll(async () =>
@@ -577,7 +578,7 @@ for (const variant of [
           )
         )
         .toBeGreaterThan(4);
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(1);
@@ -937,7 +938,7 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       await dialog
         .locator('[data-ui="gallery.videoReview.focusType"]')
         .getByRole('button', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
@@ -1200,7 +1201,7 @@ for (const variant of [
       ).toHaveAttribute('aria-pressed', 'true');
       await page.setViewportSize({ width: 1280, height: 720 });
       await timelineGesture(page, 5);
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const link = lane.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(0);
@@ -1867,7 +1868,7 @@ for (const variant of [
         await pointer.click();
       }
       await page.setViewportSize({ width: 1920, height: 1080 });
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       const position = inspector.locator('details[data-level="group"]');
       await expect(position).not.toHaveAttribute('open', '');
@@ -2276,7 +2277,7 @@ for (const locale of ['ru', 'en'] as const) {
         const button = (key: Parameters<typeof translate>[0]) =>
           dialog.getByRole('button', { name: label(key), exact: true });
         await button('gallery.videoReview.advancedEditing').click();
-        await button('gallery.videoReview.zoomAdd').click();
+        await addReviewFocus(page);
         const panel = dialog.locator('[data-ui="gallery.videoReview.inspector"]');
         const zoom = panel.locator('[data-ui="gallery.videoReview.zoomInspector"]');
         for (const width of [1280, 1920]) {
@@ -2478,7 +2479,7 @@ for (const locale of ['ru', 'en'] as const) {
             video.currentTime = 5;
           });
         });
-        await button('gallery.videoReview.zoomAdd').click();
+        await addReviewFocus(page);
         await expect(zoom.locator('details[data-level="group"]')).toHaveAttribute('open', '');
         await panel
           .locator('[data-ui="gallery.videoReview.inspectorNavigation"]')
@@ -3737,7 +3738,7 @@ for (const variant of [
       await expect(address).toHaveValue('https://sniptale.test/?a=1&b=2');
       await expect(stage.locator('img')).toHaveCount(1);
       await timelineGesture(page, 2);
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const framing = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await framing.scrollIntoViewIfNeeded();
       await expect(framing).toHaveAttribute('data-status', 'ready');
@@ -4011,7 +4012,7 @@ for (const zoomBehavior of ['fixed', 'follow-video'] as const) {
       await chooseHeader(true);
       await chooseMotion(zoomBehavior === 'follow-video');
       await timelineGesture(page, 2);
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       const preview = inspector.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');

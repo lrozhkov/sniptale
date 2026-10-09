@@ -188,7 +188,7 @@ for (const variant of [
         'title',
         label('gallery.videoReview.placement_occupied')
       );
-      await expect(button('gallery.videoReview.zoomAdd')).toBeDisabled();
+      await expect(button('gallery.videoReview.zoomAdd')).toHaveCount(0);
       await proveToolGroup(
         page,
         label('gallery.videoReview.focusType'),

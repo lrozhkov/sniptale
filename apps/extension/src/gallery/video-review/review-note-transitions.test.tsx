@@ -242,7 +242,7 @@ it.each(['success', 'cancel', 'failure'] as const)(
         fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
       );
       await fixture.click('advancedEditing');
-      await fixture.click('zoomAdd');
+      await fixture.addFocus();
       await act(async () => vi.advanceTimersByTimeAsync(300));
       await fixture.click('exportSection');
       await fixture.click('play');

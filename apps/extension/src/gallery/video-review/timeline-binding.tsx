@@ -41,8 +41,6 @@ function ReviewZoomLane(props: {
   outputTime: number | null;
   edits: readonly ReviewEdit[];
   zoom: ReturnType<typeof useReviewZoomEditor>;
-  onAdd(): void;
-  addHint?: string | undefined;
   sourceSelection?: ReviewAnchor | undefined;
   toOutputTime(source: number): number | null;
 }) {
@@ -70,8 +68,6 @@ function ReviewZoomLane(props: {
       onSelectLink={(id) =>
         (props.beforeAction ?? ((action) => action()))(() => props.zoom.setLinkSelection(id))
       }
-      addHint={props.addHint}
-      onAdd={() => (props.beforeAction ?? ((action) => action()))(props.onAdd)}
       onDragCommit={props.zoom.commitDrag}
     />
   );
@@ -97,7 +93,7 @@ function ReviewAudioLane(props: {
   busy: boolean;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
+  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onOpenSpeech?: ((replacementId?: string, time?: number) => void) | undefined;
   selectedSpeechId?: string | undefined;
 }) {
@@ -175,7 +171,7 @@ type TimelineBindingProps = {
   waveforms?: ReadonlyMap<string, ReviewWaveform> | undefined;
   onImportAudioFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
+  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onOpenSpeech?: ((replacementId?: string, time?: number) => void) | undefined;
   selectedSpeechId?: string | undefined;
   onMarker(marker: ReviewTelemetryMarker): void;
@@ -321,8 +317,6 @@ export function ReviewTimelineBinding(props: TimelineBindingProps) {
                 outputTime={props.outputTime}
                 edits={props.edits}
                 zoom={props.zoom}
-                onAdd={focus.add}
-                addHint={props.playbackRange ? focus.tool.hint : undefined}
                 toOutputTime={props.toOutputTime}
               />
             ),
@@ -487,17 +481,6 @@ function useFocusPlacement(props: TimelineBindingProps, projection: ReviewTrackP
     }
   };
   return {
-    add: () => {
-      setEnabled(false);
-      props.audio.setOriginalTool(false);
-      if (props.playbackRange) {
-        commit({ kind: 'range', ...props.playbackRange });
-        return;
-      }
-      const at = props.toOutputTime(props.time);
-      if (at === null) props.onCutPlacement();
-      else props.zoom.add(at, props.resultDuration);
-    },
     clear: () => setEnabled(false),
     preview,
     setPreview,

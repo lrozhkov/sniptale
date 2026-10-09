@@ -336,3 +336,28 @@ export async function recordedAudioResources(page: Page, excludedKeys: string[] 
     }
   }, excludedKeys);
 }
+
+/** Create focus through its supported toolbar and ruler interval, including occupied lanes. */
+export async function addReviewFocus(page: Page) {
+  const dialog = page.locator('dialog');
+  const tool = dialog.locator(
+    '[data-ui="gallery.videoReview.editingTools"] button:has(svg.lucide-focus)'
+  );
+  const plane = dialog.locator('[data-ui="gallery.videoReview.timePlane"]');
+  const duration = Number(await plane.getAttribute('aria-valuemax'));
+  const start = Number(await plane.getAttribute('aria-valuenow'));
+  const end = Math.min(duration, start + 2);
+  const before = await dialog.locator('[data-zoom-edge="start"]').count();
+  const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
+  await ruler.scrollIntoViewIfNeeded();
+  const box = (await ruler.boundingBox())!;
+  const x = (time: number) => box.x + (box.width * time) / duration;
+  await page.mouse.move(x(start) + 0.1, box.y + 15);
+  await page.mouse.down();
+  await page.mouse.move(x(end), box.y + 15, { steps: 8 });
+  await page.mouse.up();
+  await tool.click();
+  await expect(dialog.locator('[data-zoom-edge="start"]')).toHaveCount(before + 1);
+  await dialog.locator('[data-ui="gallery.videoReview.loopSummary"] button').click();
+  if ((await tool.getAttribute('aria-pressed')) === 'true') await tool.click();
+}

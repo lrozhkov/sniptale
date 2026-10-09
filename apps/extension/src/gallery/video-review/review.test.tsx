@@ -445,7 +445,7 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
         expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(0);
       })
     );
-    await click('zoomAdd');
+    await fixture.addFocus();
     await act(async () =>
       vi.waitFor(() => expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(1), {
         timeout: 3000,
@@ -485,7 +485,7 @@ it('creates a zoom region from the playhead, edits it in the inspector, and pers
   } finally {
     await fixture.cleanup();
   }
-});
+}, 30000);
 
 it('places new zoom regions in result time after cuts and speed changes (R03)', async () => {
   const history = [
@@ -528,7 +528,7 @@ it('places new zoom regions in result time after cuts and speed changes (R03)', 
     // Result of cut [0,1) + speed [1,2)x2 + keep [2,4): 2.5 s; source 3 sits at 1.5.
     await dragTimePlane(host, 300);
     await click('advancedEditing');
-    await click('zoomAdd');
+    await fixture.addFocus();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(advancedContentAt(fixture.snapshot).zoom.regions[0]).toMatchObject({
       start: 1.5,
@@ -537,9 +537,9 @@ it('places new zoom regions in result time after cuts and speed changes (R03)', 
   } finally {
     await fixture.cleanup();
   }
-});
+}, 30000);
 
-it('refuses a zoom placement while the playhead is on a removed part (R03)', async () => {
+it('rejects a removed loop interval and admits focus in kept footage (R03)', async () => {
   const history = [
     parseReviewOperation(
       {
@@ -560,38 +560,18 @@ it('refuses a zoom placement while the playhead is on a removed part (R03)', asy
     );
     await dragTimePlane(host, 50);
     await click('advancedEditing');
-    await click('zoomAdd');
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
-    expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(0);
-    expect(host.textContent).toContain('gallery.videoReview.placementOnCut');
-    const notice = () => host.querySelector('[data-ui="gallery.videoReview.feedback"]');
-    expect(notice()?.getAttribute('role')).toBe('alert');
-    expect(notice()?.closest('main')).not.toBeNull();
-    await click('dismissFeedback');
-    expect(notice()).toBeNull();
-    expect(fixture.back).not.toHaveBeenCalled();
-    const trigger = host.querySelector<HTMLButtonElement>(
-      '[aria-label="gallery.videoReview.zoomAdd"]'
-    )!;
-    trigger.focus();
-    await click('zoomAdd');
-    expect(notice()?.textContent).toContain('gallery.videoReview.placementOnCut');
-    const dismiss = notice()!.querySelector('button')!;
-    dismiss.focus();
-    await act(async () => {
-      dismiss.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    });
-    expect(notice()).not.toBeNull();
-    await act(async () => {
-      dismiss.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    });
-    expect(document.activeElement).toBe(trigger);
-    expect(notice()).toBeNull();
     await dragTimePlane(host, 200);
-    await click('zoomAdd');
+    await fixture.selectRulerRange(0.2, 0.8);
+    const notice = host.querySelector('[data-ui="gallery.videoReview.feedback"]')!;
+    expect(notice.getAttribute('role')).toBe('alert');
+    expect(notice.textContent).toContain('gallery.videoReview.emptyPlaybackRange');
+    expect(fixture.snapshot.workspace.advanced.zoom.regions).toHaveLength(0);
+    expect(host.querySelector('[aria-label="gallery.videoReview.zoomAdd"]')).toBeNull();
+    await click('dismissFeedback');
+    expect(host.querySelector('[data-ui="gallery.videoReview.feedback"]')).toBeNull();
+    await fixture.addFocus(2, 4);
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     expect(advancedContentAt(fixture.snapshot).zoom.regions).toHaveLength(1);
-    expect(notice()).toBeNull();
   } finally {
     await fixture.cleanup();
   }

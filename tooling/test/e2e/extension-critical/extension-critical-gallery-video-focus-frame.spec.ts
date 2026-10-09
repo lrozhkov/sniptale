@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -32,9 +36,9 @@ for (const variant of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const type = dialog.locator('[data-ui="gallery.videoReview.focusType"]');
-      await expect(type.getByRole('button')).toHaveCount(2);
+      await expect(type.getByRole('button')).toHaveCount(3);
       const preview = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       await expect(preview).toHaveAttribute('data-status', 'ready');
       const frame = preview.locator('[data-focus-frame]');

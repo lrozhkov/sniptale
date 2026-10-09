@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { startHostServer } from '../support/host-server';
 import {
+  addReviewFocus,
   seedReviewVideo,
   persistedFocus,
   clickReviewExport,
@@ -64,7 +65,7 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     await padding.fill('12');
     await padding.press('Enter');
     await dialog.getByRole('button', { name: label('windowHeader.browser'), exact: true }).click();
-    await button('gallery.videoReview.zoomAdd').click();
+    await addReviewFocus(page);
     await button('gallery.videoReview.spatialToolTilt').click();
     const group = dialog;
     const tilt = group.getByRole('textbox', {
@@ -178,7 +179,7 @@ test('quick zoom perspective survives reopening and matches encoded output', asy
     );
     expect(difference).toBeLessThan(18);
     await page.mouse.click(rulerBox.x + (4 * rulerBox.width) / duration, rulerBox.y + 10);
-    await button('gallery.videoReview.zoomAdd').click();
+    await addReviewFocus(page);
     const link = dialog.locator('[data-ui="gallery.videoReview.zoomLink"]');
     await link.hover();
     await link.click();
@@ -258,9 +259,7 @@ test('unavailable perspective preserves settings and can retry', async ({ page }
     await dialog
       .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
       .click();
-    await dialog
-      .getByRole('button', { name: label('gallery.videoReview.zoomAdd'), exact: true })
-      .click();
+    await addReviewFocus(page);
     await dialog
       .getByRole('button', { name: label('gallery.videoReview.zoomPreviewResult'), exact: true })
       .click();

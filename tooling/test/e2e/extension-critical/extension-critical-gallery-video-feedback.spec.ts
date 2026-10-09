@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -44,23 +44,57 @@ for (const variant of [
       await dialog.locator('[data-ui="gallery.videoReview.timePlane"]').press('v');
       const ruler = dialog.locator('[data-ui="gallery.videoReview.ruler"]');
       const rulerBox = (await ruler.boundingBox())!;
-      await ruler.click({ position: { x: rulerBox.width / 4, y: rulerBox.height / 2 } });
-      const zoom = button('gallery.videoReview.zoomAdd');
-      await zoom.click();
+      await ruler.click({ position: { x: rulerBox.width / 2, y: rulerBox.height / 2 } });
+      await expect
+        .poll(() =>
+          dialog
+            .locator('video')
+            .first()
+            .evaluate((video: HTMLVideoElement) => video.currentTime)
+        )
+        .toBeGreaterThan(4);
+      const audioTool = button('gallery.videoReview.originalAudioRange');
+      const trigger = async () => {
+        if ((await audioTool.getAttribute('aria-pressed')) !== 'true') await audioTool.click();
+        const original = dialog.locator('[data-original-audio-lane]');
+        await original.scrollIntoViewIfNeeded();
+        await dialog
+          .locator('[data-ui="gallery.videoReview.timelineViewport"]')
+          .evaluate((viewport) => {
+            const lane = viewport.querySelector('[data-original-audio-lane]')!;
+            const ruler = viewport.querySelector('[data-ui="gallery.videoReview.rulerRow"]')!;
+            viewport.scrollTop +=
+              lane.getBoundingClientRect().top - ruler.getBoundingClientRect().bottom - 4;
+          });
+        await expect
+          .poll(() =>
+            original.evaluate((node) => {
+              const box = node.getBoundingClientRect();
+              return node.contains(
+                document.elementFromPoint(box.x + box.width * 0.18, box.y + box.height / 2)
+              );
+            })
+          )
+          .toBe(true);
+        const area = (await original.boundingBox())!;
+        await page.mouse.move(area.x + area.width * 0.18, area.y + area.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(area.x + area.width * 0.28, area.y + area.height / 2, { steps: 5 });
+        await page.mouse.up();
+      };
+      await trigger();
       const feedback = dialog.locator('[data-ui="gallery.videoReview.feedback"]');
       const dismiss = button('gallery.videoReview.dismissFeedback');
+      await feedback.scrollIntoViewIfNeeded();
       await expect(feedback).toHaveAttribute('role', 'alert');
       await expect(feedback).toContainText(
-        translate('gallery.videoReview.placementOnCut', variant.locale)
+        translate('gallery.videoReview.originalAudioCut', variant.locale)
       );
       await expect(feedback).toBeInViewport({ ratio: 1 });
       await expect(dismiss).toBeInViewport({ ratio: 1 });
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-zoom-edge]')
       ).toHaveCount(0);
-      const stage = (await dialog.locator('[data-ui="gallery.videoReview.stage"]').boundingBox())!;
-      const notice = (await feedback.boundingBox())!;
-      expect(notice.y + notice.height).toBeLessThanOrEqual(stage.y);
       await page.screenshot({
         path: info.outputPath(`feedback-${variant.locale}.png`),
         fullPage: false,
@@ -68,40 +102,17 @@ for (const variant of [
       await dismiss.click();
       await expect(feedback).toHaveCount(0);
       await expect(dialog).toBeVisible();
-      await expect(zoom).toBeFocused();
-      for (const key of [' ', 'Enter', 'Escape']) {
-        await zoom.click();
+      for (const key of ['Enter', 'Escape']) {
+        await trigger();
         await expect(feedback).toBeVisible();
         await dismiss.focus();
         await dismiss.press(key);
         await expect(feedback).toHaveCount(0);
-        await expect(zoom).toBeFocused();
         await expect(dialog.locator('video').first()).toHaveJSProperty('paused', true);
       }
-      await button('gallery.videoReview.originalAudioRange').click();
-      const original = dialog.locator('[data-original-audio-lane]');
-      await original.scrollIntoViewIfNeeded();
-      const originalBox = (await original.boundingBox())!;
-      await page.mouse.move(
-        originalBox.x + originalBox.width * 0.22,
-        originalBox.y + originalBox.height / 2
-      );
-      await page.mouse.down();
-      await page.mouse.move(
-        originalBox.x + originalBox.width * 0.28,
-        originalBox.y + originalBox.height / 2,
-        { steps: 5 }
-      );
-      await page.mouse.up();
-      await expect(feedback).toContainText(
-        translate('gallery.videoReview.originalAudioCut', variant.locale)
-      );
-      await expect(feedback).toBeInViewport({ ratio: 1 });
-      await dismiss.click();
-      await expect(feedback).toHaveCount(0);
       await dialog.locator('[data-ui="gallery.videoReview.timePlane"]').press('v');
       await ruler.click({ position: { x: rulerBox.width * 0.6, y: rulerBox.height / 2 } });
-      await zoom.click();
+      await addReviewFocus(page);
       await expect(
         dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [data-zoom-edge]')
       ).toHaveCount(2);

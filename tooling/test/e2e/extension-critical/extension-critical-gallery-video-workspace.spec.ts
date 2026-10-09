@@ -2,6 +2,7 @@ import { expect, test, type Page, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import {
+  addReviewFocus,
   seedReviewVideo,
   clickReviewExport,
   expectTimelineSelection,
@@ -84,7 +85,7 @@ for (const variant of [
         'aria-pressed',
         'true'
       );
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const zoomRegion = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first();

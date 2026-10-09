@@ -10,7 +10,11 @@ import { buildReviewTimeMap } from '../../../../apps/extension/src/features/vide
 import { projectReviewVoiceover } from '../../../../apps/extension/src/features/video/review/voiceover-edits';
 import { resolve } from 'node:path';
 import { startHostServer } from '../support/host-server';
-import { clickReviewExport, seedReviewVideo } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  clickReviewExport,
+  seedReviewVideo,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -66,7 +70,7 @@ for (const variant of [
         ).toHaveAttribute('aria-pressed', String(!muted));
       };
       const originalRow = original.locator('xpath=ancestor::*[@data-review-track-muted][1]');
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const focusLane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const focusRow = focusLane.locator('xpath=ancestor::*[@data-review-track-muted][1]');
       await button('gallery.videoReview.zoomEnabled').click();

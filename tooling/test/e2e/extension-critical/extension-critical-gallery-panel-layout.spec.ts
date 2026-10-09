@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -219,7 +219,7 @@ for (const variant of [
       await page.screenshot({ path: info.outputPath('resized-panels.png'), fullPage: false });
       await button('videoEditor.app.panelFullHeight').click();
       await height.press('Home');
-      await button('gallery.videoReview.zoomAdd').first().click();
+      await addReviewFocus(page);
       const focus = inspector.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       for (const kind of [
         'gallery.videoReview.zoomRegionLabel',

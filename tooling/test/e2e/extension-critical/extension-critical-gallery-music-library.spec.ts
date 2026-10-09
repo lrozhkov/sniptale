@@ -134,12 +134,31 @@ for (const variant of [
   { width: 1280, height: 560, locale: 'ru', theme: 'dark', source: 'project-asset' },
   { width: 1920, height: 900, locale: 'en', theme: 'light', source: 'recording' },
   { width: 960, height: 560, locale: 'en', theme: 'dark', source: 'stored-asset' },
+  {
+    width: 1280,
+    height: 560,
+    locale: 'ru',
+    theme: 'dark',
+    source: 'project-asset',
+    lane: 'voiceover',
+  },
+  {
+    width: 1920,
+    height: 900,
+    locale: 'en',
+    theme: 'light',
+    source: 'stored-asset',
+    lane: 'voiceover',
+  },
 ] as const) {
-  test(`music Library preserves source and modal workflow ${variant.width}`, async ({
+  test(`music Library preserves source and modal workflow ${variant.width}/${'lane' in variant ? variant.lane : 'music'}`, async ({
     page,
   }, info) => {
     await page.setViewportSize({ width: variant.width, height: variant.height });
     const host = await startHostServer();
+    const lane = 'lane' in variant ? variant.lane : 'music';
+    const pickerLabel =
+      lane === 'voiceover' ? 'gallery.videoReview.audioImport' : 'gallery.videoReview.musicLibrary';
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
       await applyHarnessBootstrap(page, {
@@ -189,12 +208,14 @@ for (const variant of [
       await review
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
-      const header = review
-        .locator('[data-ui="gallery.videoReview.trackHeader"]')
-        .filter({ hasText: label('gallery.videoReview.audioMusic') });
-      await header
-        .getByRole('button', { name: label('gallery.videoReview.musicLibrary'), exact: true })
-        .click();
+      const header = review.locator('[data-ui="gallery.videoReview.trackHeader"]').filter({
+        hasText: label(
+          lane === 'voiceover'
+            ? 'gallery.videoReview.audioVoiceover'
+            : 'gallery.videoReview.audioMusic'
+        ),
+      });
+      await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
       const drawer = page.locator('[data-ui="music.library.drawer"]');
       await expect(drawer).toBeVisible();
       await expect(drawer.locator('li')).toHaveCount(36);
@@ -212,6 +233,9 @@ for (const variant of [
         exact: true,
       });
       const list = drawer.locator('[data-ui="music.library.list"]');
+      expect((await search.boundingBox())!.x).toBeLessThan((await filter.boundingBox())!.x);
+      await expect(upload).toHaveCSS('height', '32px');
+      expect((await upload.boundingBox())!.width).toBeGreaterThan(80);
       if (variant.width === 1280) {
         // Drawer width switches at viewport−24 = 960 and at 80vw = 960.
         for (const width of [983, 984, 985, 1199, 1200, 1201]) {
@@ -329,9 +353,7 @@ for (const variant of [
             .evaluate((node: HTMLVideoElement) => node.paused)
         )
         .toBe(true);
-      await header
-        .getByRole('button', { name: label('gallery.videoReview.musicLibrary'), exact: true })
-        .click();
+      await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
       await expect(drawer).toBeVisible();
       await expect(
         drawer.getByRole('button', {
@@ -353,12 +375,12 @@ for (const variant of [
         .getByRole('button', { name: new RegExp(`^${label('gallery.videoReview.musicAdd')}:`) })
         .click();
       await expect(drawer).toHaveCount(0);
-      await expect(review.locator('[data-audio-lane="music"] [data-audio-id]')).toHaveCount(1);
+      await expect(review.locator(`[data-audio-lane="${lane}"] [data-audio-id]`)).toHaveCount(1);
       await page.screenshot({ path: info.outputPath('music-inserted.png'), fullPage: false });
       await expect.poll(() => libraryCounts(page)).toEqual([37, 2]);
       const button = (key: Parameters<typeof translate>[0]) =>
         review.getByRole('button', { name: label(key), exact: true });
-      const clips = review.locator('[data-audio-lane="music"] [data-audio-id]');
+      const clips = review.locator(`[data-audio-lane="${lane}"] [data-audio-id]`);
       const selectedId = await clips.first().getAttribute('data-audio-id');
       await button('gallery.videoReview.undo').click();
       await expect(clips).toHaveCount(0);
@@ -383,9 +405,7 @@ for (const variant of [
       // Undo frees the captured insertion position while retaining the selected source in history.
       await button('gallery.videoReview.undo').click();
       await expect(clips).toHaveCount(0);
-      await header
-        .getByRole('button', { name: label('gallery.videoReview.musicLibrary'), exact: true })
-        .click();
+      await header.getByRole('button', { name: label(pickerLabel), exact: true }).click();
       await expect(drawer).toBeVisible();
       const chooser = page.waitForEvent('filechooser');
       await upload.click();

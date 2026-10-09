@@ -49,11 +49,11 @@ function inspectorNavigationOptions(args: {
   const options: { id: InspectorSection; label: string }[] = [];
   if (args.shown === 'preview')
     options.push({ id: 'preview', label: translate('gallery.videoReview.previewSection') });
-  if (args.context === 'speech' && args.settingsAvailable)
-    options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
   options.push({ id: 'comments', label: translate('gallery.videoReview.comments') });
   if (args.settingsAvailable)
     options.push({ id: 'scene', label: translate('gallery.videoReview.scene') });
+  if (args.context === 'speech' && args.settingsAvailable)
+    options.push({ id: 'speech', label: translate('gallery.videoReview.speechTitle') });
   if (args.context === 'selected' && args.selectionLabel)
     options.push({ id: 'selected', label: args.selectionLabel });
   if (args.context === 'history' && args.actionHistory)

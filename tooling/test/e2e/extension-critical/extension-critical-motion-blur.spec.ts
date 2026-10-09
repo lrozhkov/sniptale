@@ -70,7 +70,11 @@ test('quick scene exposure changes only moving phases and preserves opacity with
 
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
 for (const variant of [
@@ -104,10 +108,7 @@ for (const variant of [
       await dialog
         .getByRole('button', { name: label('gallery.videoReview.advancedEditing'), exact: true })
         .click();
-      await dialog
-        .getByRole('button', { name: label('gallery.videoReview.zoomAdd'), exact: true })
-        .first()
-        .click();
+      await addReviewFocus(page);
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       const enter = inspector.locator(
         '[data-ui="gallery.videoReview.motionBlurSettings"][data-phase="enter"]'

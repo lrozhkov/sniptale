@@ -177,3 +177,13 @@ it('shows a metadata admission reason and preserves header controls on list fail
   expect(button('gallery.videoReview.musicUpload').disabled).toBe(false);
   expect(button('common.actions.close').disabled).toBe(false);
 });
+
+it('places search before the filter and keeps upload a normal text action', async () => {
+  await render();
+  const search = document.querySelector('input[type="search"]')!;
+  const filter = button('gallery.videoReview.musicFilter');
+  const upload = button('gallery.videoReview.musicUpload');
+  expect(search.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(upload.className).toContain('!h-8');
+  expect(upload.className).toContain('!w-auto');
+});

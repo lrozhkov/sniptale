@@ -463,6 +463,15 @@ it('opens original speech without a synthetic selected clip and leaves it on mod
     act(() => root.render(<Harness />));
     act(() => navigation.setSection('speech'));
     expect(host.querySelector('output')?.textContent).toBe('speech');
+    expect(
+      Array.from(
+        host.querySelectorAll('[data-ui="gallery.videoReview.inspectorNavigation"] button')
+      ).map((node) => node.textContent)
+    ).toEqual([
+      'gallery.videoReview.comments',
+      'gallery.videoReview.scene',
+      'gallery.videoReview.speechTitle',
+    ]);
     const presentation = host.querySelector<HTMLButtonElement>(
       '[data-ui="gallery.videoReview.inspectorPresentation"]'
     );

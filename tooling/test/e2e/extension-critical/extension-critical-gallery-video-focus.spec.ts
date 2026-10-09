@@ -1,7 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -234,12 +238,7 @@ for (const variant of [
           exact: true,
         })
         .click();
-      await dialog
-        .getByRole('button', {
-          name: translate('gallery.videoReview.zoomAdd', variant.locale),
-          exact: true,
-        })
-        .click();
+      await addReviewFocus(page);
       const block = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first();
@@ -342,9 +341,7 @@ for (const theme of ['light', 'dark'] as const) {
           exact: true,
         })
         .click();
-      await dialog
-        .getByRole('button', { name: translate('gallery.videoReview.zoomAdd', 'en'), exact: true })
-        .click();
+      await addReviewFocus(page);
       const block = dialog
         .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
         .first();
@@ -485,7 +482,7 @@ test('quick editor zoom retains playhead and selected focus through repeated sca
       await expect(plane).toHaveAttribute('aria-valuenow', sourceTime!);
     }
     await zoom.press('Home');
-    await button('gallery.videoReview.zoomAdd').click();
+    await addReviewFocus(page);
     const block = dialog
       .locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]')
       .first();
@@ -540,7 +537,7 @@ for (const variant of [
       );
       await button('gallery.videoReview.advancedEditing').click();
       await expect(button('gallery.videoReview.focusRangeTool')).toHaveAttribute('title', /Shift/);
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const lane = dialog.locator('[data-ui="gallery.videoReview.zoomLane"]');
       const block = lane.locator('[role="button"]').first();
       const bounds = (await lane.boundingBox())!;

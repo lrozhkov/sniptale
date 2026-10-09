@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useReviewMusicImport, reviewMusicPlacement } from './music-import';
 import { createQuickEditAdvancedState } from '../../features/video/review/advanced/defaults';
+import { createReviewTimeMap } from '../../features/video/review/timeline';
 import { importedAudioClip } from '../../workflows/video-review/audio-import';
 import type { QuickEditAdvancedContent } from '../../features/video/review/advanced/types';
 
@@ -30,7 +31,9 @@ vi.mock('../../composition/persistence/review-workspaces/asset-refs', () => ({
     clipId: string,
     assetId: string
   ) =>
-    workspace.advanced.audio.music.some((clip) => clip.id === clipId && clip.assetId === assetId),
+    [...workspace.advanced.audio.music, ...workspace.advanced.audio.voiceover].some(
+      (clip) => clip.id === clipId && clip.assetId === assetId
+    ),
 }));
 vi.mock('../../composition/persistence/projects/voiceover-publication-lock', () => ({
   withVoiceoverAttachmentLock: (_id: string, work: () => Promise<unknown>) => work(),
@@ -136,9 +139,9 @@ async function render() {
   }
   await act(async () => root.render(createElement(Harness)));
 }
-async function open() {
+async function open(lane: 'music' | 'voiceover' = 'music') {
   await render();
-  act(() => api.open(host));
+  act(() => api.open(host, lane));
 }
 
 it('captures insertion intent and commits one bounded normal music clip durably', async () => {
@@ -162,60 +165,69 @@ it('captures insertion intent and commits one bounded normal music clip durably'
   expect(pause).toHaveBeenCalled();
 });
 
-it('retries upload publication with the original File and without repeating insertion', async () => {
-  const file = new File(['audio'], 'upload.wav', { type: 'audio/wav' });
-  io.publish.mockRejectedValueOnce(new Error('publication'));
-  await open();
-  await act(async () => {
-    await expect(api.drawer!.onUpload(file)).rejects.toThrow('publication');
-  });
-  expect(content.audio.music).toHaveLength(1);
-  expect(api.drawer).not.toBeNull();
-  await act(async () => api.drawer!.onRetry!());
-  expect(io.prepare).toHaveBeenCalledTimes(1);
-  expect(commit).toHaveBeenCalledTimes(1);
-  expect(io.publish).toHaveBeenCalledTimes(2);
-  expect(api.drawer).toBeNull();
-});
+it.each(['music', 'voiceover'] as const)(
+  'retries upload publication with the original File and without repeating insertion (%s)',
+  async (lane) => {
+    const file = new File(['audio'], 'upload.wav', { type: 'audio/wav' });
+    io.publish.mockRejectedValueOnce(new Error('publication'));
+    await open(lane);
+    await act(async () => {
+      await expect(api.drawer!.onUpload(file)).rejects.toThrow('publication');
+    });
+    expect(content.audio[lane]).toHaveLength(1);
+    expect(api.drawer).not.toBeNull();
+    await act(async () => api.drawer!.onRetry!());
+    expect(io.prepare).toHaveBeenCalledTimes(1);
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(io.publish).toHaveBeenCalledTimes(2);
+    expect(api.drawer).toBeNull();
+  }
+);
 
-it('retains an ambiguous durable attachment and retries publication without a second clip', async () => {
-  commit.mockImplementationOnce(async (operation: { after: QuickEditAdvancedContent }) => {
-    persisted = operation.after;
-    throw new Error('response lost');
-  });
-  await open();
-  await act(async () => {
-    await expect(api.drawer!.onSelect('song')).rejects.toThrow('response lost');
-  });
-  expect(state.session.reload).toHaveBeenCalledTimes(1);
-  expect(io.cancel).not.toHaveBeenCalled();
-  await act(async () => api.drawer!.onRetry!());
-  expect(commit).toHaveBeenCalledTimes(1);
-  expect(content.audio.music).toHaveLength(1);
-});
+it.each(['music', 'voiceover'] as const)(
+  'retains an ambiguous durable attachment and retries publication without a second clip (%s)',
+  async (lane) => {
+    commit.mockImplementationOnce(async (operation: { after: QuickEditAdvancedContent }) => {
+      persisted = operation.after;
+      throw new Error('response lost');
+    });
+    await open(lane);
+    await act(async () => {
+      await expect(api.drawer!.onSelect('song')).rejects.toThrow('response lost');
+    });
+    expect(state.session.reload).toHaveBeenCalledTimes(1);
+    expect(io.cancel).not.toHaveBeenCalled();
+    await act(async () => api.drawer!.onRetry!());
+    expect(commit).toHaveBeenCalledTimes(1);
+    expect(content.audio[lane]).toHaveLength(1);
+  }
+);
 
-it('cancels a pending selection on close before it acquires an asset', async () => {
-  let resolve!: (value: { file: File; filename: string; entry: { id: string } }) => void;
-  io.read.mockImplementationOnce(
-    () =>
-      new Promise((done) => {
-        resolve = done;
-      })
-  );
-  await open();
-  let flight!: Promise<void>;
-  act(() => {
-    flight = api.drawer!.onSelect('song');
-  });
-  act(() => api.drawer!.onClose());
-  await act(async () => {
-    resolve({ file: new File(['a'], 'song.wav'), filename: 'song.wav', entry: { id: 'asset' } });
-    await expect(flight).rejects.toThrow();
-  });
-  expect(commit).not.toHaveBeenCalled();
-  expect(io.binding).not.toHaveBeenCalled();
-  expect(api.drawer).toBeNull();
-});
+it.each(['music', 'voiceover'] as const)(
+  'cancels a pending selection on close before it acquires an asset (%s)',
+  async (lane) => {
+    let resolve!: (value: { file: File; filename: string; entry: { id: string } }) => void;
+    io.read.mockImplementationOnce(
+      () =>
+        new Promise((done) => {
+          resolve = done;
+        })
+    );
+    await open(lane);
+    let flight!: Promise<void>;
+    act(() => {
+      flight = api.drawer!.onSelect('song');
+    });
+    act(() => api.drawer!.onClose());
+    await act(async () => {
+      resolve({ file: new File(['a'], 'song.wav'), filename: 'song.wav', entry: { id: 'asset' } });
+      await expect(flight).rejects.toThrow();
+    });
+    expect(commit).not.toHaveBeenCalled();
+    expect(io.binding).not.toHaveBeenCalled();
+    expect(api.drawer).toBeNull();
+  }
+);
 
 it('discards a stale preview read and releases the active native preview on close', async () => {
   let resolve!: (value: { file: File; filename: string }) => void;
@@ -262,4 +274,65 @@ it('bounds selection placement and rejects cuts, end and occupied spans', () => 
   for (const start of [null, 10, 11, Number.NaN])
     expect(() => reviewMusicPlacement(start, 10, [])).toThrow();
   expect(() => reviewMusicPlacement(2, 10, [importedAudioClip('neighbor', 3, 1, 10)])).toThrow();
+});
+
+it('captures voiceover lane and source clock independently of music result placement', async () => {
+  state.time = 4;
+  state.session.getSnapshot = (() => ({
+    snapshot: { workspace: { aggregateId: 'review' } },
+    document: {
+      advancedContent: content,
+      edits: [
+        { id: 'cut', kind: 'cut', start: 0, end: 2, requestedStart: 0, requestedEnd: 2 },
+        {
+          id: 'speed',
+          kind: 'speed',
+          start: 2,
+          end: 6,
+          requestedStart: 2,
+          requestedEnd: 6,
+          rate: 2,
+          audio: 'speed',
+        },
+      ],
+    },
+  })) as typeof state.session.getSnapshot;
+  await render();
+  act(() => api.open(host, 'voiceover'));
+  state.time = 9;
+  await act(async () => api.drawer!.onSelect('voice'));
+  expect(content.audio.music).toHaveLength(0);
+  expect(content.audio.voiceover).toHaveLength(1);
+  expect(content.audio.voiceoverSegments).toEqual(
+    createReviewTimeMap(
+      state.source.duration,
+      state.session.getSnapshot().document.edits
+    ).getSegments()
+  );
+  expect(content.audio.voiceover[0]!.sourceAnchor?.[0]?.start).toBe(4);
+  expect(selected).toHaveBeenCalledWith(content.audio.voiceover[0]!.id, 'voiceover');
+  expect(io.publish).toHaveBeenCalledOnce();
+});
+
+it('cancels a captured voiceover library read when the project changes', async () => {
+  let finish!: (source: { file: File; filename: string; entry: { id: string } }) => void;
+  io.read.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  await open('voiceover');
+  let flight!: Promise<void>;
+  act(() => {
+    flight = api.drawer!.onSelect('voice');
+  });
+  state = { ...state, session: { ...state.session } };
+  await render();
+  await act(async () => {
+    finish({ file: new File(['a'], 'voice.wav'), filename: 'voice.wav', entry: { id: 'voice' } });
+    await expect(flight).rejects.toThrow();
+  });
+  expect(io.binding).not.toHaveBeenCalled();
+  expect(commit).not.toHaveBeenCalled();
 });

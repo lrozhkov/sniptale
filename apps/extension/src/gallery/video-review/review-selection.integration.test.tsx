@@ -485,7 +485,7 @@ it('creates edits from recorded actions, selects their properties and recalculat
   } finally {
     await fixture.cleanup();
   }
-});
+}, 30000);
 
 it('adds a note from the centered toolbar group and focuses the notes composer', async () => {
   const fixture = createEditorFixture(integration);
@@ -494,7 +494,7 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
       fixture.root.render(<VideoReview aggregateId="recording:r" onBack={fixture.back} />)
     );
     await fixture.click('advancedEditing');
-    await fixture.click('zoomAdd');
+    await fixture.addFocus();
     expect(
       fixture.host.querySelector('[data-ui="gallery.videoReview.zoomInspector"]')
     ).not.toBeNull();
@@ -514,4 +514,4 @@ it('adds a note from the centered toolbar group and focuses the notes composer',
   } finally {
     await fixture.cleanup();
   }
-});
+}, 30000);

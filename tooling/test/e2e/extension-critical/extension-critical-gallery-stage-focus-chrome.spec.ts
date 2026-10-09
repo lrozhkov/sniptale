@@ -1,7 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 for (const variant of [
@@ -33,7 +37,7 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const ruler = await dialog.locator('[data-ui="gallery.videoReview.ruler"]').boundingBox();
       if (!ruler) throw new Error('Timeline ruler missing');
       await page.mouse.click(ruler.x + ruler.width / 12.01, ruler.y + 12);

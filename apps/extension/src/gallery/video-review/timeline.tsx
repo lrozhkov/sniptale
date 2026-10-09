@@ -2,13 +2,13 @@ import { useState } from 'react';
 import {
   ReviewButton,
   reviewIconButtonClassName,
-  reviewCompactTrackButtonClassName,
+  reviewTrackStatusButtonClassName,
 } from './controls';
 import type { ReviewClickAnimation } from '../../features/video/review/advanced/click-animation';
 import { ReviewPlaybackRangeOverlay, useReviewRulerRange } from './ruler-range';
 import type { ReviewPlaybackRange } from './playback-range';
 import type { ReviewBeforeAction } from './note-transitions';
-import { Activity, List, Filter, Eye, EyeOff } from 'lucide-react';
+import { Activity, Search, Filter, Eye, EyeOff } from 'lucide-react';
 import { ReviewTrackRow } from './track-row';
 import { ReviewPlayhead, ReviewRulerRow, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane } from './timeline-selection';
@@ -265,18 +265,8 @@ function ReviewTimelineEvents(
             className={reviewIconButtonClassName}
             onClick={props.onOpenHistory}
           >
-            <List size={14} aria-hidden="true" />
+            <Search size={14} aria-hidden="true" />
           </ReviewButton>
-          {props.onToggleActions ? (
-            <ReviewButton
-              label={translate('gallery.videoReview.historyEffectsEnabled')}
-              className={reviewCompactTrackButtonClassName}
-              aria-pressed={props.actionsEnabled !== false}
-              onClick={props.onToggleActions}
-            >
-              {props.actionsEnabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
-            </ReviewButton>
-          ) : null}
           <ReviewButton
             label={translate('gallery.videoReview.historyAnimatedOnly')}
             className={reviewIconButtonClassName}
@@ -285,6 +275,16 @@ function ReviewTimelineEvents(
           >
             <Filter size={14} aria-hidden="true" />
           </ReviewButton>
+          {props.onToggleActions ? (
+            <ReviewButton
+              label={translate('gallery.videoReview.historyEffectsEnabled')}
+              className={reviewTrackStatusButtonClassName}
+              aria-pressed={props.actionsEnabled !== false}
+              onClick={props.onToggleActions}
+            >
+              {props.actionsEnabled === false ? <EyeOff size={14} /> : <Eye size={14} />}
+            </ReviewButton>
+          ) : null}
         </>
       }
     >

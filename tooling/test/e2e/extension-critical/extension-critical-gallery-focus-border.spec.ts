@@ -5,6 +5,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import {
+  addReviewFocus,
   seedReviewVideo,
   clickReviewExport,
   persistedFocus,
@@ -50,7 +51,7 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await button('gallery.videoReview.advancedEditing').click();
       await seek(page, 0.5);
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const blocks = dialog.locator('[data-ui="gallery.videoReview.zoomLane"] [role="button"]');
       await expect(blocks).toHaveCount(1);
       const toolbar = dialog.locator('[data-ui="gallery.videoReview.editingTools"]');
@@ -81,7 +82,7 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.focusBorder'), exact: true })
         .click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await expect(blocks).toHaveCount(2);
       const inspector = dialog.locator('[data-ui="gallery.videoReview.zoomInspector"]');
       await expect(
@@ -248,8 +249,8 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.focusSpotlight'), exact: true })
         .click();
-      await button('gallery.videoReview.zoomAdd').click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
+      await addReviewFocus(page);
       await expect(blocks).toHaveCount(4);
       await blocks.filter({ hasText: label('gallery.videoReview.focusBorder') }).click();
       await button('gallery.videoReview.pointerTool').click();

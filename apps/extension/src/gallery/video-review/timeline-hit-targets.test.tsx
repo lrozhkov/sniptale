@@ -382,3 +382,34 @@ it('clears the hover guide even when a camera child intercepts pointer movement'
   hoverAt(camera, 450);
   expect(host.querySelector('[data-ui="gallery.videoReview.hoverTime"]')).toBeNull();
 });
+
+it('orders action-history controls by navigation, filtering, then applying effects', () => {
+  const marker = {
+    ref: { kind: 'action' as const, id: 'click' },
+    eventType: 'CLICK',
+    start: 0.5,
+    end: 0.5,
+  };
+  const toggle = vi.fn();
+  const { host } = renderTimeline({
+    markers: [marker],
+    actionsEnabled: false,
+    onToggleActions: toggle,
+  });
+  const controls = ['historyOpen', 'historyAnimatedOnly', 'historyEffectsEnabled'].map((key) =>
+    host.querySelector<HTMLButtonElement>(`[aria-label="gallery.videoReview.${key}"]`)!
+  );
+  expect(controls.every(Boolean)).toBe(true);
+  expect(controls[0]!.querySelector('svg')?.classList.contains('lucide-search')).toBe(true);
+  expect(
+    controls[0]!.compareDocumentPosition(controls[1]!) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(
+    controls[1]!.compareDocumentPosition(controls[2]!) & Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  expect(controls[2]!.getAttribute('aria-pressed')).toBe('false');
+  expect(controls[2]!.className).toContain('aria-[pressed=false]');
+  expect(controls[2]!.querySelector('svg')?.classList.contains('lucide-eye-off')).toBe(true);
+  act(() => controls[2]!.click());
+  expect(toggle).toHaveBeenCalledOnce();
+});

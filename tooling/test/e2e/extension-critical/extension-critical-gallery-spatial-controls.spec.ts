@@ -3,7 +3,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { expect, test, type Page, type Locator, type TestInfo } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { betaV1Fixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { parseVideoWorkspace } from '../../../../apps/extension/src/composition/persistence/review-workspaces/parser';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -183,7 +187,7 @@ for (const variant of [
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await expect(tool('gallery.videoReview.spatialToolTilt')).toBeEnabled();
       await tool('gallery.videoReview.spatialToolTilt').click();
       await exact('gallery.videoReview.perspectiveX', '25');
@@ -497,7 +501,7 @@ for (const scenario of [
         .click();
       await ui.number('gallery.videoReview.backgroundPadding', '12');
       await ui.button(scenario.header ? 'windowHeader.browser' : 'windowHeader.none').click();
-      await ui.button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await ui.enable('gallery.videoReview.perspective');
       await ui.number('gallery.videoReview.perspectiveY', '35');
       const depth = await ui.enable('gallery.videoReview.depthOfField');
@@ -706,11 +710,11 @@ test('DPR2 short linked targets keep authored limits through resize and fullscre
       });
       await page.mouse.up();
     };
-    await ui.button('gallery.videoReview.zoomAdd').click();
+    await addReviewFocus(page);
     await trimEnd(clips.first(), 0.6);
     await expect.poll(async () => (await persistedRegions(page))[0]!.end).toBeLessThan(0.8);
     await ui.seek(0.8);
-    await ui.button('gallery.videoReview.zoomAdd').click();
+    await addReviewFocus(page);
     await expect(clips).toHaveCount(2);
     await trimEnd(clips.last(), 1.4);
     await expect

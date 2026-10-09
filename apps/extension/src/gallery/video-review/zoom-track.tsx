@@ -8,7 +8,7 @@ import { ReviewTimelineLabel } from './timeline-label';
 import { reviewTimelineItemTone, reviewTimelineResizeHandleClassName } from './controls';
 import { ScanEye, RectangleHorizontal } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
-import { MoveRight, Plus, Focus, Eye, EyeOff } from 'lucide-react';
+import { MoveRight, Focus, Eye, EyeOff } from 'lucide-react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
 import type { QuickEditZoomRegion } from '../../features/video/review/advanced/types';
@@ -21,12 +21,7 @@ import {
   getSnapCandidates,
   snapTimelineTime,
 } from '../../features/video/review/snap';
-import {
-  reviewTrackStatusButtonClassName,
-  reviewIconButtonClassName,
-  ReviewButton,
-  reviewTimeLabel,
-} from './controls';
+import { reviewTrackStatusButtonClassName, ReviewButton, reviewTimeLabel } from './controls';
 import type { ReviewTrackProjection } from './track-projection';
 import { ReviewTrackRow, ReviewTrackCuts } from './track-row';
 import { useReviewDragEscape } from './timeline-drag';
@@ -50,8 +45,6 @@ type ZoomTrackProps = {
   toOutputTime(source: number): number | null;
   selectedId: string | null;
   onSelect(id: string | null): void;
-  onAdd(): void;
-  addHint?: string | undefined;
   onLink?(id: string, targetId: string | null): void;
   /** Transient connection-settings selection; a linked gap opens it instead of unlinking. */
   linkSelectedId?: string | null;
@@ -213,15 +206,6 @@ export function ReviewZoomTrack(props: ZoomTrackProps) {
       icon={<Focus size={14} aria-hidden="true" />}
       controls={
         <>
-          <ReviewButton
-            label={translate('gallery.videoReview.zoomAdd')}
-            title={props.addHint ?? translate('gallery.videoReview.zoomAdd')}
-            disabled={!!props.addHint}
-            className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
-            onClick={props.onAdd}
-          >
-            <Plus size={14} />
-          </ReviewButton>
           {props.onToggleEnabled ? (
             <ReviewButton
               label={translate('gallery.videoReview.zoomEnabled')}

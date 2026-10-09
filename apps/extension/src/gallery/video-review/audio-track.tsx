@@ -122,7 +122,7 @@ type ReviewAudioTrackProps = ReviewAudioTimelineProps & {
   onOriginal(patch: Partial<QuickEditOriginalAudio>): void;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
+  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
 };
 
@@ -130,7 +130,7 @@ type ReviewClipLanesProps = ReviewAudioTimelineProps & {
   audio: QuickEditAudioState;
   onImportFile(file: File, lane: ReviewAudioLane, timelineTime?: number): void;
   onRecordVoiceover(): void;
-  onOpenMusic?: ((anchor: HTMLElement) => void) | undefined;
+  onOpenMusic?: ((anchor: HTMLElement, lane?: ReviewAudioLane) => void) | undefined;
   onMuteLane?: ((lane: ReviewAudioLane) => void) | undefined;
   pickerLane: RefObject<ReviewAudioLane | null>;
   pickerInput: RefObject<HTMLInputElement | null>;
@@ -614,10 +614,10 @@ function ReviewClipLanes(props: ReviewClipLanesProps) {
                 disabled={props.busy}
                 className={`${reviewIconButtonClassName} !h-7 !min-h-7 !w-7 !px-1`}
                 onClick={(event) => {
-                  if (lane.key === 'music' && props.onOpenMusic) {
+                  if (props.onOpenMusic) {
                     const trigger = event.currentTarget;
                     (props.beforeAction ?? ((action) => action()))(() =>
-                      props.onOpenMusic?.(trigger)
+                      props.onOpenMusic?.(trigger, lane.key)
                     );
                     return;
                   }

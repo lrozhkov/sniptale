@@ -1,6 +1,6 @@
 import { expect, test, type Locator } from '@playwright/test';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo } from '../support/quick-editor-media-fixture';
+import { addReviewFocus, seedReviewVideo } from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
@@ -74,7 +74,7 @@ for (const theme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
       await button('gallery.videoReview.advancedEditing').click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const preview = dialog.locator('[data-ui="gallery.videoReview.zoomPreview"]');
       const types = dialog.locator('[data-ui="gallery.videoReview.focusType"]');
       for (const background of ['none', 'gradient'] as const) {

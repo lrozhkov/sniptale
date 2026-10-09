@@ -1,3 +1,8 @@
+import {
+  anchorReviewVoiceover,
+  anchorReviewVoiceoverAtSource,
+} from '../../features/video/review/voiceover-edits';
+import type { ReviewAudioLane } from './use-review-audio';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { readLibraryAudioBindingSource } from '../../composition/persistence/projects/library-asset-binding';
 import { readVideoWorkspace } from '../../composition/persistence/review-workspaces/store';
@@ -33,6 +38,7 @@ type MusicImportState = Pick<
 type Intent = {
   session: EditorState['session'];
   aggregateId: string;
+  lane: ReviewAudioLane;
   sourceStart: number;
   sourceEnd: number | null;
   controller: AbortController;
@@ -131,7 +137,7 @@ function createMusicOperation(
 }
 
 async function restoreAttachedMusic(target: Intent, clipId: string, assetId: string) {
-  const clips = target.session.getSnapshot().document.advancedContent.audio.music;
+  const clips = target.session.getSnapshot().document.advancedContent.audio[target.lane];
   if (!clips.some((clip) => clip.id === clipId && clip.assetId === assetId))
     await target.session.reload();
 }
@@ -196,7 +202,7 @@ export function useReviewMusicImport(state: MusicImportState) {
       assertCurrent(target);
       await restoreAttachedMusic(target, active.clipId, asset.assetId);
       assertCurrent(target);
-      current.current.audio.setSelectedId(active.clipId, 'music');
+      current.current.audio.setSelectedId(active.clipId, target.lane);
       close();
     } catch (failure) {
       if (intent.current === target && !target.controller.signal.aborted)
@@ -207,7 +213,7 @@ export function useReviewMusicImport(state: MusicImportState) {
     }
   };
   return {
-    open: (trigger: HTMLElement) => {
+    open: (trigger: HTMLElement, lane: ReviewAudioLane = 'music') => {
       if (current.current.busy || !current.current.canStart() || pending.current) return;
       close();
       const latest = current.current;
@@ -215,6 +221,7 @@ export function useReviewMusicImport(state: MusicImportState) {
       intent.current = {
         session: latest.session,
         aggregateId: latest.session.getSnapshot().snapshot.workspace.aggregateId,
+        lane,
         sourceStart: latest.playbackRange?.start ?? latest.time,
         sourceEnd: latest.playbackRange?.end ?? null,
         controller: new AbortController(),
@@ -268,7 +275,7 @@ async function commitMusicClip(args: {
   assertCurrent(target);
   const snapshot = target.session.getSnapshot();
   const before = snapshot.document.advancedContent;
-  if (before.audio.music.some((clip) => clip.id === clipId))
+  if (before.audio[target.lane].some((clip) => clip.id === clipId))
     throw new Error(translate('gallery.videoReview.musicChanged'));
   const map = createReviewTimeMap(args.sourceDuration, snapshot.document.edits);
   const start = map.sourceToTimeline(target.sourceStart);
@@ -282,18 +289,40 @@ async function commitMusicClip(args: {
             (segment) =>
               segment.sourceStart <= target.sourceEnd! && segment.sourceEnd >= target.sourceEnd!
           )?.resultEnd);
-  const placement = reviewMusicPlacement(start, end ?? map.getDuration(), before.audio.music);
-  const clip = {
+  const placement =
+    target.lane === 'voiceover'
+      ? { start: target.sourceStart, end: target.sourceStart + duration }
+      : reviewMusicPlacement(start, end ?? map.getDuration(), before.audio.music);
+  const imported = {
     ...importedAudioClip(assetId, duration, placement.start, placement.end),
     id: clipId,
   };
+  const clip =
+    target.lane === 'voiceover'
+      ? anchorReviewVoiceoverAtSource(imported, map.getSegments())
+      : imported;
   try {
     await target.session.commitDurable({
       id: crypto.randomUUID(),
       at: Date.now(),
       target: 'advancedContent',
       before,
-      after: { ...before, audio: { ...before.audio, music: [...before.audio.music, clip] } },
+      after: {
+        ...before,
+        audio:
+          target.lane === 'voiceover'
+            ? {
+                ...before.audio,
+                voiceoverSegments: before.audio.voiceoverSegments ?? [...map.getSegments()],
+                voiceover: [
+                  ...before.audio.voiceover.map((item) =>
+                    anchorReviewVoiceover(item, before.audio.voiceoverSegments ?? map.getSegments())
+                  ),
+                  clip,
+                ],
+              }
+            : { ...before.audio, music: [...before.audio.music, clip] },
+      },
     });
   } catch (failure) {
     if (await hasDurableMusicClip(target, clipId, assetId)) await target.session.reload();

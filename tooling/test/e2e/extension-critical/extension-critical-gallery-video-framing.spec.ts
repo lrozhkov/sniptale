@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
 
 /** Compare the inspector projection with actual stage boxes, not the preview's geometry helper. */
@@ -144,7 +148,7 @@ for (const variant of [
       await button('gallery.videoReview.backgroundZoomContent').click();
       await setNumber('gallery.videoReview.backgroundPadding', '20');
       await setNumber('gallery.videoReview.backgroundCornerRadius', '0');
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await setNumber('gallery.videoReview.zoomScale', '1.25');
       await dialog
         .locator('summary')

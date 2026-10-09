@@ -1,7 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { seedReviewVideo, clickReviewExport } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  clickReviewExport,
+} from '../support/quick-editor-media-fixture';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { build } from 'esbuild';
 import { expect, test } from '@playwright/test';
@@ -71,7 +75,7 @@ test('quick editor exports a small left-edge blur with browser header and shadow
     await button('gallery.videoReview.backgroundSolid').click();
     await number('gallery.videoReview.backgroundPadding', '8');
     await number('gallery.videoReview.backgroundShadow', '80');
-    await button('gallery.videoReview.zoomAdd').click();
+    await addReviewFocus(page);
     await button('gallery.videoReview.focusSpotlight').click();
     await button('gallery.videoReview.focusOutside').click();
     await page

@@ -239,6 +239,66 @@ export function createEditorFixture(
       surface.focus();
       window.dispatchEvent(event);
     },
+    async selectRulerRange(start: number, end: number) {
+      const ruler = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.ruler"]')!;
+      const duration = Number(ruler.getAttribute('aria-valuemax'));
+      Object.assign(ruler, {
+        getBoundingClientRect: () => new DOMRect(0, 0, 400, 28),
+        setPointerCapture: vi.fn(),
+        releasePointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+      });
+      for (const [type, time] of [
+        ['pointerdown', start],
+        ['pointermove', end],
+        ['pointerup', end],
+      ] as const) {
+        const event = new MouseEvent(type, {
+          bubbles: true,
+          button: 0,
+          clientX: (time / duration) * 400,
+          clientY: 15,
+        });
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        await act(async () => {
+          ruler.dispatchEvent(event);
+        });
+      }
+    },
+    async addFocus(start?: number, end?: number) {
+      const plane = host.querySelector<HTMLElement>('[data-ui="gallery.videoReview.timePlane"]')!;
+      const at = start ?? Number(plane.getAttribute('aria-valuenow'));
+      const until = end ?? Math.min(Number(plane.getAttribute('aria-valuemax')), at + 2);
+      if (button('focusRangeTool').getAttribute('aria-pressed') !== 'true')
+        await click('focusRangeTool');
+      const gutter = Number.parseFloat(plane.style.getPropertyValue('--review-track-gutter'));
+      const duration = Number(plane.getAttribute('aria-valuemax'));
+      Object.assign(plane, {
+        getBoundingClientRect: () => new DOMRect(-gutter, 0, gutter + 400, 80),
+        setPointerCapture: vi.fn(),
+        releasePointerCapture: vi.fn(),
+        hasPointerCapture: () => true,
+      });
+      for (const [type, time] of [
+        ['pointerdown', at],
+        ['pointermove', until],
+        ['pointerup', until],
+      ] as const) {
+        const event = new MouseEvent(type, {
+          bubbles: true,
+          button: 0,
+          clientX: (time / duration) * 400,
+        });
+        Object.defineProperty(event, 'pointerId', { value: 1 });
+        const target =
+          type === 'pointerdown'
+            ? host.querySelector('[data-ui="gallery.videoReview.zoomLane"]')!
+            : plane;
+        await act(async () => {
+          target.dispatchEvent(event);
+        });
+      }
+    },
     fill,
     show,
     close,

@@ -2,7 +2,11 @@ import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 
 for (const variant of [
   { locale: 'en', theme: 'light' },
@@ -59,7 +63,7 @@ for (const variant of [
           exact: true,
         })
         .click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await button('gallery.videoReview.focusRangeTool').click();
       const tools = dialog.locator('[data-ui="gallery.videoReview.editingTools"]');
       await tools
@@ -68,7 +72,7 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.focusBorder'), exact: true })
         .click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await expect.poll(async () => !!(await persistedFocus(page))?.border).toBe(true);
       await page.screenshot({ path: info.outputPath('normal-preview.png'), fullPage: false });
       await toggle.click();

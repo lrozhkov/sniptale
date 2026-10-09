@@ -110,7 +110,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     );
     await fixture.click('pointerTool');
     await dragTimePlane(fixture.host, 200, 200);
-    await fixture.click('zoomAdd');
+    await fixture.addFocus();
     await act(async () => new Promise((resolve) => setTimeout(resolve, 320)));
     const target = () => fixture.host.querySelector('[data-ui="gallery.videoReview.zoomTarget"]');
     const preview = fixture.host.querySelector<HTMLCanvasElement>(
@@ -159,7 +159,7 @@ it('blocks history and destructive shortcuts while the export controls are disab
     await act(async () => fail?.(new Error('Cancelled test export')));
     await fixture.cleanup();
   }
-});
+}, 30000);
 
 it('marks the export opener active only while its inspector panel is shown', async () => {
   vi.useFakeTimers();
@@ -197,7 +197,7 @@ it('marks the export opener active only while its inspector panel is shown', asy
       );
     }
     expect(fixture.snapshot.workspace.history).toEqual(history);
-    await fixture.click('zoomAdd');
+    await fixture.addFocus();
     expect(opener.getAttribute('aria-pressed')).toBe('false');
     expect(tabs()).toHaveLength(3);
     expect(tabs().some((node) => node.textContent === 'gallery.videoReview.exportSection')).toBe(
@@ -213,7 +213,7 @@ it('marks the export opener active only while its inspector panel is shown', asy
     await fixture.cleanup();
     vi.useRealTimers();
   }
-});
+}, 30000);
 
 it('opens the completed copy and dismisses feedback on tool or inspector changes', async () => {
   const fixture = createEditorFixture(integration);

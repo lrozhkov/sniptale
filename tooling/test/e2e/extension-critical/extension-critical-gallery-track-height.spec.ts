@@ -2,7 +2,11 @@ import { expect, test } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { applyHarnessBootstrap, GALLERY_HARNESS_PATH } from '../extension-critical.helpers';
-import { seedReviewVideo, persistedFocus } from '../support/quick-editor-media-fixture';
+import {
+  addReviewFocus,
+  seedReviewVideo,
+  persistedFocus,
+} from '../support/quick-editor-media-fixture';
 
 for (const variant of [
   { locale: 'en', theme: 'light' },
@@ -78,9 +82,9 @@ for (const variant of [
       };
       await density.click();
       await seek(0.5);
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       await seek(6);
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const link = focus.locator('[data-ui="gallery.videoReview.zoomLink"]');
       await expect(link).toHaveCount(1);
       await link.click();
@@ -94,7 +98,7 @@ for (const variant of [
       await page
         .getByRole('option', { name: label('gallery.videoReview.focusBorder'), exact: true })
         .click();
-      await button('gallery.videoReview.zoomAdd').click();
+      await addReviewFocus(page);
       const blocks = focus.locator('[role="button"]');
       await expect(blocks).toHaveCount(3);
       await expect(focus).toHaveCSS('height', '68px');
