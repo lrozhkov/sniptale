@@ -136,6 +136,16 @@ it('keeps compact toolbar transport and zoom actions usable in playing and stopp
     const end = host.querySelector<HTMLButtonElement>(
       '[aria-label="gallery.videoReview.timelineEnd"]'
     )!;
+    const sample = () =>
+      host.querySelector('.review-playback-clock > [aria-hidden="true"]')!.textContent;
+    act(() => root.render(<ReviewToolbar {...props} duration={599.999} />));
+    expect(sample()).toBe('88:88.88 / 10:00.00');
+    act(() => root.render(<ReviewToolbar {...props} duration={599.999} time={599.994} />));
+    expect(sample()).toBe('88:88.88 / 10:00.00');
+    expect(host.querySelector('.review-playback-clock-value')?.textContent).toBe(
+      '9:59.99 / 10:00.00'
+    );
+    act(() => root.render(<ReviewToolbar {...props} />));
     expect(start.disabled).toBe(true);
     act(() => play.click());
     act(() => end.click());

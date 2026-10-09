@@ -1,4 +1,15 @@
-import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import {
+  ALL_FORMATS,
+  BlobSource,
+  BufferTarget,
+  EncodedPacketSink,
+  EncodedVideoPacketSource,
+  Input,
+  Output,
+  WebMOutputFormat,
+} from 'mediabunny';
+import { expect, test, type Page, type Locator } from '@playwright/test';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { startHostServer } from '../support/host-server';
 import { seedReviewVideo } from '../support/quick-editor-media-fixture';
@@ -172,8 +183,10 @@ for (const variant of [
         )
         .toBe(panelColor);
       expect((await ruler.boundingBox())!.y).toBeCloseTo(before.y, 0);
+      // Native scroll events clear hover; finish that event turn before moving the pointer.
+      await settleClockLayout(page);
       const y = before.y + before.height / 2;
-      const x = controlsBefore.x + controlsBefore.width + 120;
+      const x = before.x + 120;
       await page.mouse.move(x, y);
       const hoverGuide = dialog.locator('[data-ui="gallery.videoReview.hoverTime"]');
       await expect(hoverGuide).toBeVisible();
@@ -210,4 +223,155 @@ for (const variant of [
       );
     }
   });
+}
+
+/** Two genuine keyframes provide a long seekable clock without an hour-long test file. */
+async function longClockVideo() {
+  const bytes = await readFile(new URL('../fixtures/review-vp8-opus.webm', import.meta.url));
+  const input = new Input({ source: new BlobSource(new Blob([bytes])), formats: ALL_FORMATS });
+  try {
+    const track = (await input.getPrimaryVideoTrack())!;
+    const packet = (await new EncodedPacketSink(track).getFirstKeyPacket())!;
+    const decoderConfig = (await track.getDecoderConfig())!;
+    const target = new BufferTarget();
+    const output = new Output({ target, format: new WebMOutputFormat() });
+    const video = new EncodedVideoPacketSource('vp8');
+    output.addVideoTrack(video);
+    await output.start();
+    await video.add(packet.clone({ timestamp: 0, duration: 3601 }), { decoderConfig });
+    await video.add(packet.clone({ timestamp: 3601, duration: 1 }), { decoderConfig });
+    video.close();
+    await output.finalize();
+    return new Uint8Array(target.buffer!);
+  } finally {
+    input.dispose();
+  }
+}
+
+for (const variant of [
+  { locale: 'en', theme: 'light', width: 1920, height: 900 },
+  { locale: 'ru', theme: 'dark', width: 1280, height: 560 },
+  { locale: 'en', theme: 'light', width: 1200, height: 560 },
+] as const) {
+  test(`transport clock keeps button positions across rounding and minute digits (${variant.width})`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: variant.width, height: variant.height });
+    const host = await startHostServer();
+    try {
+      await applyHarnessBootstrap(page, {
+        preserveMediaLibrary: true,
+        storage: {
+          'sniptale-locale-preference': variant.locale,
+          'sniptale-theme-preference': variant.theme,
+        },
+      });
+      await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}?theme=${variant.theme}`);
+      await page.locator('[data-ui="gallery.page.root"]').waitFor();
+      await seedReviewVideo(
+        page,
+        'clock.webm',
+        { width: 160, height: 90, duration: 3602 },
+        false,
+        false,
+        { bytes: await longClockVideo(), mimeType: 'video/webm' }
+      );
+      await page.reload();
+      await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
+      await page.locator('[data-ui="gallery.videoReview.enter"]').click();
+      await page.evaluate(() => document.fonts.ready);
+      const dialog = page.locator('dialog');
+      const toolbar = dialog.locator('[data-ui="gallery.videoReview.toolbar"]');
+      const transport = toolbar.locator('[data-toolbar-transport]');
+      const video = dialog.locator('video').first();
+      await expect(transport).toContainText('60:02.00');
+      await verifyClockGeometry(
+        page,
+        toolbar,
+        video,
+        [0, 9.99, 10, 59.994, 59.999, 60, 599.999, 600, 3599.999, 3600]
+      );
+      if (variant.width === 1920) {
+        const boundaries = await clockLayoutBoundaries(page, toolbar);
+        for (const boundary of boundaries)
+          for (const width of [boundary - 1, boundary, boundary + 1]) {
+            await page.setViewportSize({ width, height: variant.height });
+            await settleClockLayout(page);
+            await verifyClockGeometry(page, toolbar, video, [0, 599.999, 3600]);
+          }
+        await page.setViewportSize({ width: variant.width, height: variant.height });
+      }
+      await page.screenshot({ path: info.outputPath('stable-clock.png'), fullPage: false });
+    } finally {
+      await new Promise<void>((resolve, reject) =>
+        host.server.close((error) => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+}
+
+async function settleClockLayout(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      )
+  );
+}
+
+async function verifyClockGeometry(
+  page: Page,
+  toolbar: Locator,
+  video: Locator,
+  times: readonly number[]
+) {
+  const measure = () =>
+    toolbar.getByRole('button').evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const box = node.getBoundingClientRect();
+        return { x: box.x, width: box.width };
+      })
+    );
+  const before = await measure();
+  const layout = await toolbar.getAttribute('data-layout');
+  for (const time of times) {
+    await video.evaluate((node, at) => {
+      node.currentTime = at;
+      node.dispatchEvent(new Event('timeupdate'));
+    }, time);
+    await expect.poll(() => video.evaluate((node) => node.currentTime)).toBeCloseTo(time, 2);
+    await settleClockLayout(page);
+    const after = await measure();
+    for (let index = 0; index < before.length; index++) {
+      expect(Math.abs(after[index]!.x - before[index]!.x)).toBeLessThanOrEqual(0.5);
+      expect(after[index]!.width).toBe(before[index]!.width);
+    }
+    await expect(toolbar).toHaveAttribute('data-layout', layout!);
+  }
+}
+
+/** Discover the actual layout thresholds rather than assuming viewport constants. */
+async function clockLayoutBoundaries(page: Page, toolbar: Locator) {
+  const at = async (width: number) => {
+    await page.setViewportSize({ width, height: 900 });
+    await settleClockLayout(page);
+    return toolbar.getAttribute('data-layout');
+  };
+  const boundaries: number[] = [];
+  let previous = await at(1200);
+  for (let width = 1232; width <= 1920; width += 32) {
+    const next = await at(width);
+    if (next !== previous) {
+      let low = width - 32,
+        high = width;
+      while (high - low > 1) {
+        const middle = Math.floor((low + high) / 2);
+        if ((await at(middle)) === previous) low = middle;
+        else high = middle;
+      }
+      boundaries.push(high);
+    }
+    previous = next;
+  }
+  return boundaries;
 }

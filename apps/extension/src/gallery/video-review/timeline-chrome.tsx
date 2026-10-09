@@ -122,6 +122,21 @@ function playbackTime(value: number): string {
   return formatPreciseTime(Math.round(value * 100) / 100).slice(0, -1);
 }
 
+/** The maximum source-clock format reserves space without changing the live readout. */
+function ReviewPlaybackClock(props: { time: number; duration: number }) {
+  const sample = playbackTime(props.duration).replace(/\d/g, '8');
+  return (
+    <span className="review-playback-clock whitespace-nowrap text-xs font-semibold tabular-nums">
+      <span aria-hidden="true" className="invisible">
+        {sample} / {playbackTime(props.duration)}
+      </span>
+      <span className="review-playback-clock-value">
+        {playbackTime(props.time)} / {playbackTime(props.duration)}
+      </span>
+    </span>
+  );
+}
+
 /** Disposable loop readout and reset beside the transport clock. */
 function ReviewLoopSummary(props: {
   range?: ReviewPlaybackRange | null | undefined;
@@ -248,9 +263,7 @@ export function ReviewToolbar(props: {
               onClear={props.onClearPlaybackRange}
             />
           ) : (
-            <span className="whitespace-nowrap text-xs font-semibold tabular-nums">
-              {playbackTime(props.time)} / {playbackTime(props.duration)}
-            </span>
+            <ReviewPlaybackClock time={props.time} duration={props.duration} />
           )}
         </div>
         {!props.playbackRange &&
