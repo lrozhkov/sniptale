@@ -404,6 +404,11 @@ it('configures recorded keys without pointer locations, separately from selected
         .click()
     );
     expect(host.querySelector('[data-ui="gallery.videoReview.clickFields"]')).not.toBeNull();
+    expect(host.querySelectorAll('[data-ui="gallery.videoReview.inspectorSections"]')).toHaveLength(
+      1
+    );
+    expect(host.textContent).toContain('gallery.videoReview.historyClicks');
+    expect(host.textContent).toContain('gallery.videoReview.historyKeys');
     const select = host.querySelector<HTMLSelectElement>(
       '[aria-label="gallery.videoReview.keyDisplay"]'
     )!;
@@ -476,4 +481,37 @@ it('filters click targets without hiding recovery controls on an empty result', 
   } finally {
     act(() => root.unmount());
   }
+});
+
+it('ignores incompatible retained filters when displaying interval and keyboard event types', async () => {
+  const { queryHistory } = await import('./action-history-filters');
+  const markers = [
+    { ref: { kind: 'signal' as const, id: 'idle' }, eventType: 'cursor-idle', start: 1, end: 4 },
+    {
+      ref: { kind: 'action' as const, id: 'key' },
+      eventType: 'KEY',
+      target: 'Ctrl+C',
+      start: 5,
+      end: 5,
+    },
+  ];
+  const retained = {
+    query: '',
+    type: 'cursor-idle',
+    targetType: 'button' as const,
+    status: 'animated' as const,
+    longer: 0,
+  };
+  expect(
+    queryHistory(markers, new Map(), retained, [], new Map()).filtered.map((m) => m.ref.id)
+  ).toEqual(['idle']);
+  expect(
+    queryHistory(
+      markers,
+      new Map(),
+      { ...retained, type: 'KEY', status: 'all', longer: 2 },
+      [],
+      new Map()
+    ).filtered.map((m) => m.ref.id)
+  ).toEqual(['key']);
 });

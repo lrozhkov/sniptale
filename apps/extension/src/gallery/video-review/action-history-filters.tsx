@@ -18,6 +18,37 @@ export interface HistoryFilterValues {
   longer: number;
 }
 
+/** Event capabilities normalize hidden criteria in both presentation and actual queries. */
+function historyFilterState(markers: readonly ReviewTelemetryMarker[], value: HistoryFilterValues) {
+  const matching = markers.filter(
+    (marker) =>
+      value.type === 'all' ||
+      (value.type === 'clicks' ? isReviewClick(marker) : marker.eventType === value.type)
+  );
+  const all = value.type === 'all';
+  const capabilities = {
+    target: all || value.type === 'clicks' || matching.some(isReviewClick),
+    animation:
+      all ||
+      value.type === 'clicks' ||
+      matching.some((marker) => isReviewClick(marker) || isReviewKey(marker)),
+    duration:
+      all ||
+      matching.some(
+        (marker) => !isReviewClick(marker) && !isReviewKey(marker) && marker.end > marker.start
+      ),
+  };
+  return {
+    capabilities,
+    value: {
+      ...value,
+      targetType: capabilities.target ? value.targetType : 'all',
+      status: capabilities.animation ? value.status : 'all',
+      longer: capabilities.duration ? value.longer : 0,
+    },
+  };
+}
+
 /** Controlled search/filter presentation; the history owner retains values across settings navigation. */
 export function HistoryFilters({
   expanded,
@@ -32,7 +63,8 @@ export function HistoryFilters({
   onToggle(): void;
   onChange(patch: Partial<HistoryFilterValues>): void;
 }) {
-  const { query, type, status, longer, targetType } = value;
+  const normalized = historyFilterState(markers, value).value;
+  const { query, type, status, longer, targetType } = normalized;
   const active = targetType !== 'all' || type !== 'all' || status !== 'all' || longer > 0;
   return (
     <>
@@ -57,7 +89,13 @@ export function HistoryFilters({
         </ContentToolbarButton>
       </div>
       <div hidden={!expanded}>
-        <HistoryFilterFields markers={markers} value={value} onChange={onChange} />
+        <HistoryFilterFields
+          markers={markers}
+          value={normalized}
+          onChange={(patch) =>
+            onChange(historyFilterState(markers, { ...normalized, ...patch }).value)
+          }
+        />
       </div>
     </>
   );
@@ -71,6 +109,7 @@ export function queryHistory(
   selected: readonly string[],
   keyAnimations: ReadonlyMap<string, ReviewKeyAnimation>
 ) {
+  filters = historyFilterState(markers, filters).value;
   const eligible = new Set(
     markers
       .filter((marker) => (isReviewClick(marker) && marker.focusPoint) || isReviewKey(marker))
@@ -168,6 +207,7 @@ function HistoryFilterFields({
   value: HistoryFilterValues;
   onChange(patch: Partial<HistoryFilterValues>): void;
 }) {
+  const { capabilities } = historyFilterState(markers, value);
   const { type, targetType, longer, status } = value;
   return (
     <div className="review-history-filters space-y-2">
@@ -188,54 +228,60 @@ function HistoryFilterFields({
           onChange({ type: value });
         }}
       />
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.targetType')}
-        value={targetType}
-        options={[
-          { value: 'all', label: translate('gallery.videoReview.targetAll') },
-          ...Array.from(
-            new Set(
-              markers
-                .filter(isReviewClick)
-                .map((marker) => marker.targetSemantics?.kind ?? 'unknown')
-            )
-          ).map((kind) => ({
-            value: kind,
-            label: translate(`gallery.videoReview.target_${kind}`),
-          })),
-        ]}
-        onChange={(value) => onChange({ targetType: value })}
-      />
-      <NumericRow
-        appearance="plain"
-        label={translate('gallery.videoReview.historyLonger')}
-        value={longer}
-        min={0}
-        max={86400}
-        step={0.1}
-        precision={1}
-        scrub={{ min: 0, max: 10, step: 0.1 }}
-        unit="s"
-        enterBehavior="blur"
-        onPreviewValue={(value) => onChange({ longer: value })}
-        onCommitValue={(value) => {
-          onChange({ longer: value });
-        }}
-      />
-      <SelectField
-        className={reviewSelectFieldClassName}
-        label={translate('gallery.videoReview.historyStatus')}
-        value={status}
-        options={[
-          { value: 'all', label: translate('gallery.videoReview.historyAll') },
-          { value: 'animated', label: translate('gallery.videoReview.historyAnimatedOnly') },
-          { value: 'selected', label: translate('gallery.videoReview.historySelectedOnly') },
-        ]}
-        onChange={(value) => {
-          onChange({ status: value });
-        }}
-      />
+      {capabilities.target ? (
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.targetType')}
+          value={targetType}
+          options={[
+            { value: 'all', label: translate('gallery.videoReview.targetAll') },
+            ...Array.from(
+              new Set(
+                markers
+                  .filter(isReviewClick)
+                  .map((marker) => marker.targetSemantics?.kind ?? 'unknown')
+              )
+            ).map((kind) => ({
+              value: kind,
+              label: translate(`gallery.videoReview.target_${kind}`),
+            })),
+          ]}
+          onChange={(value) => onChange({ targetType: value })}
+        />
+      ) : null}
+      {capabilities.duration ? (
+        <NumericRow
+          appearance="plain"
+          label={translate('gallery.videoReview.historyLonger')}
+          value={longer}
+          min={0}
+          max={86400}
+          step={0.1}
+          precision={1}
+          scrub={{ min: 0, max: 10, step: 0.1 }}
+          unit="s"
+          enterBehavior="blur"
+          onPreviewValue={(value) => onChange({ longer: value })}
+          onCommitValue={(value) => {
+            onChange({ longer: value });
+          }}
+        />
+      ) : null}
+      {capabilities.animation ? (
+        <SelectField
+          className={reviewSelectFieldClassName}
+          label={translate('gallery.videoReview.historyStatus')}
+          value={status}
+          options={[
+            { value: 'all', label: translate('gallery.videoReview.historyAll') },
+            { value: 'animated', label: translate('gallery.videoReview.historyAnimatedOnly') },
+            { value: 'selected', label: translate('gallery.videoReview.historySelectedOnly') },
+          ]}
+          onChange={(value) => {
+            onChange({ status: value });
+          }}
+        />
+      ) : null}
     </div>
   );
 }

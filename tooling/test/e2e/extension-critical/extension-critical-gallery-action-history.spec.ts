@@ -95,7 +95,13 @@ for (const variant of [
   test(`manual click history editing and filter (${variant.locale}, narrow=${variant.narrow})`, async ({
     page,
   }, info) => {
-    if (variant.narrow) await page.setViewportSize({ width: 1200, height: 560 });
+    await page.setViewportSize(
+      variant.narrow
+        ? { width: 1200, height: 560 }
+        : variant.locale === 'ru'
+          ? { width: 1280, height: 560 }
+          : { width: 1920, height: 900 }
+    );
     const server = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
@@ -122,75 +128,12 @@ for (const variant of [
         .getByRole('button', { name: label('gallery.videoReview.historyOpen'), exact: true })
         .click();
       const history = dialog.locator('[data-ui="gallery.videoReview.actionHistory"]');
-      await expect(history.locator('li')).toHaveCount(10);
-      const configure = history.getByRole('button', {
-        name: label('gallery.videoReview.historyConfigure'),
-        exact: true,
-      });
-      await expect(configure).toBeDisabled();
-      const search = history.getByRole('searchbox');
-      await expect(search).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-      expect((await search.boundingBox())!.height).toBeGreaterThanOrEqual(28);
-      await search.focus();
-      expect(await search.evaluate((node) => getComputedStyle(node, '::placeholder').color)).toBe(
-        'rgba(0, 0, 0, 0)'
+      const { configure, search } = await verifyHistorySearchSelection(
+        history,
+        page,
+        variant.locale,
+        info.outputPath('history-list-selection.png')
       );
-      await search.fill('not found');
-      await expect(history.locator('li')).toHaveCount(0);
-      await expect(history.getByRole('checkbox')).toBeDisabled();
-      await history
-        .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
-        .click();
-      await expect(search).toBeFocused();
-      await expect(history.locator('li')).toHaveCount(10);
-      const filterToggle = history.getByRole('button', {
-        name: label('gallery.videoReview.historyFilters'),
-        exact: true,
-      });
-      await filterToggle.click();
-      await history
-        .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
-        .click();
-      await page
-        .getByRole('option', {
-          name: label('gallery.videoReview.historySelectedOnly'),
-          exact: true,
-        })
-        .click();
-      await expect(history.locator('li')).toHaveCount(0);
-      await expect(filterToggle).toHaveAttribute('data-active', 'true');
-      await expect(search).toBeVisible();
-      await history
-        .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
-        .click();
-      await page
-        .getByRole('option', { name: label('gallery.videoReview.historyAll'), exact: true })
-        .click();
-      await expect(history.locator('li')).toHaveCount(10);
-      await filterToggle.click();
-      await history.locator('li input[type="checkbox"]').first().check();
-      const master = history.getByRole('checkbox', {
-        name: label('gallery.videoReview.historySelectAll'),
-        exact: true,
-      });
-      await expect(master).toBeChecked({ indeterminate: true });
-      await search.fill(label('gallery.videoReview.eventCursorIdle'));
-      await expect(history.locator('li')).toHaveCount(2);
-      await expect(history).toContainText(label('gallery.videoReview.historyHiddenSelected'));
-      await configure.click();
-      await expect(history.locator('ol')).toHaveCount(0);
-      await history
-        .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
-        .click();
-      await expect(search).toHaveValue(label('gallery.videoReview.eventCursorIdle'));
-      await expect(configure).toBeFocused();
-      await history
-        .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
-        .click();
-      await page.screenshot({
-        path: info.outputPath('history-list-selection.png'),
-        fullPage: false,
-      });
       const filters = history.getByRole('button', {
         name: label('gallery.videoReview.historyFilters'),
         exact: true,
@@ -299,6 +242,14 @@ for (const variant of [
       await animated.first().click();
       const properties = dialog.locator('[data-ui="gallery.videoReview.actionProperties"]');
       await expect(properties.locator('[data-ui="gallery.videoReview.clickFields"]')).toBeVisible();
+      await verifyActionSections(
+        dialog,
+        properties,
+        page,
+        variant.locale,
+        info.outputPath('action-sections.png'),
+        !variant.narrow
+      );
       await expect(
         properties.getByRole('button', {
           name: label('gallery.videoReview.actionFocus'),
@@ -576,6 +527,140 @@ async function verifyClickExport(page: Page, path: string) {
   await dialog.locator('button[data-animated="true"]').first().click();
 }
 
+/** Search, empty recovery, hidden selection and return navigation use the persistent list owner. */
+async function verifyHistorySearchSelection(
+  history: Locator,
+  page: Page,
+  locale: 'en' | 'ru',
+  screenshot: string
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  await expect(history.locator('li')).toHaveCount(10);
+  const configure = history.getByRole('button', {
+    name: label('gallery.videoReview.historyConfigure'),
+    exact: true,
+  });
+  await expect(configure).toBeDisabled();
+  const search = history.getByRole('searchbox');
+  await expect(search).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  expect((await search.boundingBox())!.height).toBeGreaterThanOrEqual(28);
+  await search.focus();
+  expect(await search.evaluate((node) => getComputedStyle(node, '::placeholder').color)).toBe(
+    'rgba(0, 0, 0, 0)'
+  );
+  await search.fill('not found');
+  await expect(history.locator('li')).toHaveCount(0);
+  await expect(history.getByRole('checkbox')).toBeDisabled();
+  await history
+    .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
+    .click();
+  await expect(search).toBeFocused();
+  await expect(history.locator('li')).toHaveCount(10);
+  const filterToggle = history.getByRole('button', {
+    name: label('gallery.videoReview.historyFilters'),
+    exact: true,
+  });
+  await filterToggle.click();
+  await history
+    .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
+    .click();
+  await page
+    .getByRole('option', {
+      name: label('gallery.videoReview.historySelectedOnly'),
+      exact: true,
+    })
+    .click();
+  await expect(history.locator('li')).toHaveCount(0);
+  await expect(filterToggle).toHaveAttribute('data-active', 'true');
+  await expect(search).toBeVisible();
+  await history
+    .getByRole('button', { name: label('gallery.videoReview.historyStatus'), exact: true })
+    .click();
+  await page
+    .getByRole('option', { name: label('gallery.videoReview.historyAll'), exact: true })
+    .click();
+  await expect(history.locator('li')).toHaveCount(10);
+  await filterToggle.click();
+  await history.locator('li input[type="checkbox"]').first().check();
+  const master = history.getByRole('checkbox', {
+    name: label('gallery.videoReview.historySelectAll'),
+    exact: true,
+  });
+  await expect(master).toBeChecked({ indeterminate: true });
+  await search.fill(label('gallery.videoReview.eventCursorIdle'));
+  await expect(history.locator('li')).toHaveCount(2);
+  await expect(history).toContainText(label('gallery.videoReview.historyHiddenSelected'));
+  await configure.click();
+  await expect(history.locator('ol')).toHaveCount(0);
+  await history
+    .getByRole('button', { name: label('gallery.videoReview.historyBack'), exact: true })
+    .click();
+  await expect(search).toHaveValue(label('gallery.videoReview.eventCursorIdle'));
+  await expect(configure).toBeFocused();
+  await history
+    .getByRole('button', { name: label('gallery.videoReview.historySearchClear'), exact: true })
+    .click();
+  await page.screenshot({
+    path: screenshot,
+    fullPage: false,
+  });
+  return { configure, search };
+}
+
+/** Exercise the actual inspector owner, immutable facts and adaptive section width. */
+async function verifyActionSections(
+  dialog: Locator,
+  owner: Locator,
+  page: Page,
+  locale: 'en' | 'ru',
+  screenshot: string,
+  expand: boolean
+) {
+  const label = (key: Parameters<typeof translate>[0]) => translate(key, locale);
+  const sections = owner.locator('[data-ui="gallery.videoReview.inspectorSections"]');
+  const info = owner.locator('[data-section="information"]');
+  await expect(info.locator('dl')).toBeVisible();
+  await expect(info.locator('input,select,textarea')).toHaveCount(0);
+  await dialog
+    .getByRole('button', { name: label('scenario.editor.inspectorShowSections'), exact: true })
+    .click();
+  await expect(sections).toHaveAttribute('data-presentation', 'sections');
+  await expect(info.locator('dl')).toBeVisible();
+  await expect(owner.locator('[data-ui="gallery.videoReview.inspectorCategories"]')).toHaveCount(1);
+  await page.screenshot({ path: screenshot, fullPage: false });
+  await dialog
+    .getByRole('button', { name: label('scenario.editor.inspectorShowAll'), exact: true })
+    .click();
+  if (expand) {
+    const handle = dialog.locator('[data-ui="gallery.videoReview.resizeInspector"]');
+    const scroll = dialog.locator('.review-inspector-scroll');
+    const width = () =>
+      scroll.evaluate((node) => {
+        const css = getComputedStyle(node);
+        return node.clientWidth - parseFloat(css.paddingLeft) - parseFloat(css.paddingRight);
+      });
+    for (const target of [523, 524, 525]) {
+      for (let attempt = 0; attempt < 3 && Math.abs((await width()) - target) > 0.5; attempt++) {
+        const current = await width();
+        const box = (await handle.boundingBox())!;
+        await page.mouse.move(box.x + box.width / 2, box.y + 20);
+        await page.mouse.down();
+        await page.mouse.move(box.x + box.width / 2 + current - target, box.y + 20, { steps: 4 });
+        await page.mouse.up();
+      }
+      await expect.poll(width).toBe(target);
+      await expect(sections).toHaveCSS('display', target < 524 ? 'block' : 'grid');
+      expect(
+        await owner.evaluate((node) => node.scrollWidth - node.clientWidth)
+      ).toBeLessThanOrEqual(1);
+      await page.screenshot({
+        path: screenshot.replace('.png', `-${target}.png`),
+        fullPage: false,
+      });
+    }
+  }
+}
+
 /** Open the actual inspector disclosures; closed summaries cannot prove field design. */
 async function verifyClickFields(owner: Locator, page: Page, screenshot: string) {
   const fields = owner.locator('[data-ui="gallery.videoReview.clickFields"]');
@@ -615,10 +700,17 @@ async function verifyClickFields(owner: Locator, page: Page, screenshot: string)
   const radiusRow = rows.first();
   const radiusInput = radiusRow.getByRole('textbox');
   const originalRadius = await radiusInput.inputValue();
-  await radiusRow.hover();
   const radiusRange = radiusRow.locator('input[type="range"]');
+  await radiusRange.scrollIntoViewIfNeeded();
+  await radiusRow.hover();
   await expect(radiusRange).toHaveAttribute('max', '80');
   const box = (await radiusRange.boundingBox())!;
+  expect(
+    await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('type'), {
+      x: box.x + box.width * 0.4,
+      y: box.y + box.height / 2,
+    })
+  ).toBe('range');
   await page.mouse.move(box.x + box.width * 0.4, box.y + box.height / 2);
   await page.mouse.down();
   await page.mouse.move(box.x + box.width * 0.7, box.y + box.height / 2, { steps: 5 });

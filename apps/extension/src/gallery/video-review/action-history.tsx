@@ -1,3 +1,4 @@
+import { ReviewInspectorSections } from './inspector-sections';
 import { HistoryFilters, queryHistory, type HistoryFilterValues } from './action-history-filters';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import {
@@ -5,8 +6,8 @@ import {
   type ReviewKeyAnimation,
   type ReviewKeyPatch,
 } from '../../features/video/review/advanced/key-animation';
-import { ReviewKeyFields } from './key-animation-fields';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { reviewKeySections } from './key-animation-fields';
+import { useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { translate, formatNumber, useAppLocale } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
@@ -16,7 +17,7 @@ import {
   type ReviewClickAnimation,
   type ReviewClickStyle,
 } from '../../features/video/review/advanced/click-animation';
-import { ReviewClickFields } from './click-animation-fields';
+import { reviewClickSections } from './click-animation-fields';
 import { HistorySelection, ReviewHistoryRow } from './action-history-list';
 import { ReviewButton, reviewTextButtonClassName } from './controls';
 import './action-history.css';
@@ -32,7 +33,6 @@ type ReviewActionHistoryProps = {
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
 };
 export function ReviewActionHistory(props: ReviewActionHistoryProps) {
-  const locale = useAppLocale();
   const [filters, setFilters] = useState<HistoryFilterValues>({
     query: '',
     targetType: 'all',
@@ -87,20 +87,12 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
     >
       {editing ? (
         <div className="review-history-settings space-y-3">
-          <div ref={navigation} className="review-history-navigation">
-            <ReviewButton
-              label={translate('gallery.videoReview.historyBack')}
-              className={reviewTextButtonClassName}
-              onClick={() => changeView(false)}
-            >
-              <ArrowLeft size={14} aria-hidden="true" />
-              {translate('gallery.videoReview.historyBack')}
-            </ReviewButton>
-            <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
-              {translate('gallery.videoReview.historySelected')}:{' '}
-              {formatNumber(ids.length, {}, locale)}
-            </span>
-          </div>
+          <HistoryBatchHeader
+            navigation={navigation}
+            count={ids.length}
+            hidden={hidden}
+            onBack={() => changeView(false)}
+          />
           <HistoryAnimationFields
             clickIds={clickIds}
             keyIds={keyIds}
@@ -182,6 +174,44 @@ export function ReviewActionHistory(props: ReviewActionHistoryProps) {
   );
 }
 
+/** Batch scope and return navigation stay visible independently of animation field groups. */
+function HistoryBatchHeader({
+  navigation,
+  count,
+  hidden,
+  onBack,
+}: {
+  navigation: RefObject<HTMLDivElement | null>;
+  count: number;
+  hidden: number;
+  onBack(): void;
+}) {
+  const locale = useAppLocale();
+  return (
+    <>
+      <div ref={navigation} className="review-history-navigation">
+        <ReviewButton
+          label={translate('gallery.videoReview.historyBack')}
+          className={`${reviewTextButtonClassName} !w-full justify-start`}
+          onClick={onBack}
+        >
+          <ArrowLeft size={14} aria-hidden="true" />
+          {translate('gallery.videoReview.historyBack')}
+        </ReviewButton>
+        <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('gallery.videoReview.historySelected')}: {formatNumber(count, {}, locale)}
+        </span>
+      </div>
+      {hidden > 0 ? (
+        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {formatNumber(hidden, {}, locale)}{' '}
+          {translate('gallery.videoReview.historyHiddenSelected')}
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 /** Selected click and key settings remain separate even in a mixed batch. */
 function HistoryAnimationFields(props: {
   keySettings: ReadonlyMap<string, ReviewKeyAnimation>;
@@ -192,24 +222,44 @@ function HistoryAnimationFields(props: {
   onChange(ids: readonly string[], patch: Partial<ReviewClickStyle> | null): void;
   onKeyChange?(ids: readonly string[], patch: ReviewKeyPatch | null): void;
 }) {
-  const { clickIds, keyIds, settings } = props;
+  const { clickIds, settings } = props;
+  const clickSections = clickIds.length
+    ? reviewClickSections({
+        values: clickIds.map((id) => settings.get(id) ?? REVIEW_CLICK_DEFAULT),
+        onChange: (patch) => props.onChange(clickIds, patch),
+      })
+    : [];
+  const keySections = props.keyIds.length
+    ? reviewKeySections({
+        values: props.keyIds.map((id) => props.keySettings.get(id) ?? REVIEW_KEY_DEFAULT),
+        onChange: (patch) => props.onKeyChange?.(props.keyIds, patch),
+      })
+    : [];
+  const mixed = clickSections.length > 0 && keySections.length > 0;
+  const sections = [
+    ...clickSections.map((section) => ({
+      ...section,
+      id: `click:${section.id}`,
+      label: mixed
+        ? `${translate('gallery.videoReview.historyClicks')} · ${section.label}`
+        : section.label,
+    })),
+    ...keySections.map((section) => ({
+      ...section,
+      id: `key:${section.id}`,
+      label: mixed
+        ? `${translate('gallery.videoReview.historyKeys')} · ${section.label}`
+        : section.label,
+    })),
+  ];
   return (
-    <>
-      {' '}
-      {clickIds.length ? (
-        <ReviewClickFields
-          values={clickIds.map((id) => settings.get(id) ?? REVIEW_CLICK_DEFAULT)}
-          onChange={(patch) => {
-            if (clickIds.length) props.onChange(clickIds, patch);
-          }}
-        />
-      ) : null}
-      {keyIds.length ? (
-        <ReviewKeyFields
-          values={keyIds.map((id) => props.keySettings.get(id) ?? REVIEW_KEY_DEFAULT)}
-          onChange={(patch) => props.onKeyChange?.(keyIds, patch)}
-        />
-      ) : null}
-    </>
+    <div
+      className="min-w-0"
+      data-ui={
+        clickIds.length ? 'gallery.videoReview.clickFields' : 'gallery.videoReview.keyFields'
+      }
+    >
+      <ReviewInspectorSections sections={sections} />
+    </div>
   );
 }

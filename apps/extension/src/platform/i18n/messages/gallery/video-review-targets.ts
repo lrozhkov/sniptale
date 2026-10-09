@@ -1,6 +1,11 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewTargetMessages = defineMessageSource({
+  actionInformation: { ru: 'Информация', en: 'Information' },
+  actionEventType: { ru: 'Действие', en: 'Action' },
+  actionActions: { ru: 'Действия', en: 'Actions' },
+  actionKey: { ru: 'Сочетание клавиш', en: 'Key combination' },
+  actionTarget: { ru: 'Элемент', en: 'Element' },
   targetType: { ru: 'Тип элемента', en: 'Element type' },
   targetAll: { ru: 'Все элементы', en: 'All elements' },
   'target_text-field': { ru: 'Поле ввода', en: 'Text field' },

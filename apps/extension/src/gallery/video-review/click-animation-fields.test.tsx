@@ -1,3 +1,4 @@
+import { ReviewInspectorPresentation } from './inspector-sections';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -110,4 +111,59 @@ it('shows lens controls with fractional magnification and no repeated pulses', (
     )
   );
   expect(change).toHaveBeenCalledWith({ magnification: 2.3 });
+});
+
+it('starts with recorded information and falls back when an effect removes the active section', () => {
+  const change = vi.fn();
+  const render = (effect: 'ripple' | 'off') =>
+    act(() =>
+      root.render(
+        <ReviewInspectorPresentation value="sections" section="selected" selectionScope="telemetry">
+          <ReviewClickFields
+            information={
+              <dl>
+                <dt>Recorded time</dt>
+                <dd>01.00</dd>
+              </dl>
+            }
+            values={[{ ...click, effect }]}
+            onChange={change}
+          />
+        </ReviewInspectorPresentation>
+      )
+    );
+  render('ripple');
+  expect(host.querySelector('[data-section="information"] dl')?.textContent).toContain('01.00');
+  const timing = Array.from(host.querySelectorAll('button')).find(
+    (node) => node.getAttribute('aria-label') === 'gallery.videoReview.clickTiming'
+  )!;
+  act(() => timing.click());
+  expect(host.querySelector('[data-section="timing"]')).not.toBeNull();
+  render('off');
+  expect(host.querySelector('[data-section="timing"]')).toBeNull();
+  expect(host.querySelector('[data-section="information"]')).not.toBeNull();
+  expect(change).not.toHaveBeenCalled();
+});
+
+it('remembers the chosen section when returning to the same inspector family', () => {
+  const change = vi.fn();
+  const render = (visible: boolean) =>
+    root.render(
+      <ReviewInspectorPresentation value="sections" section="selected" selectionScope="telemetry">
+        {visible ? (
+          <ReviewClickFields information={<p>Facts</p>} values={[click]} onChange={change} />
+        ) : (
+          <p>Other surface</p>
+        )}
+      </ReviewInspectorPresentation>
+    );
+  act(() => render(true));
+  act(() =>
+    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.clickTiming"]')!.click()
+  );
+  expect(host.querySelector('[data-section="timing"]')).not.toBeNull();
+  act(() => render(false));
+  act(() => render(true));
+  expect(host.querySelector('[data-section="timing"]')).not.toBeNull();
+  expect(change).not.toHaveBeenCalled();
 });

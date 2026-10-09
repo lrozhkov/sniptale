@@ -62,6 +62,7 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
     node.dispatchEvent(new Event('input', { bubbles: true }));
   };
   expect(input('key_fontSize').placeholder).toBe('—');
+  expect(host.textContent).toContain('gallery.videoReview.clickMixed');
   const range = input('key_fontSize range');
   expect(range.max).toBe('48');
   act(() => edit(range, '40'));
@@ -102,7 +103,7 @@ it('provides local slider drafts, larger typed values, and per-property batch pa
   }
   expect(change).toHaveBeenLastCalledWith({ enabled: false });
   act(() =>
-    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.clickReset"]')!.click()
+    host.querySelector<HTMLButtonElement>('[aria-label="gallery.videoReview.keyReset"]')!.click()
   );
   expect(change).toHaveBeenLastCalledWith(null);
   act(() => root.render(<ReviewKeyFields values={[REVIEW_KEY_DEFAULT]} onChange={change} />));

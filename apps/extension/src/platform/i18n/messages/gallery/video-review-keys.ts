@@ -1,5 +1,7 @@
 import { defineMessageSource } from '../source';
 export const galleryVideoReviewKeyMessages = defineMessageSource({
+  historyKeys: { ru: 'Клавиатура', en: 'Keyboard' },
+  keyReset: { ru: 'Сбросить анимацию клавиш', en: 'Reset key animation' },
   keyDisplay: { ru: 'Нажатия клавиш', en: 'Keystrokes' },
   keyCaption: { ru: 'Плашка клавиш', en: 'Key caption' },
   keyPosition: { ru: 'Расположение', en: 'Position' },

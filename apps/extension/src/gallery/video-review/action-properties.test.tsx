@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { ReviewActionProperties } from './action-properties';
@@ -75,8 +75,14 @@ it('shows recorded target metadata as text and tolerates a disappearing selectio
 });
 
 vi.mock('./key-animation-fields', () => ({
-  ReviewKeyFields: (props: { onChange(patch: { enabled: boolean }): void }) => (
-    <button onClick={() => props.onChange({ enabled: true })}>Enable key caption</button>
+  ReviewKeyFields: (props: {
+    information?: ReactNode;
+    onChange(patch: { enabled: boolean }): void;
+  }) => (
+    <>
+      {props.information}
+      <button onClick={() => props.onChange({ enabled: true })}>Enable key caption</button>
+    </>
   ),
 }));
 it('configures keyboard points without offering interval focus edits', () => {
@@ -135,7 +141,7 @@ it('keeps interval metadata and editing actions unchanged for non-click events',
       )
     );
     expect(host.textContent).not.toContain(translate('gallery.videoReview.clickTarget'));
-    expect(host.querySelector('p')?.textContent).toBe(interval.target);
+    expect(host.querySelector(`dd[title="${interval.target}"]`)?.textContent).toBe(interval.target);
     for (const key of ['actionCut', 'actionSpeed', 'actionFocus'] as const) {
       const button = host.querySelector<HTMLButtonElement>(
         `[aria-label="${translate(`gallery.videoReview.${key}`)}"]`
@@ -145,6 +151,36 @@ it('keeps interval metadata and editing actions unchanged for non-click events',
     }
     expect(onEdit.mock.calls).toEqual([['cut'], ['speed']]);
     expect(onFocus).toHaveBeenCalledOnce();
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('presents immutable recorded facts in an information section before animation controls', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    act(() =>
+      root.render(
+        <ReviewActionProperties
+          marker={marker}
+          plan={plan}
+          busy={false}
+          onEdit={vi.fn()}
+          onFocus={vi.fn()}
+        />
+      )
+    );
+    const information = host.querySelector('[data-section="information"]');
+    expect(information).not.toBeNull();
+    expect(information!.querySelector('dl')?.textContent).toContain(marker.target);
+    expect(information!.querySelector(`dd[title="${marker.target}"]`)?.textContent).toBe(
+      marker.target
+    );
+    expect(information!.querySelectorAll('input,select,textarea')).toHaveLength(0);
+    expect(host.querySelector('[data-section]')?.getAttribute('data-section')).toBe('information');
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

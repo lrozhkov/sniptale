@@ -177,6 +177,7 @@ export function ReviewInspectorBinding({
         selectionPreferenceScope={state.activeSelection.kind}
         selectionHasSections={
           state.activeSelection.kind === 'original-audio' ||
+          state.activeSelection.kind === 'telemetry' ||
           (state.advanced.ui.mode === 'advanced' &&
             ['zoom', 'canvas-comment', 'audio', 'webcam', 'webcam-position'].includes(
               state.activeSelection.kind

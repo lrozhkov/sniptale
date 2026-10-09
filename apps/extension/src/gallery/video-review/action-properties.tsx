@@ -1,3 +1,4 @@
+import { ReviewInspectorSections, ReviewInspectorColumns } from './inspector-sections';
 import { isReviewKey } from '../../features/video/review/key-animation';
 import {
   REVIEW_KEY_DEFAULT,
@@ -12,8 +13,8 @@ import {
   type ReviewClickStyle,
 } from '../../features/video/review/advanced/click-animation';
 import { ReviewClickFields } from './click-animation-fields';
-import { reviewTimeLabel } from './controls';
-import { ArrowLeft, Focus, Gauge, Scissors } from 'lucide-react';
+import { reviewTimeLabel, reviewEventLabel } from './controls';
+import { ArrowLeft, Focus, Gauge, Scissors, Info } from 'lucide-react';
 import { translate } from '../../platform/i18n';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import type { planReviewActionEdits } from '../../features/video/review/action-edits';
@@ -57,75 +58,126 @@ export function ReviewActionProperties(props: {
           {translate('gallery.videoReview.historyBack')}
         </ReviewButton>
       ) : null}
-      {isReviewClick(marker) ? (
-        <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-          <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
-            {translate('gallery.videoReview.targetType')}
-          </span>
-          <span className="min-w-0 text-right">
-            {translate(`gallery.videoReview.target_${marker.targetSemantics?.kind ?? 'unknown'}`)}
-          </span>
-        </div>
-      ) : null}
-      {isReviewClick(marker) && marker.target ? (
-        <div className="flex min-h-8 items-center justify-between gap-2 text-xs">
-          <span className="shrink-0 font-medium text-[var(--sniptale-color-text-secondary)]">
-            {translate('gallery.videoReview.clickTarget')}
-          </span>
-          <span className="min-w-0 truncate text-right" title={marker.target}>
-            {marker.target}
-          </span>
-        </div>
-      ) : null}
-      {isReviewClick(marker) || isReviewKey(marker) || marker.end <= marker.start ? (
-        <div className="flex min-h-8 items-center justify-between gap-2 text-xs tabular-nums">
-          <span className="font-medium text-[var(--sniptale-color-text-secondary)]">
-            {translate('gallery.videoReview.clickRecordedAt')}
-          </span>
-          <span>{reviewTimeLabel(marker.start)}</span>
-        </div>
-      ) : (
-        <ReviewInterval start={marker.start} end={marker.end} />
-      )}
-      {isReviewClick(marker) ? (
-        marker.focusPoint ? (
-          <ReviewClickFields
-            values={[
-              props.animations?.find((item) => item.id === marker.ref.id) ?? REVIEW_CLICK_DEFAULT,
-            ]}
-            onChange={(patch) => props.onClickAnimation?.([marker.ref.id], patch)}
-          />
-        ) : (
-          <p role="status">{translate('gallery.videoReview.clickNoPoint')}</p>
-        )
-      ) : null}
-      {isReviewKey(marker) ? (
+      {isReviewClick(marker) && marker.focusPoint ? (
+        <ReviewClickFields
+          information={<RecordedInformation marker={marker} />}
+          values={[
+            props.animations?.find((item) => item.id === marker.ref.id) ?? REVIEW_CLICK_DEFAULT,
+          ]}
+          onChange={(patch) => props.onClickAnimation?.([marker.ref.id], patch)}
+        />
+      ) : isReviewKey(marker) ? (
         <ReviewKeyFields
+          information={<RecordedInformation marker={marker} />}
           values={[
             props.keyAnimations?.find((item) => item.id === marker.ref.id) ?? REVIEW_KEY_DEFAULT,
           ]}
           onChange={(patch) => props.onKeyAnimation?.([marker.ref.id], patch)}
         />
-      ) : null}
-      {!isReviewClick(marker) && marker.target ? (
-        <p className="break-words text-[var(--sniptale-color-text-secondary)]">{marker.target}</p>
-      ) : null}
-      {!isReviewClick(marker) &&
-      !isReviewKey(marker) &&
-      marker.end > marker.start &&
-      !plan.removed ? (
-        <ReviewActionShortcuts
-          plan={plan}
-          busy={props.busy}
-          onEdit={props.onEdit}
-          onFocus={props.onFocus}
+      ) : (
+        <ReviewInspectorSections
+          sections={[
+            {
+              id: 'information',
+              label: translate('gallery.videoReview.actionInformation'),
+              icon: Info,
+              content: (
+                <>
+                  <RecordedInformation marker={marker} />
+                  {isReviewClick(marker) ? (
+                    <p role="status">{translate('gallery.videoReview.clickNoPoint')}</p>
+                  ) : null}
+                </>
+              ),
+            },
+            ...(!isReviewClick(marker) && marker.end > marker.start && !plan.removed
+              ? [
+                  {
+                    id: 'actions',
+                    label: translate('gallery.videoReview.actionActions'),
+                    icon: Scissors,
+                    content: (
+                      <ReviewActionShortcuts
+                        plan={plan}
+                        busy={props.busy}
+                        onEdit={props.onEdit}
+                        onFocus={props.onFocus}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+            ...(plan.removed
+              ? [
+                  {
+                    id: 'removed',
+                    label: translate('gallery.videoReview.actionActions'),
+                    icon: Scissors,
+                    content: (
+                      <p className="text-[var(--sniptale-color-text-muted)]">
+                        {translate('gallery.videoReview.actionRemoved')}
+                      </p>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
         />
-      ) : plan.removed ? (
-        <p className="text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.videoReview.actionRemoved')}
-        </p>
-      ) : null}
+      )}
     </div>
+  );
+}
+
+/** Only existing, display-authorized recorded metadata is exposed; no editable field chrome. */
+function RecordedInformation({ marker }: { marker: ReviewTelemetryMarker }) {
+  const point = isReviewClick(marker) || isReviewKey(marker) || marker.end <= marker.start;
+  const facts = [
+    {
+      label: translate('gallery.videoReview.actionEventType'),
+      value: reviewEventLabel(marker.eventType),
+    },
+    ...(isReviewClick(marker)
+      ? [
+          {
+            label: translate('gallery.videoReview.targetType'),
+            value: translate(
+              `gallery.videoReview.target_${marker.targetSemantics?.kind ?? 'unknown'}`
+            ),
+          },
+        ]
+      : []),
+    ...(marker.target
+      ? [
+          {
+            label: translate(
+              isReviewClick(marker)
+                ? 'gallery.videoReview.clickTarget'
+                : isReviewKey(marker)
+                  ? 'gallery.videoReview.actionKey'
+                  : 'gallery.videoReview.actionTarget'
+            ),
+            value: marker.target,
+          },
+        ]
+      : []),
+    {
+      label: translate('gallery.videoReview.clickRecordedAt'),
+      value: point
+        ? reviewTimeLabel(marker.start)
+        : `${reviewTimeLabel(marker.start)}–${reviewTimeLabel(marker.end)}`,
+    },
+  ];
+  return (
+    <dl className="min-w-0 space-y-3 text-xs">
+      {facts.map(({ label, value }) => (
+        <div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-3">
+          <dt className="text-[var(--sniptale-color-text-muted)]">{label}</dt>
+          <dd className="min-w-0 break-words text-right tabular-nums" title={value}>
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -138,7 +190,7 @@ function ReviewActionShortcuts(props: {
 }) {
   const { plan } = props;
   return (
-    <div className="space-y-2 border-t border-[var(--sniptale-color-border-soft)] pt-3">
+    <ReviewInspectorColumns>
       {plan.contextual ? (
         <p className="text-[var(--sniptale-color-text-muted)]">
           {translate('gallery.videoReview.actionContextInterval')}
@@ -190,6 +242,6 @@ function ReviewActionShortcuts(props: {
           ) : null}
         </div>
       ))}
-    </div>
+    </ReviewInspectorColumns>
   );
 }
